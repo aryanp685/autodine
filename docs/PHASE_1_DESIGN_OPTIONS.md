@@ -91,18 +91,22 @@ All three stay inside the briefed palette (Ink `#111318`, Warm White `#F6F6F3`, 
 
 ---
 
-## 6. Design lock record — *to be completed on approval*
+## 6. Design lock record — 🔒 LOCKED 2026-10-19
 
 | Field | Value |
 |---|---|
-| Locked direction | _pending_ |
-| Approved colour roles | _pending_ |
-| Typography scale | _pending_ |
-| Spacing & radius system | _pending_ |
-| Navigation model (public / dashboard / customer / kitchen) | _pending_ |
-| Component conventions | _pending_ |
-| Responsive rules | _pending_ |
-| Deviations approved | _pending_ |
-| Locked on | _pending_ |
+| **Locked direction** | **Option A — Editorial Minimal** |
+| Owner's instruction | *"option A. editorial minimal is perfect — lock it and I want that exact same with no changes in any thing ui ux frontend."* |
+| Approved colour roles | Ink / Warm White / Muted Sage / Soft Blue / Sand / Alert, plus the derived semantic tones — full table in `docs/DESIGN_SYSTEM.md` §2 |
+| Typography scale | Inter-first stack; hero 76 px → body 15 px; tabular numerals for all money, times and counts — §3 |
+| Spacing & radius system | 4/8/12/16/24/32/48/64/96 px; radius 2 / 3 / 4 px; **no shadows** — §4, §6 |
+| Navigation model | Public: minimal top bar · Dashboard: slim left rail with 2 px active marker · Customer: category bar + sticky cart · Kitchen: single control row · Cashier: two-pane — §5 |
+| Component conventions | Hairline cards, 2 px buttons, pill badges, uppercase micro-labels — §6 |
+| Responsive rules | Container query at 1000 px; single column, 20–24 px gutters, horizontal nav — §9 |
+| Deviations approved | **None.** Build it exactly as prototyped. |
+| Locked on | 2026-10-19 |
+| Full baseline | **`docs/DESIGN_SYSTEM.md`** |
 
-Nothing beyond this point will be built until the lock is recorded. The next checkpoint after lock is **Phase 6 — backend and architecture options**, which I will present for approval before any backend work begins.
+**Status of the design after lock:** zero files changed. `styles/direction-a.css`, `app/globals.css` and every `components/screens/*.tsx` are byte-for-byte what you approved. Options B and C remain in the repository as recorded rejected alternatives, untouched.
+
+The next checkpoint is **Phase 6 — backend and architecture options** (`docs/PHASE_6_BACKEND_OPTIONS.md`), presented for approval before any backend work begins.
