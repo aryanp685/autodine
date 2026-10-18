@@ -1,6 +1,6 @@
 import { inr, trial } from '@/lib/demo-data';
 
-/** Shared structure; each direction re-skins .pg* classes. */
+/** Shared page structure; styled by the locked design system. */
 export function SignupScreen() {
   return (
     <div className="pg">

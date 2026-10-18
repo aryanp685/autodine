@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import { Home } from '@/components/screens/HomeScreen';
 
-export default function RootPage() {
-  redirect('/design');
+export default function HomePage() {
+  return <Home />;
 }

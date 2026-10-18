@@ -1,7 +1,7 @@
 /* =========================================================================
-   AutoDine — Phase 1 prototype: global base
-   Shared tokens, reset, prototype chrome, and neutral component skeletons.
-   Each design direction skins these classes from styles/direction-*.css.
+   AutoDine — global base
+   Shared reset, neutral component skeletons, and the locked design tokens.
+   All product styling lives in styles/design-system.css, scoped to [data-app].
    ========================================================================= */
 
 *,
@@ -353,7 +353,4 @@ img { display: block; max-width: 100%; }
   * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
 }
 
-@import '../styles/direction-a.css';
-@import '../styles/direction-b.css';
-@import '../styles/direction-c.css';
-@import '../styles/design-hub.css';
+@import '../styles/design-system.css';

@@ -34,12 +34,12 @@ function Totals({ compact }: { compact?: boolean }) {
 }
 
 /* Option A — editorial two-column cart */
-export function CartA({ dir }: { dir: string }) {
+export function Cart() {
   const cart = useCart();
   return (
-    <div className="a-cart">
-      <header className="a-cart__head">
-        <Link href={`/design/${dir}/customer-menu`} className="a-cart__back">
+    <div className="cart">
+      <header className="cart__head">
+        <Link href={`/menu`} className="cart__back">
           ← Back to menu
         </Link>
         <h1>Your order</h1>
@@ -48,38 +48,38 @@ export function CartA({ dir }: { dir: string }) {
         </p>
       </header>
 
-      <div className="a-cart__grid">
-        <div className="a-cart__lines">
+      <div className="cart__grid">
+        <div className="cart__lines">
           {cart.lines.map((l) => (
-            <div key={l.key} className="a-cart__line">
-              <div className="a-cart__lineMain">
-                <div className="a-cart__lineTop">
+            <div key={l.key} className="cart__line">
+              <div className="cart__lineMain">
+                <div className="cart__lineTop">
                   <VegMark veg={l.veg} />
                   <strong>{l.name}</strong>
                 </div>
-                {l.variant && <div className="a-cart__lineMeta">{l.variant}</div>}
-                {l.addons && l.addons.length > 0 && <div className="a-cart__lineMeta">{l.addons.join(' · ')}</div>}
-                <div className="a-cart__linePrice tnum">{inr(l.unitPrice)} each</div>
+                {l.variant && <div className="cart__lineMeta">{l.variant}</div>}
+                {l.addons && l.addons.length > 0 && <div className="cart__lineMeta">{l.addons.join(' · ')}</div>}
+                <div className="cart__linePrice tnum">{inr(l.unitPrice)} each</div>
               </div>
-              <div className="a-cart__qty">
+              <div className="cart__qty">
                 <button onClick={() => cart.setQty(l.key, l.qty - 1)} aria-label="Decrease">−</button>
                 <span className="tnum">{l.qty}</span>
                 <button onClick={() => cart.setQty(l.key, l.qty + 1)} aria-label="Increase">+</button>
               </div>
-              <div className="a-cart__lineTotal tnum">{inr(l.qty * l.unitPrice)}</div>
+              <div className="cart__lineTotal tnum">{inr(l.qty * l.unitPrice)}</div>
             </div>
           ))}
-          {cart.lines.length === 0 && <div className="a-cart__empty">Your cart is empty — add something from the menu.</div>}
+          {cart.lines.length === 0 && <div className="cart__empty">Your cart is empty — add something from the menu.</div>}
         </div>
 
-        <aside className="a-cart__sum">
-          <div className="a-cart__sumCard">
+        <aside className="cart__sum">
+          <div className="cart__sumCard">
             <h2>Bill summary</h2>
             <Totals />
-            <Link href={`/design/${dir}/checkout`} className="a-cart__cta">
+            <Link href={`/menu/checkout`} className="cart__cta">
               Continue to checkout
             </Link>
-            <div className="a-cart__fine">
+            <div className="cart__fine">
               Totals are recalculated by the server before payment. This screen shows sample values.
             </div>
           </div>
@@ -90,123 +90,5 @@ export function CartA({ dir }: { dir: string }) {
 }
 
 /* Option B — compact operations cart */
-export function CartB({ dir }: { dir: string }) {
-  const cart = useCart();
-  return (
-    <div className="b-cart">
-      <header className="b-cart__top">
-        <Link href={`/design/${dir}/customer-menu`} className="b-cart__back">
-          ←
-        </Link>
-        <div>
-          <strong>Your order</strong>
-          <span className="b-cart__meta">T7 · {restaurant.name} · verified 12:41</span>
-        </div>
-        <span className="b-cart__count">{cart.count} items</span>
-      </header>
-
-      <div className="b-cart__body">
-        <table className="b-cart__table">
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th>Qty</th>
-              <th style={{ textAlign: 'right' }}>Amount</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {cart.lines.map((l) => (
-              <tr key={l.key}>
-                <td>
-                  <div className="b-cart__item">
-                    <VegMark veg={l.veg} />
-                    <div>
-                      <strong>{l.name}</strong>
-                      {(l.variant || l.addons) && (
-                        <div className="b-cart__itemMeta">
-                          {[l.variant, ...(l.addons ?? [])].filter(Boolean).join(' · ')}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </td>
-                <td>
-                  <div className="b-cart__qty">
-                    <button onClick={() => cart.setQty(l.key, l.qty - 1)} aria-label="Decrease">−</button>
-                    <span className="tnum">{l.qty}</span>
-                    <button onClick={() => cart.setQty(l.key, l.qty + 1)} aria-label="Increase">+</button>
-                  </div>
-                </td>
-                <td className="tnum" style={{ textAlign: 'right' }}>
-                  {inr(l.qty * l.unitPrice)}
-                </td>
-                <td>
-                  <button className="b-cart__remove" onClick={() => cart.remove(l.key)} aria-label="Remove">
-                    ×
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {cart.lines.length === 0 && <div className="b-cart__empty">Cart is empty.</div>}
-
-        <aside className="b-cart__sum">
-          <Totals compact />
-          <Link href={`/design/${dir}/checkout`} className="b-cart__cta">
-            Continue →
-          </Link>
-        </aside>
-      </div>
-    </div>
-  );
-}
 
 /* Option C — warm rounded cart */
-export function CartC({ dir }: { dir: string }) {
-  const cart = useCart();
-  return (
-    <div className="c-cart">
-      <header className="c-cart__head">
-        <Link href={`/design/${dir}/customer-menu`} className="c-cart__back">
-          ←
-        </Link>
-        <h1>Your order</h1>
-        <span className="c-cart__chip">Table 7</span>
-      </header>
-
-      <div className="c-cart__list">
-        {cart.lines.map((l) => (
-          <div key={l.key} className="c-cart__card">
-            <div className="c-cart__cardMain">
-              <div className="c-cart__cardTop">
-                <VegMark veg={l.veg} />
-                <strong>{l.name}</strong>
-              </div>
-              {l.variant && <div className="c-cart__cardMeta">{l.variant}</div>}
-              {l.addons && l.addons.length > 0 && <div className="c-cart__cardMeta">{l.addons.join(' · ')}</div>}
-              <div className="c-cart__cardPrice tnum">{inr(l.qty * l.unitPrice)}</div>
-            </div>
-            <div className="c-cart__qty">
-              <button onClick={() => cart.setQty(l.key, l.qty - 1)} aria-label="Decrease">−</button>
-              <span className="tnum">{l.qty}</span>
-              <button onClick={() => cart.setQty(l.key, l.qty + 1)} aria-label="Increase">+</button>
-            </div>
-          </div>
-        ))}
-        {cart.lines.length === 0 && <div className="c-cart__empty">Nothing here yet.</div>}
-        <Link href={`/design/${dir}/customer-menu`} className="c-cart__more">
-          + Add more items
-        </Link>
-      </div>
-
-      <div className="c-cart__bar">
-        <Totals compact />
-        <Link href={`/design/${dir}/checkout`} className="c-cart__cta">
-          Continue to checkout
-        </Link>
-      </div>
-    </div>
-  );
-}

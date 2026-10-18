@@ -8,7 +8,7 @@ const STATUS_TONE: Record<string, string> = {
   disabled: 'is-disabled',
 };
 
-/** Shared structure; each direction re-skins .pg* classes. */
+/** Shared page structure; styled by the locked design system. */
 export function TablesScreen() {
   return (
     <div className="pg pg--dash">

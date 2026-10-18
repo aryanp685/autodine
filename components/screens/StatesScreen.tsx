@@ -1,7 +1,7 @@
 import { inr, trial } from '@/lib/demo-data';
 import { Skeleton } from '@/components/ui';
 
-/** Shared structure; each direction re-skins .pg* classes. */
+/** Shared page structure; styled by the locked design system. */
 export function StatesScreen() {
   return (
     <div className="pg pg--dash">
@@ -23,7 +23,7 @@ export function StatesScreen() {
           <div className="pg__kicker">Cross-cutting</div>
           <h1 className="pg__title">States, trial &amp; subscription</h1>
           <p className="pg__lede">
-            The same states as they appear in each direction. These are the ones most likely to be seen under
+            The states most likely to be seen under pressure, worth judging now rather than after the build:
             pressure, so they are worth judging now rather than after the build.
           </p>
         </header>

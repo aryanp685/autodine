@@ -3,7 +3,7 @@ import { VegMark } from '@/components/ui';
 
 const FLOW = ['Draft', 'Review', 'Approve', 'Publish'];
 
-/** Shared structure; each direction re-skins .pg* classes. */
+/** Shared page structure; styled by the locked design system. */
 export function MenuEditorScreen() {
   const selected = items.find((i) => i.id === 'it-butter-chicken')!;
 
