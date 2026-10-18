@@ -1,18 +1,15 @@
+import Link from 'next/link';
 import { dashboardStats, recentOrders, restaurant, sparkline, topItems, trial, inr } from '@/lib/demo-data';
 import { Avatar, Money, PaymentPill, Pill, PrepPill, Sparkline } from '@/components/ui';
 
 const NAV_A = ['Overview', 'Menus', 'Tables & QR', 'Orders', 'Reports', 'Payments', 'Staff', 'Settings'];
-const NAV_B = [
-  ['Overview', '◧'],
-  ['Menus', '☰'],
-  ['Tables & QR', '▣'],
-  ['Live orders', '◷'],
-  ['Kitchen', '◍'],
-  ['Payments', '₹'],
-  ['Reports', '▲'],
-  ['Staff', '◍'],
-  ['Settings', '⚙'],
-] as const;
+/** Only these rail items have a built screen so far; the rest stay inert
+ *  rather than linking somewhere that does not exist yet. */
+const NAV_LINKS: Record<string, string> = {
+  Overview: '/dashboard',
+  Menus: '/dashboard/menus',
+  'Tables & QR': '/dashboard/tables',
+};
 
 /* ============================================================================
    Editorial Minimal — locked design system dashboard
@@ -22,17 +19,20 @@ export function Dashboard() {
   return (
     <div className="dash">
       <aside className="dash__rail">
-        <div className="dash__brand">AutoDine</div>
+        <Link href="/" className="dash__brand">AutoDine</Link>
         <div className="dash__venue">
           <div className="dash__venueName">{restaurant.name}</div>
           <div className="dash__venueMeta">{restaurant.tagline}</div>
         </div>
         <nav className="dash__nav">
-          {NAV_A.map((n) => (
-            <div key={n} className={`dash__navItem ${n === 'Overview' ? 'is-active' : ''}`}>
-              {n}
-            </div>
-          ))}
+          {NAV_A.map((n) => {
+            const href = NAV_LINKS[n];
+            return (
+              <div key={n} className={`dash__navItem ${n === 'Overview' ? 'is-active' : ''}`}>
+                {href ? <Link href={href}>{n}</Link> : n}
+              </div>
+            );
+          })}
         </nav>
         <div className="dash__railFoot">
           <div className="dash__trialLine">Trial · {trial.remaining} days left</div>
@@ -140,12 +140,3 @@ export function Dashboard() {
   );
 }
 
-/* ============================================================================
-   Option B — Modern Operations dashboard
-   Dark top bar, icon sidebar, dense tables, state-forward.
-   ========================================================================== */
-
-/* ============================================================================
-   Option C — Warm Hospitality dashboard
-   Card grid, soft shadows, calm warm hierarchy.
-   ========================================================================== */

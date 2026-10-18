@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { categories, items, inr } from '@/lib/demo-data';
 import { VegMark } from '@/components/ui';
 
@@ -10,11 +11,13 @@ export function MenuEditorScreen() {
   return (
     <div className="pg pg--dash">
       <div className="pg__bar">
-        <div className="pg__brand">AutoDine</div>
+        <Link href="/" className="pg__brand">AutoDine</Link>
         <div className="pg__barLinks">
-          <span>Overview</span>
-          <span className="is-active">Menus</span>
-          <span>Tables &amp; QR</span>
+          <Link href="/dashboard">Overview</Link>
+          <Link href="/dashboard/menus" className="is-active">
+            Menus
+          </Link>
+          <Link href="/dashboard/tables">Tables &amp; QR</Link>
           <span>Orders</span>
           <span>Reports</span>
         </div>

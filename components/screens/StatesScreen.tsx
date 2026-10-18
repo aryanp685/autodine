@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { inr, trial } from '@/lib/demo-data';
 import { Skeleton } from '@/components/ui';
 
@@ -6,11 +7,13 @@ export function StatesScreen() {
   return (
     <div className="pg pg--dash">
       <div className="pg__bar">
-        <div className="pg__brand">AutoDine</div>
+        <Link href="/" className="pg__brand">AutoDine</Link>
         <div className="pg__barLinks">
-          <span className="is-active">Overview</span>
-          <span>Menus</span>
-          <span>Tables &amp; QR</span>
+          <Link href="/dashboard" className="is-active">
+            Overview
+          </Link>
+          <Link href="/dashboard/menus">Menus</Link>
+          <Link href="/dashboard/tables">Tables &amp; QR</Link>
           <span>Orders</span>
         </div>
         <div className="pg__barRight">

@@ -1,8 +1,8 @@
 {
-  "name": "autodine-design-prototypes",
+  "name": "autodine",
   "version": "0.1.0",
   "private": true,
-  "description": "AutoDine — Phase 1 visual UI/UX prototypes (three design directions). Prototype only: no backend, no payments, no live data.",
+  "description": "AutoDine \u2014 restaurant QR ordering and management. Locked Editorial Minimal design; frontend currently runs on mock data.",
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3000",
     "build": "next build",

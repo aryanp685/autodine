@@ -88,7 +88,3 @@ export function Cart() {
     </div>
   );
 }
-
-/* Option B — compact operations cart */
-
-/* Option C — warm rounded cart */

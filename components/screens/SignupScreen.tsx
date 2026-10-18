@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { inr, trial } from '@/lib/demo-data';
 
 /** Shared page structure; styled by the locked design system. */
@@ -5,7 +6,7 @@ export function SignupScreen() {
   return (
     <div className="pg">
       <div className="pg__bar">
-        <div className="pg__brand">AutoDine</div>
+        <Link href="/" className="pg__brand">AutoDine</Link>
         <div className="pg__barRight">
           <span className="pg__barMuted">Already have an account?</span>
           <span className="pg__barLink">Sign in</span>

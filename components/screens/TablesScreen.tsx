@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { tables, restaurant } from '@/lib/demo-data';
 import { QrChip } from '@/components/ui';
 
@@ -13,11 +14,13 @@ export function TablesScreen() {
   return (
     <div className="pg pg--dash">
       <div className="pg__bar">
-        <div className="pg__brand">AutoDine</div>
+        <Link href="/" className="pg__brand">AutoDine</Link>
         <div className="pg__barLinks">
-          <span>Overview</span>
-          <span>Menus</span>
-          <span className="is-active">Tables &amp; QR</span>
+          <Link href="/dashboard">Overview</Link>
+          <Link href="/dashboard/menus">Menus</Link>
+          <Link href="/dashboard/tables" className="is-active">
+            Tables &amp; QR
+          </Link>
           <span>Orders</span>
           <span>Reports</span>
         </div>

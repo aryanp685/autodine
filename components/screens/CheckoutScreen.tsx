@@ -117,7 +117,3 @@ export function Checkout() {
     </div>
   );
 }
-
-/* Option B — compact operations checkout with explicit state preview */
-
-/* Option C — warm checkout */

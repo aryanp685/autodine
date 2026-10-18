@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { inr, plans } from '@/lib/demo-data';
 
 /* ============================================================================
@@ -8,17 +9,21 @@ export function Home() {
   return (
     <div className="home">
       <nav className="home__nav">
-        <div className="home__brand">AutoDine</div>
+        <Link href="/" className="home__brand">AutoDine</Link>
         <ul className="home__links">
           <li>Product</li>
-          <li>Pricing</li>
-          <li>Demo</li>
+          <li>
+            <Link href="/pricing">Pricing</Link>
+          </li>
+          <li>
+            <Link href="/menu">Demo</Link>
+          </li>
           <li>FAQs</li>
           <li>Contact</li>
         </ul>
         <div className="home__navRight">
           <span className="home__navLink">Sign in</span>
-          <span className="home__navCta">Start 10-day trial</span>
+          <Link href="/signup" className="home__navCta">Start 10-day trial</Link>
         </div>
       </nav>
 
@@ -37,8 +42,8 @@ export function Home() {
             issue the receipt — from one dashboard.
           </p>
           <div className="home__ctas">
-            <span className="home__btn home__btn--solid">Start 10-day trial</span>
-            <span className="home__btn home__btn--line">See the demo</span>
+            <Link href="/signup" className="home__btn home__btn--solid">Start 10-day trial</Link>
+            <Link href="/menu" className="home__btn home__btn--line">See the demo</Link>
           </div>
           <div className="home__note">Plans start at {inr(899)}/month · 10-day trial on every new account</div>
         </div>
@@ -91,7 +96,7 @@ export function Home() {
                   <li key={f}>{f}</li>
                 ))}
               </ul>
-              <span className="home__planLink">Choose {p.name} →</span>
+              <Link href="/signup" className="home__planLink">Choose {p.name} →</Link>
             </div>
           ))}
         </div>
@@ -102,7 +107,7 @@ export function Home() {
       </section>
 
       <footer className="home__foot">
-        <div className="home__footBrand">AutoDine</div>
+        <Link href="/" className="home__footBrand">AutoDine</Link>
         <div className="home__footCols">
           <div>
             <div className="home__footTitle">Product</div>
@@ -122,13 +127,3 @@ export function Home() {
     </div>
   );
 }
-
-/* ============================================================================
-   Option B — Modern Operations
-   Dark top bar, product-forward hero, dense feature grid, operational proof.
-   ========================================================================== */
-
-/* ============================================================================
-   Option C — Warm Hospitality
-   Rounded surfaces, soft shadows, Sand-forward, friendly voice.
-   ========================================================================== */

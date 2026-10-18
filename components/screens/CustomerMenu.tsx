@@ -218,15 +218,3 @@ export function ItemSheet() {
     </div>
   );
 }
-
-/* ============================================================================
-   Option B — Modern Operations customer menu
-   ========================================================================== */
-
-/* Option B — item customization: compact right-hand panel */
-
-/* ============================================================================
-   Option C — Warm Hospitality customer menu
-   ========================================================================== */
-
-/* Option C — item customization: rounded bottom sheet, big tap targets */

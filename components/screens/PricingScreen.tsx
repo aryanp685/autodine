@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { inr, plans, proposedLimits, faqs, trial } from '@/lib/demo-data';
 
 /** Shared page structure; styled by the locked design system. */
@@ -5,16 +6,16 @@ export function PricingScreen() {
   return (
     <div className="pg">
       <div className="pg__bar">
-        <div className="pg__brand">AutoDine</div>
+        <Link href="/" className="pg__brand">AutoDine</Link>
         <div className="pg__barLinks">
           <span>Product</span>
-          <span>Pricing</span>
-          <span>Demo</span>
+          <Link href="/pricing">Pricing</Link>
+          <Link href="/menu">Demo</Link>
           <span>FAQs</span>
         </div>
         <div className="pg__barRight">
           <span className="pg__barLink">Sign in</span>
-          <span className="pg__barCta">Start 10-day trial</span>
+          <Link href="/signup" className="pg__barCta">Start 10-day trial</Link>
         </div>
       </div>
 
