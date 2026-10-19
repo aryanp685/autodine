@@ -62,4 +62,10 @@ select '00000000-0000-4000-8000-000000000001', 'T' || n, 4 from generate_series(
 -- Tokens expire in 7 days and carry no meaning beyond that. Rotate them from
 -- the dashboard; a printed QR on its own proves nothing about who scanned it.
 insert into public.qr_tokens (restaurant_id, table_id, token, expires_at)
-select '00000000-0000-4000-8000-000000000001', t.id, encode(gen_random_bytes(12), 'hex'), now() + interval '7 days' from public.dining_tables t where t.restaurant_id = '00000000-0000-4000-8000-000000000001';
+select '00000000-0000-4000-8000-000000000001', t.id, encode(gen_random_bytes(12), 'hex'), now() + interval '7 days'
+from public.dining_tables t
+where t.restaurant_id = '00000000-0000-4000-8000-000000000001'
+  and not exists (
+    select 1 from public.qr_tokens q
+    where q.table_id = t.id and q.expires_at > now()
+  );
