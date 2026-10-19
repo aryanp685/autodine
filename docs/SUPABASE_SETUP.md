@@ -47,27 +47,7 @@ Also: **Project Settings → Database → Connection string → URI** for `DATAB
 
 ---
 
-## 3. Put them in `.env.local` (2 min)
-
-**Create the file yourself** in the repo root. Do not paste keys into chat.
-
-```bash
-NEXT_PUBLIC_SUPABASE_URL=https://abcdefgh.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi...
-DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@db.abcdefgh.supabase.co:5432/postgres
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
-```
-
-> **This file is for your machine only.** It is gitignored, so it never reaches GitHub and Vercel never sees it. The deployed site gets its keys separately, in step 8. Doing only step 3 and skipping step 8 is the single most common way to end up with a site that works locally and shows "database is not connected" in production.
-
-`.env.local` is already in `.gitignore` — verify with `git status` that it does **not** appear as a change. If it does, stop and tell me.
-
-`NEXT_PUBLIC_` values are compiled into the browser bundle. That is fine for the URL and anon key. It is **never** fine for `SUPABASE_SERVICE_ROLE_KEY`, which is why it has no prefix.
-
----
-
-## 4. Run the migration (3 min)
+## 3. Run the migration (3 min)
 
 **SQL Editor → New query.** Paste the **entire** contents of `supabase/migrations/20261019000001_init.sql` (544 lines).
 
@@ -111,9 +91,9 @@ order by tablename;
 
 ---
 
-## 5. Seed the demo restaurant (2 min)
+## 4. Seed the demo restaurant (2 min)
 
-**SQL Editor → New query.** Paste the contents of `supabase/seed.sql` (65 lines, already generated — or regenerate locally with `npm run seed:sql`).
+**SQL Editor → New query.** Paste the contents of `supabase/seed.sql` (71 lines, already generated — or regenerate locally with `npm run seed:sql`).
 
 Raw copy: <https://github.com/aryanp685/new/blob/main/supabase/seed.sql>
 
@@ -130,11 +110,19 @@ left join public.items i on i.restaurant_id = r.id
 group by r.name;
 ```
 
-Expect one row, `Saffron & Smoke`, with ~40 items.
+Expect exactly one row:
+
+```
+Saffron & Smoke    22
+```
+
+22 items across 7 categories, plus 10 variants. If you see a different number,
+the seed changed — the count is not important, but a **0** means the items did
+not insert and everything after this will look broken.
 
 ---
 
-## 6. Create your owner login (3 min)
+## 5. Create your owner login (3 min)
 
 1. **Authentication → Users → Add user → Create new user.**
 2. Use your email and a password. Tick **Auto Confirm User** — otherwise you'll be stuck waiting for a confirmation email.
@@ -159,7 +147,7 @@ values (
 
 ---
 
-## 7. Prove tenant isolation works (2 min)
+## 6. Prove tenant isolation works (2 min)
 
 Do this once. It is the single most valuable check in this document.
 
@@ -178,13 +166,13 @@ union all select 'orders',     count(*) from public.orders;
 reset role;
 ```
 
-**Expected:** `restaurants 1`, `menus 1`, `items ~40`, and **`qr_tokens 0`, `payments 0`, `orders 0`**.
+**Expected:** `restaurants 1`, `menus 1`, `items 22`, and **`qr_tokens 0`, `payments 0`, `orders 0`**.
 
 If `qr_tokens` or `payments` return anything other than 0, **RLS is not working** — stop and tell me. That would mean any visitor could read every table code and every payment in the system.
 
 ---
 
-## 8. Add the same keys to Vercel (2 min)
+## 7. Add the same keys to Vercel (2 min)
 
 The deployed site does **not** get your `.env.local` — Vercel builds straight from GitHub, and `.env.local` is gitignored, so it never leaves your machine. The keys have to be entered in the Vercel dashboard as well.
 
@@ -213,12 +201,35 @@ Environment variables only affect **new** builds. An existing deployment keeps r
 
 ---
 
-## 9. Tell me
+## 8. Tell me
 
 Send me **only** these two things (never the service_role key):
 
 1. Whether migration 0001 ran clean, or the exact error.
 2. Whether the tenant-isolation check returned `qr_tokens 0, payments 0, orders 0`.
+
+---
+
+## Optional — run the app on your own machine
+
+Skip this unless you want a local dev server. Everything above happens in the
+Supabase dashboard and on Vercel; none of it needs a file on your disk.
+
+**Create the file yourself** in the repo root. Do not paste keys into chat.
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://abcdefgh.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+SUPABASE_SECRET_KEY=sb_secret_...
+DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@db.abcdefgh.supabase.co:5432/postgres
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+```
+
+> **This file is for your machine only.** It is gitignored, so it never reaches GitHub and Vercel never sees it. The deployed site gets its keys separately, in step 7. Doing this but skipping step 7 is the single most common way to end up with a site that works locally and shows "database is not connected" in production.
+
+`.env.local` is already in `.gitignore` — verify with `git status` that it does **not** appear as a change. If it does, stop and tell me.
+
+`NEXT_PUBLIC_` values are compiled into the browser bundle. That is fine for the URL and the publishable key. It is **never** fine for `SUPABASE_SECRET_KEY`, which is why it has no prefix.
 
 ---
 
