@@ -19,6 +19,7 @@ const restaurant: Restaurant = {
   timezone: 'Asia/Kolkata',
   tax_rate_bps: 500,
   is_active: true,
+  trial_started_at: '2026-10-19T00:00:00Z',
   created_at: '2026-10-19T00:00:00Z',
 };
 

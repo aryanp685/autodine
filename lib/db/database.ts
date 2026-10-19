@@ -2,8 +2,8 @@
  * Supabase `Database` type.
  *
  * `supabase gen types typescript` normally generates this from the live
- * database. It cannot run here (no network to Supabase, no local Postgres),
- * so it is hand-written to match supabase/migrations/20261019000001_init.sql.
+ * database. It cannot run without a connected Supabase project, so this
+ * hand-written version tracks the current local migration set.
  *
  * REGENERATE as soon as you can:
  *   npx supabase gen types typescript --project-id <ref> > lib/db/database.ts
@@ -107,6 +107,26 @@ export type Database = {
         provider: string | null;
         provider_ref: string | null;
         idempotency_key: string | null;
+        recorded_by: string | null;
+        created_at: string;
+      }>;
+      restaurant_subscriptions: Table<{
+        restaurant_id: string;
+        plan_code: 'starter' | 'professional' | 'business';
+        status: 'pending' | 'active' | 'past_due' | 'canceled';
+        current_period_end: string | null;
+        created_at: string;
+        updated_at: string;
+      }>;
+      payment_audit_events: Table<{
+        id: string;
+        restaurant_id: string;
+        order_id: string;
+        payment_id: string;
+        actor_id: string;
+        event_type: 'cash_collected';
+        method: 'cash';
+        amount_paise: number;
         created_at: string;
       }>;
     };
@@ -120,6 +140,27 @@ export type Database = {
           p_note?: string | null;
         };
         Returns: string; // new order id (uuid)
+      };
+      place_counter_order: {
+        Args: {
+          p_restaurant_slug: string;
+          p_items: unknown; // jsonb: [{item_id, qty, variant_id?, addons?}]
+          p_note?: string | null;
+        };
+        Returns: string; // new unpaid counter order id (uuid)
+      };
+      record_cash_payment: {
+        Args: {
+          p_restaurant_slug: string;
+          p_order_id: string;
+          p_amount_paise: number;
+          p_idempotency_key: string;
+        };
+        Returns: string; // payment id (uuid); retries with the same key are idempotent
+      };
+      restaurant_can_write: {
+        Args: { p_restaurant_id: string };
+        Returns: boolean;
       };
     };
     Enums: {

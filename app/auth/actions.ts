@@ -18,13 +18,11 @@ import { redirect } from 'next/navigation';
 import { slugify, uniqueSlug } from '@/lib/slug';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { getSignupValidationError, isValidSignInInput } from '@/lib/auth-validation';
 
 function fail(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
 }
-
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MIN_PASSWORD = 10;
 
 async function rollbackSignup(
   admin: NonNullable<ReturnType<typeof getSupabaseAdmin>>,
@@ -49,11 +47,9 @@ export async function signUpAction(formData: FormData): Promise<void> {
   const password = String(formData.get('password') ?? '');
   const agreed = formData.get('agree') === 'on';
 
-  if (!fullName || !restaurantName) fail('/signup', 'Please enter your name and your restaurant name.');
-  if (!EMAIL.test(email)) fail('/signup', 'Please enter a valid email address.');
-  if (password.length < MIN_PASSWORD) fail('/signup', `Password must be at least ${MIN_PASSWORD} characters.`);
   // Preview-account data use must be explicitly acknowledged.
-  if (!agreed) fail('/signup', 'Please confirm that you understand how this preview uses your account details.');
+  const validationError = getSignupValidationError({ fullName, restaurantName, email, phone, password, agreed });
+  if (validationError) fail('/signup', validationError);
 
   const supabase = await createSupabaseServerClient();
   if (!supabase) fail('/signup', 'Sign-up is not available yet: the database is not connected.');
@@ -141,7 +137,9 @@ export async function signInAction(formData: FormData): Promise<void> {
     ? requestedNext
     : '/dashboard';
 
-  if (!email || !password) fail('/login', 'Please enter your email and password.');
+  if (!isValidSignInInput(email, password)) {
+    fail('/login', 'Please check your email and password, then try again.');
+  }
 
   const supabase = await createSupabaseServerClient();
   if (!supabase) fail('/login', 'Sign-in is not available yet: the database is not connected.');

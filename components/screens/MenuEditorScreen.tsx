@@ -1,36 +1,57 @@
 import Link from 'next/link';
 import { categories, items, inr } from '@/lib/demo-data';
 import { VegMark } from '@/components/ui';
+import { WorkspaceSwitcher } from '@/components/WorkspaceSwitcher';
+import { PreviewAction } from '@/components/ui/PreviewAction';
+import type { AuthorizedWorkspace } from '@/lib/db/workspace-selection';
 
 const FLOW = ['Draft', 'Review', 'Approve', 'Publish'];
 
 /** Shared page structure; styled by the locked design system. */
-export function MenuEditorScreen() {
+export function MenuEditorScreen({
+  workspace,
+  workspaces,
+}: {
+  workspace?: AuthorizedWorkspace;
+  workspaces?: AuthorizedWorkspace[];
+} = {}) {
   const selected = items.find((i) => i.id === 'it-butter-chicken')!;
+  const workspaceQuery = workspace ? `?workspace=${encodeURIComponent(workspace.slug)}` : '';
 
   return (
     <div className="pg pg--dash">
       <div className="pg__bar">
         <Link href="/" className="pg__brand">AutoDine</Link>
         <div className="pg__barLinks">
-          <Link href="/dashboard">Overview</Link>
-          <Link href="/dashboard/menus" className="is-active">
+          <Link href={`/dashboard${workspaceQuery}`}>Overview</Link>
+          <Link href={`/dashboard/menus${workspaceQuery}`} className="is-active">
             Menus
           </Link>
-          <Link href="/dashboard/tables">Tables &amp; QR</Link>
+          <Link href={`/dashboard/tables${workspaceQuery}`}>Tables &amp; QR</Link>
           <span>Orders</span>
           <span>Reports</span>
         </div>
         <div className="pg__barRight">
-          <span className="pg__avatar">AP</span>
+          {workspace && workspaces ? (
+            <WorkspaceSwitcher workspaces={workspaces} selectedSlug={workspace.slug} pathname="/dashboard/menus" />
+          ) : (
+            <span className="pg__avatar">AP</span>
+          )}
         </div>
+      </div>
+
+      <div className="pg__demoBanner">
+        <strong>Demo — not saved.</strong>{' '}
+        {workspace
+          ? `Workspace access verified for ${workspace.name}; menu rows and controls below are still fictional previews.`
+          : 'Menu editing, availability toggles and publishing are visual previews only.'}
       </div>
 
       <div className="pg__subbar">
         <div className="pg__subTabs">
           <span className="is-active">Main menu</span>
-          <span> Breakfast</span>
-          <span> + New menu</span>
+          <PreviewAction className="pg__subTabAction" message="Breakfast is a sample menu in this preview; no menu data changed.">Breakfast</PreviewAction>
+          <PreviewAction className="pg__subTabAction" message="Creating menus is not connected in this preview.">+ New menu</PreviewAction>
         </div>
         <div className="pg__flow">
           {FLOW.map((f, i) => (
@@ -46,16 +67,19 @@ export function MenuEditorScreen() {
         <aside className="pg__cats">
           <div className="pg__catsHead">
             Categories
-            <span className="pg__catsAdd">+</span>
+            <PreviewAction className="pg__catsAdd" message="Adding categories is not connected in this preview.">+</PreviewAction>
           </div>
           {categories.map((c, i) => (
-            <div key={c.id} className={`pg__cat ${i === 2 ? 'is-active' : ''}`}>
-              <span>{c.name}</span>
-              <span className="tnum">{c.count}</span>
-            </div>
+            <PreviewAction
+              key={c.id}
+              className={`pg__cat ${i === 2 ? 'is-active' : ''}`}
+              message={`${c.name} is a demo category; filtering is not connected to live menu data.`}
+            >
+              <><span>{c.name}</span><span className="tnum">{c.count}</span></>
+            </PreviewAction>
           ))}
           <div className="pg__catsFoot">
-            <span className="pg__importBtn">Import menu with AI</span>
+            <PreviewAction className="pg__importBtn" message="AI menu import is not enabled in this preview.">Import menu with AI</PreviewAction>
             <p className="pg__catsNote">Upload photos or a PDF. You review every item before it publishes.</p>
           </div>
         </aside>
@@ -64,9 +88,9 @@ export function MenuEditorScreen() {
           <div className="pg__itemsHead">
             <h2>Curries &amp; Mains</h2>
             <div className="pg__itemsActions">
-              <span className="pg__btn">Add item</span>
-              <span className="pg__btn">Reorder</span>
-              <span className="pg__btn">Bulk availability</span>
+              <PreviewAction className="pg__btn" message="Items are demo-only here; no new database row was created.">Add item</PreviewAction>
+              <PreviewAction className="pg__btn" message="Reordering is preview-only and was not saved.">Reorder</PreviewAction>
+              <PreviewAction className="pg__btn" message="Bulk availability is not connected to live menu data.">Bulk availability</PreviewAction>
             </div>
           </div>
           <table className="ui-table">
@@ -101,7 +125,7 @@ export function MenuEditorScreen() {
                     </td>
                     <td className="tnum">{i.variants ? i.variants.length : '—'}</td>
                     <td>
-                      <span className="ui-badge ui-badge--sage">Live</span>
+                      <span className="ui-badge ui-badge--sage">Demo</span>
                     </td>
                   </tr>
                 ))}
@@ -145,7 +169,7 @@ export function MenuEditorScreen() {
                 <span className="tnum">{inr(v.price)}</span>
               </div>
             ))}
-            <span className="pg__addChip">+ Add variant</span>
+            <PreviewAction className="pg__addChip" message="Variants are not saved in this preview.">+ Add variant</PreviewAction>
           </div>
 
           <div className="pg__editorGroup">
@@ -169,8 +193,8 @@ export function MenuEditorScreen() {
           </div>
 
           <div className="pg__editorFoot">
-            <span className="pg__btn">Save draft</span>
-            <span className="pg__btn pg__btn--solid">Send for review</span>
+            <PreviewAction className="pg__btn" message="Draft changes are not saved. This workspace editor is still a demo.">Save draft</PreviewAction>
+            <PreviewAction className="pg__btn pg__btn--solid" message="Review workflow is not connected; no menu was published.">Send for review</PreviewAction>
           </div>
           <p className="pg__fine">
             Published changes never alter past orders or receipts — every order keeps its own snapshot of items,

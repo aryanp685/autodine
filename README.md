@@ -6,12 +6,13 @@
 
 | Area | Status |
 |---|---|
-| Responsive marketing, menu, cart, dashboard, kitchen and cashier screens | Prototype UI; local/demo interactions only |
+| Marketing, customer menu/cart, dashboard, kitchen and menu/table admin | Prototype or preview UI; authenticated cashier actions are an early path and not live-verified |
 | Restaurant signup/sign-in | Supabase Auth actions are present; requires a configured Supabase project |
 | Public menu reading | Supabase-backed read path is present, with a demo-data fallback |
-| Database schema and row-level security | Initial migrations exist; must be applied and tested against a real Supabase project |
-| Order placement and kitchen sync | Not connected to the application yet |
-| Online payments, receipts and subscriptions | Not implemented; no payment provider is connected |
+| Database schema and row-level security | Migrations 0001–0005 apply and pass local PGlite/RLS tests; still requires a real Supabase project run before use |
+| Guest and counter order RPCs | Database-side validation, role checks and trial gating are implemented and locally tested; guest order submission is not connected, while the authenticated counter UI path is wired but not verified against a live Supabase project |
+| Counter cash collection | Separate idempotent RPC enforces exact-balance checks and audit records; the authenticated cashier action is wired but not verified against a live Supabase project |
+| Online payments, receipts and subscriptions | No payment provider is connected; online verification, subscription billing and persistent receipt UI remain unimplemented |
 | Production readiness | Not ready for real restaurant operations or live money |
 
 All restaurant names, orders, dashboard metrics, QR states and payments shown without a configured database are fictional demo content. The displayed 5% tax rate and plan prices are illustrative and must not be treated as tax or billing advice.
@@ -38,7 +39,7 @@ npm test
 npm run build
 ```
 
-The SQL check parses DDL syntax; it does **not** execute migrations or prove that RLS policies/functions are correct. Run migrations and security tests against a disposable Supabase project before relying on them.
+The SQL check parses DDL syntax only. `npm test` additionally applies all current migrations to a local PGlite PostgreSQL runtime and exercises trial gates, tenant isolation, order pricing, role permissions and cash-payment idempotency. This is not a substitute for validating the migrations against a disposable Supabase project before relying on them.
 
 ## Repository layout
 

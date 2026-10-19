@@ -1,105 +1,80 @@
 'use client';
 
 /**
- * Prototype-only cart state. Client side, in-memory, resets on reload.
- * It exists so the customer flow (menu → item sheet → cart → checkout) can be
- * clicked through. It is NOT the real cart: no server validation, no prices
- * trusted from the browser, no persistence.
+ * Prototype-only cart state. It lives in memory and resets on reload; checkout
+ * never submits an order. Each restaurant slug gets its own isolated cart so
+ * switching venue context cannot carry items from another restaurant.
  *
- * The arithmetic, however, is real: totals come from lib/pricing (integer
- * paise, tested), not from floating-point maths written inline here.
+ * Prices in this browser cart are for preview only. Trusted order totals are
+ * recalculated by the database RPC, not by this state.
  */
 
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { computeOrderTotals, computeSubtotal, type OrderTotals } from '@/lib/pricing';
 import type { Paise } from '@/lib/money';
-
-export type CartLine = {
-  key: string;
-  id: string;
-  name: string;
-  unitPricePaise: Paise;
-  qty: number;
-  variant?: string;
-  addons?: string[];
-  veg: boolean;
-};
+import { addCartLine, setCartLineQuantity, updateScopedCart, type CartLine, type NewCartLine } from '@/lib/cart-state';
 
 type CartApi = {
+  scope: string;
   lines: CartLine[];
-  add: (line: Omit<CartLine, 'key'>) => void;
+  add: (line: NewCartLine) => void;
   remove: (key: string) => void;
   setQty: (key: string, qty: number) => void;
   clear: () => void;
   count: number;
   subtotalPaise: Paise;
-  /** Full order totals, computed by lib/pricing. Never computed in the UI. */
   totals: OrderTotals;
 };
 
-const Ctx = createContext<CartApi | null>(null);
+type CartStore = {
+  linesByScope: Map<string, CartLine[]>;
+  updateScope: (scope: string, update: (lines: CartLine[]) => CartLine[]) => void;
+};
 
-export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [lines, setLines] = useState<CartLine[]>([
-    {
-      key: 'seed-1',
-      id: 'it-butter-chicken',
-      name: 'Butter Chicken',
-      unitPricePaise: 46900,
-      qty: 1,
-      variant: 'Regular · 4 pcs',
-      addons: ['Hot', 'Butter naan'],
-      veg: false,
-    },
-    {
-      key: 'seed-2',
-      id: 'it-naan',
-      name: 'Butter Naan',
-      unitPricePaise: 7900,
-      qty: 2,
-      veg: true,
-    },
-    {
-      key: 'seed-3',
-      id: 'it-lassi',
-      name: 'Mango Lassi',
-      unitPricePaise: 14900,
-      qty: 1,
-      veg: true,
-    },
-  ]);
+const StoreContext = createContext<CartStore | null>(null);
+const ScopeContext = createContext('unscoped');
 
-  const api = useMemo<CartApi>(() => {
-    const add: CartApi['add'] = (line) => {
-      setLines((prev) => {
-        const key = `${line.id}|${line.variant ?? ''}|${(line.addons ?? []).join(',')}`;
-        const found = prev.find((l) => l.key === key);
-        if (found) {
-          return prev.map((l) => (l.key === key ? { ...l, qty: l.qty + line.qty } : l));
-        }
-        return [...prev, { ...line, key }];
-      });
-    };
-    const remove: CartApi['remove'] = (key) => setLines((p) => p.filter((l) => l.key !== key));
-    const setQty: CartApi['setQty'] = (key, qty) =>
-      setLines((p) => (qty <= 0 ? p.filter((l) => l.key !== key) : p.map((l) => (l.key === key ? { ...l, qty } : l))));
-    return {
-      lines,
-      add,
-      remove,
-      setQty,
-      clear: () => setLines([]),
-      count: lines.reduce((n, l) => n + l.qty, 0),
-      subtotalPaise: computeSubtotal(lines),
-      totals: computeOrderTotals({ lines }),
-    };
-  }, [lines]);
-
-  return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
+export function CartScope({ scope, children }: { scope: string; children: ReactNode }) {
+  return <ScopeContext.Provider value={scope || 'unscoped'}>{children}</ScopeContext.Provider>;
 }
 
-export function useCart() {
-  const ctx = useContext(Ctx);
-  if (!ctx) throw new Error('useCart must be used inside CartProvider');
-  return ctx;
+export function CartProvider({ children }: { children: ReactNode }) {
+  const [linesByScope, setLinesByScope] = useState<Map<string, CartLine[]>>(() => new Map());
+  const updateScope = useCallback((scope: string, update: (lines: CartLine[]) => CartLine[]) => {
+    setLinesByScope((current) => updateScopedCart(current, scope, update));
+  }, []);
+
+  const store = useMemo(() => ({ linesByScope, updateScope }), [linesByScope, updateScope]);
+  return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>;
+}
+
+export function useCart(): CartApi {
+  const store = useContext(StoreContext);
+  const scope = useContext(ScopeContext);
+  if (!store) throw new Error('useCart must be used inside CartProvider');
+
+  const lines = store.linesByScope.get(scope) ?? [];
+  const add = useCallback<CartApi['add']>((line) => {
+    store.updateScope(scope, (current) => addCartLine(current, line));
+  }, [scope, store.updateScope]);
+  const remove = useCallback<CartApi['remove']>((key) => {
+    store.updateScope(scope, (current) => current.filter((line) => line.key !== key));
+  }, [scope, store.updateScope]);
+  const setQty = useCallback<CartApi['setQty']>((key, qty) => {
+    store.updateScope(scope, (current) => setCartLineQuantity(current, key, qty));
+  }, [scope, store.updateScope]);
+  const clear = useCallback(() => store.updateScope(scope, () => []), [scope, store.updateScope]);
+
+  return useMemo(() => ({
+    scope,
+    lines,
+    add,
+    remove,
+    setQty,
+    clear,
+    count: lines.reduce((count, line) => count + line.qty, 0),
+    subtotalPaise: computeSubtotal(lines),
+    totals: computeOrderTotals({ lines }),
+  }), [scope, lines, add, remove, setQty, clear]);
 }

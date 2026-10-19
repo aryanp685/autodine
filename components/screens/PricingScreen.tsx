@@ -55,7 +55,7 @@ export function PricingScreen() {
           <div className="pg__faqs">
             <details className="pg__faq">
               <summary>Can I place a real order or make a payment?</summary>
-              <p>No. The menu, cart, kitchen and cashier flows currently use sample data. There is no live order or payment processing.</p>
+              <p>Guest menu checkout does not submit orders or payments. An authenticated cashier path can create unpaid counter orders and record cash, but it has not been verified against a live Supabase project and is not ready for restaurant operations.</p>
             </details>
             <details className="pg__faq">
               <summary>Are these plan prices final?</summary>

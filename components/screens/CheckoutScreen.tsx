@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useCart } from '@/components/CartProvider';
-import { inr, restaurant } from '@/lib/demo-data';
+import { inr } from '@/lib/demo-data';
 import { VegMark } from '@/components/ui';
 import { lineTotal, paiseToRupees } from '@/lib/money';
 
@@ -14,28 +14,30 @@ function useTotals() {
 
 function MethodChoice({ value, onChange }: { value: 'online' | 'counter'; onChange: (v: 'online' | 'counter') => void }) {
   return (
-    <div className={`co__methods`}>
+        <div className={`co__methods`}>
       <button
+        type="button"
         className={`co__method ${value === 'online' ? 'is-on' : ''}`}
         onClick={() => onChange('online')}
         aria-pressed={value === 'online'}
       >
         <div className={`co__methodTop`}>
           <strong>Pay online</strong>
-          <span>UPI · Cards · Netbanking</span>
+          <span>Not connected</span>
         </div>
-        <p>We confirm payment with the provider before the order is sent to the kitchen.</p>
+        <p>Online payment is not connected in this preview; no charge or order is sent.</p>
       </button>
       <button
+        type="button"
         className={`co__method ${value === 'counter' ? 'is-on' : ''}`}
         onClick={() => onChange('counter')}
         aria-pressed={value === 'counter'}
       >
         <div className={`co__methodTop`}>
           <strong>Pay at counter</strong>
-          <span>Cash · Card on device</span>
+          <span>Not connected to guest checkout</span>
         </div>
-        <p>The order goes to the kitchen marked payment pending. The cashier records it when you pay.</p>
+        <p>This preview does not submit an order or record a counter payment.</p>
       </button>
     </div>
   );
@@ -46,17 +48,16 @@ export function Checkout() {
   const cart = useCart();
   const t = useTotals();
   const [method, setMethod] = useState<'online' | 'counter'>('online');
+  const [previewNotice, setPreviewNotice] = useState('');
 
   return (
     <div className="co">
       <header className="co__head">
-        <Link href={`/menu/cart`} className="co__back">
+        <Link href={`/menu/cart?s=${encodeURIComponent(cart.scope)}`} className="co__back">
           ← Back to cart
         </Link>
         <h1>Checkout</h1>
-        <p>
-          {restaurant.name} · Table 7 · {cart.count} items
-        </p>
+        <p>Demo checkout · {cart.count} items · no order or payment is submitted</p>
       </header>
 
       <div className="co__grid">
@@ -67,20 +68,16 @@ export function Checkout() {
           <div className="co__note">
             {method === 'online' ? (
               <>
-                <strong>What happens next:</strong> you complete payment with the provider, then we verify it on
-                our server. The order only reaches the kitchen after that verification — a success screen on
-                your phone is not treated as proof of payment.
+                <strong>Preview only:</strong> there is no payment provider or order submission connected here.
               </>
             ) : (
               <>
-                <strong>What happens next:</strong> your order goes straight to the kitchen marked
-                <em> payment pending</em>. Pay the cashier before you leave; the receipt is issued once the
-                payment is recorded.
+                <strong>Preview only:</strong> this choice does not send an order to the kitchen or create a receipt.
               </>
             )}
           </div>
 
-          <h2 className="co__h2">Order for Table 7</h2>
+          <h2 className="co__h2">Sample cart</h2>
           <ul className="co__items">
             {cart.lines.map((l) => (
               <li key={l.key}>
@@ -108,13 +105,20 @@ export function Checkout() {
             <span>Total payable</span>
             <span className="tnum">{inr(paiseToRupees(t.totalPaise))}</span>
           </div>
-          <button className="co__cta" type="button" disabled={cart.lines.length === 0}>
-            {cart.lines.length === 0
-              ? 'Add items before checkout'
-              : method === 'online'
+          {cart.lines.length === 0 ? (
+            <Link className="co__cta" href={`/menu?s=${encodeURIComponent(cart.scope)}`}>Return to the menu</Link>
+          ) : (
+            <button
+              className="co__cta"
+              type="button"
+              onClick={() => setPreviewNotice('Preview only — no order was sent and no payment was taken.')}
+            >
+              {method === 'online'
                 ? `Preview payment · ${inr(paiseToRupees(t.totalPaise))}`
                 : `Preview order · ${inr(paiseToRupees(t.totalPaise))}`}
-          </button>
+            </button>
+          )}
+          {previewNotice && <p className="co__fine" role="status">{previewNotice}</p>}
           <p className="co__fine" role="note">
             Preview only. No order is submitted, no payment provider is connected and no charge is made.
           </p>

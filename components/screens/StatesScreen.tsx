@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { inr, trial } from '@/lib/demo-data';
 import { Skeleton } from '@/components/ui';
+import { PreviewAction } from '@/components/ui/PreviewAction';
 
 /** Shared page structure; styled by the locked design system. */
 export function StatesScreen() {
@@ -26,10 +27,10 @@ export function StatesScreen() {
           <div className="pg__kicker">Cross-cutting</div>
           <h1 className="pg__title">States, trial &amp; subscription</h1>
           <p className="pg__lede">
-            The states most likely to be seen under pressure, worth judging now rather than after the build:
-            pressure, so they are worth judging now rather than after the build.
+            Illustrative loading, error, success and trial states for product review. This screen does not read a live workspace or account entitlement.
           </p>
         </header>
+        <div className="pg__demoBanner"><strong>Demo state examples.</strong> These messages and dates are illustrative, not live account or order data.</div>
 
         <section className="pg__states">
           <article className="pg__stateCard">
@@ -47,8 +48,8 @@ export function StatesScreen() {
             <div className="pg__stateBody pg__stateBody--center">
               <div className="pg__stateIcon">🍽️</div>
               <strong>No orders yet today</strong>
-              <p>Orders appear here the moment a guest scans a table QR and checks out.</p>
-              <span className="pg__btn">Print QR cards</span>
+              <p>In a future guest-order flow, orders would appear here after checkout. Guest ordering is not connected yet.</p>
+              <PreviewAction className="pg__btn" message="This state screen has sample data only; visit Tables & QR for the printable demo sheet.">Print QR cards</PreviewAction>
             </div>
             <p className="pg__stateNote">Empty states explain the next action, not just the absence.</p>
           </article>
@@ -60,7 +61,7 @@ export function StatesScreen() {
                 <strong>Could not reach the kitchen board</strong>
                 <p>Your orders are safe. Reconnecting automatically…</p>
               </div>
-              <span className="pg__btn">Retry now</span>
+              <PreviewAction className="pg__btn" message="This is a static error-state example; no live request is pending to retry.">Retry now</PreviewAction>
             </div>
             <p className="pg__stateNote">Errors never imply data loss when the order is already saved.</p>
           </article>
@@ -73,8 +74,8 @@ export function StatesScreen() {
                 <p>Order A-1041 is now paid. Receipt R-2041 is ready.</p>
               </div>
               <div className="pg__stateActions">
-                <span className="pg__btn">View receipt</span>
-                <span className="pg__btn">Print</span>
+                <PreviewAction className="pg__btn" message="Receipts are not implemented in this preview.">View receipt</PreviewAction>
+                <PreviewAction className="pg__btn" message="This is sample payment data; no receipt can be printed.">Print</PreviewAction>
               </div>
             </div>
             <p className="pg__stateNote">Success states confirm what changed, not just that it worked.</p>
@@ -84,8 +85,8 @@ export function StatesScreen() {
             <div className="pg__stateLabel">Disabled</div>
             <div className="pg__stateBody">
               <div className="pg__fieldRow">
-                <span className="pg__btn is-disabled">Publish menu</span>
-                <span className="pg__btn is-disabled">Add table</span>
+                <PreviewAction className="pg__btn" message="Publishing is not available until live menu writes are implemented and verified.">Publish menu</PreviewAction>
+                <PreviewAction className="pg__btn" message="Table creation is not available in this preview.">Add table</PreviewAction>
               </div>
               <p className="pg__stateNote pg__stateNote--top">
                 Disabled controls keep a visible reason. Hover or helper text explains why instead of failing
@@ -95,7 +96,7 @@ export function StatesScreen() {
           </article>
 
           <article className="pg__stateCard">
-            <div className="pg__stateLabel">Trial · {trial.remaining} days left</div>
+            <div className="pg__stateLabel">Demo trial example · {trial.remaining} days left</div>
             <div className="pg__stateBody">
               <div className="pg__trialBox">
                 <div className="ui-spread">
@@ -110,7 +111,7 @@ export function StatesScreen() {
                 <p className="pg__trialMeta">
                   {trial.reminderShown}. All features are open right now.
                 </p>
-                <span className="pg__btn pg__btn--solid">Choose a plan</span>
+                <PreviewAction className="pg__btn pg__btn--solid" message="Plan selection is illustrative; billing is not enabled.">Choose a plan</PreviewAction>
               </div>
             </div>
           </article>
@@ -124,38 +125,37 @@ export function StatesScreen() {
                   <div>
                     <strong>Your trial ended on {trial.expires}</strong>
                     <p>
-                      Nothing has been deleted. Your menus, orders, receipts and reports are all still here and
-                      you can view and export them. New customer orders and paid features are switched off until
-                      a plan is active.
+                      This example shows the intended read-only state. The database gate preserves existing rows
+                      and blocks restaurant writes after expiry; live export, receipts, reports and billing UI are
+                      not connected here.
                     </p>
                   </div>
-                  <span className="pg__btn pg__btn--solid">Reactivate</span>
+                  <PreviewAction className="pg__btn pg__btn--solid" message="Billing/reactivation is not configured; this action made no account changes.">Reactivate</PreviewAction>
                 </div>
                 <div className="pg__lockedGrid">
                   <div>
-                    <div className="pg__lockedLabel">Still available</div>
+                    <div className="pg__lockedLabel">Intended to remain readable</div>
                     <ul>
-                      <li>View menus, items and QR codes</li>
-                      <li>View and export order history</li>
-                      <li>View and reprint past receipts</li>
-                      <li>View reports for the retained period</li>
-                      <li>Manage your account and billing</li>
+                      <li>Restaurant data allowed by membership read policies</li>
+                      <li>Restaurant-data gate does not restrict Auth account-recovery actions</li>
+                      <li>Existing rows remain in the database after expiry</li>
+                      <li>Export, receipt and report screens are not implemented</li>
                     </ul>
                   </div>
                   <div>
-                    <div className="pg__lockedLabel">Blocked on the server</div>
+                    <div className="pg__lockedLabel">Restaurant writes blocked by the trial gate</div>
                     <ul>
-                      <li>New customer orders</li>
-                      <li>Online payments and counter payment recording</li>
-                      <li>Menu publishing and AI imports</li>
-                      <li>Creating or regenerating table QR codes</li>
-                      <li>Voice announcements to the kitchen</li>
+                      <li>New guest and counter orders</li>
+                      <li>Cash payment collection</li>
+                      <li>Menu, category, item and variant writes</li>
+                      <li>Dining-table and QR-token writes</li>
+                      <li>Restaurant settings and kitchen-status writes</li>
                     </ul>
                   </div>
                 </div>
                 <p className="pg__fine">
-                  The “still available / blocked” split above is a proposal. It is enforced on the server, not
-                  by hiding buttons — and I will confirm the exact list with you before building it.
+                  The 10-day server-side write gate is present in migration 0003, but these panels are examples—not
+                  live entitlement or billing screens. Local tests do not replace verification against Supabase.
                 </p>
               </div>
             </div>
@@ -174,7 +174,7 @@ export function StatesScreen() {
                     <strong>{name}</strong>
                     <div className="pg__planMiniPrice tnum">{inr(price as number)}/mo</div>
                     <p>{blurb}</p>
-                    <span className="pg__btn">Select</span>
+                    <PreviewAction className="pg__btn" message={`${name} is a planning option; no subscription was selected.`}>Select</PreviewAction>
                   </div>
                 ))}
               </div>

@@ -20,7 +20,7 @@ import { inr } from '@/lib/demo-data';
 import { lineTotal, paiseToRupees, rupeesToPaise } from '@/lib/money';
 import { VegMark } from '@/components/ui';
 
-const needsChoice = (i: Item) => Boolean(i.variants || i.modifiers);
+const needsChoice = (i: Item) => Boolean((i.variants?.length ?? 0) > 0 || (i.modifiers?.length ?? 0) > 0);
 
 /**
  * Preset add-on groups, used when an item carries none.
@@ -93,16 +93,18 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
           <div className="menu__venueMeta">{restaurant.tagline}</div>
         </div>
         <div className="menu__verified">
-          <span className="menu__verifiedDot" /> Table 7 · on-site verified 12:41 PM
+          <span className="menu__verifiedDot" />
+          {data ? 'Restaurant menu · ordering not connected' : 'Demo — not saved'}
         </div>
       </header>
 
       <nav className="menu__cats">
-        <button className={`menu__cat ${cat === 'all' ? 'is-active' : ''}`} onClick={() => setCat('all')}>
+        <button type="button" className={`menu__cat ${cat === 'all' ? 'is-active' : ''}`} onClick={() => setCat('all')}>
           All
         </button>
         {categories.map((c) => (
           <button
+            type="button"
             key={c.id}
             className={`menu__cat ${cat === c.id ? 'is-active' : ''}`}
             onClick={() => setCat(c.id)}
@@ -133,6 +135,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
                   </Link>
                 ) : (
                   <button
+                    type="button"
                     className="menu__dishCta"
                     onClick={() => cart.add({ id: i.id, name: i.name, unitPricePaise: rupeesToPaise(i.price), qty: 1, veg: i.veg })}
                   >
@@ -153,7 +156,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
           <span>
             {cart.count} item{cart.count === 1 ? '' : 's'} · {inr(paiseToRupees(cart.subtotalPaise))}
           </span>
-          <Link href={`/menu/cart`} className="menu__cartBtn">
+          <Link href={`/menu/cart?s=${encodeURIComponent(cart.scope)}`} className="menu__cartBtn">
             Review order
           </Link>
         </div>
@@ -186,16 +189,20 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
     demoItems.find((i) => i.id === 'it-butter-chicken')!;
 
   const variants = item.variants ?? [];
+  const spiceGroup = item.modifiers?.[0] ?? (!data ? PRESET_SPICE : undefined);
+  const breadGroup = item.modifiers?.[1] ?? (!data ? PRESET_BREAD : undefined);
+  const defaultSpice = spiceGroup?.options.find((option) => option.id === 'medium')?.id ?? spiceGroup?.options[0]?.id ?? '';
+  const defaultBread = breadGroup?.options.find((option) => option.id === 'naan')?.id ?? breadGroup?.options[0]?.id ?? '';
   const [variant, setVariant] = useState(variants[0]?.id ?? '');
-  const [spice, setSpice] = useState('medium');
-  const [bread, setBread] = useState('naan');
+  const [spice, setSpice] = useState(defaultSpice);
+  const [bread, setBread] = useState(defaultBread);
   const [qty, setQty] = useState(1);
   const cart = useCart();
 
   const vPrice = variants.find((v) => v.id === variant)?.price ?? item.price;
-  const spiceGroup = item.modifiers?.[0] ?? PRESET_SPICE;
-  const breadGroup = item.modifiers?.[1] ?? PRESET_BREAD;
-  const addonPrice = bread === 'naan' ? 79 : bread === 'roti' ? 59 : 0;
+  const addonPrice = breadGroup?.options.find((option) => option.id === bread)?.price ?? 0;
+  const selectedSpice = spiceGroup?.options.find((option) => option.id === spice)?.name;
+  const selectedBread = breadGroup?.options.find((option) => option.id === bread)?.name;
   const total = lineTotal(rupeesToPaise(vPrice + addonPrice), qty);
 
   return (
@@ -206,7 +213,8 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
           <div className="menu__venueMeta">{restaurant.tagline}</div>
         </div>
         <div className="menu__verified">
-          <span className="menu__verifiedDot" /> Table 7 · on-site verified 12:41 PM
+          <span className="menu__verifiedDot" />
+          {data ? 'Restaurant menu · ordering not connected' : 'Demo — not saved'}
         </div>
       </header>
 
@@ -233,60 +241,68 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
               <div className="sheet__kicker">Customize</div>
               <h2 className="sheet__title">{item.name}</h2>
             </div>
-            <Link href={`/menu`} className="sheet__close" aria-label="Close">
+            <Link href={`/menu?s=${encodeURIComponent(cart.scope)}`} className="sheet__close" aria-label="Close">
               ×
             </Link>
           </div>
           <p className="sheet__desc">{item.desc}</p>
 
-          <div className="sheet__group">
-            <div className="sheet__label">Portion</div>
-            {variants.map((v) => (
-              <label key={v.id} className={`sheet__opt ${variant === v.id ? 'is-on' : ''}`}>
-                <input type="radio" name="variant" checked={variant === v.id} onChange={() => setVariant(v.id)} />
-                <span>{v.name}</span>
-                <span className="tnum">{inr(v.price)}</span>
-              </label>
-            ))}
-          </div>
-
-          <div className="sheet__group">
-            <div className="sheet__label">Spice level · required</div>
-            <div className="sheet__chips">
-              {spiceGroup.options.map((o) => (
-                <button
-                  key={o.id}
-                  className={`sheet__chip ${spice === o.id ? 'is-on' : ''}`}
-                  onClick={() => setSpice(o.id)}
-                >
-                  {o.name}
-                </button>
+          {variants.length > 0 && (
+            <div className="sheet__group">
+              <div className="sheet__label">Portion</div>
+              {variants.map((v) => (
+                <label key={v.id} className={`sheet__opt ${variant === v.id ? 'is-on' : ''}`}>
+                  <input type="radio" name="variant" checked={variant === v.id} onChange={() => setVariant(v.id)} />
+                  <span>{v.name}</span>
+                  <span className="tnum">{inr(v.price)}</span>
+                </label>
               ))}
             </div>
-          </div>
+          )}
 
-          <div className="sheet__group">
-            <div className="sheet__label">Pair it with</div>
-            {breadGroup.options.map((o) => (
-              <label key={o.id} className={`sheet__opt ${bread === o.id ? 'is-on' : ''}`}>
-                <input type="radio" name="bread" checked={bread === o.id} onChange={() => setBread(o.id)} />
-                <span>{o.name}</span>
-                <span className="tnum">{o.price ? `+ ${inr(o.price)}` : '—'}</span>
-              </label>
-            ))}
-          </div>
+          {spiceGroup && (
+            <div className="sheet__group">
+              <div className="sheet__label">{spiceGroup.name}{spiceGroup.required ? ' · required' : ''}</div>
+              <div className="sheet__chips">
+                {spiceGroup.options.map((o) => (
+                  <button
+                    key={o.id}
+                    type="button"
+                    className={`sheet__chip ${spice === o.id ? 'is-on' : ''}`}
+                    onClick={() => setSpice(o.id)}
+                  >
+                    {o.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {breadGroup && (
+            <div className="sheet__group">
+              <div className="sheet__label">{breadGroup.name}</div>
+              {breadGroup.options.map((o) => (
+                <label key={o.id} className={`sheet__opt ${bread === o.id ? 'is-on' : ''}`}>
+                  <input type="radio" name="bread" checked={bread === o.id} onChange={() => setBread(o.id)} />
+                  <span>{o.name}</span>
+                  <span className="tnum">{o.price ? `+ ${inr(o.price)}` : '—'}</span>
+                </label>
+              ))}
+            </div>
+          )}
 
           <div className="sheet__foot">
             <div className="sheet__qty">
-              <button onClick={() => setQty(Math.max(1, qty - 1))} aria-label="Decrease">
+              <button type="button" onClick={() => setQty(Math.max(1, qty - 1))} aria-label="Decrease quantity">
                 −
               </button>
               <span className="tnum">{qty}</span>
-              <button onClick={() => setQty(qty + 1)} aria-label="Increase">
+              <button type="button" onClick={() => setQty(qty + 1)} aria-label="Increase quantity">
                 +
               </button>
             </div>
             <button
+              type="button"
               className="sheet__add"
               onClick={() => {
                 cart.add({
@@ -297,7 +313,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
                   // Undefined when the dish has no portions, so the cart line
                   // simply carries no variant instead of throwing.
                   variant: variants.find((v) => v.id === variant)?.name,
-                  addons: [spice, bread === 'none' ? '' : `Bread: ${bread}`].filter(Boolean),
+                  addons: [selectedSpice, selectedBread].filter((value): value is string => Boolean(value)),
                   veg: item.veg,
                 });
               }}

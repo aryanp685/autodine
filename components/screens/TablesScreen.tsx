@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import { tables, restaurant } from '@/lib/demo-data';
 import { QrChip } from '@/components/ui';
+import { WorkspaceSwitcher } from '@/components/WorkspaceSwitcher';
+import { PreviewAction } from '@/components/ui/PreviewAction';
+import type { AuthorizedWorkspace } from '@/lib/db/workspace-selection';
 
 const STATUS_TONE: Record<string, string> = {
   active: 'is-active',
@@ -10,43 +13,60 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 /** Shared page structure; styled by the locked design system. */
-export function TablesScreen() {
+export function TablesScreen({
+  workspace,
+  workspaces,
+}: {
+  workspace?: AuthorizedWorkspace;
+  workspaces?: AuthorizedWorkspace[];
+} = {}) {
+  const workspaceQuery = workspace ? `?workspace=${encodeURIComponent(workspace.slug)}` : '';
+
   return (
     <div className="pg pg--dash">
       <div className="pg__bar">
         <Link href="/" className="pg__brand">AutoDine</Link>
         <div className="pg__barLinks">
-          <Link href="/dashboard">Overview</Link>
-          <Link href="/dashboard/menus">Menus</Link>
-          <Link href="/dashboard/tables" className="is-active">
+          <Link href={`/dashboard${workspaceQuery}`}>Overview</Link>
+          <Link href={`/dashboard/menus${workspaceQuery}`}>Menus</Link>
+          <Link href={`/dashboard/tables${workspaceQuery}`} className="is-active">
             Tables &amp; QR
           </Link>
           <span>Orders</span>
           <span>Reports</span>
         </div>
         <div className="pg__barRight">
-          <span className="pg__avatar">AP</span>
+          {workspace && workspaces ? (
+            <WorkspaceSwitcher workspaces={workspaces} selectedSlug={workspace.slug} pathname="/dashboard/tables" />
+          ) : (
+            <span className="pg__avatar">AP</span>
+          )}
         </div>
+      </div>
+
+      <div className="pg__demoBanner">
+        <strong>Demo — not saved.</strong>{' '}
+        {workspace
+          ? `Workspace access verified for ${workspace.name}; the tables and QR cards below remain fictional.`
+          : 'Table cards and QR images below are illustrative; controls do not change database records.'}
       </div>
 
       <div className="pg__body">
         <header className="pg__head pg__head--row">
           <div>
             <div className="pg__kicker">Tables &amp; QR</div>
-            <h1 className="pg__title">12 tables · {restaurant.name}</h1>
+            <h1 className="pg__title">{workspace ? `Demo table preview · ${workspace.name}` : `12 demo tables · ${restaurant.name}`}</h1>
           </div>
           <div className="pg__headActions">
-            <span className="pg__btn">Print QR sheet</span>
-            <span className="pg__btn pg__btn--solid">Add table</span>
+            <PreviewAction className="pg__btn" message="Print the sample QR sheet from the browser dialog." print>Print QR sheet</PreviewAction>
+            <PreviewAction className="pg__btn pg__btn--solid" message="Tables are demo-only; no table was created.">Add table</PreviewAction>
           </div>
         </header>
 
         <div className="pg__note pg__note--info">
-          <strong>How on-site verification works:</strong> each table&apos;s QR resolves to that restaurant and
-          table, then the server checks a short-lived on-site code, expiry, revocation and ordering rules before
-          a menu is shown. A static QR alone cannot prove a guest is in the room, and GPS is unreliable indoors
-          — this reduces remote ordering abuse substantially, but no method prevents it absolutely. The exact
-          code lifetime and recovery flow will be designed and shown to you before implementation.
+          <strong>Current status:</strong> this screen and its QR controls are visual demos; the QR images are not live table credentials.
+          The guest-order RPC validates a submitted table token, expiry, table/restaurant activity and trial entitlement, but this UI
+          does not create, rotate or revoke real tokens. The live database path still needs Supabase verification before restaurant use.
         </div>
 
         <section className="pg__tables">
@@ -73,10 +93,10 @@ export function TablesScreen() {
                 </div>
               </div>
               <div className="pg__tableBtns">
-                <span className="pg__miniBtn">Preview</span>
-                <span className="pg__miniBtn">Regenerate</span>
-                <span className="pg__miniBtn">{t.qr === 'disabled' ? 'Enable' : 'Disable'}</span>
-                <span className="pg__miniBtn pg__miniBtn--danger">Revoke</span>
+                <PreviewAction className="pg__miniBtn" message={`${t.code} is a fictional demo QR; no live code was opened.`}>Preview</PreviewAction>
+                <PreviewAction className="pg__miniBtn" message="QR regeneration is not connected; no token changed.">Regenerate</PreviewAction>
+                <PreviewAction className="pg__miniBtn" message="Table availability is preview-only and was not changed.">{t.qr === 'disabled' ? 'Enable' : 'Disable'}</PreviewAction>
+                <PreviewAction className="pg__miniBtn pg__miniBtn--danger" message="This demo action did not revoke any live table token.">Revoke</PreviewAction>
               </div>
             </article>
           ))}
@@ -84,7 +104,7 @@ export function TablesScreen() {
 
         <section className="pg__printRow">
           <div className="pg__printSheet">
-            <div className="pg__printHead">Print sheet — 6 per A4 page</div>
+            <div className="pg__printHead">QR print preview · demo only · not scannable</div>
             <div className="pg__printGrid">
               {tables.slice(0, 6).map((t) => (
                 <div key={t.code} className="pg__printCard">
@@ -100,8 +120,8 @@ export function TablesScreen() {
           <aside className="pg__printAside">
             <h3 className="pg__h3">Rotating codes</h3>
             <p className="pg__p">
-              On top of the printed table code, the ordering session carries a short-lived on-site code that the
-              server validates. Proposed behaviour, pending your approval:
+              Possible future approach: pair a printed table code with a short-lived on-site session code that the
+              server validates. This is a design proposal, not a feature wired to the controls above:
             </p>
             <ul className="pg__bullets">
               <li>Code lifetime measured in minutes, refreshed while the guest is on the page.</li>
@@ -112,7 +132,7 @@ export function TablesScreen() {
             </ul>
             <div className="pg__note pg__note--warn">
               Honest limitation: a guest in the restaurant could still photograph a live code and share it. This
-              design narrows that window; it does not eliminate it.
+              approach could narrow that window; it would not eliminate it.
             </div>
           </aside>
         </section>

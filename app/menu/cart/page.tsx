@@ -1,8 +1,24 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { Cart } from '@/components/screens/CartScreen';
+import { CartScope } from '@/components/CartProvider';
+import { DEFAULT_SLUG } from '@/lib/db/menu-screen';
+import { getSingleSearchParam } from '@/lib/query-params';
 
 export const metadata: Metadata = { title: 'Your order · AutoDine' };
 
-export default function CartPage() {
-  return <Cart />;
+export default async function CartPage({
+  searchParams,
+}: {
+    searchParams: Promise<{ s?: string | string[] }>;
+  }) {
+  const { s: rawSlug } = await searchParams;
+  const slug = getSingleSearchParam(rawSlug);
+  if (!slug.valid) notFound();
+  const scope = slug.value?.trim() || DEFAULT_SLUG;
+  return (
+    <CartScope scope={scope}>
+      <Cart />
+    </CartScope>
+  );
 }

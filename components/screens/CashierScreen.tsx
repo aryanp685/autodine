@@ -28,7 +28,7 @@ export function Cashier() {
     <div className="cash">
       <header className="cash__head">
         <div>
-          <div className="cash__kicker">Cashier · demo mode</div>
+          <div className="cash__kicker">Demo — not saved</div>
           <h1 className="cash__h1">{restaurant.name}</h1>
         </div>
         <div className="cash__headMeta">

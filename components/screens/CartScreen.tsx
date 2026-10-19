@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCart } from '@/components/CartProvider';
-import { inr, restaurant } from '@/lib/demo-data';
+import { inr } from '@/lib/demo-data';
 import { VegMark } from '@/components/ui';
 import { lineTotal, paiseToRupees } from '@/lib/money';
 
@@ -37,13 +37,11 @@ export function Cart() {
   return (
     <div className="cart">
       <header className="cart__head">
-        <Link href={`/menu`} className="cart__back">
+        <Link href={`/menu?s=${encodeURIComponent(cart.scope)}`} className="cart__back">
           ← Back to menu
         </Link>
         <h1>Your order</h1>
-        <p>
-          {restaurant.name} · Table 7 · on-site verified 12:41 PM
-        </p>
+        <p>Preview cart · {cart.count} items · order submission is not connected</p>
       </header>
 
       <div className="cart__grid">
@@ -60,9 +58,9 @@ export function Cart() {
                 <div className="cart__linePrice tnum">{inr(paiseToRupees(l.unitPricePaise))} each</div>
               </div>
               <div className="cart__qty">
-                <button onClick={() => cart.setQty(l.key, l.qty - 1)} aria-label="Decrease">−</button>
+                <button type="button" onClick={() => cart.setQty(l.key, l.qty - 1)} aria-label={`Decrease ${l.name} quantity`}>−</button>
                 <span className="tnum">{l.qty}</span>
-                <button onClick={() => cart.setQty(l.key, l.qty + 1)} aria-label="Increase">+</button>
+                <button type="button" onClick={() => cart.setQty(l.key, l.qty + 1)} aria-label={`Increase ${l.name} quantity`}>+</button>
               </div>
               <div className="cart__lineTotal tnum">{inr(paiseToRupees(lineTotal(l.unitPricePaise, l.qty)))}</div>
             </div>
@@ -75,12 +73,12 @@ export function Cart() {
             <h2>Bill summary</h2>
             <Totals />
             {cart.lines.length > 0 ? (
-              <Link href="/menu/checkout" className="cart__cta">Continue to checkout</Link>
+              <Link href={`/menu/checkout?s=${encodeURIComponent(cart.scope)}`} className="cart__cta">Continue to checkout</Link>
             ) : (
-              <button type="button" className="cart__cta" disabled>Cart is empty</button>
+              <Link href={`/menu?s=${encodeURIComponent(cart.scope)}`} className="cart__cta">Browse the menu</Link>
             )}
             <div className="cart__fine">
-              Totals are recalculated by the server before payment. This screen shows sample values.
+              Demo — not saved. This cart uses browser-only state; no order is sent to a restaurant.
             </div>
           </div>
         </aside>

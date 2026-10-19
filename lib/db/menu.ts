@@ -9,7 +9,7 @@
  *
  *   2. The demo data in lib/demo-data.ts, when it is not.
  *
- * The fallback exists so the live Netlify site keeps rendering before the
+ *   The fallback exists so the hosted preview keeps rendering before the
  * database is connected. It is scaffolding. Once the database is live, delete
  * it: a misconfiguration should fail loudly, not quietly serve sample dishes
  * to a real guest who is trying to order dinner.

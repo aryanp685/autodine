@@ -75,6 +75,7 @@ export function demoMenu(slug: string): RestaurantMenu {
     timezone: 'Asia/Kolkata',
     tax_rate_bps: 500,
     is_active: true,
+    trial_started_at: '1970-01-01T00:00:00Z',
     created_at: '1970-01-01T00:00:00Z',
   };
 

@@ -1,8 +1,11 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ItemSheet } from '@/components/screens/CustomerMenu';
+import { CartScope } from '@/components/CartProvider';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
-import { getMenuScreenData } from '@/lib/db/menu-screen';
+import { DEFAULT_SLUG, getMenuScreenData } from '@/lib/db/menu-screen';
+import { items as demoItems } from '@/lib/demo-data';
+import { getSingleSearchParam } from '@/lib/query-params';
 
 export const metadata: Metadata = { title: 'Customise · AutoDine' };
 
@@ -15,11 +18,22 @@ export const metadata: Metadata = { title: 'Customise · AutoDine' };
 export default async function ItemPage({
   searchParams,
 }: {
-  searchParams: Promise<{ s?: string; item?: string }>;
-}) {
-  const { s, item } = await searchParams;
+    searchParams: Promise<{ s?: string | string[]; item?: string | string[] }>;
+  }) {
+  const { s: rawSlug, item: rawItem } = await searchParams;
+  const slug = getSingleSearchParam(rawSlug);
+  const selectedItem = getSingleSearchParam(rawItem);
+  if (!slug.valid || !selectedItem.valid) notFound();
+  const s = slug.value;
+  const item = selectedItem.value;
   const data = await getMenuScreenData(s);
   if (isSupabaseConfigured && !data) notFound();
+  if (item && !(data?.items ?? demoItems).some((candidate) => candidate.id === item)) notFound();
 
-  return <ItemSheet data={data ? { ...data, itemId: item } : undefined} itemId={item} />;
+  const scope = data?.restaurant.slug ?? s?.trim() ?? DEFAULT_SLUG;
+  return (
+    <CartScope scope={scope}>
+      <ItemSheet key={`${scope}:${item ?? ''}`} data={data ? { ...data, itemId: item } : undefined} itemId={item} />
+    </CartScope>
+  );
 }
