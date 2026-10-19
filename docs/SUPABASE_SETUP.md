@@ -49,13 +49,23 @@ Also: **Project Settings → Database → Connection string → URI** for `DATAB
 
 ## 3. Run the migration (3 min)
 
-**SQL Editor → New query.** Paste the **entire** contents of `supabase/migrations/20261019000001_init.sql` (544 lines).
+There are **two** migration files, and they must run in order. Open each one on
+GitHub, click the **Raw** button, select-all and copy, then paste into the
+editor and click **Run**.
 
-Easiest way to copy it without hunting around your disk: open it on GitHub, click the **Raw** button, then select-all and copy.
+1. `20261019000001_init.sql` — the schema, RLS and `place_order()`
+   <https://github.com/aryanp685/new/blob/main/supabase/migrations/20261019000001_init.sql>
 
-<https://github.com/aryanp685/new/blob/main/supabase/migrations/20261019000001_init.sql>
+2. `20261019000002_public_read.sql` — fixes anonymous read of published menus
+   <https://github.com/aryanp685/new/blob/main/supabase/migrations/20261019000002_public_read.sql>
 
-Click **Run**.
+> **Do not skip the second one.** 0001 shipped a bug that leaves guests
+> unable to see any menu at all: a subquery written inside an RLS policy is
+> itself filtered by the RLS of the table it reads, and `public.restaurants`
+> had no anonymous policy — so the "is this restaurant active?" check inside
+> the menu and item policies always saw zero rows and always failed. The
+> symptom is an empty menu with no error. 0002 fixes it and is safe to run on
+> top of 0001.
 
 **If it succeeds** you'll see `Success. No rows returned`.
 
@@ -166,7 +176,27 @@ union all select 'orders',     count(*) from public.orders;
 reset role;
 ```
 
-**Expected:** `restaurants 1`, `menus 1`, `items 22`, and **`qr_tokens 0`, `payments 0`, `orders 0`**.
+**Expected:**
+
+```
+restaurants   1
+menus         1
+items        21
+qr_tokens     0
+payments      0
+orders        0
+```
+
+`items` is 21 and not 22 because the seed deliberately marks one dish
+(Laal Maas) unavailable, and guests only ever see available items. If you see
+22, the availability flag is not being applied — tell me.
+
+**The three zeros are the point of this check.** They are what proves tenant
+isolation. `qr_tokens`, `payments` and `orders` must be invisible to an
+anonymous reader no matter how much data is in them.
+
+If `restaurants`, `menus` or `items` come back **0**, migration 0002 did not
+run — go back to step 3.
 
 If `qr_tokens` or `payments` return anything other than 0, **RLS is not working** — stop and tell me. That would mean any visitor could read every table code and every payment in the system.
 
