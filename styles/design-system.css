@@ -770,8 +770,87 @@
   [data-app] .menu__cats button,
   [data-app] button { min-height: 44px; }
   [data-app] .menu__cats button { display: inline-flex; align-items: center; }
+
+  /* The rule above only matches <button>. These controls are rendered as
+     <a> or <span>, so they were missed and stayed at their desktop sizes:
+     .pg__miniBtn is 24px tall and .pg__btn 32px. Every parent of .pg__btn
+     here is a flex container, so the flex display is blockified and
+     changes nothing about how they sit next to each other. */
+  [data-app] a.dash__ghostBtn,
+  [data-app] a.dash__solidBtn,
+  [data-app] a.pg__planBtn,
+  [data-app] .pg__btn,
+  [data-app] .pg__miniBtn,
+  .cash__method {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
   [data-app] .pg__formCard,
   [data-app] .pg__asideCard,
   [data-app] .pg__tableCard,
   [data-app] .pg__stateCard { min-width: 0; }
+}
+
+/* ---------------------------------------------------------------- printing */
+
+/* The "Print QR sheet" button calls window.print(). Without these rules the
+   browser prints the whole dashboard -- navigation, notes, aside copy -- with
+   the six cards somewhere in the middle of it. This leaves only the sheet. */
+@media print {
+  @page { size: A4 portrait; margin: 12mm; }
+
+  [data-app] { background: var(--surface); }
+
+  /* Hide everything, then bring the sheet back. */
+  [data-app] .pg__bar,
+  [data-app] .pg__head,
+  [data-app] .pg__note,
+  [data-app] .pg__alert,
+  [data-app] .pg__success,
+  [data-app] .pg__tables,
+  [data-app] .pg__printAside,
+  [data-app] .pg__printHead,
+  [data-app] .pg__tableBtns {
+    display: none !important;
+  }
+
+  [data-app] .pg__body { padding: 0 !important; }
+  [data-app] .pg__printRow { display: block; margin: 0; padding: 0; }
+  [data-app] .pg__printSheet { padding: 0; }
+
+  /* Six per A4 page: three across, two down. */
+  [data-app] .pg__printGrid {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 8mm !important;
+  }
+
+  [data-app] .pg__printCard {
+    border: 1px solid var(--text) !important;
+    background: var(--surface) !important;
+    padding: 6mm 4mm !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  [data-app] .pg__printCard svg { width: 32mm !important; height: 32mm !important; }
+
+  [data-app] .pg__printCode { font-size: 16pt !important; font-weight: 700; }
+  [data-app] .pg__printName { font-size: 11pt !important; }
+  [data-app] .pg__printHint { font-size: 9pt !important; color: var(--ink-70) !important; }
+
+  /* Ink and paper: no grey-on-grey, no backgrounds that eat toner. */
+  * { color: var(--text) !important; }
+}
+
+/* Small form helpers used by the inline "Add table" control. The label is
+   visually hidden because the select already reads "4 seats"; it exists so
+   screen readers still announce what the field is. */
+.ui-field--inline { flex-direction: row; align-items: center; gap: 8px; }
+.ui-label--sr {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }
