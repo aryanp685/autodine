@@ -1,15 +1,25 @@
 import Link from 'next/link';
+import { signUpAction } from '@/app/auth/actions';
 import { inr, trial } from '@/lib/demo-data';
 
-/** Shared page structure; styled by the locked design system. */
-export function SignupScreen() {
+/**
+ * Shared page structure; styled by the locked design system.
+ *
+ * This is now a REAL form: it posts to the signUpAction server action. The
+ * markup and classes are unchanged from the locked design.
+ */
+export function SignupScreen({ error }: { error?: string }) {
   return (
     <div className="pg">
       <div className="pg__bar">
-        <Link href="/" className="pg__brand">AutoDine</Link>
+        <Link href="/" className="pg__brand">
+          AutoDine
+        </Link>
         <div className="pg__barRight">
           <span className="pg__barMuted">Already have an account?</span>
-          <span className="pg__barLink">Sign in</span>
+          <Link href="/login" className="pg__barLink">
+            Sign in
+          </Link>
         </div>
       </div>
 
@@ -21,34 +31,66 @@ export function SignupScreen() {
             All features are unlocked during the trial. We ask for payment details only when you choose a plan.
           </p>
 
-          <form className="pg__form" action="#" method="dialog">
+          {error && (
+            <div className="pg__note" role="alert">
+              {error}
+            </div>
+          )}
+
+          <form className="pg__form" action={signUpAction}>
             <div className="pg__fieldRow">
               <label className="ui-field">
                 <span className="ui-label">Full name</span>
-                <input className="ui-input" placeholder="Aryan Patel" />
+                <input className="ui-input" name="fullName" autoComplete="name" placeholder="Aryan Patel" required />
               </label>
               <label className="ui-field">
                 <span className="ui-label">Restaurant name</span>
-                <input className="ui-input" placeholder="Saffron & Smoke" />
+                <input
+                  className="ui-input"
+                  name="restaurantName"
+                  autoComplete="organization"
+                  placeholder="Saffron & Smoke"
+                  required
+                />
               </label>
             </div>
             <label className="ui-field">
               <span className="ui-label">Work email</span>
-              <input className="ui-input" type="email" placeholder="owner@restaurant.in" />
+              <input
+                className="ui-input"
+                name="email"
+                type="email"
+                autoComplete="email"
+                placeholder="owner@restaurant.in"
+                required
+              />
               <span className="ui-hint">Used for receipts, trial reminders and account recovery.</span>
             </label>
             <label className="ui-field">
               <span className="ui-label">Mobile number</span>
-              <input className="ui-input" placeholder="+91 90000 00000" />
+              <input className="ui-input" name="phone" autoComplete="tel" placeholder="+91 90000 00000" />
             </label>
             <label className="ui-field">
               <span className="ui-label">Password</span>
-              <input className="ui-input" type="password" placeholder="At least 10 characters" />
+              <input
+                className="ui-input"
+                name="password"
+                type="password"
+                autoComplete="new-password"
+                placeholder="At least 10 characters"
+                minLength={10}
+                required
+              />
               <span className="ui-hint">Minimum 10 characters. Stored hashed — never in plain text.</span>
             </label>
 
+            {/*
+              NOT pre-ticked, deliberately. A pre-checked consent box is not
+              valid consent under India's DPDP Act, which requires consent to be
+              free, specific, informed, unconditional and unambiguous.
+            */}
             <label className="ui-check pg__check">
-              <input type="checkbox" defaultChecked />
+              <input type="checkbox" name="agree" />
               <span>
                 I agree to the Terms of Service and Privacy Policy, and to receive trial reminder emails.
               </span>
@@ -58,7 +100,8 @@ export function SignupScreen() {
               Create account &amp; start trial
             </button>
             <p className="pg__fine">
-              Prototype form — nothing is submitted and no account is created.
+              Your restaurant workspace and {trial.days}-day trial start immediately. The trial clock is recorded on
+              the server, not in your browser.
             </p>
           </form>
         </section>

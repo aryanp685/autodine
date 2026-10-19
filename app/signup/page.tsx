@@ -3,6 +3,11 @@ import { SignupScreen } from '@/components/screens/SignupScreen';
 
 export const metadata: Metadata = { title: 'Create your restaurant account · AutoDine' };
 
-export default function SignupPage() {
-  return <SignupScreen />;
+export default async function SignupPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
+  return <SignupScreen error={error} />;
 }

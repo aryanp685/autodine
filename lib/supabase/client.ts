@@ -7,13 +7,15 @@
 'use client';
 
 import { createBrowserClient } from '@supabase/ssr';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/lib/db/database';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, isSupabaseConfigured } from './env';
 
-let cached: ReturnType<typeof createBrowserClient> | null = null;
+let cached: SupabaseClient<Database> | null = null;
 
 /** Returns null when Supabase is not configured; callers must handle that. */
 export function getSupabaseBrowser() {
   if (!isSupabaseConfigured) return null;
-  if (!cached) cached = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  if (!cached) cached = createBrowserClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY);
   return cached;
 }

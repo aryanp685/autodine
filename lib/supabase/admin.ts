@@ -14,15 +14,16 @@
 
 import 'server-only';
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/lib/db/database';
 import { SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL, isSupabaseAdminConfigured } from './env';
 
-let cached: ReturnType<typeof createClient> | null = null;
+let cached: SupabaseClient<Database> | null = null;
 
 export function getSupabaseAdmin() {
   if (!isSupabaseAdminConfigured) return null;
   if (!cached) {
-    cached = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    cached = createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
   }

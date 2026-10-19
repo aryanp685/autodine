@@ -64,19 +64,32 @@ export async function getRestaurantMenu(slug: string): Promise<RestaurantMenu | 
   if (categoriesResult.error) throw new Error(`Could not load categories: ${categoriesResult.error.message}`);
   if (itemsResult.error) throw new Error(`Could not load items: ${itemsResult.error.message}`);
 
-  const items: MenuItem[] = (itemsResult.data ?? []).map((row: Item & { item_variants?: ItemVariant[] }) => ({
-    id: row.id,
-    restaurant_id: row.restaurant_id,
-    category_id: row.category_id,
-    name: row.name,
-    description: row.description,
-    price_paise: row.price_paise,
-    is_veg: row.is_veg,
-    is_available: row.is_available,
-    image_url: row.image_url,
-    sort_order: row.sort_order,
-    variants: (row.item_variants ?? []).slice().sort((a, b) => a.sort_order - b.sort_order),
-  }));
+  const items: MenuItem[] = (itemsResult.data ?? []).map((raw) => {
+    // The hand-written Database type cannot always tell Postgrest that this
+    // embed is one-to-many, so it is typed as either shape. The wire format is
+    // an array; normalise defensively rather than trusting the type.
+    const row = raw as unknown as Item & { item_variants?: ItemVariant[] | ItemVariant | null };
+    const embedded = row.item_variants;
+    const variants: ItemVariant[] = Array.isArray(embedded)
+      ? embedded
+      : embedded
+        ? [embedded]
+        : [];
+
+    return {
+      id: row.id,
+      restaurant_id: row.restaurant_id,
+      category_id: row.category_id,
+      name: row.name,
+      description: row.description,
+      price_paise: row.price_paise,
+      is_veg: row.is_veg,
+      is_available: row.is_available,
+      image_url: row.image_url,
+      sort_order: row.sort_order,
+      variants: variants.slice().sort((a, b) => a.sort_order - b.sort_order),
+    };
+  });
 
   return {
     restaurant: restaurant as Restaurant,
