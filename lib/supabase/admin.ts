@@ -1,7 +1,8 @@
 /**
  * ADMIN CLIENT — SERVER ONLY.
  *
- * This uses the service role key, which BYPASSES ROW LEVEL SECURITY. It can
+ * This uses the secret key (legacy name: service role key), which BYPASSES ROW
+ * LEVEL SECURITY. It can
  * read and write every restaurant's data. If this file, or the key it reads,
  * ever reaches the browser, tenant isolation is gone.
  *
@@ -16,14 +17,14 @@ import 'server-only';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/db/database';
-import { SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL, isSupabaseAdminConfigured } from './env';
+import { SUPABASE_SECRET_KEY, SUPABASE_URL, isSupabaseAdminConfigured } from './env';
 
 let cached: SupabaseClient<Database> | null = null;
 
 export function getSupabaseAdmin() {
   if (!isSupabaseAdminConfigured) return null;
   if (!cached) {
-    cached = createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    cached = createClient<Database>(SUPABASE_URL, SUPABASE_SECRET_KEY, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
   }

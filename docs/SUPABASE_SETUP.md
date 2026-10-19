@@ -23,13 +23,25 @@ You need: a GitHub account (you have one) and an email. **No card, no payment �
 
 ## 2. Collect your keys (1 min)
 
-**Project Settings → API.** Copy these three:
+**Project Settings → API Keys.** Copy these:
 
-| Value | Where | Safe to expose? |
+| Value | Section on the page | Safe to expose? |
 |---|---|---|
-| **Project URL** | "Project URL" | Yes |
-| **anon / public key** | Project API keys → `anon` `public` | Yes — protected by RLS |
-| **service_role key** | Project API keys → `service_role` | **NO. Bypasses RLS entirely.** |
+| **Project URL** | Project URL | Yes |
+| **Publishable key** | Publishable key — `sb_publishable_...` | Yes — protected by RLS |
+| **Secret key** | Secret keys — `sb_secret_...` (click the eye to reveal) | **NO. Bypasses RLS entirely.** |
+
+> **Which keys does your project have?** Supabase replaced the old `anon` and
+> `service_role` keys with these shorter ones. Projects created after November
+> 2025 get **only** the new keys; the old ones are removed by the end of 2026.
+>
+> - Key starts with **`sb_`** → you have the new keys. Use the table above.
+> - Key starts with **`eyJ`** (a long JWT) → you have legacy keys. They still
+>   work. Copy `anon public` where this guide says publishable, and
+>   `service_role` where it says secret.
+>
+> There is a "Legacy anon, service_role API keys" section lower down the page
+> if you need it. The app accepts either format, so both are fine.
 
 Also: **Project Settings → Database → Connection string → URI** for `DATABASE_URL`. Replace `[YOUR-PASSWORD]` with the password from step 1.
 
@@ -47,6 +59,8 @@ DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@db.abcdefgh.supabase.co:5432/po
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
+> **This file is for your machine only.** It is gitignored, so it never reaches GitHub and Vercel never sees it. The deployed site gets its keys separately, in step 8. Doing only step 3 and skipping step 8 is the single most common way to end up with a site that works locally and shows "database is not connected" in production.
+
 `.env.local` is already in `.gitignore` — verify with `git status` that it does **not** appear as a change. If it does, stop and tell me.
 
 `NEXT_PUBLIC_` values are compiled into the browser bundle. That is fine for the URL and anon key. It is **never** fine for `SUPABASE_SERVICE_ROLE_KEY`, which is why it has no prefix.
@@ -55,10 +69,12 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 
 ## 4. Run the migration (3 min)
 
-**SQL Editor → New query.** Paste the **entire** contents of:
-```
-supabase/migrations/20261019000001_init.sql
-```
+**SQL Editor → New query.** Paste the **entire** contents of `supabase/migrations/20261019000001_init.sql` (544 lines).
+
+Easiest way to copy it without hunting around your disk: open it on GitHub, click the **Raw** button, then select-all and copy.
+
+<https://github.com/aryanp685/new/blob/main/supabase/migrations/20261019000001_init.sql>
+
 Click **Run**.
 
 **If it succeeds** you'll see `Success. No rows returned`.
@@ -97,7 +113,11 @@ order by tablename;
 
 ## 5. Seed the demo restaurant (2 min)
 
-**SQL Editor → New query.** Paste the contents of `supabase/seed.sql` (already generated — or regenerate with `npm run seed:sql`). Run it.
+**SQL Editor → New query.** Paste the contents of `supabase/seed.sql` (65 lines, already generated — or regenerate locally with `npm run seed:sql`).
+
+Raw copy: <https://github.com/aryanp685/new/blob/main/supabase/seed.sql>
+
+Run it.
 
 This creates the fictional **Saffron & Smoke**, its menu, 12 tables, and a QR token for each. It's idempotent, so running it twice is harmless.
 
@@ -164,20 +184,32 @@ If `qr_tokens` or `payments` return anything other than 0, **RLS is not working*
 
 ---
 
-## 8. Add the same keys to Netlify (2 min)
+## 8. Add the same keys to Vercel (2 min)
 
-The deploy won't have your local `.env.local`.
+The deployed site does **not** get your `.env.local` — Vercel builds straight from GitHub, and `.env.local` is gitignored, so it never leaves your machine. The keys have to be entered in the Vercel dashboard as well.
 
-**Netlify → Site configuration → Environment variables.** Add:
+**Vercel → your project → Settings → Environment Variables.** Add each of these. For each one, tick **Production, Preview, and Development**:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY
-NEXT_PUBLIC_SITE_URL      (your Netlify URL, e.g. https://your-site.netlify.app)
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+SUPABASE_SECRET_KEY
+NEXT_PUBLIC_SITE_URL      (your Vercel URL, e.g. https://new-xxxx.vercel.app)
 ```
 
-Then **Deploys → Trigger deploy → Deploy site**. Env vars only apply to new builds.
+> 🔴 **The secret key must be `SUPABASE_SECRET_KEY`, with no `NEXT_PUBLIC_`
+> prefix.** Next.js inlines every `NEXT_PUBLIC_*` variable into the browser
+> bundle, so `NEXT_PUBLIC_SUPABASE_SECRET_KEY` would send every visitor a key
+> that bypasses Row Level Security — they could read and modify every
+> restaurant's data. The app throws at startup if you get this wrong, but it is
+> better never to type it.
+>
+> Using legacy keys instead? The names are `NEXT_PUBLIC_SUPABASE_ANON_KEY` and
+> `SUPABASE_SERVICE_ROLE_KEY`. Same rule about the prefix.
+
+Then **Deployments → the ⋯ menu on the latest deployment → Redeploy**.
+
+Environment variables only affect **new** builds. An existing deployment keeps running with whatever it was built with, so without a redeploy you will see no change at all and conclude the keys are wrong when they are fine.
 
 ---
 
