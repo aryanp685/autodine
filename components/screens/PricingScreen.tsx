@@ -40,7 +40,13 @@ export function PricingScreen() {
               <ul className="pg__planList">
                 {plan.features.slice(0, 5).map((feature) => <li key={feature}>{feature}</li>)}
               </ul>
-              <Link href="/menu" className="pg__planBtn">Explore the menu demo</Link>
+              {/* Every plan leads to the same signup; the plan is chosen
+                  there. Signup is real -- signUpAction creates the
+                  restaurant and its 10-day trial -- so this is the
+                  conversion path, not a demo link. */}
+              <Link href="/signup" className="pg__planBtn">
+                Choose {plan.name}
+              </Link>
             </article>
           ))}
         </section>

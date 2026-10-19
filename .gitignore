@@ -36,3 +36,9 @@ yarn-error.log*
 
 # Internal planning notes and operational runbooks are kept locally, not published.
 /docs/*.md
+
+# scratch scripts
+_shot.mjs
+_qrcheck.mjs
+_opt.mjs
+_h*.mjs

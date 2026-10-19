@@ -27,12 +27,27 @@ export function QrChip({ value, size = 96 }: { value: string; size?: number }) {
     return ring(0, 0) ?? ring(0, n - 7) ?? ring(n - 7, 0);
   };
 
-  const cells: React.ReactNode[] = [];
+  // One <path>, not one <rect> per dark cell.
+  //
+  // The obvious version pushes a <rect> for each of the ~210 dark cells in the
+  // grid. That is 210 React elements per chip, and the RSC payload serialises
+  // every one of them. /dashboard/tables renders 18 chips, so a single page
+  // carried ~3,800 elements and 586 KB of HTML -- 23x the next heaviest page.
+  //
+  // Horizontal runs are merged, so a row of adjacent dark cells is one
+  // subpath. The rendered result is identical: same cells, same fill.
+  const parts: string[] = [];
   for (let r = 0; r < n; r++) {
-    for (let c = 0; c < n; c++) {
-      const f = isFinder(r, c);
-      const on = f === null ? rand(r * n + c) > 0.52 : f;
-      if (on) cells.push(<rect key={`${r}-${c}`} x={c} y={r} width={1} height={1} />);
+    let runStart = -1;
+    for (let c = 0; c <= n; c++) {
+      const f = c < n ? isFinder(r, c) : null;
+      const on = c < n && (f === null ? rand(r * n + c) > 0.52 : f);
+      if (on && runStart < 0) runStart = c;
+      else if (!on && runStart >= 0) {
+        const w = c - runStart;
+        parts.push(`M${runStart} ${r}h${w}v1h-${w}z`);
+        runStart = -1;
+      }
     }
   }
 
@@ -45,7 +60,7 @@ export function QrChip({ value, size = 96 }: { value: string; size?: number }) {
       aria-label={`QR placeholder for ${value}`}
       style={{ background: '#fff', padding: 4, borderRadius: 6, display: 'block' }}
     >
-      <g fill="currentColor">{cells}</g>
+      <path d={parts.join('')} fill="currentColor" />
     </svg>
   );
 }
