@@ -1,0 +1,110 @@
+#!/usr/bin/env node
+/**
+ * Design system guard.
+ *
+ * The Editorial Minimal design is LOCKED. Locks decay unless something checks
+ * them on every commit, so this script fails the build when the CSS drifts.
+ *
+ * Run:  npm run design:check
+ * Reset the ratchet (only after a deliberate, approved reduction):
+ *        node scripts/check-design-system.mjs --update-baseline
+ */
+
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const BASELINE_PATH = join(ROOT, 'scripts', 'design-baseline.json');
+
+const cssFiles = [
+  ...readdirSync(join(ROOT, 'styles'))
+    .filter((f) => f.endsWith('.css'))
+    .map((f) => join(ROOT, 'styles', f)),
+  join(ROOT, 'app', 'globals.css'),
+].filter(existsSync);
+
+const problems = [];
+
+/* ---------------------------------------------------------------- rule 1 */
+/* The design has no drop shadows. Two exceptions are legitimate and are
+   allowed: `box-shadow: inset 0 -2px 0` is the hairline underline used for
+   active tabs (not a shadow at all), and the token `var(--shadow)` which is
+   set to `none` by the design system. */
+const ALLOWED_SHADOW = /inset|var\(--shadow\)|^\s*none\s*;?$/i;
+for (const file of cssFiles) {
+  const src = readFileSync(file, 'utf8');
+  src.split('\n').forEach((line, i) => {
+    const m = line.match(/box-shadow\s*:\s*([^;]+)/i);
+    if (!m) return;
+    const value = m[1].trim();
+    if (!ALLOWED_SHADOW.test(value)) {
+      problems.push(`${rel(file)}:${i + 1} drop shadow "${value}" — the locked design uses none. Use inset for hairline underlines, or var(--shadow).`);
+    }
+  });
+}
+
+/* ---------------------------------------------------------------- rule 2 */
+/* The A/B/C comparison harness was deleted. Its chrome must not creep back. */
+for (const file of [...cssFiles, join(ROOT, 'app'), join(ROOT, 'components')]) {
+  for (const f of walk(file)) {
+    if (!/\.(tsx?|css)$/.test(f)) continue;
+    const src = readFileSync(f, 'utf8');
+    src.split('\n').forEach((line, i) => {
+      if (/[."']proto-/.test(line)) {
+        problems.push(`${rel(f)}:${i + 1} prototype-harness reference — the A/B/C harness was deleted; do not reintroduce it.`);
+      }
+    });
+  }
+}
+
+/* ---------------------------------------------------------------- rule 3 */
+/* Hardcoded colours ratchet. The locked stylesheet predates this guard and
+   contains raw hex values that will not be rewritten (rewriting risks changing
+   the approved design). Instead of forbidding them, the count is frozen: it may
+   go down, never up. New styles must use the tokens. */
+function countHexOutsideTokens(src) {
+  // Skip the token declaration block, where hex is expected and correct.
+  const withoutTokens = src.replace(/\[data-app\]\s*\{[\s\S]*?\n\}/, '');
+  return (withoutTokens.match(/#[0-9a-fA-F]{3,8}\b/g) || []).length;
+}
+const hexCount = cssFiles.reduce((n, f) => n + countHexOutsideTokens(readFileSync(f, 'utf8')), 0);
+
+let baseline = existsSync(BASELINE_PATH) ? JSON.parse(readFileSync(BASELINE_PATH, 'utf8')).hexColours : null;
+
+if (process.argv.includes('--update-baseline') || baseline === null) {
+  writeFileSync(BASELINE_PATH, `${JSON.stringify({ hexColours: hexCount, note: 'Hardcoded hex outside the token block. May decrease, never increase.' }, null, 2)}\n`);
+  console.log(`Baseline recorded: ${hexCount} hardcoded hex values.`);
+  if (baseline !== null && hexCount < baseline) console.log(`Ratchet tightened from ${baseline}.`);
+  baseline = hexCount;
+} else if (hexCount > baseline) {
+  problems.push(
+    `Hardcoded colours grew from ${baseline} to ${hexCount} (+${hexCount - baseline}). ` +
+      `New styles must use the design tokens. If this is a deliberate reduction, ` +
+      `re-run with --update-baseline.`,
+  );
+}
+
+/* --------------------------------------------------------------- report */
+function rel(p) {
+  return p.replace(`${ROOT}/`, '');
+}
+function walk(target) {
+  const out = [];
+  if (!existsSync(target)) return out;
+  if (target.endsWith('.tsx') || target.endsWith('.ts') || target.endsWith('.css')) return [target];
+  for (const entry of readdirSync(target, { withFileTypes: true })) {
+    if (entry.name === 'node_modules' || entry.name === '.next') continue;
+    out.push(...walk(join(target, entry.name)));
+  }
+  return out;
+}
+
+if (problems.length) {
+  console.error('\nDesign system check FAILED:\n');
+  for (const p of problems) console.error(`  ✗ ${p}`);
+  console.error('');
+  process.exit(1);
+}
+
+console.log(`Design system check passed. (hex colours: ${hexCount} / budget ${baseline})`);
