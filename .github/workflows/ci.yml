@@ -29,6 +29,9 @@ jobs:
       - name: Design system guard
         run: npm run design:check
 
+      - name: Migration syntax check
+        run: npm run sql:check
+
       - name: Tests
         run: npm test
 
