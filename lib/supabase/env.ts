@@ -64,13 +64,29 @@ const SECRET_KEY = firstNonEmpty(
  * safety net, not a guarantee: curl sends no such header, and the header is
  * client-controlled anyway. So refuse to start.
  */
+function isSecretKey(key: string): boolean {
+  if (key.startsWith('sb_secret_')) return true;
+
+  // Legacy anon and service-role keys are both JWTs. Decode only the public
+  // role claim so a legacy service_role key cannot slip through this guard.
+  const payload = key.split('.')[1];
+  if (!payload) return false;
+  try {
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(payload.length / 4) * 4, '=');
+    return JSON.parse(atob(base64)).role === 'service_role';
+  } catch {
+    // A malformed value will fail Supabase authentication; do not mistake it
+    // for a confirmed secret key here.
+    return false;
+  }
+}
+
 function assertNotSecretKey(key: string): string {
-  if (key.startsWith('sb_secret_')) {
+  if (isSecretKey(key)) {
     throw new Error(
-      'Supabase: a secret key (sb_secret_...) was supplied through a ' +
-        'NEXT_PUBLIC_* variable. Secret keys bypass Row Level Security and ' +
-        'must never be inlined into the browser bundle. Put it in ' +
-        'SUPABASE_SECRET_KEY, with no NEXT_PUBLIC_ prefix.'
+      'Supabase: a secret/service_role key was supplied through a NEXT_PUBLIC_* variable. ' +
+        'Secret keys bypass Row Level Security and must never be inlined into the browser bundle. ' +
+        'Put it in SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY, with no NEXT_PUBLIC_ prefix.'
     );
   }
   return key;
