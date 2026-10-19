@@ -28,7 +28,16 @@ export function Home() {
       </nav>
 
       <header className="home__hero">
-        <img className="home__heroImg" src="/img/restaurant-interior.jpg" alt="Restaurant dining room at dusk" />
+        {/* Full-bleed, so it is always viewport-wide. srcset lets a phone pull
+            the 640w file (33 KB) instead of the 1400w one (130 KB). Same image,
+            same crop -- only the decoded resolution differs. */}
+        <img
+          className="home__heroImg"
+          src="/img/restaurant-interior.jpg"
+          srcSet="/img/restaurant-interior-640.jpg 640w, /img/restaurant-interior-1024.jpg 1024w, /img/restaurant-interior-1400.jpg 1400w"
+          sizes="100vw"
+          alt="Restaurant dining room at dusk"
+        />
         <div className="home__heroShade" />
         <div className="home__heroBody">
           <div className="home__kicker">Restaurant QR ordering &amp; management</div>
