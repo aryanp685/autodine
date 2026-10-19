@@ -33,3 +33,9 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+# scratch scripts
+_shot.mjs
+_qrcheck.mjs
+_opt.mjs
+_h*.mjs
