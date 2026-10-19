@@ -45,7 +45,11 @@ export function PricingScreen() {
                   <li key={f}>{f}</li>
                 ))}
               </ul>
-              <span className="pg__planBtn">Choose {p.name}</span>
+              {/* Every plan leads to the same signup; the plan is chosen
+                  there. Was an inert span with no destination at all. */}
+              <Link href="/signup" className="pg__planBtn">
+                Choose {p.name}
+              </Link>
             </div>
           ))}
         </section>

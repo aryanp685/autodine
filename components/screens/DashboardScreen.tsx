@@ -49,8 +49,15 @@ export function Dashboard() {
             <h1 className="dash__h1">Good evening, Aryan</h1>
           </div>
           <div className="dash__headRight">
-            <span className="dash__ghostBtn">Publish menu</span>
-            <span className="dash__solidBtn">Open kitchen board</span>
+            {/* Both of these had real destinations waiting and were inert
+                spans. globals.css resets `a { color: inherit; text-decoration:
+                none }`, so these render identically to the spans they replace. */}
+            <Link href="/dashboard/menus" className="dash__ghostBtn">
+              Publish menu
+            </Link>
+            <Link href="/kitchen" className="dash__solidBtn">
+              Open kitchen board
+            </Link>
             <Avatar initials="AP" />
           </div>
         </header>
