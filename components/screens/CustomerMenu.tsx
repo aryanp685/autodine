@@ -2,22 +2,82 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { categories, items, restaurant, type Item } from '@/lib/demo-data';
+import {
+  categories as demoCategories,
+  items as demoItems,
+  restaurant as demoRestaurant,
+  type Item,
+} from '@/lib/demo-data';
+import type {
+  DisplayCategory,
+  DisplayItem,
+  DisplayModifierGroup,
+  DisplayRestaurant,
+} from '@/lib/db/adapt';
 import { useCart } from '@/components/CartProvider';
 import { inr } from '@/lib/demo-data';
 import { lineTotal, paiseToRupees, rupeesToPaise } from '@/lib/money';
 import { VegMark } from '@/components/ui';
 
-const byCat = (id: string) => (id === 'all' ? items : items.filter((i) => i.category === id));
 const needsChoice = (i: Item) => Boolean(i.variants || i.modifiers);
+
+/**
+ * Preset add-on groups, used when an item carries none.
+ *
+ * The database has no modifier concept yet, so every real dish would
+ * otherwise render the customisation sheet with no spice and no bread group.
+ * These mirror the demo data exactly, so the locked layout is identical
+ * whichever source the data came from.
+ */
+const PRESET_SPICE: DisplayModifierGroup = {
+  id: 'spice',
+  name: 'Spice level',
+  type: 'single',
+  required: true,
+  options: [
+    { id: 'mild', name: 'Mild', price: 0 },
+    { id: 'medium', name: 'Medium', price: 0 },
+    { id: 'hot', name: 'Hot', price: 0 },
+  ],
+};
+
+const PRESET_BREAD: DisplayModifierGroup = {
+  id: 'bread',
+  name: 'Pair it with',
+  type: 'single',
+  options: [
+    { id: 'none', name: 'No bread', price: 0 },
+    { id: 'naan', name: 'Butter naan', price: 79 },
+    { id: 'roti', name: 'Tandoori roti', price: 59 },
+  ],
+};
+
+/**
+ * Everything a menu screen shows, already in display units (rupees).
+ *
+ * Optional on purpose. The locked screens render identically with no data
+ * passed -- they fall back to the demo content rather than breaking -- so
+ * wiring one screen at a time is safe.
+ */
+export type MenuScreenData = {
+  restaurant: DisplayRestaurant;
+  categories: DisplayCategory[];
+  items: DisplayItem[];
+};
 
 /* ============================================================================
    Editorial Minimal — locked design system customer menu
    ========================================================================== */
-export function CustomerMenu() {
+export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
   const cart = useCart();
   const [cat, setCat] = useState('all');
-  const list = byCat(cat);
+
+  // Deliberately named to shadow the demo imports, so that not one line of
+  // the locked JSX below had to change to accept real data.
+  const restaurant = data?.restaurant ?? demoRestaurant;
+  const categories = data?.categories ?? demoCategories;
+  const items = data?.items ?? demoItems;
+  const list = cat === 'all' ? items : items.filter((i) => i.category === cat);
 
   return (
     <div className="menu">
@@ -97,15 +157,37 @@ export function CustomerMenu() {
 }
 
 /* Option A — item customization: centred sheet, hairlines, no chrome */
-export function ItemSheet() {
-  const item = items.find((i) => i.id === 'it-butter-chicken')!;
-  const [variant, setVariant] = useState(item.variants![0].id);
+export function ItemSheet({ data }: { data?: MenuScreenData & { itemId?: string } } = {}) {
+  const allItems = data?.items ?? demoItems;
+  const restaurant = data?.restaurant ?? demoRestaurant;
+
+  // This sheet customises a dish, so it needs one that has portions to choose
+  // between.
+  //
+  // Order matters, and getting it wrong is a visible regression: with no real
+  // data the sheet must keep showing Butter Chicken, because that is what the
+  // locked design has always shown here. Preferring "first item with variants"
+  // unconditionally made it show Paneer Tikka instead.
+  //
+  // The original also did item.variants![0] unconditionally. That holds for
+  // the demo data, where the chosen dish always has portions, but against a
+  // real menu it throws the moment the item has none -- which is most of them.
+  const item =
+    (data?.itemId ? allItems.find((i) => i.id === data.itemId) : undefined) ??
+    // Real menu, no id requested: show the menu's own first customisable dish.
+    (data ? allItems.find((i) => i.variants && i.variants.length > 0) ?? allItems[0] : undefined) ??
+    demoItems.find((i) => i.id === 'it-butter-chicken')!;
+
+  const variants = item.variants ?? [];
+  const [variant, setVariant] = useState(variants[0]?.id ?? '');
   const [spice, setSpice] = useState('medium');
   const [bread, setBread] = useState('naan');
   const [qty, setQty] = useState(1);
   const cart = useCart();
 
-  const vPrice = item.variants!.find((v) => v.id === variant)!.price;
+  const vPrice = variants.find((v) => v.id === variant)?.price ?? item.price;
+  const spiceGroup = item.modifiers?.[0] ?? PRESET_SPICE;
+  const breadGroup = item.modifiers?.[1] ?? PRESET_BREAD;
   const addonPrice = bread === 'naan' ? 79 : bread === 'roti' ? 59 : 0;
   const total = lineTotal(rupeesToPaise(vPrice + addonPrice), qty);
 
@@ -122,7 +204,7 @@ export function ItemSheet() {
       </header>
 
       <div className="menu__list menu__list--dim">
-        {items.slice(0, 3).map((i) => (
+        {allItems.slice(0, 3).map((i) => (
           <article key={i.id} className="menu__dish">
             <div className="menu__dishBody">
               <div className="menu__dishTop">
@@ -152,7 +234,7 @@ export function ItemSheet() {
 
           <div className="sheet__group">
             <div className="sheet__label">Portion</div>
-            {item.variants!.map((v) => (
+            {variants.map((v) => (
               <label key={v.id} className={`sheet__opt ${variant === v.id ? 'is-on' : ''}`}>
                 <input type="radio" name="variant" checked={variant === v.id} onChange={() => setVariant(v.id)} />
                 <span>{v.name}</span>
@@ -164,7 +246,7 @@ export function ItemSheet() {
           <div className="sheet__group">
             <div className="sheet__label">Spice level · required</div>
             <div className="sheet__chips">
-              {item.modifiers![0].options.map((o) => (
+              {spiceGroup.options.map((o) => (
                 <button
                   key={o.id}
                   className={`sheet__chip ${spice === o.id ? 'is-on' : ''}`}
@@ -178,7 +260,7 @@ export function ItemSheet() {
 
           <div className="sheet__group">
             <div className="sheet__label">Pair it with</div>
-            {item.modifiers![1].options.map((o) => (
+            {breadGroup.options.map((o) => (
               <label key={o.id} className={`sheet__opt ${bread === o.id ? 'is-on' : ''}`}>
                 <input type="radio" name="bread" checked={bread === o.id} onChange={() => setBread(o.id)} />
                 <span>{o.name}</span>
@@ -205,7 +287,9 @@ export function ItemSheet() {
                   name: item.name,
                   unitPricePaise: rupeesToPaise(vPrice + addonPrice),
                   qty,
-                  variant: item.variants!.find((v) => v.id === variant)!.name,
+                  // Undefined when the dish has no portions, so the cart line
+                  // simply carries no variant instead of throwing.
+                  variant: variants.find((v) => v.id === variant)?.name,
                   addons: [spice, bread === 'none' ? '' : `Bread: ${bread}`].filter(Boolean),
                   veg: item.veg,
                 });
