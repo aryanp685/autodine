@@ -26,6 +26,19 @@ function fail(path: string, message: string): never {
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD = 10;
 
+async function rollbackSignup(
+  admin: NonNullable<ReturnType<typeof getSupabaseAdmin>>,
+  userId: string,
+  restaurantId?: string,
+) {
+  // Signup spans Supabase Auth and several Postgres inserts, which cannot share
+  // one transaction. Compensate on failure so a partial workspace is not left
+  // behind and logged as a successful registration.
+  if (restaurantId) await admin.from('restaurants').delete().eq('id', restaurantId);
+  await admin.from('profiles').delete().eq('id', userId);
+  await admin.auth.admin.deleteUser(userId);
+}
+
 export async function signUpAction(formData: FormData): Promise<void> {
   const fullName = String(formData.get('fullName') ?? '').trim();
   const restaurantName = String(formData.get('restaurantName') ?? '').trim();
@@ -39,8 +52,8 @@ export async function signUpAction(formData: FormData): Promise<void> {
   if (!fullName || !restaurantName) fail('/signup', 'Please enter your name and your restaurant name.');
   if (!EMAIL.test(email)) fail('/signup', 'Please enter a valid email address.');
   if (password.length < MIN_PASSWORD) fail('/signup', `Password must be at least ${MIN_PASSWORD} characters.`);
-  // DPDP: consent must be explicit. A pre-ticked box is not consent.
-  if (!agreed) fail('/signup', 'Please accept the Terms of Service and Privacy Policy to continue.');
+  // Preview-account data use must be explicitly acknowledged.
+  if (!agreed) fail('/signup', 'Please confirm that you understand how this preview uses your account details.');
 
   const supabase = await createSupabaseServerClient();
   if (!supabase) fail('/signup', 'Sign-up is not available yet: the database is not connected.');
@@ -59,32 +72,54 @@ export async function signUpAction(formData: FormData): Promise<void> {
     options: { data: { full_name: fullName, phone } },
   });
 
-  if (authError) fail('/signup', authError.message);
+  if (authError) fail('/signup', 'We could not create your account. Please try again.');
 
   const userId = authData.user?.id;
   if (!userId) fail('/signup', 'We could not create your account. Please try again.');
+  // Supabase can return a user with no identities for an existing email when
+  // email-enumeration protection is enabled. Do not create a second workspace.
+  if (authData.user?.identities?.length === 0) {
+    redirect('/login?notice=If%20an%20account%20can%20be%20used%20with%20that%20email%2C%20sign%20in%20instead.');
+  }
 
-  const { error: profileError } = await admin
-    .from('profiles')
-    .upsert({ id: userId, full_name: fullName, phone }, { onConflict: 'id' });
-  if (profileError) fail('/signup', profileError.message);
+  let restaurantId: string | undefined;
+  try {
+    const { error: profileError } = await admin
+      .from('profiles')
+      .upsert({ id: userId, full_name: fullName, phone }, { onConflict: 'id' });
+    if (profileError) throw profileError;
 
-  const { data: restaurant, error: restaurantError } = await admin
-    .from('restaurants')
-    .insert({ slug, name: restaurantName, timezone: 'Asia/Kolkata' })
-    .select('id')
-    .single();
-  if (restaurantError) fail('/signup', restaurantError.message);
+    const { data: restaurant, error: restaurantError } = await admin
+      .from('restaurants')
+      .insert({ slug, name: restaurantName, timezone: 'Asia/Kolkata' })
+      .select('id')
+      .single();
+    if (restaurantError) throw restaurantError;
+    restaurantId = restaurant.id;
 
-  const { error: menuError } = await admin
-    .from('menus')
-    .insert({ restaurant_id: restaurant.id, name: 'Main menu', is_published: true });
-  if (menuError) fail('/signup', menuError.message);
+    const { error: menuError } = await admin
+      .from('menus')
+      .insert({ restaurant_id: restaurantId, name: 'Main menu', is_published: true });
+    if (menuError) throw menuError;
 
-  const { error: membershipError } = await admin
-    .from('memberships')
-    .insert({ restaurant_id: restaurant.id, user_id: userId, role: 'owner' });
-  if (membershipError) fail('/signup', membershipError.message);
+    const { error: membershipError } = await admin
+      .from('memberships')
+      .insert({ restaurant_id: restaurantId, user_id: userId, role: 'owner' });
+    if (membershipError) throw membershipError;
+  } catch (error) {
+    try {
+      await rollbackSignup(admin, userId, restaurantId);
+    } catch (rollbackError) {
+      console.error('[autodine] signup rollback failed:', rollbackError);
+    }
+    try {
+      await supabase.auth.signOut();
+    } catch (signOutError) {
+      console.error('[autodine] signup session cleanup failed:', signOutError);
+    }
+    console.error('[autodine] workspace creation failed:', error);
+    fail('/signup', 'We could not finish setting up your workspace. Please try again.');
+  }
 
   // With email confirmation ON there is no session yet. Sending them to the
   // dashboard would bounce them straight back out, so say what happened.
@@ -100,6 +135,11 @@ export async function signInAction(formData: FormData): Promise<void> {
     .trim()
     .toLowerCase();
   const password = String(formData.get('password') ?? '');
+  const requestedNext = String(formData.get('next') ?? '');
+  // Only accept same-origin pathnames. Never turn the login form into an open redirect.
+  const next = requestedNext.startsWith('/') && !requestedNext.startsWith('//') && !requestedNext.includes('\\')
+    ? requestedNext
+    : '/dashboard';
 
   if (!email || !password) fail('/login', 'Please enter your email and password.');
 
@@ -113,7 +153,7 @@ export async function signInAction(formData: FormData): Promise<void> {
     fail('/login', 'Email or password is incorrect.');
   }
 
-  redirect('/dashboard');
+  redirect(next);
 }
 
 export async function signOutAction(): Promise<void> {

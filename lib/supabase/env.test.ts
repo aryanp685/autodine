@@ -112,6 +112,20 @@ describe('supabase env', () => {
       await expect(loadEnv()).rejects.toThrow(/secret key/i);
     });
 
+    it('throws when a legacy service_role JWT is passed as a public key', async () => {
+      const payload = btoa(JSON.stringify({ role: 'service_role' }));
+      vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', `eyJhbGciOiJIUzI1NiJ9.${payload}.signature`);
+
+      await expect(loadEnv()).rejects.toThrow(/service_role key/i);
+    });
+
+    it('allows a legacy anon JWT by its role claim', async () => {
+      const payload = btoa(JSON.stringify({ role: 'anon' }));
+      vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', `eyJhbGciOiJIUzI1NiJ9.${payload}.signature`);
+
+      await expect(loadEnv()).resolves.toBeTruthy();
+    });
+
     it('explains how to fix it, not just that it broke', async () => {
       vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'sb_secret_leaked');
 

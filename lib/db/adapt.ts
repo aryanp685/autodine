@@ -65,6 +65,8 @@ export type DisplayCategory = {
  * uses rather than rendering blank or `undefined`.
  */
 export type DisplayRestaurant = {
+  /** Restaurant slug is used to preserve context between menu and item routes. */
+  slug?: string;
   name: string;
   tagline: string;
   address: string;
@@ -120,6 +122,7 @@ export function toDisplayCategories(
 
 export function toDisplayRestaurant(r: Restaurant): DisplayRestaurant {
   return {
+    slug: r.slug,
     name: r.name,
     tagline: r.tagline ?? '',
     address: r.address ?? '',

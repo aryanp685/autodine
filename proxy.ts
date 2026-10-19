@@ -1,7 +1,7 @@
 /**
- * Session refresh and dashboard protection.
+ * Session refresh and owner/staff route protection.
  *
- * Runs on the edge for every /dashboard request. Two jobs:
+ * Runs in the Next.js request proxy for owner and staff application routes. Two jobs:
  *   1. Refresh the Supabase session cookie so it does not silently expire
  *      while someone is working.
  *   2. Send signed-out visitors to /login.
@@ -15,7 +15,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL, isSupabaseConfigured } from '@/lib/supabase/env';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   if (!isSupabaseConfigured) return NextResponse.next();
 
   let response = NextResponse.next({ request: { headers: request.headers } });
@@ -47,5 +47,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*'],
+  matcher: ['/dashboard/:path*', '/kitchen/:path*', '/cashier/:path*'],
 };

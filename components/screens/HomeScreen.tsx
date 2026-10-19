@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { inr, plans } from '@/lib/demo-data';
 
@@ -11,33 +12,18 @@ export function Home() {
       <nav className="home__nav">
         <Link href="/" className="home__brand">AutoDine</Link>
         <ul className="home__links">
-          <li>Product</li>
-          <li>
-            <Link href="/pricing">Pricing</Link>
-          </li>
-          <li>
-            <Link href="/menu">Demo</Link>
-          </li>
-          <li>FAQs</li>
-          <li>Contact</li>
+          <li><a href="#product">Product</a></li>
+          <li><Link href="/pricing">Pricing</Link></li>
+          <li><Link href="/menu">Menu demo</Link></li>
         </ul>
         <div className="home__navRight">
-          <span className="home__navLink">Sign in</span>
-          <Link href="/signup" className="home__navCta">Start 10-day trial</Link>
+          <Link href="/login" className="home__navLink">Sign in</Link>
+          <Link href="/signup" className="home__navCta">Create account</Link>
         </div>
       </nav>
 
       <header className="home__hero">
-        {/* Full-bleed, so it is always viewport-wide. srcset lets a phone pull
-            the 640w file (33 KB) instead of the 1400w one (130 KB). Same image,
-            same crop -- only the decoded resolution differs. */}
-        <img
-          className="home__heroImg"
-          src="/img/restaurant-interior.jpg"
-          srcSet="/img/restaurant-interior-640.jpg 640w, /img/restaurant-interior-1024.jpg 1024w, /img/restaurant-interior-1400.jpg 1400w"
-          sizes="100vw"
-          alt="Restaurant dining room at dusk"
-        />
+        <Image className="home__heroImg" src="/img/restaurant-interior.jpg" alt="Restaurant dining room at dusk" fill priority sizes="100vw" />
         <div className="home__heroShade" />
         <div className="home__heroBody">
           <div className="home__kicker">Restaurant QR ordering &amp; management</div>
@@ -47,24 +33,23 @@ export function Home() {
             one quiet system.
           </h1>
           <p className="home__lede">
-            Publish your menu, print your table QR codes, take orders, tell the kitchen, take payment and
-            issue the receipt — from one dashboard.
+            A focused preview of the restaurant ordering experience we are building. Browse the sample menu and see how the customer, kitchen and counter screens fit together.
           </p>
           <div className="home__ctas">
-            <Link href="/signup" className="home__btn home__btn--solid">Start 10-day trial</Link>
+            <Link href="/signup" className="home__btn home__btn--solid">Create account</Link>
             <Link href="/menu" className="home__btn home__btn--line">See the demo</Link>
           </div>
-          <div className="home__note">Plans start at {inr(899)}/month · 10-day trial on every new account</div>
+          <div className="home__note">Preview only · live ordering, payments and subscriptions are not enabled</div>
         </div>
       </header>
 
-      <section className="home__section">
+      <section className="home__section" id="product">
         <div className="home__rule" />
         <div className="home__three">
           {[
-            ['01', 'The menu, done once', 'Build it once with categories, variants and add-ons. Import a printed menu with AI and correct it before it goes live.'],
-            ['02', 'Orders that reach the kitchen', 'Each table gets its own QR. Orders land on the kitchen board and are announced out loud, with no app install for the guest.'],
-            ['03', 'Payment that reconciles', 'Online payment or pay at the counter — both tracked separately from preparation, so nothing is marked paid by mistake.'],
+            ['01', 'A clear digital menu', 'Explore sample categories, dish options and a mobile-friendly menu layout. Menu editing and publishing are still being built.'],
+            ['02', 'A connected service flow', 'The preview brings the customer menu, kitchen board and counter screens together. Live order delivery is not enabled yet.'],
+            ['03', 'Payments, designed carefully', 'Online and counter payment flows are represented in the interface. No payment provider is connected and no charge can be made.'],
           ].map(([n, title, body]) => (
             <article key={n} className="home__col">
               <div className="home__num">{n}</div>
@@ -78,9 +63,9 @@ export function Home() {
       <section className="home__band">
         <div className="home__bandInner">
           {[
-            ['11 min', 'Average order to table'],
-            ['0', 'Apps your guest must install'],
-            ['2', 'Payment paths: online or counter'],
+            ['Browser', 'No customer app install planned'],
+            ['Table QR', 'Designed around table service'],
+            ['Two paths', 'Online and counter payments planned'],
           ].map(([v, l]) => (
             <div key={l} className="home__stat">
               <div className="home__statValue">{v}</div>
@@ -105,13 +90,13 @@ export function Home() {
                   <li key={f}>{f}</li>
                 ))}
               </ul>
-              <Link href="/signup" className="home__planLink">Choose {p.name} →</Link>
+              <Link href="/pricing" className="home__planLink">Preview {p.name} →</Link>
             </div>
           ))}
         </div>
         <p className="home__fine">
-          Prices are listed in INR. The exact tax treatment and invoice presentation are being confirmed
-          before subscriptions go live and will be stated clearly at checkout.
+          Plan names, prices and features are illustrative preview content. Trials, subscriptions and billing
+          are not enabled.
         </p>
       </section>
 
@@ -119,19 +104,19 @@ export function Home() {
         <Link href="/" className="home__footBrand">AutoDine</Link>
         <div className="home__footCols">
           <div>
-            <div className="home__footTitle">Product</div>
-            <p>Menus · QR codes · Ordering · Kitchen · Payments · Reports</p>
+            <div className="home__footTitle">Explore</div>
+            <p><Link href="/#product">Product preview</Link> · <Link href="/pricing">Planned pricing</Link> · <Link href="/menu">Menu demo</Link></p>
           </div>
           <div>
-            <div className="home__footTitle">Company</div>
-            <p>About · Contact · Careers</p>
+            <div className="home__footTitle">Preview scope</div>
+            <p>Sample restaurant content. No live orders, payment collection or subscriptions.</p>
           </div>
           <div>
-            <div className="home__footTitle">Legal</div>
-            <p>Privacy · Terms · Refunds &amp; cancellation</p>
+            <div className="home__footTitle">Accounts</div>
+            <p><Link href="/login">Sign in</Link> · <Link href="/signup">Create account</Link></p>
           </div>
         </div>
-        <div className="home__footFine">Prototype screen · content is sample copy</div>
+        <div className="home__footFine">AutoDine · Product preview · not for live restaurant operations</div>
       </footer>
     </div>
   );

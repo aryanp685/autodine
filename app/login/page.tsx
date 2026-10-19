@@ -8,6 +8,6 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ error?: string; notice?: string; next?: string }>;
 }) {
-  const { error, notice } = await searchParams;
-  return <LoginScreen error={error} notice={notice} />;
+  const { error, notice, next } = await searchParams;
+  return <LoginScreen error={error} notice={notice} next={next} />;
 }

@@ -39,14 +39,6 @@ type Table<Row, Rel extends unknown[] = []> = {
   Relationships: Rel;
 };
 
-type Rel = {
-  foreignKeyName: string;
-  columns: string[];
-  isOneToOne: boolean;
-  referencedRelation: string;
-  referencedColumns: string[];
-};
-
 export type MemberRole = 'owner' | 'manager' | 'kitchen' | 'cashier';
 
 export type Database = {

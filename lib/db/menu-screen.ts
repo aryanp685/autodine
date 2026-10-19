@@ -8,14 +8,11 @@
  *      Not passing data keeps the locked markup and its sample content
  *      byte-for-byte identical, so the design baseline does not move.
  *
- *   2. A real query failed. Also null, so the page still renders rather than
- *      showing a stack trace to a guest.
+ *   2. A real query failed. This is thrown to the route error boundary rather
+ *      than silently replacing a live restaurant's menu with fictional dishes.
  *
- * Case 2 is logged loudly, because it is the dangerous one: a guest would be
- * looking at sample dishes and believing they are the restaurant's menu. Once
- * the database is reliably connected, this should stop swallowing errors and
- * let the page fail -- see the note in lib/db/menu.ts about deleting the
- * demo fallback.
+ * A connected database returning no restaurant is distinct from demo mode:
+ * callers must show a not-found state, never the built-in sample menu.
  */
 
 import { isSupabaseConfigured } from '@/lib/supabase/env';
@@ -42,9 +39,9 @@ export async function getMenuScreenData(slug?: string): Promise<MenuScreenData |
     return data ? toDisplayMenu(data) : null;
   } catch (error) {
     console.error(
-      `[autodine] failed to load menu for "${target}", falling back to sample data:`,
+      `[autodine] failed to load menu for "${target}":`,
       error instanceof Error ? error.message : error
     );
-    return null;
+    throw error;
   }
 }

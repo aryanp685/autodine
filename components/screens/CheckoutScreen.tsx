@@ -108,13 +108,15 @@ export function Checkout() {
             <span>Total payable</span>
             <span className="tnum">{inr(paiseToRupees(t.totalPaise))}</span>
           </div>
-          <button className="co__cta">
-            {method === 'online'
-              ? `Pay ${inr(paiseToRupees(t.totalPaise))}`
-              : `Place order · ${inr(paiseToRupees(t.totalPaise))}`}
+          <button className="co__cta" type="button" disabled={cart.lines.length === 0}>
+            {cart.lines.length === 0
+              ? 'Add items before checkout'
+              : method === 'online'
+                ? `Preview payment · ${inr(paiseToRupees(t.totalPaise))}`
+                : `Preview order · ${inr(paiseToRupees(t.totalPaise))}`}
           </button>
-          <p className="co__fine">
-            Prototype button — no payment provider is connected and no charge is made.
+          <p className="co__fine" role="note">
+            Preview only. No order is submitted, no payment provider is connected and no charge is made.
           </p>
         </aside>
       </div>

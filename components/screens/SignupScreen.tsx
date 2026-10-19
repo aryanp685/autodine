@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { signUpAction } from '@/app/auth/actions';
-import { inr, trial } from '@/lib/demo-data';
 
 /**
  * Shared page structure; styled by the locked design system.
@@ -25,10 +24,11 @@ export function SignupScreen({ error }: { error?: string }) {
 
       <div className="pg__body pg__body--split">
         <section className="pg__formCard">
-          <div className="pg__kicker">Create your account</div>
-          <h1 className="pg__title pg__title--sm">Start your {trial.days}-day trial</h1>
+          <div className="pg__kicker">Early preview</div>
+          <h1 className="pg__title pg__title--sm">Create your restaurant account</h1>
           <p className="pg__p">
-            All features are unlocked during the trial. We ask for payment details only when you choose a plan.
+            Account creation requires a configured AutoDine backend. This preview does not activate a paid plan,
+            trial entitlement or live ordering workflow.
           </p>
 
           {error && (
@@ -64,7 +64,7 @@ export function SignupScreen({ error }: { error?: string }) {
                 placeholder="owner@restaurant.in"
                 required
               />
-              <span className="ui-hint">Used for receipts, trial reminders and account recovery.</span>
+              <span className="ui-hint">Used to create and secure your preview account.</span>
             </label>
             <label className="ui-field">
               <span className="ui-label">Mobile number</span>
@@ -92,50 +92,35 @@ export function SignupScreen({ error }: { error?: string }) {
             <label className="ui-check pg__check">
               <input type="checkbox" name="agree" />
               <span>
-                I agree to the Terms of Service and Privacy Policy, and to receive trial reminder emails.
+                I understand this is a preview and agree that my details will be used to create this account in the configured Supabase project.
               </span>
             </label>
 
             <button className="pg__submit" type="submit">
-              Create account &amp; start trial
+              Create account
             </button>
             <p className="pg__fine">
-              Your restaurant workspace and {trial.days}-day trial start immediately. The trial clock is recorded on
-              the server, not in your browser.
+              Demo accounts create a restaurant workspace when the Supabase project is configured. No trial or
+              subscription is created by this form.
             </p>
           </form>
         </section>
 
         <aside className="pg__aside">
           <div className="pg__asideCard">
-            <div className="pg__asideHead">What happens next</div>
+            <div className="pg__asideHead">What this preview includes</div>
             <ol className="pg__steps">
-              <li>
-                <strong>Day 0</strong> — your restaurant workspace is created and the {trial.days}-day trial
-                starts. The start and expiry timestamps are recorded on the server.
-              </li>
-              <li>
-                <strong>Day 0–{trial.days}</strong> — every feature is available, including AI menu import,
-                QR codes, online payments and the kitchen board.
-              </li>
-              <li>
-                <strong>Day {trial.days - 3} and {trial.days - 1}</strong> — reminders appear in the dashboard
-                and by email.
-              </li>
-              <li>
-                <strong>Day {trial.days}</strong> — choose a plan from {inr(899)}/month. If you don&apos;t, the
-                account becomes read-only: your menus, orders, receipts and reports stay, but new customer
-                orders are blocked.
-              </li>
+              <li><strong>Account access</strong> — Supabase signup and sign-in actions are available when a project is configured.</li>
+              <li><strong>Workspace foundation</strong> — signup creates an initial restaurant, menu and owner membership.</li>
+              <li><strong>Sample experience</strong> — explore the menu, dashboard, kitchen and counter screens with fictional data.</li>
             </ol>
           </div>
 
           <div className="pg__asideCard pg__asideCard--quiet">
-            <div className="pg__asideHead">Trial abuse prevention</div>
+            <div className="pg__asideHead">Not active yet</div>
             <p className="pg__p">
-              Trial eligibility is decided on the server using account, restaurant and payment identifiers —
-              not by the browser. Repeatedly recreating accounts to restart a trial will not extend access.
-              Genuine new restaurants are not affected.
+              There is no live order placement, payment processing, trial enforcement or subscription billing.
+              Do not enter payment details or use this preview for restaurant operations.
             </p>
           </div>
         </aside>
