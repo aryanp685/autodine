@@ -78,7 +78,7 @@ export function TablesScreen({
             <form action={addTableAction} className="pg__headActions">
               <label className="ui-field ui-field--inline">
                 <span className="ui-label ui-label--sr">Seats</span>
-                <select className="ui-select" name="seats" defaultValue="4">
+                <select className="ui-select" name="seats" defaultValue="4" disabled={!live}>
                   {[2, 4, 6, 8, 10].map((n) => (
                     <option key={n} value={n}>
                       {n} seats
@@ -86,7 +86,9 @@ export function TablesScreen({
                   ))}
                 </select>
               </label>
-              <button type="submit" className="pg__btn pg__btn--solid">
+              {/* Without a database this submit can only fail, so it does not
+                  render as live. The warning above explains why. */}
+              <button type="submit" className="pg__btn pg__btn--solid" disabled={!live}>
                 Add table
               </button>
             </form>

@@ -795,6 +795,18 @@
     align-items: center;
     justify-content: center;
   }
+
+  /* Form fields are 37px at their desktop padding. Text inputs get the 44px
+     minimum too -- this is also what stops iOS zooming the viewport on focus,
+     since Safari only zooms for fields it considers small. */
+  .ui-input,
+  .ui-select,
+  [data-app] .ui-input,
+  [data-app] .ui-select {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  textarea.ui-input { min-height: auto; }
   [data-app] .pg__formCard,
   [data-app] .pg__asideCard,
   [data-app] .pg__tableCard,
