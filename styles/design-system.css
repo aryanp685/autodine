@@ -16,6 +16,26 @@
   --radius: 3px;
   --radius-lg: 4px;
   background: var(--page-bg);
+
+  /* Names this element as the container that every `@container frame` rule
+     at the bottom of this file queries.
+     ---
+     This was missing, and its absence silently disabled the entire
+     responsive layer: a container query whose container is never declared
+     never matches, so all ~40 rules below were dead code and the layout
+     never adapted below 1000px. It looked like "the site is not
+     responsive", not like "a rule is broken".
+     ---
+     Deliberately a container query rather than a media query. This app is
+     often shown inside an iframe (design reviews, previews), where a media
+     query would measure the outer browser window instead of the space the
+     app actually has. A container query measures the real rendered width.
+     ---
+     `inline-size` implies `contain: layout style inline-size`. No `paint`,
+     so the sticky elements (.menu__cartBar, .cart__sum, .co__sum) are
+     unaffected, and there is no `position: fixed` anywhere to capture. */
+  container-name: frame;
+  container-type: inline-size;
 }
 
 [data-app] .ui-btn { border-radius: 2px; }
@@ -579,8 +599,24 @@
   .home__heroBody { padding: 40px 24px; }
   .home__foot { padding: 48px 24px; }
   .dash { grid-template-columns: 1fr; }
-  .dash__rail { border-right: 0; border-bottom: 1px solid var(--border); flex-direction: row; align-items: center; gap: 20px; overflow-x: auto; }
-  .dash__venue, .dash__nav, .dash__railFoot { display: none; }
+  .dash__rail {
+    border-right: 0; border-bottom: 1px solid var(--border);
+    flex-direction: row; align-items: center; gap: 20px;
+    padding: 12px 20px; overflow-x: auto;
+  }
+  .dash__venue, .dash__railFoot { display: none; }
+
+  /* The nav used to be hidden here alongside the venue, with nothing put in
+     its place -- which left the mobile dashboard with no way at all to reach
+     any other screen. It becomes a scrolling row instead. The venue is still
+     hidden because its name already appears in the main header. */
+  .dash__nav { margin-top: 0; display: flex; gap: 20px; overflow-x: auto; }
+  .dash__navItem { padding: 6px 0; white-space: nowrap; }
+  .dash__navItem.is-active {
+    border-left: 0; margin-left: 0; padding-left: 0;
+    border-bottom: 2px solid var(--text);
+  }
+
   .dash__main { padding: 28px 24px 64px; }
   .dash__stats { grid-template-columns: repeat(2, 1fr); gap: 24px; }
   .dash__split { grid-template-columns: 1fr; gap: 40px; }
@@ -606,4 +642,27 @@
   [data-app] .pg__states { grid-template-columns: 1fr; }
   [data-app] .pg__stateCard--wide { grid-column: auto; }
   [data-app] .pg__printGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Phones. The 1000px step above collapses multi-column layouts to one, but a
+   few things still crowd at 360-430px: the display heading is far too large,
+   and a two-up stat row leaves each figure about 150px wide. */
+@container frame (max-width: 600px) {
+  .home__hero { min-height: 440px; }
+  .home__h1 { font-size: 40px; letter-spacing: -0.03em; }
+  .home__heroBody { padding: 32px 20px; }
+
+  .dash__stats { grid-template-columns: 1fr; gap: 16px; }
+  .dash__h1 { font-size: 27px; }
+  .dash__head { flex-direction: column; align-items: flex-start; gap: 14px; }
+  .dash__main { padding: 22px 20px 56px; }
+
+  .menu__dish { gap: 14px; padding: 22px 0; }
+  .menu__dishImg { width: 60px; height: 60px; }
+  .menu__dishName { font-size: 17px; }
+  .menu__dishPrice { font-size: 16px; }
+
+  .kb__h1 { font-size: 22px; }
+  [data-app] .pg__printGrid { grid-template-columns: 1fr; }
+  [data-app] .pg__tables { grid-template-columns: 1fr; }
 }
