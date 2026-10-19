@@ -666,6 +666,22 @@
   [data-app] .pg__printGrid { grid-template-columns: 1fr; }
   [data-app] .pg__tables { grid-template-columns: 1fr; }
 
+  /* Two side-by-side inputs left each field ~160px on a 375px phone, which
+     is not enough for "Restaurant name" with its placeholder. Stack them. */
+  [data-app] .pg__fieldRow { grid-template-columns: 1fr; gap: 16px; }
+
+  /* minmax(0, 1fr) rather than 1fr: a plain 1fr track is floored at its
+     content's min-content width, so a long dish name pushes the row wider
+     than the viewport instead of wrapping. This keeps all four columns. */
+  .dash__rank li { grid-template-columns: 22px minmax(0, 1fr) auto auto; gap: 8px; }
+
+  /* The venue name and the "Table 7 · on-site verified 12:41 PM" badge sit
+     side by side and together exceed a phone's width, so the verified badge
+     was pushing the header wider than the screen. Stack them. */
+  .menu__head { flex-direction: column; align-items: flex-start; gap: 14px; }
+  .menu__venueName { font-size: 25px; }
+  .menu__verified { font-size: 12.5px; }
+
   /* Touch targets. Several controls are 24-32px tall, well under the ~44px
      that makes a target reliably hittable with a thumb. Grown on phones
      only -- desktop spacing is left exactly as the locked design has it. */
