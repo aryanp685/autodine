@@ -5,6 +5,103 @@
 
 ---
 
+## Update — end of day, 2026-10-19
+
+The numbers below have moved since this was first written. Supabase exists
+now and the schema is applied, so M1 is partly done rather than not started.
+Deploy is live on Vercel. The frontend proportion has not changed: the
+screens are still almost entirely on mock data.
+
+| | Then | Now |
+|---|---|---|
+| M0 foundations | done | done |
+| M1 schema + RLS | 0% | **~60%** — schema applied, one migration not yet run |
+| Deploy | blocked on you | **live on Vercel** |
+| Screens on real data | 0 of 14 | **1 of 13** (`CustomerMenu`) + login/signup auth |
+
+### What was done today
+
+1. **The site was not responsive at all, and nothing said so.**
+   `design-system.css` had ~40 responsive rules inside
+   `@container frame (max-width: 1000px)`, but `container-name: frame` was
+   declared nowhere in the codebase. An undeclared container never matches,
+   so the whole responsive layer was dead code. No console error, no build
+   warning, no lint failure. Fixed by declaring the container on `[data-app]`.
+   Inside the same query, `.dash__nav` was `display: none` on mobile with
+   nothing in its place — the dashboard had no navigation on a phone. Added a
+   600px phone breakpoint too.
+2. **`/dashboard/tables` was 1.1 MB of HTML, 23× the next heaviest page.**
+   The QR placeholder drew one `<rect>` per dark cell: ~247 per code, 18
+   codes, each serialised as its own React element. It is now one `<path>`
+   per code with runs merged — 4,264 elements became 18. 586 KB → 104 KB
+   raw, 13.9 KB gzipped. The rendered QR is byte-identical in shape.
+3. **Images were 1,168 KB.** Three dish photos were 1536×1024 and render in
+   a 104px square — about 7× more pixels than the layout can show. Now 256px
+   squares (13–18 KB each). The hero ships three widths behind `srcset`, so a
+   phone pulls 33 KB instead of 130 KB. Total 216 KB.
+4. **`/states` removed from the public site.** It was a design gallery of
+   empty/loading/error/locked states, linked from nothing but the docs, and
+   carried nine dead controls. The route is gone; the component stays in the
+   repo because it is the only place the post-trial locked layout is designed,
+   and that state is a real requirement.
+5. **Three inert controls wired.** "Publish menu", "Open kitchen board" and
+   "Choose *plan*" were spans styled as buttons with no behaviour. All three
+   had destinations that already exist.
+6. **Touch targets grown on phones only.** Several controls were 24–32px
+   tall. Desktop spacing is untouched.
+
+### What is genuinely finished vs what only looks finished
+
+**Real — backed by the database or by live auth:**
+
+- `CustomerMenu` — reads real restaurants, menus, categories, items, variants
+- `LoginScreen` — 100% real, calls `signInAction`
+- `SignupScreen` — real `signUpAction` creates a restaurant, menu and
+  membership; only the trial copy is a constant
+- Money maths (`lib/money.ts`, `lib/pricing.ts`) — integer paise, tested
+- The design system, and the ESLint guard that freezes it
+
+**Looks finished, is not — every one of these reads `lib/demo-data.ts`:**
+
+`HomeScreen` · `PricingScreen` · `DashboardScreen` · `MenuEditorScreen` ·
+`TablesScreen` · `KitchenScreen` · `CashierScreen` · `CartScreen` ·
+`CheckoutScreen`
+
+Nine screens. They render the locked design correctly and they are the
+screens a visitor sees most, so the gap is easy to miss.
+
+**Dead controls still on screen** (13, all spans styled as buttons):
+
+- `MenuEditorScreen` (6): Import menu with AI · Add item · Reorder · Bulk
+  availability · Save draft · Send for review
+- `TablesScreen` (6): Print QR sheet · Add table · Preview · Regenerate ·
+  Enable/Disable · Revoke
+
+"Print QR sheet" is deliberately left unwired: there are no `@media print`
+rules, so pointing it at `window.print()` would print the whole dashboard
+chrome around the sheet.
+
+### The one thing that needs you before anything else moves
+
+**Migration `0002` has not been run on your database.** It is merged, but
+until you execute it in the Supabase SQL editor, `menus_public` and
+`items_public` are permanently false because migration 0001 has a bug: a
+subquery inside an RLS policy is itself filtered by that same table's RLS,
+and `restaurants` had no anon policy. The result is silent — the customer
+menu shows nothing, with no error anywhere.
+
+Check whether it has run:
+
+```sql
+select count(*) from pg_proc p
+join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public' and p.proname = 'restaurant_is_active';
+```
+
+`1` = it has run. `0` = it has not.
+
+---
+
 ## The short answer
 
 **You are roughly 15–20% of the way to a product a restaurant can pay for.**
@@ -55,7 +152,18 @@ The frontend number looks generous and the backend number looks brutal because t
 
 **Note on the tax model:** the 5% GST in `lib/pricing.ts` is still labelled SAMPLE. Three open questions are written into the file's header comment (tax-inclusive vs exclusive, per-line vs per-order rounding, CGST/SGST vs IGST). That comment must be resolved with a tax adviser before any live transaction.
 
-### M1 — Data model & tenant isolation · ~5–7 days
+### M1 — Data model & tenant isolation · ~5–7 days · **~60% DONE**
+
+**Done:** migration `0001` applied — 12 tables, all with `rowsecurity = true`;
+seed data (22 items, 21 available, 7 categories, 10 variants); the new-format
+Supabase publishable/secret keys wired in; menu read path built and wired to
+`CustomerMenu`.
+
+**Not done:** migration `0002` exists but has not been executed against your
+database. Without it the public read path is broken (see the box above). Also
+missing: tables/QR tokens/orders/payments/subscriptions tables, an
+`updated_at` trigger, a rate limit on `place_order`, QR rotation, and an
+audit log.
 
 - Full schema: restaurants, users, memberships, menus, categories, items, variants, add-ons, tables, QR tokens, orders, order items, payments, receipts, subscriptions, trial state, audit log
 - **Row Level Security on every table** — the security boundary is the database, not the application
@@ -143,10 +251,23 @@ M1 and M2 are the true blockers — nothing else can be built safely without the
 - M0 in full — linting, tests, CI, migrations scaffold. None of it needs an account.
 
 **Blocked on you (I won't create accounts in your name):**
-- **Supabase project** — blocks M1 onward
+
+- **Run migration `0002` in the Supabase SQL editor** — blocks *everything*
+  downstream. Nothing else can be verified until the public read path works.
+  This is the single highest-value 30 seconds you can spend today.
+- **Confirm the Supabase region is Mumbai (`ap-south-1`)** — still
+  unconfirmed. Singapore measured ~58 ms against Mumbai's ~5 ms.
 - **Razorpay account (test mode)** — blocks M5
-- **Netlify deploy** — repo is ready; you connect it in ~2 minutes (`docs/DEPLOY_NETLIFY.md`)
 - **Domain** — blocks M8 only, and is the only approved spend
+
+**Done, no longer blocked:**
+
+- Supabase project — created (ref `jubagjlnmbntogeyjiwt`, plan Free)
+- Deploy — live on Vercel. Two things had to be fixed to get there: the
+  Vercel Framework Preset was `Other` (set at import time when the repo held
+  only a README, and never re-detected), and one build served a stale cache.
+  Vercel's Hobby plan forbids commercial use, so this needs a decision before
+  a paying restaurant goes live — Netlify Free is the ₹0 ToS-safe fallback.
 
 **Blocked on someone else:**
 - GST/tax treatment for invoices — needs a CA
