@@ -23,13 +23,25 @@ You need: a GitHub account (you have one) and an email. **No card, no payment �
 
 ## 2. Collect your keys (1 min)
 
-**Project Settings → API.** Copy these three:
+**Project Settings → API Keys.** Copy these:
 
-| Value | Where | Safe to expose? |
+| Value | Section on the page | Safe to expose? |
 |---|---|---|
-| **Project URL** | "Project URL" | Yes |
-| **anon / public key** | Project API keys → `anon` `public` | Yes — protected by RLS |
-| **service_role key** | Project API keys → `service_role` | **NO. Bypasses RLS entirely.** |
+| **Project URL** | Project URL | Yes |
+| **Publishable key** | Publishable key — `sb_publishable_...` | Yes — protected by RLS |
+| **Secret key** | Secret keys — `sb_secret_...` (click the eye to reveal) | **NO. Bypasses RLS entirely.** |
+
+> **Which keys does your project have?** Supabase replaced the old `anon` and
+> `service_role` keys with these shorter ones. Projects created after November
+> 2025 get **only** the new keys; the old ones are removed by the end of 2026.
+>
+> - Key starts with **`sb_`** → you have the new keys. Use the table above.
+> - Key starts with **`eyJ`** (a long JWT) → you have legacy keys. They still
+>   work. Copy `anon public` where this guide says publishable, and
+>   `service_role` where it says secret.
+>
+> There is a "Legacy anon, service_role API keys" section lower down the page
+> if you need it. The app accepts either format, so both are fine.
 
 Also: **Project Settings → Database → Connection string → URI** for `DATABASE_URL`. Replace `[YOUR-PASSWORD]` with the password from step 1.
 
@@ -180,10 +192,20 @@ The deployed site does **not** get your `.env.local` — Vercel builds straight 
 
 ```
 NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+SUPABASE_SECRET_KEY
 NEXT_PUBLIC_SITE_URL      (your Vercel URL, e.g. https://new-xxxx.vercel.app)
 ```
+
+> 🔴 **The secret key must be `SUPABASE_SECRET_KEY`, with no `NEXT_PUBLIC_`
+> prefix.** Next.js inlines every `NEXT_PUBLIC_*` variable into the browser
+> bundle, so `NEXT_PUBLIC_SUPABASE_SECRET_KEY` would send every visitor a key
+> that bypasses Row Level Security — they could read and modify every
+> restaurant's data. The app throws at startup if you get this wrong, but it is
+> better never to type it.
+>
+> Using legacy keys instead? The names are `NEXT_PUBLIC_SUPABASE_ANON_KEY` and
+> `SUPABASE_SERVICE_ROLE_KEY`. Same rule about the prefix.
 
 Then **Deployments → the ⋯ menu on the latest deployment → Redeploy**.
 
