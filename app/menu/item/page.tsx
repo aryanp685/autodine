@@ -1,8 +1,22 @@
 import type { Metadata } from 'next';
 import { ItemSheet } from '@/components/screens/CustomerMenu';
+import { getMenuScreenData } from '@/lib/db/menu-screen';
 
 export const metadata: Metadata = { title: 'Customise · AutoDine' };
 
-export default function ItemPage() {
-  return <ItemSheet />;
+/**
+ * ?s=<slug> picks the restaurant, ?item=<id> the dish to customise.
+ *
+ * Both are query parameters so the locked screens' existing links to
+ * /menu/item keep working unchanged.
+ */
+export default async function ItemPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ s?: string; item?: string }>;
+}) {
+  const { s, item } = await searchParams;
+  const data = await getMenuScreenData(s);
+
+  return <ItemSheet data={data ? { ...data, itemId: item } : undefined} />;
 }
