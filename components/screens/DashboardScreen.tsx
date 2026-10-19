@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import { dashboardStats, recentOrders, restaurant, sparkline, topItems, trial, inr } from '@/lib/demo-data';
-import { Avatar, Money, PaymentPill, Pill, PrepPill, Sparkline } from '@/components/ui';
+import { dashboardStats, recentOrders, restaurant, sparkline, topItems, trial } from '@/lib/demo-data';
+import { Avatar, Money, Pill, PrepPill, Sparkline } from '@/components/ui';
 
 const NAV_A = ['Overview', 'Menus', 'Tables & QR', 'Orders', 'Reports', 'Payments', 'Staff', 'Settings'];
 /** Only these rail items have a built screen so far; the rest stay inert

@@ -33,8 +33,8 @@ The frontend number looks generous and the backend number looks brutal because t
 
 ## The milestones
 
-### M0 — Engineering foundations · ~2–3 days
-*Do this before writing any backend code.*
+### M0 — Engineering foundations · ✅ **DONE** (2026-10-19)
+*Was: do this before writing any backend code.*
 
 - ESLint, with rules enforcing the locked design system (no shadows, tokens only, no hard-coded colours)
 - A test runner, and the first tests for **money**: tax rounding, totals, discount precedence
@@ -42,6 +42,18 @@ The frontend number looks generous and the backend number looks brutal because t
 - GitHub Actions CI: typecheck → lint → test → build on every push
 
 **Why first:** pricing and trial maths are the two things that are expensive to get wrong and cheap to test. They get tests before they get a database.
+
+**What shipped:**
+- **ESLint** (flat config, `next/core-web-vitals` + `next/typescript`). 0 errors. Three `<img>` warnings left deliberately: the locked screens use plain `<img>` with hand-tuned CSS, and migrating to `next/image` changes rendered markup, so it needs its own verified pass.
+- **Vitest, 43 tests** over `lib/money.ts` and `lib/pricing.ts`.
+- **Money is now integer paise.** `lib/money.ts` (primitives) and `lib/pricing.ts` (order totals) replaced the floating-point rupee arithmetic that had been written inline in the client components. The cart and checkout now call the tested code — the tests guard the code that actually runs.
+- **Verified behaviour-preserving:** the rendered text of `/menu/cart` and `/menu/checkout` is byte-identical to before the refactor (₹776 subtotal / ₹39 tax / ₹815 total).
+- **Design-system guard** (`npm run design:check`): fails on drop shadows and on any reintroduced prototype-harness CSS, and freezes hardcoded hex at 97 so new styles must use tokens.
+- **Removed 112 lines of dead `.proto-*` CSS** left over from the A/B/C harness.
+- **Supabase scaffold** (`supabase/config.toml`, `supabase/migrations/`) — empty until M1.
+- **CI** (`.github/workflows/ci.yml`): typecheck → lint → design → test → build on every push.
+
+**Note on the tax model:** the 5% GST in `lib/pricing.ts` is still labelled SAMPLE. Three open questions are written into the file's header comment (tax-inclusive vs exclusive, per-line vs per-order rounding, CGST/SGST vs IGST). That comment must be resolved with a tax adviser before any live transaction.
 
 ### M1 — Data model & tenant isolation · ~5–7 days
 

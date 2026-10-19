@@ -5,15 +5,20 @@
  * It exists so the customer flow (menu → item sheet → cart → checkout) can be
  * clicked through. It is NOT the real cart: no server validation, no prices
  * trusted from the browser, no persistence.
+ *
+ * The arithmetic, however, is real: totals come from lib/pricing (integer
+ * paise, tested), not from floating-point maths written inline here.
  */
 
 import { createContext, useContext, useMemo, useState } from 'react';
+import { computeOrderTotals, computeSubtotal, type OrderTotals } from '@/lib/pricing';
+import type { Paise } from '@/lib/money';
 
 export type CartLine = {
   key: string;
   id: string;
   name: string;
-  unitPrice: number;
+  unitPricePaise: Paise;
   qty: number;
   variant?: string;
   addons?: string[];
@@ -27,7 +32,9 @@ type CartApi = {
   setQty: (key: string, qty: number) => void;
   clear: () => void;
   count: number;
-  subtotal: number;
+  subtotalPaise: Paise;
+  /** Full order totals, computed by lib/pricing. Never computed in the UI. */
+  totals: OrderTotals;
 };
 
 const Ctx = createContext<CartApi | null>(null);
@@ -38,7 +45,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       key: 'seed-1',
       id: 'it-butter-chicken',
       name: 'Butter Chicken',
-      unitPrice: 469,
+      unitPricePaise: 46900,
       qty: 1,
       variant: 'Regular · 4 pcs',
       addons: ['Hot', 'Butter naan'],
@@ -48,7 +55,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       key: 'seed-2',
       id: 'it-naan',
       name: 'Butter Naan',
-      unitPrice: 79,
+      unitPricePaise: 7900,
       qty: 2,
       veg: true,
     },
@@ -56,7 +63,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       key: 'seed-3',
       id: 'it-lassi',
       name: 'Mango Lassi',
-      unitPrice: 149,
+      unitPricePaise: 14900,
       qty: 1,
       veg: true,
     },
@@ -83,7 +90,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       setQty,
       clear: () => setLines([]),
       count: lines.reduce((n, l) => n + l.qty, 0),
-      subtotal: lines.reduce((n, l) => n + l.qty * l.unitPrice, 0),
+      subtotalPaise: computeSubtotal(lines),
+      totals: computeOrderTotals({ lines }),
     };
   }, [lines]);
 

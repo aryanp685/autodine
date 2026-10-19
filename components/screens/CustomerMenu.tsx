@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { categories, items, restaurant, type Item } from '@/lib/demo-data';
 import { useCart } from '@/components/CartProvider';
 import { inr } from '@/lib/demo-data';
+import { lineTotal, paiseToRupees, rupeesToPaise } from '@/lib/money';
 import { VegMark } from '@/components/ui';
 
 const byCat = (id: string) => (id === 'all' ? items : items.filter((i) => i.category === id));
@@ -67,7 +68,7 @@ export function CustomerMenu() {
                 ) : (
                   <button
                     className="menu__dishCta"
-                    onClick={() => cart.add({ id: i.id, name: i.name, unitPrice: i.price, qty: 1, veg: i.veg })}
+                    onClick={() => cart.add({ id: i.id, name: i.name, unitPricePaise: rupeesToPaise(i.price), qty: 1, veg: i.veg })}
                   >
                     Add
                   </button>
@@ -84,7 +85,7 @@ export function CustomerMenu() {
       {cart.count > 0 && (
         <div className="menu__cartBar">
           <span>
-            {cart.count} item{cart.count === 1 ? '' : 's'} · {inr(cart.subtotal)}
+            {cart.count} item{cart.count === 1 ? '' : 's'} · {inr(paiseToRupees(cart.subtotalPaise))}
           </span>
           <Link href={`/menu/cart`} className="menu__cartBtn">
             Review order
@@ -106,7 +107,7 @@ export function ItemSheet() {
 
   const vPrice = item.variants!.find((v) => v.id === variant)!.price;
   const addonPrice = bread === 'naan' ? 79 : bread === 'roti' ? 59 : 0;
-  const total = (vPrice + addonPrice) * qty;
+  const total = lineTotal(rupeesToPaise(vPrice + addonPrice), qty);
 
   return (
     <div className="menu menu--dim">
@@ -202,7 +203,7 @@ export function ItemSheet() {
                 cart.add({
                   id: item.id,
                   name: item.name,
-                  unitPrice: vPrice + addonPrice,
+                  unitPricePaise: rupeesToPaise(vPrice + addonPrice),
                   qty,
                   variant: item.variants!.find((v) => v.id === variant)!.name,
                   addons: [spice, bread === 'none' ? '' : `Bread: ${bread}`].filter(Boolean),
@@ -210,7 +211,7 @@ export function ItemSheet() {
                 });
               }}
             >
-              Add to order · {inr(total)}
+              Add to order · {inr(paiseToRupees(total))}
             </button>
           </div>
         </div>

@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { counterQueue, inr, restaurant } from '@/lib/demo-data';
-import { QrChip } from '@/components/ui';
 
 const RECEIPT_LINES = [
   { q: 1, name: 'Hyderabadi Chicken Biryani', note: 'Hot · Boondi raita', amount: 559 },

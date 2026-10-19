@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { kitchenOrders, restaurant, inr, type KitchenOrder } from '@/lib/demo-data';
+import { kitchenOrders, restaurant, type KitchenOrder } from '@/lib/demo-data';
 import { Money, VegMark } from '@/components/ui';
 
 const AGE_TONE = (age: number) => (age >= 20 ? 'is-late' : age >= 10 ? 'is-warn' : 'is-fresh');

@@ -5,11 +5,11 @@ import { useState } from 'react';
 import { useCart } from '@/components/CartProvider';
 import { inr, restaurant } from '@/lib/demo-data';
 import { VegMark } from '@/components/ui';
+import { lineTotal, paiseToRupees } from '@/lib/money';
 
 function useTotals() {
-  const cart = useCart();
-  const tax = Math.round(cart.subtotal * 0.05 * 100) / 100;
-  return { subtotal: cart.subtotal, tax, total: Math.round((cart.subtotal + tax) * 100) / 100, count: cart.count };
+  // All arithmetic lives in lib/pricing. The browser never computes a total.
+  return useCart().totals;
 }
 
 function MethodChoice({ value, onChange }: { value: 'online' | 'counter'; onChange: (v: 'online' | 'counter') => void }) {
@@ -55,7 +55,7 @@ export function Checkout() {
         </Link>
         <h1>Checkout</h1>
         <p>
-          {restaurant.name} · Table 7 · {t.count} items
+          {restaurant.name} · Table 7 · {cart.count} items
         </p>
       </header>
 
@@ -88,7 +88,7 @@ export function Checkout() {
                 <span>
                   <strong>{l.qty} ×</strong> {l.name}
                 </span>
-                <span className="tnum">{inr(l.qty * l.unitPrice)}</span>
+                <span className="tnum">{inr(paiseToRupees(lineTotal(l.unitPricePaise, l.qty)))}</span>
               </li>
             ))}
           </ul>
@@ -98,17 +98,21 @@ export function Checkout() {
           <h2>Bill</h2>
           <div className="co__row">
             <span>Subtotal</span>
-            <span className="tnum">{inr(t.subtotal)}</span>
+            <span className="tnum">{inr(paiseToRupees(t.subtotalPaise))}</span>
           </div>
           <div className="co__row">
             <span>Taxes (sample)</span>
-            <span className="tnum">{inr(t.tax)}</span>
+            <span className="tnum">{inr(paiseToRupees(t.taxPaise))}</span>
           </div>
           <div className="co__row co__row--total">
             <span>Total payable</span>
-            <span className="tnum">{inr(t.total)}</span>
+            <span className="tnum">{inr(paiseToRupees(t.totalPaise))}</span>
           </div>
-          <button className="co__cta">{method === 'online' ? `Pay ${inr(t.total)}` : `Place order · ${inr(t.total)}`}</button>
+          <button className="co__cta">
+            {method === 'online'
+              ? `Pay ${inr(paiseToRupees(t.totalPaise))}`
+              : `Place order · ${inr(paiseToRupees(t.totalPaise))}`}
+          </button>
           <p className="co__fine">
             Prototype button — no payment provider is connected and no charge is made.
           </p>
