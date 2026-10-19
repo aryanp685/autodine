@@ -74,9 +74,11 @@ export function Cart() {
           <div className="cart__sumCard">
             <h2>Bill summary</h2>
             <Totals />
-            <Link href={`/menu/checkout`} className="cart__cta">
-              Continue to checkout
-            </Link>
+            {cart.lines.length > 0 ? (
+              <Link href="/menu/checkout" className="cart__cta">Continue to checkout</Link>
+            ) : (
+              <button type="button" className="cart__cta" disabled>Cart is empty</button>
+            )}
             <div className="cart__fine">
               Totals are recalculated by the server before payment. This screen shows sample values.
             </div>

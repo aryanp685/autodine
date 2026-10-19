@@ -1,3 +1,5 @@
+@import '../styles/design-system.css';
+
 /* =========================================================================
    AutoDine — global base
    Shared reset, neutral component skeletons, and the locked design tokens.
@@ -240,5 +242,3 @@ img { display: block; max-width: 100%; }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
 }
-
-@import '../styles/design-system.css';

@@ -12,17 +12,17 @@
   --text: #111318;
   --accent: #6d7f70;
   --shadow: none;
-  --radius-sm: 2px;
-  --radius: 3px;
-  --radius-lg: 4px;
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
   background: var(--page-bg);
 }
 
-[data-app] .ui-btn { border-radius: 2px; }
-[data-app] .ui-card { border-radius: 3px; }
+[data-app] .ui-btn { border-radius: 6px; }
+[data-app] .ui-card { border-radius: 10px; }
 [data-app] .ui-badge { border-radius: 999px; }
 [data-app] .ui-input,
-[data-app] .ui-select { border-radius: 2px; }
+[data-app] .ui-select { border-radius: 6px; }
 
 /* ------------------------------------------------------------------ home */
 
@@ -567,43 +567,211 @@
 }
 [data-app] .totals__note { font-size: 11.5px; color: rgba(17, 19, 24, 0.5); line-height: 1.6; margin-top: 10px; }
 
-/* ------------------------------------------------------------ responsive */
+/* ------------------------------------------------------------ responsive
+   Earlier rules used a named container query but no element established that
+   container, so the responsive styles never ran. Use viewport breakpoints for
+   these full-page layouts; they now apply consistently on phones and tablets.
+   ------------------------------------------------------------------------ */
 
-@container frame (max-width: 1000px) {
-  .home__hero { min-height: 520px; }
-  .home__h1 { font-size: 56px; }
-  .home__three, .home__plans, .home__bandInner, .home__footCols { grid-template-columns: 1fr; gap: 32px; }
-  .home__nav { flex-wrap: wrap; gap: 20px; padding: 18px 24px; }
-  .home__section { padding: 56px 24px; }
-  .home__bandInner { padding: 48px 24px; }
-  .home__heroBody { padding: 40px 24px; }
-  .home__foot { padding: 48px 24px; }
+@media (max-width: 1100px) {
+  .home__nav { gap: 24px; padding-inline: 28px; }
+  .home__hero { min-height: 540px; }
+  .home__h1 { font-size: clamp(48px, 7vw, 64px); }
+  .home__section { padding: 64px 28px; }
+  .home__three, .home__plans, .home__bandInner, .home__footCols { gap: 28px; }
+  .home__plans { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home__plan:last-child { grid-column: 1 / -1; }
+  .home__bandInner { padding-inline: 28px; }
+  .home__foot { padding-inline: 28px; }
+
   .dash { grid-template-columns: 1fr; }
-  .dash__rail { border-right: 0; border-bottom: 1px solid var(--border); flex-direction: row; align-items: center; gap: 20px; overflow-x: auto; }
-  .dash__venue, .dash__nav, .dash__railFoot { display: none; }
-  .dash__main { padding: 28px 24px 64px; }
-  .dash__stats { grid-template-columns: repeat(2, 1fr); gap: 24px; }
-  .dash__split { grid-template-columns: 1fr; gap: 40px; }
-  .menu__head, .menu__cats, .menu__list { padding-left: 20px; padding-right: 20px; }
-  .menu__cats { overflow-x: auto; gap: 20px; }
-  .menu__dish { gap: 16px; }
+  .dash__rail {
+    display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center;
+    gap: 12px 20px; padding: 16px 24px; border-right: 0;
+    border-bottom: 1px solid var(--border); min-width: 0;
+  }
+  .dash__venue, .dash__railFoot { display: none; }
+  .dash__nav {
+    display: flex; gap: 20px; min-width: 0; overflow-x: auto; margin: 0;
+    scrollbar-width: thin; white-space: nowrap;
+  }
+  .dash__navItem { flex: 0 0 auto; padding: 8px 0; }
+  .dash__navItem.is-active { border-left: 0; border-bottom: 2px solid var(--text); padding: 8px 0 6px; margin: 0; }
+  .dash__main { padding: 32px 28px 64px; min-width: 0; }
+  .dash__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
+  .dash__split { grid-template-columns: 1fr; gap: 32px; }
+  .dash__block { min-width: 0; }
+  .dash__rank li { grid-template-columns: 24px minmax(0, 1fr) auto auto; gap: 10px; }
+
+  .menu__head { padding: 36px 28px 20px; }
+  .menu__cats { padding-inline: 28px; gap: 24px; overflow-x: auto; }
+  .menu__list { padding: 4px 28px 120px; }
+  .menu__dish { gap: 22px; }
+  .menu__cartBar { margin-inline: 28px; }
+
+  .cart__head, .co__head { padding-inline: 28px; }
+  .cart__grid, .co__grid { grid-template-columns: minmax(0, 1fr) 320px; gap: 32px; padding-inline: 28px; }
+  .cart__line { gap: 18px; }
+  .cart__sumCard, .co__sum, .cash__detail { padding: 24px; }
+
+  .kb__head { padding-inline: 28px; }
+  .kb__cols { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; padding-inline: 28px; }
+  .cash__head { padding-inline: 28px; }
+  .cash__grid { grid-template-columns: 320px minmax(0, 1fr); gap: 32px; padding-inline: 28px; }
+
+  [data-app] .pg__bar { padding-inline: 28px; gap: 24px; }
+  [data-app] .pg__body, [data-app] .pg__split { padding-inline: 28px; }
+  [data-app] .pg__plans, [data-app] .pg__body--split { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
+  [data-app] .pg__plan:last-child { grid-column: 1 / -1; }
+  [data-app] .pg__split { grid-template-columns: minmax(160px, 0.7fr) minmax(0, 1.5fr); gap: 24px; }
+  [data-app] .pg__editor { grid-column: 1 / -1; }
+  [data-app] .pg__tables { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  [data-app] .pg__printRow { grid-template-columns: 1fr 1fr; gap: 28px; }
+  [data-app] .pg__states { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  [data-app] .pg__stateCard--wide { grid-column: 1 / -1; }
+}
+
+@media (max-width: 760px) {
+  .home__nav { gap: 14px; padding: 16px 20px; flex-wrap: wrap; }
+  .home__links { order: 3; width: 100%; gap: 22px; overflow-x: auto; padding-bottom: 2px; }
+  .home__navRight { gap: 14px; }
+  .home__hero { min-height: 500px; }
+  .home__heroBody { padding: 36px 22px; }
+  .home__h1 { font-size: clamp(42px, 11vw, 58px); }
+  .home__lede { font-size: 17px; }
+  .home__ctas { flex-wrap: wrap; }
+  .home__btn { flex: 1 1 180px; text-align: center; }
+  .home__section { padding: 48px 22px; }
+  .home__three, .home__plans, .home__bandInner, .home__footCols { grid-template-columns: 1fr; gap: 28px; }
+  .home__plan:last-child { grid-column: auto; }
+  .home__h2 { font-size: clamp(32px, 8vw, 42px); }
+  .home__bandInner { padding: 42px 22px; }
+  .home__foot { padding: 42px 22px; }
+
+  .dash__rail { grid-template-columns: 1fr; gap: 12px; padding: 14px 20px 8px; }
+  .dash__nav { grid-row: 2; margin-inline: -20px; padding: 0 20px 4px; gap: 18px; }
+  .dash__main { padding: 24px 20px 48px; }
+  .dash__head { display: grid; align-items: start; gap: 16px; }
+  .dash__headRight { flex-wrap: wrap; }
+  .dash__h1 { font-size: clamp(28px, 7vw, 34px); }
+  .dash__trialStrip { align-items: flex-start; flex-wrap: wrap; padding: 14px; }
+  .dash__trialText { flex-basis: calc(100% - 24px); }
+  .dash__trialLink { margin-left: 19px; }
+  .dash__stats { gap: 22px 16px; margin-top: 30px; }
+  .dash__statValue { font-size: clamp(28px, 8vw, 38px); }
+  .dash__block { margin-top: 38px; }
+  .dash__blockHead { align-items: flex-start; flex-direction: column; gap: 6px; }
+  .dash__rank li { grid-template-columns: 22px minmax(0, 1fr) auto; }
+  .dash__rank li > :last-child { grid-column: 2 / -1; justify-self: end; }
+  .dash__main .ui-table { display: block; max-width: 100%; overflow-x: auto; white-space: nowrap; }
+
+  .menu__head { display: grid; gap: 14px; padding: 28px 20px 18px; }
+  .menu__venueName { font-size: 26px; }
+  .menu__verified { font-size: 12px; }
+  .menu__cats { gap: 20px; padding-inline: 20px; }
+  .menu__cat { min-height: 44px; flex: 0 0 auto; }
+  .menu__list { padding: 0 20px 110px; }
+  .menu__dish { gap: 14px; padding: 22px 0; }
   .menu__dishImg { width: 76px; height: 76px; }
-  .menu__cartBar { margin: 0 20px; }
-  .cart__head, .cart__grid, .co__head, .co__grid { padding-left: 20px; padding-right: 20px; }
-  .cart__grid, .co__grid { grid-template-columns: 1fr; gap: 36px; }
-  .cart__sum, .co__sum { position: static; }
-  .kb__head, .kb__cols { padding-left: 20px; padding-right: 20px; }
-  .kb__head { flex-direction: column; align-items: flex-start; gap: 16px; }
-  .kb__cols { grid-template-columns: 1fr; gap: 28px; }
-  .cash__head, .cash__grid { padding-left: 20px; padding-right: 20px; }
-  .cash__head { flex-direction: column; align-items: flex-start; gap: 12px; }
-  .cash__grid { grid-template-columns: 1fr; gap: 36px; }
-  [data-app] .pg__bar, [data-app] .pg__body, [data-app] .pg__subbar, [data-app] .pg__split { padding-left: 20px; padding-right: 20px; }
-  [data-app] .pg__barLinks { display: none; }
+  .menu__dishName { font-size: 18px; }
+  .menu__dishDesc { font-size: 14px; }
+  .menu__cartBar { position: fixed; z-index: 5; left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); margin: 0; padding: 14px 16px; border-radius: 10px; }
+  .sheet { position: fixed; z-index: 10; align-items: end; padding: 12px 0 0; }
+  .sheet__panel { width: 100%; max-height: 92svh; padding: 24px 20px max(20px, env(safe-area-inset-bottom)); border-radius: 16px 16px 0 0; }
+  .sheet__foot { position: sticky; bottom: 0; background: var(--surface); padding-top: 12px; }
+  .sheet__add { min-height: 46px; }
+
+  .cart__head, .co__head { padding: 28px 20px 6px; }
+  .cart__head h1 { font-size: 36px; }
+  .co__head h1 { font-size: 34px; }
+  .cart__grid, .co__grid { grid-template-columns: minmax(0, 1fr); gap: 26px; padding: 26px 20px 48px; }
+  .cart__line { grid-template-columns: minmax(0, 1fr) auto; gap: 10px 12px; padding: 18px 0; }
+  .cart__lineTotal { grid-column: 2; grid-row: 1; align-self: start; }
+  .cart__qty { grid-column: 1 / -1; justify-self: start; }
+  .cart__sum { position: static; }
+  .cart__sumCard, .co__sum { padding: 20px; }
+  .co__method { padding: 16px; }
+  .co__method.is-on { padding: 15px; }
+  .co__items li { align-items: flex-start; }
+
+  .kb__head { padding: 24px 20px; align-items: flex-start; flex-direction: column; }
+  .kb__controls { flex-wrap: wrap; }
+  .kb__cols { grid-template-columns: minmax(0, 1fr); padding: 24px 20px 48px; gap: 26px; }
+  .kb__ord { padding: 16px; }
+  .kb__ordFoot { align-items: flex-start; flex-direction: column; }
+  .kb__actions { flex-wrap: wrap; }
+  .cash__head { padding: 28px 20px; align-items: flex-start; flex-direction: column; gap: 14px; }
+  .cash__headMeta { flex-wrap: wrap; gap: 8px 16px; }
+  .cash__grid { grid-template-columns: minmax(0, 1fr); padding: 24px 20px 48px; gap: 24px; }
+  .cash__detail { padding: 20px; }
+  .cash__methods { flex-wrap: wrap; }
+  .cash__method { min-width: 90px; }
+
+  [data-app] .pg__bar { flex-wrap: wrap; gap: 14px; padding: 16px 20px; }
+  [data-app] .pg__barLinks { order: 3; flex: 1 0 100%; gap: 20px; overflow-x: auto; white-space: nowrap; padding-bottom: 3px; }
+  [data-app] .pg__barRight { gap: 12px; }
+  [data-app] .pg__barMuted { display: none; }
+  [data-app] .pg__body { padding: 36px 20px 64px; }
+  [data-app] .pg__split { padding: 24px 20px 48px; }
+  [data-app] .pg__head--row { align-items: flex-start; flex-direction: column; }
+  [data-app] .pg__title { font-size: clamp(30px, 8vw, 38px); }
+  [data-app] .pg__title--sm { font-size: 28px; }
+  [data-app] .pg__lede { font-size: 15px; }
+  [data-app] .pg__section { margin-top: 48px; }
   [data-app] .pg__plans, [data-app] .pg__body--split, [data-app] .pg__tables,
-  [data-app] .pg__printRow, [data-app] .pg__lockedGrid, [data-app] .pg__planRow { grid-template-columns: 1fr; }
-  [data-app] .pg__split { grid-template-columns: 1fr; gap: 28px; }
-  [data-app] .pg__states { grid-template-columns: 1fr; }
-  [data-app] .pg__stateCard--wide { grid-column: auto; }
-  [data-app] .pg__printGrid { grid-template-columns: repeat(2, 1fr); }
+  [data-app] .pg__printRow, [data-app] .pg__lockedGrid, [data-app] .pg__planRow,
+  [data-app] .pg__split, [data-app] .pg__states { grid-template-columns: minmax(0, 1fr); }
+  [data-app] .pg__plan:last-child, [data-app] .pg__stateCard--wide { grid-column: auto; }
+  [data-app] .pg__printGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  [data-app] .pg__headActions, [data-app] .pg__itemsActions, [data-app] .pg__editorFoot { flex-wrap: wrap; }
+  [data-app] .pg__locked { padding: 18px; }
+  [data-app] .pg__lockedHead { flex-wrap: wrap; }
+  [data-app] .pg__lockedHead .pg__btn { margin-left: 0; }
+  [data-app] .pg__editor { grid-column: auto; padding: 18px; }
+  [data-app] .pg__tableCard { padding: 16px; }
+  [data-app] .pg__stateActions { flex-wrap: wrap; }
+}
+
+@media (max-width: 420px) {
+  .home__navRight { gap: 10px; }
+  .home__navCta { padding: 9px 12px; font-size: 13px; }
+  .home__links { gap: 16px; font-size: 13px; }
+  .home__hero { min-height: 460px; }
+  .home__h1 { font-size: 42px; }
+  .dash__stats { grid-template-columns: 1fr 1fr; }
+  .dash__rank li { grid-template-columns: 20px minmax(0, 1fr); }
+  .dash__rankSold, .dash__rank li > :last-child { grid-column: 2; justify-self: start; }
+  .menu__dish { align-items: flex-start; }
+  .menu__dishImg { width: 64px; height: 64px; }
+  .sheet__foot { gap: 8px; }
+  .sheet__qty { gap: 10px; padding-inline: 10px; }
+  .sheet__add { padding: 10px; font-size: 13px; }
+  .cart__sumCard, .co__sum, .cash__detail { padding: 16px; }
+  [data-app] .pg__printGrid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  [data-app] .pg__printCard { padding: 10px; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-app] a, [data-app] button { transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, opacity 160ms ease; }
+}
+
+[data-app] button:disabled,
+[data-app] .cart__cta:disabled,
+[data-app] .co__cta:disabled,
+[data-app] .cash__cta:disabled { opacity: 0.48; cursor: not-allowed; }
+
+[data-app] .pg__table { display: block; max-width: 100%; overflow-x: auto; }
+
+@media (max-width: 760px) {
+  [data-app] .pg__table { white-space: nowrap; }
+  [data-app] .home__nav a,
+  [data-app] .pg__bar a,
+  [data-app] .dash__rail a,
+  [data-app] .menu__cats button,
+  [data-app] button { min-height: 44px; }
+  [data-app] .menu__cats button { display: inline-flex; align-items: center; }
+  [data-app] .pg__formCard,
+  [data-app] .pg__asideCard,
+  [data-app] .pg__tableCard,
+  [data-app] .pg__stateCard { min-width: 0; }
 }

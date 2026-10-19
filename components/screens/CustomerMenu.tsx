@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
 import {
@@ -78,6 +79,11 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
   const categories = data?.categories ?? demoCategories;
   const items = data?.items ?? demoItems;
   const list = cat === 'all' ? items : items.filter((i) => i.category === cat);
+  const itemHref = (itemId: string) => {
+    const params = new URLSearchParams({ item: itemId });
+    if (data?.restaurant.slug) params.set('s', data.restaurant.slug);
+    return `/menu/item?${params.toString()}`;
+  };
 
   return (
     <div className="menu">
@@ -122,7 +128,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
               </div>
               {i.available ? (
                 needsChoice(i) ? (
-                  <Link href={`/menu/item`} className="menu__dishCta">
+                  <Link href={itemHref(i.id)} className="menu__dishCta">
                     Choose options
                   </Link>
                 ) : (
@@ -137,7 +143,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
                 <span className="menu__dishOut">Sold out for now</span>
               )}
             </div>
-            {i.img && <img className="menu__dishImg" src={i.img} alt={i.name} />}
+            {i.img && <Image className="menu__dishImg" src={i.img} alt={i.name} width={104} height={104} sizes="(max-width: 760px) 76px, 104px" />}
           </article>
         ))}
       </div>
@@ -157,9 +163,10 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
 }
 
 /* Option A — item customization: centred sheet, hairlines, no chrome */
-export function ItemSheet({ data }: { data?: MenuScreenData & { itemId?: string } } = {}) {
+export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?: string }; itemId?: string } = {}) {
   const allItems = data?.items ?? demoItems;
   const restaurant = data?.restaurant ?? demoRestaurant;
+  const requestedItemId = data?.itemId ?? itemId;
 
   // This sheet customises a dish, so it needs one that has portions to choose
   // between.
@@ -173,7 +180,7 @@ export function ItemSheet({ data }: { data?: MenuScreenData & { itemId?: string 
   // the demo data, where the chosen dish always has portions, but against a
   // real menu it throws the moment the item has none -- which is most of them.
   const item =
-    (data?.itemId ? allItems.find((i) => i.id === data.itemId) : undefined) ??
+    (requestedItemId ? allItems.find((i) => i.id === requestedItemId) : undefined) ??
     // Real menu, no id requested: show the menu's own first customisable dish.
     (data ? allItems.find((i) => i.variants && i.variants.length > 0) ?? allItems[0] : undefined) ??
     demoItems.find((i) => i.id === 'it-butter-chicken')!;
@@ -214,7 +221,7 @@ export function ItemSheet({ data }: { data?: MenuScreenData & { itemId?: string 
               <p className="menu__dishDesc">{i.desc}</p>
               <div className="menu__dishPrice">{inr(i.price)}</div>
             </div>
-            {i.img && <img className="menu__dishImg" src={i.img} alt={i.name} />}
+            {i.img && <Image className="menu__dishImg" src={i.img} alt={i.name} width={104} height={104} sizes="(max-width: 760px) 76px, 104px" />}
           </article>
         ))}
       </div>

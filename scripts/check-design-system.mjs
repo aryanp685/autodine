@@ -85,6 +85,21 @@ if (process.argv.includes('--update-baseline') || baseline === null) {
   );
 }
 
+/* ---------------------------------------------------------------- rule 4 */
+/* Full-screen layouts must keep explicit viewport breakpoints. This catches a
+   regression to an inert named container query (the product root is not a CSS
+   container), which previously left phones using desktop layouts. */
+const designSystemPath = join(ROOT, 'styles', 'design-system.css');
+const designSystem = readFileSync(designSystemPath, 'utf8');
+for (const breakpoint of ['1100px', '760px', '420px']) {
+  if (!designSystem.includes(`@media (max-width: ${breakpoint})`)) {
+    problems.push(`styles/design-system.css is missing the ${breakpoint} responsive breakpoint.`);
+  }
+}
+if (/@container\s+frame/.test(designSystem) && !/container-type\s*:/.test(designSystem)) {
+  problems.push('styles/design-system.css uses @container frame without declaring a container-type.');
+}
+
 /* --------------------------------------------------------------- report */
 function rel(p) {
   return p.replace(`${ROOT}/`, '');
