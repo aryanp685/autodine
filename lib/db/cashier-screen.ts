@@ -25,6 +25,12 @@
  */
 
 import { getStaffContextDetailed } from '@/lib/db/staff';
+
+// Re-exported rather than redefined: the constant lives in a module with no
+// database imports so the client can use it. See lib/payment-methods.ts.
+export { COUNTER_METHODS, isCounterMethod } from '@/lib/payment-methods';
+export type { CounterMethod } from '@/lib/payment-methods';
+
 import { paiseToRupees } from '@/lib/money';
 
 /** Mirrors the demo counterQueue row so the locked markup is unchanged. */
@@ -59,10 +65,6 @@ export type CashierScreenData = {
   /** Set when the caller has no restaurant to show. See lib/db/staff.ts. */
   blocked?: 'signed-out' | 'no-membership';
 };
-
-/** Payment methods the counter can record. Matches the payments.method check. */
-export const COUNTER_METHODS = ['cash', 'card', 'upi'] as const;
-export type CounterMethod = (typeof COUNTER_METHODS)[number];
 
 /** How far back the queue looks for unpaid tickets. */
 export const QUEUE_WINDOW_HOURS = 24;

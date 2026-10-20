@@ -1,19 +1,25 @@
 /**
- * Counter payment actions — CASH ONLY.
+ * Counter payment actions — cash, card and UPI.
  *
- * The database function is public.record_cash_payment(). It is the only way
- * money is taken at the counter, and it is atomic: payment row, order
- * settlement and audit event in one transaction. Doing those as separate
- * calls from here would leave a window where a crash between them charges
- * the guest twice, or marks a bill paid with no record of the cash.
+ * The database function is public.record_counter_payment() (migration 0004).
+ * It is the only way money is taken at the counter, and it is atomic: payment
+ * row, order settlement and audit event in one transaction. Doing those as
+ * separate calls from here would leave a window where a crash between them
+ * charges the guest twice, or marks a bill paid with no record of the cash.
  *
- * WHY CASH ONLY
+ * WHY NOT 'ONLINE'
  *
- * The payments table allows 'cash', 'card', 'upi' and 'online', but the
- * function hardcodes method = 'cash'. There is no card or UPI counterpart.
- * That is not a schema limitation, it is just unbuilt — so the UI shows
- * those two as unavailable rather than offering a button that would fail.
- * Adding them means a new function, not a new button.
+ * The payments table allows it, but the function rejects it. An online
+ * payment is initiated by the guest through a provider and arrives by webhook
+ * carrying a provider reference; letting a cashier record one would put a row
+ * in payments with no provider, no settlement and no refund path behind it.
+ * That needs its own function written against the provider's contract.
+ *
+ * WHAT "CARD" AND "UPI" MEAN HERE
+ *
+ * Bookkeeping, not processing. The guest pays on a separate terminal or by
+ * scanning a code, and the cashier records that it happened. No card is read
+ * and no provider is contacted at any point in this file.
  *
  * THE AMOUNT IS NEVER TAKEN FROM THE CLIENT
  *
@@ -31,6 +37,10 @@
  * original payment instead of inserting a second one. Generating it inside
  * this action would defeat that completely, because every attempt would get
  * a fresh key.
+ *
+ * The method is folded into the key by the database, so changing method and
+ * retrying is treated as a different payment rather than a replay of the
+ * previous one.
  */
 
 'use server';
@@ -39,6 +49,7 @@ import { revalidatePath } from 'next/cache';
 import { getStaffContext, CASHIER_ROLES } from '@/lib/db/staff';
 import { paiseToRupees } from '@/lib/money';
 import { inr } from '@/lib/demo-data';
+import { isCounterMethod } from '@/lib/payment-methods';
 
 const CASHIER_PATH = '/cashier';
 
@@ -53,8 +64,9 @@ export type RecordPaymentResult =
  * holding an optimistic copy, and it needs to know whether to commit the
  * move or roll it back.
  */
-export async function recordCashPaymentAction(input: {
+export async function recordPaymentAction(input: {
   orderId: string;
+  method: string;
   /**
    * Generated once per attempt by the caller and reused on retry. A well
    * formed UUID; anything else is rejected before it reaches the database so
@@ -64,6 +76,13 @@ export async function recordCashPaymentAction(input: {
 }): Promise<RecordPaymentResult> {
   const orderId = input?.orderId;
   if (!orderId) return { ok: false, error: 'Missing order.' };
+
+  // Validated against the same list the UI renders, so the two cannot drift.
+  // Re-checked inside the RPC as well.
+  if (!isCounterMethod(input.method)) {
+    return { ok: false, error: 'Choose a payment method: cash, card or UPI.' };
+  }
+  const method = input.method;
 
   const key = String(input?.idempotencyKey ?? '').trim();
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -133,9 +152,10 @@ export async function recordCashPaymentAction(input: {
     return { ok: false, error: `Order ${order.code} has no outstanding balance.` };
   }
 
-  const { data: paymentId, error } = await supabase.rpc('record_cash_payment', {
+  const { data: paymentId, error } = await supabase.rpc('record_counter_payment', {
     p_restaurant_slug: slug,
     p_order_id: orderId,
+    p_method: method,
     p_amount_paise: outstanding,
     p_idempotency_key: key,
   });
@@ -159,6 +179,6 @@ export async function recordCashPaymentAction(input: {
 
   return {
     ok: true,
-    message: `Cash ${inr(paiseToRupees(outstanding))} recorded for ${order.code}${paidAlready}.${ref}`,
+    message: `${method.toUpperCase()} ${inr(paiseToRupees(outstanding))} recorded for ${order.code}${paidAlready}.${ref}`,
   };
 }

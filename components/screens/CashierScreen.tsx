@@ -3,7 +3,11 @@
 import { useMemo, useRef, useState, useTransition } from 'react';
 import { counterQueue, inr, restaurant } from '@/lib/demo-data';
 import type { CashierScreenData, CounterOrder } from '@/lib/db/cashier-screen';
-import { recordCashPaymentAction } from '@/app/cashier/actions';
+// Value import, so it comes from the database-free module. Importing
+// COUNTER_METHODS from lib/db/cashier-screen would pull lib/supabase/server
+// into the browser bundle -- type-only imports there are fine, this is not.
+import { COUNTER_METHODS, COUNTER_METHOD_LABEL, type CounterMethod } from '@/lib/payment-methods';
+import { recordPaymentAction } from '@/app/cashier/actions';
 
 /** One row in the queue, in the shape the locked markup renders. */
 type QueueRow = {
@@ -68,17 +72,18 @@ function newIdempotencyKey(): string {
 /* ============================================================================
    Counter / cashier
 
-   CASH ONLY. The database can store card and UPI payments, but the only
-   function that takes money at the counter records cash. Rather than offer
-   two buttons that would fail, they are shown and disabled, with the reason
-   next to them -- an unimplemented feature has to look unimplemented.
+   Cash, card and UPI. All three go through one database function,
+   record_counter_payment (migration 0004). None of them process anything:
+   the guest pays on a terminal or by scanning a code, and this screen records
+   that it happened. No provider is contacted.
 
-   The amount is never typed in. record_cash_payment accepts exactly the
-   outstanding balance and nothing else, so there is no "amount received" and
-   no change to compute; the server works the figure out from the order and
-   any payments already recorded against it.
+   The amount is never typed in. The function accepts exactly the outstanding
+   balance and nothing else, so there is no "amount received" and no change to
+   compute -- the server works the figure out from the order and any payments
+   already recorded against it.
    ========================================================================== */
 export function Cashier({ data }: { data?: CashierScreenData | null }) {
+  const [method, setMethod] = useState<CounterMethod>('cash');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [settling, setSettling] = useState<string[]>([]);
@@ -125,8 +130,9 @@ export function Cashier({ data }: { data?: CashierScreenData | null }) {
     setSettling((current) => [...current, paidId]);
 
     startTransition(async () => {
-      const result = await recordCashPaymentAction({
+      const result = await recordPaymentAction({
         orderId: paidId,
+        method,
         idempotencyKey: keys.current[paidId],
       });
 
@@ -227,32 +233,23 @@ export function Cashier({ data }: { data?: CashierScreenData | null }) {
             </div>
 
             <div className="cash__methods" role="group" aria-label="Payment method">
-              <span className="cash__method is-on" aria-pressed="true">
-                Cash
-              </span>
-              {/*
-                Card and UPI are deliberately NOT wired up. public.record_cash_payment
-                hardcodes method = 'cash'; there is no card or UPI counterpart in the
-                database. Rendering them as live buttons would let a cashier record a
-                payment the database refuses. They stay visible so the plan is honest
-                about what exists, and disabled so nobody relies on them.
-              */}
-              {(['Card', 'UPI'] as const).map((label) => (
-                <span
-                  key={label}
-                  className="cash__method"
-                  aria-disabled="true"
-                  title="Not enabled yet — only cash can be recorded at the counter"
+              {COUNTER_METHODS.map((value) => (
+                <button
+                  type="button"
+                  key={value}
+                  className={`cash__method ${method === value ? 'is-on' : ''}`}
+                  onClick={() => setMethod(value)}
+                  aria-pressed={method === value}
                 >
-                  {label}
-                </span>
+                  {COUNTER_METHOD_LABEL[value]}
+                </button>
               ))}
             </div>
 
             <p className="cash__fine">
-              Only cash can be recorded at the counter right now. Card and UPI need a payment
-              function in the database first — the button is not just unwired, the backend does
-              not exist for it yet.
+              Recorded as a counter {method === 'cash' ? 'cash' : method.toUpperCase()} payment.
+              Nothing is charged here — the guest pays on a terminal or by scanning a code, and
+              this only writes the record.
             </p>
 
             {error && (
@@ -268,7 +265,7 @@ export function Cashier({ data }: { data?: CashierScreenData | null }) {
               disabled={isPending || !order.orderId}
               onClick={recordPayment}
             >
-              {isPending ? 'Recording…' : `Take ${inr(order.outstanding)} in cash`}
+              {isPending ? 'Recording…' : `Record ${method === 'cash' ? 'cash' : method.toUpperCase()} ${inr(order.outstanding)}`}
             </button>
             {message && (
               <p className="cash__fine" role="status">
@@ -277,7 +274,7 @@ export function Cashier({ data }: { data?: CashierScreenData | null }) {
             )}
             <p className="cash__fine">
               {live
-                ? 'Written to the database as a counter cash payment, with an audit entry. No card terminal or payment provider is contacted.'
+                ? 'Written to the database with an audit entry. No card terminal or payment provider is contacted — this is a record, not a charge.'
                 : 'Local preview only. Nothing is persisted and no payment is collected.'}
             </p>
           </section>

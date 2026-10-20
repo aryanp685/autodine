@@ -160,6 +160,32 @@ export type Database = {
         };
         Returns: string; // payment id (uuid)
       };
+      /**
+       * Migration 0004. The one the counter actually uses: same guarantees as
+       * record_cash_payment but takes a method, so card and UPI work too.
+       *
+       *   - caller must be owner, manager or cashier
+       *   - p_amount_paise must EXACTLY equal the outstanding balance
+       *   - p_idempotency_key makes a retry return the original payment
+       *     instead of charging twice. Generate it ONCE per attempt, on the
+       *     client, and reuse it if the call is retried.
+       *   - p_method is part of the idempotency key, so a cash attempt and a
+       *     card attempt cannot be answered with each other's payment.
+       *
+       * 'online' is rejected here on purpose. An online payment is initiated
+       * by the guest through a provider and arrives by webhook with a
+       * provider reference; a cashier must not be able to record one.
+       */
+      record_counter_payment: {
+        Args: {
+          p_restaurant_slug: string;
+          p_order_id: string;
+          p_method: 'cash' | 'card' | 'upi';
+          p_amount_paise: number;
+          p_idempotency_key: string;
+        };
+        Returns: string; // payment id (uuid)
+      };
     };
     Enums: {
       member_role: MemberRole;
