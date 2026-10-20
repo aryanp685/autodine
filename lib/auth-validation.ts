@@ -31,3 +31,10 @@ export function getSignupValidationError(input: SignupCredentials): string | nul
 export function isValidSignInInput(email: string, password: string): boolean {
   return EMAIL.test(email) && email.length <= 254 && password.length > 0 && password.length <= MAX_LOGIN_PASSWORD;
 }
+
+export function getPasswordResetValidationError(password: string, confirmation: string): string | null {
+  if (password.length < MIN_PASSWORD) return `Password must be at least ${MIN_PASSWORD} characters.`;
+  if (password.length > MAX_SIGNUP_PASSWORD) return 'Password must be 128 characters or fewer.';
+  if (password !== confirmation) return 'The passwords do not match.';
+  return null;
+}

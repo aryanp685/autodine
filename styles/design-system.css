@@ -498,6 +498,8 @@
 [data-app] .auth__submit:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
 [data-app] .auth__submit:disabled { opacity: 0.62; cursor: wait; }
 [data-app] .auth__fine { max-width: 520px; }
+[data-app] .auth__recoveryLink { color: var(--accent); font-size: 13px; font-weight: 600; text-decoration: none; }
+[data-app] .auth__recoveryLink:hover { text-decoration: underline; }
 [data-app] .auth__aside { padding-top: 4px; }
 [data-app] .auth__asideCard { padding: 28px; border-radius: var(--radius); }
 [data-app] .auth__asideIcon { display: grid; place-items: center; width: 38px; height: 38px; margin-bottom: 24px; border: 1px solid var(--border); border-radius: 50%; color: var(--accent); font-size: 14px; font-weight: 600; }

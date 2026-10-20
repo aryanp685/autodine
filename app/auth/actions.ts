@@ -18,7 +18,11 @@ import { redirect } from 'next/navigation';
 import { slugify, uniqueSlug } from '@/lib/slug';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { getSignupValidationError, isValidSignInInput } from '@/lib/auth-validation';
+import {
+  getPasswordResetValidationError,
+  getSignupValidationError,
+  isValidSignInInput,
+} from '@/lib/auth-validation';
 
 function fail(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
@@ -152,6 +156,28 @@ export async function signInAction(formData: FormData): Promise<void> {
   }
 
   redirect(next);
+}
+
+export async function updatePasswordAction(formData: FormData): Promise<void> {
+  const password = String(formData.get('password') ?? '');
+  const confirmation = String(formData.get('confirmPassword') ?? '');
+  const validationError = getPasswordResetValidationError(password, confirmation);
+  if (validationError) {
+    const error = validationError.includes('match') ? 'mismatch' : 'weak-password';
+    redirect(`/reset-password?error=${error}`);
+  }
+
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) fail('/reset-password', 'Password reset is unavailable because the database is not connected.');
+
+  const { data: { user }, error: sessionError } = await supabase.auth.getUser();
+  if (sessionError || !user) redirect('/forgot-password?error=expired');
+
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) redirect('/reset-password?error=update-failed');
+
+  await supabase.auth.signOut();
+  redirect('/login?notice=password-updated');
 }
 
 export async function signOutAction(): Promise<void> {

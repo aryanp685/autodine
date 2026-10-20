@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { getSignupValidationError, isValidSignInInput, type SignupCredentials } from './auth-validation';
+import {
+  getPasswordResetValidationError,
+  getSignupValidationError,
+  isValidSignInInput,
+  type SignupCredentials,
+} from './auth-validation';
 
 const validSignup: SignupCredentials = {
   fullName: 'Aarav Patel',
@@ -32,5 +37,12 @@ describe('authentication form validation', () => {
     expect(isValidSignInInput('bad-email', 'password')).toBe(false);
     expect(isValidSignInInput('owner@restaurant.in', '')).toBe(false);
     expect(isValidSignInInput('owner@restaurant.in', 'x'.repeat(1025))).toBe(false);
+  });
+
+  it('validates password recovery values and matching confirmation', () => {
+    expect(getPasswordResetValidationError('new-password-123', 'new-password-123')).toBeNull();
+    expect(getPasswordResetValidationError('short', 'short')).toMatch(/at least 10/i);
+    expect(getPasswordResetValidationError('x'.repeat(129), 'x'.repeat(129))).toMatch(/128 characters/i);
+    expect(getPasswordResetValidationError('new-password-123', 'different-password')).toMatch(/do not match/i);
   });
 });

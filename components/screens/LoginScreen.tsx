@@ -55,10 +55,11 @@ export function LoginScreen({ error, notice, next }: { error?: string; notice?: 
                 maxLength={1024}
               />
             </label>
+            <Link href="/forgot-password" className="auth__recoveryLink">Forgot password?</Link>
 
             <SubmitButton idleLabel="Sign in" pendingLabel="Signing in…" />
             <p className="pg__fine auth__fine">
-              Having trouble signing in? Password recovery is not available in this preview yet. Contact the project owner for help.
+              If this is a new account, confirm the email address before signing in.
             </p>
           </form>
         </section>

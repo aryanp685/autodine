@@ -13,10 +13,17 @@ export default async function LoginPage({
   const error = getSingleSearchParam(raw.error);
   const notice = getSingleSearchParam(raw.notice);
   const next = getSingleSearchParam(raw.next);
+  const noticeMessage = notice.valid
+    ? notice.value === 'password-updated'
+      ? 'Password updated. Sign in with your new password.'
+      : notice.value === 'email-confirmed'
+        ? 'Email confirmed. You can now sign in.'
+        : notice.value
+    : undefined;
   return (
     <LoginScreen
       error={error.valid ? error.value : undefined}
-      notice={notice.valid ? notice.value : undefined}
+      notice={noticeMessage}
       next={next.valid ? next.value : undefined}
     />
   );
