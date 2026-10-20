@@ -16,7 +16,7 @@ function Totals({ compact }: { compact?: boolean }) {
         <span className="tnum">{inr(paiseToRupees(subtotalPaise))}</span>
       </div>
       <div className="totals__row">
-        <span>Taxes (GST 5% · sample)</span>
+        <span>GST (5% preview rate)</span>
         <span className="tnum">{inr(paiseToRupees(taxPaise))}</span>
       </div>
       <div className="totals__row totals__row--total">
@@ -24,8 +24,8 @@ function Totals({ compact }: { compact?: boolean }) {
         <span className="tnum">{inr(paiseToRupees(totalPaise))}</span>
       </div>
       <p className="totals__note">
-        Tax rates shown are sample values for layout review. Final tax configuration must be confirmed before
-        launch.
+        Preview uses one 5% restaurant-service rate (local split: CGST 2.5% + SGST 2.5%). The venue’s GST
+        status is unverified; confirm it before live billing.
       </p>
     </div>
   );

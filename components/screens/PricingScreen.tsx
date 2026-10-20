@@ -47,7 +47,9 @@ export function PricingScreen() {
 
         <div className="pg__note" role="note">
           <strong>Preview only.</strong> Features and plan entitlements are not yet available for purchase.
-          Tax treatment and final prices require confirmation before billing launches.
+          Menu calculations use one flat 5% restaurant-service rate (local split: CGST 2.5% + SGST 2.5%),
+          tax-exclusive, with no default service charge. This is a common standalone-restaurant assumption;
+          the venue’s GST status must be verified before live billing.
         </div>
 
         <section className="pg__section" id="questions">

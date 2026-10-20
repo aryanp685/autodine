@@ -5,27 +5,25 @@
  * The browser sends item ids and quantities; it never sends a total. This
  * module is where a total becomes a fact.
  *
- * ── TAX STATUS: UNCONFIRMED ────────────────────────────────────────────────
- * The 5% below is a SAMPLE for layout review only. The real GST treatment is
- * still to be decided with a tax adviser, and three questions are open:
+ * ── PREVIEW DEFAULT — VENUE STATUS UNVERIFIED ───────────────────────────────
+ * Use one flat 5% restaurant-service rate for the ordinary standalone-restaurant
+ * preview model; do not apply category-wise rates to ordinary menu dishes. Menu
+ * prices are tax-exclusive in this preview. For a local dine-in order the 5%
+ * is represented as 2.5% CGST + 2.5% SGST. No service charge or other default
+ * fee is added.
  *
- *   1. Are menu prices tax-inclusive or tax-exclusive? (This module assumes
- *      tax-exclusive: prices are shown and stored without GST, and GST is
- *      added at the end. If they are inclusive, the calculation inverts.)
- *   2. Is GST computed per line item and summed, or once on the order total?
- *      For a single-rate order the answers are identical only if each line
- *      rounds the same way; with mixed rates they are not.
- *   3. Are CGST/SGST (intra-state) and IGST (inter-state) both supported,
- *      and is the rate chosen per restaurant state vs customer state?
- *
- * Nothing here charges anyone. This module must not be used for a live
- * transaction until those questions are answered and this comment is deleted.
+ * This is a conventional preview default, NOT a verified tax determination for
+ * this venue. Specified-premises hotel restaurants, registration/composition
+ * status, inter-state supply, packaged goods/alcohol, and other exceptions may
+ * require different treatment. Confirm the restaurant's GST status and premises
+ * before using these figures for live billing. The database remains the trusted
+ * source of order totals; browser calculations are display-only.
  * ───────────────────────────────────────────────────────────────────────────
  */
 
 import { assertValidMoney, applyRate, lineTotal, splitInHalf, type Bps, type Paise } from './money';
 
-/** SAMPLE ONLY — see the tax status note above. 500 bps = 5.00%. */
+/** Preview default for ordinary restaurant service: 500 bps = 5.00%. */
 export const SAMPLE_TAX_RATE_BPS: Bps = 500;
 
 export type PriceableLine = {

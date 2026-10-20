@@ -13,6 +13,7 @@
 | Database schema and row-level security | Migrations 0001–0006 apply in local PGlite tests; migration 0007 schedules Supabase `pg_cron` cleanup and cannot be executed by PGlite. No migration has been applied to a hosted project |
 | QR table verification | Printed table QR handles, five-minute venue code, role-gated staff display, hashed 60-minute table sessions, atomic rate limiting and server-only order RPC gate are locally implemented; requires a server-only `QR_VERIFICATION_SECRET` and hosted Supabase verification |
 | Guest and counter order flows | Database-side validation, pricing and trial gates are locally tested; customer checkout still does not submit orders or payments, while the authenticated counter UI path is not verified against a live Supabase project |
+| Preview GST model | Flat 5% tax-exclusive restaurant-service assumption (local CGST/SGST split); venue GST status is unverified and this is not live tax advice |
 | Counter cash collection | Separate idempotent RPC enforces exact-balance checks and audit records; the authenticated cashier action is wired but not verified against a live Supabase project |
 | Online payments, receipts and subscriptions | No payment provider is connected; online verification, subscription billing and persistent receipt UI remain unimplemented |
 | Production readiness | Not ready for real restaurant operations or live money |

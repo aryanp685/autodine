@@ -98,7 +98,7 @@ export function Checkout() {
             <span className="tnum">{inr(paiseToRupees(t.subtotalPaise))}</span>
           </div>
           <div className="co__row">
-            <span>Taxes (sample)</span>
+            <span>GST (5% preview rate)</span>
             <span className="tnum">{inr(paiseToRupees(t.taxPaise))}</span>
           </div>
           <div className="co__row co__row--total">
@@ -120,7 +120,8 @@ export function Checkout() {
           )}
           {previewNotice && <p className="co__fine" role="status">{previewNotice}</p>}
           <p className="co__fine" role="note">
-            Preview only. No order is submitted, no payment provider is connected and no charge is made.
+            Preview only. No order is submitted, no payment provider is connected and no charge is made. The 5% GST
+            rate is a common standalone-restaurant preview assumption, not verified for this venue.
           </p>
         </aside>
       </div>

@@ -65,6 +65,14 @@ describe('computeOrderTotals', () => {
     });
   });
 
+  it('uses one flat 5% preview rate and splits local GST evenly', () => {
+    const t = computeOrderTotals({ lines: [{ unitPricePaise: 10000, qty: 1 }] });
+    expect(t.taxPaise).toBe(500);
+    expect(t.cgstPaise).toBe(250);
+    expect(t.sgstPaise).toBe(250);
+    expect(t.totalPaise).toBe(10500);
+  });
+
   it('defaults to the sample rate but accepts an override', () => {
     expect(computeOrderTotals({ lines: SEED_LINES }).taxPaise).toBe(
       computeOrderTotals({ lines: SEED_LINES, taxRateBps: SAMPLE_TAX_RATE_BPS }).taxPaise,
