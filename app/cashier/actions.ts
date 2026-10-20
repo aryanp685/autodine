@@ -5,6 +5,8 @@ import { mayUseCashier } from '@/lib/db/workspace-selection';
 import { requireWorkspaceForAction } from '@/lib/db/workspace-access';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_COUNTER_ORDER_LINES = 99;
+const MAX_COUNTER_LINE_QUANTITY = 99;
 
 type OrderLineInput = { item_id: string; qty: number; variant_id?: string; addons?: string[] };
 
@@ -20,7 +22,7 @@ function returnToCashier(slug: string): never {
 
 function safeErrorCode(message: string): string {
   if (/read-only/i.test(message)) return 'read-only';
-  if (/no longer available|invalid variant|invalid quantity|order is empty/i.test(message)) return 'items';
+  if (/no longer available|invalid variant|invalid quantity|quantity must|too many lines|more than 99 lines|order is empty/i.test(message)) return 'items';
   if (/outstanding balance|amount must exactly/i.test(message)) return 'amount';
   if (/cancelled/i.test(message)) return 'cancelled';
   if (/pending orders|no outstanding balance|already paid/i.test(message)) return 'already-paid';
@@ -53,7 +55,11 @@ export async function createCounterOrderAction(formData: FormData): Promise<void
     go(slug, 'items');
   }
 
-  if (!Array.isArray(parsed) || parsed.length === 0) go(slug, 'items');
+  if (
+    !Array.isArray(parsed)
+    || parsed.length === 0
+    || parsed.length > MAX_COUNTER_ORDER_LINES
+  ) go(slug, 'items');
   const items: OrderLineInput[] = [];
   for (const candidate of parsed as unknown[]) {
     if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) go(slug, 'items');
@@ -70,7 +76,12 @@ export async function createCounterOrderAction(formData: FormData): Promise<void
       addons = line.addons as string[];
     }
 
-    if (!UUID.test(itemId) || !Number.isSafeInteger(qty) || qty <= 0) go(slug, 'items');
+    if (
+      !UUID.test(itemId)
+      || !Number.isSafeInteger(qty)
+      || qty <= 0
+      || qty > MAX_COUNTER_LINE_QUANTITY
+    ) go(slug, 'items');
     if (variantId && !UUID.test(variantId)) go(slug, 'items');
     items.push({ item_id: itemId, qty, ...(variantId ? { variant_id: variantId } : {}), ...(addons ? { addons } : {}) });
   }

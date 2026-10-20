@@ -62,6 +62,9 @@ function stripUnsupported(sql) {
   // drop policy ... ;  (added: migration 0002 uses drop-then-create to be
   // re-runnable, and the parser rejects DROP POLICY outright)
   out = out.replace(/^[ \t]*drop\s+policy[^;]*;[ \t]*$/gim, '');
+  // alter default privileges ... (Postgres-specific ACL syntax). Strip this
+  // before grants/revokes so its multiline statement is removed as one unit.
+  out = out.replace(/^[ \t]*alter\s+default\s+privileges[^;]*;[ \t]*$/gim, '');
   // grant/revoke ... ;
   out = out.replace(/^[ \t]*(grant|revoke)\s[^;]*;[ \t]*$/gim, '');
   // alter table ... enable/disable row level security;
