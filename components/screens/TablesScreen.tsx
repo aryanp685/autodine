@@ -4,6 +4,7 @@ import { QrChip } from '@/components/ui';
 import { PrintButton } from '@/components/PrintButton';
 import type { TablesScreenData, TableRow } from '@/lib/db/tables-screen';
 import { addTableAction, revokeQrAction, rotateQrAction, setTableActiveAction } from '@/app/dashboard/tables/actions';
+import { SignInPrompt } from '@/components/SignInPrompt';
 
 const STATUS_TONE: Record<string, string> = {
   active: 'is-active',
@@ -29,7 +30,9 @@ export function TablesScreen({
   notice?: string;
 }) {
   const restaurantName = data?.restaurantName ?? demoRestaurant.name;
-  const tables: TableRow[] = data?.tables ?? demoTables;
+  // Blocked callers get an empty list, not the demo floor plan: twelve
+  // fictional tables read as a real restaurant that happens to be quiet.
+  const tables: TableRow[] = data?.tables ?? (data?.blocked ? [] : demoTables);
   const live = Boolean(data);
 
   return (
@@ -53,6 +56,9 @@ export function TablesScreen({
       </div>
 
       <div className="pg__body">
+        {data?.blocked && (
+          <SignInPrompt reason={data.blocked} screen="tables and QR screen" />
+        )}
         {error && (
           <div className="pg__alert" role="alert">
             <strong>Could not update tables.</strong>

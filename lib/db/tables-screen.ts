@@ -1,9 +1,17 @@
 /**
  * Load tables and their QR token state for the locked Tables & QR screen.
  *
+ * This is a staff screen, so the restaurant comes from the caller's membership
+ * row rather than from a slug. It used to be addressed by a hardcoded slug
+ * naming a seeded demo venue that no longer exists, which meant a signed-in
+ * owner was shown twelve fictional tables as though they were the floor plan
+ * they had to run service on tonight.
+ *
  * Returns null when Supabase is not configured, and the screen then falls
  * back to its own demo rows -- the same contract as lib/db/menu-screen.ts,
- * so the locked markup never has to change shape.
+ * so the locked markup never has to change shape. A configured-but-blocked
+ * caller gets `blocked` instead and must be shown a prompt, never the demo
+ * rows.
  *
  * A real query error is thrown rather than swallowed: silently swapping a
  * live restaurant's floor plan for twelve fictional tables would be worse
@@ -23,8 +31,7 @@
  * on the table matches the code currently in the database.
  */
 
-import { isSupabaseConfigured } from '@/lib/supabase/env';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { getStaffContextDetailed } from './staff';
 
 export type TableStatus = 'active' | 'revoked' | 'disabled';
 
@@ -51,10 +58,9 @@ export type TableRow = {
 export type TablesScreenData = {
   restaurantName: string;
   tables: TableRow[];
+  /** Set when the caller has no restaurant to show. See lib/db/staff.ts. */
+  blocked?: 'signed-out' | 'no-membership';
 };
-
-/** The seeded demo restaurant. */
-export const DEFAULT_SLUG = 'saffron-smoke';
 
 /** How long a table QR stays valid. Short-lived by design: a static printed
  *  code cannot prove a diner is physically in the room. */
@@ -77,40 +83,32 @@ function ago(iso: string | null): string {
   return days === 1 ? '1 day ago' : `${days} days ago`;
 }
 
-export async function getTablesScreenData(
-  slug?: string
-): Promise<TablesScreenData | null> {
-  if (!isSupabaseConfigured) return null;
+export async function getTablesScreenData(): Promise<TablesScreenData | null> {
+  const staff = await getStaffContextDetailed();
 
-  const target = slug?.trim() || DEFAULT_SLUG;
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) return null;
-
-  const { data: restaurant, error: restaurantError } = await supabase
-    .from('restaurants')
-    .select('id, name')
-    .eq('slug', target)
-    .maybeSingle();
-
-  if (restaurantError) {
-    throw new Error(`Could not load restaurant: ${restaurantError.message}`);
+  // Nested rather than a compound condition: a narrowed && does not carry into
+  // the next if, so the union would stay wide and `blocked` would not typecheck.
+  if (!staff.ok) {
+    if (staff.reason === 'unconfigured') return null;
+    return { restaurantName: '', tables: [], blocked: staff.reason };
   }
-  if (!restaurant) return null;
+
+  const { supabase, restaurantId, restaurantName } = staff.context;
 
   const [tablesResult, tokensResult, ordersResult] = await Promise.all([
     supabase
       .from('dining_tables')
       .select('id, label, seats, is_active')
-      .eq('restaurant_id', restaurant.id)
+      .eq('restaurant_id', restaurantId)
       .order('label', { ascending: true }),
     supabase
       .from('qr_tokens')
       .select('id, table_id, token, expires_at')
-      .eq('restaurant_id', restaurant.id),
+      .eq('restaurant_id', restaurantId),
     supabase
       .from('orders')
       .select('table_id, placed_at')
-      .eq('restaurant_id', restaurant.id),
+      .eq('restaurant_id', restaurantId),
   ]);
 
   if (tablesResult.error) {
@@ -167,5 +165,5 @@ export async function getTablesScreenData(
     };
   });
 
-  return { restaurantName: restaurant.name, tables };
+  return { restaurantName, tables };
 }
