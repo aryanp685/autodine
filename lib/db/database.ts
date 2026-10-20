@@ -84,6 +84,45 @@ export type Database = {
         expires_at: string;
         rotated_at: string;
       }>;
+      table_qr_codes: Table<{
+        id: string;
+        restaurant_id: string;
+        table_id: string;
+        public_token: string;
+        source_qr_token_id: string | null;
+        created_at: string;
+        created_by: string | null;
+        revoked_at: string | null;
+      }>;
+      restaurant_verification_settings: Table<{
+        restaurant_id: string;
+        code_version: number;
+        cashier_access_enabled: boolean;
+        updated_at: string;
+        updated_by: string | null;
+      }>;
+      table_verification_sessions: Table<{
+        token_hash: string;
+        restaurant_id: string;
+        table_id: string;
+        qr_code_id: string;
+        created_at: string;
+        expires_at: string;
+        revoked_at: string | null;
+      }>;
+      qr_verification_attempts: Table<{
+        qr_code_id: string;
+        ip_hash: string;
+        attempt_count: number;
+        window_started_at: string;
+        blocked_until: string | null;
+        updated_at: string;
+      }>;
+      qr_token_migration_issues: Table<{
+        legacy_qr_token_id: string;
+        reason: 'expired' | 'inactive_table' | 'inactive_restaurant' | 'invalid_token_format' | 'duplicate_token';
+        recorded_at: string;
+      }>;
       orders: Table<
         Order,
         [
@@ -134,12 +173,39 @@ export type Database = {
     Functions: {
       place_order: {
         Args: {
-          p_restaurant_slug: string;
-          p_table_token: string;
+          p_session_token: string;
           p_items: unknown; // jsonb: [{item_id, qty, variant_id?, addons?}]
           p_note?: string | null;
         };
-        Returns: string; // new order id (uuid)
+        Returns: string; // new order id (uuid); callable only by the trusted server role
+      };
+      reserve_qr_verification_attempt: {
+        Args: { p_qr_code_id: string; p_ip_hash: string };
+        Returns: { allowed: boolean; retry_after_seconds: number }[];
+      };
+      record_qr_verification_failure: {
+        Args: { p_qr_code_id: string; p_ip_hash: string };
+        Returns: boolean;
+      };
+      clear_qr_verification_attempts: {
+        Args: { p_qr_code_id: string; p_ip_hash: string };
+        Returns: undefined;
+      };
+      rotate_restaurant_verification_code: {
+        Args: { p_restaurant_id: string; p_actor_id: string };
+        Returns: number;
+      };
+      issue_table_qr_code: {
+        Args: { p_restaurant_id: string; p_table_id: string; p_public_token: string; p_actor_id: string };
+        Returns: Database['public']['Tables']['table_qr_codes']['Row'];
+      };
+      revoke_table_qr_code: {
+        Args: { p_restaurant_id: string; p_qr_code_id: string };
+        Returns: boolean;
+      };
+      cleanup_expired_qr_verification_attempts: {
+        Args: Record<string, never>;
+        Returns: number;
       };
       place_counter_order: {
         Args: {

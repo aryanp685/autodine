@@ -5,6 +5,7 @@ import { CartScope } from '@/components/CartProvider';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { DEFAULT_SLUG, getMenuScreenData } from '@/lib/db/menu-screen';
 import { getSingleSearchParam } from '@/lib/query-params';
+import { getCookieTableSession } from '@/lib/db/table-verification';
 
 export const metadata: Metadata = { title: 'Order · AutoDine' };
 
@@ -30,9 +31,14 @@ export default async function CustomerMenuPage({
   // a real not-found state, never a reason to show the fictional sample menu.
   if (isSupabaseConfigured && !data) notFound();
   const scope = data?.restaurant.slug ?? s?.trim() ?? DEFAULT_SLUG;
+  const tableSession = isSupabaseConfigured ? await getCookieTableSession() : null;
+  const orderingEnabled = !isSupabaseConfigured || Boolean(data && tableSession?.restaurantSlug === data.restaurant.slug);
+  const cartKey = data
+    ? `${tableSession?.restaurantId ?? data.restaurant.slug}:${orderingEnabled ? tableSession?.tableId : 'unverified'}`
+    : scope;
   return (
-    <CartScope scope={scope}>
-      <CustomerMenu key={scope} data={data ?? undefined} />
+    <CartScope scope={scope} cartKey={cartKey}>
+      <CustomerMenu key={`${scope}:${cartKey}`} data={data ?? undefined} orderingEnabled={orderingEnabled} />
     </CartScope>
   );
 }

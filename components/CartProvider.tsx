@@ -33,10 +33,14 @@ type CartStore = {
 };
 
 const StoreContext = createContext<CartStore | null>(null);
-const ScopeContext = createContext('unscoped');
+const ScopeContext = createContext({ scope: 'unscoped', cartKey: 'unscoped' });
 
-export function CartScope({ scope, children }: { scope: string; children: ReactNode }) {
-  return <ScopeContext.Provider value={scope || 'unscoped'}>{children}</ScopeContext.Provider>;
+export function CartScope({ scope, cartKey, children }: { scope: string; cartKey?: string; children: ReactNode }) {
+  return (
+    <ScopeContext.Provider value={{ scope: scope || 'unscoped', cartKey: cartKey || scope || 'unscoped' }}>
+      {children}
+    </ScopeContext.Provider>
+  );
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
@@ -51,20 +55,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
 export function useCart(): CartApi {
   const store = useContext(StoreContext);
-  const scope = useContext(ScopeContext);
+  const scopeContext = useContext(ScopeContext);
   if (!store) throw new Error('useCart must be used inside CartProvider');
 
-  const lines = store.linesByScope.get(scope) ?? [];
+  const { scope, cartKey } = scopeContext;
+  const lines = store.linesByScope.get(cartKey) ?? [];
   const add = useCallback<CartApi['add']>((line) => {
-    store.updateScope(scope, (current) => addCartLine(current, line));
-  }, [scope, store.updateScope]);
+    store.updateScope(cartKey, (current) => addCartLine(current, line));
+  }, [cartKey, store.updateScope]);
   const remove = useCallback<CartApi['remove']>((key) => {
-    store.updateScope(scope, (current) => current.filter((line) => line.key !== key));
-  }, [scope, store.updateScope]);
+    store.updateScope(cartKey, (current) => current.filter((line) => line.key !== key));
+  }, [cartKey, store.updateScope]);
   const setQty = useCallback<CartApi['setQty']>((key, qty) => {
-    store.updateScope(scope, (current) => setCartLineQuantity(current, key, qty));
-  }, [scope, store.updateScope]);
-  const clear = useCallback(() => store.updateScope(scope, () => []), [scope, store.updateScope]);
+    store.updateScope(cartKey, (current) => setCartLineQuantity(current, key, qty));
+  }, [cartKey, store.updateScope]);
+  const clear = useCallback(() => store.updateScope(cartKey, () => []), [cartKey, store.updateScope]);
 
   return useMemo(() => ({
     scope,

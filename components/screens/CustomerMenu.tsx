@@ -69,7 +69,7 @@ export type MenuScreenData = {
 /* ============================================================================
    Editorial Minimal — locked design system customer menu
    ========================================================================== */
-export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
+export function CustomerMenu({ data, orderingEnabled = true }: { data?: MenuScreenData; orderingEnabled?: boolean } = {}) {
   const cart = useCart();
   const [cat, setCat] = useState('all');
 
@@ -94,7 +94,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
         </div>
         <div className="menu__verified">
           <span className="menu__verifiedDot" />
-          {data ? 'Restaurant menu · ordering not connected' : 'Demo — not saved'}
+          {!data ? 'Demo — not saved' : orderingEnabled ? 'Verified table session' : 'Verify at your table to order'}
         </div>
       </header>
 
@@ -129,18 +129,22 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
                 {i.variants && <span className="menu__dishFrom">from</span>}
               </div>
               {i.available ? (
-                needsChoice(i) ? (
-                  <Link href={itemHref(i.id)} className="menu__dishCta">
-                    Choose options
-                  </Link>
+                orderingEnabled ? (
+                  needsChoice(i) ? (
+                    <Link href={itemHref(i.id)} className="menu__dishCta">
+                      Choose options
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      className="menu__dishCta"
+                      onClick={() => cart.add({ id: i.id, name: i.name, unitPricePaise: rupeesToPaise(i.price), qty: 1, veg: i.veg })}
+                    >
+                      Add
+                    </button>
+                  )
                 ) : (
-                  <button
-                    type="button"
-                    className="menu__dishCta"
-                    onClick={() => cart.add({ id: i.id, name: i.name, unitPricePaise: rupeesToPaise(i.price), qty: 1, veg: i.veg })}
-                  >
-                    Add
-                  </button>
+                  <span className="menu__dishOut">Ask staff for the current table code to order</span>
                 )
               ) : (
                 <span className="menu__dishOut">Sold out for now</span>
@@ -151,7 +155,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
         ))}
       </div>
 
-      {cart.count > 0 && (
+      {orderingEnabled && cart.count > 0 && (
         <div className="menu__cartBar">
           <span>
             {cart.count} item{cart.count === 1 ? '' : 's'} · {inr(paiseToRupees(cart.subtotalPaise))}
@@ -166,7 +170,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
 }
 
 /* Option A — item customization: centred sheet, hairlines, no chrome */
-export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?: string }; itemId?: string } = {}) {
+export function ItemSheet({ data, itemId, orderingEnabled = true }: { data?: MenuScreenData & { itemId?: string }; itemId?: string; orderingEnabled?: boolean } = {}) {
   const allItems = data?.items ?? demoItems;
   const restaurant = data?.restaurant ?? demoRestaurant;
   const requestedItemId = data?.itemId ?? itemId;
@@ -214,7 +218,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
         </div>
         <div className="menu__verified">
           <span className="menu__verifiedDot" />
-          {data ? 'Restaurant menu · ordering not connected' : 'Demo — not saved'}
+          {!data ? 'Demo — not saved' : orderingEnabled ? 'Verified table session' : 'Verify at your table to order'}
         </div>
       </header>
 
@@ -304,6 +308,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
             <button
               type="button"
               className="sheet__add"
+              disabled={!orderingEnabled}
               onClick={() => {
                 cart.add({
                   id: item.id,
@@ -318,7 +323,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
                 });
               }}
             >
-              Add to order · {inr(paiseToRupees(total))}
+              {orderingEnabled ? `Add to order · ${inr(paiseToRupees(total))}` : 'Verify at your table to order'}
             </button>
           </div>
         </div>

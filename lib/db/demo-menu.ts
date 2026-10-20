@@ -180,26 +180,18 @@ export function demoSeedSql(slug: string): string {
   }
 
   lines.push('');
-  lines.push('-- Twelve tables, and a starting QR token for each.');
+  lines.push('-- Twelve tables and a stable printed QR for each. The staff code is separate.');
   lines.push('insert into public.dining_tables (restaurant_id, label, seats)');
   lines.push(`select '${DEMO_RESTAURANT_ID}', 'T' || n, 4 from generate_series(1, 12) n on conflict do nothing;`);
   lines.push('');
-  lines.push('-- Tokens expire in 7 days and carry no meaning beyond that. Rotate them from');
-  lines.push('-- the dashboard; a printed QR on its own proves nothing about who scanned it.');
-  // Guarded, not `on conflict do nothing`: the token is a fresh random value
-  // every run, so there is never a conflict to catch -- an unguarded insert
-  // adds twelve more tokens each time the seed is re-run. Only issue a token
-  // to a table that has no unexpired one.
-  lines.push('insert into public.qr_tokens (restaurant_id, table_id, token, expires_at)');
-  lines.push(
-    `select '${DEMO_RESTAURANT_ID}', t.id, encode(gen_random_bytes(12), 'hex'), ` +
-      `now() + interval '7 days'`,
-  );
+  // Only create one fresh public handle per table on repeated seed runs.
+  lines.push('insert into public.table_qr_codes (restaurant_id, table_id, public_token)');
+  lines.push(`select '${DEMO_RESTAURANT_ID}', t.id, encode(gen_random_bytes(24), 'hex')`);
   lines.push('from public.dining_tables t');
-  lines.push(`where t.restaurant_id = '${DEMO_RESTAURANT_ID}'`);
+  lines.push(`where t.restaurant_id = '${DEMO_RESTAURANT_ID}' and t.is_active`);
   lines.push('  and not exists (');
-  lines.push('    select 1 from public.qr_tokens q');
-  lines.push('    where q.table_id = t.id and q.expires_at > now()');
+  lines.push('    select 1 from public.table_qr_codes q');
+  lines.push('    where q.table_id = t.id and q.revoked_at is null');
   lines.push('  );');
 
   return lines.join('\n') + '\n';

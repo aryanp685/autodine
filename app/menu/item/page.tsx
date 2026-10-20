@@ -6,6 +6,7 @@ import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { DEFAULT_SLUG, getMenuScreenData } from '@/lib/db/menu-screen';
 import { items as demoItems } from '@/lib/demo-data';
 import { getSingleSearchParam } from '@/lib/query-params';
+import { getCookieTableSession } from '@/lib/db/table-verification';
 
 export const metadata: Metadata = { title: 'Customise · AutoDine' };
 
@@ -31,9 +32,19 @@ export default async function ItemPage({
   if (item && !(data?.items ?? demoItems).some((candidate) => candidate.id === item)) notFound();
 
   const scope = data?.restaurant.slug ?? s?.trim() ?? DEFAULT_SLUG;
+  const tableSession = isSupabaseConfigured ? await getCookieTableSession() : null;
+  const orderingEnabled = !isSupabaseConfigured || Boolean(data && tableSession?.restaurantSlug === data.restaurant.slug);
+  const cartKey = data
+    ? `${tableSession?.restaurantId ?? data.restaurant.slug}:${orderingEnabled ? tableSession?.tableId : 'unverified'}`
+    : scope;
   return (
-    <CartScope scope={scope}>
-      <ItemSheet key={`${scope}:${item ?? ''}`} data={data ? { ...data, itemId: item } : undefined} itemId={item} />
+    <CartScope scope={scope} cartKey={cartKey}>
+      <ItemSheet
+        key={`${scope}:${cartKey}:${item ?? ''}`}
+        data={data ? { ...data, itemId: item } : undefined}
+        itemId={item}
+        orderingEnabled={orderingEnabled}
+      />
     </CartScope>
   );
 }

@@ -89,10 +89,11 @@ describe('demoSeedSql', () => {
     expect(demoSeedSql("o'brien's")).toContain("o''brien''s");
   });
 
-  it('seeds tables and rotating QR tokens', () => {
+  it('seeds tables and persistent printed QR handles that still require venue verification', () => {
     expect(sql).toContain('public.dining_tables');
-    expect(sql).toContain('public.qr_tokens');
-    expect(sql).toContain("interval '7 days'");
+    expect(sql).toContain('public.table_qr_codes');
+    expect(sql).toContain('gen_random_bytes(24)');
+    expect(sql).not.toContain('public.qr_tokens');
   });
 
   it('anchors everything to the demo restaurant', () => {

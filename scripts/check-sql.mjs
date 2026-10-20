@@ -51,8 +51,12 @@ if (!files.length) {
 /** Remove the constructs the parser cannot handle, so the rest can be checked. */
 function stripUnsupported(sql) {
   let out = sql;
-  // create or replace function ... $$ body $$  ... ;
-  out = out.replace(/create\s+or\s+replace\s+function[\s\S]*?\$\$[\s\S]*?\$\s*;/gi, '');
+  // CREATE [OR REPLACE] FUNCTION bodies and anonymous DO blocks.
+  out = out.replace(/create\s+(?:or\s+replace\s+)?function[\s\S]*?\$\$[\s\S]*?\$\$\s*;/gi, '');
+  out = out.replace(/^[ \t]*drop\s+function[^;]*;[ \t]*$/gim, '');
+  out = out.replace(/^[ \t]*create\s+trigger[^;]*;[ \t]*$/gim, '');
+  out = out.replace(/^[ \t]*drop\s+trigger[^;]*;[ \t]*$/gim, '');
+  out = out.replace(/^[ \t]*do\s+\$\$[\s\S]*?\$\$\s*;[ \t]*$/gim, '');
   // create policy ... ;
   out = out.replace(/^[ \t]*create\s+policy[^;]*;[ \t]*$/gim, '');
   // drop policy ... ;  (added: migration 0002 uses drop-then-create to be
