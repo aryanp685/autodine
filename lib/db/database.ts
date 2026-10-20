@@ -237,6 +237,10 @@ export type Database = {
         Args: { p_restaurant_id: string };
         Returns: boolean;
       };
+      set_restaurant_tax_rate: {
+        Args: { p_restaurant_id: string; p_tax_rate_bps: number };
+        Returns: number;
+      };
     };
     Enums: {
       member_role: MemberRole;

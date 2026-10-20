@@ -5,12 +5,13 @@ import { signOutAction } from '@/app/auth/actions';
 import { WorkspaceSwitcher } from '@/components/WorkspaceSwitcher';
 import type { AuthorizedWorkspace } from '@/lib/db/workspace-selection';
 
-const NAV_A = ['Overview', 'Menus', 'Tables & QR'];
+const NAV_A = ['Overview', 'Menus', 'Tables & QR', 'Settings'];
 /** Only show dashboard destinations that currently have a screen. */
 const NAV_LINKS: Record<string, string> = {
   Overview: '/dashboard',
   Menus: '/dashboard/menus',
   'Tables & QR': '/dashboard/tables',
+  Settings: '/dashboard/settings',
 };
 
 /* ============================================================================

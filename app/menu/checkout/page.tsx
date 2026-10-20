@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { notFound } from 'next/navigation';
 import { Checkout } from '@/components/screens/CheckoutScreen';
 import { CartScope } from '@/components/CartProvider';
-import { DEFAULT_SLUG } from '@/lib/db/menu-screen';
+import { DEFAULT_SLUG, getMenuScreenData } from '@/lib/db/menu-screen';
 import { getSingleSearchParam } from '@/lib/query-params';
 import { getCookieTableSession } from '@/lib/db/table-verification';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
@@ -22,6 +22,8 @@ export default async function CheckoutPage({
   const parsedStatus = getSingleSearchParam(rawStatus);
   if (!slug.valid) notFound();
   const scope = slug.value?.trim() || DEFAULT_SLUG;
+  const menuData = await getMenuScreenData(scope);
+  if (isSupabaseConfigured && !menuData) notFound();
   const status = parsedStatus.valid ? parsedStatus.value : undefined;
   const tableSession = isSupabaseConfigured ? await getCookieTableSession() : null;
   if (isSupabaseConfigured && (!tableSession || tableSession.restaurantSlug !== scope)) {
@@ -57,7 +59,7 @@ export default async function CheckoutPage({
 
   const cartKey = tableSession ? `${tableSession.restaurantId}:${tableSession.tableId}` : scope;
   return (
-    <CartScope scope={scope} cartKey={cartKey}>
+    <CartScope scope={scope} cartKey={cartKey} taxRateBps={menuData?.restaurant.taxRateBps ?? 0}>
       <Checkout
         submitEnabled={Boolean(isSupabaseConfigured && tableSession)}
         requestId={randomUUID()}

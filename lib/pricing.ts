@@ -1,31 +1,15 @@
 /**
  * Order pricing.
  *
- * RULE: the server is the only thing allowed to decide what an order costs.
- * The browser sends item IDs, quantities and optional variant IDs; it never
- * sends prices or totals. The database RPC recalculates the trusted bill; this
- * module supplies preview/display arithmetic and matching tests.
- *
- * ── PREVIEW DEFAULT — VENUE STATUS UNVERIFIED ───────────────────────────────
- * Use one flat 5% restaurant-service rate for the ordinary standalone-restaurant
- * preview model; do not apply category-wise rates to ordinary menu dishes. Menu
- * prices are tax-exclusive in this preview. For a local dine-in order the 5%
- * is represented as 2.5% CGST + 2.5% SGST. No service charge or other default
- * fee is added.
- *
- * This is a conventional preview default, NOT a verified tax determination for
- * this venue. Specified-premises hotel restaurants, registration/composition
- * status, inter-state supply, packaged goods/alcohol, and other exceptions may
- * require different treatment. Confirm the restaurant's GST status and premises
- * before using these figures for live billing. The database remains the trusted
- * source of order totals; browser calculations are display-only.
- * ───────────────────────────────────────────────────────────────────────────
+ * The browser calculation is display-only. The database RPC is the trusted
+ * source of order totals; it reads the restaurant's configured tax rate. New
+ * venues default to 0% tax, and the owner may configure a rate explicitly.
  */
 
 import { assertValidMoney, applyRate, lineTotal, splitInHalf, type Bps, type Paise } from './money';
 
-/** Preview default for ordinary restaurant service: 500 bps = 5.00%. */
-export const SAMPLE_TAX_RATE_BPS: Bps = 500;
+/** No automatic tax is applied unless a venue owner configures a rate. */
+export const DEFAULT_TAX_RATE_BPS: Bps = 0;
 
 export type PriceableLine = {
   /** Price of ONE unit, in paise, as stored on the menu. */
@@ -37,7 +21,7 @@ export type OrderTotalsInput = {
   lines: PriceableLine[];
   /** Applied to the pre-tax subtotal. Positive number, subtracted. */
   discountPaise?: Paise;
-  /** Defaults to the sample rate. Bps, e.g. 500 = 5.00%. */
+  /** Defaults to no tax. Bps, e.g. 500 = 5.00%. */
   taxRateBps?: Bps;
 };
 
@@ -84,7 +68,7 @@ export function computeSubtotal(lines: PriceableLine[]): Paise {
  * bill — the discount itself is reported unclamped so the anomaly is visible.
  */
 export function computeOrderTotals(input: OrderTotalsInput): OrderTotals {
-  const { lines, discountPaise = 0, taxRateBps = SAMPLE_TAX_RATE_BPS } = input;
+  const { lines, discountPaise = 0, taxRateBps = DEFAULT_TAX_RATE_BPS } = input;
 
   assertValidMoney(discountPaise);
   if (discountPaise < 0) {

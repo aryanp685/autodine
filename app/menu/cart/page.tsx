@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { Cart } from '@/components/screens/CartScreen';
 import { CartScope } from '@/components/CartProvider';
-import { DEFAULT_SLUG } from '@/lib/db/menu-screen';
+import { DEFAULT_SLUG, getMenuScreenData } from '@/lib/db/menu-screen';
 import { getSingleSearchParam } from '@/lib/query-params';
 import { getCookieTableSession } from '@/lib/db/table-verification';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
@@ -19,6 +19,8 @@ export default async function CartPage({
   const slug = getSingleSearchParam(rawSlug);
   if (!slug.valid) notFound();
   const scope = slug.value?.trim() || DEFAULT_SLUG;
+  const menuData = await getMenuScreenData(scope);
+  if (isSupabaseConfigured && !menuData) notFound();
   const tableSession = isSupabaseConfigured ? await getCookieTableSession() : null;
   if (isSupabaseConfigured && (!tableSession || tableSession.restaurantSlug !== scope)) {
     return (
@@ -33,7 +35,7 @@ export default async function CartPage({
   }
   const cartKey = tableSession ? `${tableSession.restaurantId}:${tableSession.tableId}` : scope;
   return (
-    <CartScope scope={scope} cartKey={cartKey}>
+    <CartScope scope={scope} cartKey={cartKey} taxRateBps={menuData?.restaurant.taxRateBps ?? 0}>
       <Cart orderingEnabled={Boolean(isSupabaseConfigured && tableSession)} />
     </CartScope>
   );

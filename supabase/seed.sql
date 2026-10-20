@@ -2,7 +2,7 @@
 -- SAMPLE DATA for a fictional restaurant. Replace before going live.
 
 insert into public.restaurants (id, slug, name, tagline, address, phone, gstin, timezone, tax_rate_bps)
-values ('00000000-0000-4000-8000-000000000001', 'saffron-smoke', 'Saffron & Smoke', 'Modern Indian kitchen · Nagpur', '14 Civil Lines, Near Zero Mile, Nagpur 440001, Maharashtra', '+91 712 000 0000', 'GSTIN — add in Settings', 'Asia/Kolkata', 500)
+values ('00000000-0000-4000-8000-000000000001', 'saffron-smoke', 'Saffron & Smoke', 'Modern Indian kitchen · Nagpur', '14 Civil Lines, Near Zero Mile, Nagpur 440001, Maharashtra', '+91 712 000 0000', 'GSTIN — add in Settings', 'Asia/Kolkata', 0)
 on conflict (id) do update set name = excluded.name;
 
 insert into public.menus (id, restaurant_id, name, is_published) values ('00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000001', 'Main menu', true) on conflict (id) do nothing;

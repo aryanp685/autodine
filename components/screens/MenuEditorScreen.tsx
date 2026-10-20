@@ -28,6 +28,7 @@ export function MenuEditorScreen({
             Menus
           </Link>
           <Link href={`/dashboard/tables${workspaceQuery}`}>Tables &amp; QR</Link>
+          <Link href={`/dashboard/settings${workspaceQuery}`}>Settings</Link>
           <span>Orders</span>
           <span>Reports</span>
         </div>

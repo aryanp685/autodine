@@ -8,6 +8,7 @@ import { useCart } from '@/components/CartProvider';
 import { inr } from '@/lib/demo-data';
 import { VegMark } from '@/components/ui';
 import { lineTotal, paiseToRupees } from '@/lib/money';
+import { formatTaxRatePercent } from '@/lib/tax-settings';
 
 function OrderSubmitButton({ disabled, totalPaise }: { disabled: boolean; totalPaise: number }) {
   const { pending } = useFormStatus();
@@ -41,6 +42,7 @@ export function Checkout({
 }) {
   const cart = useCart();
   const totals = cart.totals;
+  const hasTax = cart.taxRateBps > 0;
   const hasUnpricedAddons = cart.lines.some((line) => (line.addons?.length ?? 0) > 0);
   const notice = status ? STATUS_MESSAGES[status] : undefined;
   const orderLines = cart.lines.map((line) => ({
@@ -107,10 +109,12 @@ export function Checkout({
             <span>Subtotal</span>
             <span className="tnum">{inr(paiseToRupees(totals.subtotalPaise))}</span>
           </div>
-          <div className="co__row">
-            <span>GST (5% preview rate)</span>
-            <span className="tnum">{inr(paiseToRupees(totals.taxPaise))}</span>
-          </div>
+          {hasTax && (
+            <div className="co__row">
+              <span>GST ({formatTaxRatePercent(cart.taxRateBps)}%)</span>
+              <span className="tnum">{inr(paiseToRupees(totals.taxPaise))}</span>
+            </div>
+          )}
           <div className="co__row co__row--total">
             <span>Total payable</span>
             <span className="tnum">{inr(paiseToRupees(totals.totalPaise))}</span>
@@ -131,8 +135,8 @@ export function Checkout({
           )}
           <p className="co__fine" role="note">
             {submitEnabled
-              ? 'The restaurant database rechecks the table session, availability, menu prices and total before saving your order. The displayed 5% is a preview default, not verified for this venue.'
-              : 'Preview only. No order is submitted and no charge is made. The 5% GST rate is a common standalone-restaurant preview assumption, not verified for this venue.'}
+              ? `The restaurant database rechecks the table session, availability, menu prices and current configured tax rate before saving your order. ${hasTax ? 'The restaurant owner should verify that rate for their tax treatment.' : 'No tax is currently configured by this venue.'}`
+              : `Preview only. No order is submitted and no charge is made. ${hasTax ? 'The displayed tax rate is owner-configured and must be verified before live billing.' : 'No tax is added by default.'}`}
           </p>
         </aside>
       </div>

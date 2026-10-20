@@ -76,6 +76,8 @@ export type DisplayRestaurant = {
   currency: string;
   openHours: string;
   timezone: string;
+  /** Owner-configured tax in basis points; zero means no tax line. */
+  taxRateBps: number;
 };
 
 export function toDisplayItem(item: MenuItem): DisplayItem {
@@ -134,6 +136,7 @@ export function toDisplayRestaurant(r: Restaurant): DisplayRestaurant {
     currency: 'INR',
     openHours: 'Hours — add in Settings',
     timezone: r.timezone,
+    taxRateBps: r.tax_rate_bps,
   };
 }
 

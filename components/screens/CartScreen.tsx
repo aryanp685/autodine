@@ -5,27 +5,32 @@ import { useCart } from '@/components/CartProvider';
 import { inr } from '@/lib/demo-data';
 import { VegMark } from '@/components/ui';
 import { lineTotal, paiseToRupees } from '@/lib/money';
+import { formatTaxRatePercent } from '@/lib/tax-settings';
 
 function Totals({ compact }: { compact?: boolean }) {
   const cart = useCart();
   const { subtotalPaise, taxPaise, totalPaise } = cart.totals;
+  const hasTax = cart.taxRateBps > 0;
   return (
     <div className={compact ? 'totals totals--compact' : 'totals'}>
       <div className="totals__row">
         <span>Subtotal</span>
         <span className="tnum">{inr(paiseToRupees(subtotalPaise))}</span>
       </div>
-      <div className="totals__row">
-        <span>GST (5% preview rate)</span>
-        <span className="tnum">{inr(paiseToRupees(taxPaise))}</span>
-      </div>
+      {hasTax && (
+        <div className="totals__row">
+          <span>GST ({formatTaxRatePercent(cart.taxRateBps)}%)</span>
+          <span className="tnum">{inr(paiseToRupees(taxPaise))}</span>
+        </div>
+      )}
       <div className="totals__row totals__row--total">
         <span>Total</span>
         <span className="tnum">{inr(paiseToRupees(totalPaise))}</span>
       </div>
       <p className="totals__note">
-        Preview uses one 5% restaurant-service rate (local split: CGST 2.5% + SGST 2.5%). The venue’s GST
-        status is unverified; confirm it before live billing.
+        {hasTax
+          ? 'Tax rate is configured by the restaurant. The owner should confirm the applicable treatment before live billing.'
+          : 'No GST is currently added by this venue.'}
       </p>
     </div>
   );

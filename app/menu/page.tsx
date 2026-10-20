@@ -37,7 +37,7 @@ export default async function CustomerMenuPage({
     ? `${tableSession?.restaurantId ?? data.restaurant.slug}:${orderingEnabled ? tableSession?.tableId : 'unverified'}`
     : scope;
   return (
-    <CartScope scope={scope} cartKey={cartKey}>
+    <CartScope scope={scope} cartKey={cartKey} taxRateBps={data?.restaurant.taxRateBps ?? 0}>
       <CustomerMenu key={`${scope}:${cartKey}`} data={data ?? undefined} orderingEnabled={orderingEnabled} />
     </CartScope>
   );

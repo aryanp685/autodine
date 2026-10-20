@@ -44,6 +44,7 @@ export function TablesScreen({
           <Link href={`/dashboard${workspaceQuery}`}>Overview</Link>
           <Link href={`/dashboard/menus${workspaceQuery}`}>Menus</Link>
           <Link href={`/dashboard/tables${workspaceQuery}`} className="is-active">Tables &amp; QR</Link>
+          <Link href={`/dashboard/settings${workspaceQuery}`}>Settings</Link>
           <span>Orders</span>
           <span>Reports</span>
         </div>

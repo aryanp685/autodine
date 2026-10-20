@@ -87,6 +87,10 @@ beforeAll(async () => {
     new URL('../../supabase/migrations/20261020000009_security_regressions.sql', import.meta.url),
     'utf8',
   ));
+  await db.exec(readFileSync(
+    new URL('../../supabase/migrations/20261020205436_owner_optional_tax_settings.sql', import.meta.url),
+    'utf8',
+  ));
 });
 
 afterAll(async () => {
@@ -94,6 +98,55 @@ afterAll(async () => {
 });
 
 describe('security regression migration', () => {
+  it('sets new restaurant rows to 0% tax without changing existing settings', async () => {
+    const existing = await db.query<{ tax_rate_bps: number }>(
+      'select tax_rate_bps from public.restaurants where id = $1',
+      [RESTAURANT_A],
+    );
+    expect(existing.rows[0]?.tax_rate_bps).toBe(500);
+
+    const freshId = '82000000-0000-4000-8000-000000000003';
+    await db.query(
+      'insert into public.restaurants(id, slug, name) values ($1, $2, $3)',
+      [freshId, 'security-test-new', 'Security Test New'],
+    );
+    const fresh = await db.query<{ tax_rate_bps: number }>(
+      'select tax_rate_bps from public.restaurants where id = $1',
+      [freshId],
+    );
+    expect(fresh.rows[0]?.tax_rate_bps).toBe(0);
+  });
+
+  it('allows only the owner to update the tax setting through the narrow RPC', async () => {
+    const updated = await asRole('authenticated', OWNER, () => db.query<{ set_restaurant_tax_rate: number }>(
+      'select public.set_restaurant_tax_rate($1, $2) as set_restaurant_tax_rate',
+      [RESTAURANT_A, 525],
+    ));
+    expect(updated.rows[0]?.set_restaurant_tax_rate).toBe(525);
+
+    const current = await db.query<{ tax_rate_bps: number }>(
+      'select tax_rate_bps from public.restaurants where id = $1',
+      [RESTAURANT_A],
+    );
+    expect(current.rows[0]?.tax_rate_bps).toBe(525);
+
+    await expect(asRole('authenticated', MANAGER, () => db.query(
+      'select public.set_restaurant_tax_rate($1, $2)',
+      [RESTAURANT_A, 500],
+    ))).rejects.toThrow(/only the restaurant owner/i);
+
+    await expect(asRole('authenticated', OWNER, () => db.query(
+      'select public.set_restaurant_tax_rate($1, $2)',
+      [RESTAURANT_A, 3001],
+    ))).rejects.toThrow(/between 0% and 30%/i);
+
+    const disabled = await asRole('authenticated', OWNER, () => db.query<{ set_restaurant_tax_rate: number }>(
+      'select public.set_restaurant_tax_rate($1, 0) as set_restaurant_tax_rate',
+      [RESTAURANT_A],
+    ));
+    expect(disabled.rows[0]?.set_restaurant_tax_rate).toBe(0);
+  });
+
   it('prevents owners and managers from changing trial or tax fields directly', async () => {
     for (const userId of [OWNER, MANAGER]) {
       await expect(

@@ -38,7 +38,7 @@ export default async function ItemPage({
     ? `${tableSession?.restaurantId ?? data.restaurant.slug}:${orderingEnabled ? tableSession?.tableId : 'unverified'}`
     : scope;
   return (
-    <CartScope scope={scope} cartKey={cartKey}>
+    <CartScope scope={scope} cartKey={cartKey} taxRateBps={data?.restaurant.taxRateBps ?? 0}>
       <ItemSheet
         key={`${scope}:${cartKey}:${item ?? ''}`}
         data={data ? { ...data, itemId: item } : undefined}

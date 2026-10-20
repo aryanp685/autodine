@@ -73,7 +73,7 @@ export function demoMenu(slug: string): RestaurantMenu {
     phone: demoRestaurant.phone,
     gstin: demoRestaurant.gstin,
     timezone: 'Asia/Kolkata',
-    tax_rate_bps: 500,
+    tax_rate_bps: 0,
     is_active: true,
     trial_started_at: '1970-01-01T00:00:00Z',
     created_at: '1970-01-01T00:00:00Z',
@@ -136,7 +136,7 @@ export function demoSeedSql(slug: string): string {
   lines.push('insert into public.restaurants (id, slug, name, tagline, address, phone, gstin, timezone, tax_rate_bps)');
   lines.push(
     `values ('${DEMO_RESTAURANT_ID}', ${esc(slug)}, ${esc(rs.restaurant.name)}, ${esc(rs.restaurant.tagline)}, ` +
-      `${esc(rs.restaurant.address)}, ${esc(rs.restaurant.phone)}, ${esc(rs.restaurant.gstin)}, 'Asia/Kolkata', 500)`,
+      `${esc(rs.restaurant.address)}, ${esc(rs.restaurant.phone)}, ${esc(rs.restaurant.gstin)}, 'Asia/Kolkata', 0)`,
   );
   lines.push('on conflict (id) do update set name = excluded.name;');
 

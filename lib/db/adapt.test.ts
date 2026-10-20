@@ -145,6 +145,7 @@ describe('toDisplayRestaurant', () => {
     expect(out.name).toBe('Saffron & Smoke');
     expect(out.gstin).toBe('22AAAAA0000A1Z5');
     expect(out.timezone).toBe('Asia/Kolkata');
+    expect(out.taxRateBps).toBe(500);
   });
 
   it('substitutes a visible placeholder for columns that do not exist yet', () => {

@@ -11,7 +11,7 @@
 
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { computeOrderTotals, computeSubtotal, type OrderTotals } from '@/lib/pricing';
+import { computeOrderTotals, computeSubtotal, DEFAULT_TAX_RATE_BPS, type OrderTotals } from '@/lib/pricing';
 import type { Paise } from '@/lib/money';
 import { addCartLine, setCartLineQuantity, updateScopedCart, type CartLine, type NewCartLine } from '@/lib/cart-state';
 
@@ -25,6 +25,7 @@ type CartApi = {
   count: number;
   subtotalPaise: Paise;
   totals: OrderTotals;
+  taxRateBps: number;
 };
 
 type CartStore = {
@@ -33,11 +34,11 @@ type CartStore = {
 };
 
 const StoreContext = createContext<CartStore | null>(null);
-const ScopeContext = createContext({ scope: 'unscoped', cartKey: 'unscoped' });
+const ScopeContext = createContext({ scope: 'unscoped', cartKey: 'unscoped', taxRateBps: DEFAULT_TAX_RATE_BPS });
 
-export function CartScope({ scope, cartKey, children }: { scope: string; cartKey?: string; children: ReactNode }) {
+export function CartScope({ scope, cartKey, taxRateBps = DEFAULT_TAX_RATE_BPS, children }: { scope: string; cartKey?: string; taxRateBps?: number; children: ReactNode }) {
   return (
-    <ScopeContext.Provider value={{ scope: scope || 'unscoped', cartKey: cartKey || scope || 'unscoped' }}>
+    <ScopeContext.Provider value={{ scope: scope || 'unscoped', cartKey: cartKey || scope || 'unscoped', taxRateBps }}>
       {children}
     </ScopeContext.Provider>
   );
@@ -58,7 +59,7 @@ export function useCart(): CartApi {
   const scopeContext = useContext(ScopeContext);
   if (!store) throw new Error('useCart must be used inside CartProvider');
 
-  const { scope, cartKey } = scopeContext;
+  const { scope, cartKey, taxRateBps } = scopeContext;
   const lines = store.linesByScope.get(cartKey) ?? [];
   const add = useCallback<CartApi['add']>((line) => {
     store.updateScope(cartKey, (current) => addCartLine(current, line));
@@ -80,6 +81,7 @@ export function useCart(): CartApi {
     clear,
     count: lines.reduce((count, line) => count + line.qty, 0),
     subtotalPaise: computeSubtotal(lines),
-    totals: computeOrderTotals({ lines }),
-  }), [scope, lines, add, remove, setQty, clear]);
+    totals: computeOrderTotals({ lines, taxRateBps }),
+    taxRateBps,
+  }), [scope, lines, add, remove, setQty, clear, taxRateBps]);
 }
