@@ -3,6 +3,7 @@ import { categories, items as demoItems, inr } from '@/lib/demo-data';
 import { VegMark } from '@/components/ui';
 import { paiseToRupees } from '@/lib/money';
 import type { MenuEditorData } from '@/lib/db/menu-editor';
+import { SignInPrompt } from '@/components/SignInPrompt';
 import {
   addItemAction,
   publishMenuAction,
@@ -32,8 +33,15 @@ export function MenuEditorScreen({
   notice?: string;
 }) {
   const live = Boolean(data);
-  const selected =
-    data?.items.find((i) => i.id === selectedId) ?? data?.items[0] ?? demoItems.find((i) => i.id === 'it-butter-chicken')!;
+  // A blocked caller has a database and no restaurant. The editor below is
+  // hidden for them, so whatever this resolves to is never rendered -- it is
+  // kept non-null so the form's shape and its types stay unchanged.
+  const blocked = data?.blocked;
+  const selected = blocked
+    ? demoItems.find((i) => i.id === 'it-butter-chicken')!
+    : (data?.items.find((i) => i.id === selectedId) ??
+       data?.items[0] ??
+       demoItems.find((i) => i.id === 'it-butter-chicken')!);
 
   // Demo rows are rupees; the database stores paise. Normalise to rupees for
   // the price input and the table, and convert back only on save.
@@ -50,15 +58,19 @@ export function MenuEditorScreen({
       }))
     : demoItems;
 
-  const selectedPrice = data
-    ? paiseToRupees(
-        (data.items.find((i) => i.id === selected.id) ?? data.items[0])?.pricePaise ?? 0
-      )
-    : (selected as { price: number }).price;
+  const selectedPrice = blocked
+    ? 0
+    : data
+      ? paiseToRupees(
+          (data.items.find((i) => i.id === selected.id) ?? data.items[0])?.pricePaise ?? 0
+        )
+      : (selected as { price: number }).price;
 
-  const selectedDesc = data
-    ? (data.items.find((i) => i.id === selected.id) ?? data.items[0])?.desc ?? ''
-    : (selected as { desc: string }).desc;
+  const selectedDesc = blocked
+    ? ''
+    : data
+      ? (data.items.find((i) => i.id === selected.id) ?? data.items[0])?.desc ?? ''
+      : (selected as { desc: string }).desc;
 
   return (
     <div className="pg pg--dash">
@@ -101,6 +113,7 @@ export function MenuEditorScreen({
           the locked design fixed. This wrapper exists only to stack the
           banners above the three columns. */}
       <div>
+        {data?.blocked && <SignInPrompt reason={data.blocked} screen="menu editor" />}
         {error && (
           <div className="pg__alert" role="alert">
             <strong>Could not save.</strong>
@@ -114,8 +127,9 @@ export function MenuEditorScreen({
           </div>
         )}
 
-        <div className="pg__split">
-          <aside className="pg__cats">
+        {!blocked && (
+          <div className="pg__split">
+            <aside className="pg__cats">
             <div className="pg__catsHead">
               Categories
               <span className="pg__catsAdd">+</span>
@@ -291,9 +305,10 @@ export function MenuEditorScreen({
             <p className="pg__fine">
               Published changes never alter past orders or receipts — every order keeps its own snapshot of items,
               prices and modifiers.
-            </p>
-          </aside>
-        </div>
+              </p>
+            </aside>
+          </div>
+        )}
       </div>
     </div>
   );

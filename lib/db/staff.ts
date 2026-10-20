@@ -45,6 +45,16 @@ export type StaffContext = {
   restaurantId: string;
   restaurantName: string;
   /**
+   * IANA zone the restaurant closes its books in. Read from the row rather
+   * than defaulted, because "today" for the dashboard is the restaurant's
+   * today and half the countries this could expand into shift their clocks.
+   * Falls back to Asia/Kolkata only when the row somehow carries a value the
+   * runtime cannot parse.
+   */
+  timezone: string;
+  /** Null when the owner never filled it in. Never substitute sample copy. */
+  tagline: string | null;
+  /**
    * Needed by the payment RPCs, which take a slug rather than a UUID. The
    * UUID is never accepted from the client; the slug is resolved here from
    * the same membership row, so it cannot be pointed elsewhere.
@@ -107,7 +117,7 @@ export async function getStaffContextDetailed(): Promise<StaffContextResult> {
 
   const { data: restaurant, error: restaurantError } = await supabase
     .from('restaurants')
-    .select('id, name, slug')
+    .select('id, name, slug, timezone, tagline')
     .eq('id', restaurantId)
     .maybeSingle();
 
@@ -120,6 +130,8 @@ export async function getStaffContextDetailed(): Promise<StaffContextResult> {
       restaurantId,
       restaurantName: restaurant.name,
       slug: restaurant.slug,
+      timezone: restaurant.timezone ?? 'Asia/Kolkata',
+      tagline: (restaurant.tagline as string | null) ?? null,
       role: membership.role as MemberRole,
     },
   };
