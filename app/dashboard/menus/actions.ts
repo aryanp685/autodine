@@ -20,6 +20,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { rupeesToPaise } from '@/lib/money';
+import { PRESET_CATEGORIES, normaliseCategoryName } from '@/lib/menu-presets';
 
 const MENUS_PATH = '/dashboard/menus';
 
@@ -122,6 +123,63 @@ export async function addCategoryAction(formData: FormData): Promise<void> {
   ok(`Category "${name}" added.`);
 }
 
+/**
+ * Seed the categories nearly every Indian restaurant uses, in one action.
+ *
+ * Without this, going from an empty menu to a first item meant typing each
+ * category name by hand first. The chips add one at a time, but the common
+ * case is wanting all of them, so that is one press.
+ *
+ * Names already present are skipped, so pressing it twice changes nothing
+ * rather than creating duplicates.
+ */
+export async function addPresetCategoriesAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const menuId = String(formData.get('menuId') ?? '').trim();
+  if (!menuId) fail('There is no menu to add categories to.');
+
+  const { data: menu, error: menuError } = await ctx.supabase
+    .from('menus')
+    .select('id')
+    .eq('id', menuId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .maybeSingle();
+
+  if (menuError || !menu) fail('That menu is not on your account.');
+
+  const { data: existing } = await ctx.supabase
+    .from('categories')
+    .select('name')
+    .eq('restaurant_id', ctx.restaurantId);
+
+  const have = new Set((existing ?? []).map((c) => normaliseCategoryName(c.name)));
+  const missing = PRESET_CATEGORIES.filter((n) => !have.has(normaliseCategoryName(n)));
+
+  if (missing.length === 0) {
+    ok('Those categories are already on your menu.');
+  }
+
+  const { count } = await ctx.supabase
+    .from('categories')
+    .select('id', { count: 'exact', head: true })
+    .eq('restaurant_id', ctx.restaurantId);
+
+  const { error } = await ctx.supabase.from('categories').insert(
+    missing.map((name, i) => ({
+      restaurant_id: ctx.restaurantId,
+      menu_id: menuId,
+      name,
+      sort_order: (count ?? 0) + i,
+    }))
+  );
+
+  if (error) fail(`Could not add the categories: ${error.message}`);
+
+  ok(`Added ${missing.length} categor${missing.length === 1 ? 'y' : 'ies'}.`);
+}
+
 export async function deleteCategoryAction(formData: FormData): Promise<void> {
   const ctx = await currentRestaurant();
   if (!ctx) fail('You need to be signed in to edit the menu.');
@@ -193,9 +251,19 @@ export async function addItemAction(formData: FormData): Promise<void> {
   const ctx = await currentRestaurant();
   if (!ctx) fail('You need to be signed in to edit the menu.');
 
-  const name = String(formData.get('name') ?? '').trim() || 'New item';
+  // No placeholder fallback. Defaulting to "New item" at zero rupees meant
+  // every press created a blank row the owner then had to reopen and retype,
+  // so a few quick clicks left a table of identical rows that differed only
+  // by id. The form now carries the real values, so an empty name is an
+  // error rather than something to fill in later.
+  const name = String(formData.get('name') ?? '').trim();
+  if (!name) fail('Give the item a name.');
+  if (name.length > 120) fail('That item name is too long.');
+
   const rupees = Number(String(formData.get('price') ?? '0').trim());
   const safePrice = Number.isFinite(rupees) && rupees >= 0 ? rupees : 0;
+
+  const isVeg = String(formData.get('veg') ?? 'veg').trim() !== 'non';
 
   // Required, not optional. categories_id is the join that makes an item
   // visible to diners: the items_public RLS policy reaches an item only
@@ -214,14 +282,14 @@ export async function addItemAction(formData: FormData): Promise<void> {
     name,
     description: null,
     price_paise: rupeesToPaise(safePrice),
-    is_veg: true,
+    is_veg: isVeg,
     is_available: true,
     sort_order: 0,
   });
 
   if (error) fail(`Could not add the item: ${error.message}`);
 
-  ok(`"${name}" added as a draft.`);
+  ok(`"${name}" added.`);
 }
 
 export async function setAllAvailabilityAction(formData: FormData): Promise<void> {
@@ -251,13 +319,22 @@ export async function publishMenuAction(formData: FormData): Promise<void> {
   const menuId = String(formData.get('menuId') ?? '').trim();
   if (!menuId) fail('No menu to publish.');
 
+  // Publishing used to be one-way. An owner whose menu was already live saw a
+  // disabled button labelled "Published" and no way to take it down, which
+  // read as broken. One flag, both directions.
+  const published = String(formData.get('published') ?? 'true').trim() !== 'false';
+
   const { error } = await ctx.supabase
     .from('menus')
-    .update({ is_published: true })
+    .update({ is_published: published })
     .eq('id', menuId)
     .eq('restaurant_id', ctx.restaurantId);
 
-  if (error) fail(`Could not publish: ${error.message}`);
+  if (error) fail(`Could not ${published ? 'publish' : 'unpublish'}: ${error.message}`);
 
-  ok('Menu published. Diners can see it now.');
+  ok(
+    published
+      ? 'Menu published. Diners can see it now.'
+      : 'Menu unpublished. Diners see a closed menu.'
+  );
 }

@@ -485,6 +485,31 @@
 [data-app] .pg__catDel { display: inline; margin-left: 8px; }
 [data-app] .pg__catDel button { border: 0; background: none; padding: 0 2px; font-size: 14px; line-height: 1; color: rgba(17, 19, 24, 0.45); cursor: pointer; }
 [data-app] .pg__catDel button:hover { color: var(--text); }
+/* Preset category chips. One control per common category and the same control
+   removes it, so nothing has to be typed and nothing is locked. The filled
+   state is the one already on the menu. */
+[data-app] .pg__chipsLabel { margin-top: 22px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; color: var(--ink-55); }
+[data-app] .pg__catChips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+[data-app] .pg__catChips form { display: inline-flex; }
+[data-app] .pg__chip { border: 1px solid var(--border); background: var(--surface); color: var(--ink-70); padding: 7px 11px; border-radius: 999px; font-size: 12.5px; line-height: 1.2; cursor: pointer; }
+[data-app] .pg__chip:hover { border-color: var(--ink-40); color: var(--text); }
+[data-app] .pg__chip.is-on { background: var(--accent); border-color: var(--accent); color: var(--surface); font-weight: 600; }
+[data-app] .pg__catsSeed { margin-top: 12px; }
+[data-app] .pg__catsSeed .pg__btn { width: 100%; }
+
+/* One-step add row: every field an item needs sits on one line, so adding one
+   produces a real row rather than a blank placeholder to reopen and retype. */
+[data-app] .pg__addRow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 18px; }
+[data-app] .pg__addRow .ui-input { flex: 1 1 150px; min-width: 0; }
+[data-app] .pg__addRow .ui-input.tnum { flex: 0 1 120px; }
+[data-app] .pg__addRow .ui-select { flex: 0 1 auto; min-width: 0; }
+[data-app] .pg__addRow .pg__btn { flex: 0 0 auto; }
+
+/* Publish state, stated outright. A disabled button reading "Published" looked
+   broken rather than like the state it was reporting. */
+[data-app] .pg__editorFoot { align-items: center; justify-content: space-between; }
+[data-app] .pg__liveBadge { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--accent); }
+[data-app] .pg__liveBadge i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: 0 0 auto; }
 [data-app] .pg__itemsActions { display: flex; gap: 10px; font-size: 13px; text-transform: none; letter-spacing: 0; font-weight: 400; }
 [data-app] .pg__btn { border: 1px solid var(--border); padding: 8px 14px; border-radius: 2px; font-size: 13.5px; cursor: pointer; background: #fff; }
 [data-app] .pg__btn--solid { background: var(--text); color: #fff; border-color: var(--text); }
@@ -748,6 +773,10 @@
   [data-app] .pg__plan:last-child, [data-app] .pg__stateCard--wide { grid-column: auto; }
   [data-app] .pg__printGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   [data-app] .pg__headActions, [data-app] .pg__itemsActions, [data-app] .pg__editorFoot { flex-wrap: wrap; }
+  [data-app] .pg__addRow { gap: 6px; }
+  [data-app] .pg__addRow .ui-input, [data-app] .pg__addRow .ui-select { flex: 1 1 100%; }
+  [data-app] .pg__addRow .pg__btn { flex: 1 1 100%; }
+  [data-app] .pg__catChips { gap: 5px; }
   [data-app] .pg__locked { padding: 18px; }
   [data-app] .pg__lockedHead { flex-wrap: wrap; }
   [data-app] .pg__lockedHead .pg__btn { margin-left: 0; }
