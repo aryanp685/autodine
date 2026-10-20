@@ -47,6 +47,10 @@ const TOKEN_REVOKED_QR = 'f'.repeat(64);
 const TOKEN_INACTIVE_TABLE = '1'.repeat(64);
 const TOKEN_INACTIVE_RESTAURANT = '2'.repeat(64);
 const TOKEN_TAMPERED = '3'.repeat(64);
+const OWNER_USER = '71000000-0000-4000-8000-000000000001';
+const MANAGER_USER = '71000000-0000-4000-8000-000000000002';
+const CASHIER_USER = '71000000-0000-4000-8000-000000000003';
+const KITCHEN_USER = '71000000-0000-4000-8000-000000000004';
 const IP_HASH = '9'.repeat(64);
 
 const baseMigrations = [
@@ -57,6 +61,7 @@ const baseMigrations = [
   '20261019000005_cash_collection.sql',
 ];
 const qrMigration = readFileSync(new URL('../../supabase/migrations/20261019000006_qr_verification_sessions.sql', import.meta.url), 'utf8');
+const securityMigration = readFileSync(new URL('../../supabase/migrations/20261020000008_security_hardening.sql', import.meta.url), 'utf8');
 
 let db: PGlite;
 
@@ -117,6 +122,7 @@ beforeAll(async () => {
   `);
 
   await db.exec(qrMigration);
+  await db.exec(securityMigration);
   await db.exec(`
     grant usage on schema public to anon, authenticated, service_role;
     grant usage on schema auth to anon, authenticated;
@@ -128,6 +134,12 @@ beforeAll(async () => {
       public.qr_verification_attempts, public.qr_token_migration_issues
       to service_role;
     grant insert, select on public.orders, public.order_items to service_role;
+    grant select on public.restaurants, public.memberships, public.menus, public.categories,
+      public.items, public.item_variants, public.dining_tables, public.qr_tokens,
+      public.orders, public.order_items, public.payments, public.restaurant_subscriptions
+      to anon, authenticated;
+    grant insert, update, delete on public.restaurants, public.menus, public.categories,
+      public.items, public.item_variants, public.dining_tables, public.qr_tokens to authenticated;
   `);
 
   await db.exec(`
@@ -135,14 +147,20 @@ beforeAll(async () => {
       ('${ORDER_MENU}', '${ORDER_RESTAURANT}', 'Order menu', true),
       ('${OTHER_MENU}', '${OTHER_RESTAURANT}', 'Other menu', true),
       ('${EXPIRED_MENU}', '${EXPIRED_TRIAL_RESTAURANT}', 'Expired trial menu', true);
+    insert into public.menus (id, restaurant_id, name, is_published) values
+      ('52000000-0000-4000-8000-000000000004', '${ORDER_RESTAURANT}', 'Draft menu', false);
     insert into public.categories (id, restaurant_id, menu_id, name) values
       ('${ORDER_CATEGORY}', '${ORDER_RESTAURANT}', '${ORDER_MENU}', 'Main'),
       ('${OTHER_CATEGORY}', '${OTHER_RESTAURANT}', '${OTHER_MENU}', 'Main'),
-      ('${EXPIRED_CATEGORY}', '${EXPIRED_TRIAL_RESTAURANT}', '${EXPIRED_MENU}', 'Main');
+      ('${EXPIRED_CATEGORY}', '${EXPIRED_TRIAL_RESTAURANT}', '${EXPIRED_MENU}', 'Main'),
+      ('53000000-0000-4000-8000-000000000004', '${ORDER_RESTAURANT}', '52000000-0000-4000-8000-000000000004', 'Draft category');
 
     insert into public.items (id, restaurant_id, category_id, name, price_paise, is_available) values
       ('${ORDER_ITEM}', '${ORDER_RESTAURANT}', '${ORDER_CATEGORY}', 'Database-priced item', 1299, true),
-      ('${OTHER_ITEM}', '${OTHER_RESTAURANT}', '${OTHER_CATEGORY}', 'Other-tenant item', 700, true);
+      ('${OTHER_ITEM}', '${OTHER_RESTAURANT}', '${OTHER_CATEGORY}', 'Other-tenant item', 700, true),
+      ('32000000-0000-4000-8000-000000000003', '${ORDER_RESTAURANT}', '53000000-0000-4000-8000-000000000004', 'Unpublished item', 500, true);
+    insert into public.item_variants (id, item_id, name, price_paise) values
+      ('33000000-0000-4000-8000-000000000001', '32000000-0000-4000-8000-000000000003', 'Draft variant', 700);
 
     insert into public.table_qr_codes (id, restaurant_id, table_id, public_token) values
       ('${QR_ORDER}', '${ORDER_RESTAURANT}', '${ORDER_TABLE}', '${'a'.repeat(48)}'),
@@ -161,7 +179,16 @@ beforeAll(async () => {
       ('${sha256(TOKEN_INACTIVE_TABLE)}', '${ORDER_RESTAURANT}', '${ORDER_TABLE}', '${QR_ORDER}', now(), now() + interval '60 minutes', null),
       ('${sha256(TOKEN_INACTIVE_RESTAURANT)}', '${OTHER_RESTAURANT}', '${OTHER_TABLE}', '${QR_OTHER}', now(), now() + interval '60 minutes', null);
 
-
+    insert into public.profiles (id, full_name) values
+      ('${OWNER_USER}', 'Owner'),
+      ('${MANAGER_USER}', 'Manager'),
+      ('${CASHIER_USER}', 'Cashier'),
+      ('${KITCHEN_USER}', 'Kitchen');
+    insert into public.memberships (restaurant_id, user_id, role) values
+      ('${ORDER_RESTAURANT}', '${OWNER_USER}', 'owner'),
+      ('${ORDER_RESTAURANT}', '${MANAGER_USER}', 'manager'),
+      ('${ORDER_RESTAURANT}', '${CASHIER_USER}', 'cashier'),
+      ('${ORDER_RESTAURANT}', '${KITCHEN_USER}', 'kitchen');
   `);
 });
 
@@ -252,6 +279,79 @@ describe('printed QR migration and verified guest sessions', () => {
     );
     expect(rotated1.rows[0]?.version).toBe(2);
     expect(rotated2.rows[0]?.version).toBe(3);
+  });
+
+  it('hides unpublished categories, items, and variants from anonymous menu reads', async () => {
+    const hidden = await asRole('anon', '', () => db.query<{ count: number }>(
+      `select count(*)::int as count from public.items
+       where id = '32000000-0000-4000-8000-000000000003'`,
+    ));
+    const hiddenCategory = await asRole('anon', '', () => db.query<{ count: number }>(
+      `select count(*)::int as count from public.categories
+       where id = '53000000-0000-4000-8000-000000000004'`,
+    ));
+    const hiddenVariant = await asRole('anon', '', () => db.query<{ count: number }>(
+      `select count(*)::int as count from public.item_variants
+       where id = '33000000-0000-4000-8000-000000000001'`,
+    ));
+    expect(hidden.rows[0]?.count).toBe(0);
+    expect(hiddenCategory.rows[0]?.count).toBe(0);
+    expect(hiddenVariant.rows[0]?.count).toBe(0);
+  });
+
+  it('enforces owner, manager, cashier, and kitchen policy boundaries', async () => {
+    const orderId = '82000000-0000-4000-8000-000000000001';
+    await db.query(
+      `insert into public.orders(id, restaurant_id, table_id, code, subtotal_paise, tax_paise, total_paise)
+       values ($1, $2, $3, 'RLS1', 100, 5, 105)`,
+      [orderId, ORDER_RESTAURANT, ORDER_TABLE],
+    );
+    await db.query(
+      `insert into public.payments(order_id, restaurant_id, method, amount_paise, status)
+       values ($1, $2, 'cash', 105, 'recorded')`,
+      [orderId, ORDER_RESTAURANT],
+    );
+
+    const ownerEdit = await asRole('authenticated', OWNER_USER, () => db.query(
+      `update public.restaurants set tagline = 'owner edit' where id = $1 returning id`, [ORDER_RESTAURANT],
+    ));
+    const managerEdit = await asRole('authenticated', MANAGER_USER, () => db.query(
+      `update public.restaurants set tagline = 'manager edit' where id = $1 returning id`, [ORDER_RESTAURANT],
+    ));
+    const cashierEdit = await asRole('authenticated', CASHIER_USER, () => db.query(
+      `update public.restaurants set tagline = 'cashier edit' where id = $1 returning id`, [ORDER_RESTAURANT],
+    ));
+    const kitchenEdit = await asRole('authenticated', KITCHEN_USER, () => db.query(
+      `update public.restaurants set tagline = 'kitchen edit' where id = $1 returning id`, [ORDER_RESTAURANT],
+    ));
+    expect(ownerEdit.rowCount).toBe(1);
+    expect(managerEdit.rowCount).toBe(1);
+    expect(cashierEdit.rowCount).toBe(0);
+    expect(kitchenEdit.rowCount).toBe(0);
+
+    const kitchenPrep = await asRole('authenticated', KITCHEN_USER, () => db.query(
+      `update public.orders set prep_status = 'preparing' where id = $1 returning id`, [orderId],
+    ));
+    const cashierPrep = await asRole('authenticated', CASHIER_USER, () => db.query(
+      `update public.orders set prep_status = 'ready' where id = $1 returning id`, [orderId],
+    ));
+    const kitchenPayments = await asRole('authenticated', KITCHEN_USER, () => db.query<{ count: number }>(
+      'select count(*)::int as count from public.payments where order_id = $1', [orderId],
+    ));
+    const cashierPayments = await asRole('authenticated', CASHIER_USER, () => db.query<{ count: number }>(
+      'select count(*)::int as count from public.payments where order_id = $1', [orderId],
+    ));
+    expect(kitchenPrep.rowCount).toBe(1);
+    expect(cashierPrep.rowCount).toBe(0);
+    expect(kitchenPayments.rows[0]?.count).toBe(0);
+    expect(cashierPayments.rows[0]?.count).toBe(1);
+  });
+
+  it('rejects unpriced or client-invented add-ons at the database boundary', async () => {
+    await expect(asRole('service_role', '', () => db.query(
+      'select public.place_order($1, $2::jsonb, null)',
+      [TOKEN_ORDER, JSON.stringify([{ item_id: ORDER_ITEM, qty: 1, addons: ['invented paid extra'] }])],
+    ))).rejects.toThrow(/unpriced add-ons are not supported/i);
   });
 
   it('keeps verification records and order RPCs inaccessible to anonymous or authenticated clients', async () => {
