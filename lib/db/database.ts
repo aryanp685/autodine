@@ -121,6 +121,22 @@ export type Database = {
         };
         Returns: string; // new order id (uuid)
       };
+      /**
+       * Migration 0003. Atomically records a counter payment and settles the
+       * order in one transaction -- see the header comment in that migration
+       * for why this cannot be two calls from the application.
+       *
+       * Amount is PAISE. Convert from rupees with rupeesToPaise() in
+       * lib/money.ts before calling.
+       */
+      record_counter_payment: {
+        Args: {
+          p_order_id: string;
+          p_method: 'cash' | 'card' | 'upi';
+          p_amount_paise: number;
+        };
+        Returns: undefined; // void
+      };
     };
     Enums: {
       member_role: MemberRole;
