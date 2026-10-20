@@ -112,30 +112,53 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      /**
+       * Signature verified against the live database on 2026-10-20. It takes
+       * a table-verification SESSION token, not a restaurant slug and a table
+       * token as this file previously claimed -- the QR flow was reworked into
+       * table_verification_sessions after migration 0001 was written.
+       */
       place_order: {
         Args: {
-          p_restaurant_slug: string;
-          p_table_token: string;
+          p_session_token: string;
           p_items: unknown; // jsonb: [{item_id, qty, variant_id?, addons?}]
           p_note?: string | null;
         };
         Returns: string; // new order id (uuid)
       };
-      /**
-       * Migration 0003. Atomically records a counter payment and settles the
-       * order in one transaction -- see the header comment in that migration
-       * for why this cannot be two calls from the application.
-       *
-       * Amount is PAISE. Convert from rupees with rupeesToPaise() in
-       * lib/money.ts before calling.
-       */
-      record_counter_payment: {
+      /** Counter order that is never tied to a table: takeaway / walk-in. */
+      place_counter_order: {
         Args: {
-          p_order_id: string;
-          p_method: 'cash' | 'card' | 'upi';
-          p_amount_paise: number;
+          p_restaurant_slug: string;
+          p_items: unknown; // jsonb
+          p_note?: string | null;
         };
-        Returns: undefined; // void
+        Returns: string; // new order id (uuid)
+      };
+      /**
+       * The ONLY way money is taken at the counter. Atomic: inserts the
+       * payment, settles the order and writes an audit event in one
+       * transaction.
+       *
+       * Three things it enforces that the application must not duplicate:
+       *   - the caller must be owner, manager or cashier
+       *   - p_amount_paise must EXACTLY equal the outstanding balance, so
+       *     there is no "amount received" and no change to compute
+       *   - p_idempotency_key makes a retry return the original payment
+       *     instead of charging twice. Generate it ONCE per attempt, on the
+       *     client, and reuse it if the call is retried.
+       *
+       * CASH ONLY. The payments table allows card/upi/online, but this
+       * function hardcodes method = 'cash'. See app/cashier/actions.ts.
+       */
+      record_cash_payment: {
+        Args: {
+          p_restaurant_slug: string;
+          p_order_id: string;
+          p_amount_paise: number;
+          p_idempotency_key: string;
+        };
+        Returns: string; // payment id (uuid)
       };
     };
     Enums: {

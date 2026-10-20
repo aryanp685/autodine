@@ -38,13 +38,28 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import type { Database } from './database';
+import type { Database, MemberRole } from './database';
 
 export type StaffContext = {
   supabase: SupabaseClient<Database>;
   restaurantId: string;
   restaurantName: string;
+  /**
+   * Needed by the payment RPCs, which take a slug rather than a UUID. The
+   * UUID is never accepted from the client; the slug is resolved here from
+   * the same membership row, so it cannot be pointed elsewhere.
+   */
+  slug: string;
+  /**
+   * The caller's role in this restaurant. Payment RPCs reject anyone who is
+   * not owner/manager/cashier, so the UI needs it to explain why the button
+   * is disabled instead of letting the click fail with a Postgres error.
+   */
+  role: MemberRole;
 };
+
+/** Roles allowed to take money at the counter. Mirrors record_cash_payment. */
+export const CASHIER_ROLES: MemberRole[] = ['owner', 'manager', 'cashier'];
 
 /** Why a staff context could not be resolved. */
 export type StaffBlockedReason =
@@ -80,7 +95,7 @@ export async function getStaffContextDetailed(): Promise<StaffContextResult> {
 
   const { data: membership, error: membershipError } = await supabase
     .from('memberships')
-    .select('restaurant_id')
+    .select('restaurant_id, role')
     .eq('user_id', user.id)
     .order('restaurant_id', { ascending: true })
     .limit(1)
@@ -92,7 +107,7 @@ export async function getStaffContextDetailed(): Promise<StaffContextResult> {
 
   const { data: restaurant, error: restaurantError } = await supabase
     .from('restaurants')
-    .select('id, name')
+    .select('id, name, slug')
     .eq('id', restaurantId)
     .maybeSingle();
 
@@ -100,7 +115,13 @@ export async function getStaffContextDetailed(): Promise<StaffContextResult> {
 
   return {
     ok: true,
-    context: { supabase, restaurantId, restaurantName: restaurant.name },
+    context: {
+      supabase,
+      restaurantId,
+      restaurantName: restaurant.name,
+      slug: restaurant.slug,
+      role: membership.role as MemberRole,
+    },
   };
 }
 

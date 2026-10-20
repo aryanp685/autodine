@@ -94,6 +94,86 @@ describe('getCashierScreenData', () => {
     expect(data?.blocked).toBeUndefined();
   });
 
+  describe('outstanding balance', () => {
+    // record_cash_payment accepts EXACTLY the outstanding balance and nothing
+    // else, so if this arithmetic is wrong the till rejects every payment.
+
+    it('equals the total when nothing has been recorded', async () => {
+      mocks.staff.result = signedIn(
+        fakeSupabase({ orders: [order()], order_items: [], dining_tables: [{ id: 't-3', label: 'T3' }] })
+      );
+      const row = (await getCashierScreenData())?.queue[0];
+      expect(row?.total).toBe(1247);
+      expect(row?.outstanding).toBe(1247);
+      expect(row?.paid).toBe(0);
+    });
+
+    it('subtracts a recorded partial payment', async () => {
+      mocks.staff.result = signedIn(
+        fakeSupabase({
+          orders: [order()],
+          order_items: [],
+          dining_tables: [{ id: 't-3', label: 'T3' }],
+          payments: [{ order_id: 'o-1', amount_paise: 50_000, status: 'recorded' }],
+        })
+      );
+      const row = (await getCashierScreenData())?.queue[0];
+      expect(row?.paid).toBe(500);
+      expect(row?.outstanding).toBe(747);
+    });
+
+    it('ignores failed and refunded attempts — no cash actually moved', async () => {
+      // The regression this guards: counting a declined attempt as paid would
+      // understate the balance and let the guest leave owing money.
+      mocks.staff.result = signedIn(
+        fakeSupabase({
+          orders: [order()],
+          order_items: [],
+          dining_tables: [{ id: 't-3', label: 'T3' }],
+          payments: [
+            { order_id: 'o-1', amount_paise: 50_000, status: 'failed' },
+            { order_id: 'o-1', amount_paise: 20_000, status: 'refunded' },
+            { order_id: 'o-1', amount_paise: 30_000, status: 'recorded' },
+          ],
+        })
+      );
+      const row = (await getCashierScreenData())?.queue[0];
+      expect(row?.paid).toBe(300);
+      expect(row?.outstanding).toBe(947);
+    });
+
+    it('never goes negative on an overpaid order', async () => {
+      mocks.staff.result = signedIn(
+        fakeSupabase({
+          orders: [order()],
+          order_items: [],
+          dining_tables: [{ id: 't-3', label: 'T3' }],
+          payments: [{ order_id: 'o-1', amount_paise: 200_000, status: 'recorded' }],
+        })
+      );
+      const row = (await getCashierScreenData())?.queue[0];
+      expect(row?.outstanding).toBe(0);
+      // paid is clamped to the total too: a negative "amount due" would be a
+      // payment the cashier physically cannot collect.
+      expect(row?.paid).toBe(1247);
+    });
+
+    it('sums several recorded payments against one order', async () => {
+      mocks.staff.result = signedIn(
+        fakeSupabase({
+          orders: [order()],
+          order_items: [],
+          dining_tables: [{ id: 't-3', label: 'T3' }],
+          payments: [
+            { order_id: 'o-1', amount_paise: 20_000, status: 'recorded' },
+            { order_id: 'o-1', amount_paise: 30_000, status: 'recorded' },
+          ],
+        })
+      );
+      expect((await getCashierScreenData())?.queue[0].outstanding).toBe(747);
+    });
+  });
+
   it('converts paise to rupees', async () => {
     mocks.staff.result = signedIn(
       fakeSupabase({ orders: [order()], order_items: [], dining_tables: [{ id: 't-3', label: 'T3' }] })

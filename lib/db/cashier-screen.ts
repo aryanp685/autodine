@@ -38,6 +38,17 @@ export type CounterOrder = {
   state: string;
   /** Rupees, for display. Derived from total_paise. */
   total: number;
+  /**
+   * What is still owed: total minus anything already recorded. Rupees.
+   *
+   * This is the amount a payment must be made for, NOT `total`.
+   * record_cash_payment rejects any amount that is not exactly the
+   * outstanding balance, so settling a partly-paid order for its full total
+   * would fail with a Postgres error the cashier cannot act on.
+   */
+  outstanding: number;
+  /** Already recorded against this order. Rupees. */
+  paid: number;
   /** One-line summary of the ticket, e.g. '2 × Biryani · 3 × Roti'. */
   items: string;
 };
@@ -107,7 +118,12 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
   const orderIds = rows.map((row) => row.id);
   const tableIds = [...new Set(rows.map((r) => r.table_id).filter(Boolean))] as string[];
 
-  const [itemsResult, tablesResult] = await Promise.all([
+  // payments is read so the queue can show what is genuinely still owed.
+  // An order can be payment_status='pending' with a partial payment already
+  // recorded against it, and record_cash_payment will only accept the exact
+  // outstanding balance -- so showing the full total would be a lie that
+  // fails at the till.
+  const [itemsResult, tablesResult, paymentsResult] = await Promise.all([
     supabase
       .from('order_items')
       .select('order_id, qty, name_snapshot, sort_order')
@@ -116,6 +132,7 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
     tableIds.length
       ? supabase.from('dining_tables').select('id, label').in('id', tableIds)
       : Promise.resolve({ data: [], error: null }),
+    supabase.from('payments').select('order_id, amount_paise, status').in('order_id', orderIds),
   ]);
 
   if (itemsResult.error) {
@@ -123,6 +140,17 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
   }
   if (tablesResult.error) {
     throw new Error(`Could not load tables: ${tablesResult.error.message}`);
+  }
+  if (paymentsResult.error) {
+    throw new Error(`Could not load payments: ${paymentsResult.error.message}`);
+  }
+
+  // Only 'recorded' money counts. A failed or refunded attempt did not move
+  // any cash, so counting it would understate what the guest still owes.
+  const paidByOrder = new Map<string, number>();
+  for (const p of paymentsResult.data ?? []) {
+    if (p.status !== 'recorded') continue;
+    paidByOrder.set(p.order_id, (paidByOrder.get(p.order_id) ?? 0) + p.amount_paise);
   }
 
   const itemsByOrder = new Map<string, typeof itemsResult.data>();
@@ -149,6 +177,10 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
       at: clockTime(row.placed_at),
       state: PREP_LABEL[row.prep_status] ?? row.prep_status,
       total: paiseToRupees(row.total_paise),
+      // Clamped at zero: an overpaid order owes nothing, and a negative
+      // "amount due" would render as a payment the cashier cannot collect.
+      paid: paiseToRupees(Math.min(paidByOrder.get(row.id) ?? 0, row.total_paise)),
+      outstanding: paiseToRupees(Math.max(row.total_paise - (paidByOrder.get(row.id) ?? 0), 0)),
       items: lines.join(' · ') || 'No items recorded',
     };
   });
