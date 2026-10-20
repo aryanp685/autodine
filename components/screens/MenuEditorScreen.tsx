@@ -7,11 +7,13 @@ import { SignInPrompt } from '@/components/SignInPrompt';
 import {
   addCategoryAction,
   addItemAction,
+  addPresetCategoriesAction,
   deleteCategoryAction,
   publishMenuAction,
   saveItemAction,
   setAllAvailabilityAction,
 } from '@/app/dashboard/menus/actions';
+import { PRESET_CATEGORIES, normaliseCategoryName } from '@/lib/menu-presets';
 
 const FLOW = ['Draft', 'Review', 'Approve', 'Publish'];
 
@@ -64,9 +66,15 @@ export function MenuEditorScreen({
   const uncategorised = (data?.items ?? []).filter((i) => !i.categoryId).length;
 
   // The first category is the default home for a newly added item. It is the
-  // only way an item can be visible to diners, so the add button is inert
-  // until one exists rather than creating something invisible.
+  // only way an item can be visible to diners, so the add row is hidden until
+  // one exists rather than creating something invisible.
   const defaultCategoryId = liveCategories[0]?.id ?? '';
+
+  // Folded so a hand-typed "starters" matches the preset "Starters" instead
+  // of showing a duplicate chip next to the category it already is.
+  const existingByName = new Map(
+    liveCategories.map((c) => [normaliseCategoryName(c.name), c] as const)
+  );
 
   const selectedPrice = blocked
     ? 0
@@ -145,10 +153,18 @@ export function MenuEditorScreen({
               {live ? (
                 <>
                   {liveCategories.length === 0 ? (
-                    <p className="pg__catsNote">
-                      No categories yet. Diners reach an item through its category, so add one
-                      before you add items.
-                    </p>
+                    <>
+                      <p className="pg__catsNote">
+                        Diners reach an item through its category. Start with the ones most
+                        restaurants use — you can remove any of them.
+                      </p>
+                      <form action={addPresetCategoriesAction} className="pg__catsSeed">
+                        <input type="hidden" name="menuId" value={data?.menuId ?? ''} />
+                        <button type="submit" className="pg__btn pg__btn--solid">
+                          Add the usual {PRESET_CATEGORIES.length} categories
+                        </button>
+                      </form>
+                    </>
                   ) : (
                     liveCategories.map((c) => (
                       <div key={c.id} className="pg__cat">
@@ -168,6 +184,59 @@ export function MenuEditorScreen({
                     ))
                   )}
 
+                  {/* One control per common category, and the same control
+                      removes it: present shows a tick and deletes on press,
+                      absent shows a plus and adds on press. Nothing is locked,
+                      nothing has to be typed, and an owner can go back and
+                      forth as often as they like. Removing one that still
+                      holds items is refused server-side, so toggling cannot
+                      strand items where diners cannot see them. */}
+                  <div className="pg__chipsLabel">Common categories</div>
+                  <div className="pg__catChips">
+                    {PRESET_CATEGORIES.map((name) => {
+                      const match = existingByName.get(normaliseCategoryName(name));
+                      return match ? (
+                        <form key={name} action={deleteCategoryAction}>
+                          <input type="hidden" name="categoryId" value={match.id} />
+                          <button
+                            type="submit"
+                            className="pg__chip is-on"
+                            aria-label={`Remove category ${name}`}
+                          >
+                            {name} ✓
+                          </button>
+                        </form>
+                      ) : (
+                        <form key={name} action={addCategoryAction}>
+                          <input type="hidden" name="menuId" value={data?.menuId ?? ''} />
+                          <input type="hidden" name="name" value={name} />
+                          <button
+                            type="submit"
+                            className="pg__chip"
+                            aria-label={`Add category ${name}`}
+                          >
+                            + {name}
+                          </button>
+                        </form>
+                      );
+                    })}
+                  </div>
+
+                  <form action={addCategoryAction} className="pg__catForm">
+                    <input type="hidden" name="menuId" value={data?.menuId ?? ''} />
+                    <input
+                      className="ui-input"
+                      name="name"
+                      placeholder="Custom category"
+                      aria-label="Custom category name"
+                      maxLength={60}
+                      required
+                    />
+                    <button type="submit" className="pg__btn">
+                      Add
+                    </button>
+                  </form>
+
                   {uncategorised > 0 && (
                     <>
                       <div className="pg__cat">
@@ -180,21 +249,6 @@ export function MenuEditorScreen({
                       </p>
                     </>
                   )}
-
-                  <form action={addCategoryAction} className="pg__catForm">
-                    <input type="hidden" name="menuId" value={data?.menuId ?? ''} />
-                    <input
-                      className="ui-input"
-                      name="name"
-                      placeholder="New category"
-                      aria-label="New category name"
-                      maxLength={60}
-                      required
-                    />
-                    <button type="submit" className="pg__btn">
-                      Add
-                    </button>
-                  </form>
                 </>
               ) : (
                 categories.map((c, i) => (
@@ -225,28 +279,10 @@ export function MenuEditorScreen({
               <div className="pg__itemsActions">
                 {live ? (
                   <>
-                    {defaultCategoryId ? (
-                      <form action={addItemAction}>
-                        <input type="hidden" name="categoryId" value={defaultCategoryId} />
-                        <button type="submit" className="pg__btn">
-                          Add item
-                        </button>
-                      </form>
-                    ) : (
-                      // Inert rather than submit-and-fail: without a category
-                      // the insert would be rejected server-side, and a button
-                      // that looks live and then errors is worse than one that
-                      // plainly needs something first.
-                      <span className="pg__btn" aria-disabled="true">
-                        Add item
-                      </span>
-                    )}
-                    {/* Reorder needs a drag-and-drop interaction the locked
-                        layout does not define. Left as a label, not a
-                        button, so it cannot be read as working. */}
-                    <span className="pg__btn" aria-disabled="true">
-                      Reorder
-                    </span>
+                    {/* Reorder is gone from here. It needed a drag-and-drop
+                        interaction the locked layout does not define, and an
+                        inert control in the middle of a row of working ones
+                        reads as a bug rather than as "not built". */}
                     <form action={setAllAvailabilityAction}>
                       <button
                         type="submit"
@@ -277,13 +313,75 @@ export function MenuEditorScreen({
                 )}
               </div>
             </div>
+            {/* Adding an item used to create a blank "New item" row at zero
+                rupees that then had to be reopened and retyped. Every field
+                the item needs sits here instead, so one press produces a real
+                row -- and a second press produces a different one, not a
+                duplicate. */}
+            {live && liveCategories.length > 0 && (
+              <form action={addItemAction} className="pg__addRow">
+                <input
+                  className="ui-input"
+                  name="name"
+                  placeholder="Item name"
+                  aria-label="New item name"
+                  maxLength={120}
+                  required
+                />
+                <input
+                  className="ui-input tnum"
+                  name="price"
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="Price"
+                  aria-label="New item price in rupees"
+                  required
+                />
+                <select
+                  className="ui-select"
+                  name="veg"
+                  defaultValue="veg"
+                  aria-label="New item food type"
+                >
+                  <option value="veg">Veg</option>
+                  <option value="non">Non-veg</option>
+                </select>
+                <select
+                  className="ui-select"
+                  name="categoryId"
+                  defaultValue={defaultCategoryId}
+                  aria-label="New item category"
+                >
+                  {liveCategories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <button type="submit" className="pg__btn pg__btn--solid">
+                  Add item
+                </button>
+              </form>
+            )}
+
+            {live && liveCategories.length === 0 && (
+              <p className="pg__catsNote">
+                Add a category on the left and you can start adding items here.
+              </p>
+            )}
+
             <table className="ui-table">
               <thead>
                 <tr>
                   <th>Item</th>
                   <th>Price</th>
                   <th>Availability</th>
-                  <th>Variants</th>
+                  {/* Variants are not built. The column put an em dash on
+                      every live row, which reads as a feature that happens to
+                      be empty rather than one that does not exist. Demo rows
+                      carry real variant data, so it stays there. */}
+                  {!live && <th>Variants</th>}
                   <th>Status</th>
                 </tr>
               </thead>
@@ -320,7 +418,9 @@ export function MenuEditorScreen({
                           <i /> {i.available ? 'Available' : 'Sold out'}
                         </span>
                       </td>
-                      <td className="tnum">{i.variants ? i.variants.length : '—'}</td>
+                      {!live && (
+                        <td className="tnum">{i.variants ? i.variants.length : '—'}</td>
+                      )}
                       <td>
                         <span className="ui-badge ui-badge--sage">
                           {data?.published ? 'Live' : 'Draft'}
@@ -388,18 +488,33 @@ export function MenuEditorScreen({
               </div>
             </form>
 
-            <form action={publishMenuAction}>
-              <input type="hidden" name="menuId" value={data?.menuId ?? ''} />
-              <div className="pg__editorFoot">
-                <button
-                  type="submit"
-                  className="pg__btn pg__btn--solid"
-                  disabled={!live || data?.published}
-                >
-                  {data?.published ? 'Published' : 'Send for review'}
-                </button>
-              </div>
-            </form>
+            {/* Publishing used to run one way only. Once a menu was live the
+                button read "Published" and went disabled, which reads as a
+                broken control rather than as the state it was reporting. The
+                state is now said outright, and it can be reversed. */}
+            <div className="pg__editorFoot">
+              {data?.published ? (
+                <>
+                  <span className="pg__liveBadge">
+                    <i /> Live — diners can see this menu
+                  </span>
+                  <form action={publishMenuAction}>
+                    <input type="hidden" name="menuId" value={data?.menuId ?? ''} />
+                    <input type="hidden" name="published" value="false" />
+                    <button type="submit" className="pg__btn">
+                      Unpublish
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <form action={publishMenuAction}>
+                  <input type="hidden" name="menuId" value={data?.menuId ?? ''} />
+                  <button type="submit" className="pg__btn pg__btn--solid" disabled={!live}>
+                    Publish menu
+                  </button>
+                </form>
+              )}
+            </div>
 
             <p className="pg__fine">
               Published changes never alter past orders or receipts — every order keeps its own snapshot of items,
