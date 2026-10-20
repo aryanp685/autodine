@@ -1,6 +1,9 @@
 import Link from 'next/link';
-import { tables, restaurant } from '@/lib/demo-data';
+import { tables as demoTables, restaurant as demoRestaurant } from '@/lib/demo-data';
 import { QrChip } from '@/components/ui';
+import { PrintButton } from '@/components/PrintButton';
+import type { TablesScreenData, TableRow } from '@/lib/db/tables-screen';
+import { addTableAction, revokeQrAction, rotateQrAction, setTableActiveAction } from '@/app/dashboard/tables/actions';
 
 const STATUS_TONE: Record<string, string> = {
   active: 'is-active',
@@ -9,12 +12,32 @@ const STATUS_TONE: Record<string, string> = {
   disabled: 'is-disabled',
 };
 
-/** Shared page structure; styled by the locked design system. */
-export function TablesScreen() {
+/**
+ * Shared page structure; styled by the locked design system.
+ *
+ * `data` is the live floor plan when the database is configured. When it is
+ * absent the screen falls back to its demo rows, exactly as before, so the
+ * locked markup and its sample content stay byte-for-byte identical.
+ */
+export function TablesScreen({
+  data,
+  error,
+  notice,
+}: {
+  data?: TablesScreenData | null;
+  error?: string;
+  notice?: string;
+}) {
+  const restaurantName = data?.restaurantName ?? demoRestaurant.name;
+  const tables: TableRow[] = data?.tables ?? demoTables;
+  const live = Boolean(data);
+
   return (
     <div className="pg pg--dash">
       <div className="pg__bar">
-        <Link href="/" className="pg__brand">AutoDine</Link>
+        <Link href="/" className="pg__brand">
+          AutoDine
+        </Link>
         <div className="pg__barLinks">
           <Link href="/dashboard">Overview</Link>
           <Link href="/dashboard/menus">Menus</Link>
@@ -30,14 +53,45 @@ export function TablesScreen() {
       </div>
 
       <div className="pg__body">
+        {error && (
+          <div className="pg__alert" role="alert">
+            <strong>Could not update tables.</strong>
+            <p>{error}</p>
+          </div>
+        )}
+        {notice && (
+          <div className="pg__success" role="status">
+            <strong>Done.</strong>
+            <p>{notice}</p>
+          </div>
+        )}
+
         <header className="pg__head pg__head--row">
           <div>
             <div className="pg__kicker">Tables &amp; QR</div>
-            <h1 className="pg__title">12 tables · {restaurant.name}</h1>
+            <h1 className="pg__title">
+              {tables.length} tables · {restaurantName}
+            </h1>
           </div>
           <div className="pg__headActions">
-            <span className="pg__btn">Print QR sheet</span>
-            <span className="pg__btn pg__btn--solid">Add table</span>
+            <PrintButton className="pg__btn">Print QR sheet</PrintButton>
+            <form action={addTableAction} className="pg__headActions">
+              <label className="ui-field ui-field--inline">
+                <span className="ui-label ui-label--sr">Seats</span>
+                <select className="ui-select" name="seats" defaultValue="4" disabled={!live}>
+                  {[2, 4, 6, 8, 10].map((n) => (
+                    <option key={n} value={n}>
+                      {n} seats
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {/* Without a database this submit can only fail, so it does not
+                  render as live. The warning above explains why. */}
+              <button type="submit" className="pg__btn pg__btn--solid" disabled={!live}>
+                Add table
+              </button>
+            </form>
           </div>
         </header>
 
@@ -48,6 +102,13 @@ export function TablesScreen() {
           — this reduces remote ordering abuse substantially, but no method prevents it absolutely. The exact
           code lifetime and recovery flow will be designed and shown to you before implementation.
         </div>
+
+        {!live && (
+          <div className="pg__note pg__note--warn">
+            <strong>Sample floor plan.</strong> The database is not connected, so these twelve tables are
+            fictional and the buttons below do nothing. Connect Supabase to manage the real floor.
+          </div>
+        )}
 
         <section className="pg__tables">
           {tables.map((t) => (
@@ -60,7 +121,7 @@ export function TablesScreen() {
                 {t.label} · {t.seats} seats
               </div>
               <div className="pg__tableQr">
-                <QrChip value={`${restaurant.name}-${t.code}`} size={72} />
+                <QrChip value={`${restaurantName}-${t.code}`} size={72} />
               </div>
               <div className="pg__tableStats">
                 <div>
@@ -72,12 +133,44 @@ export function TablesScreen() {
                   <strong className="tnum">{t.orders}</strong>
                 </div>
               </div>
-              <div className="pg__tableBtns">
-                <span className="pg__miniBtn">Preview</span>
-                <span className="pg__miniBtn">Regenerate</span>
-                <span className="pg__miniBtn">{t.qr === 'disabled' ? 'Enable' : 'Disable'}</span>
-                <span className="pg__miniBtn pg__miniBtn--danger">Revoke</span>
-              </div>
+
+              {live && t.id ? (
+                /* One form per card. Every button shares the hidden table id
+                   and overrides only the action, so all four are real
+                   submissions rather than inert spans. */
+                <form className="pg__tableBtns">
+                  <input type="hidden" name="tableId" value={t.id} />
+                  <Link href="/menu" className="pg__miniBtn">
+                    Preview
+                  </Link>
+                  <button type="submit" formAction={rotateQrAction} className="pg__miniBtn">
+                    Regenerate
+                  </button>
+                  <button
+                    type="submit"
+                    formAction={setTableActiveAction}
+                    name="active"
+                    value={t.qr === 'disabled' ? 'true' : 'false'}
+                    className="pg__miniBtn"
+                  >
+                    {t.qr === 'disabled' ? 'Enable' : 'Disable'}
+                  </button>
+                  <button
+                    type="submit"
+                    formAction={revokeQrAction}
+                    className="pg__miniBtn pg__miniBtn--danger"
+                  >
+                    Revoke
+                  </button>
+                </form>
+              ) : (
+                <div className="pg__tableBtns">
+                  <span className="pg__miniBtn">Preview</span>
+                  <span className="pg__miniBtn">Regenerate</span>
+                  <span className="pg__miniBtn">{t.qr === 'disabled' ? 'Enable' : 'Disable'}</span>
+                  <span className="pg__miniBtn pg__miniBtn--danger">Revoke</span>
+                </div>
+              )}
             </article>
           ))}
         </section>
@@ -90,7 +183,7 @@ export function TablesScreen() {
                 <div key={t.code} className="pg__printCard">
                   <QrChip value={`print-${t.code}`} size={64} />
                   <div className="pg__printCode">{t.code}</div>
-                  <div className="pg__printName">{restaurant.name}</div>
+                  <div className="pg__printName">{restaurantName}</div>
                   <div className="pg__printHint">Scan to view menu &amp; order</div>
                 </div>
               ))}

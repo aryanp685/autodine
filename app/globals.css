@@ -1,3 +1,19 @@
+/* Inter, self-hosted from npm rather than fetched from Google Fonts.
+ *
+ * Two reasons. First, a third-party font request costs a round trip to a
+ * domain the user has not visited and leaks their IP to it; self-hosting
+ * removes that and works offline. Second, the build has no egress to
+ * fonts.googleapis.com here, so next/font/google would fail outright.
+ *
+ * Latin subset only, and only the four weights the locked design actually
+ * uses (400/500/600/700). The full package declares nine weights across
+ * seven subsets.
+ */
+@import '@fontsource/inter/latin-400.css';
+@import '@fontsource/inter/latin-500.css';
+@import '@fontsource/inter/latin-600.css';
+@import '@fontsource/inter/latin-700.css';
+
 @import '../styles/design-system.css';
 
 /* =========================================================================
@@ -37,7 +53,14 @@ html, body { margin: 0; padding: 0; }
   --s-8: 64px;
   --s-9: 96px;
 
-  --font-sans: 'Inter', 'Inter var', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+  /* -apple-system first, deliberately. On Apple hardware that resolves to SF
+     Pro -- Apple's own typeface, which is what "Apple-like" means literally,
+     and it is already installed so there is nothing to download. Inter, the
+     closest freely licensed match, is loaded for everything else.
+
+     Inter used to be first but was never imported, so the name resolved to
+     nothing and every platform silently fell through to Segoe UI or Arial. */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI',
     Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
 
   --radius-sm: 6px;
@@ -61,10 +84,40 @@ body {
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+
+  /* Let a variable font pick the optical size that suits the current px
+     size, instead of rendering the same outlines at 11px and 76px. */
+  font-optical-sizing: auto;
+  /* Never let the browser synthesise a fake bold or oblique from the roman
+     cut. A real 500/600/700 is loaded for every weight the design uses, so
+     a synthesised one would only look worse. */
+  font-synthesis: none;
+  /* Inter's contextual alternates: single-storey 'a' off, better colon and
+     punctuation spacing, and proportional old-style figures where they read
+     better in running text. */
+  font-feature-settings: 'cv05' 1, 'cv11' 1, 'ss01' 1;
+  font-variant-ligatures: contextual;
 }
 
 h1, h2, h3, h4, h5 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
 p { margin: 0; }
+
+/* ------------------------------------------------------- animation staging
+
+   Hidden only while .motion is present, which the inline script in
+   app/layout.tsx adds before first paint and only when the visitor has not
+   asked for reduced motion. Without that class -- JavaScript off, or reduced
+   motion requested -- these rules do not apply and the page renders whole.
+
+   This is the one place where content is hidden by default, so it is worth
+   being explicit about why it is safe: the hiding and the animating are
+   decided by the same condition, and the animation always ends at opacity 1.
+*/
+.motion [data-anim],
+.motion [data-anim-group] > * {
+  opacity: 0;
+  will-change: opacity, transform;
+}
 a { color: inherit; text-decoration: none; }
 ul, ol { margin: 0; padding: 0; list-style: none; }
 button { font: inherit; color: inherit; }

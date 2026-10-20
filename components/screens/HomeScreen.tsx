@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { inr, plans } from '@/lib/demo-data';
+import { HomeMotion } from '@/components/HomeMotion';
 
 /* ============================================================================
    Editorial Minimal — locked design system
@@ -22,30 +23,30 @@ export function Home() {
         </div>
       </nav>
 
-      <header className="home__hero">
-        <Image className="home__heroImg" src="/img/restaurant-interior.jpg" alt="Restaurant dining room at dusk" fill priority sizes="100vw" />
+      <header className="home__hero" data-hero>
+        <Image className="home__heroImg" src="/img/restaurant-interior.jpg" alt="Restaurant dining room at dusk" fill priority sizes="100vw" data-hero-image />
         <div className="home__heroShade" />
-        <div className="home__heroBody">
-          <div className="home__kicker">Restaurant QR ordering &amp; management</div>
-          <h1 className="home__h1">
+        <div className="home__heroBody" data-hero-body>
+          <div className="home__kicker" data-anim="hero-kicker">Restaurant QR ordering &amp; management</div>
+          <h1 className="home__h1" data-anim="hero-title">
             Every table,
             <br />
             one quiet system.
           </h1>
-          <p className="home__lede">
+          <p className="home__lede" data-anim="hero-lede">
             A focused preview of the restaurant ordering experience we are building. Browse the sample menu and see how the customer, kitchen and counter screens fit together.
           </p>
-          <div className="home__ctas">
+          <div className="home__ctas" data-anim="hero-ctas">
             <Link href="/signup" className="home__btn home__btn--solid">Create account</Link>
             <Link href="/menu" className="home__btn home__btn--line">See the demo</Link>
           </div>
-          <div className="home__note">Preview only · live ordering, payments and subscriptions are not enabled</div>
+          <div className="home__note" data-anim="hero-note">Preview only · live ordering, payments and subscriptions are not enabled</div>
         </div>
       </header>
 
-      <section className="home__section" id="product">
+      <section className="home__section" id="product" data-anim="reveal">
         <div className="home__rule" />
-        <div className="home__three">
+        <div className="home__three" data-anim-group>
           {[
             ['01', 'A clear digital menu', 'Explore sample categories, dish options and a mobile-friendly menu layout. Menu editing and publishing are still being built.'],
             ['02', 'A connected service flow', 'The preview brings the customer menu, kitchen board and counter screens together. Live order delivery is not enabled yet.'],
@@ -60,8 +61,8 @@ export function Home() {
         </div>
       </section>
 
-      <section className="home__band">
-        <div className="home__bandInner">
+      <section className="home__band" data-anim="reveal">
+        <div className="home__bandInner" data-anim-group>
           {[
             ['Browser', 'No customer app install planned'],
             ['Table QR', 'Designed around table service'],
@@ -75,9 +76,9 @@ export function Home() {
         </div>
       </section>
 
-      <section className="home__section">
+      <section className="home__section" data-anim="reveal">
         <h2 className="home__h2">Plans</h2>
-        <div className="home__plans">
+        <div className="home__plans" data-anim-group>
           {plans.map((p) => (
             <div key={p.id} className="home__plan">
               <div className="home__planName">{p.name}</div>
@@ -100,7 +101,7 @@ export function Home() {
         </p>
       </section>
 
-      <footer className="home__foot">
+      <footer className="home__foot" data-anim="reveal">
         <Link href="/" className="home__footBrand">AutoDine</Link>
         <div className="home__footCols">
           <div>
@@ -118,6 +119,10 @@ export function Home() {
         </div>
         <div className="home__footFine">AutoDine · Product preview · not for live restaurant operations</div>
       </footer>
+
+      {/* Renders nothing. Finds the [data-anim] elements above and animates
+          them; see the failure modes documented in the component. */}
+      <HomeMotion />
     </div>
   );
 }
