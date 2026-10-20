@@ -7,6 +7,8 @@ export type CartLine = {
   unitPricePaise: Paise;
   qty: number;
   variant?: string;
+  /** Stable menu variant ID for trusted server-side order validation. */
+  variantId?: string;
   addons?: string[];
   veg: boolean;
 };
@@ -14,7 +16,7 @@ export type CartLine = {
 export type NewCartLine = Omit<CartLine, 'key'>;
 
 export function addCartLine(lines: CartLine[], line: NewCartLine): CartLine[] {
-  const key = `${line.id}|${line.variant ?? ''}|${(line.addons ?? []).join(',')}`;
+  const key = `${line.id}|${line.variantId ?? line.variant ?? ''}|${(line.addons ?? []).join(',')}`;
   const existing = lines.find((item) => item.key === key);
   return existing
     ? lines.map((item) => item.key === key ? { ...item, qty: item.qty + line.qty } : item)

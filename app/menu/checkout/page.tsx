@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { randomUUID } from 'node:crypto';
 import { notFound } from 'next/navigation';
 import { Checkout } from '@/components/screens/CheckoutScreen';
 import { CartScope } from '@/components/CartProvider';
@@ -14,12 +15,14 @@ export const metadata: Metadata = { title: 'Checkout · AutoDine' };
 export default async function CheckoutPage({
   searchParams,
 }: {
-    searchParams: Promise<{ s?: string | string[] }>;
+    searchParams: Promise<{ s?: string | string[]; status?: string | string[] }>;
   }) {
-  const { s: rawSlug } = await searchParams;
+  const { s: rawSlug, status: rawStatus } = await searchParams;
   const slug = getSingleSearchParam(rawSlug);
+  const parsedStatus = getSingleSearchParam(rawStatus);
   if (!slug.valid) notFound();
   const scope = slug.value?.trim() || DEFAULT_SLUG;
+  const status = parsedStatus.valid ? parsedStatus.value : undefined;
   const tableSession = isSupabaseConfigured ? await getCookieTableSession() : null;
   if (isSupabaseConfigured && (!tableSession || tableSession.restaurantSlug !== scope)) {
     return (
@@ -55,7 +58,11 @@ export default async function CheckoutPage({
   const cartKey = tableSession ? `${tableSession.restaurantId}:${tableSession.tableId}` : scope;
   return (
     <CartScope scope={scope} cartKey={cartKey}>
-      <Checkout />
+      <Checkout
+        submitEnabled={Boolean(isSupabaseConfigured && tableSession)}
+        requestId={randomUUID()}
+        status={status ?? undefined}
+      />
     </CartScope>
   );
 }

@@ -318,6 +318,7 @@ export function ItemSheet({ data, itemId, orderingEnabled = true }: { data?: Men
                   // Undefined when the dish has no portions, so the cart line
                   // simply carries no variant instead of throwing.
                   variant: variants.find((v) => v.id === variant)?.name,
+                  variantId: variant || undefined,
                   addons: [selectedSpice, selectedBread].filter((value): value is string => Boolean(value)),
                   veg: item.veg,
                 });

@@ -30,6 +30,13 @@ describe('restaurant-scoped preview cart', () => {
     expect(differentVariant).toHaveLength(2);
   });
 
+  it('keeps stable variant IDs distinct even when display names match', () => {
+    const first = addCartLine([], { ...paneer, variant: 'Regular', variantId: 'variant-1' });
+    const second = addCartLine(first, { ...paneer, variant: 'Regular', variantId: 'variant-2' });
+    expect(second).toHaveLength(2);
+    expect(second.map((line) => line.variantId)).toEqual(['variant-1', 'variant-2']);
+  });
+
   it('removes a line when its quantity reaches zero', () => {
     const lines = addCartLine([], paneer);
     expect(setCartLineQuantity(lines, lines[0]!.key, 0)).toEqual([]);

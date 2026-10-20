@@ -179,6 +179,15 @@ export type Database = {
         };
         Returns: string; // new order id (uuid); callable only by the trusted server role
       };
+      place_order_idempotent: {
+        Args: {
+          p_session_token: string;
+          p_items: unknown;
+          p_note: string | null;
+          p_request_id: string;
+        };
+        Returns: string; // new order id or the existing order id on a retry
+      };
       reserve_qr_verification_attempt: {
         Args: { p_qr_code_id: string; p_ip_hash: string };
         Returns: { allowed: boolean; retry_after_seconds: number }[];

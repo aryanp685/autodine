@@ -2,8 +2,9 @@
  * Order pricing.
  *
  * RULE: the server is the only thing allowed to decide what an order costs.
- * The browser sends item ids and quantities; it never sends a total. This
- * module is where a total becomes a fact.
+ * The browser sends item IDs, quantities and optional variant IDs; it never
+ * sends prices or totals. The database RPC recalculates the trusted bill; this
+ * module supplies preview/display arithmetic and matching tests.
  *
  * ── PREVIEW DEFAULT — VENUE STATUS UNVERIFIED ───────────────────────────────
  * Use one flat 5% restaurant-service rate for the ordinary standalone-restaurant

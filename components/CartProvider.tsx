@@ -1,12 +1,12 @@
 'use client';
 
 /**
- * Prototype-only cart state. It lives in memory and resets on reload; checkout
- * never submits an order. Each restaurant slug gets its own isolated cart so
- * switching venue context cannot carry items from another restaurant.
+ * Guest cart state lives in memory and resets on reload. Each restaurant/table
+ * gets an isolated cart so switching venue context cannot carry items across.
  *
- * Prices in this browser cart are for preview only. Trusted order totals are
- * recalculated by the database RPC, not by this state.
+ * Browser prices are for display only. Guest checkout sends menu item IDs,
+ * quantities and stable variant IDs; the server-side database RPC revalidates
+ * availability and recalculates the trusted order totals.
  */
 
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';

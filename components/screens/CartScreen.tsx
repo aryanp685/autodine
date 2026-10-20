@@ -32,7 +32,7 @@ function Totals({ compact }: { compact?: boolean }) {
 }
 
 /* Option A — editorial two-column cart */
-export function Cart() {
+export function Cart({ orderingEnabled = false }: { orderingEnabled?: boolean }) {
   const cart = useCart();
   return (
     <div className="cart">
@@ -41,7 +41,7 @@ export function Cart() {
           ← Back to menu
         </Link>
         <h1>Your order</h1>
-        <p>Preview cart · {cart.count} items · order submission is not connected</p>
+        <p>{orderingEnabled ? `Review order · ${cart.count} items · pay at counter` : `Preview cart · ${cart.count} items`}</p>
       </header>
 
       <div className="cart__grid">
@@ -78,7 +78,9 @@ export function Cart() {
               <Link href={`/menu?s=${encodeURIComponent(cart.scope)}`} className="cart__cta">Browse the menu</Link>
             )}
             <div className="cart__fine">
-              Demo — not saved. This cart uses browser-only state; no order is sent to a restaurant.
+              {orderingEnabled
+                ? 'This cart is held in browser memory until submitted. The server rechecks every item and price before saving the order.'
+                : 'Demo — not saved. This cart uses browser-only state; no order is sent to a restaurant.'}
             </div>
           </div>
         </aside>

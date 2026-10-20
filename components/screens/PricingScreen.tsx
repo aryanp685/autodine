@@ -57,7 +57,7 @@ export function PricingScreen() {
           <div className="pg__faqs">
             <details className="pg__faq">
               <summary>Can I place a real order or make a payment?</summary>
-              <p>Guest menu checkout does not submit orders or payments. An authenticated cashier path can create unpaid counter orders and record cash, but it has not been verified against a live Supabase project and is not ready for restaurant operations.</p>
+              <p>After scanning and verifying a table QR, guest checkout can submit an unpaid counter order in a connected test/preview environment. Online payment is not connected. The restaurant database rechecks the menu and prices, but the full hosted UI-to-kitchen flow still needs a safe end-to-end test before operational use.</p>
             </details>
             <details className="pg__faq">
               <summary>Are these plan prices final?</summary>

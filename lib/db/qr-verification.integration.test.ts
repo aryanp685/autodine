@@ -62,6 +62,7 @@ const baseMigrations = [
 ];
 const qrMigration = readFileSync(new URL('../../supabase/migrations/20261019000006_qr_verification_sessions.sql', import.meta.url), 'utf8');
 const securityMigration = readFileSync(new URL('../../supabase/migrations/20261020000008_security_hardening.sql', import.meta.url), 'utf8');
+const guestOrderMigration = readFileSync(new URL('../../supabase/migrations/20261020192531_guest_order_idempotency.sql', import.meta.url), 'utf8');
 
 let db: PGlite;
 
@@ -123,6 +124,7 @@ beforeAll(async () => {
 
   await db.exec(qrMigration);
   await db.exec(securityMigration);
+  await db.exec(guestOrderMigration);
   await db.exec(`
     grant usage on schema public to anon, authenticated, service_role;
     grant usage on schema auth to anon, authenticated;
@@ -354,6 +356,28 @@ describe('printed QR migration and verified guest sessions', () => {
     ))).rejects.toThrow(/unpriced add-ons are not supported/i);
   });
 
+  it('returns the same guest order for a retried request and does not duplicate its items', async () => {
+    const requestId = '82000000-0000-4000-8000-000000000001';
+    const items = JSON.stringify([{ item_id: ORDER_ITEM, qty: 1 }]);
+    const first = await asRole('service_role', '', () => db.query<{ order_id: string }>(
+      'select public.place_order_idempotent($1, $2::jsonb, null, $3) as order_id',
+      [TOKEN_ORDER, items, requestId],
+    ));
+    const retry = await asRole('service_role', '', () => db.query<{ order_id: string }>(
+      'select public.place_order_idempotent($1, $2::jsonb, null, $3) as order_id',
+      [TOKEN_ORDER, items, requestId],
+    ));
+    expect(retry.rows[0]?.order_id).toBe(first.rows[0]?.order_id);
+
+    const counts = await db.query<{ orders: number; items: number }>(
+      `select
+         (select count(*)::int from public.orders where idempotency_key = $1) as orders,
+         (select count(*)::int from public.order_items where order_id = $2) as items`,
+      [`guest:${requestId}`, first.rows[0]?.order_id],
+    );
+    expect(counts.rows[0]).toEqual({ orders: 1, items: 1 });
+  });
+
   it('keeps verification records and order RPCs inaccessible to anonymous or authenticated clients', async () => {
     await expect(asRole('anon', '', () => db.query('select public_token from public.table_qr_codes')))
       .rejects.toThrow(/permission denied/i);
@@ -370,6 +394,10 @@ describe('printed QR migration and verified guest sessions', () => {
     await expect(asRole('authenticated', '', () => db.query(
       'select public.place_order($1, $2::jsonb, null)',
       [TOKEN_ORDER, JSON.stringify([{ item_id: ORDER_ITEM, qty: 1 }])],
+    ))).rejects.toThrow(/permission denied/i);
+    await expect(asRole('anon', '', () => db.query(
+      'select public.place_order_idempotent($1, $2::jsonb, null, $3)',
+      [TOKEN_ORDER, JSON.stringify([{ item_id: ORDER_ITEM, qty: 1 }]), '82000000-0000-4000-8000-000000000002'],
     ))).rejects.toThrow(/permission denied/i);
   });
 

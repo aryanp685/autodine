@@ -34,7 +34,7 @@ export default async function CartPage({
   const cartKey = tableSession ? `${tableSession.restaurantId}:${tableSession.tableId}` : scope;
   return (
     <CartScope scope={scope} cartKey={cartKey}>
-      <Cart />
+      <Cart orderingEnabled={Boolean(isSupabaseConfigured && tableSession)} />
     </CartScope>
   );
 }

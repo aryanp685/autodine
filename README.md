@@ -1,6 +1,6 @@
 # AutoDine
 
-**AutoDine is an early-stage, mobile-first QR ordering and restaurant-operations prototype for Indian restaurants.** The current repository includes a polished UI, sample restaurant data, Supabase schema/auth foundations, and a server-side menu reader. It is **not ready to accept real customer orders or payments**.
+**AutoDine is an early-stage, mobile-first QR ordering and restaurant-operations prototype for Indian restaurants.** The current repository includes a polished UI, sample restaurant data, Supabase schema/auth foundations, and a server-side menu reader. QR guest orders can be submitted as unpaid counter orders after table verification in a configured test/preview environment; this is not ready for production operations or payments.
 
 ## Current status
 
@@ -10,15 +10,15 @@
 | Table/QR administration | Live Supabase-backed table, QR issue/revoke and staff-code controls are gated by membership role; hosted Supabase use remains unverified |
 | Restaurant signup/sign-in | Supabase Auth actions are present; requires a configured Supabase project |
 | Public menu reading | Supabase-backed read path is present, with a demo-data fallback |
-| Database schema and row-level security | Migrations 0001–0006 apply in local PGlite tests; migration 0007 schedules Supabase `pg_cron` cleanup and cannot be executed by PGlite. No migration has been applied to a hosted project |
+| Database schema and row-level security | Core migrations and order RPCs are exercised in local PGlite; cleanup migration 0007 requires Supabase `pg_cron`. Guest-order idempotency migration 0010 is applied to the user-confirmed test project only; production is unchanged |
 | QR table verification | Printed table QR handles, five-minute venue code, role-gated staff display, hashed 60-minute table sessions, atomic rate limiting and server-only order RPC gate are locally implemented; requires a server-only `QR_VERIFICATION_SECRET` and hosted Supabase verification |
-| Guest and counter order flows | Database-side validation, pricing and trial gates are locally tested; customer checkout still does not submit orders or payments, while the authenticated counter UI path is not verified against a live Supabase project |
+| Guest and counter order flows | QR guest checkout creates unpaid counter orders through the server-only, idempotent RPC; local SQL tests pass and migration 0010 is on the test project. A full hosted UI-to-kitchen test is still pending; online payment is not connected |
 | Preview GST model | Flat 5% tax-exclusive restaurant-service assumption (local CGST/SGST split); venue GST status is unverified and this is not live tax advice |
 | Counter cash collection | Separate idempotent RPC enforces exact-balance checks and audit records; the authenticated cashier action is wired but not verified against a live Supabase project |
 | Online payments, receipts and subscriptions | No payment provider is connected; online verification, subscription billing and persistent receipt UI remain unimplemented |
 | Production readiness | Not ready for real restaurant operations or live money |
 
-All restaurant names, orders, dashboard metrics, QR states and payments shown without a configured database are fictional demo content. The displayed 5% tax rate and plan prices are illustrative and must not be treated as tax or billing advice.
+All restaurant names, orders, dashboard metrics, QR states and payments shown without a configured database are fictional demo content. The preview uses the common flat 5% standalone-restaurant GST assumption; verify the actual venue's GST status and premises before live billing. Plan prices are illustrative.
 
 ## Run locally
 
