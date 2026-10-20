@@ -112,14 +112,79 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      /**
+       * Signature verified against the live database on 2026-10-20. It takes
+       * a table-verification SESSION token, not a restaurant slug and a table
+       * token as this file previously claimed -- the QR flow was reworked into
+       * table_verification_sessions after migration 0001 was written.
+       */
       place_order: {
         Args: {
-          p_restaurant_slug: string;
-          p_table_token: string;
+          p_session_token: string;
           p_items: unknown; // jsonb: [{item_id, qty, variant_id?, addons?}]
           p_note?: string | null;
         };
         Returns: string; // new order id (uuid)
+      };
+      /** Counter order that is never tied to a table: takeaway / walk-in. */
+      place_counter_order: {
+        Args: {
+          p_restaurant_slug: string;
+          p_items: unknown; // jsonb
+          p_note?: string | null;
+        };
+        Returns: string; // new order id (uuid)
+      };
+      /**
+       * The ONLY way money is taken at the counter. Atomic: inserts the
+       * payment, settles the order and writes an audit event in one
+       * transaction.
+       *
+       * Three things it enforces that the application must not duplicate:
+       *   - the caller must be owner, manager or cashier
+       *   - p_amount_paise must EXACTLY equal the outstanding balance, so
+       *     there is no "amount received" and no change to compute
+       *   - p_idempotency_key makes a retry return the original payment
+       *     instead of charging twice. Generate it ONCE per attempt, on the
+       *     client, and reuse it if the call is retried.
+       *
+       * CASH ONLY. The payments table allows card/upi/online, but this
+       * function hardcodes method = 'cash'. See app/cashier/actions.ts.
+       */
+      record_cash_payment: {
+        Args: {
+          p_restaurant_slug: string;
+          p_order_id: string;
+          p_amount_paise: number;
+          p_idempotency_key: string;
+        };
+        Returns: string; // payment id (uuid)
+      };
+      /**
+       * Migration 0004. The one the counter actually uses: same guarantees as
+       * record_cash_payment but takes a method, so card and UPI work too.
+       *
+       *   - caller must be owner, manager or cashier
+       *   - p_amount_paise must EXACTLY equal the outstanding balance
+       *   - p_idempotency_key makes a retry return the original payment
+       *     instead of charging twice. Generate it ONCE per attempt, on the
+       *     client, and reuse it if the call is retried.
+       *   - p_method is part of the idempotency key, so a cash attempt and a
+       *     card attempt cannot be answered with each other's payment.
+       *
+       * 'online' is rejected here on purpose. An online payment is initiated
+       * by the guest through a provider and arrives by webhook with a
+       * provider reference; a cashier must not be able to record one.
+       */
+      record_counter_payment: {
+        Args: {
+          p_restaurant_slug: string;
+          p_order_id: string;
+          p_method: 'cash' | 'card' | 'upi';
+          p_amount_paise: number;
+          p_idempotency_key: string;
+        };
+        Returns: string; // payment id (uuid)
       };
     };
     Enums: {

@@ -60,6 +60,12 @@ function stripUnsupported(sql) {
   out = out.replace(/^\s*drop\s+policy[\s\S]*?;\s*$/gim, '');
   // grant ... ;
   out = out.replace(/^\s*grant\s[\s\S]*?;\s*$/gim, '');
+  // revoke ... ;  (parser has no REVOKE; added with migration 0003, which
+  // revokes the default PUBLIC execute on a SECURITY DEFINER function)
+  out = out.replace(/^\s*revoke\s[\s\S]*?;\s*$/gim, '');
+  // comment on function ... ;  (COMMENT ON TABLE/COLUMN parses fine; the
+  // FUNCTION form does not, so only that form is stripped)
+  out = out.replace(/^\s*comment\s+on\s+function[\s\S]*?;\s*$/gim, '');
   // alter table ... enable/disable row level security;
   out = out.replace(/^\s*alter\s+table[\s\S]*?row\s+level\s+security\s*;\s*$/gim, '');
   // alter table ... add/drop constraint ...;
@@ -78,6 +84,9 @@ for (const file of files) {
   const removedPolicies = (sql.match(/create\s+policy/gi) || []).length;
   const removedDrops = (sql.match(/drop\s+policy/gi) || []).length;
   const removedGrants = (sql.match(/^\s*grant\s/gim) || []).length;
+  const removedRevokes = (sql.match(/^\s*revoke\s/gim) || []).length;
+  const removedComments =
+    (sql.match(/^\s*comment\s+on\s+function/gim) || []).length;
   const removedRls = (sql.match(/row\s+level\s+security/gi) || []).length;
 
   // Comments are not statements. Strip them so a file that is nothing but
@@ -89,7 +98,8 @@ for (const file of files) {
     console.log(
       `${file}: nothing checkable (only functions/policies/grants) — ` +
         `UNVERIFIED: ${removedFns} function(s), ${removedPolicies} policy/policies, ` +
-        `${removedDrops} policy drop(s), ${removedGrants} grant(s)`,
+        `${removedDrops} policy drop(s), ${removedGrants} grant(s), ` +
+        `${removedRevokes} revoke(s), ${removedComments} function comment(s)`,
     );
     continue;
   }
@@ -101,6 +111,8 @@ for (const file of files) {
       `${removedPolicies} policy/policies`,
       `${removedDrops} policy drop(s)`,
       `${removedGrants} grant(s)`,
+      `${removedRevokes} revoke(s)`,
+      `${removedComments} function comment(s)`,
       `${removedRls} RLS statement(s)`,
     ].join(', ');
     console.log(
