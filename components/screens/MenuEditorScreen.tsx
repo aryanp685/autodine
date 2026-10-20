@@ -5,7 +5,9 @@ import { paiseToRupees } from '@/lib/money';
 import type { MenuEditorData } from '@/lib/db/menu-editor';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import {
+  addCategoryAction,
   addItemAction,
+  deleteCategoryAction,
   publishMenuAction,
   saveItemAction,
   setAllAvailabilityAction,
@@ -54,9 +56,17 @@ export function MenuEditorScreen({
         veg: i.veg,
         available: i.available,
         variants: undefined as undefined,
-        category: 'curries',
+        category: i.categoryId ?? '',
       }))
     : demoItems;
+
+  const liveCategories = data?.categories ?? [];
+  const uncategorised = (data?.items ?? []).filter((i) => !i.categoryId).length;
+
+  // The first category is the default home for a newly added item. It is the
+  // only way an item can be visible to diners, so the add button is inert
+  // until one exists rather than creating something invisible.
+  const defaultCategoryId = liveCategories[0]?.id ?? '';
 
   const selectedPrice = blocked
     ? 0
@@ -130,16 +140,71 @@ export function MenuEditorScreen({
         {!blocked && (
           <div className="pg__split">
             <aside className="pg__cats">
-            <div className="pg__catsHead">
-              Categories
-              <span className="pg__catsAdd">+</span>
-            </div>
-            {categories.map((c, i) => (
-              <div key={c.id} className={`pg__cat ${i === 2 ? 'is-active' : ''}`}>
-                <span>{c.name}</span>
-                <span className="tnum">{c.count}</span>
-              </div>
-            ))}
+              <div className="pg__catsHead">Categories</div>
+
+              {live ? (
+                <>
+                  {liveCategories.length === 0 ? (
+                    <p className="pg__catsNote">
+                      No categories yet. Diners reach an item through its category, so add one
+                      before you add items.
+                    </p>
+                  ) : (
+                    liveCategories.map((c) => (
+                      <div key={c.id} className="pg__cat">
+                        <span>{c.name}</span>
+                        <span className="tnum">
+                          {c.itemCount}
+                          {c.itemCount === 0 && (
+                            <form action={deleteCategoryAction} className="pg__catDel">
+                              <input type="hidden" name="categoryId" value={c.id} />
+                              <button type="submit" aria-label={`Delete category ${c.name}`}>
+                                ×
+                              </button>
+                            </form>
+                          )}
+                        </span>
+                      </div>
+                    ))
+                  )}
+
+                  {uncategorised > 0 && (
+                    <>
+                      <div className="pg__cat">
+                        <span>Uncategorised</span>
+                        <span className="tnum">{uncategorised}</span>
+                      </div>
+                      <p className="pg__catsNote">
+                        Diners cannot see {uncategorised === 1 ? 'this item' : `these ${uncategorised} items`} —
+                        open each one and choose a category.
+                      </p>
+                    </>
+                  )}
+
+                  <form action={addCategoryAction} className="pg__catForm">
+                    <input type="hidden" name="menuId" value={data?.menuId ?? ''} />
+                    <input
+                      className="ui-input"
+                      name="name"
+                      placeholder="New category"
+                      aria-label="New category name"
+                      maxLength={60}
+                      required
+                    />
+                    <button type="submit" className="pg__btn">
+                      Add
+                    </button>
+                  </form>
+                </>
+              ) : (
+                categories.map((c, i) => (
+                  <div key={c.id} className={`pg__cat ${i === 2 ? 'is-active' : ''}`}>
+                    <span>{c.name}</span>
+                    <span className="tnum">{c.count}</span>
+                  </div>
+                ))
+              )}
+
             <div className="pg__catsFoot">
               {/* Left inert on purpose. AI extraction needs an OCR pass and a
                   mandatory owner review before anything publishes; shipping a
@@ -156,15 +221,26 @@ export function MenuEditorScreen({
 
           <section className="pg__items">
             <div className="pg__itemsHead">
-              <h2>Curries &amp; Mains</h2>
+              <h2>{live ? 'All items' : 'Curries &amp; Mains'}</h2>
               <div className="pg__itemsActions">
                 {live ? (
                   <>
-                    <form action={addItemAction}>
-                      <button type="submit" className="pg__btn">
+                    {defaultCategoryId ? (
+                      <form action={addItemAction}>
+                        <input type="hidden" name="categoryId" value={defaultCategoryId} />
+                        <button type="submit" className="pg__btn">
+                          Add item
+                        </button>
+                      </form>
+                    ) : (
+                      // Inert rather than submit-and-fail: without a category
+                      // the insert would be rejected server-side, and a button
+                      // that looks live and then errors is worse than one that
+                      // plainly needs something first.
+                      <span className="pg__btn" aria-disabled="true">
                         Add item
-                      </button>
-                    </form>
+                      </span>
+                    )}
                     {/* Reorder needs a drag-and-drop interaction the locked
                         layout does not define. Left as a label, not a
                         button, so it cannot be read as working. */}
@@ -213,7 +289,11 @@ export function MenuEditorScreen({
               </thead>
               <tbody>
                 {tableRows
-                  .filter((i) => i.category === 'curries')
+                  // The demo board was locked showing one category's worth of
+                  // rows. Live, that constant would match nothing -- real rows
+                  // carry a category UUID -- so the filter applies to the demo
+                  // only and the sample screen keeps its locked appearance.
+                  .filter((i) => (live ? true : i.category === 'curries'))
                   .map((i) => (
                     <tr key={i.id} className={i.id === selected.id ? 'is-active' : undefined}>
                       <td>
@@ -268,6 +348,25 @@ export function MenuEditorScreen({
                 <span className="ui-label">Description</span>
                 <textarea className="ui-input" name="description" rows={3} defaultValue={selectedDesc} />
               </label>
+              {live && liveCategories.length > 0 && (
+                <label className="ui-field">
+                  <span className="ui-label">Category</span>
+                  <select
+                    className="ui-select"
+                    name="categoryId"
+                    defaultValue={
+                      (selected as { categoryId?: string | null }).categoryId ??
+                      defaultCategoryId
+                    }
+                  >
+                    {liveCategories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <div className="pg__fieldRow">
                 <label className="ui-field">
                   <span className="ui-label">Price (₹)</span>

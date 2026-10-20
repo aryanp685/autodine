@@ -36,10 +36,21 @@ export type EditorItem = {
   sortOrder: number;
 };
 
+export type EditorCategory = {
+  id: string;
+  name: string;
+  /**
+   * Items in this category, unavailable ones included: the editor shows them
+   * so they can be fixed, so the count has to match what the list shows.
+   */
+  itemCount: number;
+};
+
 export type MenuEditorData = {
   restaurantName: string;
   menuId: string;
   published: boolean;
+  categories: EditorCategory[];
   items: EditorItem[];
   /** Set when the caller has no restaurant to show. See lib/db/staff.ts. */
   blocked?: 'signed-out' | 'no-membership';
@@ -52,7 +63,14 @@ export async function getMenuEditorData(): Promise<MenuEditorData | null> {
   // the next if, so the union would stay wide and `blocked` would not typecheck.
   if (!staff.ok) {
     if (staff.reason === 'unconfigured') return null;
-    return { restaurantName: '', menuId: '', published: false, items: [], blocked: staff.reason };
+    return {
+      restaurantName: '',
+      menuId: '',
+      published: false,
+      categories: [],
+      items: [],
+      blocked: staff.reason,
+    };
   }
 
   const { supabase, restaurantId, restaurantName } = staff.context;
@@ -69,22 +87,49 @@ export async function getMenuEditorData(): Promise<MenuEditorData | null> {
   // A restaurant with no menu row is a real state, not a reason to invent one.
   // The editor renders empty and offers to add the first item.
   if (!menu) {
-    return { restaurantName, menuId: '', published: false, items: [] };
+    return { restaurantName, menuId: '', published: false, categories: [], items: [] };
   }
 
-  const { data: items, error: itemsError } = await supabase
-    .from('items')
-    .select('id, category_id, name, description, price_paise, is_veg, is_available, sort_order')
-    .eq('restaurant_id', restaurantId)
-    .order('sort_order', { ascending: true });
+  // Separate queries rather than an embedded select: lib/db/database.ts is
+  // hand-written and does not declare every relationship, so an embed such as
+  // categories(name) resolves to a SelectQueryError and will not compile.
+  const [categoriesResult, itemsResult] = await Promise.all([
+    supabase
+      .from('categories')
+      .select('id, name, sort_order')
+      .eq('restaurant_id', restaurantId)
+      .order('sort_order', { ascending: true }),
+    supabase
+      .from('items')
+      .select('id, category_id, name, description, price_paise, is_veg, is_available, sort_order')
+      .eq('restaurant_id', restaurantId)
+      .order('sort_order', { ascending: true }),
+  ]);
 
-  if (itemsError) throw new Error(`Could not load items: ${itemsError.message}`);
+  if (categoriesResult.error) {
+    throw new Error(`Could not load categories: ${categoriesResult.error.message}`);
+  }
+  if (itemsResult.error) {
+    throw new Error(`Could not load items: ${itemsResult.error.message}`);
+  }
+
+  const items = itemsResult.data ?? [];
+  const countByCategory = new Map<string, number>();
+  for (const row of items) {
+    if (!row.category_id) continue;
+    countByCategory.set(row.category_id, (countByCategory.get(row.category_id) ?? 0) + 1);
+  }
 
   return {
     restaurantName,
     menuId: menu.id as string,
     published: Boolean(menu.is_published),
-    items: (items ?? []).map((row) => ({
+    categories: (categoriesResult.data ?? []).map((row) => ({
+      id: row.id as string,
+      name: row.name as string,
+      itemCount: countByCategory.get(row.id as string) ?? 0,
+    })),
+    items: items.map((row) => ({
       id: row.id as string,
       categoryId: (row.category_id as string | null) ?? null,
       name: row.name as string,

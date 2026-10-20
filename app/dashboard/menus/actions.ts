@@ -52,6 +52,108 @@ function ok(message: string): never {
   redirect(`${MENUS_PATH}?notice=${encodeURIComponent(message)}`);
 }
 
+type Ctx = NonNullable<Awaited<ReturnType<typeof currentRestaurant>>>;
+
+/**
+ * Confirm a category id submitted by the editor belongs to this restaurant.
+ *
+ * RLS already blocks a foreign id -- categories_staff_insert and _update both
+ * carry a WITH CHECK on has_restaurant_role() -- but it fails as a generic
+ * "new row violates row-level security policy", which tells an owner nothing.
+ * Checking first turns a forged or stale id into a message they can act on.
+ *
+ * Returns null when the editor sent no category at all, which is a different
+ * situation from sending a bad one: no category means "leave it alone".
+ */
+async function resolveCategoryId(ctx: Ctx, raw: FormDataEntryValue | null): Promise<string | null> {
+  const id = String(raw ?? '').trim();
+  if (!id) return null;
+
+  const { data, error } = await ctx.supabase
+    .from('categories')
+    .select('id')
+    .eq('id', id)
+    .eq('restaurant_id', ctx.restaurantId)
+    .maybeSingle();
+
+  if (error || !data) {
+    fail('That category is no longer on your menu. Reload the page and try again.');
+  }
+  return data.id as string;
+}
+
+export async function addCategoryAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const name = String(formData.get('name') ?? '').trim();
+  const menuId = String(formData.get('menuId') ?? '').trim();
+
+  if (!name) fail('A category needs a name.');
+  if (name.length > 60) fail('That category name is too long.');
+  if (!menuId) fail('There is no menu to add this category to.');
+
+  // The menu matters as much as the name. A category whose menu_id is NULL is
+  // unreachable from items_public, so every item put in it would be invisible
+  // to diners -- the exact failure this whole action exists to prevent.
+  const { data: menu, error: menuError } = await ctx.supabase
+    .from('menus')
+    .select('id')
+    .eq('id', menuId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .maybeSingle();
+
+  if (menuError || !menu) fail('That menu is not on your account.');
+
+  const { count } = await ctx.supabase
+    .from('categories')
+    .select('id', { count: 'exact', head: true })
+    .eq('restaurant_id', ctx.restaurantId);
+
+  const { error } = await ctx.supabase.from('categories').insert({
+    restaurant_id: ctx.restaurantId,
+    menu_id: menuId,
+    name,
+    sort_order: count ?? 0,
+  });
+
+  if (error) fail(`Could not add the category: ${error.message}`);
+
+  ok(`Category "${name}" added.`);
+}
+
+export async function deleteCategoryAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const categoryId = String(formData.get('categoryId') ?? '').trim();
+  if (!categoryId) fail('No category selected.');
+
+  // Refuse rather than orphan. Deleting a category that still holds items
+  // would either fail on a foreign key or, worse, silently strand those items
+  // in a state where they exist but can never be shown to a diner.
+  const { count, error: countError } = await ctx.supabase
+    .from('items')
+    .select('id', { count: 'exact', head: true })
+    .eq('category_id', categoryId)
+    .eq('restaurant_id', ctx.restaurantId);
+
+  if (countError) fail(`Could not check that category: ${countError.message}`);
+  if ((count ?? 0) > 0) {
+    fail('Move or delete the items in this category first.');
+  }
+
+  const { error } = await ctx.supabase
+    .from('categories')
+    .delete()
+    .eq('id', categoryId)
+    .eq('restaurant_id', ctx.restaurantId);
+
+  if (error) fail(`Could not delete the category: ${error.message}`);
+
+  ok('Category deleted.');
+}
+
 export async function saveItemAction(formData: FormData): Promise<void> {
   const ctx = await currentRestaurant();
   if (!ctx) fail('You need to be signed in to edit the menu.');
@@ -61,6 +163,7 @@ export async function saveItemAction(formData: FormData): Promise<void> {
   const desc = String(formData.get('description') ?? '').trim();
   const veg = formData.get('veg') === 'veg';
   const rawPrice = String(formData.get('price') ?? '').trim();
+  const categoryId = await resolveCategoryId(ctx, formData.get('categoryId'));
 
   if (!itemId) fail('No item selected.');
   if (!name) fail('An item needs a name.');
@@ -76,6 +179,7 @@ export async function saveItemAction(formData: FormData): Promise<void> {
       description: desc || null,
       price_paise: rupeesToPaise(rupees),
       is_veg: veg,
+      ...(categoryId ? { category_id: categoryId } : {}),
     })
     .eq('id', itemId)
     .eq('restaurant_id', ctx.restaurantId);
@@ -93,8 +197,20 @@ export async function addItemAction(formData: FormData): Promise<void> {
   const rupees = Number(String(formData.get('price') ?? '0').trim());
   const safePrice = Number.isFinite(rupees) && rupees >= 0 ? rupees : 0;
 
+  // Required, not optional. categories_id is the join that makes an item
+  // visible to diners: the items_public RLS policy reaches an item only
+  // through its category and that category's published menu. An item saved
+  // with a NULL category would sit in the editor looking saved and correct
+  // while being invisible on the customer menu -- and the owner would have no
+  // way to see why.
+  const categoryId = await resolveCategoryId(ctx, formData.get('categoryId'));
+  if (!categoryId) {
+    fail('Add a category first. Diners see items through their category.');
+  }
+
   const { error } = await ctx.supabase.from('items').insert({
     restaurant_id: ctx.restaurantId,
+    category_id: categoryId,
     name,
     description: null,
     price_paise: rupeesToPaise(safePrice),
