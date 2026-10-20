@@ -10,7 +10,7 @@
 | Table/QR administration | Live Supabase-backed table, QR issue/revoke and staff-code controls are gated by membership role; hosted Supabase use remains unverified |
 | Restaurant signup/sign-in | Supabase Auth actions are present; requires a configured Supabase project |
 | Public menu reading | Supabase-backed read path is present, with a demo-data fallback |
-| Database schema and row-level security | Core migrations and order RPCs are exercised in local PGlite; cleanup migration 0007 requires Supabase `pg_cron`. Guest-order idempotency migration 0010 is applied to the user-confirmed test project only; production is unchanged |
+| Database schema and row-level security | Core migrations and order RPCs are exercised in local PGlite; cleanup migration 0007 requires Supabase `pg_cron`. Guest-order migrations 0010–0011 are applied to the user-confirmed test project only; production is unchanged |
 | QR table verification | Printed table QR handles, five-minute venue code, role-gated staff display, hashed 60-minute table sessions, atomic rate limiting and server-only order RPC gate are locally implemented; requires a server-only `QR_VERIFICATION_SECRET` and hosted Supabase verification |
 | Guest and counter order flows | QR guest checkout creates unpaid counter orders through the server-only, idempotent RPC; local SQL tests pass and migration 0010 is on the test project. A full hosted UI-to-kitchen test is still pending; online payment is not connected |
 | Preview GST model | Flat 5% tax-exclusive restaurant-service assumption (local CGST/SGST split); venue GST status is unverified and this is not live tax advice |

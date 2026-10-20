@@ -63,6 +63,7 @@ const baseMigrations = [
 const qrMigration = readFileSync(new URL('../../supabase/migrations/20261019000006_qr_verification_sessions.sql', import.meta.url), 'utf8');
 const securityMigration = readFileSync(new URL('../../supabase/migrations/20261020000008_security_hardening.sql', import.meta.url), 'utf8');
 const guestOrderMigration = readFileSync(new URL('../../supabase/migrations/20261020192531_guest_order_idempotency.sql', import.meta.url), 'utf8');
+const guestOrderSearchPathMigration = readFileSync(new URL('../../supabase/migrations/20261020193839_guest_order_crypto_search_path.sql', import.meta.url), 'utf8');
 
 let db: PGlite;
 
@@ -88,6 +89,7 @@ beforeAll(async () => {
     create role authenticated;
     create role service_role bypassrls;
     create schema auth;
+    create schema if not exists extensions;
     create function auth.uid() returns uuid
       language sql stable
       as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
@@ -125,6 +127,7 @@ beforeAll(async () => {
   await db.exec(qrMigration);
   await db.exec(securityMigration);
   await db.exec(guestOrderMigration);
+  await db.exec(guestOrderSearchPathMigration);
   await db.exec(`
     grant usage on schema public to anon, authenticated, service_role;
     grant usage on schema auth to anon, authenticated;

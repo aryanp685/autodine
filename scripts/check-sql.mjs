@@ -8,7 +8,7 @@
  *
  *   CHECKED:     CREATE TABLE / INDEX / TYPE, COMMENT. That is all.
  *   NOT CHECKED: everything that makes a Supabase schema safe.
- *                CREATE FUNCTION bodies, CREATE POLICY, DROP POLICY, GRANT,
+ * CREATE FUNCTION bodies/configuration, CREATE POLICY, DROP POLICY, GRANT,
  *                REVOKE, ALTER TABLE ... ADD/DROP CONSTRAINT, and
  *                ALTER TABLE ... ENABLE ROW LEVEL SECURITY are all stripped
  *                out before parsing, because the parser cannot read them.
@@ -51,8 +51,11 @@ if (!files.length) {
 /** Remove the constructs the parser cannot handle, so the rest can be checked. */
 function stripUnsupported(sql) {
   let out = sql;
-  // CREATE [OR REPLACE] FUNCTION bodies and anonymous DO blocks.
+  // CREATE [OR REPLACE] FUNCTION bodies and ALTER FUNCTION configuration.
   out = out.replace(/create\s+(?:or\s+replace\s+)?function[\s\S]*?\$\$[\s\S]*?\$\$\s*;/gi, '');
+  out = out.replace(/^[ \t]*alter\s+function[^;]*;[ \t]*$/gim, '');
+  // anonymous DO blocks.
+
   out = out.replace(/^[ \t]*drop\s+function[^;]*;[ \t]*$/gim, '');
   out = out.replace(/^[ \t]*create\s+trigger[^;]*;[ \t]*$/gim, '');
   out = out.replace(/^[ \t]*drop\s+trigger[^;]*;[ \t]*$/gim, '');
@@ -82,6 +85,7 @@ for (const file of files) {
 
   const stripped = stripUnsupported(sql);
   const removedFns = (sql.match(/create\s+or\s+replace\s+function/gi) || []).length;
+  const removedFunctionConfigs = (sql.match(/^\s*alter\s+function\s/gim) || []).length;
   const removedPolicies = (sql.match(/create\s+policy/gi) || []).length;
   const removedDrops = (sql.match(/drop\s+policy/gi) || []).length;
   const removedGrants = (sql.match(/^\s*grant\s/gim) || []).length;
@@ -95,8 +99,8 @@ for (const file of files) {
 
   if (!checkable) {
     console.log(
-      `${file}: nothing checkable (only functions/policies/grants) — ` +
-        `UNVERIFIED: ${removedFns} function(s), ${removedPolicies} policy/policies, ` +
+      `${file}: nothing checkable (only functions/configuration/policies/grants) — ` +
+        `UNVERIFIED: ${removedFns} function(s), ${removedFunctionConfigs} function config(s), ${removedPolicies} policy/policies, ` +
         `${removedDrops} policy drop(s), ${removedGrants} grant(s), ${removedRevokes} revoke(s)`,
     );
     continue;
@@ -106,6 +110,7 @@ for (const file of files) {
     const ast = parse(checkable);
     const unverified = [
       `${removedFns} function(s)`,
+      `${removedFunctionConfigs} function config(s)`,
       `${removedPolicies} policy/policies`,
       `${removedDrops} policy drop(s)`,
       `${removedGrants} grant(s)`,
