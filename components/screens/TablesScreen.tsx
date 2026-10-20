@@ -3,9 +3,7 @@ import { tables, restaurant } from '@/lib/demo-data';
 import { QrChip } from '@/components/ui';
 import { WorkspaceSwitcher } from '@/components/WorkspaceSwitcher';
 import { PreviewAction } from '@/components/ui/PreviewAction';
-import { VenueVerificationCodePanel } from '@/components/screens/VenueVerificationCodePanel';
 import { LiveTableQrManager } from '@/components/screens/LiveTableQrManager';
-import type { MemberRole } from '@/lib/db/database';
 import type { AuthorizedWorkspace } from '@/lib/db/workspace-selection';
 
 type LiveTable = {
@@ -37,7 +35,6 @@ export function TablesScreen({
 } = {}) {
   const workspaceQuery = workspace ? `?workspace=${encodeURIComponent(workspace.slug)}` : '';
   const isLive = liveTables !== undefined;
-  const canViewCode = workspace && ['owner', 'manager', 'cashier'].includes(workspace.role);
 
   return (
     <div className="pg pg--dash">
@@ -82,10 +79,6 @@ export function TablesScreen({
             </div>
           )}
         </header>
-
-        {workspace && canViewCode && (
-          <VenueVerificationCodePanel key={workspace.slug} slug={workspace.slug} role={workspace.role as MemberRole} />
-        )}
 
         {isLive ? (
           <LiveTableQrManager
@@ -138,15 +131,14 @@ export function TablesScreen({
                 </div>
               </div>
               <aside className="pg__printAside">
-                <h3 className="pg__h3">Rotating codes</h3>
-                <p className="pg__p">A rotating staff code now complements a printed table QR. It narrows the sharing window but cannot prove physical presence.</p>
+                <h3 className="pg__h3">Scan to order</h3>
+                <p className="pg__p">Guests scan the table QR, open the menu and send an order directly to the kitchen.</p>
                 <ul className="pg__bullets">
-                  <li>Six digits refresh every five minutes.</li>
-                  <li>Guests get a clear staff recovery message when verification fails or expires.</li>
-                  <li>Revoking a QR or disabling a table invalidates its active sessions.</li>
-                  <li>No signing keys or admin tokens appear in the QR URL.</li>
+                  <li>Each QR identifies one table and can be revoked or replaced.</li>
+                  <li>Guest sessions expire after one hour.</li>
+                  <li>Only available menu items and server-calculated prices can be ordered.</li>
+                  <li>QR links can be shared, so anyone with an active link can place an order.</li>
                 </ul>
-                <div className="pg__note pg__note--warn">A guest can photograph/share the QR and the current code; do not treat this as perfect presence detection.</div>
               </aside>
             </section>
           </>

@@ -24,8 +24,8 @@ export default async function CartPage({
     return (
       <main className="qr-verify">
         <section className="qr-verify__card">
-          <h1>Verify your table first</h1>
-          <p className="qr-verify__intro">Scan the QR on your table and enter the current code from restaurant staff before continuing to checkout.</p>
+          <h1>Start ordering from your table</h1>
+          <p className="qr-verify__intro">Scan the table QR to open the menu and start a guest ordering session before checkout.</p>
           <Link className="qr-verify__back" href={`/menu?s=${encodeURIComponent(scope)}`}>Return to menu</Link>
         </section>
       </main>

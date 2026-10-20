@@ -19,7 +19,7 @@ function OrderSubmitButton({ disabled, totalPaise }: { disabled: boolean; totalP
 }
 
 const STATUS_MESSAGES: Record<string, { text: string; success?: boolean }> = {
-  session: { text: 'Table verification expired. Scan the table QR and verify again with staff.' },
+  session: { text: 'Your table session expired. Scan the table QR to start a new ordering session.' },
   'read-only': { text: 'Ordering is temporarily paused for this restaurant. Please ask staff for help.' },
   items: { text: 'One or more items or quantities are invalid or no longer available. Review your cart.' },
   options: { text: 'Some selected add-ons are not priced for ordering yet. Remove them or ask staff.' },

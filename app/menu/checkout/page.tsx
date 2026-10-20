@@ -28,8 +28,8 @@ export default async function CheckoutPage({
     return (
       <main className="qr-verify">
         <section className="qr-verify__card">
-          <h1>Verify your table first</h1>
-          <p className="qr-verify__intro">Your table verification expired or is unavailable. Get the current code from restaurant staff and scan the table QR again.</p>
+          <h1>Restart your table session</h1>
+          <p className="qr-verify__intro">Your table session expired or is unavailable. Scan the QR on your table to start a new ordering session.</p>
           <Link className="qr-verify__back" href={`/menu?s=${encodeURIComponent(scope)}`}>Return to menu</Link>
         </section>
       </main>

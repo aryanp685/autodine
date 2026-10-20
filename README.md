@@ -11,7 +11,7 @@
 | Restaurant signup/sign-in | Supabase Auth actions are present; requires a configured Supabase project |
 | Public menu reading | Supabase-backed read path is present, with a demo-data fallback |
 | Database schema and row-level security | Core migrations and order RPCs are exercised in local PGlite; cleanup migration 0007 requires Supabase `pg_cron`. Guest-order migrations 0010–0011 are applied to the user-confirmed test project only; production is unchanged |
-| QR table verification | Printed table QR handles, five-minute venue code, role-gated staff display, hashed 60-minute table sessions, atomic rate limiting and server-only order RPC gate are locally implemented; requires a server-only `QR_VERIFICATION_SECRET` and hosted Supabase verification |
+| QR table ordering | Printed, revocable table QR handles start hashed 60-minute guest sessions; rate-limited, server-only order RPC gate and guest menu flow are locally implemented. Anyone with an active QR can order, so revoke a QR if it is shared outside the venue. Requires a server-only `QR_VERIFICATION_SECRET` and hosted Supabase verification |
 | Guest and counter order flows | QR guest checkout creates unpaid counter orders through the server-only, idempotent RPC; local SQL tests pass and migration 0010 is on the test project. A full hosted UI-to-kitchen test is still pending; online payment is not connected |
 | Preview GST model | Flat 5% tax-exclusive restaurant-service assumption (local CGST/SGST split); venue GST status is unverified and this is not live tax advice |
 | Counter cash collection | Separate idempotent RPC enforces exact-balance checks and audit records; the authenticated cashier action is wired but not verified against a live Supabase project |
@@ -29,7 +29,7 @@ npm ci
 npm run dev
 ```
 
-Open <http://localhost:3000>. With no Supabase environment variables, the site runs in demo mode. To configure Supabase, copy `.env.example` to `.env.local`, fill in your own project values, and apply migrations 0001–0007 in order; run `supabase/seed.sql` only after those migrations. The QR verification actions fail closed unless `QR_VERIFICATION_SECRET` is set to a random 32-byte value encoded as 64 hex characters (for example, generate locally with `openssl rand -hex 32`). Keep it server-only; do not commit or send it in chat. No hosted secrets or migrations have been changed from this workspace.
+Open <http://localhost:3000>. With no Supabase environment variables, the site runs in demo mode. To configure Supabase, copy `.env.example` to `.env.local`, fill in your own project values, and apply all migrations in order; run `supabase/seed.sql` only after those migrations. QR guest-session creation fails closed unless `QR_VERIFICATION_SECRET` is set to a random 32-byte value encoded as 64 hex characters (for example, generate locally with `openssl rand -hex 32`). It is used only to key privacy-preserving IP rate-limit fingerprints; keep it server-only and do not commit or send it in chat.
 
 ## Quality checks
 
@@ -56,4 +56,4 @@ The SQL check parses DDL syntax only. `npm test` additionally applies migrations
 
 ## Privacy and secrets
 
-The repository contains no production credentials. `.env.example` contains blank placeholders only. Keep all real keys in local environment variables or your hosting provider's secret manager; the Supabase secret/service-role key and `QR_VERIFICATION_SECRET` must never use a `NEXT_PUBLIC_` variable. Six-digit venue codes are derived with HMAC and are not stored in the database. Rate limiting stores only a keyed IP fingerprint scoped to a table QR; an hourly-cleanup bound is scheduled every 15 minutes by migration 0007 and deletes records after 23 hours of inactivity, leaving a one-hour scheduler-delay margin under the 24-hour retention target. Raw IPs, entered codes and session bearer tokens are not logged or persisted as plaintext. A guest may still photograph/share a live QR or code; this is not perfect physical-presence detection.
+The repository contains no production credentials. `.env.example` contains blank placeholders only. Keep all real keys in local environment variables or your hosting provider's secret manager; the Supabase secret/service-role key and `QR_VERIFICATION_SECRET` must never use a `NEXT_PUBLIC_` variable. Rate limiting stores only a keyed IP fingerprint scoped to a table QR; an hourly-cleanup bound is scheduled every 15 minutes by migration 0007 and deletes records after 23 hours of inactivity, leaving a one-hour scheduler-delay margin under the 24-hour retention target. Raw IPs and session bearer tokens are not logged or persisted as plaintext. A guest may photograph or share an active QR; anyone with the link can order until it is revoked.

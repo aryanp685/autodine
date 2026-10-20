@@ -575,17 +575,6 @@
 [data-app] .pg__tableBtns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
 [data-app] .pg__miniBtn { font-size: 12px; border: 1px solid var(--border); padding: 5px 9px; border-radius: 2px; cursor: pointer; }
 [data-app] .pg__miniBtn--danger { color: #9c3f36; border-color: rgba(199, 91, 80, 0.4); }
-[data-app] .qr-code-panel { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 0.8fr); gap: 28px; align-items: center; margin-top: 28px; padding: 24px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
-[data-app] .qr-code-panel__copy h2 { margin-top: 8px; font-size: 23px; font-weight: 500; letter-spacing: -0.025em; }
-[data-app] .qr-code-panel__copy p { margin-top: 8px; max-width: 540px; color: rgba(17, 19, 24, 0.68); font-size: 13.5px; line-height: 1.65; }
-[data-app] .qr-code-panel__copy .qr-code-panel__privacy { color: rgba(17, 19, 24, 0.52); font-size: 12px; }
-[data-app] .qr-code-panel__controls { display: grid; justify-items: start; gap: 10px; }
-[data-app] .qr-code-panel__code { font-variant-numeric: tabular-nums; font-size: clamp(34px, 5vw, 48px); font-weight: 600; letter-spacing: 0.16em; line-height: 1; }
-[data-app] .qr-code-panel__expiry, [data-app] .qr-code-panel__message { color: rgba(17, 19, 24, 0.58); font-size: 12px; }
-[data-app] .qr-code-panel__actions { display: flex; flex-wrap: wrap; gap: 8px; }
-[data-app] .qr-code-panel__cashier { display: flex; gap: 8px; align-items: center; font-size: 12px; }
-[data-app] .qr-code-panel__cashier input { accent-color: var(--accent); }
-[data-app] .qr-code-panel button:disabled { opacity: 0.55; cursor: wait; }
 [data-app] .live-qr-manager { margin-top: 34px; }
 [data-app] .live-qr-manager__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
 [data-app] .live-qr-manager__heading h2 { margin-top: 8px; font-size: 24px; font-weight: 500; letter-spacing: -0.025em; }
@@ -731,7 +720,6 @@
   [data-app] .pg__split { grid-template-columns: minmax(160px, 0.7fr) minmax(0, 1.5fr); gap: 24px; }
   [data-app] .pg__editor { grid-column: 1 / -1; }
   [data-app] .pg__tables, [data-app] .live-qr-manager__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  [data-app] .qr-code-panel { grid-template-columns: minmax(0, 1fr) minmax(180px, 0.8fr); }
   [data-app] .pg__printRow { grid-template-columns: 1fr 1fr; gap: 28px; }
   [data-app] .pg__states { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   [data-app] .pg__stateCard--wide { grid-column: 1 / -1; }
@@ -824,7 +812,6 @@
   [data-app] .pg__barMuted { display: none; }
   [data-app] .pg__body { padding: 36px 20px 64px; }
   [data-app] .pg__split { padding: 24px 20px 48px; }
-  [data-app] .qr-code-panel { grid-template-columns: minmax(0, 1fr); padding: 18px; }
   [data-app] .live-qr-manager__heading { flex-direction: column; }
   [data-app] .live-qr-manager__add { align-items: stretch; flex-direction: column; }
   [data-app] .live-qr-manager__add input { min-width: 0; width: 100%; }
@@ -848,7 +835,7 @@
 }
 
 @media print {
-  [data-app] .pg__bar, [data-app] .pg__demoBanner, [data-app] .qr-code-panel,
+  [data-app] .pg__bar, [data-app] .pg__demoBanner,
   [data-app] .live-qr-manager__heading, [data-app] .live-qr-manager__add,
   [data-app] .live-qr-manager__limitation, [data-app] .live-qr-manager__error,
   [data-app] .live-qr-manager__card-head .pg__miniBtn,

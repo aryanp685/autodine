@@ -56,7 +56,7 @@ insert into public.item_variants (id, item_id, name, price_paise, sort_order) va
 on conflict (id) do nothing;
 
 -- Twelve tables and a stable printed table QR for each. The QR identifies a
--- table only; the guest still has to enter the current rotating staff code.
+-- table; scanning the QR starts a one-hour guest ordering session.
 insert into public.dining_tables (restaurant_id, label, seats)
 select '00000000-0000-4000-8000-000000000001', 'T' || n, 4 from generate_series(1, 12) n on conflict do nothing;
 

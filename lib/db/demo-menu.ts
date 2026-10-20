@@ -180,7 +180,7 @@ export function demoSeedSql(slug: string): string {
   }
 
   lines.push('');
-  lines.push('-- Twelve tables and a stable printed QR for each. The staff code is separate.');
+  lines.push('-- Twelve tables and a stable printed QR for each. Scanning starts a guest session.');
   lines.push('insert into public.dining_tables (restaurant_id, label, seats)');
   lines.push(`select '${DEMO_RESTAURANT_ID}', 'T' || n, 4 from generate_series(1, 12) n on conflict do nothing;`);
   lines.push('');

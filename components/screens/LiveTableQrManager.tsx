@@ -88,7 +88,7 @@ export function LiveTableQrManager({ slug, initialTables, canManage }: { slug: s
         <div>
           <div className="pg__kicker">Workspace data</div>
           <h2 id="live-qr-title">Tables and printed QR codes</h2>
-          <p>QRs identify a table but do not authorize ordering. Guests still need the current venue staff code.</p>
+          <p>Each QR opens its table menu and starts a one-hour guest ordering session.</p>
         </div>
         {canManage && <button type="button" className="pg__btn" onClick={() => window.print()}>Print QR sheet</button>}
       </div>
@@ -140,7 +140,7 @@ export function LiveTableQrManager({ slug, initialTables, canManage }: { slug: s
                       return (
                         <div className="live-qr-manager__qr" key={qr.id}>
                           {url ? <QRCodeSVG value={url} size={132} level="M" includeMargin /> : <div className="live-qr-manager__qr-placeholder">Preparing QR…</div>}
-                          <span>Scan to verify table</span>
+                          <span>Scan to order</span>
                           <button type="button" className="pg__miniBtn pg__miniBtn--danger" disabled={busyId === qr.id} onClick={() => void revokeQr(table.id, qr.id)}>
                             Revoke QR
                           </button>
@@ -160,7 +160,7 @@ export function LiveTableQrManager({ slug, initialTables, canManage }: { slug: s
           })}
         </div>
       )}
-      <p className="live-qr-manager__limitation">A guest can photograph or share both a printed QR and the current venue code. The code is a verification step, not perfect physical-presence detection.</p>
+      <p className="live-qr-manager__limitation">Anyone with an active QR link can open the menu and place an order. Revoke or replace the QR if it is shared outside the restaurant.</p>
     </section>
   );
 }
