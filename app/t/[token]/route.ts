@@ -123,6 +123,33 @@ export async function GET(
 
   if (!row) return problem(request, 'unreadable');
 
+  // TEMPORARY DIAGNOSTIC — remove before merge.
+  if (request.nextUrl.searchParams.get('debug') === '1') {
+    try {
+      const probe: TableSession = {
+        token: row.session_token,
+        slug: row.restaurant_slug,
+        tableLabel: row.table_label,
+        expiresAt: row.expires_at,
+      };
+      const r = NextResponse.redirect(
+        new URL(`/menu?s=${encodeURIComponent(probe.slug)}`, request.url)
+      );
+      r.cookies.set(TABLE_SESSION_COOKIE, JSON.stringify(probe), {
+        ...TABLE_SESSION_COOKIE_OPTIONS,
+        maxAge: 60 * 59,
+      });
+      return r;
+    } catch (e) {
+      return new NextResponse(
+        `DEBUG THREW: ${e instanceof Error ? e.message : String(e)}\n` +
+          `row keys: ${Object.keys(row).join(',')}\n` +
+          `row: ${JSON.stringify(row)}`,
+        { status: 200, headers: { 'content-type': 'text/plain' } }
+      );
+    }
+  }
+
   const session: TableSession = {
     token: row.session_token,
     slug: row.restaurant_slug,
