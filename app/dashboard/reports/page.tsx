@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { ReportsScreen } from '@/components/screens/ReportsScreen';
 import { getReportsScreenData } from '@/lib/db/reports';
+import { getOutletBar } from '@/lib/db/outlet-bar';
 
 export const metadata: Metadata = { title: 'Reports · AutoDine', robots: { index: false, follow: false } };
 
@@ -18,7 +19,7 @@ export default async function ReportsPage({
 
   // Null means Supabase is not configured: the screen then renders a labelled
   // sample report rather than an empty page that reads as a dead restaurant.
-  const data = await getReportsScreenData({ range, from, to });
+  const [data, outlet] = await Promise.all([getReportsScreenData({ range, from, to }), getOutletBar()]);
 
-  return <ReportsScreen data={data} />;
+  return <ReportsScreen data={data} outlet={outlet} />;
 }

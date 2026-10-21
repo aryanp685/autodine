@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { SettingsScreen } from '@/components/screens/SettingsScreen';
 import { getSettingsScreenData } from '@/lib/db/settings-screen';
+import { getOutletBar } from '@/lib/db/outlet-bar';
 
 export const metadata: Metadata = {
   title: 'Settings · AutoDine',
@@ -16,7 +17,7 @@ export default async function SettingsPage({
 
   // Null means Supabase is not configured. The screen then renders itself
   // disabled with an explanation, never with sample values: this form writes.
-  const data = await getSettingsScreenData();
+  const [data, outlet] = await Promise.all([getSettingsScreenData(), getOutletBar()]);
 
-  return <SettingsScreen data={data} error={error} notice={notice} />;
+  return <SettingsScreen data={data} outlet={outlet} error={error} notice={notice} />;
 }

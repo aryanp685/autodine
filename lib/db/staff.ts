@@ -35,7 +35,9 @@
  * that care should use getStaffContextDetailed() below.
  */
 
+import { cookies } from 'next/headers';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { OUTLET_COOKIE, pickOutlet, type OutletOption } from '@/lib/outlets';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { Database, MemberRole } from './database';
@@ -66,6 +68,12 @@ export type StaffContext = {
    * is disabled instead of letting the click fail with a Postgres error.
    */
   role: MemberRole;
+  /**
+   * Every outlet this caller belongs to, for the switcher. The ACTIVE one is
+   * whichever the cookie named, when the caller still belongs to it -- see
+   * lib/outlets.ts. One membership means one entry and no switcher.
+   */
+  outlets: OutletOption[];
 };
 
 /** Roles allowed to take money at the counter. Mirrors record_cash_payment. */
@@ -84,13 +92,15 @@ export type StaffContextResult =
 /**
  * Resolve the caller's restaurant.
  *
- * Membership is fetched with .limit(1) because a user may belong to several
- * restaurants and this build has no workspace switcher yet -- there is no UI
- * for choosing between them, so we take one deterministically and the schema
- * already allows the rest. Ordering by restaurant_id keeps that choice stable
- * across requests instead of letting Postgres hand back whichever row it
- * happens to find first, which would make the board flicker between two
- * restaurants on refresh.
+ * All of the caller's memberships are read, not just one. The restaurant this
+ * request works on is the one named by the OUTLET_COOKIE, and only when that
+ * cookie names a restaurant the caller is actually a member of -- a cookie is
+ * a preference, never a permission. With no cookie, or a stale one, the
+ * choice falls back to the lowest restaurant_id, which is the deterministic
+ * answer this function always gave before the switcher existed.
+ *
+ * The name, slug and timezone come from the same embed, so picking a
+ * different outlet costs no extra round trip.
  */
 export async function getStaffContextDetailed(): Promise<StaffContextResult> {
   if (!isSupabaseConfigured) return { ok: false, reason: 'unconfigured' };
@@ -103,36 +113,60 @@ export async function getStaffContextDetailed(): Promise<StaffContextResult> {
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, reason: 'signed-out' };
 
-  const { data: membership, error: membershipError } = await supabase
+  type MembershipRow = {
+    restaurant_id: string;
+    role: MemberRole;
+    restaurants:
+      | { name: string; slug: string; timezone: string | null; tagline: string | null }
+      | Array<{ name: string; slug: string; timezone: string | null; tagline: string | null }>
+      | null;
+  };
+
+  const { data: membershipRows, error: membershipError } = await supabase
     .from('memberships')
-    .select('restaurant_id, role')
+    .select('restaurant_id, role, restaurants(name, slug, timezone, tagline)')
     .eq('user_id', user.id)
-    .order('restaurant_id', { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    .order('restaurant_id', { ascending: true });
 
-  if (membershipError || !membership) return { ok: false, reason: 'no-membership' };
+  if (membershipError || !membershipRows || membershipRows.length === 0) {
+    return { ok: false, reason: 'no-membership' };
+  }
 
-  const restaurantId = membership.restaurant_id as string;
+  // The embed comes back as an object for a to-one relation and as an array in
+  // some PostgREST configurations; both are handled rather than assumed.
+  const rows = (membershipRows as unknown as MembershipRow[])
+    .map((row) => {
+      const restaurant = Array.isArray(row.restaurants) ? row.restaurants[0] : row.restaurants;
+      if (!restaurant?.name) return null;
+      return {
+        id: row.restaurant_id,
+        role: row.role,
+        name: restaurant.name,
+        slug: restaurant.slug,
+        timezone: restaurant.timezone,
+        tagline: restaurant.tagline,
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null);
 
-  const { data: restaurant, error: restaurantError } = await supabase
-    .from('restaurants')
-    .select('id, name, slug, timezone, tagline')
-    .eq('id', restaurantId)
-    .maybeSingle();
+  if (rows.length === 0) return { ok: false, reason: 'no-membership' };
 
-  if (restaurantError || !restaurant) return { ok: false, reason: 'no-membership' };
+  const cookieStore = await cookies();
+  const preferred = cookieStore.get(OUTLET_COOKIE)?.value ?? null;
+  const active = pickOutlet(rows, preferred);
+  if (!active) return { ok: false, reason: 'no-membership' };
 
   return {
     ok: true,
     context: {
       supabase,
-      restaurantId,
-      restaurantName: restaurant.name,
-      slug: restaurant.slug,
-      timezone: restaurant.timezone ?? 'Asia/Kolkata',
-      tagline: (restaurant.tagline as string | null) ?? null,
-      role: membership.role as MemberRole,
+      restaurantId: active.id,
+      restaurantName: active.name,
+      slug: active.slug,
+      timezone: active.timezone ?? 'Asia/Kolkata',
+      tagline: active.tagline ?? null,
+      role: active.role,
+      outlets: rows.map(({ id, name, role }) => ({ id, name, role })),
     },
   };
 }

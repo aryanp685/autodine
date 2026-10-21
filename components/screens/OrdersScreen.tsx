@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { DashboardBar } from '@/components/DashboardBar';
+import type { OutletBar } from '@/lib/outlets';
 import { Money, PaymentPill, PrepPill } from '@/components/ui';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { demoReport, type ReportOrderRow, type ReportsScreenData } from '@/lib/db/reports';
@@ -64,10 +65,13 @@ function href(range: string, filter: OrderFilter, query: string): string {
 
 export function OrdersScreen({
   data,
+  outlet,
   filter = 'all',
   query = '',
 }: {
   data?: ReportsScreenData | null;
+  /** Which outlet is open, for the switcher in the bar. */
+  outlet?: OutletBar | null;
   filter?: OrderFilter;
   query?: string;
 }) {
@@ -88,7 +92,7 @@ export function OrdersScreen({
 
   return (
     <div className="pg pg--dash">
-      <DashboardBar active="orders" />
+      <DashboardBar active="orders" outlet={outlet} />
 
       <div className="pg__body">
         {blocked && <SignInPrompt reason={blocked} screen="order ledger" />}

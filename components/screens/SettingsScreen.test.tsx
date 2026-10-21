@@ -44,6 +44,8 @@ function data(over: Partial<SettingsScreenData> = {}): SettingsScreenData {
     publicMenuSvg: '<svg role="img" aria-label="QR"></svg>',
     publishedMenus: 1,
     totalMenus: 1,
+    outlets: [{ id: 'r-1', name: 'Maddi', role: 'owner' }],
+    activeOutletId: 'r-1',
     ...over,
   };
 }
@@ -134,5 +136,33 @@ describe('SettingsScreen', () => {
     );
     expect(html).toContain('Nothing was saved');
     expect(html).toContain('already used by another restaurant');
+  });
+
+  it('lists every outlet and marks the one the dashboard is showing', () => {
+    const html = renderToStaticMarkup(
+      <SettingsScreen
+        data={data({
+          outlets: [
+            { id: 'r-1', name: 'Maddi', role: 'owner' },
+            { id: 'r-2', name: 'Maddi Baner', role: 'owner' },
+          ],
+          activeOutletId: 'r-2',
+        })}
+      />
+    );
+
+    expect(html).toContain('Outlets');
+    expect(html).toContain('Maddi');
+    expect(html).toContain('Maddi Baner');
+    expect(html).toContain('open now');
+    expect(html).toContain('action="/dashboard/outlet/new"');
+  });
+
+  it('offers no add-outlet form to a role that cannot own one', () => {
+    const html = renderToStaticMarkup(<SettingsScreen data={data({ role: 'cashier', canEdit: false })} />);
+
+    expect(html).toContain('Outlets');
+    expect(html).not.toContain('action="/dashboard/outlet/new"');
+    expect(html).toContain('Only an owner can add an outlet');
   });
 });

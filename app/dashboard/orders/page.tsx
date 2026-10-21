@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { OrdersScreen, type OrderFilter } from '@/components/screens/OrdersScreen';
 import { getReportsScreenData } from '@/lib/db/reports';
+import { getOutletBar } from '@/lib/db/outlet-bar';
 
 export const metadata: Metadata = { title: 'Orders · AutoDine', robots: { index: false, follow: false } };
 
@@ -19,11 +20,12 @@ export default async function OrdersPage({
 
   // The ledger reads the same aggregate the sales report does: one definition
   // of "a bill", one place where a cancelled order is excluded from money.
-  const data = await getReportsScreenData({ range: range ?? 'today' });
+  const [data, outlet] = await Promise.all([getReportsScreenData({ range: range ?? 'today' }), getOutletBar()]);
 
   return (
     <OrdersScreen
       data={data}
+      outlet={outlet}
       filter={isOrderFilter(status) ? status : 'all'}
       query={q ?? ''}
     />
