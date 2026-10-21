@@ -1,5 +1,5 @@
 /**
- * The kitchen's voice.
+ * The kitchen's voice -- one voice, Hindi, never a substitute.
  *
  * WHY THIS IS NOT JUST speechSynthesis.speak()
  *
@@ -8,9 +8,9 @@
  *
  *   1. The tab was loaded without a gesture, so the browser silently blocks
  *      audio. Chrome and Safari both do this.
- *   2. There is no installed voice for the language, or voices have not
- *      loaded yet -- `getVoices()` is empty for the first few hundred
- *      milliseconds on most platforms.
+ *   2. There is no installed Hindi voice, or voices have not loaded yet --
+ *      `getVoices()` is empty for the first few hundred milliseconds on most
+ *      platforms.
  *   3. Chrome wedges: an utterance fires neither `onstart` nor `onend`, and
  *      everything queued behind it is lost for the rest of the service.
  *   4. The device's TTS engine is simply broken (common on cheap Android
@@ -18,26 +18,18 @@
  *   5. The caller asks for Hindi and the device has no Hindi voice. The
  *      synthesiser then reads Devanagari at an English phoneme set, which
  *      produces silence or noise -- and it does it while reporting success.
- *      This one is handled a layer up, by lib/announce.ts choosing a language
- *      the device can actually speak; the engine here only ever reports what
- *      it can do (see available()).
  *
- * So every utterance has a watchdog, a chime before it, a chosen voice rather
- * than whatever the platform defaults to, and a sentence-at-a-time delivery so
- * a long ticket is not read in one breath.
+ * WHY THERE IS NO ENGLISH FALLBACK HERE
  *
- * WHY A CHIME FIRST, AND WHY SENTENCES
+ * This module deliberately has no second language. A Hindi voice is the only
+ * voice this product asks for, so `available()` is the whole answer to "can
+ * this device announce?" -- and when it is false, nothing is spoken and the
+ * board says why, loudly, in words. Quietly switching to English would be a
+ * board the kitchen cannot follow while looking exactly like one that works.
  *
- * A kitchen at service is loud. A sentence that begins at conversational
- * volume is half-missed, so two short tones give the room a beat of warning --
- * and the tone still plays on a device where TTS is broken, which is the
- * difference between a missed ticket and a noticed one.
- *
- * Reading "New order, table T1. One Butter Chicken, Half. Two Butter Naan."
- * as one utterance runs the clauses together at whatever speed the engine
- * picked. Sentence by sentence, with a short gap, is how a person says it, and
- * it gives the pass a moment to write the first dish down before the next one
- * starts.
+ * So every utterance has a watchdog, a chime before it, the best available
+ * Hindi voice rather than whatever the platform defaults to, and a
+ * sentence-at-a-time delivery so a long ticket is not read in one breath.
  */
 
 /** The subset of SpeechSynthesisVoice this module needs. */
@@ -47,25 +39,12 @@ export type VoiceLike = {
   localService?: boolean;
 };
 
-/** A language this product can announce in. Mirrors lib/announce.ts. */
-export type AnnounceLang = 'hi' | 'en';
-
 /**
- * Languages in order of preference for each announcement language.
- *
- * The dish names on a menu are written the way the restaurant writes them,
- * usually English or English-transliterated Hindi. An Indian English voice
- * pronounces both correctly; a generic en-US voice reads "paneer" as "panner"
- * and "masala" flat. en-IN is not always installed, hence the fallbacks.
- *
- * Hindi has no fallback list on purpose: a Hindi sentence read by an English
- * voice is not a degraded announcement, it is no announcement. If no Hindi
- * voice exists the caller speaks English instead.
+ * Language tags that are Hindi. There is no third entry and no English entry:
+ * a Devanagari sentence read by an English voice is silence, not accented
+ * Hindi, so an unmatched device is a device that cannot announce.
  */
-export const VOICE_LANGS: Record<AnnounceLang, string[]> = {
-  hi: ['hi-IN', 'hi'],
-  en: ['en-IN', 'en-GB', 'en-AU', 'en-US', 'en'],
-};
+export const HINDI_LANGS: readonly string[] = ['hi-IN', 'hi'];
 
 function normaliseLang(lang: string): string {
   return lang.replace('_', '-').toLowerCase();
@@ -75,11 +54,11 @@ function normaliseLang(lang: string): string {
  * How pleasant a voice is likely to sound, from its name alone.
  *
  * The Web Speech API exposes no quality field, so this is a heuristic -- but a
- * useful one. Every platform ships several voices per language and the
- * default is frequently the oldest and most robotic: on Windows that is
- * Microsoft David, on macOS it is the compact legacy set. The neural voices
- * are named after what they are, and the Indian-language ones are named after
- * people (Lekha, Kalpana, Swara, Heera, Aditi).
+ * useful one. Every platform ships several voices per language and the default
+ * is frequently the oldest and most robotic: on Windows that is a legacy
+ * Microsoft voice, on macOS the compact set, on Android the embedded one. The
+ * neural voices are named after what they are, and the Hindi ones are named
+ * after people (Lekha, Kalpana, Swara, Heera, Neerja).
  *
  * Higher is better. Ties fall back to local, then alphabetical, so the choice
  * is stable between announcements instead of flickering with enumeration
@@ -91,12 +70,13 @@ export function voiceScore(voice: VoiceLike): number {
 
   if (/natural|neural/.test(name)) score += 4;
   if (/google|microsoft|azure/.test(name)) score += 2;
-  if (/lekha|kalpana|swara|heera|aditi|ravi|veena|samantha|siri|aria|jenny|neerja|prabhat/.test(name)) {
+  if (/lekha|kalpana|swara|heera|aditi|ravi|veena|neerja|prabhat|madhur|suresh/.test(name)) {
     score += 2;
   }
   if (voice.localService) score += 1; // no network round trip before it starts
 
-  // Legacy / embedded engines. Audibly worse than anything above.
+  // Legacy / embedded engines. Audibly worse than anything above, and some of
+  // them skip Devanagari-embedded Latin entirely.
   if (/compact|espeak|festival|eloquence|pico|robot/.test(name)) score -= 5;
 
   return score;
@@ -113,39 +93,23 @@ function bestOf(voices: VoiceLike[]): VoiceLike {
 }
 
 /**
- * Choose the best installed voice for one language.
+ * The Hindi voice this device will use, or null.
  *
- * Exact language matches for every preference first, then regional fallbacks.
- * Doing both inside one loop would let an en-US voice win the "family" match
- * for 'en-IN' before en-GB -- which is listed ahead of it -- was considered.
- *
- * Returns null when nothing in the list can speak this language. For Hindi
- * that is the signal to fall back to English rather than to try anyway.
+ * Exact `hi-IN` first, then any other Hindi tag, then any `hi-*` region. The
+ * passes are separate so a `hi-IN` voice is never passed over in favour of a
+ * worse one that merely shares the language family.
  */
-export function pickVoice(
-  voices: VoiceLike[],
-  preferred: string[] = VOICE_LANGS.en,
-): VoiceLike | null {
+export function pickHindiVoice(voices: VoiceLike[]): VoiceLike | null {
   if (voices.length === 0) return null;
 
-  for (const wanted of preferred) {
+  for (const wanted of HINDI_LANGS) {
     const target = normaliseLang(wanted);
-    const exact = voices.filter((v) => normaliseLang(v.lang) === target);
+    const exact = voices.filter((voice) => normaliseLang(voice.lang) === target);
     if (exact.length > 0) return bestOf(exact);
   }
 
-  for (const wanted of preferred) {
-    const language = normaliseLang(wanted).split('-')[0];
-    const family = voices.filter((v) => normaliseLang(v.lang).startsWith(`${language}-`));
-    if (family.length > 0) return bestOf(family);
-  }
-
-  return null;
-}
-
-/** The voice this engine would use for a language, or null. */
-export function pickVoiceFor(voices: VoiceLike[], lang: AnnounceLang): VoiceLike | null {
-  return pickVoice(voices, VOICE_LANGS[lang]);
+  const family = voices.filter((voice) => normaliseLang(voice.lang).startsWith('hi-'));
+  return family.length > 0 ? bestOf(family) : null;
 }
 
 /* ------------------------------------------------------------------- engine */
@@ -153,8 +117,8 @@ export function pickVoiceFor(voices: VoiceLike[], lang: AnnounceLang): VoiceLike
 /**
  * The part of SpeechSynthesisUtterance this module touches.
  *
- * Structural rather than the DOM type so the engine can be tested with a
- * plain object.
+ * Structural rather than the DOM type so the engine can be tested with a plain
+ * object.
  */
 export type UtteranceLike = {
   voice: VoiceLike | null;
@@ -189,14 +153,14 @@ export type SpeechEnv = {
 
 export type SpeechEngine = {
   /** Speak one announcement. Calls onEnd exactly once. */
-  speak(text: string, onEnd: () => void, lang?: AnnounceLang): void;
+  speak(text: string, onEnd: () => void): void;
   /** Re-read the installed voices. Cheap; safe to call on every render. */
   refreshVoices(): void;
-  /** Whether this device has a voice for the language. */
-  available(lang: AnnounceLang): boolean;
-  /** The name of the voice that will be used for a language, or null. */
-  voiceName(lang: AnnounceLang): string | null;
-  /** True when there is no voice at all for either language. */
+  /** Whether this device has a Hindi voice. The only question that matters. */
+  available(): boolean;
+  /** The name of the Hindi voice that will be used, or null. */
+  voiceName(): string | null;
+  /** True when there is no Hindi voice at all. */
   unavailable(): boolean;
   /** True when an utterance failed to start -- the engine is wedged. */
   stalled(): boolean;
@@ -209,20 +173,14 @@ export type SpeechEngine = {
 export const DEFAULT_START_TIMEOUT_MS = 4000;
 
 /**
- * Speed and pitch per language.
+ * Speed and pitch.
  *
  * Hindi voices ship fast and flat -- the same engine that reads a market price
  * will read a ticket like an automated phone menu. Pulling the rate down a
  * little and keeping the pitch neutral is the difference between a person
  * telling the pass what to cook and a device reciting a list.
- *
- * English is left closer to natural speed because the en-IN voices are
- * already well paced.
  */
-export const VOICE_TUNING: Record<AnnounceLang, { rate: number; pitch: number; volume: number }> = {
-  hi: { rate: 0.92, pitch: 1, volume: 1 },
-  en: { rate: 0.97, pitch: 1, volume: 1 },
-};
+export const VOICE_TUNING = { rate: 0.92, pitch: 1, volume: 1 } as const;
 
 /** A short pause between sentences, in milliseconds. */
 export const DEFAULT_GAP_MS = 150;
@@ -230,9 +188,9 @@ export const DEFAULT_GAP_MS = 150;
 /**
  * Split an announcement into sentences.
  *
- * Both full stops are recognised: the Latin one and the Devanagari danda, so
- * a Hindi announcement segments the same way an English one does. A piece with
- * no terminal punctuation is still one sentence and is spoken as-is.
+ * The danda is the Hindi full stop and is what lib/announce.ts ends every
+ * clause with. Latin terminators are accepted too, so a message built
+ * elsewhere is still paced rather than read in one breath.
  */
 export function splitSentences(text: string): string[] {
   const pieces = text
@@ -264,35 +222,36 @@ export function createKitchenSpeech(
 
   refreshVoices();
 
-  function voiceFor(lang: AnnounceLang): VoiceLike | null {
+  function voice(): VoiceLike | null {
     // Voices load asynchronously on most platforms; the first announcement
     // after a cold start is exactly when that matters.
     if (!loaded) refreshVoices();
-    return pickVoiceFor(voices, lang);
+    return pickHindiVoice(voices);
   }
 
   return {
-    speak(text, onEnd, lang = 'en') {
+    speak(text, onEnd) {
       const body = text.trim();
       const synthesis = env.synthesis;
-      const voice = voiceFor(lang);
+      const voiceToUse = voice();
 
-      if (!synthesis || !body || !voice) {
-        // No sound is possible. The queue still has to move: a stuck queue is
-        // a board that goes silent for the rest of the service.
+      if (!synthesis || !body || !voiceToUse) {
+        // No sound is possible. Nothing is spoken, and the queue still has to
+        // move: a stuck queue is a board that goes silent for the rest of the
+        // service. The caller surfaces why -- see unavailable().
         onEnd();
         return;
       }
 
       // The chime is played before the voice and outside the watchdog: it is
-      // the fallback for a device whose TTS is dead.
+      // the fallback for a device whose TTS is dead, and it tells the room to
+      // listen before the first word rather than after it.
       try {
         env.chime();
       } catch {
         /* audio locked or absent -- the screen still updates */
       }
 
-      const tuning = VOICE_TUNING[lang];
       const sentences = splitSentences(body);
 
       let finished = false;
@@ -332,11 +291,11 @@ export function createKitchenSpeech(
 
         try {
           const utterance = env.createUtterance(sentence);
-          utterance.voice = voice;
-          utterance.lang = voice.lang || VOICE_LANGS[lang][0];
-          utterance.rate = tuning.rate;
-          utterance.pitch = tuning.pitch;
-          utterance.volume = tuning.volume;
+          utterance.voice = voiceToUse;
+          utterance.lang = voiceToUse.lang || HINDI_LANGS[0];
+          utterance.rate = VOICE_TUNING.rate;
+          utterance.pitch = VOICE_TUNING.pitch;
+          utterance.volume = VOICE_TUNING.volume;
 
           utterance.onstart = () => {
             didStall = false;
@@ -348,9 +307,9 @@ export function createKitchenSpeech(
           watchdog = env.setTimer(() => {
             didStall = true;
             // A wedged utterance blocks the whole synthesiser queue. Clearing
-            // it is the only way the next ticket gets spoken at all -- and
-            // the rest of THIS announcement is abandoned, because the engine
-            // is no longer responding.
+            // it is the only way the next ticket gets spoken at all -- and the
+            // rest of THIS announcement is abandoned, because the engine is no
+            // longer responding.
             try {
               synthesis.cancel();
             } catch {
@@ -371,17 +330,13 @@ export function createKitchenSpeech(
 
     refreshVoices,
 
-    available(lang) {
-      return voiceFor(lang) !== null;
-    },
+    available: () => voice() !== null,
 
-    voiceName(lang) {
-      return voiceFor(lang)?.name ?? null;
-    },
+    voiceName: () => voice()?.name ?? null,
 
     /**
      * True only when this is definitely broken: no synthesiser at all, or a
-     * list of voices that contains no English one.
+     * list of voices that contains no Hindi one.
      *
      * An EMPTY list is not proof of anything -- on most browsers getVoices()
      * is empty for the first few hundred milliseconds while the engine
@@ -389,7 +344,7 @@ export function createKitchenSpeech(
      * perfectly good tablet, so an empty list reports "no voice yet" through
      * voiceName() === null and the board waits before warning.
      */
-    unavailable: () => !env.synthesis || (loaded && !voices.some((v) => /^en(-|$)/i.test(v.lang))),
+    unavailable: () => !env.synthesis || (loaded && pickHindiVoice(voices) === null),
 
     stalled: () => didStall,
     clearStall: () => {

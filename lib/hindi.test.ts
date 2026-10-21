@@ -1,0 +1,112 @@
+import { describe, expect, it } from 'vitest';
+import { hindiNumber, isDevanagariOnly, toDevanagari, transliterate } from './hindi';
+
+/**
+ * Devanagari for the voice.
+ *
+ * The rule these tests exist for: after toDevanagari() there is not one Latin
+ * letter left. A hi-IN engine that silently skips Latin text is common enough
+ * on cheap tablets that any Latin run is a dish name the kitchen never hears.
+ */
+
+describe('hindiNumber', () => {
+  it('has a word for every number a ticket can carry', () => {
+    expect(hindiNumber(1)).toBe('एक');
+    expect(hindiNumber(2)).toBe('दो');
+    expect(hindiNumber(4)).toBe('चार');
+    expect(hindiNumber(20)).toBe('बीस');
+    expect(hindiNumber(25)).toBe('पच्चीस');
+    expect(hindiNumber(47)).toBe('सैंतालीस');
+    expect(hindiNumber(99)).toBe('निन्यानवे');
+  });
+
+  it('reads a large count digit by digit rather than inventing a phrase', () => {
+    expect(hindiNumber(125)).toBe('एक दो पाँच');
+  });
+
+  it('never returns nonsense for a value it cannot express', () => {
+    expect(hindiNumber(0)).toBe('शून्य');
+    expect(hindiNumber(2.4)).toBe('दो');
+    expect(hindiNumber(-1)).toBe('-1');
+  });
+});
+
+describe('translating a menu into Devanagari', () => {
+  it('knows the dishes Indian kitchens actually cook', () => {
+    expect(toDevanagari('Butter Chicken')).toBe('बटर चिकन');
+    expect(toDevanagari('Paneer Tikka')).toBe('पनीर टिक्का');
+    expect(toDevanagari('Masala Dosa')).toBe('मसाला डोसा');
+    expect(toDevanagari('Hyderabadi Chicken Biryani')).toBe('हैदराबादी चिकन बिरयानी');
+    expect(toDevanagari('Pav Bhaji')).toBe('पाव भाजी');
+  });
+
+  it('matches the longest phrase, so a dish is one name and not two words', () => {
+    // "butter naan" is whole; a word-by-word pass would also work here, but
+    // "gulab jamun" would not -- जामुन on its own is a fruit.
+    expect(toDevanagari('Butter Naan')).toBe('बटर नान');
+    expect(toDevanagari('Gulab Jamun')).toBe('गुलाब जामुन');
+  });
+
+  it('turns digits into words, so a quantity cannot be misread', () => {
+    expect(toDevanagari('2 Butter Naan')).toBe('दो बटर नान');
+    expect(toDevanagari('12 plates')).toBe('बारह प्लेट');
+  });
+
+  it('leaves Devanagari exactly as the restaurant wrote it', () => {
+    expect(toDevanagari('पाव भाजी')).toBe('पाव भाजी');
+    expect(toDevanagari('मिसळ पाव')).toBe('मिसळ पाव');
+  });
+
+  it('translates a dish nobody has heard of rather than dropping it', () => {
+    const out = toDevanagari('Chicken Lollipop');
+    expect(out).toBe('चिकन लोलीपॉप');
+    expect(isDevanagariOnly(out)).toBe(true);
+  });
+
+  it('translates the guest note, which the guest typed in their own script', () => {
+    expect(toDevanagari('no onion')).toBe('नो प्याज़');
+    expect(isDevanagariOnly(toDevanagari('no onion, less spicy please'))).toBe(true);
+  });
+
+  it('never leaves a Latin letter behind, whatever the menu says', () => {
+    const menus = [
+      'Butter Chicken',
+      'Quesadilla',
+      'Tiramisu',
+      'Cappuccino',
+      'Mozzarella Sticks',
+      'Peri Peri Fries',
+      'Brownie with ice cream',
+      'Schezwan Chowmein',
+      'Alfredo Pasta',
+      'Mojito',
+      'XYZ123 unknown dish',
+      'Room 204',
+      'زعتر',
+    ];
+
+    for (const menu of menus) {
+      expect(isDevanagariOnly(toDevanagari(menu))).toBe(true);
+    }
+  });
+});
+
+describe('transliterate', () => {
+  it('applies the rules that actually change the sound', () => {
+    // Silent final e, magic e, c before a soft vowel, "ow".
+    expect(transliterate('coke')).toBe('कोक');
+    expect(transliterate('cake')).toBe('केक');
+    expect(transliterate('brownie')).toBe('ब्राउनी');
+    expect(transliterate('fried')).toBe('फ़्राइड');
+
+    // A consonant cluster is not a magic-e word -- and 'maple syrup' is in the
+    // dictionary anyway, which is where a word that matters belongs.
+    expect(toDevanagari('maple syrup')).toBe('मेपल सिरप');
+  });
+
+  it('returns something for input it cannot parse rather than nothing', () => {
+    expect(transliterate('')).toBe('');
+    expect(transliterate('123')).toBe('123');
+    expect(transliterate('x')).not.toBe('');
+  });
+});

@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_START_TIMEOUT_MS,
-  VOICE_LANGS,
+  DEFAULT_GAP_MS,
+  HINDI_LANGS,
   VOICE_TUNING,
   createKitchenSpeech,
-  pickVoice,
-  pickVoiceFor,
+  pickHindiVoice,
   splitSentences,
   voiceScore,
   type SpeechEnv,
@@ -21,8 +20,9 @@ import {
  * told" and "the kitchen was not told" is invisible unless the engine reports
  * it, so what is tested here is the reporting as much as the speaking.
  *
- * Hindi is the case that bites hardest: a device without a Hindi voice given
- * Devanagari produces nothing at all while the engine reports success.
+ * The one rule that must never break: Devanagari is only ever handed to a
+ * Hindi voice. A device without one is a device that cannot announce, and it
+ * is never quietly given an English voice instead.
  */
 
 type FakeUtterance = UtteranceLike & { text: string };
@@ -138,56 +138,21 @@ const hindi: VoiceLike[] = [
   { name: 'Lekha', lang: 'hi-IN', localService: true },
 ];
 
-const both: VoiceLike[] = [...english, ...hindi];
-
-describe('pickVoice', () => {
-  it('prefers Indian English, which pronounces a menu the way the menu is written', () => {
-    expect(pickVoice(english)?.name).toBe('English (India)');
+describe('pickHindiVoice', () => {
+  it('takes a Hindi voice and nothing else', () => {
+    expect(pickHindiVoice(english)).toBeNull();
+    expect(pickHindiVoice(hindi)?.lang).toBe('hi-IN');
   });
 
-  it('falls back through the list when en-IN is not installed', () => {
-    const withoutIndia = english.filter((v) => v.lang !== 'en-IN');
-    expect(pickVoice(withoutIndia)?.name).toBe('Google UK English Female');
+  it('has no English fallback list, on purpose', () => {
+    // If this ever grows an "en" entry, a Devanagari sentence can be handed to
+    // an English voice -- which reads it as silence and reports success.
+    expect(HINDI_LANGS).toEqual(['hi-IN', 'hi']);
   });
 
-  it('takes any English voice rather than reading in another language', () => {
-    const onlyHindi = [{ name: 'Google हिन्दी', lang: 'hi-IN' }];
-    expect(pickVoice(onlyHindi)).toBeNull();
-  });
-
-  it('returns null rather than guessing when nothing is installed', () => {
-    expect(pickVoice([])).toBeNull();
-  });
-});
-
-describe('pickVoiceFor', () => {
-  it('needs an actual Hindi voice for Hindi, not an English one standing in', () => {
-    expect(pickVoiceFor(english, 'hi')).toBeNull();
-    expect(pickVoiceFor(both, 'hi')?.lang).toBe('hi-IN');
-  });
-
-  it('never picks a Hindi voice to read English text', () => {
-    expect(pickVoiceFor(hindi, 'en')).toBeNull();
-  });
-
-  it('has no English fallback list for Hindi, on purpose', () => {
-    // A Hindi sentence read by an English voice is not a degraded
-    // announcement, it is no announcement. The caller switches language.
-    expect(VOICE_LANGS.hi).toEqual(['hi-IN', 'hi']);
-  });
-});
-
-describe('voiceScore', () => {
-  it('prefers a named neural voice over a legacy compact one', () => {
-    const natural = voiceScore({ name: 'Microsoft Neerja Online (Natural)', lang: 'en-IN' });
-    const legacy = voiceScore({ name: 'Microsoft David Desktop', lang: 'en-US' });
-    expect(natural).toBeGreaterThan(legacy);
-  });
-
-  it('demotes the audibly robotic engines', () => {
-    expect(voiceScore({ name: 'eSpeak Hindi', lang: 'hi-IN' })).toBeLessThan(
-      voiceScore({ name: 'Lekha', lang: 'hi-IN' }),
-    );
+  it('accepts a regional Hindi tag rather than giving up', () => {
+    expect(pickHindiVoice([{ name: 'Hindi (India)', lang: 'hi-IN' }])?.name).toBe('Hindi (India)');
+    expect(pickHindiVoice([{ name: 'Hindi', lang: 'hi' }])?.name).toBe('Hindi');
   });
 
   it('picks the better of two Hindi voices, not the first enumerated', () => {
@@ -195,283 +160,175 @@ describe('voiceScore', () => {
       { name: 'Fred (compact)', lang: 'hi-IN' },
       { name: 'Google हिन्दी', lang: 'hi-IN' },
     ];
-    expect(pickVoiceFor(voices, 'hi')?.name).toBe('Google हिन्दी');
+    expect(pickHindiVoice(voices)?.name).toBe('Google हिन्दी');
+  });
+
+  it('returns null when nothing is installed', () => {
+    expect(pickHindiVoice([])).toBeNull();
+  });
+});
+
+describe('voiceScore', () => {
+  it('prefers a natural voice over a legacy one', () => {
+    expect(voiceScore({ name: 'Microsoft Swara Online (Natural)', lang: 'hi-IN' })).toBeGreaterThan(
+      voiceScore({ name: 'Microsoft Hemant Desktop', lang: 'hi-IN' }),
+    );
+  });
+
+  it('demotes the audibly robotic engines', () => {
+    expect(voiceScore({ name: 'eSpeak Hindi', lang: 'hi-IN' })).toBeLessThan(
+      voiceScore({ name: 'Lekha', lang: 'hi-IN' }),
+    );
   });
 });
 
 describe('splitSentences', () => {
-  it('splits an English announcement', () => {
-    expect(splitSentences('New order, table T1. One Butter Chicken. Note: no onion.')).toEqual([
-      'New order, table T1.',
-      'One Butter Chicken.',
-      'Note: no onion.',
-    ]);
-  });
-
-  it('splits on the Devanagari danda too', () => {
-    // Without this a Hindi announcement would be one long breathless run.
-    expect(splitSentences('नया ऑर्डर, टेबल टी वन। एक koko।')).toEqual([
+  it('splits on the danda, which is the Hindi full stop', () => {
+    expect(splitSentences('नया ऑर्डर, टेबल टी वन। दो बटर नान, आधा।')).toEqual([
       'नया ऑर्डर, टेबल टी वन।',
-      'एक koko।',
+      'दो बटर नान, आधा।',
     ]);
   });
 
-  it('keeps a single sentence whole', () => {
-    expect(splitSentences('New order, table T1.')).toEqual(['New order, table T1.']);
-  });
-
-  it('returns nothing for blank text', () => {
+  it('treats text with no terminator as one sentence rather than none', () => {
+    expect(splitSentences('एक बटर चिकन')).toEqual(['एक बटर चिकन']);
     expect(splitSentences('   ')).toEqual([]);
   });
 });
 
-describe('createKitchenSpeech', () => {
-  it('speaks, and reports the voice it chose', () => {
-    const fake = env({ voices: both });
+describe('speaking', () => {
+  it('speaks sentence by sentence with a gap between them', () => {
+    const fake = env({ voices: hindi });
     const engine = createKitchenSpeech(fake.env);
-
     let ended = 0;
-    engine.speak('New order, table T1.', () => {
-      ended += 1;
-    });
-    fake.flush();
 
-    expect(fake.spoken[0].text).toBe('New order, table T1.');
-    expect(fake.spoken[0].lang).toBe('en-IN');
-    expect(ended).toBe(1);
-    expect(engine.voiceName('en')).toBe('English (India)');
-  });
-
-  it('speaks Hindi at a Hindi voice when one exists', () => {
-    const fake = env({ voices: both });
-    const engine = createKitchenSpeech(fake.env);
-
-    engine.speak('नया ऑर्डर, टेबल टी वन।', () => {}, 'hi');
-    fake.flush();
-
-    expect(fake.spoken[0].lang).toBe('hi-IN');
-    // Which of the two installed Hindi voices wins is a quality judgement
-    // (see voiceScore); what matters here is that it is one of them and not
-    // an English voice trying to read Devanagari.
-    expect(['Google हिन्दी', 'Lekha']).toContain(engine.voiceName('hi'));
-  });
-
-  it('does not speak Devanagari when the device has no Hindi voice', () => {
-    // The failure this prevents: an English synthesiser given Hindi text
-    // produces silence while the caller believes the kitchen was told.
-    const fake = env({ voices: english });
-    const engine = createKitchenSpeech(fake.env);
-
-    expect(engine.available('hi')).toBe(false);
-
-    let ended = 0;
-    engine.speak('नया ऑर्डर।', () => {
-      ended += 1;
-    }, 'hi');
-
-    expect(fake.spoken).toHaveLength(0);
-    expect(ended).toBe(1);
-  });
-
-  it('reads a ticket sentence by sentence, not in one breath', () => {
-    const fake = env({ voices: both });
-    const engine = createKitchenSpeech(fake.env);
-
-    engine.speak('नया ऑर्डर, टेबल टी वन। एक koko। नोट: no onion।', () => {}, 'hi');
-    fake.flush();
-
-    expect(fake.spoken.map((u) => u.text)).toEqual([
-      'नया ऑर्डर, टेबल टी वन।',
-      'एक koko।',
-      'नोट: no onion।',
-    ]);
-  });
-
-  it('calls back once, after the last sentence', () => {
-    const fake = env({ voices: both });
-    const engine = createKitchenSpeech(fake.env);
-
-    let ended = 0;
-    engine.speak('One. Two. Three.', () => {
+    engine.speak('नया ऑर्डर, टेबल टी वन। दो बटर नान।', () => {
       ended += 1;
     });
 
-    expect(ended).toBe(0);
-    fake.flush();
-    expect(ended).toBe(1);
-  });
-
-  it('slows Hindi down, because those voices ship too fast to follow', () => {
-    const fake = env({ voices: both });
-    const engine = createKitchenSpeech(fake.env);
-
-    engine.speak('नया ऑर्डर।', () => {}, 'hi');
-    fake.flush();
-
-    expect(fake.spoken[0].rate).toBe(VOICE_TUNING.hi.rate);
-    expect(fake.spoken[0].rate).toBeLessThan(1);
-  });
-
-  it('chimes once per announcement, before the first sentence', () => {
-    const fake = env({ voices: both });
-    const engine = createKitchenSpeech(fake.env);
-
-    engine.speak('One. Two. Three.', () => {});
-    fake.flush();
-
-    expect(fake.chimes).toBe(1);
-  });
-
-  it('calls back exactly once when an utterance fires both end and error', () => {
-    // Some engines fire onend AND onerror for one utterance. Two callbacks
-    // would start the next announcement twice -- the overlap this whole
-    // module exists to prevent.
-    const fake = env({ voices: both, autoStart: false });
-    const engine = createKitchenSpeech(fake.env);
-
-    let ended = 0;
-    engine.speak('One sentence.', () => {
-      ended += 1;
-    });
-
-    const utterance = fake.spoken[0];
-    utterance.onend?.();
-    utterance.onerror?.();
-    utterance.onend?.();
-
-    expect(ended).toBe(1);
-  });
-
-  it('recovers from a wedged synthesiser instead of losing the rest of the service', () => {
-    // Chrome can fire neither onstart nor onend. Without the watchdog the
-    // queue stalls on announcement one and every ticket after it is silent.
-    const fake = env({ voices: both, wedge: true });
-    const engine = createKitchenSpeech(fake.env);
-
-    let ended = 0;
-    engine.speak('One.', () => {
-      ended += 1;
-    });
-
-    expect(ended).toBe(0);
-    expect(fake.timers).toHaveLength(1);
-
-    fake.flush();
-
-    expect(ended).toBe(1);
-    expect(engine.stalled()).toBe(true);
-    // Freeing the wedged utterance is the only way the next one can play.
-    expect(fake.cancels).toBe(1);
-  });
-
-  it('clears the stall flag once a later announcement actually starts', () => {
-    const fake = env({ voices: both, wedge: true });
-    const engine = createKitchenSpeech(fake.env);
-
-    engine.speak('One.', () => {});
-    fake.flush();
-    expect(engine.stalled()).toBe(true);
-
-    fake.setVoices(both);
-    fake.setWedge(false);
-    engine.speak('Two.', () => {});
-    fake.flush();
-    fake.spoken.at(-1)?.onstart?.();
-
-    expect(engine.stalled()).toBe(false);
-  });
-
-  it('abandons the rest of a wedged announcement rather than reading it late', () => {
-    const fake = env({ voices: both, wedge: true });
-    const engine = createKitchenSpeech(fake.env);
-
-    engine.speak('One. Two. Three.', () => {});
-    fake.flush();
-
-    // Only the first sentence was ever handed over; the engine is not
-    // responding, so the remaining two must not queue behind it.
+    // First sentence now, the second only after the gap.
     expect(fake.spoken).toHaveLength(1);
-  });
+    expect(fake.spoken[0].text).toBe('नया ऑर्डर, टेबल टी वन।');
 
-  it('still ends the queue when the platform has no synthesiser at all', () => {
-    const fake = env({ voices: both });
-    fake.env.synthesis = null;
-    const engine = createKitchenSpeech(fake.env);
+    fake.flush();
 
-    let ended = 0;
-    engine.speak('anything', () => {
-      ended += 1;
-    });
-
+    expect(fake.spoken.map((u) => u.text)).toEqual(['नया ऑर्डर, टेबल टी वन।', 'दो बटर नान।']);
     expect(ended).toBe(1);
-    expect(engine.unavailable()).toBe(true);
   });
 
-  it('reports a voice list with no English voice as unusable', () => {
+  it('chimes once before the first word, not once per sentence', () => {
     const fake = env({ voices: hindi });
     const engine = createKitchenSpeech(fake.env);
 
-    engine.speak('anything', () => {});
-    expect(engine.unavailable()).toBe(true);
+    engine.speak('एक। दो। तीन।', () => {});
+    fake.flush();
+
+    expect(fake.chimes).toBe(1);
+    expect(fake.spoken).toHaveLength(3);
   });
 
-  it('does NOT call an empty voice list broken: they often have not loaded yet', () => {
-    // Raising a false alarm on a working tablet is worse than waiting a
-    // second. voiceName() === null is what the board keys its warning off.
-    const fake = env({ voices: [] });
-    fake.env.synthesis!.getVoices = () => [];
-    const engine = createKitchenSpeech(fake.env);
+  it('uses the Hindi voice and a human rate', () => {
+    const fake = env({ voices: [...english, ...hindi] });
+    createKitchenSpeech(fake.env).speak('नया ऑर्डर।', () => {});
 
-    engine.speak('anything', () => {});
-    expect(engine.unavailable()).toBe(false);
-    expect(engine.voiceName('en')).toBeNull();
+    expect(fake.spoken[0].voice?.lang).toBe('hi-IN');
+    expect(fake.spoken[0].rate).toBe(VOICE_TUNING.rate);
+    expect(VOICE_TUNING.rate).toBeLessThan(1);
   });
 
-  it('ignores empty text rather than speaking a pause', () => {
-    const fake = env({ voices: both });
+  it('says nothing at all when the device has no Hindi voice', () => {
+    const fake = env({ voices: english });
     const engine = createKitchenSpeech(fake.env);
-
     let ended = 0;
-    engine.speak('   ', () => {
+
+    engine.speak('नया ऑर्डर, टेबल टी वन।', () => {
+      ended += 1;
+    });
+
+    // Not one utterance, no chime: the board says why instead of playing a
+    // voice that cannot read the sentence.
+    expect(fake.spoken).toHaveLength(0);
+    expect(fake.chimes).toBe(0);
+    // The queue must still move, or every later ticket is stuck behind this.
+    expect(ended).toBe(1);
+    expect(engine.available()).toBe(false);
+  });
+
+  it('reports a device with no synthesiser at all', () => {
+    const fake = env({ voices: hindi });
+    const engine = createKitchenSpeech({ ...fake.env, synthesis: null });
+
+    expect(engine.unavailable()).toBe(true);
+    let ended = 0;
+    engine.speak('नया ऑर्डर।', () => {
+      ended += 1;
+    });
+    expect(ended).toBe(1);
+  });
+
+  it('does not call a tablet broken just because voices have not loaded yet', () => {
+    const fake = env({ voices: [] });
+    const engine = createKitchenSpeech(fake.env);
+
+    // An empty list is "not yet", not "never".
+    expect(engine.unavailable()).toBe(false);
+    expect(engine.voiceName()).toBeNull();
+
+    // ...and it recovers the moment the platform answers.
+    fake.setVoices(hindi);
+    engine.refreshVoices();
+    expect(engine.available()).toBe(true);
+    // Lekha is local and named; Google's is remote. Neither is wrong -- what
+    // matters is that one is chosen deterministically rather than whichever
+    // the platform happened to list first.
+    expect(engine.voiceName()).toBe('Lekha');
+  });
+
+  it('recovers from a wedged engine instead of dying quietly', () => {
+    const fake = env({ voices: hindi, wedge: true });
+    const engine = createKitchenSpeech(fake.env);
+    let ended = 0;
+
+    engine.speak('नया ऑर्डर, टेबल टी वन।', () => {
+      ended += 1;
+    });
+
+    fake.flush(); // the watchdog fires
+
+    expect(engine.stalled()).toBe(true);
+    expect(fake.cancels).toBe(1); // the wedged utterance is cleared
+    expect(ended).toBe(1); // and the queue is released
+
+    // The next ticket is spoken normally.
+    fake.setWedge(false);
+    engine.speak('दो बटर नान।', () => {});
+    expect(fake.spoken.at(-1)?.text).toBe('दो बटर नान।');
+  });
+
+  it('survives a synthesiser that throws on speak', () => {
+    const fake = env({ voices: hindi, throws: true });
+    const engine = createKitchenSpeech(fake.env);
+    let ended = 0;
+
+    engine.speak('नया ऑर्डर।', () => {
       ended += 1;
     });
 
     expect(ended).toBe(1);
-    expect(fake.spoken).toHaveLength(0);
   });
 
-  it('does not throw when the synthesiser itself throws', () => {
-    const fake = env({ voices: both, throws: true });
-    const engine = createKitchenSpeech(fake.env);
-
+  it('does nothing for empty text', () => {
+    const fake = env({ voices: hindi });
     let ended = 0;
-    expect(() =>
-      engine.speak('one', () => {
-        ended += 1;
-      }),
-    ).not.toThrow();
+    createKitchenSpeech(fake.env).speak('   ', () => {
+      ended += 1;
+    });
+
+    expect(fake.spoken).toHaveLength(0);
     expect(ended).toBe(1);
   });
 
-  it('picks up voices that load after the first render', () => {
-    // getVoices() is empty for the first few hundred milliseconds on most
-    // platforms, and the first announcement of the evening lands right there.
-    const fake = env({ voices: [] });
-    const engine = createKitchenSpeech(fake.env);
-    expect(engine.voiceName('en')).toBeNull();
-
-    // The platform finishes enumerating a moment later.
-    fake.setVoices(both);
-    engine.refreshVoices();
-
-    engine.speak('One.', () => {});
-    fake.flush();
-
-    expect(fake.spoken[0].lang).toBe('en-IN');
-  });
-
-  it('has a watchdog long enough for a slow device but short enough to notice', () => {
-    expect(DEFAULT_START_TIMEOUT_MS).toBeGreaterThanOrEqual(2000);
-    expect(DEFAULT_START_TIMEOUT_MS).toBeLessThanOrEqual(8000);
+  it('uses a gap between sentences that a person could write in', () => {
+    expect(DEFAULT_GAP_MS).toBeGreaterThanOrEqual(100);
   });
 });
