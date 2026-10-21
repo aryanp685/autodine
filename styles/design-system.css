@@ -22,6 +22,14 @@
      family, one token, so the two cannot drift apart. */
   --band: #e9e2d3;
   --band-line: #dcd3c0;
+  /* Semantic ink weights, so a new rule does not invent another rgba().
+     Two status colours only -- one for "this is going well", one for "this
+     needs attention now" -- because a board with five shades of warning is a
+     board nobody reads. --danger (below) is the third, for destructive acts. */
+  --ink-60: rgba(22, 20, 15, 0.6);
+  --ink-45: rgba(22, 20, 15, 0.45);
+  --ok: #4b6b51;
+  --warn: #a8760f;
   --shadow: none;
   --radius-sm: 6px;
   --radius: 10px;
@@ -451,59 +459,163 @@
 
 /* ---------------------------------------------------------------- kitchen */
 
+/* THE BOARD IS THE PRODUCT FOR EIGHT HOURS A DAY.
+   Everything here is judged at a metre, under strip lighting, by someone with
+   wet hands: numbers are tabular, the age of a ticket is the loudest thing on
+   its card, and every control is at least 44px tall. */
+
 .kb { background: var(--page-bg); min-height: 100vh; }
+
 .kb__head {
-  display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;
-  padding: 30px 48px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 28px;
+  padding: 26px 48px 22px; border-bottom: 1px solid var(--border);
+  background: var(--page-bg);
 }
-.kb__kicker { font-size: 11.5px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(17, 19, 24, 0.45); font-weight: 700; }
-.kb__h1 { font-size: 26px; margin-top: 8px; letter-spacing: -0.02em; font-weight: 500; }
-.kb__controls { display: flex; align-items: center; gap: 12px; }
+.kb__kicker {
+  font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--ink-45); font-weight: 700;
+}
+.kb__h1 {
+  font-size: clamp(22px, 2.2vw, 28px); margin-top: 8px;
+  letter-spacing: -0.022em; font-weight: 500;
+}
+.kb__controls { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+
 .kb__audio {
   display: flex; align-items: center; gap: 9px; font-size: 13px;
-  border: 1px solid var(--border); border-radius: 999px; padding: 8px 14px; background: #fff;
+  border: 1px solid var(--border); border-radius: 999px; padding: 8px 14px;
+  background: var(--surface);
+  transition: border-color var(--dur-1) linear;
 }
-.kb__audioDot { width: 7px; height: 7px; border-radius: 50%; }
-.kb__audio.is-on .kb__audioDot { background: #4b6b51; }
-.kb__audio.is-off .kb__audioDot { background: #b05346; }
-.kb__linkBtn { background: none; border: 0; font-size: 13px; text-decoration: underline; cursor: pointer; }
-.kb__ghost { font-size: 13px; padding: 8px 14px; border: 1px solid var(--border); border-radius: 2px; background: none; cursor: pointer; }
-.kb__live { display: flex; align-items: center; gap: 8px; font-size: 13px; color: rgba(17, 19, 24, 0.55); }
-.kb__liveDot { width: 7px; height: 7px; border-radius: 50%; background: #4b6b51; }
+.kb__audioDot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
+.kb__audio.is-on .kb__audioDot { background: var(--ok); }
+.kb__audio.is-off .kb__audioDot { background: var(--danger); }
 
-.kb__cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 44px; padding: 34px 48px 64px; }
-.kb__colHead { display: flex; align-items: baseline; justify-content: space-between; border-bottom: 1px solid var(--text); padding-bottom: 12px; }
-.kb__colHead h2 { font-size: 14px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700; }
-.kb__ord { border: 1px solid var(--border); background: #fff; border-radius: 3px; padding: 20px; margin-top: 20px; }
-.kb__ord.is-served { opacity: 0.62; }
-.kb__ordTop { display: flex; align-items: baseline; gap: 12px; }
-.kb__ordId { font-size: 21px; font-weight: 600; letter-spacing: -0.01em; }
-.kb__ordTable { font-size: 13px; color: rgba(17, 19, 24, 0.55); }
-.kb__ordAge { margin-left: auto; font-size: 13px; font-variant-numeric: tabular-nums; }
-.kb__ordAge.is-fresh { color: #4b6b51; }
-.kb__ordAge.is-warn { color: #b8860b; font-weight: 600; }
-.kb__ordAge.is-late { color: #b05346; font-weight: 700; }
+.kb__linkBtn {
+  background: none; border: 0; font-size: 13px; text-decoration: underline;
+  text-underline-offset: 3px; cursor: pointer;
+  transition: color var(--dur-1) linear;
+}
+.kb__linkBtn:hover { color: var(--accent); }
+
+.kb__ghost {
+  font-size: 13px; padding: 8px 14px; min-height: 36px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); cursor: pointer;
+  transition: border-color var(--dur-1) linear, background-color var(--dur-1) linear,
+    transform var(--dur-1) var(--ease-out);
+}
+.kb__ghost:hover { border-color: var(--ink-40); }
+.kb__ghost:active { transform: translateY(1px); }
+.kb__ghost[disabled] { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+.kb__live { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-55); }
+.kb__liveDot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex: 0 0 auto; }
+
+/* ------------------------------------------------------------- the columns */
+
+.kb__cols {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 40px; padding: 28px 48px 72px;
+}
+.kb__col { min-width: 0; }
+.kb__colHead {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  border-bottom: 1px solid var(--text); padding-bottom: 12px;
+}
+.kb__colHead h2 { font-size: 12.5px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; }
+.kb__colHead .tnum { font-size: 13px; color: var(--ink-55); }
+
+/* Column switcher. Rendered at every width and shown only under 760px, where
+   three stacked queues would mean scrolling past one empty column to reach the
+   food. Keeping it in the markup is what makes it testable and what keeps the
+   counts honest in the scroll-free layout. */
+.kb__tabs { display: none; }
+
+/* ---------------------------------------------------------------- tickets */
+
+.kb__ord {
+  position: relative;
+  border: 1px solid var(--border); background: var(--surface);
+  border-left: 2px solid transparent;
+  border-radius: var(--radius); padding: 18px 18px 16px; margin-top: 16px;
+  transition:
+    border-color var(--dur-2) var(--ease-out),
+    transform var(--dur-2) var(--ease-out),
+    opacity var(--dur-2) linear;
+}
+/* The state is the left edge. New work is the accent; work in hand is amber;
+   food that is plated and waiting is not asking for anyone. */
+.kb__ord[data-state='new'] { border-left-color: var(--accent); }
+.kb__ord[data-state='preparing'] { border-left-color: var(--warn); }
+.kb__ord[data-state='ready'] { border-left-color: var(--ink-40); }
+.kb__ord:hover { border-color: var(--ink-40); transform: translateY(-1px); }
+.kb__ord.is-served { opacity: 0.6; }
+.kb__ord.is-served:hover { transform: none; }
+
+.kb__ordTop { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.kb__ordId { font-size: 20px; font-weight: 600; letter-spacing: -0.012em; }
+.kb__ordTable { font-size: 13px; color: var(--ink-55); }
+/* The age is a chip, not a word: it is the one number a cook scans for. */
+.kb__ordAge {
+  margin-left: auto; font-size: 12.5px; font-variant-numeric: tabular-nums;
+  border: 1px solid currentColor; border-radius: 999px; padding: 1px 9px;
+}
+.kb__ordAge.is-fresh { color: var(--ok); }
+.kb__ordAge.is-warn { color: var(--warn); font-weight: 600; }
+.kb__ordAge.is-late { color: var(--danger); font-weight: 700; }
+
 .kb__unpaid {
-  margin-top: 14px; background: rgba(199, 91, 80, 0.1); color: #9c3f36;
-  font-size: 12.5px; font-weight: 700; padding: 8px 12px; border-radius: 2px;
+  margin-top: 14px; background: rgba(199, 91, 80, 0.1); color: var(--danger);
+  font-size: 12.5px; font-weight: 700; padding: 7px 11px; border-radius: 2px;
   letter-spacing: 0.02em;
 }
-.kb-items { margin-top: 14px; display: grid; gap: 7px; }
-.kb-items li { display: flex; gap: 10px; align-items: baseline; font-size: 14.5px; }
-.kb-qty { width: 30px; color: rgba(17, 19, 24, 0.55); font-variant-numeric: tabular-nums; flex: 0 0 auto; }
-.kb-itemName em { font-style: normal; font-size: 13px; color: rgba(17, 19, 24, 0.5); }
+
+.kb-items { margin-top: 14px; display: grid; gap: 8px; }
+.kb-items li { display: flex; gap: 10px; align-items: baseline; font-size: 15px; }
+.kb-qty { width: 28px; color: var(--ink-55); font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+.kb-itemName em { font-style: normal; font-size: 13px; color: var(--ink-55); }
 /* Add-ons on a ticket. A tag rather than more words in the dish name: it is an
    instruction attached to the dish, and a cook has to be able to see it from a
    metre away without reading the whole line. */
-.kb-itemAddon { font-size: 11.5px; letter-spacing: 0.02em; padding: 1px 6px; border: 1px solid rgba(17, 19, 24, 0.18); border-radius: 2px; color: rgba(17, 19, 24, 0.66); white-space: nowrap; }
+.kb-itemAddon {
+  font-size: 11.5px; letter-spacing: 0.02em; padding: 1px 6px;
+  border: 1px solid var(--border); border-radius: 2px; color: var(--ink-70);
+  white-space: nowrap;
+}
 .kb-items--compact li { font-size: 13.5px; gap: 8px; }
-.kb__note { margin-top: 14px; font-size: 13.5px; font-style: italic; color: rgba(17, 19, 24, 0.6); border-left: 2px solid #e8e2d8; padding-left: 12px; }
-.kb__ordFoot { margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(17, 19, 24, 0.1); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.kb__actions { display: flex; gap: 8px; }
-.kb__act { font-size: 13px; padding: 8px 14px; border: 1px solid var(--text); background: var(--text); color: #fff; border-radius: 2px; cursor: pointer; }
-.kb__act--quiet { background: none; color: rgba(17, 19, 24, 0.7); border-color: var(--border); }
+.kb__note {
+  margin-top: 14px; font-size: 13.5px; font-style: italic; color: var(--ink-60);
+  border-left: 2px solid var(--sand); padding-left: 12px;
+}
+.kb__ordFoot {
+  margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--ink-08);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.kb__actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.kb__act {
+  font-size: 13.5px; padding: 10px 16px; min-height: 44px;
+  border: 1px solid var(--text); background: var(--text); color: var(--surface);
+  border-radius: var(--radius-sm); cursor: pointer;
+  transition:
+    background-color var(--dur-1) linear,
+    border-color var(--dur-1) linear,
+    transform var(--dur-1) var(--ease-out);
+}
+.kb__act:hover { background: rgba(22, 20, 15, 0.85); }
+.kb__act:active { transform: translateY(1px); }
+.kb__act--quiet { background: none; color: var(--ink-70); border-color: var(--border); }
+.kb__act--quiet:hover { background: var(--ink-08); border-color: var(--ink-40); }
 .kb__act--danger { background: var(--danger); border-color: var(--danger); color: var(--surface); }
-.kb__empty { padding: 26px 0; font-size: 14px; color: rgba(17, 19, 24, 0.4); }
+.kb__act--danger:hover { background: #85342c; }
+.kb__act[disabled] { opacity: 0.5; cursor: progress; transform: none; }
+/* Served is a label, not a button: it must not look tappable. */
+.kb__act--quiet[aria-label='Order served'] { min-height: 0; padding: 8px 0; border-color: transparent; }
+
+.kb__empty {
+  padding: 22px 0; font-size: 13.5px; color: var(--ink-40);
+  border-top: 1px solid var(--ink-08); margin-top: 16px;
+}
 
 /* ---------------------------------------------------------------- cashier */
 
@@ -931,8 +1043,12 @@
   .cart__line { gap: 18px; }
   .cart__sumCard, .co__sum, .cash__detail { padding: 24px; }
 
-  .kb__head { padding-inline: 28px; }
-  .kb__cols { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; padding-inline: 28px; }
+  .kb__head { padding: 22px 28px 18px; align-items: flex-start; flex-wrap: wrap; }
+  /* Two columns, and the third takes the full width underneath: three queues
+     squeezed into 900px would make every ticket two words wide. */
+  .kb__cols { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; padding: 24px 28px 56px; }
+  .kb__col:last-child { grid-column: 1 / -1; }
+  .kb__col:last-child .kb__ord { margin-top: 12px; }
   .cash__head { padding-inline: 28px; }
   .cash__grid { grid-template-columns: 320px minmax(0, 1fr); gap: 32px; padding-inline: 28px; }
 
@@ -1015,12 +1131,52 @@
   .co__method.is-on { padding: 15px; }
   .co__items li { align-items: flex-start; }
 
-  .kb__head { padding: 24px 20px; align-items: flex-start; flex-direction: column; }
-  .kb__controls { flex-wrap: wrap; }
-  .kb__cols { grid-template-columns: minmax(0, 1fr); padding: 24px 20px 48px; gap: 26px; }
+  .kb__head { padding: 20px 20px 16px; align-items: flex-start; flex-direction: column; gap: 14px; }
+  /* One scrollable rail instead of four wrapped rows: the controls are used in
+     bursts (sound, then speed, then test), and wrapping them into a tower
+     pushes the first ticket off the screen. */
+  .kb__controls {
+    flex-wrap: nowrap; width: 100%; overflow-x: auto; padding-bottom: 4px;
+    scrollbar-width: thin; -webkit-overflow-scrolling: touch;
+  }
+  .kb__controls > * { flex: 0 0 auto; }
+
+  /* One column, chosen by the tabs below. The hidden columns are removed from
+     the layout rather than stacked, so a phone never scrolls past an entire
+     queue it did not ask to see. */
+  .kb__cols { grid-template-columns: minmax(0, 1fr); padding: 0 20px 56px; gap: 0; }
+  .kb__col { display: none; }
+  .kb__col.is-mobileActive { display: block; }
+  .kb__col:last-child { grid-column: auto; }
+
+  .kb__tabs {
+    display: flex; gap: 6px; position: sticky; top: 0; z-index: 15;
+    padding: 10px 20px; margin-bottom: 4px;
+    background: var(--page-bg); border-bottom: 1px solid var(--border);
+  }
+  .kb__tab {
+    flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    min-height: 44px; padding: 8px 10px;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--surface); font: inherit; font-size: 13px; font-weight: 600;
+    color: var(--ink-70); cursor: pointer;
+    transition: background-color var(--dur-1) linear, color var(--dur-1) linear,
+      border-color var(--dur-1) linear;
+  }
+  .kb__tab.is-on { background: var(--text); border-color: var(--text); color: var(--surface); }
+  .kb__tabCount {
+    min-width: 20px; padding: 0 5px; border-radius: 999px;
+    background: var(--ink-08); font-size: 11.5px; font-weight: 700;
+  }
+  .kb__tab.is-on .kb__tabCount { background: rgba(255, 253, 248, 0.22); }
+
   .kb__ord { padding: 16px; }
-  .kb__ordFoot { align-items: flex-start; flex-direction: column; }
+  .kb__ordFoot { align-items: stretch; flex-direction: column; gap: 12px; }
   .kb__actions { flex-wrap: wrap; }
+  /* The primary action owns the width; the quiet ones sit beside each other
+     underneath. A thumb should not have to aim at a 90px button mid-service. */
+  .kb__actions .kb__act:not(.kb__act--quiet) { flex: 1 1 100%; }
+  .kb__colHead h2 { font-size: 12px; }
   .cash__head { padding: 28px 20px; align-items: flex-start; flex-direction: column; gap: 14px; }
   .cash__headMeta { flex-wrap: wrap; gap: 8px 16px; }
   .cash__grid { grid-template-columns: minmax(0, 1fr); padding: 24px 20px 48px; gap: 24px; }
@@ -1075,6 +1231,11 @@
   .cart__sumCard, .co__sum, .cash__detail { padding: 16px; }
   [data-app] .pg__printGrid { grid-template-columns: 1fr 1fr; gap: 8px; }
   [data-app] .pg__printCard { padding: 10px; }
+  .kb__head { padding: 18px 16px 14px; }
+  .kb__tabs { padding: 8px 16px; }
+  .kb__cols { padding: 0 16px 48px; }
+  .kb__tab { font-size: 12px; padding-inline: 6px; gap: 5px; }
+  .kb__ordId { font-size: 18px; }
 }
 
 /* ------------------------------------------------------------- motion layer
@@ -1107,6 +1268,25 @@
   /* Hash links on the marketing pages glide. Product screens never use hash
      navigation, so this cannot slow down someone taking orders. */
   [data-app] { scroll-behavior: smooth; }
+
+  /* A ticket that has just landed lifts into place. 8px over 320ms catches the
+     corner of an eye across a kitchen without moving the column under a hand
+     that is already reaching for it. */
+  @keyframes kb-ticket-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .kb__ord.is-arriving { animation: kb-ticket-in var(--dur-3) var(--ease-out) both; }
+  .kb__warn { animation: kb-ticket-in var(--dur-2) var(--ease-out) both; }
+
+  /* The live dot breathes, once every 2.4s, at low contrast. It is the only
+     ambient motion on the board: a screen that moves everywhere stops being
+     read, and this one is read at a glance. */
+  @keyframes kb-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .kb__liveDot { animation: kb-pulse 2.4s var(--ease-inout) infinite; }
 }
 
 @media (prefers-reduced-motion: reduce) {

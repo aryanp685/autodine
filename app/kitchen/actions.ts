@@ -23,7 +23,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { getStaffContext } from '@/lib/db/staff';
+import { getStaffContext, KITCHEN_ROLES } from '@/lib/db/staff';
 import { nextPrepState } from '@/lib/db/prep';
 import type { KitchenPrepState } from '@/lib/db/kitchen-screen';
 
@@ -51,7 +51,19 @@ export async function advanceOrderAction(
     return { ok: false, error: 'Not signed in, or the database is not connected.' };
   }
 
-  const { supabase, restaurantId } = staff;
+  const { supabase, restaurantId, role } = staff;
+
+  // The board hides these buttons for a role that cannot write, but hiding a
+  // button is not a permission check: a request can be replayed by hand. The
+  // database refuses this anyway (orders_staff_update names owner, manager and
+  // kitchen); returning a sentence here means the operator reads a reason
+  // instead of a Postgres policy error.
+  if (!KITCHEN_ROLES.includes(role)) {
+    return {
+      ok: false,
+      error: `A ${role} can see the kitchen board but cannot move tickets. Ask an owner, a manager or kitchen staff.`,
+    };
+  }
 
   // Read the current state. restaurant_id is bound explicitly even though RLS
   // already scopes it, so the query doubles as an existence check this caller
@@ -81,14 +93,42 @@ export async function advanceOrderAction(
     return { ok: true, state: (order.prep_status as KitchenPrepState) ?? null };
   }
 
-  const { error: updateError } = await supabase
+  /**
+   * `.select()` IS THE POINT, not a convenience.
+   *
+   * Without it, a write that RLS filters out -- a read-only restaurant, a role
+   * that lost permission between the read and the write -- returns
+   * `{ error: null }` and zero rows. The board would accept that as success,
+   * move the ticket optimistically, and then quietly put it back on the next
+   * refresh, while the kitchen believed it had been marked ready. Asking for
+   * the updated row turns "nothing happened" into something this action can
+   * see and report.
+   */
+  const { data: updated, error: updateError } = await supabase
     .from('orders')
     .update({ prep_status: next })
     .eq('id', orderId)
-    .eq('restaurant_id', restaurantId);
+    .eq('restaurant_id', restaurantId)
+    .select('id, prep_status');
 
   if (updateError) {
+    // 42501 is "permission denied", which here means the second half of the
+    // update policy failed: the restaurant is read-only. Naming that is more
+    // useful than repeating the Postgres text to a cook.
+    if (updateError.code === '42501') {
+      return {
+        ok: false,
+        error: 'This restaurant is read-only right now, so tickets cannot be moved. The account can view orders, menus and reports until a plan is active.',
+      };
+    }
     return { ok: false, error: `Could not update the ticket: ${updateError.message}` };
+  }
+
+  if (!updated || updated.length === 0) {
+    return {
+      ok: false,
+      error: 'The ticket did not change. It may have been moved or cancelled on another screen — the board will catch up on the next refresh.',
+    };
   }
 
   revalidatePath(KITCHEN_PATH);

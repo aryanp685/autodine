@@ -79,6 +79,22 @@ export type StaffContext = {
 /** Roles allowed to take money at the counter. Mirrors record_cash_payment. */
 export const CASHIER_ROLES: MemberRole[] = ['owner', 'manager', 'cashier'];
 
+/**
+ * Roles allowed to move a ticket along the kitchen board.
+ *
+ * MIRRORS THE DATABASE, and the database is the authority. The update policy on
+ * `orders` (orders_staff_update) is:
+ *
+ *   has_restaurant_role(restaurant_id,
+ *     array['owner','manager','kitchen']) and restaurant_can_write(restaurant_id)
+ *
+ * This constant exists so the board can hide a button that would be refused,
+ * instead of offering it and surfacing a Postgres permission error to a cook.
+ * If the policy and this list ever disagree, the policy wins and the action's
+ * error path is what the operator sees -- which is the safe direction.
+ */
+export const KITCHEN_ROLES: MemberRole[] = ['owner', 'manager', 'kitchen'];
+
 /** Why a staff context could not be resolved. */
 export type StaffBlockedReason =
   | 'unconfigured' // Supabase env vars missing

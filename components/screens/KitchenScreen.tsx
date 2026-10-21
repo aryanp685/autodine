@@ -223,6 +223,22 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
    * this on its own -- a cancelled row simply is not in the payload.
    */
   const [cancelled, setCancelled] = useState<string[]>([]);
+  /**
+   * The demo board's own memory.
+   *
+   * With no database there is nothing to write to, and the buttons used to
+   * answer with an error on every tap -- a control that looks like the real
+   * thing and does nothing is worse than no control at all, because it teaches
+   * whoever is trying the product that the buttons are broken. The sample
+   * board therefore behaves: a tap moves the sample ticket in this browser and
+   * nowhere else, and the header keeps saying the board is local only.
+   */
+  const [demoState, setDemoState] = useState<Record<string, PrepState>>({});
+  const [demoCancelled, setDemoCancelled] = useState<string[]>([]);
+  /** Which column a phone is looking at. Ignored on a wall tablet. */
+  const [mobileCol, setMobileCol] = useState<'new' | 'preparing' | 'ready'>('new');
+  /** Tickets that just appeared, so the card can announce itself. */
+  const [arrivals, setArrivals] = useState<string[]>([]);
   /** Which ticket is asking "are you sure", so a mis-tap cannot cancel. */
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
   const [cancelBusy, setCancelBusy] = useState<string | null>(null);
@@ -454,15 +470,76 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
   const base: BoardTicket[] = (live
     ? (data?.tickets ?? []).map(fromLive)
     : kitchenOrders.map(fromDemo)
-  ).filter((ticket) => !ticket.orderId || !cancelled.includes(ticket.orderId));
+  ).filter((ticket) => {
+    if (ticket.orderId) return !cancelled.includes(ticket.orderId);
+    return !demoCancelled.includes(ticket.key);
+  });
 
-  // Optimistic overlay. Applied on top of `base`, so a refresh from the server
-  // simply wins without any resync bookkeeping.
+  /**
+   * Optimistic overlay. Applied on top of `base`, so a refresh from the server
+   * simply wins without any resync bookkeeping.
+   *
+   * Two sources, one rule: a live ticket's pending state is keyed by its UUID
+   * (and disappears with the next server payload), a demo ticket's by its
+   * sample id (and simply stays until the page is reloaded).
+   */
   const orders = base.map((ticket) =>
     ticket.orderId && pending[ticket.orderId]
       ? { ...ticket, state: pending[ticket.orderId]! }
-      : ticket,
+      : !ticket.orderId && demoState[ticket.key]
+        ? { ...ticket, state: demoState[ticket.key] }
+        : ticket,
   );
+
+  /* ------------------------------------------------------- arrival highlight */
+
+  /**
+   * Cards that appeared since the previous render, for one short animation.
+   *
+   * The signature is the key list, not the array: `orders` is rebuilt on every
+   * render, so depending on it directly would re-run this effect constantly.
+   * The first pass only records what was already on the board -- opening the
+   * page should not make the whole queue look brand new.
+   */
+  const keySignature = orders.map((ticket) => ticket.key).join('\n');
+  const seenKeysRef = useRef<Set<string> | null>(null);
+
+  useEffect(() => {
+    const keys = keySignature ? keySignature.split('\n') : [];
+
+    // First pass: remember what is already there and animate nothing. Opening
+    // the board must not make a quiet queue look like it just caught fire.
+    if (seenKeysRef.current === null) {
+      seenKeysRef.current = new Set(keys);
+      return;
+    }
+
+    const fresh = keys.filter((key) => !seenKeysRef.current!.has(key));
+    for (const key of keys) seenKeysRef.current.add(key);
+    if (fresh.length === 0) return;
+
+    setArrivals(fresh);
+    const timer = setTimeout(() => setArrivals([]), 1400);
+    return () => clearTimeout(timer);
+  }, [keySignature]);
+
+  /* ------------------------------------------------------ one-tap on a phone */
+
+  /**
+   * A phone shows one column at a time (three stacked columns means scrolling
+   * past an entire empty queue to reach the food). When the opened column is
+   * empty and another one is not, follow the work rather than showing a blank
+   * screen -- but only once, so a deliberate choice is never overridden.
+   */
+  const autoPickedRef = useRef(false);
+  useEffect(() => {
+    if (autoPickedRef.current || orders.length === 0) return;
+    autoPickedRef.current = true;
+    const hasNew = orders.some((ticket) => ticket.state === 'new');
+    if (!hasNew && orders.some((ticket) => ticket.state === 'preparing')) {
+      setMobileCol('preparing');
+    }
+  }, [orders]);
 
   /* ------------------------------------------------------------ what to say */
 
@@ -715,13 +792,17 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
   /* ---------------------------------------------------------------- actions */
 
   const advance = async (ticket: BoardTicket) => {
-    if (!ticket.orderId) {
-      setError('This board is showing sample data. Connect the database to cook real tickets.');
-      return;
-    }
-
     const next = nextPrepState(ticket.state);
     if (!next) return;
+
+    // The sample board keeps its own books. See demoState above: the alternative
+    // is a button that errors, which reads as a broken product.
+    if (!ticket.orderId) {
+      setError('');
+      setDemoState((current) => ({ ...current, [ticket.key]: next }));
+      speak(`demo:${ticket.key}:${next}`, advanceText(ticket.table, next), ticket.table, 'info');
+      return;
+    }
 
     speak(`adv:${ticket.orderId}:${next}`, advanceText(ticket.table, next), ticket.table, 'info');
     setError('');
@@ -763,13 +844,20 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
    * information, it is a stop instruction.
    */
   const cancelTicket = async (ticket: BoardTicket) => {
-    if (!ticket.orderId) {
-      setError('This board is showing sample data. Connect the database to cancel real tickets.');
+    // Demo tickets have no UUID, so their own key stands in for one: the
+    // confirm step has to be able to tell two sample tickets apart.
+    const ticketKey = ticket.orderId ?? ticket.key;
+
+    if (confirmCancel !== ticketKey) {
+      setConfirmCancel(ticketKey);
+      setError('');
       return;
     }
-    if (confirmCancel !== ticket.orderId) {
-      setConfirmCancel(ticket.orderId);
-      setError('');
+
+    if (!ticket.orderId) {
+      setConfirmCancel(null);
+      setDemoCancelled((current) => [...current, ticket.key]);
+      speak(`demo-cancel:${ticket.key}`, cancelText(ticket.table), `${ticket.table} · cancelled`, 'order');
       return;
     }
 
@@ -791,6 +879,15 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
     // Pick up anything that moved on another screen at the same time.
     refresh();
   };
+
+  /**
+   * Whether this board may offer a control that writes.
+   *
+   * The sample board is always interactive -- it writes to nothing but this
+   * browser. A live board is interactive only when the server said the caller
+   * can write, which is the same question the database will ask.
+   */
+  const interactive = !live || Boolean(data?.canAdvance);
 
   const cols: { key: string; title: string; orders: BoardTicket[] }[] = [
     { key: 'new', title: 'New', orders: orders.filter((o) => o.state === 'new') },
@@ -924,11 +1021,11 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
           <button
             type="button"
             className="kb__ghost"
-            disabled={!latest?.orderId}
+            disabled={!latest}
             onClick={() => {
-              if (!latest?.orderId) return;
+              if (!latest) return;
               replay(
-                `new:${latest.orderId}`,
+                `new:${latest.orderId ?? latest.key}`,
                 orderAnnouncement(latest),
                 announceLogLabel(latest.table, latest.items),
               );
@@ -951,6 +1048,18 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
       </header>
 
       {/* ------------------------------------------------------- the one banner */}
+
+      {/* The sample board behaves. Saying so is what stops a tap from looking
+          like it did nothing: the ticket moves, and only this browser knows. */}
+      {!live && (
+        <div className="kb__warn kb__warn--quiet" role="note">
+          <strong>Sample board.</strong>
+          <span>
+            These tickets are fictional. A tap moves one here and nowhere else — connect the database
+            to run a real service.
+          </span>
+        </div>
+      )}
 
       {status && (
         <div className={`kb__warn ${status.tone === 'quiet' ? 'kb__warn--quiet' : ''}`} role={status.tone === 'alert' ? 'alert' : 'status'}>
@@ -1041,6 +1150,25 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
 
       {data?.blocked && <SignInPrompt reason={data.blocked} screen="kitchen board" />}
 
+      {/* -------------------------------------------------- why nothing moves */}
+
+      {/* One banner, naming the actual obstacle. The buttons below are not
+          rendered in this state, so this is the only explanation on screen. */}
+      {live && data && !data.blocked && !data.canAdvance && (
+        <div className="kb__warn kb__warn--quiet" role="status">
+          <strong>
+            {data.cannotAdvance === 'plan'
+              ? 'Read-only: this restaurant’s plan is not active.'
+              : 'You can watch this board, but not move tickets.'}
+          </strong>
+          <span>
+            {data.cannotAdvance === 'plan'
+              ? 'Orders, menus and reports stay available. New customer orders and ticket updates are blocked on the server until a plan is active.'
+              : `A ${data.role ?? 'member'} can see the kitchen board; moving a ticket needs an owner, a manager or kitchen staff. Ask one of them to take a screen.`}
+          </span>
+        </div>
+      )}
+
       {live && data && !data.blocked && data.tickets.length === 0 && (
         <div className="kb__empty" style={{ marginBottom: 16 }}>
           No open tickets in the last few hours. Orders placed from the customer menu appear here
@@ -1048,15 +1176,46 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
         </div>
       )}
 
+      {/* ------------------------------------------------------- phone columns */}
+
+      {/* Hidden above 760px, where all three columns are on screen at once.
+          Counts live in the tabs so an empty column can be skipped without
+          opening it -- on a phone, the queue you cannot see still has to be
+          legible. */}
+      <nav className="kb__tabs" aria-label="Ticket columns">
+        {cols.map((c) => (
+          <button
+            key={c.key}
+            type="button"
+            className={`kb__tab ${mobileCol === c.key ? 'is-on' : ''}`}
+            aria-pressed={mobileCol === c.key}
+            onClick={() => setMobileCol(c.key as typeof mobileCol)}
+          >
+            {c.title}
+            <span className="kb__tabCount tnum">{c.orders.length}</span>
+          </button>
+        ))}
+      </nav>
+
       <div className="kb__cols">
         {cols.map((c) => (
-          <section key={c.key} className="kb__col">
+          <section
+            key={c.key}
+            className={`kb__col ${mobileCol === c.key ? 'is-mobileActive' : ''}`}
+            aria-label={c.title}
+          >
             <div className="kb__colHead">
               <h2>{c.title}</h2>
               <span className="tnum">{c.orders.length}</span>
             </div>
             {c.orders.map((o) => (
-              <article key={o.key} className={`kb__ord ${o.state === 'served' ? 'is-served' : ''}`}>
+              <article
+                key={o.key}
+                data-state={o.state}
+                className={`kb__ord ${o.state === 'served' ? 'is-served' : ''} ${
+                  arrivals.includes(o.key) ? 'is-arriving' : ''
+                }`}
+              >
                 <div className="kb__ordTop">
                   <div className="kb__ordId">{o.code}</div>
                   <div className="kb__ordTable">{o.table}</div>
@@ -1068,17 +1227,17 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
                 <div className="kb__ordFoot">
                   <Money value={rupeesToPaise(o.total)} strong />
                   <div className="kb__actions">
-                    {o.state === 'new' && (
+                    {interactive && o.state === 'new' && (
                       <button type="button" className="kb__act" onClick={() => advance(o)}>
                         Start preparing
                       </button>
                     )}
-                    {o.state === 'preparing' && (
+                    {interactive && o.state === 'preparing' && (
                       <button type="button" className="kb__act" onClick={() => advance(o)}>
                         Mark ready
                       </button>
                     )}
-                    {o.state === 'ready' && (
+                    {interactive && o.state === 'ready' && (
                       <button type="button" className="kb__act" onClick={() => advance(o)}>
                         Mark served
                       </button>
@@ -1093,7 +1252,6 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
                       className="kb__act kb__act--quiet"
                       title="Replay voice announcement"
                       aria-label={`Replay order ${o.code}`}
-                      disabled={!o.orderId}
                       onClick={() =>
                         replay(
                           `new:${o.orderId ?? o.key}`,
@@ -1104,16 +1262,16 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
                     >
                       🔊
                     </button>
-                    {o.state !== 'served' && o.orderId ? (
-                      confirmCancel === o.orderId ? (
+                    {interactive && o.state !== 'served' ? (
+                      confirmCancel === (o.orderId ?? o.key) ? (
                         <>
                           <button
                             type="button"
                             className="kb__act kb__act--danger"
-                            disabled={cancelBusy === o.orderId}
+                            disabled={Boolean(o.orderId) && cancelBusy === o.orderId}
                             onClick={() => cancelTicket(o)}
                           >
-                            {cancelBusy === o.orderId ? 'Cancelling…' : 'Yes, cancel'}
+                            {o.orderId && cancelBusy === o.orderId ? 'Cancelling…' : 'Yes, cancel'}
                           </button>
                           <button
                             type="button"

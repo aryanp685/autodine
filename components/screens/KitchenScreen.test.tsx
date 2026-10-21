@@ -78,6 +78,8 @@ describe('Kitchen board', () => {
           restaurantId: null,
           tickets: [],
           cancelled: [],
+          role: null,
+          canAdvance: false,
           blocked: 'signed-out',
         }} />,
     );
@@ -96,6 +98,8 @@ describe('Kitchen board', () => {
           restaurantName: 'maddi',
           restaurantId: 'r-1',
           cancelled: [],
+          role: 'kitchen',
+          canAdvance: true,
           tickets: [
             {
               id: 'o-1',
@@ -133,11 +137,142 @@ describe('Kitchen board', () => {
   it('shows an empty live board as empty, not as a demo', () => {
     const html = renderToStaticMarkup(
       <Kitchen
-        data={{ restaurantName: 'maddi', restaurantId: 'r-1', tickets: [], cancelled: [] }}
+        data={{
+          restaurantName: 'maddi',
+          restaurantId: 'r-1',
+          tickets: [],
+          cancelled: [],
+          role: 'owner',
+          canAdvance: true,
+        }}
       />,
     );
 
     expect(html).toContain('No open tickets');
     expect(html).not.toContain('Kitchen · demo mode');
+  });
+
+  /* ------------------------------------------------------------ dead buttons */
+
+  it('gives the sample board working controls instead of buttons that only error', () => {
+    // With no database there is nothing to write to, so the demo board used to
+    // answer every tap with an error. A control that exists and does nothing is
+    // the exact thing a person trying the product reads as "broken".
+    const html = renderToStaticMarkup(<Kitchen />);
+
+    expect(html).toContain('Start preparing');
+    expect(html).not.toMatch(/<button[^>]*disabled[^>]*>Start preparing/);
+    // And it says out loud that the change stays in this browser.
+    expect(html).toContain('Sample board.');
+  });
+
+  it('lets a demo ticket be replayed and cancelled without a database id', () => {
+    const html = renderToStaticMarkup(<Kitchen />);
+
+    expect(html).not.toMatch(/<button[^>]*disabled[^>]*aria-label="Replay order/);
+    expect(html).toContain('aria-label="Cancel order for');
+  });
+
+  /* ------------------------------------------------------------------ auth */
+
+  it('hides the move controls from a role the update policy refuses', () => {
+    const html = renderToStaticMarkup(
+      <Kitchen
+        data={{
+          restaurantName: 'maddi',
+          restaurantId: 'r-1',
+          tickets: [],
+          cancelled: [],
+          role: 'cashier',
+          canAdvance: false,
+          cannotAdvance: 'role',
+        }}
+      />,
+    );
+
+    expect(html).not.toContain('Start preparing');
+    expect(html).toContain('You can watch this board, but not move tickets.');
+    expect(html).toContain('cashier');
+  });
+
+  it('explains a read-only restaurant in terms of the plan, not the role', () => {
+    const html = renderToStaticMarkup(
+      <Kitchen
+        data={{
+          restaurantName: 'maddi',
+          restaurantId: 'r-1',
+          tickets: [],
+          cancelled: [],
+          role: 'owner',
+          canAdvance: false,
+          cannotAdvance: 'plan',
+        }}
+      />,
+    );
+
+    expect(html).toContain('Read-only');
+    expect(html).toContain('plan');
+    expect(html).not.toContain('You can watch this board, but not move tickets.');
+  });
+
+  /* ------------------------------------------------------------- responsive */
+
+  it('offers a column switcher for phones, with the counts on it', () => {
+    // Written for every width and shown under 760px; the counts are what make
+    // it possible to skip an empty queue without opening it.
+    const html = renderToStaticMarkup(<Kitchen data={{
+      restaurantName: 'maddi',
+      restaurantId: 'r-1',
+      cancelled: [],
+      role: 'kitchen',
+      canAdvance: true,
+      tickets: [
+        {
+          id: 'o-1',
+          code: 'MA-1',
+          table: 'T1',
+          placedAt: '7:42 pm',
+          placedAtIso: new Date().toISOString(),
+          ageMin: 2,
+          payment: 'pending',
+          state: 'new',
+          items: [{ qty: 1, name: 'Chai', veg: true }],
+          total: 40,
+        },
+      ],
+    }} />);
+
+    expect(html).toContain('kb__tabs');
+    expect(html).toContain('New');
+    expect(html).toContain('Preparing');
+    expect(html).toContain('kb__tabCount');
+    expect(html).toContain('is-mobileActive');
+  });
+
+  it('marks a ticket with its prep state so the card can be read at a glance', () => {
+    const html = renderToStaticMarkup(<Kitchen data={{
+      restaurantName: 'maddi',
+      restaurantId: 'r-1',
+      cancelled: [],
+      role: 'kitchen',
+      canAdvance: true,
+      tickets: [
+        {
+          id: 'o-1',
+          code: 'MA-1',
+          table: 'T1',
+          placedAt: '7:42 pm',
+          placedAtIso: new Date().toISOString(),
+          ageMin: 2,
+          payment: 'paid',
+          state: 'preparing',
+          items: [{ qty: 1, name: 'Chai', veg: true }],
+          total: 40,
+        },
+      ],
+    }} />);
+
+    expect(html).toContain('data-state="preparing"');
+    expect(html).toContain('Mark ready');
   });
 });
