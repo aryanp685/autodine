@@ -27,7 +27,7 @@
  * must produce four complete announcements, in arrival order.
  */
 
-import { hindiNumber, toDevanagari } from './hindi';
+import { hindiNumber, noteToDevanagari, spokenName, toDevanagari } from './hindi';
 
 /**
  * How the queue talks. Injected so the queue can be tested without a browser.
@@ -250,6 +250,14 @@ export type SpeakableItem = {
   name: string;
   /** "Half · Butter naan" -- the portion and any add-ons, as shown. */
   detail?: string;
+  /**
+   * The restaurant's own written pronunciation of the dish, if it has one.
+   *
+   * A rule transliteration is right often and wrong sometimes, and only the
+   * owner knows which. When a name has been set in the menu editor it is what
+   * the kitchen hears -- the dish is never quietly renamed by the algorithm.
+   */
+  spoken?: string | null;
 };
 
 /**
@@ -281,7 +289,7 @@ export function spokenDetail(detail: string | undefined): string {
  * the dish -- the order a person says it in.
  */
 export function spokenItem(item: SpeakableItem): string {
-  const name = toDevanagari(item.name.trim());
+  const name = spokenName(item.name.trim(), item.spoken);
   const base = `${hindiNumber(item.qty)} ${name}`;
   const detail = spokenDetail(item.detail);
 
@@ -348,7 +356,9 @@ export function newOrderText(table: string, items: SpeakableItem[], note?: strin
       trimmedNote.length > MAX_SPOKEN_NOTE
         ? `${trimmedNote.slice(0, MAX_SPOKEN_NOTE).trimEnd()}…`
         : trimmedNote;
-    clauses.push(`नोट, ${toDevanagari(cut)}।`);
+    // "ध्यान दें" rather than "नोट": a kitchen acts on a warning, and the
+    // word is unmistakable over extractor fans.
+    clauses.push(`ध्यान दें, ${noteToDevanagari(cut)}।`);
   }
 
   return clauses.join(' ');

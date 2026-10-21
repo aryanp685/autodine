@@ -147,8 +147,6 @@ export type SpeechEnv = {
   clearTimer: (id: unknown) => void;
   /** How long an utterance may go without starting before it is treated as stuck. */
   startTimeoutMs?: number;
-  /** The pause between sentences. Long enough to write a dish down. */
-  gapMs?: number;
 };
 
 export type SpeechEngine = {
@@ -179,11 +177,82 @@ export const DEFAULT_START_TIMEOUT_MS = 4000;
  * will read a ticket like an automated phone menu. Pulling the rate down a
  * little and keeping the pitch neutral is the difference between a person
  * telling the pass what to cook and a device reciting a list.
+ *
+ * This is the BASE rate. Individual sentences are adjusted around it by
+ * planSpeech() below, because a person does not read a ticket at one speed.
  */
 export const VOICE_TUNING = { rate: 0.92, pitch: 1, volume: 1 } as const;
 
-/** A short pause between sentences, in milliseconds. */
-export const DEFAULT_GAP_MS = 150;
+/**
+ * How long the board waits after the chime before the first word.
+ *
+ * A tone followed instantly by speech sounds like a machine. A person rings a
+ * bell and then takes a breath; that breath is the difference between "an
+ * alert" and "someone telling you something".
+ */
+export const LEAD_IN_MS = 280;
+
+/**
+ * A sentence, with the pacing it is read at.
+ *
+ * Web Speech gives rate, one utterance at a time, and the gap we insert
+ * between them -- that is the whole palette. So the three kinds of sentence a
+ * ticket contains are paced differently, the way a person says them:
+ *
+ *   greeting   "नया ऑर्डर, टेबल टी वन।"  a little slower, then a real pause,
+ *              because the next words are a list the pass has to write down
+ *   dish       "एक बटर चिकन, आधा।"      steady, short pause between dishes
+ *   note       "ध्यान दें, प्याज़ नहीं।" slower and warned by a longer pause,
+ *              because a constraint said at speed is a constraint missed
+ */
+export type SpeechSegment = {
+  text: string;
+  /** Multiplier applied to VOICE_TUNING.rate. */
+  rate: number;
+  /** Silence before this sentence starts. */
+  leadMs: number;
+  /** Silence after this sentence, before the next one. */
+  gapMs: number;
+};
+
+const PACE = {
+  greeting: { rate: 0.98, leadMs: 0, gapMs: 420 },
+  dish: { rate: 1, leadMs: 0, gapMs: 240 },
+  note: { rate: 0.94, leadMs: 380, gapMs: 0 },
+} as const;
+
+/** The sentence kinds planSpeech recognises, by how they open. */
+export function sentenceKind(sentence: string): keyof typeof PACE {
+  if (/^(ध्यान दें|नोट)/.test(sentence)) return 'note';
+  if (/^(नया|टेबल)/.test(sentence)) return 'greeting';
+  return 'dish';
+}
+
+/**
+ * Turn an announcement into paced sentences.
+ *
+ * This is where "human" actually lives. Speaking the same words at one rate
+ * with one gap, no matter what they mean, is what makes a synthesiser sound
+ * like a synthesiser: the voice has no idea that "टेबल टी वन" is a heading and
+ * "प्याज़ नहीं" is a warning. Giving each kind its own rate and its own pause
+ * costs nothing and is heard immediately in a kitchen.
+ */
+export function planSpeech(text: string): SpeechSegment[] {
+  const sentences = splitSentences(text);
+
+  return sentences.map((sentence, index) => {
+    const pace = PACE[sentenceKind(sentence)];
+
+    return {
+      text: sentence,
+      rate: pace.rate,
+      // The lead-in already covers the pause before the first sentence.
+      leadMs: index === 0 ? 0 : pace.leadMs,
+      // Nothing to wait for after the last sentence.
+      gapMs: index === sentences.length - 1 ? 0 : pace.gapMs,
+    };
+  });
+}
 
 /**
  * Split an announcement into sentences.
@@ -203,14 +272,13 @@ export function splitSentences(text: string): string[] {
 
 export function createKitchenSpeech(
   env: SpeechEnv,
-  options: { startTimeoutMs?: number; gapMs?: number } = {},
+  options: { startTimeoutMs?: number } = {},
 ): SpeechEngine {
   let voices: VoiceLike[] = [];
   let loaded = false;
   let didStall = false;
 
   const startTimeoutMs = options.startTimeoutMs ?? env.startTimeoutMs ?? DEFAULT_START_TIMEOUT_MS;
-  const gapMs = options.gapMs ?? env.gapMs ?? DEFAULT_GAP_MS;
 
   function refreshVoices(): void {
     if (!env.synthesis) return;
@@ -253,6 +321,7 @@ export function createKitchenSpeech(
       }
 
       const sentences = splitSentences(body);
+      const plan = planSpeech(body);
 
       let finished = false;
       const finish = () => {
@@ -266,8 +335,9 @@ export function createKitchenSpeech(
       const speakAt = (index: number) => {
         if (finished) return;
 
+        const segment = plan[index];
         const sentence = sentences[index];
-        if (!sentence) {
+        if (!segment || !sentence) {
           finish();
           return;
         }
@@ -285,15 +355,17 @@ export function createKitchenSpeech(
             return;
           }
 
-          // The gap is what makes it sound like a person rather than a list.
-          env.setTimer(() => speakAt(index + 1), gapMs);
+          // The gap is what makes it sound like a person rather than a list:
+          // a beat between dishes, a longer one before the note.
+          const nextSegment = plan[index + 1];
+          env.setTimer(() => speakAt(index + 1), segment.gapMs + (nextSegment?.leadMs ?? 0));
         };
 
         try {
           const utterance = env.createUtterance(sentence);
           utterance.voice = voiceToUse;
           utterance.lang = voiceToUse.lang || HINDI_LANGS[0];
-          utterance.rate = VOICE_TUNING.rate;
+          utterance.rate = VOICE_TUNING.rate * segment.rate;
           utterance.pitch = VOICE_TUNING.pitch;
           utterance.volume = VOICE_TUNING.volume;
 
@@ -325,7 +397,8 @@ export function createKitchenSpeech(
         }
       };
 
-      speakAt(0);
+      // A breath between the chime and the first word.
+      env.setTimer(() => speakAt(0), LEAD_IN_MS);
     },
 
     refreshVoices,

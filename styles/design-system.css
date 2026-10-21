@@ -1175,3 +1175,16 @@
    promise a choice the product does not offer. */
 
 [data-app] .kb__pill.is-ok { border-color: var(--accent); color: var(--text); }
+
+/* ------------------------------------------------- spoken name (menu editor)
+   The Devanagari the kitchen will hear, shown under the field that sets it.
+   Devanagari needs a touch more room than Latin at the same size to stay
+   legible on a wall tablet. */
+
+[data-app] .pg__pronPreview {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--text);
+  word-break: break-word;
+}

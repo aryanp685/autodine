@@ -65,7 +65,7 @@ type BoardTicket = {
   payment: 'paid' | 'pending' | 'failed';
   state: KitchenOrder['state'];
   note?: string;
-  items: { qty: number; name: string; detail?: string; veg: boolean }[];
+  items: { qty: number; name: string; detail?: string; veg: boolean; spoken?: string | null }[];
   total: number;
 };
 

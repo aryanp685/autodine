@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_GAP_MS,
   HINDI_LANGS,
+  LEAD_IN_MS,
   VOICE_TUNING,
   createKitchenSpeech,
   pickHindiVoice,
+  planSpeech,
+  sentenceKind,
   splitSentences,
   voiceScore,
   type SpeechEnv,
@@ -96,7 +98,6 @@ function env(
       if (index >= 0) timers.splice(index, 1);
     },
     startTimeoutMs: 50,
-    gapMs: 0,
   };
 
   return {
@@ -206,9 +207,10 @@ describe('speaking', () => {
       ended += 1;
     });
 
-    // First sentence now, the second only after the gap.
-    expect(fake.spoken).toHaveLength(1);
-    expect(fake.spoken[0].text).toBe('नया ऑर्डर, टेबल टी वन।');
+    // Nothing yet: the board takes a breath after the chime first, the way a
+    // person does, instead of starting on the same tick as the tone.
+    expect(fake.timers[0]?.ms).toBe(LEAD_IN_MS);
+    expect(fake.spoken).toHaveLength(0);
 
     fake.flush();
 
@@ -220,7 +222,7 @@ describe('speaking', () => {
     const fake = env({ voices: hindi });
     const engine = createKitchenSpeech(fake.env);
 
-    engine.speak('एक। दो। तीन।', () => {});
+    engine.speak('नया ऑर्डर। एक। दो।', () => {});
     fake.flush();
 
     expect(fake.chimes).toBe(1);
@@ -229,11 +231,14 @@ describe('speaking', () => {
 
   it('uses the Hindi voice and a human rate', () => {
     const fake = env({ voices: [...english, ...hindi] });
-    createKitchenSpeech(fake.env).speak('नया ऑर्डर।', () => {});
+    createKitchenSpeech(fake.env).speak('नया ऑर्डर, टेबल टी वन।', () => {});
+    fake.flush();
 
     expect(fake.spoken[0].voice?.lang).toBe('hi-IN');
-    expect(fake.spoken[0].rate).toBe(VOICE_TUNING.rate);
-    expect(VOICE_TUNING.rate).toBeLessThan(1);
+    // The heading is read a shade slower than the base rate, never faster
+    // than a person would say it.
+    expect(fake.spoken[0].rate).toBeLessThan(VOICE_TUNING.rate);
+    expect(fake.spoken[0].rate).toBeGreaterThan(0.8);
   });
 
   it('says nothing at all when the device has no Hindi voice', () => {
@@ -293,7 +298,7 @@ describe('speaking', () => {
       ended += 1;
     });
 
-    fake.flush(); // the watchdog fires
+    fake.flush(); // lead-in, then the watchdog
 
     expect(engine.stalled()).toBe(true);
     expect(fake.cancels).toBe(1); // the wedged utterance is cleared
@@ -302,6 +307,7 @@ describe('speaking', () => {
     // The next ticket is spoken normally.
     fake.setWedge(false);
     engine.speak('दो बटर नान।', () => {});
+    fake.flush();
     expect(fake.spoken.at(-1)?.text).toBe('दो बटर नान।');
   });
 
@@ -313,6 +319,7 @@ describe('speaking', () => {
     engine.speak('नया ऑर्डर।', () => {
       ended += 1;
     });
+    fake.flush();
 
     expect(ended).toBe(1);
   });
@@ -328,7 +335,32 @@ describe('speaking', () => {
     expect(ended).toBe(1);
   });
 
-  it('uses a gap between sentences that a person could write in', () => {
-    expect(DEFAULT_GAP_MS).toBeGreaterThanOrEqual(100);
+  it('paces each kind of sentence the way a person says it', () => {
+    const plan = planSpeech('नया ऑर्डर, टेबल टी वन। एक बटर चिकन, आधा। ध्यान दें, प्याज़ नहीं।');
+
+    const [greeting, dish, note] = plan;
+
+    // A heading is read a little slower and followed by a real pause.
+    expect(greeting.rate).toBeLessThan(dish.rate);
+    expect(greeting.gapMs).toBeGreaterThan(dish.gapMs);
+
+    // A constraint is the slowest thing on the ticket and comes after the
+    // longest silence, so it is not mistaken for another dish.
+    expect(note.rate).toBeLessThan(dish.rate);
+    expect(note.leadMs).toBeGreaterThan(0);
+
+    // The last sentence has nothing to wait for.
+    expect(note.gapMs).toBe(0);
+  });
+
+  it('names the kind of each sentence, so the pacing is not a guess', () => {
+    expect(sentenceKind('नया ऑर्डर, टेबल टी वन।')).toBe('greeting');
+    expect(sentenceKind('एक बटर चिकन, आधा।')).toBe('dish');
+    expect(sentenceKind('ध्यान दें, प्याज़ नहीं।')).toBe('note');
+    expect(sentenceKind('नोट, प्याज़ नहीं।')).toBe('note');
+  });
+
+  it('takes a breath after the chime before speaking', () => {
+    expect(LEAD_IN_MS).toBeGreaterThanOrEqual(200);
   });
 });

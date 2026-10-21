@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { hindiNumber, isDevanagariOnly, toDevanagari, transliterate } from './hindi';
+import {
+  hindiNumber,
+  isDevanagariOnly,
+  noteToDevanagari,
+  spokenName,
+  toDevanagari,
+  transliterate,
+  unknownWords,
+} from './hindi';
 
 /**
  * Devanagari for the voice.
@@ -108,5 +116,59 @@ describe('transliterate', () => {
     expect(transliterate('')).toBe('');
     expect(transliterate('123')).toBe('123');
     expect(transliterate('x')).not.toBe('');
+  });
+});
+
+describe('unknownWords', () => {
+  it('reports nothing for a name it knows word for word', () => {
+    expect(unknownWords('Butter Chicken')).toEqual([]);
+    expect(unknownWords('पाव भाजी')).toEqual([]);
+  });
+
+  it('names the words it had to guess, so they can be corrected', () => {
+    expect(unknownWords('Quesadilla')).toEqual(['Quesadilla']);
+    expect(unknownWords('Paneer Quesadilla')).toEqual(['Quesadilla']);
+  });
+
+  it('does not report the same word twice', () => {
+    expect(unknownWords('Quesadilla Quesadilla')).toEqual(['Quesadilla']);
+  });
+});
+
+describe('spokenName', () => {
+  it('uses the owner\'s pronunciation when there is one', () => {
+    expect(spokenName('Butter Chicken', 'बटर चिकन स्पेशल')).toBe('बटर चिकन स्पेशल');
+  });
+
+  it('falls back to the menu name when the override is empty', () => {
+    expect(spokenName('Butter Chicken', '')).toBe('बटर चिकन');
+    expect(spokenName('Butter Chicken', null)).toBe('बटर चिकन');
+    expect(spokenName('Butter Chicken', '   ')).toBe('बटर चिकन');
+  });
+
+  it('converts an override typed in Latin, so no Latin ever reaches the voice', () => {
+    expect(isDevanagariOnly(spokenName('Butter Chicken', 'batata vada'))).toBe(true);
+  });
+});
+
+describe('noteToDevanagari', () => {
+  it('puts the negation where Hindi puts it', () => {
+    expect(noteToDevanagari('no onion')).toBe('प्याज़ नहीं');
+    expect(noteToDevanagari('no onions, no garlic')).toBe('प्याज़ नहीं, लहसुन नहीं');
+  });
+
+  it('puts the quantity before the thing it describes', () => {
+    expect(noteToDevanagari('less spicy')).toBe('कम तीखा');
+    expect(noteToDevanagari('extra cheese')).toBe('ज़्यादा चीज़');
+  });
+
+  it('handles "without", which is a different word order again', () => {
+    expect(noteToDevanagari('without butter')).toBe('बटर के बिना');
+  });
+
+  it('translates a note it does not recognise rather than dropping it', () => {
+    const out = noteToDevanagari('birthday cake');
+    expect(isDevanagariOnly(out)).toBe(true);
+    expect(out).toContain('केक');
   });
 });

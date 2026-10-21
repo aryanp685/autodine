@@ -316,11 +316,13 @@ export async function saveItemAction(formData: FormData): Promise<void> {
   const name = String(formData.get('name') ?? '').trim();
   const desc = String(formData.get('description') ?? '').trim();
   const veg = formData.get('veg') === 'veg';
+  const spokenName = String(formData.get('spokenName') ?? '').trim();
   const rawPrice = String(formData.get('price') ?? '').trim();
   const categoryId = await resolveCategoryId(ctx, formData.get('categoryId'));
 
   if (!itemId) fail('No item selected.');
   if (!name) fail('An item needs a name.');
+  if (spokenName.length > 120) fail('That spoken name is too long to say in one breath.');
 
   const rupees = Number(rawPrice);
   if (!Number.isFinite(rupees) || rupees < 0) fail('Price must be a number.');
@@ -331,6 +333,9 @@ export async function saveItemAction(formData: FormData): Promise<void> {
     .update({
       name,
       description: desc || null,
+      // Empty means "say the name": the board generates the pronunciation
+      // itself, and storing '' would be a pronunciation of nothing.
+      spoken_name: spokenName || null,
       price_paise: rupeesToPaise(rupees),
       is_veg: veg,
       ...(categoryId ? { category_id: categoryId } : {}),

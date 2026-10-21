@@ -403,14 +403,19 @@ export function transliterate(word: string): string {
 }
 
 /**
- * Any text as Devanagari.
+ * Any text as Devanagari, plus the words that had to be guessed.
  *
  * Devanagari, digits, punctuation and spaces pass through; each Latin run is
  * looked up as a phrase first, then word by word, and transliterated by rule
  * if it is not in the dictionary. Digits become words, because a quantity
  * read by a synthesiser is a quantity that can be misread.
+ *
+ * `guessed` is the point of returning an object: a rule transliteration is
+ * usually right and sometimes wrong, and the owner is the only one who knows
+ * which. The menu editor shows this list so a dish can be corrected before a
+ * kitchen hears it wrong all evening.
  */
-export function toDevanagari(text: string): string {
+function convert(text: string): { text: string; guessed: string[] } {
   // Numbers first: "2 Butter Naan" has to become "दो Butter Naan" before the
   // word pass, or the digits stay digits.
   const numbered = text.replace(/\d+/g, (digits) => hindiNumber(Number(digits)));
@@ -426,19 +431,74 @@ export function toDevanagari(text: string): string {
     if (pattern.test(replaced)) replaced = replaced.replace(pattern, word);
   }
 
-  // Whatever Latin is left is a word the dictionary does not know. A plural is
-  // looked up by its stem first -- "plates" is प्लेट, the same word as "plate",
-  // and a menu writes both.
-  return replaced.replace(/[A-Za-z]+/g, (word) => {
+  const guessed: string[] = [];
+
+  const spoken = replaced.replace(/[A-Za-z]+/g, (word) => {
     const lower = word.toLowerCase();
+
     // Both endings, in order: "plates" -> plate, "fries" -> fries (its own
     // entry) then fri. Stripping "es" first would turn "plates" into "plat".
     for (const ending of [/s$/, /es$/]) {
       const stem = lower.replace(ending, '');
       if (stem !== lower && WORDS[stem]) return WORDS[stem];
     }
+    if (WORDS[lower]) return WORDS[lower];
+
+    guessed.push(word);
     return transliterate(word);
   });
+
+  return { text: spoken, guessed };
+}
+
+export function toDevanagari(text: string): string {
+  return convert(text).text;
+}
+
+/**
+ * The words in a name the dictionary does not know, deduplicated.
+ *
+ * Empty means every word is known, which is the answer the menu editor wants:
+ * nothing to review.
+ */
+export function unknownWords(text: string): string[] {
+  return [...new Set(convert(text).guessed)];
+}
+
+/**
+ * What the board says for a dish.
+ *
+ * The restaurant's own written pronunciation wins when it has one. It may be
+ * typed in Devanagari or in Latin -- either way it goes through the same
+ * conversion, so an override can never put Latin in front of the voice.
+ */
+export function spokenName(name: string, override?: string | null): string {
+  const chosen = (override ?? '').trim() || name;
+  return toDevanagari(chosen);
+}
+
+/**
+ * A guest's note, said the way a person would say it.
+ *
+ * "no onion" transliterated word for word is "नो प्याज़" -- understandable,
+ * and not how anyone speaks. Hindi puts the negation last ("प्याज़ नहीं") and
+ * the quantifier first ("कम तीखा"), so the common English note patterns are
+ * reordered before the words are converted. Anything that does not match a
+ * pattern is still translated word for word, which is the honest fallback.
+ */
+const NOTE_REWRITES: [RegExp, string][] = [
+  [/\bwithout\s+([a-z]+)/gi, '$1 के बिना'],
+  [/\bno\s+([a-z]+)/gi, '$1 नहीं'],
+  [/\bnot\s+([a-z]+)/gi, '$1 नहीं'],
+  [/\bless\s+([a-z]+)/gi, 'कम $1'],
+  [/\bextra\s+([a-z]+)/gi, 'ज़्यादा $1'],
+  [/\bmore\s+([a-z]+)/gi, 'ज़्यादा $1'],
+];
+
+export function noteToDevanagari(text: string): string {
+  let out = text;
+  for (const [pattern, replacement] of NOTE_REWRITES) out = out.replace(pattern, replacement);
+  return toDevanagari(out);
 }
 
 /** True when every letter of the text is Devanagari or punctuation. */

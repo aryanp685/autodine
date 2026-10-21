@@ -72,6 +72,12 @@ describe('spokenItem', () => {
     expect(isDevanagariOnly(spokenDetail('Peri Peri'))).toBe(true);
   });
 
+  it('says the owner\'s pronunciation instead of the generated one', () => {
+    // The board must never rename a dish behind the restaurant's back: when a
+    // pronunciation has been set, it is what the kitchen hears.
+    expect(spokenItem({ qty: 1, name: 'Bhaji', spoken: 'भज्जी' })).toBe('एक भज्जी');
+  });
+
   it('still says the dish when there is no portion', () => {
     expect(spokenItem({ qty: 3, name: 'Masala Dosa' })).toBe('तीन मसाला डोसा');
   });
@@ -81,7 +87,7 @@ describe('newOrderText', () => {
   it('says table first, dishes next, the guest note last', () => {
     const text = newOrderText('T1', [chicken], 'no onion');
 
-    expect(text).toBe('नया ऑर्डर, टेबल टी वन। एक बटर चिकन, आधा, बटर नान। नोट, नो प्याज़।');
+    expect(text).toBe('नया ऑर्डर, टेबल टी वन। एक बटर चिकन, आधा, बटर नान। ध्यान दें, प्याज़ नहीं।');
   });
 
   it('never hands a Latin letter to the voice', () => {
@@ -97,13 +103,15 @@ describe('newOrderText', () => {
     }
   });
 
-  it('marks the note as a note, so it is not mistaken for another dish', () => {
-    expect(newOrderText('T3', [naan], 'no onion')).toContain('नोट, ');
+  it('marks the note as a warning, so it is not mistaken for another dish', () => {
+    // "नोट" is easy to lose under an extractor fan; "ध्यान दें" is what a
+    // person says when the next words are a constraint.
+    expect(newOrderText('T3', [naan], 'no onion')).toContain('ध्यान दें, ');
   });
 
   it('omits the note clause entirely when there is none', () => {
-    expect(newOrderText('T3', [naan])).not.toContain('नोट');
-    expect(newOrderText('T3', [naan], '   ')).not.toContain('नोट');
+    expect(newOrderText('T3', [naan])).not.toContain('ध्यान दें');
+    expect(newOrderText('T3', [naan], '   ')).not.toContain('ध्यान दें');
   });
 
   it('speaks a takeaway ticket without inventing a table', () => {
@@ -122,6 +130,15 @@ describe('newOrderText', () => {
     // Four dishes, then "and three items" -- in words, in Devanagari.
     expect(text).toContain('और तीन आइटम');
     expect(text.split('।').filter((clause) => clause.includes('डिश')).length).toBeLessThanOrEqual(MAX_SPOKEN_ITEMS + 1);
+  });
+
+  it('says a note the way Hindi says it, not word for word', () => {
+    // "no onion" word for word is "नो प्याज़" -- understood, and not spoken by
+    // anyone. Hindi negates at the end and quantifies at the front.
+    expect(newOrderText('T2', [naan], 'no onion')).toContain('प्याज़ नहीं');
+    expect(newOrderText('T2', [naan], 'without garlic')).toContain('लहसुन के बिना');
+    expect(newOrderText('T2', [naan], 'less spicy')).toContain('कम तीखा');
+    expect(newOrderText('T2', [naan], 'extra cheese')).toContain('ज़्यादा चीज़');
   });
 
   it('cuts a note that would take longer to say than the ticket took to cook', () => {
