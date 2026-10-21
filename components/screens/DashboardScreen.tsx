@@ -1,3 +1,4 @@
+import { rupeesToPaise } from '@/lib/money';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { dashboardStats, recentOrders, restaurant, sparkline, topItems } from '@/lib/demo-data';
@@ -6,13 +7,19 @@ import { signOutAction } from '@/app/auth/actions';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import type { DashboardScreenData } from '@/lib/db/dashboard-screen';
 
-const NAV_A = ['Overview', 'Menus', 'Tables & QR'];
-/** Only show dashboard destinations that currently have a screen. */
+/**
+ * Only destinations that actually exist are listed. "Orders" and "Reports"
+ * used to be rendered as bare text here and on the other two screens, which
+ * read as working navigation and did nothing when clicked.
+ */
 const NAV_LINKS: Record<string, string> = {
   Overview: '/dashboard',
   Menus: '/dashboard/menus',
   'Tables & QR': '/dashboard/tables',
+  Orders: '/dashboard/orders',
+  Reports: '/dashboard/reports',
 };
+const NAV_A = Object.keys(NAV_LINKS);
 
 /**
  * 'refunded' reads as paid here for the same reason it does on the kitchen
@@ -298,7 +305,7 @@ export function Dashboard({ data }: { data?: DashboardScreenData | null }) {
                       <PrepPill state={prepState(o.state.toLowerCase())} />
                     </td>
                     <td className="tnum" style={{ textAlign: 'right' }}>
-                      <Money value={o.total} strong />
+                      <Money value={rupeesToPaise(o.total)} strong />
                     </td>
                   </tr>
                 ))}

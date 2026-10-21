@@ -1,3 +1,4 @@
+import { DashboardBar } from '@/components/DashboardBar';
 import Link from 'next/link';
 import { tables as demoTables, restaurant as demoRestaurant } from '@/lib/demo-data';
 import { TableQr } from '@/components/TableQr';
@@ -37,23 +38,7 @@ export function TablesScreen({
 
   return (
     <div className="pg pg--dash">
-      <div className="pg__bar">
-        <Link href="/" className="pg__brand">
-          AutoDine
-        </Link>
-        <div className="pg__barLinks">
-          <Link href="/dashboard">Overview</Link>
-          <Link href="/dashboard/menus">Menus</Link>
-          <Link href="/dashboard/tables" className="is-active">
-            Tables &amp; QR
-          </Link>
-          <span>Orders</span>
-          <span>Reports</span>
-        </div>
-        <div className="pg__barRight">
-          <span className="pg__avatar">AP</span>
-        </div>
-      </div>
+      <DashboardBar active="tables" />
 
       <div className="pg__body">
         {data?.blocked && (

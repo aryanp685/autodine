@@ -1,4 +1,5 @@
 import { inr } from '@/lib/demo-data';
+import { paiseToRupees } from '@/lib/money';
 
 /** Deterministic pseudo-QR so the layouts can be judged with realistic shapes.
  *  This is a decorative pattern, NOT a working QR code. */
@@ -78,10 +79,22 @@ export function VegMark({ veg, size = 14 }: { veg: boolean; size?: number }) {
   );
 }
 
+/**
+ * An amount of money.
+ *
+ * `value` is PAISE, always -- the same unit as every *_paise column and every
+ * money helper in lib/money.ts. It used to be formatted straight through
+ * `inr()` without dividing by 100, which meant every live figure on the
+ * dashboard read one hundred times too large: a day that took Rs 1,557.60 was
+ * displayed as Rs 1,55,760. The demo rows passed whole rupees, so the bug was
+ * invisible in preview mode and only ever appeared against real data.
+ *
+ * Callers holding rupees must convert at the boundary with rupeesToPaise().
+ */
 export function Money({ value, strong = false }: { value: number; strong?: boolean }) {
   return (
     <span className="money" style={strong ? { fontWeight: 600 } : undefined}>
-      {inr(value)}
+      {inr(paiseToRupees(value))}
     </span>
   );
 }
