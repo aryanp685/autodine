@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { parseCart } from '@/lib/cart-storage';
-import { isExpired, readTableSession } from '@/lib/table-session';
+import { loadTableAccess } from '@/lib/table-access';
 
 const CART_PATH = '/menu/cart';
 
@@ -47,12 +47,37 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
   // the kitchen calls out. The session is passed rather than a table number
   // the browser could have typed: the database resolves the table from it.
   //
-  // An expired session is dropped rather than failed. The order still goes
-  // through as a counter order, which is a real thing a guest standing at a
-  // counter does, and refusing it outright would lose a sale over a clock.
-  const session = await readTableSession();
-  const liveSession =
-    session && !isExpired(session) && session.slug === slug ? session.token : null;
+  // THIS IS NOW REQUIRED, AND THE DATABASE IS ASKED
+  //
+  // An expired session used to be dropped and the order placed as a counter
+  // order -- a "clock should not lose a sale" decision that also meant anyone
+  // holding a cart could order from anywhere. place_public_order now raises
+  // without a table session, so this cannot quietly fall back even if this
+  // line were wrong; the check here exists so the guest gets a sentence they
+  // can act on instead of a Postgres error, and so a guest whose hour ran out
+  // is sent back to the code form rather than left staring at a cart.
+  const access = await loadTableAccess(slug);
+
+  if (access.status === 'stale' && access.qrToken) {
+    // One tap back to the card's form. The cart lives in localStorage, so
+    // nothing is lost by leaving the page.
+    redirect(`/t/${access.qrToken}`);
+  }
+
+  if (access.status === 'stale') {
+    fail('Your table session has ended. Scan the QR code on your table and enter the current code to order.');
+  }
+  if (access.status === 'none') {
+    fail('This menu takes orders from a table. Scan the QR code on your table and enter the code showing inside the restaurant.');
+  }
+  if (access.status === 'unavailable') {
+    fail('We could not check your table just now. Please try again, or order with staff.');
+  }
+  if (access.status !== 'verified') {
+    fail('This menu takes orders from a table. Please scan the QR code on your table.');
+  }
+
+  const liveSession = access.session.token;
 
   // The guest's own key to this order, made here and never shown to anyone
   // else. It goes into the redirect that follows, which is what lets the

@@ -49,7 +49,7 @@ export function Home() {
         <div className="home__three" data-anim-group>
           {[
             ['01', 'A clear digital menu', 'Every dish, price and menu is edited and published from the dashboard, and several menus can run side by side — lunch and dinner, dine-in and takeaway.'],
-            ['02', 'A connected service flow', 'A guest scans the table code and the order lands on the kitchen board immediately, spoken out in Hindi, and is paid for at the counter.'],
+            ['02', 'A connected service flow', 'A guest scans the table code, types the six digits showing inside the restaurant, and the order lands on the kitchen board immediately, spoken out in Hindi, and is paid for at the counter.'],
             ['03', 'Payments, designed carefully', 'Cash, card and UPI collected at the counter are recorded against the bill. No online payment provider is connected yet, so nothing is charged from a phone.'],
           ].map(([n, title, body]) => (
             <article key={n} className="home__col">
