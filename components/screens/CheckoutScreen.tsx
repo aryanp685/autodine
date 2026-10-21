@@ -90,10 +90,13 @@ export function Checkout({
           <h2 className="co__h2">Your order</h2>
           <ul className="co__items">
             {priced.lines.map((l) => (
-              <li key={l.itemId}>
+              // Keyed by portion as well as item: two portions of one dish
+              // are two rows, and keying only by item made them collide.
+              <li key={`${l.itemId}|${l.variantId ?? ''}`}>
                 <VegMark veg={l.isVeg} />
                 <span>
                   <strong>{l.qty} ×</strong> {l.name}
+                  {l.variantName ? <em className="co__variant"> · {l.variantName}</em> : null}
                 </span>
                 <span className="tnum">{inr(paiseToRupees(l.lineTotalPaise))}</span>
               </li>

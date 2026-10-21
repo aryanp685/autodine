@@ -58,6 +58,7 @@ export function OrderPlacedScreen({ data }: { data: OrderScreenData | null }) {
                 <div className="cart__lineTop">
                   <VegMark veg={l.isVeg} />
                   <strong>{l.name}</strong>
+                  {l.variantName ? <em className="co__variant"> · {l.variantName}</em> : null}
                 </div>
                 <div className="cart__linePrice tnum">
                   {inr(paiseToRupees(l.unitPricePaise))} each

@@ -512,6 +512,28 @@
 /* Checkout with nothing in it. Reuses the cart's empty state so the two read
    as the same thing. */
 [data-app] .co__empty { padding: 14px 0; font-size: 13.5px; color: var(--ink-55); }
+/* Which portion a checkout line is. Muted rather than bold, so it reads as a
+   qualifier on the dish and not as part of its name -- the dish is what was
+   ordered, the portion is how much of it. */
+[data-app] .co__variant { font-style: normal; color: var(--ink-55); font-size: 13px; }
+/* Portions in the menu editor. A compact list with a remove control per row,
+   then one inline row to add another -- the same shape as adding an item, so
+   the two read as the same kind of action. */
+[data-app] .pg__variants { border-top: 1px solid var(--border); margin-top: 20px; padding-top: 18px; display: grid; gap: 12px; }
+[data-app] .pg__variantsHead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+[data-app] .pg__variantsHead h4 { font-size: 13px; font-weight: 600; letter-spacing: 0.02em; }
+[data-app] .pg__variantList { display: grid; gap: 0; }
+[data-app] .pg__variantList li { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+[data-app] .pg__variantX { border: 1px solid var(--border); background: transparent; color: var(--ink-55); width: 22px; height: 22px; border-radius: 2px; line-height: 1; cursor: pointer; font-size: 14px; }
+[data-app] .pg__variantX:hover { color: var(--surface); background: var(--accent); border-color: var(--accent); }
+[data-app] .pg__variantForm { display: grid; grid-template-columns: 1fr 96px auto; gap: 8px; align-items: end; }
+[data-app] .pg__variantCount { color: var(--text); }
+[data-app] .pg__variantNone { color: var(--ink-55); }
+
+@media (max-width: 560px) {
+  [data-app] .pg__variantForm { grid-template-columns: 1fr 1fr; }
+  [data-app] .pg__variantForm .pg__btn { grid-column: span 2; }
+}
 [data-app] .co__noteForm { margin-top: 20px; display: grid; gap: 8px; }
 [data-app] .pg__undo { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 0 48px 16px; padding: 12px 16px; border: 1px solid var(--border); background: var(--surface); font-size: 13.5px; }
 [data-app] .pg__undoBtn { border: 1px solid var(--text); background: var(--text); color: var(--surface); padding: 7px 14px; border-radius: 2px; font-size: 13px; cursor: pointer; }

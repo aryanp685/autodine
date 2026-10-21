@@ -23,8 +23,10 @@ vi.mock('@/app/dashboard/menus/actions', () => ({
   addCategoryAction: mocks.action('addCategoryAction'),
   addItemAction: mocks.action('addItemAction'),
   addPresetCategoriesAction: mocks.action('addPresetCategoriesAction'),
+  addVariantAction: mocks.action('addVariantAction'),
   deleteCategoryAction: mocks.action('deleteCategoryAction'),
   deleteItemAction: mocks.action('deleteItemAction'),
+  deleteVariantAction: mocks.action('deleteVariantAction'),
   publishMenuAction: mocks.action('publishMenuAction'),
   restoreItemAction: mocks.action('restoreItemAction'),
   saveItemAction: mocks.action('saveItemAction'),
@@ -56,6 +58,7 @@ const item = (id: string, name: string, over: ItemOverride = {}): EditorItem => 
   available: true,
   sortOrder: 0,
   categoryId: 'c-1',
+  variants: [],
   ...over,
 });
 
@@ -112,10 +115,34 @@ describe('MenuEditorScreen, live', () => {
     expect(html).not.toContain('New item name');
   });
 
-  it('drops the Variants column, which showed an em dash because it is not built', () => {
+  it('shows a Portions column, now that portions exist', () => {
+    // The column used to be hidden when live: variants were not built, so it
+    // put an em dash on every row, which reads as a broken feature rather
+    // than an absent one. They are built, so it is shown.
     const html = render(data({ items: [item('i-1', 'Paneer Tikka')] }));
 
+    expect(html).toContain('Portions');
     expect(html).not.toContain('Variants');
+  });
+
+  it('counts the portions on each row', () => {
+    const html = render(
+      data({
+        items: [
+          item('i-1', 'Paneer Tikka', {
+            variants: [
+              { id: 'v-1', name: 'Half', pricePaise: 21000, sortOrder: 1 },
+              { id: 'v-2', name: 'Full', pricePaise: 32000, sortOrder: 2 },
+            ],
+          }),
+          item('i-2', 'Dal Bukhara'),
+        ],
+      })
+    );
+
+    // Two portions on the first row, an em dash on the one with none.
+    expect(html).toContain('pg__variantCount">2</span>');
+    expect(html).toContain('pg__variantNone');
   });
 
   it('says the menu is live and offers to take it down when published', () => {
@@ -204,10 +231,70 @@ describe('MenuEditorScreen, live', () => {
 
     expect(html).toContain('Curries &amp; Mains');
     // Demo rows carry real variant data, so that column is not a lie there.
-    expect(html).toContain('Variants');
+    expect(html).toContain('Portions');
     // Nothing to delete: there is no database behind these rows. The editor
     // form still carries an itemId field of its own, so the check is on the
     // delete control, not on the field name.
     expect(html).not.toContain('pg__rowDel');
+  });
+});
+
+describe('portions', () => {
+  const variant = (n: number, name: string, paise: number) => ({
+    id: `v-${n}`,
+    name,
+    pricePaise: paise,
+    sortOrder: n,
+  });
+
+  it('lists the portions with their prices, in rupees', () => {
+    const html = render(
+      data({
+        items: [
+          item('i-1', 'Paneer Tikka', {
+            variants: [variant(1, 'Half', 21000), variant(2, 'Full', 32000)],
+          }),
+        ],
+      })
+    );
+
+    expect(html).toContain('Half');
+    expect(html).toContain('Full');
+    // Stored in paise, shown in rupees: 21000 paise is Rs 210.
+    expect(html).toContain('₹210');
+    expect(html).toContain('₹320');
+  });
+
+  it('offers a remove control per portion', () => {
+    // Same shape as an item delete: one small control per row, no dialog.
+    const html = render(
+      data({
+        items: [item('i-1', 'Paneer Tikka', { variants: [variant(1, 'Half', 21000)] })],
+      })
+    );
+
+    expect(html).toContain('name="variantId"');
+    expect(html).toContain('pg__variantX');
+  });
+
+  it('offers a form to add a portion, carrying the item id', () => {
+    const html = render(data({ items: [item('i-1', 'Paneer Tikka')] }));
+
+    expect(html).toContain('name="variantName"');
+    expect(html).toContain('name="variantPrice"');
+    expect(html).toContain('Add portion');
+  });
+
+  it('says plainly when a dish has no portions', () => {
+    const html = render(data({ items: [item('i-1', 'Paneer Tikka')] }));
+    expect(html).toContain('sold at one price');
+  });
+
+  it('never renders the add form as live when there is no database', () => {
+    // A form that looks like it saves and cannot is worse than a control that
+    // plainly does nothing.
+    const html = render(null);
+    expect(html).toContain('Add portion');
+    expect(html).toContain('disabled');
   });
 });

@@ -17,11 +17,36 @@
 export type StoredLine = {
   itemId: string;
   qty: number;
+  /**
+   * Which portion was chosen, when the dish has portions.
+   *
+   * Absent means "the dish as it is priced on the menu", not "no portion".
+   * The distinction matters at the till: a dish with no variants has no
+   * choice to make, while a dish with variants that somehow arrives without
+   * one is a bug and is priced at the base price rather than silently
+   * dropped -- dropping it would lose the sale over a UI problem.
+   */
+  variantId?: string;
 };
 
 const PREFIX = 'autodine.cart.';
 const MAX_QTY = 99;
 const MAX_LINES = 100;
+
+/**
+ * What makes two cart lines the same line.
+ *
+ * Item id alone is not enough once portions exist. A half plate and a full
+ * plate of the same dish are two different things at two different prices;
+ * collapsing them by item id would mean adding "Full" after "Half" bumped the
+ * half's quantity and charged the wrong price for both.
+ *
+ * This is the single place that rule lives, so `add` merging, quantity edits
+ * and deduplication on read cannot disagree about it.
+ */
+export function lineKey(line: Pick<StoredLine, 'itemId' | 'variantId'>): string {
+  return `${line.itemId}|${line.variantId ?? ''}`;
+}
 
 export function cartKey(slug: string): string {
   return `${PREFIX}${slug}`;
@@ -53,17 +78,24 @@ export function parseCart(raw: string | null): StoredLine[] {
 
   for (const entry of parsed) {
     if (typeof entry !== 'object' || entry === null) continue;
-    const { itemId, qty } = entry as Record<string, unknown>;
+    const { itemId, qty, variantId } = entry as Record<string, unknown>;
 
     if (typeof itemId !== 'string' || !itemId) continue;
-    // One line per item. A duplicated id means the second one wins, which is
+
+    // A variant id is optional but not free-form: a non-string is dropped
+    // rather than coerced, because a coerced id would resolve to a different
+    // dish's portion rather than to nothing.
+    const variant = typeof variantId === 'string' && variantId ? variantId : undefined;
+
+    // One line per portion. A duplicate means the second one wins, which is
     // what repeatedly pressing "add" should do.
-    if (seen.has(itemId)) continue;
+    const key = lineKey({ itemId, variantId: variant });
+    if (seen.has(key)) continue;
     if (typeof qty !== 'number' || !Number.isInteger(qty)) continue;
     if (qty <= 0 || qty > MAX_QTY) continue;
 
-    seen.add(itemId);
-    lines.push({ itemId, qty });
+    seen.add(key);
+    lines.push({ itemId, qty, ...(variant ? { variantId: variant } : {}) });
     if (lines.length >= MAX_LINES) break;
   }
 
@@ -74,15 +106,27 @@ export function serialiseCart(lines: StoredLine[]): string {
   return JSON.stringify(lines);
 }
 
-/** Adds one, or bumps the quantity if the item is already in the cart. */
-export function addLine(lines: StoredLine[], itemId: string, by = 1): StoredLine[] {
+/**
+ * Adds one, or bumps the quantity when that exact portion is already there.
+ *
+ * "Exact portion" is the point. Adding a full plate when a half is in the
+ * cart starts a second line; adding another half bumps the first.
+ */
+export function addLine(
+  lines: StoredLine[],
+  itemId: string,
+  by = 1,
+  variantId?: string
+): StoredLine[] {
   if (!itemId) return lines;
 
-  const existing = lines.findIndex((l) => l.itemId === itemId);
+  const wanted = lineKey({ itemId, variantId });
+  const existing = lines.findIndex((l) => lineKey(l) === wanted);
+  const base = variantId ? { itemId, variantId } : { itemId };
 
   if (existing === -1) {
     if (lines.length >= MAX_LINES) return lines;
-    return [...lines, { itemId, qty: Math.min(Math.max(by, 1), MAX_QTY) }];
+    return [...lines, { ...base, qty: Math.min(Math.max(by, 1), MAX_QTY) }];
   }
 
   return lines.map((l, i) =>
@@ -91,16 +135,25 @@ export function addLine(lines: StoredLine[], itemId: string, by = 1): StoredLine
 }
 
 /** Removes the line when the quantity reaches zero, rather than showing a 0. */
-export function setQty(lines: StoredLine[], itemId: string, qty: number): StoredLine[] {
+export function setQty(
+  lines: StoredLine[],
+  itemId: string,
+  qty: number,
+  variantId?: string
+): StoredLine[] {
+  const wanted = lineKey({ itemId, variantId });
+  const isTarget = (l: StoredLine) => lineKey(l) === wanted;
+
   if (!Number.isInteger(qty) || qty <= 0) {
-    return lines.filter((l) => l.itemId !== itemId);
+    return lines.filter((l) => !isTarget(l));
   }
   const clamped = Math.min(qty, MAX_QTY);
-  return lines.map((l) => (l.itemId === itemId ? { ...l, qty: clamped } : l));
+  return lines.map((l) => (isTarget(l) ? { ...l, qty: clamped } : l));
 }
 
-export function removeLine(lines: StoredLine[], itemId: string): StoredLine[] {
-  return lines.filter((l) => l.itemId !== itemId);
+export function removeLine(lines: StoredLine[], itemId: string, variantId?: string): StoredLine[] {
+  const wanted = lineKey({ itemId, variantId });
+  return lines.filter((l) => lineKey(l) !== wanted);
 }
 
 export function totalQty(lines: StoredLine[]): number {

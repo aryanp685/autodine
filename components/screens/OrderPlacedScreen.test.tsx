@@ -30,6 +30,7 @@ const order = (over: Partial<OrderScreenData> = {}): OrderScreenData => ({
       unitPricePaise: 32000,
       lineTotalPaise: 64000,
       isVeg: true,
+      variantName: null,
     },
     {
       name: 'Butter Chicken',
@@ -37,6 +38,7 @@ const order = (over: Partial<OrderScreenData> = {}): OrderScreenData => ({
       unitPricePaise: 42000,
       lineTotalPaise: 42000,
       isVeg: false,
+      variantName: 'Half',
     },
   ],
   ...over,
@@ -104,5 +106,19 @@ describe('OrderPlacedScreen', () => {
   it('says so plainly when the order cannot be found', () => {
     const html = renderToStaticMarkup(<OrderPlacedScreen data={null} />);
     expect(html).toContain('Order not found');
+  });
+
+  it('shows which portion was ordered', () => {
+    // The snapshot, not the current menu. A guest checking their receipt
+    // needs to see what they bought, and a portion picker that never reaches
+    // the receipt is a choice the guest cannot confirm.
+    const html = renderToStaticMarkup(<OrderPlacedScreen data={order()} />);
+    expect(html).toContain('Half');
+  });
+
+  it('does not invent a portion for a dish that has none', () => {
+    const html = renderToStaticMarkup(<OrderPlacedScreen data={order()} />);
+    expect(html).toContain('Paneer Tikka');
+    expect(html).not.toContain('Paneer Tikka · ');
   });
 });

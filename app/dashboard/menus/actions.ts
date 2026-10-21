@@ -434,3 +434,119 @@ export async function publishMenuAction(formData: FormData): Promise<void> {
       : 'Menu unpublished. Diners see a closed menu.'
   );
 }
+
+/* ============================================================================
+   Portions
+   ========================================================================== */
+
+/**
+ * Confirm an item id submitted by the editor belongs to this restaurant.
+ *
+ * Same reasoning as resolveCategoryId: RLS would block a foreign id, but it
+ * fails as a generic policy violation that tells the owner nothing. Checking
+ * first turns a stale or forged id into a sentence they can act on.
+ */
+async function requireOwnItem(ctx: Ctx, raw: FormDataEntryValue | null): Promise<string> {
+  const itemId = String(raw ?? '').trim();
+  if (!itemId) fail('No item selected.');
+
+  const { data, error } = await ctx.supabase
+    .from('items')
+    .select('id')
+    .eq('id', itemId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .maybeSingle();
+
+  if (error || !data) {
+    fail('That item is not on your menu. Reload the page and try again.');
+  }
+  return data.id as string;
+}
+
+/**
+ * Add a portion to a dish.
+ *
+ * A portion is a name and a price. The name has to be short: it is printed on
+ * the kitchen ticket and shown on the bill after the dish name, so "Half
+ * (suitable for one, served with rice)" is not a portion name, it is a
+ * description in the wrong field.
+ */
+export async function addVariantAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const itemId = await requireOwnItem(ctx, formData.get('itemId'));
+
+  const name = String(formData.get('variantName') ?? '').trim();
+  if (!name) fail('Give the portion a name, such as Half or Full.');
+  if (name.length > 40) fail('That portion name is too long. Keep it to 40 characters.');
+
+  const rupees = Number(String(formData.get('variantPrice') ?? '').trim());
+  if (!Number.isFinite(rupees) || rupees < 0) fail('The portion price must be a number.');
+  if (rupees > 100000) fail('That price looks wrong. Please check it.');
+
+  // Appended at the end, so the order the owner adds portions in is the order
+  // diners see them in.
+  const { data: existing, error: readError } = await ctx.supabase
+    .from('item_variants')
+    .select('sort_order')
+    .eq('item_id', itemId)
+    .order('sort_order', { ascending: false })
+    .limit(1);
+
+  if (readError) fail(`Could not read the portions: ${readError.message}`);
+
+  const nextOrder = ((existing?.[0]?.sort_order as number | undefined) ?? 0) + 1;
+
+  const { error } = await ctx.supabase.from('item_variants').insert({
+    item_id: itemId,
+    name,
+    price_paise: rupeesToPaise(rupees),
+    sort_order: nextOrder,
+  });
+
+  if (error) fail(`Could not add the portion: ${error.message}`);
+
+  ok(`"${name}" added at ₹${rupees}. Publish the menu and diners will see it.`);
+}
+
+/**
+ * Remove a portion.
+ *
+ * A hard delete, like an item delete, and for the same reason: a portion that
+ * is visible in the editor but not on the menu is a state the owner cannot
+ * explain. Orders already placed are unaffected -- order_items carries a
+ * snapshot of the portion name and its price at the time of the order, so a
+ * past bill still reads correctly after this.
+ */
+export async function deleteVariantAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const variantId = String(formData.get('variantId') ?? '').trim();
+  if (!variantId) fail('No portion selected.');
+
+  // Resolve the portion's dish, then prove the dish is ours. A direct delete
+  // scoped by id alone would rely on the RLS policy to reject a foreign id,
+  // and the failure would be a policy violation the owner cannot interpret.
+  const { data: variant, error: readError } = await ctx.supabase
+    .from('item_variants')
+    .select('id, item_id, name')
+    .eq('id', variantId)
+    .maybeSingle();
+
+  if (readError) fail(`Could not read that portion: ${readError.message}`);
+  if (!variant) fail('That portion is already gone.');
+
+  const itemId = await requireOwnItem(ctx, variant.item_id as string);
+
+  const { error } = await ctx.supabase
+    .from('item_variants')
+    .delete()
+    .eq('id', variantId)
+    .eq('item_id', itemId);
+
+  if (error) fail(`Could not remove the portion: ${error.message}`);
+
+  ok(`"${variant.name as string}" removed. Past orders keep their own record of it.`);
+}

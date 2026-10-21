@@ -19,6 +19,14 @@ export type MenuItemPrice = {
   pricePaise: Paise;
   isVeg: boolean;
   isAvailable: boolean;
+  /**
+   * The portions this dish comes in, when it has any.
+   *
+   * Absent or empty means the dish is sold one way, at `pricePaise`. A dish
+   * is never assumed to have portions; the menu either says it does or it
+   * does not.
+   */
+  variants?: { id: string; name: string; pricePaise: Paise }[];
 };
 
 export type PricedLine = {
@@ -28,6 +36,9 @@ export type PricedLine = {
   qty: number;
   isVeg: boolean;
   lineTotalPaise: Paise;
+  /** Which portion, when the dish has portions and one was chosen. */
+  variantId?: string;
+  variantName?: string;
 };
 
 export type PricedCart = {
@@ -39,6 +50,16 @@ export type PricedCart = {
   missingIds: string[];
   /** Items that exist but are sold out right now. */
   unavailableIds: string[];
+  /**
+   * Cart lines whose chosen portion no longer exists.
+   *
+   * These are kept, priced at the dish's menu price, and listed here -- not
+   * dropped. Dropping them would lose a sale because a menu changed out from
+   * under an open cart, and pricing them silently would take money for
+   * something the guest did not pick. Flagging them lets the cart say so in
+   * as many words before anyone pays.
+   */
+  staleVariantIds: string[];
   subtotalPaise: Paise;
   totals: OrderTotals;
 };
@@ -53,6 +74,7 @@ export function priceCart(
   const lines: PricedLine[] = [];
   const missingIds: string[] = [];
   const unavailableIds: string[] = [];
+  const staleVariantIds: string[] = [];
 
   for (const line of stored) {
     const item = byId.get(line.itemId);
@@ -69,13 +91,38 @@ export function priceCart(
       continue;
     }
 
+    // Resolve the chosen portion. Three outcomes, and only the first is the
+    // normal one:
+    //
+    //   no variant asked for   -> the dish's own price
+    //   variant found          -> that portion's price
+    //   variant asked, missing -> the dish's own price, and flagged
+    //
+    // The third is not an error to throw on. Menus change while carts sit
+    // open; a portion deleted ten minutes ago should not turn a full cart
+    // into an empty one.
+    let unitPricePaise = item.pricePaise;
+    let variantName: string | undefined;
+
+    if (line.variantId) {
+      const variant = (item.variants ?? []).find((v) => v.id === line.variantId);
+      if (variant) {
+        unitPricePaise = variant.pricePaise;
+        variantName = variant.name;
+      } else {
+        staleVariantIds.push(line.variantId);
+      }
+    }
+
     lines.push({
       itemId: item.id,
       name: item.name,
-      unitPricePaise: item.pricePaise,
+      unitPricePaise,
       qty: line.qty,
       isVeg: item.isVeg,
-      lineTotalPaise: item.pricePaise * line.qty,
+      lineTotalPaise: unitPricePaise * line.qty,
+      ...(line.variantId ? { variantId: line.variantId } : {}),
+      ...(variantName ? { variantName } : {}),
     });
   }
 
@@ -88,6 +135,7 @@ export function priceCart(
     lines,
     missingIds,
     unavailableIds,
+    staleVariantIds,
     subtotalPaise: totals.subtotalPaise,
     totals,
   };

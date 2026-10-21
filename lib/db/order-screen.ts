@@ -33,6 +33,14 @@ export type OrderScreenData = {
     unitPricePaise: number;
     lineTotalPaise: number;
     isVeg: boolean;
+    /**
+     * Which portion, as it was when the order was placed.
+     *
+     * From order_items.variant_snapshot, not from the menu. A receipt has to
+     * keep saying "Half" after someone rewrites the dish tomorrow, which is
+     * the entire reason the column exists.
+     */
+    variantName: string | null;
   }[];
 };
 
@@ -72,7 +80,7 @@ export async function getOrderScreenData(
   // not describe this relationship, so order_items(*) does not typecheck.
   const { data: rows, error: itemsError } = await supabase
     .from('order_items')
-    .select('name_snapshot, qty, unit_price_paise, is_veg, sort_order')
+    .select('name_snapshot, qty, unit_price_paise, is_veg, sort_order, variant_snapshot')
     .eq('order_id', order.id as string)
     .order('sort_order', { ascending: true });
 
@@ -111,6 +119,7 @@ export async function getOrderScreenData(
       unitPricePaise: Number(r.unit_price_paise ?? 0),
       lineTotalPaise: Number(r.unit_price_paise ?? 0) * Number(r.qty ?? 0),
       isVeg: Boolean(r.is_veg),
+      variantName: ((r.variant_snapshot as string | null) ?? null) || null,
     })),
   };
 }

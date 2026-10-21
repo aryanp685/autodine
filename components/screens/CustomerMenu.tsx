@@ -227,6 +227,28 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
   const [qty, setQty] = useState(1);
   const cart = useCart();
 
+  /**
+   * The portion being bought, and what it costs.
+   *
+   * A dish with no portions has no variant and is priced at its menu price.
+   * A dish with portions is priced at the selected one -- which is the whole
+   * point of asking. The button and the bill have to agree, and until this
+   * existed the button read the menu price regardless of what was selected.
+   */
+  const chosenVariant = variants.find((v) => v.id === variant);
+  const chosenUnitPrice = chosenVariant?.price ?? item.price;
+
+  /**
+   * Spice and bread are still not charged, and saying so is not optional.
+   *
+   * There is no modifier table in the schema: these are preset groups that
+   * exist only on this screen. Showing a price beside them, or including them
+   * in the total, would be inventing a charge the till cannot honour. The note
+   * stays until they are real; it now says exactly which part is free instead
+   * of claiming portions are too.
+   */
+  const hasUnpricedAddons = Boolean(item.modifiers?.length) || Boolean(variants.length);
+
   const spiceGroup = item.modifiers?.[0] ?? PRESET_SPICE;
   const breadGroup = item.modifiers?.[1] ?? PRESET_BREAD;
 
@@ -323,20 +345,19 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
             <button
               className="sheet__add"
               onClick={() => {
-                // Only the dish and how many. Portions and add-ons are chosen
-                // here but not charged -- the cart carries an id and a
-                // quantity, and the price is read from the kitchen's menu when
-                // the order is placed, so the options below cannot change what
-                // is billed.
-                cart.add(item.id, qty);
+                // The dish, how many, and which portion. The portion travels
+                // with the line because the server prices it from the
+                // database -- what is sent is the id, never a price.
+                cart.add(item.id, qty, chosenVariant?.id);
               }}
             >
-              Add to order · {inr(paiseToRupees(item.price * qty))}
+              Add to order · {inr(paiseToRupees(chosenUnitPrice * qty))}
             </button>
-            {(Boolean(item.variants?.length) || Boolean(item.modifiers?.length)) && (
+            {hasUnpricedAddons && (
               <p className="sheet__note">
-                Portions and add-ons you pick here are not charged yet — the bill uses
-                the menu price of {inr(item.price)} each.
+                Spice level and any bread you add are passed to the kitchen but not
+                charged — the bill is {inr(chosenUnitPrice)} per plate
+                {chosenVariant ? ` (${chosenVariant.name})` : ''}.
               </p>
             )}
           </div>
