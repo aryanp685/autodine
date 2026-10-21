@@ -351,7 +351,14 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
                 cart.add(item.id, qty, chosenVariant?.id);
               }}
             >
-              Add to order · {inr(paiseToRupees(chosenUnitPrice * qty))}
+              {/* Both are rupees already: item.price and variant.price come
+                  from DisplayItem, which is in display units. Passing them
+                  through paiseToRupees divided an already-rupees number by a
+                  hundred, so a Rs 250 plate showed as Rs 3. The bug predates
+                  portions -- the button has always read wrong -- but it only
+                  became visible enough to catch once the sheet offered a
+                  second price to compare against. */}
+              Add to order · {inr(chosenUnitPrice * qty)}
             </button>
             {hasUnpricedAddons && (
               <p className="sheet__note">
