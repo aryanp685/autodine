@@ -22,16 +22,30 @@
  * The demo rows carry four QR states. The database has no "printed" column,
  * so the mapping is:
  *
- *   is_active = false        -> 'disabled'  (table out of service)
- *   no live qr_token         -> 'revoked'   (needs a code before it can sell)
- *   live, unexpired token    -> 'active'
+ *   is_active = false   -> 'disabled'  (table out of service)
+ *   no live code        -> 'revoked'   (needs a code before it can sell)
+ *   a live code         -> 'active'
+ *
+ * 'revoked' should now be unreachable for a live table: migration 0007 puts a
+ * trigger on dining_tables so a row cannot be inserted without a code
+ * following it, and backfills every table that predates the trigger. The
+ * branch is kept because the trigger can be dropped, and because finding out
+ * that a table has no code is exactly what this screen is for.
  *
  * 'printed' is not derivable from the schema and is never returned here. A
  * real deployment would need a printed_at column to tell whether the card
  * on the table matches the code currently in the database.
+ *
+ * ON qr_tokens
+ *
+ * This used to read qr_tokens, the twelve-hour rotating scheme. It does not
+ * any more, and nothing writes to that table either. table_qr_codes is the
+ * scheme that scanning actually uses -- see migration 0007 for why the older
+ * functions were left in place rather than granted.
  */
 
 import { getStaffContextDetailed } from './staff';
+import { qrSvg, siteOrigin, tableScanUrl } from '../qr';
 
 export type TableStatus = 'active' | 'revoked' | 'disabled';
 
@@ -50,9 +64,16 @@ export type TableRow = {
   /** Humanised time of the most recent order at this table, or '—'. */
   lastScan: string;
   orders: number;
-  /** Only set when a live token exists. Never rendered to the page as-is. */
+  /**
+   * The code this table scans with. Shown to staff in full, because they have
+   * to be able to reprint a card, and they are already inside the
+   * restaurant's own dashboard to see it.
+   */
   token?: string | null;
-  expiresAt?: string | null;
+  /** The absolute URL the printed card encodes. Never guessed; always built. */
+  scanUrl?: string | null;
+  /** Rendered QR for that URL, or null if it could not be encoded. */
+  qrSvg?: string | null;
 };
 
 export type TablesScreenData = {
@@ -62,9 +83,17 @@ export type TablesScreenData = {
   blocked?: 'signed-out' | 'no-membership';
 };
 
-/** How long a table QR stays valid. Short-lived by design: a static printed
- *  code cannot prove a diner is physically in the room. */
-export const QR_TTL_HOURS = 12;
+// There is deliberately no QR_TTL_HOURS any more.
+//
+// The twelve-hour rotation it described belonged to qr_tokens, and that
+// scheme has been replaced. A printed card cannot be rotated on a timer --
+// nobody is going to reprint five cards every twelve hours -- so the card
+// now carries a permanent token, and what expires is the *session* a scan
+// creates from it, inside the database. See migration 0007.
+//
+// Rotation is still available, as an explicit act: rotating a code is how a
+// restaurant takes a leaked one out of service. It is a decision someone
+// makes, not a clock running down.
 
 function ago(iso: string | null): string {
   if (!iso) return '—';
@@ -102,9 +131,10 @@ export async function getTablesScreenData(): Promise<TablesScreenData | null> {
       .eq('restaurant_id', restaurantId)
       .order('label', { ascending: true }),
     supabase
-      .from('qr_tokens')
-      .select('id, table_id, token, expires_at')
-      .eq('restaurant_id', restaurantId),
+      .from('table_qr_codes')
+      .select('id, table_id, public_token, created_at')
+      .eq('restaurant_id', restaurantId)
+      .is('revoked_at', null),
     supabase
       .from('orders')
       .select('table_id, placed_at')
@@ -115,29 +145,34 @@ export async function getTablesScreenData(): Promise<TablesScreenData | null> {
     throw new Error(`Could not load tables: ${tablesResult.error.message}`);
   }
   if (tokensResult.error) {
-    throw new Error(`Could not load QR tokens: ${tokensResult.error.message}`);
+    throw new Error(`Could not load QR codes: ${tokensResult.error.message}`);
   }
   if (ordersResult.error) {
     throw new Error(`Could not load orders: ${ordersResult.error.message}`);
   }
 
-  const now = Date.now();
-
-  // Latest token per table, and only if it has not expired.
-  const liveTokenByTable = new Map<string, { token: string; expiresAt: string }>();
+  // One live code per table. The query already excludes revoked rows, and the
+  // trigger in migration 0007 keeps a table to one; this picks the newest so
+  // a table that somehow ended up with two still resolves to a single answer
+  // rather than whichever the database happened to return first.
+  const liveCodeByTable = new Map<string, string>();
   for (const row of tokensResult.data ?? []) {
-    if (!row.table_id) continue;
-    const expires = new Date(row.expires_at).getTime();
-    if (Number.isNaN(expires) || expires <= now) continue;
-
-    const existing = liveTokenByTable.get(row.table_id);
-    if (!existing || expires > new Date(existing.expiresAt).getTime()) {
-      liveTokenByTable.set(row.table_id, {
-        token: row.token,
-        expiresAt: row.expires_at,
-      });
-    }
+    if (!row.table_id || !row.public_token) continue;
+    liveCodeByTable.set(row.table_id, row.public_token);
   }
+
+  // Every card is rendered here rather than in the component, so the SVG is
+  // built once per table on the server and the page carries no encoder with
+  // it. The origin is resolved from the request: a code printed with the
+  // preview host baked in is a dead card in production.
+  const origin = await siteOrigin();
+  const svgByToken = new Map<string, string>();
+  await Promise.all(
+    [...liveCodeByTable.values()].map(async (token) => {
+      const svg = await qrSvg(tableScanUrl(origin, token));
+      if (svg) svgByToken.set(token, svg);
+    })
+  );
 
   const statsByTable = new Map<string, { orders: number; last: string | null }>();
   for (const row of ordersResult.data ?? []) {
@@ -149,7 +184,7 @@ export async function getTablesScreenData(): Promise<TablesScreenData | null> {
   }
 
   const tables: TableRow[] = (tablesResult.data ?? []).map((row) => {
-    const token = liveTokenByTable.get(row.id) ?? null;
+    const token = liveCodeByTable.get(row.id) ?? null;
     const stats = statsByTable.get(row.id);
 
     return {
@@ -160,8 +195,9 @@ export async function getTablesScreenData(): Promise<TablesScreenData | null> {
       qr: !row.is_active ? 'disabled' : token ? 'active' : 'revoked',
       lastScan: ago(stats?.last ?? null),
       orders: stats?.orders ?? 0,
-      token: token?.token ?? null,
-      expiresAt: token?.expiresAt ?? null,
+      token,
+      scanUrl: token ? tableScanUrl(origin, token) : null,
+      qrSvg: token ? (svgByToken.get(token) ?? null) : null,
     };
   });
 

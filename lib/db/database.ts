@@ -76,6 +76,25 @@ export type Database = {
       >;
       item_variants: Table<ItemVariant>;
       dining_tables: Table<DiningTable>;
+      /**
+       * The printed card's code. This is the scheme scanning uses.
+       *
+       * qr_tokens, defined below it, is the older twelve-hour rotating
+       * scheme. Nothing writes to it any more and nothing reads it. It is
+       * still typed because table_qr_codes.source_qr_token_id references it
+       * and dropping the type would mean the column could not be described.
+       * If you are deciding which of the two to use: this one.
+       */
+      table_qr_codes: Table<{
+        id: string;
+        restaurant_id: string;
+        table_id: string;
+        public_token: string;
+        source_qr_token_id: string | null;
+        created_at: string;
+        created_by: string | null;
+        revoked_at: string | null;
+      }>;
       qr_tokens: Table<{
         id: string;
         restaurant_id: string;
@@ -179,6 +198,36 @@ export type Database = {
           table_label: string;
           expires_at: string;
         }[];
+      };
+      /**
+       * Migration 0007. Replace a table's printed code, and take one out of
+       * service.
+       *
+       * Both are SECURITY DEFINER and both check membership against the
+       * session before touching anything, which is the only thing that makes
+       * them safe to grant: under SECURITY DEFINER, RLS is suspended inside
+       * the function body, so a missing check would let any signed-in user
+       * rotate -- and read back -- the live code for any table anywhere.
+       *
+       * Neither is granted to anon. A guest scans codes; only staff issue
+       * them.
+       *
+       * Rotation revokes the old code before inserting the new one, in one
+       * transaction. Split across two client writes, a failure between them
+       * would leave the table with no live code at all.
+       *
+       * Both raise 42501 'You do not manage this restaurant.' and P0002
+       * 'That table does not exist.' -- staff-facing, unlike the P0001s in
+       * verify_table_qr which are written for guests.
+       */
+      rotate_table_qr_code: {
+        Args: { p_table_id: string };
+        /** The new public token, so the caller can re-render the card. */
+        Returns: string;
+      };
+      retire_table_qr_code: {
+        Args: { p_table_id: string };
+        Returns: undefined;
       };
       /**
        * Migration 0005. The only way a signed-out diner places an order.
