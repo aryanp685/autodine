@@ -100,7 +100,10 @@ export function Dashboard({ data }: { data?: DashboardScreenData | null }) {
   const itemRows: Array<{ name: string; qty: number; revenuePaise: number }> =
     live && data
       ? data.topItems
-      : topItems.map((t) => ({ name: t.name, qty: t.sold, revenuePaise: t.revenue }));
+      // Demo rows hold rupees; the live ones hold paise. Money takes paise,
+      // so the demo branch converts at the boundary rather than teaching the
+      // component two units.
+      : topItems.map((t) => ({ name: t.name, qty: t.sold, revenuePaise: rupeesToPaise(t.revenue) }));
 
   // The Sparkline divides by (length - 1); a single bucket at ten past
   // midnight would hand it a zero step and draw nothing. Two points minimum.
