@@ -28,8 +28,9 @@
  * only place allowed to divide by 100.
  */
 
-import { getStaffContextDetailed } from '@/lib/db/staff';
+import { getStaffContextDetailed, KITCHEN_ROLES } from '@/lib/db/staff';
 import { paiseToRupees } from '@/lib/money';
+import type { MemberRole } from './database';
 
 export type KitchenPrepState = 'new' | 'preparing' | 'ready' | 'served';
 
@@ -119,6 +120,19 @@ export type KitchenScreenData = {
    * blocked one needs the user to do something. See lib/db/staff.ts.
    */
   blocked?: 'signed-out' | 'no-membership';
+  /** The caller's role, so the board can explain itself in their words. */
+  role: MemberRole | null;
+  /**
+   * Whether this caller may move tickets. False for two unrelated reasons --
+   * the role, or the restaurant being read-only -- and `cannotAdvance` says
+   * which, because "ask an owner" and "the plan has ended" are different
+   * instructions.
+   *
+   * The database is still the authority: this only decides whether to show a
+   * button that would be refused.
+   */
+  canAdvance: boolean;
+  cannotAdvance?: 'role' | 'plan';
 };
 
 /**
@@ -183,11 +197,42 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
       restaurantId: null,
       tickets: [],
       cancelled: [],
+      role: null,
+      canAdvance: false,
+      cannotAdvance: 'role',
       blocked: staff.reason,
     };
   }
 
-  const { supabase, restaurantId, restaurantName } = staff.context;
+  const { supabase, restaurantId, restaurantName, role } = staff.context;
+
+  /**
+   * Two independent gates, checked in the order the operator can act on them.
+   *
+   * A cashier cannot move tickets because the update policy on orders names
+   * owner, manager and kitchen only -- not because the board feels like
+   * restricting them. A read-only restaurant (trial ended, no plan) fails the
+   * second half of the same policy.
+   *
+   * restaurant_can_write is a read; a transient failure here must not hide the
+   * buttons, so the call is treated as "allowed" and the write path reports
+   * whatever the database says.
+   */
+  let canAdvance = KITCHEN_ROLES.includes(role);
+  let cannotAdvance: 'role' | 'plan' | undefined = canAdvance ? undefined : 'role';
+
+  if (canAdvance) {
+    const { data: writable, error: writeCheckError } = await supabase.rpc('restaurant_can_write', {
+      p_restaurant_id: restaurantId,
+    });
+
+    if (writeCheckError) {
+      console.error(`[kitchen] could not read the write state: ${writeCheckError.message}`);
+    } else if (writable === false) {
+      canAdvance = false;
+      cannotAdvance = 'plan';
+    }
+  }
   const now = Date.now();
   const cutoff = new Date(now - BOARD_WINDOW_HOURS * 3_600_000).toISOString();
 
@@ -337,5 +382,13 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
     };
   });
 
-  return { restaurantName, restaurantId, tickets, cancelled };
+  return {
+    restaurantName,
+    restaurantId,
+    tickets,
+    cancelled,
+    role,
+    canAdvance,
+    ...(cannotAdvance ? { cannotAdvance } : {}),
+  };
 }

@@ -16,6 +16,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/lib/db/staff', () => ({
   getStaffContextDetailed: () => Promise.resolve(mocks.staff.result),
+  // Mirrors the database: orders_staff_update names these three roles. The
+  // loader reads it to decide whether to offer the move buttons.
+  KITCHEN_ROLES: ['owner', 'manager', 'kitchen'],
 }));
 
 import { getKitchenScreenData } from './kitchen-screen';
@@ -27,7 +30,7 @@ type Row = Record<string, unknown>;
  * it yields the rows registered for that table. Close enough to supabase-js's
  * PostgrestFilterBuilder for the shapes these queries use.
  */
-function fakeSupabase(rows: Record<string, Row[]>) {
+function fakeSupabase(rows: Record<string, Row[]>, writable: boolean | 'error' = true) {
   const from = (table: string) => {
     const data = rows[table] ?? [];
     // Not annotated as PromiseLike on purpose: the real client's generics
@@ -50,13 +53,21 @@ function fakeSupabase(rows: Record<string, Row[]>) {
     };
     return chain;
   };
-  return { from } as never;
+  // restaurant_can_write is the other half of the update policy. True by
+  // default; a test passes false for a read-only plan, or 'error' to simulate
+  // the read itself failing.
+  const rpc = () =>
+    writable === 'error'
+      ? Promise.resolve({ data: null, error: { message: 'network' } })
+      : Promise.resolve({ data: writable, error: null });
+
+  return { from, rpc } as never;
 }
 
-function signedIn(supabase: unknown) {
+function signedIn(supabase: unknown, role = 'kitchen') {
   return {
     ok: true as const,
-    context: { supabase, restaurantId: 'r-1', restaurantName: 'Saffron & Smoke' },
+    context: { supabase, restaurantId: 'r-1', restaurantName: 'Saffron & Smoke', role },
   };
 }
 
@@ -306,5 +317,47 @@ describe('getKitchenScreenData', () => {
     const ticket = (await getKitchenScreenData())?.tickets[0];
     expect(ticket?.id).toBe('o-99');
     expect(ticket?.note).toBe('Ring the bell');
+  });
+
+  /* --------------------------------------------------------- who may write
+     The board must not offer a button the database will refuse, and it must
+     explain the refusal in words the person reading the screen can act on.
+     These three cases are the whole permission story. */
+
+  it('lets owner, manager and kitchen move tickets', async () => {
+    for (const role of ['owner', 'manager', 'kitchen'] as const) {
+      mocks.staff.result = signedIn(fakeSupabase({ orders: [], order_items: [] }), role);
+      const data = await getKitchenScreenData();
+      expect(data?.canAdvance, role).toBe(true);
+      expect(data?.cannotAdvance, role).toBeUndefined();
+    }
+  });
+
+  it('lets a cashier watch the board but not move tickets', async () => {
+    mocks.staff.result = signedIn(fakeSupabase({ orders: [], order_items: [] }), 'cashier');
+    const data = await getKitchenScreenData();
+    expect(data?.canAdvance).toBe(false);
+    expect(data?.cannotAdvance).toBe('role');
+    expect(data?.role).toBe('cashier');
+    // Still a real board: the tickets are visible, only the controls are gone.
+    expect(data?.tickets).toEqual([]);
+    expect(data?.blocked).toBeUndefined();
+  });
+
+  it('turns the board read-only when the restaurant cannot write', async () => {
+    // A trial that ended with no plan fails the second half of the update
+    // policy. The role is fine, the plan is not, and the two need different
+    // sentences on screen.
+    mocks.staff.result = signedIn(fakeSupabase({ orders: [], order_items: [] }, false), 'owner');
+    const data = await getKitchenScreenData();
+    expect(data?.canAdvance).toBe(false);
+    expect(data?.cannotAdvance).toBe('plan');
+  });
+
+  it('does not hide the controls because the write check itself failed', async () => {
+    // A transient error reading the write state must not make a working board
+    // look read-only: the write path reports what the database actually says.
+    mocks.staff.result = signedIn(fakeSupabase({ orders: [], order_items: [] }, 'error'), 'owner');
+    expect((await getKitchenScreenData())?.canAdvance).toBe(true);
   });
 });

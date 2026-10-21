@@ -139,6 +139,19 @@ export type Database = {
     Views: Record<string, never>;
     Functions: {
       /**
+       * Whether writes are allowed for this restaurant right now.
+       *
+       * False once a trial has ended with no active subscription. Every write
+       * policy on the staff tables is written as
+       * `has_restaurant_role(...) and restaurant_can_write(restaurant_id)`, so
+       * this is the single question a screen has to ask before offering a
+       * button that writes. Signature checked against the live database.
+       */
+      restaurant_can_write: {
+        Args: { p_restaurant_id: string };
+        Returns: boolean;
+      };
+      /**
        * Signature verified against the live database on 2026-10-20. It takes
        * a table-verification SESSION token, not a restaurant slug and a table
        * token as this file previously claimed -- the QR flow was reworked into
