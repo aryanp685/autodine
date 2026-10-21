@@ -20,10 +20,14 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/app/dashboard/menus/actions', () => ({
+  addAddonAction: mocks.action('addAddonAction'),
+  addAddonGroupAction: mocks.action('addAddonGroupAction'),
   addCategoryAction: mocks.action('addCategoryAction'),
   addItemAction: mocks.action('addItemAction'),
   addPresetCategoriesAction: mocks.action('addPresetCategoriesAction'),
   addVariantAction: mocks.action('addVariantAction'),
+  deleteAddonAction: mocks.action('deleteAddonAction'),
+  deleteAddonGroupAction: mocks.action('deleteAddonGroupAction'),
   deleteCategoryAction: mocks.action('deleteCategoryAction'),
   deleteItemAction: mocks.action('deleteItemAction'),
   deleteVariantAction: mocks.action('deleteVariantAction'),
@@ -60,6 +64,7 @@ const item = (id: string, name: string, over: ItemOverride = {}): EditorItem => 
   categoryId: 'c-1',
   spokenName: '',
   variants: [],
+  addonGroups: [],
   ...over,
 });
 
@@ -339,5 +344,66 @@ describe('spoken name', () => {
     );
 
     expect(html).toContain('Every word is known');
+  });
+});
+
+/**
+ * Add-ons in the editor.
+ *
+ * The point of the section is that the number typed here is the number a guest
+ * pays, so the tests are about what the owner can see and act on: a price that
+ * is shown, a zero that reads as free rather than as missing, and a way to add
+ * a choice without leaving the dish.
+ */
+describe('MenuEditorScreen add-ons', () => {
+  const withAddons = item('i-1', 'Butter Naan', {
+    addonGroups: [
+      {
+        id: 'g-1',
+        name: 'Add a little extra',
+        minSelect: 0,
+        maxSelect: 2,
+        sortOrder: 0,
+        addons: [
+          { id: 'a-1', name: 'Extra cheese', pricePaise: 4000, available: true, sortOrder: 0 },
+          { id: 'a-2', name: 'Jain', pricePaise: 0, available: true, sortOrder: 1 },
+        ],
+      },
+    ],
+  });
+
+  const html = renderToStaticMarkup(
+    <MenuEditorScreen data={data({ items: [withAddons] })} selectedId="i-1" />,
+  );
+
+  it('shows the group, so the owner can see what a diner will be offered', () => {
+    expect(html).toContain('Add a little extra');
+    expect(html).toContain('Choose up to 2');
+    expect(html).toContain('optional');
+  });
+
+  it('shows what each choice adds to the bill', () => {
+    expect(html).toContain('Extra cheese');
+    expect(html).toContain('₹40');
+  });
+
+  it('calls a free add-on free, not blank', () => {
+    // "Jain" costs nothing and still has to reach the kitchen. An empty price
+    // cell would read as a number that failed to load.
+    expect(html).toContain('Jain');
+    expect(html).toContain('Free');
+  });
+
+  it('offers a form to add a choice to the group without leaving the dish', () => {
+    expect(html).toContain('Add choice');
+    expect(html).toContain('name="groupName"');
+  });
+
+  it('says a dish has no add-ons rather than showing an empty section', () => {
+    const bare = renderToStaticMarkup(
+      <MenuEditorScreen data={data({ items: [item('i-2', 'Masala Dosa')] })} selectedId="i-2" />,
+    );
+
+    expect(bare).toContain('No add-ons');
   });
 });

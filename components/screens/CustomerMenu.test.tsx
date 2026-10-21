@@ -191,3 +191,125 @@ describe('the add button price', () => {
     expect(button(html)).not.toBe('Add to order · ₹3');
   });
 });
+
+/**
+ * Add-ons on the dish sheet.
+ *
+ * They used to be presets printed on every dish -- "Spice level", "Pair it
+ * with / Butter naan +79" -- that never reached the kitchen and were never
+ * charged, with a footnote admitting as much. These tests pin the opposite:
+ * what is offered comes from the restaurant, and the price on the button
+ * already includes it.
+ */
+describe('ItemSheet add-ons', () => {
+  const button = (html: string) => {
+    const match = html.match(/Add to order · [^<]*/);
+    return match ? match[0] : '';
+  };
+
+  const withAddons = (
+    groups: {
+      id: string;
+      name: string;
+      type: 'single' | 'multi';
+      required?: boolean;
+      max?: number;
+      options: { id: string; name: string; price: number }[];
+    }[]
+  ) => ({
+    restaurant,
+    categories: [{ id: 'c1', name: 'Breads', count: 1 }],
+    items: [
+      {
+        id: 'i-naan',
+        name: 'Butter Naan',
+        desc: 'Tandoor baked',
+        price: 80,
+        category: 'c1',
+        veg: true,
+        available: true,
+        modifiers: groups,
+      },
+    ],
+    table: null,
+  });
+
+  const extras = [
+    {
+      id: 'g-extra',
+      name: 'Add a little extra',
+      type: 'multi' as const,
+      max: 2,
+      options: [
+        { id: 'a-cheese', name: 'Extra cheese', price: 40 },
+        { id: 'a-butter', name: 'Extra butter', price: 20 },
+      ],
+    },
+  ];
+
+  it('offers the dish\'s own add-ons as chips, with their prices', () => {
+    const html = renderToStaticMarkup(<ItemSheet data={withAddons(extras)} />);
+
+    expect(html).toContain('Add a little extra');
+    expect(html).toContain('Extra cheese');
+    expect(html).toContain('+ ₹40');
+    expect(html).toContain('pick up to 2');
+  });
+
+  it('adds nothing until something is picked', () => {
+    const html = renderToStaticMarkup(<ItemSheet data={withAddons(extras)} />);
+    expect(button(html)).toBe('Add to order · ₹80');
+  });
+
+  it('starts a required group with its first option chosen, and charges it', () => {
+    // "Required" has to mean the guest leaves with an answer. A disabled
+    // button and no explanation is not an answer.
+    const html = renderToStaticMarkup(
+      <ItemSheet
+        data={withAddons([
+          {
+            id: 'g-size',
+            name: 'Make it a meal',
+            type: 'single',
+            required: true,
+            options: [
+              { id: 'a-meal', name: 'With dal and rice', price: 30 },
+              { id: 'a-plain', name: 'Just the naan', price: 0 },
+            ],
+          },
+        ])}
+      />,
+    );
+
+    expect(html).toContain('required');
+    expect(button(html)).toBe('Add to order · ₹110');
+  });
+
+  it('no longer offers presets for a dish the restaurant has not customised', () => {
+    const html = renderToStaticMarkup(
+      <ItemSheet
+        data={{
+          restaurant,
+          categories: [{ id: 'c1', name: 'Breads', count: 1 }],
+          items: [
+            {
+              id: 'i-plain',
+              name: 'Tandoori Roti',
+              desc: 'Whole wheat',
+              price: 30,
+              category: 'c1',
+              veg: true,
+              available: true,
+            },
+          ],
+          table: null,
+        }}
+      />,
+    );
+
+    // The old sheet invented these for every dish and charged for none.
+    expect(html).not.toContain('Spice level');
+    expect(html).not.toContain('Pair it with');
+    expect(button(html)).toBe('Add to order · ₹30');
+  });
+});

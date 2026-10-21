@@ -12,6 +12,21 @@ import type { StoredLine } from './cart-storage';
  * database.
  */
 
+/**
+ * One add-on the guest may pick for a dish.
+ *
+ * `groupId` and `maxSelect` describe the OTHER rows it competes with: extras
+ * in one group share a limit ("pick up to 2 sauces"). An add-on with no group
+ * is its own group of one.
+ */
+export type MenuAddon = {
+  id: string;
+  name: string;
+  pricePaise: Paise;
+  groupId?: string;
+  maxSelect?: number;
+};
+
 export type MenuItemPrice = {
   id: string;
   name: string;
@@ -19,6 +34,8 @@ export type MenuItemPrice = {
   pricePaise: Paise;
   isVeg: boolean;
   isAvailable: boolean;
+  /** What can be added to this dish, and what each costs. */
+  addons?: MenuAddon[];
   /**
    * The portions this dish comes in, when it has any.
    *
@@ -39,6 +56,11 @@ export type PricedLine = {
   /** Which portion, when the dish has portions and one was chosen. */
   variantId?: string;
   variantName?: string;
+  /** The add-ons that were picked and still exist, in the order chosen. */
+  addonIds?: string[];
+  addonNames?: string[];
+  /** What those add-ons add to ONE unit, in paise. */
+  addonPaise?: Paise;
 };
 
 export type PricedCart = {
@@ -60,9 +82,64 @@ export type PricedCart = {
    * as many words before anyone pays.
    */
   staleVariantIds: string[];
+  /**
+   * Add-on ids on the cart that no longer exist on that dish.
+   *
+   * Priced without them and listed here, for the same reason a stale portion
+   * is kept rather than dropped: a menu edited under an open cart must not
+   * quietly charge for something that is gone, nor throw the line away.
+   */
+  staleAddonIds: string[];
   subtotalPaise: Paise;
   totals: OrderTotals;
 };
+
+/**
+ * Which of the chosen add-ons count, and what they cost per unit.
+ *
+ * The rule mirrors place_public_order exactly, because a cart that prices one
+ * way and a till that charges another is the dispute this file exists to
+ * avoid:
+ *
+ *   - an id that is not on this dish is dropped and reported as stale
+ *   - picks beyond a group's maxSelect are dropped, in the order they were
+ *     chosen, never charged
+ *   - a surviving pick adds its own price to one plate
+ */
+export function resolveAddons(
+  addonIds: string[] | undefined,
+  addons: MenuAddon[] | undefined
+): { ids: string[]; names: string[]; pricePaise: Paise; staleIds: string[] } {
+  const chosen = addonIds ?? [];
+  if (chosen.length === 0) return { ids: [], names: [], pricePaise: 0, staleIds: [] };
+
+  const byId = new Map((addons ?? []).map((a) => [a.id, a]));
+  const usedPerGroup = new Map<string, number>();
+
+  const ids: string[] = [];
+  const names: string[] = [];
+  const staleIds: string[] = [];
+  let pricePaise = 0;
+
+  for (const id of chosen) {
+    const addon = byId.get(id);
+    if (!addon) {
+      staleIds.push(id);
+      continue;
+    }
+
+    const group = addon.groupId ?? addon.id;
+    const used = usedPerGroup.get(group) ?? 0;
+    if (used >= (addon.maxSelect ?? 1)) continue;
+
+    usedPerGroup.set(group, used + 1);
+    ids.push(addon.id);
+    names.push(addon.name);
+    pricePaise += addon.pricePaise;
+  }
+
+  return { ids, names, pricePaise, staleIds };
+}
 
 export function priceCart(
   stored: StoredLine[],
@@ -75,6 +152,7 @@ export function priceCart(
   const missingIds: string[] = [];
   const unavailableIds: string[] = [];
   const staleVariantIds: string[] = [];
+  const staleAddonIds: string[] = [];
 
   for (const line of stored) {
     const item = byId.get(line.itemId);
@@ -114,6 +192,13 @@ export function priceCart(
       }
     }
 
+    // Add-ons ride on the unit price, not the line total: two plates with
+    // extra cheese is two extras. resolveAddons is the single rule, shared
+    // with the till.
+    const addons = resolveAddons(line.addonIds, item.addons);
+    staleAddonIds.push(...addons.staleIds);
+    unitPricePaise += addons.pricePaise;
+
     lines.push({
       itemId: item.id,
       name: item.name,
@@ -123,6 +208,9 @@ export function priceCart(
       lineTotalPaise: unitPricePaise * line.qty,
       ...(line.variantId ? { variantId: line.variantId } : {}),
       ...(variantName ? { variantName } : {}),
+      ...(addons.ids.length
+        ? { addonIds: addons.ids, addonNames: addons.names, addonPaise: addons.pricePaise }
+        : {}),
     });
   }
 
@@ -136,6 +224,7 @@ export function priceCart(
     missingIds,
     unavailableIds,
     staleVariantIds,
+    staleAddonIds,
     subtotalPaise: totals.subtotalPaise,
     totals,
   };

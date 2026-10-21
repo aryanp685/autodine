@@ -229,3 +229,110 @@ describe('variant pricing', () => {
     expect(cart.staleVariantIds).toEqual(['v-lamb-half']);
   });
 });
+
+describe('add-on pricing', () => {
+  /**
+   * Add-ons are per plate and priced from the menu, exactly like the dish.
+   * The cart carries ids; these rows carry the money.
+   */
+  const dish = item('i-1', 'Butter Naan', 8000, {
+    addons: [
+      { id: 'a-cheese', name: 'Extra cheese', pricePaise: 4000, groupId: 'g-extra', maxSelect: 2 },
+      { id: 'a-butter', name: 'Extra butter', pricePaise: 2000, groupId: 'g-extra', maxSelect: 2 },
+      { id: 'a-jain', name: 'Jain', pricePaise: 0, groupId: 'g-jain', maxSelect: 1 },
+    ],
+  });
+
+  it('adds the add-on to one plate, not to the whole line', () => {
+    const cart = priceCart([{ itemId: 'i-1', qty: 3, addonIds: ['a-cheese'] }], [dish], 0);
+
+    expect(cart.lines[0].unitPricePaise).toBe(12000);
+    expect(cart.lines[0].lineTotalPaise).toBe(36000);
+    expect(cart.lines[0].addonNames).toEqual(['Extra cheese']);
+  });
+
+  it('charges nothing for a free add-on, and still records it', () => {
+    // "Jain" is a Rs 0 instruction the kitchen must see. A zero price is a
+    // price, not a missing one.
+    const cart = priceCart([{ itemId: 'i-1', qty: 1, addonIds: ['a-jain'] }], [dish], 0);
+
+    expect(cart.lines[0].unitPricePaise).toBe(8000);
+    expect(cart.lines[0].addonNames).toEqual(['Jain']);
+  });
+
+  it('keeps two add-ons from the same group when the owner allows two', () => {
+    const cart = priceCart(
+      [{ itemId: 'i-1', qty: 1, addonIds: ['a-cheese', 'a-butter'] }],
+      [dish],
+      0
+    );
+
+    expect(cart.lines[0].unitPricePaise).toBe(14000);
+    expect(cart.lines[0].addonNames).toEqual(['Extra cheese', 'Extra butter']);
+    expect(cart.staleAddonIds).toEqual([]);
+  });
+
+  it('never charges for more picks than the group allows', () => {
+    // The limit lives on the group, and the till applies it too -- a cart
+    // that prices one way and a bill that charges another is the dispute
+    // this module exists to prevent.
+    const strict = item('i-1', 'Butter Naan', 8000, {
+      addons: [
+        { id: 'a-1', name: 'One', pricePaise: 1000, groupId: 'g', maxSelect: 1 },
+        { id: 'a-2', name: 'Two', pricePaise: 1000, groupId: 'g', maxSelect: 1 },
+      ],
+    });
+
+    const cart = priceCart([{ itemId: 'i-1', qty: 1, addonIds: ['a-1', 'a-2'] }], [strict], 0);
+
+    expect(cart.lines[0].unitPricePaise).toBe(9000);
+    expect(cart.lines[0].addonNames).toEqual(['One']);
+  });
+
+  it('flags an add-on that is no longer on the dish instead of charging for it', () => {
+    const cart = priceCart(
+      [{ itemId: 'i-1', qty: 1, addonIds: ['a-deleted'] }],
+      [dish],
+      0
+    );
+
+    expect(cart.lines[0].unitPricePaise).toBe(8000);
+    expect(cart.staleAddonIds).toEqual(['a-deleted']);
+  });
+
+  it('prices a line with no add-ons exactly as it did before they existed', () => {
+    const cart = priceCart([{ itemId: 'i-1', qty: 2 }], [dish], 0);
+
+    expect(cart.lines[0].unitPricePaise).toBe(8000);
+    expect(cart.lines[0].addonNames).toBeUndefined();
+    expect(cart.staleAddonIds).toEqual([]);
+  });
+
+  it('taxes the add-on', () => {
+    const cart = priceCart([{ itemId: 'i-1', qty: 1, addonIds: ['a-cheese'] }], [dish], 1800);
+
+    // 18% of Rs 120 is Rs 21.60 -> 2160 paise (rounded once, at the tax step).
+    expect(cart.totals.subtotalPaise).toBe(12000);
+    expect(cart.totals.taxPaise).toBe(2160);
+  });
+
+  it('stacks a portion and an add-on on the same plate', () => {
+    const sized = item('i-2', 'Butter Chicken', 42000, {
+      variants: [
+        { id: 'v-half', name: 'Half', pricePaise: 25000 },
+        { id: 'v-full', name: 'Full', pricePaise: 46900 },
+      ],
+      addons: [{ id: 'a-cheese', name: 'Extra cheese', pricePaise: 4000, groupId: 'g', maxSelect: 1 }],
+    });
+
+    const cart = priceCart(
+      [{ itemId: 'i-2', qty: 2, variantId: 'v-half', addonIds: ['a-cheese'] }],
+      [sized],
+      0
+    );
+
+    expect(cart.lines[0].unitPricePaise).toBe(29000);
+    expect(cart.lines[0].lineTotalPaise).toBe(58000);
+    expect(cart.lines[0].variantName).toBe('Half');
+  });
+});

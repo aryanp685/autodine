@@ -32,6 +32,33 @@ export type EditorVariant = {
   sortOrder: number;
 };
 
+export type EditorAddon = {
+  id: string;
+  name: string;
+  /** Paise. The editor renders rupees and converts back on save. */
+  pricePaise: number;
+  available: boolean;
+  sortOrder: number;
+};
+
+/**
+ * A heading of choices against one dish, with its options.
+ *
+ * Loaded with the dish rather than on demand, for the same reason portions
+ * are: the editor shows them the moment a row is selected, and a round trip
+ * per click would make every selection feel slow for a handful of rows.
+ */
+export type EditorAddonGroup = {
+  id: string;
+  name: string;
+  /** 0 = skippable, 1 or more = required, shown with a default chosen. */
+  minSelect: number;
+  /** 1 = pick one, higher = pick up to that many. */
+  maxSelect: number;
+  sortOrder: number;
+  addons: EditorAddon[];
+};
+
 export type EditorItem = {
   id: string;
   categoryId: string | null;
@@ -56,6 +83,8 @@ export type EditorItem = {
    * make every click feel slow for data that is only a handful of rows.
    */
   variants: EditorVariant[];
+  /** Add-on groups with their options. Empty for a dish with none. */
+  addonGroups: EditorAddonGroup[];
 };
 
 export type EditorCategory = {
@@ -182,6 +211,71 @@ export async function getMenuEditorData(): Promise<MenuEditorData | null> {
   }
   for (const list of variantsByItem.values()) list.sort((a, b) => a.sortOrder - b.sortOrder);
 
+  /**
+   * Add-ons: two more queries, scoped by item id like portions above.
+   *
+   * A failure here is logged and the section renders empty rather than
+   * failing the whole screen -- the same call as portions, and for the same
+   * reason: an owner must still be able to edit a price while a new table is
+   * missing.
+   */
+  const { data: addonGroupRows, error: addonGroupsError } = itemIds.length
+    ? await supabase
+        .from('item_addon_groups')
+        .select('id, item_id, name, min_select, max_select, sort_order')
+        .in('item_id', itemIds)
+        .order('sort_order', { ascending: true })
+    : { data: [], error: null };
+
+  if (addonGroupsError) {
+    console.error(`[menu-editor] could not load add-on groups: ${addonGroupsError.message}`);
+  }
+
+  const groupIds = (addonGroupRows ?? []).map((row) => row.id as string);
+
+  const { data: addonRows, error: addonsError } = groupIds.length
+    ? await supabase
+        .from('item_addons')
+        .select('id, group_id, name, price_paise, is_available, sort_order')
+        .in('group_id', groupIds)
+        .order('sort_order', { ascending: true })
+    : { data: [], error: null };
+
+  if (addonsError) {
+    console.error(`[menu-editor] could not load add-ons: ${addonsError.message}`);
+  }
+
+  const addonsByGroup = new Map<string, EditorAddon[]>();
+  for (const row of addonRows ?? []) {
+    const groupId = row.group_id as string;
+    const list = addonsByGroup.get(groupId) ?? [];
+    list.push({
+      id: row.id as string,
+      name: (row.name as string) ?? '',
+      pricePaise: Number(row.price_paise ?? 0),
+      available: Boolean(row.is_available),
+      sortOrder: Number(row.sort_order ?? 0),
+    });
+    addonsByGroup.set(groupId, list);
+  }
+  for (const list of addonsByGroup.values()) list.sort((a, b) => a.sortOrder - b.sortOrder);
+
+  const addonGroupsByItem = new Map<string, EditorAddonGroup[]>();
+  for (const row of addonGroupRows ?? []) {
+    const itemId = row.item_id as string;
+    const list = addonGroupsByItem.get(itemId) ?? [];
+    list.push({
+      id: row.id as string,
+      name: (row.name as string) ?? '',
+      minSelect: Number(row.min_select ?? 0),
+      maxSelect: Number(row.max_select ?? 1),
+      sortOrder: Number(row.sort_order ?? 0),
+      addons: addonsByGroup.get(row.id as string) ?? [],
+    });
+    addonGroupsByItem.set(itemId, list);
+  }
+  for (const list of addonGroupsByItem.values()) list.sort((a, b) => a.sortOrder - b.sortOrder);
+
   const countByCategory = new Map<string, number>();
   for (const row of items) {
     if (!row.category_id) continue;
@@ -208,6 +302,7 @@ export async function getMenuEditorData(): Promise<MenuEditorData | null> {
       sortOrder: Number(row.sort_order ?? 0),
       spokenName: ((row.spoken_name as string | null) ?? '').trim(),
       variants: variantsByItem.get(row.id as string) ?? [],
+      addonGroups: addonGroupsByItem.get(row.id as string) ?? [],
     })),
   };
 }

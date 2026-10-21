@@ -555,3 +555,189 @@ export async function deleteVariantAction(formData: FormData): Promise<void> {
 
   ok(`"${variant.name as string}" removed. Past orders keep their own record of it.`);
 }
+
+/* ============================================================================
+   Add-ons
+   ========================================================================== */
+
+/**
+ * Add a group of choices to a dish -- "Add a little extra", "Jain / no onion".
+ *
+ * A group is the unit because the limit lives there: three sauces sharing
+ * "pick up to 2" is one decision, not three. Making options required is done
+ * by saying so here rather than by hiding the skip button in the UI, because
+ * the guest sheet and the kitchen both read this row.
+ */
+export async function addAddonGroupAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const itemId = await requireOwnItem(ctx, formData.get('itemId'));
+
+  const name = String(formData.get('groupName') ?? '').trim();
+  if (!name) fail('Give the add-on group a name, such as "Add a little extra".');
+  if (name.length > 60) fail('That group name is too long. Keep it to 60 characters.');
+
+  // Anything other than an explicit "yes" means the guest may skip it, which
+  // is both the common case and the safe default: a group nobody can skip is
+  // a way to lose an order.
+  const required = formData.get('required') === 'yes';
+  const minSelect = required ? 1 : 0;
+
+  const rawMax = Number(String(formData.get('maxSelect') ?? '1').trim());
+  const maxSelect = Number.isFinite(rawMax) ? Math.min(Math.max(Math.round(rawMax), 1), 10) : 1;
+
+  const { data: existing, error: readError } = await ctx.supabase
+    .from('item_addon_groups')
+    .select('sort_order')
+    .eq('item_id', itemId)
+    .order('sort_order', { ascending: false })
+    .limit(1);
+
+  if (readError) fail(`Could not read the add-on groups: ${readError.message}`);
+
+  const nextOrder = ((existing?.[0]?.sort_order as number | undefined) ?? 0) + 1;
+
+  const { error } = await ctx.supabase.from('item_addon_groups').insert({
+    item_id: itemId,
+    name,
+    min_select: minSelect,
+    max_select: maxSelect,
+    sort_order: nextOrder,
+  });
+
+  if (error) fail(`Could not add the group: ${error.message}`);
+
+  ok(`"${name}" added. Now give it its choices.`);
+}
+
+/**
+ * Remove a group, and every choice in it.
+ *
+ * A hard delete like a portion, and for the same reason: a group that shows
+ * in the editor but not on the menu is a state the owner cannot explain.
+ * Orders already placed keep the names they were sold with, because
+ * order_items stores its own snapshot.
+ */
+export async function deleteAddonGroupAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const groupId = String(formData.get('groupId') ?? '').trim();
+  if (!groupId) fail('No add-on group selected.');
+
+  const { data: group, error: readError } = await ctx.supabase
+    .from('item_addon_groups')
+    .select('id, item_id, name')
+    .eq('id', groupId)
+    .maybeSingle();
+
+  if (readError) fail(`Could not read that group: ${readError.message}`);
+  if (!group) fail('That add-on group is already gone.');
+
+  await requireOwnItem(ctx, group.item_id as string);
+
+  const { error } = await ctx.supabase
+    .from('item_addon_groups')
+    .delete()
+    .eq('id', groupId)
+    .eq('item_id', group.item_id as string);
+
+  if (error) fail(`Could not remove the group: ${error.message}`);
+
+  ok(`"${group.name as string}" removed. Past orders keep their own record of it.`);
+}
+
+/** Add one choice to a group: a name and what it costs per plate. */
+export async function addAddonAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const groupId = String(formData.get('groupId') ?? '').trim();
+  if (!groupId) fail('No add-on group selected.');
+
+  const { data: group, error: groupError } = await ctx.supabase
+    .from('item_addon_groups')
+    .select('id, item_id')
+    .eq('id', groupId)
+    .maybeSingle();
+
+  if (groupError) fail(`Could not read that group: ${groupError.message}`);
+  if (!group) fail('That add-on group is no longer on this dish.');
+
+  await requireOwnItem(ctx, group.item_id as string);
+
+  const name = String(formData.get('addonName') ?? '').trim();
+  if (!name) fail('Give the add-on a name, such as "Extra cheese".');
+  if (name.length > 40) fail('That add-on name is too long. Keep it to 40 characters.');
+
+  // A blank price means free, not unknown. "Jain" is the case: an instruction
+  // the kitchen must see that costs nothing.
+  const rawPrice = String(formData.get('addonPrice') ?? '').trim();
+  const rupees = rawPrice === '' ? 0 : Number(rawPrice);
+  if (!Number.isFinite(rupees) || rupees < 0) fail('The add-on price must be a number.');
+  if (rupees > 100000) fail('That price looks wrong. Please check it.');
+
+  const { data: existing, error: readError } = await ctx.supabase
+    .from('item_addons')
+    .select('sort_order')
+    .eq('group_id', groupId)
+    .order('sort_order', { ascending: false })
+    .limit(1);
+
+  if (readError) fail(`Could not read the add-ons: ${readError.message}`);
+
+  const nextOrder = ((existing?.[0]?.sort_order as number | undefined) ?? 0) + 1;
+
+  const { error } = await ctx.supabase.from('item_addons').insert({
+    group_id: groupId,
+    name,
+    price_paise: rupeesToPaise(rupees),
+    sort_order: nextOrder,
+  });
+
+  if (error) fail(`Could not add the choice: ${error.message}`);
+
+  ok(
+    `"${name}" ${rupees > 0 ? `at ₹${rupees}` : 'at no charge'} added. ` +
+      'Diners see it once the menu is published.'
+  );
+}
+
+/** Remove one choice. Past orders keep the copy they were sold with. */
+export async function deleteAddonAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const addonId = String(formData.get('addonId') ?? '').trim();
+  if (!addonId) fail('No add-on selected.');
+
+  const { data: addon, error: readError } = await ctx.supabase
+    .from('item_addons')
+    .select('id, group_id, name')
+    .eq('id', addonId)
+    .maybeSingle();
+
+  if (readError) fail(`Could not read that add-on: ${readError.message}`);
+  if (!addon) fail('That add-on is already gone.');
+
+  // Prove the group -- and through it the dish -- is ours before deleting.
+  const { data: group } = await ctx.supabase
+    .from('item_addon_groups')
+    .select('id, item_id')
+    .eq('id', addon.group_id as string)
+    .maybeSingle();
+
+  if (!group) fail('That add-on group is no longer on your menu.');
+  await requireOwnItem(ctx, group.item_id as string);
+
+  const { error } = await ctx.supabase
+    .from('item_addons')
+    .delete()
+    .eq('id', addonId)
+    .eq('group_id', addon.group_id as string);
+
+  if (error) fail(`Could not remove the add-on: ${error.message}`);
+
+  ok(`"${addon.name as string}" removed. Past orders keep their own record of it.`);
+}

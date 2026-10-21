@@ -6,10 +6,14 @@ import { paiseToRupees } from '@/lib/money';
 import type { MenuEditorData } from '@/lib/db/menu-editor';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import {
+  addAddonAction,
+  addAddonGroupAction,
   addCategoryAction,
   addItemAction,
   addPresetCategoriesAction,
   addVariantAction,
+  deleteAddonAction,
+  deleteAddonGroupAction,
   deleteCategoryAction,
   deleteItemAction,
   deleteVariantAction,
@@ -128,6 +132,16 @@ export function MenuEditorScreen({
           (selected as { variants?: { id: string; name: string; price: number }[] }).variants ??
           []
         ).map((v) => ({ id: v.id, name: v.name, rupees: v.price }));
+
+  /**
+   * The selected dish's add-on groups, with their options in paise.
+   *
+   * Demo rows carry none: the sample screen is a layout, and inventing
+   * add-ons for it would put prices on screen that no till could charge.
+   */
+  const selectedAddonGroups = blocked
+    ? []
+    : (data?.items.find((i) => i.id === selected.id)?.addonGroups ?? []);
 
   const selectedDesc = blocked
     ? ''
@@ -639,6 +653,146 @@ export function MenuEditorScreen({
               </form>
               <p className="pg__fine">
                 Orders already placed keep their own record of the portion they were sold at.
+              </p>
+            </div>
+
+            {/*
+              Add-ons.
+
+              The dish sheet has always shown a "Pair it with / Butter naan
+              +79" group, and nothing ever reached the kitchen or the bill.
+              These are the real thing: a group, the choices inside it, and
+              the price each one adds to a plate. place_public_order reads
+              item_addons for the amount, so the number typed here is the
+              number a guest pays.
+
+              A zero price is not a mistake -- "Jain" is an instruction the
+              kitchen must see that costs nothing -- which is why the price
+              box may be left empty.
+            */}
+            <div className="pg__variants">
+              <div className="pg__variantsHead">
+                <h4>Add-ons</h4>
+                <span className="pg__fine">
+                  {selectedAddonGroups.length > 0
+                    ? 'Diners can pick these. Each price is added to the bill.'
+                    : 'No add-ons — this dish is sold plain.'}
+                </span>
+              </div>
+
+              {live &&
+                selectedAddonGroups.map((group) => (
+                  <div key={group.id} className="pg__variantGroup">
+                    <div className="pg__variantGroupHead">
+                      <strong>{group.name}</strong>
+                      <span className="pg__fine">
+                        {group.maxSelect === 1 ? 'Choose one' : `Choose up to ${group.maxSelect}`}
+                        {' · '}
+                        {group.minSelect > 0 ? 'required' : 'optional'}
+                      </span>
+                      <form action={deleteAddonGroupAction}>
+                        <input type="hidden" name="groupId" value={group.id} />
+                        <button
+                          type="submit"
+                          className="pg__variantX"
+                          aria-label={`Remove the ${group.name} group`}
+                          title={`Remove ${group.name}`}
+                        >
+                          ×
+                        </button>
+                      </form>
+                    </div>
+
+                    <ul className="pg__variantList">
+                      {group.addons.map((addon) => (
+                        <li key={addon.id}>
+                          <span>{addon.name}</span>
+                          <span className="tnum">
+                            {addon.pricePaise > 0 ? inr(paiseToRupees(addon.pricePaise)) : 'Free'}
+                          </span>
+                          <form action={deleteAddonAction}>
+                            <input type="hidden" name="addonId" value={addon.id} />
+                            <button
+                              type="submit"
+                              className="pg__variantX"
+                              aria-label={`Remove ${addon.name}`}
+                              title={`Remove ${addon.name}`}
+                            >
+                              ×
+                            </button>
+                          </form>
+                        </li>
+                      ))}
+                      {group.addons.length === 0 && (
+                        <li>
+                          <span className="pg__fine">No choices in it yet.</span>
+                        </li>
+                      )}
+                    </ul>
+
+                    <form action={addAddonAction} className="pg__variantForm">
+                      <input type="hidden" name="groupId" value={group.id} />
+                      <label className="ui-field">
+                        <span className="ui-label ui-label--sr">Choice name</span>
+                        <input
+                          className="ui-input"
+                          name="addonName"
+                          placeholder="Extra cheese"
+                          maxLength={40}
+                          required
+                        />
+                      </label>
+                      <label className="ui-field">
+                        <span className="ui-label ui-label--sr">Price added</span>
+                        <input
+                          className="ui-input tnum"
+                          name="addonPrice"
+                          placeholder="₹ (blank = free)"
+                          inputMode="decimal"
+                        />
+                      </label>
+                      <button type="submit" className="pg__btn">
+                        Add choice
+                      </button>
+                    </form>
+                  </div>
+                ))}
+
+              <form action={addAddonGroupAction} className="pg__variantForm pg__variantForm--addon">
+                <input type="hidden" name="itemId" value={live ? selected.id : ''} />
+                <label className="ui-field">
+                  <span className="ui-label ui-label--sr">Add-on group name</span>
+                  <input
+                    className="ui-input"
+                    name="groupName"
+                    placeholder="Add a little extra"
+                    maxLength={60}
+                    disabled={!live}
+                  />
+                </label>
+                <label className="ui-field">
+                  <span className="ui-label ui-label--sr">How many may be picked</span>
+                  <select className="ui-select" name="maxSelect" defaultValue="1" disabled={!live}>
+                    <option value="1">Pick one</option>
+                    <option value="2">Up to 2</option>
+                    <option value="3">Up to 3</option>
+                    <option value="5">Up to 5</option>
+                  </select>
+                </label>
+                <label className="ui-field">
+                  <span className="ui-label ui-label--sr">Skippable</span>
+                  <select className="ui-select" name="required" defaultValue="no" disabled={!live}>
+                    <option value="no">Optional</option>
+                    <option value="yes">Must pick one</option>
+                  </select>
+                </label>
+                <button type="submit" className="pg__btn" disabled={!live}>
+                  Add group
+                </button>
+              </form>
+              <p className="pg__fine">
+                The price here is what a guest pays — the kitchen ticket and the bill both carry
+                the add-on by name.
               </p>
             </div>
 

@@ -62,7 +62,37 @@ export type ItemVariant = {
   sort_order: number;
 };
 
-export type MenuItem = Item & { variants: ItemVariant[] };
+/**
+ * A heading of choices against one dish -- "Add a little extra", "Jain /
+ * no onion". Defined per dish, never shared between dishes.
+ */
+export type ItemAddonGroup = {
+  id: string;
+  item_id: string;
+  name: string;
+  /** 0 = the guest may skip it. >= 1 = shown as required, default chosen. */
+  min_select: number;
+  /** 1 = pick one. Higher = pick up to that many. */
+  max_select: number;
+  sort_order: number;
+};
+
+/** One choice inside a group, with the price it adds to a plate. */
+export type ItemAddon = {
+  id: string;
+  group_id: string;
+  name: string;
+  /** Paise. 0 is a real price: "Jain" costs nothing and still matters. */
+  price_paise: number;
+  is_available: boolean;
+  sort_order: number;
+};
+
+export type MenuItem = Item & {
+  variants: ItemVariant[];
+  /** Add-on groups with their options already attached. */
+  addonGroups?: (ItemAddonGroup & { addons: ItemAddon[] })[];
+};
 
 export type Menu = {
   id: string;

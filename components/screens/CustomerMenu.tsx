@@ -21,38 +21,17 @@ import { inr } from '@/lib/demo-data';
 import { paiseToRupees, rupeesToPaise } from '@/lib/money';
 import { VegMark } from '@/components/ui';
 
-const needsChoice = (i: Item) => Boolean(i.variants || i.modifiers);
-
 /**
- * Preset add-on groups, used when an item carries none.
+ * Whether this dish has anything to choose.
  *
- * The database has no modifier concept yet, so every real dish would
- * otherwise render the customisation sheet with no spice and no bread group.
- * These mirror the demo data exactly, so the locked layout is identical
- * whichever source the data came from.
+ * Only real choices count. There used to be hard-coded "Spice level" and
+ * "Pair it with" groups here for every dish, and neither reached the kitchen
+ * or the bill -- the sheet even admitted, underneath, that they were not
+ * charged. A dish with nothing to choose now goes straight into the cart
+ * instead of opening a sheet full of controls that do nothing.
  */
-const PRESET_SPICE: DisplayModifierGroup = {
-  id: 'spice',
-  name: 'Spice level',
-  type: 'single',
-  required: true,
-  options: [
-    { id: 'mild', name: 'Mild', price: 0 },
-    { id: 'medium', name: 'Medium', price: 0 },
-    { id: 'hot', name: 'Hot', price: 0 },
-  ],
-};
-
-const PRESET_BREAD: DisplayModifierGroup = {
-  id: 'bread',
-  name: 'Pair it with',
-  type: 'single',
-  options: [
-    { id: 'none', name: 'No bread', price: 0 },
-    { id: 'naan', name: 'Butter naan', price: 79 },
-    { id: 'roti', name: 'Tandoori roti', price: 59 },
-  ],
-};
+const needsChoice = (i: Item) =>
+  Boolean((i.variants && i.variants.length) || (i.modifiers && i.modifiers.length));
 
 /**
  * Everything a menu screen shows, already in display units (rupees).
@@ -107,6 +86,18 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
     pricePaise: rupeesToPaise(i.price),
     isVeg: i.veg,
     isAvailable: i.available,
+    // Carried here so the bar counts the extras too. A running total that
+    // ignored them would jump by a few hundred rupees at the cart, which
+    // reads as a hidden charge rather than as the add-ons the guest picked.
+    addons: (i.modifiers ?? []).flatMap((group) =>
+      group.options.map((option) => ({
+        id: option.id,
+        name: option.name,
+        pricePaise: rupeesToPaise(option.price),
+        groupId: group.id,
+        maxSelect: group.max ?? group.options.length,
+      })),
+    ),
   }));
   const barSubtotal = priceCart(cart.lines, menuPrices).subtotalPaise;
   const cartHref = slug ? `/menu/cart?s=${encodeURIComponent(slug)}` : '/menu/cart';
@@ -221,36 +212,80 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
     demoItems.find((i) => i.id === 'it-butter-chicken')!;
 
   const variants = item.variants ?? [];
+  const groups: DisplayModifierGroup[] = item.modifiers ?? [];
+
   const [variant, setVariant] = useState(variants[0]?.id ?? '');
-  const [spice, setSpice] = useState('medium');
-  const [bread, setBread] = useState('naan');
   const [qty, setQty] = useState(1);
   const cart = useCart();
 
   /**
-   * The portion being bought, and what it costs.
+   * What has been picked in each add-on group, by option id.
+   *
+   * A required single-choice group starts with its first option already
+   * picked. That is the honest reading of "required": a guest who does not
+   * care still ends up with a valid answer, instead of a disabled button and
+   * no explanation.
+   */
+  const [picks, setPicks] = useState<Record<string, string[]>>(() => {
+    const initial: Record<string, string[]> = {};
+    for (const group of groups) {
+      initial[group.id] =
+        group.required && group.type === 'single' && group.options[0]
+          ? [group.options[0].id]
+          : [];
+    }
+    return initial;
+  });
+
+  const toggle = (group: DisplayModifierGroup, optionId: string) => {
+    setPicks((current) => {
+      const chosen = current[group.id] ?? [];
+
+      if (group.type === 'single') return { ...current, [group.id]: [optionId] };
+
+      if (chosen.includes(optionId)) {
+        return { ...current, [group.id]: chosen.filter((id) => id !== optionId) };
+      }
+
+      // The owner's limit, applied at the moment of the click rather than on
+      // the bill. Beyond it nothing happens, and the chips that would exceed
+      // it are disabled, so the rule is visible before it is hit.
+      const max = group.max ?? group.options.length;
+      if (chosen.length >= max) return current;
+
+      return { ...current, [group.id]: [...chosen, optionId] };
+    });
+  };
+
+  const chosenAddonIds = groups.flatMap((group) => picks[group.id] ?? []);
+
+  /**
+   * What the add-ons add to ONE plate.
+   *
+   * Priced here from the menu's own numbers so the button and the bill agree
+   * before the guest commits. The amount actually charged is still read from
+   * the database when the order is written -- this is a preview, and the ids
+   * are all that leave the browser.
+   */
+  const addonRupees = groups.reduce(
+    (sum, group) =>
+      sum +
+      (picks[group.id] ?? []).reduce(
+        (inner, id) => inner + (group.options.find((o) => o.id === id)?.price ?? 0),
+        0,
+      ),
+    0,
+  );
+
+  /**
+   * The portion being bought, and what the plate costs with its add-ons.
    *
    * A dish with no portions has no variant and is priced at its menu price.
    * A dish with portions is priced at the selected one -- which is the whole
-   * point of asking. The button and the bill have to agree, and until this
-   * existed the button read the menu price regardless of what was selected.
+   * point of asking. The button and the bill have to agree.
    */
   const chosenVariant = variants.find((v) => v.id === variant);
-  const chosenUnitPrice = chosenVariant?.price ?? item.price;
-
-  /**
-   * Spice and bread are still not charged, and saying so is not optional.
-   *
-   * There is no modifier table in the schema: these are preset groups that
-   * exist only on this screen. Showing a price beside them, or including them
-   * in the total, would be inventing a charge the till cannot honour. The note
-   * stays until they are real; it now says exactly which part is free instead
-   * of claiming portions are too.
-   */
-  const hasUnpricedAddons = Boolean(item.modifiers?.length) || Boolean(variants.length);
-
-  const spiceGroup = item.modifiers?.[0] ?? PRESET_SPICE;
-  const breadGroup = item.modifiers?.[1] ?? PRESET_BREAD;
+  const chosenUnitPrice = (chosenVariant?.price ?? item.price) + addonRupees;
 
   return (
     <div className="menu menu--dim">
@@ -295,42 +330,76 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
           </div>
           <p className="sheet__desc">{item.desc}</p>
 
-          <div className="sheet__group">
-            <div className="sheet__label">Portion</div>
-            {variants.map((v) => (
-              <label key={v.id} className={`sheet__opt ${variant === v.id ? 'is-on' : ''}`}>
-                <input type="radio" name="variant" checked={variant === v.id} onChange={() => setVariant(v.id)} />
-                <span>{v.name}</span>
-                <span className="tnum">{inr(v.price)}</span>
-              </label>
-            ))}
-          </div>
-
-          <div className="sheet__group">
-            <div className="sheet__label">Spice level · required</div>
-            <div className="sheet__chips">
-              {spiceGroup.options.map((o) => (
-                <button
-                  key={o.id}
-                  className={`sheet__chip ${spice === o.id ? 'is-on' : ''}`}
-                  onClick={() => setSpice(o.id)}
-                >
-                  {o.name}
-                </button>
+          {variants.length > 0 && (
+            <div className="sheet__group">
+              <div className="sheet__label">Portion</div>
+              {variants.map((v) => (
+                <label key={v.id} className={`sheet__opt ${variant === v.id ? 'is-on' : ''}`}>
+                  <input type="radio" name="variant" checked={variant === v.id} onChange={() => setVariant(v.id)} />
+                  <span>{v.name}</span>
+                  <span className="tnum">{inr(v.price)}</span>
+                </label>
               ))}
             </div>
-          </div>
+          )}
 
-          <div className="sheet__group">
-            <div className="sheet__label">Pair it with</div>
-            {breadGroup.options.map((o) => (
-              <label key={o.id} className={`sheet__opt ${bread === o.id ? 'is-on' : ''}`}>
-                <input type="radio" name="bread" checked={bread === o.id} onChange={() => setBread(o.id)} />
-                <span>{o.name}</span>
-                <span className="tnum">{o.price ? `+ ${inr(o.price)}` : '—'}</span>
-              </label>
-            ))}
-          </div>
+          {/* The dish's own add-ons, defined by the restaurant. Every price
+              shown here is one the till will charge: place_public_order reads
+              item_addons for the amount. */}
+          {groups.map((group) => {
+            const chosen = picks[group.id] ?? [];
+            const max = group.max ?? group.options.length;
+            const atMax = group.type === 'multi' && chosen.length >= max;
+
+            return (
+              <div key={group.id} className="sheet__group">
+                <div className="sheet__label">
+                  {group.name}
+                  {group.required ? ' · required' : ''}
+                  {group.type === 'multi' ? ` · pick up to ${max}` : ''}
+                </div>
+
+                {group.type === 'single' ? (
+                  <div>
+                    {group.options.map((option) => (
+                      <label
+                        key={option.id}
+                        className={`sheet__opt ${chosen.includes(option.id) ? 'is-on' : ''}`}
+                      >
+                        <input
+                          type="radio"
+                          name={`addon-${group.id}`}
+                          checked={chosen.includes(option.id)}
+                          onChange={() => toggle(group, option.id)}
+                        />
+                        <span>{option.name}</span>
+                        <span className="tnum">{option.price ? `+ ${inr(option.price)}` : '—'}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="sheet__chips">
+                    {group.options.map((option) => {
+                      const on = chosen.includes(option.id);
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          className={`sheet__chip ${on ? 'is-on' : ''}`}
+                          aria-pressed={on}
+                          disabled={!on && atMax}
+                          onClick={() => toggle(group, option.id)}
+                        >
+                          {option.name}
+                          {option.price ? ` + ${inr(option.price)}` : ''}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
           <div className="sheet__foot">
             <div className="sheet__qty">
@@ -345,28 +414,18 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
             <button
               className="sheet__add"
               onClick={() => {
-                // The dish, how many, and which portion. The portion travels
-                // with the line because the server prices it from the
-                // database -- what is sent is the id, never a price.
-                cart.add(item.id, qty, chosenVariant?.id);
+                // The dish, how many, which portion, and which add-ons. All
+                // ids: the server prices every one of them from the database,
+                // so what is sent can never be what is charged.
+                cart.add(item.id, qty, chosenVariant?.id, chosenAddonIds);
               }}
             >
               {/* Both are rupees already: item.price and variant.price come
                   from DisplayItem, which is in display units. Passing them
                   through paiseToRupees divided an already-rupees number by a
-                  hundred, so a Rs 250 plate showed as Rs 3. The bug predates
-                  portions -- the button has always read wrong -- but it only
-                  became visible enough to catch once the sheet offered a
-                  second price to compare against. */}
+                  hundred, so a Rs 250 plate showed as Rs 3. */}
               Add to order · {inr(chosenUnitPrice * qty)}
             </button>
-            {hasUnpricedAddons && (
-              <p className="sheet__note">
-                Spice level and any bread you add are passed to the kitchen but not
-                charged — the bill is {inr(chosenUnitPrice)} per plate
-                {chosenVariant ? ` (${chosenVariant.name})` : ''}.
-              </p>
-            )}
           </div>
         </div>
       </div>

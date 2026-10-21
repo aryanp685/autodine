@@ -110,6 +110,8 @@ export type ModifierGroup = {
   name: string;
   type: 'single' | 'multi';
   required?: boolean;
+  /** How many may be picked. Absent means "all of them". */
+  max?: number;
   options: { id: string; name: string; price: number }[];
 };
 

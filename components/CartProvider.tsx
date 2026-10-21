@@ -38,11 +38,12 @@ type CartApi = {
    *
    * `variantId` is the chosen portion. It identifies the line as much as the
    * item does: a half plate and a full plate of the same dish are two lines,
-   * because they are two different prices.
+   * because they are two different prices. `addonIds` does the same job for
+   * extras: a naan with cheese and a plain naan are two lines.
    */
-  add: (itemId: string, by?: number, variantId?: string) => void;
-  remove: (itemId: string, variantId?: string) => void;
-  setQty: (itemId: string, qty: number, variantId?: string) => void;
+  add: (itemId: string, by?: number, variantId?: string, addonIds?: string[]) => void;
+  remove: (itemId: string, variantId?: string, addonIds?: string[]) => void;
+  setQty: (itemId: string, qty: number, variantId?: string, addonIds?: string[]) => void;
   clear: () => void;
   count: number;
   /**
@@ -102,9 +103,12 @@ export function CartProvider({
     () => ({
       lines,
       ready,
-      add: (itemId, by = 1, variantId) => persist(addLine(lines, itemId, by, variantId)),
-      remove: (itemId, variantId) => persist(removeLine(lines, itemId, variantId)),
-      setQty: (itemId, qty, variantId) => persist(setLineQty(lines, itemId, qty, variantId)),
+      add: (itemId, by = 1, variantId, addonIds) =>
+        persist(addLine(lines, itemId, by, variantId, addonIds)),
+      remove: (itemId, variantId, addonIds) =>
+        persist(removeLine(lines, itemId, variantId, addonIds)),
+      setQty: (itemId, qty, variantId, addonIds) =>
+        persist(setLineQty(lines, itemId, qty, variantId, addonIds)),
       clear: () => persist([]),
       count: totalQty(lines),
     }),

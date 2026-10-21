@@ -191,3 +191,47 @@ describe('portions', () => {
     );
   });
 });
+
+describe('add-ons', () => {
+  it('keeps a plain naan and a naan with cheese as two lines', () => {
+    let lines = addLine([], 'i-1');
+    lines = addLine(lines, 'i-1', 1, undefined, ['a-cheese']);
+
+    expect(lines).toHaveLength(2);
+    expect(totalQty(lines)).toBe(2);
+  });
+
+  it('adds to the same line when the same extras are picked again', () => {
+    let lines = addLine([], 'i-1', 1, undefined, ['a-cheese']);
+    lines = addLine(lines, 'i-1', 1, undefined, ['a-cheese']);
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0].qty).toBe(2);
+  });
+
+  it('treats the same extras in a different order as the same line', () => {
+    let lines = addLine([], 'i-1', 1, undefined, ['a-cheese', 'a-butter']);
+    lines = addLine(lines, 'i-1', 1, undefined, ['a-butter', 'a-cheese']);
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0].qty).toBe(2);
+  });
+
+  it('refuses anything but strings as add-on ids', () => {
+    // A number would coerce to some other add-on's id. Dropping it leaves the
+    // dish plain, which is the safe direction.
+    const raw = JSON.stringify([{ itemId: 'i-1', qty: 1, addonIds: [42, null, 'a-cheese'] }]);
+    expect(parseCart(raw)).toEqual([{ itemId: 'i-1', qty: 1, addonIds: ['a-cheese'] }]);
+  });
+
+  it('reads a cart written before add-ons existed', () => {
+    // Every cart in a guest's phone today is this shape. It must keep working.
+    const raw = JSON.stringify([{ itemId: 'i-1', qty: 2, variantId: 'v-half' }]);
+    expect(parseCart(raw)).toEqual([{ itemId: 'i-1', qty: 2, variantId: 'v-half' }]);
+  });
+
+  it('round-trips add-ons through storage', () => {
+    const lines = addLine(addLine([], 'i-1', 2, 'v-half'), 'i-2', 1, undefined, ['a-1', 'a-2']);
+    expect(parseCart(serialiseCart(lines))).toEqual(lines);
+  });
+});

@@ -20,6 +20,8 @@ import type {
   Category,
   DiningTable,
   Item,
+  ItemAddon,
+  ItemAddonGroup,
   ItemVariant,
   Menu,
   Order,
@@ -75,6 +77,8 @@ export type Database = {
         ]
       >;
       item_variants: Table<ItemVariant>;
+      item_addon_groups: Table<ItemAddonGroup>;
+      item_addons: Table<ItemAddon>;
       dining_tables: Table<DiningTable>;
       /**
        * The printed card's code. This is the scheme scanning uses.
