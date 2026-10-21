@@ -126,12 +126,14 @@ describe('unknownWords', () => {
   });
 
   it('names the words it had to guess, so they can be corrected', () => {
-    expect(unknownWords('Quesadilla')).toEqual(['Quesadilla']);
-    expect(unknownWords('Paneer Quesadilla')).toEqual(['Quesadilla']);
+    // "Shawarma" is a real menu word this build does not know yet -- that is
+    // the case this list exists for, not a word the dictionary already covers.
+    expect(unknownWords('Shawarma')).toEqual(['Shawarma']);
+    expect(unknownWords('Paneer Shawarma')).toEqual(['Shawarma']);
   });
 
   it('does not report the same word twice', () => {
-    expect(unknownWords('Quesadilla Quesadilla')).toEqual(['Quesadilla']);
+    expect(unknownWords('Shawarma Shawarma')).toEqual(['Shawarma']);
   });
 });
 
@@ -170,5 +172,32 @@ describe('noteToDevanagari', () => {
     const out = noteToDevanagari('birthday cake');
     expect(isDevanagariOnly(out)).toBe(true);
     expect(out).toContain('केक');
+  });
+});
+
+describe('the mispronunciations that were reported', () => {
+  it('says normal as नॉर्मल, not नोरमाल', () => {
+    // "नोरमाल" is read out as "normaal" -- long o, long a. Both were wrong.
+    expect(toDevanagari('normal')).toBe('नॉर्मल');
+    expect(toDevanagari('Normal')).toBe('नॉर्मल');
+  });
+
+  it('does not stretch a short English vowel', () => {
+    expect(toDevanagari('total')).toBe('टोटल');
+    expect(toDevanagari('cap')).toBe('कैप');
+    expect(toDevanagari('bottle')).toBe('बोतल');
+  });
+
+  it('keeps English menu words out of the rules entirely', () => {
+    const cases: [string, string][] = [
+      ['Family Pack', 'फ़ैमिली पैक'],
+      ['Jumbo Combo', 'जंबो कॉम्बो'],
+      ['Crispy Corn', 'क्रिस्पी कॉर्न'],
+      ['Grilled Chicken', 'ग्रिल्ड चिकन'],
+      ['Chocolate Pudding', 'चॉकलेट पुडिंग'],
+      ['Kids Meal', 'किड्स मील'],
+    ];
+
+    for (const [input, expected] of cases) expect(toDevanagari(input)).toBe(expected);
   });
 });

@@ -158,6 +158,30 @@ export type SpeechEngine = {
   available(): boolean;
   /** The name of the Hindi voice that will be used, or null. */
   voiceName(): string | null;
+  /**
+   * Every Hindi voice this device has.
+   *
+   * A device can carry more than one, and they are not equally good: an
+   * embedded engine and a downloaded neural one both answer to hi-IN and
+   * sound nothing alike. The board lists them so an operator whose default
+   * sounds wrong can try the other one instead of living with it.
+   */
+  hindiVoices(): VoiceLike[];
+  /**
+   * Force a specific Hindi voice, or null to go back to the best available.
+   *
+   * Returns false when the requested voice is not installed -- a preference
+   * saved on another tablet, say -- so the caller can fall back rather than
+   * silently speaking in something else.
+   */
+  setVoiceName(name: string | null): boolean;
+  /**
+   * Speed multiplier applied to every sentence. 1 is the tuned default.
+   *
+   * A room with an echo, or an operator who finds the default hurried, needs
+   * this. Clamped so a stored value cannot make the board unintelligible.
+   */
+  setRateScale(scale: number): void;
   /** True when there is no Hindi voice at all. */
   unavailable(): boolean;
   /** True when an utterance failed to start -- the engine is wedged. */
@@ -277,6 +301,8 @@ export function createKitchenSpeech(
   let voices: VoiceLike[] = [];
   let loaded = false;
   let didStall = false;
+  let forced: string | null = null;
+  let rateScale = 1;
 
   const startTimeoutMs = options.startTimeoutMs ?? env.startTimeoutMs ?? DEFAULT_START_TIMEOUT_MS;
 
@@ -294,6 +320,12 @@ export function createKitchenSpeech(
     // Voices load asynchronously on most platforms; the first announcement
     // after a cold start is exactly when that matters.
     if (!loaded) refreshVoices();
+
+    if (forced) {
+      const chosen = voices.find((candidate) => candidate.name === forced);
+      if (chosen) return chosen;
+    }
+
     return pickHindiVoice(voices);
   }
 
@@ -336,9 +368,19 @@ export function createKitchenSpeech(
         if (finished) return;
 
         const segment = plan[index];
-        const sentence = sentences[index];
-        if (!segment || !sentence) {
+        const raw = sentences[index];
+        if (!segment || !raw) {
           finish();
+          return;
+        }
+
+        // The danda is our sentence separator, not a sound. Some engines
+        // vocalise or clip it, which is heard as a stutter at the end of every
+        // phrase -- exactly the "totla" impression. The pause is ours anyway.
+        const sentence = raw.replace(/[।.!?\s]+$/u, '').trim();
+        if (!sentence) {
+          if (index + 1 >= sentences.length) finish();
+          else env.setTimer(() => speakAt(index + 1), 0);
           return;
         }
 
@@ -365,7 +407,7 @@ export function createKitchenSpeech(
           const utterance = env.createUtterance(sentence);
           utterance.voice = voiceToUse;
           utterance.lang = voiceToUse.lang || HINDI_LANGS[0];
-          utterance.rate = VOICE_TUNING.rate * segment.rate;
+          utterance.rate = Math.min(1.5, Math.max(0.5, VOICE_TUNING.rate * segment.rate * rateScale));
           utterance.pitch = VOICE_TUNING.pitch;
           utterance.volume = VOICE_TUNING.volume;
 
@@ -406,6 +448,27 @@ export function createKitchenSpeech(
     available: () => voice() !== null,
 
     voiceName: () => voice()?.name ?? null,
+
+    hindiVoices() {
+      if (!loaded) refreshVoices();
+      return voices.filter((candidate) => /^hi(-|$)/i.test(candidate.lang.replace('_', '-')));
+    },
+
+    setVoiceName(name) {
+      if (name === null) {
+        forced = null;
+        return true;
+      }
+      if (!loaded) refreshVoices();
+      if (!voices.some((candidate) => candidate.name === name)) return false;
+      forced = name;
+      return true;
+    },
+
+    setRateScale(scale) {
+      if (!Number.isFinite(scale)) return;
+      rateScale = Math.min(1.3, Math.max(0.6, scale));
+    },
 
     /**
      * True only when this is definitely broken: no synthesiser at all, or a

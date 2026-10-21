@@ -45,6 +45,20 @@ const VOICE_WAIT_MS = 5000;
  */
 const AUDIO_KEY = 'autodine:kitchen:audio';
 const SPEAKS_KEY = 'autodine:kitchen:speaks';
+const VOICE_KEY = 'autodine:kitchen:voice';
+const SPEED_KEY = 'autodine:kitchen:speed';
+
+/**
+ * How fast to read.
+ *
+ * Three steps, not a slider: an operator in a kitchen has one hand free and no
+ * patience for a control that needs aiming. "धीमा" exists because a hurried
+ * Hindi voice is what sounds slurred, and the right pace depends on the room --
+ * a tiled hall with an echo needs slower than a small counter.
+ */
+const SPEEDS = { slow: 0.85, normal: 1, fast: 1.1 } as const;
+
+type Speed = keyof typeof SPEEDS;
 const seenKey = (restaurantId: string | null) => `autodine:kitchen:seen:${restaurantId ?? 'demo'}`;
 
 /**
@@ -166,6 +180,10 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
   const [audio, setAudio] = useState(true);
   const [speaksHere, setSpeaksHere] = useState(true);
   const [voiceName, setVoiceName] = useState<string | null>(null);
+  /** Every Hindi voice installed here, so a bad default can be swapped. */
+  const [voiceList, setVoiceList] = useState<{ name: string; lang: string }[]>([]);
+  const [voicePref, setVoicePref] = useState('');
+  const [speed, setSpeed] = useState<Speed>('normal');
   /** 'starting' until the platform either names a Hindi voice or has none. */
   const [voiceState, setVoiceState] = useState<'starting' | 'ready' | 'no-voice'>('starting');
   const [stalled, setStalled] = useState(false);
@@ -178,6 +196,15 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
   const [delivery, setDelivery] = useState<'connecting' | 'live' | 'polling'>('polling');
   const [queued, setQueued] = useState(0);
   const [missed, setMissed] = useState<BoardTicket[]>([]);
+  /**
+   * Why those tickets were not read out.
+   *
+   * Two different situations that used to share one sentence: this device
+   * cannot speak at all (no Hindi voice), or the operator muted this screen.
+   * The first needs a fix and the second needs a decision, so the banner says
+   * which one it is.
+   */
+  const [missedReason, setMissedReason] = useState<'voice' | 'muted'>('voice');
   const [ready, setReady] = useState(false);
 
   const live = Boolean(data);
@@ -191,6 +218,7 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
   speaksRef.current = speaksHere;
 
   const speechRef = useRef<SpeechEngine | null>(null);
+  const speedRef = useRef<Speed>('normal');
   const queueRef = useRef<AnnounceQueue | null>(null);
   const seenRef = useRef<Set<string>>(new Set());
   const primedRef = useRef(false);
@@ -208,6 +236,13 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
     try {
       if (localStorage.getItem(AUDIO_KEY) === 'off') setAudio(false);
       if (localStorage.getItem(SPEAKS_KEY) === 'off') setSpeaksHere(false);
+      setVoicePref(localStorage.getItem(VOICE_KEY) ?? '');
+
+      const storedSpeed = localStorage.getItem(SPEED_KEY);
+      if (storedSpeed === 'slow' || storedSpeed === 'normal' || storedSpeed === 'fast') {
+        setSpeed(storedSpeed);
+        speedRef.current = storedSpeed;
+      }
     } catch {
       /* private mode: defaults are fine */
     }
@@ -219,10 +254,12 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
     try {
       localStorage.setItem(AUDIO_KEY, audio ? 'on' : 'off');
       localStorage.setItem(SPEAKS_KEY, speaksHere ? 'on' : 'off');
+      localStorage.setItem(VOICE_KEY, voicePref);
+      localStorage.setItem(SPEED_KEY, speed);
     } catch {
       /* nothing to persist to */
     }
-  }, [audio, speaksHere, ready]);
+  }, [audio, speaksHere, voicePref, speed, ready]);
 
   /* ------------------------------------------------------------------ speech */
 
@@ -241,6 +278,15 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
      */
     const refresh = () => {
       engine.refreshVoices();
+      engine.setRateScale(SPEEDS[speedRef.current]);
+
+      // A preference saved on another tablet may not exist here; the engine
+      // says so and we keep the best available rather than pretending.
+      const stored = localStorage.getItem(VOICE_KEY);
+      if (stored) engine.setVoiceName(stored);
+
+      setVoiceList(engine.hindiVoices().map((v) => ({ name: v.name, lang: v.lang })));
+
       const name = engine.voiceName();
 
       canAnnounceRef.current = name !== null;
@@ -398,6 +444,7 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
         // Unheard, and never pretended otherwise: the ticket joins the list
         // the pass can read out by hand once the voice problem is fixed.
         seenRef.current.add(ticket.orderId);
+        setMissedReason(readyToSpeak ? 'muted' : 'voice');
         setMissed((current) => [ticket, ...current].slice(0, LOG_LIMIT));
         continue;
       }
@@ -671,6 +718,50 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
                 : 'हिंदी · आवाज़ नहीं'}
           </span>
 
+          {/* Speed. A hurried Hindi voice is what sounds slurred, so the
+              operator gets the last word on pace instead of a constant. */}
+          <div className="kb__speeds" role="group" aria-label="आवाज़ की रफ़्तार — voice speed">
+            {(['slow', 'normal', 'fast'] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                className={`kb__speed ${speed === value ? 'is-on' : ''}`}
+                aria-pressed={speed === value}
+                onClick={() => {
+                  setSpeed(value);
+                  speedRef.current = value;
+                  speechRef.current?.setRateScale(SPEEDS[value]);
+                }}
+              >
+                {value === 'slow' ? 'धीमा' : value === 'normal' ? 'सामान्य' : 'तेज़'}
+              </button>
+            ))}
+          </div>
+
+          {/* Which Hindi voice. A device can carry two, and they are not
+              equally good -- an embedded engine and a downloaded neural one
+              both answer to hi-IN. Only shown when there is a real choice. */}
+          {voiceList.length > 1 && (
+            <select
+              className="kb__voicePick"
+              aria-label="Hindi voice"
+              value={voicePref}
+              onChange={(event) => {
+                const next = event.target.value;
+                setVoicePref(next);
+                speechRef.current?.setVoiceName(next || null);
+                setVoiceName(speechRef.current?.voiceName() ?? null);
+              }}
+            >
+              <option value="">सबसे अच्छी आवाज़ (auto)</option>
+              {voiceList.map((voice) => (
+                <option key={voice.name} value={voice.name}>
+                  {voice.name}
+                </option>
+              ))}
+            </select>
+          )}
+
           {live && (
             <button
               type="button"
@@ -739,9 +830,11 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
           </strong>
           <span>
             {/* Two honest reasons, and they are not the same thing. */}
-            {voiceState === 'ready'
-              ? 'They were placed before this board was opened. The pass may have seen them already.'
-              : 'They arrived while this device had no voice to read them with.'}{' '}
+            {missedReason === 'muted'
+              ? 'They arrived while this screen was muted or the sound was off.'
+              : voiceState === 'ready'
+                ? 'They were placed before this board was opened. The pass may have seen them already.'
+                : 'They arrived while this device had no voice to read them with.'}{' '}
             They are on the board below.
           </span>
           <button type="button" className="kb__ghost" onClick={readMissed}>
