@@ -44,7 +44,7 @@ export function OrderPlacedScreen({ data }: { data: OrderScreenData | null }) {
   return (
     <div className="cart">
       <header className="cart__head">
-        <h1>Order {data.code}</h1>
+        <h1>{data.tableLabel ? `Table ${data.tableLabel}` : 'Counter order'}</h1>
         <p>
           {data.restaurantName} · {prepLabel}
         </p>
@@ -77,6 +77,16 @@ export function OrderPlacedScreen({ data }: { data: OrderScreenData | null }) {
               <strong>Your note:</strong> {data.customerNote}
             </div>
           )}
+
+          {/*
+            A small reference, not the headline. The kitchen is told the table
+            and the dishes, which is what a cook acts on; this is only for the
+            moment at the counter where the bill has to be found, and for a
+            takeaway there is no table to find it by.
+          */}
+          <p className="cart__fine">
+            Reference {data.code} — quote this if staff ask.
+          </p>
         </div>
 
         <aside className="cart__sum">

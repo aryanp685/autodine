@@ -152,6 +152,35 @@ export type Database = {
        * function hardcodes method = 'cash'. See app/cashier/actions.ts.
        */
       /**
+       * Migration 0006. Exchange a scanned table QR token for a session.
+       *
+       * The token in the URL is printed on the table and is not a secret.
+       * What comes back is: 64 hex characters, generated inside the database,
+       * handed over once and stored there only as a SHA-256 hash. It expires,
+       * and revoking the QR code revokes every session issued against it.
+       *
+       * Rate limited per code and per IP hash: five attempts in fifteen
+       * minutes, then a fifteen minute block. p_ip_hash must be 64 hex
+       * characters -- sha256 of the caller's address, salted with the token.
+       *
+       * Raises P0001 with a guest-readable message for every failure a guest
+       * can cause: unreadable code, revoked code, table out of service,
+       * restaurant paused, menu not published, rate limited. Those are shown;
+       * anything else is logged and replaced.
+       */
+      verify_table_qr: {
+        Args: {
+          p_public_token: string;
+          p_ip_hash: string;
+        };
+        Returns: {
+          session_token: string;
+          restaurant_slug: string;
+          table_label: string;
+          expires_at: string;
+        }[];
+      };
+      /**
        * Migration 0005. The only way a signed-out diner places an order.
        *
        * The orders and order_items tables have NO insert policy for anon --
@@ -174,12 +203,21 @@ export type Database = {
        * action passes those through and logs everything else.
        *
        * Returns the human-facing code, e.g. 'MA-K3F9Q'.
+       *
+       * Migration 0006 adds p_session_token. Pass the token from
+       * verify_table_qr and the order is stamped with that table, which is
+       * what lets the kitchen board say which table a ticket belongs to.
+       * Omit it and the order is a counter order with no table -- which is
+       * the honest value to record for a takeaway, rather than an invented
+       * table. When the token is given it decides the restaurant, and the
+       * slug is only checked for agreement.
        */
       place_public_order: {
         Args: {
           p_slug: string;
           p_lines: unknown; // jsonb: [{item_id, qty}]
           p_note?: string | null;
+          p_session_token?: string | null;
         };
         Returns: string; // order code
       };
