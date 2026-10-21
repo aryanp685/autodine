@@ -1,5 +1,5 @@
 /**
- * Sign up, sign in, sign out.
+ * Sign up, sign in, sign out, and the two halves of a password reset.
  *
  * Runs only on the server. Signup deliberately uses the SERVICE ROLE client
  * to create the restaurant, menu and membership, because there is no RLS
@@ -14,7 +14,10 @@
 
 'use server';
 
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { RECOVERY_COOKIE, passwordProblem, passwordsMatch } from '@/lib/password';
+import { siteOrigin } from '@/lib/site-origin';
 import { slugify, uniqueSlug } from '@/lib/slug';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
@@ -24,7 +27,6 @@ function fail(path: string, message: string): never {
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MIN_PASSWORD = 10;
 
 async function rollbackSignup(
   admin: NonNullable<ReturnType<typeof getSupabaseAdmin>>,
@@ -51,7 +53,8 @@ export async function signUpAction(formData: FormData): Promise<void> {
 
   if (!fullName || !restaurantName) fail('/signup', 'Please enter your name and your restaurant name.');
   if (!EMAIL.test(email)) fail('/signup', 'Please enter a valid email address.');
-  if (password.length < MIN_PASSWORD) fail('/signup', `Password must be at least ${MIN_PASSWORD} characters.`);
+  const passwordIssue = passwordProblem(password);
+  if (passwordIssue) fail('/signup', passwordIssue);
   // Preview-account data use must be explicitly acknowledged.
   if (!agreed) fail('/signup', 'Please confirm that you understand how this preview uses your account details.');
 
@@ -66,10 +69,19 @@ export async function signUpAction(formData: FormData): Promise<void> {
     return Boolean(data);
   });
 
+  // Where the "confirm your email" link comes back to. Without this Supabase
+  // uses the project's Site URL, which is a single value: every confirmation
+  // mail sent from a preview or a branch deployment pointed at whichever host
+  // happened to be configured months earlier, and those deployments are gone.
+  const origin = await siteOrigin();
+
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { full_name: fullName, phone } },
+    options: {
+      data: { full_name: fullName, phone },
+      ...(origin ? { emailRedirectTo: `${origin}/auth/confirm?next=/dashboard` } : {}),
+    },
   });
 
   if (authError) fail('/signup', 'We could not create your account. Please try again.');
@@ -160,4 +172,138 @@ export async function signOutAction(): Promise<void> {
   const supabase = await createSupabaseServerClient();
   if (supabase) await supabase.auth.signOut();
   redirect('/login');
+}
+
+/* ========================================================================== */
+/*  Password reset                                                            */
+/* ========================================================================== */
+
+/**
+ * Ask Supabase to email a reset link.
+ *
+ * Deliberately says the same thing whether or not the address has an account.
+ * Signup already refuses to confirm that an email exists (it lets Supabase's
+ * own enumeration protection hide it), and a reset form that answers
+ * "no such user" would hand that answer back on a plate.
+ *
+ * The one exception is a rate limit, and only because staying silent there
+ * would be a lie of a different kind: the person would wait for a mail that
+ * was never sent. A rate limit is a property of the site, not of the address,
+ * so saying so reveals nothing about who has an account.
+ */
+export async function requestPasswordResetAction(formData: FormData): Promise<void> {
+  const email = String(formData.get('email') ?? '')
+    .trim()
+    .toLowerCase();
+
+  if (!EMAIL.test(email)) fail('/forgot-password', 'Please enter a valid email address.');
+
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    fail('/forgot-password', 'Password reset is not available yet: the database is not connected.');
+  }
+
+  const origin = await siteOrigin();
+  if (!origin) {
+    fail('/forgot-password', 'Password reset is not available from this address. Open the site on its usual domain and try again.');
+  }
+
+  // The link is built from the request's own host, so a reset started on a
+  // preview deployment comes back to that preview, not to production.
+  //
+  // `flow=recovery` is carried through the mail link so /auth/confirm can tell
+  // a password reset apart from an email confirmation. Both land on the same
+  // handler with the same `code`, and only a reset may leave behind the
+  // short-lived permission to set a new password without knowing the old one.
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/auth/confirm?flow=recovery`,
+  });
+
+  if (error) {
+    const status = (error as { status?: number }).status;
+    if (status === 429 || /rate limit/i.test(error.message)) {
+      fail(
+        '/forgot-password',
+        'Too many reset emails have been sent from this site in the last hour. Wait a few minutes, then try again.',
+      );
+    }
+    console.error('[autodine] could not send password reset email:', error.message);
+    fail('/forgot-password', 'We could not send the email just now. Please try again in a few minutes.');
+  }
+
+  redirect(
+    `/forgot-password?notice=${encodeURIComponent(
+      'If that email has an AutoDine account, a reset link is on its way. It works once and expires in an hour. Check the spam folder if it does not arrive.',
+    )}`,
+  );
+}
+
+/** The notice a finished reset lands on. */
+const PASSWORD_CHANGED_NOTICE = 'Your password was changed. Sign in with the new one.';
+
+/**
+ * Set the new password, on the session the emailed link created.
+ *
+ * There is no "which user" input: the account is whatever `/auth/confirm`
+ * established, so this cannot be pointed at somebody else's account. That also
+ * means it must be useless without that session, which is what the getUser()
+ * check below enforces -- the page shows the same thing, but the check has to
+ * be here too, because a form can be posted by hand.
+ */
+export async function updatePasswordAction(formData: FormData): Promise<void> {
+  const password = String(formData.get('password') ?? '');
+  const confirmation = String(formData.get('confirmation') ?? '');
+
+  // A signed-in session is not permission to replace the password: it could be
+  // a laptop somebody walked away from. The recovery cookie is, and only for
+  // fifteen minutes after the emailed link was used.
+  const cookieStore = await cookies();
+  if (cookieStore.get(RECOVERY_COOKIE)?.value !== '1') {
+    fail('/reset-password', 'Open the link from the reset email to choose a new password.');
+  }
+
+  const problem = passwordProblem(password);
+  if (problem) fail('/reset-password', problem);
+  if (!passwordsMatch(password, confirmation)) {
+    fail('/reset-password', 'The two passwords do not match.');
+  }
+
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) fail('/reset-password', 'Password reset is not available yet: the database is not connected.');
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    fail('/reset-password', 'This reset link has expired. Request a new one.');
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+
+  if (error) {
+    if (/different from the old password/i.test(error.message)) {
+      fail('/reset-password', 'That is already your password. Choose a different one.');
+    }
+    if (/weak|pwned|leaked/i.test(error.message)) {
+      fail('/reset-password', 'That password is too easy to guess. Choose a longer one.');
+    }
+    console.error('[autodine] could not set the new password:', error.message);
+    fail('/reset-password', 'We could not save the new password. Request a new reset link and try again.');
+  }
+
+  // The permission is spent. Leaving it would let a second change go through
+  // without another email.
+  cookieStore.delete(RECOVERY_COOKIE);
+
+  // A reset is also a "sign out everywhere": whoever may have been holding the
+  // old password loses the sessions they were using. The person then signs in
+  // again on this device with the password they just chose.
+  try {
+    await supabase.auth.signOut();
+  } catch (signOutError) {
+    console.error('[autodine] sign-out after password reset failed:', signOutError);
+  }
+
+  redirect(`/login?notice=${encodeURIComponent(PASSWORD_CHANGED_NOTICE)}`);
 }

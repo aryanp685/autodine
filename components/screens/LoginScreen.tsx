@@ -68,7 +68,11 @@ export function LoginScreen({ error, notice, next }: { error?: string; notice?: 
               Sign in
             </button>
             <p className="pg__fine">
-              Password reset is not implemented in this preview. Contact the project owner for help.
+              Forgotten it?{' '}
+              <Link href="/forgot-password" className="pg__fineLink">
+                Reset your password
+              </Link>{' '}
+              — we email a single-use link to the address you signed up with.
             </p>
           </form>
         </section>
