@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { kitchenOrders, restaurant, type KitchenOrder } from '@/lib/demo-data';
 import { Money, VegMark } from '@/components/ui';
@@ -8,6 +8,12 @@ import type { KitchenScreenData, KitchenTicket } from '@/lib/db/kitchen-screen';
 import { nextPrepState, type PrepState } from '@/lib/db/prep';
 import { advanceOrderAction } from '@/app/kitchen/actions';
 import { SignInPrompt } from '@/components/SignInPrompt';
+import {
+  advanceText,
+  createAnnounceQueue,
+  newOrderText,
+  summariseItems,
+} from '@/lib/announce';
 
 const AGE_TONE = (age: number) => (age >= 20 ? 'is-late' : age >= 10 ? 'is-warn' : 'is-fresh');
 
@@ -94,6 +100,10 @@ function Items({ order, compact }: { order: BoardTicket; compact?: boolean }) {
    ========================================================================== */
 export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
   const [audio, setAudio] = useState(false);
+  // The speaker closure is built once, so it reads the toggle through a ref
+  // rather than capturing the value it had at first render.
+  const audioRef = useRef(audio);
+  audioRef.current = audio;
   const [announcement, setAnnouncement] = useState('');
   const [error, setError] = useState('');
   const [pending, setPending] = useState<Record<string, PrepState>>({});
@@ -115,16 +125,80 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
       : ticket
   );
 
-  const speak = useCallback(
-    (text: string) => {
-      setAnnouncement(text);
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window && audio) {
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
-      }
-    },
-    [audio]
-  );
+  /**
+   * Announcements are queued, not cancelled.
+   *
+   * The previous version called speechSynthesis.cancel() before each
+   * utterance. When four tables ordered within a second of each other, three
+   * announcements were cut off mid-word and the kitchen heard a fragment.
+   * Food still went out, so it failed quietly and looked like it worked.
+   *
+   * The queue is created once and held in a ref, so the memory of what has
+   * been said survives a re-render -- the board re-reads itself every fifteen
+   * seconds, and a queue rebuilt each time would forget and start over.
+   */
+  const queueRef = useRef<ReturnType<typeof createAnnounceQueue> | null>(null);
+  if (!queueRef.current) {
+    queueRef.current = createAnnounceQueue({
+      speak(text, onEnd) {
+        const synth = typeof window !== 'undefined' ? window.speechSynthesis : undefined;
+        if (!synth || !audioRef.current) {
+          // No audio, or audio switched off: still consume the queue, just
+          // without sound. Otherwise turning audio off would let the backlog
+          // build and then play all at once when it was switched back on.
+          onEnd();
+          return;
+        }
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.onend = onEnd;
+        // An utterance that errors would otherwise never call onend, and the
+        // queue would stop dead for the rest of the service.
+        utterance.onerror = onEnd;
+        synth.speak(utterance);
+      },
+    });
+  }
+
+  const speak = useCallback((key: string, text: string) => {
+    setAnnouncement(text);
+    queueRef.current?.push(key, text);
+  }, []);
+
+  /** Replay one, on demand, whether or not it has been said before. */
+  const replay = useCallback((key: string, text: string) => {
+    setAnnouncement(text);
+    queueRef.current?.forget(key);
+    queueRef.current?.push(key, text);
+  }, []);
+
+  /**
+   * Announce orders that have just arrived.
+   *
+   * The board re-reads itself, so `orders` is a fresh list every fifteen
+   * seconds containing tickets that were already there. Announcing on every
+   * render would mean the board never stops talking. Announcing only on the
+   * first sight of an order id means a guest's order is called out once, when
+   * it lands.
+   *
+   * Four arriving together produce four queued announcements, spoken whole
+   * one after another -- which is the whole point of the queue.
+   */
+  const announced = useRef(new Set<string>());
+  useEffect(() => {
+    if (!live) return;
+
+    for (const ticket of orders) {
+      if (!ticket.orderId) continue; // demo row, nothing real to announce
+      if (announced.current.has(ticket.orderId)) continue;
+
+      announced.current.add(ticket.orderId);
+      speak(
+        `new:${ticket.orderId}`,
+        newOrderText(ticket.table, summariseItems(ticket.items))
+      );
+    }
+  }, [orders, live, speak]);
 
   const advance = async (ticket: BoardTicket) => {
     // Demo rows have no database identity. Nothing to call, so nothing
@@ -139,7 +213,7 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
     const next = nextPrepState(ticket.state);
     if (!next) return;
 
-    speak(`Order ${ticket.code} for table ${ticket.table}, ${next}`);
+    speak(`adv:${ticket.orderId}:${next}`, advanceText(ticket.table, next));
     setError('');
     setPending((current) => ({ ...current, [ticket.orderId!]: next }));
 
@@ -196,7 +270,7 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
               {audio ? 'Turn off' : 'Turn on'}
             </button>
           </div>
-          <button type="button" className="kb__ghost" onClick={() => speak('AutoDine kitchen audio test')}>
+          <button type="button" className="kb__ghost" onClick={() => replay(`test:${Date.now()}`, 'AutoDine kitchen audio test')}>
             Test announcement
           </button>
           <button
@@ -204,7 +278,11 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
             className="kb__ghost"
             onClick={() => {
               const latest = orders.find((order) => order.state !== 'served') ?? orders[0];
-              if (latest) speak(`Order ${latest.code} for table ${latest.table}`);
+              if (latest?.orderId)
+                replay(
+                  `new:${latest.orderId}`,
+                  newOrderText(latest.table, summariseItems(latest.items))
+                );
             }}
           >
             Replay latest
@@ -282,7 +360,12 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
                       className="kb__act kb__act--quiet"
                       title="Replay voice announcement"
                       aria-label={`Replay order ${o.code}`}
-                      onClick={() => speak(`Order ${o.code} for table ${o.table}`)}
+                      onClick={() =>
+                        replay(
+                          `new:${o.orderId ?? o.key}`,
+                          newOrderText(o.table, summariseItems(o.items))
+                        )
+                      }
                     >
                       🔊
                     </button>

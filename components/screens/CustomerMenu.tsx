@@ -61,16 +61,34 @@ const PRESET_BREAD: DisplayModifierGroup = {
  * passed -- they fall back to the demo content rather than breaking -- so
  * wiring one screen at a time is safe.
  */
+/**
+ * The table the guest is sitting at, when we actually know it.
+ *
+ * Optional, and that is the important part. It is only present when a QR was
+ * scanned and its session is still live. When it is absent nothing claims the
+ * guest is seated -- the badge is simply not rendered.
+ *
+ * It used to be a hard-coded string reading "Table 7 · on-site verified",
+ * shown to everyone. A guest at table 3 was told they were at table 7, and
+ * every order reached the kitchen with no table at all. Declining to guess is
+ * not a downgrade from that.
+ */
+export type MenuScreenTable = {
+  label: string;
+};
+
 export type MenuScreenData = {
   restaurant: DisplayRestaurant;
   categories: DisplayCategory[];
   items: DisplayItem[];
+  table?: MenuScreenTable | null;
 };
 
 /* ============================================================================
    Editorial Minimal — locked design system customer menu
    ========================================================================== */
 export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
+  const table = data?.table ?? null;
   const cart = useCart();
   const [cat, setCat] = useState('all');
 
@@ -106,9 +124,11 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
           <div className="menu__venueName">{restaurant.name}</div>
           <div className="menu__venueMeta">{restaurant.tagline}</div>
         </div>
-        <div className="menu__verified">
-          <span className="menu__verifiedDot" /> Table 7 · on-site verified 12:41 PM
-        </div>
+        {table ? (
+          <div className="menu__verified">
+            <span className="menu__verifiedDot" /> {table.label}
+          </div>
+        ) : null}
       </header>
 
       <nav className="menu__cats">
@@ -178,6 +198,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
 
 /* Option A — item customization: centred sheet, hairlines, no chrome */
 export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?: string }; itemId?: string } = {}) {
+  const table = data?.table ?? null;
   const allItems = data?.items ?? demoItems;
   const restaurant = data?.restaurant ?? demoRestaurant;
   const requestedItemId = data?.itemId ?? itemId;
@@ -216,9 +237,11 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
           <div className="menu__venueName">{restaurant.name}</div>
           <div className="menu__venueMeta">{restaurant.tagline}</div>
         </div>
-        <div className="menu__verified">
-          <span className="menu__verifiedDot" /> Table 7 · on-site verified 12:41 PM
-        </div>
+        {table ? (
+          <div className="menu__verified">
+            <span className="menu__verifiedDot" /> {table.label}
+          </div>
+        ) : null}
       </header>
 
       <div className="menu__list menu__list--dim">

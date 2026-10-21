@@ -15,6 +15,7 @@ import type { OrderScreenData } from '@/lib/db/order-screen';
 const order = (over: Partial<OrderScreenData> = {}): OrderScreenData => ({
   code: 'MA-K3F9Q',
   restaurantName: 'Maddi',
+  tableLabel: 'T1',
   prepStatus: 'new',
   paymentStatus: 'pending',
   subtotalPaise: 106000,
@@ -42,7 +43,26 @@ const order = (over: Partial<OrderScreenData> = {}): OrderScreenData => ({
 });
 
 describe('OrderPlacedScreen', () => {
-  it('shows the code the kitchen will call out', () => {
+  it('leads with the table, not with a code', () => {
+    // The confirmation is a guest checking the kitchen knows where to bring
+    // the food. A reference number answers a question nobody is asking yet.
+    const html = renderToStaticMarkup(<OrderPlacedScreen data={order()} />);
+    expect(html).toContain('Table T1');
+    expect(html).not.toContain('<h1>Order MA-K3F9Q</h1>');
+  });
+
+  it('says counter order when there is no table', () => {
+    // A takeaway really has no table, and saying so is better than a blank.
+    const html = renderToStaticMarkup(
+      <OrderPlacedScreen data={order({ tableLabel: null })} />
+    );
+    expect(html).toContain('Counter order');
+    expect(html).not.toContain('Table');
+  });
+
+  it('keeps the code as a reference for the counter', () => {
+    // Not the headline, but not gone: for a counter order there is no table
+    // to find the bill by.
     const html = renderToStaticMarkup(<OrderPlacedScreen data={order()} />);
     expect(html).toContain('MA-K3F9Q');
   });

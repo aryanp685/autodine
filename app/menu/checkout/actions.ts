@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { parseCart } from '@/lib/cart-storage';
+import { isExpired, readTableSession } from '@/lib/table-session';
 
 const CART_PATH = '/menu/cart';
 
@@ -42,10 +43,22 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
 
   const note = String(formData.get('note') ?? '').trim().slice(0, 300) || null;
 
+  // Arriving by QR means the order belongs to a table, and the table is what
+  // the kitchen calls out. The session is passed rather than a table number
+  // the browser could have typed: the database resolves the table from it.
+  //
+  // An expired session is dropped rather than failed. The order still goes
+  // through as a counter order, which is a real thing a guest standing at a
+  // counter does, and refusing it outright would lose a sale over a clock.
+  const session = await readTableSession();
+  const liveSession =
+    session && !isExpired(session) && session.slug === slug ? session.token : null;
+
   const { data: code, error } = await supabase.rpc('place_public_order', {
     p_slug: slug,
     p_lines: lines,
     p_note: note,
+    p_session_token: liveSession,
   });
 
   if (error) {

@@ -4,6 +4,7 @@ import { CartProvider } from '@/components/CartProvider';
 import { ItemSheet } from '@/components/screens/CustomerMenu';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { getMenuScreenData } from '@/lib/db/menu-screen';
+import { isExpired, readTableSession } from '@/lib/table-session';
 
 export const metadata: Metadata = { title: 'Customise · AutoDine' };
 
@@ -22,9 +23,18 @@ export default async function ItemPage({
   const data = await getMenuScreenData(s);
   if (isSupabaseConfigured && !data) notFound();
 
+  const session = await readTableSession();
+  const table =
+    session && !isExpired(session) && session.slug === data?.restaurant.slug
+      ? { label: session.tableLabel }
+      : null;
+
   return (
     <CartProvider slug={s}>
-      <ItemSheet data={data ? { ...data, itemId: item } : undefined} itemId={item} />
+      <ItemSheet
+        data={data ? { ...data, itemId: item, table } : undefined}
+        itemId={item}
+      />
     </CartProvider>
   );
 }

@@ -12,6 +12,14 @@ import { isSupabaseConfigured } from '@/lib/supabase/env';
 export type OrderScreenData = {
   code: string;
   restaurantName: string;
+  /**
+   * Which table the order is going to, or null for a counter order.
+   *
+   * This is the line the guest checks first: not a reference number, but
+   * whether the kitchen knows where to bring the food. Null is a real answer
+   * for a takeaway, and the screen says so rather than showing a blank.
+   */
+  tableLabel: string | null;
   prepStatus: string;
   paymentStatus: string;
   subtotalPaise: number;
@@ -51,7 +59,7 @@ export async function getOrderScreenData(
   const { data: order, error: orderError } = await supabase
     .from('orders')
     .select(
-      'id, code, prep_status, payment_status, subtotal_paise, tax_paise, total_paise, customer_note, placed_at'
+      'id, code, table_id, prep_status, payment_status, subtotal_paise, tax_paise, total_paise, customer_note, placed_at'
     )
     .eq('restaurant_id', restaurant.id)
     .eq('code', code.trim())
@@ -70,9 +78,25 @@ export async function getOrderScreenData(
 
   if (itemsError) throw new Error(`Could not load the order: ${itemsError.message}`);
 
+  // A separate lookup rather than an embed, for the same reason as the items:
+  // the hand-written Database type does not describe dining_tables on orders.
+  const tableId = (order.table_id as string | null) ?? null;
+  let tableLabel: string | null = null;
+
+  if (tableId) {
+    const { data: table } = await supabase
+      .from('dining_tables')
+      .select('label')
+      .eq('id', tableId)
+      .maybeSingle();
+
+    tableLabel = ((table?.label as string | undefined) ?? null) || null;
+  }
+
   return {
     code: order.code as string,
     restaurantName: (restaurant.name as string) ?? 'Your table',
+    tableLabel,
     prepStatus: order.prep_status as string,
     paymentStatus: order.payment_status as string,
     subtotalPaise: Number(order.subtotal_paise ?? 0),

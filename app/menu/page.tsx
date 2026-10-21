@@ -5,6 +5,7 @@ import { CustomerMenu } from '@/components/screens/CustomerMenu';
 import { MenuSlugNeeded } from '@/components/screens/MenuSlugNeeded';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { getMenuScreenData } from '@/lib/db/menu-screen';
+import { isExpired, readTableSession } from '@/lib/table-session';
 
 export const metadata: Metadata = { title: 'Order · AutoDine' };
 
@@ -36,10 +37,21 @@ export default async function CustomerMenuPage({
   // Null means demo mode only. A configured database with an unknown slug is
   // a real not-found state, never a reason to show the fictional sample menu.
   if (isSupabaseConfigured && !data) notFound();
+
+  // Only claim a table if this restaurant is the one the session is for. A
+  // session is issued per restaurant, and a guest following a link to another
+  // venue while one is live would otherwise be shown a table number from a
+  // building they are not in.
+  const session = await readTableSession();
+  const table =
+    session && !isExpired(session) && session.slug === data?.restaurant.slug
+      ? { label: session.tableLabel }
+      : null;
+
   // The cart is keyed by restaurant, so it is mounted where the slug is known.
   return (
     <CartProvider slug={s}>
-      <CustomerMenu data={data ?? undefined} />
+      <CustomerMenu data={data ? { ...data, table } : undefined} />
     </CartProvider>
   );
 }
