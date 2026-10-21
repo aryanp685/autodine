@@ -72,6 +72,15 @@ export type OrderScreenData = {
    * nothing has been paid, and the order is inside the ten minute window.
    */
   canGuestChange: boolean;
+  /**
+   * Has the owner switched online (card/UPI) payment on for this outlet?
+   *
+   * Only the restaurant's own switch. Whether this DEPLOYMENT has a gateway
+   * key is decided on the page, because that is an environment question and
+   * this module's job is to read the restaurant. See
+   * lib/payments/online-availability.ts for how the two combine.
+   */
+  onlineEnabled: boolean;
   lines: OrderLine[];
 };
 
@@ -134,7 +143,7 @@ export async function getOrderScreenData(
   const [restaurantResult, orderResult] = await Promise.all([
     supabase
       .from('restaurants')
-      .select('name')
+      .select('name, online_payments_enabled')
       .eq('slug', slug.trim())
       .eq('is_active', true)
       .maybeSingle(),
@@ -180,6 +189,7 @@ export async function getOrderScreenData(
     placedAt,
     canGuestChange:
       prepStatus === 'new' && paymentStatus === 'pending' && insideWindow,
+    onlineEnabled: restaurantResult.data?.online_payments_enabled === true,
     lines: (Array.isArray(order.lines) ? order.lines : [])
       .map(line)
       .filter((row): row is OrderLine => row !== null),

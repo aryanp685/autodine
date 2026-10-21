@@ -37,6 +37,8 @@ export type SettingsScreenData = {
   canEdit: boolean;
   details: SettingsRestaurant;
   taxRateBps: number;
+  /** Has the owner switched card/UPI payment on? */
+  onlinePaymentsEnabled: boolean;
   /** Read-only: it decides what "today" means in Reports. See the screen. */
   timezone: string;
   /** Absolute when a request origin is known, otherwise the path. */
@@ -66,6 +68,7 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
       canEdit: false,
       details: { name: '', tagline: '', address: '', phone: '', gstin: '', slug: '' },
       taxRateBps: 0,
+      onlinePaymentsEnabled: false,
       timezone: 'Asia/Kolkata',
       publicMenuUrl: '',
       publicMenuSvg: null,
@@ -82,7 +85,7 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
   const [restaurantResult, menusResult] = await Promise.all([
     supabase
       .from('restaurants')
-      .select('name, tagline, address, phone, gstin, slug, timezone, tax_rate_bps')
+      .select('name, tagline, address, phone, gstin, slug, timezone, tax_rate_bps, online_payments_enabled')
       .eq('id', restaurantId)
       .maybeSingle(),
     supabase.from('menus').select('id, is_published').eq('restaurant_id', restaurantId),
@@ -104,6 +107,7 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
       canEdit: false,
       details: { name: '', tagline: '', address: '', phone: '', gstin: '', slug: '' },
       taxRateBps: 0,
+      onlinePaymentsEnabled: false,
       timezone: 'Asia/Kolkata',
       publicMenuUrl: '',
       publicMenuSvg: null,
@@ -138,6 +142,7 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
     // lib/pricing.ts. The sample is a layout number; charging it would be
     // inventing a tax nobody set.
     taxRateBps: Number(row.tax_rate_bps ?? 0),
+    onlinePaymentsEnabled: row.online_payments_enabled === true,
     timezone: String(row.timezone ?? 'Asia/Kolkata'),
     publicMenuUrl,
     publicMenuSvg,

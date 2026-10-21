@@ -28,6 +28,14 @@ export type CartScreenData = {
    * wrong number to charge somebody.
    */
   taxRateBps: number;
+  /**
+   * Has the owner switched card/UPI payment on for this outlet?
+   *
+   * The checkout screen uses it to describe what happens after placing the
+   * order -- not to take payment there. Whether this DEPLOYMENT has gateway
+   * keys is decided on the page (lib/payments/online-availability.ts).
+   */
+  onlinePaymentsEnabled: boolean;
   /** Only items a diner can actually order right now. */
   items: MenuItemPrice[];
 };
@@ -41,7 +49,7 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
 
   const { data: restaurant, error: restaurantError } = await supabase
     .from('restaurants')
-    .select('id, name, slug, tax_rate_bps')
+    .select('id, name, slug, tax_rate_bps, online_payments_enabled')
     .eq('slug', slug.trim())
     .eq('is_active', true)
     .maybeSingle();
@@ -192,6 +200,7 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
     slug: restaurant.slug as string,
     restaurantName: (restaurant.name as string) ?? 'Your table',
     taxRateBps: Number(restaurant.tax_rate_bps ?? 500),
+    onlinePaymentsEnabled: restaurant.online_payments_enabled === true,
     items: (rows ?? []).map((r) => {
       const variants = variantsOf((r as Record<string, unknown>).item_variants);
       const addons = addonsByItem.get(r.id as string) ?? [];

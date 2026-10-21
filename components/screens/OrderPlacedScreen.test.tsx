@@ -12,6 +12,16 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: () => {}, push: () => {} }),
 }));
 
+/*
+ * The pay button is a client component that imports a 'use server' action,
+ * which pulls in the admin Supabase client (server-only). In a static render
+ * that module must not be executed, so it is replaced with a stub — these
+ * tests are about which sentence appears, not about payment.
+ */
+vi.mock('@/app/menu/order/pay-actions', () => ({
+  startOnlinePaymentAction: async () => ({ ok: false, error: 'not in this test' }),
+}));
+
 vi.mock('@/app/menu/order/actions', () => ({
   cancelGuestOrderAction: async () => ({ ok: true, message: 'Cancelled.' }),
   setGuestOrderLinesAction: async () => ({ ok: true, message: 'Saved.' }),
@@ -39,6 +49,7 @@ const order = (over: Partial<OrderScreenData> = {}): OrderScreenData => ({
   totalPaise: 111300,
   customerNote: null,
   placedAt: '2026-10-21T12:00:00Z',
+  onlineEnabled: false,
   lines: [
     {
       id: 'l-1',
@@ -100,6 +111,56 @@ describe('OrderPlacedScreen', () => {
     const html = renderToStaticMarkup(<OrderPlacedScreen data={order()} />);
     expect(html).toContain('Pay at the counter');
     expect(html).not.toContain('Paid. Thank you.');
+  });
+
+  describe('paying online', () => {
+    it('offers the pay button when the server says it may', () => {
+      const html = renderToStaticMarkup(
+        <OrderPlacedScreen
+          data={order({ onlineEnabled: true })}
+          slug="maddi"
+          token="11111111-1111-1111-1111-111111111111"
+          onlinePay={{ available: true, note: null }}
+        />,
+      );
+
+      expect(html).toContain('Pay ₹1,113 online');
+      // The counter is still offered, because a guest may prefer it.
+      expect(html).toContain('pay at the counter');
+    });
+
+    it('never draws the button when the server withheld it, and says why', () => {
+      const html = renderToStaticMarkup(
+        <OrderPlacedScreen
+          data={order({ onlineEnabled: true })}
+          slug="maddi"
+          token="11111111-1111-1111-1111-111111111111"
+          onlinePay={{
+            available: false,
+            note: 'Card payment is not connected on this deployment yet — pay at the counter.',
+          }}
+        />,
+      );
+
+      expect(html).not.toContain('Pay ₹');
+      expect(html).toContain('Card payment is not connected');
+      expect(html).toContain('Pay at the counter');
+    });
+
+    it('does not offer payment on an order that is already paid', () => {
+      // Even if a caller passes a permissive offer, the paid branch wins.
+      const html = renderToStaticMarkup(
+        <OrderPlacedScreen
+          data={order({ paymentStatus: 'paid' })}
+          slug="maddi"
+          token="11111111-1111-1111-1111-111111111111"
+          onlinePay={{ available: true, note: null }}
+        />,
+      );
+
+      expect(html).toContain('Paid. Thank you.');
+      expect(html).not.toContain('Pay ₹');
+    });
   });
 
   it('does not ask for payment that has already been made', () => {

@@ -5,7 +5,7 @@ import { PrintButton } from '@/components/PrintButton';
 import type { OutletBar } from '@/lib/outlets';
 import type { SettingsScreenData } from '@/lib/db/settings-screen';
 import { formatTaxPercent, taxExamplePaise } from '@/lib/settings-input';
-import { saveDetailsAction, saveTaxAction } from '@/app/dashboard/settings/actions';
+import { saveDetailsAction, saveOnlinePaymentsAction, saveTaxAction } from '@/app/dashboard/settings/actions';
 import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
 
@@ -36,12 +36,22 @@ export function SettingsScreen({
   outlet,
   error,
   notice,
+  gatewayConfigured = false,
 }: {
   data?: SettingsScreenData | null;
   /** Which outlet is open, for the switcher in the bar. */
   outlet?: OutletBar | null;
   error?: string;
   notice?: string;
+  /**
+   * Does this DEPLOYMENT have a payment gateway key pair?
+   *
+   * Passed in rather than read here, because it is an environment fact and
+   * this component is also rendered in tests. The switch and the key are two
+   * different things and the card below says which one is missing -- an owner
+   * who "turned it on" and saw no button needs to know why.
+   */
+  gatewayConfigured?: boolean;
 }) {
   // Blocked callers get the prompt only. See the note above.
   if (data?.blocked) {
@@ -271,6 +281,53 @@ export function SettingsScreen({
               <p className="pg__fine">
                 Orders already placed keep the tax they were charged — a bill is a record of the rate at that
                 moment, not a live calculation. New orders use the new rate immediately.
+              </p>
+            </section>
+
+            <section className="pg__formCard">
+              <h2 className="pg__h2">Online payment</h2>
+              <p className="pg__p">
+                Let guests pay by card or UPI from their own order page. Money goes to your payment-gateway
+                account, and the order is marked paid as soon as the gateway confirms it.
+              </p>
+
+              {data?.onlinePaymentsEnabled && !gatewayConfigured && (
+                <div className="pg__note pg__note--warn">
+                  <strong>Switched on, but this deployment has no gateway keys.</strong> Guests will not see a
+                  pay button — they will be told to pay at the counter. Nothing is broken; the key is simply not
+                  configured on this server.
+                </div>
+              )}
+
+              {!data?.onlinePaymentsEnabled && gatewayConfigured && (
+                <div className="pg__note pg__note--info">
+                  <strong>Off.</strong> This server has gateway keys, but guests still see &quot;pay at the
+                  counter&quot;. Tick the box and save to change that.
+                </div>
+              )}
+
+              <form action={saveOnlinePaymentsAction} className="pg__form">
+                <label className="ui-check">
+                  <input
+                    type="checkbox"
+                    name="onlinePayments"
+                    defaultChecked={Boolean(data?.onlinePaymentsEnabled)}
+                    disabled={disabled}
+                  />
+                  <span>
+                    Take card and UPI payment online. Orders stay unpaid until the gateway confirms the money,
+                    so nothing is ever marked paid on the guest&apos;s word.
+                  </span>
+                </label>
+
+                <button type="submit" className="pg__submit" disabled={disabled}>
+                  Save payment setting
+                </button>
+              </form>
+
+              <p className="pg__fine">
+                Turning this off does not touch orders already paid, and does not refund anything. Counter
+                payments — cash, card and UPI at the till — keep working either way.
               </p>
             </section>
 

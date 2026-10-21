@@ -20,6 +20,12 @@ export type Restaurant = {
   timezone: string;
   tax_rate_bps: number;
   is_active: boolean;
+  /**
+   * Migration 20261022000800. Whether this outlet takes card/UPI online.
+   * Off until the owner switches it on: taking card money is their decision,
+   * not something a deployment key should turn on for them.
+   */
+  online_payments_enabled: boolean;
   created_at: string;
 };
 
