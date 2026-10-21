@@ -25,6 +25,21 @@ export const PRESET_CATEGORIES = [
   'Desserts',
 ] as const;
 
+/**
+ * Folds a name so two spellings of one category compare equal.
+ *
+ * The singular/plural step exists because of what actually happened: an owner
+ * typed "starter", then later added the "Starters" chip, and the menu ended up
+ * with both -- one holding the items and one sitting empty. Case-folding alone
+ * missed it, because "starter" and "starters" differ by more than case.
+ *
+ * Only a single trailing "s" comes off. That is enough for how these are
+ * written in practice and it will not turn two different categories into one.
+ */
 export function normaliseCategoryName(name: string): string {
-  return name.trim().replace(/\s+/g, ' ').toLowerCase();
+  return name
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+    .replace(/s$/, '');
 }

@@ -26,13 +26,14 @@ export type MenuScreenData = {
   items: DisplayItem[];
 };
 
-/** The seeded demo restaurant. Overridden by ?s=<slug> for other venues. */
-export const DEFAULT_SLUG = 'saffron-smoke';
-
 export async function getMenuScreenData(slug?: string): Promise<MenuScreenData | null> {
   if (!isSupabaseConfigured) return null;
 
-  const target = slug?.trim() || DEFAULT_SLUG;
+  // No default restaurant. There used to be one -- a hard-coded demo slug --
+  // which meant a configured database turned every bare /menu into a lookup
+  // for a venue that is not in it. Callers decide what "no slug" means.
+  const target = slug?.trim() ?? '';
+  if (!target) return null;
 
   try {
     const data = await getRestaurantMenu(target);

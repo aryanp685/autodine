@@ -9,7 +9,9 @@ import {
   addItemAction,
   addPresetCategoriesAction,
   deleteCategoryAction,
+  deleteItemAction,
   publishMenuAction,
+  restoreItemAction,
   saveItemAction,
   setAllAvailabilityAction,
 } from '@/app/dashboard/menus/actions';
@@ -30,11 +32,14 @@ export function MenuEditorScreen({
   selectedId,
   error,
   notice,
+  undo,
 }: {
   data?: MenuEditorData | null;
   selectedId?: string;
   error?: string;
   notice?: string;
+  /** Serialised UndoItem from the delete that just happened, if any. */
+  undo?: string;
 }) {
   const live = Boolean(data);
   // A blocked caller has a database and no restaurant. The editor below is
@@ -138,11 +143,26 @@ export function MenuEditorScreen({
             <p>{error}</p>
           </div>
         )}
-        {notice && (
-          <div className="pg__success" role="status">
-            <strong>Done.</strong>
-            <p>{notice}</p>
+        {/* One banner, not two. A delete sets both a notice and an undo, and
+            stacking a green "Done" strip above an "Undo" strip makes the page
+            look like two things happened when one did. */}
+        {undo ? (
+          <div className="pg__undo" role="status">
+            <span>{notice ?? 'Item deleted.'}</span>
+            <form action={restoreItemAction}>
+              <input type="hidden" name="undo" value={undo} />
+              <button type="submit" className="pg__undoBtn">
+                Undo
+              </button>
+            </form>
           </div>
+        ) : (
+          notice && (
+            <div className="pg__success" role="status">
+              <strong>Done.</strong>
+              <p>{notice}</p>
+            </div>
+          )
         )}
 
         {!blocked && (
@@ -422,9 +442,28 @@ export function MenuEditorScreen({
                         <td className="tnum">{i.variants ? i.variants.length : '—'}</td>
                       )}
                       <td>
-                        <span className="ui-badge ui-badge--sage">
-                          {data?.published ? 'Live' : 'Draft'}
-                        </span>
+                        <div className="pg__rowEnd">
+                          <span className="ui-badge ui-badge--sage">
+                            {data?.published ? 'Live' : 'Draft'}
+                          </span>
+                          {/* Deleting is immediate and reversible. A confirm
+                              dialog on every press would slow down the one
+                              edit a busy owner makes most, so the safeguard is
+                              the undo instead of a question. Past orders are
+                              unaffected: order_items keeps its own snapshot. */}
+                          {live && (
+                            <form action={deleteItemAction} className="pg__rowDel">
+                              <input type="hidden" name="itemId" value={i.id} />
+                              <button
+                                type="submit"
+                                aria-label={`Delete ${i.name}`}
+                                title={`Delete ${i.name}`}
+                              >
+                                ×
+                              </button>
+                            </form>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

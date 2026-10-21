@@ -24,6 +24,19 @@ describe('normaliseCategoryName', () => {
   it('reads an empty or whitespace-only name as empty', () => {
     expect(normaliseCategoryName('   ')).toBe('');
   });
+
+  it('folds a singular typing onto the plural preset', () => {
+    // What actually happened on the live menu: "starter" was typed by hand,
+    // then the "Starters" chip was added, and both ended up on the menu -- one
+    // holding every item and one empty.
+    expect(normaliseCategoryName('starter')).toBe(normaliseCategoryName('Starters'));
+    expect(normaliseCategoryName('Main Course')).toBe(normaliseCategoryName('Main Courses'));
+  });
+
+  it('strips only one trailing s, so real words are not cut down', () => {
+    expect(normaliseCategoryName('Breads')).toBe('bread');
+    expect(normaliseCategoryName('Rice & Biryani')).toBe('rice & biryani');
+  });
 });
 
 describe('PRESET_CATEGORIES', () => {

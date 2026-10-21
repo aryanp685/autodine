@@ -485,6 +485,21 @@
 [data-app] .pg__catDel { display: inline; margin-left: 8px; }
 [data-app] .pg__catDel button { border: 0; background: none; padding: 0 2px; font-size: 14px; line-height: 1; color: rgba(17, 19, 24, 0.45); cursor: pointer; }
 [data-app] .pg__catDel button:hover { color: var(--text); }
+/* Delete a row, and the undo that makes an immediate delete safe to press. */
+[data-app] .pg__rowEnd { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+[data-app] .pg__rowDel { display: inline-flex; }
+[data-app] .pg__rowDel button { border: 0; background: none; padding: 0 2px; font-size: 16px; line-height: 1; color: rgba(17, 19, 24, 0.35); cursor: pointer; }
+[data-app] .pg__rowDel button:hover { color: var(--alert); }
+/* /menu with no restaurant named. Centred, plain, and short -- it is a sign
+   pointing at the QR code, not a page worth scrolling. */
+[data-app] .pg__slugNeeded { max-width: 520px; margin: 0 auto; padding: 96px 24px 120px; text-align: center; display: grid; gap: 16px; justify-items: center; }
+[data-app] .pg__slugNeeded h1 { font-size: 24px; letter-spacing: -0.01em; }
+[data-app] .pg__slugNeeded p { font-size: 14.5px; line-height: 1.65; color: var(--ink-70); }
+[data-app] .pg__slugNeededHint { font-size: 13px !important; color: var(--ink-55) !important; }
+[data-app] .pg__slugNeeded .pg__btn { margin-top: 8px; }
+[data-app] .pg__undo { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 0 48px 16px; padding: 12px 16px; border: 1px solid var(--border); background: var(--surface); font-size: 13.5px; }
+[data-app] .pg__undoBtn { border: 1px solid var(--text); background: var(--text); color: var(--surface); padding: 7px 14px; border-radius: 2px; font-size: 13px; cursor: pointer; }
+[data-app] .pg__undoBtn:hover { background: var(--accent); border-color: var(--accent); }
 /* Preset category chips. One control per common category and the same control
    removes it, so nothing has to be typed and nothing is locked. The filled
    state is the one already on the menu. */
@@ -773,6 +788,7 @@
   [data-app] .pg__plan:last-child, [data-app] .pg__stateCard--wide { grid-column: auto; }
   [data-app] .pg__printGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   [data-app] .pg__headActions, [data-app] .pg__itemsActions, [data-app] .pg__editorFoot { flex-wrap: wrap; }
+  [data-app] .pg__undo { margin-left: 20px; margin-right: 20px; }
   [data-app] .pg__addRow { gap: 6px; }
   [data-app] .pg__addRow .ui-input, [data-app] .pg__addRow .ui-select { flex: 1 1 100%; }
   [data-app] .pg__addRow .pg__btn { flex: 1 1 100%; }
