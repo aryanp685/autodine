@@ -293,18 +293,19 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
   activeLangRef.current = activeLang;
 
   const speak = useCallback(
-    (key: string, text: string, label: string, priority: 'order' | 'info' = 'order') => {
+    (key: string, text: string, label: string, priority: 'order' | 'info' = 'order'): boolean => {
       const spoken = queueRef.current?.push(key, text, priority, activeLangRef.current) ?? false;
 
       // Only log what was actually queued. Logging a dropped announcement
       // would show the pass a sentence the kitchen never heard.
-      if (!spoken) return;
+      if (!spoken) return false;
 
       setAnnouncement(text);
       setLog((current) =>
         [{ key, at: clockNow(), label, text, lang: activeLangRef.current }, ...current].slice(0, LOG_LIMIT),
       );
       setQueued(queueRef.current?.depth() ?? 0);
+      return true;
     },
     [],
   );
@@ -374,13 +375,17 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
     if (!voicesReady) return;
 
     for (const ticket of fresh) {
-      seenRef.current.add(ticket.orderId!);
-      speak(
+      // Mark it seen only once the queue has accepted it. If the backlog is
+      // full the queue refuses; leaving the ticket unmarked means the next
+      // poll (or the next order) announces it instead of losing it for good.
+      const accepted = speak(
         `new:${ticket.orderId}`,
         orderAnnouncement(ticket, activeLangRef.current),
         announceLogLabel(ticket.table, ticket.items),
         'order',
       );
+      if (!accepted) break;
+      seenRef.current.add(ticket.orderId!);
     }
 
     writeSeen(restaurantId, [...seenRef.current]);
