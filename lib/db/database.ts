@@ -151,6 +151,38 @@ export type Database = {
        * CASH ONLY. The payments table allows card/upi/online, but this
        * function hardcodes method = 'cash'. See app/cashier/actions.ts.
        */
+      /**
+       * Migration 0005. The only way a signed-out diner places an order.
+       *
+       * The orders and order_items tables have NO insert policy for anon --
+       * under RLS a missing policy means denied, and a permissive one would
+       * let a guest name their own unit_price_paise or attach lines to
+       * somebody else's order. So the write goes through here instead.
+       *
+       * What makes it safe to expose to anon:
+       *   - it takes dish ids and quantities, never prices or totals
+       *   - every price is read from items, scoped to this restaurant's
+       *     published menu, so a dish from another kitchen cannot be ordered
+       *   - tax is restaurants.tax_rate_bps, the same column
+       *     place_counter_order reads -- 5% is only the fallback
+       *   - order and lines commit in one transaction, so a ticket can never
+       *     reach the kitchen pass with nothing on it
+       *   - it rejects a restaurant in read-only mode
+       *
+       * Raises P0001 with a customer-readable message for the failures a
+       * customer can cause (no items, sold out, unknown restaurant), so the
+       * action passes those through and logs everything else.
+       *
+       * Returns the human-facing code, e.g. 'MA-K3F9Q'.
+       */
+      place_public_order: {
+        Args: {
+          p_slug: string;
+          p_lines: unknown; // jsonb: [{item_id, qty}]
+          p_note?: string | null;
+        };
+        Returns: string; // order code
+      };
       record_cash_payment: {
         Args: {
           p_restaurant_slug: string;

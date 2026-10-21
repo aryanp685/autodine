@@ -17,6 +17,17 @@ import type { MenuItemPrice } from '@/lib/cart-pricing';
 export type CartScreenData = {
   slug: string;
   restaurantName: string;
+  /**
+   * The restaurant's own rate, in basis points.
+   *
+   * A bill priced at a rate the restaurant did not set is wrong in a way the
+   * guest cannot check and finance only finds later, so the screens price
+   * with this and the database prices with the same column. It is read here
+   * rather than defaulted, because the fallback in lib/pricing.ts is a
+   * layout sample -- it is the right number to draw a screen with and the
+   * wrong number to charge somebody.
+   */
+  taxRateBps: number;
   /** Only items a diner can actually order right now. */
   items: MenuItemPrice[];
 };
@@ -30,7 +41,7 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
 
   const { data: restaurant, error: restaurantError } = await supabase
     .from('restaurants')
-    .select('id, name, slug')
+    .select('id, name, slug, tax_rate_bps')
     .eq('slug', slug.trim())
     .eq('is_active', true)
     .maybeSingle();
@@ -52,6 +63,7 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
   return {
     slug: restaurant.slug as string,
     restaurantName: (restaurant.name as string) ?? 'Your table',
+    taxRateBps: Number(restaurant.tax_rate_bps ?? 500),
     items: (rows ?? []).map((r) => ({
       id: r.id as string,
       name: (r.name as string) ?? '',

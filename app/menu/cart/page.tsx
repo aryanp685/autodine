@@ -31,6 +31,7 @@ export default async function CartPage({
       <Cart
         slug={s}
         restaurantName={data?.restaurantName}
+        taxRateBps={data?.taxRateBps}
         // No restaurant resolved: show the empty state rather than a menu of
         // prices that came from nowhere.
         items={data?.items ?? []}

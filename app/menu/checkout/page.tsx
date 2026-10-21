@@ -16,7 +16,12 @@ export default async function CheckoutPage({
 
   return (
     <CartProvider slug={s}>
-      <Checkout slug={s} restaurantName={data?.restaurantName} items={data?.items ?? []} />
+      <Checkout
+        slug={s}
+        restaurantName={data?.restaurantName}
+        taxRateBps={data?.taxRateBps}
+        items={data?.items ?? []}
+      />
     </CartProvider>
   );
 }
