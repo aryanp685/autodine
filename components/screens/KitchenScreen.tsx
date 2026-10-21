@@ -13,17 +13,19 @@ import { getSupabaseBrowser } from '@/lib/supabase/client';
 import {
   advanceText,
   announceLogLabel,
+  chooseLanguage,
   createAnnounceQueue,
   orderAnnouncement,
   primeOnOpen,
   selectNewTickets,
+  type AnnounceLang,
   type AnnounceQueue,
 } from '@/lib/announce';
 import {
   browserSpeechEnv,
   createChime,
   createKitchenSpeech,
-  type KitchenSpeech,
+  type SpeechEngine,
 } from '@/lib/speech';
 
 const AGE_TONE = (age: number) => (age >= 20 ? 'is-late' : age >= 10 ? 'is-warn' : 'is-fresh');
@@ -32,11 +34,12 @@ const AGE_TONE = (age: number) => (age >= 20 ? 'is-late' : age >= 10 ? 'is-warn'
 const LOG_LIMIT = 6;
 
 /**
- * localStorage keys. Prefixed per restaurant so a tablet moved between venues
- * does not inherit the other one's memory of what it has said.
+ * Storage keys. Prefixed per restaurant where it matters, so a tablet moved
+ * between venues does not inherit the other one's memory of what it has said.
  */
 const AUDIO_KEY = 'autodine:kitchen:audio';
 const SPEAKS_KEY = 'autodine:kitchen:speaks';
+const LANG_KEY = 'autodine:kitchen:lang';
 const seenKey = (restaurantId: string | null) => `autodine:kitchen:seen:${restaurantId ?? 'demo'}`;
 
 /**
@@ -61,7 +64,7 @@ type BoardTicket = {
   total: number;
 };
 
-type LogEntry = { key: string; at: string; label: string; text: string };
+type LogEntry = { key: string; at: string; label: string; text: string; lang: AnnounceLang };
 
 function fromDemo(order: KitchenOrder): BoardTicket {
   return {
@@ -120,18 +123,19 @@ function Items({ order, compact }: { order: BoardTicket; compact?: boolean }) {
 
    Two sources of truth are deliberately avoided. The database is the only
    one; local state holds nothing but a map of in-flight optimistic moves,
-   keyed by order UUID. When an action succeeds the entry is dropped and the
-   server's own value is what renders. When it fails the entry is dropped too,
-   which rolls the tile back to whatever the server last said.
+   keyed by order UUID.
 
    THE ANNOUNCEMENT CONTRACT
 
    A guest presses "Place order" on a phone. The kitchen must hear, within
-   about a second, the table and the dishes with their portions. Three things
-   have to be true for that:
+   about a second, the table and the dishes with their portions, in a language
+   the room actually speaks. Four things have to be true:
 
      delivery   realtime pushes the row; a poll every few seconds is the
                 safety net when the socket drops
+     language   Hindi by default. A device with no Hindi voice announces in
+                English and SAYS SO, because Devanagari read by an English
+                synthesiser is silence, not accented Hindi
      wording    lib/announce.ts builds the sentence. Portions and the guest's
                 note are spoken, because the voice is the only version some
                 cooks get
@@ -144,28 +148,45 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
 
   const [audio, setAudio] = useState(true);
   const [speaksHere, setSpeaksHere] = useState(true);
+  const [lang, setLang] = useState<AnnounceLang>('hi');
+  const [hindiAvailable, setHindiAvailable] = useState(true);
+  /**
+   * False until the platform has finished enumerating its voices.
+   *
+   * On most browsers getVoices() is empty for the first few hundred
+   * milliseconds. An announcement made in that window finds no voice, is
+   * consumed silently, and is then marked as seen -- so the very first order
+   * after a cold start is the one that never gets read out. The pass below
+   * waits for this flag instead, and the ticket stays unmarked until it can
+   * actually be spoken.
+   */
+  const [voicesReady, setVoicesReady] = useState(false);
   const [announcement, setAnnouncement] = useState('');
   const [log, setLog] = useState<LogEntry[]>([]);
   const [error, setError] = useState('');
   const [pending, setPending] = useState<Record<string, PrepState>>({});
   const [voiceName, setVoiceName] = useState<string | null>(null);
   const [voiceProblem, setVoiceProblem] = useState<'none' | 'unavailable' | 'stalled'>('none');
+  const [lostCount, setLostCount] = useState(0);
   const [delivery, setDelivery] = useState<'connecting' | 'live' | 'polling'>('polling');
   const [queued, setQueued] = useState(0);
   const [missed, setMissed] = useState<BoardTicket[]>([]);
   const [ready, setReady] = useState(false);
+  const [gestureDone, setGestureDone] = useState(false);
 
   const live = Boolean(data);
   const restaurantId = data?.restaurantId ?? null;
 
-  // The speaker closure is built once, so it reads the toggle through a ref
-  // rather than capturing the value it had at first render.
+  // The speaker closure is built once, so it reads these through refs rather
+  // than capturing the values they had at first render.
   const audioRef = useRef(audio);
   audioRef.current = audio;
   const speaksRef = useRef(speaksHere);
   speaksRef.current = speaksHere;
+  const langRef = useRef<AnnounceLang>(lang);
+  langRef.current = lang;
 
-  const speechRef = useRef<KitchenSpeech | null>(null);
+  const speechRef = useRef<SpeechEngine | null>(null);
   const queueRef = useRef<AnnounceQueue | null>(null);
   const seenRef = useRef<Set<string>>(new Set());
   const primedRef = useRef(false);
@@ -178,6 +199,8 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
     try {
       if (localStorage.getItem(AUDIO_KEY) === 'off') setAudio(false);
       if (localStorage.getItem(SPEAKS_KEY) === 'off') setSpeaksHere(false);
+      const stored = localStorage.getItem(LANG_KEY);
+      if (stored === 'hi' || stored === 'en') setLang(stored);
     } catch {
       /* private mode: defaults are fine */
     }
@@ -189,24 +212,31 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
     try {
       localStorage.setItem(AUDIO_KEY, audio ? 'on' : 'off');
       localStorage.setItem(SPEAKS_KEY, speaksHere ? 'on' : 'off');
+      localStorage.setItem(LANG_KEY, lang);
     } catch {
       /* nothing to persist to */
     }
-  }, [audio, speaksHere, ready]);
+  }, [audio, speaksHere, lang, ready]);
 
   /* ------------------------------------------------------------------ speech */
 
   useEffect(() => {
     const chime = createChime();
-    const speech = createKitchenSpeech(browserSpeechEnv(chime));
-    speechRef.current = speech;
+    const engine = createKitchenSpeech(browserSpeechEnv(chime));
+    speechRef.current = engine;
 
     // Voices load asynchronously on most platforms. The first announcement
     // after a cold start is exactly when that matters.
     const refresh = () => {
-      speech.refreshVoices();
-      setVoiceName(speech.voiceName());
-      setVoiceProblem(speech.unavailable() ? 'unavailable' : 'none');
+      engine.refreshVoices();
+      const hasHindi = engine.available('hi');
+      setHindiAvailable(hasHindi);
+      // "Ready" means the engine answered with SOMETHING. A device with no
+      // voice at all still has to be released, or the board would wait for
+      // ever; the unavailable() strip covers that case honestly.
+      if (engine.voiceName('en') !== null || engine.unavailable()) setVoicesReady(true);
+      setVoiceName(engine.voiceName(hasHindi ? 'hi' : 'en'));
+      setVoiceProblem(engine.unavailable() ? 'unavailable' : 'none');
     };
     refresh();
 
@@ -214,45 +244,94 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
     synth?.addEventListener?.('voiceschanged', refresh);
 
     queueRef.current = createAnnounceQueue({
-      speak(text, onEnd) {
-        const engine = speechRef.current;
+      speak(text, onEnd, entryLang) {
+        const current = speechRef.current;
 
         // Sound off, or this device is not the one that speaks: consume the
         // announcement without sound. Consuming rather than skipping is
         // deliberate -- otherwise a backlog would build while muted and play
         // all at once the moment it was switched on.
-        if (!engine || !audioRef.current || !speaksRef.current) {
+        if (!current || !audioRef.current || !speaksRef.current) {
           onEnd();
           return;
         }
 
-        engine.speak(text, () => {
-          setVoiceProblem(engine.stalled() ? 'stalled' : 'none');
-          onEnd();
-        });
+        current.speak(
+          text,
+          () => {
+            if (current.stalled()) {
+              // The browser refused to start the utterance. The sentence is
+              // in the log, so the pass can replay it, but say so rather than
+              // letting the board look like it announced something.
+              setVoiceProblem('stalled');
+              setLostCount((count) => count + 1);
+            } else {
+              setVoiceProblem(current.unavailable() ? 'unavailable' : 'none');
+            }
+            onEnd();
+          },
+          entryLang ?? langRef.current,
+        );
       },
     });
 
     return () => {
       synth?.removeEventListener?.('voiceschanged', refresh);
-      speech.cancel();
+      engine.cancel();
       speechRef.current = null;
       queueRef.current = null;
     };
   }, []);
 
-  const speak = useCallback((key: string, text: string, label: string, priority: 'order' | 'info' = 'order') => {
+  // The resolved language: what will ACTUALLY be spoken, which is what the
+  // board must promise. Not the preference.
+  const choice = chooseLanguage(lang, hindiAvailable);
+  const activeLang = choice.lang;
+
+  // Refs so callbacks built before a language change still use the current one.
+  const activeLangRef = useRef<AnnounceLang>(activeLang);
+  activeLangRef.current = activeLang;
+
+  const speak = useCallback(
+    (key: string, text: string, label: string, priority: 'order' | 'info' = 'order') => {
+      const spoken = queueRef.current?.push(key, text, priority, activeLangRef.current) ?? false;
+
+      // Only log what was actually queued. Logging a dropped announcement
+      // would show the pass a sentence the kitchen never heard.
+      if (!spoken) return;
+
+      setAnnouncement(text);
+      setLog((current) =>
+        [{ key, at: clockNow(), label, text, lang: activeLangRef.current }, ...current].slice(0, LOG_LIMIT),
+      );
+      setQueued(queueRef.current?.depth() ?? 0);
+    },
+    [],
+  );
+
+  /**
+   * Replay one, on demand, whether or not it has been said before.
+   *
+   * `langForEntry` is the language the stored text was written in, which is
+   * not always the language selected now -- a log entry from before a switch
+   * still says what it said. Reading it in the wrong voice is silence.
+   */
+  const replay = useCallback((key: string, text: string, label: string, langForEntry?: AnnounceLang) => {
+    // force(), not push(): a replay pressed while the original is still
+    // waiting would otherwise be refused as a duplicate and appear to do
+    // nothing at all.
+    const queued = queueRef.current?.force(key, text, 'order', langForEntry) ?? false;
+    if (!queued) return;
+
     setAnnouncement(text);
-    setLog((current) => [{ key, at: clockNow(), label, text }, ...current].slice(0, LOG_LIMIT));
-    queueRef.current?.push(key, text, priority);
+    setLog((current) =>
+      [
+        { key, at: clockNow(), label, text, lang: langForEntry ?? activeLangRef.current },
+        ...current,
+      ].slice(0, LOG_LIMIT),
+    );
     setQueued(queueRef.current?.depth() ?? 0);
   }, []);
-
-  /** Replay one, on demand, whether or not it has been said before. */
-  const replay = useCallback((key: string, text: string, label: string) => {
-    queueRef.current?.forget(key);
-    speak(key, text, label);
-  }, [speak]);
 
   /* ---------------------------------------------------------------- the board */
 
@@ -290,11 +369,15 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
     const fresh = selectNewTickets(orders, seenRef.current);
     if (fresh.length === 0) return;
 
+    // Wait for the voice list. Returning WITHOUT marking them seen is the
+    // point: the effect re-runs when voicesReady flips and speaks them then.
+    if (!voicesReady) return;
+
     for (const ticket of fresh) {
       seenRef.current.add(ticket.orderId!);
       speak(
         `new:${ticket.orderId}`,
-        orderAnnouncement(ticket),
+        orderAnnouncement(ticket, activeLangRef.current),
         announceLogLabel(ticket.table, ticket.items),
         'order',
       );
@@ -302,9 +385,14 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
 
     writeSeen(restaurantId, [...seenRef.current]);
     setMissed((current) => current.filter((t) => !seenRef.current.has(t.orderId!)));
-  }, [orders, live, restaurantId, speak]);
+  }, [orders, live, restaurantId, speak, voicesReady]);
 
   /* --------------------------------------------------------------- delivery */
+
+  const refresh = useCallback(() => {
+    if (document.visibilityState !== 'visible') return;
+    router.refresh();
+  }, [router]);
 
   /**
    * Realtime first, polling as the safety net.
@@ -313,11 +401,6 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
    * stops -- it only slows down while the socket is known good. When the
    * socket dies the interval tightens on its own.
    */
-  const refresh = useCallback(() => {
-    if (document.visibilityState !== 'visible') return;
-    router.refresh();
-  }, [router]);
-
   useEffect(() => {
     if (!live || !restaurantId) return;
 
@@ -356,29 +439,58 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
 
   useAutoRefresh(live, delivery === 'live' ? 30 : 5, refresh);
 
+  /* ------------------------------------------------------------------ unlock */
+
+  /**
+   * Browsers refuse to play audio until the page has been interacted with.
+   * A kitchen tablet is often opened and left alone, so the first
+   * announcement of the evening is exactly the one that gets swallowed.
+   *
+   * The board therefore asks for one tap -- and it takes the tap from anywhere
+   * on the page, so it is not a button someone has to find.
+   */
+  useEffect(() => {
+    if (!ready || gestureDone) return;
+
+    const unlock = () => {
+      setGestureDone(true);
+      // A resumed AudioContext plus one silent utterance is what tells Chrome
+      // and Safari that this origin may now make noise.
+      speechRef.current?.refreshVoices();
+      setVoiceName(speechRef.current?.voiceName(hindiAvailable ? 'hi' : 'en') ?? null);
+    };
+
+    window.addEventListener('pointerdown', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, [ready, gestureDone, hindiAvailable]);
+
   /* ---------------------------------------------------------------- actions */
 
   const advance = async (ticket: BoardTicket) => {
-    // Demo rows have no database identity. Nothing to call, so nothing
-    // pretends to have been saved.
     if (!ticket.orderId) {
       setError('This board is showing sample data. Connect the database to cook real tickets.');
       return;
     }
 
-    // Same shared machine the server uses, so the optimistic move and the
-    // write can never disagree.
     const next = nextPrepState(ticket.state);
     if (!next) return;
 
-    speak(`adv:${ticket.orderId}:${next}`, advanceText(ticket.table, next), ticket.table, 'info');
+    speak(
+      `adv:${ticket.orderId}:${next}`,
+      advanceText(ticket.table, next, activeLangRef.current),
+      ticket.table,
+      'info',
+    );
     setError('');
     setPending((current) => ({ ...current, [ticket.orderId!]: next }));
 
     const result = await advanceOrderAction(ticket.orderId);
 
-    // Drop the override either way: on success the server now holds this
-    // state, on failure the tile must snap back to it.
     setPending((current) => {
       const copy = { ...current };
       delete copy[ticket.orderId!];
@@ -390,8 +502,6 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
       return;
     }
     if (result.state) {
-      // The server is authoritative about what it moved to, which may differ
-      // from our guess if another device advanced the ticket first.
       setPending((current) => ({ ...current, [ticket.orderId!]: result.state! }));
       setTimeout(() => {
         setPending((current) => {
@@ -415,6 +525,11 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
 
   const latest = orders.find((order) => order.state !== 'served') ?? orders[0];
 
+  const sampleText =
+    activeLang === 'hi'
+      ? 'नया ऑर्डर, टेबल टी वन। एक Butter Chicken, आधा। नोट: प्याज़ नहीं।'
+      : 'New order, table T1. One Butter Chicken, Half.';
+
   return (
     <div className="kb">
       <header className="kb__head">
@@ -430,6 +545,31 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
               {audio ? 'Turn off' : 'Turn on'}
             </button>
           </div>
+
+          {/* Language. Two states, both real: the board never offers Hindi on
+              a device that cannot speak it without saying why it is English. */}
+          <div className="kb__langs" role="group" aria-label="Announcement language">
+            {(['hi', 'en'] as const).map((value) => {
+              // Hindi with no Hindi voice on this device is a button that
+              // cannot do what it says. Rather than let it look pressed while
+              // the board speaks English, it goes disabled and explains why.
+              const blocked = value === 'hi' && !hindiAvailable;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  className={`kb__lang ${activeLang === value ? 'is-on' : ''}`}
+                  aria-pressed={activeLang === value}
+                  disabled={blocked}
+                  title={blocked ? 'इस डिवाइस में हिंदी की आवाज़ नहीं है' : undefined}
+                  onClick={() => setLang(value)}
+                >
+                  {value === 'hi' ? 'हिंदी' : 'English'}
+                </button>
+              );
+            })}
+          </div>
+
           {live && (
             <button
               type="button"
@@ -443,7 +583,7 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
           <button
             type="button"
             className="kb__ghost"
-            onClick={() => replay(`test:${Date.now()}`, 'AutoDine kitchen audio test', 'Test')}
+            onClick={() => replay(`test:${Date.now()}`, sampleText, 'Test')}
           >
             Test announcement
           </button>
@@ -455,7 +595,7 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
               if (!latest?.orderId) return;
               replay(
                 `new:${latest.orderId}`,
-                orderAnnouncement(latest),
+                orderAnnouncement(latest, activeLangRef.current),
                 announceLogLabel(latest.table, latest.items),
               );
             }}
@@ -476,7 +616,33 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
         </div>
       </header>
 
-      {/* ------------------------------------------------------ honesty strip */}
+      {/* ------------------------------------------------------ honesty strips */}
+
+      {!gestureDone && audio && speaksHere && (
+        <div className="kb__warn kb__warn--quiet" role="status">
+          <strong>Tap once anywhere on this board.</strong>
+          <span>
+            Some browsers block sound until the page has been touched. One tap now means the first
+            order of the day is not the one that gets swallowed.
+          </span>
+        </div>
+      )}
+
+      {lang === 'hi' && !hindiAvailable && (
+        <div className="kb__warn" role="alert">
+          <strong>No Hindi voice on this device.</strong>
+          <span>
+            Orders are being announced in <strong>English</strong> so the kitchen still hears them.
+            To get Hindi: install a Hindi text-to-speech voice (Android: Settings → Language &amp;
+            input → Text-to-speech → install Hindi; iPad: Settings → Accessibility → Spoken Content →
+            Voices → Hindi).
+          </span>
+          <button type="button" className="kb__ghost" onClick={() => setLang('en')}>
+            Announce in English
+          </button>
+        </div>
+      )}
+
       {audio && speaksHere && voiceProblem === 'unavailable' && (
         <div className="kb__warn" role="alert">
           <strong>This device has no speech voice.</strong>
@@ -487,14 +653,24 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
         </div>
       )}
 
-      {audio && speaksHere && voiceProblem === 'stalled' && (
+      {audio && speaksHere && voiceProblem === 'stalled' && lostCount > 0 && (
         <div className="kb__warn" role="alert">
-          <strong>The browser blocked the voice.</strong>
+          <strong>
+            {lostCount} announcement{lostCount === 1 ? '' : 's'} could not be read out.
+          </strong>
           <span>
-            Announcements are being cut short. Tap anywhere on this board once to allow sound, then
-            use “Test announcement”.
+            The browser blocked the voice. Tap this board once to allow sound, press “Test
+            announcement”, then replay from the list below — the sentences are all there.
           </span>
-          <button type="button" className="kb__ghost" onClick={() => speechRef.current?.clearStall()}>
+          <button
+            type="button"
+            className="kb__ghost"
+            onClick={() => {
+              speechRef.current?.clearStall();
+              setVoiceProblem('none');
+              setLostCount(0);
+            }}
+          >
             Dismiss
           </button>
         </div>
@@ -539,7 +715,7 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
               for (const ticket of [...missed].reverse()) {
                 speak(
                   `new:${ticket.orderId}`,
-                  orderAnnouncement(ticket),
+                  orderAnnouncement(ticket, activeLangRef.current),
                   announceLogLabel(ticket.table, ticket.items),
                 );
               }
@@ -562,7 +738,7 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
             <span>Announcements</span>
             <span className="kb__logVoice">
               {audio && speaksHere
-                ? (voiceName ?? 'no voice selected')
+                ? `${voiceName ?? 'no voice selected'}${activeLang === 'hi' ? ' · हिंदी' : ''}`
                 : 'muted on this screen — nothing was read aloud'}
             </span>
           </div>
@@ -576,7 +752,9 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
                   type="button"
                   className="kb__linkBtn"
                   aria-label={`Replay ${entry.label}`}
-                  onClick={() => replay(`${entry.key}:replay:${entry.at}`, entry.text, entry.label)}
+                  onClick={() =>
+                    replay(`${entry.key}:replay:${entry.at}`, entry.text, entry.label, entry.lang)
+                  }
                 >
                   Replay
                 </button>
@@ -657,7 +835,7 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
                       onClick={() =>
                         replay(
                           `new:${o.orderId ?? o.key}`,
-                          orderAnnouncement(o),
+                          orderAnnouncement(o, activeLangRef.current),
                           announceLogLabel(o.table, o.items),
                         )
                       }

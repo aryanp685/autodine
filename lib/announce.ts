@@ -1,41 +1,50 @@
 /**
- * Speaking orders out loud, one at a time -- and saying the RIGHT thing.
+ * Speaking orders out loud, one at a time -- and saying the RIGHT thing, in
+ * the language the kitchen actually speaks.
  *
  * WHY A QUEUE AND NOT JUST speak()
  *
- * The obvious implementation is window.speechSynthesis.speak(), and the
- * obvious way to stop two announcements overlapping is to cancel() before
- * each one. That is what this replaced, and it breaks in the exact case that
- * matters: four tables order within a second of each other, three
- * announcements are cancelled mid-word, and the kitchen hears a fragment of
- * the last one. Guests still get their food, so it fails quietly.
+ * See lib/speech.ts. The short version: cancelling before each utterance cuts
+ * every announcement but the last, and a burst of orders is exactly when that
+ * matters.
  *
- * So announcements are queued. Each waits for the one before it to finish.
- * Nothing is cancelled, nothing is dropped, and a burst of orders produces a
- * burst of complete sentences in the order they arrived.
+ * WHY TWO LANGUAGES
  *
- * WHY THE KEY
+ * An Indian kitchen does not talk in one language. The frame of the sentence
+ * is Hindi; the dish names are whatever the menu calls them, usually English.
+ * A board that reads out "New order, table T1" in a neutral accent is a board
+ * the pass stops listening to within a week.
  *
- * The kitchen board re-reads itself every few seconds, and every re-read
- * looks like every order again. Without a memory of what was already said,
- * the same ticket would be announced on every poll -- a board that will not
- * stop talking, which any real kitchen would switch off within a minute and
- * then never turn back on.
+ * BUT Hindi is not always available
  *
- * WHY THE WORDS MATTER
- *
- * A cook does not read the screen; they hear "table four, two butter
- * chicken". If the announcement says "1 Butter Chicken" when the guest
- * ordered a HALF portion, the kitchen plates a full one and the restaurant
- * loses money on every such ticket. So the spoken sentence carries the
- * portion, the add-ons and the guest's note -- the same detail the ticket
- * card shows, because the voice is the only version some cooks get.
+ * A laptop bought in the US has no hi-IN voice installed. Speaking Devanagari
+ * at an English voice produces silence or gibberish, which is the worst
+ * possible outcome: the board looks like it announced something and the
+ * kitchen heard nothing at all. So the language is CHOSEN against what the
+ * device can actually speak, never assumed -- see chooseLanguage and
+ * resolveAnnouncement below. When the choice falls back, the board says so.
  */
 
-/** How the queue talks. Injected so the queue can be tested without a browser. */
+/** A language this product can announce in. */
+export type AnnounceLang = 'hi' | 'en';
+
+/**
+ * How the queue talks. Injected so the queue can be tested without a browser.
+ *
+ * The language travels WITH the announcement, not alongside the queue. A
+ * kitchen board lets someone switch language while tickets are still waiting;
+ * if the speaker looked up the current language at speak time, a queued Hindi
+ * sentence would be handed to an English voice -- which reads Devanagari as
+ * silence. Each entry therefore remembers how it was written.
+ */
 export type Speaker = {
-  /** Called for one announcement. Must call onEnd exactly once, even on error. */
-  speak(text: string, onEnd: () => void): void;
+  /**
+   * Called for one announcement. Must call onEnd exactly once, even on error.
+   *
+   * `lang` is undefined when the caller never set one, and the speaker is then
+   * free to use its default.
+   */
+  speak(text: string, onEnd: () => void, lang?: AnnounceLang): void;
 };
 
 /**
@@ -54,7 +63,16 @@ export type AnnounceQueue = {
    * is already waiting, or when an 'info' announcement was dropped because
    * the queue is backed up. In all three cases nothing will be spoken.
    */
-  push(key: string, text: string, priority?: AnnouncePriority): boolean;
+  push(key: string, text: string, priority?: AnnouncePriority, lang?: AnnounceLang): boolean;
+  /**
+   * Queue an announcement whether or not the key has been used, and replacing
+   * any copy of it still waiting.
+   *
+   * This is what a Replay button needs. Without the replacement a replay
+   * pressed while the original is still queued is refused as a duplicate and
+   * the button appears to do nothing.
+   */
+  force(key: string, text: string, priority?: AnnouncePriority, lang?: AnnounceLang): boolean;
   /** Whether this key was announced before. Does not queue anything. */
   has(key: string): boolean;
   /** Forget a key, so the same announcement can be made again on request. */
@@ -76,7 +94,7 @@ export type AnnounceQueue = {
 export const MAX_BACKLOG = 6;
 
 export function createAnnounceQueue(speaker: Speaker): AnnounceQueue {
-  const waiting: { key: string; text: string; priority: AnnouncePriority }[] = [];
+  const waiting: { key: string; text: string; priority: AnnouncePriority; lang?: AnnounceLang }[] = [];
   const said = new Set<string>();
   let busy = false;
 
@@ -99,7 +117,7 @@ export function createAnnounceQueue(speaker: Speaker): AnnounceQueue {
     };
 
     try {
-      speaker.speak(next.text, finish);
+      speaker.speak(next.text, finish, next.lang);
     } catch {
       // A speaker that throws must not wedge the queue: without this the
       // board would announce once and then fall silent for the rest of the
@@ -108,18 +126,33 @@ export function createAnnounceQueue(speaker: Speaker): AnnounceQueue {
     }
   }
 
-  return {
-    push(key, text, priority = 'order') {
-      if (said.has(key)) return false;
-      // Also skip a duplicate still waiting, so a double poll does not queue
-      // the same thing twice before the first one has been spoken.
-      if (waiting.some((entry) => entry.key === key)) return false;
-      if (priority === 'info' && waiting.length >= MAX_BACKLOG) return false;
+  function enqueue(
+    key: string,
+    text: string,
+    priority: AnnouncePriority,
+    replaceWaiting: boolean,
+    lang?: AnnounceLang,
+  ): boolean {
+    if (said.has(key) && !replaceWaiting) return false;
 
-      waiting.push({ key, text, priority });
-      drain();
-      return true;
-    },
+    const alreadyQueued = waiting.findIndex((entry) => entry.key === key);
+    if (alreadyQueued >= 0) {
+      if (!replaceWaiting) return false;
+      waiting.splice(alreadyQueued, 1);
+    }
+
+    if (priority === 'info' && waiting.length >= MAX_BACKLOG) return false;
+
+    if (replaceWaiting) said.delete(key);
+
+    waiting.push({ key, text, priority, lang });
+    drain();
+    return true;
+  }
+
+  return {
+    push: (key, text, priority = 'order', lang) => enqueue(key, text, priority, false, lang),
+    force: (key, text, priority = 'order', lang) => enqueue(key, text, priority, true, lang),
     has: (key) => said.has(key),
     forget: (key) => said.delete(key),
     pending: () => waiting.length,
@@ -129,31 +162,42 @@ export function createAnnounceQueue(speaker: Speaker): AnnounceQueue {
 }
 
 /* ========================================================================== */
+/*  Choosing a language                                                       */
+/* ========================================================================== */
+
+export type LanguageChoice = {
+  /** The language the text will actually be spoken in. */
+  lang: AnnounceLang;
+  /** True when the preference could not be honoured and English is used. */
+  fellBack: boolean;
+};
+
+/**
+ * Pick the language to announce in, given what the device can speak.
+ *
+ * The rule is one line long on purpose: never ask a voice to read a script it
+ * cannot read. Hindi text at an English synthesiser is not "a bit accented",
+ * it is silence -- and a silent board that believes it spoke is the failure
+ * this whole module exists to prevent.
+ */
+export function chooseLanguage(preferred: AnnounceLang, hindiAvailable: boolean): LanguageChoice {
+  if (preferred === 'hi' && !hindiAvailable) return { lang: 'en', fellBack: true };
+  return { lang: preferred, fellBack: false };
+}
+
+/* ========================================================================== */
 /*  Words                                                                     */
 /* ========================================================================== */
 
-const NUMBER_WORDS = [
-  'zero',
-  'one',
-  'two',
-  'three',
-  'four',
-  'five',
-  'six',
-  'seven',
-  'eight',
-  'nine',
-  'ten',
-  'eleven',
-  'twelve',
-  'thirteen',
-  'fourteen',
-  'fifteen',
-  'sixteen',
-  'seventeen',
-  'eighteen',
-  'nineteen',
-  'twenty',
+const EN_NUMBERS = [
+  'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+  'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen',
+  'nineteen', 'twenty',
+];
+
+const HI_NUMBERS = [
+  'शून्य', 'एक', 'दो', 'तीन', 'चार', 'पाँच', 'छह', 'सात', 'आठ', 'नौ', 'दस',
+  'ग्यारह', 'बारह', 'तेरह', 'चौदह', 'पंद्रह', 'सोलह', 'सत्रह', 'अठारह', 'उन्नीस', 'बीस',
 ];
 
 /**
@@ -163,10 +207,115 @@ const NUMBER_WORDS = [
  * Butter Chicken" comes out stilted and slow. A word flows. Above twenty the
  * digit is clearer than a long phrase, so it is left as digits.
  */
-export function numberWord(n: number): string {
+export function numberWord(n: number, lang: AnnounceLang = 'en'): string {
   const rounded = Math.round(n);
   if (!Number.isFinite(rounded) || rounded < 0) return String(n);
-  return rounded <= 20 ? NUMBER_WORDS[rounded] : String(rounded);
+
+  const words = lang === 'hi' ? HI_NUMBERS : EN_NUMBERS;
+  return rounded <= 20 ? words[rounded] : String(rounded);
+}
+
+/**
+ * Portion names, translated.
+ *
+ * A variant is free text an owner typed, so anything unknown is spoken as-is
+ * rather than guessed at. These are the ones that actually appear on Indian
+ * menus, including the Bombay "paav" for a quarter.
+ */
+const HI_DETAIL: Record<string, string> = {
+  half: 'आधा',
+  full: 'पूरा',
+  quarter: 'पाव',
+  regular: 'रेगुलर',
+  small: 'छोटा',
+  medium: 'मीडियम',
+  large: 'बड़ा',
+  single: 'सिंगल',
+  double: 'डबल',
+  plate: 'प्लेट',
+  extra: 'एक्स्ट्रा',
+};
+
+function translateDetail(detail: string, lang: AnnounceLang): string {
+  if (lang === 'en') return detail;
+
+  return detail
+    .split(/\s*,\s*/)
+    .map((part) => {
+      const key = part.trim().toLowerCase();
+      return HI_DETAIL[key] ?? part.trim();
+    })
+    .filter(Boolean)
+    .join(', ');
+}
+
+/**
+ * A table label as an Indian voice can definitely pronounce it.
+ *
+ * 'T1' is printed on the table and must be spoken exactly, but Devanagari
+ * synthesisers disagree about Latin letters and digits -- some read them, some
+ * spell them out letter by letter, some skip them. Every character is mapped
+ * to a Devanagari syllable instead, so 'T12' becomes 'टी बारह' on every
+ * engine: letters by their Indian names, digits the way a person says "T one
+ * two" -- actually "T twelve", because that is what the label means.
+ */
+const HI_LETTERS: Record<string, string> = {
+  a: 'ए', b: 'बी', c: 'सी', d: 'डी', e: 'ई', f: 'एफ़', g: 'जी', h: 'एच', i: 'आई',
+  j: 'जे', k: 'के', l: 'एल', m: 'एम', n: 'एन', o: 'ओ', p: 'पी', q: 'क्यू', r: 'आर',
+  s: 'एस', t: 'टी', u: 'यू', v: 'वी', w: 'डब्ल्यू', x: 'एक्स', y: 'वाय', z: 'ज़ेड',
+};
+
+/**
+ * Digits as Indians say a TABLE NUMBER.
+ *
+ * Deliberately not the Hindi numerals used for quantities. A table labelled
+ * T1 is "टेबल टी वन" -- nobody says "टेबल टी एक". The quantity on the ticket
+ * is a different thing and does use Hindi numerals ("दो Butter Chicken"), so
+ * the two lists cannot be shared.
+ */
+const HI_LABEL_DIGITS = [
+  'ज़ीरो', 'वन', 'टू', 'थ्री', 'फ़ोर', 'फ़ाइव', 'सिक्स', 'सेवन', 'एट', 'नाइन',
+  'टेन', 'इलेवन', 'ट्वेल्व', 'थर्टीन', 'फ़ोर्टीन', 'फ़िफ़्टीन', 'सिक्स्टीन', 'सेवन्टीन',
+  'एटीन', 'नाइन्टीन', 'ट्वेन्टी',
+];
+
+function labelDigits(chunk: string): string {
+  const value = Number(chunk);
+
+  // A table up to T20 is said as one number; "T12" is "टी ट्वेल्व".
+  if (Number.isInteger(value) && value >= 0 && value <= 20) return HI_LABEL_DIGITS[value];
+
+  // Longer labels -- a hotel's "Room 204" -- are said digit by digit, which
+  // is how a room number is spoken everywhere.
+  return [...chunk].map((digit) => HI_LABEL_DIGITS[Number(digit)] ?? digit).join(' ');
+}
+
+/**
+ * A table label spoken in Hindi.
+ *
+ * A run of digits is spoken the way the table number is said, not one digit
+ * at a time for a normal number and not as a Hindi numeral.
+ */
+export function spokenTable(table: string, lang: AnnounceLang): string {
+  const trimmed = table.trim();
+  if (trimmed === '') return lang === 'hi' ? 'टेकअवे' : 'Takeaway';
+
+  if (lang === 'en') return trimmed;
+
+  if (/^(takeaway|take away|counter)$/i.test(trimmed)) return 'टेकअवे';
+
+  const out: string[] = [];
+  // One pass so 'T12' is T + the number 12, not T + 1 + 2.
+  for (const chunk of trimmed.match(/\d+|[^\d]/g) ?? []) {
+    if (/^\d+$/.test(chunk)) {
+      out.push(labelDigits(chunk));
+      continue;
+    }
+    const letter = HI_LETTERS[chunk.toLowerCase()];
+    out.push(letter ?? chunk);
+  }
+
+  return out.join(' ').replace(/\s+/g, ' ').trim();
 }
 
 /** How long a guest's note may be before it is cut. Spoken, not printed. */
@@ -182,18 +331,16 @@ export type SpeakableItem = {
 /**
  * One dish, as a clause.
  *
- * "two Butter Chicken, Half, Butter naan"
- *
  * The separators in `detail` are the middot the ticket card uses; a voice
  * reads a middot as nothing at all, so it becomes a comma.
  */
-export function spokenItem(item: SpeakableItem): string {
-  const base = `${numberWord(item.qty)} ${item.name}`;
+export function spokenItem(item: SpeakableItem, lang: AnnounceLang = 'en'): string {
+  const base = `${numberWord(item.qty, lang)} ${item.name}`;
 
-  const detail = (item.detail ?? '')
-    .replace(/\s*·\s*/g, ', ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const detail = translateDetail(
+    (item.detail ?? '').replace(/\s*·\s*/g, ', ').replace(/\s+/g, ' ').trim(),
+    lang,
+  );
 
   return detail ? `${base}, ${detail}` : base;
 }
@@ -209,31 +356,41 @@ export function spokenItem(item: SpeakableItem): string {
  */
 export const MAX_SPOKEN_ITEMS = 4;
 
-export function summariseItems<T extends SpeakableItem>(items: T[]): T[] {
+export function summariseItems<T extends SpeakableItem>(items: T[], lang: AnnounceLang = 'en'): T[] {
   if (items.length <= MAX_SPOKEN_ITEMS) return items;
 
   const head = items.slice(0, MAX_SPOKEN_ITEMS);
   const rest = items.slice(MAX_SPOKEN_ITEMS);
   const extraQty = rest.reduce((sum, i) => sum + i.qty, 0);
 
+  const tail =
+    lang === 'hi'
+      ? { qty: 0, name: `और ${numberWord(rest.length, 'hi')} आइटम` }
+      : { qty: extraQty, name: `more item${rest.length === 1 ? '' : 's'}` };
+
   // Cast because the tail is a plain summary rather than a real dish: it has
   // a quantity and a name and nothing else, which is all the reader needs.
-  return [...head, { qty: extraQty, name: `more item${rest.length === 1 ? '' : 's'}` } as unknown as T];
+  return [...head, tail as unknown as T];
+}
+
+/** The tail's own quantity is zero when the count is already in its name. */
+function spokeSummaryTail(item: SpeakableItem, lang: AnnounceLang): string {
+  if (lang === 'hi' && /^और /.test(item.name)) return item.name;
+  return spokenItem(item, lang);
+}
+
+function isTakeaway(table: string): boolean {
+  const trimmed = table.trim();
+  return trimmed === '' || /^(takeaway|take away|counter)$/i.test(trimmed);
 }
 
 /**
- * The first character as a capital.
- *
- * Each dish is its own spoken sentence, and a sentence that begins with a
- * lower-case "two" reads as a continuation of the one before it.
+ * The first character as a capital. English only; Devanagari has no case, and
+ * a Hindi sentence that begins with one is already a sentence.
  */
-function capitalise(text: string): string {
-  return text.length === 0 ? text : text[0].toUpperCase() + text.slice(1);
-}
-
-/** 'T1' stays 'T1'; 'Takeaway' gets its own sentence rather than a table. */
-function isTakeaway(table: string): boolean {
-  return /^takeaway$/i.test(table.trim()) || table.trim() === '';
+function capitalise(text: string, lang: AnnounceLang): string {
+  if (lang === 'hi' || text.length === 0) return text;
+  return text[0].toUpperCase() + text.slice(1);
 }
 
 /**
@@ -248,15 +405,33 @@ function isTakeaway(table: string): boolean {
  * later; nobody carrying a plate needs to hear "MA-K3F9Q", and a kitchen
  * asked to remember one will get it wrong under pressure.
  */
-export function newOrderText(table: string, items: SpeakableItem[], note?: string | null): string {
-  const spoken = summariseItems(items);
+export function newOrderText(
+  table: string,
+  items: SpeakableItem[],
+  note?: string | null,
+  lang: AnnounceLang = 'en',
+): string {
+  const spoken = summariseItems(items, lang);
   const clauses: string[] = [];
 
-  if (isTakeaway(table)) clauses.push('New takeaway order.');
-  else clauses.push(`New order, table ${table.trim()}.`);
+  const where = spokenTable(table, lang);
 
-  if (spoken.length > 0) {
-    clauses.push(`${spoken.map((item) => capitalise(spokenItem(item))).join('. ')}.`);
+  if (lang === 'hi') {
+    clauses.push(isTakeaway(table) ? 'नया टेकअवे ऑर्डर।' : `नया ऑर्डर, टेबल ${where}।`);
+    if (spoken.length > 0) {
+      const dishes = spoken
+        .map((item) => (/^और /.test(item.name) ? spokeSummaryTail(item, lang) : spokenItem(item, lang)))
+        .join('। ');
+      clauses.push(`${dishes}।`);
+    }
+  } else {
+    clauses.push(isTakeaway(table) ? 'New takeaway order.' : `New order, table ${where}.`);
+    if (spoken.length > 0) {
+      const dishes = spoken
+        .map((item) => capitalise(spokenItem(item, lang), lang))
+        .join('. ');
+      clauses.push(`${dishes}.`);
+    }
   }
 
   const trimmedNote = (note ?? '').trim().replace(/\s+/g, ' ');
@@ -265,23 +440,39 @@ export function newOrderText(table: string, items: SpeakableItem[], note?: strin
       trimmedNote.length > MAX_SPOKEN_NOTE
         ? `${trimmedNote.slice(0, MAX_SPOKEN_NOTE).trimEnd()}…`
         : trimmedNote;
-    clauses.push(`Note: ${cut}.`);
+    clauses.push(lang === 'hi' ? `नोट: ${cut}।` : `Note: ${cut}.`);
   }
 
   return clauses.join(' ');
 }
 
-const ADVANCE_PHRASES: Record<string, (table: string) => string> = {
-  preparing: (table) => `Table ${table}, now preparing.`,
-  ready: (table) => `Table ${table} is ready.`,
-  served: (table) => `Table ${table} served.`,
+const EN_ADVANCE: Record<string, { table: (t: string) => string; takeaway: string }> = {
+  preparing: { table: (t) => `Table ${t}, now preparing.`, takeaway: 'The takeaway order is being prepared.' },
+  ready: { table: (t) => `Table ${t} is ready.`, takeaway: 'The takeaway order is ready.' },
+  served: { table: (t) => `Table ${t} served.`, takeaway: 'The takeaway order has been served.' },
 };
 
-/** What the pass says when a ticket moves on. */
-export function advanceText(table: string, next: string): string {
-  const phrase = ADVANCE_PHRASES[next];
-  if (phrase) return phrase(isTakeaway(table) ? 'takeaway' : table.trim());
-  return `${table}, ${next}.`;
+const HI_ADVANCE: Record<string, { table: (t: string) => string; takeaway: string }> = {
+  preparing: { table: (t) => `टेबल ${t}, बनना शुरू।`, takeaway: 'टेकअवे ऑर्डर बन रहा है।' },
+  ready: { table: (t) => `टेबल ${t} तैयार है।`, takeaway: 'टेकअवे ऑर्डर तैयार है।' },
+  served: { table: (t) => `टेबल ${t} सर्व हो गया।`, takeaway: 'टेकअवे ऑर्डर सर्व हो गया।' },
+};
+
+/**
+ * What the pass says when a ticket moves on.
+ *
+ * A takeaway ticket has no table, and "Table takeaway, now preparing" is what
+ * a naive template produces -- a sentence that is not just clumsy but wrong,
+ * because a cook listening for a table number hears one that does not exist.
+ */
+export function advanceText(table: string, next: string, lang: AnnounceLang = 'en'): string {
+  const phrases = lang === 'hi' ? HI_ADVANCE : EN_ADVANCE;
+  const where = spokenTable(table, lang);
+
+  const phrase = phrases[next];
+  if (phrase) return isTakeaway(table) ? phrase.takeaway : phrase.table(where);
+
+  return lang === 'hi' ? `टेबल ${where}, ${next}।` : `Table ${where}, ${next}.`;
 }
 
 /**
@@ -315,8 +506,8 @@ export type AnnounceableTicket = {
 };
 
 /** The full spoken sentence for one ticket. */
-export function orderAnnouncement(ticket: AnnounceableTicket): string {
-  return newOrderText(ticket.table, ticket.items, ticket.note);
+export function orderAnnouncement(ticket: AnnounceableTicket, lang: AnnounceLang = 'en'): string {
+  return newOrderText(ticket.table, ticket.items, ticket.note, lang);
 }
 
 /**
