@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/app/dashboard/settings/actions', () => ({
   saveDetailsAction: mocks.action('saveDetailsAction'),
   saveTaxAction: mocks.action('saveTaxAction'),
+  saveOnlinePaymentsAction: mocks.action('saveOnlinePaymentsAction'),
 }));
 
 import { SettingsScreen } from './SettingsScreen';
@@ -39,6 +40,7 @@ function data(over: Partial<SettingsScreenData> = {}): SettingsScreenData {
       slug: 'maddi',
     },
     taxRateBps: 1800,
+    onlinePaymentsEnabled: false,
     timezone: 'Asia/Kolkata',
     publicMenuUrl: 'https://autodine.example/menu?s=maddi',
     publicMenuSvg: '<svg role="img" aria-label="QR"></svg>',
@@ -104,6 +106,36 @@ describe('SettingsScreen', () => {
     expect(html).toContain('disabled');
     // The confirmation checkbox only exists for someone who could act on it.
     expect(html).not.toContain('name="slugConfirm"');
+  });
+
+  describe('online payment', () => {
+    it('says the deployment has no keys when the switch is on but the server is not configured', () => {
+      // The exact confusion this card exists to stop: an owner ticks the box,
+      // sees no pay button on the guest side, and concludes the feature is
+      // broken rather than unconfigured.
+      const html = renderToStaticMarkup(
+        <SettingsScreen data={data({ onlinePaymentsEnabled: true })} gatewayConfigured={false} />,
+      );
+
+      expect(html).toContain('Online payment');
+      expect(html).toContain('no gateway keys');
+    });
+
+    it('says nothing is missing when the switch is on and the server has keys', () => {
+      const html = renderToStaticMarkup(
+        <SettingsScreen data={data({ onlinePaymentsEnabled: true })} gatewayConfigured />,
+      );
+
+      expect(html).not.toContain('no gateway keys');
+    });
+
+    it('explains that a configured server still shows the counter until the box is ticked', () => {
+      const html = renderToStaticMarkup(
+        <SettingsScreen data={data({ onlinePaymentsEnabled: false })} gatewayConfigured />,
+      );
+
+      expect(html).toContain('pay at the counter');
+    });
   });
 
   it('shows the sign-in prompt and no form at all when blocked', () => {

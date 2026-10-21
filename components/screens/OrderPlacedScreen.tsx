@@ -2,7 +2,9 @@ import Link from 'next/link';
 import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
 import { GuestOrderEditor } from '@/components/screens/GuestOrderEditor';
+import { PayOnline } from '@/components/PayOnline';
 import { GUEST_CHANGE_WINDOW_MS, type OrderScreenData } from '@/lib/db/order-screen';
+import type { OnlineOffer } from '@/lib/payments/online-availability';
 
 /**
  * Why the guest cannot change this order any more, in their own words.
@@ -38,17 +40,28 @@ const PREP_LABEL: Record<string, string> = {
 /**
  * Confirmation, and the only screen that tells the diner what happens next.
  *
- * It says plainly that payment happens at the counter, because online payment
- * is not connected and a screen that stayed quiet about it would leave someone
- * waiting for a card prompt that is never coming.
+ * It says plainly how the bill gets paid. When the restaurant takes card
+ * online the button is here; when it does not, or this deployment has no
+ * gateway key, the screen says "pay at the counter" in as many words. Staying
+ * quiet would leave someone waiting for a card prompt that is never coming.
  */
 export function OrderPlacedScreen({
   data,
   token,
+  slug,
+  onlinePay,
 }: {
   data: OrderScreenData | null;
   /** The guest's credential from the URL. Absent on a stale or hand-typed link. */
   token?: string;
+  /** Which restaurant, for the pay button's server call. */
+  slug?: string;
+  /**
+   * Whether card payment may be offered on this order, decided on the server
+   * (lib/payments/online-availability.ts). Null means the order could not be
+   * read at all.
+   */
+  onlinePay?: OnlineOffer | null;
 }) {
   if (!data) {
     return (
@@ -138,10 +151,30 @@ export function OrderPlacedScreen({
                 is owed. Order again from the menu whenever you are ready.
               </p>
             ) : data.paymentStatus === 'pending' ? (
-              <p className="cart__fine">
-                <strong>Pay at the counter before you leave.</strong> The kitchen has your
-                order already and is starting on it now.
-              </p>
+              <>
+                {onlinePay?.available && slug && token ? (
+                  <>
+                    <PayOnline
+                      slug={slug}
+                      code={data.code}
+                      token={token}
+                      duePaise={data.totalPaise}
+                    />
+                    <p className="cart__fine">
+                      Or pay at the counter before you leave — the kitchen has your order
+                      already and is starting on it now.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    {onlinePay?.note ? <p className="cart__fine">{onlinePay.note}</p> : null}
+                    <p className="cart__fine">
+                      <strong>Pay at the counter before you leave.</strong> The kitchen has
+                      your order already and is starting on it now.
+                    </p>
+                  </>
+                )}
+              </>
             ) : (
               <p className="cart__fine">Paid. Thank you.</p>
             )}

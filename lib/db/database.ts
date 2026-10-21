@@ -128,7 +128,10 @@ export type Database = {
         amount_paise: number;
         status: 'pending' | 'recorded' | 'failed' | 'refunded';
         provider: string | null;
+        /** The provider's id for the attempt, e.g. Razorpay order_... */
         provider_ref: string | null;
+        /** The provider's id for the money, e.g. Razorpay pay_.... Migration 00800. */
+        provider_payment_ref: string | null;
         idempotency_key: string | null;
         created_at: string;
       }>;
@@ -307,6 +310,58 @@ export type Database = {
           p_guest_token?: string | null;
         };
         Returns: string; // order code
+      };
+      /**
+       * Migration 20261022000800. What this guest still owes, and whether the
+       * restaurant has switched online payment on.
+       *
+       * SECURITY DEFINER, granted to service_role only: the browser reaches it
+       * through a server action. The guest token is the credential; a wrong
+       * token returns null, never an error that distinguishes the two cases.
+       */
+      public_online_due: {
+        Args: { p_slug: string; p_code: string; p_token: string };
+        Returns: unknown;
+      };
+      /**
+       * Migration 20261022000800. Record an online attempt as pending, after
+       * the provider has issued its own order id.
+       *
+       * The amount must equal the outstanding balance computed here, so a
+       * provider order created for a stale amount cannot be attached.
+       * Idempotent on (provider, provider_order_ref).
+       */
+      begin_online_payment: {
+        Args: {
+          p_provider: string;
+          p_provider_order_ref: string;
+          p_slug: string;
+          p_order_id: string;
+          p_guest_token: string;
+          p_amount_paise: number;
+        };
+        Returns: string; // payment id
+      };
+      /**
+       * Migration 20261022000800. Settle: the money is real.
+       *
+       * Called only after a signature has been verified — the checkout
+       * callback with the key secret, the webhook with the webhook secret.
+       * Idempotent on the provider order id, because both fire for the same
+       * payment and only the first one should move anything.
+       *
+       * A null p_amount_paise means "the attempt's own amount" and is what the
+       * checkout callback sends; the webhook sends the provider's number and
+       * is held to it.
+       */
+      settle_online_payment: {
+        Args: {
+          p_provider: string;
+          p_provider_order_ref: string;
+          p_provider_payment_ref: string;
+          p_amount_paise?: number | null;
+        };
+        Returns: string; // payment id
       };
       /**
        * Migration 00600. One order, for its guest.

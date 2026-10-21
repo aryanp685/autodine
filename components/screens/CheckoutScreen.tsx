@@ -9,28 +9,39 @@ import { priceCart, type MenuItemPrice } from '@/lib/cart-pricing';
 import { placeOrderAction } from '@/app/menu/checkout/actions';
 
 /**
- * Checkout, with one honest gap.
+ * Checkout.
  *
- * Paying at the counter works: the order goes to the kitchen marked payment
- * pending, and the cashier records the payment when it happens. That is the
- * whole loop and it is real.
+ * One path, and it is the same order either way: the order goes to the kitchen
+ * immediately, marked payment pending. What differs is what happens next, and
+ * the screen says which.
  *
- * Paying online does not exist yet -- the payment provider's KYC is not
- * finished, so there is nothing to charge against. It is shown as unavailable
- * rather than as a button that fails on press. A control that looks live and
- * then errors is worse than one that plainly is not ready.
+ *   counter  the guest pays the cashier, who records it at the till.
+ *   online   the guest pays by card/UPI on their own order page, straight
+ *            after placing, and the order is marked paid only when the
+ *            gateway confirms it.
+ *
+ * No payment choice is made HERE, because none can be: the order has to exist
+ * before it can be paid. Drawing "Pay online" as a selectable option would
+ * promise a card sheet this screen cannot open.
  */
 export function Checkout({
   slug,
   restaurantName,
   taxRateBps,
   items,
+  onlinePaymentAvailable = false,
 }: {
   slug?: string;
   restaurantName?: string;
   /** The restaurant's own rate. Without it the bill is priced at a sample. */
   taxRateBps?: number;
   items: MenuItemPrice[];
+  /**
+   * Owner switch AND a gateway this deployment can verify with. False means
+   * the guest is told the counter is how payment happens -- including when an
+   * owner has switched it on but the server has no keys.
+   */
+  onlinePaymentAvailable?: boolean;
 }) {
   const cart = useCart();
   const priced = priceCart(cart.lines, items, taxRateBps);
@@ -78,11 +89,12 @@ export function Checkout({
             <button type="button" className="co__method" aria-disabled="true" disabled>
               <div className="co__methodTop">
                 <strong>Pay online</strong>
-                <span>Not connected yet</span>
+                <span>{onlinePaymentAvailable ? 'Card · UPI, after you order' : 'Not available here'}</span>
               </div>
               <p>
-                Online payment needs our payment provider&rsquo;s verification to finish.
-                Until it does, orders are placed and paid at the counter.
+                {onlinePaymentAvailable
+                  ? 'Place the order first, then pay by card or UPI on your order page. Your order is marked paid only when the payment gateway confirms it.'
+                  : 'This restaurant takes payment at the counter. Your order still goes to the kitchen straight away.'}
               </p>
             </button>
           </div>
@@ -151,7 +163,9 @@ export function Checkout({
             {!canOrder ? 'Add items before checkout' : `Place order · ${inr(paiseToRupees(totalPaise))}`}
           </button>
           <p className="co__fine" role="note">
-            You pay at the counter. The kitchen starts on this straight away.
+            {onlinePaymentAvailable
+              ? 'Pay at the counter, or by card/UPI on the next screen. The kitchen starts straight away either way.'
+              : 'You pay at the counter. The kitchen starts on this straight away.'}
           </p>
         </aside>
       </div>

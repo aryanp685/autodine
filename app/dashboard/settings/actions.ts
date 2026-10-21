@@ -161,6 +161,46 @@ export async function saveDetailsAction(formData: FormData): Promise<void> {
   );
 }
 
+/**
+ * Switch card/UPI payment on or off for this outlet.
+ *
+ * A checkbox, so "absent from the form" means OFF and is not an error -- the
+ * browser omits an unticked box entirely. Reading it as `=== 'on'` makes the
+ * off state expressible; reading it with String(formData.get(...)) would make
+ * the absence the string "null" and quietly switch it on.
+ *
+ * No environment check here. An owner may switch this on before the deployment
+ * has a gateway key; the guest screen is what refuses to draw a pay button in
+ * that case, and says so. Refusing the save would leave the owner with nothing
+ * to do but guess.
+ */
+export async function saveOnlinePaymentsAction(formData: FormData): Promise<void> {
+  const { supabase, restaurantId } = await requireEditor();
+
+  const enabled = formData.get('onlinePayments') === 'on';
+
+  const { data: saved, error } = await supabase
+    .from('restaurants')
+    .update({ online_payments_enabled: enabled })
+    .eq('id', restaurantId)
+    .select('id');
+
+  if (error) writeFailure('switching online payments', error);
+  if (!saved || saved.length === 0) {
+    fail('Nothing was saved. Your account can see this restaurant but is not allowed to change it.');
+  }
+
+  for (const path of AFFECTED_PATHS) revalidatePath(path);
+  // The guest's order screen is not in AFFECTED_PATHS: it is per-order and
+  // force-dynamic, so it re-reads this switch on the next request anyway.
+
+  done(
+    enabled
+      ? 'Card and UPI payment is on. Guests will see a pay button on their order page once this deployment has gateway keys.'
+      : 'Card and UPI payment is off. Guests pay at the counter, and no pay button is shown.',
+  );
+}
+
 export async function saveTaxAction(formData: FormData): Promise<void> {
   const { supabase, restaurantId } = await requireEditor();
 
