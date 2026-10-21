@@ -3,6 +3,7 @@ import {
   MAX_BACKLOG,
   MAX_SPOKEN_ITEMS,
   advanceText,
+  cancelText,
   announceLogLabel,
   createAnnounceQueue,
   isTakeaway,
@@ -252,6 +253,22 @@ describe('advanceText', () => {
 
   it('degrades to a real sentence for a state it does not know', () => {
     expect(advanceText('T4', 'cancelled')).toBe('टेबल टी फ़ोर, कैंसल।');
+  });
+});
+
+describe('cancelText', () => {
+  it('names the table whose order was stopped', () => {
+    expect(cancelText('T2')).toBe('टेबल टी टू का ऑर्डर कैंसल हो गया।');
+  });
+
+  it('does not read out "table takeaway"', () => {
+    expect(cancelText('Takeaway')).toBe('टेकअवे ऑर्डर कैंसल हो गया।');
+  });
+
+  it('is speakable by a Hindi voice and nothing else', () => {
+    for (const table of ['T1', 'T12', 'Takeaway']) {
+      expect(isDevanagariOnly(cancelText(table))).toBe(true);
+    }
   });
 });
 

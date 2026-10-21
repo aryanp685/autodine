@@ -73,7 +73,13 @@ describe('Kitchen board', () => {
 
   it('prompts to sign in instead of showing a blank board to a blocked caller', () => {
     const html = renderToStaticMarkup(
-      <Kitchen data={{ restaurantName: '', restaurantId: null, tickets: [], blocked: 'signed-out' }} />,
+      <Kitchen data={{
+          restaurantName: '',
+          restaurantId: null,
+          tickets: [],
+          cancelled: [],
+          blocked: 'signed-out',
+        }} />,
     );
 
     expect(html).toContain('Sign in');
@@ -89,6 +95,7 @@ describe('Kitchen board', () => {
         data={{
           restaurantName: 'maddi',
           restaurantId: 'r-1',
+          cancelled: [],
           tickets: [
             {
               id: 'o-1',
@@ -125,7 +132,9 @@ describe('Kitchen board', () => {
 
   it('shows an empty live board as empty, not as a demo', () => {
     const html = renderToStaticMarkup(
-      <Kitchen data={{ restaurantName: 'maddi', restaurantId: 'r-1', tickets: [] }} />,
+      <Kitchen
+        data={{ restaurantName: 'maddi', restaurantId: 'r-1', tickets: [], cancelled: [] }}
+      />,
     );
 
     expect(html).toContain('No open tickets');

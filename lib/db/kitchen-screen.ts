@@ -84,6 +84,21 @@ export type KitchenTicket = {
   total: number;
 };
 
+/**
+ * A ticket cancelled recently, so the board can say so out loud.
+ *
+ * The board cannot work this out by comparing payloads: a ticket that leaves
+ * the list may have been cancelled at the counter, cancelled by the guest, or
+ * served from a phone. Announcing the wrong one of those is worse than saying
+ * nothing, so the query names cancellations explicitly.
+ */
+export type CancelledTicket = {
+  id: string;
+  table: string;
+  /** ISO instant of the cancellation. */
+  at: string;
+};
+
 export type KitchenScreenData = {
   restaurantName: string;
   /**
@@ -92,6 +107,12 @@ export type KitchenScreenData = {
    */
   restaurantId: string | null;
   tickets: KitchenTicket[];
+  /**
+   * Cancelled in the last fifteen minutes. The board announces new entries
+   * once each -- a cook who has a pan on needs to hear a stop, not notice that
+   * a card quietly vanished.
+   */
+  cancelled: CancelledTicket[];
   /**
    * Set when the database answered but this caller has no restaurant to show.
    * Distinct from a genuinely empty board: an empty board is good news, a
@@ -106,6 +127,9 @@ export type KitchenScreenData = {
  * restaurant has been using AutoDine.
  */
 export const BOARD_WINDOW_HOURS = 6;
+
+/** How long a cancellation stays worth announcing. Minutes. */
+export const CANCELLED_WINDOW_MIN = 15;
 
 /** Tickets older than this are the kitchen running late. Minutes. */
 export const LATE_AFTER_MIN = 20;
@@ -154,32 +178,58 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
     if (staff.reason === 'unconfigured') return null;
     // Configured but this caller has no restaurant: say which, so the screen
     // can prompt instead of showing a blank board that reads as "no orders".
-    return { restaurantName: '', restaurantId: null, tickets: [], blocked: staff.reason };
+    return {
+      restaurantName: '',
+      restaurantId: null,
+      tickets: [],
+      cancelled: [],
+      blocked: staff.reason,
+    };
   }
 
   const { supabase, restaurantId, restaurantName } = staff.context;
   const now = Date.now();
   const cutoff = new Date(now - BOARD_WINDOW_HOURS * 3_600_000).toISOString();
 
-  const { data: orders, error: ordersError } = await supabase
-    .from('orders')
-    .select(
-      'id, code, table_id, customer_note, prep_status, payment_status, total_paise, placed_at'
-    )
-    .eq('restaurant_id', restaurantId)
-    .neq('prep_status', 'cancelled')
-    .gte('placed_at', cutoff)
-    .order('placed_at', { ascending: true });
+  const cancelledCutoff = new Date(
+    now - CANCELLED_WINDOW_MIN * 60_000
+  ).toISOString();
 
-  if (ordersError) {
-    throw new Error(`Could not load orders: ${ordersError.message}`);
+  const [ordersResult, cancelledResult] = await Promise.all([
+    supabase
+      .from('orders')
+      .select(
+        'id, code, table_id, customer_note, prep_status, payment_status, total_paise, placed_at'
+      )
+      .eq('restaurant_id', restaurantId)
+      .neq('prep_status', 'cancelled')
+      .gte('placed_at', cutoff)
+      .order('placed_at', { ascending: true }),
+    supabase
+      .from('orders')
+      .select('id, table_id, updated_at, placed_at')
+      .eq('restaurant_id', restaurantId)
+      .eq('prep_status', 'cancelled')
+      .gte('updated_at', cancelledCutoff)
+      .order('updated_at', { ascending: true }),
+  ]);
+
+  if (ordersResult.error) {
+    throw new Error(`Could not load orders: ${ordersResult.error.message}`);
+  }
+  if (cancelledResult.error) {
+    throw new Error(`Could not load cancellations: ${cancelledResult.error.message}`);
   }
 
-  const rows = orders ?? [];
-  if (rows.length === 0) return { restaurantName, restaurantId, tickets: [] };
+  const rows = ordersResult.data ?? [];
+  const cancelledRows = cancelledResult.data ?? [];
 
   const orderIds = rows.map((row) => row.id);
-  const tableIds = [...new Set(rows.map((r) => r.table_id).filter(Boolean))] as string[];
+  const tableIds = [
+    ...new Set(
+      [...rows, ...cancelledRows].map((r) => r.table_id).filter(Boolean),
+    ),
+  ] as string[];
 
   // Separate queries rather than embedded selects: lib/db/database.ts is
   // hand-written and only declares the orders -> order_items relationship, so
@@ -187,13 +237,17 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
   // not compile. Joining in JS also lets us order items by sort_order, which
   // is the sequence the kitchen wants them plated in.
   const [itemsResult, tablesResult] = await Promise.all([
-    supabase
-      .from('order_items')
-      .select(
-        'order_id, item_id, qty, name_snapshot, variant_snapshot, addons_snapshot, is_veg, sort_order'
-      )
-      .in('order_id', orderIds)
-      .order('sort_order', { ascending: true }),
+    // An empty .in() list is a wasted round trip on a board that refreshes
+    // every thirty seconds, so it is skipped rather than sent.
+    orderIds.length
+      ? supabase
+          .from('order_items')
+          .select(
+            'order_id, item_id, qty, name_snapshot, variant_snapshot, addons_snapshot, is_veg, sort_order'
+          )
+          .in('order_id', orderIds)
+          .order('sort_order', { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
     tableIds.length
       ? supabase.from('dining_tables').select('id, label').in('id', tableIds)
       : Promise.resolve({ data: [], error: null }),
@@ -244,6 +298,12 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
     labelByTable.set(table.id, table.label);
   }
 
+  const cancelled: CancelledTicket[] = cancelledRows.map((row) => ({
+    id: row.id,
+    table: (row.table_id && labelByTable.get(row.table_id)) || NO_TABLE,
+    at: row.updated_at,
+  }));
+
   const tickets: KitchenTicket[] = rows.map((row) => {
     const items = (itemsByOrder.get(row.id) ?? []).map((item) => {
       const portion = item.variant_snapshot?.trim() || undefined;
@@ -277,5 +337,5 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
     };
   });
 
-  return { restaurantName, restaurantId, tickets };
+  return { restaurantName, restaurantId, tickets, cancelled };
 }

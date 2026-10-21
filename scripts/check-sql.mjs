@@ -9,8 +9,8 @@
  *   CHECKED:     CREATE TABLE / INDEX / TYPE, COMMENT. That is all.
  *   NOT CHECKED: everything that makes a Supabase schema safe.
  *                CREATE FUNCTION bodies, CREATE POLICY, DROP POLICY, GRANT,
- *                ALTER TABLE ... ADD/DROP CONSTRAINT, and
- *                ALTER TABLE ... ENABLE ROW LEVEL SECURITY are all stripped
+ *                ALTER TABLE ... ADD/DROP CONSTRAINT, ALTER FUNCTION ... RENAME,
+ *                and ALTER TABLE ... ENABLE ROW LEVEL SECURITY are all stripped
  *                out before parsing, because the parser cannot read them.
  *
  *                That list grew as migrations started using drop-then-create
@@ -76,6 +76,10 @@ function stripUnsupported(sql) {
   out = out.replace(/^\s*create\s+(or\s+replace\s+)?trigger[\s\S]*?;\s*$/gim, '');
   // drop trigger ... ;
   out = out.replace(/^\s*drop\s+trigger[\s\S]*?;\s*$/gim, '');
+  // alter function ... rename to ...;  (the parser has no ALTER FUNCTION.
+  // Added with migration 00600, which renames the pricing function so that the
+  // wrapper carrying the guest token is the only callable door to it.)
+  out = out.replace(/^\s*alter\s+function[\s\S]*?;\s*$/gim, '');
   // do $$ ... $$;  (migration 0010 uses a DO block to make an ALTER
   // PUBLICATION idempotent. The parser has no plpgsql, so the whole block
   // goes. It is reported as unverified like the functions above.)
@@ -107,6 +111,7 @@ for (const file of files) {
   const removedDoBlocks = (sql.match(/^\s*do\s+\$\$/gim) || []).length;
   const removedPublications = (sql.match(/^\s*alter\s+publication/gim) || []).length;
   const removedReplicaIdentity = (sql.match(/replica\s+identity/gi) || []).length;
+  const removedRenames = (sql.match(/^\s*alter\s+function/gim) || []).length;
 
   // Comments are not statements. Strip them so a file that is nothing but
   // functions, policies and grants reports "nothing checkable" instead of
@@ -121,7 +126,8 @@ for (const file of files) {
         `${removedRevokes} revoke(s), ${removedComments} function comment(s)`,
         `${removedTriggers} trigger(s), ${removedTriggerDrops} trigger drop(s), ` +
         `${removedDoBlocks} do block(s), ${removedPublications} publication change(s), ` +
-        `${removedReplicaIdentity} replica identity statement(s)`,
+        `${removedReplicaIdentity} replica identity statement(s), ` +
+        `${removedRenames} function rename(s)`,
     );
     continue;
   }
@@ -138,7 +144,8 @@ for (const file of files) {
       `${removedRls} RLS statement(s)`,
       `${removedTriggers} trigger(s), ${removedTriggerDrops} trigger drop(s)`,
       `${removedDoBlocks} do block(s), ${removedPublications} publication change(s), ` +
-        `${removedReplicaIdentity} replica identity statement(s)`,
+        `${removedReplicaIdentity} replica identity statement(s), ` +
+        `${removedRenames} function rename(s)`,
     ].join(', ');
     console.log(
       `${file}: DDL parses (${ast.length} statements)` +

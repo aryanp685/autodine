@@ -1,7 +1,21 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { OrderPlacedScreen } from './OrderPlacedScreen';
 import type { OrderScreenData } from '@/lib/db/order-screen';
+
+/*
+ * The screen now contains a client component with quantity controls, so the
+ * hooks it uses have to exist in a static render. Effects do not run here:
+ * what these tests check is the markup a guest sees first.
+ */
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: () => {}, push: () => {} }),
+}));
+
+vi.mock('@/app/menu/order/actions', () => ({
+  cancelGuestOrderAction: async () => ({ ok: true, message: 'Cancelled.' }),
+  setGuestOrderLinesAction: async () => ({ ok: true, message: 'Saved.' }),
+}));
 
 /**
  * The screen a diner lands on after pressing "Place order".
@@ -13,7 +27,9 @@ import type { OrderScreenData } from '@/lib/db/order-screen';
  */
 
 const order = (over: Partial<OrderScreenData> = {}): OrderScreenData => ({
+  id: 'o-1',
   code: 'MA-K3F9Q',
+  canGuestChange: false,
   restaurantName: 'Maddi',
   tableLabel: 'T1',
   prepStatus: 'new',
@@ -25,16 +41,20 @@ const order = (over: Partial<OrderScreenData> = {}): OrderScreenData => ({
   placedAt: '2026-10-21T12:00:00Z',
   lines: [
     {
+      id: 'l-1',
       name: 'Paneer Tikka',
       qty: 2,
+      addons: [],
       unitPricePaise: 32000,
       lineTotalPaise: 64000,
       isVeg: true,
       variantName: null,
     },
     {
+      id: 'l-2',
       name: 'Butter Chicken',
       qty: 1,
+      addons: [],
       unitPricePaise: 42000,
       lineTotalPaise: 42000,
       isVeg: false,
@@ -101,6 +121,39 @@ describe('OrderPlacedScreen', () => {
       <OrderPlacedScreen data={order({ customerNote: 'No onion in the raita' })} />
     );
     expect(html).toContain('No onion in the raita');
+  });
+
+  it('offers the guest a way out of an order the kitchen has not started', () => {
+    const html = renderToStaticMarkup(
+      <OrderPlacedScreen data={order({ canGuestChange: true })} token="t-1" />
+    );
+    expect(html).toContain('Cancel this order');
+    expect(html).toContain('Save changes');
+  });
+
+  it('does not draw the controls on a link that carries no token', () => {
+    // Without the token the server returns no order at all, but a hand-typed
+    // code plus a stale page must never look like it can cancel something.
+    const html = renderToStaticMarkup(<OrderPlacedScreen data={order()} />);
+    expect(html).not.toContain('Cancel this order');
+  });
+
+  it('says the order is cancelled instead of asking for payment', () => {
+    const html = renderToStaticMarkup(
+      <OrderPlacedScreen data={order({ prepStatus: 'cancelled' })} token="t-1" />
+    );
+    expect(html).toContain('This order was cancelled');
+    expect(html).toContain('nothing is owed');
+    expect(html).not.toContain('Pay at the counter');
+    expect(html).not.toContain('Cancel this order');
+  });
+
+  it('explains why the order can no longer be changed once cooking starts', () => {
+    const html = renderToStaticMarkup(
+      <OrderPlacedScreen data={order({ prepStatus: 'preparing', canGuestChange: false })} token="t-1" />
+    );
+    expect(html).toContain('The kitchen has started');
+    expect(html).not.toContain('Cancel this order');
   });
 
   it('says so plainly when the order cannot be found', () => {
