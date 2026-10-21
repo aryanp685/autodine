@@ -143,6 +143,40 @@ export async function rotateQrAction(formData: FormData): Promise<void> {
   );
 }
 
+/**
+ * Replace the six digits showing inside the restaurant.
+ *
+ * The code rolls on its own every ten minutes; this is for the case where it
+ * leaked before the window ended -- somebody read it out over the phone, or a
+ * guest photographed the screen. Rotating makes the code from that moment
+ * wrong, without touching any table's card and without ending the session of
+ * anyone who already verified: they proved presence at the time, and their
+ * hour stands.
+ *
+ * Owner and manager only, enforced inside the function rather than here --
+ * auth.uid() is the only thing that can name the caller, and a check in this
+ * file would be a check the browser could skip by calling the RPC directly.
+ */
+export async function rotateVerificationCodeAction(): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to change the on-site code.');
+
+  const { error } = await ctx.supabase.rpc('rotate_verification_code', {
+    p_restaurant_id: ctx.restaurantId,
+  });
+
+  if (error) fail(`Could not change the code: ${error.message}`);
+
+  // The old code is dead the moment this returns, so the screen must not keep
+  // showing it from a cached render.
+  revalidatePath(TABLES_PATH);
+  redirect(
+    `${TABLES_PATH}?notice=${encodeURIComponent(
+      'New code showing. Tell guests the digits on screen now — the old ones no longer work.'
+    )}`
+  );
+}
+
 export async function revokeQrAction(formData: FormData): Promise<void> {
   const ctx = await currentRestaurant();
   if (!ctx) fail('You need to be signed in to manage tables.');

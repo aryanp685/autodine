@@ -76,9 +76,36 @@ export type TableRow = {
   qrSvg?: string | null;
 };
 
+/**
+ * The six digits showing on the screen inside the restaurant right now.
+ *
+ * This is the second half of the scan: the card proves the guest has seen the
+ * table, this code proves somebody in the room can read a screen. It is
+ * derived from a per-restaurant secret and the current ten-minute window, so
+ * there is nothing stored to leak and nothing to keep in sync -- see
+ * migration 20261023000900.
+ *
+ * Only staff can read it (the RPC checks membership), which is the whole
+ * point: if a guest could fetch this, entering it would prove nothing.
+ */
+export type VerificationCode = {
+  code: string;
+  expiresAt: string;
+  windowSeconds: number;
+};
+
 export type TablesScreenData = {
   restaurantName: string;
   tables: TableRow[];
+  /**
+   * Null when the code could not be read (see verificationError) or when the
+   * caller is blocked. The screen renders the panel only when it has digits:
+   * showing an empty box where a code belongs would look like the feature is
+   * broken rather than like it is unavailable.
+   */
+  verification?: VerificationCode | null;
+  /** Why the code could not be read, if it could not. Staff-facing only. */
+  verificationError?: string;
   /** Set when the caller has no restaurant to show. See lib/db/staff.ts. */
   blocked?: 'signed-out' | 'no-membership';
 };
@@ -124,7 +151,7 @@ export async function getTablesScreenData(): Promise<TablesScreenData | null> {
 
   const { supabase, restaurantId, restaurantName } = staff.context;
 
-  const [tablesResult, tokensResult, ordersResult] = await Promise.all([
+  const [tablesResult, tokensResult, ordersResult, codeResult] = await Promise.all([
     supabase
       .from('dining_tables')
       .select('id, label, seats, is_active')
@@ -139,6 +166,10 @@ export async function getTablesScreenData(): Promise<TablesScreenData | null> {
       .from('orders')
       .select('table_id, placed_at')
       .eq('restaurant_id', restaurantId),
+    // The on-site code. SECURITY DEFINER with a membership check inside, so
+    // this cannot be pointed at another restaurant by passing an id from the
+    // browser -- restaurantId here came from the caller's own membership row.
+    supabase.rpc('current_verification_code', { p_restaurant_id: restaurantId }),
   ]);
 
   if (tablesResult.error) {
@@ -149,6 +180,23 @@ export async function getTablesScreenData(): Promise<TablesScreenData | null> {
   }
   if (ordersResult.error) {
     throw new Error(`Could not load orders: ${ordersResult.error.message}`);
+  }
+
+  // Unlike the three reads above, a failure here is not fatal: the rest of the
+  // floor plan is still worth showing, and the panel that displays the code is
+  // the only thing that needs it.
+  const codeRow = Array.isArray(codeResult.data) ? codeResult.data[0] : codeResult.data;
+  const verification: VerificationCode | null =
+    codeRow && typeof codeRow.code === 'string'
+      ? {
+          code: codeRow.code,
+          expiresAt: codeRow.expires_at,
+          windowSeconds: codeRow.window_seconds ?? 600,
+        }
+      : null;
+
+  if (codeResult.error) {
+    console.error('[tables-screen] could not read verification code', codeResult.error);
   }
 
   // One live code per table. The query already excludes revoked rows, and the
@@ -201,5 +249,12 @@ export async function getTablesScreenData(): Promise<TablesScreenData | null> {
     };
   });
 
-  return { restaurantName, tables };
+  return {
+    restaurantName,
+    tables,
+    verification,
+    ...(codeResult.error
+      ? { verificationError: 'The on-site code could not be read. Guests will not be able to verify until it is.' }
+      : {}),
+  };
 }

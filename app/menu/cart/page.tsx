@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { CartProvider } from '@/components/CartProvider';
 import { Cart } from '@/components/screens/CartScreen';
+import { TableGateScreen } from '@/components/screens/TableGateScreen';
 import { getCartScreenData } from '@/lib/db/cart-screen';
+import { loadTableAccess, verifyAgainHref } from '@/lib/table-access';
 
 export const metadata: Metadata = { title: 'Your order · AutoDine' };
 
@@ -11,6 +13,15 @@ export const metadata: Metadata = { title: 'Your order · AutoDine' };
  * The cart is mounted here rather than at the root because it is keyed by
  * restaurant: one cart spanning two kitchens would put a dish from one on
  * another's bill.
+ *
+ * GATED LIKE /menu
+ *
+ * The cart holds the things a guest is about to order, and the button on it
+ * posts to the checkout action. An open cart page was therefore a working step
+ * of the ordering flow for somebody who never scanned anything. The database
+ * refuses a sessionless order, and the action refuses one too -- but a page
+ * that renders a "Place order" button and then fails is worse than a page that
+ * says where to scan.
  */
 export default async function CartPage({
   searchParams,
@@ -18,6 +29,15 @@ export default async function CartPage({
   searchParams: Promise<{ s?: string; error?: string }>;
 }) {
   const { s, error } = await searchParams;
+
+  const access = await loadTableAccess(s);
+
+  if (access.status === 'none') return <TableGateScreen reason="none" />;
+  if (access.status === 'unavailable') return <TableGateScreen reason="unavailable" />;
+  if (access.status === 'stale') {
+    return <TableGateScreen reason="stale" verifyHref={verifyAgainHref(access)} />;
+  }
+
   const data = await getCartScreenData(s);
 
   return (

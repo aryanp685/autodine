@@ -19,7 +19,15 @@ export const metadata: Metadata = {
  * a busy room holding a phone, and "something went wrong" is no help to them.
  */
 
-type Reason = 'unreadable' | 'revoked' | 'limited' | 'notserving' | 'nomenu' | 'offline' | 'failed';
+type Reason =
+  | 'unreadable'
+  | 'revoked'
+  | 'limited'
+  | 'notserving'
+  | 'nomenu'
+  | 'nosetup'
+  | 'offline'
+  | 'failed';
 
 const REASONS: Record<Reason, { title: string; detail: string; staffHint?: string }> = {
   unreadable: {
@@ -47,6 +55,12 @@ const REASONS: Record<Reason, { title: string; detail: string; staffHint?: strin
     title: 'No menu published yet',
     detail: 'This restaurant has not published a menu. Please order with staff.',
     staffHint: 'Publish the menu from the dashboard to start taking QR orders.',
+  },
+  nosetup: {
+    title: 'This restaurant has not switched on table codes yet',
+    detail: 'Please order with staff — they can take the order at the counter.',
+    staffHint:
+      'Open Dashboard → Tables & QR once to create this restaurant’s verification code, then guests can scan and enter it.',
   },
   offline: {
     title: 'Ordering is not switched on',

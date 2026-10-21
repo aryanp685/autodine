@@ -178,32 +178,143 @@ export type Database = {
        * function hardcodes method = 'cash'. See app/cashier/actions.ts.
        */
       /**
-       * Migration 0006. Exchange a scanned table QR token for a session.
+       * Migration 20261023000900. What a scanned card is for, before anything
+       * is proved: restaurant name, table label, and how often the on-site
+       * code changes.
+       *
+       * Returns NO ROW rather than an error for a token that is unknown,
+       * revoked, or belongs to a table that is out of service -- the
+       * verification screen needs to distinguish "not a table" from "you
+       * typed the code wrong", and a raised exception would collapse both
+       * into one.
+       *
+       * Creates nothing and grants nothing.
+       */
+      public_qr_intro: {
+        Args: { p_public_token: string };
+        Returns: {
+          restaurant_slug: string;
+          restaurant_name: string;
+          table_label: string;
+          window_seconds: number;
+        }[];
+      };
+      /**
+       * Migration 20261023000900. THE ONLY WAY a table session is minted.
+       *
+       * Replaces verify_table_qr, which this migration drops: that function
+       * took a scanned token as sufficient proof, so a photograph of a card
+       * ordered from anywhere. This one also requires the short code showing
+       * on a screen inside the restaurant.
        *
        * The token in the URL is printed on the table and is not a secret.
-       * What comes back is: 64 hex characters, generated inside the database,
-       * handed over once and stored there only as a SHA-256 hash. It expires,
-       * and revoking the QR code revokes every session issued against it.
+       * What comes back on success is: 64 hex characters, generated inside
+       * the database, handed over once and stored there only as a SHA-256
+       * hash. It expires after 59 minutes, and revoking the QR code revokes
+       * every session issued against it.
        *
-       * Rate limited per code and per IP hash: five attempts in fifteen
-       * minutes, then a fifteen minute block. p_ip_hash must be 64 hex
-       * characters -- sha256 of the caller's address, salted with the token.
+       * FAILURES COME BACK AS A STATUS, NOT AS AN ERROR
        *
-       * Raises P0001 with a guest-readable message for every failure a guest
-       * can cause: unreadable code, revoked code, table out of service,
-       * restaurant paused, menu not published, rate limited. Those are shown;
-       * anything else is logged and replaced.
+       * An earlier version raised P0001, which rolled back the rate-limit
+       * attempt it had just recorded -- so a wrong code left no trace and the
+       * limiter could never fire. This one returns a row every time.
+       *
+       *   ok          session_token etc. are set
+       *   unreadable  not a card token
+       *   revoked     card or table out of service
+       *   notserving  restaurant paused or read-only
+       *   nomenu      nothing published
+       *   nosetup     the restaurant has no on-site code yet
+       *   limited     too many attempts from this address
+       *   wrong       digits did not match; code_rotated says whether that
+       *               wrong code was the one that replaced the secret
+       *
+       * p_ip_hash must be 64 hex characters -- sha256 of the caller's
+       * address, salted with the token. Rate limited per code and per IP
+       * hash: five attempts in fifteen minutes, then a fifteen minute block.
+       * A wrong code also counts against the restaurant: twenty inside one
+       * code window rotates the secret, which is what stops a guesser with
+       * many addresses from working through a million combinations.
+       *
+       * Anything that is not a guest-caused failure (a constraint, a
+       * permission error) still raises, and the caller turns that into one
+       * fixed sentence.
        */
-      verify_table_qr: {
+      verify_table_qr_with_code: {
         Args: {
           p_public_token: string;
+          p_code: string;
           p_ip_hash: string;
         };
         Returns: {
-          session_token: string;
+          /** See the list above. Kept as string: a status added later must
+           *  not break the build, it must fall through to the failure page. */
+          status: string;
+          session_token: string | null;
+          restaurant_slug: string | null;
+          table_label: string | null;
+          expires_at: string | null;
+          retry_after_seconds: number | null;
+          code_rotated: boolean | null;
+        }[];
+      };
+      /**
+       * Migration 20261023000900. The read gate.
+       *
+       * Resolves a cookie's token against the live database -- expiry,
+       * revocation, table still active, card still live, restaurant still
+       * open. Returns no row for anything that does not hold, which is why
+       * every guest page asks this instead of trusting the cookie.
+       *
+       * Granted to anon: a guest has no account, and the token itself is the
+       * only credential it will ever have.
+       */
+      current_table_session: {
+        Args: { p_token: string };
+        Returns: {
+          restaurant_id: string;
           restaurant_slug: string;
+          table_id: string;
           table_label: string;
           expires_at: string;
+        }[];
+      };
+      /**
+       * Migration 20261023000900. The six digits showing on the screen inside
+       * the restaurant, for staff to read out or point at.
+       *
+       * Granted to authenticated only, and SECURITY DEFINER with a membership
+       * check in the body: under definer rights RLS is suspended, so the body
+       * is the only thing between a signed-in caller and another restaurant's
+       * secret. A guest must never be able to call this -- if they could, the
+       * code would prove nothing.
+       *
+       * Creates the restaurant's secret on first call, so a restaurant that
+       * has never opened this screen can still show a code.
+       */
+      current_verification_code: {
+        Args: { p_restaurant_id: string };
+        Returns: {
+          code: string;
+          expires_at: string;
+          window_seconds: number;
+        }[];
+      };
+      /**
+       * Migration 20261023000900. A new secret, therefore a new code, without
+       * waiting for the window to roll. Owner and manager only -- it is the
+       * way a code that leaked (someone read it out over the phone) is taken
+       * out of service.
+       *
+       * Rotating does not revoke sessions already issued: the guest at that
+       * table has proved presence and keeps their hour.
+       */
+      rotate_verification_code: {
+        Args: { p_restaurant_id: string };
+        Returns: {
+          code: string;
+          expires_at: string;
+          window_seconds: number;
         }[];
       };
       /**
@@ -224,8 +335,9 @@ export type Database = {
        * would leave the table with no live code at all.
        *
        * Both raise 42501 'You do not manage this restaurant.' and P0002
-       * 'That table does not exist.' -- staff-facing, unlike the P0001s in
-       * verify_table_qr which are written for guests.
+       * 'That table does not exist.' -- staff-facing, unlike the guest path,
+       * which returns status words and never raises for anything a guest can
+       * cause.
        */
       rotate_table_qr_code: {
         Args: { p_table_id: string };
@@ -289,12 +401,14 @@ export type Database = {
        * Returns the human-facing code, e.g. 'MA-K3F9Q'.
        *
        * Migration 0006 adds p_session_token. Pass the token from
-       * verify_table_qr and the order is stamped with that table, which is
-       * what lets the kitchen board say which table a ticket belongs to.
-       * Omit it and the order is a counter order with no table -- which is
-       * the honest value to record for a takeaway, rather than an invented
-       * table. When the token is given it decides the restaurant, and the
-       * slug is only checked for agreement.
+       * verify_table_qr_with_code and the order is stamped with that table,
+       * which is what lets the kitchen board say which table a ticket belongs
+       * to. Migration 20261023000900 makes it REQUIRED here: this is the
+       * signed-out guest path, and a guest who has not proved they are in the
+       * restaurant has no business creating an order. Staff counter orders go
+       * through place_counter_order, which needs no table session and is
+       * untouched. The token decides the restaurant, and the slug is only
+       * checked for agreement.
        */
       place_public_order: {
         Args: {

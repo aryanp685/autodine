@@ -141,3 +141,59 @@ describe('isExpired', () => {
     expect(isExpired({ ...session, expiresAt: 'whenever' })).toBe(true);
   });
 });
+
+describe('the card token kept alongside the session', () => {
+  /**
+   * The public token of the card that was scanned is stored with the session
+   * so that an expired session can send the guest back to the code form for
+   * the same table. It is printed on the table and is not a secret -- but it
+   * still arrives from a customer-editable cookie, so it is shape-checked like
+   * everything else here.
+   */
+  it('keeps a well-formed card token', async () => {
+    const session = await read(
+      JSON.stringify({
+        token: validToken,
+        slug: 'maddi',
+        tableLabel: 'T1',
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        qrToken: 'qr_abcdefghijklmnop',
+      })
+    );
+
+    expect(session?.qrToken).toBe('qr_abcdefghijklmnop');
+  });
+
+  it('drops one that is not shaped like a card token, and keeps the session', async () => {
+    // Dropping rather than rejecting: the session is still good, it simply
+    // cannot offer the "verify again" shortcut.
+    for (const qrToken of ['', 'a b', '../../etc/passwd', 'x'.repeat(200), 42]) {
+      const session = await read(
+        JSON.stringify({
+          token: validToken,
+          slug: 'maddi',
+          tableLabel: 'T1',
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          qrToken,
+        })
+      );
+
+      expect(session).not.toBeNull();
+      expect(session?.qrToken).toBeUndefined();
+    }
+  });
+
+  it('still reads a cookie written before the field existed', async () => {
+    const session = await read(
+      JSON.stringify({
+        token: validToken,
+        slug: 'maddi',
+        tableLabel: 'T1',
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      })
+    );
+
+    expect(session?.token).toBe(validToken);
+    expect(session?.qrToken).toBeUndefined();
+  });
+});
