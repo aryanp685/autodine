@@ -17,10 +17,12 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { rupeesToPaise } from '@/lib/money';
 import { PRESET_CATEGORIES, normaliseCategoryName } from '@/lib/menu-presets';
+import { EDITOR_MENU_COOKIE } from '@/lib/db/menu-editor';
 import { readUndoItem } from '@/lib/menu-undo';
 import type { UndoItem } from '@/lib/menu-undo';
 
@@ -83,6 +85,96 @@ async function resolveCategoryId(ctx: Ctx, raw: FormDataEntryValue | null): Prom
     fail('That category is no longer on your menu. Reload the page and try again.');
   }
   return data.id as string;
+}
+
+/**
+ * Remember which menu the owner is editing.
+ *
+ * A menu is chosen far more often than it is created, and the choice has to
+ * survive every save on the screen. A cookie does that without threading a
+ * menu id through the twenty-odd forms below -- and a form that forgot it
+ * would save into the wrong menu, which is the bug this whole change is about.
+ */
+export async function selectMenuAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const menuId = String(formData.get('menuId') ?? '').trim();
+  if (!menuId) fail('No menu was chosen.');
+
+  const { data: menu, error } = await ctx.supabase
+    .from('menus')
+    .select('id')
+    .eq('id', menuId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .maybeSingle();
+
+  if (error || !menu) fail('That menu is not on your account.');
+
+  (await cookies()).set(EDITOR_MENU_COOKIE, menuId, {
+    path: MENUS_PATH,
+    sameSite: 'lax',
+    httpOnly: true,
+    maxAge: 60 * 60 * 24 * 180,
+  });
+
+  revalidatePath(MENUS_PATH);
+  redirect(MENUS_PATH);
+}
+
+/**
+ * A second menu -- breakfast, a festival card, the evening a-la-carte.
+ *
+ * Created as a draft, deliberately. A half-built menu that goes live the
+ * moment it is named is a menu guests see empty, and the owner has no idea
+ * which button did that.
+ */
+export async function createMenuAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to add a menu.');
+
+  const name = String(formData.get('name') ?? '').trim();
+  if (!name) fail('A menu needs a name.');
+  if (name.length > 40) fail('That menu name is too long.');
+
+  const { data: existing, error: listError } = await ctx.supabase
+    .from('menus')
+    .select('id, name, sort_order')
+    .eq('restaurant_id', ctx.restaurantId);
+
+  if (listError) fail(`Could not add the menu: ${listError.message}`);
+
+  const taken = (existing ?? []).some(
+    (row) => String(row.name ?? '').trim().toLowerCase() === name.toLowerCase(),
+  );
+  if (taken) fail(`You already have a menu called "${name}".`);
+
+  const nextOrder =
+    (existing ?? []).reduce((max, row) => Math.max(max, Number(row.sort_order ?? 0)), 0) + 1;
+
+  const { data: created, error } = await ctx.supabase
+    .from('menus')
+    .insert({
+      restaurant_id: ctx.restaurantId,
+      name,
+      is_published: false,
+      sort_order: nextOrder,
+    })
+    .select('id')
+    .maybeSingle();
+
+  if (error || !created) fail(`Could not add the menu: ${error?.message ?? 'unknown error'}`);
+
+  // Open the new menu straight away. Creating one and then leaving the owner
+  // on the old one reads as if nothing happened.
+  (await cookies()).set(EDITOR_MENU_COOKIE, created.id as string, {
+    path: MENUS_PATH,
+    sameSite: 'lax',
+    httpOnly: true,
+    maxAge: 60 * 60 * 24 * 180,
+  });
+
+  ok(`Menu "${name}" added as a draft. Add its categories, then publish it.`);
 }
 
 export async function addCategoryAction(formData: FormData): Promise<void> {

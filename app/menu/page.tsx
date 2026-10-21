@@ -24,15 +24,17 @@ export const metadata: Metadata = { title: 'Order · AutoDine' };
 export default async function CustomerMenuPage({
   searchParams,
 }: {
-  searchParams: Promise<{ s?: string }>;
+  searchParams: Promise<{ s?: string; m?: string }>;
 }) {
-  const { s } = await searchParams;
+  const { s, m } = await searchParams;
 
   // Asked for nothing, so show nothing -- not the sample menu, which would
   // read as this restaurant's dishes.
   if (isSupabaseConfigured && !s?.trim()) return <MenuSlugNeeded />;
 
-  const data = await getMenuScreenData(s);
+  // `m` names the menu. Unknown or draft ids fall back to the first published
+  // one rather than erroring, so a stale link still shows a live menu.
+  const data = await getMenuScreenData(s, m);
 
   // Null means demo mode only. A configured database with an unknown slug is
   // a real not-found state, never a reason to show the fictional sample menu.

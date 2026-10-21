@@ -9,18 +9,23 @@ import { isExpired, readTableSession } from '@/lib/table-session';
 export const metadata: Metadata = { title: 'Customise · AutoDine' };
 
 /**
- * ?s=<slug> picks the restaurant, ?item=<id> the dish to customise.
+ * ?s=<slug> picks the restaurant, ?item=<id> the dish to customise, ?m=<id>
+ * the menu it came from.
  *
- * Both are query parameters so the locked screens' existing links to
+ * All three are query parameters so the locked screens' existing links to
  * /menu/item keep working unchanged.
+ *
+ * The menu matters here: a dish on the dinner menu is not in the breakfast
+ * list, so opening this page without it would fall back to the first menu and
+ * show the sheet for whatever dish happened to match -- or nothing.
  */
 export default async function ItemPage({
   searchParams,
 }: {
-  searchParams: Promise<{ s?: string; item?: string }>;
+  searchParams: Promise<{ s?: string; item?: string; m?: string }>;
 }) {
-  const { s, item } = await searchParams;
-  const data = await getMenuScreenData(s);
+  const { s, item, m } = await searchParams;
+  const data = await getMenuScreenData(s, m);
   if (isSupabaseConfigured && !data) notFound();
 
   const session = await readTableSession();

@@ -142,9 +142,21 @@ export type OrderItem = {
   sort_order: number;
 };
 
+/**
+ * A menu a guest may switch to: just enough to draw the tab.
+ *
+ * The rest of a menu is loaded only when it is the one being shown. A venue
+ * with three menus must not pay for three menus' worth of dishes to look at
+ * one of them.
+ */
+export type MenuOption = { id: string; name: string };
+
 export type RestaurantMenu = {
   restaurant: Restaurant;
+  /** The menu being shown. */
   menu: Menu;
+  /** Every published menu, in the restaurant's own order. Never empty. */
+  menus: MenuOption[];
   categories: Category[];
   items: MenuItem[];
 };

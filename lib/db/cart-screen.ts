@@ -49,6 +49,41 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
   if (restaurantError) throw new Error(`Could not load restaurant: ${restaurantError.message}`);
   if (!restaurant) return null;
 
+  /**
+   * Only dishes on a PUBLISHED menu are priced here.
+   *
+   * A cart can be filled from any of the restaurant's live menus, so this
+   * cannot be scoped to one menu the way the guest menu screen is -- but it
+   * must be scoped to the published ones. A dish the owner moved to a draft
+   * menu is not orderable, and pricing it on the cart screen would promise a
+   * total that checkout then refuses.
+   *
+   * Three reads rather than an embedded filter: lib/db/database.ts is
+   * hand-written and does not describe the categories->menus relationship well
+   * enough to compile an embed.
+   */
+  const { data: menuRows, error: menusError } = await supabase
+    .from('menus')
+    .select('id')
+    .eq('restaurant_id', restaurant.id)
+    .eq('is_published', true);
+
+  if (menusError) throw new Error(`Could not load the menus: ${menusError.message}`);
+
+  const menuIds = (menuRows ?? []).map((row) => row.id as string);
+
+  const { data: categoryRows, error: categoriesError } = menuIds.length
+    ? await supabase
+        .from('categories')
+        .select('id')
+        .eq('restaurant_id', restaurant.id)
+        .in('menu_id', menuIds)
+    : { data: [], error: null };
+
+  if (categoriesError) throw new Error(`Could not load the menus: ${categoriesError.message}`);
+
+  const categoryIds = (categoryRows ?? []).map((row) => row.id as string);
+
   // Sold-out items are left out entirely. A dish a diner cannot order should
   // not be priced on a bill they are about to be asked to pay.
   //
@@ -57,12 +92,14 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
   // to the menu price -- which is exactly the undercharge this change exists
   // to stop. Fetching them separately would leave a window where the item is
   // known and its portions are not.
-  const { data: rows, error } = await supabase
-    .from('items')
-    .select('id, name, price_paise, is_veg, is_available, item_variants(id, name, price_paise, sort_order)')
-    .eq('restaurant_id', restaurant.id)
-    .eq('is_available', true)
-    .order('sort_order', { ascending: true });
+  const { data: rows, error } = categoryIds.length
+    ? await supabase
+        .from('items')
+        .select('id, name, price_paise, is_veg, is_available, item_variants(id, name, price_paise, sort_order)')
+        .in('category_id', categoryIds)
+        .eq('is_available', true)
+        .order('sort_order', { ascending: true })
+    : { data: [], error: null };
 
   if (error) throw new Error(`Could not load the menu: ${error.message}`);
 

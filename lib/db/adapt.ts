@@ -179,6 +179,10 @@ export function toDisplayRestaurant(r: Restaurant): DisplayRestaurant {
 export function toDisplayMenu(data: RestaurantMenu) {
   return {
     restaurant: toDisplayRestaurant(data.restaurant),
+    /** The tabs. One entry means no tabs, which is most restaurants. */
+    menus: data.menus,
+    menuId: data.menu.id,
+    menuName: data.menu.name,
     categories: toDisplayCategories(data.categories, data.items),
     items: data.items.map(toDisplayItem),
   };

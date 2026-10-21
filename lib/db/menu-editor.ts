@@ -22,7 +22,12 @@
  * merely logged out reads as real data.
  */
 
+import { cookies } from 'next/headers';
+import { chooseMenu } from '@/lib/menu-select';
 import { getStaffContextDetailed } from './staff';
+
+/** The name of the cookie that remembers which menu the owner is editing. */
+export const EDITOR_MENU_COOKIE = 'autodine.editor.menu';
 
 export type EditorVariant = {
   id: string;
@@ -97,15 +102,43 @@ export type EditorCategory = {
   itemCount: number;
 };
 
+/** One menu, as the editor's tab bar needs it. */
+export type EditorMenu = {
+  id: string;
+  name: string;
+  published: boolean;
+  /** Categories in this menu, so a tab can say how much is on it. */
+  categoryCount: number;
+};
+
 export type MenuEditorData = {
   restaurantName: string;
   menuId: string;
+  menuName: string;
   published: boolean;
+  /** Every menu on the account, drafts included, in the owner's order. */
+  menus: EditorMenu[];
   categories: EditorCategory[];
   items: EditorItem[];
   /** Set when the caller has no restaurant to show. See lib/db/staff.ts. */
   blocked?: 'signed-out' | 'no-membership';
 };
+
+/**
+ * The menu the owner last opened, if the cookie says so.
+ *
+ * `cookies()` throws when there is no request in flight -- a unit test, or any
+ * future job that loads this outside a browser turn. That is not a failure
+ * worth throwing for: with no memory we fall back to the first menu, which is
+ * exactly what the editor did before it could remember anything.
+ */
+async function readRememberedMenu(): Promise<string | null> {
+  try {
+    return (await cookies()).get(EDITOR_MENU_COOKIE)?.value ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export async function getMenuEditorData(): Promise<MenuEditorData | null> {
   const staff = await getStaffContextDetailed();
@@ -117,7 +150,9 @@ export async function getMenuEditorData(): Promise<MenuEditorData | null> {
     return {
       restaurantName: '',
       menuId: '',
+      menuName: '',
       published: false,
+      menus: [],
       categories: [],
       items: [],
       blocked: staff.reason,
@@ -126,29 +161,53 @@ export async function getMenuEditorData(): Promise<MenuEditorData | null> {
 
   const { supabase, restaurantId, restaurantName } = staff.context;
 
-  const { data: menu, error: menuError } = await supabase
+  /**
+   * Every menu, drafts included -- this is the editor, and a draft is exactly
+   * what gets edited before it goes live.
+   *
+   * Which one is being edited comes from a cookie rather than the URL, so that
+   * every existing form in this screen keeps its action and its redirect
+   * unchanged. A URL would have meant threading a menu id through twenty
+   * forms, and the first one anybody forgot would silently save into the
+   * other menu.
+   */
+  const { data: menuRows, error: menuError } = await supabase
     .from('menus')
-    .select('id, is_published')
+    .select('id, name, is_published, sort_order')
     .eq('restaurant_id', restaurantId)
     .order('sort_order', { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    .order('created_at', { ascending: true });
 
-  if (menuError) throw new Error(`Could not load menu: ${menuError.message}`);
+  if (menuError) throw new Error(`Could not load menus: ${menuError.message}`);
+
+  const allMenus = (menuRows ?? []) as { id: string; name: string; is_published: boolean }[];
+
   // A restaurant with no menu row is a real state, not a reason to invent one.
   // The editor renders empty and offers to add the first item.
-  if (!menu) {
-    return { restaurantName, menuId: '', published: false, categories: [], items: [] };
+  if (allMenus.length === 0) {
+    return {
+      restaurantName,
+      menuId: '',
+      menuName: '',
+      published: false,
+      menus: [],
+      categories: [],
+      items: [],
+    };
   }
+
+  const remembered = await readRememberedMenu();
+  const menu = chooseMenu(allMenus, remembered) ?? allMenus[0];
 
   // Separate queries rather than an embedded select: lib/db/database.ts is
   // hand-written and does not declare every relationship, so an embed such as
   // categories(name) resolves to a SelectQueryError and will not compile.
-  const [categoriesResult, itemsResult] = await Promise.all([
+  const [categoriesResult, itemsResult, allCategoriesResult] = await Promise.all([
     supabase
       .from('categories')
       .select('id, name, sort_order')
       .eq('restaurant_id', restaurantId)
+      .eq('menu_id', menu.id)
       .order('sort_order', { ascending: true }),
     supabase
       .from('items')
@@ -157,6 +216,9 @@ export async function getMenuEditorData(): Promise<MenuEditorData | null> {
       )
       .eq('restaurant_id', restaurantId)
       .order('sort_order', { ascending: true }),
+    // Every category in the restaurant, only to count them per menu for the
+    // tab bar. Cheap: two columns, and a menu list is small.
+    supabase.from('categories').select('id, menu_id').eq('restaurant_id', restaurantId),
   ]);
 
   if (categoriesResult.error) {
@@ -165,8 +227,39 @@ export async function getMenuEditorData(): Promise<MenuEditorData | null> {
   if (itemsResult.error) {
     throw new Error(`Could not load items: ${itemsResult.error.message}`);
   }
+  if (allCategoriesResult.error) {
+    throw new Error(`Could not load categories: ${allCategoriesResult.error.message}`);
+  }
 
-  const items = itemsResult.data ?? [];
+  const categoriesInMenu = new Map<string, number>();
+  for (const row of allCategoriesResult.data ?? []) {
+    const menuId = row.menu_id as string | null;
+    if (!menuId) continue;
+    categoriesInMenu.set(menuId, (categoriesInMenu.get(menuId) ?? 0) + 1);
+  }
+
+  const menus: EditorMenu[] = allMenus.map((row) => ({
+    id: row.id,
+    name: row.name,
+    published: Boolean(row.is_published),
+    categoryCount: categoriesInMenu.get(row.id) ?? 0,
+  }));
+
+  /**
+   * Dishes shown for this menu.
+   *
+   * A dish belongs to a menu through its category, so a dish filed under
+   * another menu is not this menu's business. Dishes with no category at all
+   * are kept: they are on no menu, which is exactly the problem the
+   * Uncategorised counter exists to surface, and hiding them from every menu
+   * would hide the problem too.
+   */
+  const menuCategoryIds = new Set((categoriesResult.data ?? []).map((row) => row.id as string));
+
+  const items = (itemsResult.data ?? []).filter((row) => {
+    const categoryId = row.category_id as string | null;
+    return !categoryId || menuCategoryIds.has(categoryId);
+  });
 
   /**
    * Portions are a second query, not an embed.
@@ -285,6 +378,8 @@ export async function getMenuEditorData(): Promise<MenuEditorData | null> {
   return {
     restaurantName,
     menuId: menu.id as string,
+    menuName: menu.name as string,
+    menus,
     published: Boolean(menu.is_published),
     categories: (categoriesResult.data ?? []).map((row) => ({
       id: row.id as string,

@@ -58,6 +58,16 @@ export type MenuScreenTable = {
 
 export type MenuScreenData = {
   restaurant: DisplayRestaurant;
+  /**
+   * Every published menu, for the tab bar.
+   *
+   * Only present when the database was read. The demo menu has one, so the
+   * demo screens show no tabs -- exactly as they did before this existed.
+   */
+  menus?: { id: string; name: string }[];
+  /** The menu `categories` and `items` belong to. */
+  menuId?: string;
+  menuName?: string;
   categories: DisplayCategory[];
   items: DisplayItem[];
   table?: MenuScreenTable | null;
@@ -80,6 +90,8 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
   // Priced against this menu for the bar only. It is a running hint, not the
   // amount charged: the order is priced from the database when it is placed.
   const slug = data?.restaurant.slug;
+  const menus = data?.menus ?? [];
+  const menuId = data?.menuId;
   const menuPrices = items.map((i) => ({
     id: i.id,
     name: i.name,
@@ -105,6 +117,10 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
   const itemHref = (itemId: string) => {
     const params = new URLSearchParams({ item: itemId });
     if (data?.restaurant.slug) params.set('s', data.restaurant.slug);
+    // Carried through: the sheet loads its dishes from one menu, and this is
+    // that menu. Without it the sheet opens on the default menu and cannot
+    // find the dish.
+    if (menuId) params.set('m', menuId);
     return `/menu/item?${params.toString()}`;
   };
 
@@ -121,6 +137,33 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
           </div>
         ) : null}
       </header>
+
+      {/*
+        Which menu this is. Hidden for the ordinary one-menu restaurant, so
+        nothing changes for them; shown the moment there is a second published
+        menu, because a guest looking at Breakfast has no other way to reach
+        Dinner. Plain links, not buttons: the menu is part of the address, so a
+        guest can share or bookmark what they were looking at, and the back
+        button does what it says.
+      */}
+      {menus.length > 1 && (
+        <nav className="menu__menus" aria-label="Menus">
+          {menus.map((option) => {
+            const params = new URLSearchParams({ s: slug ?? '' });
+            params.set('m', option.id);
+            return (
+              <a
+                key={option.id}
+                href={`/menu?${params.toString()}`}
+                className={`menu__menuLink ${option.id === menuId ? 'is-active' : ''}`}
+                aria-current={option.id === menuId ? 'page' : undefined}
+              >
+                {option.name}
+              </a>
+            );
+          })}
+        </nav>
+      )}
 
       <nav className="menu__cats">
         <button className={`menu__cat ${cat === 'all' ? 'is-active' : ''}`} onClick={() => setCat('all')}>

@@ -66,6 +66,58 @@ function render(table?: { label: string } | null) {
   return renderToStaticMarkup(<CustomerMenu data={data(table)} />);
 }
 
+describe('menu tabs', () => {
+  it('shows a tab per published menu, and links to each one', () => {
+    // Two menus used to be merged into one list, with half the dishes failing
+    // at checkout. The tabs are how a guest reaches the other menu at all.
+    const html = renderToStaticMarkup(
+      <CustomerMenu
+        data={{
+          ...data(),
+          menus: [
+            { id: 'm-1', name: 'Breakfast' },
+            { id: 'm-2', name: 'Dinner' },
+          ],
+          menuId: 'm-2',
+          menuName: 'Dinner',
+        }}
+      />,
+    );
+
+    expect(html).toContain('Breakfast');
+    expect(html).toContain('Dinner');
+    // The menu is part of the address, so a link can be shared and the back
+    // button does what it says.
+    expect(html).toContain('/menu?s=maddi&amp;m=m-1');
+    expect(html).toContain('aria-current="page"');
+  });
+
+  it('shows no tabs for the ordinary one-menu restaurant', () => {
+    const html = renderToStaticMarkup(
+      <CustomerMenu data={{ ...data(), menus: [{ id: 'm-1', name: 'Main menu' }], menuId: 'm-1' }} />,
+    );
+    expect(html).not.toContain('menu__menus');
+    expect(html).not.toContain('Main menu');
+  });
+
+  it('carries the menu into the dish link, so the sheet opens the same dish', () => {
+    const html = renderToStaticMarkup(
+      <CustomerMenu
+        data={{
+          ...data(),
+          menus: [
+            { id: 'm-1', name: 'Breakfast' },
+            { id: 'm-2', name: 'Dinner' },
+          ],
+          menuId: 'm-2',
+          menuName: 'Dinner',
+        }}
+      />,
+    );
+    expect(html).toContain('m=m-2');
+  });
+});
+
 describe('the table badge', () => {
   it('says nothing about a table when none is known', () => {
     const html = render(null);
