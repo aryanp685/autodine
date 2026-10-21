@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { DashboardBar } from '@/components/DashboardBar';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { PrintButton } from '@/components/PrintButton';
+import type { OutletBar } from '@/lib/outlets';
 import type { SettingsScreenData } from '@/lib/db/settings-screen';
 import { formatTaxPercent, taxExamplePaise } from '@/lib/settings-input';
 import { saveDetailsAction, saveTaxAction } from '@/app/dashboard/settings/actions';
@@ -32,10 +33,13 @@ import { paiseToRupees } from '@/lib/money';
  */
 export function SettingsScreen({
   data,
+  outlet,
   error,
   notice,
 }: {
   data?: SettingsScreenData | null;
+  /** Which outlet is open, for the switcher in the bar. */
+  outlet?: OutletBar | null;
   error?: string;
   notice?: string;
 }) {
@@ -43,7 +47,7 @@ export function SettingsScreen({
   if (data?.blocked) {
     return (
       <div className="pg pg--dash">
-        <DashboardBar active="settings" />
+        <DashboardBar active="settings" outlet={outlet} />
         <div className="pg__body">
           <SignInPrompt reason={data.blocked} screen="settings screen" />
         </div>
@@ -61,7 +65,7 @@ export function SettingsScreen({
 
   return (
     <div className="pg pg--dash">
-      <DashboardBar active="settings" />
+      <DashboardBar active="settings" outlet={outlet} />
 
       <div className="pg__body">
         {error && (
@@ -268,6 +272,54 @@ export function SettingsScreen({
                 Orders already placed keep the tax they were charged — a bill is a record of the rate at that
                 moment, not a live calculation. New orders use the new rate immediately.
               </p>
+            </section>
+
+            <section className="pg__formCard">
+              <h2 className="pg__h2">Outlets</h2>
+              <p className="pg__p">
+                Every outlet has its own menu, tables, QR codes, orders and bills. Whatever is open here is what
+                the rest of the dashboard shows.
+              </p>
+
+              {live && (
+                <ul className="pg__bullets">
+                  {(data?.outlets ?? []).map((entry) => (
+                    <li key={entry.id}>
+                      <strong>{entry.name}</strong> — {entry.role}
+                      {entry.id === data?.activeOutletId ? ' · open now' : ''}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {live && data?.role === 'owner' && (
+                <form className="pg__form" method="post" action="/dashboard/outlet/new">
+                  <label className="ui-field">
+                    <span className="ui-label">Add another outlet</span>
+                    <input
+                      className="ui-input"
+                      name="name"
+                      placeholder="Maddi — Baner"
+                      minLength={2}
+                      maxLength={80}
+                      required
+                    />
+                    <span className="ui-hint">
+                      Up to five per account. A new outlet starts empty, with its own web address and a 0% tax rate
+                      to set.
+                    </span>
+                  </label>
+                  <button className="pg__submit" type="submit">
+                    Create outlet
+                  </button>
+                </form>
+              )}
+
+              {live && data?.role !== 'owner' && (
+                <p className="pg__fine">
+                  Only an owner can add an outlet. You are signed in as {data?.role ?? 'staff'}.
+                </p>
+              )}
             </section>
           </div>
 

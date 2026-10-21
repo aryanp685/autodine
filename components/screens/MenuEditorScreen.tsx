@@ -1,4 +1,5 @@
 import { DashboardBar } from '@/components/DashboardBar';
+import type { OutletBar } from '@/lib/outlets';
 import Link from 'next/link';
 import { categories, items as demoItems, inr } from '@/lib/demo-data';
 import { VegMark } from '@/components/ui';
@@ -39,12 +40,15 @@ const FLOW = ['Draft', 'Review', 'Approve', 'Publish'];
  */
 export function MenuEditorScreen({
   data,
+  outlet,
   selectedId,
   error,
   notice,
   undo,
 }: {
   data?: MenuEditorData | null;
+  /** Which outlet is open, for the switcher in the bar. */
+  outlet?: OutletBar | null;
   selectedId?: string;
   error?: string;
   notice?: string;
@@ -153,7 +157,7 @@ export function MenuEditorScreen({
 
   return (
     <div className="pg pg--dash">
-      <DashboardBar active="menus" />
+      <DashboardBar active="menus" outlet={outlet} />
 
       <div className="pg__subbar">
         <div className="pg__subTabs">

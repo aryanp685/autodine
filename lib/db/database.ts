@@ -387,6 +387,21 @@ export type Database = {
         };
         Returns: string; // payment id (uuid)
       };
+      /**
+       * Migration 00700. Open a second, third ... outlet on the same account.
+       *
+       * SECURITY DEFINER because there is no INSERT policy on restaurants: the
+       * function creates the restaurant, an owner membership and a starter
+       * menu in one transaction, validates the name and slug itself, and
+       * refuses once the caller owns MAX_OUTLETS_PER_OWNER restaurants.
+       */
+      create_outlet: {
+        Args: {
+          p_name: string;
+          p_slug: string;
+        };
+        Returns: string; // new restaurant id (uuid)
+      };
     };
     Enums: {
       member_role: MemberRole;

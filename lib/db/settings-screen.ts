@@ -16,6 +16,7 @@
  * never the form — same contract as lib/db/tables-screen.ts.
  */
 
+import type { OutletOption } from '../outlets';
 import { getStaffContextDetailed } from './staff';
 import { canEditSettings } from '../settings-input';
 import { qrSvg, siteOrigin } from '../qr';
@@ -49,6 +50,9 @@ export type SettingsScreenData = {
    */
   publishedMenus: number;
   totalMenus: number;
+  /** Every outlet on this account, so Settings can list and add them. */
+  outlets: OutletOption[];
+  activeOutletId: string;
   blocked?: 'signed-out' | 'no-membership';
 };
 
@@ -67,11 +71,13 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
       publicMenuSvg: null,
       publishedMenus: 0,
       totalMenus: 0,
+      outlets: [],
+      activeOutletId: '',
       blocked: staff.reason,
     };
   }
 
-  const { supabase, restaurantId, role } = staff.context;
+  const { supabase, restaurantId, role, outlets } = staff.context;
 
   const [restaurantResult, menusResult] = await Promise.all([
     supabase
@@ -103,6 +109,8 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
       publicMenuSvg: null,
       publishedMenus: 0,
       totalMenus: 0,
+      outlets: [],
+      activeOutletId: '',
       blocked: 'no-membership',
     };
   }
@@ -135,5 +143,7 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
     publicMenuSvg,
     publishedMenus: menus.filter((menu) => menu.is_published === true).length,
     totalMenus: menus.length,
+    outlets,
+    activeOutletId: restaurantId,
   };
 }

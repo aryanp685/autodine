@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { DashboardBar } from '@/components/DashboardBar';
+import type { OutletBar } from '@/lib/outlets';
 import { Money, PaymentPill, PrepPill } from '@/components/ui';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import {
@@ -84,7 +85,14 @@ function Bar({ label, value, peak, bills }: { label: string; value: number; peak
   );
 }
 
-export function ReportsScreen({ data }: { data?: ReportsScreenData | null }) {
+export function ReportsScreen({
+  data,
+  outlet,
+}: {
+  data?: ReportsScreenData | null;
+  /** Which outlet is open, for the switcher in the bar. */
+  outlet?: OutletBar | null;
+}) {
   const live = Boolean(data);
   const blocked = data?.blocked;
 
@@ -109,7 +117,7 @@ export function ReportsScreen({ data }: { data?: ReportsScreenData | null }) {
 
   return (
     <div className="pg pg--dash">
-      <DashboardBar active="reports" />
+      <DashboardBar active="reports" outlet={outlet} />
 
       <div className="pg__body">
         {blocked && <SignInPrompt reason={blocked} screen="sales report" />}

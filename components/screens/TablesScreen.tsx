@@ -1,4 +1,5 @@
 import { DashboardBar } from '@/components/DashboardBar';
+import type { OutletBar } from '@/lib/outlets';
 import Link from 'next/link';
 import { tables as demoTables, restaurant as demoRestaurant } from '@/lib/demo-data';
 import { TableQr } from '@/components/TableQr';
@@ -23,10 +24,13 @@ const STATUS_TONE: Record<string, string> = {
  */
 export function TablesScreen({
   data,
+  outlet,
   error,
   notice,
 }: {
   data?: TablesScreenData | null;
+  /** Which outlet is open, for the switcher in the bar. */
+  outlet?: OutletBar | null;
   error?: string;
   notice?: string;
 }) {
@@ -38,7 +42,7 @@ export function TablesScreen({
 
   return (
     <div className="pg pg--dash">
-      <DashboardBar active="tables" />
+      <DashboardBar active="tables" outlet={outlet} />
 
       <div className="pg__body">
         {data?.blocked && (

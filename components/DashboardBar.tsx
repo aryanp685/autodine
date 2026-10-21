@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { OutletSwitcher } from '@/components/OutletSwitcher';
+import { outletInitials, type OutletBar } from '@/lib/outlets';
 
 /**
  * The dashboard's top bar.
@@ -25,7 +27,15 @@ export const DASHBOARD_LINKS: ReadonlyArray<{ key: DashboardSection; label: stri
   { key: 'settings', label: 'Settings', href: '/dashboard/settings' },
 ];
 
-export function DashboardBar({ active }: { active: DashboardSection }) {
+/**
+ * `outlet` is optional: in demo mode there is no session and therefore no
+ * outlets, and the bar still has to render. It is also what tells the avatar
+ * whose account this is.
+ */
+export function DashboardBar({ active, outlet }: { active: DashboardSection; outlet?: OutletBar | null }) {
+  const activeHref = DASHBOARD_LINKS.find((link) => link.key === active)?.href ?? '/dashboard';
+  const activeOutlet = outlet?.outlets.find((entry) => entry.id === outlet.activeId) ?? outlet?.outlets[0] ?? null;
+
   return (
     <div className="pg__bar">
       <Link href="/" className="pg__brand">
@@ -44,7 +54,14 @@ export function DashboardBar({ active }: { active: DashboardSection }) {
         ))}
       </nav>
       <div className="pg__barRight">
-        <span className="pg__avatar">AP</span>
+        {outlet && outlet.outlets.length > 0 && (
+          <OutletSwitcher outlets={outlet.outlets} activeId={outlet.activeId} next={activeHref} />
+        )}
+        {/* The avatar was the letters AP on every restaurant, which told an
+            owner nothing and looked like somebody else's account. */}
+        <span className="pg__avatar" aria-hidden="true">
+          {outletInitials(activeOutlet?.name ?? 'AutoDine')}
+        </span>
       </div>
     </div>
   );

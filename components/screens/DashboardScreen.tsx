@@ -1,4 +1,6 @@
 import { rupeesToPaise } from '@/lib/money';
+import { OutletSwitcher } from '@/components/OutletSwitcher';
+import type { OutletBar } from '@/lib/outlets';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { dashboardStats, recentOrders, restaurant, sparkline, topItems } from '@/lib/demo-data';
@@ -62,7 +64,14 @@ function initialsOf(name: string): string {
    the signed-in account belongs to, and says so when there is nothing to show
    rather than dressing an empty day up as a quiet one.
    ========================================================================== */
-export function Dashboard({ data }: { data?: DashboardScreenData | null }) {
+export function Dashboard({
+  data,
+  outlet,
+}: {
+  data?: DashboardScreenData | null;
+  /** Which outlet is open, for the switcher in the rail. */
+  outlet?: OutletBar | null;
+}) {
   const live = Boolean(data);
   const blocked = data?.blocked;
   const stats = data?.stats;
@@ -146,6 +155,12 @@ export function Dashboard({ data }: { data?: DashboardScreenData | null }) {
             <h1 className="dash__h1">Restaurant overview</h1>
           </div>
           <div className="dash__headRight">
+            {/* In the header, not the rail: the rail's venue block is hidden on
+                phones, and switching outlets is exactly what an owner walking
+                between two branches reaches for. */}
+            {outlet && outlet.outlets.length > 0 && (
+              <OutletSwitcher outlets={outlet.outlets} activeId={outlet.activeId} next="/dashboard" />
+            )}
             <Link href="/dashboard/menus" className="dash__ghostBtn">
               Menu preview
             </Link>
