@@ -40,7 +40,7 @@ export function Home() {
             <Link href="/signup" className="home__btn home__btn--solid">Create account</Link>
             <Link href="/menu" className="home__btn home__btn--line">See the demo</Link>
           </div>
-          <div className="home__note" data-anim="hero-note">Preview only · live ordering, payments and subscriptions are not enabled</div>
+          <div className="home__note" data-anim="hero-note">Ordering is live · online payments and subscriptions are not enabled yet</div>
         </div>
       </header>
 
@@ -48,9 +48,9 @@ export function Home() {
         <div className="home__rule" />
         <div className="home__three" data-anim-group>
           {[
-            ['01', 'A clear digital menu', 'Explore sample categories, dish options and a mobile-friendly menu layout. Menu editing and publishing are still being built.'],
-            ['02', 'A connected service flow', 'The preview brings the customer menu, kitchen board and counter screens together. Live order delivery is not enabled yet.'],
-            ['03', 'Payments, designed carefully', 'Online and counter payment flows are represented in the interface. No payment provider is connected and no charge can be made.'],
+            ['01', 'A clear digital menu', 'Every dish, price and menu is edited and published from the dashboard, and several menus can run side by side — lunch and dinner, dine-in and takeaway.'],
+            ['02', 'A connected service flow', 'A guest scans the table code and the order lands on the kitchen board immediately, spoken out in Hindi, and is paid for at the counter.'],
+            ['03', 'Payments, designed carefully', 'Cash, card and UPI collected at the counter are recorded against the bill. No online payment provider is connected yet, so nothing is charged from a phone.'],
           ].map(([n, title, body]) => (
             <article key={n} className="home__col">
               <div className="home__num">{n}</div>

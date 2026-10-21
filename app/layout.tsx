@@ -4,7 +4,7 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'AutoDine',
   description:
-    'AutoDine — QR ordering and restaurant management for Indian restaurants. Frontend prototype: demo data only, no backend, no live payments.',
+    'AutoDine — QR ordering and restaurant management for Indian restaurants. Scan, order, and the kitchen board hears it in Hindi. Online payments are not connected yet.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
