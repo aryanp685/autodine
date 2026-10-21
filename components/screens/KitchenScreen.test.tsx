@@ -46,6 +46,20 @@ describe('Kitchen board', () => {
     expect(html).toContain('Test announcement');
   });
 
+  it('lets the operator slow the voice down from the board itself', () => {
+    const html = renderToStaticMarkup(<Kitchen />);
+
+    for (const label of ['धीमा', 'सामान्य', 'तेज़']) expect(html).toContain(label);
+    // One of them is the current setting, and the board says which.
+    expect(html).toMatch(/aria-pressed="true"[^<]*>सामान्य</);
+  });
+
+  it('does not claim to be speaking when it has said nothing', () => {
+    const html = renderToStaticMarkup(<Kitchen />);
+    expect(html).not.toContain('Speaking now');
+    expect(html).not.toContain('Last announcement');
+  });
+
   it('says it is a demo board rather than looking live', () => {
     const html = renderToStaticMarkup(<Kitchen />);
     expect(html).toContain('demo mode');

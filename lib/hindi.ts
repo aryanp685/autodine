@@ -195,6 +195,10 @@ const WORDS: Record<string, string> = {
   'chicken lollipop': 'चिकन लोलीपॉप', 'lollipop': 'लोलीपॉप',
   'cappuccino': 'कैपुचीनो', 'espresso': 'एस्प्रेसो', 'latte': 'लाते',
   'mozzarella': 'मोज़रेला', 'maple syrup': 'मेपल सिरप',
+  // Pizza names are spelled the way they are said, not the way they are
+  // printed: the rule engine turned "Margherita" into मैर्घेरिटा, which is
+  // not a word in any language.
+  'margherita': 'मार्गेरिटा', 'pepperoni': 'पेपरोनी', 'farmhouse': 'फ़ार्महाउस',
 
   // ---- how a dish is ordered
   'half': 'आधा', 'full': 'पूरा', 'quarter': 'पाव', 'regular': 'रेगुलर', 'small': 'छोटा',
