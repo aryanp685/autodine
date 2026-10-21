@@ -1110,3 +1110,61 @@
   [data-app] .rep__stat:first-child { border-top: 0; }
   [data-app] .rep__stat:not(:first-child) { padding-left: 0; }
 }
+
+/* ============================================================ kitchen voice
+   The announcement system's own chrome: the honesty strips that say when the
+   kitchen cannot hear, and the log of what was actually read out.
+
+   No new hex. Everything is a token or the same muted rgba the rest of the
+   sheet uses. The warning strip is intentionally the loudest thing on the
+   board -- a silent kitchen screen that looks live is the failure this
+   feature exists to prevent. */
+
+[data-app] .kb__warn {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px;
+  margin: 0 0 14px; padding: 12px 16px;
+  border: 1px solid var(--border); border-left: 3px solid var(--text);
+  background: var(--surface); font-size: 13.5px; line-height: 1.55;
+}
+[data-app] .kb__warn strong { font-weight: 600; }
+[data-app] .kb__warn span { color: rgba(17, 19, 24, 0.66); flex: 1 1 280px; }
+[data-app] .kb__warn--quiet { border-left-color: var(--border); }
+
+[data-app] .kb__toggle {
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: transparent; padding: 6px 12px; min-height: 32px;
+  font: inherit; font-size: 12.5px; color: rgba(17, 19, 24, 0.62); cursor: pointer;
+}
+[data-app] .kb__toggle.is-on { border-color: rgba(17, 19, 24, 0.4); color: var(--text); }
+
+[data-app] .kb__pill {
+  border: 1px solid var(--border); border-radius: 999px;
+  padding: 3px 10px; font-size: 12px; color: rgba(17, 19, 24, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-app] .kb__log {
+  margin: 0 0 16px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+}
+[data-app] .kb__logHead {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 10px 0 8px; font-size: 11px; letter-spacing: 0.12em;
+  text-transform: uppercase; font-weight: 700; color: rgba(17, 19, 24, 0.45);
+}
+[data-app] .kb__logVoice { letter-spacing: 0; text-transform: none; font-weight: 400; }
+[data-app] .kb__log ul { display: grid; gap: 6px; padding-bottom: 12px; }
+[data-app] .kb__log li {
+  display: grid; grid-template-columns: 62px 150px minmax(0, 1fr) auto;
+  align-items: baseline; gap: 12px; font-size: 13px;
+}
+[data-app] .kb__logAt { color: rgba(17, 19, 24, 0.4); font-variant-numeric: tabular-nums; }
+[data-app] .kb__logLabel { font-weight: 600; white-space: nowrap; }
+[data-app] .kb__logText {
+  color: rgba(17, 19, 24, 0.66); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  [data-app] .kb__log li { grid-template-columns: 54px minmax(0, 1fr) auto; }
+  [data-app] .kb__logText { display: none; }
+  [data-app] .kb__warn { font-size: 13px; }
+}

@@ -44,7 +44,15 @@ export type KitchenTicket = {
   /** Human-facing order code, e.g. 'A-1042'. This is what the pass calls out. */
   code: string;
   table: string;
+  /** Formatted for the card. */
   placedAt: string;
+  /**
+   * The same instant, untouched. The board compares it against the moment the
+   * screen was opened to tell "this ticket has been sitting here" from "this
+   * arrived while nobody was watching", which a formatted clock time cannot
+   * answer across midnight or a reload.
+   */
+  placedAtIso: string;
   ageMin: number;
   payment: 'paid' | 'pending' | 'failed';
   state: KitchenPrepState;
@@ -56,6 +64,11 @@ export type KitchenTicket = {
 
 export type KitchenScreenData = {
   restaurantName: string;
+  /**
+   * Needed by the realtime subscription, which filters INSERTs to this
+   * restaurant in the browser. Null on demo data.
+   */
+  restaurantId: string | null;
   tickets: KitchenTicket[];
   /**
    * Set when the database answered but this caller has no restaurant to show.
@@ -119,7 +132,7 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
     if (staff.reason === 'unconfigured') return null;
     // Configured but this caller has no restaurant: say which, so the screen
     // can prompt instead of showing a blank board that reads as "no orders".
-    return { restaurantName: '', tickets: [], blocked: staff.reason };
+    return { restaurantName: '', restaurantId: null, tickets: [], blocked: staff.reason };
   }
 
   const { supabase, restaurantId, restaurantName } = staff.context;
@@ -141,7 +154,7 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
   }
 
   const rows = orders ?? [];
-  if (rows.length === 0) return { restaurantName, tickets: [] };
+  if (rows.length === 0) return { restaurantName, restaurantId, tickets: [] };
 
   const orderIds = rows.map((row) => row.id);
   const tableIds = [...new Set(rows.map((r) => r.table_id).filter(Boolean))] as string[];
@@ -199,6 +212,7 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
       code: row.code,
       table: (row.table_id && labelByTable.get(row.table_id)) || NO_TABLE,
       placedAt: clockTime(row.placed_at),
+      placedAtIso: row.placed_at,
       ageMin: minutesSince(row.placed_at, now),
       payment: paymentLabel(row.payment_status),
       state: row.prep_status as KitchenPrepState,
@@ -208,5 +222,5 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
     };
   });
 
-  return { restaurantName, tickets };
+  return { restaurantName, restaurantId, tickets };
 }

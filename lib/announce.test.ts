@@ -2,8 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   advanceText,
   createAnnounceQueue,
+  MAX_BACKLOG,
   MAX_SPOKEN_ITEMS,
   newOrderText,
+  numberWord,
+  orderAnnouncement,
+  primeOnOpen,
+  selectNewTickets,
   summariseItems,
   type Speaker,
 } from './announce';
@@ -196,7 +201,40 @@ describe('newOrderText', () => {
       { qty: 2, name: 'Butter Chicken' },
       { qty: 1, name: 'normal rice' },
     ]);
-    expect(text).toBe('New order for T1. 2 Butter Chicken, 1 normal rice.');
+    // Quantities are words: a synthesised "2." hangs a pause on the digit and
+    // the sentence arrives stilted.
+    expect(text).toBe('New order, table T1. Two Butter Chicken. One normal rice.');
+  });
+
+  it('says the portion, because a Half plated as a Full loses money', () => {
+    const text = newOrderText('T1', [
+      { qty: 1, name: 'Butter Chicken', detail: 'Half' },
+      { qty: 2, name: 'Butter Naan', detail: 'Full · Butter naan' },
+    ]);
+    expect(text).toBe(
+      'New order, table T1. One Butter Chicken, Half. Two Butter Naan, Full, Butter naan.',
+    );
+  });
+
+  it("reads the guest's note last, clearly marked", () => {
+    const text = newOrderText('T3', [{ qty: 1, name: 'koko' }], 'no onion, less spicy');
+    expect(text).toBe('New order, table T3. One koko. Note: no onion, less spicy.');
+  });
+
+  it('cuts a very long note instead of speaking a paragraph', () => {
+    const text = newOrderText('T3', [{ qty: 1, name: 'koko' }], 'x'.repeat(400));
+    expect(text.length).toBeLessThan(250);
+    expect(text).toContain('…');
+  });
+
+  it('ignores a blank note rather than saying "Note: ."', () => {
+    expect(newOrderText('T1', [{ qty: 1, name: 'koko' }], '   ')).not.toContain('Note');
+  });
+
+  it('calls a counter order a takeaway, not a table', () => {
+    const text = newOrderText('Takeaway', [{ qty: 1, name: 'koko' }]);
+    expect(text).toBe('New takeaway order. One koko.');
+    expect(text).not.toContain('Takeaway.');
   });
 
   it('never mentions the order code', () => {
@@ -207,13 +245,14 @@ describe('newOrderText', () => {
   });
 
   it('says something useful for an order with no lines', () => {
-    expect(newOrderText('T1', [])).toBe('New order for T1.');
+    expect(newOrderText('T1', [])).toBe('New order, table T1.');
   });
 });
 
 describe('advanceText', () => {
-  it('names the table and the new state', () => {
-    expect(advanceText('T1', 'ready')).toBe('T1, ready.');
+  it('names the table and the new state in a spoken sentence', () => {
+    expect(advanceText('T1', 'ready')).toBe('Table T1 is ready.');
+    expect(advanceText('T2', 'preparing')).toBe('Table T2, now preparing.');
   });
 });
 
@@ -232,5 +271,141 @@ describe('summariseItems', () => {
 
     expect(out).toHaveLength(MAX_SPOKEN_ITEMS + 1);
     expect(out.at(-1)).toEqual({ qty: 5, name: 'more items' });
+  });
+
+  it('still names the four dishes the cook needs first', () => {
+    const items = Array.from({ length: 6 }, (_, i) => ({ qty: 2, name: `dish${i}` }));
+    const text = newOrderText('T1', items);
+
+    expect(text).toContain('dish0');
+    expect(text).toContain('dish3');
+    expect(text).not.toContain('dish4');
+    expect(text).toContain('Four more items');
+  });
+});
+
+describe('numberWord', () => {
+  it('spells the counts a menu actually uses', () => {
+    expect([1, 2, 3, 10, 20].map(numberWord)).toEqual([
+      'one',
+      'two',
+      'three',
+      'ten',
+      'twenty',
+    ]);
+  });
+
+  it('leaves large counts as digits, which are clearer than a long phrase', () => {
+    expect(numberWord(37)).toBe('37');
+  });
+});
+
+describe('announcement priority', () => {
+  it('never drops an order, however far behind the queue is', () => {
+    const ctl = controllable();
+    const queue = createAnnounceQueue(ctl.speaker);
+
+    for (let i = 0; i < 12; i += 1) {
+      // Simulate the backlog by never finishing the first utterance.
+      queue.push(`o${i}`, `order ${i}`);
+    }
+
+    expect(queue.pending()).toBe(11);
+  });
+
+  it('drops a state-change announcement once the queue is backed up', () => {
+    // Six queued tickets are more important than hearing that table two is
+    // now preparing -- that is already on the screen.
+    const ctl = controllable();
+    const queue = createAnnounceQueue(ctl.speaker);
+
+    // One is being spoken and MAX_BACKLOG are waiting: the board is already
+    // describing the past.
+    for (let i = 0; i < MAX_BACKLOG + 1; i += 1) queue.push(`o${i}`, `order ${i}`);
+    expect(queue.pending()).toBe(MAX_BACKLOG);
+
+    expect(queue.push('adv:o1:ready', 'Table T1 is ready.', 'info')).toBe(false);
+  });
+
+  it('takes a state-change announcement while the queue is short', () => {
+    const ctl = controllable();
+    const queue = createAnnounceQueue(ctl.speaker);
+    expect(queue.push('adv:o1:ready', 'Table T1 is ready.', 'info')).toBe(true);
+  });
+});
+
+describe('orderAnnouncement', () => {
+  it('reads the note with the order, not as a separate ticket', () => {
+    const text = orderAnnouncement({
+      table: 'T2',
+      note: 'no onion',
+      items: [{ qty: 1, name: 'Butter Chicken', detail: 'Half' }],
+    });
+
+    expect(text).toBe('New order, table T2. One Butter Chicken, Half. Note: no onion.');
+  });
+});
+
+describe('primeOnOpen', () => {
+  const NOW = Date.UTC(2026, 9, 21, 12, 0, 0);
+  const minutesAgo = (m: number) => new Date(NOW - m * 60_000).toISOString();
+
+  const ticket = (id: string, minutes: number) => ({
+    orderId: id,
+    table: 'T1',
+    placedAtIso: minutesAgo(minutes),
+    items: [{ qty: 1, name: 'koko' }],
+  });
+
+  it('marks the whole board as seen, so opening it does not read out the afternoon', () => {
+    const board = [ticket('a', 5), ticket('b', 90), ticket('c', 200)];
+    const { seen } = primeOnOpen(board, [], NOW);
+
+    expect(seen.sort()).toEqual(['a', 'b', 'c']);
+  });
+
+  it('offers only the last half hour to be read out', () => {
+    // Six hours of open tickets is an ambush; the ten minutes before someone
+    // walked in is work the pass may genuinely still need.
+    const board = [ticket('a', 5), ticket('b', 45)];
+    const { missed } = primeOnOpen(board, [], NOW);
+
+    expect(missed.map((t) => t.orderId)).toEqual(['a']);
+  });
+
+  it('never re-offers a ticket already seen in a previous session', () => {
+    const board = [ticket('a', 2), ticket('b', 3)];
+    const { missed } = primeOnOpen(board, ['a'], NOW);
+
+    expect(missed.map((t) => t.orderId)).toEqual(['b']);
+  });
+
+  it('ignores demo rows, which have no identity to remember', () => {
+    const { seen, missed } = primeOnOpen([{ table: 'T1', items: [] }], [], NOW);
+    expect(seen).toEqual([]);
+    expect(missed).toEqual([]);
+  });
+
+  it('does not offer a ticket with an unreadable timestamp', () => {
+    const { missed } = primeOnOpen(
+      [{ orderId: 'x', table: 'T1', placedAtIso: 'not a date', items: [] }],
+      [],
+      NOW,
+    );
+    expect(missed).toEqual([]);
+  });
+});
+
+describe('selectNewTickets', () => {
+  it('returns only what has not been seen', () => {
+    const board = [
+      { orderId: 'a', table: 'T1', items: [] },
+      { orderId: 'b', table: 'T2', items: [] },
+    ];
+    expect(selectNewTickets(board, ['a']).map((t) => t.orderId)).toEqual(['b']);
+  });
+
+  it('ignores rows with no id', () => {
+    expect(selectNewTickets([{ table: 'T1', items: [] }], [])).toEqual([]);
   });
 });
