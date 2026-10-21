@@ -41,8 +41,19 @@ describe('spokenTable', () => {
     expect(spokenTable('T12')).toBe('टी ट्वेल्व');
   });
 
-  it('reads a long label digit by digit, the way a room number is said', () => {
-    expect(spokenTable('Room 204')).toBe('आर ओ ओ एम टू ज़ीरो फ़ोर');
+  it('reads a table number past twenty as one number', () => {
+    // A hall with thirty tables is ordinary. "T21" said digit by digit is
+    // "टी टू वन" -- a table two-one, which is not a table, and the pass walks
+    // to the wrong one.
+    expect(spokenTable('T21')).toBe('टी ट्वेन्टी वन');
+    expect(spokenTable('T30')).toBe('टी थर्टी');
+    expect(spokenTable('T99')).toBe('टी नाइन्टी नाइन');
+  });
+
+  it('says a room as a word and the number digit by digit', () => {
+    // "Room 204" is a room, not four letters followed by three digits, and
+    // a room number is spoken one digit at a time everywhere.
+    expect(spokenTable('Room 204')).toBe('रूम टू ज़ीरो फ़ोर');
   });
 
   it('has words for a takeaway ticket, which has no table', () => {
@@ -97,10 +108,43 @@ describe('spokenItem', () => {
     expect(spokenAddons('Peri Peri')).not.toBe('');
   });
 
+  it('treats "Half Plate" as a portion, not as a second dish', () => {
+    // Most menus write the portion as a measure. Filed as an add-on it trails
+    // the dish name, and a cook hears two items instead of one.
+    expect(spokenItem({ qty: 1, name: 'Paneer Butter Masala', detail: 'Half Plate' })).toBe(
+      'एक आधी प्लेट पनीर बटर मसाला',
+    );
+    // Feminine, because प्लेट is. "आधा प्लेट" is an accent.
+    expect(spokenItem({ qty: 2, name: 'Butter Naan', detail: 'Full Plate · Extra cheese' })).toBe(
+      'दो पूरी प्लेट बटर नान, एक्स्ट्रा चीज़',
+    );
+  });
+
+  it('says a weight the way it is written on the board, not letter by letter', () => {
+    // "Half kg" used to come out as "आधा क्ग": the abbreviation was
+    // transliterated as if it were a word.
+    expect(spokenItem({ qty: 1, name: 'Masala Dosa', detail: 'Half kg · Extra spicy' })).toBe(
+      'एक आधा किलो मसाला डोसा, ज़्यादा तीखा',
+    );
+  });
+
+  it('keeps a measure portion on the portion side', () => {
+    expect(spokenPortion('Half Plate · Extra cheese')).toBe('आधी प्लेट');
+    expect(spokenAddons('Half Plate · Extra cheese')).toBe('एक्स्ट्रा चीज़');
+  });
+
   it('says the owner\'s pronunciation instead of the generated one', () => {
     // The board must never rename a dish behind the restaurant's back: when a
     // pronunciation has been set, it is what the kitchen hears.
     expect(spokenItem({ qty: 1, name: 'Bhaji', spoken: 'भज्जी' })).toBe('एक भज्जी');
+  });
+
+  it('says a pizza name that is printed in English on the menu', () => {
+    // Rule transliteration mangles this one into "मैर्घेरिटा"; the menu words
+    // win when they are known.
+    expect(spokenItem({ qty: 1, name: 'Margherita Pizza', detail: 'Large' })).toBe(
+      'एक बड़ा मार्गेरिटा पिज़्ज़ा',
+    );
   });
 
   it('still says the dish when there is no portion', () => {
@@ -126,6 +170,27 @@ describe('newOrderText', () => {
     for (const items of menus) {
       expect(isDevanagariOnly(newOrderText('T12', items, 'less spicy, no onion'))).toBe(true);
     }
+  });
+
+  it('reads a portion and the add-ons in the order a person says them', () => {
+    // The exact shape place_public_order snapshots: variant name, then each
+    // add-on, joined the way order_items stores them.
+    const text = newOrderText('T1', [
+      { qty: 1, name: 'Butter Naan', detail: 'Half · Extra cheese · Jain' },
+    ]);
+
+    expect(text).toBe('नया ऑर्डर, टेबल टी वन। एक आधा बटर नान, एक्स्ट्रा चीज़, जैन।');
+  });
+
+  it('says the restaurant\'s own add-ons, not just the ones we know', () => {
+    // An owner will invent names this file has never seen. They are read out
+    // rather than dropped, because the guest paid for them.
+    const text = newOrderText('T2', [
+      { qty: 2, name: 'Masala Dosa', detail: 'Extra mint chutney · Onion salad' },
+    ]);
+
+    expect(text).toContain('एक्स्ट्रा मिंट चटनी');
+    expect(text).toContain('प्याज़ सलाद');
   });
 
   it('marks the note as a warning, so it is not mistaken for another dish', () => {

@@ -229,6 +229,52 @@ const PORTION: Record<string, string> = {
   single: 'सिंगल',
   double: 'डबल',
   plate: 'प्लेट',
+
+  // A portion is usually written as a measure, not a bare adjective: menus say
+  // "Half Plate", "Full Plate", "Half Kg". Read as two unknown words that
+  // becomes "आधा प्लेट" -- which in Hindi is the wrong gender and, worse, gets
+  // filed as an ADD-ON, so it trails the dish and sounds like a second item:
+  // "एक बटर नान, आधा प्लेट". Composed forms are listed whole, with the gender
+  // the measure word actually takes, because "आधी प्लेट" is a plate and
+  // "आधा प्लेट" is an accent.
+  'half plate': 'आधी प्लेट',
+  'full plate': 'पूरी प्लेट',
+  'quarter plate': 'पाव प्लेट',
+  'half bowl': 'आधा बाउल',
+  'full bowl': 'पूरा बाउल',
+  'half katori': 'आधी कटोरी',
+  'full katori': 'पूरी कटोरी',
+  'half kg': 'आधा किलो',
+  'half kilo': 'आधा किलो',
+  'full kg': 'एक किलो',
+  'full kilo': 'एक किलो',
+  'one kg': 'एक किलो',
+  'half litre': 'आधा लीटर',
+  'half liter': 'आधा लीटर',
+  'full litre': 'एक लीटर',
+  'full liter': 'एक लीटर',
+  'half glass': 'आधा ग्लास',
+  'full glass': 'पूरा ग्लास',
+  'half bottle': 'आधी बोतल',
+  'full bottle': 'पूरी बोतल',
+  'half pack': 'आधा पैक',
+  'full pack': 'पूरा पैक',
+
+  // The bare measures, for "Plate" or "1 Kg" written on their own.
+  kg: 'किलो',
+  kilo: 'किलो',
+  gram: 'ग्राम',
+  grams: 'ग्राम',
+  gm: 'ग्राम',
+  gms: 'ग्राम',
+  ml: 'मिली',
+  litre: 'लीटर',
+  liter: 'लीटर',
+  bowl: 'बाउल',
+  katori: 'कटोरी',
+  glass: 'ग्लास',
+  bottle: 'बोतल',
+  pack: 'पैक',
 };
 
 /**
@@ -272,21 +318,39 @@ const LETTERS: Record<string, string> = {
   s: 'एस', t: 'टी', u: 'यू', v: 'वी', w: 'डब्ल्यू', x: 'एक्स', y: 'वाय', z: 'ज़ेड',
 };
 
-const LABEL_DIGITS = [
+const LABEL_UNITS = [
   'ज़ीरो', 'वन', 'टू', 'थ्री', 'फ़ोर', 'फ़ाइव', 'सिक्स', 'सेवन', 'एट', 'नाइन',
-  'टेन', 'इलेवन', 'ट्वेल्व', 'थर्टीन', 'फ़ोर्टीन', 'फ़िफ़्टीन', 'सिक्स्टीन', 'सेवन्टीन',
-  'एटीन', 'नाइन्टीन', 'ट्वेन्टी',
 ];
+const LABEL_TEENS = [
+  'टेन', 'इलेवन', 'ट्वेल्व', 'थर्टीन', 'फ़ोर्टीन', 'फ़िफ़्टीन', 'सिक्स्टीन',
+  'सेवन्टीन', 'एटीन', 'नाइन्टीन',
+];
+const LABEL_TENS = [
+  '', '', 'ट्वेन्टी', 'थर्टी', 'फ़ोर्टी', 'फ़िफ़्टी', 'सिक्स्टी', 'सेवन्टी', 'एटी', 'नाइन्टी',
+];
+
+/** A number said as a number, up to 99. */
+function labelNumber(value: number): string {
+  if (value < 10) return LABEL_UNITS[value];
+  if (value < 20) return LABEL_TEENS[value - 10];
+
+  const tens = Math.floor(value / 10);
+  const units = value % 10;
+  return units === 0 ? LABEL_TENS[tens] : `${LABEL_TENS[tens]} ${LABEL_UNITS[units]}`;
+}
 
 function labelDigits(chunk: string): string {
   const value = Number(chunk);
 
-  // A table up to T20 is said as one number: "T12" is "टी ट्वेल्व".
-  if (Number.isInteger(value) && value >= 0 && value <= 20) return LABEL_DIGITS[value];
+  // A table is a number, so it is read as one: "T12" is "टी ट्वेल्व" and
+  // "T21" is "टी ट्वेन्टी वन". Said digit by digit -- "टी टू वन" -- a
+  // table twenty-one becomes a table two-one, and the pass walks to the wrong
+  // table. Larger places run well past twenty tables.
+  if (Number.isInteger(value) && value >= 0 && value <= 99) return labelNumber(value);
 
-  // Longer labels -- a hotel's "Room 204" -- are said digit by digit, which is
-  // how a room number is spoken everywhere.
-  return [...chunk].map((digit) => LABEL_DIGITS[Number(digit)] ?? digit).join(' ');
+  // Longer numbers -- a hotel's "Room 204" -- are said digit by digit, which
+  // is how a room number is spoken everywhere.
+  return [...chunk].map((digit) => LABEL_UNITS[Number(digit)] ?? digit).join(' ');
 }
 
 /** Whether a table label means "no table" rather than naming one. */
@@ -303,13 +367,22 @@ export function spokenTable(table: string): string {
   const out: string[] = [];
 
   // One pass so 'T12' is T + the number twelve, not T + 1 + 2.
-  for (const chunk of trimmed.match(/\d+|[^\d]/g) ?? []) {
+  for (const chunk of trimmed.match(/\d+|[^\d\s]+/g) ?? []) {
     if (/^\d+$/.test(chunk)) {
       out.push(labelDigits(chunk));
       continue;
     }
-    if (/\s/.test(chunk)) continue;
-    out.push(LETTERS[chunk.toLowerCase()] ?? chunk);
+
+    // A run of three letters or more is a word -- "Room 204", "Garden" -- and
+    // is said as one: spelling it gives "आर ओ ओ एम", which is four letters,
+    // not a room. Shorter runs are labels and acronyms and are spelled: the
+    // printed table says "T1", and a table is never "टी" + a word.
+    if (chunk.length >= 3) {
+      out.push(toDevanagari(chunk));
+      continue;
+    }
+
+    for (const letter of chunk) out.push(LETTERS[letter.toLowerCase()] ?? letter);
   }
 
   return out.join(' ').replace(/\s+/g, ' ').trim();
