@@ -24,6 +24,14 @@
 
 import { getStaffContextDetailed } from './staff';
 
+export type EditorVariant = {
+  id: string;
+  name: string;
+  /** Paise. The editor renders rupees and converts back on save. */
+  pricePaise: number;
+  sortOrder: number;
+};
+
 export type EditorItem = {
   id: string;
   categoryId: string | null;
@@ -34,6 +42,14 @@ export type EditorItem = {
   veg: boolean;
   available: boolean;
   sortOrder: number;
+  /**
+   * The portions this dish is sold in. Empty for most dishes.
+   *
+   * Loaded with the item rather than on demand, because the editor shows them
+   * the moment a row is selected and a second round trip per selection would
+   * make every click feel slow for data that is only a handful of rows.
+   */
+  variants: EditorVariant[];
 };
 
 export type EditorCategory = {
@@ -114,6 +130,50 @@ export async function getMenuEditorData(): Promise<MenuEditorData | null> {
   }
 
   const items = itemsResult.data ?? [];
+
+  /**
+   * Portions are a second query, not an embed.
+   *
+   * The Database type in lib/db/database.ts is hand-written and describes the
+   * variant relationship only well enough to typecheck a plain select; asking
+   * PostgREST for an embedded item_variants(...) resolves to a
+   * GenericStringError and every column read off it fails. Two queries over a
+   * menu's worth of rows is not worth fighting a type for.
+   *
+   * Scoped by item id, because item_variants has no restaurant column --
+   * a portion belongs to a dish and inherits its ownership. The item ids come
+   * from the query above, which is already filtered to this restaurant, so
+   * this cannot reach another kitchen's portions.
+   */
+  const itemIds = items.map((row) => row.id as string);
+  const { data: variantRows, error: variantsError } = itemIds.length
+    ? await supabase
+        .from('item_variants')
+        .select('id, item_id, name, price_paise, sort_order')
+        .in('item_id', itemIds)
+    : { data: [] as { id: string; item_id: string; name: string; price_paise: number; sort_order: number }[], error: null };
+
+  // A failed variants read is not fatal. The editor still works; the owner
+  // sees no portions and can still save the item. Failing the whole screen
+  // over a cosmetic section would be worse than showing it empty.
+  if (variantsError) {
+    console.error(`[menu-editor] could not load portions: ${variantsError.message}`);
+  }
+
+  const variantsByItem = new Map<string, EditorVariant[]>();
+  for (const row of variantRows ?? []) {
+    const itemId = row.item_id as string;
+    const list = variantsByItem.get(itemId) ?? [];
+    list.push({
+      id: row.id as string,
+      name: (row.name as string) ?? '',
+      pricePaise: Number(row.price_paise ?? 0),
+      sortOrder: Number(row.sort_order ?? 0),
+    });
+    variantsByItem.set(itemId, list);
+  }
+  for (const list of variantsByItem.values()) list.sort((a, b) => a.sortOrder - b.sortOrder);
+
   const countByCategory = new Map<string, number>();
   for (const row of items) {
     if (!row.category_id) continue;
@@ -138,6 +198,7 @@ export async function getMenuEditorData(): Promise<MenuEditorData | null> {
       veg: Boolean(row.is_veg),
       available: Boolean(row.is_available),
       sortOrder: Number(row.sort_order ?? 0),
+      variants: variantsByItem.get(row.id as string) ?? [],
     })),
   };
 }

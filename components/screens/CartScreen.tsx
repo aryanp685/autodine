@@ -84,26 +84,30 @@ export function Cart({
           ) : (
             <>
               {priced.lines.map((l) => (
-                <div key={l.itemId} className="cart__line">
+                // Keyed by portion too. Keying by item alone collapsed a
+                // half and a full plate of the same dish onto one React
+                // element, so changing one quantity re-rendered the other.
+                <div key={`${l.itemId}|${l.variantId ?? ''}`} className="cart__line">
                   <div className="cart__lineMain">
                     <div className="cart__lineTop">
                       <VegMark veg={l.isVeg} />
                       <strong>{l.name}</strong>
                     </div>
                     <div className="cart__linePrice tnum">
+                      {l.variantName ? `${l.variantName} · ` : ''}
                       {inr(paiseToRupees(l.unitPricePaise))} each
                     </div>
                   </div>
                   <div className="cart__qty">
                     <button
-                      onClick={() => cart.setQty(l.itemId, l.qty - 1)}
+                      onClick={() => cart.setQty(l.itemId, l.qty - 1, l.variantId)}
                       aria-label={`Decrease ${l.name}`}
                     >
                       −
                     </button>
                     <span className="tnum">{l.qty}</span>
                     <button
-                      onClick={() => cart.setQty(l.itemId, l.qty + 1)}
+                      onClick={() => cart.setQty(l.itemId, l.qty + 1, l.variantId)}
                       aria-label={`Increase ${l.name}`}
                     >
                       +
@@ -125,6 +129,22 @@ export function Cart({
                 <div className="cart__empty">
                   {dropped === 1 ? 'One item is' : `${dropped} items are`} no longer
                   available, so {dropped === 1 ? 'it is' : 'they are'} not on the bill.
+                </div>
+              )}
+
+              {/*
+                A portion that no longer exists is kept and priced at the menu
+                price rather than dropped -- losing the line would lose the
+                sale over a menu edit. But the guest has to be told, because
+                they chose a cheaper portion and are now being billed the
+                dearer one.
+              */}
+              {priced.staleVariantIds.length > 0 && (
+                <div className="cart__empty">
+                  The portion you picked for{' '}
+                  {priced.staleVariantIds.length === 1 ? 'one dish is' : 'some dishes is'} no
+                  longer on the menu, so {priced.staleVariantIds.length === 1 ? 'it is' : 'they are'}{' '}
+                  priced at the menu price. Please check the bill before paying.
                 </div>
               )}
             </>

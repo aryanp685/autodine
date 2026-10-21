@@ -8,8 +8,10 @@ import {
   addCategoryAction,
   addItemAction,
   addPresetCategoriesAction,
+  addVariantAction,
   deleteCategoryAction,
   deleteItemAction,
+  deleteVariantAction,
   publishMenuAction,
   restoreItemAction,
   saveItemAction,
@@ -62,7 +64,14 @@ export function MenuEditorScreen({
         price: paiseToRupees(i.pricePaise),
         veg: i.veg,
         available: i.available,
-        variants: undefined as undefined,
+        // Carried through rather than blanked. This used to be forced to
+        // `undefined` because variants were not built; it is what made the
+        // column land on an em dash for every live row.
+        variants: i.variants.map((v) => ({
+          id: v.id,
+          name: v.name,
+          price: paiseToRupees(v.pricePaise),
+        })),
         category: i.categoryId ?? '',
       }))
     : demoItems;
@@ -88,6 +97,28 @@ export function MenuEditorScreen({
           (data.items.find((i) => i.id === selected.id) ?? data.items[0])?.pricePaise ?? 0
         )
       : (selected as { price: number }).price;
+
+  /**
+   * The selected dish's portions, in rupees, whichever source it came from.
+   *
+   * Live rows hold paise and demo rows hold rupees, exactly as they do for the
+   * price field above. Normalising here rather than at each use keeps the
+   * markup identical for both, which is the same contract the rest of this
+   * screen follows.
+   */
+  const selectedVariants: { id: string; name: string; rupees: number }[] = blocked
+    ? []
+    : data
+      ? // Looked up from data.items rather than read off `selected`, because
+        // `selected` is a union of EditorItem and the demo Item and only the
+        // first carries pricePaise.
+        (
+          data.items.find((i) => i.id === selected.id)?.variants ?? []
+        ).map((v) => ({ id: v.id, name: v.name, rupees: paiseToRupees(v.pricePaise) }))
+      : (
+          (selected as { variants?: { id: string; name: string; price: number }[] }).variants ??
+          []
+        ).map((v) => ({ id: v.id, name: v.name, rupees: v.price }));
 
   const selectedDesc = blocked
     ? ''
@@ -397,11 +428,11 @@ export function MenuEditorScreen({
                   <th>Item</th>
                   <th>Price</th>
                   <th>Availability</th>
-                  {/* Variants are not built. The column put an em dash on
-                      every live row, which reads as a feature that happens to
-                      be empty rather than one that does not exist. Demo rows
-                      carry real variant data, so it stays there. */}
-                  {!live && <th>Variants</th>}
+                  {/* Portions are real now, so the column applies to live
+                      rows too. It used to be hidden when live, because an em
+                      dash on every row read as a broken feature -- which it
+                      was. */}
+                  <th>Portions</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -438,9 +469,19 @@ export function MenuEditorScreen({
                           <i /> {i.available ? 'Available' : 'Sold out'}
                         </span>
                       </td>
-                      {!live && (
-                        <td className="tnum">{i.variants ? i.variants.length : '—'}</td>
-                      )}
+                      <td className="tnum">
+                        {live ? (
+                          i.variants && i.variants.length > 0 ? (
+                            <span className="pg__variantCount">{i.variants.length}</span>
+                          ) : (
+                            <span className="pg__variantNone">—</span>
+                          )
+                        ) : i.variants ? (
+                          i.variants.length
+                        ) : (
+                          '—'
+                        )}
+                      </td>
                       <td>
                         <div className="pg__rowEnd">
                           <span className="ui-badge ui-badge--sage">
@@ -526,6 +567,82 @@ export function MenuEditorScreen({
                 </button>
               </div>
             </form>
+
+            {/*
+              Portions.
+
+              A dish sold in more than one size needs them, and until this
+              existed there was no way to create one anywhere in the product:
+              the customer sheet offered portions only for dishes that already
+              had them, and no screen could add any. The feature was reachable
+              only by writing SQL.
+
+              Setting a portion here is what makes the sheet charge for it --
+              place_public_order reads item_variants for the price, so the
+              number an owner types is the number a guest pays.
+            */}
+            <div className="pg__variants">
+              <div className="pg__variantsHead">
+                <h4>Portions</h4>
+                <span className="pg__fine">
+                  {selectedVariants.length > 0
+                    ? 'Diners pick one of these.'
+                    : 'No portions — this dish is sold at one price.'}
+                </span>
+              </div>
+
+              {live && selectedVariants.length > 0 && (
+                <ul className="pg__variantList">
+                  {selectedVariants.map((v) => (
+                    <li key={v.id}>
+                      <span>{v.name}</span>
+                      <span className="tnum">{inr(v.rupees)}</span>
+                      <form action={deleteVariantAction}>
+                        <input type="hidden" name="variantId" value={v.id} />
+                        <button
+                          type="submit"
+                          className="pg__variantX"
+                          aria-label={`Remove the ${v.name} portion`}
+                          title={`Remove ${v.name}`}
+                        >
+                          ×
+                        </button>
+                      </form>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <form action={addVariantAction} className="pg__variantForm">
+                <input type="hidden" name="itemId" value={live ? selected.id : ''} />
+                <label className="ui-field">
+                  <span className="ui-label ui-label--sr">Portion name</span>
+                  <input
+                    className="ui-input"
+                    name="variantName"
+                    placeholder="Half"
+                    maxLength={40}
+                    disabled={!live}
+                  />
+                </label>
+                <label className="ui-field">
+                  <span className="ui-label ui-label--sr">Portion price</span>
+                  <input
+                    className="ui-input tnum"
+                    name="variantPrice"
+                    placeholder="₹"
+                    inputMode="decimal"
+                    disabled={!live}
+                  />
+                </label>
+                <button type="submit" className="pg__btn" disabled={!live}>
+                  Add portion
+                </button>
+              </form>
+              <p className="pg__fine">
+                Orders already placed keep their own record of the portion they were sold at.
+              </p>
+            </div>
 
             {/* Publishing used to run one way only. Once a menu was live the
                 button read "Published" and went disabled, which reads as a

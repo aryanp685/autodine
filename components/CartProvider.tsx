@@ -31,12 +31,18 @@ import {
 export type { StoredLine };
 
 type CartApi = {
-  /** Item ids and quantities only. Names and prices come from the server. */
+  /** Item ids, portions and quantities only. Names and prices come from the server. */
   lines: StoredLine[];
-  /** Adds one, or `by` when the dish was added from a quantity stepper. */
-  add: (itemId: string, by?: number) => void;
-  remove: (itemId: string) => void;
-  setQty: (itemId: string, qty: number) => void;
+  /**
+   * Adds one, or `by` when the dish was added from a quantity stepper.
+   *
+   * `variantId` is the chosen portion. It identifies the line as much as the
+   * item does: a half plate and a full plate of the same dish are two lines,
+   * because they are two different prices.
+   */
+  add: (itemId: string, by?: number, variantId?: string) => void;
+  remove: (itemId: string, variantId?: string) => void;
+  setQty: (itemId: string, qty: number, variantId?: string) => void;
   clear: () => void;
   count: number;
   /**
@@ -96,9 +102,9 @@ export function CartProvider({
     () => ({
       lines,
       ready,
-      add: (itemId, by = 1) => persist(addLine(lines, itemId, by)),
-      remove: (itemId) => persist(removeLine(lines, itemId)),
-      setQty: (itemId, qty) => persist(setLineQty(lines, itemId, qty)),
+      add: (itemId, by = 1, variantId) => persist(addLine(lines, itemId, by, variantId)),
+      remove: (itemId, variantId) => persist(removeLine(lines, itemId, variantId)),
+      setQty: (itemId, qty, variantId) => persist(setLineQty(lines, itemId, qty, variantId)),
       clear: () => persist([]),
       count: totalQty(lines),
     }),
