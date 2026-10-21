@@ -194,7 +194,16 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
   const [error, setError] = useState('');
   const [pending, setPending] = useState<Record<string, PrepState>>({});
   const [delivery, setDelivery] = useState<'connecting' | 'live' | 'polling'>('polling');
-  const [queued, setQueued] = useState(0);
+  /**
+   * What the queue is doing, not what it was asked to do.
+   *
+   * These used to be set at push time, which meant the board showed the
+   * fourth ticket of a burst as "last announcement" while the first was still
+   * being read, and a "4 queued" pill that never went down because nothing
+   * ever recounted it. The queue reports both now.
+   */
+  const [speaking, setSpeaking] = useState(false);
+  const [waiting, setWaiting] = useState(0);
   const [missed, setMissed] = useState<BoardTicket[]>([]);
   /**
    * Why those tickets were not read out.
@@ -326,31 +335,45 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
       }
     }, VOICE_WAIT_MS);
 
-    queueRef.current = createAnnounceQueue({
-      speak(text, onEnd) {
-        const current = speechRef.current;
+    queueRef.current = createAnnounceQueue(
+      {
+        speak(text, onEnd) {
+          const current = speechRef.current;
 
-        // Sound off, no Hindi voice, or this device is not the one that
-        // speaks: consume the announcement without sound. Consuming rather
-        // than skipping is deliberate -- otherwise a backlog would build
-        // while muted and play all at once when it was switched on.
-        if (!current || !audioRef.current || !speaksRef.current || !current.available()) {
-          onEnd();
-          return;
-        }
-
-        current.speak(text, () => {
-          if (current.stalled()) {
-            // The browser refused to start the utterance. The sentence stays
-            // in the log so the pass can replay it, but the board says so
-            // rather than looking like it announced something.
-            setStalled(true);
-            setLostCount((count) => count + 1);
+          // Sound off, no Hindi voice, or this device is not the one that
+          // speaks: consume the announcement without sound. Consuming rather
+          // than skipping is deliberate -- otherwise a backlog would build
+          // while muted and play all at once when it was switched on.
+          if (!current || !audioRef.current || !speaksRef.current || !current.available()) {
+            onEnd();
+            return;
           }
-          onEnd();
-        });
+
+          current.speak(text, () => {
+            if (current.stalled()) {
+              // The browser refused to start the utterance. The sentence stays
+              // in the log so the pass can replay it, but the board says so
+              // rather than looking like it announced something.
+              setStalled(true);
+              setLostCount((count) => count + 1);
+            }
+            onEnd();
+          });
+        },
       },
-    });
+      {
+        // Only what actually reached the speaker is called "speaking now".
+        onBegin(_key, text) {
+          setAnnouncement(text);
+          setSpeaking(true);
+          setWaiting(queueRef.current?.pending() ?? 0);
+        },
+        onIdle() {
+          setSpeaking(false);
+          setWaiting(0);
+        },
+      },
+    );
 
     return () => {
       clearTimeout(giveUp);
@@ -369,9 +392,8 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
       // would show the pass a sentence the kitchen never heard.
       if (!accepted) return false;
 
-      setAnnouncement(text);
       setLog((current) => [{ key, at: clockNow(), label, text }, ...current].slice(0, LOG_LIMIT));
-      setQueued(queueRef.current?.depth() ?? 0);
+      setWaiting(queueRef.current?.pending() ?? 0);
       return true;
     },
     [],
@@ -387,9 +409,8 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
     const accepted = queueRef.current?.force(key, text, 'order') ?? false;
     if (!accepted) return;
 
-    setAnnouncement(text);
     setLog((current) => [{ key, at: clockNow(), label, text }, ...current].slice(0, LOG_LIMIT));
-    setQueued(queueRef.current?.depth() ?? 0);
+    setWaiting(queueRef.current?.pending() ?? 0);
   }, []);
 
   /* ---------------------------------------------------------------- the board */
@@ -675,8 +696,21 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
 
   const latest = orders.find((order) => order.state !== 'served') ?? orders[0];
 
-  /** The sentence "Test announcement" speaks; the same builder a real ticket uses. */
-  const sampleText = newOrderText('T1', [{ qty: 1, name: 'Butter Chicken', detail: 'Half' }], 'no onion');
+  /**
+   * The sentence "Test announcement" speaks.
+   *
+   * The same builder a real ticket uses, with one of each kind of clause in it
+   * -- a portion, a second dish, a note -- so pressing it once tells the
+   * operator what all three sound like at the speed they picked.
+   */
+  const sampleText = newOrderText(
+    'T1',
+    [
+      { qty: 1, name: 'Butter Chicken', detail: 'Half' },
+      { qty: 2, name: 'Butter Naan' },
+    ],
+    'no onion',
+  );
 
   const readMissed = () => {
     for (const ticket of [...missed].reverse()) {
@@ -804,7 +838,7 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
                   : 'Live · checking every 5s'
               : 'Demo board · local only'}
           </div>
-          {queued > 1 && <span className="kb__pill">{queued} queued</span>}
+          {waiting > 0 && <span className="kb__pill">{waiting} waiting</span>}
         </div>
       </header>
 
@@ -884,7 +918,9 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
 
       {announcement && (
         <span className="ui-hint" role="status" style={{ display: 'block', marginBottom: 8 }}>
-          Last announcement: {announcement}
+          {/* "Last announcement" was a half-truth: it was the last thing the
+              queue ACCEPTED, which in a burst is not the thing being said. */}
+          {speaking ? 'Speaking now' : 'Last announcement'}: {announcement}
         </span>
       )}
 

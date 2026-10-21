@@ -13,8 +13,9 @@
  *
  * WHAT A SENTENCE IS MADE OF
  *
- *   1. the table, first, because that is who gets the plate
- *   2. the dishes, each with its portion and add-ons
+ *   1. one greeting that names the new ticket and the table it is for
+ *   2. the dishes, each as how many, how much of it, and what it is -- then
+ *      any add-on that was asked for on top
  *   3. the guest's note, last and labelled
  *
  * Every word of it is Devanagari by the time it reaches the voice -- see
@@ -93,10 +94,37 @@ export const MAX_BACKLOG = 6;
  */
 export const MAX_PENDING = 20;
 
-export function createAnnounceQueue(speaker: Speaker): AnnounceQueue {
+/**
+ * What the board wants to know about the queue itself.
+ *
+ * The board draws two things: what is being said right now, and how much is
+ * still waiting. Both belong to the queue, not to the caller -- a caller that
+ * guessed "the thing I just pushed is what is playing" is wrong the moment two
+ * orders arrive together, and a counter that only ever goes up is a display
+ * that lies.
+ *
+ * Notified synchronously from inside push() when the queue was idle, which is
+ * what lets the first ticket start speaking without a render in between.
+ */
+export type QueueHooks = {
+  /** An announcement has left the queue and gone to the speaker. */
+  onBegin?: (key: string, text: string) => void;
+  /** Nothing is speaking and nothing is waiting. */
+  onIdle?: () => void;
+};
+
+export function createAnnounceQueue(speaker: Speaker, hooks: QueueHooks = {}): AnnounceQueue {
   const waiting: { key: string; text: string; priority: AnnouncePriority }[] = [];
   const said = new Set<string>();
   let busy = false;
+
+  function notifyIdle(): void {
+    try {
+      hooks.onIdle?.();
+    } catch {
+      /* a broken listener must not stall the queue */
+    }
+  }
 
   function drain(): void {
     if (busy) return;
@@ -107,6 +135,12 @@ export function createAnnounceQueue(speaker: Speaker): AnnounceQueue {
     busy = true;
     said.add(next.key);
 
+    try {
+      hooks.onBegin?.(next.key, next.text);
+    } catch {
+      /* same: the board's own bookkeeping never stops a ticket being read */
+    }
+
     const finish = () => {
       // Guard against a speaker that calls onEnd twice (an utterance can fire
       // both onend and onerror on some engines). Without this the queue would
@@ -114,6 +148,9 @@ export function createAnnounceQueue(speaker: Speaker): AnnounceQueue {
       if (!busy) return;
       busy = false;
       drain();
+      // drain() sets busy again when it found something, so this is only true
+      // when the announcement that just ended was the last one.
+      if (!busy && waiting.length === 0) notifyIdle();
     };
 
     try {
@@ -171,12 +208,17 @@ export function createAnnounceQueue(speaker: Speaker): AnnounceQueue {
 /* ========================================================================== */
 
 /**
- * Portion and add-on words, as a kitchen says them.
+ * Portion words, as a kitchen says them -- and they come BEFORE the dish.
  *
- * A variant is free text an owner typed, so anything unknown is spoken as it
- * is rather than guessed at.
+ * "एक आधा बटर चिकन" is how a person says it. "बटर चिकन, आधा" is how a list
+ * says it: the comma makes the portion sound like a second dish, and on a
+ * ticket with three dishes the cook has to remember which dish it belonged to.
+ * Put in front, it is attached to the dish by the only word order Hindi has.
+ *
+ * "पाव" is Bombay for a quarter and is what the kitchen actually calls it; the
+ * menu can say "Quarter".
  */
-const DETAIL: Record<string, string> = {
+const PORTION: Record<string, string> = {
   half: 'आधा',
   full: 'पूरा',
   quarter: 'पाव',
@@ -187,11 +229,29 @@ const DETAIL: Record<string, string> = {
   single: 'सिंगल',
   double: 'डबल',
   plate: 'प्लेट',
+};
+
+/**
+ * Add-on words, and they come AFTER the dish.
+ *
+ * "दो बटर नान, एक्स्ट्रा चीज़" -- an add-on is an instruction about the dish
+ * that was just named, so it trails it the way a request does.
+ */
+const ADDON: Record<string, string> = {
   extra: 'एक्स्ट्रा',
   'extra cheese': 'एक्स्ट्रा चीज़',
   'extra spicy': 'ज़्यादा तीखा',
   'less spicy': 'कम तीखा',
 };
+
+/**
+ * Everything the board knows how to say about a dish's detail line.
+ *
+ * A variant is free text an owner typed, so anything unknown is spoken as it
+ * is rather than guessed at -- that is what keeps a menu this module has never
+ * seen from being silently mispronounced or dropped.
+ */
+const DETAIL: Record<string, string> = { ...PORTION, ...ADDON };
 
 /**
  * A table label as an Indian voice says it.
@@ -277,36 +337,54 @@ export type SpeakableItem = {
  * A dish's detail parts, translated where they are a portion or a known
  * add-on, and left to the transliterator where they are anything else.
  */
-export function spokenDetail(detail: string | undefined): string {
-  const parts = (detail ?? '')
+function detailParts(detail: string | undefined): string[] {
+  return (detail ?? '')
     .replace(/\s*·\s*/g, ', ')
     .split(/\s*,\s*/)
     .map((part) => part.trim())
     .filter(Boolean);
+}
 
-  if (parts.length === 0) return '';
+/** One detail word in Devanagari: a known word if we have it, as written if not. */
+function spokenPart(part: string): string {
+  return DETAIL[part.toLowerCase()] ?? toDevanagari(part);
+}
 
-  return parts
-    .map((part) => {
-      const direct = DETAIL[part.toLowerCase()];
-      if (direct) return direct;
-      return toDevanagari(part);
-    })
+/** The whole detail line, in the order it was written. */
+export function spokenDetail(detail: string | undefined): string {
+  return detailParts(detail).map(spokenPart).join(', ');
+}
+
+/** The portions on a dish, said before its name: "आधा" from "Half · Extra cheese". */
+export function spokenPortion(detail: string | undefined): string {
+  return detailParts(detail)
+    .filter((part) => PORTION[part.toLowerCase()] !== undefined)
+    .map((part) => PORTION[part.toLowerCase()]!)
+    .join(' ');
+}
+
+/** The add-ons on a dish, said after its name: "एक्स्ट्रा चीज़". */
+export function spokenAddons(detail: string | undefined): string {
+  return detailParts(detail)
+    .filter((part) => PORTION[part.toLowerCase()] === undefined)
+    .map(spokenPart)
     .join(', ');
 }
 
 /**
- * One dish, as a clause: "दो बटर चिकन, आधा".
+ * One dish, as a clause: "एक आधा बटर चिकन, एक्स्ट्रा चीज़".
  *
- * The quantity is a word, the name is Devanagari, and the portion comes after
- * the dish -- the order a person says it in.
+ * The order is the order a person says it in -- how many, how much of it, what
+ * it is, and then anything extra asked for on top. Quantity and portion are
+ * words, the name is Devanagari, and only the add-ons trail the dish.
  */
 export function spokenItem(item: SpeakableItem): string {
   const name = spokenName(item.name.trim(), item.spoken);
-  const base = `${hindiNumber(item.qty)} ${name}`;
-  const detail = spokenDetail(item.detail);
+  const portion = spokenPortion(item.detail);
+  const addons = spokenAddons(item.detail);
 
-  return detail ? `${base}, ${detail}` : base;
+  const base = [hindiNumber(item.qty), portion, name].filter(Boolean).join(' ');
+  return addons ? `${base}, ${addons}` : base;
 }
 
 /**
@@ -337,10 +415,11 @@ function spokenTail(item: SpeakableItem): string {
 /**
  * What the pass says when an order arrives.
  *
- * Table first, because that is the half the kitchen acts on -- who to walk the
- * food to. Then the dishes with their portions. Then the guest's note, last
- * and labelled, because a note is a constraint ("प्याज़ नहीं") rather than
- * another dish and must not be mistaken for one.
+ * The table is named in the first heartbeat, because it is the half the
+ * kitchen acts on -- who to walk the food to. Then the dishes, portion first
+ * so it stays attached to the dish. Then the guest's note, last and labelled,
+ * because a note is a constraint ("प्याज़ नहीं") rather than another dish and
+ * must not be mistaken for one.
  *
  * Deliberately not the order code. A code is a reference for finding a bill
  * later; nobody carrying a plate needs to hear "MA-K3F9Q", and a kitchen asked

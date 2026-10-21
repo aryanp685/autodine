@@ -240,9 +240,9 @@ export type SpeechSegment = {
 };
 
 const PACE = {
-  greeting: { rate: 0.98, leadMs: 0, gapMs: 420 },
-  dish: { rate: 1, leadMs: 0, gapMs: 240 },
-  note: { rate: 0.94, leadMs: 380, gapMs: 0 },
+  greeting: { rate: 0.98, leadMs: 0, gapMs: 480 },
+  dish: { rate: 1, leadMs: 0, gapMs: 300 },
+  note: { rate: 0.94, leadMs: 520, gapMs: 0 },
 } as const;
 
 /** The sentence kinds planSpeech recognises, by how they open. */

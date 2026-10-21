@@ -10,8 +10,10 @@ import {
   orderAnnouncement,
   primeOnOpen,
   selectNewTickets,
+  spokenAddons,
   spokenDetail,
   spokenItem,
+  spokenPortion,
   spokenTable,
   type SpeakableItem,
 } from './announce';
@@ -56,12 +58,26 @@ describe('spokenTable', () => {
 });
 
 describe('spokenItem', () => {
-  it('says the quantity as a word, then the dish, then the portion', () => {
-    expect(spokenItem({ qty: 2, name: 'Butter Naan', detail: 'Half' })).toBe('दो बटर नान, आधा');
+  it('says how many, how much, and what -- in that order', () => {
+    // "दो आधा बटर नान" attaches the portion to the dish. "दो बटर नान, आधा"
+    // makes the portion sound like a second item on the ticket.
+    expect(spokenItem({ qty: 2, name: 'Butter Naan', detail: 'Half' })).toBe('दो आधा बटर नान');
   });
 
   it('says a Bombay quarter the way a kitchen says it', () => {
-    expect(spokenItem({ qty: 1, name: 'Veg Biryani', detail: 'Quarter' })).toBe('एक वेज बिरयानी, पाव');
+    expect(spokenItem({ qty: 1, name: 'Veg Biryani', detail: 'Quarter' })).toBe('एक पाव वेज बिरयानी');
+  });
+
+  it('puts an add-on after the dish, because it is an instruction about it', () => {
+    expect(spokenItem({ qty: 1, name: 'Butter Naan', detail: 'Extra cheese' })).toBe(
+      'एक बटर नान, एक्स्ट्रा चीज़',
+    );
+  });
+
+  it('keeps portion and add-on on their own sides of the dish name', () => {
+    expect(spokenItem({ qty: 2, name: 'Butter Naan', detail: 'Half · Extra cheese' })).toBe(
+      'दो आधा बटर नान, एक्स्ट्रा चीज़',
+    );
   });
 
   it('keeps add-ons, translated and in order', () => {
@@ -70,6 +86,15 @@ describe('spokenItem', () => {
 
   it('translates an add-on nobody has heard of instead of dropping it', () => {
     expect(isDevanagariOnly(spokenDetail('Peri Peri'))).toBe(true);
+  });
+
+  it('separates the portion from the add-ons, because they sit on opposite sides', () => {
+    expect(spokenPortion('Half · Extra cheese')).toBe('आधा');
+    expect(spokenAddons('Half · Extra cheese')).toBe('एक्स्ट्रा चीज़');
+    // An unknown word is not a portion, so it trails the dish rather than
+    // being pushed in front of its name.
+    expect(spokenPortion('Peri Peri')).toBe('');
+    expect(spokenAddons('Peri Peri')).not.toBe('');
   });
 
   it('says the owner\'s pronunciation instead of the generated one', () => {
@@ -87,7 +112,7 @@ describe('newOrderText', () => {
   it('says table first, dishes next, the guest note last', () => {
     const text = newOrderText('T1', [chicken], 'no onion');
 
-    expect(text).toBe('नया ऑर्डर, टेबल टी वन। एक बटर चिकन, आधा, बटर नान। ध्यान दें, प्याज़ नहीं।');
+    expect(text).toBe('नया ऑर्डर, टेबल टी वन। एक आधा बटर चिकन, बटर नान। ध्यान दें, प्याज़ नहीं।');
   });
 
   it('never hands a Latin letter to the voice', () => {
@@ -310,6 +335,93 @@ describe('announcement queue', () => {
     const { queue, heard } = recorder();
     expect(queue.push('a', '   ')).toBe(false);
     expect(heard).toEqual([]);
+  });
+});
+
+describe('what the board is told about the queue', () => {
+  /**
+   * The board used to set these itself from the push call, which is a guess:
+   * "the thing I just pushed is what is playing" is wrong the moment two
+   * orders arrive together, and the counter it drew never came back down.
+   */
+  it('names what is speaking, not what was queued last', () => {
+    const begins: string[] = [];
+    let release = () => {};
+
+    const queue = createAnnounceQueue(
+      {
+        speak(_text, onEnd) {
+          release = onEnd; // hold the speaker open
+        },
+      },
+      { onBegin: (_key, text) => begins.push(text) },
+    );
+
+    queue.push('o1', 'पहला।');
+    queue.push('o2', 'दूसरा।');
+    queue.push('o3', 'तीसरा।');
+
+    // Only the first has reached the speaker. The other two are still waiting,
+    // so the board must not claim they were announced.
+    expect(begins).toEqual(['पहला।']);
+    expect(queue.pending()).toBe(2);
+
+    release();
+    expect(begins).toEqual(['पहला।', 'दूसरा।']);
+    expect(queue.pending()).toBe(1);
+
+    release();
+    release(); // the last one, then idle
+    expect(begins).toEqual(['पहला।', 'दूसरा।', 'तीसरा।']);
+    expect(queue.pending()).toBe(0);
+  });
+
+  it('says when it has gone quiet, so a waiting counter can return to zero', () => {
+    const events: string[] = [];
+
+    createAnnounceQueue(
+      { speak(_text, onEnd) { onEnd(); } },
+      {
+        onBegin: (key) => events.push(`begin:${key}`),
+        onIdle: () => events.push('idle'),
+      },
+    ).push('o1', 'एक।');
+
+    expect(events).toEqual(['begin:o1', 'idle']);
+  });
+
+  it('goes idle only after the last announcement, never in the middle of a burst', () => {
+    const events: string[] = [];
+    const releases: (() => void)[] = [];
+
+    const queue = createAnnounceQueue(
+      { speak(_text, onEnd) { releases.push(onEnd); } },
+      { onBegin: (key) => events.push(`begin:${key}`), onIdle: () => events.push('idle') },
+    );
+
+    queue.push('o1', 'एक।');
+    queue.push('o2', 'दो।');
+    releases[0]();
+    expect(events).toEqual(['begin:o1', 'begin:o2']);
+    releases[1]();
+    expect(events).toEqual(['begin:o1', 'begin:o2', 'idle']);
+  });
+
+  it('is not stopped by a listener that throws', () => {
+    const queue = createAnnounceQueue(
+      { speak(_text, onEnd) { onEnd(); } },
+      {
+        onBegin() {
+          throw new Error('board bug');
+        },
+        onIdle() {
+          throw new Error('board bug');
+        },
+      },
+    );
+
+    expect(queue.push('o1', 'एक।')).toBe(true);
+    expect(queue.speaking()).toBe(false);
   });
 });
 

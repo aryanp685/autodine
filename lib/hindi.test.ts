@@ -71,6 +71,13 @@ describe('translating a menu into Devanagari', () => {
     expect(isDevanagariOnly(out)).toBe(true);
   });
 
+  it('says the pizza names the way an Indian kitchen says them', () => {
+    // The rules produce मैर्घेरिटा for this, which nobody can recognise.
+    expect(toDevanagari('Margherita Pizza')).toBe('मार्गेरिटा पिज़्ज़ा');
+    expect(toDevanagari('Pepperoni')).toBe('पेपरोनी');
+    expect(toDevanagari('Farmhouse Pizza')).toBe('फ़ार्महाउस पिज़्ज़ा');
+  });
+
   it('translates the guest note, which the guest typed in their own script', () => {
     expect(toDevanagari('no onion')).toBe('नो प्याज़');
     expect(isDevanagariOnly(toDevanagari('no onion, less spicy please'))).toBe(true);
