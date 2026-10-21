@@ -17,7 +17,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { RECOVERY_COOKIE, passwordProblem, passwordsMatch } from '@/lib/password';
-import { siteOrigin } from '@/lib/site-origin';
+import { requestOrigin } from '@/lib/site-origin';
 import { slugify, uniqueSlug } from '@/lib/slug';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
@@ -73,7 +73,7 @@ export async function signUpAction(formData: FormData): Promise<void> {
   // uses the project's Site URL, which is a single value: every confirmation
   // mail sent from a preview or a branch deployment pointed at whichever host
   // happened to be configured months earlier, and those deployments are gone.
-  const origin = await siteOrigin();
+  const origin = await requestOrigin();
 
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
@@ -203,7 +203,7 @@ export async function requestPasswordResetAction(formData: FormData): Promise<vo
     fail('/forgot-password', 'Password reset is not available yet: the database is not connected.');
   }
 
-  const origin = await siteOrigin();
+  const origin = await requestOrigin();
   if (!origin) {
     fail('/forgot-password', 'Password reset is not available from this address. Open the site on its usual domain and try again.');
   }
