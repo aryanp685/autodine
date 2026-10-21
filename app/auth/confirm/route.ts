@@ -67,7 +67,7 @@ const TYPES: readonly string[] = ['recovery', 'email', 'email_change', 'invite',
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
-  const isRecovery = params.get('flow') === 'recovery';
+  const isRecovery = params.get('flow') === 'recovery' || params.get('next') === '/reset-password';
   const next = safeNext(params.get('next'), isRecovery ? '/reset-password' : '/dashboard');
 
   const supabase = await createSupabaseServerClient();
