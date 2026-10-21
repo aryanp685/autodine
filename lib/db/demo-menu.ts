@@ -116,7 +116,9 @@ export function demoMenu(slug: string): RestaurantMenu {
     ),
   }));
 
-  return { restaurant, menu, categories, items };
+    // One menu, published, and named as a menu -- the tab bar hides itself when
+  // there is only one, so a single-menu venue never sees the word.
+  return { restaurant, menu, menus: [{ id: menu.id, name: menu.name }], categories, items };
 }
 
 /**

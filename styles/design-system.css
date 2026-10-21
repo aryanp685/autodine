@@ -196,6 +196,24 @@
 }
 .menu__verifiedDot { width: 7px; height: 7px; border-radius: 50%; background: #4b6b51; }
 
+/*
+ * Menu tabs. Deliberately quieter than the category rail below them: a menu is
+ * chosen once, a category is switched constantly, and two rows of equal weight
+ * would read as one confused list.
+ */
+.menu__menus {
+  display: flex; gap: 8px; padding: 14px 48px 0; flex-wrap: wrap;
+}
+.menu__menuLink {
+  padding: 7px 14px; border-radius: 999px; font-size: 13px; font-weight: 500;
+  letter-spacing: 0.01em; color: rgba(17, 19, 24, 0.62);
+  border: 1px solid rgba(17, 19, 24, 0.14); text-decoration: none;
+}
+.menu__menuLink.is-active {
+  color: var(--text); border-color: transparent;
+  background: rgba(17, 19, 24, 0.06); font-weight: 600;
+}
+
 .menu__cats { display: flex; gap: 30px; padding: 0 48px; border-bottom: 1px solid var(--border); }
 .menu__cat {
   background: none; border: 0; padding: 13px 0; font-size: 14.5px;
@@ -475,6 +493,24 @@
 [data-app] .pg__subbar { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 48px; border-bottom: 1px solid var(--border); }
 [data-app] .pg__subTabs { display: flex; gap: 26px; font-size: 14px; color: rgba(17, 19, 24, 0.6); }
 [data-app] .pg__subTabs .is-active { color: var(--text); font-weight: 600; box-shadow: inset 0 -2px 0 var(--text); padding: 14px 0; }
+/* Real menu tabs. A menu is a document the owner switches between, so each one
+   is a submit button carrying its id, and the current one gets the same
+   hairline underline the locked design already uses for an active tab. */
+[data-app] .pg__menuTabForm { display: inline-flex; align-items: center; gap: 4px; }
+[data-app] .pg__menuTab {
+  display: inline-flex; align-items: center; gap: 7px; background: none; border: 0;
+  padding: 14px 0; font: inherit; font-size: 14px; color: rgba(17, 19, 24, 0.6); cursor: pointer;
+}
+[data-app] .pg__menuTab.is-active { color: var(--text); font-weight: 600; box-shadow: inset 0 -2px 0 var(--text); }
+[data-app] .pg__menuTabDraft {
+  font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 700;
+  color: rgba(17, 19, 24, 0.45); border: 1px solid rgba(17, 19, 24, 0.18);
+  border-radius: 999px; padding: 1px 6px;
+}
+[data-app] .pg__menuNew {
+  width: 104px; font: inherit; font-size: 13px; padding: 4px 2px; background: none;
+  border: 0; border-bottom: 1px solid rgba(17, 19, 24, 0.2); color: var(--text);
+}
 [data-app] .pg__flow { display: flex; align-items: center; gap: 18px; font-size: 12.5px; color: rgba(17, 19, 24, 0.5); }
 [data-app] .pg__flowStep.is-current { color: var(--text); font-weight: 600; }
 [data-app] .pg__flowState { margin-left: 8px; background: #e8e2d8; color: #5a5142; padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700; }

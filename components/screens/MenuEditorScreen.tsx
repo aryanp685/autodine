@@ -11,6 +11,7 @@ import {
   addCategoryAction,
   addItemAction,
   addPresetCategoriesAction,
+  createMenuAction,
   addVariantAction,
   deleteAddonAction,
   deleteAddonGroupAction,
@@ -20,6 +21,7 @@ import {
   publishMenuAction,
   restoreItemAction,
   saveItemAction,
+  selectMenuAction,
   setAllAvailabilityAction,
 } from '@/app/dashboard/menus/actions';
 import { PRESET_CATEGORIES, normaliseCategoryName } from '@/lib/menu-presets';
@@ -155,9 +157,53 @@ export function MenuEditorScreen({
 
       <div className="pg__subbar">
         <div className="pg__subTabs">
-          <span className="is-active">Main menu</span>
-          <span> Breakfast</span>
-          <span> + New menu</span>
+          {/*
+            These used to be three decorative spans -- "Main menu", "Breakfast",
+            "+ New menu" -- none of which did anything. They were a picture of a
+            feature that did not exist, on the screen where an owner would go
+            looking for it. They are real now: a form per menu, and one to add
+            another.
+          */}
+          {data && !data.blocked ? (
+            <>
+              {data.menus.map((menu) => (
+                <form key={menu.id} action={selectMenuAction} className="pg__menuTabForm">
+                  <input type="hidden" name="menuId" value={menu.id} />
+                  <button
+                    type="submit"
+                    className={`pg__menuTab ${menu.id === data.menuId ? 'is-active' : ''}`}
+                    aria-current={menu.id === data.menuId ? 'true' : undefined}
+                    title={
+                      menu.published
+                        ? `${menu.name} — live`
+                        : `${menu.name} — draft, not visible to guests`
+                    }
+                  >
+                    {menu.name}
+                    {!menu.published && <span className="pg__menuTabDraft">Draft</span>}
+                  </button>
+                </form>
+              ))}
+              <form action={createMenuAction} className="pg__menuTabForm">
+                <input
+                  type="text"
+                  name="name"
+                  className="pg__menuNew"
+                  placeholder="New menu"
+                  aria-label="Name for a new menu"
+                  maxLength={40}
+                  required
+                />
+                <button type="submit" className="pg__menuTab" aria-label="Add this menu">
+                  +
+                </button>
+              </form>
+            </>
+          ) : (
+            // No database, so nothing can be created or switched. One plain
+            // label is the honest rendering of that.
+            <span className="is-active">Main menu</span>
+          )}
         </div>
         <div className="pg__flow">
           {FLOW.map((f, i) => (

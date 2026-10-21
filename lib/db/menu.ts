@@ -16,6 +16,7 @@
  */
 
 import { demoMenu } from './demo-menu';
+import { chooseMenu } from '@/lib/menu-select';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type {
   Category,
@@ -32,10 +33,18 @@ import type {
 export { usingDemoData } from './demo-menu';
 
 /**
- * Load a restaurant's published menu by slug.
+ * Load one published menu of a restaurant by slug.
+ *
+ * `menuId` picks which one; omitted (or unknown) means the restaurant's first
+ * published menu. See lib/menu-select.ts for the rule and why it is not "the
+ * newest".
+ *
  * Returns null when there is no such active restaurant or no published menu.
  */
-export async function getRestaurantMenu(slug: string): Promise<RestaurantMenu | null> {
+export async function getRestaurantMenu(
+  slug: string,
+  menuId?: string | null,
+): Promise<RestaurantMenu | null> {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return demoMenu(slug);
 
@@ -49,30 +58,54 @@ export async function getRestaurantMenu(slug: string): Promise<RestaurantMenu | 
   if (restaurantError) throw new Error(`Could not load restaurant: ${restaurantError.message}`);
   if (!restaurant) return null;
 
-  const { data: menu, error: menuError } = await supabase
+  // Every published menu, so the guest can switch, and the chosen one, so the
+  // dishes below are scoped to it. `created_at` is the tie-break: two menus
+  // with the same sort_order must not swap places between loads.
+  const { data: menuRows, error: menuError } = await supabase
     .from('menus')
     .select('*')
     .eq('restaurant_id', restaurant.id)
     .eq('is_published', true)
     .order('sort_order', { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    .order('created_at', { ascending: true });
 
-  if (menuError) throw new Error(`Could not load menu: ${menuError.message}`);
+  if (menuError) throw new Error(`Could not load menus: ${menuError.message}`);
+
+  const published = (menuRows ?? []) as Menu[];
+  const menu = chooseMenu(published, menuId);
   if (!menu) return null;
 
-  const [categoriesResult, itemsResult] = await Promise.all([
-    supabase.from('categories').select('*').eq('restaurant_id', restaurant.id).order('sort_order', { ascending: true }),
-    supabase
-      .from('items')
-      .select('*, item_variants(*)')
-      .eq('restaurant_id', restaurant.id)
-      .eq('is_available', true)
-      .order('sort_order', { ascending: true }),
-  ]);
+  // Categories belong to a menu. Loading them by restaurant instead is what
+  // merged Breakfast and Dinner into one list, with half the dishes failing at
+  // the last step because the ordering function had picked the other menu.
+  const { data: categoryRows, error: categoriesError } = await supabase
+    .from('categories')
+    .select('*')
+    .eq('restaurant_id', restaurant.id)
+    .eq('menu_id', menu.id)
+    .order('sort_order', { ascending: true });
 
-  if (categoriesResult.error) throw new Error(`Could not load categories: ${categoriesResult.error.message}`);
-  if (itemsResult.error) throw new Error(`Could not load items: ${itemsResult.error.message}`);
+  if (categoriesError) throw new Error(`Could not load categories: ${categoriesError.message}`);
+
+  const categories = (categoryRows ?? []) as Category[];
+  const categoryIds = categories.map((category) => category.id);
+
+  // A dish is reachable only through its category, and an item with no
+  // category belongs to no menu. Scoped by id rather than by restaurant for
+  // the same reason as the categories above.
+  const { data: itemRows, error: itemsError } = categoryIds.length
+    ? await supabase
+        .from('items')
+        .select('*, item_variants(*)')
+        .in('category_id', categoryIds)
+        .eq('is_available', true)
+        .order('sort_order', { ascending: true })
+    : { data: [], error: null };
+
+  if (itemsError) throw new Error(`Could not load items: ${itemsError.message}`);
+
+  const categoriesResult = { data: categories };
+  const itemsResult = { data: itemRows ?? [] };
 
   /**
    * Add-ons: two more reads, scoped by the item ids just loaded.
@@ -168,8 +201,9 @@ export async function getRestaurantMenu(slug: string): Promise<RestaurantMenu | 
 
   return {
     restaurant: restaurant as Restaurant,
-    menu: menu as Menu,
-    categories: (categoriesResult.data ?? []) as Category[],
+    menu,
+    menus: published.map((row) => ({ id: row.id, name: row.name })),
+    categories: categoriesResult.data as Category[],
     items,
   };
 }

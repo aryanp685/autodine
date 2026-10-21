@@ -26,6 +26,8 @@ vi.mock('@/app/dashboard/menus/actions', () => ({
   addItemAction: mocks.action('addItemAction'),
   addPresetCategoriesAction: mocks.action('addPresetCategoriesAction'),
   addVariantAction: mocks.action('addVariantAction'),
+  createMenuAction: mocks.action('createMenuAction'),
+  selectMenuAction: mocks.action('selectMenuAction'),
   deleteAddonAction: mocks.action('deleteAddonAction'),
   deleteAddonGroupAction: mocks.action('deleteAddonGroupAction'),
   deleteCategoryAction: mocks.action('deleteCategoryAction'),
@@ -44,7 +46,9 @@ function data(over: Partial<MenuEditorData> = {}): MenuEditorData {
   return {
     restaurantName: 'Maddi',
     menuId: 'm-1',
+    menuName: 'Main menu',
     published: false,
+    menus: [{ id: 'm-1', name: 'Main menu', published: false, categoryCount: 0 }],
     items: [],
     categories: [],
     ...over,
@@ -405,5 +409,45 @@ describe('MenuEditorScreen add-ons', () => {
     );
 
     expect(bare).toContain('No add-ons');
+  });
+});
+
+describe('MenuEditorScreen menu tabs', () => {
+  it('draws one real tab per menu, with the draft ones marked', () => {
+    const html = renderToStaticMarkup(
+      <MenuEditorScreen
+        data={data({
+          menus: [
+            { id: 'm-1', name: 'Breakfast', published: true, categoryCount: 2 },
+            { id: 'm-2', name: 'Dinner', published: false, categoryCount: 0 },
+          ],
+          menuId: 'm-2',
+          menuName: 'Dinner',
+        })}
+      />,
+    );
+
+    // The tab bar used to be three decorative spans that did nothing. If it
+    // ever goes back to being decoration these will not be submit buttons.
+    expect(html).toContain('Breakfast');
+    expect(html).toContain('Dinner');
+    expect(html).toContain('pg__menuTab');
+    expect(html).toContain('Draft');
+    // A real form carrying the id, so switching actually switches.
+    expect(html).toContain('name="menuId" value="m-1"');
+  });
+
+  it('offers a way to add a menu, and says where the new one goes', () => {
+    const html = renderToStaticMarkup(<MenuEditorScreen data={data()} />);
+    expect(html).toContain('New menu');
+    expect(html).toContain('aria-label="Add this menu"');
+  });
+
+  it('does not offer a menu control when there is no database to write to', () => {
+    // Demo mode: the form cannot save. A button that looks like it creates a
+    // menu and cannot is worse than no button.
+    const html = renderToStaticMarkup(<MenuEditorScreen />);
+    expect(html).toContain('Main menu');
+    expect(html).not.toContain('aria-label="Add this menu"');
   });
 });

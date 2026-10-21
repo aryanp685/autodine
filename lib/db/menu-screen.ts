@@ -22,11 +22,23 @@ import type { DisplayCategory, DisplayItem, DisplayRestaurant } from './adapt';
 
 export type MenuScreenData = {
   restaurant: DisplayRestaurant;
+  /** Every published menu, for the tab bar. One entry means no tab bar. */
+  menus: { id: string; name: string }[];
+  /** The menu these categories and items belong to. */
+  menuId: string;
+  menuName: string;
   categories: DisplayCategory[];
   items: DisplayItem[];
 };
 
-export async function getMenuScreenData(slug?: string): Promise<MenuScreenData | null> {
+/**
+ * `menuId` picks the menu. Omitted means the restaurant's first published one,
+ * which is what every existing link already gets.
+ */
+export async function getMenuScreenData(
+  slug?: string,
+  menuId?: string | null,
+): Promise<MenuScreenData | null> {
   if (!isSupabaseConfigured) return null;
 
   // No default restaurant. There used to be one -- a hard-coded demo slug --
@@ -36,7 +48,7 @@ export async function getMenuScreenData(slug?: string): Promise<MenuScreenData |
   if (!target) return null;
 
   try {
-    const data = await getRestaurantMenu(target);
+    const data = await getRestaurantMenu(target, menuId);
     return data ? toDisplayMenu(data) : null;
   } catch (error) {
     console.error(

@@ -160,11 +160,31 @@ describe('toDisplayMenu', () => {
     const out = toDisplayMenu({
       restaurant,
       menu: { id: 'm-1', restaurant_id: 'r-1', name: 'Main', is_published: true, sort_order: 0 },
+      menus: [{ id: 'm-1', name: 'Main' }],
       categories: [{ id: 'c-1', restaurant_id: 'r-1', menu_id: 'm-1', name: 'Starters', sort_order: 0 }],
       items: [item()],
     });
     expect(out.restaurant.name).toBe('Saffron & Smoke');
     expect(out.categories).toHaveLength(1);
     expect(out.items[0].price).toBe(349);
+  });
+
+  it('carries the menu tabs and which one is showing', () => {
+    const out = toDisplayMenu({
+      restaurant,
+      menu: { id: 'm-2', restaurant_id: 'r-1', name: 'Dinner', is_published: true, sort_order: 1 },
+      menus: [
+        { id: 'm-1', name: 'Breakfast' },
+        { id: 'm-2', name: 'Dinner' },
+      ],
+      categories: [{ id: 'c-9', restaurant_id: 'r-1', menu_id: 'm-2', name: 'Mains', sort_order: 0 }],
+      items: [{ ...item(), id: 'i-9', category_id: 'c-9' }],
+    });
+
+    // Both tabs reach the screen, and the one being shown is named, so the
+    // subtitle can say "Dinner" rather than guessing from the first tab.
+    expect(out.menus.map((menu) => menu.name)).toEqual(['Breakfast', 'Dinner']);
+    expect(out.menuId).toBe('m-2');
+    expect(out.menuName).toBe('Dinner');
   });
 });
