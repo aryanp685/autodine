@@ -214,7 +214,8 @@ describe('speaking', () => {
 
     fake.flush();
 
-    expect(fake.spoken.map((u) => u.text)).toEqual(['नया ऑर्डर, टेबल टी वन।', 'दो बटर नान।']);
+    // The danda is our separator, not a sound: it never reaches the engine.
+    expect(fake.spoken.map((u) => u.text)).toEqual(['नया ऑर्डर, टेबल टी वन', 'दो बटर नान']);
     expect(ended).toBe(1);
   });
 
@@ -308,7 +309,7 @@ describe('speaking', () => {
     fake.setWedge(false);
     engine.speak('दो बटर नान।', () => {});
     fake.flush();
-    expect(fake.spoken.at(-1)?.text).toBe('दो बटर नान।');
+    expect(fake.spoken.at(-1)?.text).toBe('दो बटर नान');
   });
 
   it('survives a synthesiser that throws on speak', () => {
@@ -362,5 +363,64 @@ describe('speaking', () => {
 
   it('takes a breath after the chime before speaking', () => {
     expect(LEAD_IN_MS).toBeGreaterThanOrEqual(200);
+  });
+});
+
+describe('voices the operator can choose between', () => {
+  it('lists only Hindi voices, because those are the only ones that can read the ticket', () => {
+    const fake = env({ voices: [...english, ...hindi] });
+    const engine = createKitchenSpeech(fake.env);
+
+    expect(engine.hindiVoices().map((v) => v.name)).toEqual(['Google हिन्दी', 'Lekha']);
+  });
+
+  it('speaks in the voice that was chosen, not the automatic one', () => {
+    const fake = env({ voices: [...english, ...hindi] });
+    const engine = createKitchenSpeech(fake.env);
+
+    expect(engine.setVoiceName('Google हिन्दी')).toBe(true);
+    engine.speak('नया ऑर्डर।', () => {});
+    fake.flush();
+
+    expect(fake.spoken[0].voice?.name).toBe('Google हिन्दी');
+  });
+
+  it('refuses a stored choice this device does not have, rather than lying', () => {
+    const fake = env({ voices: hindi });
+    const engine = createKitchenSpeech(fake.env);
+
+    expect(engine.setVoiceName('Microsoft Swara')).toBe(false);
+    expect(engine.available()).toBe(true);
+    expect(engine.setVoiceName(null)).toBe(true);
+  });
+
+  it('slows down when asked, and never past the point of being intelligible', () => {
+    const fake = env({ voices: hindi });
+    const engine = createKitchenSpeech(fake.env);
+
+    engine.setRateScale(0.85);
+    engine.speak('नया ऑर्डर।', () => {});
+    fake.flush();
+    const slow = fake.spoken[0].rate;
+
+    engine.setRateScale(1);
+    engine.speak('नया ऑर्डर।', () => {});
+    fake.flush();
+    const normal = fake.spoken[1].rate;
+
+    engine.setRateScale(99);
+    engine.speak('नया ऑर्डर।', () => {});
+    fake.flush();
+
+    expect(slow).toBeLessThan(normal);
+    expect(fake.spoken[2].rate).toBeLessThanOrEqual(1.5);
+  });
+
+  it('never hands the danda to the engine, which would clip it as a stutter', () => {
+    const fake = env({ voices: hindi });
+    createKitchenSpeech(fake.env).speak('नया ऑर्डर, टेबल टी वन। दो बटर नान।', () => {});
+    fake.flush();
+
+    for (const utterance of fake.spoken) expect(utterance.text).not.toContain('।');
   });
 });

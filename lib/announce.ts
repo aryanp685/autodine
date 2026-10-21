@@ -81,6 +81,18 @@ export type AnnounceQueue = {
  */
 export const MAX_BACKLOG = 6;
 
+/**
+ * A hard ceiling on everything waiting, orders included.
+ *
+ * Orders are never dropped for being low priority, but an unbounded queue is
+ * its own failure: a wedged engine plus a busy evening leaves an hour of
+ * tickets waiting to be read out one after another, long after the food went
+ * cold. At this depth the queue refuses, the board leaves those tickets
+ * unmarked, and they are announced when it drains -- or offered for replay,
+ * which is the honest outcome either way.
+ */
+export const MAX_PENDING = 20;
+
 export function createAnnounceQueue(speaker: Speaker): AnnounceQueue {
   const waiting: { key: string; text: string; priority: AnnouncePriority }[] = [];
   const said = new Set<string>();
@@ -133,6 +145,7 @@ export function createAnnounceQueue(speaker: Speaker): AnnounceQueue {
       waiting.splice(duplicate, 1);
     }
 
+    if (waiting.length >= MAX_PENDING) return false;
     if (priority === 'info' && waiting.length >= MAX_BACKLOG) return false;
 
     waiting.push({ key, text: body, priority });

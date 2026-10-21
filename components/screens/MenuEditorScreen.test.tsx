@@ -326,11 +326,11 @@ describe('spoken name', () => {
 
   it('names the words it had to guess, so they can be fixed', () => {
     const html = renderToStaticMarkup(
-      <MenuEditorScreen data={data({ items: [item('i-1', 'Quesadilla')] })} selectedId="i-1" />,
+      <MenuEditorScreen data={data({ items: [item('i-1', 'Shawarma')] })} selectedId="i-1" />,
     );
 
     expect(html).toContain('Guessed, not known');
-    expect(html).toContain('Quesadilla');
+    expect(html).toContain('Shawarma');
   });
 
   it('says nothing needs checking when every word is known', () => {

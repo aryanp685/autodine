@@ -139,13 +139,13 @@ const WORDS: Record<string, string> = {
   'rumali roti': 'रुमाली रोटी',
   'missi roti': 'मिस्सी रोटी',
   'tandoori roti': 'तंदूरी रोटी',
-  laccha: 'लच्छा', lachha: 'लच्छा', rumali: 'रुमाली', missi: 'मिस्सी',
-  bhindi: 'भिंडी', karela: 'करेला', lauki: 'लौकी', baingan: 'बैंगन',
-  haleem: 'हलीम', nihari: 'निहारी', paya: 'पाया', keema: 'कीमा', kheema: 'कीमा',
-  bhuna: 'भुना', tawa: 'तवा', sizzler: 'सिज़लर', malai: 'मलाई',
-  navratan: 'नवरतन', dum: 'दम', matka: 'मटका', sharing: 'शेयरिंग',
-  bajra: 'बाजरा', jowar: 'ज्वार', ragi: 'रागी',
-  subz: 'सब्ज़', bukhara: 'बुख़ारा', 'dal bukhara': 'दाल बुख़ारा', 'garlic naan': 'लहसुन नान',
+  'laccha': 'लच्छा', 'lachha': 'लच्छा', 'rumali': 'रुमाली', 'missi': 'मिस्सी',
+  'bhindi': 'भिंडी', 'karela': 'करेला', 'lauki': 'लौकी', 'baingan': 'बैंगन',
+  'haleem': 'हलीम', 'nihari': 'निहारी', 'paya': 'पाया', 'keema': 'कीमा', 'kheema': 'कीमा',
+  'bhuna': 'भुना', 'tawa': 'तवा', 'sizzler': 'सिज़लर', 'malai': 'मलाई',
+  'navratan': 'नवरतन', 'dum': 'दम', 'matka': 'मटका', 'sharing': 'शेयरिंग',
+  'bajra': 'बाजरा', 'jowar': 'ज्वार', 'ragi': 'रागी',
+  'subz': 'सब्ज़', 'bukhara': 'बुख़ारा', 'dal bukhara': 'दाल बुख़ारा', 'garlic naan': 'लहसुन नान',
   'chicken thali': 'चिकन थाली',
   'boondi raita': 'बूंदी रायता',
   'mint chutney': 'मिंट चटनी',
@@ -160,59 +160,73 @@ const WORDS: Record<string, string> = {
   'soft drink': 'कोल्ड ड्रिंक',
 
   // ---- dish words
-  chicken: 'चिकन', mutton: 'मटन', fish: 'फ़िश', prawn: 'प्रॉन', prawns: 'प्रॉन',
-  egg: 'एग', eggs: 'एग', paneer: 'पनीर', tofu: 'टोफ़ू', soya: 'सोया',
-  biryani: 'बिरयानी', pulao: 'पुलाव', rice: 'राइस', naan: 'नान', roti: 'रोटी',
-  paratha: 'पराठा', parotta: 'परोटा', kulcha: 'कुलचा', bhature: 'भटूरे', puri: 'पूरी',
-  dosa: 'डोसा', idli: 'इडली', vada: 'वड़ा', sambar: 'सांबार', uttapam: 'उत्तपम',
-  upma: 'उपमा', poha: 'पोहा', samosa: 'समोसा', pakora: 'पकोड़ा', kebab: 'कबाब',
-  seekh: 'सीख', tikka: 'टिक्का', tandoori: 'तंदूरी', curry: 'करी', masala: 'मसाला',
-  makhani: 'मखनी', kadai: 'कड़ाही', handi: 'हांडी', kolhapuri: 'कोल्हापुरी',
-  manchurian: 'मंचूरियन', schezwan: 'शेज़वान', hakka: 'हक्का', noodles: 'नूडल्स',
-  chowmein: 'चाउमीन', chow: 'चाउ', mein: 'मीन', momos: 'मोमोज़', momo: 'मोमो',
-  burger: 'बर्गर', pizza: 'पिज़्ज़ा', pasta: 'पास्ता', sandwich: 'सैंडविच',
-  fries: 'फ़्राइज़', soup: 'सूप', salad: 'सलाद', papad: 'पापड़', raita: 'रायता',
-  pickle: 'अचार', achar: 'अचार', thali: 'थाली', combo: 'कॉम्बो', platter: 'प्लेटर',
-  dal: 'दाल', daal: 'दाल', sabzi: 'सब्ज़ी', subzi: 'सब्ज़ी', bhaji: 'भाजी',
-  aloo: 'आलू', potato: 'आलू', gobi: 'गोबी', matar: 'मटर', chana: 'चना',
-  rajma: 'राजमा', chole: 'छोले', cholay: 'छोले', kadhi: 'कढ़ी', korma: 'कोरमा',
-  kofta: 'कोफ़्ता', tikkaa: 'टिक्का', chaap: 'चाप', chaat: 'चाट', kachori: 'कचौरी',
-  dhokla: 'ढोकला', thepla: 'थेपला', khichdi: 'खिचड़ी', maggi: 'मैगी',
-  cheese: 'चीज़', corn: 'कॉर्न', mushroom: 'मशरूम', spinach: 'पालक', palak: 'पालक',
-  onion: 'प्याज़', tomato: 'टमाटर', garlic: 'लहसुन', ginger: 'अदरक',
-  coriander: 'धनिया', coconut: 'नारियल', cashew: 'काजू', almond: 'बादाम',
-  saffron: 'केसर', cardamom: 'इलायची', sugar: 'शुगर', salt: 'नमक',
-  bread: 'ब्रेड', toast: 'टोस्ट', butter: 'बटर', ghee: 'घी', curd: 'दही',
-  'ice cream': 'आइस क्रीम', cream: 'क्रीम', dessert: 'डेज़र्ट', sweet: 'स्वीट',
-  lassi: 'लस्सी', chai: 'चाय', tea: 'चाय', coffee: 'कॉफ़ी', water: 'वाटर',
-  coke: 'कोक', pepsi: 'पेप्सी', sprite: 'स्प्राइट', lemonade: 'लेमनाड',
-  lemon: 'लेमन', lime: 'लाइम', soda: 'सोडा', juice: 'जूस', shake: 'शेक',
-  thums: 'थम्स', up: 'अप', beer: 'बियर',
-  mojito: 'मोजितो', brownie: 'ब्राउनी', cake: 'केक',
-  pancake: 'पैनकेक', waffle: 'वफ़ल', nachos: 'नाचोज़', taco: 'टाको',
-  salsa: 'साल्सा', dip: 'डिप', sauce: 'सॉस', ketchup: 'केचप', mayo: 'मेयो',
+  'chicken': 'चिकन', 'mutton': 'मटन', 'fish': 'फ़िश', 'prawn': 'प्रॉन', 'prawns': 'प्रॉन',
+  'egg': 'एग', 'eggs': 'एग', 'paneer': 'पनीर', 'tofu': 'टोफ़ू', 'soya': 'सोया',
+  'biryani': 'बिरयानी', 'pulao': 'पुलाव', 'rice': 'राइस', 'naan': 'नान', 'roti': 'रोटी',
+  'paratha': 'पराठा', 'parotta': 'परोटा', 'kulcha': 'कुलचा', 'bhature': 'भटूरे', 'puri': 'पूरी',
+  'dosa': 'डोसा', 'idli': 'इडली', 'vada': 'वड़ा', 'sambar': 'सांबार', 'uttapam': 'उत्तपम',
+  'upma': 'उपमा', 'poha': 'पोहा', 'samosa': 'समोसा', 'pakora': 'पकोड़ा', 'kebab': 'कबाब',
+  'seekh': 'सीख', 'tikka': 'टिक्का', 'tandoori': 'तंदूरी', 'curry': 'करी', 'masala': 'मसाला',
+  'makhani': 'मखनी', 'kadai': 'कड़ाही', 'handi': 'हांडी', 'kolhapuri': 'कोल्हापुरी',
+  'manchurian': 'मंचूरियन', 'schezwan': 'शेज़वान', 'hakka': 'हक्का', 'noodles': 'नूडल्स',
+  'chowmein': 'चाउमीन', 'chow': 'चाउ', 'mein': 'मीन', 'momos': 'मोमोज़', 'momo': 'मोमो',
+  'burger': 'बर्गर', 'pizza': 'पिज़्ज़ा', 'pasta': 'पास्ता', 'sandwich': 'सैंडविच',
+  'fries': 'फ़्राइज़', 'soup': 'सूप', 'salad': 'सलाद', 'papad': 'पापड़', 'raita': 'रायता',
+  'pickle': 'अचार', 'achar': 'अचार', 'thali': 'थाली', 'combo': 'कॉम्बो', 'platter': 'प्लेटर',
+  'dal': 'दाल', 'daal': 'दाल', 'sabzi': 'सब्ज़ी', 'subzi': 'सब्ज़ी', 'bhaji': 'भाजी',
+  'aloo': 'आलू', 'potato': 'आलू', 'gobi': 'गोबी', 'matar': 'मटर', 'chana': 'चना',
+  'rajma': 'राजमा', 'chole': 'छोले', 'cholay': 'छोले', 'kadhi': 'कढ़ी', 'korma': 'कोरमा',
+  'kofta': 'कोफ़्ता', 'tikkaa': 'टिक्का', 'chaap': 'चाप', 'chaat': 'चाट', 'kachori': 'कचौरी',
+  'dhokla': 'ढोकला', 'thepla': 'थेपला', 'khichdi': 'खिचड़ी', 'maggi': 'मैगी',
+  'cheese': 'चीज़', 'corn': 'कॉर्न', 'mushroom': 'मशरूम', 'spinach': 'पालक', 'palak': 'पालक',
+  'onion': 'प्याज़', 'tomato': 'टमाटर', 'garlic': 'लहसुन', 'ginger': 'अदरक',
+  'coriander': 'धनिया', 'coconut': 'नारियल', 'cashew': 'काजू', 'almond': 'बादाम',
+  'saffron': 'केसर', 'cardamom': 'इलायची', 'sugar': 'शुगर', 'salt': 'नमक',
+  'bread': 'ब्रेड', 'toast': 'टोस्ट', 'butter': 'बटर', 'ghee': 'घी', 'curd': 'दही',
+  'ice cream': 'आइस क्रीम', 'cream': 'क्रीम', 'dessert': 'डेज़र्ट', 'sweet': 'स्वीट',
+  'lassi': 'लस्सी', 'chai': 'चाय', 'tea': 'चाय', 'coffee': 'कॉफ़ी', 'water': 'वाटर',
+  'coke': 'कोक', 'pepsi': 'पेप्सी', 'sprite': 'स्प्राइट', 'lemonade': 'लेमनाड',
+  'lemon': 'लेमन', 'lime': 'लाइम', 'soda': 'सोडा', 'juice': 'जूस', 'shake': 'शेक',
+  'thums': 'थम्स', 'up': 'अप', 'beer': 'बियर',
+  'mojito': 'मोजितो', 'brownie': 'ब्राउनी', 'cake': 'केक',
+  'pancake': 'पैनकेक', 'waffle': 'वफ़ल', 'nachos': 'नाचोज़', 'taco': 'टाको',
+  'salsa': 'साल्सा', 'dip': 'डिप', 'sauce': 'सॉस', 'ketchup': 'केचप', 'mayo': 'मेयो',
   'fried rice': 'फ़्राइड राइस', 'peri peri fries': 'पेरी पेरी फ़्राइज़',
-  'chicken lollipop': 'चिकन लोलीपॉप', lollipop: 'लोलीपॉप',
-  cappuccino: 'कैपुचीनो', espresso: 'एस्प्रेसो', latte: 'लाते',
-  mozzarella: 'मोज़रेला', 'maple syrup': 'मेपल सिरप',
+  'chicken lollipop': 'चिकन लोलीपॉप', 'lollipop': 'लोलीपॉप',
+  'cappuccino': 'कैपुचीनो', 'espresso': 'एस्प्रेसो', 'latte': 'लाते',
+  'mozzarella': 'मोज़रेला', 'maple syrup': 'मेपल सिरप',
 
   // ---- how a dish is ordered
-  half: 'आधा', full: 'पूरा', quarter: 'पाव', regular: 'रेगुलर', small: 'छोटा',
-  medium: 'मीडियम', large: 'बड़ा', single: 'सिंगल', double: 'डबल', plate: 'प्लेट',
-  bowl: 'बाउल', cup: 'कप', glass: 'ग्लास', bottle: 'बोतल', piece: 'पीस',
-  pieces: 'पीस', extra: 'एक्स्ट्रा', plain: 'प्लेन', special: 'स्पेशल',
-  fresh: 'फ़्रेश', hot: 'गरम', cold: 'ठंडा', spicy: 'तीखा', mild: 'माइल्ड',
-  salty: 'नमकीन', dry: 'ड्राई', gravy: 'ग्रेवी',
+  'half': 'आधा', 'full': 'पूरा', 'quarter': 'पाव', 'regular': 'रेगुलर', 'small': 'छोटा',
+  'medium': 'मीडियम', 'large': 'बड़ा', 'single': 'सिंगल', 'double': 'डबल', 'plate': 'प्लेट',
+  'bowl': 'बाउल', 'cup': 'कप', 'glass': 'ग्लास', 'bottle': 'बोतल', 'piece': 'पीस',
+  'pieces': 'पीस', 'extra': 'एक्स्ट्रा', 'plain': 'प्लेन', 'special': 'स्पेशल',
+  'fresh': 'फ़्रेश', 'hot': 'गरम', 'cold': 'ठंडा', 'spicy': 'तीखा', 'mild': 'माइल्ड',
+  'salty': 'नमकीन', 'dry': 'ड्राई', 'gravy': 'ग्रेवी',
 
   // ---- the guest's note
-  no: 'नो', without: 'विदाउट', less: 'कम', more: 'ज़्यादा', please: 'प्लीज़',
-  allergy: 'एलर्जी', allergic: 'एलर्जिक', jain: 'जैन', vegan: 'वीगन', fasting: 'व्रत',
+  'no': 'नो', 'without': 'विदाउट', 'less': 'कम', 'more': 'ज़्यादा', 'please': 'प्लीज़',
+  'allergy': 'एलर्जी', 'allergic': 'एलर्जिक', 'jain': 'जैन', 'vegan': 'वीगन', 'fasting': 'व्रत',
 
   // ---- the board's own words
-  order: 'ऑर्डर', table: 'टेबल', takeaway: 'टेकअवे', counter: 'काउंटर',
-  cancelled: 'कैंसल', canceled: 'कैंसल', pending: 'पेंडिंग', waited: 'इंतज़ार',
-  waiting: 'इंतज़ार', returned: 'वापस', refunded: 'रिफ़ंड', paid: 'पेड',
-  guest: 'गेस्ट', note: 'नोट', item: 'आइटम', items: 'आइटम',
+  'order': 'ऑर्डर', 'table': 'टेबल', 'takeaway': 'टेकअवे', 'counter': 'काउंटर',
+  'cancelled': 'कैंसल', 'canceled': 'कैंसल', 'pending': 'पेंडिंग', 'waited': 'इंतज़ार',
+  'waiting': 'इंतज़ार', 'returned': 'वापस', 'refunded': 'रिफ़ंड', 'paid': 'पेड',
+  'guest': 'गेस्ट', 'note': 'नोट', 'item': 'आइटम', 'items': 'आइटम',
+
+  // ---- English a menu actually uses (rules would guess; these are known)
+  'normal': 'नॉर्मल', 'total': 'टोटल', 'model': 'मॉडल',
+  'local': 'लोकल', 'signal': 'सिग्नल', 'menu': 'मेन्यू',
+  'chocolate': 'चॉकलेट', 'pudding': 'पुडिंग', 'family': 'फ़ैमिली',
+  'pack': 'पैक', 'jumbo': 'जंबो', 'mini': 'मिनी',
+  'kids': 'किड्स', 'meal': 'मील', 'premium': 'प्रीमियम',
+  'classic': 'क्लासिक', 'grilled': 'ग्रिल्ड', 'crispy': 'क्रिस्पी',
+  'crunchy': 'क्रंची', 'creamy': 'क्रीमी', 'tangy': 'टैंगी',
+  'loaded': 'लोडेड', 'signature': 'सिग्नेचर', 'quesadilla': 'क़ेसाडिया',
+  'tiramisu': 'टिरामिसू',
+  'sizzling': 'सिज़लिंग', 'serving': 'सर्विंग', 'canned': 'कैन्ड',
+  'sundae': 'संडे', 'smoothie': 'स्मूदी',
+  'muffin': 'मफ़िन', 'donut': 'डोनट', 'cookie': 'कुकी',
 };
 
 /** Sorted longest-first, so a phrase wins over the words inside it. */
@@ -225,20 +239,31 @@ const PHRASES: readonly string[] = Object.keys(WORDS).sort((a, b) => b.length - 
 /**
  * A Latin word as Devanagari, by rule.
  *
- * The dictionary above handles Indian menu vocabulary. What is left is mostly
- * imported food -- brownie, mojito, cappuccino -- so these rules follow how
- * those words are SAID, not how English orthography maps them, using the
- * handful of rules that actually change the sound:
+ * The dictionary above covers the vocabulary a kitchen actually uses. What is
+ * left is mostly English -- "normal", "small", "family pack", "brownie" -- and
+ * this is where "readable" and "right" part company.
  *
- *   a silent final e        "coke"      -> कोक
- *   magic e                 "maple"     -> मेपल
- *   c/g before e, i, y      "cappuccino"-> कैपुचीनो
- *   ow, ou                  "brownie"   -> ब्राउनी
+ * The failure that made this rewrite necessary: "normal" came out as नोरमाल,
+ * which a Hindi voice reads as "normaal". Every vowel was written long because
+ * the rules did not know the word was English. So the rules now follow the
+ * handful of things English spelling actually does:
  *
- * It will not be perfect, and it does not need to be: a word transliterated
- * slightly wrong is still spoken in a voice the kitchen can place, while a
- * word left in Latin script may not be spoken at all. Anything that matters
- * for a real menu belongs in the dictionary, which is a one-line addition.
+ *   English short o      "normal"    -> नॉर्मल      (नोरमाल is "normaal")
+ *   unstressed final a   "total"     -> टोटल       (टोटाल is "totaal")
+ *   closed short a       "cap"       -> कैप
+ *   consonant + le       "bottle"    -> बोटल       (बोट्ल stumbles)
+ *   silent final e       "coke"      -> कोक
+ *   magic e              "cake"      -> केक
+ *   c/g before e, i, y   "cappuccino"-> कैपुचीनो
+ *   doubled consonants   "butter"    -> बटर        (बट्टर over-stresses)
+ *
+ * It is still a rule, and a rule is still a guess. Anything an owner cares
+ * about belongs in the dictionary -- or in the "spoken name" field, which wins
+ * over all of this. The menu editor names the words that were guessed.
+ *
+ * These rules apply ONLY to words the dictionary does not know: a Hindi word
+ * typed in Latin is far more likely to be listed than to survive rules meant
+ * for English.
  */
 export function transliterate(word: string): string {
   const source = word.toLowerCase().replace(/[^a-z]/g, '');
@@ -246,8 +271,8 @@ export function transliterate(word: string): string {
 
   const SOFT = new Set(['e', 'i', 'y']);
   const at = (index: number) => source[index] ?? '';
+  const isVowel = (letter: string) => letter !== '' && 'aeiou'.includes(letter);
 
-  /** Consonant clusters that are said as one sound. */
   const groups: [string, string][] = [
     ['tion', 'शन'], ['sion', 'शन'], ['igh', 'ाइ'],
     ['chh', 'छ'], ['tch', 'च'], ['sch', 'श'], ['sh', 'श'], ['ch', 'च'],
@@ -258,7 +283,7 @@ export function transliterate(word: string): string {
     ['kk', 'क'], ['ff', 'फ़'], ['ss', 'स'], ['zz', 'ज़'],
   ];
 
-  const vowels: [string, { matra: string; solo: string }][] = [
+  const digraphs: [string, { matra: string; solo: string }][] = [
     ['aa', { matra: 'ा', solo: 'आ' }],
     ['ee', { matra: 'ी', solo: 'ई' }],
     ['ea', { matra: 'ी', solo: 'ई' }],
@@ -275,14 +300,6 @@ export function transliterate(word: string): string {
     ['ei', { matra: 'े', solo: 'ए' }],
   ];
 
-  const singles: Record<string, { matra: string; solo: string }> = {
-    a: { matra: 'ा', solo: 'अ' },
-    e: { matra: 'े', solo: 'ए' },
-    i: { matra: 'ि', solo: 'इ' },
-    o: { matra: 'ो', solo: 'ओ' },
-    u: { matra: 'ु', solo: 'उ' },
-  };
-
   const consonant = (index: number): [string, number] => {
     const letter = source[index];
     const next = at(index + 1);
@@ -296,11 +313,69 @@ export function transliterate(word: string): string {
     if (letter === 'x') return ['क्स', 1];
 
     const table: Record<string, string> = {
-      b: 'ब', d: 'द', f: 'फ़', h: 'ह', j: 'ज', k: 'क', l: 'ल', m: 'म',
+      b: 'ब', d: 'ड', f: 'फ़', h: 'ह', j: 'ज', k: 'क', l: 'ल', m: 'म',
       n: 'न', p: 'प', q: 'क़', r: 'र', t: 'ट', v: 'व', w: 'व', y: 'य', z: 'ज़',
     };
 
     return [table[letter] ?? '', 1];
+  };
+
+  /**
+   * A single vowel, as English says it in this position.
+   *
+   * Three distinctions do all the work, and each one was a mispronunciation
+   * before it existed:
+   *
+   *   an English short O        -> ॉ   "normal" is नॉर्मल, not नोरमाल
+   *   a short A in the first syllable -> ै   "cap" is कैप, not काप
+   *   an unstressed final a     -> nothing at all   "total" is टोटल
+   */
+  const single = (index: number): { matra: string; solo: string } | null => {
+    const letter = source[index];
+    const next = at(index + 1);
+    const afterNext = at(index + 2);
+    const firstVowel = !/[aeiou]/.test(source.slice(0, index));
+    const ending = index + 1 === source.length;
+
+    // A word-final i or u is long: "peri" is पेरी, "menu" मेनू.
+    if (ending && letter === 'i') return { matra: 'ी', solo: 'ई' };
+    if (ending && letter === 'u') return { matra: 'ू', solo: 'ऊ' };
+
+    // An 'a' before a final consonant, in a word that already had a vowel: an
+    // unstressed schwa. "total" is टोटल, not टोटाल. In a one-syllable word
+    // the same letters are the vowel itself ("cap" is कैप), which is why the
+    // earlier vowel decides.
+    if (letter === 'a' && !firstVowel && next !== '' && !isVowel(next) && afterNext === '') {
+      return { matra: '', solo: 'अ' };
+    }
+
+    if (letter === 'o') {
+      // "or" is ॉ in Hindi transliteration -- normal, form, short, fork. It is
+      // also the single most common way an English o fooled these rules.
+      if (next === 'r' && afterNext !== '' && !isVowel(afterNext)) {
+        return { matra: 'ॉ', solo: 'ऑ' };
+      }
+      // A three-letter word with a closed o: cot, dog, box.
+      if (source.length <= 3 && next !== '' && !isVowel(next)) {
+        return { matra: 'ॉ', solo: 'ऑ' };
+      }
+      return { matra: 'ो', solo: 'ओ' };
+    }
+
+    if (letter === 'a') {
+      // The first a of a word, followed by a consonant that is not itself
+      // followed by a vowel: the English short a -- cap, pack, snack.
+      if (firstVowel && next !== '' && !isVowel(next) && !isVowel(afterNext)) {
+        return { matra: 'ै', solo: 'ऐ' };
+      }
+      return { matra: 'ा', solo: 'आ' };
+    }
+
+    if (letter === 'e') return { matra: 'े', solo: 'ए' };
+    if (letter === 'i') return { matra: 'ि', solo: 'इ' };
+    if (letter === 'u') return { matra: 'ु', solo: 'उ' };
+
+    return null;
   };
 
   let out = '';
@@ -308,14 +383,24 @@ export function transliterate(word: string): string {
   let i = 0;
 
   while (i < source.length) {
-      const group = groups.find(([letters]) => source.startsWith(letters, i));
+    const group = groups.find(([letters]) => source.startsWith(letters, i));
     if (group) {
-      // Two consonants with no vowel between them are a cluster, and a cluster
-      // in Devanagari is written with a halant: "brownie" is ब्राउनी, not
-      // बराउनी (which reads "barauni").
+      // Two consonants with no vowel between them are a cluster, written with
+      // a halant: "brownie" is ब्राउनी, not बराउनी (which reads "barauni").
       out += afterConsonant ? `्${group[1]}` : group[1];
       afterConsonant = true;
       i += group[0].length;
+      continue;
+    }
+
+    // Consonant + "le" at the end: bottle, apple, simple. The l carries an
+    // unwritten vowel and the e is silent, so the l stands alone. Without
+    // this the schwa-less path writes बोट्ल, which a voice stumbles over --
+    // the exact stutter this file exists to avoid.
+    if (at(i) === 'l' && at(i + 1) === 'e' && i + 2 === source.length) {
+      out += 'ल';
+      afterConsonant = false;
+      i = source.length;
       continue;
     }
 
@@ -335,59 +420,39 @@ export function transliterate(word: string): string {
       continue;
     }
 
-    // A two-letter vowel first: "ie" in brownie is one sound, and must not be
-    // mistaken for the i of a magic-e word.
-    const vowel = vowels.find(([letters]) => source.startsWith(letters, i));
-    if (vowel) {
-      const [, letters] = vowel;
+    const digraph = digraphs.find(([letters]) => source.startsWith(letters, i));
+    if (digraph) {
+      const [, letters] = digraph;
       out += afterConsonant ? letters.matra : letters.solo;
       afterConsonant = false;
-      i += vowel[0].length;
+      i += digraph[0].length;
       continue;
     }
 
-    // Magic e: a single vowel, one consonant, then a silent final e. The
-    // vowel is long and the e disappears -- "coke" is कोक, "cake" केक. The
-    // consonant between them still has to be written, which is the part that
-    // a naive rule loses ("coke" -> को).
+    // Magic e: a single vowel, one consonant, then a silent final e. The vowel
+    // is long and the e disappears -- "coke" is कोक, "cake" केक. The consonant
+    // between them still has to be written.
     const long: Record<string, string> = { a: 'े', i: 'ाइ', o: 'ो', u: '्यू', e: 'ी' };
-    const longSolo: Record<string, string> = { a: 'ए', i: 'आइ', o: 'ओ', u: 'यू', e: 'ई' };
     const longForm = long[source[i]];
-    if (
-      longForm &&
-      at(i + 2) === 'e' &&
-      i + 3 === source.length &&
-      !vowels.some(([l]) => l.length > 1 && source.startsWith(l, i))
-    ) {
-      out += afterConsonant ? longForm : (longSolo[source[i]] ?? longForm);
-      const [magicConsonant] = consonant(i + 1);
-      out += magicConsonant;
+    if (longForm && at(i + 2) === 'e' && i + 3 === source.length) {
+      out += afterConsonant ? longForm : (longSoloOf(source[i]) ?? longForm);
+      out += consonant(i + 1)[0];
       afterConsonant = false;
       i = source.length;
       continue;
     }
 
-    const single = singles[source[i]];
-    if (single) {
-      // A final 'e' is silent: "coke" is handled above, this is "rare" etc.
-      if (source[i] === 'e' && i + 1 === source.length && out !== '') {
-        i += 1;
-        continue;
-      }
-      // A word-final i or u is long: "peri" is पेरी, "menu" मेनू.
-      if (i + 1 === source.length && source[i] === 'i' && afterConsonant) {
-        out += 'ी';
+    const vowel = single(i);
+    if (vowel) {
+      if (vowel.matra === '') {
+        // The consonant before this schwa keeps the previous vowel's sign; the
+        // consonant AFTER it must not take a halant, because this unwritten
+        // vowel belongs to it. Getting that backwards is what wrote नॉर्म्ल.
         afterConsonant = false;
         i += 1;
         continue;
       }
-      if (i + 1 === source.length && source[i] === 'u' && afterConsonant) {
-        out += 'ू';
-        afterConsonant = false;
-        i += 1;
-        continue;
-      }
-      out += afterConsonant ? single.matra : single.solo;
+      out += afterConsonant ? vowel.matra : vowel.solo;
       afterConsonant = false;
       i += 1;
       continue;
@@ -400,6 +465,12 @@ export function transliterate(word: string): string {
   }
 
   return out || word;
+}
+
+/** The standalone letter for a magic-e vowel. */
+function longSoloOf(letter: string): string | null {
+  const table: Record<string, string> = { a: 'ए', i: 'आइ', o: 'ओ', u: 'यू', e: 'ई' };
+  return table[letter] ?? null;
 }
 
 /**
