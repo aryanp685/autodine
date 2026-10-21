@@ -43,6 +43,12 @@ export type EditorItem = {
   available: boolean;
   sortOrder: number;
   /**
+   * The owner's own pronunciation, or '' when the board should say the name.
+   * Loaded with the item because the editor previews it the moment a row is
+   * selected.
+   */
+  spokenName: string;
+  /**
    * The portions this dish is sold in. Empty for most dishes.
    *
    * Loaded with the item rather than on demand, because the editor shows them
@@ -117,7 +123,9 @@ export async function getMenuEditorData(): Promise<MenuEditorData | null> {
       .order('sort_order', { ascending: true }),
     supabase
       .from('items')
-      .select('id, category_id, name, description, price_paise, is_veg, is_available, sort_order')
+      .select(
+        'id, category_id, name, description, price_paise, is_veg, is_available, sort_order, spoken_name'
+      )
       .eq('restaurant_id', restaurantId)
       .order('sort_order', { ascending: true }),
   ]);
@@ -198,6 +206,7 @@ export async function getMenuEditorData(): Promise<MenuEditorData | null> {
       veg: Boolean(row.is_veg),
       available: Boolean(row.is_available),
       sortOrder: Number(row.sort_order ?? 0),
+      spokenName: ((row.spoken_name as string | null) ?? '').trim(),
       variants: variantsByItem.get(row.id as string) ?? [],
     })),
   };

@@ -43,6 +43,14 @@ export type Item = {
   is_available: boolean;
   image_url: string | null;
   sort_order: number;
+  /**
+   * How the kitchen board should SAY this dish, when the automatic
+   * transliteration is wrong. Null means "say the name" -- see lib/hindi.ts.
+   *
+   * Optional because it is not selected everywhere an item is read, and a
+   * customer-facing menu has no use for it.
+   */
+  spoken_name?: string | null;
 };
 
 export type ItemVariant = {

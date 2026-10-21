@@ -58,6 +58,7 @@ const item = (id: string, name: string, over: ItemOverride = {}): EditorItem => 
   available: true,
   sortOrder: 0,
   categoryId: 'c-1',
+  spokenName: '',
   variants: [],
   ...over,
 });
@@ -296,5 +297,47 @@ describe('portions', () => {
     const html = render(null);
     expect(html).toContain('Add portion');
     expect(html).toContain('disabled');
+  });
+});
+
+describe('spoken name', () => {
+  it('shows the exact Devanagari the kitchen board will say', () => {
+    const html = renderToStaticMarkup(
+      <MenuEditorScreen data={data({ items: [item('i-1', 'Butter Chicken')] })} selectedId="i-1" />,
+    );
+
+    expect(html).toContain('Spoken name');
+    // The preview is the sentence the voice gets, not a promise about it.
+    expect(html).toContain('बटर चिकन');
+  });
+
+  it('uses the saved pronunciation when the restaurant has set one', () => {
+    const html = renderToStaticMarkup(
+      <MenuEditorScreen
+        data={data({
+          items: [item('i-1', 'Bhaji', { spokenName: 'भज्जी' })],
+        })}
+        selectedId="i-1"
+      />,
+    );
+
+    expect(html).toContain('भज्जी');
+  });
+
+  it('names the words it had to guess, so they can be fixed', () => {
+    const html = renderToStaticMarkup(
+      <MenuEditorScreen data={data({ items: [item('i-1', 'Quesadilla')] })} selectedId="i-1" />,
+    );
+
+    expect(html).toContain('Guessed, not known');
+    expect(html).toContain('Quesadilla');
+  });
+
+  it('says nothing needs checking when every word is known', () => {
+    const html = renderToStaticMarkup(
+      <MenuEditorScreen data={data({ items: [item('i-1', 'Paneer Tikka')] })} selectedId="i-1" />,
+    );
+
+    expect(html).toContain('Every word is known');
   });
 });

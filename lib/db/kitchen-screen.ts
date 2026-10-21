@@ -57,7 +57,14 @@ export type KitchenTicket = {
   payment: 'paid' | 'pending' | 'failed';
   state: KitchenPrepState;
   note?: string;
-  items: { qty: number; name: string; detail?: string; veg: boolean }[];
+  items: {
+    qty: number;
+    name: string;
+    detail?: string;
+    veg: boolean;
+    /** The owner's written pronunciation, when there is one. */
+    spoken?: string | null;
+  }[];
   /** Rupees, for display. Derived from total_paise. */
   total: number;
 };
@@ -168,7 +175,7 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
     supabase
       .from('order_items')
       .select(
-        'order_id, qty, name_snapshot, variant_snapshot, addons_snapshot, is_veg, sort_order'
+        'order_id, item_id, qty, name_snapshot, variant_snapshot, addons_snapshot, is_veg, sort_order'
       )
       .in('order_id', orderIds)
       .order('sort_order', { ascending: true }),
@@ -182,6 +189,32 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
   }
   if (tablesResult.error) {
     throw new Error(`Could not load tables: ${tablesResult.error.message}`);
+  }
+
+  /**
+   * How each dish should be said.
+   *
+   * Read from the live item, not from the order snapshot: a pronunciation is
+   * a property of the dish, and correcting it should fix every ticket from the
+   * moment it is saved. A dish deleted since the order was placed simply has
+   * no entry, and the board falls back to the automated transliteration.
+   */
+  const itemIds = [
+    ...new Set((itemsResult.data ?? []).map((item) => item.item_id).filter(Boolean)),
+  ] as string[];
+
+  const { data: spokenRows, error: spokenError } = itemIds.length
+    ? await supabase.from('items').select('id, spoken_name').in('id', itemIds)
+    : { data: [] as { id: string; spoken_name: string | null }[], error: null };
+
+  if (spokenError) {
+    // Not fatal: the board still announces, using the generated pronunciation.
+    console.error(`[kitchen] could not load spoken names: ${spokenError.message}`);
+  }
+
+  const spokenById = new Map<string, string>();
+  for (const row of spokenRows ?? []) {
+    if (row.spoken_name && row.spoken_name.trim()) spokenById.set(row.id, row.spoken_name.trim());
   }
 
   const itemsByOrder = new Map<string, typeof itemsResult.data>();
@@ -205,6 +238,7 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
           .filter((part): part is string => Boolean(part && part.trim()))
           .join(' · ') || undefined,
       veg: item.is_veg,
+      spoken: (item.item_id && spokenById.get(item.item_id)) || undefined,
     }));
 
     return {

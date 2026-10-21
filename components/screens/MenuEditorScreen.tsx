@@ -19,6 +19,7 @@ import {
   setAllAvailabilityAction,
 } from '@/app/dashboard/menus/actions';
 import { PRESET_CATEGORIES, normaliseCategoryName } from '@/lib/menu-presets';
+import { PronunciationField } from '@/components/PronunciationField';
 
 const FLOW = ['Draft', 'Review', 'Approve', 'Publish'];
 
@@ -90,6 +91,13 @@ export function MenuEditorScreen({
   const existingByName = new Map(
     liveCategories.map((c) => [normaliseCategoryName(c.name), c] as const)
   );
+
+  /**
+   * The saved pronunciation for the selected dish, whichever source the row
+   * came from. Demo rows carry none, which is also the honest answer: nothing
+   * has been set for them.
+   */
+  const selectedSpoken = (selected as { spokenName?: string }).spokenName ?? '';
 
   const selectedPrice = blocked
     ? 0
@@ -509,6 +517,11 @@ export function MenuEditorScreen({
                 <span className="ui-label">Item name</span>
                 <input className="ui-input" name="name" defaultValue={selected.name} />
               </label>
+
+              {/* The board reads this name out loud. Latin script is turned
+                  into Devanagari automatically; this is where a name the
+                  rules get wrong is corrected. */}
+              <PronunciationField name={selected.name} spoken={selectedSpoken} disabled={!live} />
               <label className="ui-field">
                 <span className="ui-label">Description</span>
                 <textarea className="ui-input" name="description" rows={3} defaultValue={selectedDesc} />
