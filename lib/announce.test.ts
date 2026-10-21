@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   advanceText,
+  chooseLanguage,
   createAnnounceQueue,
   MAX_BACKLOG,
   MAX_SPOKEN_ITEMS,
@@ -9,6 +10,7 @@ import {
   orderAnnouncement,
   primeOnOpen,
   selectNewTickets,
+  spokenTable,
   summariseItems,
   type Speaker,
 } from './announce';
@@ -286,7 +288,7 @@ describe('summariseItems', () => {
 
 describe('numberWord', () => {
   it('spells the counts a menu actually uses', () => {
-    expect([1, 2, 3, 10, 20].map(numberWord)).toEqual([
+    expect([1, 2, 3, 10, 20].map((n) => numberWord(n))).toEqual([
       'one',
       'two',
       'three',
@@ -407,5 +409,179 @@ describe('selectNewTickets', () => {
 
   it('ignores rows with no id', () => {
     expect(selectNewTickets([{ table: 'T1', items: [] }], [])).toEqual([]);
+  });
+});
+
+
+/* ========================================================================== */
+/*  Hindi                                                                     */
+/* ========================================================================== */
+
+describe('Hindi announcements', () => {
+  it('speaks the frame in Hindi and leaves the dish name as the menu writes it', () => {
+    // An Indian kitchen says it exactly like this: the grammar is Hindi, the
+    // dish is whatever the menu calls it. Translating "Butter Chicken" would
+    // be inventing a name the pass does not recognise.
+    const text = newOrderText('T1', [{ qty: 2, name: 'Butter Chicken', detail: 'Half' }], null, 'hi');
+
+    expect(text).toBe('नया ऑर्डर, टेबल टी वन। दो Butter Chicken, आधा।');
+  });
+
+  it('reads the table label in Devanagari so any Hindi voice can say it', () => {
+    // Devanagari synthesisers disagree about Latin letters: some read them,
+    // some spell them out, some skip them. Mapping every character removes
+    // the question.
+    expect(spokenTable('T1', 'hi')).toBe('टी वन');
+    // "T twelve", not "T one two" and not the Hindi numeral.
+    expect(spokenTable('T12', 'hi')).toBe('टी ट्वेल्व');
+    // A hotel's room number is said digit by digit: "Room two oh four".
+    expect(spokenTable('Room 204', 'hi')).toBe('आर ओ ओ एम टू ज़ीरो फ़ोर');
+  });
+
+  it('keeps Latin labels untouched in English', () => {
+    expect(spokenTable('T12', 'en')).toBe('T12');
+  });
+
+  it('calls a counter order a takeaway', () => {
+    expect(spokenTable('Takeaway', 'hi')).toBe('टेकअवे');
+    expect(newOrderText('Takeaway', [{ qty: 1, name: 'koko' }], null, 'hi')).toBe(
+      'नया टेकअवे ऑर्डर। एक koko।',
+    );
+  });
+
+  it('translates the portions a menu actually has', () => {
+    const half = newOrderText('T2', [{ qty: 1, name: 'Biryani', detail: 'Half' }], null, 'hi');
+    const full = newOrderText('T2', [{ qty: 1, name: 'Biryani', detail: 'Full' }], null, 'hi');
+    const pav = newOrderText('T2', [{ qty: 1, name: 'Biryani', detail: 'Quarter' }], null, 'hi');
+
+    expect(half).toContain('आधा');
+    expect(full).toContain('पूरा');
+    // Bombay menus call a quarter "paav"; the Hindi word for a quarter plate
+    // in a restaurant is not "चौथाई".
+    expect(pav).toContain('पाव');
+  });
+
+  it('passes an unknown portion through rather than guessing', () => {
+    const text = newOrderText('T2', [{ qty: 1, name: 'Thali', detail: 'Jumbo' }], null, 'hi');
+    expect(text).toContain('Jumbo');
+  });
+
+  it('reads the guest note in Hindi, last and marked', () => {
+    const text = newOrderText('T3', [{ qty: 1, name: 'koko' }], 'no onion', 'hi');
+    expect(text).toBe('नया ऑर्डर, टेबल टी थ्री। एक koko। नोट: no onion।');
+  });
+
+  it('counts a long order instead of reading it all out', () => {
+    const items = Array.from({ length: 7 }, (_, i) => ({ qty: 1, name: `dish${i}` }));
+    const text = newOrderText('T1', items, null, 'hi');
+
+    expect(text).toContain('dish3');
+    expect(text).not.toContain('dish4');
+    expect(text).toContain('और तीन आइटम');
+  });
+
+  it('uses the Devanagari danda, which is what a Hindi voice pauses on', () => {
+    const text = newOrderText('T1', [{ qty: 1, name: 'koko' }], null, 'hi');
+    expect(text).toContain('।');
+    expect(text).not.toContain('.');
+  });
+
+  it('never mentions the order code', () => {
+    const text = newOrderText('T1', [{ qty: 1, name: 'koko' }], null, 'hi');
+    expect(text).not.toMatch(/MA-/);
+  });
+});
+
+describe('advanceText for a takeaway ticket', () => {
+  it('does not invent a table called "takeaway"', () => {
+    // "Table takeaway, now preparing" is not clumsy, it is wrong: a cook
+    // listening for a table number hears one that does not exist.
+    expect(advanceText('Takeaway', 'preparing')).toBe('The takeaway order is being prepared.');
+    expect(advanceText('Takeaway', 'ready', 'hi')).toBe('टेकअवे ऑर्डर तैयार है।');
+  });
+
+  it('speaks the table in Hindi for a table ticket', () => {
+    expect(advanceText('T2', 'ready', 'hi')).toBe('टेबल टी टू तैयार है।');
+  });
+});
+
+describe('chooseLanguage', () => {
+  it('uses Hindi when the device has a Hindi voice', () => {
+    expect(chooseLanguage('hi', true)).toEqual({ lang: 'hi', fellBack: false });
+  });
+
+  it('falls back to English rather than reading Devanagari at an English voice', () => {
+    // An English synthesiser given Devanagari produces silence or noise, and
+    // reports success while doing it. Falling back is the only honest option,
+    // and the board says so on screen.
+    expect(chooseLanguage('hi', false)).toEqual({ lang: 'en', fellBack: true });
+  });
+
+  it('leaves an explicit English choice alone', () => {
+    expect(chooseLanguage('en', false)).toEqual({ lang: 'en', fellBack: false });
+    expect(chooseLanguage('en', true)).toEqual({ lang: 'en', fellBack: false });
+  });
+});
+
+describe('force', () => {
+  it('replays an announcement that is still waiting in the queue', () => {
+    // The Replay button used to do nothing when pressed while the original
+    // was still queued: push() refused it as a duplicate.
+    const ctl = controllable();
+    const queue = createAnnounceQueue(ctl.speaker);
+
+    queue.push('o1', 'first');
+    queue.push('o1', 'first'); // refused, as a poll would be
+
+    expect(queue.force('o1', 'first again')).toBe(true);
+
+    ctl.finish();
+    ctl.finish();
+
+    expect(ctl.spoken).toEqual(['first', 'first again']);
+  });
+
+  it('replays something already said', () => {
+    const { speaker, spoken } = immediate();
+    const queue = createAnnounceQueue(speaker);
+
+    queue.push('o1', 'once');
+    expect(queue.force('o1', 'twice')).toBe(true);
+
+    expect(spoken).toEqual(['once', 'twice']);
+  });
+});
+
+describe('language travels with the announcement', () => {
+  it('hands the speaker the language the sentence was written in', () => {
+    // A board lets someone switch language with tickets still waiting. If the
+    // speaker looked up "the current language" at speak time, a queued Hindi
+    // sentence would be read by an English voice -- which is silence.
+    const heard: Array<string | undefined> = [];
+    const queue = createAnnounceQueue({
+      speak(_text, onEnd, lang) {
+        heard.push(lang);
+        onEnd();
+      },
+    });
+
+    queue.push('o1', 'नया ऑर्डर।', 'order', 'hi');
+    queue.push('o2', 'New order.', 'order', 'en');
+    queue.force('o3', 'again', 'order', 'hi');
+
+    expect(heard).toEqual(['hi', 'en', 'hi']);
+  });
+
+  it('leaves the language undefined when the caller never set one', () => {
+    const heard: Array<string | undefined> = [];
+    const queue = createAnnounceQueue({
+      speak(_text, onEnd, lang) {
+        heard.push(lang);
+        onEnd();
+      },
+    });
+
+    queue.push('o1', 'anything');
+    expect(heard).toEqual([undefined]);
   });
 });
