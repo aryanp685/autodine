@@ -14,7 +14,7 @@ import Link from 'next/link';
  * One list, one place. Adding a destination here adds it everywhere.
  */
 
-export type DashboardSection = 'overview' | 'menus' | 'tables' | 'orders' | 'reports';
+export type DashboardSection = 'overview' | 'menus' | 'tables' | 'orders' | 'reports' | 'settings';
 
 export const DASHBOARD_LINKS: ReadonlyArray<{ key: DashboardSection; label: string; href: string }> = [
   { key: 'overview', label: 'Overview', href: '/dashboard' },
@@ -22,6 +22,7 @@ export const DASHBOARD_LINKS: ReadonlyArray<{ key: DashboardSection; label: stri
   { key: 'tables', label: 'Tables & QR', href: '/dashboard/tables' },
   { key: 'orders', label: 'Orders', href: '/dashboard/orders' },
   { key: 'reports', label: 'Reports', href: '/dashboard/reports' },
+  { key: 'settings', label: 'Settings', href: '/dashboard/settings' },
 ];
 
 export function DashboardBar({ active }: { active: DashboardSection }) {
