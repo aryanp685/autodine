@@ -1,12 +1,4 @@
-/**
- * Demo menu, built from lib/demo-data.ts, plus the SQL that seeds it.
- *
- * Kept separate from menu.ts on purpose: this module imports nothing from
- * Next.js or Supabase, so `npm run seed:sql` can run it in plain Node.
- *
- * This is SAMPLE DATA for the pilot — a fictional "Saffron & Smoke". It is not
- * a real restaurant and must not be left in place for a live customer.
- */
+/** Sample menu data and seed SQL. This module is independent of Next.js and Supabase clients. */
 
 import { categories as demoCategories, items as demoItems, restaurant as demoRestaurant } from '@/lib/demo-data';
 import { rupeesToPaise } from '@/lib/money';
@@ -73,8 +65,9 @@ export function demoMenu(slug: string): RestaurantMenu {
     phone: demoRestaurant.phone,
     gstin: demoRestaurant.gstin,
     timezone: 'Asia/Kolkata',
-    tax_rate_bps: 500,
+    tax_rate_bps: 0,
     is_active: true,
+    trial_started_at: '1970-01-01T00:00:00Z',
     created_at: '1970-01-01T00:00:00Z',
   };
 
@@ -120,22 +113,20 @@ export function demoMenu(slug: string): RestaurantMenu {
 }
 
 /**
- * Seed SQL for the demo restaurant, so the pilot has something to serve.
- * Run this in the Supabase SQL editor AFTER migration 0001.
- * Printed by `npm run seed:sql`.
+ * Generate sample seed SQL for a local development database.
+ * Run only after all database migrations. Printed by `npm run seed:sql`.
  */
 export function demoSeedSql(slug: string): string {
   const rs = demoMenu(slug);
   const esc = (v: string | null) => (v === null ? 'null' : `'${v.replace(/'/g, "''")}'`);
 
   const lines: string[] = [];
-  lines.push('-- Demo seed for the pilot. Idempotent: safe to run more than once.');
-  lines.push('-- SAMPLE DATA for a fictional restaurant. Replace before going live.');
+  lines.push('-- Fictional sample data for local development only. Safe to rerun.');
   lines.push('');
   lines.push('insert into public.restaurants (id, slug, name, tagline, address, phone, gstin, timezone, tax_rate_bps)');
   lines.push(
     `values ('${DEMO_RESTAURANT_ID}', ${esc(slug)}, ${esc(rs.restaurant.name)}, ${esc(rs.restaurant.tagline)}, ` +
-      `${esc(rs.restaurant.address)}, ${esc(rs.restaurant.phone)}, ${esc(rs.restaurant.gstin)}, 'Asia/Kolkata', 500)`,
+      `${esc(rs.restaurant.address)}, ${esc(rs.restaurant.phone)}, ${esc(rs.restaurant.gstin)}, 'Asia/Kolkata', 0)`,
   );
   lines.push('on conflict (id) do update set name = excluded.name;');
 
@@ -179,26 +170,18 @@ export function demoSeedSql(slug: string): string {
   }
 
   lines.push('');
-  lines.push('-- Twelve tables, and a starting QR token for each.');
+  lines.push('-- Twelve tables and a stable printed QR for each. Scanning starts a guest session.');
   lines.push('insert into public.dining_tables (restaurant_id, label, seats)');
   lines.push(`select '${DEMO_RESTAURANT_ID}', 'T' || n, 4 from generate_series(1, 12) n on conflict do nothing;`);
   lines.push('');
-  lines.push('-- Tokens expire in 7 days and carry no meaning beyond that. Rotate them from');
-  lines.push('-- the dashboard; a printed QR on its own proves nothing about who scanned it.');
-  // Guarded, not `on conflict do nothing`: the token is a fresh random value
-  // every run, so there is never a conflict to catch -- an unguarded insert
-  // adds twelve more tokens each time the seed is re-run. Only issue a token
-  // to a table that has no unexpired one.
-  lines.push('insert into public.qr_tokens (restaurant_id, table_id, token, expires_at)');
-  lines.push(
-    `select '${DEMO_RESTAURANT_ID}', t.id, encode(gen_random_bytes(12), 'hex'), ` +
-      `now() + interval '7 days'`,
-  );
+  // Only create one fresh public handle per table on repeated seed runs.
+  lines.push('insert into public.table_qr_codes (restaurant_id, table_id, public_token)');
+  lines.push(`select '${DEMO_RESTAURANT_ID}', t.id, encode(gen_random_bytes(24), 'hex')`);
   lines.push('from public.dining_tables t');
-  lines.push(`where t.restaurant_id = '${DEMO_RESTAURANT_ID}'`);
+  lines.push(`where t.restaurant_id = '${DEMO_RESTAURANT_ID}' and t.is_active`);
   lines.push('  and not exists (');
-  lines.push('    select 1 from public.qr_tokens q');
-  lines.push('    where q.table_id = t.id and q.expires_at > now()');
+  lines.push('    select 1 from public.table_qr_codes q');
+  lines.push('    where q.table_id = t.id and q.revoked_at is null');
   lines.push('  );');
 
   return lines.join('\n') + '\n';

@@ -1,6 +1,18 @@
 import Link from 'next/link';
 import { tables, restaurant } from '@/lib/demo-data';
 import { QrChip } from '@/components/ui';
+import { WorkspaceSwitcher } from '@/components/WorkspaceSwitcher';
+import { PreviewAction } from '@/components/ui/PreviewAction';
+import { LiveTableQrManager } from '@/components/screens/LiveTableQrManager';
+import type { AuthorizedWorkspace } from '@/lib/db/workspace-selection';
+
+type LiveTable = {
+  id: string;
+  label: string;
+  seats: number;
+  is_active: boolean;
+  qrCodes: Array<{ id: string; public_token: string; revoked_at: string | null }>;
+};
 
 const STATUS_TONE: Record<string, string> = {
   active: 'is-active',
@@ -9,113 +21,132 @@ const STATUS_TONE: Record<string, string> = {
   disabled: 'is-disabled',
 };
 
-/** Shared page structure; styled by the locked design system. */
-export function TablesScreen() {
+/** Shared page structure; demo routes and live workspace data are explicit. */
+export function TablesScreen({
+  workspace,
+  workspaces,
+  liveTables,
+  canManageTables = false,
+  canWriteTables = false,
+}: {
+  workspace?: AuthorizedWorkspace;
+  workspaces?: AuthorizedWorkspace[];
+  liveTables?: LiveTable[];
+  canManageTables?: boolean;
+  canWriteTables?: boolean;
+} = {}) {
+  const workspaceQuery = workspace ? `?workspace=${encodeURIComponent(workspace.slug)}` : '';
+  const isLive = liveTables !== undefined;
+
   return (
     <div className="pg pg--dash">
       <div className="pg__bar">
         <Link href="/" className="pg__brand">AutoDine</Link>
         <div className="pg__barLinks">
-          <Link href="/dashboard">Overview</Link>
-          <Link href="/dashboard/menus">Menus</Link>
-          <Link href="/dashboard/tables" className="is-active">
-            Tables &amp; QR
-          </Link>
+          <Link href={`/dashboard${workspaceQuery}`}>Overview</Link>
+          <Link href={`/dashboard/menus${workspaceQuery}`}>Menus</Link>
+          <Link href={`/dashboard/tables${workspaceQuery}`} className="is-active">Tables &amp; QR</Link>
+          <Link href={`/dashboard/settings${workspaceQuery}`}>Settings</Link>
           <span>Orders</span>
           <span>Reports</span>
         </div>
         <div className="pg__barRight">
-          <span className="pg__avatar">AP</span>
+          {workspace && workspaces ? (
+            <WorkspaceSwitcher workspaces={workspaces} selectedSlug={workspace.slug} pathname="/dashboard/tables" />
+          ) : (
+            <span className="pg__avatar">AP</span>
+          )}
         </div>
+      </div>
+
+      <div className="pg__demoBanner">
+        {isLive ? (
+          <><strong>Live workspace data.</strong> Table records and QR codes are loaded from Supabase. In a connected test workspace, guest checkout can place unpaid counter orders; online payments are not connected and the hosted flow still needs end-to-end verification.</>
+        ) : (
+          <><strong>Demo — not saved.</strong> {workspace
+            ? `Workspace access verified for ${workspace.name}; table cards below are fictional.`
+            : 'Table cards and QR images below are illustrative; controls do not change database records.'}</>
+        )}
       </div>
 
       <div className="pg__body">
         <header className="pg__head pg__head--row">
           <div>
             <div className="pg__kicker">Tables &amp; QR</div>
-            <h1 className="pg__title">12 tables · {restaurant.name}</h1>
+            <h1 className="pg__title">{isLive ? `${liveTables.length} tables · ${workspace?.name ?? ''}` : workspace ? `Demo table preview · ${workspace.name}` : `12 demo tables · ${restaurant.name}`}</h1>
           </div>
-          <div className="pg__headActions">
-            <span className="pg__btn">Print QR sheet</span>
-            <span className="pg__btn pg__btn--solid">Add table</span>
-          </div>
+          {!isLive && (
+            <div className="pg__headActions">
+              <PreviewAction className="pg__btn" message="Print the sample QR sheet from the browser dialog." print>Print QR sheet</PreviewAction>
+              <PreviewAction className="pg__btn pg__btn--solid" message="Tables are demo-only; no table was created.">Add table</PreviewAction>
+            </div>
+          )}
         </header>
 
-        <div className="pg__note pg__note--info">
-          <strong>How on-site verification works:</strong> each table&apos;s QR resolves to that restaurant and
-          table, then the server checks a short-lived on-site code, expiry, revocation and ordering rules before
-          a menu is shown. A static QR alone cannot prove a guest is in the room, and GPS is unreliable indoors
-          — this reduces remote ordering abuse substantially, but no method prevents it absolutely. The exact
-          code lifetime and recovery flow will be designed and shown to you before implementation.
-        </div>
+        {isLive ? (
+          <LiveTableQrManager
+            key={`${workspace?.slug}:${liveTables.length}`}
+            slug={workspace?.slug ?? ''}
+            initialTables={liveTables}
+            canManage={canManageTables}
+            canWrite={canWriteTables}
+          />
+        ) : (
+          <>
+            <div className="pg__note pg__note--info">
+              <strong>Preview only:</strong> table cards and QR images below are fictional; no table records or QR tokens are changed.
+            </div>
 
-        <section className="pg__tables">
-          {tables.map((t) => (
-            <article key={t.code} className={`pg__tableCard ${STATUS_TONE[t.qr]}`}>
-              <div className="pg__tableTop">
-                <div className="pg__tableCode">{t.code}</div>
-                <span className={`pg__qrState is-${t.qr}`}>{t.qr}</span>
-              </div>
-              <div className="pg__tableMeta">
-                {t.label} · {t.seats} seats
-              </div>
-              <div className="pg__tableQr">
-                <QrChip value={`${restaurant.name}-${t.code}`} size={72} />
-              </div>
-              <div className="pg__tableStats">
-                <div>
-                  <span>Last scan</span>
-                  <strong>{t.lastScan}</strong>
-                </div>
-                <div>
-                  <span>Orders today</span>
-                  <strong className="tnum">{t.orders}</strong>
-                </div>
-              </div>
-              <div className="pg__tableBtns">
-                <span className="pg__miniBtn">Preview</span>
-                <span className="pg__miniBtn">Regenerate</span>
-                <span className="pg__miniBtn">{t.qr === 'disabled' ? 'Enable' : 'Disable'}</span>
-                <span className="pg__miniBtn pg__miniBtn--danger">Revoke</span>
-              </div>
-            </article>
-          ))}
-        </section>
-
-        <section className="pg__printRow">
-          <div className="pg__printSheet">
-            <div className="pg__printHead">Print sheet — 6 per A4 page</div>
-            <div className="pg__printGrid">
-              {tables.slice(0, 6).map((t) => (
-                <div key={t.code} className="pg__printCard">
-                  <QrChip value={`print-${t.code}`} size={64} />
-                  <div className="pg__printCode">{t.code}</div>
-                  <div className="pg__printName">{restaurant.name}</div>
-                  <div className="pg__printHint">Scan to view menu &amp; order</div>
-                </div>
+            <section className="pg__tables">
+              {tables.map((t) => (
+                <article key={t.code} className={`pg__tableCard ${STATUS_TONE[t.qr]}`}>
+                  <div className="pg__tableTop">
+                    <div className="pg__tableCode">{t.code}</div>
+                    <span className={`pg__qrState is-${t.qr}`}>{t.qr}</span>
+                  </div>
+                  <div className="pg__tableMeta">{t.label} · {t.seats} seats</div>
+                  <div className="pg__tableQr"><QrChip value={`${restaurant.name}-${t.code}`} size={72} /></div>
+                  <div className="pg__tableStats">
+                    <div><span>Last scan</span><strong>{t.lastScan}</strong></div>
+                    <div><span>Orders today</span><strong className="tnum">{t.orders}</strong></div>
+                  </div>
+                  <div className="pg__tableBtns">
+                    <PreviewAction className="pg__miniBtn" message={`${t.code} is a fictional demo QR; no live code was opened.`}>Preview</PreviewAction>
+                    <PreviewAction className="pg__miniBtn" message="QR regeneration is not connected; no token changed.">Regenerate</PreviewAction>
+                    <PreviewAction className="pg__miniBtn" message="Table availability is preview-only and was not changed.">{t.qr === 'disabled' ? 'Enable' : 'Disable'}</PreviewAction>
+                    <PreviewAction className="pg__miniBtn pg__miniBtn--danger" message="This demo action did not revoke any live table token.">Revoke</PreviewAction>
+                  </div>
+                </article>
               ))}
-            </div>
-          </div>
+            </section>
 
-          <aside className="pg__printAside">
-            <h3 className="pg__h3">Rotating codes</h3>
-            <p className="pg__p">
-              On top of the printed table code, the ordering session carries a short-lived on-site code that the
-              server validates. Proposed behaviour, pending your approval:
-            </p>
-            <ul className="pg__bullets">
-              <li>Code lifetime measured in minutes, refreshed while the guest is on the page.</li>
-              <li>Expired or revoked codes show a clear message with a recovery path — never a silent bypass.</li>
-              <li>Regenerating a table code invalidates the previous one immediately.</li>
-              <li>Ordering can be disabled per table without touching the menu.</li>
-              <li>No signing keys or admin tokens appear in the QR URL.</li>
-            </ul>
-            <div className="pg__note pg__note--warn">
-              Honest limitation: a guest in the restaurant could still photograph a live code and share it. This
-              design narrows that window; it does not eliminate it.
-            </div>
-          </aside>
-        </section>
+            <section className="pg__printRow">
+              <div className="pg__printSheet">
+                <div className="pg__printHead">QR print preview · demo only · not scannable</div>
+                <div className="pg__printGrid">
+                  {tables.slice(0, 6).map((t) => (
+                    <div key={t.code} className="pg__printCard">
+                      <QrChip value={`print-${t.code}`} size={64} />
+                      <div className="pg__printCode">{t.code}</div>
+                      <div className="pg__printName">{restaurant.name}</div>
+                      <div className="pg__printHint">Scan to view menu &amp; order</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <aside className="pg__printAside">
+                <h3 className="pg__h3">Scan to order</h3>
+                <p className="pg__p">In a connected test workspace, guests scan the table QR, open the menu and submit an unpaid counter order. The live kitchen board is not connected yet.</p>
+                <ul className="pg__bullets">
+                  <li>Each QR identifies one table and can be revoked or replaced.</li>
+                  <li>Guest sessions expire after one hour.</li>
+                  <li>Only available menu items and server-calculated prices can be ordered.</li>
+                  <li>QR links can be shared, so anyone with an active link can place an order.</li>
+                </ul>
+              </aside>
+            </section>
+          </>
+        )}
       </div>
     </div>
   );

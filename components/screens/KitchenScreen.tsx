@@ -22,9 +22,6 @@ function Items({ order, compact }: { order: KitchenOrder; compact?: boolean }) {
   );
 }
 
-/* ============================================================================
-   Editorial Minimal — locked design system kitchen board
-   ========================================================================== */
 export function Kitchen() {
   const [audio, setAudio] = useState(false);
   const [orders, setOrders] = useState<KitchenOrder[]>(() => kitchenOrders.map((order) => ({ ...order })));

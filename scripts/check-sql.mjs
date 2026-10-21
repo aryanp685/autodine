@@ -8,8 +8,8 @@
  *
  *   CHECKED:     CREATE TABLE / INDEX / TYPE, COMMENT. That is all.
  *   NOT CHECKED: everything that makes a Supabase schema safe.
- *                CREATE FUNCTION bodies, CREATE POLICY, DROP POLICY, GRANT,
- *                ALTER TABLE ... ADD/DROP CONSTRAINT, and
+ * CREATE FUNCTION bodies/configuration, CREATE POLICY, DROP POLICY, GRANT,
+ *                REVOKE, ALTER TABLE ... ADD/DROP CONSTRAINT, and
  *                ALTER TABLE ... ENABLE ROW LEVEL SECURITY are all stripped
  *                out before parsing, because the parser cannot read them.
  *
@@ -51,19 +51,29 @@ if (!files.length) {
 /** Remove the constructs the parser cannot handle, so the rest can be checked. */
 function stripUnsupported(sql) {
   let out = sql;
-  // create or replace function ... $$ body $$  ... ;
-  out = out.replace(/create\s+or\s+replace\s+function[\s\S]*?\$\$[\s\S]*?\$\s*;/gi, '');
+  // CREATE [OR REPLACE] FUNCTION bodies and ALTER FUNCTION configuration.
+  out = out.replace(/create\s+(?:or\s+replace\s+)?function[\s\S]*?\$\$[\s\S]*?\$\$\s*;/gi, '');
+  out = out.replace(/^[ \t]*alter\s+function[^;]*;[ \t]*$/gim, '');
+  // anonymous DO blocks.
+
+  out = out.replace(/^[ \t]*drop\s+function[^;]*;[ \t]*$/gim, '');
+  out = out.replace(/^[ \t]*create\s+trigger[^;]*;[ \t]*$/gim, '');
+  out = out.replace(/^[ \t]*drop\s+trigger[^;]*;[ \t]*$/gim, '');
+  out = out.replace(/^[ \t]*do\s+\$\$[\s\S]*?\$\$\s*;[ \t]*$/gim, '');
   // create policy ... ;
-  out = out.replace(/^\s*create\s+policy[\s\S]*?;\s*$/gim, '');
+  out = out.replace(/^[ \t]*create\s+policy[^;]*;[ \t]*$/gim, '');
   // drop policy ... ;  (added: migration 0002 uses drop-then-create to be
   // re-runnable, and the parser rejects DROP POLICY outright)
-  out = out.replace(/^\s*drop\s+policy[\s\S]*?;\s*$/gim, '');
-  // grant ... ;
-  out = out.replace(/^\s*grant\s[\s\S]*?;\s*$/gim, '');
+  out = out.replace(/^[ \t]*drop\s+policy[^;]*;[ \t]*$/gim, '');
+  // alter default privileges ... (Postgres-specific ACL syntax). Strip this
+  // before grants/revokes so its multiline statement is removed as one unit.
+  out = out.replace(/^[ \t]*alter\s+default\s+privileges[^;]*;[ \t]*$/gim, '');
+  // grant/revoke ... ;
+  out = out.replace(/^[ \t]*(grant|revoke)\s[^;]*;[ \t]*$/gim, '');
   // alter table ... enable/disable row level security;
-  out = out.replace(/^\s*alter\s+table[\s\S]*?row\s+level\s+security\s*;\s*$/gim, '');
+  out = out.replace(/^[ \t]*alter\s+table[^;]*?row\s+level\s+security[ \t]*;[ \t]*$/gim, '');
   // alter table ... add/drop constraint ...;
-  out = out.replace(/^\s*alter\s+table[\s\S]*?(add|drop)\s+constraint[\s\S]*?;\s*$/gim, '');
+  out = out.replace(/^[ \t]*alter\s+table[^;]*?\b(add|drop)\s+constraint[^;]*;[ \t]*$/gim, '');
   return out;
 }
 
@@ -75,21 +85,23 @@ for (const file of files) {
 
   const stripped = stripUnsupported(sql);
   const removedFns = (sql.match(/create\s+or\s+replace\s+function/gi) || []).length;
+  const removedFunctionConfigs = (sql.match(/^\s*alter\s+function\s/gim) || []).length;
   const removedPolicies = (sql.match(/create\s+policy/gi) || []).length;
   const removedDrops = (sql.match(/drop\s+policy/gi) || []).length;
   const removedGrants = (sql.match(/^\s*grant\s/gim) || []).length;
+  const removedRevokes = (sql.match(/^\s*revoke\s/gim) || []).length;
   const removedRls = (sql.match(/row\s+level\s+security/gi) || []).length;
 
   // Comments are not statements. Strip them so a file that is nothing but
-  // functions, policies and grants reports "nothing checkable" instead of
+  // functions, policies, grants and revokes reports "nothing checkable" instead of
   // tripping the parser's "unexpected end of input" on empty input.
   const checkable = stripped.replace(/--[^\n]*/g, '').trim();
 
   if (!checkable) {
     console.log(
-      `${file}: nothing checkable (only functions/policies/grants) — ` +
-        `UNVERIFIED: ${removedFns} function(s), ${removedPolicies} policy/policies, ` +
-        `${removedDrops} policy drop(s), ${removedGrants} grant(s)`,
+      `${file}: nothing checkable (only functions/configuration/policies/grants) — ` +
+        `UNVERIFIED: ${removedFns} function(s), ${removedFunctionConfigs} function config(s), ${removedPolicies} policy/policies, ` +
+        `${removedDrops} policy drop(s), ${removedGrants} grant(s), ${removedRevokes} revoke(s)`,
     );
     continue;
   }
@@ -98,9 +110,11 @@ for (const file of files) {
     const ast = parse(checkable);
     const unverified = [
       `${removedFns} function(s)`,
+      `${removedFunctionConfigs} function config(s)`,
       `${removedPolicies} policy/policies`,
       `${removedDrops} policy drop(s)`,
       `${removedGrants} grant(s)`,
+      `${removedRevokes} revoke(s)`,
       `${removedRls} RLS statement(s)`,
     ].join(', ');
     console.log(

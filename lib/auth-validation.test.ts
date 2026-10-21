@@ -1,0 +1,48 @@
+import { describe, expect, it } from 'vitest';
+import {
+  getPasswordResetValidationError,
+  getSignupValidationError,
+  isValidSignInInput,
+  type SignupCredentials,
+} from './auth-validation';
+
+const validSignup: SignupCredentials = {
+  fullName: 'Aarav Patel',
+  restaurantName: 'Saffron & Smoke',
+  email: 'owner@example.invalid',
+  phone: '+91 90000 00000',
+  password: 'a-long-preview-password',
+  agreed: true,
+};
+
+describe('authentication form validation', () => {
+  it('accepts valid signup details', () => {
+    expect(getSignupValidationError(validSignup)).toBeNull();
+  });
+
+  it('enforces required consent and the password length range on the server', () => {
+    expect(getSignupValidationError({ ...validSignup, agreed: false })).toMatch(/confirm/i);
+    expect(getSignupValidationError({ ...validSignup, password: 'short' })).toMatch(/at least 10/i);
+    expect(getSignupValidationError({ ...validSignup, password: 'x'.repeat(129) })).toMatch(/128 characters/i);
+  });
+
+  it('rejects invalid or oversized account details', () => {
+    expect(getSignupValidationError({ ...validSignup, email: 'not-an-email' })).toMatch(/valid email/i);
+    expect(getSignupValidationError({ ...validSignup, fullName: 'x'.repeat(121) })).toMatch(/120 characters/i);
+    expect(getSignupValidationError({ ...validSignup, phone: 'x'.repeat(31) })).toMatch(/30 characters/i);
+  });
+
+  it('validates sign-in credentials without trimming or changing the password', () => {
+    expect(isValidSignInInput('owner@example.invalid', '  keep spaces  ')).toBe(true);
+    expect(isValidSignInInput('bad-email', 'password')).toBe(false);
+    expect(isValidSignInInput('owner@example.invalid', '')).toBe(false);
+    expect(isValidSignInInput('owner@example.invalid', 'x'.repeat(1025))).toBe(false);
+  });
+
+  it('validates password recovery values and matching confirmation', () => {
+    expect(getPasswordResetValidationError('new-password-123', 'new-password-123')).toBeNull();
+    expect(getPasswordResetValidationError('short', 'short')).toMatch(/at least 10/i);
+    expect(getPasswordResetValidationError('x'.repeat(129), 'x'.repeat(129))).toMatch(/128 characters/i);
+    expect(getPasswordResetValidationError('new-password-123', 'different-password')).toMatch(/do not match/i);
+  });
+});

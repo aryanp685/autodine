@@ -1,18 +1,7 @@
 /**
- * Adapt database rows into the display shapes the locked screens consume.
- *
- * Why adapt instead of rewriting the screens: the design is locked, and the
- * screens' JSX is the locked artefact. The demo data and the database disagree
- * about both names and units -- the demo says `price` in rupees and `desc`,
- * the database says `price_paise` in integer paise and `description`.
- *
- * Adapting at the boundary means every screen keeps its markup untouched, and
- * the money conversion lives in exactly one place, which is tested.
- *
- * The display types below deliberately mirror the `Item` type in
- * lib/demo-data.ts. They are restated rather than imported so that this module
- * never pulls demo data into the database path -- importing demo data here
- * would quietly keep the fallback alive in production.
+ * Convert database records into the display types used by menu components.
+ * Keep database-to-display field and currency conversions at this boundary.
+ * Demo types are declared separately to avoid pulling sample data into this path.
  */
 
 import { paiseToRupees } from '@/lib/money';
@@ -60,9 +49,8 @@ export type DisplayCategory = {
 };
 
 /**
- * The fields the locked screens read about the venue. Several have no column
- * in the database yet, so they fall back to the same placeholders the demo
- * uses rather than rendering blank or `undefined`.
+ * Venue fields consumed by the menu UI. Fields without a database value use
+ * neutral display placeholders rather than rendering `undefined`.
  */
 export type DisplayRestaurant = {
   /** Restaurant slug is used to preserve context between menu and item routes. */
@@ -76,6 +64,8 @@ export type DisplayRestaurant = {
   currency: string;
   openHours: string;
   timezone: string;
+  /** Owner-configured tax in basis points; zero means no tax line. */
+  taxRateBps: number;
 };
 
 export function toDisplayItem(item: MenuItem): DisplayItem {
@@ -127,13 +117,12 @@ export function toDisplayRestaurant(r: Restaurant): DisplayRestaurant {
     tagline: r.tagline ?? '',
     address: r.address ?? '',
     phone: r.phone ?? '',
-    // The seed writes the literal string 'GSTIN — add in Settings' so the
-    // placeholder is visible on a real receipt rather than silently blank.
-    gstin: r.gstin ?? 'GSTIN — add in Settings',
-    fssai: 'FSSAI — add in Settings',
+    gstin: r.gstin ?? 'Not provided',
+    fssai: 'Not provided',
     currency: 'INR',
-    openHours: 'Hours — add in Settings',
+    openHours: 'Not provided',
     timezone: r.timezone,
+    taxRateBps: r.tax_rate_bps,
   };
 }
 

@@ -23,8 +23,7 @@ export function PricingScreen() {
           <div className="pg__kicker">Early preview</div>
           <h1 className="pg__title">Planned plans and pricing</h1>
           <p className="pg__lede">
-            The prices below are planning figures, not an active offer. Billing, subscriptions and trial
-            access are not enabled in this preview. No payment details are requested here.
+            The prices below are planning figures, not an active offer. A server-timed 10-day workspace trial is available when its database migration is installed, but billing and subscriptions are not enabled. No payment details are requested here.
           </p>
         </header>
 
@@ -47,7 +46,8 @@ export function PricingScreen() {
 
         <div className="pg__note" role="note">
           <strong>Preview only.</strong> Features and plan entitlements are not yet available for purchase.
-          Tax treatment and final prices require confirmation before billing launches.
+          New restaurants add no tax by default; an owner may configure a tax rate for future orders.
+          This setting is not tax advice, and the venue must verify its applicable GST treatment before live billing.
         </div>
 
         <section className="pg__section" id="questions">
@@ -55,7 +55,7 @@ export function PricingScreen() {
           <div className="pg__faqs">
             <details className="pg__faq">
               <summary>Can I place a real order or make a payment?</summary>
-              <p>No. The menu, cart, kitchen and cashier flows currently use sample data. There is no live order or payment processing.</p>
+              <p>After scanning an active table QR, guest checkout can submit an unpaid counter order in a connected test/preview environment. Online payment is not connected. The restaurant database rechecks the menu and prices, but the full hosted UI-to-kitchen flow still needs a safe end-to-end test before operational use.</p>
             </details>
             <details className="pg__faq">
               <summary>Are these plan prices final?</summary>

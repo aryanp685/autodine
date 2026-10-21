@@ -1,5 +1,5 @@
 /**
- * Row shapes for supabase/migrations/20261019000001_init.sql.
+ * Row shapes for the current Supabase migration set.
  *
  * Hand-written because the Supabase CLI, which normally generates these,
  * cannot run here (no network to Supabase, no local Postgres). They are kept
@@ -20,6 +20,7 @@ export type Restaurant = {
   timezone: string;
   tax_rate_bps: number;
   is_active: boolean;
+  trial_started_at: string;
   created_at: string;
 };
 

@@ -1,33 +1,4 @@
-/**
- * Supabase environment.
- *
- * Accepts BOTH the current key format and the legacy one:
- *
- * | Purpose        | Current (use this)                      | Legacy (still works)           |
- * | -------------- | --------------------------------------- | ------------------------------ |
- * | Browser / RLS  | NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY     | NEXT_PUBLIC_SUPABASE_ANON_KEY  |
- * | Server / admin | SUPABASE_SECRET_KEY                      | SUPABASE_SERVICE_ROLE_KEY      |
- *
- * Why both: Supabase deprecated the legacy `anon` / `service_role` keys, to be
- * removed by the end of 2026. Projects created after November 2025 are issued
- * ONLY the new short `sb_publishable_...` / `sb_secret_...` keys. Reading the
- * legacy names alone would therefore leave a brand new project permanently
- * unconfigured -- and because this module tolerates empty values, it would not
- * error, it would quietly serve demo data forever. Both names are read so the
- * app works whichever the project has.
- *
- * The keys are interchangeable in the client libraries: Supabase states the new
- * values can be used "without any additional changes".
- *
- * Deliberately tolerant of EMPTY values: the app must build, deploy and render
- * with NO environment variables at all, because the site went live before the
- * database existed. Callers check isSupabaseConfigured and fall back to the
- * demo data in lib/db/demo-menu.ts.
- *
- * That fallback is a pilot convenience, not a design goal. Once the database is
- * live the fallback should be deleted so a misconfiguration fails loudly
- * instead of quietly serving sample data to a real guest.
- */
+/** Supports current Supabase key names and legacy aliases for browser and server clients. */
 
 export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 

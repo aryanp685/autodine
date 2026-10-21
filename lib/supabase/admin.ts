@@ -1,17 +1,4 @@
-/**
- * ADMIN CLIENT — SERVER ONLY.
- *
- * This uses the secret key (legacy name: service role key), which BYPASSES ROW
- * LEVEL SECURITY. It can
- * read and write every restaurant's data. If this file, or the key it reads,
- * ever reaches the browser, tenant isolation is gone.
- *
- * Rules:
- *   - Never import this from a file marked 'use client'.
- *   - Never return this client, or anything derived from it, to the client.
- *   - Use it only for work that cannot be expressed as an RLS policy:
- *     webhooks that arrive without a session, background jobs, migrations.
- */
+/** Server-only Supabase client. Its secret key bypasses RLS; validate authorization before every operation. */
 
 import 'server-only';
 

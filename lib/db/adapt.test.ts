@@ -13,12 +13,13 @@ const restaurant: Restaurant = {
   slug: 'saffron-smoke',
   name: 'Saffron & Smoke',
   tagline: 'Modern Indian kitchen',
-  address: '14 Civil Lines',
-  phone: '+91 712 000 0000',
-  gstin: '22AAAAA0000A1Z5',
+  address: 'Demo location',
+  phone: '',
+  gstin: 'DEMO-GSTIN',
   timezone: 'Asia/Kolkata',
   tax_rate_bps: 500,
   is_active: true,
+  trial_started_at: '2026-10-19T00:00:00Z',
   created_at: '2026-10-19T00:00:00Z',
 };
 
@@ -142,15 +143,14 @@ describe('toDisplayRestaurant', () => {
   it('passes through the columns that exist', () => {
     const out = toDisplayRestaurant(restaurant);
     expect(out.name).toBe('Saffron & Smoke');
-    expect(out.gstin).toBe('22AAAAA0000A1Z5');
+    expect(out.gstin).toBe('DEMO-GSTIN');
     expect(out.timezone).toBe('Asia/Kolkata');
+    expect(out.taxRateBps).toBe(500);
   });
 
   it('substitutes a visible placeholder for columns that do not exist yet', () => {
     const out = toDisplayRestaurant({ ...restaurant, gstin: null, tagline: null });
-    // A blank on a printed receipt looks like a bug. A placeholder reads as
-    // "not filled in yet", which is the truth.
-    expect(out.gstin).toBe('GSTIN — add in Settings');
+    expect(out.gstin).toBe('Not provided');
     expect(out.tagline).toBe('');
   });
 });

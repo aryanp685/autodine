@@ -1,15 +1,4 @@
-/**
- * Session refresh and owner/staff route protection.
- *
- * Runs in the Next.js request proxy for owner and staff application routes. Two jobs:
- *   1. Refresh the Supabase session cookie so it does not silently expire
- *      while someone is working.
- *   2. Send signed-out visitors to /login.
- *
- * When Supabase is not configured this does nothing at all, so the demo site
- * stays browsable. That is a deliberate pilot convenience — before launch it
- * should fail closed instead.
- */
+/** Refresh Supabase sessions and require sign-in on workspace routes when configured. */
 
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';

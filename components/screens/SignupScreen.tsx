@@ -1,130 +1,133 @@
 import Link from 'next/link';
 import { signUpAction } from '@/app/auth/actions';
+import { PasswordInput } from '@/components/auth/PasswordInput';
+import { SubmitButton } from '@/components/auth/SubmitButton';
 
-/**
- * Shared page structure; styled by the locked design system.
- *
- * This is now a REAL form: it posts to the signUpAction server action. The
- * markup and classes are unchanged from the locked design.
- */
 export function SignupScreen({ error }: { error?: string }) {
   return (
-    <div className="pg">
-      <div className="pg__bar">
-        <Link href="/" className="pg__brand">
-          AutoDine
+    <main className="pg auth">
+      <header className="pg__bar auth__bar">
+        <Link href="/" className="pg__brand" aria-label="AutoDine home">
+          AutoDine<span className="auth__brandMark">.</span>
         </Link>
         <div className="pg__barRight">
           <span className="pg__barMuted">Already have an account?</span>
-          <Link href="/login" className="pg__barLink">
-            Sign in
-          </Link>
+          <Link href="/login" className="pg__barCta">Sign in</Link>
         </div>
-      </div>
+      </header>
 
-      <div className="pg__body pg__body--split">
-        <section className="pg__formCard">
-          <div className="pg__kicker">Early preview</div>
-          <h1 className="pg__title pg__title--sm">Create your restaurant account</h1>
-          <p className="pg__p">
-            Account creation requires a configured AutoDine backend. This preview does not activate a paid plan,
-            trial entitlement or live ordering workflow.
+      <div className="pg__body pg__body--split pg__authBody pg__authBody--signup">
+        <section className="pg__formCard pg__formCard--auth" aria-labelledby="signup-title">
+          <div className="auth__eyebrow"><span className="auth__eyebrowDot" /> Early preview access</div>
+          <h1 id="signup-title" className="pg__title pg__title--sm auth__title">Set up your workspace</h1>
+          <p className="pg__p auth__intro">
+            Create an owner account for your restaurant. No paid subscription is created by signing up.
           </p>
 
-          {error && (
-            <div className="pg__note" role="alert">
-              {error}
-            </div>
-          )}
+          {error && <div className="auth__message auth__message--error" role="alert">{error}</div>}
 
-          <form className="pg__form" action={signUpAction}>
-            <div className="pg__fieldRow">
-              <label className="ui-field">
-                <span className="ui-label">Full name</span>
-                <input className="ui-input" name="fullName" autoComplete="name" placeholder="Aryan Patel" required />
+          <form className="pg__form auth__form" action={signUpAction}>
+            <div className="pg__fieldRow auth__fieldRow">
+              <label className="ui-field" htmlFor="signup-name">
+                <span className="ui-label">Your name</span>
+                <input
+                  className="ui-input"
+                  id="signup-name"
+                  name="fullName"
+                  autoComplete="name"
+                  maxLength={120}
+                  placeholder="Aarav Patel"
+                  required
+                />
               </label>
-              <label className="ui-field">
+              <label className="ui-field" htmlFor="signup-restaurant">
                 <span className="ui-label">Restaurant name</span>
                 <input
                   className="ui-input"
+                  id="signup-restaurant"
                   name="restaurantName"
                   autoComplete="organization"
+                  maxLength={120}
                   placeholder="Saffron & Smoke"
                   required
                 />
               </label>
             </div>
-            <label className="ui-field">
+
+            <label className="ui-field" htmlFor="signup-email">
               <span className="ui-label">Work email</span>
               <input
                 className="ui-input"
+                id="signup-email"
                 name="email"
                 type="email"
                 autoComplete="email"
-                placeholder="owner@restaurant.in"
+                autoCapitalize="none"
+                spellCheck={false}
+                inputMode="email"
+                maxLength={254}
+                placeholder="you@example.com"
                 required
               />
-              <span className="ui-hint">Used to create and secure your preview account.</span>
+              <span className="ui-hint">We’ll use this to secure your account and send confirmation if required.</span>
             </label>
-            <label className="ui-field">
-              <span className="ui-label">Mobile number</span>
-              <input className="ui-input" name="phone" autoComplete="tel" placeholder="+91 90000 00000" />
-            </label>
-            <label className="ui-field">
-              <span className="ui-label">Password</span>
+
+            <label className="ui-field" htmlFor="signup-phone">
+              <span className="ui-label">Mobile number <span className="auth__optional">Optional</span></span>
               <input
                 className="ui-input"
+                id="signup-phone"
+                name="phone"
+                type="tel"
+                autoComplete="tel"
+                inputMode="tel"
+                maxLength={30}
+                placeholder="+91 90000 00000"
+              />
+            </label>
+
+            <label className="ui-field" htmlFor="signup-password">
+              <span className="ui-label">Create password</span>
+              <PasswordInput
+                id="signup-password"
                 name="password"
-                type="password"
                 autoComplete="new-password"
                 placeholder="At least 10 characters"
                 minLength={10}
-                required
               />
-              <span className="ui-hint">Minimum 10 characters. Stored hashed — never in plain text.</span>
+              <span className="ui-hint">Use 10–128 characters. Your password is handled by Supabase Auth.</span>
             </label>
 
-            {/*
-              NOT pre-ticked, deliberately. A pre-checked consent box is not
-              valid consent under India's DPDP Act, which requires consent to be
-              free, specific, informed, unconditional and unambiguous.
-            */}
-            <label className="ui-check pg__check">
-              <input type="checkbox" name="agree" />
-              <span>
-                I understand this is a preview and agree that my details will be used to create this account in the configured Supabase project.
-              </span>
+            <label className="ui-check pg__check auth__consent">
+              <input type="checkbox" name="agree" required />
+              <span>I understand this is a preview and agree that my details will be used to create an account in the configured Supabase project.</span>
             </label>
 
-            <button className="pg__submit" type="submit">
-              Create account
-            </button>
-            <p className="pg__fine">
-              Demo accounts create a restaurant workspace when the Supabase project is configured. No trial or
-              subscription is created by this form.
+            <SubmitButton idleLabel="Create owner account" pendingLabel="Creating account…" />
+            <p className="pg__fine auth__fine">
+              Workspace creation starts the server-timed 10-day trial when the relevant database migration is installed. Billing is not enabled.
             </p>
           </form>
         </section>
 
-        <aside className="pg__aside">
-          <div className="pg__asideCard">
-            <div className="pg__asideHead">What this preview includes</div>
-            <ol className="pg__steps">
-              <li><strong>Account access</strong> — Supabase signup and sign-in actions are available when a project is configured.</li>
-              <li><strong>Workspace foundation</strong> — signup creates an initial restaurant, menu and owner membership.</li>
-              <li><strong>Sample experience</strong> — explore the menu, dashboard, kitchen and counter screens with fictional data.</li>
+        <aside className="pg__aside auth__aside" aria-label="About the preview">
+          <div className="pg__asideCard auth__asideCard">
+            <div className="auth__asideIcon" aria-hidden="true">01</div>
+            <div className="pg__asideHead">What happens next</div>
+            <ol className="auth__steps">
+              <li><span>01</span><p>Create an owner account and restaurant workspace.</p></li>
+              <li><span>02</span><p>Confirm your email if the project requires it.</p></li>
+              <li><span>03</span><p>Sign in and select an authorized workspace.</p></li>
             </ol>
           </div>
-
-          <div className="pg__asideCard pg__asideCard--quiet">
-            <div className="pg__asideHead">Not active yet</div>
-            <p className="pg__p">
-              There is no live order placement, payment processing, trial enforcement or subscription billing.
-              Do not enter payment details or use this preview for restaurant operations.
+          <div className="pg__asideCard pg__asideCard--quiet auth__asideCard auth__asideCard--quiet">
+            <div className="pg__asideHead">Before you continue</div>
+            <p className="pg__p auth__asideCopy">
+              AutoDine is a development preview, not production-ready. QR checkout can submit unpaid counter orders in a connected test workspace; online payments and subscription billing are not active.
             </p>
           </div>
         </aside>
       </div>
-    </div>
+    </main>
   );
 }

@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { SAMPLE_TAX_RATE_BPS, computeOrderTotals, computeSubtotal, type PriceableLine } from './pricing';
+import { DEFAULT_TAX_RATE_BPS, computeOrderTotals, computeSubtotal, type PriceableLine } from './pricing';
 
-/**
- * The seeded cart in the prototype: Butter Chicken x1, Butter Naan x2,
- * Mango Lassi x1. These are the numbers the locked screens were signed off
- * against, so they are asserted here as a regression guard.
- */
+/** Sample cart totals used as regression fixtures. */
 const SEED_LINES: PriceableLine[] = [
   { unitPricePaise: 46900, qty: 1 },
   { unitPricePaise: 7900, qty: 2 },
@@ -13,7 +9,7 @@ const SEED_LINES: PriceableLine[] = [
 ];
 
 describe('computeSubtotal', () => {
-  it('matches the numbers the locked design was signed off against', () => {
+  it('matches the sample cart subtotal', () => {
     expect(computeSubtotal(SEED_LINES)).toBe(77600); // ₹776.00
   });
 
@@ -32,8 +28,8 @@ describe('computeSubtotal', () => {
 });
 
 describe('computeOrderTotals', () => {
-  it('produces the signed-off cart totals', () => {
-    const t = computeOrderTotals({ lines: SEED_LINES });
+  it('calculates the sample cart totals', () => {
+    const t = computeOrderTotals({ lines: SEED_LINES, taxRateBps: 500 });
     expect(t.subtotalPaise).toBe(77600); // ₹776.00
     expect(t.taxPaise).toBe(3880); // ₹38.80
     expect(t.cgstPaise).toBe(1940);
@@ -43,9 +39,9 @@ describe('computeOrderTotals', () => {
     expect(t.taxablePaise).toBe(77600);
   });
 
-  it('renders exactly as the locked screens do (₹776 / ₹39 / ₹815)', () => {
+  it('formats sample totals as whole rupees (₹776 / ₹39 / ₹815)', () => {
     // Display rounds to whole rupees; the arithmetic underneath does not.
-    const t = computeOrderTotals({ lines: SEED_LINES });
+    const t = computeOrderTotals({ lines: SEED_LINES, taxRateBps: 500 });
     const shown = (p: number) => '₹' + (p / 100).toLocaleString('en-IN', { maximumFractionDigits: 0 });
     expect(shown(t.subtotalPaise)).toBe('₹776');
     expect(shown(t.taxPaise)).toBe('₹39');
@@ -65,17 +61,24 @@ describe('computeOrderTotals', () => {
     });
   });
 
-  it('defaults to the sample rate but accepts an override', () => {
-    expect(computeOrderTotals({ lines: SEED_LINES }).taxPaise).toBe(
-      computeOrderTotals({ lines: SEED_LINES, taxRateBps: SAMPLE_TAX_RATE_BPS }).taxPaise,
-    );
+  it('applies an explicitly configured 5% rate and splits local GST evenly', () => {
+    const t = computeOrderTotals({ lines: [{ unitPricePaise: 10000, qty: 1 }], taxRateBps: 500 });
+    expect(t.taxPaise).toBe(500);
+    expect(t.cgstPaise).toBe(250);
+    expect(t.sgstPaise).toBe(250);
+    expect(t.totalPaise).toBe(10500);
+  });
+
+  it('defaults to no tax but accepts an explicit configured rate', () => {
+    expect(computeOrderTotals({ lines: SEED_LINES }).taxPaise).toBe(0);
+    expect(DEFAULT_TAX_RATE_BPS).toBe(0);
     expect(computeOrderTotals({ lines: SEED_LINES, taxRateBps: 1800 }).taxPaise).toBe(13968);
   });
 });
 
 describe('discount precedence', () => {
   it('applies the discount BEFORE tax, so GST follows the reduced value', () => {
-    const t = computeOrderTotals({ lines: SEED_LINES, discountPaise: 10000 }); // ₹100 off
+    const t = computeOrderTotals({ lines: SEED_LINES, discountPaise: 10000, taxRateBps: 500 }); // ₹100 off
     expect(t.subtotalPaise).toBe(77600);
     expect(t.discountPaise).toBe(10000);
     expect(t.taxablePaise).toBe(67600);
@@ -84,13 +87,13 @@ describe('discount precedence', () => {
   });
 
   it('charges less tax with a discount than without', () => {
-    const withDiscount = computeOrderTotals({ lines: SEED_LINES, discountPaise: 10000 });
-    const without = computeOrderTotals({ lines: SEED_LINES });
+    const withDiscount = computeOrderTotals({ lines: SEED_LINES, discountPaise: 10000, taxRateBps: 500 });
+    const without = computeOrderTotals({ lines: SEED_LINES, taxRateBps: 500 });
     expect(withDiscount.taxPaise).toBeLessThan(without.taxPaise);
   });
 
   it('clamps the taxable base at zero instead of producing a negative bill', () => {
-    const t = computeOrderTotals({ lines: SEED_LINES, discountPaise: 999999 });
+    const t = computeOrderTotals({ lines: SEED_LINES, discountPaise: 999999, taxRateBps: 500 });
     expect(t.taxablePaise).toBe(0);
     expect(t.taxPaise).toBe(0);
     expect(t.totalPaise).toBe(0);
@@ -99,7 +102,7 @@ describe('discount precedence', () => {
   });
 
   it('handles a discount equal to the subtotal', () => {
-    const t = computeOrderTotals({ lines: SEED_LINES, discountPaise: 77600 });
+    const t = computeOrderTotals({ lines: SEED_LINES, discountPaise: 77600, taxRateBps: 500 });
     expect(t.taxablePaise).toBe(0);
     expect(t.totalPaise).toBe(0);
   });
@@ -129,7 +132,7 @@ describe('invariants that must hold for every order', () => {
         qty: Math.floor(rand() * 5),
       }));
       const discount = rand() < 0.3 ? Math.floor(rand() * 50000) : 0;
-      const t = computeOrderTotals({ lines, discountPaise: discount });
+      const t = computeOrderTotals({ lines, discountPaise: discount, taxRateBps: Math.floor(rand() * 2800) });
       expect(t.totalPaise).toBe(t.taxablePaise + t.taxPaise);
     }
   });
@@ -137,7 +140,7 @@ describe('invariants that must hold for every order', () => {
   it('the tax split always sums back to the tax', () => {
     for (let i = 0; i < 500; i += 1) {
       const lines = [{ unitPricePaise: Math.floor(rand() * 500000), qty: 1 + Math.floor(rand() * 4) }];
-      const t = computeOrderTotals({ lines });
+      const t = computeOrderTotals({ lines, taxRateBps: Math.floor(rand() * 2800) });
       expect(t.cgstPaise + t.sgstPaise).toBe(t.taxPaise);
     }
   });

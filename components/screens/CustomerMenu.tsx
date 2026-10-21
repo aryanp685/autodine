@@ -20,16 +20,9 @@ import { inr } from '@/lib/demo-data';
 import { lineTotal, paiseToRupees, rupeesToPaise } from '@/lib/money';
 import { VegMark } from '@/components/ui';
 
-const needsChoice = (i: Item) => Boolean(i.variants || i.modifiers);
+const needsChoice = (i: Item) => Boolean((i.variants?.length ?? 0) > 0 || (i.modifiers?.length ?? 0) > 0);
 
-/**
- * Preset add-on groups, used when an item carries none.
- *
- * The database has no modifier concept yet, so every real dish would
- * otherwise render the customisation sheet with no spice and no bread group.
- * These mirror the demo data exactly, so the locked layout is identical
- * whichever source the data came from.
- */
+/** Preset customization groups for menu items without database modifier data. */
 const PRESET_SPICE: DisplayModifierGroup = {
   id: 'spice',
   name: 'Spice level',
@@ -53,28 +46,18 @@ const PRESET_BREAD: DisplayModifierGroup = {
   ],
 };
 
-/**
- * Everything a menu screen shows, already in display units (rupees).
- *
- * Optional on purpose. The locked screens render identically with no data
- * passed -- they fall back to the demo content rather than breaking -- so
- * wiring one screen at a time is safe.
- */
+/** Menu data is optional in demo mode; live routes provide database-backed display records. */
 export type MenuScreenData = {
   restaurant: DisplayRestaurant;
   categories: DisplayCategory[];
   items: DisplayItem[];
 };
 
-/* ============================================================================
-   Editorial Minimal — locked design system customer menu
-   ========================================================================== */
-export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
+export function CustomerMenu({ data, orderingEnabled = true }: { data?: MenuScreenData; orderingEnabled?: boolean } = {}) {
   const cart = useCart();
   const [cat, setCat] = useState('all');
 
-  // Deliberately named to shadow the demo imports, so that not one line of
-  // the locked JSX below had to change to accept real data.
+  // Use database-backed data when available, otherwise show the local sample menu.
   const restaurant = data?.restaurant ?? demoRestaurant;
   const categories = data?.categories ?? demoCategories;
   const items = data?.items ?? demoItems;
@@ -93,16 +76,18 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
           <div className="menu__venueMeta">{restaurant.tagline}</div>
         </div>
         <div className="menu__verified">
-          <span className="menu__verifiedDot" /> Table 7 · on-site verified 12:41 PM
+          <span className="menu__verifiedDot" />
+          {!data ? 'Demo — not saved' : orderingEnabled ? 'Verified table session' : 'Verify at your table to order'}
         </div>
       </header>
 
       <nav className="menu__cats">
-        <button className={`menu__cat ${cat === 'all' ? 'is-active' : ''}`} onClick={() => setCat('all')}>
+        <button type="button" className={`menu__cat ${cat === 'all' ? 'is-active' : ''}`} onClick={() => setCat('all')}>
           All
         </button>
         {categories.map((c) => (
           <button
+            type="button"
             key={c.id}
             className={`menu__cat ${cat === c.id ? 'is-active' : ''}`}
             onClick={() => setCat(c.id)}
@@ -127,17 +112,22 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
                 {i.variants && <span className="menu__dishFrom">from</span>}
               </div>
               {i.available ? (
-                needsChoice(i) ? (
-                  <Link href={itemHref(i.id)} className="menu__dishCta">
-                    Choose options
-                  </Link>
+                orderingEnabled ? (
+                  needsChoice(i) ? (
+                    <Link href={itemHref(i.id)} className="menu__dishCta">
+                      Choose options
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      className="menu__dishCta"
+                      onClick={() => cart.add({ id: i.id, name: i.name, unitPricePaise: rupeesToPaise(i.price), qty: 1, veg: i.veg })}
+                    >
+                      Add
+                    </button>
+                  )
                 ) : (
-                  <button
-                    className="menu__dishCta"
-                    onClick={() => cart.add({ id: i.id, name: i.name, unitPricePaise: rupeesToPaise(i.price), qty: 1, veg: i.veg })}
-                  >
-                    Add
-                  </button>
+                  <span className="menu__dishOut">Ask staff for the current table code to order</span>
                 )
               ) : (
                 <span className="menu__dishOut">Sold out for now</span>
@@ -148,12 +138,12 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
         ))}
       </div>
 
-      {cart.count > 0 && (
+      {orderingEnabled && cart.count > 0 && (
         <div className="menu__cartBar">
           <span>
             {cart.count} item{cart.count === 1 ? '' : 's'} · {inr(paiseToRupees(cart.subtotalPaise))}
           </span>
-          <Link href={`/menu/cart`} className="menu__cartBtn">
+          <Link href={`/menu/cart?s=${encodeURIComponent(cart.scope)}`} className="menu__cartBtn">
             Review order
           </Link>
         </div>
@@ -163,22 +153,13 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
 }
 
 /* Option A — item customization: centred sheet, hairlines, no chrome */
-export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?: string }; itemId?: string } = {}) {
+export function ItemSheet({ data, itemId, orderingEnabled = true }: { data?: MenuScreenData & { itemId?: string }; itemId?: string; orderingEnabled?: boolean } = {}) {
   const allItems = data?.items ?? demoItems;
   const restaurant = data?.restaurant ?? demoRestaurant;
   const requestedItemId = data?.itemId ?? itemId;
 
-  // This sheet customises a dish, so it needs one that has portions to choose
-  // between.
-  //
-  // Order matters, and getting it wrong is a visible regression: with no real
-  // data the sheet must keep showing Butter Chicken, because that is what the
-  // locked design has always shown here. Preferring "first item with variants"
-  // unconditionally made it show Paneer Tikka instead.
-  //
-  // The original also did item.variants![0] unconditionally. That holds for
-  // the demo data, where the chosen dish always has portions, but against a
-  // real menu it throws the moment the item has none -- which is most of them.
+  // Keep a stable sample dish in demo mode; live menus use their first
+  // customizable item and safely handle menus without any variants.
   const item =
     (requestedItemId ? allItems.find((i) => i.id === requestedItemId) : undefined) ??
     // Real menu, no id requested: show the menu's own first customisable dish.
@@ -186,16 +167,20 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
     demoItems.find((i) => i.id === 'it-butter-chicken')!;
 
   const variants = item.variants ?? [];
+  const spiceGroup = item.modifiers?.[0] ?? (!data ? PRESET_SPICE : undefined);
+  const breadGroup = item.modifiers?.[1] ?? (!data ? PRESET_BREAD : undefined);
+  const defaultSpice = spiceGroup?.options.find((option) => option.id === 'medium')?.id ?? spiceGroup?.options[0]?.id ?? '';
+  const defaultBread = breadGroup?.options.find((option) => option.id === 'naan')?.id ?? breadGroup?.options[0]?.id ?? '';
   const [variant, setVariant] = useState(variants[0]?.id ?? '');
-  const [spice, setSpice] = useState('medium');
-  const [bread, setBread] = useState('naan');
+  const [spice, setSpice] = useState(defaultSpice);
+  const [bread, setBread] = useState(defaultBread);
   const [qty, setQty] = useState(1);
   const cart = useCart();
 
   const vPrice = variants.find((v) => v.id === variant)?.price ?? item.price;
-  const spiceGroup = item.modifiers?.[0] ?? PRESET_SPICE;
-  const breadGroup = item.modifiers?.[1] ?? PRESET_BREAD;
-  const addonPrice = bread === 'naan' ? 79 : bread === 'roti' ? 59 : 0;
+  const addonPrice = breadGroup?.options.find((option) => option.id === bread)?.price ?? 0;
+  const selectedSpice = spiceGroup?.options.find((option) => option.id === spice)?.name;
+  const selectedBread = breadGroup?.options.find((option) => option.id === bread)?.name;
   const total = lineTotal(rupeesToPaise(vPrice + addonPrice), qty);
 
   return (
@@ -206,7 +191,8 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
           <div className="menu__venueMeta">{restaurant.tagline}</div>
         </div>
         <div className="menu__verified">
-          <span className="menu__verifiedDot" /> Table 7 · on-site verified 12:41 PM
+          <span className="menu__verifiedDot" />
+          {!data ? 'Demo — not saved' : orderingEnabled ? 'Verified table session' : 'Verify at your table to order'}
         </div>
       </header>
 
@@ -233,61 +219,70 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
               <div className="sheet__kicker">Customize</div>
               <h2 className="sheet__title">{item.name}</h2>
             </div>
-            <Link href={`/menu`} className="sheet__close" aria-label="Close">
+            <Link href={`/menu?s=${encodeURIComponent(cart.scope)}`} className="sheet__close" aria-label="Close">
               ×
             </Link>
           </div>
           <p className="sheet__desc">{item.desc}</p>
 
-          <div className="sheet__group">
-            <div className="sheet__label">Portion</div>
-            {variants.map((v) => (
-              <label key={v.id} className={`sheet__opt ${variant === v.id ? 'is-on' : ''}`}>
-                <input type="radio" name="variant" checked={variant === v.id} onChange={() => setVariant(v.id)} />
-                <span>{v.name}</span>
-                <span className="tnum">{inr(v.price)}</span>
-              </label>
-            ))}
-          </div>
-
-          <div className="sheet__group">
-            <div className="sheet__label">Spice level · required</div>
-            <div className="sheet__chips">
-              {spiceGroup.options.map((o) => (
-                <button
-                  key={o.id}
-                  className={`sheet__chip ${spice === o.id ? 'is-on' : ''}`}
-                  onClick={() => setSpice(o.id)}
-                >
-                  {o.name}
-                </button>
+          {variants.length > 0 && (
+            <div className="sheet__group">
+              <div className="sheet__label">Portion</div>
+              {variants.map((v) => (
+                <label key={v.id} className={`sheet__opt ${variant === v.id ? 'is-on' : ''}`}>
+                  <input type="radio" name="variant" checked={variant === v.id} onChange={() => setVariant(v.id)} />
+                  <span>{v.name}</span>
+                  <span className="tnum">{inr(v.price)}</span>
+                </label>
               ))}
             </div>
-          </div>
+          )}
 
-          <div className="sheet__group">
-            <div className="sheet__label">Pair it with</div>
-            {breadGroup.options.map((o) => (
-              <label key={o.id} className={`sheet__opt ${bread === o.id ? 'is-on' : ''}`}>
-                <input type="radio" name="bread" checked={bread === o.id} onChange={() => setBread(o.id)} />
-                <span>{o.name}</span>
-                <span className="tnum">{o.price ? `+ ${inr(o.price)}` : '—'}</span>
-              </label>
-            ))}
-          </div>
+          {spiceGroup && (
+            <div className="sheet__group">
+              <div className="sheet__label">{spiceGroup.name}{spiceGroup.required ? ' · required' : ''}</div>
+              <div className="sheet__chips">
+                {spiceGroup.options.map((o) => (
+                  <button
+                    key={o.id}
+                    type="button"
+                    className={`sheet__chip ${spice === o.id ? 'is-on' : ''}`}
+                    onClick={() => setSpice(o.id)}
+                  >
+                    {o.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {breadGroup && (
+            <div className="sheet__group">
+              <div className="sheet__label">{breadGroup.name}</div>
+              {breadGroup.options.map((o) => (
+                <label key={o.id} className={`sheet__opt ${bread === o.id ? 'is-on' : ''}`}>
+                  <input type="radio" name="bread" checked={bread === o.id} onChange={() => setBread(o.id)} />
+                  <span>{o.name}</span>
+                  <span className="tnum">{o.price ? `+ ${inr(o.price)}` : '—'}</span>
+                </label>
+              ))}
+            </div>
+          )}
 
           <div className="sheet__foot">
             <div className="sheet__qty">
-              <button onClick={() => setQty(Math.max(1, qty - 1))} aria-label="Decrease">
+              <button type="button" onClick={() => setQty(Math.max(1, qty - 1))} aria-label="Decrease quantity">
                 −
               </button>
               <span className="tnum">{qty}</span>
-              <button onClick={() => setQty(qty + 1)} aria-label="Increase">
+              <button type="button" onClick={() => setQty(qty + 1)} aria-label="Increase quantity">
                 +
               </button>
             </div>
             <button
+              type="button"
               className="sheet__add"
+              disabled={!orderingEnabled}
               onClick={() => {
                 cart.add({
                   id: item.id,
@@ -297,12 +292,13 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
                   // Undefined when the dish has no portions, so the cart line
                   // simply carries no variant instead of throwing.
                   variant: variants.find((v) => v.id === variant)?.name,
-                  addons: [spice, bread === 'none' ? '' : `Bread: ${bread}`].filter(Boolean),
+                  variantId: variant || undefined,
+                  addons: [selectedSpice, selectedBread].filter((value): value is string => Boolean(value)),
                   veg: item.veg,
                 });
               }}
             >
-              Add to order · {inr(paiseToRupees(total))}
+              {orderingEnabled ? `Add to order · ${inr(paiseToRupees(total))}` : 'Verify at your table to order'}
             </button>
           </div>
         </div>

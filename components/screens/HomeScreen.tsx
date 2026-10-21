@@ -2,10 +2,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { inr, plans } from '@/lib/demo-data';
 
-/* ============================================================================
-   Editorial Minimal — locked design system
-   Full-bleed photography, display typography, hairline rules, no shadows.
-   ========================================================================== */
 export function Home() {
   return (
     <div className="home">
@@ -33,13 +29,13 @@ export function Home() {
             one quiet system.
           </h1>
           <p className="home__lede">
-            A focused preview of the restaurant ordering experience we are building. Browse the sample menu and see how the customer, kitchen and counter screens fit together.
+            A focused preview of the restaurant ordering experience we are building. Browse the sample menu and explore prototypes for the customer, kitchen and counter screens.
           </p>
           <div className="home__ctas">
             <Link href="/signup" className="home__btn home__btn--solid">Create account</Link>
             <Link href="/menu" className="home__btn home__btn--line">See the demo</Link>
           </div>
-          <div className="home__note">Preview only · live ordering, payments and subscriptions are not enabled</div>
+          <div className="home__note">Preview only · a connected, accessible test workspace can accept unpaid counter orders. Online payments and subscriptions are not enabled, and the hosted order-to-kitchen flow is not production-verified.</div>
         </div>
       </header>
 
@@ -47,9 +43,9 @@ export function Home() {
         <div className="home__rule" />
         <div className="home__three">
           {[
-            ['01', 'A clear digital menu', 'Explore sample categories, dish options and a mobile-friendly menu layout. Menu editing and publishing are still being built.'],
-            ['02', 'A connected service flow', 'The preview brings the customer menu, kitchen board and counter screens together. Live order delivery is not enabled yet.'],
-            ['03', 'Payments, designed carefully', 'Online and counter payment flows are represented in the interface. No payment provider is connected and no charge can be made.'],
+            ['01', 'A clear digital menu', 'Explore a sample menu or read a published restaurant menu when configured. Menu editing and publishing are still previews.'],
+            ['02', 'A connected service flow', 'QR checkout can save unpaid counter orders in a connected test workspace. The live kitchen board and hosted end-to-end workflow are not yet verified.'],
+            ['03', 'Payments, designed carefully', 'Online payments are not connected. Cash recording exists in an early cashier path, but is not live-verified.'],
           ].map(([n, title, body]) => (
             <article key={n} className="home__col">
               <div className="home__num">{n}</div>
@@ -65,7 +61,7 @@ export function Home() {
           {[
             ['Browser', 'No customer app install planned'],
             ['Table QR', 'Designed around table service'],
-            ['Two paths', 'Online and counter payments planned'],
+            ['Two paths', 'Guest online payment planned · cashier cash path unverified'],
           ].map(([v, l]) => (
             <div key={l} className="home__stat">
               <div className="home__statValue">{v}</div>
@@ -109,7 +105,7 @@ export function Home() {
           </div>
           <div>
             <div className="home__footTitle">Preview scope</div>
-            <p>Sample restaurant content. No live orders, payment collection or subscriptions.</p>
+            <p>Demo content contains no live orders or subscriptions. QR orders and cash collection are early test paths; the live kitchen workflow is not verified.</p>
           </div>
           <div>
             <div className="home__footTitle">Accounts</div>

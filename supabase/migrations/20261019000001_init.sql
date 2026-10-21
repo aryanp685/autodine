@@ -1,9 +1,5 @@
 -- ============================================================================
--- AutoDine — initial schema
---
--- Migration 0001. Written 2026-10-19 for the 3-day pilot build.
---
--- DESIGN RULES BAKED IN HERE (do not relax without an explicit decision):
+-- Initial schema and core data-integrity rules:
 --   1. Money is BIGINT paise. Never numeric, never float, never rupees.
 --   2. Timestamps are TIMESTAMPTZ. All UTC; each restaurant carries an IANA
 --      timezone for display.
@@ -14,10 +10,9 @@
 --   5. Orders are priced by the place_order() function, in the database. The
 --      browser sends item ids and quantities only. It never sends a total.
 --
--- TAX: tax_rate_bps lives on restaurants and defaults to the SAMPLE 5% used
--- by lib/pricing.ts. This is NOT a confirmed GST model. See the header of
--- lib/pricing.ts for the three open questions. Do not raise a live invoice on
--- this until those are answered by a tax adviser.
+-- The original tax default was historical sample data. The optional-tax
+-- migration sets new restaurants to 0 and preserves existing settings. Owners
+-- must verify applicable tax treatment; this software is not tax advice.
 -- ============================================================================
 
 -- ---------------------------------------------------------------- extensions
@@ -214,8 +209,8 @@ create table if not exists public.payments (
   amount_paise  bigint not null check (amount_paise >= 0),
   status        text not null default 'recorded'
                 check (status in ('pending','recorded','failed','refunded')),
-  provider      text,              -- 'razorpay' | 'counter' | null
-  provider_ref  text,              -- gateway payment id, for reconciliation
+  provider      text,              -- Payment provider identifier; null for counter payments.
+  provider_ref  text,              -- External transaction reference, when applicable.
   -- Idempotency: one gateway event must never be recorded twice.
   idempotency_key text unique,
   created_at    timestamptz not null default now()

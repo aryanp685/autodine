@@ -1,19 +1,4 @@
-/**
- * Menu reads.
- *
- * Two sources, deliberately:
- *
- *   1. Supabase, when it is configured. Reads go through the anon key, so Row
- *      Level Security applies: an anonymous guest can read a PUBLISHED menu at
- *      an ACTIVE restaurant and nothing else.
- *
- *   2. The demo data in lib/demo-data.ts, when it is not.
- *
- * The fallback exists so the live Netlify site keeps rendering before the
- * database is connected. It is scaffolding. Once the database is live, delete
- * it: a misconfiguration should fail loudly, not quietly serve sample dishes
- * to a real guest who is trying to order dinner.
- */
+/** Read published menus through the session client; use sample data only when Supabase is unconfigured. */
 
 import { demoMenu } from './demo-menu';
 import { createSupabaseServerClient } from '@/lib/supabase/server';

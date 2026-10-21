@@ -34,5 +34,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 
-# Internal planning notes and operational runbooks are kept locally, not published.
+# Local-only documentation
 /docs/*.md

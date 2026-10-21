@@ -1,8 +1,7 @@
--- Demo seed for the pilot. Idempotent: safe to run more than once.
--- SAMPLE DATA for a fictional restaurant. Replace before going live.
+-- Fictional sample data for local development only. Safe to rerun.
 
 insert into public.restaurants (id, slug, name, tagline, address, phone, gstin, timezone, tax_rate_bps)
-values ('00000000-0000-4000-8000-000000000001', 'saffron-smoke', 'Saffron & Smoke', 'Modern Indian kitchen · Nagpur', '14 Civil Lines, Near Zero Mile, Nagpur 440001, Maharashtra', '+91 712 000 0000', 'GSTIN — add in Settings', 'Asia/Kolkata', 500)
+values ('00000000-0000-4000-8000-000000000001', 'saffron-smoke', 'Saffron & Smoke', 'Sample restaurant · India', 'Demo location', null, null, 'Asia/Kolkata', 0)
 on conflict (id) do update set name = excluded.name;
 
 insert into public.menus (id, restaurant_id, name, is_published) values ('00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000001', 'Main menu', true) on conflict (id) do nothing;
@@ -55,17 +54,17 @@ insert into public.item_variants (id, item_id, name, price_paise, sort_order) va
   ('04292280-1a62-477a-8e0b-bdb83807483e', 'ec65e133-d1e1-4d96-86bb-5f715389fc4c', 'Large', 14900, 1)
 on conflict (id) do nothing;
 
--- Twelve tables, and a starting QR token for each.
+-- Twelve tables and a stable printed table QR for each. The QR identifies a
+-- table; scanning the QR starts a one-hour guest ordering session.
 insert into public.dining_tables (restaurant_id, label, seats)
 select '00000000-0000-4000-8000-000000000001', 'T' || n, 4 from generate_series(1, 12) n on conflict do nothing;
 
--- Tokens expire in 7 days and carry no meaning beyond that. Rotate them from
--- the dashboard; a printed QR on its own proves nothing about who scanned it.
-insert into public.qr_tokens (restaurant_id, table_id, token, expires_at)
-select '00000000-0000-4000-8000-000000000001', t.id, encode(gen_random_bytes(12), 'hex'), now() + interval '7 days'
+insert into public.table_qr_codes (restaurant_id, table_id, public_token)
+select '00000000-0000-4000-8000-000000000001', t.id, encode(gen_random_bytes(24), 'hex')
 from public.dining_tables t
 where t.restaurant_id = '00000000-0000-4000-8000-000000000001'
+  and t.is_active
   and not exists (
-    select 1 from public.qr_tokens q
-    where q.table_id = t.id and q.expires_at > now()
+    select 1 from public.table_qr_codes q
+    where q.table_id = t.id and q.revoked_at is null
   );

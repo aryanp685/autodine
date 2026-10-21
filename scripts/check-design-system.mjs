@@ -1,13 +1,10 @@
 #!/usr/bin/env node
 /**
- * Design system guard.
+ * Checks shared style rules and prevents hardcoded-color growth.
  *
- * The Editorial Minimal design is LOCKED. Locks decay unless something checks
- * them on every commit, so this script fails the build when the CSS drifts.
- *
- * Run:  npm run design:check
- * Reset the ratchet (only after a deliberate, approved reduction):
- *        node scripts/check-design-system.mjs --update-baseline
+ * Run: npm run design:check
+ * Refresh the color baseline after a deliberate reduction:
+ * node scripts/check-design-system.mjs --update-baseline
  */
 
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -39,30 +36,27 @@ for (const file of cssFiles) {
     if (!m) return;
     const value = m[1].trim();
     if (!ALLOWED_SHADOW.test(value)) {
-      problems.push(`${rel(file)}:${i + 1} drop shadow "${value}" — the locked design uses none. Use inset for hairline underlines, or var(--shadow).`);
+      problems.push(`${rel(file)}:${i + 1} drop shadow "${value}" — use the existing border or token styling instead.`);
     }
   });
 }
 
 /* ---------------------------------------------------------------- rule 2 */
-/* The A/B/C comparison harness was deleted. Its chrome must not creep back. */
+/* Keep prototype-comparison-only class names out of product components. */
 for (const file of [...cssFiles, join(ROOT, 'app'), join(ROOT, 'components')]) {
   for (const f of walk(file)) {
     if (!/\.(tsx?|css)$/.test(f)) continue;
     const src = readFileSync(f, 'utf8');
     src.split('\n').forEach((line, i) => {
       if (/[."']proto-/.test(line)) {
-        problems.push(`${rel(f)}:${i + 1} prototype-harness reference — the A/B/C harness was deleted; do not reintroduce it.`);
+        problems.push(`${rel(f)}:${i + 1} prototype-only class name; use product component styles instead.`);
       }
     });
   }
 }
 
 /* ---------------------------------------------------------------- rule 3 */
-/* Hardcoded colours ratchet. The locked stylesheet predates this guard and
-   contains raw hex values that will not be rewritten (rewriting risks changing
-   the approved design). Instead of forbidding them, the count is frozen: it may
-   go down, never up. New styles must use the tokens. */
+/* Existing raw color values may decrease but should not grow; use design tokens for new styles. */
 function countHexOutsideTokens(src) {
   // Skip the token declaration block, where hex is expected and correct.
   const withoutTokens = src.replace(/\[data-app\]\s*\{[\s\S]*?\n\}/, '');
