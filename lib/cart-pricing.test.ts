@@ -89,6 +89,18 @@ describe('priceCart', () => {
     }
   });
 
+  it('prices with the restaurant rate, not the sample one', () => {
+    // maddi sits at 1800 bps (18% GST) while lib/pricing.ts carries a 500 bps
+    // sample. A cart that used the sample would show a guest one total and
+    // write another -- undercharging by more than a tenth of the order.
+    const atDefault = priceCart([{ itemId: 'i-1', qty: 1 }], menu);
+    const atEighteen = priceCart([{ itemId: 'i-1', qty: 1 }], menu, 1800);
+
+    expect(atDefault.totals.taxPaise).toBe(1600); // 5% of 32000
+    expect(atEighteen.totals.taxPaise).toBe(5760); // 18% of 32000
+    expect(atEighteen.totals.totalPaise).toBeGreaterThan(atDefault.totals.totalPaise);
+  });
+
   it('separates GST into CGST and SGST halves', () => {
     const cart = priceCart([{ itemId: 'i-1', qty: 1 }], menu);
     expect(cart.totals.cgstPaise + cart.totals.sgstPaise).toBe(cart.totals.taxPaise);

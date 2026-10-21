@@ -23,14 +23,17 @@ import { placeOrderAction } from '@/app/menu/checkout/actions';
 export function Checkout({
   slug,
   restaurantName,
+  taxRateBps,
   items,
 }: {
   slug?: string;
   restaurantName?: string;
+  /** The restaurant's own rate. Without it the bill is priced at a sample. */
+  taxRateBps?: number;
   items: MenuItemPrice[];
 }) {
   const cart = useCart();
-  const priced = priceCart(cart.lines, items);
+  const priced = priceCart(cart.lines, items, taxRateBps);
   const { subtotalPaise, taxPaise, totalPaise } = priced.totals;
 
   const withSlug = (path: string) => (slug ? `${path}?s=${encodeURIComponent(slug)}` : path);
