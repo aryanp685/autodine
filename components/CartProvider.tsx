@@ -1,99 +1,109 @@
 'use client';
 
 /**
- * Prototype-only cart state. Client side, in-memory, resets on reload.
- * It exists so the customer flow (menu → item sheet → cart → checkout) can be
- * clicked through. It is NOT the real cart: no server validation, no prices
- * trusted from the browser, no persistence.
+ * The customer's cart.
  *
- * The arithmetic, however, is real: totals come from lib/pricing (integer
- * paise, tested), not from floating-point maths written inline here.
+ * It remembers item ids and quantities, and nothing else -- no names, no
+ * prices. localStorage belongs to the customer and can be edited freely, so
+ * nothing stored here is trusted: the cart is a list of intentions, and every
+ * amount shown or charged is read back from the database at the time it is
+ * needed. A price kept in the browser is a price a customer can set.
+ *
+ * It is keyed by restaurant slug. One cart spanning two kitchens would let a
+ * dish ordered in one turn up on another's bill.
+ *
+ * Quantities survive a reload, which an in-memory cart did not: a diner who
+ * refreshes or locks their phone mid-order should not lose the order.
  */
 
-import { createContext, useContext, useMemo, useState } from 'react';
-import { computeOrderTotals, computeSubtotal, type OrderTotals } from '@/lib/pricing';
-import type { Paise } from '@/lib/money';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  addLine,
+  cartKey,
+  parseCart,
+  removeLine,
+  serialiseCart,
+  setQty as setLineQty,
+  totalQty,
+  type StoredLine,
+} from '@/lib/cart-storage';
 
-export type CartLine = {
-  key: string;
-  id: string;
-  name: string;
-  unitPricePaise: Paise;
-  qty: number;
-  variant?: string;
-  addons?: string[];
-  veg: boolean;
-};
+export type { StoredLine };
 
 type CartApi = {
-  lines: CartLine[];
-  add: (line: Omit<CartLine, 'key'>) => void;
-  remove: (key: string) => void;
-  setQty: (key: string, qty: number) => void;
+  /** Item ids and quantities only. Names and prices come from the server. */
+  lines: StoredLine[];
+  /** Adds one, or `by` when the dish was added from a quantity stepper. */
+  add: (itemId: string, by?: number) => void;
+  remove: (itemId: string) => void;
+  setQty: (itemId: string, qty: number) => void;
   clear: () => void;
   count: number;
-  subtotalPaise: Paise;
-  /** Full order totals, computed by lib/pricing. Never computed in the UI. */
-  totals: OrderTotals;
+  /**
+   * False until the stored cart has been read. The server renders an empty
+   * cart, so anything that counts items has to wait rather than flashing zero
+   * over a cart that is not empty.
+   */
+  ready: boolean;
 };
 
 const Ctx = createContext<CartApi | null>(null);
 
-export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [lines, setLines] = useState<CartLine[]>([
-    {
-      key: 'seed-1',
-      id: 'it-butter-chicken',
-      name: 'Butter Chicken',
-      unitPricePaise: 46900,
-      qty: 1,
-      variant: 'Regular · 4 pcs',
-      addons: ['Hot', 'Butter naan'],
-      veg: false,
-    },
-    {
-      key: 'seed-2',
-      id: 'it-naan',
-      name: 'Butter Naan',
-      unitPricePaise: 7900,
-      qty: 2,
-      veg: true,
-    },
-    {
-      key: 'seed-3',
-      id: 'it-lassi',
-      name: 'Mango Lassi',
-      unitPricePaise: 14900,
-      qty: 1,
-      veg: true,
-    },
-  ]);
+export function CartProvider({
+  children,
+  slug,
+}: {
+  children: React.ReactNode;
+  /** Restaurant the cart belongs to. */
+  slug?: string;
+}) {
+  const [lines, setLines] = useState<StoredLine[]>([]);
+  const [ready, setReady] = useState(false);
 
-  const api = useMemo<CartApi>(() => {
-    const add: CartApi['add'] = (line) => {
-      setLines((prev) => {
-        const key = `${line.id}|${line.variant ?? ''}|${(line.addons ?? []).join(',')}`;
-        const found = prev.find((l) => l.key === key);
-        if (found) {
-          return prev.map((l) => (l.key === key ? { ...l, qty: l.qty + line.qty } : l));
-        }
-        return [...prev, { ...line, key }];
-      });
-    };
-    const remove: CartApi['remove'] = (key) => setLines((p) => p.filter((l) => l.key !== key));
-    const setQty: CartApi['setQty'] = (key, qty) =>
-      setLines((p) => (qty <= 0 ? p.filter((l) => l.key !== key) : p.map((l) => (l.key === key ? { ...l, qty } : l))));
-    return {
+  const key = cartKey(slug?.trim() || 'demo');
+
+  // Read after mount, not during render: the server has no localStorage, and
+  // reading it while rendering would produce markup that cannot match.
+  useEffect(() => {
+    setReady(false);
+    try {
+      setLines(parseCart(window.localStorage.getItem(key)));
+    } catch {
+      // Private browsing and disabled storage both throw here. An empty cart
+      // is the right answer -- the order can still be placed, it just will not
+      // survive a reload.
+      setLines([]);
+    }
+    setReady(true);
+  }, [key]);
+
+  // Write on change, but not before the first read, or the stored cart would
+  // be overwritten by the empty one rendered on the server.
+  const persist = useCallback(
+    (next: StoredLine[]) => {
+      setLines(next);
+      try {
+        if (next.length === 0) window.localStorage.removeItem(key);
+        else window.localStorage.setItem(key, serialiseCart(next));
+      } catch {
+        // Nothing useful to do. The cart still works for this page view.
+      }
+    },
+    [key]
+  );
+
+  const api = useMemo<CartApi>(
+    () => ({
       lines,
-      add,
-      remove,
-      setQty,
-      clear: () => setLines([]),
-      count: lines.reduce((n, l) => n + l.qty, 0),
-      subtotalPaise: computeSubtotal(lines),
-      totals: computeOrderTotals({ lines }),
-    };
-  }, [lines]);
+      ready,
+      add: (itemId, by = 1) => persist(addLine(lines, itemId, by)),
+      remove: (itemId) => persist(removeLine(lines, itemId)),
+      setQty: (itemId, qty) => persist(setLineQty(lines, itemId, qty)),
+      clear: () => persist([]),
+      count: totalQty(lines),
+    }),
+    [lines, ready, persist]
+  );
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
 }

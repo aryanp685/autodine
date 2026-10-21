@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { CartProvider } from '@/components/CartProvider';
 import { ItemSheet } from '@/components/screens/CustomerMenu';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { getMenuScreenData } from '@/lib/db/menu-screen';
@@ -21,5 +22,9 @@ export default async function ItemPage({
   const data = await getMenuScreenData(s);
   if (isSupabaseConfigured && !data) notFound();
 
-  return <ItemSheet data={data ? { ...data, itemId: item } : undefined} itemId={item} />;
+  return (
+    <CartProvider slug={s}>
+      <ItemSheet data={data ? { ...data, itemId: item } : undefined} itemId={item} />
+    </CartProvider>
+  );
 }

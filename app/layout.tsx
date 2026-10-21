@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { CartProvider } from '@/components/CartProvider';
 
 export const metadata: Metadata = {
   title: 'AutoDine',
@@ -35,9 +34,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         {/* [data-app] scopes every rule in styles/design-system.css to the product. */}
-        <div data-app>
-          <CartProvider>{children}</CartProvider>
-        </div>
+        {/* The cart is not mounted here any more. It is keyed by restaurant,
+            so it belongs to the page that knows which restaurant this is --
+            see the /menu routes. */}
+        <div data-app>{children}</div>
       </body>
     </html>
   );
