@@ -76,6 +76,14 @@ function stripUnsupported(sql) {
   out = out.replace(/^\s*create\s+(or\s+replace\s+)?trigger[\s\S]*?;\s*$/gim, '');
   // drop trigger ... ;
   out = out.replace(/^\s*drop\s+trigger[\s\S]*?;\s*$/gim, '');
+  // do $$ ... $$;  (migration 0010 uses a DO block to make an ALTER
+  // PUBLICATION idempotent. The parser has no plpgsql, so the whole block
+  // goes. It is reported as unverified like the functions above.)
+  out = out.replace(/^\s*do\s+\$\$[\s\S]*?\$\$\s*;\s*$/gim, '');
+  // alter publication ... ;  (no such statement in the parser)
+  out = out.replace(/^\s*alter\s+publication[\s\S]*?;\s*$/gim, '');
+  // alter table ... replica identity ... ;  (not in the parser either)
+  out = out.replace(/^\s*alter\s+table[\s\S]*?replica\s+identity[\s\S]*?;\s*$/gim, '');
   return out;
 }
 
@@ -96,6 +104,9 @@ for (const file of files) {
   const removedRls = (sql.match(/row\s+level\s+security/gi) || []).length;
   const removedTriggers = (sql.match(/^\s*create\s+(?:or\s+replace\s+)?trigger/gim) || []).length;
   const removedTriggerDrops = (sql.match(/^\s*drop\s+trigger/gim) || []).length;
+  const removedDoBlocks = (sql.match(/^\s*do\s+\$\$/gim) || []).length;
+  const removedPublications = (sql.match(/^\s*alter\s+publication/gim) || []).length;
+  const removedReplicaIdentity = (sql.match(/replica\s+identity/gi) || []).length;
 
   // Comments are not statements. Strip them so a file that is nothing but
   // functions, policies and grants reports "nothing checkable" instead of
@@ -108,7 +119,9 @@ for (const file of files) {
         `UNVERIFIED: ${removedFns} function(s), ${removedPolicies} policy/policies, ` +
         `${removedDrops} policy drop(s), ${removedGrants} grant(s), ` +
         `${removedRevokes} revoke(s), ${removedComments} function comment(s)`,
-        `${removedTriggers} trigger(s), ${removedTriggerDrops} trigger drop(s)`,
+        `${removedTriggers} trigger(s), ${removedTriggerDrops} trigger drop(s), ` +
+        `${removedDoBlocks} do block(s), ${removedPublications} publication change(s), ` +
+        `${removedReplicaIdentity} replica identity statement(s)`,
     );
     continue;
   }
@@ -124,6 +137,8 @@ for (const file of files) {
       `${removedComments} function comment(s)`,
       `${removedRls} RLS statement(s)`,
       `${removedTriggers} trigger(s), ${removedTriggerDrops} trigger drop(s)`,
+      `${removedDoBlocks} do block(s), ${removedPublications} publication change(s), ` +
+        `${removedReplicaIdentity} replica identity statement(s)`,
     ].join(', ');
     console.log(
       `${file}: DDL parses (${ast.length} statements)` +
