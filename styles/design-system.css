@@ -1169,25 +1169,9 @@
   [data-app] .kb__warn { font-size: 13px; }
 }
 
-/* ------------------------------------------------- announcement language
-   Two buttons, not a dropdown: on a wall tablet a dropdown is a menu to open
-   and a button is a tap. Hindi is the default in an Indian kitchen and the
-   selected one has to be obvious from across the room. */
+/* ------------------------------------------------------ announcement voice
+   One language, so there is no picker: this chip names the voice that will
+   actually speak, and says so plainly when there is none. A toggle here would
+   promise a choice the product does not offer. */
 
-[data-app] .kb__langs {
-  display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-[data-app] .kb__lang {
-  border: 0; background: transparent; padding: 6px 12px; min-height: 32px;
-  font: inherit; font-size: 12.5px; color: rgba(17, 19, 24, 0.6); cursor: pointer;
-}
-[data-app] .kb__lang + .kb__lang { border-left: 1px solid var(--border); }
-[data-app] .kb__lang.is-on { background: var(--text); color: var(--surface); font-weight: 600; }
-
-/* A language the device cannot speak: visible, disabled, and explained by the
-   warning strip above it rather than silently pretending to work. */
-.kb__lang:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
+[data-app] .kb__pill.is-ok { border-color: var(--accent); color: var(--text); }

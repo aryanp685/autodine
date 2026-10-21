@@ -25,14 +25,25 @@ vi.mock('@/lib/supabase/client', () => ({
 }));
 
 describe('Kitchen board', () => {
-  it('offers Hindi and English, with Hindi the default', () => {
+  it('offers one language, not a picker that implies a second one exists', () => {
     const html = renderToStaticMarkup(<Kitchen />);
 
     expect(html).toContain('हिंदी');
-    expect(html).toContain('English');
-    // aria-pressed tells a screen reader which one is active; the class is
-    // what a person sees.
-    expect(html).toMatch(/aria-pressed="true"[^>]*>हिंदी|हिंदी<\/button>/);
+    expect(html).not.toContain('aria-label="Announcement language"');
+    expect(html).not.toContain('>English<');
+  });
+
+  it('names the voice it will use rather than promising Hindi blindly', () => {
+    const html = renderToStaticMarkup(<Kitchen />);
+
+    // Before the effect runs the board is still looking for the voice, and it
+    // says so instead of claiming to be ready.
+    expect(html).toMatch(/हिंदी · (आवाज़ खोज रहे हैं|तैयार|आवाज़ नहीं)/);
+  });
+
+  it('offers the exact sentence it will speak as a test', () => {
+    const html = renderToStaticMarkup(<Kitchen />);
+    expect(html).toContain('Test announcement');
   });
 
   it('says it is a demo board rather than looking live', () => {
