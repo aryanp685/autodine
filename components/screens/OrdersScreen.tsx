@@ -204,7 +204,17 @@ export function OrdersScreen({
                             minute: '2-digit',
                           })}
                         </td>
-                        <td className="pg__barMuted">{order.code}</td>
+                        <td className="pg__barMuted">
+                          {live && !blocked ? (
+                            // The code is the natural door into one bill: it is
+                            // what the counter and the guest both quote.
+                            <Link href={`/bill/${order.id}`} title="Open this bill">
+                              {order.code}
+                            </Link>
+                          ) : (
+                            order.code
+                          )}
+                        </td>
                         <td>{order.tableLabel ?? 'Takeaway'}</td>
                         <td>
                           {cancelled ? (

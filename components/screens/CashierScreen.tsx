@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { counterQueue, inr, restaurant } from '@/lib/demo-data';
@@ -255,6 +256,12 @@ export function Cashier({ data }: { data?: CashierScreenData | null }) {
               <div>
                 <div className="cash__kicker">
                   Order {order.code} · {order.table}
+                  {order.orderId ? (
+                    <>
+                      {' · '}
+                      <Link href={`/bill/${order.orderId}`}>bill</Link>
+                    </>
+                  ) : null}
                 </div>
                 <h2 className="cash__amount" id="cashier-order-title">
                   {inr(order.outstanding)}

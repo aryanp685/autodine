@@ -127,6 +127,19 @@ export type Order = {
   total_paise: number;
   placed_at: string;
   updated_at: string;
+  /**
+   * The guest's own key to this order (migration 00600). Null on counter
+   * orders and on anything placed before the column existed -- which is why
+   * every guest-side function treats null as "not yours to open".
+   */
+  guest_token: string | null;
+  /** 'guest' or 'staff', or a staff member's own words. */
+  cancel_reason: string | null;
+  /**
+   * The tax rate this order was priced at, frozen at the moment it was
+   * placed. A bill must show the rate it was charged, not today's.
+   */
+  tax_rate_bps_snapshot: number | null;
 };
 
 export type OrderItem = {
