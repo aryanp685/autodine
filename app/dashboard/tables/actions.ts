@@ -29,7 +29,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { getStaffContextDetailed } from '@/lib/db/staff';
 
 const TABLES_PATH = '/dashboard/tables';
 
@@ -42,23 +42,13 @@ function fail(message: string): never {
  * Returns null when unconfigured, signed out, or not a member of anything.
  */
 async function currentRestaurant() {
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) return null;
+  // One resolver, cookie included: with several outlets on one account an
+  // `.limit(1)` here would write into the lowest restaurant id while the
+  // screen was showing another -- a silent write into the wrong tenant.
+  const staff = await getStaffContextDetailed();
+  if (!staff.ok) return null;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: membership, error } = await supabase
-    .from('memberships')
-    .select('restaurant_id')
-    .eq('user_id', user.id)
-    .limit(1)
-    .maybeSingle();
-
-  if (error || !membership) return null;
-  return { supabase, restaurantId: membership.restaurant_id as string };
+  return { supabase: staff.context.supabase, restaurantId: staff.context.restaurantId };
 }
 
 /** Next free table label: T1, T2, ... skipping any label already taken. */
