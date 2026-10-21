@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { CustomerMenu } from './CustomerMenu';
+import { CustomerMenu, ItemSheet } from './CustomerMenu';
 import { QrProblemScreen } from './QrProblemScreen';
 
 /**
@@ -121,5 +121,73 @@ describe('QrProblemScreen', () => {
       <QrProblemScreen title="Nope" detail="Try again" staffHint="Taken out of service." />
     );
     expect(withHint).toContain('Taken out of service.');
+  });
+});
+
+/**
+ * The price on the add button.
+ *
+ * It was wrong long before portions existed. item.price is already in rupees,
+ * and the button ran it through paiseToRupees() first, dividing by a hundred:
+ * a Rs 469 dish offered itself as "Add to order · Rs 5". Nobody noticed
+ * because there was only one price on the screen and no second number to
+ * compare it against -- the note underneath said Rs 469, but the note was in
+ * small grey text under a button people press without reading.
+ *
+ * Once the sheet offered Half at Rs 250 and Full at Rs 469, the button read
+ * Rs 3 against two visible prices in the hundreds, and became impossible to
+ * miss. These tests exist so it cannot go back.
+ */
+describe('the add button price', () => {
+  const dish = (variants?: { id: string; name: string; price: number }[]) => ({
+    restaurant,
+    categories: [{ id: 'c1', name: 'Main Course', count: 1 }],
+    items: [
+      {
+        id: 'i1',
+        name: 'Butter Chicken',
+        desc: 'Slow-cooked',
+        price: 469,
+        category: 'c1',
+        veg: false,
+        available: true,
+        ...(variants ? { variants } : {}),
+      },
+    ],
+    table: null,
+  });
+
+  const portions = [
+    { id: 'v-half', name: 'Half', price: 250 },
+    { id: 'v-full', name: 'Full', price: 469 },
+  ];
+
+  const button = (html: string) => {
+    const match = html.match(/Add to order · [^<]*/);
+    return match ? match[0] : '';
+  };
+
+  it('shows the dish price in rupees, not divided by a hundred', () => {
+    const html = renderToStaticMarkup(<ItemSheet data={dish()} />);
+    expect(button(html)).toBe('Add to order · ₹469');
+  });
+
+  it('shows the cheapest portion when that is the one selected', () => {
+    // The first variant is selected by default, which is the half plate.
+    const html = renderToStaticMarkup(<ItemSheet data={dish(portions)} />);
+    expect(button(html)).toBe('Add to order · ₹250');
+  });
+
+  it('shows the full price once the full plate is chosen', () => {
+    // Rendered with the full plate first, so it is the default selection.
+    const html = renderToStaticMarkup(
+      <ItemSheet data={dish([portions[1], portions[0]])} />
+    );
+    expect(button(html)).toBe('Add to order · ₹469');
+  });
+
+  it('never shows a three-digit price as a single digit', () => {
+    const html = renderToStaticMarkup(<ItemSheet data={dish(portions)} />);
+    expect(button(html)).not.toBe('Add to order · ₹3');
   });
 });
