@@ -70,6 +70,12 @@ function stripUnsupported(sql) {
   out = out.replace(/^\s*alter\s+table[\s\S]*?row\s+level\s+security\s*;\s*$/gim, '');
   // alter table ... add/drop constraint ...;
   out = out.replace(/^\s*alter\s+table[\s\S]*?(add|drop)\s+constraint[\s\S]*?;\s*$/gim, '');
+  // create trigger ... ;  (the parser has no CREATE TRIGGER. Trigger bodies
+  // are function calls, so there is little to check anyway -- but they must
+  // be removed or they break the parse of everything around them.)
+  out = out.replace(/^\s*create\s+(or\s+replace\s+)?trigger[\s\S]*?;\s*$/gim, '');
+  // drop trigger ... ;
+  out = out.replace(/^\s*drop\s+trigger[\s\S]*?;\s*$/gim, '');
   return out;
 }
 
@@ -88,6 +94,8 @@ for (const file of files) {
   const removedComments =
     (sql.match(/^\s*comment\s+on\s+function/gim) || []).length;
   const removedRls = (sql.match(/row\s+level\s+security/gi) || []).length;
+  const removedTriggers = (sql.match(/^\s*create\s+(?:or\s+replace\s+)?trigger/gim) || []).length;
+  const removedTriggerDrops = (sql.match(/^\s*drop\s+trigger/gim) || []).length;
 
   // Comments are not statements. Strip them so a file that is nothing but
   // functions, policies and grants reports "nothing checkable" instead of
@@ -100,6 +108,7 @@ for (const file of files) {
         `UNVERIFIED: ${removedFns} function(s), ${removedPolicies} policy/policies, ` +
         `${removedDrops} policy drop(s), ${removedGrants} grant(s), ` +
         `${removedRevokes} revoke(s), ${removedComments} function comment(s)`,
+        `${removedTriggers} trigger(s), ${removedTriggerDrops} trigger drop(s)`,
     );
     continue;
   }
@@ -114,6 +123,7 @@ for (const file of files) {
       `${removedRevokes} revoke(s)`,
       `${removedComments} function comment(s)`,
       `${removedRls} RLS statement(s)`,
+      `${removedTriggers} trigger(s), ${removedTriggerDrops} trigger drop(s)`,
     ].join(', ');
     console.log(
       `${file}: DDL parses (${ast.length} statements)` +

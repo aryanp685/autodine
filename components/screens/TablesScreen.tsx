@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { tables as demoTables, restaurant as demoRestaurant } from '@/lib/demo-data';
-import { QrChip } from '@/components/ui';
+import { TableQr } from '@/components/TableQr';
 import { PrintButton } from '@/components/PrintButton';
 import type { TablesScreenData, TableRow } from '@/lib/db/tables-screen';
 import { addTableAction, revokeQrAction, rotateQrAction, setTableActiveAction } from '@/app/dashboard/tables/actions';
@@ -102,11 +102,18 @@ export function TablesScreen({
         </header>
 
         <div className="pg__note pg__note--info">
-          <strong>How on-site verification works:</strong> each table&apos;s QR resolves to that restaurant and
-          table, then the server checks a short-lived on-site code, expiry, revocation and ordering rules before
-          a menu is shown. A static QR alone cannot prove a guest is in the room, and GPS is unreliable indoors
-          — this reduces remote ordering abuse substantially, but no method prevents it absolutely. The exact
-          code lifetime and recovery flow will be designed and shown to you before implementation.
+          <strong>How a scan works:</strong> the card on the table carries an unguessable token, not a link to
+          the restaurant. Scanning exchanges it for a session that is bound to that one table and expires in
+          under an hour, so an order placed from it is stamped with the table it was placed at. Each restaurant
+          gets its own codes — one restaurant&apos;s card will not scan into another.
+        </div>
+
+        <div className="pg__note pg__note--warn">
+          <strong>Honest limitation:</strong> a guest in the room can photograph a live card and send the
+          picture to someone outside, who can then order to that table. No printed code can prevent this —
+          the code has to be readable by whoever is sitting there. What is prevented is the worse case: a
+          shareable link anyone could edit or reuse from anywhere, forever. Revoking a code here takes it out
+          of service immediately and ends any session created from it.
         </div>
 
         {!live && (
@@ -127,7 +134,7 @@ export function TablesScreen({
                 {t.label} · {t.seats} seats
               </div>
               <div className="pg__tableQr">
-                <QrChip value={`${restaurantName}-${t.code}`} size={72} />
+                <TableQr svg={t.qrSvg} fallbackValue={`${restaurantName}-${t.code}`} size={72} />
               </div>
               <div className="pg__tableStats">
                 <div>
@@ -187,7 +194,7 @@ export function TablesScreen({
             <div className="pg__printGrid">
               {tables.slice(0, 6).map((t) => (
                 <div key={t.code} className="pg__printCard">
-                  <QrChip value={`print-${t.code}`} size={64} />
+                  <TableQr svg={t.qrSvg} fallbackValue={`print-${t.code}`} size={64} />
                   <div className="pg__printCode">{t.code}</div>
                   <div className="pg__printName">{restaurantName}</div>
                   <div className="pg__printHint">Scan to view menu &amp; order</div>
@@ -197,21 +204,25 @@ export function TablesScreen({
           </div>
 
           <aside className="pg__printAside">
-            <h3 className="pg__h3">Rotating codes</h3>
+            <h3 className="pg__h3">What a card carries</h3>
             <p className="pg__p">
-              On top of the printed table code, the ordering session carries a short-lived on-site code that the
-              server validates. Proposed behaviour, pending your approval:
+              These are real QR codes. Each encodes a URL containing 256 bits of randomness, bound to one table.
+              There is no restaurant name in it to guess at and no expiry on the card itself.
             </p>
             <ul className="pg__bullets">
-              <li>Code lifetime measured in minutes, refreshed while the guest is on the page.</li>
-              <li>Expired or revoked codes show a clear message with a recovery path — never a silent bypass.</li>
-              <li>Regenerating a table code invalidates the previous one immediately.</li>
+              <li>Every table is given a code when it is created — a table cannot exist without one.</li>
+              <li>A scan creates a session that expires in under an hour; the card keeps working.</li>
+              <li>An expired or revoked code shows a clear message with a recovery path, never a silent bypass.</li>
+              <li>
+                Regenerating a table code invalidates the previous one immediately, and ends any session created
+                from it.
+              </li>
               <li>Ordering can be disabled per table without touching the menu.</li>
               <li>No signing keys or admin tokens appear in the QR URL.</li>
             </ul>
             <div className="pg__note pg__note--warn">
-              Honest limitation: a guest in the restaurant could still photograph a live code and share it. This
-              design narrows that window; it does not eliminate it.
+              Print a fresh sheet after regenerating. The old cards look identical and will simply stop working,
+              which is the intended behaviour but is not obvious to a guest holding one.
             </div>
           </aside>
         </section>

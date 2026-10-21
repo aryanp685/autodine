@@ -9,9 +9,16 @@
  * session's membership row. Taking it from the form would let any signed-in
  * owner pass someone else's id.
  *
- * QR tokens are short-lived (QR_TTL_HOURS) on purpose. A static printed code
- * cannot prove a diner is physically in the room, so a leaked screenshot of
- * an old code must stop working on its own.
+ * QR codes used to be short-lived. They no longer are, and the reason is
+ * mundane: nobody reprints five table cards every twelve hours. The card now
+ * carries a permanent token, and what expires is the session a scan creates
+ * from it. Rotation still exists -- it is how a leaked code is taken out of
+ * service -- but it is something a person decides, not a clock running out.
+ *
+ * A table's code is created by a trigger on dining_tables (migration 0007),
+ * not by this file. It used to be created here, which meant any path that
+ * added a table without going through this action produced a table with no
+ * code -- which is precisely the state four of the six tables were found in.
  *
  * Errors redirect with a message in the query string, matching the pattern in
  * app/auth/actions.ts: these are called by <form action> in Server Components
@@ -20,11 +27,9 @@
 
 'use server';
 
-import { randomBytes } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { QR_TTL_HOURS } from '@/lib/db/tables-screen';
 
 const TABLES_PATH = '/dashboard/tables';
 
@@ -56,15 +61,6 @@ async function currentRestaurant() {
   return { supabase, restaurantId: membership.restaurant_id as string };
 }
 
-/** A short, URL-safe, unguessable table code. Not a JWT, not sequential. */
-function newToken(): string {
-  return randomBytes(16).toString('base64url');
-}
-
-function expiresAt(): string {
-  return new Date(Date.now() + QR_TTL_HOURS * 60 * 60 * 1000).toISOString();
-}
-
 /** Next free table label: T1, T2, ... skipping any label already taken. */
 function nextLabel(existing: string[]): string {
   const used = new Set(existing);
@@ -93,25 +89,19 @@ export async function addTableAction(formData: FormData): Promise<void> {
 
   const label = nextLabel((existing ?? []).map((row) => row.label as string));
 
-  const { data: created, error } = await ctx.supabase
+  // No .select(): the returned row is not needed now that the QR code is
+  // created by the trigger, and asking for one only to discard it is a
+  // round trip's worth of payload for nothing.
+  const { error } = await ctx.supabase
     .from('dining_tables')
-    .insert({ restaurant_id: ctx.restaurantId, label, seats })
-    .select('id')
-    .single();
+    .insert({ restaurant_id: ctx.restaurantId, label, seats });
 
   if (error) fail(`Could not add table: ${error.message}`);
 
-  // A new table gets a live code immediately, so it can take orders the
-  // moment it exists.
-  const { error: tokenError } = await ctx.supabase.from('qr_tokens').insert({
-    restaurant_id: ctx.restaurantId,
-    table_id: created.id as string,
-    token: newToken(),
-    expires_at: expiresAt(),
-  });
-
-  if (tokenError) fail(`Table added, but its QR could not be created: ${tokenError.message}`);
-
+  // No QR insert here. A trigger on dining_tables creates the code in the
+  // same transaction as the table, so a table cannot exist without one.
+  // Doing it as a second write from here is how four of the six tables ended
+  // up with no code at all.
   revalidatePath(TABLES_PATH);
   redirect(`${TABLES_PATH}?notice=${encodeURIComponent(`${label} added with a new QR code.`)}`);
 }
@@ -147,29 +137,18 @@ export async function rotateQrAction(formData: FormData): Promise<void> {
   const tableId = String(formData.get('tableId') ?? '').trim();
   if (!tableId) fail('Missing table.');
 
-  // Drop the old codes first, then issue one. Both writes are RLS-gated to
-  // this restaurant, so a wrong table id simply affects no rows.
-  const { error: clearError } = await ctx.supabase
-    .from('qr_tokens')
-    .delete()
-    .eq('table_id', tableId)
-    .eq('restaurant_id', ctx.restaurantId);
+  // One call, not two writes. Revoke-then-insert split across the network can
+  // fail between the two and leave the table with no code at all. The
+  // function holds both, checks membership itself, and revokes any live
+  // session created from the old code.
+  const { error } = await ctx.supabase.rpc('rotate_table_qr_code', { p_table_id: tableId });
 
-  if (clearError) fail(`Could not retire the old code: ${clearError.message}`);
-
-  const { error } = await ctx.supabase.from('qr_tokens').insert({
-    restaurant_id: ctx.restaurantId,
-    table_id: tableId,
-    token: newToken(),
-    expires_at: expiresAt(),
-  });
-
-  if (error) fail(`Could not create a new code: ${error.message}`);
+  if (error) fail(`Could not issue a new code: ${error.message}`);
 
   revalidatePath(TABLES_PATH);
   redirect(
     `${TABLES_PATH}?notice=${encodeURIComponent(
-      `New code issued. It expires in ${QR_TTL_HOURS} hours and the old one stops working now.`
+      'New code issued. The old one stops working now -- reprint the card before service.'
     )}`
   );
 }
@@ -181,16 +160,14 @@ export async function revokeQrAction(formData: FormData): Promise<void> {
   const tableId = String(formData.get('tableId') ?? '').trim();
   if (!tableId) fail('Missing table.');
 
-  const { error } = await ctx.supabase
-    .from('qr_tokens')
-    .delete()
-    .eq('table_id', tableId)
-    .eq('restaurant_id', ctx.restaurantId);
+  const { error } = await ctx.supabase.rpc('retire_table_qr_code', { p_table_id: tableId });
 
   if (error) fail(`Could not revoke the code: ${error.message}`);
 
   revalidatePath(TABLES_PATH);
   redirect(
-    `${TABLES_PATH}?notice=${encodeURIComponent('Code revoked. Print a new card before this table can take orders.')}`
+    `${TABLES_PATH}?notice=${encodeURIComponent(
+      'Code revoked. Print a new card before this table can take orders.'
+    )}`
   );
 }
