@@ -485,6 +485,7 @@
 [data-app] .pg__check { font-size: 13.5px; color: rgba(17, 19, 24, 0.7); align-items: flex-start; line-height: 1.6; }
 [data-app] .pg__submit { width: 100%; background: var(--text); color: #fff; border: 0; padding: 15px; border-radius: 2px; font-size: 15px; cursor: pointer; }
 [data-app] .pg__fine { font-size: 12px; color: rgba(17, 19, 24, 0.5); line-height: 1.6; }
+[data-app] .pg__fineLink { color: inherit; text-decoration: underline; text-underline-offset: 2px; font-weight: 600; }
 [data-app] .pg__aside { display: grid; gap: 20px; align-content: start; }
 [data-app] .pg__asideCard { border: 1px solid var(--border); background: #fff; padding: 26px; border-radius: 3px; }
 [data-app] .pg__asideCard--quiet { background: #efe9dd; border-color: #ddd5c4; }

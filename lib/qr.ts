@@ -50,32 +50,11 @@ const MARGIN = 2;
 /**
  * The origin these QR codes point at.
  *
- * Derived from the incoming request rather than a constant, because the same
- * build is served from a Vercel preview URL, a production alias, and a custom
- * domain. A code printed with the wrong host in it is a dead card, and there
- * is no way to tell from the card that it is dead.
- *
- * Falls back to an explicit SITE_URL when there is no request to read --
- * scripts, tests, and any other non-request context.
+ * Defined in lib/site-origin.ts so the password-reset mail can use the same
+ * hostname without importing a QR encoder, and re-exported here for the
+ * screens that already ask this module for it.
  */
-export async function siteOrigin(): Promise<string> {
-  const configured = process.env.SITE_URL?.trim();
-  if (configured) return configured.replace(/\/+$/, '');
-
-  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
-  if (vercel) return `https://${vercel.replace(/\/+$/, '')}`;
-
-  // Read lazily: headers() is request-scoped, and calling it at module scope
-  // would make every import of this file require a request.
-  const { headers } = await import('next/headers');
-  const h = await headers();
-  const host = h.get('x-forwarded-host') ?? h.get('host');
-  if (!host) return '';
-
-  // x-forwarded-proto is what Vercel sets; host alone cannot tell us.
-  const proto = h.get('x-forwarded-proto') ?? 'https';
-  return `${proto}://${host}`;
-}
+export { siteOrigin } from './site-origin';
 
 /**
  * The URL a printed table card encodes.
