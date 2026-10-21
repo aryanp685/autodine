@@ -74,6 +74,18 @@
 --
 -- Nothing in this migration changes how orders are taken by staff.
 -- place_counter_order is untouched and does not need a table session.
+--
+-- APPLYING THIS
+--
+-- This file is additive and safe to run against the app that is currently
+-- deployed: it adds functions and one required parameter check, and changes
+-- nothing the old scan path calls. The old, code-less verify_table_qr() is
+-- still present and still granted to anon on purpose, because the app that is
+-- live on main calls it on every scan.
+--
+-- The second half is 20261024000900_drop_old_qr_scan.sql, which revokes and
+-- drops it. That one goes on AFTER the build using
+-- verify_table_qr_with_code is live. Section 8 explains the ordering.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -685,20 +697,31 @@ comment on function public.current_table_session(text) is
   'for anything that does not. The gate every guest Ordering page reads.';
 
 -- ----------------------------------------------------------------------------
--- 8. Close the old door
+-- 8. The old door is CLOSED LATER, not here.
 --
--- verify_table_qr(token, ip) minted a session with no code at all, and anon
--- held EXECUTE on it: anyone could call it through the REST API. Revoking the
--- grant is not enough to forget it exists -- service_role could still call it
--- by accident -- so it is dropped. Exactly one function mints sessions now.
+-- verify_table_qr(token, ip) mints a session with no code at all, and anon
+-- holds EXECUTE on it, so a browser can still call it through the REST API.
+-- It has to stay callable until this migration's partner is live, because the
+-- application currently deployed on main calls it on every scan.
+--
+-- Dropping it in this file would mean choosing which of the two windows to
+-- break: apply the migration first and scans fail until the new build is
+-- promoted; promote first and scans fail until the migration is applied.
+-- Neither is acceptable in a restaurant mid-service.
+--
+-- So this migration is ADDITIVE and safe for the running app:
+--
+--   * the old scan path keeps working, unchanged;
+--   * the new tables and functions simply exist;
+--   * place_public_order now requires a session, which the old path already
+--     supplies whenever the guest has one -- the only difference is that a
+--     guest whose session expired is refused instead of being given a
+--     tokenless counter order, which is the change we want anyway.
+--
+-- The closing move is migration 20261024000900_drop_old_qr_scan.sql, applied
+-- AFTER this app is live. Until then the old hole is still open: a card
+-- photograph alone can still order, which is what the deploy closes.
 -- ----------------------------------------------------------------------------
-
-revoke all on function public.verify_table_qr(text, text) from public;
-revoke all on function public.verify_table_qr(text, text) from anon;
-revoke all on function public.verify_table_qr(text, text) from authenticated;
-revoke all on function public.verify_table_qr(text, text) from service_role;
-
-drop function if exists public.verify_table_qr(text, text);
 
 -- ----------------------------------------------------------------------------
 -- 9. An order without a verified table is a counter order, and the guest has
