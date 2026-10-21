@@ -33,3 +33,30 @@ export async function siteOrigin(): Promise<string> {
   const proto = h.get('x-forwarded-proto') ?? 'https';
   return `${proto}://${host}`;
 }
+
+/**
+ * The origin of THIS request, even on a preview deployment.
+ *
+ * siteOrigin() prefers the project's production domain, which is right for a
+ * printed QR card: a card that survives the deployment it was printed from is
+ * the whole point. It is wrong for an emailed auth link, and quietly so. The
+ * PKCE verifier for a password reset is a cookie on the host that asked for
+ * the link. Send the mail back to production from a preview, and the exchange
+ * lands on the wrong host, finds no verifier, and reports the link as expired.
+ *
+ * So auth links ask this instead: whoever is serving the request gets the
+ * redirect, and the cookie is where the link comes back to.
+ */
+export async function requestOrigin(): Promise<string> {
+  const { headers } = await import('next/headers');
+  const h = await headers();
+  const host = h.get('x-forwarded-host') ?? h.get('host');
+
+  if (host) {
+    // x-forwarded-proto is what Vercel sets; host alone cannot tell us.
+    const proto = h.get('x-forwarded-proto') ?? 'https';
+    return `${proto}://${host}`;
+  }
+
+  return siteOrigin();
+}
