@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import { NextResponse, type NextRequest } from 'next/server';
-import { cookies } from 'next/headers';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import {
@@ -131,7 +130,16 @@ export async function GET(
     expiresAt: row.expires_at,
   };
 
-  (await cookies()).set(TABLE_SESSION_COOKIE, JSON.stringify(session), {
+  // The cookie is set on the response rather than through cookies() from
+  // next/headers. Both are allowed in a Route Handler, but mixing them is
+  // not: cookies() writes into the request context's mutable cookie store
+  // while an explicit NextResponse carries its own headers, and the two do
+  // not reliably compose. One response, one place the cookie is written.
+  const response = NextResponse.redirect(
+    new URL(`/menu?s=${encodeURIComponent(session.slug)}`, request.url)
+  );
+
+  response.cookies.set(TABLE_SESSION_COOKIE, JSON.stringify(session), {
     ...TABLE_SESSION_COOKIE_OPTIONS,
     // The cookie must not outlive the session it carries. The database caps a
     // session at an hour; taking a minute off the cookie means the browser
@@ -140,7 +148,5 @@ export async function GET(
     maxAge: 60 * 59,
   });
 
-  return NextResponse.redirect(
-    new URL(`/menu?s=${encodeURIComponent(session.slug)}`, request.url)
-  );
+  return response;
 }
