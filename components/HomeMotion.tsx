@@ -82,17 +82,46 @@ export function HomeMotion() {
 
             gsap.from(target, {
               opacity: 0,
-              y: step === 'title' ? 26 : 16,
-              duration: step === 'title' ? 1.1 : 0.85,
+              // The headline travels furthest because it is the largest thing
+              // on screen; moving the lede the same distance would make the
+              // two look like one block instead of a hierarchy.
+              y: step === 'title' ? 30 : step === 'note' ? 10 : 18,
+              duration: step === 'title' ? 1.05 : 0.8,
               ease: 'power3.out',
-              delay: 0.08 + i * 0.11,
+              delay: 0.1 + i * 0.1,
+            });
+          });
+
+          // The opening frame: the photograph settles from a 6% overscan over
+          // 1.6s while the copy arrives over it. Slow on purpose -- this runs
+          // once per visit, and a fast zoom reads as a stutter rather than a
+          // breath. It animates scale only, so it cannot fight the scrubbed
+          // yPercent parallax set up further down.
+          const openingHeroImg = document.querySelector<HTMLElement>('[data-hero-image]');
+          if (openingHeroImg) {
+            gsap.from(openingHeroImg, {
+              scale: 1.06,
+              duration: 1.6,
+              ease: 'power2.out',
+            });
+          }
+
+          // Section rules are drawn from the left as their section arrives.
+          // scaleX on a 1px line is composited, so this costs nothing to run
+          // alongside the block's own fade.
+          gsap.utils.toArray<HTMLElement>('[data-rule]').forEach((rule) => {
+            gsap.from(rule, {
+              scaleX: 0,
+              duration: 1.1,
+              ease: 'power2.out',
+              scrollTrigger: { trigger: rule.parentElement ?? rule, start: 'top 88%', once: true },
             });
           });
 
           gsap.utils.toArray<HTMLElement>('[data-anim="reveal"]').forEach((el) => {
             gsap.from(el, {
               opacity: 0,
-              y: 24,
+              y: 26,
               duration: 0.9,
               ease: 'power3.out',
               scrollTrigger: {
@@ -108,13 +137,16 @@ export function HomeMotion() {
           // Hero parallax. The photograph drifts up more slowly than the page
           // scrolls, which is what gives a full-bleed image depth instead of
           // letting it feel pasted flat behind the type. Small on purpose:
-          // 12% of the hero height, scrubbed against scroll so it tracks the
-          // wheel rather than running on a timer.
+          // 8% of the image's own height, scrubbed against scroll so it tracks
+          // the wheel rather than running on a timer. The stylesheet sizes the
+          // image at 120% with 10% of overhang, so 8% of 120% = 9.6% of the
+          // hero stays inside it. Changing one number means changing the
+          // other -- see the note on .home__heroImg.
           const heroImg = document.querySelector<HTMLElement>('[data-hero-image]');
           const hero = document.querySelector<HTMLElement>('[data-hero]');
           if (heroImg && hero) {
             gsap.to(heroImg, {
-              yPercent: 12,
+              yPercent: 8,
               ease: 'none',
               scrollTrigger: {
                 trigger: hero,
@@ -149,10 +181,12 @@ export function HomeMotion() {
 
             gsap.from(children, {
               opacity: 0,
-              y: 20,
+              y: 18,
               duration: 0.8,
               ease: 'power3.out',
-              stagger: 0.09,
+              // 75ms between siblings: close enough that a row reads as one
+              // gesture, far enough that the order is legible.
+              stagger: 0.075,
               scrollTrigger: { trigger: group, start: 'top 85%', once: true },
             });
           });

@@ -30,18 +30,18 @@ html, body { margin: 0; padding: 0; }
 
 :root {
   /* Baseline brief palette (Part 5.4) — directions may re-weight, not replace. */
-  --ink: #111318;
-  --warm-white: #F6F6F3;
-  --muted-sage: #6D7F70;
+  --ink: #16140f;
+  --warm-white: #f7f4ed;
+  --muted-sage: #66735a;
   --soft-blue: #DDE7F2;
-  --sand: #E8E2D8;
+  --sand: #ede6d8;
   --alert: #C75B50;
 
-  --ink-70: rgba(17, 19, 24, 0.7);
-  --ink-55: rgba(17, 19, 24, 0.55);
-  --ink-40: rgba(17, 19, 24, 0.4);
-  --ink-14: rgba(17, 19, 24, 0.14);
-  --ink-08: rgba(17, 19, 24, 0.08);
+  --ink-70: rgba(22, 20, 15, 0.7);
+  --ink-55: rgba(22, 20, 15, 0.55);
+  --ink-40: rgba(22, 20, 15, 0.4);
+  --ink-14: rgba(22, 20, 15, 0.14);
+  --ink-08: rgba(22, 20, 15, 0.08);
 
   --s-1: 4px;
   --s-2: 8px;
@@ -77,7 +77,7 @@ html, body { margin: 0; padding: 0; }
 }
 
 body {
-  background: #eceae6;
+  background: #eae6dd;
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: 15px;
@@ -147,7 +147,11 @@ img { display: block; max-width: 100%; }
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+  transition:
+    background-color var(--dur-1) linear,
+    border-color var(--dur-1) linear,
+    color var(--dur-1) linear,
+    transform var(--dur-1) var(--ease-out);
   white-space: nowrap;
 }
 .ui-btn:hover { border-color: var(--ink-40); }
@@ -187,7 +191,7 @@ img { display: block; max-width: 100%; }
   border: 1px solid transparent;
   white-space: nowrap;
 }
-.ui-badge--sage { background: rgba(109, 127, 112, 0.14); color: #47584a; }
+.ui-badge--sage { background: rgba(102, 115, 90, 0.15); color: #46523b; }
 .ui-badge--alert { background: rgba(199, 91, 80, 0.13); color: #9c3f36; }
 .ui-badge--blue { background: var(--soft-blue); color: #2f4661; }
 .ui-badge--sand { background: var(--sand); color: #5a5142; }
@@ -207,7 +211,11 @@ img { display: block; max-width: 100%; }
   background: var(--surface);
   color: var(--text);
   width: 100%;
+  transition: border-color var(--dur-1) linear, background-color var(--dur-1) linear;
 }
+/* Focus is a state, not an animation: it arrives instantly so a keyboard user
+   is never chasing a moving outline. */
+.ui-input:hover:not(:focus), .ui-select:hover:not(:focus) { border-color: var(--ink-40); }
 .ui-input::placeholder { color: var(--ink-40); }
 .ui-hint { font-size: 12px; color: var(--ink-55); }
 

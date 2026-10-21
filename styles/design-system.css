@@ -6,18 +6,39 @@
    ========================================================================= */
 
 [data-app] {
-  --page-bg: #f6f6f3;
-  --surface: #ffffff;
-  --border: rgba(17, 19, 24, 0.16);
-  --text: #111318;
-  --accent: #6d7f70;
+  /* Warm paper (2026-10 polish). The greys this replaces were neutral-cool,
+     which made full-bleed photography look pasted on. These are the same
+     relationships, warmed by a few degrees: paper, cream surface, warm ink.
+     Every value is a token so the shift stays one edit wide. */
+  --page-bg: #f7f4ed;
+  --surface: #fffdf8;
+  --border: rgba(22, 20, 15, 0.16);
+  --text: #16140f;
+  --accent: #66735a;
   /* Destructive actions only: cancelling an order, deleting a dish. Taken from
      the existing row-delete colour so the design does not grow a second red. */
   --danger: #9c3f36;
+  /* The beige statistic band and the trial strip used to be hardcoded. Same
+     family, one token, so the two cannot drift apart. */
+  --band: #e9e2d3;
+  --band-line: #dcd3c0;
   --shadow: none;
   --radius-sm: 6px;
   --radius: 10px;
   --radius-lg: 14px;
+  /* Motion scale. Three durations, two curves, no fourth of either: anything
+     that needs its own number is really a bug in the intent. --dur-1 is
+     feedback (a press, a hover), --dur-2 is an element arriving, --dur-3 is a
+     panel or a page. --ease-out decelerates hard at the end, which is what
+     makes short distances read as "settled" rather than "moved". */
+  --dur-1: 140ms;
+  --dur-2: 220ms;
+  --dur-3: 320ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
+  /* Distance for an arriving element. One value so a hundred small slides
+     all travel the same distance. */
+  --rise: 12px;
   background: var(--page-bg);
 }
 
@@ -31,88 +52,170 @@
 
 .home { background: var(--page-bg); }
 
+/* The bar is sticky and condenses on scroll.
+   At rest it belongs to the poster: generous height, no bottom edge. Once the
+   page moves under it, it becomes a thin translucent sheet with a hairline, so
+   the reader keeps their place without the chrome ever competing with the
+   photograph. Condensing is a padding change rather than a height change --
+   height is the one property here that would reflow the hero. */
 .home__nav {
+  position: sticky; top: 0; z-index: 30;
   display: flex; align-items: center; gap: 40px;
-  padding: 22px 48px; border-bottom: 1px solid var(--border);
+  padding-block: 22px;
+  padding-inline: 48px;
+  border-bottom: 1px solid transparent;
+  background: var(--page-bg);
+  background: color-mix(in srgb, var(--page-bg) 90%, transparent);
+  -webkit-backdrop-filter: saturate(1.05) blur(10px);
+  backdrop-filter: saturate(1.05) blur(10px);
+  transition:
+    padding var(--dur-2) var(--ease-out),
+    border-color var(--dur-2) var(--ease-out);
 }
+.home__nav.is-condensed { padding-block: 12px; border-bottom-color: var(--border); }
+
 .home__brand { font-size: 18px; font-weight: 600; letter-spacing: -0.025em; }
-.home__links { display: flex; gap: 28px; font-size: 14px; color: rgba(17, 19, 24, 0.7); }
+.home__links { display: flex; gap: 28px; font-size: 14px; color: rgba(22, 20, 15, 0.7); }
 .home__navRight { margin-left: auto; display: flex; align-items: center; gap: 24px; }
-.home__navLink { font-size: 14px; color: rgba(17, 19, 24, 0.7); }
-.home__navCta {
-  font-size: 14px; font-weight: 500; background: var(--text); color: #fff;
-  padding: 10px 18px; border-radius: 2px;
+.home__navLink { font-size: 14px; color: rgba(22, 20, 15, 0.7); }
+
+/* Underline grows from the left on hover instead of appearing. One pixel of
+   movement at 220ms is the whole effect; anything more distracts from the
+   photograph behind it. */
+.home__links a { position: relative; }
+.home__links a::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -4px; height: 1px;
+  background: currentColor; transform: scaleX(0); transform-origin: left;
+  transition: transform var(--dur-2) var(--ease-out);
 }
+.home__links a:hover::after { transform: scaleX(1); }
+
+.home__navCta {
+  font-size: 14px; font-weight: 500; background: var(--text); color: var(--surface);
+  padding: 10px 18px; border-radius: 2px;
+  transition: background-color var(--dur-1) linear, transform var(--dur-1) var(--ease-out);
+}
+.home__navCta:hover { background: rgba(22, 20, 15, 0.85); }
+.home__navCta:active { transform: translateY(1px); }
 
 /* overflow: hidden matters for the parallax below -- without it the drifting
    image would spill out over the next section instead of being cropped. */
-.home__hero { position: relative; min-height: 620px; display: flex; align-items: flex-end; overflow: hidden; }
+.home__hero {
+  position: relative; display: flex; align-items: flex-end; overflow: hidden;
+  min-height: clamp(560px, 82vh, 760px);
+}
 
 /* next/image with `fill` writes position/inset as inline styles, so the only
-   way to give the photograph room to travel is to override them. 14% of extra
-   height against a 12% parallax leaves headroom at both ends; the !important
-   is the cost of fighting an inline style, not a habit. */
+   way to give the photograph room to travel is to override them; the
+   !important is the cost of fighting an inline style, not a habit.
+
+   THE OVERSCAN HAS TO COVER THE TRAVEL. The image is 120% of the hero, hung
+   from -10%: 10% of slack above and below. GSAP moves it 8% of ITS OWN height
+   (yPercent is relative to the element, not the hero), which is 9.6% of the
+   hero -- just inside the 10% of slack. Push either number past the other and
+   a strip of page background appears at the top of the hero while it is still
+   half on screen. The 16px of extra travel that would look 20% better is not
+   worth that failure mode.
+
+   transform-origin is centred and slightly low so the opening zoom pushes the
+   frame outward from the middle of the room rather than from a corner. */
 .home__heroImg {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
-  height: 114% !important;
-  top: -7% !important;
+  height: 120% !important;
+  top: -10% !important;
+  transform-origin: 50% 60%;
 }
 .home__heroShade {
   position: absolute; inset: 0;
-  background: linear-gradient(to top, rgba(17, 19, 24, 0.88) 0%, rgba(17, 19, 24, 0.45) 55%, rgba(17, 19, 24, 0.25) 100%);
+  background: linear-gradient(to top, rgba(22, 20, 15, 0.9) 0%, rgba(22, 20, 15, 0.46) 55%, rgba(22, 20, 15, 0.24) 100%);
 }
-.home__heroBody { position: relative; padding: 64px 48px; color: #fff; max-width: 860px; }
+.home__heroBody { position: relative; padding: 72px 48px; color: var(--surface); max-width: 900px; }
 .home__kicker {
-  font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.7); margin-bottom: 22px; font-weight: 600;
+  font-size: 11.5px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72); margin-bottom: 24px; font-weight: 600;
 }
-.home__h1 { font-size: 76px; line-height: 1.02; font-weight: 500; letter-spacing: -0.04em; }
+/* clamp, not a fixed size: the headline carries the page, and 76px at a 1440px
+   window left the right third of the hero empty. It now scales with the
+   viewport and stops before it outgrows the photograph. */
+.home__h1 { font-size: clamp(46px, 6.4vw, 92px); line-height: 0.98; font-weight: 500; letter-spacing: -0.045em; }
 .home__lede {
-  margin-top: 22px; font-size: 19px; line-height: 1.6;
-  color: rgba(255, 255, 255, 0.8); max-width: 560px;
+  margin-top: 24px; font-size: clamp(17px, 1.4vw, 20px); line-height: 1.6;
+  color: rgba(255, 255, 255, 0.82); max-width: 580px;
 }
-.home__ctas { display: flex; gap: 14px; margin-top: 34px; }
-.home__btn { padding: 15px 28px; font-size: 15px; font-weight: 500; border-radius: 2px; }
-.home__btn--solid { background: #f6f6f3; color: #111318; }
-.home__btn--line { border: 1px solid rgba(255, 255, 255, 0.55); color: #fff; }
-.home__note { margin-top: 24px; font-size: 13px; color: rgba(255, 255, 255, 0.62); }
+.home__ctas { display: flex; gap: 14px; margin-top: 36px; }
+/* The hover lift is 2px, not 6. On a photograph, a card that jumps reads as a
+   bug; a card that settles reads as a raised surface. */
+.home__btn {
+  padding: 15px 28px; font-size: 15px; font-weight: 500; border-radius: 2px;
+  transition:
+    transform var(--dur-2) var(--ease-out),
+    background-color var(--dur-1) linear,
+    border-color var(--dur-1) linear,
+    color var(--dur-1) linear;
+}
+.home__btn:hover { transform: translateY(-2px); }
+.home__btn:active { transform: translateY(0); transition-duration: var(--dur-1); }
+.home__btn--solid { background: var(--surface); color: var(--text); }
+.home__btn--solid:hover { background: var(--page-bg); }
+.home__btn--line { border: 1px solid rgba(255, 255, 255, 0.55); color: var(--surface); }
+.home__btn--line:hover { border-color: rgba(255, 255, 255, 0.9); background: rgba(255, 255, 255, 0.1); }
+.home__note { margin-top: 26px; font-size: 13px; color: rgba(255, 255, 255, 0.6); }
 
-.home__section { padding: 88px 48px; }
-.home__rule { height: 1px; background: var(--border); margin-bottom: 48px; }
+.home__section { padding: 96px 48px; }
+/* The rule is drawn rather than printed: it scales out from the left as the
+   section arrives (see HomeMotion). transform-origin is here because the
+   animation needs it and a stylesheet is the only place it belongs. */
+.home__rule { height: 1px; background: var(--border); margin-bottom: 52px; transform-origin: left center; }
 .home__three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; }
 .home__num {
-  font-size: 12px; letter-spacing: 0.16em; color: rgba(17, 19, 24, 0.4); font-weight: 600;
+  font-size: 12px; letter-spacing: 0.18em; color: rgba(22, 20, 15, 0.4); font-weight: 600;
+  transition: color var(--dur-2) var(--ease-out);
 }
-.home__colTitle { font-size: 25px; margin-top: 18px; letter-spacing: -0.02em; font-weight: 500; }
-.home__colBody { margin-top: 14px; font-size: 15px; line-height: 1.75; color: rgba(17, 19, 24, 0.68); }
+.home__col:hover .home__num { color: var(--accent); }
+.home__colTitle { font-size: 26px; margin-top: 18px; letter-spacing: -0.022em; font-weight: 500; }
+.home__colBody { margin-top: 14px; font-size: 15px; line-height: 1.75; color: rgba(22, 20, 15, 0.68); }
 
-.home__band { background: #e8e2d8; }
+.home__band { background: var(--band); border-block: 1px solid var(--band-line); }
 .home__bandInner {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 48px;
-  padding: 72px 48px; max-width: 1280px; margin: 0 auto;
+  padding: 76px 48px; max-width: 1280px; margin: 0 auto;
 }
-.home__statValue { font-size: 44px; font-weight: 500; letter-spacing: -0.03em; }
-.home__statLabel { margin-top: 8px; font-size: 13px; color: rgba(17, 19, 24, 0.6); }
+/* Hairline separators instead of whitespace alone: the three claims are not
+   a sentence, they are three facts, and a rule says so without a box. */
+.home__stat + .home__stat { border-left: 1px solid var(--band-line); padding-left: 44px; }
+.home__statValue { font-size: clamp(32px, 3.2vw, 46px); font-weight: 500; letter-spacing: -0.03em; }
+.home__statLabel { margin-top: 10px; font-size: 13px; color: rgba(22, 20, 15, 0.6); }
 
-.home__h2 { font-size: 44px; letter-spacing: -0.03em; font-weight: 500; }
-.home__plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 44px; margin-top: 44px; }
-.home__plan { border-top: 1px solid var(--text); padding-top: 24px; }
+.home__h2 { font-size: clamp(34px, 3.6vw, 48px); letter-spacing: -0.03em; font-weight: 500; }
+.home__plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 44px; margin-top: 48px; }
+.home__plan {
+  border-top: 1px solid var(--text); padding-top: 26px;
+  transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out);
+}
+.home__plan:hover { border-top-color: var(--accent); transform: translateY(-2px); }
 .home__planName { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 700; }
-.home__planPrice { font-size: 36px; margin-top: 14px; letter-spacing: -0.03em; font-weight: 500; }
-.home__planPrice span { font-size: 15px; color: rgba(17, 19, 24, 0.5); letter-spacing: 0; }
-.home__planBlurb { margin-top: 12px; font-size: 14px; color: rgba(17, 19, 24, 0.62); line-height: 1.6; }
-.home__planList { margin-top: 20px; display: grid; gap: 9px; }
-.home__planList li { font-size: 13.5px; color: rgba(17, 19, 24, 0.72); padding-left: 16px; position: relative; }
-.home__planList li::before { content: '·'; position: absolute; left: 0; color: rgba(17, 19, 24, 0.4); }
-.home__planLink { display: inline-block; margin-top: 22px; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
-.home__fine { margin-top: 40px; font-size: 12.5px; color: rgba(17, 19, 24, 0.5); max-width: 620px; line-height: 1.7; }
+.home__planPrice { font-size: 38px; margin-top: 14px; letter-spacing: -0.03em; font-weight: 500; }
+.home__planPrice span { font-size: 15px; color: rgba(22, 20, 15, 0.5); letter-spacing: 0; }
+.home__planBlurb { margin-top: 12px; font-size: 14px; color: rgba(22, 20, 15, 0.62); line-height: 1.6; }
+.home__planList { margin-top: 22px; display: grid; gap: 10px; }
+.home__planList li { font-size: 13.5px; color: rgba(22, 20, 15, 0.72); padding-left: 16px; position: relative; }
+.home__planList li::before { content: '·'; position: absolute; left: 0; color: rgba(22, 20, 15, 0.4); }
+.home__planLink {
+  display: inline-block; margin-top: 24px; font-size: 14px;
+  border-bottom: 1px solid var(--border); padding-bottom: 2px;
+  transition: border-color var(--dur-2) var(--ease-out);
+}
+.home__planLink:hover { border-color: var(--text); }
+.home__fine { margin-top: 44px; font-size: 12.5px; color: rgba(22, 20, 15, 0.5); max-width: 620px; line-height: 1.7; }
 
-.home__foot { padding: 64px 48px; border-top: 1px solid var(--border); display: grid; gap: 32px; }
+.home__foot { padding: 72px 48px; border-top: 1px solid var(--border); display: grid; gap: 36px; }
 .home__footBrand { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
 .home__footCols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
-.home__footTitle { font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(17, 19, 24, 0.45); font-weight: 700; margin-bottom: 8px; }
-.home__footCols p { font-size: 13.5px; color: rgba(17, 19, 24, 0.68); line-height: 1.7; }
-.home__footFine { font-size: 11.5px; color: rgba(17, 19, 24, 0.4); }
+.home__footTitle { font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(22, 20, 15, 0.45); font-weight: 700; margin-bottom: 8px; }
+.home__footCols p { font-size: 13.5px; color: rgba(22, 20, 15, 0.68); line-height: 1.7; }
+.home__footCols a { border-bottom: 1px solid transparent; transition: border-color var(--dur-2) var(--ease-out); }
+.home__footCols a:hover { border-bottom-color: var(--border); }
+.home__footFine { font-size: 11.5px; color: rgba(22, 20, 15, 0.4); }
 
 /* ------------------------------------------------------------------ links */
 
@@ -157,7 +260,7 @@
 
 .dash__trialStrip {
   display: flex; align-items: center; gap: 12px; margin-top: 30px;
-  padding: 14px 18px; background: #efe9dd; border: 1px solid #ddd5c4; border-radius: 3px;
+  padding: 14px 18px; background: var(--band); border: 1px solid var(--band-line); border-radius: 3px;
 }
 .dash__trialDot { width: 7px; height: 7px; border-radius: 50%; background: #b8860b; flex: 0 0 auto; }
 .dash__trialStrip strong { font-size: 13.5px; }
@@ -790,7 +893,7 @@
 @media (max-width: 1100px) {
   .home__nav { gap: 24px; padding-inline: 28px; }
   .home__hero { min-height: 540px; }
-  .home__h1 { font-size: clamp(48px, 7vw, 64px); }
+  .home__h1 { font-size: clamp(44px, 6.6vw, 72px); }
   .home__section { padding: 64px 28px; }
   .home__three, .home__plans, .home__bandInner, .home__footCols { gap: 28px; }
   .home__plans { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -847,16 +950,20 @@
 
 @media (max-width: 760px) {
   .home__nav { gap: 14px; padding: 16px 20px; flex-wrap: wrap; }
+  .home__nav.is-condensed { padding-block: 10px; }
   .home__links { order: 3; width: 100%; gap: 22px; overflow-x: auto; padding-bottom: 2px; }
   .home__navRight { gap: 14px; }
   .home__hero { min-height: 500px; }
   .home__heroBody { padding: 36px 22px; }
-  .home__h1 { font-size: clamp(42px, 11vw, 58px); }
+  .home__h1 { font-size: clamp(40px, 10.5vw, 56px); }
   .home__lede { font-size: 17px; }
   .home__ctas { flex-wrap: wrap; }
   .home__btn { flex: 1 1 180px; text-align: center; }
   .home__section { padding: 48px 22px; }
   .home__three, .home__plans, .home__bandInner, .home__footCols { grid-template-columns: 1fr; gap: 28px; }
+  /* One column: the vertical hairlines between the three claims would now
+     run down the left edge of nothing. */
+  .home__stat + .home__stat { border-left: 0; padding-left: 0; border-top: 1px solid var(--band-line); padding-top: 24px; }
   .home__plan:last-child { grid-column: auto; }
   .home__h2 { font-size: clamp(32px, 8vw, 42px); }
   .home__bandInner { padding: 42px 22px; }
@@ -970,8 +1077,40 @@
   [data-app] .pg__printCard { padding: 10px; }
 }
 
+/* ------------------------------------------------------------- motion layer
+   One place for the rules that make the product feel continuous instead of
+   instantaneous. Everything is gated on prefers-reduced-motion: no preference,
+   so a visitor who asked for stillness gets stillness -- not a slower version
+   of the same movement.
+
+   Durations and curves come from the tokens above (--dur-1/2/3, --ease-out).
+   A screen that wants its own number is describing a different intent, not a
+   new value; add a token only when the intent is genuinely new.
+   ------------------------------------------------------------------------ */
+
 @media (prefers-reduced-motion: no-preference) {
-  [data-app] a, [data-app] button { transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, opacity 160ms ease; }
+  [data-app] a,
+  [data-app] button {
+    transition:
+      color var(--dur-1) linear,
+      background-color var(--dur-1) linear,
+      border-color var(--dur-1) linear,
+      opacity var(--dur-1) linear;
+  }
+
+  /* A press is acknowledged before the action completes. One pixel, never a
+     scale: scaling text makes its edges shimmer while it moves. */
+  [data-app] .ui-btn:active:not([disabled]):not([aria-disabled='true']) {
+    transform: translateY(1px);
+  }
+
+  /* Hash links on the marketing pages glide. Product screens never use hash
+     navigation, so this cannot slow down someone taking orders. */
+  [data-app] { scroll-behavior: smooth; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-app] { scroll-behavior: auto; }
 }
 
 [data-app] button:disabled,
