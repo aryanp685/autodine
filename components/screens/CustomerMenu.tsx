@@ -56,95 +56,147 @@ export type MenuScreenData = {
 export function CustomerMenu({ data, orderingEnabled = true }: { data?: MenuScreenData; orderingEnabled?: boolean } = {}) {
   const cart = useCart();
   const [cat, setCat] = useState('all');
+  const [announcement, setAnnouncement] = useState('');
 
   // Use database-backed data when available, otherwise show the local sample menu.
   const restaurant = data?.restaurant ?? demoRestaurant;
   const categories = data?.categories ?? demoCategories;
   const items = data?.items ?? demoItems;
   const list = cat === 'all' ? items : items.filter((i) => i.category === cat);
+  const activeCategory = categories.find((category) => category.id === cat)?.name ?? 'All dishes';
   const itemHref = (itemId: string) => {
     const params = new URLSearchParams({ item: itemId });
     if (data?.restaurant.slug) params.set('s', data.restaurant.slug);
     return `/menu/item?${params.toString()}`;
   };
 
+  const addItem = (item: DisplayItem | Item) => {
+    cart.add({
+      id: item.id,
+      name: item.name,
+      unitPricePaise: rupeesToPaise(item.price),
+      qty: 1,
+      veg: item.veg,
+    });
+    setAnnouncement(`${item.name} added to your order.`);
+  };
+
   return (
-    <div className="menu">
-      <header className="menu__head">
-        <div className="menu__venue">
-          <div className="menu__venueName">{restaurant.name}</div>
-          <div className="menu__venueMeta">{restaurant.tagline}</div>
-        </div>
-        <div className="menu__verified">
-          <span className="menu__verifiedDot" />
-          {!data ? 'Demo — not saved' : orderingEnabled ? 'Verified table session' : 'Verify at your table to order'}
-        </div>
-      </header>
-
-      <nav className="menu__cats">
-        <button type="button" className={`menu__cat ${cat === 'all' ? 'is-active' : ''}`} onClick={() => setCat('all')}>
-          All
-        </button>
-        {categories.map((c) => (
-          <button
-            type="button"
-            key={c.id}
-            className={`menu__cat ${cat === c.id ? 'is-active' : ''}`}
-            onClick={() => setCat(c.id)}
-          >
-            {c.name}
-          </button>
-        ))}
-      </nav>
-
-      <div className="menu__list">
-        {list.map((i) => (
-          <article key={i.id} className={`menu__dish ${i.available ? '' : 'is-out'}`}>
-            <div className="menu__dishBody">
-              <div className="menu__dishTop">
-                <VegMark veg={i.veg} />
-                <h3 className="menu__dishName">{i.name}</h3>
-                {i.badge && <span className="menu__dishBadge">{i.badge}</span>}
-              </div>
-              <p className="menu__dishDesc">{i.desc}</p>
-              <div className="menu__dishPrice">
-                {inr(i.price)}
-                {i.variants && <span className="menu__dishFrom">from</span>}
-              </div>
-              {i.available ? (
-                orderingEnabled ? (
-                  needsChoice(i) ? (
-                    <Link href={itemHref(i.id)} className="menu__dishCta">
-                      Choose options
-                    </Link>
-                  ) : (
-                    <button
-                      type="button"
-                      className="menu__dishCta"
-                      onClick={() => cart.add({ id: i.id, name: i.name, unitPricePaise: rupeesToPaise(i.price), qty: 1, veg: i.veg })}
-                    >
-                      Add
-                    </button>
-                  )
-                ) : (
-                  <span className="menu__dishOut">Ask staff for the current table code to order</span>
-                )
-              ) : (
-                <span className="menu__dishOut">Sold out for now</span>
-              )}
-            </div>
-            {i.img && <Image className="menu__dishImg" src={i.img} alt={i.name} width={104} height={104} sizes="(max-width: 760px) 76px, 104px" />}
-          </article>
-        ))}
+    <div className="menu menu--browse">
+      <div className="menu__browseShell">
+        <header className="menu__head menu__head--browse">
+          <div className="menu__venue">
+            <span className="menu__eyebrow">A TABLESIDE MENU</span>
+            <h1 className="menu__venueName">{restaurant.name}</h1>
+            <p className="menu__venueMeta">{restaurant.tagline}</p>
+          </div>
+          <div className="menu__verified" aria-live="polite">
+            <span className={`menu__verifiedDot ${orderingEnabled ? 'is-ready' : 'is-idle'}`} />
+            <span>
+              {!data ? 'Preview menu · not saved' : orderingEnabled ? 'Your table is ready' : 'Scan the table QR to order'}
+            </span>
+          </div>
+        </header>
       </div>
 
+      <nav className="menu__cats menu__cats--browse" aria-label="Menu categories">
+        <button
+          type="button"
+          className={`menu__cat ${cat === 'all' ? 'is-active' : ''}`}
+          aria-pressed={cat === 'all'}
+          onClick={() => setCat('all')}
+        >
+          All <span className="menu__catCount">{items.length}</span>
+        </button>
+        {categories.map((category) => {
+          const count = items.filter((item) => item.category === category.id).length;
+          return (
+            <button
+              type="button"
+              key={category.id}
+              className={`menu__cat ${cat === category.id ? 'is-active' : ''}`}
+              aria-pressed={cat === category.id}
+              onClick={() => setCat(category.id)}
+            >
+              {category.name} <span className="menu__catCount">{count}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      <main className="menu__content">
+        <div className="menu__sectionHeading">
+          <div>
+            <span className="menu__sectionKicker">MADE FOR THE TABLE</span>
+            <h2>{cat === 'all' ? 'Something delicious' : activeCategory}</h2>
+          </div>
+          <span className="menu__dishCount">{list.length} {list.length === 1 ? 'dish' : 'dishes'}</span>
+        </div>
+
+        <div className="menu__list" key={cat}>
+          {list.map((item) => (
+            <article key={item.id} className={`menu__dish ${item.available ? '' : 'is-out'}`}>
+              <div className="menu__dishBody">
+                <div className="menu__dishTop">
+                  <VegMark veg={item.veg} />
+                  <h3 className="menu__dishName">{item.name}</h3>
+                  {item.badge && <span className="menu__dishBadge">{item.badge}</span>}
+                </div>
+                <p className="menu__dishDesc">{item.desc}</p>
+                <div className="menu__dishFoot">
+                  <div className="menu__dishPrice">
+                    {inr(item.price)}
+                    {item.variants && <span className="menu__dishFrom">from</span>}
+                  </div>
+                  {item.available ? (
+                    orderingEnabled ? (
+                      needsChoice(item) ? (
+                        <Link href={itemHref(item.id)} className="menu__dishCta menu__dishCta--choice">
+                          Choose <span aria-hidden="true">↗</span>
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          className="menu__dishCta"
+                          aria-label={`Add ${item.name} to your order`}
+                          onClick={() => addItem(item)}
+                        >
+                          <span className="menu__addMark" aria-hidden="true">+</span> Add
+                        </button>
+                      )
+                    ) : (
+                      <span className="menu__verifyPrompt">Scan the table QR to order</span>
+                    )
+                  ) : (
+                    <span className="menu__dishOut">Sold out for now</span>
+                  )}
+                </div>
+              </div>
+              {item.img ? (
+                <Image className="menu__dishImg" src={item.img} alt={item.name} width={144} height={124} sizes="(max-width: 760px) 96px, 144px" />
+              ) : (
+                <div className="menu__dishImg menu__dishImg--empty" aria-hidden="true">AD</div>
+              )}
+            </article>
+          ))}
+          {list.length === 0 && (
+            <p className="menu__emptyState">There are no dishes in this category yet. Try another section.</p>
+          )}
+        </div>
+      </main>
+
+      <span className="menu__srOnly" aria-live="polite">{announcement}</span>
       {orderingEnabled && cart.count > 0 && (
-        <div className="menu__cartBar">
-          <span>
-            {cart.count} item{cart.count === 1 ? '' : 's'} · {inr(paiseToRupees(cart.subtotalPaise))}
-          </span>
-          <Link href={`/menu/cart?s=${encodeURIComponent(cart.scope)}`} className="menu__cartBtn">
-            Review order
+        <div className="menu__cartBar menu__cartBar--browse" key={cart.count}>
+          <div className="menu__cartSummary">
+            <span className="menu__cartCount">{cart.count}</span>
+            <span>
+              <strong>{cart.count} item{cart.count === 1 ? '' : 's'}</strong>
+              <span className="menu__cartSubtotal"> · {inr(paiseToRupees(cart.subtotalPaise))}</span>
+            </span>
+          </div>
+          <Link href={`/menu/cart?s=${encodeURIComponent(cart.scope)}`} className="menu__cartBtn menu__cartBtn--browse">
+            View order <span aria-hidden="true">→</span>
           </Link>
         </div>
       )}
