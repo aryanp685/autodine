@@ -24,7 +24,9 @@ vi.mock('@/app/dashboard/menus/actions', () => ({
   addItemAction: mocks.action('addItemAction'),
   addPresetCategoriesAction: mocks.action('addPresetCategoriesAction'),
   deleteCategoryAction: mocks.action('deleteCategoryAction'),
+  deleteItemAction: mocks.action('deleteItemAction'),
   publishMenuAction: mocks.action('publishMenuAction'),
+  restoreItemAction: mocks.action('restoreItemAction'),
   saveItemAction: mocks.action('saveItemAction'),
   setAllAvailabilityAction: mocks.action('setAllAvailabilityAction'),
 }));
@@ -57,8 +59,8 @@ const item = (id: string, name: string, over: ItemOverride = {}): EditorItem => 
   ...over,
 });
 
-const render = (d: MenuEditorData | null) =>
-  renderToStaticMarkup(<MenuEditorScreen data={d} />);
+const render = (d: MenuEditorData | null, undo?: string) =>
+  renderToStaticMarkup(<MenuEditorScreen data={d} undo={undo} />);
 
 describe('MenuEditorScreen, live', () => {
   it('offers every preset category as a chip when none exist yet', () => {
@@ -146,11 +148,66 @@ describe('MenuEditorScreen, live', () => {
     expect(html).toContain('Diners cannot see this item');
   });
 
+  it('puts a delete control on every live row', () => {
+    const html = render(
+      data({
+        categories: [{ id: 'c-1', name: 'Starters', itemCount: 2 }],
+        items: [item('i-1', 'Paneer Tikka'), item('i-2', 'Chicken 65')],
+      })
+    );
+
+    expect(html).toContain('Delete Paneer Tikka');
+    expect(html).toContain('Delete Chicken 65');
+    expect(html).toContain('pg__rowDel');
+    expect(html).toContain('name="itemId" value="i-1"');
+  });
+
+  it('offers an undo carrying the row back, after a delete', () => {
+    const payload = JSON.stringify({
+      id: '05979fc9-ad4d-482d-950f-27d3d0e1e519',
+      name: 'Butter Chicken',
+      description: null,
+      pricePaise: 46900,
+      isVeg: false,
+      isAvailable: true,
+      categoryId: '937a3c2a-1331-43be-9d03-ecf6e9f84165',
+      sortOrder: 0,
+    });
+
+    const html = render(data(), payload);
+
+    expect(html).toContain('Undo');
+    expect(html).toContain('Butter Chicken');
+    // The payload has to survive into a hidden field, or the undo cannot
+    // put the row back with the same id and the same category.
+    expect(html).toContain('name="undo"');
+    expect(html).toContain('05979fc9-ad4d-482d-950f-27d3d0e1e519');
+  });
+
+  it('shows one banner after a delete, not a notice and an undo stacked', () => {
+    const html = render(data(), JSON.stringify({ id: '05979fc9-ad4d-482d-950f-27d3d0e1e519', name: 'X', pricePaise: 0 }));
+
+    expect(html).toContain('pg__undo');
+    // Two strips would read as two things having happened when one did.
+    expect(html).not.toContain('pg__success');
+  });
+
+  it('shows the plain notice when there is nothing to undo', () => {
+    const html = renderToStaticMarkup(<MenuEditorScreen data={data()} notice="Saved." />);
+
+    expect(html).toContain('pg__success');
+    expect(html).not.toContain('pg__undo');
+  });
+
   it('keeps the demo board when there is no data', () => {
     const html = render(null);
 
     expect(html).toContain('Curries &amp; Mains');
     // Demo rows carry real variant data, so that column is not a lie there.
     expect(html).toContain('Variants');
+    // Nothing to delete: there is no database behind these rows. The editor
+    // form still carries an itemId field of its own, so the check is on the
+    // delete control, not on the field name.
+    expect(html).not.toContain('pg__rowDel');
   });
 });

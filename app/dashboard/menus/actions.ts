@@ -21,6 +21,8 @@ import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { rupeesToPaise } from '@/lib/money';
 import { PRESET_CATEGORIES, normaliseCategoryName } from '@/lib/menu-presets';
+import { readUndoItem } from '@/lib/menu-undo';
+import type { UndoItem } from '@/lib/menu-undo';
 
 const MENUS_PATH = '/dashboard/menus';
 
@@ -210,6 +212,100 @@ export async function deleteCategoryAction(formData: FormData): Promise<void> {
   if (error) fail(`Could not delete the category: ${error.message}`);
 
   ok('Category deleted.');
+}
+
+export async function deleteItemAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const itemId = String(formData.get('itemId') ?? '').trim();
+  if (!itemId) fail('No item selected.');
+
+  // Read it back before deleting. The undo has to be able to put the row back
+  // exactly as it was -- same id, same category, same price -- so the snapshot
+  // is taken from the row, not from anything the form claimed about it.
+  const { data: row, error: readError } = await ctx.supabase
+    .from('items')
+    .select('id, name, description, price_paise, is_veg, is_available, category_id, sort_order')
+    .eq('id', itemId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .maybeSingle();
+
+  if (readError || !row) fail('That item is no longer on your menu.');
+
+  const { error } = await ctx.supabase
+    .from('items')
+    .delete()
+    .eq('id', itemId)
+    .eq('restaurant_id', ctx.restaurantId);
+
+  if (error) fail(`Could not delete the item: ${error.message}`);
+
+  // Past orders are safe. order_items.item_id is ON DELETE SET NULL and every
+  // order item keeps its own snapshot of the name and price, so removing an
+  // item from the menu does not rewrite what a customer was already served.
+  const undo: UndoItem = {
+    id: row.id as string,
+    name: row.name as string,
+    description: (row.description as string | null) ?? null,
+    pricePaise: Number(row.price_paise ?? 0),
+    isVeg: Boolean(row.is_veg),
+    isAvailable: Boolean(row.is_available),
+    categoryId: (row.category_id as string | null) ?? null,
+    sortOrder: Number(row.sort_order ?? 0),
+  };
+
+  revalidatePath(MENUS_PATH);
+  redirect(
+    `${MENUS_PATH}?notice=${encodeURIComponent(`"${undo.name}" deleted.`)}` +
+      `&undo=${encodeURIComponent(JSON.stringify(undo))}`
+  );
+}
+
+export async function restoreItemAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const raw = String(formData.get('undo') ?? '').trim();
+  if (!raw) fail('Nothing to undo.');
+
+  // JSON.parse throws on anything that is not JSON, and a stale or hand-edited
+  // link is the common case here rather than an exceptional one.
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    fail('That undo has expired. Add the item again if you still want it.');
+  }
+
+  const item = readUndoItem(parsed);
+  if (!item) fail('That undo has expired. Add the item again if you still want it.');
+
+  // Already back -- a double press, or the owner re-added it by hand. Inserting
+  // again would collide on the primary key and surface as a raw database error.
+  const { data: existing } = await ctx.supabase
+    .from('items')
+    .select('id')
+    .eq('id', item.id)
+    .maybeSingle();
+
+  if (existing) ok(`"${item.name}" is already back on the menu.`);
+
+  const { error } = await ctx.supabase.from('items').insert({
+    id: item.id,
+    restaurant_id: ctx.restaurantId,
+    category_id: item.categoryId,
+    name: item.name,
+    description: item.description,
+    price_paise: item.pricePaise,
+    is_veg: item.isVeg,
+    is_available: item.isAvailable,
+    sort_order: item.sortOrder,
+  });
+
+  if (error) fail(`Could not put the item back: ${error.message}`);
+
+  ok(`"${item.name}" is back.`);
 }
 
 export async function saveItemAction(formData: FormData): Promise<void> {
