@@ -11,6 +11,9 @@
   --border: rgba(17, 19, 24, 0.16);
   --text: #111318;
   --accent: #6d7f70;
+  /* Destructive actions only: cancelling an order, deleting a dish. Taken from
+     the existing row-delete colour so the design does not grow a second red. */
+  --danger: #9c3f36;
   --shadow: none;
   --radius-sm: 6px;
   --radius: 10px;
@@ -396,6 +399,7 @@
 .kb__actions { display: flex; gap: 8px; }
 .kb__act { font-size: 13px; padding: 8px 14px; border: 1px solid var(--text); background: var(--text); color: #fff; border-radius: 2px; cursor: pointer; }
 .kb__act--quiet { background: none; color: rgba(17, 19, 24, 0.7); border-color: var(--border); }
+.kb__act--danger { background: var(--danger); border-color: var(--danger); color: var(--surface); }
 .kb__empty { padding: 26px 0; font-size: 14px; color: rgba(17, 19, 24, 0.4); }
 
 /* ---------------------------------------------------------------- cashier */

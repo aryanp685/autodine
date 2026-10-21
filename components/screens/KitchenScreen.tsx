@@ -8,11 +8,13 @@ import { Money, VegMark } from '@/components/ui';
 import type { KitchenScreenData, KitchenTicket } from '@/lib/db/kitchen-screen';
 import { nextPrepState, type PrepState } from '@/lib/db/prep';
 import { advanceOrderAction } from '@/app/kitchen/actions';
+import { cancelStaffOrderAction } from '@/app/orders/actions';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { getSupabaseBrowser } from '@/lib/supabase/client';
 import {
   advanceText,
   announceLogLabel,
+  cancelText,
   createAnnounceQueue,
   newOrderText,
   orderAnnouncement,
@@ -212,6 +214,18 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
   const [log, setLog] = useState<LogEntry[]>([]);
   const [error, setError] = useState('');
   const [pending, setPending] = useState<Record<string, PrepState>>({});
+  /**
+   * Tickets removed from this board because they were cancelled.
+   *
+   * The board re-reads the queue every thirty seconds, but a cancelled ticket
+   * has to leave the moment it is cancelled: a cook working from a board that
+   * still shows it is cooking food nobody ordered. The server refresh clears
+   * this on its own -- a cancelled row simply is not in the payload.
+   */
+  const [cancelled, setCancelled] = useState<string[]>([]);
+  /** Which ticket is asking "are you sure", so a mis-tap cannot cancel. */
+  const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
+  const [cancelBusy, setCancelBusy] = useState<string | null>(null);
   const [delivery, setDelivery] = useState<'connecting' | 'live' | 'polling'>('polling');
   /**
    * What the queue is doing, not what it was asked to do.
@@ -250,6 +264,9 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
   const queueRef = useRef<AnnounceQueue | null>(null);
   const seenRef = useRef<Set<string>>(new Set());
   const primedRef = useRef(false);
+  /** Cancellations already announced, so a refresh cannot repeat one. */
+  const cancelSeenRef = useRef<Set<string>>(new Set());
+  const cancelPrimedRef = useRef(false);
   /** True once the board knows whether a Hindi voice exists. */
   const settledRef = useRef(false);
   /** The same answer, readable from the announcement pass without a re-render. */
@@ -434,9 +451,10 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
 
   /* ---------------------------------------------------------------- the board */
 
-  const base: BoardTicket[] = live
+  const base: BoardTicket[] = (live
     ? (data?.tickets ?? []).map(fromLive)
-    : kitchenOrders.map(fromDemo);
+    : kitchenOrders.map(fromDemo)
+  ).filter((ticket) => !ticket.orderId || !cancelled.includes(ticket.orderId));
 
   // Optimistic overlay. Applied on top of `base`, so a refresh from the server
   // simply wins without any resync bookkeeping.
@@ -511,6 +529,36 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
       setMissed((current) => current.filter((t) => !t.orderId || !announced.has(t.orderId)));
     }
   }, [orders, live, restaurantId, speak, settled, voiceState]);
+
+  /* ------------------------------------------------------- cancelled tickets */
+
+  useEffect(() => {
+    if (!live || !data) return;
+
+    const list = data.cancelled ?? [];
+
+    // On open, everything already cancelled is history. Reading fifteen
+    // minutes of cancellations out loud the moment the board wakes up would
+    // teach the kitchen to ignore the announcement that matters.
+    if (!cancelPrimedRef.current) {
+      cancelPrimedRef.current = true;
+      for (const row of list) cancelSeenRef.current.add(row.id);
+      return;
+    }
+
+    for (const row of list) {
+      if (cancelSeenRef.current.has(row.id)) continue;
+      cancelSeenRef.current.add(row.id);
+
+      // 'order' priority: this is a stop instruction, not a status note.
+      speak(
+        `cancel:${row.id}`,
+        cancelText(row.table),
+        `${row.table} · cancelled`,
+        'order',
+      );
+    }
+  }, [data, live, speak]);
 
   /* --------------------------------------------------------------- delivery */
 
@@ -701,6 +749,47 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
         });
       }, 0);
     }
+  };
+
+  /**
+   * Cancel a ticket from the board.
+   *
+   * Two taps: the first puts the ticket into an "are you sure" state, the
+   * second cancels. A single-tap cancel on a board that is worked with wet
+   * hands and elbows is an order lost per service.
+   *
+   * The announcement is queued at 'order' priority, not 'info'. Under load
+   * informational lines are dropped on purpose; a cancellation is not
+   * information, it is a stop instruction.
+   */
+  const cancelTicket = async (ticket: BoardTicket) => {
+    if (!ticket.orderId) {
+      setError('This board is showing sample data. Connect the database to cancel real tickets.');
+      return;
+    }
+    if (confirmCancel !== ticket.orderId) {
+      setConfirmCancel(ticket.orderId);
+      setError('');
+      return;
+    }
+
+    const id = ticket.orderId;
+    setCancelBusy(id);
+    setConfirmCancel(null);
+
+    const result = await cancelStaffOrderAction({ orderId: id });
+    setCancelBusy(null);
+
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+
+    setCancelled((current) => (current.includes(id) ? current : [...current, id]));
+    cancelSeenRef.current.add(id);
+    speak(`cancel:${id}`, cancelText(ticket.table), `${ticket.table} · cancelled`, 'order');
+    // Pick up anything that moved on another screen at the same time.
+    refresh();
   };
 
   const cols: { key: string; title: string; orders: BoardTicket[] }[] = [
@@ -1015,6 +1104,36 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
                     >
                       🔊
                     </button>
+                    {o.state !== 'served' && o.orderId ? (
+                      confirmCancel === o.orderId ? (
+                        <>
+                          <button
+                            type="button"
+                            className="kb__act kb__act--danger"
+                            disabled={cancelBusy === o.orderId}
+                            onClick={() => cancelTicket(o)}
+                          >
+                            {cancelBusy === o.orderId ? 'Cancelling…' : 'Yes, cancel'}
+                          </button>
+                          <button
+                            type="button"
+                            className="kb__act kb__act--quiet"
+                            onClick={() => setConfirmCancel(null)}
+                          >
+                            No
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          className="kb__act kb__act--quiet"
+                          aria-label={`Cancel order for ${o.table}`}
+                          onClick={() => cancelTicket(o)}
+                        >
+                          Cancel
+                        </button>
+                      )
+                    ) : null}
                   </div>
                 </div>
               </article>

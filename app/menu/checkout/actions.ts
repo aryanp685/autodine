@@ -54,11 +54,20 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
   const liveSession =
     session && !isExpired(session) && session.slug === slug ? session.token : null;
 
+  // The guest's own key to this order, made here and never shown to anyone
+  // else. It goes into the redirect that follows, which is what lets the
+  // confirmation screen read, change and cancel the order without a login.
+  // The order code cannot do that job: it is short, it is read out at the
+  // counter, and a page that opened on a guessed code would show a stranger's
+  // bill.
+  const guestToken = crypto.randomUUID();
+
   const { data: code, error } = await supabase.rpc('place_public_order', {
     p_slug: slug,
     p_lines: lines,
     p_note: note,
     p_session_token: liveSession,
+    p_guest_token: guestToken,
   });
 
   if (error) {
@@ -81,5 +90,7 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
     fail('We could not place that order. Please try again.');
   }
 
-  redirect(`/menu/order?s=${encodeURIComponent(slug)}&code=${encodeURIComponent(code)}`);
+  redirect(
+    `/menu/order?s=${encodeURIComponent(slug)}&code=${encodeURIComponent(code)}&t=${guestToken}`
+  );
 }

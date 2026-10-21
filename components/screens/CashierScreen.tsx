@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { counterQueue, inr, restaurant } from '@/lib/demo-data';
 import type { CashierScreenData, CounterOrder } from '@/lib/db/cashier-screen';
 // Value import, so it comes from the database-free module. Importing
@@ -8,6 +9,7 @@ import type { CashierScreenData, CounterOrder } from '@/lib/db/cashier-screen';
 // into the browser bundle -- type-only imports there are fine, this is not.
 import { COUNTER_METHODS, COUNTER_METHOD_LABEL, type CounterMethod } from '@/lib/payment-methods';
 import { recordPaymentAction } from '@/app/cashier/actions';
+import { cancelStaffOrderAction } from '@/app/orders/actions';
 
 /** One row in the queue, in the shape the locked markup renders. */
 type QueueRow = {
@@ -83,10 +85,14 @@ function newIdempotencyKey(): string {
    already recorded against it.
    ========================================================================== */
 export function Cashier({ data }: { data?: CashierScreenData | null }) {
+  const router = useRouter();
   const [method, setMethod] = useState<CounterMethod>('cash');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [settling, setSettling] = useState<string[]>([]);
+  /** The order the cashier has asked to cancel, before they confirm. */
+  const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   /**
@@ -147,6 +153,49 @@ export function Cashier({ data }: { data?: CashierScreenData | null }) {
       setSettling((current) => current.filter((id) => id !== paidId));
       setMessage(result.message);
     });
+  };
+
+  /**
+   * Cancel the selected order.
+   *
+   * Two taps, and the confirmation names what is being cancelled: at a busy
+   * counter "Cancel" next to "Record cash" is one slip away from throwing
+   * away a guest's order.
+   *
+   * The row leaves the queue immediately and the server is re-read, because a
+   * cancelled order must not be settleable -- taking money for food that will
+   * never arrive is the worst outcome this screen can produce.
+   */
+  const cancelOrder = async () => {
+    if (!order?.orderId) {
+      setError('This queue is showing sample data. Connect the database to cancel real orders.');
+      return;
+    }
+
+    const id = order.orderId;
+
+    if (confirmCancel !== id) {
+      setConfirmCancel(id);
+      return;
+    }
+
+    setError('');
+    setMessage('');
+    setCancelling(id);
+
+    const result = await cancelStaffOrderAction({ orderId: id });
+
+    setCancelling(null);
+    setConfirmCancel(null);
+
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+
+    setSettling((current) => [...current, id]);
+    setMessage(result.message);
+    router.refresh();
   };
 
   return (
@@ -267,6 +316,41 @@ export function Cashier({ data }: { data?: CashierScreenData | null }) {
             >
               {isPending ? 'Recording…' : `Record ${method === 'cash' ? 'cash' : method.toUpperCase()} ${inr(order.outstanding)}`}
             </button>
+            {confirmCancel === order.orderId ? (
+              <div className="pg__alert" role="group" aria-label="Confirm cancellation">
+                <strong>Cancel {order.code} for {order.table}?</strong>
+                <p>
+                  Nothing is charged. The kitchen is told at once and the ticket leaves this
+                  queue — this cannot be undone.
+                </p>
+                <div className="pg__stateActions">
+                  <button
+                    type="button"
+                    className="pg__miniBtn pg__miniBtn--danger"
+                    disabled={cancelling === order.orderId}
+                    onClick={cancelOrder}
+                  >
+                    {cancelling === order.orderId ? 'Cancelling…' : 'Yes, cancel it'}
+                  </button>
+                  <button
+                    type="button"
+                    className="pg__miniBtn"
+                    onClick={() => setConfirmCancel(null)}
+                  >
+                    Keep it
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="pg__miniBtn pg__miniBtn--danger"
+                disabled={isPending || !order.orderId}
+                onClick={cancelOrder}
+              >
+                Cancel this order
+              </button>
+            )}
             {message && (
               <p className="cash__fine" role="status">
                 {message}

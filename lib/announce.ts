@@ -550,6 +550,22 @@ export function advanceText(table: string, next: string): string {
 }
 
 /**
+ * What the pass says when a ticket is cancelled.
+ *
+ * A cancellation is not a state change the board can show quietly: a cook may
+ * already have the pan on. It is spoken at 'order' priority, because dropping
+ * it under load is exactly how food gets made for an order that no longer
+ * exists.
+ *
+ * "का ऑर्डर" rather than "ऑर्डर," -- without the possessive the sentence reads
+ * as though the whole restaurant's orders were cancelled.
+ */
+export function cancelText(table: string): string {
+  if (isTakeaway(table)) return 'टेकअवे ऑर्डर कैंसल हो गया।';
+  return `टेबल ${spokenTable(table)} का ऑर्डर कैंसल हो गया।`;
+}
+
+/**
  * The line shown in the on-screen log for one announcement.
  *
  * Kept separate from the spoken text so the log can be denser than the voice:

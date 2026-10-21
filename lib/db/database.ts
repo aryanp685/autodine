@@ -299,8 +299,58 @@ export type Database = {
           p_lines: unknown; // jsonb: [{item_id, qty}]
           p_note?: string | null;
           p_session_token?: string | null;
+          /**
+           * Migration 00600. The guest's own credential for the order, made by
+           * the caller and stored on the row. Without it the order is created
+           * but the guest cannot read, change or cancel it afterwards.
+           */
+          p_guest_token?: string | null;
         };
         Returns: string; // order code
+      };
+      /**
+       * Migration 00600. One order, for its guest.
+       *
+       * SECURITY DEFINER and gated on the token: the guest has no session, so
+       * the token is the credential. Returns null when the token does not
+       * match, which is also what a wrong code returns -- never confirm which.
+       *
+       * jsonb rather than a row set, so the lines arrive with the order in one
+       * round trip. The shape is described by PublicOrderPayload in
+       * lib/db/order-screen.ts.
+       */
+      get_public_order: {
+        Args: { p_slug: string; p_code: string; p_token: string };
+        Returns: unknown;
+      };
+      /**
+       * Migration 00600. Cancel, as the guest (token) or as staff (session).
+       *
+       * Refuses a paid order for everyone: undoing money is a refund, and this
+       * build has none. Refuses a guest outside ten minutes or after the
+       * kitchen has started. Cancelling twice returns already = true rather
+       * than raising, because two people press the same button.
+       */
+      cancel_order: {
+        Args: {
+          p_order_id: string;
+          p_guest_token?: string | null;
+          p_reason?: string | null;
+        };
+        Returns: unknown;
+      };
+      /**
+       * Migration 00600. Change quantities on a ticket the kitchen has not
+       * started. Pure arithmetic on the order's own snapshots: no menu is read
+       * and no price comes from the caller.
+       */
+      set_order_line_quantities: {
+        Args: {
+          p_order_id: string;
+          p_lines: unknown; // jsonb: [{line_id, qty}] -- qty 0 removes the line
+          p_guest_token?: string | null;
+        };
+        Returns: unknown;
       };
       record_cash_payment: {
         Args: {

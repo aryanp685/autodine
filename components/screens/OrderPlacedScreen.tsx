@@ -1,8 +1,31 @@
 import Link from 'next/link';
 import { inr } from '@/lib/demo-data';
-import { VegMark } from '@/components/ui';
 import { paiseToRupees } from '@/lib/money';
-import type { OrderScreenData } from '@/lib/db/order-screen';
+import { GuestOrderEditor } from '@/components/screens/GuestOrderEditor';
+import { GUEST_CHANGE_WINDOW_MS, type OrderScreenData } from '@/lib/db/order-screen';
+
+/**
+ * Why the guest cannot change this order any more, in their own words.
+ *
+ * Returning a sentence rather than a boolean matters: a screen that silently
+ * drops the buttons leaves the guest tapping a dead bill and guessing.
+ */
+function lockedReason(data: OrderScreenData): string {
+  if (data.prepStatus === 'cancelled') {
+    return 'This order was cancelled, so nothing is being cooked and nothing is owed.';
+  }
+  if (data.paymentStatus !== 'pending') return '';
+  if (data.prepStatus !== 'new') {
+    return 'The kitchen has started on this order, so it cannot be changed here. Please ask the staff.';
+  }
+
+  const placed = new Date(data.placedAt).getTime();
+  if (!Number.isNaN(placed) && Date.now() - placed > GUEST_CHANGE_WINDOW_MS) {
+    return 'Orders can only be changed in the first ten minutes, and this one is older. Please ask the staff.';
+  }
+
+  return '';
+}
 
 const PREP_LABEL: Record<string, string> = {
   new: 'Sent to the kitchen',
@@ -19,7 +42,14 @@ const PREP_LABEL: Record<string, string> = {
  * is not connected and a screen that stayed quiet about it would leave someone
  * waiting for a card prompt that is never coming.
  */
-export function OrderPlacedScreen({ data }: { data: OrderScreenData | null }) {
+export function OrderPlacedScreen({
+  data,
+  token,
+}: {
+  data: OrderScreenData | null;
+  /** The guest's credential from the URL. Absent on a stale or hand-typed link. */
+  token?: string;
+}) {
   if (!data) {
     return (
       <div className="cart">
@@ -47,31 +77,27 @@ export function OrderPlacedScreen({ data }: { data: OrderScreenData | null }) {
         <h1>{data.tableLabel ? `Table ${data.tableLabel}` : 'Counter order'}</h1>
         <p>
           {data.restaurantName} · {prepLabel}
+          {data.prepStatus === 'cancelled' ? ' · nothing is owed' : ''}
         </p>
       </header>
 
       <div className="cart__grid">
         <div className="cart__lines">
-          {data.lines.map((l, i) => (
-            <div key={`${l.name}-${i}`} className="cart__line">
-              <div className="cart__lineMain">
-                <div className="cart__lineTop">
-                  <VegMark veg={l.isVeg} />
-                  <strong>{l.name}</strong>
-                  {l.variantName ? <em className="co__variant"> · {l.variantName}</em> : null}
-                </div>
-                <div className="cart__linePrice tnum">
-                  {inr(paiseToRupees(l.unitPricePaise))} each
-                </div>
-              </div>
-              <div className="cart__qty">
-                <span className="tnum">{l.qty}</span>
-              </div>
-              <div className="cart__lineTotal tnum">
-                {inr(paiseToRupees(l.lineTotalPaise))}
-              </div>
-            </div>
-          ))}
+          {/*
+            The lines are rendered by a client component because, for the
+            first ten minutes, they carry quantity controls and a cancel
+            button. Prices still come from the server: the editor only
+            multiplies the unit price already on screen, and the database
+            recomputes the bill when it saves.
+          */}
+          <GuestOrderEditor
+            orderId={data.id}
+            token={token ?? ''}
+            lines={data.lines}
+            canEdit={Boolean(token) && data.canGuestChange}
+            lockedReason={token ? lockedReason(data) : 'Open this page from the link you were given after ordering to see or change the order.'}
+            subtotalPaise={data.subtotalPaise}
+          />
 
           {data.customerNote && (
             <div className="cart__empty">
@@ -106,7 +132,12 @@ export function OrderPlacedScreen({ data }: { data: OrderScreenData | null }) {
               <span className="tnum">{inr(paiseToRupees(data.totalPaise))}</span>
             </div>
 
-            {data.paymentStatus === 'pending' ? (
+            {data.prepStatus === 'cancelled' ? (
+              <p className="cart__fine">
+                <strong>This order was cancelled.</strong> Nothing is being cooked and nothing
+                is owed. Order again from the menu whenever you are ready.
+              </p>
+            ) : data.paymentStatus === 'pending' ? (
               <p className="cart__fine">
                 <strong>Pay at the counter before you leave.</strong> The kitchen has your
                 order already and is starting on it now.
