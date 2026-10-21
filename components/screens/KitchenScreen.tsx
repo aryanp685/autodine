@@ -1,5 +1,6 @@
 'use client';
 
+import { rupeesToPaise } from '@/lib/money';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { kitchenOrders, restaurant, type KitchenOrder } from '@/lib/demo-data';
@@ -333,7 +334,7 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
                 <Items order={o} />
                 {o.note && <div className="kb__note">“{o.note}”</div>}
                 <div className="kb__ordFoot">
-                  <Money value={o.total} strong />
+                  <Money value={rupeesToPaise(o.total)} strong />
                   <div className="kb__actions">
                     {o.state === 'new' && (
                       <button type="button" className="kb__act" onClick={() => advance(o)}>

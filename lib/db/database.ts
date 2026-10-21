@@ -230,6 +230,34 @@ export type Database = {
         Returns: undefined;
       };
       /**
+       * Migration 0009. Sales aggregates for one restaurant and one range.
+       *
+       * Returns jsonb rather than a row set because the shape is nested:
+       * totals, a bucket series, item and category rankings, payment methods
+       * and the order ledger all in one round trip. Fetching those separately
+       * would be a join the app has to do by hand, chunking order ids into
+       * `.in()` lists -- and a long range would silently truncate.
+       *
+       * SECURITY DEFINER with `is_member()` inside, because RLS is suspended
+       * in the body. Granted to authenticated only; anon gets 42501.
+       *
+       * `p_bucket` is 'hour' or 'day'. `p_include_lines` adds every order line
+       * in the range, which is only wanted for the CSV export -- it is a much
+       * bigger payload than the screen needs.
+       */
+      report_sales: {
+        Args: {
+          p_restaurant_id: string;
+          p_from: string;
+          p_to: string;
+          p_timezone?: string;
+          p_bucket?: 'hour' | 'day';
+          p_order_limit?: number;
+          p_include_lines?: boolean;
+        };
+        Returns: unknown; // jsonb; parsed by lib/db/reports.ts
+      };
+      /**
        * Migration 0005. The only way a signed-out diner places an order.
        *
        * The orders and order_items tables have NO insert policy for anon --

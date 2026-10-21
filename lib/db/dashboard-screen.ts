@@ -25,15 +25,8 @@
  */
 
 import { getStaffContextDetailed } from './staff';
+import { hourInZone, startOfDayUtc } from './time';
 
-/**
- * Fallback only. The zone actually used comes from restaurants.timezone, read
- * through getStaffContextDetailed, so a venue in another country closes its
- * books on its own midnight without a code change. This constant covers the
- * window before a row has loaded -- and any row whose zone the runtime cannot
- * parse, which is why staff.ts substitutes it rather than throwing.
- */
-export const RESTAURANT_TIME_ZONE = 'Asia/Kolkata';
 
 /** Payment rows in this state have actually moved money. */
 const RECORDED = 'recorded';
@@ -96,84 +89,17 @@ export const RECENT_ORDER_LIMIT = 8;
 export const TOP_ITEM_LIMIT = 5;
 
 /**
- * Offset in milliseconds between the given zone and UTC at a given instant.
- *
- * Derived from Intl rather than a table so that zones which shift for daylight
- * saving resolve correctly at the instant asked about.
+ * Time helpers live in ./time so that the dashboard and the reports screen
+ * cannot disagree about where a day starts. Re-exported here because this
+ * module was their only home until reports arrived, and every caller and test
+ * already imports them from this path.
  */
-export function timeZoneOffsetMs(timeZone: string, at: Date): number {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    hour12: false,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).formatToParts(at);
-
-  let year = 0;
-  let month = 1;
-  let day = 1;
-  let hour = 0;
-  let minute = 0;
-  let second = 0;
-
-  for (const part of parts) {
-    const value = Number(part.value);
-    switch (part.type) {
-      case 'year':
-        year = value;
-        break;
-      case 'month':
-        month = value;
-        break;
-      case 'day':
-        day = value;
-        break;
-      case 'hour':
-        // Intl can render midnight as '24' with hour12: false.
-        hour = value % 24;
-        break;
-      case 'minute':
-        minute = value;
-        break;
-      case 'second':
-        second = value;
-        break;
-      default:
-        break;
-    }
-  }
-
-  const asIfUtc = Date.UTC(year, month - 1, day, hour, minute, second);
-  return asIfUtc - at.getTime();
-}
-
-/** The UTC instant at which the given zone's current day began. */
-export function startOfDayUtc(timeZone: string, at: Date): Date {
-  const isoDate = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(at);
-
-  const [year, month, day] = isoDate.split('-').map(Number);
-  const localMidnight = Date.UTC(year, month - 1, day, 0, 0, 0);
-  return new Date(localMidnight - timeZoneOffsetMs(timeZone, new Date(localMidnight)));
-}
-
-/** Hour of day (0-23) in the given zone. */
-export function hourInZone(timeZone: string, at: Date): number {
-  const hour = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    hour12: false,
-    hour: '2-digit',
-  }).format(at);
-  return Number(hour) % 24;
-}
+export {
+  RESTAURANT_TIME_ZONE,
+  hourInZone,
+  startOfDayUtc,
+  timeZoneOffsetMs,
+} from './time';
 
 export async function getDashboardScreenData(): Promise<DashboardScreenData | null> {
   const staff = await getStaffContextDetailed();

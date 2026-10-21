@@ -1,3 +1,4 @@
+import { DashboardBar } from '@/components/DashboardBar';
 import Link from 'next/link';
 import { categories, items as demoItems, inr } from '@/lib/demo-data';
 import { VegMark } from '@/components/ui';
@@ -128,23 +129,7 @@ export function MenuEditorScreen({
 
   return (
     <div className="pg pg--dash">
-      <div className="pg__bar">
-        <Link href="/" className="pg__brand">
-          AutoDine
-        </Link>
-        <div className="pg__barLinks">
-          <Link href="/dashboard">Overview</Link>
-          <Link href="/dashboard/menus" className="is-active">
-            Menus
-          </Link>
-          <Link href="/dashboard/tables">Tables &amp; QR</Link>
-          <span>Orders</span>
-          <span>Reports</span>
-        </div>
-        <div className="pg__barRight">
-          <span className="pg__avatar">AP</span>
-        </div>
-      </div>
+      <DashboardBar active="menus" />
 
       <div className="pg__subbar">
         <div className="pg__subTabs">
