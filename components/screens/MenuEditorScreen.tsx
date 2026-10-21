@@ -368,15 +368,15 @@ export function MenuEditorScreen({
               )}
 
             <div className="pg__catsFoot">
-              {/* Left inert on purpose. AI extraction needs an OCR pass and a
-                  mandatory owner review before anything publishes; shipping a
-                  button that pretends otherwise would break the rule that the
-                  owner approves every imported item. */}
-              <span className="pg__importBtn" aria-disabled="true">
-                Import menu with AI
-              </span>
+              {/* Real now: paste the text of an existing menu, review what was
+                  read, and import it as a DRAFT. Nothing publishes without the
+                  owner opening the draft and pressing publish. */}
+              <Link href="/dashboard/menus/import" className="pg__importBtn">
+                Import an existing menu
+              </Link>
               <p className="pg__catsNote">
-                Not built yet. When it is, you review every item before it publishes.
+                Paste the text, check every dish and price, and it arrives as a draft. Nothing goes live until you
+                publish it.
               </p>
             </div>
           </aside>
