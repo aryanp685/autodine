@@ -79,7 +79,17 @@ type BoardTicket = {
   payment: 'paid' | 'pending' | 'failed';
   state: KitchenOrder['state'];
   note?: string;
-  items: { qty: number; name: string; detail?: string; veg: boolean; spoken?: string | null }[];
+  items: {
+    qty: number;
+    name: string;
+    detail?: string;
+    /** The portion alone, when the dish has one. */
+    portion?: string;
+    /** Add-ons alone, shown as tags on the ticket. */
+    addons?: string[];
+    veg: boolean;
+    spoken?: string | null;
+  }[];
   total: number;
 };
 
@@ -144,7 +154,16 @@ function Items({ order, compact }: { order: BoardTicket; compact?: boolean }) {
           <span className="kb-qty">{it.qty}×</span>
           <span className="kb-itemName">
             <VegMark veg={it.veg} size={11} /> {it.name}
-            {it.detail && <em> · {it.detail}</em>}
+            {/* Portion first, then each add-on as its own tag. A ticket that
+                reads "Butter Naan · Half · Extra cheese · Jain" makes the cook
+                hunt for the part they must not get wrong; the tags survive a
+                glance from a metre away. */}
+            {it.portion ? <em> · {it.portion}</em> : !it.addons && it.detail && <em> · {it.detail}</em>}
+            {it.addons?.map((addon) => (
+              <span key={addon} className="kb-itemAddon">
+                {addon}
+              </span>
+            ))}
           </span>
         </li>
       ))}

@@ -67,6 +67,68 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
   if (error) throw new Error(`Could not load the menu: ${error.message}`);
 
   /**
+   * Add-ons, with their prices and their group limits.
+   *
+   * They have to be here, not only on the dish sheet: a cart line names the
+   * add-ons it was built with, and a bill that cannot resolve them would
+   * quietly drop them from the total -- the same undercharge the portions
+   * join above exists to stop. The group's max_select is carried too, because
+   * lib/cart-pricing applies it and the bill must agree with the till.
+   */
+  const itemIds = (rows ?? []).map((r) => r.id as string);
+
+  const { data: groupRows, error: groupsError } = itemIds.length
+    ? await supabase
+        .from('item_addon_groups')
+        .select('id, item_id, max_select')
+        .in('item_id', itemIds)
+    : { data: [], error: null };
+
+  if (groupsError) {
+    console.error(`[cart] could not load add-on groups: ${groupsError.message}`);
+  }
+
+  const groupIds = (groupRows ?? []).map((g) => g.id as string);
+
+  const { data: addonRows, error: addonsError } = groupIds.length
+    ? await supabase
+        .from('item_addons')
+        .select('id, group_id, name, price_paise, is_available, sort_order')
+        .in('group_id', groupIds)
+        .eq('is_available', true)
+        .order('sort_order', { ascending: true })
+    : { data: [], error: null };
+
+  if (addonsError) {
+    console.error(`[cart] could not load add-ons: ${addonsError.message}`);
+  }
+
+  const groupById = new Map(
+    (groupRows ?? []).map((g) => [
+      g.id as string,
+      { itemId: g.item_id as string, maxSelect: Number(g.max_select ?? 1) },
+    ])
+  );
+
+  const addonsByItem = new Map<
+    string,
+    { id: string; name: string; pricePaise: number; groupId: string; maxSelect: number }[]
+  >();
+  for (const row of addonRows ?? []) {
+    const group = groupById.get(row.group_id as string);
+    if (!group) continue;
+    const list = addonsByItem.get(group.itemId) ?? [];
+    list.push({
+      id: row.id as string,
+      name: (row.name as string) ?? '',
+      pricePaise: Number(row.price_paise ?? 0),
+      groupId: row.group_id as string,
+      maxSelect: group.maxSelect,
+    });
+    addonsByItem.set(group.itemId, list);
+  }
+
+  /**
    * item_variants arrives either as an array, as a single object, or as null,
    * depending on how PostgREST infers the relationship for this hand-written
    * Database type. All three are normalised here so the screens never have to
@@ -95,6 +157,7 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
     taxRateBps: Number(restaurant.tax_rate_bps ?? 500),
     items: (rows ?? []).map((r) => {
       const variants = variantsOf((r as Record<string, unknown>).item_variants);
+      const addons = addonsByItem.get(r.id as string) ?? [];
       return {
         id: r.id as string,
         name: (r.name as string) ?? '',
@@ -102,6 +165,7 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
         isVeg: Boolean(r.is_veg),
         isAvailable: Boolean(r.is_available),
         ...(variants.length ? { variants } : {}),
+        ...(addons.length ? { addons } : {}),
       };
     }),
   };

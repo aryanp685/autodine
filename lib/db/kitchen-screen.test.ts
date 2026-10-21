@@ -218,7 +218,12 @@ describe('getKitchenScreenData', () => {
     expect(items[0]).toEqual({
       qty: 2,
       name: 'Butter Naan',
+      // `detail` is what the voice reads: portion first, then every add-on.
       detail: 'Regular · Butter · Garlic',
+      // The same facts, split for the ticket card: the portion qualifies the
+      // dish, the add-ons are tags pinned to it.
+      portion: 'Regular',
+      addons: ['Butter', 'Garlic'],
       veg: true,
     });
   });

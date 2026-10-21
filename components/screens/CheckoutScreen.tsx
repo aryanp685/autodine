@@ -92,11 +92,14 @@ export function Checkout({
             {priced.lines.map((l) => (
               // Keyed by portion as well as item: two portions of one dish
               // are two rows, and keying only by item made them collide.
-              <li key={`${l.itemId}|${l.variantId ?? ''}`}>
+              <li key={`${l.itemId}|${l.variantId ?? ''}|${(l.addonIds ?? []).join(',')}`}>
                 <VegMark veg={l.isVeg} />
                 <span>
                   <strong>{l.qty} ×</strong> {l.name}
                   {l.variantName ? <em className="co__variant"> · {l.variantName}</em> : null}
+                  {l.addonNames && l.addonNames.length > 0 ? (
+                    <em className="co__variant"> · {l.addonNames.join(', ')}</em>
+                  ) : null}
                 </span>
                 <span className="tnum">{inr(paiseToRupees(l.lineTotalPaise))}</span>
               </li>

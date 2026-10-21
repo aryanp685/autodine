@@ -87,7 +87,10 @@ export function Cart({
                 // Keyed by portion too. Keying by item alone collapsed a
                 // half and a full plate of the same dish onto one React
                 // element, so changing one quantity re-rendered the other.
-                <div key={`${l.itemId}|${l.variantId ?? ''}`} className="cart__line">
+                <div
+                  key={`${l.itemId}|${l.variantId ?? ''}|${(l.addonIds ?? []).join(',')}`}
+                  className="cart__line"
+                >
                   <div className="cart__lineMain">
                     <div className="cart__lineTop">
                       <VegMark veg={l.isVeg} />
@@ -97,17 +100,26 @@ export function Cart({
                       {l.variantName ? `${l.variantName} · ` : ''}
                       {inr(paiseToRupees(l.unitPricePaise))} each
                     </div>
+                    {/* The add-ons the guest picked, named. A line total that
+                        is higher than the menu price with no reason on screen
+                        reads as a wrong bill. */}
+                    {l.addonNames && l.addonNames.length > 0 && (
+                      <div className="cart__lineAddons">
+                        + {l.addonNames.join(' · ')}
+                        {l.addonPaise ? ` (${inr(paiseToRupees(l.addonPaise))} each)` : ' (free)'}
+                      </div>
+                    )}
                   </div>
                   <div className="cart__qty">
                     <button
-                      onClick={() => cart.setQty(l.itemId, l.qty - 1, l.variantId)}
+                      onClick={() => cart.setQty(l.itemId, l.qty - 1, l.variantId, l.addonIds)}
                       aria-label={`Decrease ${l.name}`}
                     >
                       −
                     </button>
                     <span className="tnum">{l.qty}</span>
                     <button
-                      onClick={() => cart.setQty(l.itemId, l.qty + 1, l.variantId)}
+                      onClick={() => cart.setQty(l.itemId, l.qty + 1, l.variantId, l.addonIds)}
                       aria-label={`Increase ${l.name}`}
                     >
                       +
@@ -139,6 +151,19 @@ export function Cart({
                 they chose a cheaper portion and are now being billed the
                 dearer one.
               */}
+              {/* An add-on the restaurant has since removed is not charged.
+                  Saying so is the difference between a bill the guest can
+                  check and one they have to take on trust. */}
+              {priced.staleAddonIds.length > 0 && (
+                <div className="cart__empty">
+                  {priced.staleAddonIds.length === 1
+                    ? 'One add-on you picked is'
+                    : `${priced.staleAddonIds.length} add-ons you picked are`}{' '}
+                  no longer on the menu, so {priced.staleAddonIds.length === 1 ? 'it is' : 'they are'}{' '}
+                  not on the bill.
+                </div>
+              )}
+
               {priced.staleVariantIds.length > 0 && (
                 <div className="cart__empty">
                   The portion you picked for{' '}

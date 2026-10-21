@@ -29,6 +29,8 @@ export type DisplayModifierGroup = {
   name: string;
   type: 'single' | 'multi';
   required?: boolean;
+  /** How many may be picked at once. Only meaningful for a multi group. */
+  max?: number;
   options: DisplayModifierOption[];
 };
 
@@ -45,10 +47,11 @@ export type DisplayItem = {
   badge?: string;
   variants?: { id: string; name: string; price: number }[];
   /**
-   * Add-on groups. The database has no modifier concept yet, so this is
-   * always undefined for real menus -- the screens fall back to built-in
-   * presets. Defined here rather than omitted so that type stays honest about
-   * what the screens read.
+   * Add-on groups, from item_addon_groups and item_addons.
+   *
+   * Undefined when the dish has none -- not an empty array -- so the sheet can
+   * tell "nothing to choose" from "a group with nothing in it", and stops
+   * offering a customisation step that would lead nowhere.
    */
   modifiers?: DisplayModifierGroup[];
 };
@@ -87,6 +90,8 @@ export function toDisplayItem(item: MenuItem): DisplayItem {
     }),
   );
 
+  const modifiers = toDisplayModifiers(item);
+
   return {
     id: item.id,
     name: item.name,
@@ -99,7 +104,40 @@ export function toDisplayItem(item: MenuItem): DisplayItem {
     available: item.is_available,
     ...(item.image_url ? { img: item.image_url } : {}),
     ...(variants.length ? { variants } : {}),
+    ...(modifiers.length ? { modifiers } : {}),
   };
+}
+
+/**
+ * Add-on groups, in display units.
+ *
+ * A group with no available options is dropped rather than rendered empty: an
+ * owner who retired every choice would otherwise leave guests facing a heading
+ * with nothing under it.
+ */
+export function toDisplayModifiers(item: MenuItem): DisplayModifierGroup[] {
+  return (item.addonGroups ?? [])
+    .map((group) => {
+      const options = group.addons
+        .filter((addon) => addon.is_available)
+        .map((addon) => ({
+          id: addon.id,
+          name: addon.name,
+          price: paiseToRupees(addon.price_paise),
+        }));
+
+      const single = group.max_select <= 1;
+
+      return {
+        id: group.id,
+        name: group.name,
+        type: single ? 'single' : ('multi' as const),
+        required: group.min_select > 0,
+        max: group.max_select,
+        options,
+      } satisfies DisplayModifierGroup;
+    })
+    .filter((group) => group.options.length > 0);
 }
 
 export function toDisplayCategories(

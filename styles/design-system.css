@@ -277,6 +277,9 @@
 .cart__lineTop strong { font-size: 17px; font-weight: 500; }
 .cart__lineMeta { margin-top: 5px; font-size: 13px; color: rgba(17, 19, 24, 0.55); }
 .cart__linePrice { margin-top: 8px; font-size: 13px; color: rgba(17, 19, 24, 0.45); font-variant-numeric: tabular-nums; }
+/* What the extras add. A line total above the menu price with nothing on
+   screen to explain it reads as a wrong bill. */
+.cart__lineAddons { margin-top: 4px; font-size: 12.5px; color: rgba(17, 19, 24, 0.55); }
 .cart__qty { display: flex; align-items: center; gap: 15px; border: 1px solid var(--border); border-radius: 2px; padding: 7px 14px; }
 .cart__qty button { background: none; border: 0; font-size: 17px; cursor: pointer; }
 .cart__lineTotal { font-size: 17px; font-variant-numeric: tabular-nums; }
@@ -365,6 +368,10 @@
 .kb-items li { display: flex; gap: 10px; align-items: baseline; font-size: 14.5px; }
 .kb-qty { width: 30px; color: rgba(17, 19, 24, 0.55); font-variant-numeric: tabular-nums; flex: 0 0 auto; }
 .kb-itemName em { font-style: normal; font-size: 13px; color: rgba(17, 19, 24, 0.5); }
+/* Add-ons on a ticket. A tag rather than more words in the dish name: it is an
+   instruction attached to the dish, and a cook has to be able to see it from a
+   metre away without reading the whole line. */
+.kb-itemAddon { font-size: 11.5px; letter-spacing: 0.02em; padding: 1px 6px; border: 1px solid rgba(17, 19, 24, 0.18); border-radius: 2px; color: rgba(17, 19, 24, 0.66); white-space: nowrap; }
 .kb-items--compact li { font-size: 13.5px; gap: 8px; }
 .kb__note { margin-top: 14px; font-size: 13.5px; font-style: italic; color: rgba(17, 19, 24, 0.6); border-left: 2px solid #e8e2d8; padding-left: 12px; }
 .kb__ordFoot { margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(17, 19, 24, 0.1); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -527,12 +534,23 @@
 [data-app] .pg__variantX { border: 1px solid var(--border); background: transparent; color: var(--ink-55); width: 22px; height: 22px; border-radius: 2px; line-height: 1; cursor: pointer; font-size: 14px; }
 [data-app] .pg__variantX:hover { color: var(--surface); background: var(--accent); border-color: var(--accent); }
 [data-app] .pg__variantForm { display: grid; grid-template-columns: 1fr 96px auto; gap: 8px; align-items: end; }
+/* Add-on groups. A group is a heading plus its choices, so it gets its own
+   hairline inside the section rather than a second border-top from
+   .pg__variants -- nesting that class would double the rule and read as a
+   fragment of two sections rather than one group of groups. */
+[data-app] .pg__variantGroup { display: grid; gap: 8px; padding: 12px 0 4px; border-top: 1px dashed var(--border); }
+[data-app] .pg__variantGroupHead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13.5px; }
+[data-app] .pg__variantGroupHead .pg__fine { margin-left: auto; }
+/* A group needs four things on one line -- name, how many, skippable, add --
+   and the shared three-column form would wrap the last one onto its own row. */
+[data-app] .pg__variantForm--addon { grid-template-columns: 1fr auto auto auto; }
 [data-app] .pg__variantCount { color: var(--text); }
 [data-app] .pg__variantNone { color: var(--ink-55); }
 
 @media (max-width: 560px) {
   [data-app] .pg__variantForm { grid-template-columns: 1fr 1fr; }
   [data-app] .pg__variantForm .pg__btn { grid-column: span 2; }
+  [data-app] .pg__variantForm--addon { grid-template-columns: 1fr 1fr; }
 }
 [data-app] .co__noteForm { margin-top: 20px; display: grid; gap: 8px; }
 [data-app] .pg__undo { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 0 48px 16px; padding: 12px 16px; border: 1px solid var(--border); background: var(--surface); font-size: 13.5px; }

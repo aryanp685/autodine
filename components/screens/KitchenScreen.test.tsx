@@ -80,6 +80,49 @@ describe('Kitchen board', () => {
     expect(html).not.toContain('Demo board · local only');
   });
 
+  it('attaches an add-on to the dish it was ordered with, as a tag', () => {
+    // The cook reads the dish first and its instructions second. Run together
+    // as "Butter Naan · Half · Extra cheese" the add-on reads as part of the
+    // dish name and gets missed.
+    const html = renderToStaticMarkup(
+      <Kitchen
+        data={{
+          restaurantName: 'maddi',
+          restaurantId: 'r-1',
+          tickets: [
+            {
+              id: 'o-1',
+              code: 'MA-ABC12',
+              table: 'T1',
+              placedAt: '7:42 pm',
+              placedAtIso: new Date().toISOString(),
+              ageMin: 1,
+              payment: 'pending',
+              state: 'new',
+              items: [
+                {
+                  qty: 1,
+                  name: 'Butter Naan',
+                  detail: 'Half · Extra cheese · Jain',
+                  portion: 'Half',
+                  addons: ['Extra cheese', 'Jain'],
+                  veg: true,
+                },
+              ],
+              total: 120,
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(html).toContain('kb-itemAddon');
+    expect(html).toContain('Extra cheese');
+    expect(html).toContain('Jain');
+    // The portion stays a qualifier on the dish, not a tag.
+    expect(html).toContain('· Half');
+  });
+
   it('shows an empty live board as empty, not as a demo', () => {
     const html = renderToStaticMarkup(
       <Kitchen data={{ restaurantName: 'maddi', restaurantId: 'r-1', tickets: [] }} />,

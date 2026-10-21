@@ -60,7 +60,22 @@ export type KitchenTicket = {
   items: {
     qty: number;
     name: string;
+    /**
+     * Portion and add-ons together, as the voice reads them: "Half · Extra
+     * cheese". Kept as one string because lib/announce turns it into Hindi by
+     * splitting it again, and because every ticket printed before add-ons
+     * existed already carries this shape.
+     */
     detail?: string;
+    /** The portion alone, for the ticket card. */
+    portion?: string;
+    /**
+     * The add-ons alone, for the ticket card. Shown as tags attached to the
+     * dish rather than as part of its name: a cook reads the dish first and
+     * its instructions second, and "Half · Extra cheese" run together reads
+     * as one long dish name.
+     */
+    addons?: string[];
     veg: boolean;
     /** The owner's written pronunciation, when there is one. */
     spoken?: string | null;
@@ -230,16 +245,22 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
   }
 
   const tickets: KitchenTicket[] = rows.map((row) => {
-    const items = (itemsByOrder.get(row.id) ?? []).map((item) => ({
-      qty: item.qty,
-      name: item.name_snapshot,
-      detail:
-        [item.variant_snapshot, ...(item.addons_snapshot ?? [])]
-          .filter((part): part is string => Boolean(part && part.trim()))
-          .join(' · ') || undefined,
-      veg: item.is_veg,
-      spoken: (item.item_id && spokenById.get(item.item_id)) || undefined,
-    }));
+    const items = (itemsByOrder.get(row.id) ?? []).map((item) => {
+      const portion = item.variant_snapshot?.trim() || undefined;
+      const addons = (item.addons_snapshot ?? [])
+        .map((name) => name?.trim())
+        .filter((name): name is string => Boolean(name));
+
+      return {
+        qty: item.qty,
+        name: item.name_snapshot,
+        detail: [portion, ...addons].filter(Boolean).join(' · ') || undefined,
+        ...(portion ? { portion } : {}),
+        ...(addons.length ? { addons } : {}),
+        veg: item.is_veg,
+        spoken: (item.item_id && spokenById.get(item.item_id)) || undefined,
+      };
+    });
 
     return {
       id: row.id,
