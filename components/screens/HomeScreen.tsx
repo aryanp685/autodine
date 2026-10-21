@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { inr, plans } from '@/lib/demo-data';
 import { HomeMotion } from '@/components/HomeMotion';
+import { HomeNavCondense } from '@/components/HomeNavCondense';
 
 /* ============================================================================
    Editorial Minimal — locked design system
@@ -45,7 +46,7 @@ export function Home() {
       </header>
 
       <section className="home__section" id="product" data-anim="reveal">
-        <div className="home__rule" />
+        <div className="home__rule" data-rule />
         <div className="home__three" data-anim-group>
           {[
             ['01', 'A clear digital menu', 'Every dish, price and menu is edited and published from the dashboard, and several menus can run side by side — lunch and dinner, dine-in and takeaway.'],
@@ -120,8 +121,10 @@ export function Home() {
         <div className="home__footFine">AutoDine · Product preview · not for live restaurant operations</div>
       </footer>
 
-      {/* Renders nothing. Finds the [data-anim] elements above and animates
-          them; see the failure modes documented in the component. */}
+      {/* Both render nothing. HomeNavCondense toggles the bar's condensed
+          state on scroll; HomeMotion finds the [data-anim] elements above and
+          animates them. See the failure modes documented in each. */}
+      <HomeNavCondense />
       <HomeMotion />
     </div>
   );
