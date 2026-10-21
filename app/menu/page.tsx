@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { CartProvider } from '@/components/CartProvider';
 import { CustomerMenu } from '@/components/screens/CustomerMenu';
 import { MenuSlugNeeded } from '@/components/screens/MenuSlugNeeded';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
@@ -35,5 +36,10 @@ export default async function CustomerMenuPage({
   // Null means demo mode only. A configured database with an unknown slug is
   // a real not-found state, never a reason to show the fictional sample menu.
   if (isSupabaseConfigured && !data) notFound();
-  return <CustomerMenu data={data ?? undefined} />;
+  // The cart is keyed by restaurant, so it is mounted where the slug is known.
+  return (
+    <CartProvider slug={s}>
+      <CustomerMenu data={data ?? undefined} />
+    </CartProvider>
+  );
 }

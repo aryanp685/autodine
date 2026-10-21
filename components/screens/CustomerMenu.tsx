@@ -16,8 +16,9 @@ import type {
   DisplayRestaurant,
 } from '@/lib/db/adapt';
 import { useCart } from '@/components/CartProvider';
+import { priceCart } from '@/lib/cart-pricing';
 import { inr } from '@/lib/demo-data';
-import { lineTotal, paiseToRupees, rupeesToPaise } from '@/lib/money';
+import { paiseToRupees, rupeesToPaise } from '@/lib/money';
 import { VegMark } from '@/components/ui';
 
 const needsChoice = (i: Item) => Boolean(i.variants || i.modifiers);
@@ -78,6 +79,19 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
   const restaurant = data?.restaurant ?? demoRestaurant;
   const categories = data?.categories ?? demoCategories;
   const items = data?.items ?? demoItems;
+
+  // Priced against this menu for the bar only. It is a running hint, not the
+  // amount charged: the order is priced from the database when it is placed.
+  const slug = data?.restaurant.slug;
+  const menuPrices = items.map((i) => ({
+    id: i.id,
+    name: i.name,
+    pricePaise: rupeesToPaise(i.price),
+    isVeg: i.veg,
+    isAvailable: i.available,
+  }));
+  const barSubtotal = priceCart(cart.lines, menuPrices).subtotalPaise;
+  const cartHref = slug ? `/menu/cart?s=${encodeURIComponent(slug)}` : '/menu/cart';
   const list = cat === 'all' ? items : items.filter((i) => i.category === cat);
   const itemHref = (itemId: string) => {
     const params = new URLSearchParams({ item: itemId });
@@ -134,7 +148,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
                 ) : (
                   <button
                     className="menu__dishCta"
-                    onClick={() => cart.add({ id: i.id, name: i.name, unitPricePaise: rupeesToPaise(i.price), qty: 1, veg: i.veg })}
+                    onClick={() => cart.add(i.id)}
                   >
                     Add
                   </button>
@@ -151,9 +165,9 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
       {cart.count > 0 && (
         <div className="menu__cartBar">
           <span>
-            {cart.count} item{cart.count === 1 ? '' : 's'} · {inr(paiseToRupees(cart.subtotalPaise))}
+            {cart.count} item{cart.count === 1 ? '' : 's'} · {inr(paiseToRupees(barSubtotal))}
           </span>
-          <Link href={`/menu/cart`} className="menu__cartBtn">
+          <Link href={cartHref} className="menu__cartBtn">
             Review order
           </Link>
         </div>
@@ -192,11 +206,8 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
   const [qty, setQty] = useState(1);
   const cart = useCart();
 
-  const vPrice = variants.find((v) => v.id === variant)?.price ?? item.price;
   const spiceGroup = item.modifiers?.[0] ?? PRESET_SPICE;
   const breadGroup = item.modifiers?.[1] ?? PRESET_BREAD;
-  const addonPrice = bread === 'naan' ? 79 : bread === 'roti' ? 59 : 0;
-  const total = lineTotal(rupeesToPaise(vPrice + addonPrice), qty);
 
   return (
     <div className="menu menu--dim">
@@ -289,21 +300,22 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
             <button
               className="sheet__add"
               onClick={() => {
-                cart.add({
-                  id: item.id,
-                  name: item.name,
-                  unitPricePaise: rupeesToPaise(vPrice + addonPrice),
-                  qty,
-                  // Undefined when the dish has no portions, so the cart line
-                  // simply carries no variant instead of throwing.
-                  variant: variants.find((v) => v.id === variant)?.name,
-                  addons: [spice, bread === 'none' ? '' : `Bread: ${bread}`].filter(Boolean),
-                  veg: item.veg,
-                });
+                // Only the dish and how many. Portions and add-ons are chosen
+                // here but not charged -- the cart carries an id and a
+                // quantity, and the price is read from the kitchen's menu when
+                // the order is placed, so the options below cannot change what
+                // is billed.
+                cart.add(item.id, qty);
               }}
             >
-              Add to order · {inr(paiseToRupees(total))}
+              Add to order · {inr(paiseToRupees(item.price * qty))}
             </button>
+            {(Boolean(item.variants?.length) || Boolean(item.modifiers?.length)) && (
+              <p className="sheet__note">
+                Portions and add-ons you pick here are not charged yet — the bill uses
+                the menu price of {inr(item.price)} each.
+              </p>
+            )}
           </div>
         </div>
       </div>

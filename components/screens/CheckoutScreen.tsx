@@ -1,122 +1,148 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
 import { useCart } from '@/components/CartProvider';
-import { inr, restaurant } from '@/lib/demo-data';
+import { inr } from '@/lib/demo-data';
 import { VegMark } from '@/components/ui';
-import { lineTotal, paiseToRupees } from '@/lib/money';
+import { paiseToRupees } from '@/lib/money';
+import { priceCart, type MenuItemPrice } from '@/lib/cart-pricing';
+import { placeOrderAction } from '@/app/menu/checkout/actions';
 
-function useTotals() {
-  // All arithmetic lives in lib/pricing. The browser never computes a total.
-  return useCart().totals;
-}
-
-function MethodChoice({ value, onChange }: { value: 'online' | 'counter'; onChange: (v: 'online' | 'counter') => void }) {
-  return (
-    <div className={`co__methods`}>
-      <button
-        className={`co__method ${value === 'online' ? 'is-on' : ''}`}
-        onClick={() => onChange('online')}
-        aria-pressed={value === 'online'}
-      >
-        <div className={`co__methodTop`}>
-          <strong>Pay online</strong>
-          <span>UPI · Cards · Netbanking</span>
-        </div>
-        <p>We confirm payment with the provider before the order is sent to the kitchen.</p>
-      </button>
-      <button
-        className={`co__method ${value === 'counter' ? 'is-on' : ''}`}
-        onClick={() => onChange('counter')}
-        aria-pressed={value === 'counter'}
-      >
-        <div className={`co__methodTop`}>
-          <strong>Pay at counter</strong>
-          <span>Cash · Card on device</span>
-        </div>
-        <p>The order goes to the kitchen marked payment pending. The cashier records it when you pay.</p>
-      </button>
-    </div>
-  );
-}
-
-/* Option A — editorial checkout */
-export function Checkout() {
+/**
+ * Checkout, with one honest gap.
+ *
+ * Paying at the counter works: the order goes to the kitchen marked payment
+ * pending, and the cashier records the payment when it happens. That is the
+ * whole loop and it is real.
+ *
+ * Paying online does not exist yet -- the payment provider's KYC is not
+ * finished, so there is nothing to charge against. It is shown as unavailable
+ * rather than as a button that fails on press. A control that looks live and
+ * then errors is worse than one that plainly is not ready.
+ */
+export function Checkout({
+  slug,
+  restaurantName,
+  items,
+}: {
+  slug?: string;
+  restaurantName?: string;
+  items: MenuItemPrice[];
+}) {
   const cart = useCart();
-  const t = useTotals();
-  const [method, setMethod] = useState<'online' | 'counter'>('online');
+  const priced = priceCart(cart.lines, items);
+  const { subtotalPaise, taxPaise, totalPaise } = priced.totals;
+
+  const withSlug = (path: string) => (slug ? `${path}?s=${encodeURIComponent(slug)}` : path);
+  const canOrder = cart.ready && priced.lines.length > 0;
 
   return (
     <div className="co">
       <header className="co__head">
-        <Link href={`/menu/cart`} className="co__back">
+        <Link href={withSlug('/menu/cart')} className="co__back">
           ← Back to cart
         </Link>
         <h1>Checkout</h1>
         <p>
-          {restaurant.name} · Table 7 · {cart.count} items
+          {restaurantName ?? 'Your table'} · {cart.count} item{cart.count === 1 ? '' : 's'}
         </p>
       </header>
 
       <div className="co__grid">
         <div>
           <h2 className="co__h2">How would you like to pay?</h2>
-          <MethodChoice value={method} onChange={setMethod} />
 
-          <div className="co__note">
-            {method === 'online' ? (
-              <>
-                <strong>What happens next:</strong> you complete payment with the provider, then we verify it on
-                our server. The order only reaches the kitchen after that verification — a success screen on
-                your phone is not treated as proof of payment.
-              </>
-            ) : (
-              <>
-                <strong>What happens next:</strong> your order goes straight to the kitchen marked
-                <em> payment pending</em>. Pay the cashier before you leave; the receipt is issued once the
-                payment is recorded.
-              </>
-            )}
+          <div className="co__methods">
+            <button
+              type="button"
+              className="co__method is-on"
+              aria-pressed="true"
+              disabled
+              // Not a choice yet: it is the only way to pay, so it reads as
+              // selected and inactive rather than as one of two options.
+            >
+              <div className="co__methodTop">
+                <strong>Pay at counter</strong>
+                <span>Cash · Card · UPI</span>
+              </div>
+              <p>
+                Your order goes to the kitchen straight away, marked payment pending.
+                Pay the cashier before you leave; the receipt is issued once the payment
+                is recorded.
+              </p>
+            </button>
+
+            <button type="button" className="co__method" aria-disabled="true" disabled>
+              <div className="co__methodTop">
+                <strong>Pay online</strong>
+                <span>Not connected yet</span>
+              </div>
+              <p>
+                Online payment needs our payment provider&rsquo;s verification to finish.
+                Until it does, orders are placed and paid at the counter.
+              </p>
+            </button>
           </div>
 
-          <h2 className="co__h2">Order for Table 7</h2>
+          <h2 className="co__h2">Your order</h2>
           <ul className="co__items">
-            {cart.lines.map((l) => (
-              <li key={l.key}>
-                <VegMark veg={l.veg} />
+            {priced.lines.map((l) => (
+              <li key={l.itemId}>
+                <VegMark veg={l.isVeg} />
                 <span>
                   <strong>{l.qty} ×</strong> {l.name}
                 </span>
-                <span className="tnum">{inr(paiseToRupees(lineTotal(l.unitPricePaise, l.qty)))}</span>
+                <span className="tnum">{inr(paiseToRupees(l.lineTotalPaise))}</span>
               </li>
             ))}
+            {cart.ready && priced.lines.length === 0 && (
+              <li className="co__empty">Nothing to order yet — add something from the menu.</li>
+            )}
           </ul>
+
+          <form id="co-place-order" action={placeOrderAction} className="co__noteForm">
+            <input type="hidden" name="slug" value={slug ?? ''} />
+            {/* Only ids and quantities go to the server. The prices are read
+                from the database when the order is written. */}
+            <input type="hidden" name="lines" value={JSON.stringify(cart.lines)} />
+            <label className="ui-field">
+              <span className="ui-label">Anything the kitchen should know?</span>
+              <textarea
+                className="ui-input"
+                name="note"
+                rows={2}
+                maxLength={300}
+                placeholder="No onion in the raita, less chilli…"
+              />
+            </label>
+          </form>
         </div>
 
         <aside className="co__sum">
           <h2>Bill</h2>
           <div className="co__row">
             <span>Subtotal</span>
-            <span className="tnum">{inr(paiseToRupees(t.subtotalPaise))}</span>
+            <span className="tnum">{inr(paiseToRupees(subtotalPaise))}</span>
           </div>
           <div className="co__row">
-            <span>Taxes (sample)</span>
-            <span className="tnum">{inr(paiseToRupees(t.taxPaise))}</span>
+            <span>Taxes (GST 5% · sample)</span>
+            <span className="tnum">{inr(paiseToRupees(taxPaise))}</span>
           </div>
           <div className="co__row co__row--total">
             <span>Total payable</span>
-            <span className="tnum">{inr(paiseToRupees(t.totalPaise))}</span>
+            <span className="tnum">{inr(paiseToRupees(totalPaise))}</span>
           </div>
-          <button className="co__cta" type="button" disabled={cart.lines.length === 0}>
-            {cart.lines.length === 0
-              ? 'Add items before checkout'
-              : method === 'online'
-                ? `Preview payment · ${inr(paiseToRupees(t.totalPaise))}`
-                : `Preview order · ${inr(paiseToRupees(t.totalPaise))}`}
+
+          <button
+            type="submit"
+            form="co-place-order"
+            className="co__cta"
+            disabled={!canOrder}
+          >
+            {!canOrder ? 'Add items before checkout' : `Place order · ${inr(paiseToRupees(totalPaise))}`}
           </button>
           <p className="co__fine" role="note">
-            Preview only. No order is submitted, no payment provider is connected and no charge is made.
+            You pay at the counter. The kitchen starts on this straight away.
           </p>
         </aside>
       </div>
