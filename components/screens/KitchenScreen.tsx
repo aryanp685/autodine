@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { kitchenOrders, restaurant, type KitchenOrder } from '@/lib/demo-data';
 import { Money, VegMark } from '@/components/ui';
 import type { KitchenScreenData, KitchenTicket } from '@/lib/db/kitchen-screen';
-import { nextPrepState, type PrepState } from '@/lib/db/prep';
+import { clockTimeInZone } from '@/lib/db/time';
+import { LATE_AFTER_MIN, WARN_AFTER_MIN, nextPrepState, type PrepState } from '@/lib/db/prep';
 import { advanceOrderAction } from '@/app/kitchen/actions';
 import { cancelStaffOrderAction } from '@/app/orders/actions';
 import { SignInPrompt } from '@/components/SignInPrompt';
@@ -29,7 +30,10 @@ import {
   type SpeechEngine,
 } from '@/lib/speech';
 
-const AGE_TONE = (age: number) => (age >= 20 ? 'is-late' : age >= 10 ? 'is-warn' : 'is-fresh');
+/* The thresholds live next to the query that computes the age, so the badge
+   and the board cannot disagree about what "late" means. */
+const AGE_TONE = (age: number) =>
+  age >= LATE_AFTER_MIN ? 'is-late' : age >= WARN_AFTER_MIN ? 'is-warn' : 'is-fresh';
 
 /** How many past announcements the on-screen log keeps. */
 const LOG_LIMIT = 6;
@@ -127,10 +131,6 @@ function fromLive(ticket: KitchenTicket): BoardTicket {
     items: ticket.items,
     total: ticket.total,
   };
-}
-
-function clockNow(): string {
-  return new Date().toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
 /**
@@ -444,7 +444,7 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
       // would show the pass a sentence the kitchen never heard.
       if (!accepted) return false;
 
-      setLog((current) => [{ key, at: clockNow(), label, text }, ...current].slice(0, LOG_LIMIT));
+      setLog((current) => [{ key, at: clockTimeInZone(null, new Date()), label, text }, ...current].slice(0, LOG_LIMIT));
       setWaiting(queueRef.current?.pending() ?? 0);
       return true;
     },
@@ -461,7 +461,7 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
     const accepted = queueRef.current?.force(key, text, 'order') ?? false;
     if (!accepted) return;
 
-    setLog((current) => [{ key, at: clockNow(), label, text }, ...current].slice(0, LOG_LIMIT));
+    setLog((current) => [{ key, at: clockTimeInZone(null, new Date()), label, text }, ...current].slice(0, LOG_LIMIT));
     setWaiting(queueRef.current?.pending() ?? 0);
   }, []);
 

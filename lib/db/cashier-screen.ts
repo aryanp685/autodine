@@ -25,6 +25,7 @@
  */
 
 import { getStaffContextDetailed } from '@/lib/db/staff';
+import { clockTimeInZone } from './time';
 
 // Re-exported rather than redefined: the constant lives in a module with no
 // database imports so the client can use it. See lib/payment-methods.ts.
@@ -71,16 +72,6 @@ export const QUEUE_WINDOW_HOURS = 24;
 
 const NO_TABLE = 'Takeaway';
 
-function clockTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleTimeString('en-IN', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
-}
-
 /** Human label for a prep state, matching the wording used on the board. */
 const PREP_LABEL: Record<string, string> = {
   new: 'New',
@@ -98,7 +89,7 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
     return { restaurantName: '', queue: [], blocked: staff.reason };
   }
 
-  const { supabase, restaurantId, restaurantName } = staff.context;
+  const { supabase, restaurantId, restaurantName, timezone } = staff.context;
   const cutoff = new Date(Date.now() - QUEUE_WINDOW_HOURS * 3_600_000).toISOString();
 
   const { data: orders, error: ordersError } = await supabase
@@ -176,7 +167,7 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
       id: row.id,
       code: row.code,
       table: (row.table_id && labelByTable.get(row.table_id)) || NO_TABLE,
-      at: clockTime(row.placed_at),
+      at: clockTimeInZone(timezone, row.placed_at),
       state: PREP_LABEL[row.prep_status] ?? row.prep_status,
       total: paiseToRupees(row.total_paise),
       // Clamped at zero: an overpaid order owes nothing, and a negative

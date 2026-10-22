@@ -8,6 +8,7 @@ import { Avatar, Money, PaymentPill, PrepPill, Sparkline } from '@/components/ui
 import { signOutAction } from '@/app/auth/actions';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import type { DashboardScreenData } from '@/lib/db/dashboard-screen';
+import { clockTimeInZone } from '@/lib/db/time';
 
 /**
  * Only destinations that actually exist are listed. "Orders" and "Reports"
@@ -42,12 +43,6 @@ function prepState(status: string): 'new' | 'preparing' | 'ready' | 'served' {
   return 'new';
 }
 
-function clockTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
-}
-
 /** Up to two initials from the venue name. '—' rather than a made-up pair. */
 function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
@@ -78,6 +73,8 @@ export function Dashboard({
 
   const venueName = live ? (data?.restaurantName ?? '') : restaurant.name;
   const venueMeta = live ? (data?.tagline ?? '') : restaurant.tagline;
+  // Times in the table are shown on the restaurant's clock, never the server's.
+  const timezone = data?.timezone;
 
   const cards: Array<{ label: string; value: ReactNode; meta: string }> = live && stats
     ? [
@@ -278,7 +275,7 @@ export function Dashboard({
                     <tr key={o.id}>
                       <td className="tnum">{o.code}</td>
                       <td>{o.table}</td>
-                      <td className="tnum">{clockTime(o.placedAt)}</td>
+                      <td className="tnum">{clockTimeInZone(timezone, o.placedAt)}</td>
                       <td>
                         <PaymentPill state={paymentState(o.paymentStatus)} />
                       </td>

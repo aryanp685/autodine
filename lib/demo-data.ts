@@ -78,25 +78,6 @@ export const plans = [
   },
 ] as const;
 
-/** PROPOSED limits — draft for owner approval, not enforced anywhere yet. */
-export const proposedLimits: {
-  label: string;
-  starter: string;
-  professional: string;
-  business: string;
-}[] = [
-  { label: 'Restaurants per account', starter: '1', professional: '1', business: '3' },
-  { label: 'Tables / active QR codes', starter: '25', professional: '60', business: '150' },
-  { label: 'Menus', starter: '2', professional: '6', business: '15' },
-  { label: 'Menu items (per restaurant)', starter: '150', professional: '400', business: '1,000' },
-  { label: 'Staff accounts', starter: '3', professional: '10', business: '30' },
-  { label: 'AI menu imports / month', starter: '0', professional: '10', business: '30' },
-  { label: 'Order & receipt history', starter: '6 months', professional: '24 months', business: 'Unlimited*' },
-  { label: 'Storage for menu & brand assets', starter: '1 GB', professional: '5 GB', business: '15 GB' },
-  { label: 'Kitchen + cashier devices', starter: '2', professional: '6', business: '20' },
-  { label: 'Support level', starter: 'Email', professional: 'Priority email', business: 'Priority + onboarding' },
-];
-
 export const trial = {
   days: 10,
   started: '14 Oct 2026',
@@ -530,38 +511,4 @@ export const recentOrders = [
   { id: 'A-1040', table: 'T12', at: '12:31 PM', total: 985, payment: 'Paid online', state: 'Ready' },
   { id: 'A-1039', table: 'T5', at: '12:24 PM', total: 864, payment: 'Paid online', state: 'Served' },
   { id: 'A-1038', table: 'T9', at: '12:19 PM', total: 737, payment: 'Counter due', state: 'Ready' },
-];
-
-export const menuDraftRows = [
-  { name: 'Paneer Tikka', category: 'Starters', price: 349, confidence: 'high', status: 'Ready' },
-  { name: 'Hara Bhara Kebab', category: 'Starters', price: 299, confidence: 'high', status: 'Ready' },
-  { name: 'Murgh Malai Kabaab', category: 'Starters', price: 429, confidence: 'medium', status: 'Needs review' },
-  { name: 'Tandoori Chicken', category: 'Tandoor & Grills', price: 349, confidence: 'high', status: 'Ready' },
-  { name: 'Laal Maas', category: 'Curries & Mains', price: 0, confidence: 'low', status: 'Price missing' },
-  { name: 'Dal Bukhara', category: 'Curries & Mains', price: 389, confidence: 'high', status: 'Ready' },
-  { name: 'Subz Dum Biryani', category: 'Biryani & Rice', price: 379, confidence: 'medium', status: 'Needs review' },
-  { name: 'Gulab Jamun (2 pc)', category: 'Desserts', price: 149, confidence: 'high', status: 'Ready' },
-];
-
-export const faqs = [
-  {
-    q: 'What happens when the 10-day trial ends?',
-    a: 'Your data stays. With no active plan, the account moves to read-only: you can view menus, orders, receipts and reports, but new customer orders and paid features are blocked on the server until you activate a plan.',
-  },
-  {
-    q: 'Do I need to buy any hardware?',
-    a: 'No. Print your table QR cards, run the kitchen board on any laptop, tablet or phone, and connect a Bluetooth speaker through your device if you want louder voice announcements.',
-  },
-  {
-    q: 'Can customers pay online and at the counter?',
-    a: 'Yes. Both paths are supported. Counter orders stay visibly payment-pending until a cashier records the payment, and preparation status stays separate from payment status.',
-  },
-  {
-    q: 'How does the AI menu scanner work?',
-    a: 'You upload photos or a PDF of your existing menu. The system extracts categories, items and prices, flags anything uncertain, and you review and correct every item before publishing. Nothing is published automatically.',
-  },
-  {
-    q: 'Are taxes included in the price shown?',
-    a: 'Plan prices are listed in INR. The exact tax treatment and invoice presentation are being confirmed before subscriptions go live, and will be shown clearly on the billing screen.',
-  },
 ];

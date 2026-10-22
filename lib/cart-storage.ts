@@ -214,4 +214,3 @@ export function totalQty(lines: StoredLine[]): number {
   return lines.reduce((n, l) => n + l.qty, 0);
 }
 
-export const CART_MAX_QTY = MAX_QTY;

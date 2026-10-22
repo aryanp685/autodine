@@ -248,8 +248,3 @@ export function billTaxRateBps(
   if (typeof snapshot === 'number') return snapshot;
   return deriveTaxRateBps(taxPaise, taxablePaise);
 }
-
-/** Guards the percentage maths above from a nonsense rate instead of printing NaN. */
-export function isSaneRate(bps: number | null): boolean {
-  return typeof bps === 'number' && Number.isFinite(bps) && bps >= 0 && bps <= BPS_PER_100_PERCENT;
-}

@@ -137,11 +137,3 @@ export function PrepPill({ state }: { state: 'new' | 'preparing' | 'ready' | 'se
 export function Avatar({ initials }: { initials: string }) {
   return <span className="ui-avatar">{initials}</span>;
 }
-
-export function Skeleton({ w = '100%', h = 12 }: { w?: string | number; h?: number }) {
-  return <div className="ui-skeleton" style={{ width: w, height: h }} />;
-}
-
-export function Kicker({ children }: { children: React.ReactNode }) {
-  return <div className="ui-kicker">{children}</div>;
-}

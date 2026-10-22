@@ -16,7 +16,13 @@
  */
 
 export async function siteOrigin(): Promise<string> {
-  const configured = process.env.SITE_URL?.trim();
+  // Two names for one value. `SITE_URL` is what this module has always read;
+  // `NEXT_PUBLIC_SITE_URL` is what .env.example and the Vercel project have
+  // actually been carrying, so the documented variable was ignored and every
+  // QR code fell through to the request headers. Both are accepted now, and
+  // the one the deployment already sets wins over guessing.
+  const configured =
+    process.env.SITE_URL?.trim() || process.env.NEXT_PUBLIC_SITE_URL?.trim();
   if (configured) return configured.replace(/\/+$/, '');
 
   const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();

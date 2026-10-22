@@ -18,6 +18,7 @@ import type { DashboardScreenData } from '@/lib/db/dashboard-screen';
 function live(over: Partial<DashboardScreenData> = {}): DashboardScreenData {
   return {
     restaurantName: 'maddi',
+    timezone: 'Asia/Kolkata',
     tagline: null,
     stats: {
       ordersToday: 3,

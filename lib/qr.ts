@@ -26,8 +26,6 @@
 
 import QRCode from 'qrcode';
 
-export type QrFormat = 'svg' | 'png-data-url';
-
 /**
  * Error correction level.
  *
@@ -104,12 +102,3 @@ export async function qrSvg(text: string): Promise<string | null> {
  * `svg` carries no width or height so it fills whatever box it is placed in;
  * the viewBox is what makes that work.
  */
-export async function tableQrSvg(
-  origin: string,
-  publicToken: string
-): Promise<{ svg: string; url: string } | null> {
-  const url = tableScanUrl(origin, publicToken);
-  const svg = await qrSvg(url);
-  if (!svg) return null;
-  return { svg, url };
-}

@@ -582,4 +582,3 @@ export function isDevanagariOnly(text: string): boolean {
 }
 
 /** Exported for the tests that pin the dictionary's coverage. */
-export const KNOWN_WORDS: readonly string[] = PHRASES;

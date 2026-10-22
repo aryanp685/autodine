@@ -28,7 +28,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: no-preference)').matches){document.documentElement.classList.add('motion')}`,
+            __html:
+              "(function(){var d=document.documentElement;" +
+              "if(!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: no-preference)').matches))return;" +
+              "d.classList.add('motion');" +
+              // Fail open. The hiding rule is the only thing standing between a
+              // visitor and a blank page, and it depends on a client component
+              // mounting. If HomeMotion never reports in (a hydration error, a
+              // chunk that 404s, an extension that blocks the bundle), dropping
+              // .motion makes every staged element visible again -- un-animated,
+              // but readable, which is the right way to lose.
+              "setTimeout(function(){if(!d.hasAttribute('data-motion-ready'))d.classList.remove('motion')},4000)})()",
           }}
         />
       </head>
