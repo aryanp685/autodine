@@ -4,6 +4,7 @@ import type { OutletBar } from '@/lib/outlets';
 import { Money, PaymentPill, PrepPill } from '@/components/ui';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { demoReport, type ReportOrderRow, type ReportsScreenData } from '@/lib/db/reports';
+import { dateTimeInZone } from '@/lib/db/time';
 
 /**
  * The order ledger.
@@ -200,13 +201,7 @@ export function OrdersScreen({
                     return (
                       <tr key={order.id} className={cancelled ? 'rep__row--void' : undefined}>
                         <td className="tnum">
-                          {new Date(order.placedAt).toLocaleString('en-IN', {
-                            timeZone: timezone,
-                            day: '2-digit',
-                            month: 'short',
-                            hour: 'numeric',
-                            minute: '2-digit',
-                          })}
+                          {dateTimeInZone(timezone, order.placedAt)}
                         </td>
                         <td className="pg__barMuted">
                           {live && !blocked ? (

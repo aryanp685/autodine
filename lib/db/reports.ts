@@ -39,7 +39,6 @@ import {
 
 export type ReportRangeKey = 'today' | '7d' | '30d' | 'custom';
 
-export const REPORT_RANGE_KEYS: readonly ReportRangeKey[] = ['today', '7d', '30d', 'custom'] as const;
 
 /** Nobody needs a report longer than this, and a typo in a date picker is cheaper to refuse. */
 export const MAX_RANGE_DAYS = 366;

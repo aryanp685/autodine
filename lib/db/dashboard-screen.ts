@@ -25,7 +25,7 @@
  */
 
 import { getStaffContextDetailed } from './staff';
-import { hourInZone, startOfDayUtc } from './time';
+import { hourInZone, RESTAURANT_TIME_ZONE, startOfDayUtc } from './time';
 
 
 /** Payment rows in this state have actually moved money. */
@@ -65,6 +65,8 @@ export type DashboardStats = {
 
 export type DashboardScreenData = {
   restaurantName: string;
+  /** IANA zone of the restaurant, so a placed-at time is its time, not UTC's. */
+  timezone: string;
   /** Null when the owner never filled it in. Never substitute sample copy. */
   tagline: string | null;
   stats: DashboardStats;
@@ -111,6 +113,7 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
     if (staff.reason === 'unconfigured') return null;
     return {
       restaurantName: '',
+      timezone: RESTAURANT_TIME_ZONE,
       tagline: null,
       stats: { ordersToday: 0, revenueTodayPaise: 0, averageTicketPaise: 0, openOrders: 0 },
       orders: [],
@@ -183,6 +186,7 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
   if (rows.length === 0) {
     return {
       restaurantName,
+      timezone,
       tagline: staff.context.tagline,
       stats: { ordersToday: 0, revenueTodayPaise, averageTicketPaise: 0, openOrders: 0 },
       orders: [],
@@ -236,6 +240,7 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
 
   return {
     restaurantName,
+    timezone,
     tagline: staff.context.tagline,
     stats: { ordersToday, revenueTodayPaise, averageTicketPaise, openOrders },
     orders: rows.slice(0, RECENT_ORDER_LIMIT).map((row) => ({

@@ -20,6 +20,7 @@ import { requestOrigin, siteOrigin } from './site-origin';
 beforeEach(() => {
   state.headers.clear();
   delete process.env.SITE_URL;
+  delete process.env.NEXT_PUBLIC_SITE_URL;
   delete process.env.VERCEL_PROJECT_PRODUCTION_URL;
 });
 
@@ -51,6 +52,14 @@ describe('requestOrigin', () => {
 });
 
 describe('siteOrigin', () => {
+  it('accepts NEXT_PUBLIC_SITE_URL, the name the deployment actually sets', async () => {
+    // The documented variable was NEXT_PUBLIC_SITE_URL while this module read
+    // SITE_URL, so a configured deployment still fell through to the request.
+    process.env.NEXT_PUBLIC_SITE_URL = 'https://autodine.example/';
+    state.headers.set('x-forwarded-host', 'preview-abc.vercel.app');
+    expect(await siteOrigin()).toBe('https://autodine.example');
+  });
+
   it('prefers an explicit SITE_URL over the request, for QR cards', async () => {
     process.env.SITE_URL = 'https://autodine.example';
     state.headers.set('x-forwarded-host', 'preview.vercel.app');

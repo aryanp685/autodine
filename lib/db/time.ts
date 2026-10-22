@@ -154,3 +154,52 @@ export function hourInZone(timeZone: string, at: Date): number {
   }).format(at);
   return Number(hour) % 24;
 }
+
+/**
+ * Time of day as a person reads it off a ticket: '12:31 pm'.
+ *
+ * This used to exist three times over -- on the kitchen board, in the cashier
+ * queue and on the dashboard -- and each copy formatted in the SERVER's zone.
+ * Every Vercel lambda runs in UTC, so a bill placed at half past twelve in
+ * Noida was shown as 07:01, and a cook working the board was reading times
+ * from a different clock than the guest who placed the order. One function,
+ * one zone, and the zone comes from restaurants.timezone like everything else
+ * in this file.
+ *
+ * The em dash on an unparseable timestamp is deliberate: a wrong time is worse
+ * than an obvious gap, and every caller renders this inside a <td> or a pill
+ * where an empty string would look like a bug in the layout.
+ */
+export function clockTimeInZone(
+  timeZone: string | null | undefined,
+  at: string | Date,
+): string {
+  const date = at instanceof Date ? at : new Date(at);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleTimeString('en-IN', {
+    timeZone: timeZone || RESTAURANT_TIME_ZONE,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+/**
+ * Date and time together, for a ledger row where the day matters: '12 Oct,
+ * 12:31 pm'. Same reasoning as clockTimeInZone -- the zone is the
+ * restaurant's, never the server's.
+ */
+export function dateTimeInZone(
+  timeZone: string | null | undefined,
+  at: string | Date,
+): string {
+  const date = at instanceof Date ? at : new Date(at);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString('en-IN', {
+    timeZone: timeZone || RESTAURANT_TIME_ZONE,
+    day: '2-digit',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}

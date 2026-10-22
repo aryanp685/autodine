@@ -30,6 +30,7 @@
 
 import { getStaffContextDetailed, KITCHEN_ROLES } from '@/lib/db/staff';
 import { paiseToRupees } from '@/lib/money';
+import { clockTimeInZone } from './time';
 import type { MemberRole } from './database';
 
 export type KitchenPrepState = 'new' | 'preparing' | 'ready' | 'served';
@@ -145,10 +146,6 @@ export const BOARD_WINDOW_HOURS = 6;
 /** How long a cancellation stays worth announcing. Minutes. */
 export const CANCELLED_WINDOW_MIN = 15;
 
-/** Tickets older than this are the kitchen running late. Minutes. */
-export const LATE_AFTER_MIN = 20;
-export const WARN_AFTER_MIN = 10;
-
 /** Table label shown when an order has no table (takeaway, delivery). */
 const NO_TABLE = 'Takeaway';
 
@@ -156,16 +153,6 @@ function minutesSince(iso: string, now: number): number {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return 0;
   return Math.max(0, Math.floor((now - then) / 60_000));
-}
-
-function clockTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleTimeString('en-IN', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
 }
 
 /**
@@ -204,7 +191,7 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
     };
   }
 
-  const { supabase, restaurantId, restaurantName, role } = staff.context;
+  const { supabase, restaurantId, restaurantName, role, timezone } = staff.context;
 
   /**
    * Two independent gates, checked in the order the operator can act on them.
@@ -371,7 +358,7 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
       id: row.id,
       code: row.code,
       table: (row.table_id && labelByTable.get(row.table_id)) || NO_TABLE,
-      placedAt: clockTime(row.placed_at),
+      placedAt: clockTimeInZone(timezone, row.placed_at),
       placedAtIso: row.placed_at,
       ageMin: minutesSince(row.placed_at, now),
       payment: paymentLabel(row.payment_status),

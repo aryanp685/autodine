@@ -30,7 +30,6 @@
   --ink-45: rgba(22, 20, 15, 0.45);
   --ok: #4b6b51;
   --warn: #a8760f;
-  --shadow: none;
   --radius-sm: 6px;
   --radius: 10px;
   --radius-lg: 14px;
@@ -49,9 +48,6 @@
   --rise: 12px;
   background: var(--page-bg);
 }
-
-[data-app] .ui-btn { border-radius: 6px; }
-[data-app] .ui-card { border-radius: 10px; }
 [data-app] .ui-badge { border-radius: 999px; }
 [data-app] .ui-input,
 [data-app] .ui-select { border-radius: 6px; }
@@ -255,8 +251,6 @@
 }
 .dash__railFoot { margin-top: auto; padding-top: 24px; }
 .dash__trialLine { font-size: 12px; color: rgba(17, 19, 24, 0.55); }
-.dash__trialBar { height: 3px; background: rgba(17, 19, 24, 0.12); margin-top: 8px; border-radius: 999px; }
-.dash__trialBar i { display: block; height: 100%; background: #b8860b; border-radius: 999px; }
 
 .dash__main { padding: 40px 52px 72px; }
 .dash__head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
@@ -554,8 +548,7 @@
 @media (min-width: 761px) {
   .sheet { place-items: center; padding: 40px 24px; }
   .sheet__panel { border-radius: var(--radius-lg); border-bottom: 1px solid var(--border); }
-  .sheet__panel::before { display: none; }
-}
+  .sheet__panel::before { display: none; }}
 
 /* ------------------------------------------------------------- cart / co */
 
@@ -954,7 +947,6 @@
 .cash__methods { display: flex; gap: 10px; margin-top: 26px; }
 .cash__method { flex: 1; padding: 12px; border: 1px solid var(--border); background: none; border-radius: 2px; font-size: 14px; cursor: pointer; }
 .cash__method.is-on { border: 2px solid var(--text); padding: 11px; background: #f1efe9; font-weight: 600; }
-.cash__field { margin-top: 22px; display: grid; gap: 8px; }
 .cash__cta { width: 100%; margin-top: 26px; background: var(--text); color: #fff; border: 0; padding: 15px; border-radius: 2px; font-size: 15px; cursor: pointer; }
 .cash__fine { margin-top: 14px; font-size: 12px; color: rgba(17, 19, 24, 0.5); line-height: 1.6; }
 
@@ -994,7 +986,6 @@
 [data-app] .pg__note { margin-top: 32px; font-size: 13px; line-height: 1.75; color: rgba(17, 19, 24, 0.6); max-width: 720px; }
 [data-app] .pg__note--info { border-left: 2px solid #dde7f2; padding-left: 16px; }
 [data-app] .pg__note--warn { border-left: 2px solid #c75b50; padding-left: 16px; color: #8e3c33; }
-[data-app] .pg__table { margin-top: 22px; }
 [data-app] .pg__faqs { margin-top: 22px; display: grid; gap: 14px; max-width: 860px; }
 [data-app] .pg__faq { border-bottom: 1px solid var(--border); padding-bottom: 14px; }
 [data-app] .pg__faq summary { cursor: pointer; font-size: 15px; font-weight: 500; }
@@ -1046,7 +1037,6 @@
 [data-app] .pg__itemsHead h2 { font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; }
 [data-app] .pg__cat { display: flex; justify-content: space-between; padding: 11px 0; font-size: 14px; color: rgba(17, 19, 24, 0.66); border-bottom: 1px solid rgba(17, 19, 24, 0.07); cursor: pointer; }
 [data-app] .pg__cat.is-active { color: var(--text); font-weight: 600; }
-[data-app] .pg__catsAdd { cursor: pointer; }
 [data-app] .pg__catsFoot { margin-top: 28px; }
 [data-app] .pg__importBtn { display: inline-block; border: 1px solid var(--text); padding: 10px 14px; font-size: 13.5px; border-radius: 2px; cursor: pointer; }
 [data-app] .pg__catsNote { margin-top: 12px; font-size: 12px; color: rgba(17, 19, 24, 0.5); line-height: 1.6; }
@@ -1083,12 +1073,7 @@
 [data-app] .pg__qrVerify .pg__title { margin-top: 6px; }
 [data-app] .pg__qrVerify .pg__p { margin: 10px 0 0; font-size: 14.5px; line-height: 1.65; color: var(--ink-70); }
 [data-app] .pg__qrVerify .pg__alert { margin-top: 18px; }
-[data-app] .pg__codeInput { font-size: 26px; letter-spacing: 0.34em; text-align: center; font-variant-numeric: tabular-nums; padding: 14px 10px; }
-[data-app] .pg__codeInput::placeholder { letter-spacing: 0.34em; color: var(--ink-40); }
 [data-app] .pg__qrVerifyFoot { margin-top: 20px; font-size: 12.5px; line-height: 1.6; color: var(--ink-55); text-align: center; }
-/* A note under the add-to-order button, saying the options picked above are
-   not charged. Without it the button's price and the bill would disagree. */
-[data-app] .sheet__note { margin-top: 10px; font-size: 12.5px; line-height: 1.6; color: var(--ink-55); }
 /* Checkout with nothing in it. Reuses the cart's empty state so the two read
    as the same thing. */
 [data-app] .co__empty { padding: 14px 0; font-size: 13.5px; color: var(--ink-55); }
@@ -1123,8 +1108,7 @@
 @media (max-width: 560px) {
   [data-app] .pg__variantForm { grid-template-columns: 1fr 1fr; }
   [data-app] .pg__variantForm .pg__btn { grid-column: span 2; }
-  [data-app] .pg__variantForm--addon { grid-template-columns: 1fr 1fr; }
-}
+  [data-app] .pg__variantForm--addon { grid-template-columns: 1fr 1fr; }}
 [data-app] .co__noteForm { margin-top: 20px; display: grid; gap: 8px; }
 [data-app] .pg__undo { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 0 48px 16px; padding: 12px 16px; border: 1px solid var(--border); background: var(--surface); font-size: 13.5px; }
 [data-app] .pg__undoBtn { border: 1px solid var(--text); background: var(--text); color: var(--surface); padding: 7px 14px; border-radius: 2px; font-size: 13px; cursor: pointer; }
@@ -1135,7 +1119,10 @@
 [data-app] .pg__chipsLabel { margin-top: 22px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; color: var(--ink-55); }
 [data-app] .pg__catChips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 [data-app] .pg__catChips form { display: inline-flex; }
-[data-app] .pg__chip { border: 1px solid var(--border); background: var(--surface); color: var(--ink-70); padding: 7px 11px; border-radius: 999px; font-size: 12.5px; line-height: 1.2; cursor: pointer; }
+/* One rule, not two. A second .pg__chip block further down this file set its
+   own background, padding and font size, so which chip a reader saw depended
+   on which block came last. These are the values that were actually winning. */
+[data-app] .pg__chip { display: inline-flex; gap: 6px; border: 1px solid var(--border); background: #f1efe9; color: var(--ink-70); padding: 5px 10px; border-radius: 999px; font-size: 13px; line-height: 1.2; cursor: pointer; }
 [data-app] .pg__chip:hover { border-color: var(--ink-40); color: var(--text); }
 [data-app] .pg__chip.is-on { background: var(--accent); border-color: var(--accent); color: var(--surface); font-weight: 600; }
 [data-app] .pg__catsSeed { margin-top: 12px; }
@@ -1177,16 +1164,7 @@
 [data-app] .pg__editor { border: 1px solid var(--border); background: #fff; padding: 26px; border-radius: 3px; display: grid; gap: 16px; align-content: start; }
 [data-app] .pg__editorHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 [data-app] .pg__editorHead h3 { font-size: 19px; font-weight: 500; }
-[data-app] .pg__editorGroup { border-top: 1px solid var(--border); padding-top: 16px; display: grid; gap: 8px; }
-[data-app] .pg__editorLabel { font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; color: rgba(17, 19, 24, 0.45); }
-[data-app] .pg__chipRow { display: flex; align-items: center; justify-content: space-between; font-size: 13.5px; }
-[data-app] .pg__chip { display: inline-flex; gap: 6px; background: #f1efe9; border: 1px solid var(--border); padding: 5px 10px; border-radius: 999px; font-size: 13px; }
 [data-app] .pg__chip em { font-style: normal; color: rgba(17, 19, 24, 0.5); }
-[data-app] .pg__addChip { font-size: 13px; text-decoration: underline; cursor: pointer; justify-self: start; }
-[data-app] .pg__mod { border: 1px solid var(--border); border-radius: 3px; padding: 12px; }
-[data-app] .pg__modTop { display: flex; justify-content: space-between; gap: 10px; font-size: 13.5px; }
-[data-app] .pg__modMeta { font-size: 12px; color: rgba(17, 19, 24, 0.5); }
-[data-app] .pg__modOpts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 [data-app] .pg__editorFoot { display: flex; gap: 10px; margin-top: 6px; }
 [data-app] .pg__headActions { display: flex; gap: 10px; }
 
@@ -1201,8 +1179,7 @@
 
 @media (max-width: 760px) {
   [data-app] .pg__verifyPanel { flex-wrap: wrap; gap: 14px; padding: 16px 18px; }
-  [data-app] .pg__verifyCode { margin-left: 0; font-size: 34px; }
-}
+  [data-app] .pg__verifyCode { margin-left: 0; font-size: 34px; }}
 
 [data-app] .pg__tables { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 36px; }
 [data-app] .pg__tableCard { border: 1px solid var(--border); background: #fff; padding: 20px; border-radius: 3px; }
@@ -1230,14 +1207,6 @@
  */
 [data-app] .qr-svg { display: block; }
 [data-app] .qr-svg svg { display: block; width: 100%; height: 100%; }
-
-/* A card whose code could not be encoded is shown as a dashed empty box
- * rather than left blank. A blank space looks like a loading state that has
- * not finished; a box that is obviously empty says something went wrong. */
-[data-app] .qr-svg--missing {
-  border: 1px dashed var(--border);
-  border-radius: 3px;
-}
 [data-app] .pg__tableStats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 12px; }
 [data-app] .pg__tableStats span { color: rgba(17, 19, 24, 0.45); display: block; }
 [data-app] .pg__tableStats strong { font-size: 13.5px; font-weight: 600; }
@@ -1261,38 +1230,11 @@
 [data-app] .pg__bullets { margin-top: 12px; display: grid; gap: 8px; }
 [data-app] .pg__bullets li { font-size: 13.5px; line-height: 1.6; color: rgba(17, 19, 24, 0.68); padding-left: 16px; position: relative; }
 [data-app] .pg__bullets li::before { content: '·'; position: absolute; left: 0; color: rgba(17, 19, 24, 0.4); }
-
-/* states screen */
-[data-app] .pg__states { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 40px; }
-[data-app] .pg__stateCard { border: 1px solid var(--border); background: #fff; border-radius: 3px; padding: 20px; display: flex; flex-direction: column; }
-[data-app] .pg__stateCard--wide { grid-column: span 3; }
-[data-app] .pg__stateLabel { font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; color: rgba(17, 19, 24, 0.45); }
-[data-app] .pg__stateBody { margin-top: 16px; display: grid; gap: 10px; flex: 1; }
-[data-app] .pg__stateBody--center { justify-items: center; text-align: center; gap: 8px; }
-[data-app] .pg__stateBody--center p { font-size: 13.5px; color: rgba(17, 19, 24, 0.6); }
-[data-app] .pg__stateIcon { font-size: 28px; }
-[data-app] .pg__stateNote { margin-top: 16px; font-size: 12px; color: rgba(17, 19, 24, 0.5); line-height: 1.6; }
-[data-app] .pg__stateNote--top { margin-top: 12px; }
 [data-app] .pg__alert { border: 1px solid rgba(199, 91, 80, 0.35); background: rgba(199, 91, 80, 0.07); padding: 14px 16px; border-radius: 3px; }
 [data-app] .pg__alert p { margin-top: 6px; font-size: 13px; color: rgba(17, 19, 24, 0.6); }
 [data-app] .pg__success { border: 1px solid rgba(109, 127, 112, 0.35); background: rgba(109, 127, 112, 0.08); padding: 14px 16px; border-radius: 3px; }
 [data-app] .pg__success p { margin-top: 6px; font-size: 13px; color: rgba(17, 19, 24, 0.6); }
 [data-app] .pg__stateActions { display: flex; gap: 8px; }
-[data-app] .pg__trialBox { border: 1px solid var(--border); padding: 16px; border-radius: 3px; display: grid; gap: 10px; background: #f1efe9; }
-[data-app] .pg__trialMeta { font-size: 12.5px; color: rgba(17, 19, 24, 0.6); }
-[data-app] .pg__locked { border: 1px solid rgba(199, 91, 80, 0.3); background: rgba(199, 91, 80, 0.05); border-radius: 3px; padding: 22px; }
-[data-app] .pg__lockedHead { display: flex; gap: 16px; align-items: flex-start; }
-[data-app] .pg__lockedHead p { margin-top: 8px; font-size: 13.5px; line-height: 1.7; color: rgba(17, 19, 24, 0.66); max-width: 640px; }
-[data-app] .pg__lockedHead .pg__btn { margin-left: auto; white-space: nowrap; }
-[data-app] .pg__lockedIcon { font-size: 20px; }
-[data-app] .pg__lockedGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 24px; }
-[data-app] .pg__lockedLabel { font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; color: rgba(17, 19, 24, 0.45); margin-bottom: 10px; }
-[data-app] .pg__lockedGrid li { font-size: 13.5px; padding: 5px 0 5px 16px; position: relative; color: rgba(17, 19, 24, 0.7); }
-[data-app] .pg__lockedGrid li::before { content: '·'; position: absolute; left: 0; }
-[data-app] .pg__planRow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-[data-app] .pg__planMini { border: 1px solid var(--border); border-radius: 3px; padding: 18px; }
-[data-app] .pg__planMiniPrice { font-size: 22px; margin-top: 6px; font-weight: 500; }
-[data-app] .pg__planMini p { margin-top: 8px; font-size: 13px; color: rgba(17, 19, 24, 0.6); margin-bottom: 14px; }
 
 /* shared totals block (cart screens) */
 [data-app] .totals { display: grid; gap: 8px; }
@@ -1367,10 +1309,7 @@
   [data-app] .pg__split { grid-template-columns: minmax(160px, 0.7fr) minmax(0, 1.5fr); gap: 24px; }
   [data-app] .pg__editor { grid-column: 1 / -1; }
   [data-app] .pg__tables { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  [data-app] .pg__printRow { grid-template-columns: 1fr 1fr; gap: 28px; }
-  [data-app] .pg__states { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  [data-app] .pg__stateCard--wide { grid-column: 1 / -1; }
-}
+  [data-app] .pg__printRow { grid-template-columns: 1fr 1fr; gap: 28px; }}
 
 @media (max-width: 760px) {
   .home__nav { gap: 14px; padding: 16px 20px; flex-wrap: wrap; }
@@ -1450,11 +1389,6 @@
   .cart__sum { position: static; }
   .cart__sumCard, .co__sum { padding: 20px; }
   .co__items li { align-items: flex-start; }
-
-  /* The bill is below the order on a phone, so its button is repeated here,
-     fixed, with the number the guest is deciding about. The inline copy is
-     hidden so there are never two visible "Place order" buttons. */
-  .cart__mobileHidden { display: none; }
   .cart__sumCard .cart__cta, .co__sum .co__cta { display: none; }
 
   .cart__bar, .co__bar {
@@ -1546,10 +1480,16 @@
   [data-app] .pg__title--sm { font-size: 28px; }
   [data-app] .pg__lede { font-size: 15px; }
   [data-app] .pg__section { margin-top: 48px; }
-  [data-app] .pg__plans, [data-app] .pg__body--split, [data-app] .pg__tables,
-  [data-app] .pg__printRow, [data-app] .pg__lockedGrid, [data-app] .pg__planRow,
-  [data-app] .pg__split, [data-app] .pg__states { grid-template-columns: minmax(0, 1fr); }
-  [data-app] .pg__plan:last-child, [data-app] .pg__stateCard--wide { grid-column: auto; }
+  [data-app] .pg__plans,
+
+  [data-app] .pg__body--split,
+
+  [data-app] .pg__tables,
+
+  [data-app] .pg__printRow,
+
+  [data-app] .pg__split { grid-template-columns: minmax(0, 1fr); }
+  [data-app] .pg__plan:last-child { grid-column: auto; }
   [data-app] .pg__printGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   [data-app] .pg__headActions, [data-app] .pg__itemsActions, [data-app] .pg__editorFoot { flex-wrap: wrap; }
   [data-app] .pg__undo { margin-left: 20px; margin-right: 20px; }
@@ -1557,13 +1497,9 @@
   [data-app] .pg__addRow .ui-input, [data-app] .pg__addRow .ui-select { flex: 1 1 100%; }
   [data-app] .pg__addRow .pg__btn { flex: 1 1 100%; }
   [data-app] .pg__catChips { gap: 5px; }
-  [data-app] .pg__locked { padding: 18px; }
-  [data-app] .pg__lockedHead { flex-wrap: wrap; }
-  [data-app] .pg__lockedHead .pg__btn { margin-left: 0; }
   [data-app] .pg__editor { grid-column: auto; padding: 18px; }
   [data-app] .pg__tableCard { padding: 16px; }
-  [data-app] .pg__stateActions { flex-wrap: wrap; }
-}
+  [data-app] .pg__stateActions { flex-wrap: wrap; }}
 
 @media (max-width: 420px) {
   .home__navRight { gap: 10px; }
@@ -1592,8 +1528,7 @@
   .kb__tabs { padding: 8px 16px; }
   .kb__cols { padding: 0 16px 48px; }
   .kb__tab { font-size: 12px; padding-inline: 6px; gap: 5px; }
-  .kb__ordId { font-size: 18px; }
-}
+  .kb__ordId { font-size: 18px; }}
 
 /* ------------------------------------------------------------- motion layer
    One place for the rules that make the product feel continuous instead of
@@ -1614,12 +1549,6 @@
       background-color var(--dur-1) linear,
       border-color var(--dur-1) linear,
       opacity var(--dur-1) linear;
-  }
-
-  /* A press is acknowledged before the action completes. One pixel, never a
-     scale: scaling text makes its edges shimmer while it moves. */
-  [data-app] .ui-btn:active:not([disabled]):not([aria-disabled='true']) {
-    transform: translateY(1px);
   }
 
   /* Hash links on the marketing pages glide. Product screens never use hash
@@ -1699,22 +1628,17 @@
 
   /* The verifying dot: three seconds of quiet life while the code is checked,
      so a slow check does not look like a dead button. */
-  .menu__verifiedDot { animation: kb-pulse 3s var(--ease-inout) infinite; }
-}
+  .menu__verifiedDot { animation: kb-pulse 3s var(--ease-inout) infinite; }}
 
 @media (prefers-reduced-motion: reduce) {
-  [data-app] { scroll-behavior: auto; }
-}
+  [data-app] { scroll-behavior: auto; }}
 
 [data-app] button:disabled,
 [data-app] .cart__cta:disabled,
 [data-app] .co__cta:disabled,
 [data-app] .cash__cta:disabled { opacity: 0.48; cursor: not-allowed; }
 
-[data-app] .pg__table { display: block; max-width: 100%; overflow-x: auto; }
-
 @media (max-width: 760px) {
-  [data-app] .pg__table { white-space: nowrap; }
   [data-app] .home__nav a,
   [data-app] .pg__bar a,
   [data-app] .dash__rail a,
@@ -1751,10 +1675,10 @@
   }
   textarea.ui-input { min-height: auto; }
   [data-app] .pg__formCard,
+
   [data-app] .pg__asideCard,
-  [data-app] .pg__tableCard,
-  [data-app] .pg__stateCard { min-width: 0; }
-}
+
+  [data-app] .pg__tableCard { min-width: 0; }}
 
 /* -------------------------------------------------------------------- bill */
 
@@ -1881,8 +1805,7 @@
   [data-app] .bill__sheet { padding: 22px 18px; }
   [data-app] .bill__head { flex-direction: column; gap: 16px; }
   [data-app] .bill__ref { text-align: left; }
-  [data-app] .bill__wa { padding: 18px 16px; }
-}
+  [data-app] .bill__wa { padding: 18px 16px; }}
 
 /* ---------------------------------------------------------------- printing */
 
@@ -1949,8 +1872,7 @@
   [data-app] .bill__void { border-color: var(--text) !important; }
 
   /* Ink and paper: no grey-on-grey, no backgrounds that eat toner. */
-  * { color: var(--text) !important; }
-}
+  * { color: var(--text) !important; }}
 
 /* Small form helpers used by the inline "Add table" control. The label is
    visually hidden because the select already reads "4 seats"; it exists so
@@ -1989,8 +1911,7 @@
 }
 
 @media (max-width: 720px) {
-  [data-app] .pg__outletSelect { max-width: 150px; font-size: 13px; padding: 6px 8px; }
-}
+  [data-app] .pg__outletSelect { max-width: 150px; font-size: 13px; padding: 6px 8px; }}
 
 /* ==================================================================== reports
    Editorial Minimal, same as everywhere else: hairlines, no cards with
@@ -2084,8 +2005,7 @@
   [data-app] .rep__stat:nth-child(4) { border-top: 1px solid var(--border); }
   [data-app] .rep__stat:nth-child(3) { padding-left: 0; }
   [data-app] .rep__grid { grid-template-columns: minmax(0, 1fr); gap: 40px; }
-  [data-app] .rep__grid .rep__block + .rep__block { margin-top: 40px; }
-}
+  [data-app] .rep__grid .rep__block + .rep__block { margin-top: 40px; }}
 
 @media (max-width: 760px) {
   [data-app] .rep__custom { margin-left: 0; width: 100%; }
@@ -2097,15 +2017,13 @@
   [data-app] .rep__block .ui-table,
   [data-app] .rep__block--wide .ui-table {
     display: block; max-width: 100%; overflow-x: auto; white-space: nowrap;
-  }
-}
+  }}
 
 @media (max-width: 420px) {
   [data-app] .rep__stats { grid-template-columns: minmax(0, 1fr); }
   [data-app] .rep__stat { border-right: 0; border-top: 1px solid var(--border); padding: 18px 0; }
   [data-app] .rep__stat:first-child { border-top: 0; }
-  [data-app] .rep__stat:not(:first-child) { padding-left: 0; }
-}
+  [data-app] .rep__stat:not(:first-child) { padding-left: 0; }}
 
 /* ============================================================ kitchen voice
    The announcement system's own chrome: the honesty strips that say when the
@@ -2162,8 +2080,7 @@
 @media (max-width: 760px) {
   [data-app] .kb__log li { grid-template-columns: 54px minmax(0, 1fr) auto; }
   [data-app] .kb__logText { display: none; }
-  [data-app] .kb__warn { font-size: 13px; }
-}
+  [data-app] .kb__warn { font-size: 13px; }}
 
 /* ------------------------------------------------------ announcement voice
    One language, so there is no picker: this chip names the voice that will
@@ -2208,5 +2125,4 @@
 }
 
 @media (max-width: 760px) {
-  [data-app] .kb__voicePick { max-width: 128px; }
-}
+  [data-app] .kb__voicePick { max-width: 128px; }}

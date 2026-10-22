@@ -10,7 +10,7 @@ import {
   type ReportRangeKey,
   type ReportsScreenData,
 } from '@/lib/db/reports';
-import { localDateKey } from '@/lib/db/time';
+import { dateTimeInZone, localDateKey } from '@/lib/db/time';
 
 /**
  * Sales report.
@@ -380,13 +380,7 @@ export function ReportsScreen({
                     return (
                       <tr key={order.id} className={cancelled ? 'rep__row--void' : undefined}>
                         <td className="tnum">
-                          {new Date(order.placedAt).toLocaleString('en-IN', {
-                            timeZone: timezone,
-                            day: '2-digit',
-                            month: 'short',
-                            hour: 'numeric',
-                            minute: '2-digit',
-                          })}
+                          {dateTimeInZone(timezone, order.placedAt)}
                         </td>
                         <td>{order.tableLabel ?? 'Takeaway'}</td>
                         <td>

@@ -27,6 +27,19 @@ import type { PrepStatus } from './types';
  */
 export type PrepState = Exclude<PrepStatus, 'cancelled'>;
 
+/**
+ * How old a ticket is, in the words a cook would use. Minutes.
+ *
+ * These live here rather than beside the query that stamps each ticket with
+ * its age, because the BOARD is the thing that colours a ticket red -- and the
+ * board is a client component. A value imported from lib/db/kitchen-screen
+ * would drag that module's database client (and next/headers) into the browser
+ * bundle; a threshold is not worth a build error. Kept next to the state
+ * machine so "late" and "ready" can never be defined in two places.
+ */
+export const LATE_AFTER_MIN = 20;
+export const WARN_AFTER_MIN = 10;
+
 export const PREP_TRANSITIONS: Record<PrepStatus, PrepState | null> = {
   new: 'preparing',
   preparing: 'ready',
