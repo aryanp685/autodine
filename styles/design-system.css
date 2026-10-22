@@ -54,180 +54,14 @@
 
 /* ------------------------------------------------------------------ home */
 
-.home { background: var(--page-bg); }
-
-/* The bar is sticky and condenses on scroll.
-   At rest it belongs to the poster: generous height, no bottom edge. Once the
-   page moves under it, it becomes a thin translucent sheet with a hairline, so
-   the reader keeps their place without the chrome ever competing with the
-   photograph. Condensing is a padding change rather than a height change --
-   height is the one property here that would reflow the hero. */
-.home__nav {
-  position: sticky; top: 0; z-index: 30;
-  display: flex; align-items: center; gap: 40px;
-  padding-block: 22px;
-  padding-inline: 48px;
-  border-bottom: 1px solid transparent;
-  background: var(--page-bg);
-  background: color-mix(in srgb, var(--page-bg) 90%, transparent);
-  -webkit-backdrop-filter: saturate(1.05) blur(10px);
-  backdrop-filter: saturate(1.05) blur(10px);
-  transition:
-    padding var(--dur-2) var(--ease-out),
-    border-color var(--dur-2) var(--ease-out);
-}
-.home__nav.is-condensed { padding-block: 12px; border-bottom-color: var(--border); }
-
-.home__brand { font-size: 18px; font-weight: 600; letter-spacing: -0.025em; }
-.home__links { display: flex; gap: 28px; font-size: 14px; color: rgba(22, 20, 15, 0.7); }
-.home__navRight { margin-left: auto; display: flex; align-items: center; gap: 24px; }
-.home__navLink { font-size: 14px; color: rgba(22, 20, 15, 0.7); }
-
-/* Underline grows from the left on hover instead of appearing. One pixel of
-   movement at 220ms is the whole effect; anything more distracts from the
-   photograph behind it. */
-.home__links a { position: relative; }
-.home__links a::after {
-  content: ''; position: absolute; left: 0; right: 0; bottom: -4px; height: 1px;
-  background: currentColor; transform: scaleX(0); transform-origin: left;
-  transition: transform var(--dur-2) var(--ease-out);
-}
-.home__links a:hover::after { transform: scaleX(1); }
-
-.home__navCta {
-  font-size: 14px; font-weight: 500; background: var(--text); color: var(--surface);
-  padding: 10px 18px; border-radius: 2px;
-  transition: background-color var(--dur-1) linear, transform var(--dur-1) var(--ease-out);
-}
-.home__navCta:hover { background: rgba(22, 20, 15, 0.85); }
-.home__navCta:active { transform: translateY(1px); }
-
-/* overflow: hidden matters for the parallax below -- without it the drifting
-   image would spill out over the next section instead of being cropped. */
-.home__hero {
-  position: relative; display: flex; align-items: flex-end; overflow: hidden;
-  min-height: clamp(560px, 82vh, 760px);
-}
-
-/* next/image with `fill` writes position/inset as inline styles, so the only
-   way to give the photograph room to travel is to override them; the
-   !important is the cost of fighting an inline style, not a habit.
-
-   THE OVERSCAN HAS TO COVER THE TRAVEL. The image is 120% of the hero, hung
-   from -10%: 10% of slack above and below. GSAP moves it 8% of ITS OWN height
-   (yPercent is relative to the element, not the hero), which is 9.6% of the
-   hero -- just inside the 10% of slack. Push either number past the other and
-   a strip of page background appears at the top of the hero while it is still
-   half on screen. The 16px of extra travel that would look 20% better is not
-   worth that failure mode.
-
-   transform-origin is centred and slightly low so the opening zoom pushes the
-   frame outward from the middle of the room rather than from a corner. */
-.home__heroImg {
-  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
-  height: 120% !important;
-  top: -10% !important;
-  transform-origin: 50% 60%;
-}
-.home__heroShade {
-  position: absolute; inset: 0;
-  background: linear-gradient(to top, rgba(22, 20, 15, 0.9) 0%, rgba(22, 20, 15, 0.46) 55%, rgba(22, 20, 15, 0.24) 100%);
-}
-.home__heroBody { position: relative; padding: 72px 48px; color: var(--surface); max-width: 900px; }
-.home__kicker {
-  font-size: 11.5px; letter-spacing: 0.18em; text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.72); margin-bottom: 24px; font-weight: 600;
-}
-/* clamp, not a fixed size: the headline carries the page, and 76px at a 1440px
-   window left the right third of the hero empty. It now scales with the
-   viewport and stops before it outgrows the photograph. */
-.home__h1 { font-size: clamp(46px, 6.4vw, 92px); line-height: 0.98; font-weight: 500; letter-spacing: -0.045em; }
-.home__lede {
-  margin-top: 24px; font-size: clamp(17px, 1.4vw, 20px); line-height: 1.6;
-  color: rgba(255, 255, 255, 0.82); max-width: 580px;
-}
-.home__ctas { display: flex; gap: 14px; margin-top: 36px; }
-/* The hover lift is 2px, not 6. On a photograph, a card that jumps reads as a
-   bug; a card that settles reads as a raised surface. */
-.home__btn {
-  padding: 15px 28px; font-size: 15px; font-weight: 500; border-radius: 2px;
-  transition:
-    transform var(--dur-2) var(--ease-out),
-    background-color var(--dur-1) linear,
-    border-color var(--dur-1) linear,
-    color var(--dur-1) linear;
-}
-.home__btn:hover { transform: translateY(-2px); }
-.home__btn:active { transform: translateY(0); transition-duration: var(--dur-1); }
-.home__btn--solid { background: var(--surface); color: var(--text); }
-.home__btn--solid:hover { background: var(--page-bg); }
-.home__btn--line { border: 1px solid rgba(255, 255, 255, 0.55); color: var(--surface); }
-.home__btn--line:hover { border-color: rgba(255, 255, 255, 0.9); background: rgba(255, 255, 255, 0.1); }
-.home__note { margin-top: 26px; font-size: 13px; color: rgba(255, 255, 255, 0.6); }
-
-.home__section { padding: 96px 48px; }
-/* The rule is drawn rather than printed: it scales out from the left as the
-   section arrives (see HomeMotion). transform-origin is here because the
-   animation needs it and a stylesheet is the only place it belongs. */
-.home__rule { height: 1px; background: var(--border); margin-bottom: 52px; transform-origin: left center; }
-.home__three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; }
-.home__num {
-  font-size: 12px; letter-spacing: 0.18em; color: rgba(22, 20, 15, 0.4); font-weight: 600;
-  transition: color var(--dur-2) var(--ease-out);
-}
-.home__col:hover .home__num { color: var(--accent); }
-.home__colTitle { font-size: 26px; margin-top: 18px; letter-spacing: -0.022em; font-weight: 500; }
-.home__colBody { margin-top: 14px; font-size: 15px; line-height: 1.75; color: rgba(22, 20, 15, 0.68); }
-
-.home__band { background: var(--band); border-block: 1px solid var(--band-line); }
-.home__bandInner {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 48px;
-  padding: 76px 48px; max-width: 1280px; margin: 0 auto;
-}
-/* Hairline separators instead of whitespace alone: the three claims are not
-   a sentence, they are three facts, and a rule says so without a box. */
-.home__stat + .home__stat { border-left: 1px solid var(--band-line); padding-left: 44px; }
-.home__statValue { font-size: clamp(32px, 3.2vw, 46px); font-weight: 500; letter-spacing: -0.03em; }
-.home__statLabel { margin-top: 10px; font-size: 13px; color: rgba(22, 20, 15, 0.6); }
-
-.home__h2 { font-size: clamp(34px, 3.6vw, 48px); letter-spacing: -0.03em; font-weight: 500; }
-.home__plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 44px; margin-top: 48px; }
-.home__plan {
-  border-top: 1px solid var(--text); padding-top: 26px;
-  transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out);
-}
-.home__plan:hover { border-top-color: var(--accent); transform: translateY(-2px); }
-.home__planName { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 700; }
-.home__planPrice { font-size: 38px; margin-top: 14px; letter-spacing: -0.03em; font-weight: 500; }
-.home__planPrice span { font-size: 15px; color: rgba(22, 20, 15, 0.5); letter-spacing: 0; }
-.home__planBlurb { margin-top: 12px; font-size: 14px; color: rgba(22, 20, 15, 0.62); line-height: 1.6; }
-.home__planList { margin-top: 22px; display: grid; gap: 10px; }
-.home__planList li { font-size: 13.5px; color: rgba(22, 20, 15, 0.72); padding-left: 16px; position: relative; }
-.home__planList li::before { content: '·'; position: absolute; left: 0; color: rgba(22, 20, 15, 0.4); }
-.home__planLink {
-  display: inline-block; margin-top: 24px; font-size: 14px;
-  border-bottom: 1px solid var(--border); padding-bottom: 2px;
-  transition: border-color var(--dur-2) var(--ease-out);
-}
-.home__planLink:hover { border-color: var(--text); }
-.home__fine { margin-top: 44px; font-size: 12.5px; color: rgba(22, 20, 15, 0.5); max-width: 620px; line-height: 1.7; }
-
-.home__foot { padding: 72px 48px; border-top: 1px solid var(--border); display: grid; gap: 36px; }
-.home__footBrand { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
-.home__footCols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
-.home__footTitle { font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(22, 20, 15, 0.45); font-weight: 700; margin-bottom: 8px; }
-.home__footCols p { font-size: 13.5px; color: rgba(22, 20, 15, 0.68); line-height: 1.7; }
-.home__footCols a { border-bottom: 1px solid transparent; transition: border-color var(--dur-2) var(--ease-out); }
-.home__footCols a:hover { border-bottom-color: var(--border); }
-.home__footFine { font-size: 11.5px; color: rgba(22, 20, 15, 0.4); }
-
 /* ------------------------------------------------------------------ links */
 
 /* Navigation labels that used to be inert markup are now real links. This rule
    exists so that change produces no visible difference. :where() contributes
    zero specificity, so any class that sets its own colour or underline
-   (.home__navCta, .pg__barCta, .home__planLink, .is-active) still wins. */
-:where(.home__nav, .home__hero, .home__foot, .home__plans, .pg__bar, .pg__barLinks, .dash__rail, .dash__nav) a {
+   (.pg__barCta, .is-active) still wins. The public pages moved to their own
+   premium layer (styles/premium.css) and no longer need an entry here. */
+:where(.pg__bar, .pg__barLinks, .dash__rail, .dash__nav) a {
   color: inherit;
   text-decoration: none;
 }
@@ -971,25 +805,9 @@
 [data-app] .pg__p { margin-top: 12px; font-size: 14.5px; line-height: 1.7; color: rgba(17, 19, 24, 0.66); }
 [data-app] .pg__h2 { font-size: 26px; letter-spacing: -0.025em; font-weight: 500; }
 [data-app] .pg__h3 { font-size: 18px; font-weight: 500; }
-[data-app] .pg__section { margin-top: 72px; }
-[data-app] .pg__plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 44px; margin-top: 44px; }
-[data-app] .pg__plan { border-top: 1px solid var(--text); padding-top: 24px; position: relative; }
-[data-app] .pg__planFlag { position: absolute; top: -11px; left: 0; background: var(--text); color: #fff; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; font-weight: 700; }
-[data-app] .pg__planName { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 700; }
-[data-app] .pg__planPrice { font-size: 36px; margin-top: 14px; letter-spacing: -0.03em; font-weight: 500; }
-[data-app] .pg__planPrice span { font-size: 15px; color: rgba(17, 19, 24, 0.5); }
-[data-app] .pg__planBlurb { margin-top: 12px; font-size: 14px; color: rgba(17, 19, 24, 0.62); line-height: 1.6; }
-[data-app] .pg__planList { margin-top: 20px; display: grid; gap: 9px; }
-[data-app] .pg__planList li { font-size: 13.5px; color: rgba(17, 19, 24, 0.72); padding-left: 16px; position: relative; }
-[data-app] .pg__planList li::before { content: '·'; position: absolute; left: 0; color: rgba(17, 19, 24, 0.4); }
-[data-app] .pg__planBtn { display: inline-block; margin-top: 24px; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
 [data-app] .pg__note { margin-top: 32px; font-size: 13px; line-height: 1.75; color: rgba(17, 19, 24, 0.6); max-width: 720px; }
 [data-app] .pg__note--info { border-left: 2px solid #dde7f2; padding-left: 16px; }
 [data-app] .pg__note--warn { border-left: 2px solid #c75b50; padding-left: 16px; color: #8e3c33; }
-[data-app] .pg__faqs { margin-top: 22px; display: grid; gap: 14px; max-width: 860px; }
-[data-app] .pg__faq { border-bottom: 1px solid var(--border); padding-bottom: 14px; }
-[data-app] .pg__faq summary { cursor: pointer; font-size: 15px; font-weight: 500; }
-[data-app] .pg__faq p { margin-top: 10px; font-size: 14px; line-height: 1.7; color: rgba(17, 19, 24, 0.66); }
 [data-app] .pg__foot { margin-top: 64px; font-size: 11.5px; color: rgba(17, 19, 24, 0.4); }
 [data-app] .pg__body--split { display: grid; grid-template-columns: 1.15fr 1fr; gap: 72px; }
 [data-app] .pg__formCard { border: 1px solid var(--border); background: #fff; padding: 36px; border-radius: 3px; }
@@ -1252,15 +1070,6 @@
    ------------------------------------------------------------------------ */
 
 @media (max-width: 1100px) {
-  .home__nav { gap: 24px; padding-inline: 28px; }
-  .home__hero { min-height: 540px; }
-  .home__h1 { font-size: clamp(44px, 6.6vw, 72px); }
-  .home__section { padding: 64px 28px; }
-  .home__three, .home__plans, .home__bandInner, .home__footCols { gap: 28px; }
-  .home__plans { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .home__plan:last-child { grid-column: 1 / -1; }
-  .home__bandInner { padding-inline: 28px; }
-  .home__foot { padding-inline: 28px; }
 
   .dash { grid-template-columns: 1fr; }
   .dash__rail {
@@ -1304,33 +1113,13 @@
 
   [data-app] .pg__bar { padding-inline: 28px; gap: 24px; }
   [data-app] .pg__body, [data-app] .pg__split { padding-inline: 28px; }
-  [data-app] .pg__plans, [data-app] .pg__body--split { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
-  [data-app] .pg__plan:last-child { grid-column: 1 / -1; }
+  [data-app] .pg__body--split { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
   [data-app] .pg__split { grid-template-columns: minmax(160px, 0.7fr) minmax(0, 1.5fr); gap: 24px; }
   [data-app] .pg__editor { grid-column: 1 / -1; }
   [data-app] .pg__tables { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   [data-app] .pg__printRow { grid-template-columns: 1fr 1fr; gap: 28px; }}
 
 @media (max-width: 760px) {
-  .home__nav { gap: 14px; padding: 16px 20px; flex-wrap: wrap; }
-  .home__nav.is-condensed { padding-block: 10px; }
-  .home__links { order: 3; width: 100%; gap: 22px; overflow-x: auto; padding-bottom: 2px; }
-  .home__navRight { gap: 14px; }
-  .home__hero { min-height: 500px; }
-  .home__heroBody { padding: 36px 22px; }
-  .home__h1 { font-size: clamp(40px, 10.5vw, 56px); }
-  .home__lede { font-size: 17px; }
-  .home__ctas { flex-wrap: wrap; }
-  .home__btn { flex: 1 1 180px; text-align: center; }
-  .home__section { padding: 48px 22px; }
-  .home__three, .home__plans, .home__bandInner, .home__footCols { grid-template-columns: 1fr; gap: 28px; }
-  /* One column: the vertical hairlines between the three claims would now
-     run down the left edge of nothing. */
-  .home__stat + .home__stat { border-left: 0; padding-left: 0; border-top: 1px solid var(--band-line); padding-top: 24px; }
-  .home__plan:last-child { grid-column: auto; }
-  .home__h2 { font-size: clamp(32px, 8vw, 42px); }
-  .home__bandInner { padding: 42px 22px; }
-  .home__foot { padding: 42px 22px; }
 
   .dash__rail { grid-template-columns: 1fr; gap: 12px; padding: 14px 20px 8px; }
   .dash__nav { grid-row: 2; margin-inline: -20px; padding: 0 20px 4px; gap: 18px; }
@@ -1479,9 +1268,6 @@
   [data-app] .pg__title { font-size: clamp(30px, 8vw, 38px); }
   [data-app] .pg__title--sm { font-size: 28px; }
   [data-app] .pg__lede { font-size: 15px; }
-  [data-app] .pg__section { margin-top: 48px; }
-  [data-app] .pg__plans,
-
   [data-app] .pg__body--split,
 
   [data-app] .pg__tables,
@@ -1489,7 +1275,6 @@
   [data-app] .pg__printRow,
 
   [data-app] .pg__split { grid-template-columns: minmax(0, 1fr); }
-  [data-app] .pg__plan:last-child { grid-column: auto; }
   [data-app] .pg__printGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   [data-app] .pg__headActions, [data-app] .pg__itemsActions, [data-app] .pg__editorFoot { flex-wrap: wrap; }
   [data-app] .pg__undo { margin-left: 20px; margin-right: 20px; }
@@ -1502,11 +1287,6 @@
   [data-app] .pg__stateActions { flex-wrap: wrap; }}
 
 @media (max-width: 420px) {
-  .home__navRight { gap: 10px; }
-  .home__navCta { padding: 9px 12px; font-size: 13px; }
-  .home__links { gap: 16px; font-size: 13px; }
-  .home__hero { min-height: 460px; }
-  .home__h1 { font-size: 42px; }
   .dash__stats { grid-template-columns: 1fr 1fr; }
   .dash__rank li { grid-template-columns: 20px minmax(0, 1fr); }
   .dash__rankSold, .dash__rank li > :last-child { grid-column: 2; justify-self: start; }
@@ -1639,10 +1419,12 @@
 [data-app] .cash__cta:disabled { opacity: 0.48; cursor: not-allowed; }
 
 @media (max-width: 760px) {
-  [data-app] .home__nav a,
   [data-app] .pg__bar a,
+
   [data-app] .dash__rail a,
+
   [data-app] .menu__cats button,
+
   [data-app] button { min-height: 44px; }
   [data-app] .menu__cats button { display: inline-flex; align-items: center; }
 
@@ -1652,10 +1434,13 @@
      here is a flex container, so the flex display is blockified and
      changes nothing about how they sit next to each other. */
   [data-app] a.dash__ghostBtn,
+
   [data-app] a.dash__solidBtn,
-  [data-app] a.pg__planBtn,
+
   [data-app] .pg__btn,
+
   [data-app] .pg__miniBtn,
+
   .cash__method {
     min-height: 44px;
     display: inline-flex;
@@ -2212,8 +1997,7 @@
 @media (prefers-reduced-motion: reduce) {
   [data-app] .skel__bar,
   [data-app] .skel__card,
-  [data-app] .skel__stat { animation: none; opacity: 0.6; }
-}
+  [data-app] .skel__stat { animation: none; opacity: 0.6; }}
 
 @media (max-width: 760px) {
   [data-app] .skel { padding: 34px 20px 64px; gap: 12px; }
@@ -2221,5 +2005,4 @@
   [data-app] .skel__bar--lede { width: 100%; }
   [data-app] .skel__cards,
   [data-app] .skel__stats,
-  [data-app] .skel__cols { grid-template-columns: 1fr; margin-top: 20px; }
-}
+  [data-app] .skel__cols { grid-template-columns: 1fr; margin-top: 20px; }}
