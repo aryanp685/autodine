@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { DashboardBar } from '@/components/DashboardBar';
 import { SignInPrompt } from '@/components/SignInPrompt';
+import { CopyButton } from '@/components/CopyButton';
 import { PrintButton } from '@/components/PrintButton';
 import type { OutletBar } from '@/lib/outlets';
 import type { SettingsScreenData } from '@/lib/db/settings-screen';
@@ -78,6 +79,17 @@ export function SettingsScreen({
       <DashboardBar active="settings" outlet={outlet} />
 
       <div className="pg__body">
+        <header className="pg__head">
+          <div className="pg__kicker">Settings</div>
+          <h1 className="pg__title">{details.name || 'Your restaurant'}</h1>
+          <p className="pg__lede">
+            What guests see, what the bill charges, and the code that opens your menu. Changes take effect
+            immediately — the guest menu reads these the next time somebody scans.
+          </p>
+        </header>
+
+        {/* The result of a save belongs under the title, not above it: a page
+            that opens on a red band reads as broken before it reads as fixed. */}
         {error && (
           <div className="pg__alert" role="alert">
             <strong>Nothing was saved.</strong>
@@ -90,15 +102,6 @@ export function SettingsScreen({
             <p>{notice}</p>
           </div>
         )}
-
-        <header className="pg__head">
-          <div className="pg__kicker">Settings</div>
-          <h1 className="pg__title">{details.name || 'Your restaurant'}</h1>
-          <p className="pg__lede">
-            What guests see, what the bill charges, and the code that opens your menu. Changes take effect
-            immediately — the guest menu reads these the next time somebody scans.
-          </p>
-        </header>
 
         {!live && (
           <div className="pg__note pg__note--warn">
@@ -165,8 +168,8 @@ export function SettingsScreen({
                     autoComplete="street-address"
                   />
                   <span className="ui-hint">
-                    Stored for the bill and the printed QR sheet. Bill printing is not built yet, so nothing
-                    prints this today.
+                    Printed on the bill, under the restaurant name, and on the menu card you can print from
+                    this page. A missing address is called out on the bill rather than left blank silently.
                   </span>
                 </label>
 
@@ -291,11 +294,17 @@ export function SettingsScreen({
                 account, and the order is marked paid as soon as the gateway confirms it.
               </p>
 
-              {data?.onlinePaymentsEnabled && !gatewayConfigured && (
+              {/* Shown whenever the keys are missing, not only when the box is
+                  already ticked. The switch is a database flag; the keys are an
+                  environment fact, and this deployment has none. Offering a
+                  control that cannot change anything -- and only explaining
+                  why after it is saved -- is how an owner concludes the
+                  feature is broken. */}
+              {!gatewayConfigured && (
                 <div className="pg__note pg__note--warn">
-                  <strong>Switched on, but this deployment has no gateway keys.</strong> Guests will not see a
-                  pay button — they will be told to pay at the counter. Nothing is broken; the key is simply not
-                  configured on this server.
+                  <strong>No gateway keys on this deployment.</strong> This switch is disabled because there
+                  is nothing behind it: the server has no payment-gateway key pair, so no pay button can
+                  appear for a guest. Ask whoever deploys AutoDine to add the keys, then come back.
                 </div>
               )}
 
@@ -312,7 +321,7 @@ export function SettingsScreen({
                     type="checkbox"
                     name="onlinePayments"
                     defaultChecked={Boolean(data?.onlinePaymentsEnabled)}
-                    disabled={disabled}
+                    disabled={disabled || !gatewayConfigured}
                   />
                   <span>
                     Take card and UPI payment online. Orders stay unpaid until the gateway confirms the money,
@@ -320,7 +329,11 @@ export function SettingsScreen({
                   </span>
                 </label>
 
-                <button type="submit" className="pg__submit" disabled={disabled}>
+                <button
+                  type="submit"
+                  className="pg__submit"
+                  disabled={disabled || !gatewayConfigured}
+                >
                   Save payment setting
                 </button>
               </form>
@@ -403,7 +416,24 @@ export function SettingsScreen({
                 </p>
               )}
 
-              {data?.publicMenuUrl && <p className="pg__settingsUrl">{data.publicMenuUrl}</p>}
+              {data?.publicMenuUrl && (
+                <div className="pg__settingsUrl">
+                  <a
+                    id="settings-menu-url"
+                    href={data.publicMenuUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="pg__settingsUrlText"
+                  >
+                    {data.publicMenuUrl}
+                  </a>
+                  <CopyButton
+                    value={data.publicMenuUrl}
+                    selectId="settings-menu-url"
+                    className="pg__miniBtn"
+                  />
+                </div>
+              )}
 
               <p className="pg__fine">
                 This is the menu, not a table. It opens for anyone, with no table attached, so it works for
@@ -413,8 +443,18 @@ export function SettingsScreen({
 
               {noPublishedMenu && (
                 <div className="pg__note pg__note--warn">
-                  <strong>Nothing to show yet.</strong> None of your {data?.totalMenus ?? 0} menus is
-                  published, so a guest scanning this lands on an empty page. Publish a menu first.
+                  {(data?.totalMenus ?? 0) === 0 ? (
+                    <>
+                      <strong>Nothing to show yet.</strong> You have no menus at all, so a guest scanning this
+                      lands on an empty page. Add dishes first, then publish the menu.
+                    </>
+                  ) : (
+                    <>
+                      <strong>Nothing to show yet.</strong> None of your {data?.totalMenus} menus is
+                      published, so a guest scanning this lands on an empty page. Publish one menu and this
+                      code starts working.
+                    </>
+                  )}
                 </div>
               )}
 
@@ -431,7 +471,7 @@ export function SettingsScreen({
                 <li>Name and tagline: the top of the guest menu, and the browser tab title.</li>
                 <li>Tax rate: the cart, the checkout total and every order placed from now on.</li>
                 <li>Web address: the QR above and every link to your menu.</li>
-                <li>Address, phone and GSTIN: stored for invoices and receipts — bill printing is not built yet.</li>
+                <li>Address, phone and GSTIN: printed on the bill. A bill with either the address or the GSTIN missing says so.</li>
               </ul>
               <p className="pg__fine">
                 Timezone: <strong>{data?.timezone ?? 'Asia/Kolkata'}</strong>. Fixed at signup, because it
@@ -444,7 +484,7 @@ export function SettingsScreen({
 
         {/* Printed by the Print menu card button. The @media print block hides
             the forms and the aside, and leaves only this card. */}
-        <div className="pg__printRow">
+        <div className="pg__printRow pg__printRow--sheetOnly">
           <div className="pg__printSheet">
             <div className="pg__printHead">Menu card</div>
             <div className="pg__printGrid pg__printGrid--single">

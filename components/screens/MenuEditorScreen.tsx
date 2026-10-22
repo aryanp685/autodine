@@ -28,8 +28,6 @@ import {
 import { PRESET_CATEGORIES, normaliseCategoryName } from '@/lib/menu-presets';
 import { PronunciationField } from '@/components/PronunciationField';
 
-const FLOW = ['Draft', 'Review', 'Approve', 'Publish'];
-
 /**
  * Shared page structure; styled by the locked design system.
  *
@@ -209,14 +207,26 @@ export function MenuEditorScreen({
             <span className="is-active">Main menu</span>
           )}
         </div>
-        <div className="pg__flow">
-          {FLOW.map((f, i) => (
-            <span key={f} className={`pg__flowStep ${i === 0 ? 'is-current' : ''}`}>
-              {i + 1}. {f}
-            </span>
-          ))}
-          <span className="pg__flowState">Status: {data?.published ? 'Published' : 'Draft'}</span>
-        </div>
+        {/* One state, said once. This used to be a four-step strip -- Draft,
+            Review, Approve, Publish -- where only the first step was ever
+            current and the last three did not exist anywhere in the product:
+            publishing is a single flag on the menu. A workflow drawn on a
+            screen is a promise that the workflow exists. The action itself
+            lives at the foot of the editor; this is the state, and it is
+            read from the same field. */}
+        <span
+          className={`pg__menuState ${data?.published ? 'is-live' : 'is-draft'}`}
+          title={
+            !live
+              ? 'Preview: no database is connected, so nothing here is published or saved'
+              : data?.published
+                ? 'Live: diners opening this menu see it now'
+                : 'Draft: diners do not see this menu until you publish it'
+          }
+        >
+          <i aria-hidden="true" />
+          {!live ? 'Preview' : data?.published ? 'Live' : 'Draft'}
+        </span>
       </div>
 
       {/* No padding class here. .pg__split carries its own (32px 48px 72px);
@@ -413,11 +423,11 @@ export function MenuEditorScreen({
                     </form>
                   </>
                 ) : (
-                  <>
-                    <span className="pg__btn">Add item</span>
-                    <span className="pg__btn">Reorder</span>
-                    <span className="pg__btn">Bulk availability</span>
-                  </>
+                  // Preview. Three button-shaped spans used to sit here --
+                  // "Add item", "Reorder", "Bulk availability" -- and none of
+                  // them could be pressed, which is the exact thing this file
+                  // argues against everywhere else. One sentence instead.
+                  <p className="pg__fine">Connect the database to add, edit and publish.</p>
                 )}
               </div>
             </div>
