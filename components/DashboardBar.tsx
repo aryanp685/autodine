@@ -32,7 +32,19 @@ export const DASHBOARD_LINKS: ReadonlyArray<{ key: DashboardSection; label: stri
  * outlets, and the bar still has to render. It is also what tells the avatar
  * whose account this is.
  */
-export function DashboardBar({ active, outlet }: { active: DashboardSection; outlet?: OutletBar | null }) {
+export function DashboardBar({
+  active,
+  outlet,
+}: {
+  /**
+   * Optional so the loading skeleton can render this bar before it knows which
+   * screen is coming. With no `active`, no link claims to be the current page
+   * -- which is honest while nothing has loaded yet, and beats the navigation
+   * blinking out of existence for the length of the fetch.
+   */
+  active?: DashboardSection;
+  outlet?: OutletBar | null;
+}) {
   const activeHref = DASHBOARD_LINKS.find((link) => link.key === active)?.href ?? '/dashboard';
   const activeOutlet = outlet?.outlets.find((entry) => entry.id === outlet.activeId) ?? outlet?.outlets[0] ?? null;
 
