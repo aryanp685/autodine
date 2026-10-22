@@ -3,6 +3,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { CustomerMenu, ItemSheet } from './CustomerMenu';
 import { QrProblemScreen } from './QrProblemScreen';
 
+/* The item sheet navigates back to the menu after adding a dish, which needs
+   the App Router. These tests render components in isolation, so the router is
+   stubbed rather than mounted -- nothing here asserts navigation. */
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => {} }) }));
+
 /**
  * The table badge.
  *
@@ -363,5 +368,76 @@ describe('ItemSheet add-ons', () => {
     expect(html).not.toContain('Spice level');
     expect(html).not.toContain('Pair it with');
     expect(button(html)).toBe('Add to order · ₹30');
+  });
+});
+
+/**
+ * Leaving the dish sheet.
+ *
+ * The close control used to be a bare /menu link, throwing away both the
+ * restaurant and the menu the sheet came from. Against a configured database
+ * that is not the menu at all -- it is the "open this from your table" page --
+ * so customising a dish and closing the sheet was a dead end, in production
+ * only, which is the worst kind of regression: invisible in the demo.
+ */
+describe('leaving the dish sheet', () => {
+  const withMenu = (menuId: string) => ({
+    restaurant,
+    categories: [{ id: 'c1', name: 'Main Course', count: 1 }],
+    items: [
+      {
+        id: 'i1',
+        name: 'Butter Chicken',
+        desc: 'Slow-cooked',
+        price: 469,
+        category: 'c1',
+        veg: false,
+        available: true,
+        variants: [{ id: 'v-half', name: 'Half', price: 250 }],
+      },
+    ],
+    menus: [{ id: menuId, name: 'Dinner' }],
+    menuId,
+    menuName: 'Dinner',
+  });
+
+  it('goes back to the menu it came from, not to a slugless /menu', () => {
+    const html = renderToStaticMarkup(<ItemSheet data={withMenu('m-2')} />);
+
+    expect(html).toContain('/menu?s=maddi&amp;m=m-2');
+    // A bare /menu against a live database is the gate page, not the menu.
+    expect(html).not.toMatch(/href="\/menu"/);
+  });
+
+  it('offers a scrim and Escape as ways out, not only a small ×', () => {
+    const html = renderToStaticMarkup(<ItemSheet data={withMenu('m-2')} />);
+    expect(html).toContain('sheet__scrim');
+    expect(html).toContain('aria-label="Close"');
+  });
+
+  it('keeps the close control working when there is no menu id', () => {
+    // Demo mode (and a one-menu restaurant) has no menu id, so the link is
+    // the restaurant alone -- which still resolves to the menu.
+    const html = renderToStaticMarkup(
+      <ItemSheet
+        data={{
+          restaurant,
+          categories: [{ id: 'c1', name: 'Main Course', count: 1 }],
+          items: [
+            {
+              id: 'i1',
+              name: 'Butter Chicken',
+              desc: 'Slow-cooked',
+              price: 469,
+              category: 'c1',
+              veg: false,
+              available: true,
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(html).toContain('/menu?s=maddi');
   });
 });

@@ -2,7 +2,8 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   categories as demoCategories,
   items as demoItems,
@@ -80,6 +81,13 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
   const table = data?.table ?? null;
   const cart = useCart();
   const [cat, setCat] = useState('all');
+  /** Bumped on every add, so the bar re-runs its entry animation. */
+  const [barPulse, setBarPulse] = useState(0);
+
+  const addToCart = (itemId: string) => {
+    cart.add(itemId);
+    setBarPulse((n) => n + 1);
+  };
 
   // Deliberately named to shadow the demo imports, so that not one line of
   // the locked JSX below had to change to accept real data.
@@ -202,7 +210,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
                 ) : (
                   <button
                     className="menu__dishCta"
-                    onClick={() => cart.add(i.id)}
+                    onClick={() => addToCart(i.id)}
                   >
                     Add
                   </button>
@@ -216,10 +224,14 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
         ))}
       </div>
 
+      {/* The bar is keyed by the add count so a second "Add" replays its own
+          entry: without the key the element never remounts, and the only
+          feedback for a tap is a number changing somewhere off the thumb. */}
       {cart.count > 0 && (
-        <div className="menu__cartBar">
-          <span>
-            {cart.count} item{cart.count === 1 ? '' : 's'} · {inr(paiseToRupees(barSubtotal))}
+        <div className="menu__cartBar" key={barPulse}>
+          <span className="menu__cartCount">
+            <strong className="tnum">{cart.count}</strong> item{cart.count === 1 ? '' : 's'} ·{' '}
+            {inr(paiseToRupees(barSubtotal))}
           </span>
           <Link href={cartHref} className="menu__cartBtn">
             Review order
@@ -259,7 +271,35 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
 
   const [variant, setVariant] = useState(variants[0]?.id ?? '');
   const [qty, setQty] = useState(1);
+  const [added, setAdded] = useState(false);
   const cart = useCart();
+  const router = useRouter();
+
+  /**
+   * Where closing the sheet goes.
+   *
+   * This used to be a bare "/menu", which threw away the restaurant and the
+   * menu it came from -- against a configured database a bare /menu is not
+   * the menu at all, it is "Open this menu from your table". So customising a
+   * dish and then closing the sheet was a dead end, in production only.
+   */
+  const backHref = (() => {
+    const params = new URLSearchParams();
+    if (data?.restaurant.slug) params.set('s', data.restaurant.slug);
+    if (data?.menuId) params.set('m', data.menuId);
+    const query = params.toString();
+    return query ? `/menu?${query}` : '/menu';
+  })();
+
+  /* The sheet is the last thing on the page, so Escape has to work or a
+     keyboard user is stuck on a dish they did not mean to open. */
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') router.push(backHref);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [router, backHref]);
 
   /**
    * What has been picked in each add-on group, by option id.
@@ -332,6 +372,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
 
   return (
     <div className="menu menu--dim">
+      <Link href={backHref} className="sheet__scrim" aria-label="Close" tabIndex={-1} />
       <header className="menu__head">
         <div className="menu__venue">
           <div className="menu__venueName">{restaurant.name}</div>
@@ -367,7 +408,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
               <div className="sheet__kicker">Customize</div>
               <h2 className="sheet__title">{item.name}</h2>
             </div>
-            <Link href={`/menu`} className="sheet__close" aria-label="Close">
+            <Link href={backHref} className="sheet__close" aria-label="Close">
               ×
             </Link>
           </div>
@@ -455,19 +496,35 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
               </button>
             </div>
             <button
-              className="sheet__add"
+              className={`sheet__add ${added ? 'is-added' : ''}`}
+              aria-live="polite"
               onClick={() => {
                 // The dish, how many, which portion, and which add-ons. All
                 // ids: the server prices every one of them from the database,
                 // so what is sent can never be what is charged.
                 cart.add(item.id, qty, chosenVariant?.id, chosenAddonIds);
+
+                // Confirm, then leave. Adding used to change a number on a bar
+                // behind an overlay and nothing else, so the obvious next move
+                // was to hunt for the close button -- which was broken. The
+                // button says what happened for a moment, then the guest is
+                // back on the menu, where the next dish is.
+                setAdded(true);
+                window.setTimeout(() => router.push(backHref), 700);
               }}
             >
-              {/* Both are rupees already: item.price and variant.price come
-                  from DisplayItem, which is in display units. Passing them
-                  through paiseToRupees divided an already-rupees number by a
-                  hundred, so a Rs 250 plate showed as Rs 3. */}
-              Add to order · {inr(chosenUnitPrice * qty)}
+              {added ? (
+                'Added to your order ✓'
+              ) : (
+                <>
+                  {/* Both are rupees already: item.price and variant.price
+                      come from DisplayItem, which is in display units.
+                      Passing them through paiseToRupees divided an
+                      already-rupees number by a hundred, so a Rs 250 plate
+                      showed as Rs 3. */}
+                  Add to order · {inr(chosenUnitPrice * qty)}
+                </>
+              )}
             </button>
           </div>
         </div>

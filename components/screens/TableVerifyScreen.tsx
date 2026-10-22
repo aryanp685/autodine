@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { verifyTableCodeAction } from '@/app/t/[token]/actions';
+import { VerifyCodeForm } from '@/components/VerifyCodeForm';
 
 /**
  * The step between scanning a table's card and seeing its menu.
@@ -46,7 +46,7 @@ export function TableVerifyScreen({
   error,
 }: TableVerifyScreenProps) {
   return (
-    <div className="pg">
+    <div className="pg qr">
       <div className="pg__bar">
         <Link href="/" className="pg__brand">
           AutoDine
@@ -57,7 +57,7 @@ export function TableVerifyScreen({
       </div>
 
       <main className="pg__qrVerify">
-        <section className="pg__formCard">
+        <section className="pg__formCard qr__card">
           <div className="pg__kicker">Table {tableLabel}</div>
           <h1 className="pg__title pg__title--sm">Enter the code in the restaurant</h1>
           <p className="pg__p">
@@ -73,35 +73,9 @@ export function TableVerifyScreen({
             </div>
           ) : null}
 
-          <form className="pg__form" action={verifyTableCodeAction}>
-            <input type="hidden" name="token" value={token} />
-            <label className="ui-field">
-              <span className="ui-label">Six-digit code</span>
-              <input
-                className="ui-input pg__codeInput"
-                name="code"
-                // inputMode brings up the keypad on a phone: this is typed
-                // standing up, one-handed, in a loud room.
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                pattern="[0-9]{6}"
-                maxLength={6}
-                placeholder="000000"
-                aria-describedby="code-hint"
-                required
-                autoFocus
-              />
-            </label>
-
-            <button className="pg__submit" type="submit">
-              Open the menu
-            </button>
-
-            <p className="pg__fine" id="code-hint">
-              The code changes every {windowMinutes === 1 ? 'minute' : `${windowMinutes} minutes`}.
-              If you cannot see it, ask a member of staff — they can read it out for you.
-            </p>
-          </form>
+          {/* A client component, because the sixth digit submits the form.
+              See components/VerifyCodeForm.tsx for the reasons. */}
+          <VerifyCodeForm token={token} windowMinutes={windowMinutes} />
         </section>
 
         <p className="pg__qrVerifyFoot">

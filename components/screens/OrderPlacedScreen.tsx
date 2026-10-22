@@ -75,7 +75,13 @@ export function OrderPlacedScreen({
         </header>
         <div className="cart__grid">
           <div className="cart__empty">
-            <Link href="/menu">Back to the menu</Link>
+            {/* The slug is carried through when we have one. A bare /menu is
+                not "the menu" against a configured database -- it is the
+                "open this from your table" page, which is a dead end for
+                somebody whose order has just failed to load. */}
+            <Link href={slug ? `/menu?s=${encodeURIComponent(slug)}` : '/menu'}>
+              Back to the menu
+            </Link>
           </div>
         </div>
       </div>
@@ -85,12 +91,18 @@ export function OrderPlacedScreen({
   const prepLabel = PREP_LABEL[data.prepStatus] ?? data.prepStatus;
 
   return (
-    <div className="cart">
+    <div className="cart cart--placed">
       <header className="cart__head">
+        <div className="cart__kicker">
+          {data.prepStatus === 'cancelled' ? 'Order cancelled' : 'Order placed'}
+        </div>
         <h1>{data.tableLabel ? `Table ${data.tableLabel}` : 'Counter order'}</h1>
         <p>
           {data.restaurantName} · {prepLabel}
           {data.prepStatus === 'cancelled' ? ' · nothing is owed' : ''}
+        </p>
+        <p className="cart__code" aria-label="Order reference">
+          <span>Reference</span> <strong>{data.code}</strong>
         </p>
       </header>
 
@@ -125,7 +137,7 @@ export function OrderPlacedScreen({
             takeaway there is no table to find it by.
           */}
           <p className="cart__fine">
-            Reference {data.code} — quote this if staff ask.
+            Quote the reference above if staff ask — it is how the counter finds this bill.
           </p>
         </div>
 

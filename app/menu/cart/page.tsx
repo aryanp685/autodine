@@ -42,10 +42,15 @@ export default async function CartPage({
 
   return (
     <CartProvider slug={s}>
+      {/* The action redirects back here with ?error=…, so this is where the
+          guest learns why. It sits above the cart rather than floating at the
+          edge of the page: it is about the order they are looking at. */}
       {error && (
-        <div className="pg__alert" role="alert">
-          <strong>Could not place that order.</strong>
-          <p>{error}</p>
+        <div className="cart__alertWrap">
+          <div className="pg__alert" role="alert">
+            <strong>Could not place that order.</strong>
+            <p>{error}</p>
+          </div>
         </div>
       )}
       <Cart
