@@ -239,7 +239,7 @@ export function PricingScreen() {
           title="Start with the menu, decide later."
           body="Creating an account is free and starts a trial. Nothing is charged, and no card is asked for."
           primary={{ label: 'Create an account', href: '/signup' }}
-          secondary={{ label: 'See the demo', href: '/menu' }}
+          secondary={{ label: 'See the sample menu', href: '/demo/menu' }}
         />
 
         <SiteFooter

@@ -116,8 +116,8 @@ export function Home() {
             </p>
 
             <div className="hero__ctas" data-hero-step>
-              <Link href="/menu" className="p-btn p-btn--solid">
-                Open the demo menu
+              <Link href="/demo/menu" className="p-btn p-btn--solid">
+                Open the sample menu
               </Link>
               <Link href="/pricing" className="p-btn p-btn--glass">
                 See pricing
@@ -188,8 +188,8 @@ export function Home() {
                   <p className="p-lede" style={{ marginTop: 22, maxWidth: '34ch' }}>
                     The whole guest journey is under a minute, and none of it needs an install.
                   </p>
-                  <Link href="/menu" className="p-arrow" style={{ marginTop: 28 }}>
-                    Try the flow <span aria-hidden="true">→</span>
+                  <Link href="/demo/menu" className="p-arrow" style={{ marginTop: 28 }}>
+                    Read the menu <span aria-hidden="true">→</span>
                   </Link>
                 </div>
               </div>
@@ -284,8 +284,8 @@ export function Home() {
 
         <SiteClosing
           title="Look at it the way a guest would."
-          body="The demo menu is open. Browse it, build an order, and watch what the kitchen and the counter would see."
-          primary={{ label: 'Open the menu', href: '/menu' }}
+          body="The sample menu is open, set exactly as a guest reads it at the table. Ordering itself starts with the QR code on a table card."
+          primary={{ label: 'Open the sample menu', href: '/demo/menu' }}
           secondary={{ label: 'Create an account', href: '/signup' }}
         />
 
