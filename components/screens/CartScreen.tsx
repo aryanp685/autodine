@@ -84,7 +84,7 @@ export function Cart({
      header reading "Maddi · 0 items" over a cart that is about to appear is
      the same lie as an empty-cart screen. */
   const headerMeta = [
-    restaurantName ?? 'Your table',
+    restaurantName ?? 'Your order',
     cart.ready && cart.count > 0 ? `${cart.count} ${cart.count === 1 ? 'item' : 'items'}` : null,
   ]
     .filter(Boolean)
@@ -269,11 +269,11 @@ export function Cart({
                 Prices are read from the kitchen&rsquo;s menu when you order, so the total you are
                 charged is the one the restaurant set. Nothing is charged from this phone.
               </div>
-            ) : (
+            ) : cart.ready ? (
               <button type="button" className="cart__cta" disabled>
                 Cart is empty
               </button>
-            )}
+            ) : null}
           </div>
         </aside>
       </div>

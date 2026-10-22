@@ -39,17 +39,9 @@ describe('DishPhoto', () => {
     // it may only ever get shorter, and a dish that gains a photo has to be
     // removed from it here. A dish added to the menu without one fails the
     // test rather than quietly becoming the nth empty tile.
-    const stillToShoot: string[] = [
-      'Garlic Naan',
-      'Tandoori Roti',
-      'Laccha Paratha',
-      'Gulab Jamun',
-      'Rasmalai',
-      'Masala Chai',
-      'Mango Lassi',
-      'Fresh Lime Soda',
-      'Filter Coffee',
-    ];
+    // Every dish on the sample menu now has a photograph. The fallback tile
+    // still exists for a restaurant that adds a dish without one.
+    const stillToShoot: string[] = [];
 
     const missing = items.filter((item) => !item.img).map((item) => item.name);
     expect(missing).toEqual(stillToShoot);

@@ -1111,6 +1111,16 @@
 [data-app] .co__variant { font-style: normal; color: var(--p-ink-46); }
 [data-app] .co__empty { color: var(--p-ink-46); }
 
+/* An inline way out of an empty or changed order, inside a sentence. Quiet
+   enough to be part of the copy, underlined so it is obviously a link. */
+[data-app] .co__emptyLink {
+  color: var(--p-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+[data-app] .co__emptyLink:hover { text-decoration-color: var(--p-accent); }
+
 [data-app] .co__noteForm { margin-top: 26px; display: grid; gap: 9px; }
 
 [data-app] .co__noteForm .ui-label {

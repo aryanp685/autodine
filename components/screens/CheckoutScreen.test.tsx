@@ -129,4 +129,28 @@ describe('checkout action bar', () => {
     expect(html).toContain('flow__steps');
     expect(html).toMatch(/flow__step is-now[^>]*aria-current="step"[^>]*>\s*<span class="flow__sr">Pay/);
   });
+
+  it('says a dish sold out instead of quietly shrinking the bill', () => {
+    // priceCart drops an unavailable dish because it cannot be ordered. On the
+    // last screen before the money, dropping it in silence left the guest
+    // looking at a total that had got smaller for no stated reason.
+    mocks.cart.lines = [{ itemId: 'i1', qty: 1, variantId: undefined, addonIds: [] }];
+    mocks.cart.count = 1;
+    try {
+      const html = renderToStaticMarkup(
+        <Checkout
+          slug="maddi"
+          taxRateBps={500}
+          items={[{ ...items[0], isAvailable: false }]}
+        />,
+      );
+
+      expect(html).toContain('has sold out since you added it');
+      expect(html).toContain('/menu/cart');
+      expect(html).toContain('Nothing to order yet');
+    } finally {
+      mocks.cart.lines = [{ itemId: 'i1', qty: 2, variantId: undefined, addonIds: [] }];
+      mocks.cart.count = 2;
+    }
+  });
 });

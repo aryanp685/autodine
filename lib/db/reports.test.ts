@@ -405,4 +405,66 @@ describe('demoReport', () => {
       report.totals.billedPaise - report.totals.collectedPaise,
     );
   });
+
+  /**
+   * A sample report is still a report. It used to be four hand-written sets of
+   * numbers that contradicted each other -- the payment rows added up to a
+   * fifth of "collected", the categories to a different total again, and the
+   * top items were priced at a tenth of the menu -- so an owner reading it
+   * could not tell which figure was the real one.
+   */
+  it('adds up across buckets, categories and payment methods', () => {
+    for (const key of ['today', '7d', '30d'] as const) {
+      const report = demoReport(resolveRange(key, TZ, NOON), TZ, NOON);
+
+      const bucketRevenue = report.buckets.reduce((sum, b) => sum + b.revenuePaise, 0);
+      const bucketBills = report.buckets.reduce((sum, b) => sum + b.bills, 0);
+      expect(bucketRevenue).toBe(report.totals.billedPaise);
+      expect(bucketBills).toBe(report.totals.bills);
+
+      const categoryRevenue = report.categories.reduce((sum, c) => sum + c.revenuePaise, 0);
+      expect(categoryRevenue).toBe(report.totals.billedPaise);
+
+      const recorded = report.methods.reduce(
+        (sum, m) => sum + m.recordedPaise - m.refundedPaise,
+        0,
+      );
+      expect(recorded).toBe(report.totals.collectedPaise);
+
+      // Nothing in the "top items" table can outsell the whole day.
+      for (const item of report.topItems) {
+        expect(item.revenuePaise).toBeLessThanOrEqual(report.totals.billedPaise);
+      }
+    }
+  });
+
+  it('prices the sample top items off the sample menu', () => {
+    const report = demoReport(resolveRange('7d', TZ, NOON), TZ, NOON);
+    const prices: Record<string, number> = {
+      'Butter Chicken · Full': 46_900,
+      'Paneer Tikka': 34_900,
+      'Dal Bukhara': 38_900,
+      'Garlic Naan': 9_900,
+    };
+
+    for (const item of report.topItems) {
+      expect(item.revenuePaise).toBe(item.qty * prices[item.name]);
+    }
+
+    const revenues = report.topItems.map((item) => item.revenuePaise);
+    expect([...revenues].sort((a, b) => b - a)).toEqual(revenues);
+  });
+
+  it('shows the same bills the kitchen and the counter show', () => {
+    const report = demoReport(resolveRange('7d', TZ, NOON), TZ, NOON);
+    const codes = report.orders.map((order) => order.code);
+
+    expect(codes).toEqual(['A-1042', 'A-1041', 'A-1040', 'A-1039', 'A-1038', 'A-1037']);
+    // A paid bill owes nothing; an unpaid one owes all of it. A row where the
+    // two disagree is a row nobody can act on.
+    for (const order of report.orders) {
+      if (order.paymentStatus === 'paid') expect(order.paidPaise).toBe(order.totalPaise);
+      else expect(order.paidPaise).toBe(0);
+    }
+  });
 });

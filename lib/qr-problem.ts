@@ -73,3 +73,61 @@ export function isVerifyErrorReason(value: string | undefined): value is VerifyE
 export function verifyErrorText(reason: VerifyErrorReason): string {
   return VERIFY_ERRORS[reason];
 }
+
+/**
+ * What each dead end says, in the order a guest reads it.
+ *
+ * Lives here rather than beside the page so the page's <title> can read from
+ * the same map as its body. The title used to be a fixed "This code did not
+ * work", so a restaurant that had simply not switched ordering on still had a
+ * browser tab telling the guest their code was wrong.
+ */
+export const QR_PROBLEM_COPY: Record<
+  QrProblemReason,
+  { title: string; detail: string; staffHint?: string }
+> = {
+  unreadable: {
+    title: 'This code did not work',
+    detail: 'Please ask staff for the current code for your table.',
+    staffHint:
+      'If this code is printed and still failing, the table may have been taken out of service or its code replaced.',
+  },
+  revoked: {
+    title: 'This code is no longer in use',
+    detail: 'Your table has a newer code. Please ask staff for the current one.',
+    staffHint: 'Codes stop working when a table is reset or its QR is replaced.',
+  },
+  limited: {
+    title: 'Too many attempts',
+    detail: 'Please wait a few minutes and scan again.',
+    staffHint: 'Too many wrong codes were tried from this connection.',
+  },
+  notserving: {
+    title: 'Not taking orders right now',
+    detail: 'Please order with staff.',
+    staffHint: 'The restaurant or this table may be switched off for the moment.',
+  },
+  nomenu: {
+    title: 'No menu published yet',
+    detail: 'This restaurant has not published a menu. Please order with staff.',
+    staffHint: 'Publish the menu from the dashboard to start taking QR orders.',
+  },
+  nosetup: {
+    title: 'This restaurant has not switched on table codes yet',
+    detail: 'Please order with staff — they can take the order at the counter.',
+    staffHint:
+      'Open Dashboard → Tables & QR once to create this restaurant’s verification code, then guests can scan and enter it.',
+  },
+  offline: {
+    title: 'Ordering is not switched on',
+    detail: 'This restaurant has not connected its ordering system. Please order with staff.',
+  },
+  failed: {
+    title: 'This code did not work',
+    detail: 'Please try scanning again, or order with staff.',
+  },
+};
+
+export function isQrProblemReason(value: string | undefined): value is QrProblemReason {
+  return typeof value === 'string' && value in QR_PROBLEM_COPY;
+}

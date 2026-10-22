@@ -1,10 +1,26 @@
 import type { Metadata } from 'next';
 import { QrProblemScreen } from '@/components/screens/QrProblemScreen';
+import { QR_PROBLEM_COPY, isQrProblemReason, type QrProblemReason } from '@/lib/qr-problem';
 
-export const metadata: Metadata = {
-  title: 'This code did not work · AutoDine',
-  robots: { index: false, follow: false },
-};
+/**
+ * The tab says the same thing as the page. See lib/qr-problem.ts.
+ *
+ * generateMetadata rather than a fixed `metadata` export, so a restaurant that
+ * has simply not switched ordering on does not get a tab reading "This code
+ * did not work". The two cannot be exported together.
+ */
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ r?: string }>;
+}): Promise<Metadata> {
+  const { r } = await searchParams;
+  const reason: QrProblemReason = isQrProblemReason(r) ? r : 'unreadable';
+  return {
+    title: `${QR_PROBLEM_COPY[reason].title} · AutoDine`,
+    robots: { index: false, follow: false },
+  };
+}
 
 /**
  * Where a scanned QR lands when it cannot be turned into a table.
@@ -19,62 +35,6 @@ export const metadata: Metadata = {
  * a busy room holding a phone, and "something went wrong" is no help to them.
  */
 
-type Reason =
-  | 'unreadable'
-  | 'revoked'
-  | 'limited'
-  | 'notserving'
-  | 'nomenu'
-  | 'nosetup'
-  | 'offline'
-  | 'failed';
-
-const REASONS: Record<Reason, { title: string; detail: string; staffHint?: string }> = {
-  unreadable: {
-    title: 'This code did not work',
-    detail: 'Please ask staff for the current code for your table.',
-    staffHint:
-      'If this code is printed and still failing, the table may have been taken out of service or its code replaced.',
-  },
-  revoked: {
-    title: 'This code is no longer in use',
-    detail: 'Your table has a newer code. Please ask staff for the current one.',
-    staffHint: 'Codes stop working when a table is reset or its QR is replaced.',
-  },
-  limited: {
-    title: 'Too many attempts',
-    detail: 'Please wait a few minutes and scan again.',
-    staffHint: 'Too many wrong codes were tried from this connection.',
-  },
-  notserving: {
-    title: 'Not taking orders right now',
-    detail: 'Please order with staff.',
-    staffHint: 'The restaurant or this table may be switched off for the moment.',
-  },
-  nomenu: {
-    title: 'No menu published yet',
-    detail: 'This restaurant has not published a menu. Please order with staff.',
-    staffHint: 'Publish the menu from the dashboard to start taking QR orders.',
-  },
-  nosetup: {
-    title: 'This restaurant has not switched on table codes yet',
-    detail: 'Please order with staff — they can take the order at the counter.',
-    staffHint:
-      'Open Dashboard → Tables & QR once to create this restaurant’s verification code, then guests can scan and enter it.',
-  },
-  offline: {
-    title: 'Ordering is not switched on',
-    detail: 'This restaurant has not connected its ordering system. Please order with staff.',
-  },
-  failed: {
-    title: 'This code did not work',
-    detail: 'Please try scanning again, or order with staff.',
-  },
-};
-
-const isReason = (value: string | undefined): value is Reason =>
-  typeof value === 'string' && value in REASONS;
-
 export default async function TableQrProblemPage({
   searchParams,
 }: {
@@ -84,8 +44,8 @@ export default async function TableQrProblemPage({
 
   // An unrecognised or missing code falls back to the plainest explanation
   // rather than rendering nothing at all.
-  const reason: Reason = isReason(r) ? r : 'unreadable';
-  const copy = REASONS[reason];
+  const reason: QrProblemReason = isQrProblemReason(r) ? r : 'unreadable';
+  const copy = QR_PROBLEM_COPY[reason];
 
   return (
     <QrProblemScreen

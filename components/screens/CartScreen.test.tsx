@@ -172,4 +172,15 @@ describe('the cart actions', () => {
     const without = renderToStaticMarkup(<Cart slug="maddi" items={items} taxRateBps={500} />);
     expect(without).not.toContain('flow__table');
   });
+
+  it('does not call the cart empty before it has been read', () => {
+    // The disabled "Cart is empty" button rendered while the stored cart was
+    // still loading, next to the words "Loading your order…". Two opposite
+    // statements, on the screen where the order is agreed.
+    mocks.cart.ready = false;
+    const html = renderToStaticMarkup(<Cart slug="maddi" items={items} taxRateBps={500} />);
+
+    expect(html).toContain('Loading your order');
+    expect(html).not.toContain('Cart is empty');
+  });
 });
