@@ -1,3 +1,5 @@
+import { GuestNote } from '@/components/GuestNote';
+
 /**
  * Shown when a scanned code cannot be turned into a table.
  *
@@ -5,6 +7,12 @@
  * "something went wrong" is no help to somebody standing at a table in a busy
  * room holding a phone. They need to know whether to scan again, ask staff,
  * or give up.
+ *
+ * The shell is the same one the code form and the bare-menu screen wear. This
+ * page used to be the odd one out -- a centred badge, its own legacy classes,
+ * a different type scale -- so a guest who scanned a dead card landed on
+ * something that did not look like the restaurant's own product. Being told no
+ * is a moment for the most familiar screen in the flow, not the least.
  */
 
 export type QrProblemScreenProps = {
@@ -18,18 +26,25 @@ export type QrProblemScreenProps = {
 
 export function QrProblemScreen({ title, detail, staffHint }: QrProblemScreenProps) {
   return (
-    <main className="pg">
-      <div className="pg__qrProblem">
-        <div className="pg__qrBadge" aria-hidden="true">
-          ?
-        </div>
-        <h1>{title}</h1>
-        <p>{detail}</p>
-        {staffHint ? <p className="pg__qrHint">{staffHint}</p> : null}
-        <a className="pg__btn" href="/">
+    <GuestNote
+      eyebrow="Table access"
+      title={title}
+      foot={
+        <>
+          Ordering with staff always works. Behind the counter? The dashboard is at{' '}
+          <a href="/dashboard/menus">Dashboard → Menus</a>.
+        </>
+      }
+    >
+      <p className="gnote__text">{detail}</p>
+
+      {staffHint ? <p className="gnote__staff">{staffHint}</p> : null}
+
+      <div className="gnote__actions">
+        <a className="gnote__cta" href="/">
           AutoDine home
         </a>
       </div>
-    </main>
+    </GuestNote>
   );
 }

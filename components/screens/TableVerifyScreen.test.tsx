@@ -35,6 +35,14 @@ describe('TableVerifyScreen', () => {
     expect(html).toContain('Maddi');
   });
 
+  it('styles the field as the gate’s own control, not the dashboard’s', () => {
+    expect(html).toContain('gnote__code');
+    expect(html).toContain('gnote__submit');
+    // The app's form classes are for signed-in staff screens; reusing them
+    // here is what made this page drift from the rest of the gate.
+    expect(html).not.toContain('pg__codeInput');
+  });
+
   it('asks for six digits with a phone keypad', () => {
     expect(html).toContain('name="code"');
     expect(html).toContain('inputMode="numeric"');

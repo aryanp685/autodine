@@ -57,14 +57,14 @@ export function VerifyCodeForm({
   }, [code]);
 
   return (
-    <form ref={formRef} className="pg__form qr__form" action={verifyTableCodeAction}>
+    <form ref={formRef} className="gnote__form" action={verifyTableCodeAction}>
       <input type="hidden" name="token" value={token} />
 
-      <label className="ui-field">
-        <span className="ui-label">Six-digit code</span>
+      <label className="gnote__label">
+        <span className="gnote__labelText">Six-digit code</span>
         <input
           ref={inputRef}
-          className="ui-input pg__codeInput"
+          className="gnote__code"
           name="code"
           // inputMode brings up the keypad on a phone; one-time-code lets iOS
           // and Android offer the code from the message that delivered it.
@@ -96,11 +96,11 @@ export function VerifyCodeForm({
         />
       </label>
 
-      <button className="pg__submit qr__submit" type="submit" disabled={sending || !complete}>
+      <button className="gnote__submit" type="submit" disabled={sending || !complete}>
         {sending ? 'Checking…' : 'Open the menu'}
       </button>
 
-      <p className="pg__fine" id="code-hint">
+      <p className="gnote__hintText" id="code-hint">
         {complete && !sending
           ? 'Checking that code…'
           : `The code changes every ${windowMinutes === 1 ? 'minute' : `${windowMinutes} minutes`}. If you cannot see it, ask a member of staff — they can read it out for you.`}
