@@ -1562,3 +1562,155 @@
   [data-app] .gnote__body { padding-top: 24px; }
   [data-app] .gnote .pg__form { max-width: none; }
 }
+
+/* =========================================================================
+   SAMPLE MENU — the public, read-only one
+   =========================================================================
+
+   Set the way a printed menu is set, because that is the form the guest
+   already knows how to read: a section heading, then rows whose name and price
+   are joined by a dotted leader. It is also the most honest way to show the
+   design without offering a button that cannot place an order.
+   ========================================================================= */
+
+[data-app] .smenu { padding-bottom: 0; }
+
+[data-app] .smenu__body {
+  width: min(100%, 880px);
+  margin: 0 auto;
+  padding: 8px var(--p-gutter) 96px;
+}
+
+[data-app] .smenu__sect { margin-top: 64px; }
+[data-app] .smenu__sect:first-child { margin-top: 36px; }
+
+[data-app] .smenu__sectHead {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--p-line-strong);
+}
+
+[data-app] .smenu__sectNum {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  color: var(--p-ink-28);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-app] .smenu__sectName {
+  font-size: clamp(1.35rem, 2.6vw, 1.85rem);
+  font-weight: 500;
+  letter-spacing: -0.032em;
+  color: var(--p-ink);
+}
+
+[data-app] .smenu__sectCount {
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+  white-space: nowrap;
+}
+
+[data-app] .smenu__rows { margin-top: 2px; }
+
+[data-app] .smenu__row {
+  padding: 17px 0;
+  border-bottom: 1px solid var(--p-line);
+}
+
+[data-app] .smenu__row:last-child { border-bottom: 0; }
+
+[data-app] .smenu__line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+[data-app] .smenu__mark {
+  flex: 0 0 auto;
+  align-self: center;
+  display: inline-flex;
+  transform: translateY(-1px);
+}
+
+[data-app] .smenu__name {
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: -0.018em;
+  color: var(--p-ink);
+}
+
+/* The leader. A hairline of dots is the oldest menu convention there is, and
+   it earns its place: it takes the eye from the dish to the price without a
+   column of empty space doing nothing. */
+[data-app] .smenu__dots {
+  flex: 1 1 auto;
+  min-width: 16px;
+  align-self: center;
+  transform: translateY(-3px);
+  border-bottom: 1px dotted var(--p-line-strong);
+}
+
+[data-app] .smenu__price {
+  flex: 0 0 auto;
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  color: var(--p-ink);
+}
+
+[data-app] .smenu__out {
+  flex: 0 0 auto;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .smenu__row.is-out .smenu__name,
+[data-app] .smenu__row.is-out .smenu__price { color: var(--p-ink-46); }
+
+[data-app] .smenu__desc {
+  margin-top: 5px;
+  padding-left: 22px;
+  max-width: 58ch;
+  font-size: 0.84375rem;
+  line-height: 1.6;
+  color: var(--p-ink-46);
+}
+
+[data-app] .smenu__foot {
+  width: min(100%, 880px);
+  margin: 0 auto;
+  padding: 32px var(--p-gutter) 96px;
+}
+
+[data-app] .smenu__note {
+  max-width: 54ch;
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: var(--p-ink-64);
+}
+
+[data-app] .smenu__fine {
+  margin-top: 12px;
+  max-width: 60ch;
+  font-size: 0.75rem;
+  line-height: 1.65;
+  color: var(--p-ink-46);
+}
+
+@media (max-width: 760px) {
+  [data-app] .smenu__sect { margin-top: 44px; }
+  [data-app] .smenu__sectHead { gap: 10px; }
+  [data-app] .smenu__sectCount { display: none; }
+  [data-app] .smenu__desc { padding-left: 0; }
+  [data-app] .smenu__body { padding-bottom: 64px; }
+  [data-app] .smenu__foot { padding-bottom: 88px; }
+}
