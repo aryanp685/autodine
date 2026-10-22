@@ -64,9 +64,24 @@ function matches(order: ReportOrderRow, filter: OrderFilter, query: string): boo
   );
 }
 
-function href(range: string, filter: OrderFilter, query: string): string {
+/**
+ * Every link on this screen, with the state it must not lose.
+ *
+ * `custom` carries its dates: switching from "last 7 days" to a filter chip
+ * must not silently throw away the week the person picked.
+ */
+function href(
+  range: string,
+  filter: OrderFilter,
+  query: string,
+  dates?: { from?: string; to?: string },
+): string {
   const params = new URLSearchParams();
   if (range !== 'today') params.set('range', range);
+  if (range === 'custom') {
+    if (dates?.from) params.set('from', dates.from);
+    if (dates?.to) params.set('to', dates.to);
+  }
   if (filter !== 'all') params.set('status', filter);
   if (query) params.set('q', query);
   const qs = params.toString();
@@ -78,17 +93,25 @@ export function OrdersScreen({
   outlet,
   filter = 'all',
   query = '',
+  customFrom,
+  customTo,
 }: {
   data?: ReportsScreenData | null;
   /** Which outlet is open, for the switcher in the bar. */
   outlet?: OutletBar | null;
   filter?: OrderFilter;
   query?: string;
+  /** The dates a custom range was asked for, so the form can show them back. */
+  customFrom?: string;
+  customTo?: string;
 }) {
   const live = Boolean(data);
   const blocked = data?.blocked;
   const timezone = data?.timezone ?? 'Asia/Kolkata';
-  const rangeKey = data?.range.key === 'custom' ? 'today' : (data?.range.key ?? 'today');
+  // A custom range stays itself. It used to be flattened to 'today', which lit
+  // the wrong chip and made the custom form's Apply look like it had failed.
+  const rangeKey = data?.range.key ?? 'today';
+  const dates = { from: customFrom, to: customTo };
 
   // Sample rows when nothing is configured, labelled as such below. The range
   // comes from resolveRange rather than from two identical instants: `from`
@@ -101,6 +124,16 @@ export function OrdersScreen({
   const openCount = orders.filter(isOpen).length;
   const unsettledCount = orders.filter((o) => o.prepStatus !== 'cancelled' && o.paymentStatus !== 'paid').length;
   const cancelledCount = orders.filter((o) => o.prepStatus === 'cancelled').length;
+
+  // The CSV has to cover the window on screen. A custom range is sent as the
+  // two local dates it was asked for, because the resolved range holds ISO
+  // instants and re-resolving those would move the window by a few seconds.
+  const exportParams = new URLSearchParams({ type: 'orders', range: rangeKey });
+  if (rangeKey === 'custom') {
+    if (customFrom) exportParams.set('from', customFrom);
+    if (customTo) exportParams.set('to', customTo);
+  }
+  const exportHref = `/dashboard/reports/export?${exportParams.toString()}`;
 
   return (
     <div className="pg pg--dash">
@@ -130,7 +163,7 @@ export function OrdersScreen({
                   RSC payload to fetch here. */}
               <a
                 className="pg__btn pg__btn--solid"
-                href={`/dashboard/reports/export?type=orders&range=${rangeKey}`}
+                href={exportHref}
                 download
               >
                 Order CSV
@@ -144,7 +177,7 @@ export function OrdersScreen({
             {RANGE_LINKS.map((r) => (
               <Link
                 key={r.key}
-                href={href(r.key, filter, query)}
+                href={href(r.key, filter, query, dates)}
                 className={`rep__range ${rangeKey === r.key ? 'is-active' : ''}`}
                 aria-current={rangeKey === r.key ? 'true' : undefined}
               >
@@ -152,8 +185,35 @@ export function OrdersScreen({
               </Link>
             ))}
 
+            {/* The sales report has always had a custom range; the ledger,
+                which reads the same aggregate, only had three presets. A
+                dispute about one evening is exactly the question this screen
+                gets asked. */}
+            <form className="rep__custom rep__custom--dates" method="get" action="/dashboard/orders">
+              <input type="hidden" name="range" value="custom" />
+              {filter !== 'all' && <input type="hidden" name="status" value={filter} />}
+              {query ? <input type="hidden" name="q" value={query} /> : null}
+              <label className="rep__customField">
+                <span>From</span>
+                <input type="date" name="from" defaultValue={customFrom} required />
+              </label>
+              <label className="rep__customField">
+                <span>To</span>
+                <input type="date" name="to" defaultValue={customTo} required />
+              </label>
+              <button type="submit" className="rep__range">
+                Apply dates
+              </button>
+            </form>
+
             <form className="rep__custom" method="get" action="/dashboard/orders">
               {rangeKey !== 'today' && <input type="hidden" name="range" value={rangeKey} />}
+              {rangeKey === 'custom' && customFrom ? (
+                <input type="hidden" name="from" value={customFrom} />
+              ) : null}
+              {rangeKey === 'custom' && customTo ? (
+                <input type="hidden" name="to" value={customTo} />
+              ) : null}
               {filter !== 'all' && <input type="hidden" name="status" value={filter} />}
               <label className="rep__customField">
                 <span>Find</span>
@@ -177,7 +237,7 @@ export function OrdersScreen({
             {FILTERS.map((f) => (
               <Link
                 key={f.key}
-                href={href(rangeKey, f.key, query)}
+                href={href(rangeKey, f.key, query, dates)}
                 className={`rep__range ${filter === f.key ? 'is-active' : ''}`}
                 aria-current={filter === f.key ? 'true' : undefined}
               >
