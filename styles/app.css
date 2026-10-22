@@ -1,0 +1,1112 @@
+/* =========================================================================
+   APP CHAPTER — the screens staff use during service
+   =========================================================================
+
+   The menu a guest reads is marketing; these screens are the kitchen. They
+   are read standing up, in a hurry, in bad light, with a queue behind them.
+   So the premium language survives but changes register:
+
+     - INFORMATION FIRST. Hairlines, tabular numerals, one accent for state,
+       and no ornament that costs a millimetre of a ticket.
+     - TYPE SCALES UP WITH IMPORTANCE, not with rank. Table numbers are the
+       biggest number on a ticket because that is what the cook needs first.
+     - ONE STATE COLOUR PER STATE. New is green, waiting is amber, late is
+       red, and nothing else is coloured at all. A board with six shades of
+       warning is a board nobody reads.
+     - THE SHELL IS SHARED. Every screen a signed-in person can open wears
+       the same bar, with the same destinations, in the same order.
+
+   Rules are scoped to [data-app] and load after design-system.css, so they
+   win ties without !important.
+   ========================================================================= */
+
+/* ------------------------------------------------------------- app shell */
+
+[data-app] .app {
+  min-height: 100svh;
+  background: var(--p-paper);
+}
+
+[data-app] .appBar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 2vw, 28px);
+  padding: 0 var(--p-gutter);
+  height: 62px;
+  border-bottom: 1px solid var(--p-line);
+  background: var(--p-glass);
+  -webkit-backdrop-filter: saturate(1.4) blur(18px);
+  backdrop-filter: saturate(1.4) blur(18px);
+}
+
+[data-app] .appBar__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+[data-app] .appBar__brand {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--p-ink);
+  text-decoration: none;
+}
+
+/* The outlet the session is working on, as an initial mark. Not an avatar:
+   this is a workspace selector, and it is also a switcher two elements away. */
+[data-app] .appBar__venue {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--p-line-strong);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--p-ink-64);
+}
+
+[data-app] .appBar__nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+[data-app] .appBar__nav::-webkit-scrollbar { display: none; }
+
+[data-app] .appBar__nav a {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  height: 62px;
+  padding: 0 12px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--p-ink-46);
+  text-decoration: none;
+  position: relative;
+  transition: color var(--p-d1) linear;
+}
+
+[data-app] .appBar__nav a:hover { color: var(--p-ink); }
+
+/* The current page is marked with a rule, not a pill: eight pills in a row
+   would read as eight buttons rather than as a place in a product. */
+[data-app] .appBar__nav a.is-active { color: var(--p-ink); }
+
+[data-app] .appBar__nav a.is-active::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -1px;
+  height: 1px;
+  background: var(--p-ink);
+}
+
+[data-app] .appBar__right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+[data-app] .appBar__signOut {
+  border: 0;
+  background: none;
+  padding: 8px 0;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--p-ink-46);
+  cursor: pointer;
+  transition: color var(--p-d1) linear;
+}
+
+[data-app] .appBar__signOut:hover { color: var(--p-ink); }
+
+/* --------------------------------------------------------- page frames */
+
+/* The loading boundary has to occupy the same box as the page it replaces, or
+   the whole layout shifts sideways the moment content lands. One measure for
+   both: the marketing column. */
+[data-app] .skel {
+  width: min(100%, 1240px);
+  max-width: none;
+  margin: 0 auto;
+  padding: clamp(24px, 4vh, 44px) var(--p-gutter) 96px;
+}
+
+[data-app] .pg--dash {
+  background: var(--p-paper);
+  min-height: 100svh;
+}
+
+[data-app] .pg__body {
+  width: min(100%, 1240px);
+  margin: 0 auto;
+  padding: clamp(24px, 4vh, 44px) var(--p-gutter) 96px;
+}
+
+[data-app] .pg__head { max-width: none; }
+
+[data-app] .pg__head--row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 18px 24px;
+}
+
+[data-app] .pg__kicker {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .pg__title {
+  margin-top: 14px;
+  font-size: clamp(1.9rem, 3.6vw, 2.9rem);
+  font-weight: 500;
+  letter-spacing: -0.042em;
+  line-height: 1.02;
+  color: var(--p-ink);
+}
+
+[data-app] .pg__title--sm { font-size: clamp(1.5rem, 2.6vw, 2rem); }
+
+/* ------------------------------------------------------------- controls */
+
+[data-app] .pg__btn,
+[data-app] .pg__ghostBtn,
+[data-app] .dash__ghostBtn,
+[data-app] .dash__solidBtn,
+[data-app] .kb__ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-r-sm);
+  background: var(--p-surface);
+  color: var(--p-ink);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color var(--p-d1) linear,
+    border-color var(--p-d1) linear,
+    color var(--p-d1) linear,
+    transform var(--p-d1) var(--p-ease);
+}
+
+[data-app] .pg__btn:hover,
+[data-app] .pg__ghostBtn:hover,
+[data-app] .dash__ghostBtn:hover,
+[data-app] .kb__ghost:hover {
+  border-color: var(--p-ink);
+  background: var(--p-paper-deep);
+}
+
+[data-app] .pg__btn:active,
+[data-app] .pg__ghostBtn:active,
+[data-app] .dash__ghostBtn:active,
+[data-app] .kb__ghost:active { transform: translateY(1px); }
+
+[data-app] .pg__btn--solid,
+[data-app] .dash__solidBtn {
+  background: var(--p-ink);
+  border-color: var(--p-ink);
+  color: var(--p-on-ink);
+}
+
+[data-app] .pg__btn--solid:hover,
+[data-app] .dash__solidBtn:hover {
+  background: color-mix(in srgb, var(--p-ink) 88%, var(--p-on-ink));
+  border-color: transparent;
+  color: var(--p-on-ink);
+}
+
+[data-app] .pg__btn:disabled,
+[data-app] .pg__btn[disabled],
+[data-app] .pg__btn.is-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+[data-app] .pg__miniBtn {
+  min-height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-r-sm);
+  background: var(--p-surface);
+  font: inherit;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--p-ink);
+  cursor: pointer;
+  transition: border-color var(--p-d1) linear, background-color var(--p-d1) linear;
+}
+
+[data-app] .pg__miniBtn:hover { border-color: var(--p-ink); }
+
+[data-app] .pg__miniBtn--danger {
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+  color: var(--danger);
+}
+
+[data-app] .pg__miniBtn--danger:hover {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--p-surface));
+}
+
+[data-app] .pg__headActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ----------------------------------------------------------- form parts */
+
+[data-app] .ui-field { display: grid; gap: 7px; }
+[data-app] .ui-field--inline { display: flex; align-items: center; gap: 8px; }
+
+[data-app] .ui-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .ui-input,
+[data-app] .ui-select {
+  min-height: 44px;
+  padding: 0 13px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-r-sm);
+  background: var(--p-surface);
+  color: var(--p-ink);
+  font: inherit;
+  font-size: 0.875rem;
+  transition: border-color var(--p-d1) linear;
+}
+
+[data-app] textarea.ui-input {
+  padding: 11px 13px;
+  line-height: 1.6;
+  min-height: 80px;
+}
+
+[data-app] .ui-input:focus,
+[data-app] .ui-select:focus {
+  border-color: var(--p-ink);
+  outline: 2px solid var(--p-accent);
+  outline-offset: 2px;
+}
+
+[data-app] .ui-input::placeholder { color: var(--p-ink-28); }
+
+/* ------------------------------------------------------------- messages */
+
+[data-app] .pg__alert,
+[data-app] .pg__success,
+[data-app] .pg__note {
+  padding: 14px 16px;
+  border: 0;
+  border-left: 2px solid var(--danger);
+  border-radius: 0 var(--p-r-sm) var(--p-r-sm) 0;
+  background: color-mix(in srgb, var(--danger) 8%, var(--p-paper));
+  font-size: 0.84375rem;
+  line-height: 1.6;
+  color: var(--p-ink-80);
+}
+
+[data-app] .pg__success {
+  border-left-color: var(--p-accent);
+  background: var(--p-accent-soft);
+}
+
+[data-app] .pg__note {
+  border-left-color: var(--p-ink-28);
+  background: var(--p-paper-deep);
+}
+
+/* A screen that needs a decision, not a screen that failed. Neutral surface,
+   one accent rule, and the two ways forward as real buttons. */
+[data-app] .pg__signin {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 18px 28px;
+  margin: 24px 0 0;
+  padding: 20px 22px;
+  border: 1px solid var(--p-line);
+  border-left: 2px solid var(--p-accent);
+  border-radius: 0 var(--p-r) var(--p-r) 0;
+  background: var(--p-surface);
+}
+
+[data-app] .pg__signinBody { min-width: 0; max-width: 52ch; }
+[data-app] .pg__signinBody strong { display: block; font-size: 0.9375rem; font-weight: 600; color: var(--p-ink); }
+[data-app] .pg__signinBody p { margin: 6px 0 0; font-size: 0.84375rem; line-height: 1.6; color: var(--p-ink-64); }
+[data-app] .pg__signinActions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+[data-app] .pg__alert strong,
+[data-app] .pg__success strong { display: block; font-weight: 600; margin-bottom: 3px; }
+[data-app] .pg__alert p,
+[data-app] .pg__success p { margin: 3px 0 0; }
+[data-app] .pg__alert a { color: var(--p-ink); }
+
+/* --------------------------------------------------------------- tables */
+
+[data-app] .ui-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  color: var(--p-ink-80);
+}
+
+[data-app] .ui-table th {
+  padding: 10px 12px 10px 0;
+  border-bottom: 1px solid var(--p-line-strong);
+  text-align: left;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+  white-space: nowrap;
+}
+
+[data-app] .ui-table td {
+  padding: 14px 12px 14px 0;
+  border-bottom: 1px solid var(--p-line);
+  vertical-align: middle;
+}
+
+[data-app] .ui-table tbody tr:last-child td { border-bottom: 0; }
+[data-app] .ui-table tbody tr:hover td { background: color-mix(in srgb, var(--p-paper-deep) 55%, transparent); }
+[data-app] .ui-table th:last-child,
+[data-app] .ui-table td:last-child { padding-right: 0; }
+
+/* =========================================================================
+   Dashboard overview
+   ========================================================================= */
+
+[data-app] .dash__main {
+  width: min(100%, 1240px);
+  margin: 0 auto;
+  padding: clamp(24px, 4vh, 44px) var(--p-gutter) 96px;
+}
+
+[data-app] .dash__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 18px 24px;
+}
+
+[data-app] .dash__kicker {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .dash__h1 {
+  margin-top: 12px;
+  font-size: clamp(2rem, 4vw, 3.1rem);
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  color: var(--p-ink);
+}
+
+[data-app] .dash__venueMeta {
+  margin-top: 12px;
+  max-width: 52ch;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--p-ink-46);
+}
+
+[data-app] .dash__headRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+[data-app] .dash__trialStrip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin-top: 28px;
+  padding: 14px 18px;
+  border-left: 2px solid var(--p-accent);
+  border-radius: 0 var(--p-r-sm) var(--p-r-sm) 0;
+  background: var(--p-accent-soft);
+  font-size: 0.8125rem;
+  color: var(--p-ink-80);
+}
+
+[data-app] .dash__trialStrip strong { font-weight: 600; color: var(--p-accent); }
+[data-app] .dash__trialDot { display: none; }
+[data-app] .dash__trialText { color: var(--p-ink-64); }
+[data-app] .dash__trialLink {
+  margin-left: auto;
+  color: var(--p-accent);
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 1px;
+}
+
+/* The four numbers. A hairline above each, a label small enough to be a
+   label, and the number large enough to read from a step back. */
+[data-app] .dash__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(20px, 3vw, 44px);
+  margin-top: clamp(32px, 5vh, 56px);
+}
+
+[data-app] .dash__stat {
+  padding-top: 16px;
+  border-top: 1px solid var(--p-line-strong);
+}
+
+[data-app] .dash__statLabel {
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .dash__statValue {
+  margin-top: 14px;
+  font-size: clamp(2rem, 3.4vw, 2.85rem);
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-ink);
+}
+
+[data-app] .dash__statDelta {
+  margin-top: 10px;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--p-ink-46);
+}
+
+[data-app] .dash__split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: clamp(28px, 4vw, 64px);
+  margin-top: clamp(40px, 6vh, 72px);
+}
+
+[data-app] .dash__block { margin-top: clamp(32px, 5vh, 56px); min-width: 0; }
+[data-app] .dash__split .dash__block { margin-top: 0; }
+
+[data-app] .dash__blockHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--p-line-strong);
+}
+
+[data-app] .dash__blockHead h2 {
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: -0.018em;
+  color: var(--p-ink);
+}
+
+[data-app] .dash__blockMeta {
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+  white-space: nowrap;
+}
+
+[data-app] .dash__chart { margin-top: 20px; }
+
+/* The four numbers arrive in sequence, 45ms apart: enough to read as one
+   gesture, short enough that nobody waits for it. Pure CSS, so it costs no
+   bundle and cannot leave the page blank if a script fails to load -- the
+   `both` fill ends at the real state, and the global reduced-motion rule
+   removes the travel. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-app] .dash__stat {
+    animation: dash-rise var(--p-d3) var(--p-ease) both;
+  }
+
+  [data-app] .dash__stat:nth-child(2) { animation-delay: 45ms; }
+  [data-app] .dash__stat:nth-child(3) { animation-delay: 90ms; }
+  [data-app] .dash__stat:nth-child(4) { animation-delay: 135ms; }
+}
+
+@keyframes dash-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+[data-app] .dash__rank { display: grid; margin: 0; padding: 0; list-style: none; }
+
+[data-app] .dash__rank li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  gap: 12px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--p-line);
+  font-size: 0.875rem;
+}
+
+[data-app] .dash__rank li:last-child { border-bottom: 0; }
+[data-app] .dash__rankNum { font-size: 0.625rem; color: var(--p-ink-28); font-variant-numeric: tabular-nums; }
+[data-app] .dash__rankName { font-weight: 500; color: var(--p-ink); }
+[data-app] .dash__rankSold { font-size: 0.75rem; color: var(--p-ink-46); white-space: nowrap; }
+
+[data-app] .dash__main .ui-table { margin-top: 4px; }
+
+/* An empty block is a sentence, not a shrug: same measure and colour as the
+   prose on the marketing pages, so "nothing has happened yet" reads like the
+   product talking rather than a missing component. */
+[data-app] .dash__empty,
+[data-app] .pg__empty {
+  padding: 22px 0;
+  max-width: 62ch;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: var(--p-ink-46);
+}
+
+/* =========================================================================
+   Kitchen board
+   ========================================================================= */
+
+[data-app] .kb {
+  background: var(--p-paper);
+  min-height: 100svh;
+  padding: 0 var(--p-gutter) 48px;
+}
+
+[data-app] .kb__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 18px 28px;
+  padding: clamp(20px, 3vh, 30px) 0 clamp(16px, 2.4vh, 22px);
+  border-bottom: 1px solid var(--p-line-strong);
+}
+
+[data-app] .kb__kicker {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .kb__h1 {
+  margin-top: 10px;
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  font-weight: 500;
+  letter-spacing: -0.042em;
+  line-height: 1;
+  color: var(--p-ink);
+}
+
+[data-app] .kb__controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Every control on this board is the same shape: a 34px pill with small
+   type, because they are pressed with a wrist, not a mouse. */
+[data-app] .kb__audio,
+[data-app] .kb__pill,
+[data-app] .kb__toggle,
+[data-app] .kb__live,
+[data-app] .kb__voicePick {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-pill);
+  background: var(--p-surface);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--p-ink-64);
+  white-space: nowrap;
+}
+
+[data-app] .kb__audioDot,
+[data-app] .kb__liveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--p-ink-28);
+}
+
+[data-app] .kb__audio.is-on .kb__audioDot,
+[data-app] .kb__liveDot { background: var(--p-accent); }
+[data-app] .kb__audio.is-off .kb__audioDot { background: var(--danger); }
+
+[data-app] .kb__linkBtn {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--p-ink);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--p-line-strong);
+}
+
+[data-app] .kb__linkBtn:hover { text-decoration-color: var(--p-ink); }
+
+[data-app] .kb__speeds {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-pill);
+  background: var(--p-surface);
+}
+
+[data-app] .kb__speed {
+  min-height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--p-pill);
+  background: none;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--p-ink-46);
+  cursor: pointer;
+  transition: background-color var(--p-d1) linear, color var(--p-d1) linear;
+}
+
+[data-app] .kb__speed.is-on { background: var(--p-ink); color: var(--p-on-ink); }
+
+[data-app] .kb__toggle {
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+}
+
+[data-app] .kb__toggle.is-on {
+  border-color: var(--p-accent);
+  color: var(--p-accent);
+  background: var(--p-accent-soft);
+}
+
+[data-app] .kb__pill.is-ok { border-color: var(--p-accent); color: var(--p-accent); }
+
+[data-app] .kb__voicePick { padding-right: 8px; font-size: 0.75rem; }
+
+[data-app] .kb__warn {
+  display: grid;
+  gap: 4px;
+  margin: 18px 0 0;
+  padding: 14px 16px;
+  border-left: 2px solid var(--danger);
+  border-radius: 0 var(--p-r-sm) var(--p-r-sm) 0;
+  background: color-mix(in srgb, var(--danger) 8%, var(--p-paper));
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--p-ink-80);
+}
+
+[data-app] .kb__warn strong { font-weight: 600; }
+[data-app] .kb__warn--quiet {
+  border-left-color: var(--p-ink-28);
+  background: var(--p-paper-deep);
+}
+
+[data-app] .kb__empty {
+  padding: 22px 0;
+  max-width: 62ch;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: var(--p-ink-46);
+}
+
+/* Three columns, each its own stack. The heading sticks so a cook scrolling a
+   long queue never loses which column they are looking at. */
+[data-app] .kb__cols {
+  display: grid;
+  padding: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(16px, 2.2vw, 30px);
+  margin-top: clamp(20px, 3vh, 32px);
+  align-items: start;
+}
+
+[data-app] .kb__col { min-width: 0; }
+
+[data-app] .kb__colHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--p-line-strong);
+  /* The board has no bar of its own -- the controls scroll away with the
+     header -- so the column headings pin to the viewport top, not under a
+     62px app bar that is only present on the other screens. */
+  position: sticky;
+  top: 0;
+  background: var(--p-paper);
+  z-index: 5;
+}
+
+[data-app] .kb__colHead h2 {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--p-ink-64);
+}
+
+[data-app] .kb__colHead .tnum {
+  font-size: 0.6875rem;
+  color: var(--p-ink-46);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-app] .kb__ord {
+  position: relative;
+  margin-top: 12px;
+  padding: 16px 18px 14px 20px;
+  background: var(--p-surface);
+  border: 1px solid var(--p-line);
+  border-left: 2px solid var(--p-ink-28);
+  border-radius: 0 var(--p-r) var(--p-r) 0;
+  box-shadow: var(--p-shadow-1);
+  transition: border-color var(--p-d2) linear, box-shadow var(--p-d2) var(--p-ease);
+}
+
+[data-app] .kb__ord[data-state='new'] { border-left-color: var(--p-accent); }
+[data-app] .kb__ord[data-state='preparing'] { border-left-color: var(--warn); }
+[data-app] .kb__ord[data-state='ready'] { border-left-color: var(--p-ink-28); }
+
+[data-app] .kb__ord:hover {
+  border-color: var(--p-line-strong);
+  box-shadow: var(--p-shadow-2);
+}
+
+[data-app] .kb__ord.is-served { opacity: 0.55; box-shadow: none; }
+
+[data-app] .kb__ordTop {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* The table is the biggest thing on a ticket, because it is the thing the
+   cook says out loud when they hand the plate over. */
+[data-app] .kb__ordId {
+  font-size: 1.5rem;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-ink);
+}
+
+[data-app] .kb__ordTable {
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .kb__ordAge {
+  margin-left: auto;
+  padding: 4px 9px;
+  border-radius: var(--p-pill);
+  background: var(--p-paper-deep);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--p-ink-46);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+[data-app] .kb__ordAge.is-fresh { background: var(--p-accent-soft); color: var(--p-accent); }
+[data-app] .kb__ordAge.is-warn { background: color-mix(in srgb, var(--warn) 12%, var(--p-paper)); color: var(--warn); }
+[data-app] .kb__ordAge.is-late { background: color-mix(in srgb, var(--danger) 12%, var(--p-paper)); color: var(--danger); }
+
+[data-app] .kb__unpaid {
+  margin-top: 8px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--warn);
+}
+
+[data-app] .kb-items {
+  display: grid;
+  gap: 7px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+[data-app] .kb-items li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  color: var(--p-ink-80);
+}
+
+[data-app] .kb-qty {
+  flex: 0 0 auto;
+  min-width: 20px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-ink);
+}
+
+[data-app] .kb-itemName em { font-style: normal; color: var(--p-ink-46); }
+
+[data-app] .kb-itemAddon {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 7px;
+  border-radius: var(--p-pill);
+  background: var(--p-accent-soft);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--p-accent);
+}
+
+[data-app] .kb__note {
+  margin-top: 12px;
+  padding: 9px 11px;
+  border-radius: var(--p-r-sm);
+  background: var(--p-paper-deep);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--p-ink-64);
+}
+
+[data-app] .kb__ordFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--p-line);
+}
+
+[data-app] .kb__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+[data-app] .kb__act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid var(--p-ink);
+  border-radius: var(--p-r-sm);
+  background: var(--p-ink);
+  color: var(--p-on-ink);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color var(--p-d1) linear, opacity var(--p-d1) linear;
+}
+
+[data-app] .kb__act:hover { background: color-mix(in srgb, var(--p-ink) 88%, var(--p-on-ink)); }
+[data-app] .kb__act[disabled] { opacity: 0.35; cursor: not-allowed; }
+
+[data-app] .kb__act--quiet {
+  background: transparent;
+  border-color: var(--p-line-strong);
+  color: var(--p-ink-64);
+}
+
+[data-app] .kb__act--quiet:hover { background: var(--p-paper-deep); color: var(--p-ink); }
+
+[data-app] .kb__act--danger {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+  color: var(--danger);
+}
+
+[data-app] .kb__act--danger:hover {
+  background: color-mix(in srgb, var(--danger) 8%, var(--p-surface));
+  border-color: var(--danger);
+}
+
+/* ------------------------------------------------------------ log panel */
+
+[data-app] .kb__log {
+  margin-top: clamp(28px, 4vh, 44px);
+  padding: 18px 0 0;
+  border-top: 1px solid var(--p-line);
+}
+
+[data-app] .kb__logHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .kb__log ol,
+[data-app] .kb__log ul { display: grid; gap: 0; margin: 10px 0 0; padding: 0; list-style: none; }
+
+[data-app] .kb__log li {
+  display: grid;
+  grid-template-columns: 48px auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--p-line);
+  font-size: 0.8125rem;
+}
+
+[data-app] .kb__logAt { font-size: 0.6875rem; color: var(--p-ink-46); font-variant-numeric: tabular-nums; }
+[data-app] .kb__logText { color: var(--p-ink-64); min-width: 0; overflow-wrap: anywhere; }
+[data-app] .kb__logLabel { font-weight: 500; color: var(--p-ink); }
+
+[data-app] .kb__tabs { display: none; }
+
+/* ------------------------------------------------------------- responsive */
+
+@media (max-width: 1100px) {
+  [data-app] .dash__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  [data-app] .dash__split { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+  [data-app] .kb__cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* The third column wraps under the first two; on a wall tablet that is
+     still one screen, and a cook sweeps left-to-right either way. */
+}
+
+@media (max-width: 860px) {
+  [data-app] .appBar { height: auto; flex-wrap: wrap; padding-block: 10px; gap: 8px 14px; }
+  [data-app] .appBar__nav { order: 3; width: 100%; }
+  [data-app] .appBar__nav a { height: 36px; padding: 0 10px; }
+  [data-app] .appBar__nav a.is-active::after { left: 10px; right: 10px; bottom: 0; }
+  [data-app] .appBar__right { margin-left: auto; }
+
+  [data-app] .kb__cols { grid-template-columns: minmax(0, 1fr); }
+  [data-app] .kb__col { display: none; }
+  [data-app] .kb__col.is-mobileActive { display: block; }
+  [data-app] .kb__colHead { position: static; }
+
+  [data-app] .kb__tabs {
+    display: flex;
+    gap: 6px;
+    margin-top: 18px;
+    padding: 0 0 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  [data-app] .kb__tabs::-webkit-scrollbar { display: none; }
+
+  [data-app] .kb__tab {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 0 14px;
+    border: 1px solid var(--p-line-strong);
+    border-radius: var(--p-pill);
+    background: var(--p-surface);
+    font: inherit;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--p-ink-46);
+    cursor: pointer;
+  }
+
+  [data-app] .kb__tab.is-on {
+    background: var(--p-ink);
+    border-color: var(--p-ink);
+    color: var(--p-on-ink);
+  }
+
+  [data-app] .kb__tabCount { font-variant-numeric: tabular-nums; opacity: 0.7; }
+}
+
+@media (max-width: 560px) {
+  [data-app] .dash__stats { grid-template-columns: minmax(0, 1fr); }
+  [data-app] .dash__stat { padding-top: 14px; }
+  [data-app] .dash__statValue { font-size: 2.2rem; }
+  [data-app] .dash__headRight { width: 100%; }
+  [data-app] .dash__headRight > * { flex: 1 1 auto; }
+  [data-app] .kb { padding-bottom: 32px; }
+  [data-app] .kb__cols, [data-app] .kb__log { padding-inline: 0; }
+  [data-app] .kb__head { flex-direction: column; align-items: stretch; }
+  [data-app] .kb__ordId { font-size: 1.35rem; }
+}

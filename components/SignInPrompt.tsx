@@ -9,6 +9,14 @@ import Link from 'next/link';
  * the page reads as "no orders" when the truth is "you are not signed in".
  * Those two need to look different: one is fine, the other needs the user to
  * do something.
+ *
+ * WHY THIS IS NOT A RED ALERT
+ *
+ * It used to reuse .pg__alert, the error box, so "you are not signed in" wore
+ * the same colour as "the order failed to save". Nothing went wrong here; the
+ * screen simply has a question to ask. It is now a neutral panel with the two
+ * actions as buttons rather than a sentence with two inline links, because on
+ * a wall-mounted kitchen board a link inside a paragraph is not a target.
  */
 export function SignInPrompt({
   reason,
@@ -20,26 +28,31 @@ export function SignInPrompt({
   const signedOut = reason === 'signed-out';
 
   return (
-    <div className="pg__alert" role="status">
-      <strong>{signedOut ? 'Sign in to see this screen.' : 'No restaurant on this account yet.'}</strong>
-      <p>
-        {signedOut ? (
-          <>
-            The {screen} reads real data, and it is filtered to the restaurant your account
-            belongs to. Sign in and it will load.
-          </>
-        ) : (
-          <>
-            Your account is signed in but is not a member of any restaurant, so there is
-            nothing this screen is allowed to show.
-          </>
-        )}
-      </p>
-      <p>
-        <Link href="/login">Sign in</Link>
-        {' · '}
-        <Link href="/signup">Create an account</Link>
-      </p>
+    <div className="pg__signin" role="status">
+      <div className="pg__signinBody">
+        <strong>{signedOut ? 'Sign in to see this screen.' : 'No restaurant on this account yet.'}</strong>
+        <p>
+          {signedOut ? (
+            <>
+              The {screen} reads real data, and it is filtered to the restaurant your account
+              belongs to. Sign in and it will load.
+            </>
+          ) : (
+            <>
+              Your account is signed in but is not a member of any restaurant, so there is
+              nothing this screen is allowed to show.
+            </>
+          )}
+        </p>
+      </div>
+      <div className="pg__signinActions">
+        <Link href="/login" className="pg__btn pg__btn--solid">
+          Sign in
+        </Link>
+        <Link href="/signup" className="pg__btn">
+          Create an account
+        </Link>
+      </div>
     </div>
   );
 }
