@@ -738,36 +738,10 @@
 
 /* ---------------------------------------------------------------- cashier */
 
-.cash { background: var(--page-bg); min-height: 100vh; }
-.cash__head { display: flex; align-items: flex-end; justify-content: space-between; padding: 40px 48px; border-bottom: 1px solid var(--border); }
-.cash__kicker { font-size: 11.5px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(17, 19, 24, 0.45); font-weight: 700; }
-.cash__h1 { font-size: 26px; margin-top: 8px; font-weight: 500; letter-spacing: -0.02em; }
-.cash__headMeta { display: flex; gap: 20px; font-size: 13.5px; color: rgba(17, 19, 24, 0.6); }
-.cash__outstanding { font-weight: 600; color: #b05346; }
-.cash__grid { display: grid; grid-template-columns: 400px 1fr; gap: 72px; padding: 36px 48px 96px; }
-.cash__h2 { font-size: 19px; font-weight: 500; margin-bottom: 18px; }
-.cash__qItem { padding: 22px 0; border-bottom: 1px solid rgba(17, 19, 24, 0.1); }
-.cash__qItem.is-active { border-left: 2px solid var(--text); padding-left: 18px; margin-left: -20px; }
-.cash__qTop { display: flex; align-items: baseline; gap: 12px; }
-.cash__qTop strong { font-size: 16px; }
-.cash__qTable { font-size: 13px; color: rgba(17, 19, 24, 0.55); }
-.cash__qTime { margin-left: auto; font-size: 12.5px; color: rgba(17, 19, 24, 0.45); font-variant-numeric: tabular-nums; }
-.cash__qItems { margin-top: 8px; font-size: 13.5px; color: rgba(17, 19, 24, 0.6); }
-.cash__qFoot { margin-top: 12px; display: flex; align-items: center; justify-content: space-between; }
-.cash__qState { font-size: 12.5px; color: rgba(17, 19, 24, 0.55); }
-.cash__detail { border: 1px solid var(--border); background: #fff; padding: 34px; border-radius: 3px; align-self: start; }
-.cash__detailHead { display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 20px; }
-.cash__amount { font-size: 40px; margin-top: 8px; letter-spacing: -0.03em; font-weight: 500; font-variant-numeric: tabular-nums; }
-.cash__due { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #9c3f36; background: rgba(199, 91, 80, 0.1); padding: 5px 10px; border-radius: 999px; }
-.cash__lines { margin-top: 20px; display: grid; gap: 12px; }
-.cash__lines li { display: flex; justify-content: space-between; gap: 20px; font-size: 14.5px; }
-.cash__lines em { font-style: normal; font-size: 13px; color: rgba(17, 19, 24, 0.5); }
-.cash__totalRow { display: flex; justify-content: space-between; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 17px; }
-.cash__methods { display: flex; gap: 10px; margin-top: 26px; }
-.cash__method { flex: 1; padding: 12px; border: 1px solid var(--border); background: none; border-radius: 2px; font-size: 14px; cursor: pointer; }
-.cash__method.is-on { border: 2px solid var(--text); padding: 11px; background: #f1efe9; font-weight: 600; }
-.cash__cta { width: 100%; margin-top: 26px; background: var(--text); color: #fff; border: 0; padding: 15px; border-radius: 2px; font-size: 15px; cursor: pointer; }
-.cash__fine { margin-top: 14px; font-size: 12px; color: rgba(17, 19, 24, 0.5); line-height: 1.6; }
+/* The counter's locked rules used to live here. styles/app.css owns that
+   screen now; the old block was still setting padding and margins on rows
+   the new markup styles itself, so it had to go rather than be out-voted
+   property by property. */
 
 /* ------------------------------------------------------- shared .pg pages */
 
@@ -1068,7 +1042,7 @@
   .cart__head, .co__head { padding-inline: 28px; }
   .cart__grid, .co__grid { grid-template-columns: minmax(0, 1fr) 320px; gap: 32px; padding-inline: 28px; }
   .cart__line { gap: 18px; }
-  .cart__sumCard, .co__sum, .cash__detail { padding: 22px; }
+  .cart__sumCard, .co__sum { padding: 22px; }
 
   .kb__head { padding: 22px 28px 18px; align-items: flex-start; flex-wrap: wrap; }
   /* Two columns, and the third takes the full width underneath: three queues
@@ -1076,8 +1050,6 @@
   .kb__cols { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; padding: 24px 28px 56px; }
   .kb__col:last-child { grid-column: 1 / -1; }
   .kb__col:last-child .kb__ord { margin-top: 12px; }
-  .cash__head { padding-inline: 28px; }
-  .cash__grid { grid-template-columns: 320px minmax(0, 1fr); gap: 32px; padding-inline: 28px; }
 
   [data-app] .pg__bar { padding-inline: 28px; gap: 24px; }
   [data-app] .pg__body, [data-app] .pg__split { padding-inline: 28px; }
@@ -1217,12 +1189,6 @@
      underneath. A thumb should not have to aim at a 90px button mid-service. */
   .kb__actions .kb__act:not(.kb__act--quiet) { flex: 1 1 100%; }
   .kb__colHead h2 { font-size: 12px; }
-  .cash__head { padding: 28px 20px; align-items: flex-start; flex-direction: column; gap: 14px; }
-  .cash__headMeta { flex-wrap: wrap; gap: 8px 16px; }
-  .cash__grid { grid-template-columns: minmax(0, 1fr); padding: 24px 20px 48px; gap: 24px; }
-  .cash__detail { padding: 20px; }
-  .cash__methods { flex-wrap: wrap; }
-  .cash__method { min-width: 90px; }
 
   [data-app] .pg__bar { flex-wrap: wrap; gap: 14px; padding: 16px 20px; }
   [data-app] .pg__barLinks { order: 3; flex: 1 0 100%; gap: 20px; overflow-x: auto; white-space: nowrap; padding-bottom: 3px; }
@@ -1265,7 +1231,7 @@
   .sheet__qty { gap: 4px; padding-inline: 2px; }
   .sheet__qty button { width: 32px; }
   .sheet__add { padding: 10px 12px; font-size: 13.5px; }
-  .cart__sumCard, .co__sum, .cash__detail { padding: 16px; }
+  .cart__sumCard, .co__sum { padding: 16px; }
   .cart__head, .co__head { padding-inline: 16px; }
   .cart__grid, .co__grid { padding-inline: 16px; }
   [data-app] .pg__printGrid { grid-template-columns: 1fr 1fr; gap: 8px; }
