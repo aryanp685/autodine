@@ -29,6 +29,7 @@ export function QrProblemScreen({ title, detail, staffHint }: QrProblemScreenPro
     <GuestNote
       eyebrow="Table access"
       title={title}
+      steps="scan"
       foot={
         <>
           Ordering with staff always works. Behind the counter? The dashboard is at{' '}

@@ -3,6 +3,7 @@ import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
 import { GuestOrderEditor } from '@/components/screens/GuestOrderEditor';
 import { PayOnline } from '@/components/PayOnline';
+import { OrderStatusRefresh } from '@/components/OrderStatusRefresh';
 import { GUEST_CHANGE_WINDOW_MS, type OrderScreenData } from '@/lib/db/order-screen';
 import type { OnlineOffer } from '@/lib/payments/online-availability';
 
@@ -36,6 +37,47 @@ const PREP_LABEL: Record<string, string> = {
   served: 'Served',
   cancelled: 'Cancelled',
 };
+
+/**
+ * The four states a ticket actually moves through, in the order it moves.
+ *
+ * Read straight from `prepStatus`, which the kitchen board writes. This is not
+ * a decorative progress bar: every mark on it corresponds to a state the
+ * database holds, and the guest can compare it with what is on the table.
+ *
+ * `preparing` used to be called "cooking" on the board and "preparing" here;
+ * one product, one word.
+ */
+const PREP_STEPS: ReadonlyArray<{ key: string; label: string }> = [
+  { key: 'new', label: 'Sent to the kitchen' },
+  { key: 'preparing', label: 'Being cooked' },
+  { key: 'ready', label: 'Ready to serve' },
+  { key: 'served', label: 'Served' },
+];
+
+function OrderTrack({ prepStatus }: { prepStatus: string }) {
+  const currentIndex = PREP_STEPS.findIndex((step) => step.key === prepStatus);
+  // An unrecognised state has no position on a four-step track, so nothing is
+  // marked rather than the first step being marked by accident.
+  if (currentIndex < 0) return null;
+
+  return (
+    <ol className="placed__track" aria-label="Kitchen progress">
+      {PREP_STEPS.map((step, index) => {
+        const state = index < currentIndex ? 'is-done' : index === currentIndex ? 'is-now' : 'is-todo';
+        return (
+          <li key={step.key} className={`placed__step ${state}`}>
+            <span className="placed__stepDot" aria-hidden="true" />
+            <span className="placed__stepLabel">
+              {step.label}
+              {index === currentIndex ? <span className="gnote__sr"> — where it is now</span> : null}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
 
 /**
  * Confirmation, and the only screen that tells the diner what happens next.
@@ -92,7 +134,24 @@ export function OrderPlacedScreen({
 
   return (
     <div className="cart cart--placed">
-      <header className="cart__head">
+      <header className="cart__head placed__head">
+        {/* The one moment in the flow that deserves a mark. Drawn rather than
+            typed: a tick in a circle reads at a glance from across a table,
+            and it is the only decoration on the screen. */}
+        <span
+          className={`placed__mark ${data.prepStatus === 'cancelled' ? 'is-void' : 'is-ok'}`}
+          aria-hidden="true"
+        >
+          {data.prepStatus === 'cancelled' ? (
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M4 12.5l5 5L20 6.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </span>
         <div className="cart__kicker">
           {data.prepStatus === 'cancelled' ? 'Order cancelled' : 'Order placed'}
         </div>
@@ -104,6 +163,25 @@ export function OrderPlacedScreen({
         <p className="cart__code" aria-label="Order reference">
           <span>Reference</span> <strong>{data.code}</strong>
         </p>
+
+        {/* What happens next, from the state the kitchen last wrote. A
+            cancelled order has no track: there is nothing left to move
+            through, and drawing four steps with none of them reached would
+            read as an order about to start. */}
+        {data.prepStatus === 'cancelled' ? (
+          <p className="placed__cancelled">
+            Nothing is being cooked and nothing is owed. Order again from the menu whenever you
+            are ready.
+          </p>
+        ) : (
+          <>
+            <OrderTrack prepStatus={data.prepStatus} />
+            {/* Only when the guest cannot edit any more: see the comment in
+                OrderStatusRefresh for why a refresh must not land on a screen
+                holding unsaved changes. */}
+            {!data.canGuestChange ? <OrderStatusRefresh /> : null}
+          </>
+        )}
       </header>
 
       <div className="cart__grid">

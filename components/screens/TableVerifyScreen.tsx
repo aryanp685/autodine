@@ -50,6 +50,7 @@ export function TableVerifyScreen({
     <GuestNote
       eyebrow={`Table ${tableLabel} · ${restaurantName}`}
       title="Enter the code in the restaurant"
+      steps="code"
       foot={
         <>
           Not at table {tableLabel}? Scan the QR code on your own table.{' '}

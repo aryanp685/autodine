@@ -2031,3 +2031,199 @@
   [data-app] .cart,
   [data-app] .co { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
 }
+
+/* =========================================================================
+   THE GATE CHAPTER — where the guest is in the three steps
+   =========================================================================
+
+   Scanning a card, typing six digits and reading a menu are three steps, and
+   a guest can land in the middle of them from a forwarded link, a dead card
+   or a wrong code. The bar at the top says which one they are on, so the
+   screen is a place in a flow rather than an isolated page that says no.
+
+   Editorial, not a progress bar: three numerals, a hairline between them, one
+   of them in ink. Nothing animates, because this is a state, not a task.
+   ========================================================================= */
+
+[data-app] .gnote__bar {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+[data-app] .gnote__steps {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+[data-app] .gnote__step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--p-ink-28);
+  white-space: nowrap;
+}
+
+[data-app] .gnote__stepNum { font-variant-numeric: tabular-nums; }
+
+/* The hairline between steps belongs to the step after it, so a wrapped row
+   never starts with a rule. */
+[data-app] .gnote__stepRule {
+  width: clamp(8px, 2vw, 18px);
+  height: 1px;
+  margin-right: 4px;
+  background: var(--p-line-strong);
+}
+
+[data-app] .gnote__step.is-done { color: var(--p-ink-64); }
+[data-app] .gnote__step.is-now { color: var(--p-ink); }
+[data-app] .gnote__step.is-now .gnote__stepNum { color: var(--p-accent); }
+
+[data-app] .gnote__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The code is the only interactive thing on the page, so its label, field and
+   hint are given room to breathe rather than being packed into the shell. */
+[data-app] .gnote__form { margin-top: 34px; }
+
+[data-app] .gnote__code {
+  min-height: 72px;
+  font-size: 2rem;
+  letter-spacing: 0.5em;
+  text-indent: 0.25em;
+}
+
+@media (max-width: 560px) {
+  [data-app] .gnote__bar { flex-wrap: wrap; row-gap: 10px; }
+  [data-app] .gnote__stepLabel { font-size: 0.625rem; }
+  [data-app] .gnote__code { min-height: 64px; font-size: 1.625rem; letter-spacing: 0.4em; }
+}
+
+/* =========================================================================
+   THE CONFIRMATION — placed, and then what
+   =========================================================================
+
+   This is the only screen that tells the diner what happens next, and it is
+   read on a phone held at arm's length in a loud room. So the mark comes
+   first, the table second, and the reference third; the kitchen's actual
+   state is drawn as four steps read from prepStatus, not as a spinner.
+   ========================================================================= */
+
+[data-app] .placed__head { padding-top: clamp(24px, 5vh, 44px); }
+
+[data-app] .placed__mark {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  margin-bottom: 18px;
+  border-radius: 50%;
+}
+
+/* Ink on paper for a placed order; the one green for the tick, because a
+   tick is a mark and the product's marks are green. */
+[data-app] .placed__mark.is-ok {
+  background: var(--p-accent-soft);
+  color: var(--p-accent);
+}
+
+[data-app] .placed__mark.is-void {
+  background: var(--p-paper-deep);
+  color: var(--p-ink-46);
+}
+
+[data-app] .placed__track {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  margin: 26px 0 0;
+  padding: 18px 0 0;
+  border-top: 1px solid var(--p-line);
+  list-style: none;
+  max-width: 40rem;
+}
+
+[data-app] .placed__step {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  color: var(--p-ink-46);
+}
+
+[data-app] .placed__stepDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid var(--p-line-strong);
+}
+
+[data-app] .placed__step.is-done { color: var(--p-ink-64); }
+[data-app] .placed__step.is-done .placed__stepDot {
+  border-color: var(--p-ink);
+  background: var(--p-ink);
+}
+
+/* Where it is now: the only step at full ink, with a filled dot and the one
+   accent, so the eye finds it before it reads a word. */
+[data-app] .placed__step.is-now { color: var(--p-ink); font-weight: 500; }
+[data-app] .placed__step.is-now .placed__stepDot {
+  border-color: var(--p-accent);
+  background: var(--p-accent);
+  outline: 3px solid color-mix(in srgb, var(--p-accent) 18%, transparent);
+  outline-offset: 1px;
+}
+
+[data-app] .placed__step.is-todo { color: var(--p-ink-28); }
+
+[data-app] .placed__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 0;
+  font-size: 0.75rem;
+  color: var(--p-ink-46);
+}
+
+[data-app] .placed__liveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--p-accent);
+}
+
+[data-app] .placed__cancelled {
+  margin: 22px 0 0;
+  padding: 14px 16px;
+  border-left: 2px solid var(--p-line-strong);
+  background: var(--p-paper-deep);
+  border-radius: 0 var(--p-r-sm) var(--p-r-sm) 0;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--p-ink-64);
+  max-width: 44rem;
+}
+
+@media (max-width: 560px) {
+  [data-app] .placed__track { gap: 8px 14px; }
+  [data-app] .placed__step { font-size: 0.6875rem; }
+}
