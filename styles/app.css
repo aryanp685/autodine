@@ -3842,6 +3842,48 @@
   [data-app] .shell__menuBtn { display: inline-flex; }
 }
 
+/* On a phone the rail is the wrong shape. A 232px column on a 390px screen is
+   two thirds of the screen gone, and a full-height drawer is a desktop idea
+   wearing a phone's clothes -- the thumb cannot reach the top of it. So on a
+   phone it becomes a sheet that rises from the bottom edge, which is where the
+   nearest third of the screen already is at a glance. Same content, same
+   markup, only the box changes. */
+@media (max-width: 640px) {
+  [data-app] .shell__rail {
+    inset: auto 0 0 0;
+    width: 100%;
+    max-height: min(84svh, 620px);
+    padding: 0 12px calc(12px + env(safe-area-inset-bottom));
+    border-right: 0;
+    border-top: 1px solid var(--p-line);
+    border-radius: 22px 22px 0 0;
+    transform: translateY(110%);
+    transition: transform var(--p-d2) var(--p-ease);
+  }
+
+  [data-app] .shell__rail.is-open { transform: translateY(0); }
+
+  /* The grab handle. It is decoration -- there is nothing to drag -- so it is
+     drawn, not announced: a control that does nothing is worse than a hint
+     that something came up from the edge. */
+  [data-app] .shell__brandRow { position: relative; padding-top: 20px; }
+  [data-app] .shell__brandRow::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    margin-left: -18px;
+    border-radius: 999px;
+    background: var(--p-line-strong);
+  }
+
+  [data-app] .shell__nav { padding-bottom: 4px; }
+
+  [data-app] .shell__foot { position: sticky; bottom: 0; background: var(--p-surface); }
+}
+
 @media (max-width: 760px) {
   [data-app] .shell__top { gap: 8px; }
   [data-app] .shellSearch { display: none; }

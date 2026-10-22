@@ -30,11 +30,16 @@ export { DASHBOARD_LINKS };
  *                   padded by exactly its width, so nothing is ever hidden
  *                   behind it.
  *   tablet          the rail becomes a drawer with a scrim, opened from the
- *                   top bar. 1024px is the kitchen's wall-tablet width, and a
- *                   rail there would eat a quarter of the board.
- *   phone           the same drawer, full width, with the venue name in the top
- *                   bar because the rail -- which normally answers "where am
- *                   I" -- is off screen.
+ *                   top bar. 1100px is where a 232px column stops being free
+ *                   space and starts being a quarter of the working area.
+ *   phone           the same contents as a sheet that rises from the bottom
+ *                   edge, with the current screen in the top bar. A drawer
+ *                   that slides in from the side puts its first item at the
+ *                   top of the screen, out of a thumb's reach; the bottom
+ *                   third is where the hand already is.
+ *
+ * Only the box changes between those three: one tree, one order, one set of
+ * names, so a destination cannot exist on a laptop and not on a phone.
  *
  * The kitchen board does not use this shell at all: it is a full-screen wall
  * display with no navigation, by design.
