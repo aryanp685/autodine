@@ -52,7 +52,11 @@ export function Checkout({
   const canOrder = cart.ready && priced.lines.length > 0;
 
   return (
-    <div className="co">
+    // The phone bar repeats this bill's total at the bottom of the screen.
+    // When it is showing, the same button inside the summary is hidden by CSS,
+    // so a guest never sees two black buttons 40px apart. The class says
+    // whether the bar exists, because CSS cannot ask.
+    <div className={canOrder ? 'co co--barred' : 'co'}>
       <header className="co__head">
         <Link href={withSlug('/menu/cart')} className="co__back">
           ← Back to cart

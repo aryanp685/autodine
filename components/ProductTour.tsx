@@ -61,10 +61,10 @@ function GuestPanel() {
       </div>
 
       <div className="tour__cats" aria-hidden="true">
-        <span className="tour__cat is-on">Starters</span>
+        <span className="tour__cat is-on">All</span>
         <span className="tour__cat">Mains</span>
         <span className="tour__cat">Breads</span>
-        <span className="tour__cat">Sweet</span>
+        <span className="tour__cat">Drinks</span>
       </div>
 
       <div className="tour__dishes">
@@ -80,10 +80,10 @@ function GuestPanel() {
         </div>
         <div className="tour__dish">
           <div>
-            <p className="tour__dishName">Garlic Naan</p>
-            <p className="tour__dishDesc">Leavened bread, brushed with garlic butter.</p>
+            <p className="tour__dishName">Butter Naan</p>
+            <p className="tour__dishDesc">Tandoor-baked, brushed with butter.</p>
             <p className="tour__dishFoot">
-              <span className="tour__price tnum">{inr(89)}</span>
+              <span className="tour__price tnum">{inr(79)}</span>
               <span className="tour__add">Add</span>
             </p>
           </div>
@@ -92,7 +92,7 @@ function GuestPanel() {
 
       <div className="tour__cartBar">
         <span>
-          <strong className="tnum">2</strong> items · <span className="tnum">{inr(776)}</span>
+          <strong className="tnum">4</strong> items · <span className="tnum">{inr(776)}</span>
         </span>
         <span className="tour__cartBtn">Review order</span>
       </div>
@@ -119,10 +119,10 @@ function KitchenPanel() {
         </div>
         <ul className="tour__ticketItems">
           <li>
-            <span className="tnum">2×</span> Butter Chicken <em>· Half</em>
+            <span className="tnum">1×</span> Butter Chicken <em>· Regular</em>
           </li>
           <li>
-            <span className="tnum">3×</span> Garlic Naan
+            <span className="tnum">2×</span> Butter Naan
           </li>
           <li>
             <span className="tnum">1×</span> Mango Lassi
@@ -130,7 +130,7 @@ function KitchenPanel() {
         </ul>
         <p className="tour__ticketNote">“no onion in the gravy”</p>
         <div className="tour__ticketFoot">
-          <span className="tour__ticketTotal tnum">{inr(1247)}</span>
+          <span className="tour__ticketTotal tnum">{inr(776)}</span>
           <span className="tour__act">Start preparing</span>
         </div>
       </div>
@@ -162,12 +162,16 @@ function CounterPanel() {
 
       <div className="tour__lines">
         <p>
-          <span>Butter Chicken · 2</span>
-          <span className="tnum">{inr(938)}</span>
+          <span>Butter Chicken · 1</span>
+          <span className="tnum">{inr(469)}</span>
         </p>
         <p>
-          <span>Garlic Naan · 3</span>
-          <span className="tnum">{inr(267)}</span>
+          <span>Butter Naan · 2</span>
+          <span className="tnum">{inr(158)}</span>
+        </p>
+        <p>
+          <span>Mango Lassi · 1</span>
+          <span className="tnum">{inr(149)}</span>
         </p>
         <p className="tour__linesTotal">
           <span>Outstanding</span>

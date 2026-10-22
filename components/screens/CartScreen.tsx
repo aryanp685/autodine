@@ -30,10 +30,17 @@ function Totals({ subtotalPaise, taxPaise, totalPaise, taxRateBps, compact }: {
         <span>Total</span>
         <span className="tnum">{inr(paiseToRupees(totalPaise))}</span>
       </div>
-      <p className="totals__note">
-        Tax rates shown are sample values for layout review. Final tax configuration must be confirmed before
-        launch.
-      </p>
+      {/* Only when there is no restaurant rate to price against. This note
+          used to render for every guest, including one sitting in a real
+          restaurant with a real GST rate, and told them the tax they were
+          about to pay was a layout sample. On a demo it is true and worth
+          saying; on a live menu it is a lie about someone's bill. */}
+      {taxRateBps === undefined && (
+        <p className="totals__note">
+          This menu has no tax rate configured, so the tax above is a sample for layout review rather than a
+          rate the restaurant set.
+        </p>
+      )}
     </div>
   );
 }
