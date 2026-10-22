@@ -665,35 +665,46 @@
 [data-app] .feat__body { margin: 14px 0 0; max-width: 36ch; }
 
 /* =========================================================================
-   Flow — sticky heading, numbered rows
+   pflow — sticky heading, numbered rows
    =========================================================================
 
    The layout an expensive product page uses for "how it works": the heading
    parks on the left while the steps scroll past it. On a phone it collapses
    to a normal stack, because a sticky column on a 380px screen is just a
    heading that will not move out of the way.
+
+   NAMED pflow, NOT flow, ON PURPOSE.
+
+   The guest ordering flow has its own `.flow`, `.flow__step` and `.flow__body`
+   in styles/guest.css — a full-height shell with a progress bar — and that
+   file is imported after this one. Both used the same names, so the guest
+   shell's rules won on the marketing page: the four steps here were laid out
+   as 16px progress-bar segments, and their headings and body copy overflowed
+   a 16px box on top of each other. On the live site the whole section was
+   unreadable. `p-` is this page's prefix already (p-sect, p-wrap, p-h2), so
+   the marketing section now wears it and the two cannot collide again.
    ========================================================================= */
 
-[data-app] .flow {
+[data-app] .pflow {
   display: grid;
   grid-template-columns: minmax(0, 0.76fr) minmax(0, 1.24fr);
   gap: clamp(32px, 6vw, 96px);
   align-items: start;
 }
 
-[data-app] .flow__aside { position: sticky; top: 108px; }
-[data-app] .flow__steps { display: grid; }
+[data-app] .pflow__aside { position: sticky; top: 108px; }
+[data-app] .pflow__steps { display: grid; }
 
-[data-app] .flow__step {
+[data-app] .pflow__step {
   display: grid;
   grid-template-columns: 64px minmax(0, 1fr);
   gap: clamp(16px, 2vw, 32px);
   padding: clamp(24px, 3vh, 34px) 0;
   border-top: 1px solid var(--p-line);
 }
-[data-app] .flow__step:last-child { border-bottom: 1px solid var(--p-line); }
+[data-app] .pflow__step:last-child { border-bottom: 1px solid var(--p-line); }
 
-[data-app] .flow__num {
+[data-app] .pflow__num {
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.16em;
@@ -703,8 +714,8 @@
   padding-top: 4px;
 }
 
-[data-app] .flow__title { margin: 0 0 8px; }
-[data-app] .flow__body { max-width: 46ch; }
+[data-app] .pflow__title { margin: 0 0 8px; }
+[data-app] .pflow__body { max-width: 46ch; }
 
 /* =========================================================================
    Statement — the full-width line that closes the argument
@@ -1107,8 +1118,8 @@
   [data-app] .p-plans { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   [data-app] .p-plans > :last-child { grid-column: 1 / -1; }
   [data-app] .foot__grid { grid-template-columns: 1fr 1fr; }
-  [data-app] .flow { grid-template-columns: minmax(0, 1fr); gap: 40px; }
-  [data-app] .flow__aside { position: static; }
+  [data-app] .pflow { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+  [data-app] .pflow__aside { position: static; }
 }
 
 @media (max-width: 760px) {
@@ -1147,7 +1158,7 @@
   [data-app] .p-plans > :last-child { grid-column: auto; }
 
   [data-app] .p-close__inner { align-items: flex-start; }
-  [data-app] .flow__step { grid-template-columns: 40px minmax(0, 1fr); gap: 14px; }
+  [data-app] .pflow__step { grid-template-columns: 40px minmax(0, 1fr); gap: 14px; }
   [data-app] .foot__fine { flex-direction: column; gap: 6px; }
 
   /* 48px on every control, which is also what stops iOS zooming the viewport. */

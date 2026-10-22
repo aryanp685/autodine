@@ -182,8 +182,8 @@ export function Home() {
         {/* ------------------------------------------------------------ flow */}
         <section className="p-sect p-sect--tight" id="flow">
           <div className="p-wrap">
-            <div className="flow">
-              <div className="flow__aside">
+            <div className="pflow">
+              <div className="pflow__aside">
                 <div data-reveal>
                   <div className="p-eyebrow">02 · How it works</div>
                   <h2 className="p-h2" style={{ marginTop: 24, maxWidth: '12ch' }}>
@@ -198,13 +198,13 @@ export function Home() {
                 </div>
               </div>
 
-              <div className="flow__steps" data-stagger>
+              <div className="pflow__steps" data-stagger>
                 {STEPS.map((step) => (
-                  <div key={step.n} className="flow__step">
-                    <p className="flow__num">{step.n}</p>
+                  <div key={step.n} className="pflow__step">
+                    <p className="pflow__num">{step.n}</p>
                     <div>
-                      <h3 className="p-h3 flow__title">{step.title}</h3>
-                      <p className="p-body flow__body">{step.body}</p>
+                      <h3 className="p-h3 pflow__title">{step.title}</h3>
+                      <p className="p-body pflow__body">{step.body}</p>
                     </div>
                   </div>
                 ))}

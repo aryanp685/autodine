@@ -68,3 +68,22 @@ describe('pricing', () => {
     );
   });
 });
+
+describe('the marketing step sections', () => {
+  /**
+   * These two sections shipped broken: their markup used `.flow`, `.flow__step`
+   * and `.flow__steps`, which are the guest ordering flow's own class names in
+   * styles/guest.css. That file loads later, so on the live site the four steps
+   * were drawn as progress-bar segments and their text overflowed on top of
+   * itself. lib/style-scopes.test.ts guards the stylesheets; this guards the
+   * markup that has to use the prefixed names.
+   */
+  it('wears the pflow prefix on both pages, never the guest flow’s names', () => {
+    for (const html of [home, pricing]) {
+      expect(html).toContain('pflow__steps');
+      expect(html).toContain('pflow__step');
+      expect(html).not.toContain('class="flow');
+      expect(html).not.toMatch(/class="[^"]*\bflow__/);
+    }
+  });
+});
