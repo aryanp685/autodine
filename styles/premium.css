@@ -1882,3 +1882,1207 @@
   [data-app] .tour__stage.is-live .tour__panels { position: static; height: auto; display: grid; }
   [data-app] .tour__stage.is-live .tour__panel { position: static; opacity: 1 !important; transform: none !important; }
 }
+
+/* =========================================================================
+   GUEST MENU — a room, not a feed
+   =========================================================================
+
+   The menu is read standing up, on a phone, by someone who has already sat
+   down and is hungry. Two things follow from that and everything below is
+   downstream of them:
+
+     1. THE DISH IS THE UNIT. A row carries what it is, what it costs and one
+        way to order it. No badges competing with the name, no card inside a
+        card, no second column of decoration.
+     2. THE DECISION SITS WHERE THE THUMB IS. The action shares a column with
+        the picture, on the right, because that is where the hand already is.
+
+   Layout: one measure (860px) for the title, the rail and the list, so the
+   page reads as one column with a sticky rail across it rather than as a
+   header, a nav and a feed stapled together.
+   ========================================================================= */
+
+[data-app] .menu {
+  min-height: 100svh;
+  background: var(--p-paper);
+  /* The faintest light from the top: a page that is flat paper everywhere
+     reads as a document rather than as a room. One gradient, no textures. */
+  background-image: radial-gradient(
+    120% 60% at 50% -12%,
+    color-mix(in srgb, var(--p-surface) 90%, transparent),
+    transparent 70%
+  );
+}
+
+[data-app] .menu__head {
+  width: min(100%, 860px);
+  margin: 0 auto;
+  padding: clamp(26px, 6vw, 56px) var(--p-gutter) clamp(16px, 2.2vw, 22px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 24px;
+}
+
+[data-app] .menu__venue { min-width: 0; }
+
+[data-app] .menu__kicker {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .menu__venueName {
+  margin-top: 12px;
+  font-size: clamp(2.1rem, 5.6vw, 3.4rem);
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 0.98;
+  color: var(--p-ink);
+  text-wrap: balance;
+}
+
+[data-app] .menu__venueMeta {
+  margin-top: 10px;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--p-ink-46);
+  max-width: 46ch;
+}
+
+/* Where you are sitting. The only thing on the page that is allowed to move
+   on its own: it is the reassurance the order reaches the right table. */
+[data-app] .menu__verified {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px 7px 11px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-pill);
+  background: var(--p-surface);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--p-ink-64);
+  white-space: nowrap;
+}
+
+[data-app] .menu__verifiedDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--p-live);
+  flex: 0 0 auto;
+}
+
+/* Menu tabs: quieter than the category rail. A menu is chosen once, a course
+   is switched constantly, and two rows of equal weight read as one confused
+   list. */
+[data-app] .menu__menus {
+  width: min(100%, 860px);
+  margin: 0 auto;
+  padding: 0 var(--p-gutter);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+[data-app] .menu__menuLink {
+  padding: 7px 14px;
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-pill);
+  font-size: 0.8125rem;
+  color: var(--p-ink-46);
+  transition: color var(--p-d1) linear, border-color var(--p-d1) linear,
+    background-color var(--p-d1) linear;
+}
+
+[data-app] .menu__menuLink:hover { color: var(--p-ink); border-color: var(--p-line-strong); }
+
+[data-app] .menu__menuLink.is-active {
+  color: var(--p-ink);
+  border-color: transparent;
+  background: var(--p-accent-soft);
+  font-weight: 500;
+}
+
+/* The course rail. Sticky, because a guest scrolls a menu back and forth and
+   returning to the top to change course is an unfair amount of scrolling.
+   Opaque rather than translucent on purpose: it sits over a photograph-laden
+   list, and a blur behind a 20px tab row costs a phone more frames than it
+   buys in looks. */
+[data-app] .menu__cats {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  width: min(100%, 860px);
+  margin: 0 auto;
+  padding: 0 var(--p-gutter);
+  display: flex;
+  gap: clamp(18px, 3vw, 28px);
+  border-bottom: 1px solid var(--p-line);
+  background: var(--p-paper);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+[data-app] .menu__cats::-webkit-scrollbar { display: none; }
+
+[data-app] .menu__cat {
+  flex: 0 0 auto;
+  padding: 15px 0 13px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--p-ink-46);
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: inset 0 -1.5px 0 transparent;
+  transition: color var(--p-d1) linear, box-shadow var(--p-d1) linear;
+}
+
+[data-app] .menu__cat:hover { color: var(--p-ink-80); }
+
+[data-app] .menu__cat.is-active {
+  color: var(--p-ink);
+  font-weight: 600;
+  box-shadow: inset 0 -1.5px 0 var(--p-ink);
+}
+
+/* Bottom padding clears the cart bar, so the last dish is never behind the
+   thing that orders it. */
+[data-app] .menu__list {
+  width: min(100%, 860px);
+  margin: 0 auto;
+  padding: 0 var(--p-gutter) calc(132px + env(safe-area-inset-bottom));
+}
+
+[data-app] .menu__listHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: clamp(22px, 3.4vw, 34px) 0 4px;
+}
+
+[data-app] .menu__listTitle {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .menu__listCount {
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  color: var(--p-ink-28);
+}
+
+[data-app] .menu__listEmpty {
+  padding: clamp(28px, 6vw, 48px) 0;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--p-ink-46);
+  max-width: 44ch;
+}
+
+/* ------------------------------------------------------------------ dish */
+
+/* Two columns: the reading column, then the column the thumb uses. The
+   divider is a hairline, not a card -- twenty-six cards in a list is a
+   spreadsheet, twenty-six rules is a menu. */
+[data-app] .menu__dish {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: clamp(14px, 2.8vw, 30px);
+  align-items: start;
+  padding: clamp(18px, 2.6vw, 26px) 0;
+  border-bottom: 1px solid var(--p-line);
+}
+
+[data-app] .menu__dishBody { min-width: 0; }
+
+[data-app] .menu__dishTop {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+[data-app] .menu__dishName {
+  font-size: clamp(1rem, 1.5vw, 1.125rem);
+  font-weight: 500;
+  letter-spacing: -0.021em;
+  line-height: 1.3;
+  color: var(--p-ink);
+}
+
+[data-app] .menu__dishBadge {
+  padding: 3px 8px;
+  border: 0;
+  border-radius: var(--p-pill);
+  background: var(--p-accent-soft);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--p-accent);
+}
+
+/* Price directly under the name, above the description: it is the second
+   thing anyone looks for and it used to be three lines down. */
+[data-app] .menu__dishPrice {
+  margin-top: 5px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-ink-80);
+}
+
+[data-app] .menu__dishFrom {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--p-ink-46);
+}
+
+[data-app] .menu__dishDesc {
+  margin-top: 7px;
+  max-width: 46ch;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--p-ink-46);
+  /* Two lines. A menu row is a glance, and a description that pushes the next
+     dish off the screen is a description nobody reads. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+[data-app] .menu__dishMedia {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 116px;
+  flex: 0 0 auto;
+}
+
+[data-app] .menu__dishImg {
+  width: 116px;
+  height: 116px;
+  border-radius: var(--p-r);
+  object-fit: cover;
+  background: var(--p-paper-deep);
+}
+
+/* The control overlaps the bottom edge of the photograph. It is the one
+   piece of the row that is allowed to break the grid: a button that sits half
+   on the dish reads as belonging to it rather than to the column. */
+[data-app] .menu__dishActions {
+  position: relative;
+  z-index: 2;
+  margin-top: -16px;
+  display: flex;
+  justify-content: center;
+}
+
+[data-app] .menu__dishCta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 88px;
+  min-height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-r-sm);
+  background: var(--p-surface);
+  box-shadow: var(--p-shadow-1);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--p-ink);
+  cursor: pointer;
+  transition: background-color var(--p-d1) linear, color var(--p-d1) linear,
+    border-color var(--p-d1) linear, transform var(--p-d1) var(--p-ease);
+}
+
+[data-app] .menu__dishCta:hover {
+  background: var(--p-ink);
+  border-color: var(--p-ink);
+  color: var(--p-on-ink);
+}
+
+[data-app] .menu__dishCta:active { transform: scale(0.97); }
+
+/* Once something is in the order the button becomes a stepper, here, without
+   a page load. The stepper is wider than the photograph on purpose: it is the
+   thing being used. */
+[data-app] .menu__stepper {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 2px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-r-sm);
+  background: var(--p-surface);
+  box-shadow: var(--p-shadow-1);
+}
+
+[data-app] .menu__stepper button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--p-ink);
+  cursor: pointer;
+  transition: background-color var(--p-d1) linear;
+}
+
+[data-app] .menu__stepper button:hover { background: var(--p-paper-deep); }
+[data-app] .menu__stepper span {
+  min-width: 22px;
+  text-align: center;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A dish with no photograph keeps the action column, so every row has its
+   button in the same place. Nothing is drawn in the picture's space. */
+[data-app] .menu__dishMedia.is-bare {
+  width: auto;
+  align-self: stretch;
+  justify-content: flex-end;
+}
+
+[data-app] .menu__dishMedia.is-bare .menu__dishActions { margin-top: 0; }
+
+[data-app] .menu__dishOut {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-r-sm);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--p-ink-28);
+  white-space: nowrap;
+}
+
+/* Sold out: dimmed, desaturated, and still legible. A greyed row that cannot
+   be read is a row a guest thinks is a rendering bug. */
+[data-app] .menu__dish.is-out { opacity: 1; }
+[data-app] .menu__dish.is-out .menu__dishName,
+[data-app] .menu__dish.is-out .menu__dishPrice { color: var(--p-ink-46); }
+[data-app] .menu__dish.is-out .menu__dishDesc { color: var(--p-ink-28); }
+[data-app] .menu__dish.is-out .menu__dishImg { filter: grayscale(1); opacity: 0.55; }
+
+/* ------------------------------------------------------------- cart bar */
+
+/* Full width, hard against the bottom, with the count on the left and the one
+   action on the right. A floating pill looks like a notification; a bar looks
+   like the end of the page. */
+[data-app] .menu__cartBar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transform: none;
+  width: auto;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px max(var(--p-gutter), calc((100% - 860px) / 2 + var(--p-gutter)));
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  border-radius: 0;
+  background: var(--p-ink);
+  color: var(--p-on-ink);
+  font-size: 0.875rem;
+}
+
+[data-app] .menu__cartCount {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  color: var(--p-on-ink-64);
+  font-size: 0.8125rem;
+}
+
+[data-app] .menu__cartCount strong {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--p-on-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes g-bar-in {
+  from { opacity: 0; transform: translateY(100%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-app] .menu__cartBar { animation: g-bar-in var(--p-d3) var(--p-ease) both; }
+}
+
+[data-app] .menu__cartBtn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: var(--p-r-sm);
+  background: var(--p-on-ink);
+  color: var(--p-ink);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  transition: background-color var(--p-d1) linear;
+}
+
+[data-app] .menu__cartBtn:hover { background: color-mix(in srgb, var(--p-on-ink) 88%, var(--p-ink)); }
+
+/* ------------------------------------------------------------------ phone */
+
+@media (max-width: 760px) {
+  [data-app] .menu__head { flex-direction: column; align-items: flex-start; gap: 14px; }
+  [data-app] .menu__venueMeta { font-size: 0.875rem; }
+  [data-app] .menu__dishMedia { width: 96px; }
+  [data-app] .menu__dishImg { width: 96px; height: 96px; border-radius: var(--p-r-sm); }
+  [data-app] .menu__dishActions { margin-top: -14px; }
+  [data-app] .menu__dishCta { min-width: 76px; min-height: 34px; padding: 0 12px; font-size: 0.6875rem; }
+  [data-app] .menu__stepper { min-height: 34px; }
+  [data-app] .menu__stepper button { width: 28px; height: 30px; }
+  [data-app] .menu__cat { padding: 14px 0 12px; }
+}
+
+@media (max-width: 420px) {
+  [data-app] .menu__dishMedia { width: 84px; }
+  [data-app] .menu__dishImg { width: 84px; height: 84px; }
+  [data-app] .menu__dishCta { min-width: 68px; padding: 0 10px; letter-spacing: 0.06em; }
+  [data-app] .menu__cartBtn { padding: 0 16px; }
+}
+
+/* =========================================================================
+   GUEST CART, CHECKOUT AND THE DISH SHEET
+   =========================================================================
+
+   Same language as the menu: paper, one measure, hairlines, tabular numbers,
+   and a single ink action per screen. The bill is the only place on the guest
+   side where numbers are allowed to be loud, because it is the only place
+   where the guest is being asked to agree to something.
+   ========================================================================= */
+
+[data-app] .cart,
+[data-app] .co {
+  min-height: 100svh;
+  background: var(--p-paper);
+}
+
+[data-app] .cart__head,
+[data-app] .co__head {
+  width: min(100%, 1120px);
+  margin: 0 auto;
+  padding: clamp(26px, 5vw, 52px) var(--p-gutter) 0;
+}
+
+[data-app] .cart__back,
+[data-app] .co__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  font-size: 0.8125rem;
+  color: var(--p-ink-46);
+  transition: color var(--p-d1) linear;
+}
+
+[data-app] .cart__back:hover,
+[data-app] .co__back:hover { color: var(--p-ink); }
+
+[data-app] .cart__head h1,
+[data-app] .co__head h1 {
+  margin-top: 16px;
+  font-size: clamp(2.1rem, 4.4vw, 3.2rem);
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  color: var(--p-ink);
+}
+
+[data-app] .cart__head p,
+[data-app] .co__head p {
+  margin-top: 10px;
+  font-size: 0.875rem;
+  color: var(--p-ink-46);
+}
+
+[data-app] .cart__grid,
+[data-app] .co__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 368px;
+  gap: clamp(32px, 4.6vw, 72px);
+  width: min(100%, 1120px);
+  margin: 0 auto;
+  padding: clamp(22px, 3vw, 34px) var(--p-gutter) 64px;
+  align-items: start;
+}
+
+/* ------------------------------------------------------------------ lines */
+
+[data-app] .cart__line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: clamp(16px, 2.4vw, 32px);
+  align-items: center;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--p-line);
+}
+
+[data-app] .cart__line:first-of-type { border-top: 1px solid var(--p-line); }
+
+[data-app] .cart__lineTop { display: flex; align-items: center; gap: 9px; }
+
+[data-app] .cart__lineTop strong {
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: var(--p-ink);
+}
+
+[data-app] .cart__linePrice {
+  margin-top: 5px;
+  font-size: 0.75rem;
+  color: var(--p-ink-46);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-app] .cart__lineAddons {
+  margin-top: 4px;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--p-ink-46);
+}
+
+/* The stepper: three targets in a hairline pill. Quiet until used, because
+   the common act on this page is reading, not editing. */
+[data-app] .cart__qty,
+[data-app] .sheet__qty {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 2px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-r-sm);
+  background: var(--p-surface);
+}
+
+[data-app] .cart__qty button,
+[data-app] .sheet__qty button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--p-ink);
+  cursor: pointer;
+  transition: background-color var(--p-d1) linear;
+}
+
+[data-app] .cart__qty button:hover,
+[data-app] .sheet__qty button:hover { background: var(--p-paper-deep); }
+
+[data-app] .cart__qty .tnum,
+[data-app] .sheet__qty .tnum {
+  min-width: 22px;
+  text-align: center;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+[data-app] .cart__lineEnd {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 84px;
+}
+
+[data-app] .cart__lineTotal {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-ink);
+}
+
+[data-app] .cart__remove {
+  border: 0;
+  background: none;
+  padding: 2px 0;
+  font: inherit;
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--p-ink-28);
+  cursor: pointer;
+  transition: color var(--p-d1) linear;
+}
+
+[data-app] .cart__remove:hover { color: var(--danger); }
+
+[data-app] .cart__empty {
+  padding: clamp(26px, 5vw, 40px);
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-r);
+  background: var(--p-surface);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--p-ink-64);
+  max-width: 52ch;
+}
+
+[data-app] .cart__empty p { margin: 0 0 14px; }
+
+[data-app] .cart__emptyCta {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: var(--p-r-sm);
+  background: var(--p-ink);
+  color: var(--p-on-ink);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+/* A dish that went missing is said out loud, in the one colour that means
+   "read this before paying". */
+[data-app] .cart__notice {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-left: 2px solid var(--warn);
+  border-radius: 0 var(--p-r-sm) var(--p-r-sm) 0;
+  background: color-mix(in srgb, var(--warn) 9%, var(--p-paper));
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--p-ink-80);
+}
+
+/* ------------------------------------------------------------------- bill */
+
+[data-app] .cart__sum { position: sticky; top: 24px; align-self: start; min-width: 0; }
+
+[data-app] .cart__sumCard,
+[data-app] .co__sum {
+  padding: clamp(20px, 2.4vw, 26px);
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-r);
+  background: var(--p-surface);
+}
+
+[data-app] .cart__sumCard h2,
+[data-app] .co__sum h2 {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+  margin-bottom: 12px;
+}
+
+[data-app] .totals__row,
+[data-app] .co__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0;
+  font-size: 0.875rem;
+  color: var(--p-ink-64);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-app] .totals__row--total,
+[data-app] .co__row--total {
+  margin-top: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--p-line-strong);
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--p-ink);
+}
+
+[data-app] .totals__note {
+  margin-top: 12px;
+  font-size: 0.6875rem;
+  line-height: 1.6;
+  color: var(--p-ink-28);
+}
+
+[data-app] .cart__cta,
+[data-app] .co__cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 52px;
+  margin-top: 20px;
+  padding: 0 20px;
+  border: 1px solid var(--p-ink);
+  border-radius: var(--p-r-sm);
+  background: var(--p-ink);
+  color: var(--p-on-ink);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: center;
+  transition: background-color var(--p-d1) linear, opacity var(--p-d1) linear;
+}
+
+[data-app] .cart__cta:hover,
+[data-app] .co__cta:hover { background: color-mix(in srgb, var(--p-ink) 88%, var(--p-on-ink)); }
+
+[data-app] .cart__cta[disabled],
+[data-app] .co__cta[disabled] { opacity: 0.36; cursor: not-allowed; }
+
+[data-app] .cart__fine,
+[data-app] .co__fine {
+  margin-top: 12px;
+  font-size: 0.6875rem;
+  line-height: 1.65;
+  color: var(--p-ink-28);
+}
+
+/* --------------------------------------------------------------- checkout */
+
+[data-app] .co__h2 {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+  margin: 28px 0 12px;
+}
+
+[data-app] .co__h2:first-child { margin-top: 0; }
+
+/* One stated method, in a card that reads as a receipt line rather than as a
+   selected option: nothing here is tappable, and nothing should look it. */
+[data-app] .co__pay {
+  padding: clamp(16px, 2vw, 22px);
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-r);
+  background: var(--p-surface);
+}
+
+[data-app] .co__payRow { display: flex; align-items: center; gap: 11px; }
+
+[data-app] .co__payMark {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  border: 5px solid var(--p-ink);
+  border-radius: 50%;
+  background: var(--p-surface);
+}
+
+[data-app] .co__payRow strong {
+  display: block;
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: var(--p-ink);
+}
+
+[data-app] .co__payRow span { font-size: 0.75rem; color: var(--p-ink-46); }
+
+[data-app] .co__payNote {
+  margin-top: 12px;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--p-ink-64);
+}
+
+[data-app] .co__payNote--soft { color: var(--p-ink-46); }
+
+[data-app] .co__items { display: grid; gap: 0; }
+
+[data-app] .co__items li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--p-line);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--p-ink-80);
+}
+
+[data-app] .co__items li:first-child { border-top: 1px solid var(--p-line); }
+[data-app] .co__items li > span:nth-child(2) { flex: 1; min-width: 0; }
+[data-app] .co__items li strong { font-weight: 600; color: var(--p-ink); }
+[data-app] .co__items .tnum { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+[data-app] .co__variant { font-style: normal; color: var(--p-ink-46); }
+
+[data-app] .co__empty {
+  display: block;
+  border: 0 !important;
+  padding: 18px 0;
+  font-size: 0.875rem;
+  color: var(--p-ink-46);
+}
+
+[data-app] .co__noteForm { margin-top: 22px; display: grid; gap: 8px; }
+
+[data-app] .co__sum { position: sticky; top: 24px; align-self: start; min-width: 0; }
+
+/* -------------------------------------------------------------- dish sheet */
+
+[data-app] .sheet__scrim {
+  background: color-mix(in srgb, var(--p-ink) 44%, transparent);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+/* A bottom sheet on a phone, a centred card on a desktop. The panel is the
+   page's paper, not a second surface: the dish in the sheet is the same dish
+   that was in the row underneath it. */
+[data-app] .sheet__panel {
+  background: var(--p-paper);
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-r-lg) var(--p-r-lg) 0 0;
+  padding: 26px var(--p-gutter) calc(20px + env(safe-area-inset-bottom));
+  max-height: 92svh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+[data-app] .sheet__panel::before {
+  content: '';
+  width: 36px;
+  height: 4px;
+  margin: -14px auto 14px;
+  border-radius: var(--p-pill);
+  background: var(--p-ink-12);
+}
+
+[data-app] .sheet__kicker {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .sheet__title {
+  margin-top: 6px;
+  font-size: clamp(1.5rem, 3.4vw, 1.875rem);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+  color: var(--p-ink);
+}
+
+[data-app] .sheet__close {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-pill);
+  background: var(--p-surface);
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--p-ink-46);
+  transition: color var(--p-d1) linear, border-color var(--p-d1) linear;
+}
+
+[data-app] .sheet__close:hover { color: var(--p-ink); border-color: var(--p-line-strong); }
+
+[data-app] .sheet__desc {
+  margin-top: 10px;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--p-ink-46);
+  max-width: 52ch;
+}
+
+[data-app] .sheet__group { margin-top: 22px; }
+
+[data-app] .sheet__label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+  margin-bottom: 8px;
+}
+
+/* A choice row is a row, not a card: radio, name, price, hairline between.
+   The selected row is marked by the radio and by weight, not by a colour
+   block -- three of anything tinted and the sheet looks like a form. */
+[data-app] .sheet__opt {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 2px;
+  border-bottom: 1px solid var(--p-line);
+  font-size: 0.875rem;
+  color: var(--p-ink-80);
+  cursor: pointer;
+}
+
+[data-app] .sheet__opt:first-of-type { border-top: 1px solid var(--p-line); }
+[data-app] .sheet__opt:last-child { border-bottom: 0; }
+[data-app] .sheet__opt:hover { color: var(--p-ink); }
+[data-app] .sheet__opt input { accent-color: var(--p-accent); width: 17px; height: 17px; margin: 0; }
+[data-app] .sheet__opt.is-on { color: var(--p-ink); font-weight: 500; }
+[data-app] .sheet__opt .tnum { font-size: 0.8125rem; color: var(--p-ink-46); font-variant-numeric: tabular-nums; }
+
+[data-app] .sheet__chips { display: flex; gap: 8px; flex-wrap: wrap; }
+
+[data-app] .sheet__chip {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-r-sm);
+  background: var(--p-surface);
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--p-ink-80);
+  cursor: pointer;
+  transition: background-color var(--p-d1) linear, color var(--p-d1) linear,
+    border-color var(--p-d1) linear;
+}
+
+[data-app] .sheet__chip:hover { border-color: var(--p-ink); color: var(--p-ink); }
+
+[data-app] .sheet__chip.is-on {
+  background: var(--p-ink);
+  border-color: var(--p-ink);
+  color: var(--p-on-ink);
+}
+
+[data-app] .sheet__chip[disabled] { opacity: 0.36; cursor: not-allowed; }
+
+[data-app] .sheet__foot {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--p-line);
+  background: var(--p-paper);
+}
+
+[data-app] .sheet__add {
+  flex: 1 1 auto;
+  min-height: 48px;
+  padding: 0 18px;
+  border: 1px solid var(--p-ink);
+  border-radius: var(--p-r-sm);
+  background: var(--p-ink);
+  color: var(--p-on-ink);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  transition: background-color var(--p-d1) linear, color var(--p-d1) linear;
+}
+
+[data-app] .sheet__add:hover { background: color-mix(in srgb, var(--p-ink) 88%, var(--p-on-ink)); }
+
+[data-app] .sheet__add.is-added {
+  background: var(--p-accent-soft);
+  border-color: var(--p-accent-soft);
+  color: var(--p-accent);
+}
+
+/* -------------------------------------------------------- phone action bars */
+
+[data-app] .cart__bar,
+[data-app] .co__bar { display: none; }
+
+@media (max-width: 900px) {
+  [data-app] .cart__grid,
+  [data-app] .co__grid { grid-template-columns: minmax(0, 1fr); gap: 24px; padding-bottom: 40px; }
+  [data-app] .cart__sum,
+  [data-app] .co__sum { position: static; }
+
+  /* The bill is below the lines here, which puts the one button that
+     completes the flow past the end of a long order. The bar is the same
+     destination, always within reach, with the number being decided about. */
+  [data-app] .cart__bar,
+  [data-app] .co__bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 11px var(--p-gutter);
+    padding-bottom: calc(11px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--p-line);
+    background: var(--p-glass);
+    -webkit-backdrop-filter: saturate(1.4) blur(18px);
+    backdrop-filter: saturate(1.4) blur(18px);
+  }
+
+  [data-app] .cart__barTotal,
+  [data-app] .co__barTotal { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+
+  [data-app] .cart__barLabel,
+  [data-app] .co__barLabel {
+    font-size: 0.625rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--p-ink-46);
+  }
+
+  [data-app] .cart__barTotal strong,
+  [data-app] .co__barTotal strong {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--p-ink);
+  }
+
+  [data-app] .cart__barCta,
+  [data-app] .co__barCta {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 46px;
+    padding: 0 22px;
+    border: 1px solid var(--p-ink);
+    border-radius: var(--p-r-sm);
+    background: var(--p-ink);
+    color: var(--p-on-ink);
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  [data-app] .cart,
+  [data-app] .co { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+
+  /* Where the sticky bill would duplicate the bar's number, the sticky card's
+     button steps aside: two identical black buttons stacked 40px apart is a
+     page that cannot decide which one is real. */
+  [data-app] .co--barred .co__sum .co__cta,
+  [data-app] .co--barred .co__sum .co__fine { display: none; }
+  [data-app] .co__sum { margin-top: 4px; }
+}
+
+@media (max-width: 760px) {
+  [data-app] .cart__line {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'main qty' 'end end';
+    gap: 12px;
+    align-items: start;
+  }
+
+  [data-app] .cart__lineMain { grid-area: main; }
+  [data-app] .cart__qty { grid-area: qty; }
+
+  [data-app] .cart__lineEnd {
+    grid-area: end;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  [data-app] .cart__lineTotal { font-size: 0.875rem; }
+
+  [data-app] .sheet__panel {
+    border-radius: var(--p-r-lg) var(--p-r-lg) 0 0;
+    padding-top: 20px;
+  }
+}
+
+@media (min-width: 761px) {
+  [data-app] .sheet {
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+  }
+
+  [data-app] .sheet__panel {
+    width: min(100%, 560px);
+    border-radius: var(--p-r-lg);
+    padding: 28px 32px 22px;
+  }
+
+  [data-app] .sheet__panel::before { display: none; }
+}
+
+/* The order reference, where it can be read out to a cashier. It is the one
+   string on the confirmation page that has to survive being spoken aloud, so
+   it is set in tabular figures with room around it. */
+[data-app] .cart__code {
+  margin-top: 14px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 14px;
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-pill);
+  background: var(--p-surface);
+  font-size: 0.75rem;
+  color: var(--p-ink-46);
+}
+
+[data-app] .cart__code strong {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-ink);
+}
+
+[data-app] .cart__kicker {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}

@@ -228,6 +228,11 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
         )}
 
         {list.map((i) => (
+          /* One row per dish, in the order a hungry person reads it: what it
+             is, what it costs, what is in it -- then the decision, in the
+             column the eye already uses for pictures. The price moved above
+             the description for that reason; it is the second thing anyone
+             looks for and it was three lines down. */
           <article key={i.id} className={`menu__dish ${i.available ? '' : 'is-out'}`}>
             <div className="menu__dishBody">
               <div className="menu__dishTop">
@@ -235,16 +240,31 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
                 <h2 className="menu__dishName">{i.name}</h2>
                 {i.badge && i.available && <span className="menu__dishBadge">{i.badge}</span>}
               </div>
-              <p className="menu__dishDesc">{i.desc}</p>
 
-              {/* Price and the one action share a baseline: a menu line reads
-                  as a menu line when the number is next to the decision, not
-                  stacked above it like a product listing. */}
+              <div className="menu__dishPrice">
+                {i.variants && <span className="menu__dishFrom">from</span>}
+                {inr(i.price)}
+              </div>
+
+              <p className="menu__dishDesc">{i.desc}</p>
+            </div>
+
+            {/* The media column is also the action column: on a phone the
+                thumb is already there, and a row whose only control lives at
+                the far end of a 300px line is a stretch. */}
+            <div className={`menu__dishMedia ${i.img ? '' : 'is-bare'}`}>
+              {i.img && (
+                <Image
+                  className="menu__dishImg"
+                  src={i.img}
+                  alt={i.name}
+                  width={112}
+                  height={112}
+                  sizes="(max-width: 420px) 96px, (max-width: 760px) 96px, 112px"
+                />
+              )}
+
               <div className="menu__dishActions">
-                <div className="menu__dishPrice">
-                  {i.variants && <span className="menu__dishFrom">from</span>}
-                  {inr(i.price)}
-                </div>
                 {i.available ? (
                   needsChoice(i) ? (
                     <Link href={itemHref(i.id)} className="menu__dishCta">
@@ -285,7 +305,6 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
                 )}
               </div>
             </div>
-            {i.img && <Image className="menu__dishImg" src={i.img} alt={i.name} width={104} height={104} sizes="(max-width: 420px) 92vw, (max-width: 760px) 88px, 116px" />}
           </article>
         ))}
       </div>
