@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { DishPhoto } from '@/components/DishPhoto';
 import { GuestFlow } from '@/components/GuestFlow';
 import { PlaceOrderButton } from '@/components/PlaceOrderButton';
@@ -139,9 +140,45 @@ export function Checkout({
               </li>
             ))}
             {cart.ready && priced.lines.length === 0 && (
-              <li className="co__empty">Nothing to order yet — add something from the menu.</li>
+              <li className="co__empty">
+                Nothing to order yet —{' '}
+                <Link href={withSlug('/menu')} className="co__emptyLink">
+                  open the menu
+                </Link>
+                .
+              </li>
             )}
           </ul>
+
+          {/*
+            A dish that sold out while the cart was open is dropped from the
+            bill (priceCart does that, and must: an unavailable dish cannot be
+            ordered). Dropping it silently left the guest looking at a total
+            that had quietly got smaller, with no idea why. The cart screen
+            already said so; this is the last screen before the money, so it
+            has to say it too.
+          */}
+          {priced.unavailableIds.length > 0 && (
+            <div className="cart__notice" role="status">
+              <p>
+                {priced.unavailableIds.length === 1
+                  ? 'One dish has sold out since you added it, so it is not in this bill.'
+                  : `${priced.unavailableIds.length} dishes have sold out since you added them, so they are not in this bill.`}{' '}
+                <Link href={withSlug('/menu/cart')} className="co__emptyLink">
+                  Review your order
+                </Link>
+              </p>
+            </div>
+          )}
+
+          {priced.staleVariantIds.length > 0 && (
+            <div className="cart__notice" role="status">
+              <p>
+                A portion you picked is no longer on the menu, so that dish is priced at the
+                menu price. Check the bill before you place it.
+              </p>
+            </div>
+          )}
 
           <div className="co__noteForm">
             <label className="ui-field">

@@ -678,25 +678,67 @@ export function emptyPayload(): ReportPayload {
 }
 
 /**
+ * Splits a sample day's takings across the buckets the chart will draw.
+ *
+ * The rows are DERIVED from the day's total rather than typed in beside it, so
+ * the bars always add up to the figure above them. They also have to land
+ * inside the window: an hourly chart for a day that is three hours old cannot
+ * show an 8pm bar, and a `zeroFillBuckets` run that drops rows would silently
+ * break the sum.
+ */
+function demoSampleBuckets(
+  range: ReportRange,
+  timeZone: string,
+  now: Date,
+  totalPaise: number,
+  bills: number,
+): ReportBucketRow[] {
+  /** Weights in the order the buckets are drawn. They sum to 1. */
+  const weights = range.bucket === 'hour' ? [0.18, 0.26, 0.22, 0.34] : [0.31, 0.39, 0.3];
+
+  let keys: string[];
+
+  if (range.bucket === 'hour') {
+    const start = new Date(range.fromIso);
+    const dayKey = localDateKey(timeZone, start);
+    // Mirrors zeroFillBuckets: a running day stops at the current hour.
+    const lastHour = localDateKey(timeZone, now) === dayKey ? hourInZone(timeZone, now) : 23;
+    const count = Math.min(weights.length, lastHour + 1);
+    const hours = Array.from({ length: count }, (_, i) =>
+      count === 1 ? lastHour : Math.round((lastHour * (i + 1)) / count),
+    );
+    keys = hours.map((hour) => `${dayKey} ${String(hour).padStart(2, '0')}:00`);
+  } else {
+    keys = [2, 1, 0].map(
+      (offset) => `${localDateKey(timeZone, startOfDayOffsetUtc(timeZone, now, offset))} 00:00`,
+    );
+  }
+
+  const count = keys.length;
+  const used = weights.slice(weights.length - count);
+  const weightSum = used.reduce((sum, w) => sum + w, 0);
+
+  let remainingPaise = totalPaise;
+  let remainingBills = bills;
+
+  return keys.map((key, index) => {
+    const last = index === count - 1;
+    const revenuePaise = last
+      ? remainingPaise
+      : Math.round((totalPaise * used[index]) / weightSum);
+    const bucketBills = last ? remainingBills : Math.max(1, Math.round((bills * used[index]) / weightSum));
+    remainingPaise -= revenuePaise;
+    remainingBills -= bucketBills;
+    return { key, bills: bucketBills, revenuePaise };
+  });
+}
+
+/**
  * Sample report for the unconfigured case, so the layout can be judged without
  * a database. Every surface that renders it says it is sample data -- an owner
  * who has not signed in must never see fabricated takings that look real.
  */
 export function demoReport(range: ReportRange, timeZone: string, now: Date = new Date()): ReportView {
-  const raw: ReportBucketRow[] = range.bucket === 'hour'
-    ? [
-        { key: `${localDateKey(timeZone, new Date(range.fromIso))} 12:00`, bills: 3, revenuePaise: 184_300 },
-        { key: `${localDateKey(timeZone, new Date(range.fromIso))} 13:00`, bills: 5, revenuePaise: 296_100 },
-        { key: `${localDateKey(timeZone, new Date(range.fromIso))} 19:00`, bills: 4, revenuePaise: 421_800 },
-        { key: `${localDateKey(timeZone, new Date(range.fromIso))} 20:00`, bills: 6, revenuePaise: 588_400 },
-      ]
-    : [
-        { key: `${localDateKey(timeZone, startOfDayOffsetUtc(timeZone, now, 2))} 00:00`, bills: 18, revenuePaise: 1_284_000 },
-        { key: `${localDateKey(timeZone, startOfDayOffsetUtc(timeZone, now, 1))} 00:00`, bills: 24, revenuePaise: 1_742_500 },
-        { key: `${localDateKey(timeZone, startOfDayUtc(timeZone, now))} 00:00`, bills: 18, revenuePaise: 1_490_600 },
-      ];
-
-  const billed = raw.reduce((sum, b) => sum + b.revenuePaise, 0);
 
   /* Six fictional bills, newest first.
      Without them the sample ledger was an empty table under the words "Sample
@@ -705,12 +747,15 @@ export function demoReport(range: ReportRange, timeZone: string, now: Date = new
      whatever range is being previewed, and they carry no customer data of any
      kind. */
   const sampleOrders: ReportOrderRow[] = [
-    { code: 'MA-1042', tableLabel: 'T4', prepStatus: 'preparing', paymentStatus: 'pending', minutesAgo: 4, totalPaise: 84_000, paidPaise: 0 },
-    { code: 'MA-1041', tableLabel: 'T1', prepStatus: 'new', paymentStatus: 'pending', minutesAgo: 11, totalPaise: 46_500, paidPaise: 0 },
-    { code: 'MA-1040', tableLabel: 'T7', prepStatus: 'ready', paymentStatus: 'paid', minutesAgo: 26, totalPaise: 132_000, paidPaise: 132_000 },
-    { code: 'MA-1039', tableLabel: null, prepStatus: 'served', paymentStatus: 'paid', minutesAgo: 41, totalPaise: 29_000, paidPaise: 29_000 },
-    { code: 'MA-1038', tableLabel: 'T2', prepStatus: 'served', paymentStatus: 'pending', minutesAgo: 58, totalPaise: 97_500, paidPaise: 50_000 },
-    { code: 'MA-1037', tableLabel: 'T5', prepStatus: 'cancelled', paymentStatus: 'failed', minutesAgo: 73, totalPaise: 61_000, paidPaise: 0 },
+    // The same five tickets the kitchen board and the counter show, plus one
+    // cancelled bill, so a code quoted on the phone means one order across
+    // the whole product rather than three different ones.
+    { code: 'A-1042', tableLabel: 'T7', prepStatus: 'new', paymentStatus: 'paid', minutesAgo: 4, totalPaise: 77_600, paidPaise: 77_600 },
+    { code: 'A-1041', tableLabel: 'T3', prepStatus: 'preparing', paymentStatus: 'pending', minutesAgo: 8, totalPaise: 124_700, paidPaise: 0 },
+    { code: 'A-1040', tableLabel: 'T12', prepStatus: 'ready', paymentStatus: 'paid', minutesAgo: 15, totalPaise: 98_500, paidPaise: 98_500 },
+    { code: 'A-1039', tableLabel: 'T5', prepStatus: 'served', paymentStatus: 'paid', minutesAgo: 22, totalPaise: 86_400, paidPaise: 86_400 },
+    { code: 'A-1038', tableLabel: 'T9', prepStatus: 'ready', paymentStatus: 'pending', minutesAgo: 27, totalPaise: 73_700, paidPaise: 0 },
+    { code: 'A-1037', tableLabel: 'T4', prepStatus: 'cancelled', paymentStatus: 'failed', minutesAgo: 73, totalPaise: 61_000, paidPaise: 0 },
   ].map((order, index) => ({
     id: `demo-order-${index + 1}`,
     code: order.code,
@@ -726,36 +771,66 @@ export function demoReport(range: ReportRange, timeZone: string, now: Date = new
     tableLabel: order.tableLabel,
   }));
 
+  /**
+   * Every figure below is DERIVED, never typed twice.
+   *
+   * The sample report used to be a set of hand-written numbers that did not
+   * agree with each other: the payment rows added up to a fifth of "collected",
+   * the categories to a different total again, and the top items were priced at
+   * a tenth of the menu. An owner reading it cannot tell which number is the
+   * real one, and a demo that does not add up is a demo nobody trusts.
+   */
+  const categories: ReportItemRow[] = [
+    // Main course, starters and breads, in menu money: 96, 74 and 128 dishes.
+    { name: 'Main Course', qty: 96, revenuePaise: 3_200_000 },
+    { name: 'Starters', qty: 74, revenuePaise: 1_900_000 },
+    { name: 'Breads', qty: 128, revenuePaise: 1_100_000 },
+  ];
+
+  const billedTotal = categories.reduce((sum, row) => sum + row.revenuePaise, 0);
+  const raw = demoSampleBuckets(range, timeZone, now, billedTotal, 60);
+  const collectedTotal = Math.round(billedTotal * 0.62);
+
+  // The same 22 / 9 / 4 split of payments the methods table has always shown,
+  // with the amounts derived from what was collected so the column adds up.
+  const paymentCounts = { upi: 22, card: 9, cash: 4 } as const;
+  const paymentCount = paymentCounts.upi + paymentCounts.card + paymentCounts.cash;
+  const upiPaise = Math.round((collectedTotal * paymentCounts.upi) / paymentCount);
+  const cardPaise = Math.round((collectedTotal * paymentCounts.card) / paymentCount);
+
   return {
     ...emptyPayload(),
     orders: sampleOrders,
     totals: {
       bills: 60,
       cancelled: 1,
-      billedPaise: billed,
-      taxPaise: Math.round(billed * 0.18),
+      billedPaise: billedTotal,
+      taxPaise: Math.round(billedTotal * 0.18),
       discountPaise: 24_000,
-      collectedPaise: Math.round(billed * 0.62),
+      collectedPaise: collectedTotal,
       refundedPaise: 0,
-      unpaidPaise: billed - Math.round(billed * 0.62),
-      averageBillPaise: Math.round(billed / 60),
+      unpaidPaise: billedTotal - collectedTotal,
+      averageBillPaise: Math.round(billedTotal / 60),
     },
     buckets: zeroFillBuckets(range, raw, timeZone, now),
+    // Priced off the menu, quantity by quantity: 34 Butter Chicken at ₹469,
+    // 41 Paneer Tikka at ₹349, 29 Dal Bukhara at ₹389, 88 Garlic Naan at ₹99.
     topItems: [
-      { name: 'Butter Chicken · Full', qty: 34, revenuePaise: 159_460 },
-      { name: 'Paneer Tikka', qty: 41, revenuePaise: 143_090 },
-      { name: 'Dal Makhani', qty: 29, revenuePaise: 101_210 },
-      { name: 'Garlic Naan', qty: 88, revenuePaise: 52_800 },
+      { name: 'Butter Chicken · Full', qty: 34, revenuePaise: 1_594_600 },
+      { name: 'Paneer Tikka', qty: 41, revenuePaise: 1_430_900 },
+      { name: 'Dal Bukhara', qty: 29, revenuePaise: 1_128_100 },
+      { name: 'Garlic Naan', qty: 88, revenuePaise: 871_200 },
     ],
-    categories: [
-      { name: 'Main Course', qty: 96, revenuePaise: 402_600 },
-      { name: 'Starters', qty: 74, revenuePaise: 258_300 },
-      { name: 'Breads', qty: 128, revenuePaise: 76_800 },
-    ],
+    categories,
     methods: [
-      { method: 'upi', count: 22, recordedPaise: 640_000, refundedPaise: 0 },
-      { method: 'card', count: 9, recordedPaise: 288_000, refundedPaise: 0 },
-      { method: 'cash', count: 4, recordedPaise: 96_000, refundedPaise: 0 },
+      { method: 'upi', count: paymentCounts.upi, recordedPaise: upiPaise, refundedPaise: 0 },
+      { method: 'card', count: paymentCounts.card, recordedPaise: cardPaise, refundedPaise: 0 },
+      {
+        method: 'cash',
+        count: paymentCounts.cash,
+        recordedPaise: collectedTotal - upiPaise - cardPaise,
+        refundedPaise: 0,
+      },
     ],
   };
 }

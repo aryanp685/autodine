@@ -306,7 +306,7 @@ export const kitchenOrders: KitchenOrder[] = [
     payment: 'paid',
     paymentMethod: 'UPI · paid online',
     state: 'new',
-    note: 'Ring the bell when biryani leaves the pass.',
+    note: 'Ring the bell — no onion in the gravy.',
     items: [
       { qty: 1, name: 'Butter Chicken', detail: 'Regular · Hot · Butter naan', veg: false },
       { qty: 2, name: 'Butter Naan', veg: true },

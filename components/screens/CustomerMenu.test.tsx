@@ -454,4 +454,38 @@ describe('leaving the dish sheet', () => {
 
     expect(html).toContain('/menu?s=maddi');
   });
+
+  it('says a dish is gone instead of opening a different one', () => {
+    // A stale link used to fall through to the first dish on the menu and let
+    // the guest add and pay for a plate they never chose.
+    const html = renderToStaticMarkup(<ItemSheet itemId="it-does-not-exist" />);
+
+    expect(html).toContain('That dish is not on the menu');
+    expect(html).not.toContain('Add to order');
+  });
+
+  it('still opens a real dish', () => {
+    const html = renderToStaticMarkup(<ItemSheet itemId="it-butter-chicken" />);
+
+    expect(html).toContain('Butter Chicken');
+    expect(html).toContain('Add to order');
+    expect(html).not.toContain('not on the menu');
+  });
+
+  it('stops at the cart’s own limit instead of promising more than it adds', () => {
+    // The sheet incremented without a ceiling while the cart quietly stopped
+    // at 99, so the button could promise a hundred plates and store 99.
+    // Butter Naan: no portions, no add-ons, so the cart line is the dish alone.
+    mocks.cart.lines = [{ itemId: 'it-naan', qty: 99 }];
+    mocks.cart.count = 99;
+    try {
+      const html = renderToStaticMarkup(<ItemSheet itemId="it-naan" />);
+
+      expect(html).toContain('99 is the most of one dish');
+      expect(html).not.toContain('Add to order ·');
+    } finally {
+      mocks.cart.lines = [];
+      mocks.cart.count = 0;
+    }
+  });
 });

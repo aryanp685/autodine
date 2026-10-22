@@ -6,7 +6,9 @@ import { getOrderScreenData } from '@/lib/db/order-screen';
 import { onlinePaymentOffer, type OnlineOffer } from '@/lib/payments/online-availability';
 import { onlinePaymentsConfigured } from '@/lib/payments/razorpay';
 
-export const metadata: Metadata = { title: 'Order placed · AutoDine' };
+// Not "Order placed": this page also renders the state of a link that could
+// not be opened, and a tab promising an order that is not there is a small lie.
+export const metadata: Metadata = { title: 'Your order · AutoDine' };
 
 /**
  * ?s=<slug>&code=<order code>&t=<guest token>

@@ -240,6 +240,11 @@ describe('MenuEditorScreen, live', () => {
     const html = render(null);
 
     expect(html).toContain('Curries &amp; Mains');
+    // Escaped ONCE. The heading used to be an HTML entity inside a JS string,
+    // so the ampersand was escaped twice and the board literally read
+    // "Curries &amp; Mains". ``toContain('Curries &amp; Mains')`` passed
+    // happily through that, because the broken string contains the fixed one.
+    expect(html).not.toContain('&amp;amp;');
     // Demo rows carry real variant data, so that column is not a lie there.
     expect(html).toContain('Portions');
     // Nothing to delete: there is no database behind these rows. The editor

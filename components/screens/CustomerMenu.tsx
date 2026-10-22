@@ -147,7 +147,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
   const menuMeta = [
     restaurant.tagline?.trim(),
     items.length > 0 ? `${items.length} ${items.length === 1 ? 'dish' : 'dishes'}` : null,
-    categories.length > 1 ? `${categories.length} courses` : null,
+    categories.length > 1 ? `${categories.length} sections` : null,
   ]
     .filter(Boolean)
     .join(' · ');
@@ -364,8 +364,22 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
   // The original also did item.variants![0] unconditionally. That holds for
   // the demo data, where the chosen dish always has portions, but against a
   // real menu it throws the moment the item has none -- which is most of them.
+  const requestedItem = requestedItemId
+    ? allItems.find((i) => i.id === requestedItemId)
+    : undefined;
+
+  /**
+   * The dish the link asked for does not exist.
+   *
+   * This used to fall through to the first dish on the menu, so a stale link
+   * -- an old order, a screenshot, a menu edited since -- quietly opened
+   * somebody else's dish and let the guest add and pay for it. Saying the dish
+   * is gone, with a way back, is the only honest answer.
+   */
+  const missing = Boolean(requestedItemId) && !requestedItem;
+
   const item =
-    (requestedItemId ? allItems.find((i) => i.id === requestedItemId) : undefined) ??
+    requestedItem ??
     // Real menu, no id requested: show the menu's own first customisable dish.
     (data ? allItems.find((i) => i.variants && i.variants.length > 0) ?? allItems[0] : undefined) ??
     demoItems.find((i) => i.id === 'it-butter-chicken')!;
@@ -485,6 +499,45 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
    */
   const chosenVariant = variants.find((v) => v.id === variant);
   const chosenUnitPrice = (chosenVariant?.price ?? item.price) + addonRupees;
+
+  /**
+   * How many more of this exact line the cart can hold.
+   *
+   * The sheet used to increment without a ceiling while the cart silently
+   * stopped at 99, so the button could promise "Add to order · ₹12,400" for a
+   * hundred plates and the cart would hold ninety-nine. The limit is shared
+   * with lib/cart-storage.ts, and the button now says what will actually be
+   * added.
+   */
+  const existingQty =
+    cart.lines.find(
+      (line) =>
+        line.itemId === item.id &&
+        (line.variantId ?? '') === (variant ?? '') &&
+        [...(line.addonIds ?? [])].sort().join(',') === [...chosenAddonIds].sort().join(','),
+    )?.qty ?? 0;
+  const room = Math.max(0, 99 - existingQty);
+  const addQty = Math.min(qty, room);
+  const atCeiling = room === 0;
+
+  if (missing) {
+    return (
+      <div className="cart cart--plain">
+        <header className="cart__head">
+          <h1>That dish is not on the menu</h1>
+          <p>
+            The link may be from an older menu, or the restaurant has taken the dish off today.
+            Nothing has been added to your order.
+          </p>
+        </header>
+        <div className="cart__grid">
+          <div className="cart__empty">
+            <Link href={backHref}>Back to the menu</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="menu menu--dim">
@@ -608,22 +661,34 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
 
           <div className="sheet__foot">
             <div className="sheet__qty">
-              <button onClick={() => setQty(Math.max(1, qty - 1))} aria-label="Decrease">
+              <button
+                type="button"
+                onClick={() => setQty(Math.max(1, qty - 1))}
+                aria-label="Decrease"
+                disabled={qty <= 1 || atCeiling}
+              >
                 −
               </button>
-              <span className="tnum">{qty}</span>
-              <button onClick={() => setQty(qty + 1)} aria-label="Increase">
+              <span className="tnum">{Math.max(1, addQty)}</span>
+              <button
+                type="button"
+                onClick={() => setQty(Math.min(room, qty + 1))}
+                aria-label="Increase"
+                disabled={qty >= room || atCeiling}
+              >
                 +
               </button>
             </div>
             <button
+              type="button"
               className={`sheet__add ${added ? 'is-added' : ''}`}
               aria-live="polite"
+              disabled={atCeiling}
               onClick={() => {
                 // The dish, how many, which portion, and which add-ons. All
                 // ids: the server prices every one of them from the database,
                 // so what is sent can never be what is charged.
-                cart.add(item.id, qty, chosenVariant?.id, chosenAddonIds);
+                cart.add(item.id, addQty, chosenVariant?.id, chosenAddonIds);
 
                 // Confirm, then leave. Adding used to change a number on a bar
                 // behind an overlay and nothing else, so the obvious next move
@@ -636,6 +701,8 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
             >
               {added ? (
                 'Added to your order ✓'
+              ) : atCeiling ? (
+                '99 is the most of one dish we take online'
               ) : (
                 <>
                   {/* Both are rupees already: item.price and variant.price
@@ -643,7 +710,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
                       Passing them through paiseToRupees divided an
                       already-rupees number by a hundred, so a Rs 250 plate
                       showed as Rs 3. */}
-                  Add to order · {inr(chosenUnitPrice * qty)}
+                  Add to order · {inr(chosenUnitPrice * Math.max(1, addQty))}
                 </>
               )}
             </button>

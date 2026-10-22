@@ -16,7 +16,7 @@ export function SignupScreen({ error }: { error?: string }) {
     <AuthShell
       eyebrow="Create an account"
       title="Start with your restaurant"
-      lede="One account, one restaurant workspace, one menu to fill in. No card, nothing to install."
+      lede="One account, one restaurant to start with, one menu to fill in. More outlets can be added later. No card, nothing to install."
       action={{ prompt: 'Already have an account?', label: 'Sign in', href: '/login' }}
       notes={[
         <>

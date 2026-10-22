@@ -326,20 +326,18 @@ export function OrdersScreen({
                           {/* A cancelled bill is never collectable: money must
                               not be taken for food that will not arrive. */}
                           {outstanding > 0 && !cancelled ? (
-                            live && !blocked ? (
-                              // The money on this row is collected on that
-                              // bill, not on an arbitrary one: the counter
-                              // opens on this ticket.
-                              <Link
-                                className="rep__collect"
-                                href={`/cashier?order=${encodeURIComponent(order.id)}`}
-                                title={`Take payment for ${order.code} at the counter`}
-                              >
-                                Collect <Money value={outstanding} />
-                              </Link>
-                            ) : (
-                              <Money value={outstanding} />
-                            )
+                            // The money on this row is collected on that bill,
+                            // not on an arbitrary one: the counter opens on
+                            // this ticket. Without a database the sample rows
+                            // are the counter's own sample queue, so the code
+                            // is the handle that works there.
+                            <Link
+                              className="rep__collect"
+                              href={`/cashier?order=${encodeURIComponent(live && !blocked ? order.id : order.code)}`}
+                              title={`Take payment for ${order.code} at the counter`}
+                            >
+                              Collect <Money value={outstanding} />
+                            </Link>
                           ) : (
                             '—'
                           )}
@@ -410,19 +408,13 @@ export function OrdersScreen({
                         </span>
                         <span className="rep__cardDue">
                           {outstanding > 0 && !cancelled ? (
-                            live && !blocked ? (
-                              <Link
-                                className="rep__collect"
-                                href={`/cashier?order=${encodeURIComponent(order.id)}`}
-                                title={`Take payment for ${order.code} at the counter`}
-                              >
-                                Collect <Money value={outstanding} />
-                              </Link>
-                            ) : (
-                              <>
-                                Due <Money value={outstanding} />
-                              </>
-                            )
+                            <Link
+                              className="rep__collect"
+                              href={`/cashier?order=${encodeURIComponent(live && !blocked ? order.id : order.code)}`}
+                              title={`Take payment for ${order.code} at the counter`}
+                            >
+                              Collect <Money value={outstanding} />
+                            </Link>
                           ) : (
                             'Settled'
                           )}

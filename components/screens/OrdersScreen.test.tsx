@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { OrdersScreen } from './OrdersScreen';
+import { counterQueue } from '@/lib/demo-data';
 import {
   demoReport,
   emptyPayload,
@@ -217,11 +218,16 @@ describe('OrdersScreen', () => {
     expect(cancelled).not.toContain('/cashier?order=');
   });
 
-  it('never points a sample row at a counter ticket that does not exist', () => {
-    // The fictional rows have fictional ids. A Collect link built from one
-    // would open some real table's bill at the counter.
+  it('points a sample row only at a ticket the sample counter actually has', () => {
+    // The sample ledger and the sample counter are the same six tickets, so a
+    // Collect link has to land on one of them. A link built from a fictional
+    // id would open some real table's bill at the counter in production.
     const html = renderToStaticMarkup(<OrdersScreen data={null} />);
+    const targets = [...html.matchAll(/\/cashier\?order=([^"&]+)/g)].map((m) => decodeURIComponent(m[1]));
 
-    expect(html).not.toContain('/cashier?order=');
+    expect(targets.length).toBeGreaterThan(0);
+    for (const code of targets) {
+      expect(counterQueue.map((ticket) => ticket.id)).toContain(code);
+    }
   });
 });

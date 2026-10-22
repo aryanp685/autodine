@@ -39,7 +39,10 @@ export async function proxy(request: NextRequest) {
   if (!user) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
-    url.searchParams.set('next', request.nextUrl.pathname);
+    // pathname AND search: dropping the query sent an owner who opened
+    // /dashboard/orders?range=7d&status=open back to today's bills after
+    // signing in, so the link they clicked appeared not to work.
+    url.searchParams.set('next', `${request.nextUrl.pathname}${request.nextUrl.search}`);
     return NextResponse.redirect(url);
   }
 

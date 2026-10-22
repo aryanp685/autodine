@@ -393,7 +393,7 @@ export function MenuEditorScreen({
 
           <section className="pg__items">
             <div className="pg__itemsHead">
-              <h2>{live ? 'All items' : 'Curries &amp; Mains'}</h2>
+              <h2>{live ? 'All items' : 'Curries & Mains'}</h2>
               <div className="pg__itemsActions">
                 {live ? (
                   <>

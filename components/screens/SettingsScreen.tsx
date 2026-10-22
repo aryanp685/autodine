@@ -351,6 +351,13 @@ export function SettingsScreen({
                 the rest of the dashboard shows.
               </p>
 
+              {!live && (
+                <p className="pg__fine">
+                  The database is not connected, so there are no outlets to list and none can be
+                  added. The sample restaurant elsewhere in this preview is a single outlet.
+                </p>
+              )}
+
               {live && (
                 <ul className="pg__bullets">
                   {(data?.outlets ?? []).map((entry) => (
