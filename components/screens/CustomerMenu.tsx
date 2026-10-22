@@ -208,6 +208,25 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
       </nav>
 
       <div className="menu__list">
+        {/* What is below, named and counted. The rail above says which course
+            is selected; this says it again where the dishes start, so a guest
+            who scrolled past the rail still knows what they are reading. The
+            count is the filtered list's own length -- never a typed number. */}
+        <div className="menu__listHead">
+          <span className="menu__listTitle">
+            {categories.find((c) => c.id === cat)?.name ?? 'The full menu'}
+          </span>
+          <span className="menu__listCount tnum">
+            {list.length} {list.length === 1 ? 'dish' : 'dishes'}
+          </span>
+        </div>
+
+        {list.length === 0 && (
+          <p className="menu__listEmpty">
+            Nothing in this course is available right now. Try another, or ask the counter.
+          </p>
+        )}
+
         {list.map((i) => (
           <article key={i.id} className={`menu__dish ${i.available ? '' : 'is-out'}`}>
             <div className="menu__dishBody">

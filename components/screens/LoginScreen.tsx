@@ -91,8 +91,8 @@ export function LoginScreen({ error, notice, next }: { error?: string; notice?: 
           <div className="pg__asideCard pg__asideCard--quiet">
             <div className="pg__asideHead">Important</div>
             <p className="pg__p">
-              No trial enforcement, plan billing, live ordering or payment processing is enabled in this build.
-              This environment is for product preview and development only.
+              Ordering, the kitchen board and the counter are live. Plans are not on sale, no payment gateway
+              is connected and no trial is being enforced, so nothing here will ever ask you for a card.
             </p>
           </div>
         </aside>

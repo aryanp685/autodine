@@ -1,11 +1,12 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { inr } from '@/lib/demo-data';
-import { LIVE, NOT_CONNECTED, PLANS, capabilitiesFor } from '@/lib/plans';
+import { LIVE, NOT_CONNECTED, NumberWord, PLANS, capabilitiesFor, numberWord } from '@/lib/plans';
 import { SiteNav } from '@/components/SiteNav';
 import { SiteMotion } from '@/components/SiteMotion';
 import { SiteClosing } from '@/components/SiteClosing';
 import { SiteFooter } from '@/components/SiteFooter';
+import { ProductTour } from '@/components/ProductTour';
 
 /* ============================================================================
    Home — premium editorial.
@@ -75,6 +76,7 @@ export function Home() {
         links={[
           { label: 'Product', href: '/#product' },
           { label: 'How it works', href: '/#flow' },
+          { label: 'The screens', href: '/#tour' },
           { label: 'What is live', href: '/#status' },
           { label: 'Pricing', href: '/pricing' },
         ]}
@@ -211,6 +213,8 @@ export function Home() {
           </div>
         </section>
 
+        <ProductTour />
+
         {/* ------------------------------------------------------- statement */}
         <section className="statement">
           <div className="p-wrap">
@@ -232,9 +236,9 @@ export function Home() {
           <div className="p-wrap">
             <div className="status">
               <div className="status__lead" data-reveal>
-                <div className="p-eyebrow">03 · What is live</div>
+                <div className="p-eyebrow">04 · What is live</div>
                 <h2 className="p-h2" style={{ marginTop: 24, maxWidth: '15ch' }}>
-                  Six things work. Three do not.
+                  {`${NumberWord(LIVE.length)} things work. ${NumberWord(NOT_CONNECTED.length)} do not.`}
                 </h2>
                 <p className="p-lede" style={{ marginTop: 22, maxWidth: '36ch' }}>
                   This is a working product in preview, not a finished one. The honest version of
@@ -272,8 +276,8 @@ export function Home() {
                     ))}
                   </ul>
                   <p className="status__fine">
-                    The six on the left are not mock-ups. They are the screens the kitchen
-                    and the counter use in this build.
+                    {`The ${numberWord(LIVE.length)} on the left are not mock-ups. They are the screens
+                    the kitchen and the counter use in this build.`}
                   </p>
                 </div>
               </div>
@@ -286,7 +290,7 @@ export function Home() {
           <div className="p-wrap">
             <div className="p-head" data-reveal>
               <div>
-                <div className="p-eyebrow">04 · Pricing</div>
+                <div className="p-eyebrow">05 · Pricing</div>
                 <h2 className="p-h2 p-head__title">Planned, not yet charged.</h2>
               </div>
               <Link href="/pricing" className="p-arrow" style={{ alignSelf: 'flex-end' }}>

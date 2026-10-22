@@ -27,8 +27,8 @@ export function SignupScreen({ error }: { error?: string }) {
           <div className="pg__kicker">Early preview</div>
           <h1 className="pg__title pg__title--sm">Create your restaurant account</h1>
           <p className="pg__p">
-            Account creation requires a configured AutoDine backend. This preview does not activate a paid plan,
-            trial entitlement or live ordering workflow.
+            Creating an account needs the AutoDine backend to be configured. No paid plan and no trial
+            is started by this form — the account is free while the product is in preview.
           </p>
 
           {error && (
@@ -100,8 +100,8 @@ export function SignupScreen({ error }: { error?: string }) {
               Create account
             </button>
             <p className="pg__fine">
-              Demo accounts create a restaurant workspace when the Supabase project is configured. No trial or
-              subscription is created by this form.
+              Signing up creates a restaurant workspace with one menu, one owner and nothing charged. No trial
+              and no subscription is created by this form.
             </p>
           </form>
         </section>
@@ -112,15 +112,15 @@ export function SignupScreen({ error }: { error?: string }) {
             <ol className="pg__steps">
               <li><strong>Account access</strong> — Supabase signup and sign-in actions are available when a project is configured.</li>
               <li><strong>Workspace foundation</strong> — signup creates an initial restaurant, menu and owner membership.</li>
-              <li><strong>Sample experience</strong> — explore the menu, dashboard, kitchen and counter screens with fictional data.</li>
+              <li><strong>Live screens</strong> — the menu, orders, kitchen board and counter all read and write the database once the backend is configured.</li>
             </ol>
           </div>
 
           <div className="pg__asideCard pg__asideCard--quiet">
             <div className="pg__asideHead">Not active yet</div>
             <p className="pg__p">
-              There is no live order placement, payment processing, trial enforcement or subscription billing.
-              Do not enter payment details or use this preview for restaurant operations.
+              No payment gateway is connected, no plan can be bought and no trial is being enforced. Guests pay
+              at the counter and the payment is recorded there. Do not enter card details anywhere.
             </p>
           </div>
         </aside>
