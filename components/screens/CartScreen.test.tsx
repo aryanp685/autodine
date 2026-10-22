@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
     ready: true,
     add: () => {},
     remove: () => {},
+    removeItems: () => {},
     setQty: () => {},
     clear: () => {},
   },
@@ -53,7 +54,12 @@ function setLines(lines: typeof mocks.cart.lines, count = 0) {
   mocks.cart.count = count || lines.reduce((sum, line) => sum + line.qty, 0);
 }
 
-beforeEach(() => setLines([], 0));
+beforeEach(() => {
+  setLines([], 0);
+  // One test turns this off to prove the loading state; leaving it off would
+  // make every later render look like a cart that has not been read yet.
+  mocks.cart.ready = true;
+});
 
 describe('the cart bill', () => {
   it('shows the restaurant rate and does not call its own tax a sample', () => {
@@ -132,5 +138,38 @@ describe('the cart actions', () => {
 
     expect(html).toContain('Loading your order');
     expect(html).not.toContain('Your cart is empty');
+  });
+
+  it('offers one checkout button, not two', () => {
+    setLines([{ itemId: 'i1', qty: 1 }]);
+    const html = renderToStaticMarkup(<Cart slug="maddi" items={items} taxRateBps={500} />);
+
+    // The dock is the only route to checkout: the summary used to carry a
+    // second identical button that was hidden below 900px, which meant the
+    // two widths disagreed about how many actions the screen had.
+    expect(html.match(/Continue to checkout/g)).toHaveLength(1);
+  });
+
+  it('lets the guest clear dishes that no longer exist', () => {
+    mocks.cart.lines = [{ itemId: 'gone', qty: 2 }];
+    mocks.cart.count = 2;
+    const html = renderToStaticMarkup(<Cart slug="maddi" items={items} taxRateBps={500} />);
+
+    // The notice used to be permanent: the dead ids stayed in localStorage, so
+    // every visit found them again and warned about them again.
+    expect(html).toContain('no longer available');
+    expect(html).toContain('cart__noticeBtn');
+    expect(html).toContain('Remove it from my cart');
+  });
+
+  it('tells the guest which table the order is for, when one is known', () => {
+    setLines([{ itemId: 'i1', qty: 1 }]);
+    const withTable = renderToStaticMarkup(
+      <Cart slug="maddi" items={items} tableLabel="T4" taxRateBps={500} />,
+    );
+    expect(withTable).toContain('T4');
+
+    const without = renderToStaticMarkup(<Cart slug="maddi" items={items} taxRateBps={500} />);
+    expect(without).not.toContain('flow__table');
   });
 });

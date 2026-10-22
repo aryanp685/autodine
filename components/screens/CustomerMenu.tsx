@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   categories as demoCategories,
@@ -16,6 +16,7 @@ import type {
   DisplayModifierGroup,
   DisplayRestaurant,
 } from '@/lib/db/adapt';
+import { GuestFlow } from '@/components/GuestFlow';
 import { useCart } from '@/components/CartProvider';
 import { priceCart } from '@/lib/cart-pricing';
 import { inr } from '@/lib/demo-data';
@@ -162,18 +163,32 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
   };
 
   return (
-    <div className="menu">
+    <GuestFlow
+      step="menu"
+      venue={restaurant.name}
+      table={table?.label ?? null}
+      dock={
+        /* The cart is the dock: it is the one action on a menu, and it has to
+           stay under the thumb while a guest scrolls past thirty dishes. */
+        cart.count > 0 ? (
+          <div className="menu__cartBar" key={barPulse}>
+            <span className="menu__cartCount" role="status" aria-live="polite">
+              <strong className="tnum">{cart.count}</strong> item{cart.count === 1 ? '' : 's'} ·{' '}
+              {inr(paiseToRupees(barSubtotal))} before taxes
+            </span>
+            <Link href={cartHref} className="menu__cartBtn">
+              Review order
+            </Link>
+          </div>
+        ) : null
+      }
+    >
       <header className="menu__head">
         <div className="menu__venue">
           <div className="menu__kicker">The menu</div>
           <h1 className="menu__venueName">{restaurant.name}</h1>
           <div className="menu__venueMeta">{menuMeta}</div>
         </div>
-        {table ? (
-          <div className="menu__verified">
-            <span className="menu__verifiedDot" /> {table.label}
-          </div>
-        ) : null}
       </header>
 
       {/*
@@ -203,14 +218,21 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
         </nav>
       )}
 
-      <nav className="menu__cats">
-        <button className={`menu__cat ${cat === 'all' ? 'is-active' : ''}`} onClick={() => setCat('all')}>
+      <nav className="menu__cats" aria-label="Courses">
+        <button
+          type="button"
+          className={`menu__cat ${cat === 'all' ? 'is-active' : ''}`}
+          aria-pressed={cat === 'all'}
+          onClick={() => setCat('all')}
+        >
           All
         </button>
         {categories.map((c) => (
           <button
             key={c.id}
+            type="button"
             className={`menu__cat ${cat === c.id ? 'is-active' : ''}`}
+            aria-pressed={cat === c.id}
             onClick={() => setCat(c.id)}
           >
             {c.name}
@@ -320,21 +342,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
         ))}
       </div>
 
-      {/* The bar is keyed by the add count so a second "Add" replays its own
-          entry: without the key the element never remounts, and the only
-          feedback for a tap is a number changing somewhere off the thumb. */}
-      {cart.count > 0 && (
-        <div className="menu__cartBar" key={barPulse}>
-          <span className="menu__cartCount" role="status" aria-live="polite">
-            <strong className="tnum">{cart.count}</strong> item{cart.count === 1 ? '' : 's'} ·{' '}
-            {inr(paiseToRupees(barSubtotal))}
-          </span>
-          <Link href={cartHref} className="menu__cartBtn">
-            Review order
-          </Link>
-        </div>
-      )}
-    </div>
+    </GuestFlow>
   );
 }
 
@@ -370,6 +378,18 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
   const [added, setAdded] = useState(false);
   const cart = useCart();
   const router = useRouter();
+
+  /**
+   * The timer that takes the guest back to the menu after adding.
+   *
+   * Held in a ref so it can be cancelled: a guest who taps Back or closes the
+   * sheet inside those 700ms was being pushed to the menu anyway, from a page
+   * they had already left.
+   */
+  const returnTimer = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (returnTimer.current !== null) window.clearTimeout(returnTimer.current);
+  }, []);
 
   /**
    * Where closing the sheet goes.
@@ -502,7 +522,11 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
         <div className="sheet__panel">
           <div className="sheet__head">
             <div>
-              <div className="sheet__kicker">Customize</div>
+              {/* "Customize" over a dish with no portions and no add-ons is a
+                  heading for a decision that does not exist. */}
+              <div className="sheet__kicker">
+                {variants.length > 0 || groups.length > 0 ? 'Customize' : 'Add to order'}
+              </div>
               <h2 className="sheet__title">{item.name}</h2>
             </div>
             <Link href={backHref} className="sheet__close" aria-label="Close">
@@ -607,7 +631,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
                 // button says what happened for a moment, then the guest is
                 // back on the menu, where the next dish is.
                 setAdded(true);
-                window.setTimeout(() => router.push(backHref), 700);
+                returnTimer.current = window.setTimeout(() => router.push(backHref), 700);
               }}
             >
               {added ? (

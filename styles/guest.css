@@ -2227,3 +2227,444 @@
   [data-app] .placed__track { gap: 8px 14px; }
   [data-app] .placed__step { font-size: 0.6875rem; }
 }
+
+/* =========================================================================
+   THE FLOW SHELL — menu, cart, pay, placed
+   =========================================================================
+
+   A guest who scanned a card is in an app: they have a table, a cart and one
+   thing to do next. So the ordering flow is four full screens, each the whole
+   viewport, each with one primary action docked at the bottom, and a thin bar
+   at the top that says whose restaurant it is, which table, and how much of
+   the flow is left.
+
+   Everything below is one system. The screens themselves only choose a step
+   and an action; the rhythm, the bar and the dock are shared, so the flow
+   cannot drift screen by screen the way the staff bar once did.
+   ========================================================================= */
+
+[data-app] .flow {
+  --flow-bar: 56px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+  background: var(--p-paper);
+}
+
+[data-app] .flow__bar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: var(--flow-bar);
+  padding: 0 clamp(14px, 4vw, 28px);
+  border-bottom: 1px solid var(--p-line);
+  background: var(--p-glass);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
+}
+
+[data-app] .flow__lead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+[data-app] .flow__brand {
+  flex: 0 0 auto;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--p-ink);
+  text-decoration: none;
+}
+
+[data-app] .flow__back {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-left: -6px;
+  border-radius: 50%;
+  color: var(--p-ink);
+  transition: background-color var(--p-d1) linear;
+}
+
+[data-app] .flow__back:hover { background: var(--p-paper-deep); }
+[data-app] .flow__back:focus-visible { outline: 2px solid var(--p-accent); outline-offset: 2px; }
+
+[data-app] .flow__venue {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--p-ink);
+}
+
+/* The table, only when a session named one. A quiet chip, not a badge: it is
+   context, not a status. */
+[data-app] .flow__table {
+  flex: 0 0 auto;
+  padding: 3px 9px;
+  border-radius: var(--p-pill);
+  background: var(--p-accent-soft);
+  color: var(--p-accent);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* Four segments. The shape reads at arm's length; the words are for the
+   screen reader, and the current one is also spoken. */
+[data-app] .flow__steps {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  flex: 0 0 auto;
+}
+
+[data-app] .flow__step {
+  width: 16px;
+  height: 3px;
+  border-radius: var(--p-pill);
+  background: var(--p-line-strong);
+  transition: background-color var(--p-d2) var(--p-ease), width var(--p-d2) var(--p-ease);
+}
+
+[data-app] .flow__step.is-done { background: var(--p-ink-46); }
+
+/* Where you are is longer as well as darker -- the one segment that is not
+   the same size is the one that is true about now. */
+[data-app] .flow__step.is-now { width: 26px; background: var(--p-ink); }
+
+[data-app] .flow__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+[data-app] .flow__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  animation: flowIn var(--p-d3) var(--p-ease) both;
+}
+
+@keyframes flowIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* The screen's own heading, under the bar. Not a hero: the bar already names
+   the restaurant, so this is the job in hand. */
+[data-app] .flow__head {
+  width: min(100%, 1120px);
+  margin: 0 auto;
+  padding: clamp(20px, 4vh, 34px) var(--p-gutter) 0;
+}
+
+[data-app] .flow__kicker {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .flow__title {
+  margin: 10px 0 0;
+  font-size: clamp(1.6rem, 3.4vw, 2.3rem);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: var(--p-ink);
+}
+
+[data-app] .flow__lede {
+  margin: 10px 0 0;
+  max-width: 52ch;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--p-ink-64);
+}
+
+/* --------------------------------------------------------------- the dock */
+
+[data-app] .flow--docked .flow__body { padding-bottom: 108px; }
+
+[data-app] .flow__dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 45;
+  border-top: 1px solid var(--p-line);
+  background: var(--p-glass);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+[data-app] .flow__dock > * {
+  width: min(100%, 1120px);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px var(--p-gutter);
+}
+
+/* The flow's one button. Ink, pill, tall enough for a thumb. */
+[data-app] .flow__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 26px;
+  border: 0;
+  border-radius: var(--p-pill);
+  background: var(--p-ink);
+  color: var(--p-on-ink);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform var(--p-d1) var(--p-ease), opacity var(--p-d1) linear;
+}
+
+[data-app] .flow__cta:hover { transform: translateY(-1px); }
+[data-app] .flow__cta:focus-visible { outline: 2px solid var(--p-accent); outline-offset: 3px; }
+[data-app] .flow__cta:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* A pending submit shows a turning ring rather than only changing its words:
+   the words are at the far end of a thumb, the ring is in the corner of the
+   eye. */
+[data-app] .flow__spin {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--p-on-ink) 35%, transparent);
+  border-top-color: var(--p-on-ink);
+  animation: flowSpin 700ms linear infinite;
+}
+
+@keyframes flowSpin { to { transform: rotate(360deg); } }
+
+/* ---------------------------------------------------- the three flow screens */
+
+/* Cart and pay already have their own layouts; the shell only replaces their
+   page frame. These keep the two columns and the bill where they were. */
+[data-app] .flow .cart__grid,
+[data-app] .flow .co__grid {
+  width: min(100%, 1120px);
+  margin: 0 auto;
+  padding: clamp(20px, 3.4vh, 30px) var(--p-gutter) 24px;
+}
+
+[data-app] .flow .cart__lines {
+  border-top: 1px solid var(--p-line);
+}
+
+[data-app] .flow .cart__sum,
+[data-app] .flow .co__sum { top: calc(var(--flow-bar) + 16px); }
+
+/* The cart's dock and the pay screen's dock share the row shape; each keeps
+   its own total label because they say different things. */
+[data-app] .cart__bar,
+[data-app] .co__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: min(100%, 1120px);
+  margin: 0 auto;
+  padding: 12px var(--p-gutter);
+  border-top: 0;
+  background: none;
+  position: static;
+}
+
+[data-app] .cart__barTotal,
+[data-app] .co__barTotal {
+  display: grid;
+  gap: 2px;
+}
+
+[data-app] .cart__barLabel,
+[data-app] .co__barLabel {
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .cart__barTotal strong,
+[data-app] .co__barTotal strong {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-ink);
+}
+
+[data-app] .cart__barCta {
+  display: inline-flex;
+  align-items: center;
+  min-height: 46px;
+  padding: 0 24px;
+  border-radius: var(--p-pill);
+  background: var(--p-ink);
+  color: var(--p-on-ink);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform var(--p-d1) var(--p-ease);
+}
+
+[data-app] .cart__barCta:hover { transform: translateY(-1px); }
+
+/* The summary's own button is gone: the dock holds the action, and two black
+   buttons on one screen is a choice nobody asked for. */
+[data-app] .cart__sumCard .cart__cta[disabled] { margin-top: 18px; }
+
+/* --------------------------------------------------------------- the menu */
+
+/* The category rail sticks under the flow bar rather than to the top of the
+   window, or the bar would slide over it. */
+[data-app] .flow .menu__cats { top: var(--flow-bar); z-index: 20; }
+[data-app] .flow .menu { background: transparent; min-height: 0; padding-bottom: 0; }
+
+/* ------------------------------------------------------------- the placed */
+
+[data-app] .placed__dock { justify-content: center; }
+
+/* The confirmation's own column was two columns on desktop like the cart; it
+   reads better as one, because there is nothing to compare -- the bill is a
+   summary of what was just placed. */
+[data-app] .placed__head { display: grid; justify-items: start; }
+
+[data-app] .flow .cart--placed,
+[data-app] .flow .cart--plain { background: transparent; padding-bottom: 0; }
+
+/* ------------------------------------------------------ the order editor */
+
+/* These two were unstyled `co__method` buttons: browser default grey boxes in
+   the middle of a screen the guest is reading about money. */
+[data-app] .flow__ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 20px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-pill);
+  background: var(--p-surface);
+  color: var(--p-ink);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: border-color var(--p-d1) linear, background-color var(--p-d1) linear;
+}
+
+[data-app] .flow__ghost:hover { border-color: var(--p-ink); }
+[data-app] .flow__ghost:focus-visible { outline: 2px solid var(--p-accent); outline-offset: 3px; }
+[data-app] .flow__ghost:disabled { opacity: 0.45; cursor: not-allowed; }
+
+[data-app] .flow__ghost--danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 32%, transparent); }
+[data-app] .flow__ghost--danger:hover { border-color: var(--danger); }
+
+[data-app] .flow__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+[data-app] .flow__row .co__cta { width: auto; min-width: 180px; margin-top: 0; }
+
+/* ------------------------------------------------------------- the bill */
+
+/* Three classes on the bill screen had no rule at all -- the restaurant's
+   name, its address block and the toolbar's action group were browser
+   defaults on the one screen that gets printed. */
+[data-app] .bill__brand { display: grid; gap: 3px; }
+
+[data-app] .bill__barActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+[data-app] .cart__lines { border-top: 1px solid var(--p-line); }
+
+/* -------------------------------------------------------------- small screens */
+
+@media (max-width: 720px) {
+  [data-app] .flow { --flow-bar: 52px; }
+  [data-app] .flow__venue { font-size: 0.75rem; max-width: 34vw; }
+  [data-app] .flow__step { width: 12px; }
+  [data-app] .flow__step.is-now { width: 20px; }
+  [data-app] .flow--docked .flow__body { padding-bottom: 96px; }
+  [data-app] .flow__dock > * { padding: 10px var(--p-gutter); }
+  [data-app] .flow__cta { min-height: 46px; padding: 0 20px; font-size: 0.875rem; }
+  [data-app] .flow__title { font-size: 1.5rem; }
+  [data-app] .cart__barCta { padding: 0 18px; }
+  [data-app] .flow__row .co__cta { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-app] .flow__body { animation: none; }
+  [data-app] .flow__spin { animation-duration: 1600ms; }
+  [data-app] .flow__cta:hover,
+  [data-app] .cart__barCta:hover { transform: none; }
+}
+
+/* A line the guest has just set to zero, before saving. Dimmed and struck
+   rather than removed: it is still on the order until the server agrees, and
+   a row that vanishes on tap reads as a mis-tap. */
+[data-app] .cart__line.is-removed { opacity: 0.5; }
+[data-app] .cart__line .is-struck { text-decoration: line-through; }
+
+/* The notice names what went and offers to clear it. It used to name what
+   went and then keep re-reading the same dead ids on every visit. */
+[data-app] .cart__notice p { margin: 0; }
+
+[data-app] .cart__noticeBtn {
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--p-ink);
+  font: inherit;
+  font-size: 0.75rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+[data-app] .cart__noticeBtn:hover { color: var(--danger); }
+
+/* One action per screen. The dock holds it; the button inside the bill is the
+   same submission and would read as a second, different one. */
+[data-app] .flow--docked .co__sum .co__cta { display: none; }

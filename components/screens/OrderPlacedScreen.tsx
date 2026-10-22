@@ -3,6 +3,7 @@ import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
 import { GuestOrderEditor } from '@/components/screens/GuestOrderEditor';
 import { PayOnline } from '@/components/PayOnline';
+import { GuestFlow } from '@/components/GuestFlow';
 import { OrderStatusRefresh } from '@/components/OrderStatusRefresh';
 import { GUEST_CHANGE_WINDOW_MS, type OrderScreenData } from '@/lib/db/order-screen';
 import type { OnlineOffer } from '@/lib/payments/online-availability';
@@ -107,7 +108,7 @@ export function OrderPlacedScreen({
 }) {
   if (!data) {
     return (
-      <div className="cart">
+      <div className="cart cart--plain">
         <header className="cart__head">
           <h1>Order not found</h1>
           <p>
@@ -132,9 +133,24 @@ export function OrderPlacedScreen({
 
   const prepLabel = PREP_LABEL[data.prepStatus] ?? data.prepStatus;
 
+  const menuHref = slug ? `/menu?s=${encodeURIComponent(slug)}` : '/menu';
+
   return (
-    <div className="cart cart--placed">
-      <header className="cart__head placed__head">
+    <GuestFlow
+      step="placed"
+      venue={data.restaurantName}
+      table={data.tableLabel}
+      dock={
+        /* The flow does not end here: a table usually orders again, and the
+           screen used to offer no way back to the menu at all. */
+        <div className="placed__dock">
+          <Link href={menuHref} className="flow__cta">
+            Order something else
+          </Link>
+        </div>
+      }
+    >
+      <header className="flow__head placed__head">
         {/* The one moment in the flow that deserves a mark. Drawn rather than
             typed: a tick in a circle reads at a glance from across a table,
             and it is the only decoration on the screen. */}
@@ -155,8 +171,10 @@ export function OrderPlacedScreen({
         <div className="cart__kicker">
           {data.prepStatus === 'cancelled' ? 'Order cancelled' : 'Order placed'}
         </div>
-        <h1>{data.tableLabel ? `Table ${data.tableLabel}` : 'Counter order'}</h1>
-        <p>
+        <h1 className="flow__title">
+          {data.tableLabel ? `Table ${data.tableLabel}` : 'Counter order'}
+        </h1>
+        <p className="flow__lede">
           {data.restaurantName} · {prepLabel}
           {data.prepStatus === 'cancelled' ? ' · nothing is owed' : ''}
         </p>
@@ -271,6 +289,6 @@ export function OrderPlacedScreen({
           </div>
         </aside>
       </div>
-    </div>
+    </GuestFlow>
   );
 }

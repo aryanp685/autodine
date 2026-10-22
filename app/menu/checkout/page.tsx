@@ -45,6 +45,7 @@ export default async function CheckoutPage({
       <Checkout
         slug={s}
         restaurantName={data?.restaurantName}
+        tableLabel={access.status === 'verified' ? access.tableLabel : null}
         taxRateBps={data?.taxRateBps}
         items={data?.items ?? []}
         // Both are needed before the screen may promise card payment later:

@@ -1,6 +1,7 @@
 'use client';
 
-import Link from 'next/link';
+import { GuestFlow } from '@/components/GuestFlow';
+import { PlaceOrderButton } from '@/components/PlaceOrderButton';
 import { useCart } from '@/components/CartProvider';
 import { inr } from '@/lib/demo-data';
 import { VegMark } from '@/components/ui';
@@ -28,12 +29,15 @@ import { gstLabel } from '@/lib/pricing';
 export function Checkout({
   slug,
   restaurantName,
+  tableLabel,
   taxRateBps,
   items,
   onlinePaymentAvailable = false,
 }: {
   slug?: string;
   restaurantName?: string;
+  /** The table a live session confirmed, when there is one. */
+  tableLabel?: string | null;
   /** The restaurant's own rate. Without it the bill is priced at a sample. */
   taxRateBps?: number;
   items: MenuItemPrice[];
@@ -52,28 +56,37 @@ export function Checkout({
   const canOrder = cart.ready && priced.lines.length > 0;
 
   return (
-    // The phone bar repeats this bill's total at the bottom of the screen.
-    // When it is showing, the same button inside the summary is hidden by CSS,
-    // so a guest never sees two black buttons 40px apart. The class says
-    // whether the bar exists, because CSS cannot ask.
-    <div className={canOrder ? 'co co--barred' : 'co'}>
-      <header className="co__head">
-        <Link href={withSlug('/menu/cart')} className="co__back">
-          ← Back to cart
-        </Link>
-        <h1>Checkout</h1>
+    <GuestFlow
+      step="pay"
+      venue={restaurantName}
+      table={tableLabel}
+      back={{ href: withSlug('/menu/cart'), label: 'Back to your order' }}
+      docked={canOrder}
+    >
+      <header className="flow__head">
+        <div className="flow__kicker">Pay</div>
+        <h1 className="flow__title">Checkout</h1>
         {/* The count appears once the stored cart has been read. Until then
             it would read "0 items" over an order that is still loading. */}
-        <p>
-          {restaurantName ?? 'Your table'}
+        <p className="flow__lede">
           {cart.ready && cart.count > 0
-            ? ` · ${cart.count} ${cart.count === 1 ? 'item' : 'items'}`
-            : null}
+            ? `${cart.count} ${cart.count === 1 ? 'item' : 'items'} · the kitchen starts as soon as you place it.`
+            : 'Nothing to order yet — add a dish from the menu first.'}
         </p>
       </header>
 
-      <div className="co__grid">
-        <div>
+      {/* The whole screen is one form, so both Place order buttons -- the one
+          in the bill and the one pinned at the bottom -- can read the same
+          pending state. Two independent submits would have needed the action
+          to be called twice, and would have disagreed about being busy. */}
+      <form id="co-place-order" action={placeOrderAction} className="co__formOuter">
+        <input type="hidden" name="slug" value={slug ?? ''} />
+        {/* Only ids and quantities go to the server. The prices are read from
+            the database when the order is written. */}
+        <input type="hidden" name="lines" value={JSON.stringify(cart.lines)} />
+
+        <div className="co__grid">
+          <div>
           {/*
             ONE method, stated, not two buttons with one of them disabled.
 
@@ -128,11 +141,7 @@ export function Checkout({
             )}
           </ul>
 
-          <form id="co-place-order" action={placeOrderAction} className="co__noteForm">
-            <input type="hidden" name="slug" value={slug ?? ''} />
-            {/* Only ids and quantities go to the server. The prices are read
-                from the database when the order is written. */}
-            <input type="hidden" name="lines" value={JSON.stringify(cart.lines)} />
+          <div className="co__noteForm">
             <label className="ui-field">
               <span className="ui-label">Anything the kitchen should know?</span>
               <textarea
@@ -142,8 +151,12 @@ export function Checkout({
                 maxLength={300}
                 placeholder="No onion in the raita, less chilli…"
               />
+              <span className="ui-hint">
+                A note is read by the kitchen, not a special instruction the bill is priced
+                against.
+              </span>
             </label>
-          </form>
+          </div>
         </div>
 
         <aside className="co__sum">
@@ -161,14 +174,12 @@ export function Checkout({
             <span className="tnum">{inr(paiseToRupees(totalPaise))}</span>
           </div>
 
-          <button
-            type="submit"
+          <PlaceOrderButton
+            totalPaise={totalPaise}
+            canOrder={canOrder}
             form="co-place-order"
-            className="co__cta"
-            disabled={!canOrder}
-          >
-            {!canOrder ? 'Add items before checkout' : `Place order · ${inr(paiseToRupees(totalPaise))}`}
-          </button>
+            variant="bill"
+          />
           <p className="co__fine" role="note">
             {onlinePaymentAvailable
               ? 'Pay at the counter, or by card/UPI on the next screen. The kitchen starts straight away either way.'
@@ -177,20 +188,26 @@ export function Checkout({
         </aside>
       </div>
 
-      {/* Phones only: the bill is below the order on a narrow screen, so the
-          one button that completes the flow would otherwise be off-screen.
-          It submits the same form from here. */}
-      {canOrder && (
-        <div className="co__bar">
-          <span className="co__barTotal">
-            <span className="co__barLabel">Total</span>
-            <strong className="tnum">{inr(paiseToRupees(totalPaise))}</strong>
-          </span>
-          <button type="submit" form="co-place-order" className="co__barCta">
-            Place order
-          </button>
-        </div>
-      )}
-    </div>
+        {/* Inside the form on purpose: useFormStatus only sees a form it is a
+            descendant of, and both Place order buttons have to go busy
+            together or a second tap writes a second order. */}
+        {canOrder && (
+          <div className="flow__dock">
+            <div className="co__bar">
+              <span className="co__barTotal">
+                <span className="co__barLabel">Total payable</span>
+                <strong className="tnum">{inr(paiseToRupees(totalPaise))}</strong>
+              </span>
+              <PlaceOrderButton
+                totalPaise={totalPaise}
+                canOrder={canOrder}
+                form="co-place-order"
+                variant="dock"
+              />
+            </div>
+          </div>
+        )}
+      </form>
+    </GuestFlow>
   );
 }

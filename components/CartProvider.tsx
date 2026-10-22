@@ -43,6 +43,15 @@ type CartApi = {
    */
   add: (itemId: string, by?: number, variantId?: string, addonIds?: string[]) => void;
   remove: (itemId: string, variantId?: string, addonIds?: string[]) => void;
+  /**
+   * Drops every line of the named dishes at once.
+   *
+   * Needed because the cart screen has to clear out a list of things that are
+   * no longer on the menu, and calling `remove` in a loop would lose all but
+   * the last: each call closes over the same `lines` from the render it
+   * belongs to, so the second write starts from the pre-removal cart again.
+   */
+  removeItems: (itemIds: string[]) => void;
   setQty: (itemId: string, qty: number, variantId?: string, addonIds?: string[]) => void;
   clear: () => void;
   count: number;
@@ -107,6 +116,10 @@ export function CartProvider({
         persist(addLine(lines, itemId, by, variantId, addonIds)),
       remove: (itemId, variantId, addonIds) =>
         persist(removeLine(lines, itemId, variantId, addonIds)),
+      removeItems: (itemIds) => {
+        const gone = new Set(itemIds);
+        persist(lines.filter((line) => !gone.has(line.itemId)));
+      },
       setQty: (itemId, qty, variantId, addonIds) =>
         persist(setLineQty(lines, itemId, qty, variantId, addonIds)),
       clear: () => persist([]),

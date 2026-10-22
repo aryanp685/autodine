@@ -56,6 +56,9 @@ export default async function CartPage({
       <Cart
         slug={s}
         restaurantName={data?.restaurantName}
+        // Only a verified session names a table. Demo mode can carry one from
+        // the sample cookie; a real database read decides it above.
+        tableLabel={access.status === 'verified' ? access.tableLabel : null}
         taxRateBps={data?.taxRateBps}
         // No restaurant resolved: show the empty state rather than a menu of
         // prices that came from nowhere.
