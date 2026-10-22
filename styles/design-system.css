@@ -298,17 +298,37 @@
 
 /* --------------------------------------------------------- customer menu */
 
+/* THE GUEST'S MENU IS A ROOM, NOT A FEED.
+   It is read on a phone, standing up, in bad light, usually once. So: one
+   column, generous line height, prices in tabular figures aligned to the same
+   edge, and exactly one action per dish. The content column is capped at 880px
+   because a menu line that runs the width of a desktop monitor is a menu
+   nobody can scan. */
+
 .menu { position: relative; min-height: 100vh; background: var(--page-bg); }
+
 .menu__head {
   display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;
+  width: min(100%, 880px); margin: 0 auto;
   padding: 44px 48px 22px;
 }
-.menu__venueName { font-size: 30px; letter-spacing: -0.03em; font-weight: 500; }
-.menu__venueMeta { font-size: 13.5px; color: rgba(17, 19, 24, 0.55); margin-top: 6px; }
-.menu__verified {
-  display: flex; align-items: center; gap: 8px; font-size: 13px; color: rgba(17, 19, 24, 0.6);
+.menu__venueName {
+  font-size: clamp(26px, 3.4vw, 38px); letter-spacing: -0.035em; font-weight: 500;
 }
-.menu__verifiedDot { width: 7px; height: 7px; border-radius: 50%; background: #4b6b51; }
+.menu__venueMeta { font-size: 13.5px; color: var(--ink-55); margin-top: 6px; }
+
+/* Where you are sitting. A pill, with a dot that is the only thing on this
+   page that moves: it is the reassurance that the order will reach the right
+   table, and it is worth being able to find at a glance. */
+.menu__verified {
+  display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto;
+  font-size: 12.5px; color: var(--ink-60); font-weight: 500;
+  border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px;
+  background: var(--surface);
+}
+.menu__verifiedDot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex: 0 0 auto;
+}
 
 /*
  * Menu tabs. Deliberately quieter than the category rail below them: a menu is
@@ -316,146 +336,433 @@
  * would read as one confused list.
  */
 .menu__menus {
-  display: flex; gap: 8px; padding: 14px 48px 0; flex-wrap: wrap;
+  display: flex; gap: 8px; width: min(100%, 880px); margin: 0 auto;
+  padding: 14px 48px 0; flex-wrap: wrap;
 }
 .menu__menuLink {
   padding: 7px 14px; border-radius: 999px; font-size: 13px; font-weight: 500;
-  letter-spacing: 0.01em; color: rgba(17, 19, 24, 0.62);
-  border: 1px solid rgba(17, 19, 24, 0.14); text-decoration: none;
+  letter-spacing: 0.01em; color: var(--ink-60);
+  border: 1px solid var(--border); text-decoration: none;
+  transition: border-color var(--dur-1) linear, color var(--dur-1) linear,
+    background-color var(--dur-1) linear;
 }
+.menu__menuLink:hover { border-color: var(--ink-40); color: var(--text); }
 .menu__menuLink.is-active {
   color: var(--text); border-color: transparent;
-  background: rgba(17, 19, 24, 0.06); font-weight: 600;
+  background: var(--ink-08); font-weight: 600;
 }
 
-.menu__cats { display: flex; gap: 30px; padding: 0 48px; border-bottom: 1px solid var(--border); }
-.menu__cat {
-  background: none; border: 0; padding: 13px 0; font-size: 14.5px;
-  color: rgba(17, 19, 24, 0.55); cursor: pointer;
+/* Sticky, because a guest scrolls a menu back and forth and switching
+   category from the top of a long list is an unfair amount of scrolling.
+   The rail scrolls horizontally on a narrow screen; the mask fades the cut
+   edge so it reads as "more to the right" rather than as a clipped word. */
+.menu__cats {
+  display: flex; gap: 28px; width: min(100%, 880px); margin: 0 auto;
+  padding: 0 48px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 10;
+  background: var(--page-bg);
+  background: color-mix(in srgb, var(--page-bg) 94%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  overflow-x: auto; scrollbar-width: none;
 }
+.menu__cats::-webkit-scrollbar { display: none; }
+.menu__cat {
+  background: none; border: 0; padding: 14px 0; font-size: 14.5px;
+  color: var(--ink-55); cursor: pointer; white-space: nowrap; flex: 0 0 auto;
+  transition: color var(--dur-1) linear;
+}
+.menu__cat:hover { color: var(--ink-70); }
 .menu__cat.is-active { color: var(--text); font-weight: 600; box-shadow: inset 0 -2px 0 var(--text); }
 
-.menu__list { padding: 4px 48px 140px; }
-.menu__dish { display: flex; gap: 34px; padding: 28px 0; border-bottom: 1px solid rgba(17, 19, 24, 0.1); }
-.menu__dishBody { flex: 1; }
-.menu__dishTop { display: flex; align-items: center; gap: 10px; }
-.menu__dishName { font-size: 20px; font-weight: 500; letter-spacing: -0.02em; }
+/* Bottom padding clears the fixed cart bar, so the last dish is never behind
+   the thing that orders it. */
+.menu__list { width: min(100%, 880px); margin: 0 auto; padding: 4px 48px 152px; }
+
+.menu__dish {
+  display: flex; gap: 30px; align-items: flex-start;
+  padding: 26px 0; border-bottom: 1px solid var(--ink-08);
+}
+.menu__dishBody { flex: 1; min-width: 0; }
+.menu__dishTop { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.menu__dishName { font-size: clamp(17px, 1.6vw, 20px); font-weight: 500; letter-spacing: -0.02em; }
 .menu__dishBadge {
-  font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 700;
-  background: #e8e2d8; color: #5a5142; padding: 3px 8px; border-radius: 999px;
+  font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700;
+  background: var(--band); color: #5a5142; padding: 3px 8px; border-radius: 999px;
+  border: 1px solid var(--band-line);
 }
-.menu__dishDesc { margin-top: 8px; font-size: 14.5px; color: rgba(17, 19, 24, 0.55); max-width: 540px; line-height: 1.6; }
-.menu__dishPrice { margin-top: 12px; font-size: 18px; font-variant-numeric: tabular-nums; }
-.menu__dishFrom { font-size: 12px; color: rgba(17, 19, 24, 0.4); margin-left: 7px; }
+.menu__dishDesc {
+  margin-top: 7px; font-size: 14.5px; color: var(--ink-55);
+  max-width: 52ch; line-height: 1.65;
+}
+.menu__dishPrice {
+  margin-top: 12px; font-size: 17px; font-variant-numeric: tabular-nums;
+  display: flex; align-items: baseline; gap: 8px;
+}
+.menu__dishFrom { font-size: 12px; color: var(--ink-40); }
+
+/* One action per dish. The press state matters more than the hover state
+   here: on a phone there is no hover, and the only feedback a guest gets is
+   the button itself. */
 .menu__dishCta {
-  display: inline-block; margin-top: 16px; font-size: 14px; padding: 9px 18px;
-  border: 1px solid var(--text); border-radius: 2px; background: none; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 40px; margin-top: 14px; padding: 9px 20px;
+  font: inherit; font-size: 14px; font-weight: 500;
+  border: 1px solid var(--text); border-radius: var(--radius-sm);
+  background: none; color: var(--text); cursor: pointer; text-decoration: none;
+  transition: background-color var(--dur-1) linear, color var(--dur-1) linear,
+    transform var(--dur-1) var(--ease-out);
 }
-.menu__dishCta:hover { background: var(--text); color: #fff; }
-.menu__dishImg { width: 104px; height: 104px; object-fit: cover; border-radius: 3px; flex: 0 0 auto; }
-.menu__dish.is-out { opacity: 0.55; }
-.menu__dishOut { display: inline-block; margin-top: 16px; font-size: 13.5px; color: #b05346; }
-.menu__list--dim { filter: blur(1px); opacity: 0.4; }
+.menu__dishCta:hover { background: var(--text); color: var(--surface); }
+.menu__dishCta:active { transform: scale(0.98); }
+.menu__dishImg {
+  width: 104px; height: 104px; object-fit: cover; border-radius: var(--radius);
+  flex: 0 0 auto; background: var(--sand);
+}
+.menu__dish.is-out { opacity: 0.5; }
+.menu__dish.is-out .menu__dishImg { filter: grayscale(1); }
+.menu__dishOut { display: inline-block; margin-top: 14px; font-size: 13.5px; color: var(--danger); }
+.menu__list--dim { filter: blur(1px); opacity: 0.35; }
 .menu--dim .menu__dishCta { pointer-events: none; }
 
-.menu__cartBar {
-  position: sticky; bottom: 24px; margin: 0 48px; background: var(--text); color: #fff;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 24px; border-radius: 3px; font-size: 14.5px;
-}
-.menu__cartBtn { color: #fff; text-decoration: underline; text-underline-offset: 3px; font-weight: 500; }
+/* ---------------------------------------------------------------- cart bar */
 
-.sheet { position: absolute; inset: 0; background: rgba(17, 19, 24, 0.45); display: grid; place-items: center; padding: 40px 24px; }
+.menu__cartBar {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: 24px; z-index: 20; width: min(calc(100% - 96px), 784px);
+  background: var(--text); color: var(--surface);
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 14px 14px 14px 22px; border-radius: 999px;
+  font-size: 14.5px;
+}
+.menu__cartCount strong { font-weight: 600; }
+.menu__cartBtn {
+  color: var(--text); background: var(--surface); text-decoration: none;
+  font-weight: 600; font-size: 14px; padding: 11px 20px; border-radius: 999px;
+  white-space: nowrap; flex: 0 0 auto;
+}
+
+/* ------------------------------------------------------------------- sheet */
+
+/* The dish sheet. A bottom sheet on a phone -- thumb-reachable, dismissible by
+   the scrim or Escape -- and a centred panel from tablet up. The scrim is a
+   link, not a div with a handler: it is a way out of the sheet, so it is a
+   control that assistive technology can find and that works without JS. */
+.sheet__scrim {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(22, 20, 15, 0.42);
+  animation: scrim-in var(--dur-2) var(--ease-out) both;
+}
+.sheet {
+  position: fixed; inset: 0; z-index: 41;
+  display: grid; place-items: end center; padding: 0;
+  pointer-events: none;
+}
 .sheet__panel {
-  background: #fff; width: min(580px, 100%); max-height: 100%; overflow: auto;
-  padding: 34px; border-radius: 3px;
+  pointer-events: auto;
+  background: var(--surface); width: min(560px, 100%);
+  max-height: 92svh; overflow-y: auto; overscroll-behavior: contain;
+  padding: 26px 28px calc(22px + env(safe-area-inset-bottom));
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  border: 1px solid var(--border); border-bottom: 0;
+  animation: sheet-up var(--dur-3) var(--ease-out) both;
+}
+/* The grab handle. It does nothing -- dragging is not implemented -- and that
+   is on purpose: a handle that implies a gesture the page does not have is a
+   small lie that costs a second of tugging. It is a visual cue for "this comes
+   from the bottom", and the scrim and Escape are the real exits. */
+.sheet__panel::before {
+  content: ''; display: block; width: 38px; height: 4px; border-radius: 999px;
+  background: var(--ink-14); margin: -8px auto 18px;
 }
 .sheet__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.sheet__kicker { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(17, 19, 24, 0.45); font-weight: 700; }
-.sheet__title { font-size: 28px; margin-top: 8px; letter-spacing: -0.02em; font-weight: 500; }
-.sheet__close { font-size: 24px; color: rgba(17, 19, 24, 0.4); line-height: 1; }
-.sheet__desc { margin-top: 10px; font-size: 14.5px; color: rgba(17, 19, 24, 0.6); line-height: 1.6; }
-.sheet__group { margin-top: 26px; }
-.sheet__label { font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(17, 19, 24, 0.45); font-weight: 700; margin-bottom: 10px; }
+.sheet__kicker {
+  font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--ink-45); font-weight: 700;
+}
+.sheet__title { font-size: clamp(22px, 4.6vw, 28px); margin-top: 6px; letter-spacing: -0.025em; font-weight: 500; }
+.sheet__close {
+  display: inline-grid; place-items: center; flex: 0 0 auto;
+  width: 40px; height: 40px; margin: -6px -8px 0 0; border-radius: 999px;
+  font-size: 22px; line-height: 1; color: var(--ink-45);
+  transition: background-color var(--dur-1) linear, color var(--dur-1) linear;
+}
+.sheet__close:hover { background: var(--ink-08); color: var(--text); }
+.sheet__desc { margin-top: 10px; font-size: 14.5px; color: var(--ink-60); line-height: 1.65; }
+.sheet__group { margin-top: 24px; }
+.sheet__label {
+  font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-45); font-weight: 700; margin-bottom: 8px;
+}
 .sheet__opt {
   display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center;
-  padding: 12px 0; border-bottom: 1px solid rgba(17, 19, 24, 0.1); cursor: pointer; font-size: 14.5px;
+  padding: 13px 2px; border-bottom: 1px solid var(--ink-08);
+  cursor: pointer; font-size: 14.5px;
+  transition: background-color var(--dur-1) linear;
 }
+.sheet__opt:hover { background: var(--ink-08); }
+.sheet__opt:last-child { border-bottom: 0; }
+.sheet__opt input { accent-color: var(--text); width: 17px; height: 17px; }
 .sheet__opt.is-on { font-weight: 600; }
 .sheet__chips { display: flex; gap: 10px; flex-wrap: wrap; }
 .sheet__chip {
-  border: 1px solid var(--border); background: none; padding: 9px 16px;
-  border-radius: 999px; font-size: 14px; cursor: pointer;
+  border: 1px solid var(--border); background: none; padding: 10px 16px;
+  border-radius: 999px; font: inherit; font-size: 14px; cursor: pointer;
+  min-height: 42px;
+  transition: background-color var(--dur-1) linear, color var(--dur-1) linear,
+    border-color var(--dur-1) linear, transform var(--dur-1) var(--ease-out);
 }
-.sheet__chip.is-on { background: var(--text); color: #fff; border-color: var(--text); }
-.sheet__foot { display: flex; gap: 14px; margin-top: 30px; }
-.sheet__qty { display: flex; align-items: center; gap: 16px; border: 1px solid var(--border); border-radius: 2px; padding: 8px 16px; }
-.sheet__qty button { background: none; border: 0; font-size: 18px; cursor: pointer; }
-.sheet__add { flex: 1; background: var(--text); color: #fff; border: 0; border-radius: 2px; font-size: 15px; cursor: pointer; }
+.sheet__chip:hover { border-color: var(--ink-40); }
+.sheet__chip:active { transform: scale(0.98); }
+.sheet__chip.is-on { background: var(--text); color: var(--surface); border-color: var(--text); }
+.sheet__chip[disabled] { opacity: 0.4; cursor: not-allowed; }
+
+/* Sticky footer: the button that commits the choice stays reachable however
+   many add-on groups a dish has. */
+.sheet__foot {
+  position: sticky; bottom: 0; z-index: 1;
+  display: flex; gap: 12px; margin-top: 26px;
+  padding-top: 14px; padding-bottom: 2px;
+  background: var(--surface);
+  border-top: 1px solid var(--ink-08);
+}
+.sheet__qty {
+  display: flex; align-items: center; gap: 12px; flex: 0 0 auto;
+  border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 6px;
+}
+.sheet__qty button {
+  background: none; border: 0; font-size: 19px; cursor: pointer;
+  width: 36px; height: 36px; border-radius: var(--radius-sm); color: var(--text);
+  transition: background-color var(--dur-1) linear;
+}
+.sheet__qty button:hover { background: var(--ink-08); }
+.sheet__qty .tnum { min-width: 18px; text-align: center; font-size: 15px; }
+.sheet__add {
+  flex: 1; min-height: 48px; border: 1px solid var(--text); border-radius: var(--radius-sm);
+  background: var(--text); color: var(--surface);
+  font: inherit; font-size: 15px; font-weight: 500; cursor: pointer;
+  transition: background-color var(--dur-2) var(--ease-out),
+    color var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out);
+}
+.sheet__add:hover { background: rgba(22, 20, 15, 0.86); }
+/* The confirmation. Colour, not a new element: the button the guest is
+   already touching becomes the receipt for the tap. */
+.sheet__add.is-added {
+  background: var(--ok); border-color: var(--ok); color: var(--surface);
+}
+
+@media (min-width: 761px) {
+  .sheet { place-items: center; padding: 40px 24px; }
+  .sheet__panel { border-radius: var(--radius-lg); border-bottom: 1px solid var(--border); }
+  .sheet__panel::before { display: none; }
+}
 
 /* ------------------------------------------------------------- cart / co */
 
-.cart { background: var(--page-bg); min-height: 100vh; }
-.cart__head { padding: 44px 48px 8px; }
-.cart__back { font-size: 14px; color: rgba(17, 19, 24, 0.6); }
-.cart__head h1 { font-size: 44px; margin-top: 18px; letter-spacing: -0.035em; font-weight: 500; }
-.cart__head p { margin-top: 10px; font-size: 14px; color: rgba(17, 19, 24, 0.55); }
-.cart__grid { display: grid; grid-template-columns: 1fr 380px; gap: 72px; padding: 36px 48px 96px; }
+/* The cart and the checkout are the same page shape: a heading, the order on
+   the left, the bill on the right, and one button that commits. On a phone
+   the bill moves below the order and the button moves into a fixed bar, so
+   the decision and the action are never more than a thumb apart. */
+
+.cart { background: var(--page-bg); min-height: 100vh; padding-bottom: 8px; }
+
+.cart__head { width: min(100%, 1000px); margin: 0 auto; padding: 42px 48px 8px; }
+.cart__kicker {
+  font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--ink-45); font-weight: 700;
+}
+.cart__back {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 32px;
+  font-size: 14px; color: var(--ink-60);
+  transition: color var(--dur-1) linear;
+}
+.cart__back:hover { color: var(--text); }
+.cart__head h1 {
+  font-size: clamp(30px, 4.4vw, 46px); margin-top: 14px;
+  letter-spacing: -0.038em; font-weight: 500; line-height: 1.04;
+}
+.cart__head p { margin-top: 10px; font-size: 14px; color: var(--ink-55); }
+/* The reference, in the header where it can be read to a cashier. */
+.cart__code {
+  margin-top: 16px; display: inline-flex; align-items: baseline; gap: 8px;
+  font-size: 13px; color: var(--ink-55);
+  border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px;
+  background: var(--surface);
+}
+.cart__code strong { font-size: 14.5px; color: var(--text); letter-spacing: 0.04em; }
+
+.cart__grid {
+  display: grid; grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 64px; width: min(100%, 1000px); margin: 0 auto;
+  padding: 30px 48px 64px;
+}
+
 .cart__line {
-  display: grid; grid-template-columns: 1fr auto auto; gap: 34px; align-items: center;
-  padding: 24px 0; border-bottom: 1px solid rgba(17, 19, 24, 0.1);
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 28px; align-items: center;
+  padding: 22px 0; border-bottom: 1px solid var(--ink-08);
 }
 .cart__lineTop { display: flex; align-items: center; gap: 9px; }
-.cart__lineTop strong { font-size: 17px; font-weight: 500; }
-.cart__lineMeta { margin-top: 5px; font-size: 13px; color: rgba(17, 19, 24, 0.55); }
-.cart__linePrice { margin-top: 8px; font-size: 13px; color: rgba(17, 19, 24, 0.45); font-variant-numeric: tabular-nums; }
+.cart__lineTop strong { font-size: 16.5px; font-weight: 500; }
+.cart__linePrice { margin-top: 6px; font-size: 13px; color: var(--ink-45); font-variant-numeric: tabular-nums; }
 /* What the extras add. A line total above the menu price with nothing on
    screen to explain it reads as a wrong bill. */
-.cart__lineAddons { margin-top: 4px; font-size: 12.5px; color: rgba(17, 19, 24, 0.55); }
-.cart__qty { display: flex; align-items: center; gap: 15px; border: 1px solid var(--border); border-radius: 2px; padding: 7px 14px; }
-.cart__qty button { background: none; border: 0; font-size: 17px; cursor: pointer; }
-.cart__lineTotal { font-size: 17px; font-variant-numeric: tabular-nums; }
-.cart__empty { font-size: 15px; color: rgba(17, 19, 24, 0.5); padding: 32px 0; }
-.cart__sum { position: sticky; top: 24px; align-self: start; }
-.cart__sumCard { border: 1px solid var(--border); padding: 28px; border-radius: 3px; background: #fff; }
-.cart__sumCard h2 { font-size: 19px; font-weight: 500; margin-bottom: 18px; }
-.cart__cta {
-  display: block; margin-top: 22px; background: var(--text); color: #fff;
-  text-align: center; padding: 15px; border-radius: 2px; font-size: 15px;
+.cart__lineAddons { margin-top: 4px; font-size: 12.5px; color: var(--ink-55); }
+
+/* A stepper is the most-tapped control on this page, so it is 40px tall with
+   44px targets and usable one-handed. */
+.cart__qty {
+  display: flex; align-items: center; gap: 4px;
+  border: 1px solid var(--border); border-radius: 999px; padding: 3px;
+  background: var(--surface);
 }
-.cart__fine { margin-top: 14px; font-size: 12px; color: rgba(17, 19, 24, 0.5); line-height: 1.6; }
+.cart__qty button {
+  background: none; border: 0; cursor: pointer; color: var(--text);
+  width: 36px; height: 36px; border-radius: 999px;
+  font-size: 17px; line-height: 1;
+  display: grid; place-items: center;
+  transition: background-color var(--dur-1) linear;
+}
+.cart__qty button:hover { background: var(--ink-08); }
+.cart__qty .tnum { min-width: 20px; text-align: center; font-size: 14.5px; }
+.cart__lineTotal { font-size: 16.5px; font-variant-numeric: tabular-nums; text-align: right; }
+
+.cart__empty { font-size: 14.5px; color: var(--ink-55); padding: 26px 0; line-height: 1.65; }
+.cart__sum { position: sticky; top: 24px; align-self: start; }
+.cart__sumCard {
+  border: 1px solid var(--border); padding: 26px;
+  border-radius: var(--radius); background: var(--surface);
+}
+.cart__sumCard h2 { font-size: 18px; font-weight: 500; margin-bottom: 16px; letter-spacing: -0.01em; }
+
+.totals__row {
+  display: flex; justify-content: space-between; gap: 16px;
+  font-size: 14.5px; padding: 7px 0; color: var(--ink-70);
+  font-variant-numeric: tabular-nums;
+}
+.totals__row--total {
+  border-top: 1px solid var(--border); margin-top: 8px; padding-top: 15px;
+  font-size: 19px; font-weight: 600; color: var(--text);
+}
+.totals__note { margin-top: 12px; font-size: 11.5px; line-height: 1.6; color: var(--ink-40); }
+
+.cart__cta, .co__cta {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 50px; margin-top: 22px;
+  background: var(--text); color: var(--surface); border: 0;
+  text-align: center; border-radius: var(--radius-sm);
+  font: inherit; font-size: 15px; font-weight: 500; cursor: pointer;
+  text-decoration: none;
+  transition: background-color var(--dur-1) linear, transform var(--dur-1) var(--ease-out);
+}
+.cart__cta:hover, .co__cta:hover { background: rgba(22, 20, 15, 0.86); }
+.cart__cta:active, .co__cta:active { transform: translateY(1px); }
+.cart__cta[disabled], .co__cta[disabled] { opacity: 0.45; cursor: not-allowed; transform: none; }
+.cart__fine { margin-top: 12px; font-size: 12px; color: var(--ink-45); line-height: 1.65; }
+/* An error from the order action, inside the page's own column so it does not
+   read as a site-wide failure banner. */
+.cart__alertWrap { width: min(100%, 1000px); margin: 0 auto; padding: 18px 48px 0; }
+
+/* The phone-only action bars. Present in the markup for every width and shown
+   only where the bill is out of reach; see the 760px block. */
+.cart__bar, .co__bar { display: none; }
+
+/* ---------------------------------------------------------------- checkout */
 
 .co { background: var(--page-bg); min-height: 100vh; }
-.co__head { padding: 44px 48px 8px; }
-.co__back { font-size: 14px; color: rgba(17, 19, 24, 0.6); }
-.co__head h1 { font-size: 40px; margin-top: 18px; letter-spacing: -0.03em; font-weight: 500; }
-.co__head p { margin-top: 10px; font-size: 14px; color: rgba(17, 19, 24, 0.55); }
-.co__grid { display: grid; grid-template-columns: 1fr 380px; gap: 72px; padding: 36px 48px 96px; }
-.co__h2 { font-size: 19px; font-weight: 500; margin: 34px 0 18px; }
+.co__head { width: min(100%, 1000px); margin: 0 auto; padding: 42px 48px 8px; }
+.co__back {
+  display: inline-flex; align-items: center; min-height: 32px;
+  font-size: 14px; color: var(--ink-60); text-decoration: none;
+  transition: color var(--dur-1) linear;
+}
+.co__back:hover { color: var(--text); }
+.co__head h1 {
+  font-size: clamp(28px, 4vw, 42px); margin-top: 14px;
+  letter-spacing: -0.035em; font-weight: 500; line-height: 1.05;
+}
+.co__head p { margin-top: 10px; font-size: 14px; color: var(--ink-55); }
+
+.co__grid {
+  display: grid; grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 64px; width: min(100%, 1000px); margin: 0 auto;
+  padding: 30px 48px 64px;
+}
+.co__h2 { font-size: 18px; font-weight: 500; margin: 32px 0 14px; letter-spacing: -0.01em; }
 .co__h2:first-child { margin-top: 0; }
-.co__methods { display: grid; gap: 14px; }
-.co__method {
-  text-align: left; border: 1px solid var(--border); background: #fff; border-radius: 3px;
-  padding: 20px 22px; cursor: pointer;
+
+/* One stated method. See the note in CheckoutScreen: two dead buttons were
+   the previous shape, and they read as a broken page. */
+.co__pay {
+  border: 1px solid var(--border); border-left: 2px solid var(--accent);
+  border-radius: var(--radius); background: var(--surface);
+  padding: 20px 22px;
 }
-.co__method.is-on { border: 2px solid var(--text); padding: 19px 21px; background: #f1efe9; }
-.co__methodTop { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-.co__methodTop strong { font-size: 17px; font-weight: 500; }
-.co__methodTop span { font-size: 12.5px; color: rgba(17, 19, 24, 0.5); }
-.co__method p { margin-top: 10px; font-size: 13.5px; color: rgba(17, 19, 24, 0.62); line-height: 1.6; }
-.co__note {
-  margin-top: 18px; font-size: 13.5px; line-height: 1.7; color: rgba(17, 19, 24, 0.66);
-  border-left: 2px solid #e8e2d8; padding-left: 16px;
+.co__payRow { display: flex; align-items: center; gap: 12px; }
+.co__payMark {
+  width: 18px; height: 18px; border-radius: 50%; flex: 0 0 auto;
+  border: 5px solid var(--text); background: var(--surface);
 }
-.co__items { display: grid; gap: 12px; }
-.co__items li { display: flex; align-items: center; gap: 10px; font-size: 14.5px; }
-.co__items li span:nth-child(2) { flex: 1; }
-.co__sum { border: 1px solid var(--border); background: #fff; padding: 28px; border-radius: 3px; align-self: start; position: sticky; top: 24px; }
-.co__sum h2 { font-size: 19px; font-weight: 500; margin-bottom: 18px; }
-.co__row { display: flex; justify-content: space-between; font-size: 14.5px; padding: 8px 0; }
-.co__row--total { border-top: 1px solid var(--border); margin-top: 10px; padding-top: 16px; font-size: 19px; font-weight: 600; }
-.co__cta { width: 100%; margin-top: 22px; background: var(--text); color: #fff; border: 0; padding: 15px; border-radius: 2px; font-size: 15px; cursor: pointer; }
-.co__fine { margin-top: 12px; font-size: 12px; color: rgba(17, 19, 24, 0.5); }
+.co__payRow strong { font-size: 16.5px; font-weight: 500; display: block; }
+.co__payRow span { font-size: 12.5px; color: var(--ink-55); }
+.co__payNote {
+  margin-top: 12px; font-size: 13.5px; line-height: 1.65; color: var(--ink-70);
+}
+.co__payNote--soft { color: var(--ink-55); }
+
+.co__items { display: grid; gap: 10px; }
+.co__items li {
+  display: flex; align-items: baseline; gap: 10px;
+  font-size: 14.5px; padding: 6px 0;
+}
+.co__items li > span:nth-child(2) { flex: 1; min-width: 0; }
+.co__items .tnum { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.co__noteForm { margin-top: 22px; display: grid; gap: 8px; }
+
+.co__sum {
+  border: 1px solid var(--border); background: var(--surface);
+  padding: 26px; border-radius: var(--radius); align-self: start;
+  position: sticky; top: 24px;
+}
+.co__sum h2 { font-size: 18px; font-weight: 500; margin-bottom: 16px; letter-spacing: -0.01em; }
+.co__row {
+  display: flex; justify-content: space-between; gap: 16px;
+  font-size: 14.5px; padding: 7px 0; color: var(--ink-70);
+  font-variant-numeric: tabular-nums;
+}
+.co__row--total {
+  border-top: 1px solid var(--border); margin-top: 8px; padding-top: 15px;
+  font-size: 19px; font-weight: 600; color: var(--text);
+}
+.co__fine { margin-top: 12px; font-size: 12px; color: var(--ink-45); line-height: 1.65; }
+
+/* Placed-order screen: the reference and status belong above the bill, not
+   buried in the lines. */
+.cart--placed .cart__head { padding-bottom: 14px; }
+.cart--placed .cart__code { margin-top: 14px; }
+
+/* ------------------------------------------------------- table verify / gate */
+
+.qr .pg__bar { border-bottom-color: var(--border); }
+
+/* The code form is one question on an otherwise empty page. It is centred,
+   capped, and given room: the field is the only thing a guest has to find. */
+[data-app] .qr__card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 32px 30px;
+}
+[data-app] .qr__form { margin-top: 22px; }
+[data-app] .qr__submit { width: 100%; min-height: 50px; margin-top: 18px; }
+[data-app] .qr__submit[disabled] { opacity: 0.5; cursor: progress; }
+/* The digits are the point. Big, spaced, tabular, and centred so a mistyped
+   digit is visible at a glance rather than read character by character. */
+[data-app] .pg__codeInput {
+  font-size: clamp(26px, 7vw, 32px); letter-spacing: 0.3em; text-align: center;
+  font-variant-numeric: tabular-nums; padding: 16px 10px 16px 18px;
+  background: var(--page-bg); border-color: var(--ink-40);
+}
+[data-app] .pg__codeInput:focus { border-color: var(--text); background: var(--surface); }
+[data-app] .pg__codeInput::placeholder { letter-spacing: 0.3em; color: var(--ink-40); }
 
 /* ---------------------------------------------------------------- kitchen */
 
@@ -1033,15 +1340,16 @@
   .dash__rank li { grid-template-columns: 24px minmax(0, 1fr) auto auto; gap: 10px; }
 
   .menu__head { padding: 36px 28px 20px; }
-  .menu__cats { padding-inline: 28px; gap: 24px; overflow-x: auto; }
-  .menu__list { padding: 4px 28px 120px; }
+  .menu__menus { padding-inline: 28px; }
+  .menu__cats { padding-inline: 28px; gap: 24px; }
+  .menu__list { padding: 4px 28px 140px; }
   .menu__dish { gap: 22px; }
-  .menu__cartBar { margin-inline: 28px; }
+  .menu__cartBar { width: min(calc(100% - 56px), 784px); }
 
   .cart__head, .co__head { padding-inline: 28px; }
   .cart__grid, .co__grid { grid-template-columns: minmax(0, 1fr) 320px; gap: 32px; padding-inline: 28px; }
   .cart__line { gap: 18px; }
-  .cart__sumCard, .co__sum, .cash__detail { padding: 24px; }
+  .cart__sumCard, .co__sum, .cash__detail { padding: 22px; }
 
   .kb__head { padding: 22px 28px 18px; align-items: flex-start; flex-wrap: wrap; }
   /* Two columns, and the third takes the full width underneath: three queues
@@ -1102,34 +1410,77 @@
   .dash__rank li > :last-child { grid-column: 2 / -1; justify-self: end; }
   .dash__main .ui-table { display: block; max-width: 100%; overflow-x: auto; white-space: nowrap; }
 
-  .menu__head { display: grid; gap: 14px; padding: 28px 20px 18px; }
-  .menu__venueName { font-size: 26px; }
-  .menu__verified { font-size: 12px; }
-  .menu__cats { gap: 20px; padding-inline: 20px; }
-  .menu__cat { min-height: 44px; flex: 0 0 auto; }
-  .menu__list { padding: 0 20px 110px; }
-  .menu__dish { gap: 14px; padding: 22px 0; }
+  .menu__head { display: grid; gap: 12px; padding: 26px 20px 16px; }
+  .menu__venueName { font-size: 25px; }
+  .menu__verified { font-size: 12px; justify-self: start; }
+  .menu__menus { padding-inline: 20px; }
+  .menu__cats { gap: 20px; padding-inline: 20px; top: 0; }
+  .menu__cat { min-height: 46px; flex: 0 0 auto; padding: 0; }
+  .menu__list { padding: 0 20px calc(112px + env(safe-area-inset-bottom)); }
+  .menu__dish { gap: 14px; padding: 20px 0; }
   .menu__dishImg { width: 76px; height: 76px; }
-  .menu__dishName { font-size: 18px; }
+  .menu__dishName { font-size: 17.5px; }
   .menu__dishDesc { font-size: 14px; }
-  .menu__cartBar { position: fixed; z-index: 5; left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); margin: 0; padding: 14px 16px; border-radius: 10px; }
+  /* Full-width pill above the home indicator. It is the only way forward from
+     the menu, so it is fixed, thumb-high, and never behind the fold. */
+  .menu__cartBar {
+    left: 12px; right: 12px; transform: none; width: auto;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    border-radius: 14px; padding: 12px 12px 12px 18px;
+    /* The desktop entry animation centres the bar with translateX(-50%), which
+       would fight the left/right anchoring here. Same motion, no horizontal
+       component. */
+    animation-name: bar-up;
+  }
+  .menu__cartBtn { padding: 11px 16px; }
   .sheet { position: fixed; z-index: 10; align-items: end; padding: 12px 0 0; }
-  .sheet__panel { width: 100%; max-height: 92svh; padding: 24px 20px max(20px, env(safe-area-inset-bottom)); border-radius: 16px 16px 0 0; }
-  .sheet__foot { position: sticky; bottom: 0; background: var(--surface); padding-top: 12px; }
-  .sheet__add { min-height: 46px; }
+  .sheet__panel { width: 100%; padding: 22px 20px calc(18px + env(safe-area-inset-bottom)); }
+  .sheet__foot { gap: 10px; }
+  .sheet__add { min-height: 50px; font-size: 14.5px; }
 
-  .cart__head, .co__head { padding: 28px 20px 6px; }
-  .cart__head h1 { font-size: 36px; }
-  .co__head h1 { font-size: 34px; }
-  .cart__grid, .co__grid { grid-template-columns: minmax(0, 1fr); gap: 26px; padding: 26px 20px 48px; }
-  .cart__line { grid-template-columns: minmax(0, 1fr) auto; gap: 10px 12px; padding: 18px 0; }
+  .cart__head, .co__head { padding: 30px 20px 6px; }
+  .cart__alertWrap { padding: 14px 20px 0; }
+  .cart__head h1 { font-size: 32px; }
+  .co__head h1 { font-size: 30px; }
+  .cart__grid, .co__grid { grid-template-columns: minmax(0, 1fr); gap: 24px; padding: 24px 20px 40px; }
+  .cart__line { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 18px 0; }
+  .cart__lineTop strong { font-size: 16px; }
   .cart__lineTotal { grid-column: 2; grid-row: 1; align-self: start; }
   .cart__qty { grid-column: 1 / -1; justify-self: start; }
   .cart__sum { position: static; }
   .cart__sumCard, .co__sum { padding: 20px; }
-  .co__method { padding: 16px; }
-  .co__method.is-on { padding: 15px; }
   .co__items li { align-items: flex-start; }
+
+  /* The bill is below the order on a phone, so its button is repeated here,
+     fixed, with the number the guest is deciding about. The inline copy is
+     hidden so there are never two visible "Place order" buttons. */
+  .cart__mobileHidden { display: none; }
+  .cart__sumCard .cart__cta, .co__sum .co__cta { display: none; }
+
+  .cart__bar, .co__bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    position: fixed; z-index: 20; left: 0; right: 0; bottom: 0;
+    padding: 12px 20px max(12px, env(safe-area-inset-bottom));
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+  .cart__barTotal, .co__barTotal { display: flex; flex-direction: column; gap: 2px; }
+  .cart__barLabel, .co__barLabel {
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--ink-45); font-weight: 700;
+  }
+  .cart__barTotal strong, .co__barTotal strong { font-size: 18px; font-weight: 600; }
+  .cart__barCta, .co__barCta {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-height: 48px; padding: 0 26px; border-radius: var(--radius-sm);
+    background: var(--text); color: var(--surface); border: 0;
+    font: inherit; font-size: 15px; font-weight: 500; cursor: pointer;
+    text-decoration: none; white-space: nowrap;
+  }
+  /* Clears the fixed bar so the last line and the fine print are not under it. */
+  .cart, .co { padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+
+  [data-app] .qr__card { padding: 24px 20px; }
 
   .kb__head { padding: 20px 20px 16px; align-items: flex-start; flex-direction: column; gap: 14px; }
   /* One scrollable rail instead of four wrapped rows: the controls are used in
@@ -1225,10 +1576,16 @@
   .dash__rankSold, .dash__rank li > :last-child { grid-column: 2; justify-self: start; }
   .menu__dish { align-items: flex-start; }
   .menu__dishImg { width: 64px; height: 64px; }
+  .menu__head { padding-inline: 16px; }
+  .menu__list { padding-inline: 16px; }
+  .menu__menus, .menu__cats { padding-inline: 16px; }
   .sheet__foot { gap: 8px; }
-  .sheet__qty { gap: 10px; padding-inline: 10px; }
-  .sheet__add { padding: 10px; font-size: 13px; }
+  .sheet__qty { gap: 4px; padding-inline: 2px; }
+  .sheet__qty button { width: 32px; }
+  .sheet__add { padding: 10px 12px; font-size: 13.5px; }
   .cart__sumCard, .co__sum, .cash__detail { padding: 16px; }
+  .cart__head, .co__head { padding-inline: 16px; }
+  .cart__grid, .co__grid { padding-inline: 16px; }
   [data-app] .pg__printGrid { grid-template-columns: 1fr 1fr; gap: 8px; }
   [data-app] .pg__printCard { padding: 10px; }
   .kb__head { padding: 18px 16px 14px; }
@@ -1287,6 +1644,62 @@
     50% { opacity: 0.4; }
   }
   .kb__liveDot { animation: kb-pulse 2.4s var(--ease-inout) infinite; }
+
+  /* ------------------------------------------------------ guest journey
+
+     The guest flow is used once, by someone standing in a restaurant, on a
+     phone they may be holding in one hand. Motion here does one job: tell
+     them which way the page just moved. Nothing is decorative, nothing
+     replays, and every animation ends at the resting state. */
+
+  @keyframes g-rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Dishes arrive in reading order rather than all at once, so the eye is led
+     down the list instead of landing in the middle of it. Capped at the first
+     eight: past that the list is being scrolled, not read. */
+  .menu__dish { animation: g-rise var(--dur-3) var(--ease-out) both; }
+  .menu__dish:nth-child(2) { animation-delay: 40ms; }
+  .menu__dish:nth-child(3) { animation-delay: 80ms; }
+  .menu__dish:nth-child(4) { animation-delay: 120ms; }
+  .menu__dish:nth-child(5) { animation-delay: 160ms; }
+  .menu__dish:nth-child(6) { animation-delay: 200ms; }
+  .menu__dish:nth-child(7) { animation-delay: 240ms; }
+  .menu__dish:nth-child(8) { animation-delay: 280ms; }
+
+  /* The cart bar rises the first time there is something in it, and again on
+     each add because the element is keyed by the count. */
+  @keyframes bar-in {
+    from { opacity: 0; transform: translate(-50%, 14px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+  }
+  .menu__cartBar { animation: bar-in var(--dur-3) var(--ease-out) both; }
+
+  @keyframes scrim-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes sheet-up {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Cart lines and the bill fade in as the stored cart is read. Without it
+     the page pops from "Loading your order…" to a full list in one frame. */
+  .cart__line, .totals, .co__items li { animation: g-rise var(--dur-2) var(--ease-out) both; }
+
+  /* The phone action bar slides up once, when it becomes relevant. */
+  @keyframes bar-up {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  .cart__bar, .co__bar { animation: bar-up var(--dur-3) var(--ease-out) both; }
+
+  /* The verifying dot: three seconds of quiet life while the code is checked,
+     so a slow check does not look like a dead button. */
+  .menu__verifiedDot { animation: kb-pulse 3s var(--ease-inout) infinite; }
 }
 
 @media (prefers-reduced-motion: reduce) {

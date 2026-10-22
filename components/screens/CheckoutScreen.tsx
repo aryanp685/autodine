@@ -64,39 +64,36 @@ export function Checkout({
 
       <div className="co__grid">
         <div>
-          <h2 className="co__h2">How would you like to pay?</h2>
+          {/*
+            ONE method, stated, not two buttons with one of them disabled.
 
-          <div className="co__methods">
-            <button
-              type="button"
-              className="co__method is-on"
-              aria-pressed="true"
-              disabled
-              // Not a choice yet: it is the only way to pay, so it reads as
-              // selected and inactive rather than as one of two options.
-            >
-              <div className="co__methodTop">
-                <strong>Pay at counter</strong>
+            This used to be a pair of cards -- "Pay at counter" already selected
+            and unclickable, next to "Pay online" greyed out. Two dead controls
+            in the most important moment of the flow read as a broken page: a
+            guest taps the second one and concludes the checkout does not work.
+            There is no choice to make here, because an order has to exist
+            before it can be paid for, so the screen states the one thing that
+            will happen and says plainly what comes next.
+          */}
+          <h2 className="co__h2">How you will pay</h2>
+
+          <div className="co__pay">
+            <div className="co__payRow">
+              <span className="co__payMark" aria-hidden="true" />
+              <div>
+                <strong>At the counter</strong>
                 <span>Cash · Card · UPI</span>
               </div>
-              <p>
-                Your order goes to the kitchen straight away, marked payment pending.
-                Pay the cashier before you leave; the receipt is issued once the payment
-                is recorded.
-              </p>
-            </button>
-
-            <button type="button" className="co__method" aria-disabled="true" disabled>
-              <div className="co__methodTop">
-                <strong>Pay online</strong>
-                <span>{onlinePaymentAvailable ? 'Card · UPI, after you order' : 'Not available here'}</span>
-              </div>
-              <p>
-                {onlinePaymentAvailable
-                  ? 'Place the order first, then pay by card or UPI on your order page. Your order is marked paid only when the payment gateway confirms it.'
-                  : 'This restaurant takes payment at the counter. Your order still goes to the kitchen straight away.'}
-              </p>
-            </button>
+            </div>
+            <p className="co__payNote">
+              Your order goes to the kitchen straight away and is marked payment pending. Pay the
+              cashier before you leave; the receipt is issued once the payment is recorded.
+            </p>
+            <p className="co__payNote co__payNote--soft">
+              {onlinePaymentAvailable
+                ? 'This restaurant also takes card or UPI online, on the order page you reach after placing — the order is marked paid only when the gateway confirms it.'
+                : 'Card and UPI are accepted at the counter. Nothing is charged from your phone.'}
+            </p>
           </div>
 
           <h2 className="co__h2">Your order</h2>
@@ -169,6 +166,21 @@ export function Checkout({
           </p>
         </aside>
       </div>
+
+      {/* Phones only: the bill is below the order on a narrow screen, so the
+          one button that completes the flow would otherwise be off-screen.
+          It submits the same form from here. */}
+      {canOrder && (
+        <div className="co__bar">
+          <span className="co__barTotal">
+            <span className="co__barLabel">Total</span>
+            <strong className="tnum">{inr(paiseToRupees(totalPaise))}</strong>
+          </span>
+          <button type="submit" form="co-place-order" className="co__barCta">
+            Place order
+          </button>
+        </div>
+      )}
     </div>
   );
 }

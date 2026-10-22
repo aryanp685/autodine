@@ -200,6 +200,24 @@ export function Cart({
           </div>
         </aside>
       </div>
+
+      {/*
+        Phones only. The bill sits below the lines on a narrow screen, which
+        puts "Continue to checkout" past the end of a long order -- the one
+        button on the page, out of reach. This bar is the same destination,
+        always at the bottom, with the number the guest is deciding about.
+      */}
+      {priced.lines.length > 0 && (
+        <div className="cart__bar">
+          <span className="cart__barTotal">
+            <span className="cart__barLabel">Total</span>
+            <strong className="tnum">{inr(paiseToRupees(totalPaise))}</strong>
+          </span>
+          <Link href={withSlug('/menu/checkout')} className="cart__barCta">
+            Checkout
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
