@@ -62,8 +62,13 @@ export function Checkout({
           ← Back to cart
         </Link>
         <h1>Checkout</h1>
+        {/* The count appears once the stored cart has been read. Until then
+            it would read "0 items" over an order that is still loading. */}
         <p>
-          {restaurantName ?? 'Your table'} · {cart.count} item{cart.count === 1 ? '' : 's'}
+          {restaurantName ?? 'Your table'}
+          {cart.ready && cart.count > 0
+            ? ` · ${cart.count} ${cart.count === 1 ? 'item' : 'items'}`
+            : null}
         </p>
       </header>
 

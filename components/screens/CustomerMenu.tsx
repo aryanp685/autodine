@@ -140,6 +140,17 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
         !line.variantId &&
         (!line.addonIds || line.addonIds.length === 0),
     )?.qty ?? 0;
+  /* How much menu there is, in one line under the venue's name. A guest
+     deciding whether to order another round is asking a size question, and
+     two true numbers beat an adjective. Both come from the data on screen. */
+  const menuMeta = [
+    restaurant.tagline?.trim(),
+    items.length > 0 ? `${items.length} ${items.length === 1 ? 'dish' : 'dishes'}` : null,
+    categories.length > 1 ? `${categories.length} courses` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   const itemHref = (itemId: string) => {
     const params = new URLSearchParams({ item: itemId });
     if (data?.restaurant.slug) params.set('s', data.restaurant.slug);
@@ -156,7 +167,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
         <div className="menu__venue">
           <div className="menu__kicker">The menu</div>
           <h1 className="menu__venueName">{restaurant.name}</h1>
-          <div className="menu__venueMeta">{restaurant.tagline}</div>
+          <div className="menu__venueMeta">{menuMeta}</div>
         </div>
         {table ? (
           <div className="menu__verified">
