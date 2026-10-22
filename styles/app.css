@@ -27,116 +27,6 @@
   background: var(--p-paper);
 }
 
-[data-app] .appBar {
-  position: sticky;
-  top: 0;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  gap: clamp(12px, 2vw, 28px);
-  padding: 0 var(--p-gutter);
-  height: 62px;
-  border-bottom: 1px solid var(--p-line);
-  background: var(--p-glass);
-  -webkit-backdrop-filter: saturate(1.4) blur(18px);
-  backdrop-filter: saturate(1.4) blur(18px);
-}
-
-[data-app] .appBar__left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 0 0 auto;
-}
-
-[data-app] .appBar__brand {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--p-ink);
-  text-decoration: none;
-}
-
-/* The outlet the session is working on, as an initial mark. Not an avatar:
-   this is a workspace selector, and it is also a switcher two elements away. */
-[data-app] .appBar__venue {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 1px solid var(--p-line-strong);
-  font-size: 0.5625rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--p-ink-64);
-}
-
-[data-app] .appBar__nav {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
-  flex: 1 1 auto;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-[data-app] .appBar__nav::-webkit-scrollbar { display: none; }
-
-[data-app] .appBar__nav a {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  height: 62px;
-  padding: 0 12px;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  letter-spacing: -0.005em;
-  color: var(--p-ink-46);
-  text-decoration: none;
-  position: relative;
-  transition: color var(--p-d1) linear;
-}
-
-[data-app] .appBar__nav a:hover { color: var(--p-ink); }
-
-/* The current page is marked with a rule, not a pill: eight pills in a row
-   would read as eight buttons rather than as a place in a product. */
-[data-app] .appBar__nav a.is-active { color: var(--p-ink); }
-
-[data-app] .appBar__nav a.is-active::after {
-  content: '';
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: -1px;
-  height: 1px;
-  background: var(--p-ink);
-}
-
-[data-app] .appBar__right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 0 0 auto;
-}
-
-[data-app] .appBar__signOut {
-  border: 0;
-  background: none;
-  padding: 8px 0;
-  font: inherit;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--p-ink-46);
-  cursor: pointer;
-  transition: color var(--p-d1) linear;
-}
-
-[data-app] .appBar__signOut:hover { color: var(--p-ink); }
-
 /* --------------------------------------------------------- page frames */
 
 /* The loading boundary has to occupy the same box as the page it replaces, or
@@ -1068,11 +958,6 @@
 }
 
 @media (max-width: 860px) {
-  [data-app] .appBar { height: auto; flex-wrap: wrap; padding-block: 10px; gap: 8px 14px; }
-  [data-app] .appBar__nav { order: 3; width: 100%; }
-  [data-app] .appBar__nav a { height: 36px; padding: 0 10px; }
-  [data-app] .appBar__nav a.is-active::after { left: 10px; right: 10px; bottom: 0; }
-  [data-app] .appBar__right { margin-left: auto; }
 
   [data-app] .kb__cols { grid-template-columns: minmax(0, 1fr); }
   [data-app] .kb__col { display: none; }
@@ -3584,4 +3469,413 @@
   [data-app] .photoImport__priceField .ui-input { width: 100%; }
   [data-app] .photoImport__footer { flex-direction: column; align-items: stretch; }
   [data-app] .photoImport__footer .pg__btn { width: 100%; }
+}
+
+/* =========================================================================
+   The staff shell (components/DashboardBar.tsx)
+
+   A fixed rail + a sticky top bar. The rail is padding on `.pg--dash` rather
+   than a grid column, because every screen already renders the bar as its
+   first child and a fixed element needs no change to the tree it sits in --
+   which is what keeps this from being a rewrite of nine screens.
+   ========================================================================= */
+
+/* The rail's width. One number, used by the rail and by the padding that keeps
+   content out from under it -- declared on the app root rather than on
+   `.pg--dash` so a screen cannot half-adopt the shell. */
+[data-app] { --shell-rail: 232px; }
+
+[data-app] .shell__rail {
+  position: fixed;
+  inset-block: 0;
+  left: 0;
+  z-index: 40;
+  width: var(--shell-rail);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 18px 12px 12px;
+  background: var(--p-surface);
+  border-right: 1px solid var(--p-line);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+[data-app] .shell__brandRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 14px;
+}
+
+[data-app] .shell__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--p-ink);
+  text-decoration: none;
+  border-radius: var(--p-r-sm);
+}
+
+[data-app] .shell__brand:focus-visible { outline: 2px solid var(--p-accent); outline-offset: 3px; }
+
+[data-app] .shell__mark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--p-accent);
+  color: var(--p-on-ink);
+  flex: 0 0 auto;
+}
+
+[data-app] .shell__close {
+  display: none;
+  width: 44px;
+  height: 44px;
+  margin-right: -8px;
+  border: 0;
+  background: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--p-ink-64);
+  cursor: pointer;
+  border-radius: var(--p-r-sm);
+}
+
+[data-app] .shell__outlet {
+  padding: 0 8px 12px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--p-line);
+}
+
+[data-app] .shell__nav { display: grid; gap: 18px; padding-top: 12px; }
+
+[data-app] .shell__group { display: grid; gap: 2px; }
+
+[data-app] .shell__groupName {
+  padding: 0 10px 6px;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .shell__link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 9px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--p-ink-64);
+  text-decoration: none;
+  transition: background var(--p-d1) var(--p-ease), color var(--p-d1) var(--p-ease);
+}
+
+[data-app] .shell__link:hover { background: var(--p-ink-07); color: var(--p-ink); }
+
+[data-app] .shell__link.is-active {
+  background: var(--p-accent-soft);
+  color: var(--p-ink);
+}
+
+[data-app] .shell__link:focus-visible { outline: 2px solid var(--p-accent); outline-offset: -1px; }
+
+[data-app] .shell__icon { display: grid; place-items: center; color: currentColor; opacity: 0.9; }
+
+[data-app] .shell__link.is-active .shell__icon { color: var(--p-accent); opacity: 1; }
+
+[data-app] .shell__foot {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--p-line);
+  display: grid;
+  gap: 6px;
+}
+
+[data-app] .shell__who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  min-width: 0;
+}
+
+[data-app] .shell__avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--p-paper-deep);
+  color: var(--p-ink);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+[data-app] .shell__whoText { display: grid; min-width: 0; }
+
+[data-app] .shell__whoName {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--p-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-app] .shell__whoRole {
+  font-size: 0.6875rem;
+  color: var(--p-ink-46);
+  text-transform: capitalize;
+}
+
+[data-app] .shell__signOut {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--p-ink-64);
+  cursor: pointer;
+  text-align: left;
+}
+
+[data-app] .shell__signOut:hover { background: var(--p-ink-07); color: var(--p-ink); }
+
+/* ---- top bar ----------------------------------------------------------- */
+
+[data-app] .shell__top {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px clamp(16px, 3vw, 28px);
+  background: color-mix(in srgb, var(--p-surface) 88%, transparent);
+  backdrop-filter: saturate(150%) blur(10px);
+  border-bottom: 1px solid var(--p-line);
+}
+
+[data-app] .shell__menuBtn {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px 0 8px;
+  margin-left: -8px;
+  border: 0;
+  border-radius: var(--p-r-sm);
+  background: none;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--p-ink);
+  cursor: pointer;
+}
+
+[data-app] .shell__menuBtn:hover { background: var(--p-ink-07); }
+
+[data-app] .shell__menuBars { display: grid; gap: 3px; width: 16px; }
+[data-app] .shell__menuBars i {
+  display: block;
+  height: 1.5px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+[data-app] .shell__crumbs {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+[data-app] .shell__crumbNow {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--p-ink);
+  white-space: nowrap;
+}
+
+[data-app] .shell__crumbVenue {
+  font-size: 0.75rem;
+  color: var(--p-ink-46);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-app] .shell__topRight { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+/* ---- "Go to…" ---------------------------------------------------------- */
+
+[data-app] .shellSearch { position: relative; }
+
+[data-app] .shellSearch__input {
+  width: 200px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-pill);
+  background: var(--p-surface);
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--p-ink);
+  transition: width var(--p-d2) var(--p-ease), border-color var(--p-d1) var(--p-ease);
+}
+
+[data-app] .shellSearch__input::placeholder { color: var(--p-ink-46); }
+[data-app] .shellSearch__input:focus {
+  width: 260px;
+  outline: none;
+  border-color: var(--p-ink-46);
+  box-shadow: var(--p-shadow-1);
+}
+
+/* The browser's own clear button on type=search is a grey X at a different
+   optical size than everything else here. */
+[data-app] .shellSearch__input::-webkit-search-cancel-button { display: none; }
+
+[data-app] .shellSearch__panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 264px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
+  border-radius: var(--p-r);
+  border: 1px solid var(--p-line);
+  background: var(--p-surface);
+  box-shadow: var(--p-shadow-2);
+}
+
+[data-app] .shellSearch__item {
+  display: flex;
+  text-decoration: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--p-ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+[data-app] .shellSearch__item.is-on { background: var(--p-accent-soft); }
+
+[data-app] .shellSearch__group {
+  font-size: 0.6875rem;
+  color: var(--p-ink-46);
+}
+
+[data-app] .shellSearch__empty {
+  padding: 12px 10px;
+  font-size: 0.8125rem;
+  color: var(--p-ink-46);
+}
+
+/* ---- scrim ------------------------------------------------------------- */
+
+[data-app] .shell__scrim {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  border: 0;
+  padding: 0;
+  background: rgba(12, 11, 9, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--p-d2) var(--p-ease);
+  cursor: pointer;
+}
+
+/* ---- layouts ----------------------------------------------------------- */
+
+@media (min-width: 1101px) {
+  [data-app] .pg--dash { padding-left: var(--shell-rail); }
+
+  /* The rail is always on screen, so the drawer affordances do not exist. */
+  [data-app] .shell__close { display: none; }
+}
+
+@media (max-width: 1100px) {
+  [data-app] .shell__rail {
+    transform: translateX(-100%);
+    transition: transform var(--p-d2) var(--p-ease);
+    box-shadow: var(--p-shadow-2);
+    width: min(286px, 84vw);
+  }
+
+  [data-app] .shell__rail.is-open { transform: translateX(0); }
+  [data-app] .shell__close { display: grid; place-items: center; }
+
+  [data-app] .shell__scrim { display: block; }
+  [data-app] .shell__scrim.is-open { opacity: 1; pointer-events: auto; }
+
+  [data-app] .shell__menuBtn { display: inline-flex; }
+}
+
+@media (max-width: 760px) {
+  [data-app] .shell__top { gap: 8px; }
+  [data-app] .shellSearch { display: none; }
+  [data-app] .shell__crumbVenue { display: none; }
+}
+
+@media (max-width: 400px) {
+  [data-app] .shell__top { padding-inline: 12px; }
+}
+
+/* The rail is chrome: it must not print, and it must not eat a page of paper. */
+@media print {
+  [data-app] .shell__rail,
+  [data-app] .shell__top,
+  [data-app] .shell__scrim { display: none !important; }
+  [data-app] .pg--dash { padding-left: 0 !important; }
+}
+
+/* The outlet picker, wearing the rail's proportions instead of the old bar's. */
+[data-app] .shell__outletLabel {
+  display: block;
+  padding: 0 0 6px;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .shell__outlet .pg__outletForm { width: 100%; }
+
+[data-app] .shell__outlet .pg__outletSelect {
+  width: 100%;
+  max-width: none;
+  min-height: 36px;
+  border-radius: 8px;
 }

@@ -8,7 +8,7 @@ import { RouteSkeleton } from '@/components/RouteSkeleton';
  */
 export default function Loading() {
   return (
-    <div className="pg">
+    <div className="pg pg--dash">
       <DashboardBar />
       <RouteSkeleton variant="dashboard" />
     </div>
