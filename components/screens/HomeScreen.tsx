@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { inr } from '@/lib/demo-data';
-import { LIVE, NOT_CONNECTED, PLANS } from '@/lib/plans';
+import { LIVE, NOT_CONNECTED, PLANS, capabilitiesFor } from '@/lib/plans';
 import { SiteNav } from '@/components/SiteNav';
 import { SiteMotion } from '@/components/SiteMotion';
 import { SiteClosing } from '@/components/SiteClosing';
@@ -310,24 +310,33 @@ export function Home() {
                   </div>
                   <div className="plan__rule" />
                   <ul className="plan__features">
-                    <li className="plan__feature">
-                      {plan.id === 'starter'
-                        ? `All ${LIVE.length} live capabilities`
-                        : `Everything in ${PLANS[PLANS.findIndex((p) => p.id === plan.id) - 1].name}`}
-                    </li>
-                    <li className="plan__feature">
-                      {plan.id === 'business'
-                        ? 'Several outlets and a team'
-                        : plan.id === 'professional'
-                          ? 'Manager roles and menu import'
-                          : 'One room, one menu, one counter'}
-                    </li>
-                    <li className="plan__feature plan__feature--soft">
-                      {plan.id === 'starter'
-                        ? 'Available today, unlimited'
-                        : 'Differences are planned, not built'}
-                    </li>
+                    {plan.id === 'starter' ? (
+                      <>
+                        <li className="plan__feature">All {LIVE.length} live capabilities</li>
+                        <li className="plan__feature">Unlimited orders and tables</li>
+                      </>
+                    ) : (
+                      <>
+                        <li className="plan__feature">
+                          Everything in {PLANS[PLANS.indexOf(plan) - 1].name}, plus:
+                        </li>
+                        {/* Only what this tier adds over the one below it, from
+                            the same data the pricing page reads. */}
+                        {capabilitiesFor(plan.id)
+                          .filter((c) => {
+                            if (c.tiers === 'all') return false;
+                            return !c.tiers.includes(PLANS[PLANS.indexOf(plan) - 1].id);
+                          })
+                          .map((c) => (
+                            <li key={c.id} className="plan__feature">
+                              {c.label}
+                            </li>
+                          ))}
+                      </>
+                    )}
                   </ul>
+
+                  <p className="plan__stage">Planned · not on sale</p>
                   <Link
                     href={`/pricing#plan-${plan.id}`}
                     className={`p-btn p-btn--block ${plan.recommended ? 'p-btn--onInk' : 'p-btn--line'}`}
