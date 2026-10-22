@@ -158,4 +158,38 @@ describe('OrdersScreen', () => {
     const sample = demoReport(resolveRange('7d', TZ, NOW), TZ);
     expect(sample.orders.length).toBeGreaterThan(0);
   });
+
+  it('keeps a custom date range instead of flattening it to today', () => {
+    // The range key used to be rewritten to 'today' whenever it was custom,
+    // which lit the wrong chip and made Apply look like it had failed.
+    const html = renderToStaticMarkup(
+      <OrdersScreen
+        data={{ ...live(), range: { ...resolveRange('custom', TZ, NOW, { from: '2026-10-03', to: '2026-10-09' }) } }}
+        customFrom="2026-10-03"
+        customTo="2026-10-09"
+      />,
+    );
+
+    expect(html).toContain('value="custom"');
+    expect(html).toContain('value="2026-10-03"');
+    expect(html).toContain('value="2026-10-09"');
+    expect(html).toContain('Apply dates');
+  });
+
+  it('carries the custom dates through a filter and into the export', () => {
+    const html = renderToStaticMarkup(
+      <OrdersScreen
+        data={{ ...live(), range: resolveRange('custom', TZ, NOW, { from: '2026-10-03', to: '2026-10-09' }) }}
+        customFrom="2026-10-03"
+        customTo="2026-10-09"
+        filter="settled"
+      />,
+    );
+
+    // Filtering must not widen the window the person is looking at.
+    expect(html).toContain('from=2026-10-03');
+    expect(html).toContain('to=2026-10-09');
+    // And the CSV covers the same dates the screen shows.
+    expect(html).toContain('type=orders&amp;range=custom&amp;from=2026-10-03&amp;to=2026-10-09');
+  });
 });
