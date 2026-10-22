@@ -3,43 +3,67 @@ import Link from 'next/link';
 import { inr, plans } from '@/lib/demo-data';
 import { SiteNav } from '@/components/SiteNav';
 import { SiteMotion } from '@/components/SiteMotion';
+import { SiteClosing } from '@/components/SiteClosing';
+import { SiteFooter } from '@/components/SiteFooter';
 
 /* ============================================================================
    Home — premium editorial.
 
-   A full-bleed photograph, one confident line of type anchored to the bottom
-   of the frame, then air. The sections below alternate between type on paper
-   and a beige band so the page has a rhythm rather than a scroll of boxes.
+   A full-bleed photograph, one confident line anchored to the bottom of the
+   frame, a thin meta strip under it, then air. Three sections follow, each
+   with its own shape so the page has a rhythm rather than a scroll of cards:
 
-   Everything here is a Server Component. The two client pieces are imports
-   that render nothing but an effect: SiteNav owns the bar's scrolled state,
-   SiteMotion owns the animation. Neither pulls the markup into the browser
-   bundle as JavaScript.
+     product     three columns of type on a hairline
+     flow        a sticky heading beside four numbered rows
+     statement   one large line on a beige band
+     plans       three cards, one of them ink
+     close       the last action, on paper
+     footer      ink, with the wordmark set enormous and faded into it
+
+   Everything here is a Server Component. The two client pieces render nothing
+   but an effect: SiteNav owns the bar's scrolled state, SiteMotion owns the
+   animation. Neither pulls this markup into the browser bundle as JavaScript.
    ========================================================================== */
 
 const FEATURES = [
   {
     n: '01',
     title: 'A menu that stays current',
-    body: 'Every dish, price and section is edited and published from the dashboard. Several menus can run side by side — lunch and dinner, dine-in and takeaway — without touching a single QR card.',
+    body: 'Every dish, price and section is edited and published from the dashboard. Several menus run side by side — lunch and dinner, dine-in and takeaway — without reprinting a single table card.',
   },
   {
     n: '02',
     title: 'One service thread',
-    body: 'A guest scans the table code, types the six digits showing in the room, and the order lands on the kitchen board immediately. The ticket is spoken out loud, and settled at the counter.',
+    body: 'A guest scans the table code, types the six digits showing in the room, and the order lands on the kitchen board in the same second. The ticket is spoken aloud, and settled at the counter.',
   },
   {
     n: '03',
     title: 'Money that reconciles',
-    body: 'Cash, card and UPI collected at the counter are recorded against the bill. Billed and collected are kept as two numbers, so the day’s takings are never an estimate.',
+    body: 'Cash, card and UPI collected at the counter are recorded against the bill. Billed and collected stay two numbers, so the day’s takings are never an estimate.',
   },
 ];
 
 const STEPS = [
-  ['Scan', 'The QR on the table resolves to that table, in that restaurant.'],
-  ['Verify', 'A six-digit code stands in for a guest account. No app, no signup.'],
-  ['Order', 'The kitchen board picks the ticket up, ordered by what needs cooking next.'],
-  ['Settle', 'Paid at the counter, recorded against the bill, printed or sent.'],
+  {
+    n: '01',
+    title: 'Scan',
+    body: 'The QR on the table resolves to that table, in that restaurant — not to a generic menu. A card from a closed table is refused, and says so.',
+  },
+  {
+    n: '02',
+    title: 'Verify',
+    body: 'A six-digit code, changed by staff and shown in the room, stands in for a guest account. No app to install, no account to create, nothing to remember tomorrow.',
+  },
+  {
+    n: '03',
+    title: 'Order',
+    body: 'The kitchen board picks the ticket up and orders it by what needs cooking next, not by when it was placed. Aging tickets get louder as they get older.',
+  },
+  {
+    n: '04',
+    title: 'Settle',
+    body: 'Paid at the counter and recorded against the bill, or printed and handed over. The receipt and the record are the same document.',
+  },
 ];
 
 export function Home() {
@@ -49,8 +73,8 @@ export function Home() {
         onImage
         links={[
           { label: 'Product', href: '/#product' },
+          { label: 'How it works', href: '/#flow' },
           { label: 'Pricing', href: '/pricing' },
-          { label: 'Menu demo', href: '/menu' },
         ]}
       />
 
@@ -61,7 +85,7 @@ export function Home() {
             <Image
               className="hero__img"
               src="/img/restaurant-interior.jpg"
-              alt="Restaurant dining room at dusk"
+              alt="A restaurant dining room at dusk, tables laid and lamps lit"
               fill
               priority
               sizes="100vw"
@@ -69,10 +93,11 @@ export function Home() {
             />
           </div>
           <div className="hero__scrim" />
+          <div className="grain" />
 
           <div className="hero__body" data-hero-body>
-            <div className="p-eyebrow hero__eyebrow" data-hero-step>
-              Restaurant QR ordering &amp; management
+            <div className="p-eyebrow p-eyebrow--onInk" data-hero-step>
+              Restaurant QR ordering
             </div>
 
             <h1 className="hero__title">
@@ -86,22 +111,37 @@ export function Home() {
             </h1>
 
             <p className="hero__lede" data-hero-step>
-              A working preview of the ordering experience we are building: the menu a guest
-              reads, the board a kitchen works from, and the counter that settles the bill.
+              The menu a guest reads, the board a kitchen works from, and the counter that
+              settles the bill — one continuous system, built around table service.
             </p>
 
             <div className="hero__ctas" data-hero-step>
               <Link href="/menu" className="p-btn p-btn--solid">
-                See the demo
+                Open the demo menu
               </Link>
-              <Link href="/signup" className="p-btn p-btn--glass">
-                Create an account
+              <Link href="/pricing" className="p-btn p-btn--glass">
+                See pricing
               </Link>
+            </div>
+
+            <div className="hero__meta" data-hero-step>
+              <div className="hero__metaItem">
+                <p className="hero__metaValue">No app</p>
+                <p className="hero__metaLabel">the browser is the client</p>
+              </div>
+              <div className="hero__metaItem">
+                <p className="hero__metaValue">No account</p>
+                <p className="hero__metaLabel">a six-digit code at the table</p>
+              </div>
+              <div className="hero__metaItem">
+                <p className="hero__metaValue">No hardware</p>
+                <p className="hero__metaLabel">print the cards, keep the phones</p>
+              </div>
             </div>
 
             <p className="hero__note" data-hero-step>
               <i aria-hidden="true" />
-              Ordering is live · online payments and subscriptions are not enabled yet
+              Ordering is live in this preview · online payments are not connected
             </p>
           </div>
 
@@ -111,22 +151,22 @@ export function Home() {
         {/* --------------------------------------------------------- product */}
         <section className="p-sect" id="product">
           <div className="p-wrap">
-            <div data-reveal>
-              <div className="p-eyebrow">The product</div>
-              <h2 className="p-h2" style={{ marginTop: 22, maxWidth: '18ch' }}>
-                Three screens. One service.
-              </h2>
-              <p className="p-lede" style={{ marginTop: 20 }}>
+            <div className="p-head" data-reveal>
+              <div>
+                <div className="p-eyebrow">The product</div>
+                <h2 className="p-h2 p-head__title">Three screens. One service.</h2>
+              </div>
+              <p className="p-lede p-head__aside">
                 Most restaurant software is a dashboard with a menu attached. This is the other
-                way round — the guest’s table is the centre, and everything else is plumbing.
+                way round: the guest’s table is the centre, and everything else is plumbing.
               </p>
             </div>
 
-            <div className="p-grid" style={{ marginTop: 'clamp(44px, 6vh, 72px)' }} data-stagger>
+            <div className="p-grid" style={{ marginTop: 'clamp(48px, 7vh, 88px)' }} data-stagger>
               {FEATURES.map((f) => (
                 <article key={f.n} className="feat">
                   <hr className="p-rule feat__rule" data-draw />
-                  <div className="feat__num">{f.n}</div>
+                  <p className="feat__num">{f.n}</p>
                   <h3 className="p-h3 feat__title">{f.title}</h3>
                   <p className="p-body feat__body">{f.body}</p>
                 </article>
@@ -136,155 +176,121 @@ export function Home() {
         </section>
 
         {/* ------------------------------------------------------------ flow */}
-        <section className="p-band">
+        <section className="p-sect p-sect--tight" id="flow">
           <div className="p-wrap">
-            <div className="p-steps" data-stagger>
-              {STEPS.map(([label, body], i) => (
-                <div key={label} className="step">
-                  <hr className="p-rule step__rule" data-draw />
-                  <p className="step__num">{String(i + 1).padStart(2, '0')}</p>
-                  <p className="step__label">{label}</p>
-                  <p className="step__body">{body}</p>
+            <div className="flow">
+              <div className="flow__aside">
+                <div data-reveal>
+                  <div className="p-eyebrow">How it works</div>
+                  <h2 className="p-h2" style={{ marginTop: 24, maxWidth: '12ch' }}>
+                    Four steps, no ceremony.
+                  </h2>
+                  <p className="p-lede" style={{ marginTop: 22, maxWidth: '34ch' }}>
+                    The whole guest journey is under a minute, and none of it needs an install.
+                  </p>
+                  <Link href="/menu" className="p-arrow" style={{ marginTop: 28 }}>
+                    Try the flow <span aria-hidden="true">→</span>
+                  </Link>
                 </div>
-              ))}
+              </div>
+
+              <div className="flow__steps" data-stagger>
+                {STEPS.map((step) => (
+                  <div key={step.n} className="flow__step">
+                    <p className="flow__num">{step.n}</p>
+                    <div>
+                      <h3 className="p-h3 flow__title">{step.title}</h3>
+                      <p className="p-body flow__body">{step.body}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
+          </div>
+        </section>
+
+        {/* ------------------------------------------------------- statement */}
+        <section className="statement">
+          <div className="p-wrap">
+            <p className="p-label" data-reveal>
+              Why it is quiet
+            </p>
+            <h2 className="statement__text" style={{ marginTop: 26 }} data-reveal>
+              A restaurant is already loud. The software does not need to be.
+            </h2>
+            <p className="p-lede statement__sub" data-reveal>
+              No dashboards competing for attention during service. One board the kitchen reads,
+              one screen the counter works from, and a menu that behaves like a menu.
+            </p>
           </div>
         </section>
 
         {/* ----------------------------------------------------------- plans */}
         <section className="p-sect">
           <div className="p-wrap">
-            <div
-              data-reveal
-              style={{
-                display: 'flex',
-                alignItems: 'flex-end',
-                justifyContent: 'space-between',
-                gap: 32,
-                flexWrap: 'wrap',
-              }}
-            >
+            <div className="p-head" data-reveal>
               <div>
                 <div className="p-eyebrow">Pricing</div>
-                <h2 className="p-h2" style={{ marginTop: 22, maxWidth: '16ch' }}>
-                  Planned, not yet charged.
-                </h2>
+                <h2 className="p-h2 p-head__title">Planned, not yet charged.</h2>
               </div>
-              <Link href="/pricing" className="p-link" style={{ fontSize: '0.9375rem', fontWeight: 500 }}>
-                See the full comparison
+              <Link href="/pricing" className="p-arrow" style={{ alignSelf: 'flex-end' }}>
+                Full comparison <span aria-hidden="true">→</span>
               </Link>
             </div>
 
-            <div className="p-plans" style={{ marginTop: 'clamp(36px, 5vh, 56px)' }} data-stagger>
+            <div className="p-plans" style={{ marginTop: 'clamp(40px, 6vh, 64px)' }} data-stagger>
               {plans.map((p) => (
-                <article key={p.id} className={`plan${p.highlight ? ' plan--featured' : ''}`}>
+                <article
+                  key={p.id}
+                  className={`plan${p.highlight ? ' plan--featured' : ''}`}
+                  data-plan-id={p.id}
+                >
                   {p.highlight && <div className="plan__flag">Most complete</div>}
                   <div className="plan__name">{p.name}</div>
+                  <p className="plan__fit">{p.fit}</p>
                   <div className="plan__price">
                     {inr(p.price)}
                     <span>/month</span>
                   </div>
-                  <p className="plan__blurb">{p.blurb}</p>
                   <div className="plan__rule" />
                   <ul className="plan__features">
-                    {p.features.slice(0, 5).map((f) => (
+                    {p.features.slice(0, 4).map((f) => (
                       <li key={f} className="plan__feature">
                         {f}
                       </li>
                     ))}
+                    {p.features.length > 4 && (
+                      <li className="plan__feature" style={{ color: 'var(--p-ink-46)' }}>
+                        + {p.features.length - 4} more
+                      </li>
+                    )}
                   </ul>
                   <Link
                     href="/pricing"
                     className={`p-btn p-btn--block ${p.highlight ? 'p-btn--onInk' : 'p-btn--line'}`}
                   >
-                    Preview {p.name}
+                    See {p.name}
                   </Link>
                 </article>
               ))}
             </div>
 
-            <p className="p-small" style={{ marginTop: 28, maxWidth: '62ch' }}>
-              Plan names, prices and features are illustrative preview content. Trials,
-              subscriptions and billing are not enabled.
+            <p className="p-small" style={{ marginTop: 30, maxWidth: '64ch' }}>
+              Prices are planning figures shown for product preview. Trials, subscriptions and
+              billing are not enabled.
             </p>
           </div>
         </section>
 
-        {/* ----------------------------------------------------- closing note */}
-        <section className="p-close">
-          <div className="p-wrap p-close__inner">
-            <div>
-              <div className="p-eyebrow">Start here</div>
-              <h2 className="p-h2 p-close__title" style={{ marginTop: 22 }}>
-                Look at it the way a guest would.
-              </h2>
-              <p className="p-lede" style={{ marginTop: 20, maxWidth: '46ch' }}>
-                The demo menu is open. Browse it, build an order, and watch what the kitchen
-                and the counter would see.
-              </p>
-            </div>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <Link href="/menu" className="p-btn p-btn--solid">
-                Open the menu
-              </Link>
-              <Link href="/pricing" className="p-btn p-btn--line">
-                Planned pricing
-              </Link>
-            </div>
-          </div>
-        </section>
+        <SiteClosing
+          title="Look at it the way a guest would."
+          body="The demo menu is open. Browse it, build an order, and watch what the kitchen and the counter would see."
+          primary={{ label: 'Open the menu', href: '/menu' }}
+          secondary={{ label: 'Create an account', href: '/signup' }}
+        />
 
-        {/* ----------------------------------------------------------- footer */}
-        <footer className="foot">
-          <div className="p-wrap">
-            <div className="foot__grid">
-              <div>
-                <div className="foot__brand">AutoDine</div>
-                <p className="foot__note">
-                  Table QR ordering and restaurant operations, built around the service a
-                  restaurant actually runs.
-                </p>
-              </div>
-              <div>
-                <p className="foot__colTitle">Explore</p>
-                <ul className="foot__links">
-                  <li>
-                    <Link href="/#product">Product</Link>
-                  </li>
-                  <li>
-                    <Link href="/pricing">Planned pricing</Link>
-                  </li>
-                  <li>
-                    <Link href="/menu">Menu demo</Link>
-                  </li>
-                </ul>
-              </div>
-              <div>
-                <p className="foot__colTitle">Accounts</p>
-                <ul className="foot__links">
-                  <li>
-                    <Link href="/login">Sign in</Link>
-                  </li>
-                  <li>
-                    <Link href="/signup">Create account</Link>
-                  </li>
-                </ul>
-              </div>
-              <div>
-                <p className="foot__colTitle">Scope</p>
-                <p className="p-small">
-                  Sample restaurant content. No live orders, payment collection or
-                  subscriptions.
-                </p>
-              </div>
-            </div>
+        <SiteFooter />
 
-            <div className="foot__fine">
-              <span>AutoDine · Product preview</span>
-              <span>Not for live restaurant operations</span>
-            </div>
-          </div>
-        </footer>
       </main>
 
       <SiteMotion />

@@ -2,14 +2,18 @@ import Link from 'next/link';
 import { inr, plans } from '@/lib/demo-data';
 import { SiteNav } from '@/components/SiteNav';
 import { SiteMotion } from '@/components/SiteMotion';
+import { PlanMatcher } from '@/components/PlanMatcher';
+import { SiteClosing } from '@/components/SiteClosing';
+import { SiteFooter } from '@/components/SiteFooter';
 
 /* ============================================================================
    Pricing — premium editorial.
 
    The same bones as Home so the two pages read as one product: a type-led
-   header, three plans on paper, one dark featured card, then quiet proof in
-   the FAQ. Billing is not enabled, and the page says so three times in three
-   different registers rather than once in small print.
+   header, a matcher, three plans on paper with one dark card, a spec list of
+   what every plan shares and what still differs, then the questions worth
+   asking. Billing is not enabled, and the page says so in three registers
+   rather than once in small print.
    ========================================================================== */
 
 const FAQS = [
@@ -31,8 +35,22 @@ const FAQS = [
   },
   {
     q: 'Can guests pay online?',
-    a: 'Not yet in this preview. Both paths are built — online and at the counter — but the gateway is not connected, so the guest is sent to the counter and the order shows as payment-pending until a cashier records it.',
+    a: 'Not in this preview. Both paths are built — online and at the counter — but the gateway is not connected, so the guest is sent to the counter and the order shows as payment-pending until a cashier records it.',
   },
+];
+
+const INCLUDED = [
+  ['Unlimited guest orders', 'Ordering is not metered on any plan, at any table, at any hour.'],
+  ['Kitchen, cashier and bill', 'The operational screens are the product, not an add-on tier.'],
+  ['Printed table cards', 'QR cards are generated per table and reprintable when a table moves.'],
+];
+
+const DIFFERS = [
+  ['Menus', 'Starter runs the house menu. Professional and Business run several side by side — lunch and dinner, dine-in and takeaway.'],
+  ['Menu import', 'Professional and Business read a photographed or pasted menu and draft it for review. Starter is entered by hand.'],
+  ['Staff and roles', 'Starter has counter access. Professional adds manager roles; Business adds per-outlet roles across several rooms.'],
+  ['Reporting', 'All plans show billed and collected separately. Professional and Business add item-level performance and exports.'],
+  ['Still being set', 'Table counts, staff seats and storage per plan are not final, so they are deliberately not printed here.'],
 ];
 
 export function PricingScreen() {
@@ -41,25 +59,29 @@ export function PricingScreen() {
       <SiteNav
         links={[
           { label: 'Product', href: '/#product' },
+          { label: 'How it works', href: '/#flow' },
           { label: 'Pricing', href: '/pricing', active: true },
-          { label: 'Menu demo', href: '/menu' },
         ]}
       />
 
-      <main style={{ paddingTop: 116 }}>
+      <main style={{ paddingTop: 118 }}>
         {/* ---------------------------------------------------------- header */}
-        <section className="p-sect--tight" style={{ paddingTop: 'clamp(48px, 7vh, 88px)' }}>
+        <section style={{ paddingBlock: 'clamp(48px, 8vh, 96px) clamp(36px, 5vh, 56px)' }}>
           <div className="p-wrap">
-            <div data-reveal>
-              <div className="p-eyebrow">Pricing</div>
-              <h1 className="p-display" style={{ marginTop: 24, maxWidth: '15ch' }}>
-                Priced for one restaurant, not a chain.
-              </h1>
-              <p className="p-lede" style={{ marginTop: 26, maxWidth: '52ch' }}>
-                Three plans, each one built around a different size of operation. These are
-                planning figures — billing and subscriptions are not enabled in this preview,
-                and no payment details are asked for anywhere on this page.
-              </p>
+            <div className="p-head" data-reveal>
+              <div>
+                <div className="p-eyebrow">Pricing</div>
+                <h1 className="p-display" style={{ marginTop: 26, maxWidth: '14ch' }}>
+                  Priced for one restaurant, not a chain.
+                </h1>
+              </div>
+              <div className="p-head__aside">
+                <p className="p-lede">
+                  Three plans, each built around a different size of operation. These are
+                  planning figures — nothing is charged, and no card is asked for anywhere on
+                  this page.
+                </p>
+              </div>
             </div>
           </div>
         </section>
@@ -67,16 +89,45 @@ export function PricingScreen() {
         {/* ----------------------------------------------------------- plans */}
         <section style={{ paddingBottom: 'clamp(56px, 9vh, 104px)' }}>
           <div className="p-wrap">
+            <div
+              style={{ marginBottom: 'clamp(28px, 4vh, 40px)' }}
+              data-reveal
+            >
+              <PlanMatcher
+                options={[
+                  {
+                    planId: 'starter',
+                    label: 'One outlet',
+                    hint: 'Starter fits a single restaurant running one menu and one counter.',
+                  },
+                  {
+                    planId: 'professional',
+                    label: 'A busy floor',
+                    hint: 'Professional fits a full floor with a kitchen board and a manager on shift.',
+                  },
+                  {
+                    planId: 'business',
+                    label: 'Several rooms',
+                    hint: 'Business fits several outlets or rooms, each with its own screens and staff.',
+                  },
+                ]}
+              />
+            </div>
+
             <div className="p-plans" data-stagger>
               {plans.map((plan) => (
-                <article key={plan.id} className={`plan${plan.highlight ? ' plan--featured' : ''}`}>
+                <article
+                  key={plan.id}
+                  className={`plan${plan.highlight ? ' plan--featured' : ''}`}
+                  data-plan-id={plan.id}
+                >
                   {plan.highlight && <div className="plan__flag">Most complete</div>}
                   <div className="plan__name">{plan.name}</div>
+                  <p className="plan__fit">{plan.fit}</p>
                   <div className="plan__price">
                     {inr(plan.price)}
                     <span>/month · planned</span>
                   </div>
-                  <p className="plan__blurb">{plan.blurb}</p>
                   <div className="plan__rule" />
                   <ul className="plan__features">
                     {plan.features.map((feature) => (
@@ -101,56 +152,79 @@ export function PricingScreen() {
 
             <p className="p-small" style={{ marginTop: 30, maxWidth: '68ch' }}>
               <strong style={{ color: 'var(--p-ink)', fontWeight: 500 }}>Preview only.</strong>{' '}
-              Features and plan entitlements are not yet available for purchase. Tax treatment
-              and final prices require confirmation before billing launches.
+              Features and entitlements are not yet available for purchase. Tax treatment and
+              final prices require confirmation before billing launches.
             </p>
           </div>
         </section>
 
-        {/* ------------------------------------------------ what is included */}
-        <section className="p-band">
+        {/* -------------------------------------------------- what is shared */}
+        <section className="statement">
           <div className="p-wrap">
-            <div className="p-band__grid" data-stagger>
+            <div className="p-head" data-reveal>
               <div>
-                <p className="feat__num">Included</p>
-                <p className="p-stat__value" style={{ marginTop: 12 }}>
-                  Unlimited guest orders
-                </p>
-                <p className="p-stat__label">Ordering is not metered on any plan.</p>
+                <div className="p-eyebrow">In every plan</div>
+                <h2 className="p-h2 p-head__title">Nothing operational is gated.</h2>
               </div>
+              <p className="p-lede p-head__aside">
+                A restaurant that cannot take an order is not a smaller customer. The parts that
+                run service are in all three plans.
+              </p>
+            </div>
+
+            <div
+              className="p-grid"
+              style={{ marginTop: 'clamp(40px, 6vh, 64px)' }}
+              data-stagger
+            >
+              {INCLUDED.map(([title, body], i) => (
+                <article key={title} className="feat">
+                  <hr className="p-rule feat__rule" data-draw />
+                  <p className="feat__num">{String(i + 1).padStart(2, '0')}</p>
+                  <h3 className="p-h3 feat__title">{title}</h3>
+                  <p className="p-body feat__body">{body}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ------------------------------------------------- what differs */}
+        <section className="p-sect">
+          <div className="p-wrap">
+            <div className="p-head" data-reveal>
               <div>
-                <p className="feat__num">Included</p>
-                <p className="p-stat__value" style={{ marginTop: 12 }}>
-                  Kitchen, cashier and bill
-                </p>
-                <p className="p-stat__label">
-                  The operational screens are the product, not an add-on.
-                </p>
+                <div className="p-eyebrow">What differs</div>
+                <h2 className="p-h2 p-head__title">The honest version.</h2>
               </div>
-              <div>
-                <p className="feat__num">Changing</p>
-                <p className="p-stat__value" style={{ marginTop: 12 }}>
-                  Plan limits
-                </p>
-                <p className="p-stat__label">
-                  Table counts and staff seats per plan are still being set.
-                </p>
-              </div>
+              <p className="p-lede p-head__aside">
+                Rather than a grid of ticks, the four things that actually change — and the
+                numbers that are not settled yet.
+              </p>
+            </div>
+
+            <div className="spec" style={{ marginTop: 'clamp(32px, 5vh, 52px)' }} data-stagger>
+              {DIFFERS.map(([label, value]) => (
+                <div key={label} className="spec__row">
+                  <p className="spec__label">{label}</p>
+                  <p className="spec__value">{value}</p>
+                </div>
+              ))}
             </div>
           </div>
         </section>
 
         {/* ------------------------------------------------------------- FAQ */}
-        <section className="p-sect">
+        <section className="p-sect p-sect--tight" style={{ paddingTop: 0 }}>
           <div className="p-wrap">
-            <div data-reveal>
-              <div className="p-eyebrow">Questions</div>
-              <h2 className="p-h2" style={{ marginTop: 22, maxWidth: '14ch' }}>
-                The ones worth asking first.
-              </h2>
+            <div className="p-head" data-reveal>
+              <div>
+                <div className="p-eyebrow">Questions</div>
+                <h2 className="p-h2 p-head__title">The ones worth asking first.</h2>
+              </div>
             </div>
 
-            <div className="p-faqs" style={{ marginTop: 'clamp(32px, 4vh, 48px)' }} data-stagger>
+            <div className="p-faqs" style={{ marginTop: 'clamp(28px, 4vh, 44px)' }} data-stagger>
               {FAQS.map((item) => (
                 <details key={item.q} className="p-faq">
                   <summary>{item.q}</summary>
@@ -161,75 +235,19 @@ export function PricingScreen() {
           </div>
         </section>
 
-        {/* ---------------------------------------------------------- closing */}
-        <section className="p-close">
-          <div className="p-wrap p-close__inner">
-            <div>
-              <div className="p-eyebrow">Start here</div>
-              <h2 className="p-h2 p-close__title" style={{ marginTop: 22 }}>
-                Start with the menu, decide later.
-              </h2>
-              <p className="p-lede" style={{ marginTop: 20, maxWidth: '44ch' }}>
-                Creating an account is free and starts a trial. Nothing is charged, and no
-                card is asked for.
-              </p>
-            </div>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <Link href="/signup" className="p-btn p-btn--solid">
-                Create an account
-              </Link>
-              <Link href="/menu" className="p-btn p-btn--line">
-                See the demo
-              </Link>
-            </div>
-          </div>
-        </section>
+        <SiteClosing
+          title="Start with the menu, decide later."
+          body="Creating an account is free and starts a trial. Nothing is charged, and no card is asked for."
+          primary={{ label: 'Create an account', href: '/signup' }}
+          secondary={{ label: 'See the demo', href: '/menu' }}
+        />
 
-        {/* ----------------------------------------------------------- footer */}
-        <footer className="foot">
-          <div className="p-wrap">
-            <div className="foot__grid">
-              <div>
-                <div className="foot__brand">AutoDine</div>
-                <p className="foot__note">Table QR ordering and restaurant operations.</p>
-              </div>
-              <div>
-                <p className="foot__colTitle">Explore</p>
-                <ul className="foot__links">
-                  <li>
-                    <Link href="/">Home</Link>
-                  </li>
-                  <li>
-                    <Link href="/pricing">Pricing</Link>
-                  </li>
-                  <li>
-                    <Link href="/menu">Menu demo</Link>
-                  </li>
-                </ul>
-              </div>
-              <div>
-                <p className="foot__colTitle">Accounts</p>
-                <ul className="foot__links">
-                  <li>
-                    <Link href="/login">Sign in</Link>
-                  </li>
-                  <li>
-                    <Link href="/signup">Create account</Link>
-                  </li>
-                </ul>
-              </div>
-              <div>
-                <p className="foot__colTitle">Scope</p>
-                <p className="p-small">Early product preview. Not for live restaurant operations.</p>
-              </div>
-            </div>
+        <SiteFooter
+          note="Table QR ordering and restaurant operations."
+          scope="Early product preview. Not for live restaurant operations."
+          fineRight="Prices shown are planning figures"
+        />
 
-            <div className="foot__fine">
-              <span>AutoDine · Product preview</span>
-              <span>Prices shown are planning figures</span>
-            </div>
-          </div>
-        </footer>
       </main>
 
       <SiteMotion />

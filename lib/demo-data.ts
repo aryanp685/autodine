@@ -28,6 +28,7 @@ export const plans = [
     id: 'starter',
     name: 'Starter',
     price: 899,
+    fit: 'One outlet, one menu, one counter.',
     blurb: 'For a single restaurant going digital.',
     features: [
       'Restaurant profile & digital menu',
@@ -47,6 +48,7 @@ export const plans = [
     id: 'professional',
     name: 'Professional',
     price: 1599,
+    fit: 'A busy floor with a kitchen board and a manager.',
     blurb: 'For restaurants that want AI menu import and deeper reporting.',
     features: [
       'Everything in Starter',
@@ -64,6 +66,7 @@ export const plans = [
     id: 'business',
     name: 'Business',
     price: 2699,
+    fit: 'Several rooms, several screens, a team.',
     blurb: 'For multi-device kitchens and cashier teams.',
     features: [
       'Everything in Professional',
