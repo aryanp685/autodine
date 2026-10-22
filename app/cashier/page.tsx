@@ -13,10 +13,22 @@ export const metadata: Metadata = {
 // it has been settled, which is how a guest gets charged twice.
 export const dynamic = 'force-dynamic';
 
-export default async function CashierPage() {
+export default async function CashierPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ order?: string | string[] }>;
+}) {
   // Null means Supabase is not configured: the screen then renders its own
   // sample queue, exactly as it did before the database existed.
-  const [data, outlet] = await Promise.all([getCashierScreenData(), getOutletBar()]);
+  const [data, outlet, params] = await Promise.all([
+    getCashierScreenData(),
+    getOutletBar(),
+    searchParams,
+  ]);
+  // "Collect" on a ledger row arrives here as ?order=<id>. The screen opens on
+  // that ticket instead of the oldest one; an id that is no longer waiting is
+  // reported rather than swapped out silently.
+  const focus = typeof params.order === 'string' ? params.order : undefined;
 
   /**
    * The bar is rendered HERE, on the server, and handed to the client screen
@@ -37,6 +49,7 @@ export default async function CashierPage() {
   return (
     <Cashier
       data={data ?? undefined}
+      focus={focus}
       nav={
         <DashboardBar
           active="counter"

@@ -1488,6 +1488,27 @@
   color: var(--p-ink-46);
 }
 
+/* From the ledger: the bill that was asked for has already left the queue.
+   A note, not an alarm -- nothing went wrong, the money simply moved. */
+[data-app] .cash__focus {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border-radius: var(--p-r);
+  background: var(--p-accent-soft);
+  color: var(--p-ink);
+}
+[data-app] .cash__focus p {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  max-width: 46ch;
+}
+
 /* Cancelling is a decision, not a failure: it gets a neutral panel, not the
    red error box it used to borrow. The one red element is the button that
    actually destroys the order. */
@@ -2340,6 +2361,28 @@
   display: inline-flex;
   gap: 6px;
   align-items: baseline;
+}
+
+/* The ledger's single per-bill action. It reads as a number with a verb in
+   front of it rather than a second button competition: the amount is what the
+   eye is looking for, and it is the same tap target as a link. */
+[data-app] .rep__collect {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-ink);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--p-accent) 45%, transparent);
+  padding-bottom: 1px;
+  transition: color var(--p-d1) linear;
+}
+[data-app] .rep__collect:hover { color: var(--p-accent); }
+[data-app] .rep__collect:focus-visible {
+  outline: 2px solid var(--p-accent);
+  outline-offset: 2px;
+  border-radius: 3px;
 }
 
 [data-app] .rep__card.is-void .rep__cardRef,
