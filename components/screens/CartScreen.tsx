@@ -6,11 +6,14 @@ import { inr } from '@/lib/demo-data';
 import { VegMark } from '@/components/ui';
 import { paiseToRupees } from '@/lib/money';
 import { priceCart, type MenuItemPrice } from '@/lib/cart-pricing';
+import { gstLabel } from '@/lib/pricing';
 
-function Totals({ subtotalPaise, taxPaise, totalPaise, compact }: {
+function Totals({ subtotalPaise, taxPaise, totalPaise, taxRateBps, compact }: {
   subtotalPaise: number;
   taxPaise: number;
   totalPaise: number;
+  /** The restaurant's own rate; absent means the bill is priced at a sample. */
+  taxRateBps?: number;
   compact?: boolean;
 }) {
   return (
@@ -20,7 +23,7 @@ function Totals({ subtotalPaise, taxPaise, totalPaise, compact }: {
         <span className="tnum">{inr(paiseToRupees(subtotalPaise))}</span>
       </div>
       <div className="totals__row">
-        <span>Taxes (GST 5% · sample)</span>
+        <span>Taxes ({gstLabel(taxRateBps)})</span>
         <span className="tnum">{inr(paiseToRupees(taxPaise))}</span>
       </div>
       <div className="totals__row totals__row--total">
@@ -125,15 +128,27 @@ export function Cart({
                       +
                     </button>
                   </div>
-                  <div className="cart__lineTotal tnum">
-                    {inr(paiseToRupees(l.lineTotalPaise))}
+                  <div className="cart__lineEnd">
+                    <div className="cart__lineTotal tnum">
+                      {inr(paiseToRupees(l.lineTotalPaise))}
+                    </div>
+                    <button
+                      type="button"
+                      className="cart__remove"
+                      onClick={() => cart.remove(l.itemId, l.variantId, l.addonIds)}
+                    >
+                      Remove
+                    </button>
                   </div>
                 </div>
               ))}
 
               {cart.lines.length === 0 && (
                 <div className="cart__empty">
-                  Your cart is empty — add something from the menu.
+                  <p>Your cart is empty — nothing has been added from the menu yet.</p>
+                  <Link href={withSlug('/menu')} className="cart__emptyCta">
+                    Open the menu
+                  </Link>
                 </div>
               )}
 
@@ -183,6 +198,7 @@ export function Cart({
               subtotalPaise={subtotalPaise}
               taxPaise={taxPaise}
               totalPaise={totalPaise}
+              taxRateBps={taxRateBps}
             />
             {priced.lines.length > 0 ? (
               <Link href={withSlug('/menu/checkout')} className="cart__cta">

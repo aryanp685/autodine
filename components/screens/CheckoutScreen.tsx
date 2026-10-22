@@ -7,6 +7,7 @@ import { VegMark } from '@/components/ui';
 import { paiseToRupees } from '@/lib/money';
 import { priceCart, type MenuItemPrice } from '@/lib/cart-pricing';
 import { placeOrderAction } from '@/app/menu/checkout/actions';
+import { gstLabel } from '@/lib/pricing';
 
 /**
  * Checkout.
@@ -143,7 +144,7 @@ export function Checkout({
             <span className="tnum">{inr(paiseToRupees(subtotalPaise))}</span>
           </div>
           <div className="co__row">
-            <span>Taxes (GST 5% · sample)</span>
+            <span>Taxes ({gstLabel(taxRateBps)})</span>
             <span className="tnum">{inr(paiseToRupees(taxPaise))}</span>
           </div>
           <div className="co__row co__row--total">

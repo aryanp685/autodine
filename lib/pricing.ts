@@ -28,6 +28,21 @@ import { assertValidMoney, applyRate, lineTotal, splitInHalf, type Bps, type Pai
 /** SAMPLE ONLY — see the tax status note above. 500 bps = 5.00%. */
 export const SAMPLE_TAX_RATE_BPS: Bps = 500;
 
+/**
+ * How the tax line on a bill is labelled.
+ *
+ * The rate comes from the restaurant when it has one, and falls back to the
+ * sample. The label used to say "GST 5% · sample" unconditionally, which was
+ * wrong the moment a restaurant configured its own rate: the bill showed one
+ * percentage and charged another.
+ */
+export function gstLabel(taxRateBps?: number): string {
+  const bps = taxRateBps ?? SAMPLE_TAX_RATE_BPS;
+  const pct = bps / 100;
+  const shown = Number.isInteger(pct) ? String(pct) : pct.toFixed(2);
+  return taxRateBps == null ? `GST ${shown}% · sample` : `GST ${shown}%`;
+}
+
 export type PriceableLine = {
   /** Price of ONE unit, in paise, as stored on the menu. */
   unitPricePaise: Paise;

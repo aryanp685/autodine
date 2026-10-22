@@ -1714,3 +1714,120 @@
   [data-app] .smenu__body { padding-bottom: 64px; }
   [data-app] .smenu__foot { padding-bottom: 88px; }
 }
+
+/* A second, quieter way out of a gate. It is a real link to real content, so
+   it gets a real control rather than a line of text in the small print. */
+[data-app] .gnote__ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50px;
+  padding: 0 22px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-r-sm);
+  background: transparent;
+  color: var(--p-ink);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: border-color var(--p-d1) linear, background-color var(--p-d1) linear;
+}
+
+[data-app] .gnote__ghost:hover {
+  border-color: var(--p-ink);
+  background: var(--p-paper-deep);
+}
+
+/* The row's action becomes a stepper once the dish is in the order. Sized to
+   the same 40px as the Add pill so the row does not jump when it swaps. */
+[data-app] .menu__stepper {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 3px;
+  border: 1px solid var(--p-ink);
+  border-radius: var(--p-pill);
+  background: var(--p-ink);
+  color: var(--p-on-ink);
+}
+
+[data-app] .menu__stepper button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--p-pill);
+  background: none;
+  color: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color var(--p-d1) linear;
+}
+
+[data-app] .menu__stepper button:hover { background: rgba(250, 247, 241, 0.14); }
+
+[data-app] .menu__stepper .tnum {
+  min-width: 22px;
+  text-align: center;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------- cart extras */
+
+[data-app] .cart__lineEnd {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
+
+[data-app] .cart__remove {
+  border: 0;
+  background: none;
+  padding: 2px 0;
+  font: inherit;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+  cursor: pointer;
+  transition: color var(--p-d1) linear;
+}
+
+[data-app] .cart__remove:hover { color: var(--p-ink); }
+
+[data-app] .cart__empty p { margin: 0; }
+
+[data-app] .cart__emptyCta {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  margin-top: 14px;
+  padding: 0 18px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-pill);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--p-ink);
+  text-decoration: none;
+  transition: border-color var(--p-d1) linear, background-color var(--p-d1) linear;
+}
+
+[data-app] .cart__emptyCta:hover {
+  border-color: var(--p-ink);
+  background: var(--p-paper-deep);
+}
+
+@media (max-width: 760px) {
+  [data-app] .cart__lineEnd {
+    grid-area: total;
+    grid-auto-flow: column;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+}
