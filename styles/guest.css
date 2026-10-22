@@ -1521,18 +1521,21 @@
 [data-app] .gnote__alert strong { font-weight: 600; }
 [data-app] .gnote__alert p { margin-top: 4px; }
 
-/* The code form. Six digits, set large and tracked out, so the guest can see
-   at a glance how many are still to come. */
-[data-app] .gnote .pg__form {
+/* The code form. One question, one field, one button. Six digits set large and
+   tracked out, so the guest can see at a glance how many are still to come.
+   These are the gate chapter's own classes rather than the app's: the form is
+   the only interactive thing on the page, and it should not inherit the
+   dashboard's idea of what a label is. */
+[data-app] .gnote__form {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   margin-top: 30px;
   max-width: 22rem;
 }
 
-[data-app] .gnote .ui-field { display: grid; gap: 8px; }
+[data-app] .gnote__label { display: grid; gap: 8px; }
 
-[data-app] .gnote .ui-label {
+[data-app] .gnote__labelText {
   font-size: 0.6875rem;
   font-weight: 500;
   letter-spacing: 0.16em;
@@ -1540,17 +1543,16 @@
   color: var(--p-ink-46);
 }
 
-[data-app] .gnote .ui-input,
-[data-app] .gnote .pg__codeInput {
+[data-app] .gnote__code {
   width: 100%;
-  min-height: 60px;
+  min-height: 64px;
   padding: 0 16px;
   border: 1px solid var(--p-line-strong);
   border-radius: var(--p-r-sm);
   background: var(--p-surface);
   color: var(--p-ink);
   font: inherit;
-  font-size: 1.625rem;
+  font-size: 1.75rem;
   font-weight: 500;
   letter-spacing: 0.42em;
   text-indent: 0.2em;
@@ -1558,47 +1560,62 @@
   transition: border-color var(--p-d1) linear;
 }
 
-[data-app] .gnote .ui-input::placeholder {
-  color: var(--p-ink-28);
-  letter-spacing: 0.42em;
-}
+[data-app] .gnote__code::placeholder { color: var(--p-ink-28); letter-spacing: 0.42em; }
 
-[data-app] .gnote .ui-input:focus {
+/* Focus is a state, not an animation: it arrives instantly so a keyboard user
+   is never chasing a moving outline. */
+[data-app] .gnote__code:focus {
   border-color: var(--p-ink);
   outline: 2px solid var(--p-accent);
   outline-offset: 2px;
 }
 
-[data-app] .gnote .pg__submit {
+[data-app] .gnote__code:disabled { opacity: 0.6; }
+
+[data-app] .gnote__submit {
   min-height: 52px;
   padding: 0 22px;
-  border: 0;
+  border: 1px solid var(--p-ink);
   border-radius: var(--p-r-sm);
   background: var(--p-ink);
   color: var(--p-on-ink);
   font: inherit;
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   transition: background-color var(--p-d1) linear, opacity var(--p-d1) linear;
 }
 
-[data-app] .gnote .pg__submit:hover {
+[data-app] .gnote__submit:hover {
   background: color-mix(in srgb, var(--p-ink) 88%, var(--p-on-ink));
 }
 
-[data-app] .gnote .pg__submit[disabled] { opacity: 0.35; cursor: not-allowed; }
+/* Not "greyed out": a disabled submit here means the code is not six digits
+   yet, and the hint underneath says so in words. */
+[data-app] .gnote__submit[disabled] { opacity: 0.35; cursor: not-allowed; }
 
-[data-app] .gnote .pg__fine {
+[data-app] .gnote__hintText {
   font-size: 0.75rem;
   line-height: 1.65;
+  color: var(--p-ink-46);
+}
+
+/* What a staff member needs to know, for the times a guest hands their phone
+   over. Quieter than the guest's own sentence, because it is not addressed to
+   them. */
+[data-app] .gnote__staff {
+  margin-top: 18px;
+  padding-left: 14px;
+  border-left: 2px solid var(--p-line-strong);
+  font-size: 0.75rem;
+  line-height: 1.7;
   color: var(--p-ink-46);
 }
 
 @media (max-width: 760px) {
   [data-app] .gnote__bar { padding-block: 20px; }
   [data-app] .gnote__body { padding-top: 24px; }
-  [data-app] .gnote .pg__form { max-width: none; }
+  [data-app] .gnote__form { max-width: none; }
 }
 
 /* =========================================================================
@@ -1868,4 +1885,96 @@
     align-items: baseline;
     justify-content: space-between;
   }
+}
+
+/* The gate wears the menu's light. Same paper, same faint wash from the top,
+   so the first screen after a scan and the menu behind it read as one place. */
+[data-app] .gnote {
+  background-image: radial-gradient(
+    120% 55% at 50% 0%,
+    color-mix(in srgb, var(--p-surface) 92%, transparent),
+    transparent 70%
+  );
+}
+
+/* -------------------------------------------------- dish media and stepper
+
+   The dish row's right-hand column: the photograph, and the one control under
+   it. The markup puts the action inside this column (it is where the thumb
+   already is on a phone), so the column owns both rather than leaving the
+   button to the text flow. Dishes without a photograph keep the column and
+   lose the reserved width, so every row's button sits on the same line. */
+[data-app] .menu__dishMedia {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 116px;
+  flex: 0 0 auto;
+}
+
+[data-app] .menu__dishMedia .menu__dishActions {
+  margin-top: 12px;
+  justify-content: center;
+}
+
+[data-app] .menu__dishMedia.is-bare {
+  width: auto;
+  align-self: stretch;
+  justify-content: flex-end;
+}
+
+[data-app] .menu__dishMedia.is-bare .menu__dishActions { margin-top: 0; }
+
+/* Order reference and kicker: used by the confirmation screen, which wears the
+   cart's shell. Set as a pill because it is the one string a guest reads out
+   loud to a cashier. */
+[data-app] .cart__kicker {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .cart__code {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 7px 14px;
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-pill);
+  background: var(--p-surface);
+  font-size: 0.75rem;
+  color: var(--p-ink-46);
+}
+
+[data-app] .cart__code strong {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-ink);
+}
+
+/* The first line closes the table it belongs to: without this the list starts
+   with a hairline underneath instead of above, and reads as unanchored. */
+[data-app] .cart__line:first-of-type { border-top: 1px solid var(--p-line); }
+[data-app] .sheet__opt:first-of-type { border-top: 1px solid var(--p-line); }
+
+@media (max-width: 760px) {
+  [data-app] .menu__dishMedia { width: 88px; }
+}
+
+/* On a phone the checkout's action bar repeats the bill's total at the bottom
+   of the screen. When it is there, the button inside the bill steps aside: two
+   identical black buttons 40px apart is a page that cannot decide which one is
+   real. The class says whether the bar exists, because CSS cannot ask. */
+@media (max-width: 900px) {
+  [data-app] .co--barred .co__sum .co__cta,
+  [data-app] .co--barred .co__sum .co__fine { display: none; }
+
+  [data-app] .cart,
+  [data-app] .co { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
 }

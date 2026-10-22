@@ -30,12 +30,13 @@ export function MenuSlugNeeded() {
         there.
       </p>
 
+      {/* One quiet action. There is nothing else a guest can do from here --
+          the menu opens from a card and from nowhere else -- and a primary
+          button pointing at a staff dashboard was the wrong thing to offer
+          the person holding the phone. */}
       <div className="gnote__actions">
-        <Link href="/dashboard/menus" className="gnote__cta">
-          Go to my menu
-        </Link>
         <Link href="/demo/menu" className="gnote__ghost">
-          See a sample menu
+          See what a menu looks like
         </Link>
       </div>
     </GuestNote>

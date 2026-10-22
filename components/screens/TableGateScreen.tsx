@@ -68,20 +68,20 @@ export function TableGateScreen({
       <p className="gnote__text">{copy.detail}</p>
 
       <div className="gnote__actions">
+        {/* The only thing a guest can DO here is re-enter the code, and only
+            when we still know which card they scanned. The dashboard used to
+            be the primary button on this screen, which handed a guest whose
+            code had expired the least useful action available. It stays in
+            the footnote, where staff look for it. */}
         {verifyHref ? (
           <Link href={verifyHref} className="gnote__cta">
             Enter the code again
           </Link>
-        ) : (
-          <Link href="/dashboard/menus" className="gnote__cta">
-            Go to my menu
-          </Link>
-        )}
-        {/* Not able to scan? There is still something to look at. This is the
-            one place the sample menu is offered, because this is the one place
-            a guest has been told no. */}
+        ) : null}
+        {/* Not able to scan? There is still something to look at, and it is
+            labelled as a sample rather than as this restaurant's menu. */}
         <Link href="/demo/menu" className="gnote__ghost">
-          See a sample menu
+          See what a menu looks like
         </Link>
       </div>
     </GuestNote>

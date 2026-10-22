@@ -168,6 +168,20 @@ describe('QrProblemScreen', () => {
     expect(html).toContain('Please ask staff for the current one.');
   });
 
+  it('wears the same gate shell as the code form and the bare menu link', () => {
+    // A dead card used to land on a page with its own centred badge and its
+    // own type scale -- the one screen in the flow that did not look like the
+    // restaurant's product at the moment a guest is already unsure.
+    const html = renderToStaticMarkup(
+      <QrProblemScreen title="This code did not work" detail="Ask staff." />
+    );
+
+    expect(html).toContain('gnote__body');
+    expect(html).toContain('gnote__eyebrow');
+    expect(html).toContain('Table access');
+    expect(html).not.toContain('pg__qrProblem');
+  });
+
   it('does not show a staff hint unless there is one', () => {
     const without = renderToStaticMarkup(
       <QrProblemScreen title="Nope" detail="Try again" />

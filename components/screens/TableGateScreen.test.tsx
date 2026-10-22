@@ -58,6 +58,19 @@ describe('TableGateScreen', () => {
     expect(html).toContain('href="/dashboard/menus"');
   });
 
+  it('does not put a staff dashboard where the guest’s next step should be', () => {
+    // This screen is read by a guest whose card did not open a menu. The
+    // primary button used to be "Go to my menu", pointed at /dashboard/menus:
+    // the least useful destination in the product for the person holding the
+    // phone, and the most prominent thing on the page.
+    const html = renderToStaticMarkup(<TableGateScreen reason="none" />);
+
+    expect(html).not.toContain('gnote__cta');
+    expect(html).toContain('gnote__ghost');
+    // The staff route is still there, as a footnote rather than a button.
+    expect(html).toContain('Behind the counter?');
+  });
+
   it('never shows menu content, which would defeat the gate', () => {
     for (const reason of ['none', 'stale', 'unavailable'] as const) {
       const html = renderToStaticMarkup(<TableGateScreen reason={reason} />);
