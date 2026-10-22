@@ -34,6 +34,9 @@ export function MenuSlugNeeded() {
         <Link href="/dashboard/menus" className="gnote__cta">
           Go to my menu
         </Link>
+        <Link href="/demo/menu" className="gnote__ghost">
+          See a sample menu
+        </Link>
       </div>
     </GuestNote>
   );

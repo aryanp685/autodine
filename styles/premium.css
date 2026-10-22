@@ -770,9 +770,12 @@
   transition: opacity var(--p-d2) linear, transform var(--p-d3) var(--p-ease);
 }
 
-html[data-plan-match='starter'] [data-app] .plan[data-plan-id='starter']::after,
-html[data-plan-match='professional'] [data-app] .plan[data-plan-id='professional']::after,
-html[data-plan-match='business'] [data-app] .plan[data-plan-id='business']::after {
+/* Arriving from the matcher lands on #plan-<id>, and the card rings itself.
+   :target is the browser's own state, so this needs no JavaScript, survives a
+   reload of the shared link, and does not pretend a choice was saved. */
+[data-app] .plan:target::after,
+[data-app] .plan:hover::after,
+[data-app] .plan:focus-within::after {
   opacity: 1;
   transform: scale(1);
 }
@@ -792,7 +795,7 @@ html[data-plan-match='business'] [data-app] .plan[data-plan-id='business']::afte
 [data-app] .plan--featured .plan__flag { background: rgba(250, 247, 241, 0.12); color: var(--p-on-ink); border-color: var(--p-line-on-ink); }
 [data-app] .plan--featured .plan__feature::before { background: rgba(250, 247, 241, 0.45); }
 [data-app] .plan--featured .plan__rule { background: var(--p-line-on-ink); }
-html[data-plan-match='professional'] [data-app] .plan--featured::after { border-color: rgba(250, 247, 241, 0.55); }
+[data-app] .plan--featured:target::after { border-color: rgba(250, 247, 241, 0.55); }
 
 [data-app] .plan__flag {
   align-self: flex-start;
@@ -875,6 +878,8 @@ html[data-plan-match='professional'] [data-app] .plan--featured::after { border-
 }
 
 [data-app] .matcher__opt {
+  display: inline-flex;
+  align-items: center;
   border: 0;
   background: transparent;
   color: var(--p-ink-64);
@@ -884,11 +889,11 @@ html[data-plan-match='professional'] [data-app] .plan--featured::after { border-
   min-height: 40px;
   padding: 0 18px;
   border-radius: var(--p-pill);
+  text-decoration: none;
   cursor: pointer;
   transition: background-color var(--p-d2) linear, color var(--p-d2) linear;
 }
-[data-app] .matcher__opt:hover { color: var(--p-ink); }
-[data-app] .matcher__opt[aria-pressed='true'] { background: var(--p-ink); color: var(--p-on-ink); }
+[data-app] .matcher__opt:hover { color: var(--p-ink); background: var(--p-paper-deep); }
 [data-app] .matcher__opt:focus-visible { outline: 2px solid var(--p-accent); outline-offset: 2px; }
 
 [data-app] .matcher__hint {
@@ -1155,4 +1160,249 @@ html[data-plan-match='professional'] [data-app] .plan--featured::after { border-
   [data-app] .hero__ctas { flex-direction: column; align-items: stretch; }
   [data-app] .hero__ctas .p-btn { width: 100%; }
   [data-app] .hero__meta { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* =========================================================================
+   Pricing — the parts that are not a plan card
+   =========================================================================
+
+   The page has more to say than three boxes: what is live, what the tiers
+   will change, and how the money will work. Each of those gets its own shape
+   so the page has a rhythm rather than four grids in a row.
+   ========================================================================= */
+
+[data-app] .pricing__head { padding-bottom: 0; }
+
+/* The header sets a display line, so it needs a little less air underneath
+   than a section that follows another section. */
+[data-app] .pricing__head .p-head { margin-bottom: clamp(28px, 4vh, 44px); }
+
+[data-app] .pricing__bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px 32px;
+  padding-bottom: clamp(24px, 3vh, 36px);
+}
+
+[data-app] .matcherBlock { display: grid; gap: 12px; }
+
+[data-app] .matcherBlock__label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .matcherBlock__hint {
+  max-width: 52ch;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--p-ink-46);
+}
+
+/* The honest status of the whole page, stated once, at the top. A green dot
+   would say "live"; this one is hollow because billing is not. */
+[data-app] .pricing__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 14px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-pill);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--p-ink-64);
+  white-space: nowrap;
+}
+
+[data-app] .pricing__stateDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid var(--p-ink-28);
+}
+
+/* One action for the page instead of three that would do the same thing. */
+[data-app] .pricing__action {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px 32px;
+  margin-top: clamp(28px, 4vh, 44px);
+  padding-top: clamp(24px, 3.4vh, 36px);
+  border-top: 1px solid var(--p-line);
+}
+
+[data-app] .pricing__actionNote {
+  margin: 12px 0 0;
+  font-size: 0.8125rem;
+  color: var(--p-ink-46);
+}
+
+/* A plan card has no button, so the feature list carries the weight, and the
+   last line says what the card is: a plan, not a product on sale. */
+[data-app] .plan__feature--soft { color: var(--p-ink-46); }
+[data-app] .plan__feature--soft::before { background: var(--p-line-strong); }
+[data-app] .plan--featured .plan__feature--soft { color: rgba(250, 247, 241, 0.5); }
+
+[data-app] .plan__stage {
+  margin: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--p-line);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .plan--featured .plan__stage {
+  border-top-color: var(--p-line-on-ink);
+  color: var(--p-on-ink-40);
+}
+
+/* The tag that says which tier a capability belongs to. Two words, no
+   ornament: the point is that the reader can check it. */
+[data-app] .diff { display: grid; }
+
+[data-app] .diff__row {
+  display: grid;
+  grid-template-columns: minmax(0, 15rem) minmax(0, 1fr);
+  gap: clamp(16px, 3vw, 48px);
+  padding: clamp(20px, 2.6vh, 28px) 0;
+  border-top: 1px solid var(--p-line);
+}
+
+[data-app] .diff__row:last-child { border-bottom: 1px solid var(--p-line); }
+
+[data-app] .diff__lead { display: grid; gap: 10px; align-content: start; }
+
+[data-app] .diff__label {
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: -0.018em;
+  color: var(--p-ink);
+}
+
+[data-app] .diff__tiers { display: flex; flex-wrap: wrap; gap: 6px; }
+
+[data-app] .diff__tier {
+  padding: 4px 9px;
+  border-radius: var(--p-pill);
+  background: var(--p-paper-deep);
+  color: var(--p-ink-46);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+[data-app] .diff__detail {
+  max-width: 62ch;
+  font-size: 0.9375rem;
+  line-height: 1.66;
+  color: var(--p-ink-64);
+}
+
+@media (max-width: 760px) {
+  [data-app] .pricing__bar { align-items: flex-start; }
+  [data-app] .pricing__state { align-self: flex-start; }
+  [data-app] .diff__row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  [data-app] .pricing__action { flex-direction: column; align-items: stretch; }
+  [data-app] .pricing__action .p-btn { width: 100%; }
+}
+
+/* =========================================================================
+   Status — what works, and what does not
+   =========================================================================
+
+   A product preview that only lists what works is a brochure. This is the
+   section that says the rest out loud, and it does it in the same type as
+   everything else: two columns, hairlines, one filled dot and one hollow one.
+
+   It also answers the question a pricing page cannot: is any of this real.
+   ========================================================================= */
+
+[data-app] .status {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr);
+  gap: clamp(36px, 5vw, 88px);
+  align-items: start;
+}
+
+[data-app] .status__lead { position: sticky; top: 108px; }
+
+[data-app] .status__cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(24px, 3vw, 48px);
+}
+
+[data-app] .status__head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--p-line-strong);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--p-ink-64);
+}
+
+[data-app] .status__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid var(--p-ink-28);
+  flex: 0 0 auto;
+}
+
+[data-app] .status__dot--live {
+  border-color: var(--p-accent);
+  background: var(--p-accent);
+}
+
+[data-app] .status__list { display: grid; margin: 0; padding: 0; list-style: none; }
+
+[data-app] .status__item {
+  display: grid;
+  gap: 4px;
+  padding: 15px 0;
+  border-bottom: 1px solid var(--p-line);
+}
+
+[data-app] .status__name {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  color: var(--p-ink);
+}
+
+[data-app] .status__detail {
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--p-ink-46);
+}
+
+[data-app] .status__fine {
+  margin-top: 18px;
+  font-size: 0.75rem;
+  line-height: 1.7;
+  color: var(--p-ink-46);
+}
+
+@media (max-width: 1100px) {
+  [data-app] .status { grid-template-columns: minmax(0, 1fr); }
+  [data-app] .status__lead { position: static; }
+}
+
+@media (max-width: 760px) {
+  [data-app] .status__cols { grid-template-columns: minmax(0, 1fr); gap: 32px; }
 }

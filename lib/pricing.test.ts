@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { SAMPLE_TAX_RATE_BPS, computeOrderTotals, computeSubtotal, type PriceableLine } from './pricing';
+import {
+  SAMPLE_TAX_RATE_BPS,
+  computeOrderTotals,
+  computeSubtotal,
+  gstLabel,
+  type PriceableLine,
+} from './pricing';
 
 /**
  * The seeded cart in the prototype: Butter Chicken x1, Butter Naan x2,
@@ -158,5 +164,20 @@ describe('invariants that must hold for every order', () => {
       const t = computeOrderTotals({ lines, discountPaise: Math.floor(rand() * 400000) });
       expect(t.totalPaise).toBeGreaterThanOrEqual(0);
     }
+  });
+});
+
+describe('gstLabel', () => {
+  it('says so when the rate is the sample, because the bill is not the restaurant’s own', () => {
+    expect(gstLabel()).toBe('GST 5% · sample');
+    expect(gstLabel(undefined)).toBe('GST 5% · sample');
+  });
+
+  it('prints the restaurant’s rate when it has one', () => {
+    // The label used to be hard-coded to 5%, so a restaurant on 12% showed a
+    // bill that named one rate and charged another.
+    expect(gstLabel(1200)).toBe('GST 12%');
+    expect(gstLabel(500)).toBe('GST 5%');
+    expect(gstLabel(250)).toBe('GST 2.50%');
   });
 });

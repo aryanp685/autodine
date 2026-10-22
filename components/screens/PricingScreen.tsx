@@ -1,57 +1,73 @@
 import Link from 'next/link';
-import { inr, plans } from '@/lib/demo-data';
 import { SiteNav } from '@/components/SiteNav';
 import { SiteMotion } from '@/components/SiteMotion';
-import { PlanMatcher } from '@/components/PlanMatcher';
-import { SiteClosing } from '@/components/SiteClosing';
 import { SiteFooter } from '@/components/SiteFooter';
+import { SiteClosing } from '@/components/SiteClosing';
+import { PlanMatcher } from '@/components/PlanMatcher';
+import { inr } from '@/lib/demo-data';
+import {
+  BILLING,
+  DIFFERENCES,
+  LIVE,
+  PLANS,
+  capabilitiesFor,
+} from '@/lib/plans';
 
 /* ============================================================================
-   Pricing — premium editorial.
+   Pricing — what it costs, and what is actually true today.
 
-   The same bones as Home so the two pages read as one product: a type-led
-   header, a matcher, three plans on paper with one dark card, a spec list of
-   what every plan shares and what still differs, then the questions worth
-   asking. Billing is not enabled, and the page says so in three registers
-   rather than once in small print.
+   The page has one job beyond looking expensive: it must not sell anything
+   that does not exist. Billing is not connected in this deployment, so:
+
+     - no card carries a "Choose" button; there is nothing to choose, and a
+       button that leads to a signup form that ignores the plan is a lie
+     - every capability is labelled live or planned, from lib/plans.ts
+     - "what you get today" is a list of built features, not of promises
+     - the trial is described as it will work WHEN billing opens, in a section
+       that says so, rather than in the present tense on a page with prices
+
+   Section order is deliberate: price, then proof, then the differences, then
+   the money mechanics, then the questions a person actually asks.
    ========================================================================== */
 
 const FAQS = [
   {
-    q: 'Can I place a real order or make a payment?',
-    a: 'The demo menu, cart, kitchen board and cashier are connected to a real database, so an order placed in the demo really does reach the board. Payments are not connected: nothing is charged to a card, and no subscription is active.',
+    q: 'Can I buy a plan today?',
+    a: 'No. Billing is not connected in this build: there is no gateway, no subscription record and no card is ever asked for. Accounts created now are free and stay free while the product is in preview.',
+  },
+  {
+    q: 'What do I get if I create an account now?',
+    a: 'Everything in the product: menus, table cards, guest ordering, the kitchen board, the counter and reports. Nothing is gated, metered or limited, and that will not change without telling you first.',
   },
   {
     q: 'Are these prices final?',
-    a: 'No. They are planning figures shown for product preview. Final prices, the tax treatment on them, and the shape of the trial are still being settled before billing launches.',
+    a: 'They are planning figures. The monthly amounts are our intent, but final pricing and the tax treatment on it are not settled, so nothing here is a quote.',
   },
   {
-    q: 'What happens when the trial ends?',
-    a: 'Your data stays. With no active plan the account moves to read-only: menus, orders, receipts and reports remain visible, but new customer orders and paid features are blocked on the server until a plan is activated.',
+    q: 'How will a subscription work when it opens?',
+    a: 'Monthly, per restaurant, with a ten-day trial before the first charge. If a subscription lapses the account becomes read-only: menus, orders and reports stay visible and are never deleted. We will give notice before any of that is switched on.',
   },
   {
     q: 'Do I need any hardware?',
-    a: 'No. Print the table QR cards on ordinary paper, run the kitchen board on any laptop, tablet or phone, and connect a Bluetooth speaker through the device if you want the ticket announcements louder.',
+    a: 'No. Print the table cards on ordinary paper, run the kitchen board on any laptop or tablet, and print receipts from the same browser the counter already uses.',
   },
   {
     q: 'Can guests pay online?',
-    a: 'Not in this preview. Both paths are built — online and at the counter — but the gateway is not connected, so the guest is sent to the counter and the order shows as payment-pending until a cashier records it.',
+    a: 'Not in this build. Both paths are written — online and at the counter — but the payment gateway is not connected, so guests are asked to pay at the counter and the order shows as payment pending until it is recorded.',
   },
 ];
 
-const INCLUDED = [
-  ['Unlimited guest orders', 'Ordering is not metered on any plan, at any table, at any hour.'],
-  ['Kitchen, cashier and bill', 'The operational screens are the product, not an add-on tier.'],
-  ['Printed table cards', 'QR cards are generated per table and reprintable when a table moves.'],
-];
-
-const DIFFERS = [
-  ['Menus', 'Starter runs the house menu. Professional and Business run several side by side — lunch and dinner, dine-in and takeaway.'],
-  ['Menu import', 'Professional and Business read a photographed or pasted menu and draft it for review. Starter is entered by hand.'],
-  ['Staff and roles', 'Starter has counter access. Professional adds manager roles; Business adds per-outlet roles across several rooms.'],
-  ['Reporting', 'All plans show billed and collected separately. Professional and Business add item-level performance and exports.'],
-  ['Still being set', 'Table counts, staff seats and storage per plan are not final, so they are deliberately not printed here.'],
-];
+function TierTags({ tiers }: { tiers: string[] }) {
+  return (
+    <span className="diff__tiers">
+      {tiers.map((tier) => (
+        <span key={tier} className="diff__tier">
+          {tier}
+        </span>
+      ))}
+    </span>
+  );
+}
 
 export function PricingScreen() {
   return (
@@ -60,166 +76,253 @@ export function PricingScreen() {
         links={[
           { label: 'Product', href: '/#product' },
           { label: 'How it works', href: '/#flow' },
+          { label: 'What is live', href: '/#status' },
           { label: 'Pricing', href: '/pricing', active: true },
         ]}
       />
 
-      <main style={{ paddingTop: 118 }}>
+      <main>
         {/* ---------------------------------------------------------- header */}
-        <section style={{ paddingBlock: 'clamp(48px, 8vh, 96px) clamp(36px, 5vh, 56px)' }}>
+        <header className="p-sect pricing__head">
           <div className="p-wrap">
             <div className="p-head" data-reveal>
               <div>
-                <div className="p-eyebrow">Pricing</div>
-                <h1 className="p-display" style={{ marginTop: 26, maxWidth: '14ch' }}>
-                  Priced for one restaurant, not a chain.
+                <div className="p-eyebrow">01 · Plans</div>
+                <h1 className="p-display p-head__title">
+                  Priced for one restaurant,
+                  <br />
+                  not a chain.
                 </h1>
               </div>
-              <div className="p-head__aside">
-                <p className="p-lede">
-                  Three plans, each built around a different size of operation. These are
-                  planning figures — nothing is charged, and no card is asked for anywhere on
-                  this page.
+              <p className="p-lede p-head__aside">
+                Three sizes of operation, one product. Everything below is a planning figure —
+                plans are not on sale, and no account is limited by them today.
+              </p>
+            </div>
+
+            <div className="pricing__bar" data-reveal>
+              <PlanMatcher
+                options={PLANS.map((plan) => ({
+                  planId: plan.id,
+                  label: plan.fit.split(',')[0],
+                  hint: plan.fit,
+                }))}
+              />
+              <span className="pricing__state">
+                <span className="pricing__stateDot" aria-hidden="true" />
+                {BILLING.connected ? 'Billing connected' : 'Preview · billing not connected'}
+              </span>
+            </div>
+          </div>
+        </header>
+
+        {/* ----------------------------------------------------------- plans */}
+        <section className="p-sect p-sect--tight" style={{ paddingTop: 0 }} id="plans">
+          <div className="p-wrap">
+            <div className="p-plans" data-stagger>
+              {PLANS.map((plan) => {
+                const included = capabilitiesFor(plan.id);
+                return (
+                  <article
+                    key={plan.id}
+                    id={`plan-${plan.id}`}
+                    className={`plan${plan.recommended ? ' plan--featured' : ''}`}
+                    data-plan-id={plan.id}
+                  >
+                    {plan.recommended && <div className="plan__flag">Recommended</div>}
+
+                    <div className="plan__name">{plan.name}</div>
+                    <p className="plan__fit">{plan.fit}</p>
+
+                    <div className="plan__price">
+                      {inr(plan.price)}
+                      <span>/month · planned</span>
+                    </div>
+
+                    <div className="plan__rule" />
+
+                    <ul className="plan__features">
+                      {plan.id === 'starter' ? (
+                        <>
+                          <li className="plan__feature">All {LIVE.length} live capabilities</li>
+                          <li className="plan__feature">Unlimited orders and tables</li>
+                          <li className="plan__feature">Available today, nothing charged</li>
+                        </>
+                      ) : (
+                        <>
+                          <li className="plan__feature">
+                            Everything in {PLANS[PLANS.indexOf(plan) - 1].name}, plus:
+                          </li>
+                          {/* Only what this tier adds over the one below it.
+                              Repeating Professional's rows on Business reads as
+                              a longer list and is the same list. */}
+                          {included
+                            .filter((c) => {
+                              if (c.tiers === 'all') return false;
+                              const below = PLANS[PLANS.indexOf(plan) - 1].id;
+                              return !c.tiers.includes(below);
+                            })
+                            .map((c) => (
+                              <li key={c.id} className="plan__feature">
+                                {c.label}
+                              </li>
+                            ))}
+                        </>
+                      )}
+                    </ul>
+                    <p className="plan__stage">Planned · not on sale</p>
+                  </article>
+                );
+              })}
+            </div>
+
+            {/* One action for the whole page. Three "Choose" buttons would be
+                three ways to do the same thing, and none of them would put the
+                account on a plan. */}
+            <div className="pricing__action" data-reveal>
+              <div>
+                <Link href="/signup" className="p-btn p-btn--solid">
+                  Create an account
+                </Link>
+                <p className="pricing__actionNote">
+                  Free while the product is in preview. No card, nothing charged.
                 </p>
               </div>
+              <Link href="/demo/menu" className="p-arrow">
+                See a sample menu <span aria-hidden="true">→</span>
+              </Link>
             </div>
           </div>
         </section>
 
-        {/* ----------------------------------------------------------- plans */}
-        <section style={{ paddingBottom: 'clamp(56px, 9vh, 104px)' }}>
+        {/* ------------------------------------------------------ live today */}
+        <section className="p-sect" id="live">
           <div className="p-wrap">
-            <div
-              style={{ marginBottom: 'clamp(28px, 4vh, 40px)' }}
-              data-reveal
-            >
-              <PlanMatcher
-                options={[
-                  {
-                    planId: 'starter',
-                    label: 'One outlet',
-                    hint: 'Starter fits a single restaurant running one menu and one counter.',
-                  },
-                  {
-                    planId: 'professional',
-                    label: 'A busy floor',
-                    hint: 'Professional fits a full floor with a kitchen board and a manager on shift.',
-                  },
-                  {
-                    planId: 'business',
-                    label: 'Several rooms',
-                    hint: 'Business fits several outlets or rooms, each with its own screens and staff.',
-                  },
-                ]}
-              />
+            <div className="p-head" data-reveal>
+              <div>
+                <div className="p-eyebrow">02 · In the product today</div>
+                <h2 className="p-h2 p-head__title">Built, and switched on.</h2>
+              </div>
+              <p className="p-lede p-head__aside">
+                Not a roadmap. These six are running in this build, on every account, whatever
+                the plans end up costing.
+              </p>
             </div>
 
-            <div className="p-plans" data-stagger>
-              {plans.map((plan) => (
-                <article
-                  key={plan.id}
-                  className={`plan${plan.highlight ? ' plan--featured' : ''}`}
-                  data-plan-id={plan.id}
-                >
-                  {plan.highlight && <div className="plan__flag">Most complete</div>}
-                  <div className="plan__name">{plan.name}</div>
-                  <p className="plan__fit">{plan.fit}</p>
-                  <div className="plan__price">
-                    {inr(plan.price)}
-                    <span>/month · planned</span>
-                  </div>
-                  <div className="plan__rule" />
-                  <ul className="plan__features">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="plan__feature">
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                  {/* Every plan leads to the same signup, where the plan is
-                      chosen. Signup is real -- it creates the restaurant and
-                      its trial -- so this is the conversion path, not a demo
-                      link. */}
-                  <Link
-                    href="/signup"
-                    className={`p-btn p-btn--block ${plan.highlight ? 'p-btn--onInk' : 'p-btn--line'}`}
-                  >
-                    Choose {plan.name}
-                  </Link>
+            <div className="p-grid" style={{ marginTop: 'clamp(48px, 7vh, 88px)' }} data-stagger>
+              {LIVE.map((capability, index) => (
+                <article key={capability.id} className="feat">
+                  <hr className="p-rule feat__rule" data-draw />
+                  <p className="feat__num">{String(index + 1).padStart(2, '0')}</p>
+                  <h3 className="p-h3 feat__title">{capability.label}</h3>
+                  <p className="p-body feat__body">{capability.detail}</p>
                 </article>
               ))}
             </div>
+          </div>
+        </section>
 
-            <p className="p-small" style={{ marginTop: 30, maxWidth: '68ch' }}>
-              <strong style={{ color: 'var(--p-ink)', fontWeight: 500 }}>Preview only.</strong>{' '}
-              Features and entitlements are not yet available for purchase. Tax treatment and
-              final prices require confirmation before billing launches.
+        {/* ------------------------------------------------------- statement */}
+        <section className="statement">
+          <div className="p-wrap">
+            <p className="p-label" data-reveal>
+              Why nothing is gated
+            </p>
+            <h2 className="statement__text" style={{ marginTop: 26 }} data-reveal>
+              A restaurant that cannot take an order is not a smaller customer.
+            </h2>
+            <p className="p-lede statement__sub" data-reveal>
+              The parts that run service are in every plan, and today they are not metered at
+              all. Billing, when it arrives, will not take away the kitchen board.
             </p>
           </div>
         </section>
 
-        {/* -------------------------------------------------- what is shared */}
-        <section className="statement">
+        {/* -------------------------------------------------------- differs */}
+        <section className="p-sect" id="differs">
           <div className="p-wrap">
             <div className="p-head" data-reveal>
               <div>
-                <div className="p-eyebrow">In every plan</div>
-                <h2 className="p-h2 p-head__title">Nothing operational is gated.</h2>
+                <div className="p-eyebrow">03 · What the tiers change</div>
+                <h2 className="p-h2 p-head__title">Five differences, not fifty.</h2>
               </div>
               <p className="p-lede p-head__aside">
-                A restaurant that cannot take an order is not a smaller customer. The parts that
-                run service are in all three plans.
+                What each step up will add when billing opens. Nothing here exists yet, which is
+                why every row is marked planned.
               </p>
             </div>
 
-            <div
-              className="p-grid"
-              style={{ marginTop: 'clamp(40px, 6vh, 64px)' }}
-              data-stagger
-            >
-              {INCLUDED.map(([title, body], i) => (
-                <article key={title} className="feat">
-                  <hr className="p-rule feat__rule" data-draw />
-                  <p className="feat__num">{String(i + 1).padStart(2, '0')}</p>
-                  <h3 className="p-h3 feat__title">{title}</h3>
-                  <p className="p-body feat__body">{body}</p>
-                </article>
-              ))}
+            <div className="diff" style={{ marginTop: 'clamp(32px, 5vh, 52px)' }} data-stagger>
+              {DIFFERENCES.map((difference) => {
+                const tiers = difference.tiers === 'all' ? [] : difference.tiers;
+                return (
+                  <div key={difference.id} className="diff__row">
+                    <div className="diff__lead">
+                      <p className="diff__label">{difference.label}</p>
+                      <TierTags tiers={tiers.map((t) => PLANS.find((p) => p.id === t)!.name)} />
+                    </div>
+                    <p className="diff__detail">{difference.detail}</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </section>
 
-        {/* ------------------------------------------------- what differs */}
-        <section className="p-sect">
+        {/* --------------------------------------------------------- billing */}
+        <section className="p-sect p-sect--tight" id="billing">
           <div className="p-wrap">
-            <div className="p-head" data-reveal>
-              <div>
-                <div className="p-eyebrow">What differs</div>
-                <h2 className="p-h2 p-head__title">The honest version.</h2>
-              </div>
-              <p className="p-lede p-head__aside">
-                Rather than a grid of ticks, the four things that actually change — and the
-                numbers that are not settled yet.
-              </p>
-            </div>
-
-            <div className="spec" style={{ marginTop: 'clamp(32px, 5vh, 52px)' }} data-stagger>
-              {DIFFERS.map(([label, value]) => (
-                <div key={label} className="spec__row">
-                  <p className="spec__label">{label}</p>
-                  <p className="spec__value">{value}</p>
+            <div className="flow">
+              <div className="flow__aside">
+                <div data-reveal>
+                  <div className="p-eyebrow">04 · The money side</div>
+                  <h2 className="p-h2" style={{ marginTop: 24, maxWidth: '14ch' }}>
+                    How billing will work.
+                  </h2>
+                  <p className="p-lede" style={{ marginTop: 22, maxWidth: '34ch' }}>
+                    None of this is switched on. It is written down so the shape is not a
+                    surprise when it is.
+                  </p>
                 </div>
-              ))}
+              </div>
+
+              <div className="flow__steps" data-stagger>
+                {[
+                  {
+                    n: '01',
+                    title: `${BILLING.trialDays} days, everything on`,
+                    body: 'A new account starts on the whole product. No card is taken to begin, and the trial is not a cut-down tier.',
+                  },
+                  {
+                    n: '02',
+                    title: 'Monthly, per restaurant',
+                    body: 'One amount in rupees, once a month. No setup fee, no percentage of sales, no charge per order or per table.',
+                  },
+                  {
+                    n: '03',
+                    title: 'If it lapses, it goes quiet',
+                    body: 'The account becomes read-only: menus, orders, receipts and reports stay visible and are never deleted. New orders stop until a plan is active.',
+                  },
+                ].map((step) => (
+                  <div key={step.n} className="flow__step">
+                    <p className="flow__num">{step.n}</p>
+                    <div>
+                      <h3 className="p-h3 flow__title">{step.title}</h3>
+                      <p className="p-body flow__body">{step.body}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </section>
 
         {/* ------------------------------------------------------------- FAQ */}
-        <section className="p-sect p-sect--tight" style={{ paddingTop: 0 }}>
+        <section className="p-sect p-sect--tight" id="questions">
           <div className="p-wrap">
             <div className="p-head" data-reveal>
               <div>
-                <div className="p-eyebrow">Questions</div>
+                <div className="p-eyebrow">05 · Questions</div>
                 <h2 className="p-h2 p-head__title">The ones worth asking first.</h2>
               </div>
             </div>
@@ -232,22 +335,25 @@ export function PricingScreen() {
                 </details>
               ))}
             </div>
+
+            <p className="p-small" style={{ marginTop: 30, maxWidth: '70ch' }}>
+              {BILLING.note}
+            </p>
           </div>
         </section>
 
         <SiteClosing
-          title="Start with the menu, decide later."
-          body="Creating an account is free and starts a trial. Nothing is charged, and no card is asked for."
+          title="Start with the product, decide later."
+          body="An account is free today and gives you the entire product. When plans open, you will hear about it before anything is charged."
           primary={{ label: 'Create an account', href: '/signup' }}
           secondary={{ label: 'See the sample menu', href: '/demo/menu' }}
         />
 
         <SiteFooter
           note="Table QR ordering and restaurant operations."
-          scope="Early product preview. Not for live restaurant operations."
-          fineRight="Prices shown are planning figures"
+          scope="Product preview. Billing is not connected and nothing is for sale."
+          fineRight="Prices are planning figures"
         />
-
       </main>
 
       <SiteMotion />

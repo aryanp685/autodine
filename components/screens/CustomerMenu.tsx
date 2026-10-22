@@ -122,6 +122,24 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
   const barSubtotal = priceCart(cart.lines, menuPrices).subtotalPaise;
   const cartHref = slug ? `/menu/cart?s=${encodeURIComponent(slug)}` : '/menu/cart';
   const list = cat === 'all' ? items : items.filter((i) => i.category === cat);
+
+  /**
+   * How many of this dish are in the cart, for dishes that have nothing to
+   * choose. A dish with portions or add-ons is served many ways, so "how many"
+   * is a question only the sheet can answer.
+   *
+   * This is what turns the row's single button into a stepper once something
+   * is in the order: adjusting a quantity from the menu is the most common
+   * thing a guest does after the first tap, and sending them to the cart to do
+   * it is a page load for a minus sign.
+   */
+  const plainQty = (itemId: string) =>
+    cart.lines.find(
+      (line) =>
+        line.itemId === itemId &&
+        !line.variantId &&
+        (!line.addonIds || line.addonIds.length === 0),
+    )?.qty ?? 0;
   const itemHref = (itemId: string) => {
     const params = new URLSearchParams({ item: itemId });
     if (data?.restaurant.slug) params.set('s', data.restaurant.slug);
@@ -137,7 +155,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
       <header className="menu__head">
         <div className="menu__venue">
           <div className="menu__kicker">The menu</div>
-          <div className="menu__venueName">{restaurant.name}</div>
+          <h1 className="menu__venueName">{restaurant.name}</h1>
           <div className="menu__venueMeta">{restaurant.tagline}</div>
         </div>
         {table ? (
@@ -195,7 +213,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
             <div className="menu__dishBody">
               <div className="menu__dishTop">
                 <VegMark veg={i.veg} />
-                <h3 className="menu__dishName">{i.name}</h3>
+                <h2 className="menu__dishName">{i.name}</h2>
                 {i.badge && i.available && <span className="menu__dishBadge">{i.badge}</span>}
               </div>
               <p className="menu__dishDesc">{i.desc}</p>
@@ -213,6 +231,26 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
                     <Link href={itemHref(i.id)} className="menu__dishCta">
                       Choose
                     </Link>
+                  ) : plainQty(i.id) > 0 ? (
+                    <div className="menu__stepper">
+                      <button
+                        type="button"
+                        onClick={() => cart.setQty(i.id, plainQty(i.id) - 1)}
+                        aria-label={`One fewer ${i.name}`}
+                      >
+                        −
+                      </button>
+                      <span className="tnum" aria-live="polite">
+                        {plainQty(i.id)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => addToCart(i.id)}
+                        aria-label={`One more ${i.name}`}
+                      >
+                        +
+                      </button>
+                    </div>
                   ) : (
                     <button
                       type="button"
@@ -385,7 +423,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
       <header className="menu__head">
         <div className="menu__venue">
           <div className="menu__kicker">The menu</div>
-          <div className="menu__venueName">{restaurant.name}</div>
+          <h1 className="menu__venueName">{restaurant.name}</h1>
           <div className="menu__venueMeta">{restaurant.tagline}</div>
         </div>
         {table ? (
@@ -401,7 +439,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
             <div className="menu__dishBody">
               <div className="menu__dishTop">
                 <VegMark veg={i.veg} />
-                <h3 className="menu__dishName">{i.name}</h3>
+                <h2 className="menu__dishName">{i.name}</h2>
               </div>
               <p className="menu__dishDesc">{i.desc}</p>
               <div className="menu__dishPrice">{inr(i.price)}</div>

@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { inr, plans } from '@/lib/demo-data';
+import { inr } from '@/lib/demo-data';
+import { LIVE, NOT_CONNECTED, PLANS } from '@/lib/plans';
 import { SiteNav } from '@/components/SiteNav';
 import { SiteMotion } from '@/components/SiteMotion';
 import { SiteClosing } from '@/components/SiteClosing';
@@ -74,6 +75,7 @@ export function Home() {
         links={[
           { label: 'Product', href: '/#product' },
           { label: 'How it works', href: '/#flow' },
+          { label: 'What is live', href: '/#status' },
           { label: 'Pricing', href: '/pricing' },
         ]}
       />
@@ -116,11 +118,11 @@ export function Home() {
             </p>
 
             <div className="hero__ctas" data-hero-step>
-              <Link href="/demo/menu" className="p-btn p-btn--solid">
-                Open the sample menu
+              <Link href="/signup" className="p-btn p-btn--solid">
+                Create your restaurant
               </Link>
-              <Link href="/pricing" className="p-btn p-btn--glass">
-                See pricing
+              <Link href="/#flow" className="p-btn p-btn--glass">
+                See how it works
               </Link>
             </div>
 
@@ -153,7 +155,7 @@ export function Home() {
           <div className="p-wrap">
             <div className="p-head" data-reveal>
               <div>
-                <div className="p-eyebrow">The product</div>
+                <div className="p-eyebrow">01 · The product</div>
                 <h2 className="p-h2 p-head__title">Three screens. One service.</h2>
               </div>
               <p className="p-lede p-head__aside">
@@ -181,15 +183,15 @@ export function Home() {
             <div className="flow">
               <div className="flow__aside">
                 <div data-reveal>
-                  <div className="p-eyebrow">How it works</div>
+                  <div className="p-eyebrow">02 · How it works</div>
                   <h2 className="p-h2" style={{ marginTop: 24, maxWidth: '12ch' }}>
                     Four steps, no ceremony.
                   </h2>
                   <p className="p-lede" style={{ marginTop: 22, maxWidth: '34ch' }}>
                     The whole guest journey is under a minute, and none of it needs an install.
                   </p>
-                  <Link href="/demo/menu" className="p-arrow" style={{ marginTop: 28 }}>
-                    Read the menu <span aria-hidden="true">→</span>
+                  <Link href="/pricing" className="p-arrow" style={{ marginTop: 28 }}>
+                    See what it costs <span aria-hidden="true">→</span>
                   </Link>
                 </div>
               </div>
@@ -225,12 +227,66 @@ export function Home() {
           </div>
         </section>
 
+        {/* --------------------------------------------------------- status */}
+        <section className="p-sect p-sect--tight" id="status">
+          <div className="p-wrap">
+            <div className="status">
+              <div className="status__lead" data-reveal>
+                <div className="p-eyebrow">03 · What is live</div>
+                <h2 className="p-h2" style={{ marginTop: 24, maxWidth: '15ch' }}>
+                  Six things work. Three do not.
+                </h2>
+                <p className="p-lede" style={{ marginTop: 22, maxWidth: '36ch' }}>
+                  This is a working product in preview, not a finished one. The honest version of
+                  the state of it is more useful than a launch badge.
+                </p>
+              </div>
+
+              <div className="status__cols" data-stagger>
+                <div className="status__col">
+                  <p className="status__head">
+                    <span className="status__dot status__dot--live" aria-hidden="true" />
+                    Live now
+                  </p>
+                  <ul className="status__list">
+                    {LIVE.map((capability) => (
+                      <li key={capability.id} className="status__item">
+                        <span className="status__name">{capability.label}</span>
+                        <span className="status__detail">{capability.detail}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="status__col">
+                  <p className="status__head">
+                    <span className="status__dot" aria-hidden="true" />
+                    Not connected
+                  </p>
+                  <ul className="status__list">
+                    {NOT_CONNECTED.map((item) => (
+                      <li key={item.id} className="status__item">
+                        <span className="status__name">{item.label}</span>
+                        <span className="status__detail">{item.detail}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="status__fine">
+                    The six on the left are not mock-ups. They are the screens the kitchen
+                    and the counter use in this build.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* ----------------------------------------------------------- plans */}
-        <section className="p-sect">
+        <section className="p-sect" id="pricing">
           <div className="p-wrap">
             <div className="p-head" data-reveal>
               <div>
-                <div className="p-eyebrow">Pricing</div>
+                <div className="p-eyebrow">04 · Pricing</div>
                 <h2 className="p-h2 p-head__title">Planned, not yet charged.</h2>
               </div>
               <Link href="/pricing" className="p-arrow" style={{ alignSelf: 'flex-end' }}>
@@ -239,54 +295,61 @@ export function Home() {
             </div>
 
             <div className="p-plans" style={{ marginTop: 'clamp(40px, 6vh, 64px)' }} data-stagger>
-              {plans.map((p) => (
+              {PLANS.map((plan) => (
                 <article
-                  key={p.id}
-                  className={`plan${p.highlight ? ' plan--featured' : ''}`}
-                  data-plan-id={p.id}
+                  key={plan.id}
+                  className={`plan${plan.recommended ? ' plan--featured' : ''}`}
+                  data-plan-id={plan.id}
                 >
-                  {p.highlight && <div className="plan__flag">Most complete</div>}
-                  <div className="plan__name">{p.name}</div>
-                  <p className="plan__fit">{p.fit}</p>
+                  {plan.recommended && <div className="plan__flag">Recommended</div>}
+                  <div className="plan__name">{plan.name}</div>
+                  <p className="plan__fit">{plan.fit}</p>
                   <div className="plan__price">
-                    {inr(p.price)}
-                    <span>/month</span>
+                    {inr(plan.price)}
+                    <span>/month · planned</span>
                   </div>
                   <div className="plan__rule" />
                   <ul className="plan__features">
-                    {p.features.slice(0, 4).map((f) => (
-                      <li key={f} className="plan__feature">
-                        {f}
-                      </li>
-                    ))}
-                    {p.features.length > 4 && (
-                      <li className="plan__feature" style={{ color: 'var(--p-ink-46)' }}>
-                        + {p.features.length - 4} more
-                      </li>
-                    )}
+                    <li className="plan__feature">
+                      {plan.id === 'starter'
+                        ? `All ${LIVE.length} live capabilities`
+                        : `Everything in ${PLANS[PLANS.findIndex((p) => p.id === plan.id) - 1].name}`}
+                    </li>
+                    <li className="plan__feature">
+                      {plan.id === 'business'
+                        ? 'Several outlets and a team'
+                        : plan.id === 'professional'
+                          ? 'Manager roles and menu import'
+                          : 'One room, one menu, one counter'}
+                    </li>
+                    <li className="plan__feature plan__feature--soft">
+                      {plan.id === 'starter'
+                        ? 'Available today, unlimited'
+                        : 'Differences are planned, not built'}
+                    </li>
                   </ul>
                   <Link
-                    href="/pricing"
-                    className={`p-btn p-btn--block ${p.highlight ? 'p-btn--onInk' : 'p-btn--line'}`}
+                    href={`/pricing#plan-${plan.id}`}
+                    className={`p-btn p-btn--block ${plan.recommended ? 'p-btn--onInk' : 'p-btn--line'}`}
                   >
-                    See {p.name}
+                    See {plan.name}
                   </Link>
                 </article>
               ))}
             </div>
 
-            <p className="p-small" style={{ marginTop: 30, maxWidth: '64ch' }}>
-              Prices are planning figures shown for product preview. Trials, subscriptions and
-              billing are not enabled.
+            <p className="p-small" style={{ marginTop: 30, maxWidth: '68ch' }}>
+              Plans are not on sale. Nothing is charged, no card is taken, and no account is
+              limited by which of these you would pick.
             </p>
           </div>
         </section>
 
         <SiteClosing
-          title="Look at it the way a guest would."
-          body="The sample menu is open, set exactly as a guest reads it at the table. Ordering itself starts with the QR code on a table card."
-          primary={{ label: 'Open the sample menu', href: '/demo/menu' }}
-          secondary={{ label: 'Create an account', href: '/signup' }}
+          title="Start with the product, not a demo."
+          body="An account takes a minute and opens the whole product while it is in preview — menus, table cards, the kitchen board and the counter."
+          primary={{ label: 'Create an account', href: '/signup' }}
+          secondary={{ label: 'See pricing', href: '/pricing' }}
         />
 
         <SiteFooter />

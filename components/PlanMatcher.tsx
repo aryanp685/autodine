@@ -1,83 +1,42 @@
-'use client';
+import Link from 'next/link';
 
-/**
- * "Which plan fits?" — a segmented control that rings the matching plan.
- *
- * WHY THIS EXISTS
- *
- * Three plans with the same shape are hard to choose between, and the usual
- * fix — a dense comparison table — reads as a spreadsheet. This is the honest
- * version of a recommendation: the visitor says what their operation looks
- * like, and the card that matches gets a ring. Nothing is hidden, nothing is
- * disabled, every card keeps its own button, and if the visitor never touches
- * the control no card is highlighted at all.
- *
- * It is deliberately not a "recommended for you" badge computed from nothing.
- *
- * HOW THE RING REACHES THE CARDS
- *
- * The cards are Server Components rendered elsewhere in the tree, so this
- * component publishes the current match as an attribute on <html> and CSS does
- * the rest:
- *
- *     html[data-plan-match='professional'] .plan[data-plan-id='professional']
- *
- * One attribute, cleared to an empty string when deselected. The alternative —
- * moving three plan cards into the client bundle so a class name could be
- * passed down — is a lot of JavaScript for a border.
- */
+/* ============================================================================
+   "Which plan fits your restaurant."
 
-import { useEffect, useId, useState } from 'react';
+   Three ways to describe a restaurant, each of which jumps to the plan that
+   fits it and rings that card. It is honest by construction: the control does
+   exactly what an anchor does, because that is what it is. No selection is
+   stored, nothing is filtered out, and the back button behaves.
 
-export type PlanMatchOption = {
-  /** The plan this option points at, by id. Must match the card's data-plan-id. */
-  planId: string;
-  label: string;
-  /** Shown under the control once selected, so the choice explains itself. */
-  hint: string;
-};
+   It used to be a client component that published an attribute on <html> from
+   an effect. That is a lot of machinery to move a ring, and a segmented
+   control that cannot be "applied" reads as a choice that was not saved.
+   ========================================================================== */
 
-export function PlanMatcher({ options }: { options: ReadonlyArray<PlanMatchOption> }) {
-  const [selected, setSelected] = useState<PlanMatchOption | null>(null);
-  const labelId = useId();
-  const hintId = useId();
+export type MatcherOption = { planId: string; label: string; hint: string };
 
-  // Written to the document rather than passed down: the cards are rendered
-  // outside this component. Auto-cleans on unmount so a navigation away cannot
-  // leave a stale ring on the next page.
-  useEffect(() => {
-    const root = document.documentElement;
-    if (selected) root.setAttribute('data-plan-match', selected.planId);
-    else root.removeAttribute('data-plan-match');
-
-    return () => root.removeAttribute('data-plan-match');
-  }, [selected]);
-
+export function PlanMatcher({ options }: { options: MatcherOption[] }) {
   return (
-    <div>
-      <div className="matcher" role="group" aria-labelledby={labelId} aria-describedby={hintId}>
-        <span id={labelId} className="sr-only">
-          Which plan fits your restaurant
-        </span>
-        {options.map((option) => {
-          const pressed = selected?.planId === option.planId;
-          return (
-            <button
-              key={option.planId}
-              type="button"
-              className="matcher__opt"
-              aria-pressed={pressed}
-              onClick={() => setSelected(pressed ? null : option)}
-            >
-              {option.label}
-            </button>
-          );
-        })}
+    <nav className="matcherBlock" aria-label="Which plan fits">
+      <p className="matcherBlock__label">Which plan fits your restaurant</p>
+
+      <div className="matcher">
+        {options.map((option) => (
+          <Link
+            key={option.planId}
+            href={`#plan-${option.planId}`}
+            className="matcher__opt"
+            title={option.hint}
+          >
+            {option.label}
+          </Link>
+        ))}
       </div>
 
-      <p className="matcher__hint" id={hintId} aria-live="polite">
-        {selected ? selected.hint : 'Pick the closest description — every plan stays visible.'}
+      <p className="matcherBlock__hint">
+        Pick the closest description. Every plan stays visible, and none of them can be bought
+        yet.
       </p>
-    </div>
+    </nav>
   );
 }

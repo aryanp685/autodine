@@ -77,6 +77,12 @@ export function TableGateScreen({
             Go to my menu
           </Link>
         )}
+        {/* Not able to scan? There is still something to look at. This is the
+            one place the sample menu is offered, because this is the one place
+            a guest has been told no. */}
+        <Link href="/demo/menu" className="gnote__ghost">
+          See a sample menu
+        </Link>
       </div>
     </GuestNote>
   );

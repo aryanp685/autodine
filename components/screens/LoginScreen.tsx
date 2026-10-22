@@ -83,7 +83,7 @@ export function LoginScreen({ error, notice, next }: { error?: string; notice?: 
             <ol className="pg__steps">
               <li><strong>Dashboard</strong> — sample metrics and fictional orders only.</li>
               <li><strong>Menu</strong> — database-backed public menu reads are available when configured.</li>
-              <li><strong>Kitchen &amp; counter</strong> — interface previews only; no live orders or payments.</li>
+              <li><strong>Kitchen &amp; counter</strong> — connected to the database when configured; an order from a verified table reaches the board.</li>
               <li><strong>Account</strong> — Supabase authentication is available when the project is configured.</li>
             </ol>
           </div>
