@@ -108,6 +108,29 @@ describe('TablesScreen', () => {
     expect(html).toContain('Sample floor plan');
   });
 
+  it('does not dress the sample floor plan in controls that do nothing', () => {
+    // Demo mode once rendered Preview / Regenerate / Enable / Revoke as <span>s
+    // styled identically to the real buttons -- four things per card that
+    // looked tappable and were not.
+    const html = renderToStaticMarkup(<TablesScreen data={null} />);
+
+    expect(html).not.toContain('pg__miniBtn');
+    expect(html).not.toContain('Regenerate');
+    expect(html).toContain('Sample card');
+    expect(html).toContain('cannot be managed');
+  });
+
+  it('keeps the card explanation on screen and out of the print sheet', () => {
+    const html = renderToStaticMarkup(<TablesScreen data={data()} />);
+
+    // The copy used to live in an aside next to the print sheet; the sheet is
+    // print-only, so the explanation was the only part of that row people saw.
+    expect(html).toContain('pg__tableNotes');
+    expect(html).toContain('What a card carries');
+    expect(html).toContain('256 bits of randomness');
+    expect(html).toContain('pg__printRow--sheetOnly');
+  });
+
   it('previews what a guest sees: the card, not the menu', () => {
     const html = renderToStaticMarkup(<TablesScreen data={data()} />);
     expect(html).toContain('href="https://example.test/t/qr_abcdefghijklmnop"');

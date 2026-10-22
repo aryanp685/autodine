@@ -3,7 +3,7 @@ import { DashboardBar } from '@/components/DashboardBar';
 import type { OutletBar } from '@/lib/outlets';
 import { Money, PaymentPill, PrepPill } from '@/components/ui';
 import { SignInPrompt } from '@/components/SignInPrompt';
-import { demoReport, type ReportOrderRow, type ReportsScreenData } from '@/lib/db/reports';
+import { demoReport, resolveRange, type ReportOrderRow, type ReportsScreenData } from '@/lib/db/reports';
 import { dateTimeInZone } from '@/lib/db/time';
 
 /**
@@ -40,10 +40,19 @@ function isOpen(order: ReportOrderRow): boolean {
   return order.prepStatus === 'new' || order.prepStatus === 'preparing' || order.prepStatus === 'ready';
 }
 
+/**
+ * `all` means all.
+ *
+ * It used to hide cancelled bills, so the screen's own footnote ("a cancelled
+ * order stays in this list so the day's history is complete") described
+ * something the default view did not do: a cancellation vanished from the day
+ * it happened and could only be found by guessing at the Cancelled tab. The
+ * other three filters stay mutually exclusive and skip cancelled bills, which
+ * is why they are worth having.
+ */
 function matches(order: ReportOrderRow, filter: OrderFilter, query: string): boolean {
-  if (filter === 'cancelled' && order.prepStatus !== 'cancelled') return false;
-  if (filter === 'cancelled') return true;
-  if (order.prepStatus === 'cancelled') return false;
+  if (filter === 'cancelled') return order.prepStatus === 'cancelled';
+  if (filter !== 'all' && order.prepStatus === 'cancelled') return false;
   if (filter === 'open' && !isOpen(order)) return false;
   if (filter === 'settled' && order.paymentStatus !== 'paid') return false;
 
@@ -81,15 +90,17 @@ export function OrdersScreen({
   const timezone = data?.timezone ?? 'Asia/Kolkata';
   const rangeKey = data?.range.key === 'custom' ? 'today' : (data?.range.key ?? 'today');
 
-  // Sample rows when nothing is configured, labelled as such below.
-  const orders: ReportOrderRow[] = data?.report.orders ?? demoReport(
-    { key: '7d', fromIso: new Date().toISOString(), toIso: new Date().toISOString(), label: '', bucket: 'day', days: 7 },
-    timezone,
-  ).orders;
+  // Sample rows when nothing is configured, labelled as such below. The range
+  // comes from resolveRange rather than from two identical instants: `from`
+  // equal to `to` is an empty window, which is how the sample ledger ended up
+  // promising rows and rendering none.
+  const orders: ReportOrderRow[] =
+    data?.report.orders ?? demoReport(resolveRange('7d', timezone), timezone).orders;
 
   const visible = orders.filter((order) => matches(order, filter, query.trim()));
   const openCount = orders.filter(isOpen).length;
   const unsettledCount = orders.filter((o) => o.prepStatus !== 'cancelled' && o.paymentStatus !== 'paid').length;
+  const cancelledCount = orders.filter((o) => o.prepStatus === 'cancelled').length;
 
   return (
     <div className="pg pg--dash">
@@ -106,6 +117,7 @@ export function OrdersScreen({
               {live && !blocked ? data?.range.label : 'Sample ledger · fictional orders'}
               {' · '}
               {openCount} open · {unsettledCount} not settled
+              {cancelledCount > 0 ? ` · ${cancelledCount} cancelled` : ''}
             </p>
           </div>
           {live && !blocked && (
@@ -113,12 +125,16 @@ export function OrdersScreen({
               <Link className="pg__btn" href="/kitchen">
                 Kitchen board
               </Link>
-              <Link
+              {/* A route handler that answers with a file, so an anchor with
+                  `download` rather than <Link>: client-side navigation has no
+                  RSC payload to fetch here. */}
+              <a
                 className="pg__btn pg__btn--solid"
                 href={`/dashboard/reports/export?type=orders&range=${rangeKey}`}
+                download
               >
                 Order CSV
-              </Link>
+              </a>
             </div>
           )}
         </header>
@@ -130,6 +146,7 @@ export function OrdersScreen({
                 key={r.key}
                 href={href(r.key, filter, query)}
                 className={`rep__range ${rangeKey === r.key ? 'is-active' : ''}`}
+                aria-current={rangeKey === r.key ? 'true' : undefined}
               >
                 {r.label}
               </Link>
@@ -162,6 +179,7 @@ export function OrdersScreen({
                 key={f.key}
                 href={href(rangeKey, f.key, query)}
                 className={`rep__range ${filter === f.key ? 'is-active' : ''}`}
+                aria-current={filter === f.key ? 'true' : undefined}
               >
                 {f.label}
               </Link>
@@ -256,6 +274,73 @@ export function OrdersScreen({
                   ? 'No orders in this range.'
                   : 'No orders match this filter.'}
               </div>
+            )}
+
+            {/* The same bills as cards, for the width where seven columns of
+                numbers become a sideways scroll. One of the two is always
+                display:none, so neither is read twice. */}
+            {visible.length > 0 && (
+              <ul className="rep__cards">
+                {visible.map((order) => {
+                  const outstanding = Math.max(0, order.totalPaise - order.paidPaise);
+                  const cancelled = order.prepStatus === 'cancelled';
+                  return (
+                    <li key={order.id} className={`rep__card ${cancelled ? 'is-void' : ''}`}>
+                      <div className="rep__cardTop">
+                        <span className="rep__cardRef">
+                          {live && !blocked ? (
+                            <Link href={`/bill/${order.id}`} title="Open this bill">
+                              {order.code}
+                            </Link>
+                          ) : (
+                            order.code
+                          )}
+                        </span>
+                        <span className="rep__cardTime">{dateTimeInZone(timezone, order.placedAt)}</span>
+                      </div>
+                      <div className="rep__cardMid">
+                        <span className="rep__cardTable">{order.tableLabel ?? 'Takeaway'}</span>
+                        {cancelled ? (
+                          <span className="rep__void">Cancelled</span>
+                        ) : (
+                          <PrepPill
+                            state={
+                              order.prepStatus === 'preparing' ||
+                              order.prepStatus === 'ready' ||
+                              order.prepStatus === 'served'
+                                ? order.prepStatus
+                                : 'new'
+                            }
+                          />
+                        )}
+                        <PaymentPill
+                          state={
+                            order.paymentStatus === 'pending'
+                              ? 'pending'
+                              : order.paymentStatus === 'failed'
+                                ? 'failed'
+                                : 'paid'
+                          }
+                        />
+                      </div>
+                      <div className="rep__cardFoot">
+                        <span className="rep__cardTotal">
+                          <Money value={order.totalPaise} />
+                        </span>
+                        <span className="rep__cardDue">
+                          {outstanding > 0 ? (
+                            <>
+                              Due <Money value={outstanding} />
+                            </>
+                          ) : (
+                            'Settled'
+                          )}
+                        </span>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
           </section>
         )}

@@ -698,8 +698,37 @@ export function demoReport(range: ReportRange, timeZone: string, now: Date = new
 
   const billed = raw.reduce((sum, b) => sum + b.revenuePaise, 0);
 
+  /* Six fictional bills, newest first.
+     Without them the sample ledger was an empty table under the words "Sample
+     ledger -- fictional orders", which reads as a page that failed rather than
+     a product that works. They are built from `now` so they always sit inside
+     whatever range is being previewed, and they carry no customer data of any
+     kind. */
+  const sampleOrders: ReportOrderRow[] = [
+    { code: 'MA-1042', tableLabel: 'T4', prepStatus: 'preparing', paymentStatus: 'pending', minutesAgo: 4, totalPaise: 84_000, paidPaise: 0 },
+    { code: 'MA-1041', tableLabel: 'T1', prepStatus: 'new', paymentStatus: 'pending', minutesAgo: 11, totalPaise: 46_500, paidPaise: 0 },
+    { code: 'MA-1040', tableLabel: 'T7', prepStatus: 'ready', paymentStatus: 'paid', minutesAgo: 26, totalPaise: 132_000, paidPaise: 132_000 },
+    { code: 'MA-1039', tableLabel: null, prepStatus: 'served', paymentStatus: 'paid', minutesAgo: 41, totalPaise: 29_000, paidPaise: 29_000 },
+    { code: 'MA-1038', tableLabel: 'T2', prepStatus: 'served', paymentStatus: 'pending', minutesAgo: 58, totalPaise: 97_500, paidPaise: 50_000 },
+    { code: 'MA-1037', tableLabel: 'T5', prepStatus: 'cancelled', paymentStatus: 'failed', minutesAgo: 73, totalPaise: 61_000, paidPaise: 0 },
+  ].map((order, index) => ({
+    id: `demo-order-${index + 1}`,
+    code: order.code,
+    placedAt: new Date(now.getTime() - order.minutesAgo * 60_000).toISOString(),
+    prepStatus: order.prepStatus,
+    paymentStatus: order.paymentStatus,
+    subtotalPaise: Math.round(order.totalPaise / 1.05),
+    discountPaise: 0,
+    taxPaise: order.totalPaise - Math.round(order.totalPaise / 1.05),
+    totalPaise: order.totalPaise,
+    paidPaise: order.paidPaise,
+    refundedPaise: 0,
+    tableLabel: order.tableLabel,
+  }));
+
   return {
     ...emptyPayload(),
+    orders: sampleOrders,
     totals: {
       bills: 60,
       cancelled: 1,
