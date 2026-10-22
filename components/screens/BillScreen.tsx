@@ -77,6 +77,17 @@ export function BillScreen({ bill }: { bill: BillData }) {
 
   const missingDetails = !restaurant.address || !restaurant.gstin;
 
+  /**
+   * The number, as far as the button is concerned.
+   *
+   * toWhatsAppNumber() is the rule that matters -- it builds the link -- but
+   * the button used to be live with nothing typed, so the only way to learn
+   * what it wanted was to press it and read an error. Disabling it until a
+   * plausible number is in the field makes the requirement visible before it
+   * is a mistake.
+   */
+  const phoneReady = Boolean(toWhatsAppNumber(phone));
+
   return (
     <div className="bill">
       <div className="bill__bar">
@@ -84,7 +95,8 @@ export function BillScreen({ bill }: { bill: BillData }) {
           ← Counter
         </Link>
         <div className="bill__barActions">
-          <PrintButton className="pg__btn">Print bill</PrintButton>
+          <span className="bill__barHint">One page, nothing else</span>
+          <PrintButton className="bill__print">Print bill</PrintButton>
         </div>
       </div>
 
@@ -215,7 +227,12 @@ export function BillScreen({ bill }: { bill: BillData }) {
               }}
             />
           </label>
-          <button type="button" className="pg__btn" onClick={sendOnWhatsApp}>
+          <button
+            type="button"
+            className="bill__waBtn"
+            onClick={sendOnWhatsApp}
+            disabled={!phoneReady}
+          >
             Open WhatsApp
           </button>
         </div>
@@ -226,10 +243,15 @@ export function BillScreen({ bill }: { bill: BillData }) {
           </p>
         ) : null}
 
+        {/* The hand-off sentence is always here; the reason the button is
+            asleep is only worth saying while it is asleep. */}
         <p className="bill__hint">
           Opens WhatsApp with this bill written out — you still press send yourself. No payment
           provider is involved, and the number is not saved by AutoDine.
         </p>
+        {!phoneReady ? (
+          <p className="bill__hint">Type the guest’s 10-digit mobile number to enable this.</p>
+        ) : null}
 
         {missingDetails ? (
           <p className="bill__hint bill__hint--warn">

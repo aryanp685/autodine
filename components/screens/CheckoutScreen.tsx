@@ -1,5 +1,6 @@
 'use client';
 
+import { DishPhoto } from '@/components/DishPhoto';
 import { GuestFlow } from '@/components/GuestFlow';
 import { PlaceOrderButton } from '@/components/PlaceOrderButton';
 import { useCart } from '@/components/CartProvider';
@@ -125,6 +126,7 @@ export function Checkout({
               // Keyed by portion as well as item: two portions of one dish
               // are two rows, and keying only by item made them collide.
               <li key={`${l.itemId}|${l.variantId ?? ''}|${(l.addonIds ?? []).join(',')}`}>
+                <DishPhoto src={l.img} name={l.name} size={44} className="co__itemImg" />
                 <VegMark veg={l.isVeg} />
                 <span>
                   <strong>{l.qty} ×</strong> {l.name}
