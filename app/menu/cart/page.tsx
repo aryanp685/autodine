@@ -3,6 +3,7 @@ import { CartProvider } from '@/components/CartProvider';
 import { Cart } from '@/components/screens/CartScreen';
 import { TableGateScreen } from '@/components/screens/TableGateScreen';
 import { getCartScreenData } from '@/lib/db/cart-screen';
+import { getGuestBranding } from '@/lib/db/branding';
 import { loadTableAccess, verifyAgainHref } from '@/lib/table-access';
 
 export const metadata: Metadata = { title: 'Your order · AutoDine' };
@@ -38,7 +39,9 @@ export default async function CartPage({
     return <TableGateScreen reason="stale" verifyHref={verifyAgainHref(access)} />;
   }
 
-  const data = await getCartScreenData(s);
+  // Branding is fetched separately from the cart: the cart needs only the
+  // restaurant's name and rate, while the accent paints the whole flow.
+  const [data, branding] = await Promise.all([getCartScreenData(s), getGuestBranding(s)]);
 
   return (
     <CartProvider slug={s}>
@@ -56,6 +59,7 @@ export default async function CartPage({
       <Cart
         slug={s}
         restaurantName={data?.restaurantName}
+        accent={branding.accent}
         // Only a verified session names a table. Demo mode can carry one from
         // the sample cookie; a real database read decides it above.
         tableLabel={access.status === 'verified' ? access.tableLabel : null}

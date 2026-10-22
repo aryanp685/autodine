@@ -16,6 +16,7 @@
  */
 
 import { paiseToRupees } from '@/lib/money';
+import { publicAssetUrl } from '@/lib/storage/assets';
 import type { Category, ItemVariant, MenuItem, Restaurant, RestaurantMenu } from './types';
 
 export type DisplayModifierOption = {
@@ -79,6 +80,18 @@ export type DisplayRestaurant = {
   currency: string;
   openHours: string;
   timezone: string;
+  /**
+   * Restaurant branding. All three are optional, and every consumer must treat
+   * them that way: a restaurant that has never opened the branding screen is
+   * the normal case on day one, and the menu has to look finished for it.
+   *
+   * `accent` is a palette KEY (`forest`, `terracotta`, ...), never a hex value
+   * -- see lib/branding/palette.ts for why an owner cannot pick arbitrary
+   * colour.
+   */
+  logoUrl?: string;
+  bannerUrl?: string;
+  accent?: string;
 };
 
 export function toDisplayItem(item: MenuItem): DisplayItem {
@@ -172,6 +185,12 @@ export function toDisplayRestaurant(r: Restaurant): DisplayRestaurant {
     currency: 'INR',
     openHours: 'Hours — add in Settings',
     timezone: r.timezone,
+    // Absent, not empty string: the header branches on truthiness to decide
+    // between the banner layout and the paper layout, and '' would be a third
+    // state that renders neither.
+    ...(publicAssetUrl(r.logo_path) ? { logoUrl: publicAssetUrl(r.logo_path)! } : {}),
+    ...(publicAssetUrl(r.banner_path) ? { bannerUrl: publicAssetUrl(r.banner_path)! } : {}),
+    accent: r.accent || undefined,
   };
 }
 

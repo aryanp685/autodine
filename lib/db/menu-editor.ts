@@ -25,6 +25,7 @@
 import { cookies } from 'next/headers';
 import { chooseMenu } from '@/lib/menu-select';
 import { getStaffContextDetailed } from './staff';
+import { publicAssetUrl } from '@/lib/storage/assets';
 
 /** The name of the cookie that remembers which menu the owner is editing. */
 export const EDITOR_MENU_COOKIE = 'autodine.editor.menu';
@@ -73,6 +74,14 @@ export type EditorItem = {
   pricePaise: number;
   veg: boolean;
   available: boolean;
+  /**
+   * Public URL of the dish photo, or null when none has been uploaded.
+   *
+   * Migration 20261025001000 gave this column a write path for the first time;
+   * before that `items.image_url` existed and was read by three screens but no
+   * UI ever set it.
+   */
+  img: string | null;
   sortOrder: number;
   /**
    * The owner's own pronunciation, or '' when the board should say the name.
@@ -212,7 +221,7 @@ export async function getMenuEditorData(): Promise<MenuEditorData | null> {
     supabase
       .from('items')
       .select(
-        'id, category_id, name, description, price_paise, is_veg, is_available, sort_order, spoken_name'
+        'id, category_id, name, description, price_paise, is_veg, is_available, image_url, sort_order, spoken_name'
       )
       .eq('restaurant_id', restaurantId)
       .order('sort_order', { ascending: true }),
@@ -394,6 +403,10 @@ export async function getMenuEditorData(): Promise<MenuEditorData | null> {
       pricePaise: Number(row.price_paise ?? 0),
       veg: Boolean(row.is_veg),
       available: Boolean(row.is_available),
+      // Stored as a URL (not a path) because items.image_url predates this
+      // feature and three existing readers expect a URL. See
+      // lib/storage/assets.ts for the reasoning.
+      img: publicAssetUrl((row.image_url as string | null) ?? null),
       sortOrder: Number(row.sort_order ?? 0),
       spokenName: ((row.spoken_name as string | null) ?? '').trim(),
       variants: variantsByItem.get(row.id as string) ?? [],

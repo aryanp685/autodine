@@ -19,6 +19,22 @@ const nextConfig = {
   },
 
   /**
+   * Server Actions receive uploaded files in the request body.
+   *
+   * Next's default cap is 1 MB, which is smaller than a phone photo, so every
+   * dish-photo upload from a camera would fail with an opaque "Body exceeded"
+   * error before the action ran. 6 MB covers the largest asset this app takes
+   * (a 4 MB dish photo, plus multipart overhead) with room to spare.
+   *
+   * This is NOT the size rule: lib/storage/assets.ts enforces the per-kind
+   * limit and the bucket enforces 4 MB again. This number only decides when
+   * the request is rejected at the door.
+   */
+  experimental: {
+    serverActions: { bodySizeLimit: '6mb' },
+  },
+
+  /**
    * Security headers. These used to live in netlify.toml, which this project
    * has never deployed from -- Vercel was reading nothing, so every response
    * went out without them. Declared here they apply to the platform that

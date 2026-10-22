@@ -24,9 +24,11 @@ import {
   saveItemAction,
   selectMenuAction,
   setAllAvailabilityAction,
+  setItemAvailabilityAction,
 } from '@/app/dashboard/menus/actions';
 import { PRESET_CATEGORIES, normaliseCategoryName } from '@/lib/menu-presets';
 import { PronunciationField } from '@/components/PronunciationField';
+import { DishPhotoField } from '@/components/DishPhotoField';
 
 /**
  * Shared page structure; styled by the locked design system.
@@ -532,9 +534,34 @@ export function MenuEditorScreen({
                       </td>
                       <td className="tnum">{inr(i.price)}</td>
                       <td>
-                        <span className={`pg__toggle ${i.available ? 'is-on' : 'is-off'}`}>
-                          <i /> {i.available ? 'Available' : 'Sold out'}
-                        </span>
+                        {/* A real switch, one dish at a time. It used to be a
+                            badge: the only way to sell out a single dish was
+                            the two bulk buttons above, which took the whole
+                            menu down. Guest-side, an unavailable dish is
+                            greyed and cannot be added. */}
+                        {live ? (
+                          <form action={setItemAvailabilityAction}>
+                            <input type="hidden" name="itemId" value={i.id} />
+                            <input type="hidden" name="available" value={i.available ? 'false' : 'true'} />
+                            <button
+                              type="submit"
+                              className={`pg__toggle pg__toggle--btn ${i.available ? 'is-on' : 'is-off'}`}
+                              aria-pressed={i.available}
+                              title={
+                                i.available
+                                  ? `Mark ${i.name} sold out`
+                                  : `Put ${i.name} back on sale`
+                              }
+                            >
+                              <i aria-hidden="true" />
+                              <span>{i.available ? 'Available' : 'Sold out'}</span>
+                            </button>
+                          </form>
+                        ) : (
+                          <span className={`pg__toggle ${i.available ? 'is-on' : 'is-off'}`}>
+                            <i /> {i.available ? 'Available' : 'Sold out'}
+                          </span>
+                        )}
                       </td>
                       <td className="tnum">
                         {live ? (
@@ -584,6 +611,19 @@ export function MenuEditorScreen({
               <h3>{selected.name}</h3>
               <span className="ui-badge ui-badge--outline">Editing draft</span>
             </div>
+
+            {/* The photo is its own form on purpose: it uploads a file to
+                Storage and writes one column, while the form below saves text
+                fields. Merging them would mean a text edit re-uploads a photo
+                it did not change. */}
+            {live && (
+              <DishPhotoField
+                itemId={selected.id}
+                dishName={selected.name}
+                imageUrl={data?.items.find((i) => i.id === selected.id)?.img ?? null}
+                disabled={!live}
+              />
+            )}
 
             <form action={saveItemAction} className="pg__editorForm">
               <input type="hidden" name="itemId" value={live ? selected.id : ''} />

@@ -3,6 +3,7 @@ import { CartProvider } from '@/components/CartProvider';
 import { ClearCartOnOrder } from '@/components/ClearCartOnOrder';
 import { OrderPlacedScreen } from '@/components/screens/OrderPlacedScreen';
 import { getOrderScreenData } from '@/lib/db/order-screen';
+import { getGuestBranding } from '@/lib/db/branding';
 import { onlinePaymentOffer, type OnlineOffer } from '@/lib/payments/online-availability';
 import { onlinePaymentsConfigured } from '@/lib/payments/razorpay';
 
@@ -29,7 +30,7 @@ export default async function OrderPage({
   searchParams: Promise<{ s?: string; code?: string; t?: string }>;
 }) {
   const { s, code, t } = await searchParams;
-  const data = await getOrderScreenData(s, code, t);
+  const [data, branding] = await Promise.all([getOrderScreenData(s, code, t), getGuestBranding(s)]);
 
   /**
    * Two separate facts decide whether a pay button is drawn: the owner's
@@ -57,7 +58,7 @@ export default async function OrderPage({
   return (
     <CartProvider slug={s}>
       <ClearCartOnOrder clear={placed} />
-      <OrderPlacedScreen data={data} token={t} slug={s} onlinePay={onlinePay} />
+      <OrderPlacedScreen data={data} token={t} slug={s} onlinePay={onlinePay} accent={branding.accent} />
     </CartProvider>
   );
 }

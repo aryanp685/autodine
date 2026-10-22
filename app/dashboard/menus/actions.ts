@@ -25,6 +25,14 @@ import { PRESET_CATEGORIES, normaliseCategoryName } from '@/lib/menu-presets';
 import { EDITOR_MENU_COOKIE } from '@/lib/db/menu-editor';
 import { readUndoItem } from '@/lib/menu-undo';
 import type { UndoItem } from '@/lib/menu-undo';
+import {
+  ASSET_BUCKET,
+  bucketPathFromUrl,
+  checkSize,
+  dishAssetPath,
+  publicAssetUrl,
+  validateImage,
+} from '@/lib/storage/assets';
 
 const MENUS_PATH = '/dashboard/menus';
 
@@ -822,4 +830,170 @@ export async function deleteAddonAction(formData: FormData): Promise<void> {
   if (error) fail(`Could not remove the add-on: ${error.message}`);
 
   ok(`"${addon.name as string}" removed. Past orders keep their own record of it.`);
+}
+
+/* ============================================================================
+   Dish photos and per-dish availability
+   ========================================================================== */
+
+/**
+ * Sold out, one dish at a time.
+ *
+ * Until now the only availability control was two bulk buttons ("Mark all sold
+ * out" / "Mark all available"), which is the wrong instrument for the common
+ * case: one dish runs out at 9pm. An owner had to either take the whole menu
+ * down or leave a dish on sale that the kitchen cannot cook.
+ *
+ * The item id is confirmed against THIS restaurant first. RLS would refuse a
+ * foreign id anyway, but it would surface as a generic policy error, and an
+ * owner pressing "sold out" deserves a sentence they can act on.
+ */
+export async function setItemAvailabilityAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const itemId = String(formData.get('itemId') ?? '').trim();
+  const available = formData.get('available') === 'true';
+  if (!itemId) fail('No dish selected.');
+
+  const { data: row, error: readError } = await ctx.supabase
+    .from('items')
+    .select('id, name')
+    .eq('id', itemId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .maybeSingle();
+
+  if (readError || !row) fail('That dish is no longer on your menu.');
+
+  const { data: saved, error } = await ctx.supabase
+    .from('items')
+    .update({ is_available: available })
+    .eq('id', itemId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .select('id');
+
+  if (error || !saved || saved.length === 0) fail('Could not change availability. Nothing was changed.');
+
+  const name = String((row as { name?: string }).name ?? 'That dish');
+  ok(available ? `"${name}" is back on sale.` : `"${name}" is marked sold out. Guests see it greyed.`);
+}
+
+/**
+ * Upload or replace a dish photo.
+ *
+ * Stores the PUBLIC URL in items.image_url, because that column is a URL with
+ * three existing readers including the demo rows that point at /img/dishes.
+ * Changing its meaning to a path would have broken all of them.
+ *
+ * Same three-step order as branding: upload, point the row, then delete the
+ * old object. A failure at step two removes the just-uploaded object so the
+ * bucket does not accumulate files nothing references.
+ */
+export async function uploadDishPhotoAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const itemId = String(formData.get('itemId') ?? '').trim();
+  if (!itemId) fail('No dish selected.');
+
+  const file = formData.get('photo');
+  if (!(file instanceof File) || file.size === 0) fail('Choose a photo first.');
+
+  const checked = validateImage(file);
+  if (!checked.ok) fail(checked.message);
+
+  const sized = checkSize('dish', file.size, checked.extension);
+  if (!sized.ok) fail(sized.message);
+
+  const { data: row, error: readError } = await ctx.supabase
+    .from('items')
+    .select('id, name, image_url')
+    .eq('id', itemId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .maybeSingle();
+
+  if (readError || !row) fail('That dish is no longer on your menu.');
+
+  const path = dishAssetPath(ctx.restaurantId, itemId, checked.extension);
+
+  const { error: uploadError } = await ctx.supabase.storage
+    .from(ASSET_BUCKET)
+    .upload(path, await file.arrayBuffer(), {
+      contentType: checked.contentType,
+      upsert: false,
+      cacheControl: '31536000',
+    });
+
+  if (uploadError) {
+    console.error('[menu] dish photo upload failed', uploadError);
+    fail(
+      /row-level security|permission/i.test(uploadError.message)
+        ? 'The database refused that upload for this account. Nothing was changed.'
+        : 'That photo did not upload. Nothing was changed — please try again.'
+    );
+  }
+
+  const url = publicAssetUrl(path);
+  const { data: saved, error } = await ctx.supabase
+    .from('items')
+    .update({ image_url: url })
+    .eq('id', itemId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .select('id');
+
+  if (error || !saved || saved.length === 0) {
+    await ctx.supabase.storage.from(ASSET_BUCKET).remove([path]);
+    fail('Could not save that photo. Nothing was changed.');
+  }
+
+  // Only delete a previous file we own; a demo row's /img/... path is not in
+  // the bucket and must never be handed to the Storage API.
+  const previousUrl = (row as { image_url?: string | null }).image_url ?? null;
+  const previousPath = bucketPathFromUrl(previousUrl);
+  if (previousPath) {
+    const { error: removeError } = await ctx.supabase.storage.from(ASSET_BUCKET).remove([previousPath]);
+    if (removeError) console.error('[menu] previous dish photo not deleted', removeError);
+  }
+
+  ok(`Photo updated for "${String((row as { name?: string }).name ?? 'this dish')}".`);
+}
+
+/** Remove a dish photo. The dish stays; its initials tile comes back. */
+export async function removeDishPhotoAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const itemId = String(formData.get('itemId') ?? '').trim();
+  if (!itemId) fail('No dish selected.');
+
+  const { data: row, error: readError } = await ctx.supabase
+    .from('items')
+    .select('id, image_url')
+    .eq('id', itemId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .maybeSingle();
+
+  if (readError || !row) fail('That dish is no longer on your menu.');
+
+  const previousUrl = (row as { image_url?: string | null }).image_url ?? null;
+
+  // Clear the column first: the page becomes correct even if the object
+  // delete fails, and a stray object is recoverable while a broken image on a
+  // diner's phone is not.
+  const { data: saved, error } = await ctx.supabase
+    .from('items')
+    .update({ image_url: null })
+    .eq('id', itemId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .select('id');
+
+  if (error || !saved || saved.length === 0) fail('Could not remove that photo. Nothing was changed.');
+
+  const previousPath = bucketPathFromUrl(previousUrl);
+  if (previousPath) {
+    const { error: removeError } = await ctx.supabase.storage.from(ASSET_BUCKET).remove([previousPath]);
+    if (removeError) console.error('[menu] dish photo not deleted', removeError);
+  }
+
+  ok('Photo removed. Guests see the dish’s initials until you add another.');
 }

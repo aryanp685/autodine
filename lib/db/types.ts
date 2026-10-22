@@ -26,6 +26,16 @@ export type Restaurant = {
    * not something a deployment key should turn on for them.
    */
   online_payments_enabled: boolean;
+  /**
+   * Migration 20261025001000. Storage object paths, not URLs -- see
+   * lib/storage/assets.ts for why. Null means "never uploaded", which is the
+   * normal case and is drawn as a designed state, never as a broken image.
+   */
+  logo_path: string | null;
+  banner_path: string | null;
+  /** Key into the curated palette in lib/branding/palette.ts. */
+  accent: string;
+  updated_at: string;
   created_at: string;
 };
 

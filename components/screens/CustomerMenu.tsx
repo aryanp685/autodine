@@ -17,6 +17,8 @@ import type {
 } from '@/lib/db/adapt';
 import { DishPhoto } from '@/components/DishPhoto';
 import { GuestFlow } from '@/components/GuestFlow';
+import { MenuIdentity } from '@/components/MenuIdentity';
+import { accentStyle } from '@/lib/branding/palette';
 import { useCart } from '@/components/CartProvider';
 import { priceCart } from '@/lib/cart-pricing';
 import { inr } from '@/lib/demo-data';
@@ -141,17 +143,6 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
         !line.variantId &&
         (!line.addonIds || line.addonIds.length === 0),
     )?.qty ?? 0;
-  /* How much menu there is, in one line under the venue's name. A guest
-     deciding whether to order another round is asking a size question, and
-     two true numbers beat an adjective. Both come from the data on screen. */
-  const menuMeta = [
-    restaurant.tagline?.trim(),
-    items.length > 0 ? `${items.length} ${items.length === 1 ? 'dish' : 'dishes'}` : null,
-    categories.length > 1 ? `${categories.length} sections` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
-
   const itemHref = (itemId: string) => {
     const params = new URLSearchParams({ item: itemId });
     if (data?.restaurant.slug) params.set('s', data.restaurant.slug);
@@ -165,6 +156,8 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
   return (
     <GuestFlow
       step="menu"
+      /* The accent paints the whole flow, so it is applied once at the root. */
+      style={accentStyle(data?.restaurant.accent)}
       venue={restaurant.name}
       table={table?.label ?? null}
       dock={
@@ -183,13 +176,22 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
         ) : null
       }
     >
-      <header className="menu__head">
-        <div className="menu__venue">
-          <div className="menu__kicker">The menu</div>
-          <h1 className="menu__venueName">{restaurant.name}</h1>
-          <div className="menu__venueMeta">{menuMeta}</div>
-        </div>
-      </header>
+      {/* The venue header. Its banner/paper state is decided by whether the
+          restaurant has uploaded one -- see components/MenuIdentity.tsx. The
+          badge that used to live here said "The menu" to everyone, which told
+          a guest nothing they did not already know from holding a menu. */}
+      <MenuIdentity
+        name={restaurant.name}
+        tagline={restaurant.tagline}
+        address={restaurant.address}
+        /* Branding comes only from the DATABASE shape. The demo fallback has
+           no branding fields at all, and reading them off the union would be
+           a type error that says exactly the right thing: there is nothing to
+           show until a real restaurant has uploaded something. */
+        logoUrl={data?.restaurant.logoUrl}
+        bannerUrl={data?.restaurant.bannerUrl}
+        tableLabel={table?.label ?? null}
+      />
 
       {/*
         Which menu this is. Hidden for the ordinary one-menu restaurant, so

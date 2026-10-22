@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import Link from 'next/link';
 
 /**
@@ -46,6 +46,7 @@ export function GuestFlow({
   children,
   dock,
   docked,
+  style,
 }: {
   step: GuestStep;
   /** The restaurant's name, as the guest knows it. */
@@ -57,6 +58,15 @@ export function GuestFlow({
   children: ReactNode;
   /** The one primary action for this screen, pinned to the bottom. */
   dock?: ReactNode;
+  /**
+   * Per-restaurant accent, as `--p-accent` / `--p-accent-soft`.
+   *
+   * Applied to the flow root rather than each screen, because the accent is a
+   * property of the restaurant and not of a step: a guest who moves from menu
+   * to cart must not see the colour change. Consumers build this with
+   * `accentStyle()` from lib/branding/palette.ts.
+   */
+  style?: CSSProperties;
   /**
    * Forces the docked padding when the screen renders its own dock.
    *
@@ -71,7 +81,7 @@ export function GuestFlow({
   const position = currentIndex + 1;
 
   return (
-    <div className={`flow ${dock || docked ? 'flow--docked' : ''}`}>
+    <div className={`flow ${dock || docked ? 'flow--docked' : ''}`} style={style}>
       <header className="flow__bar">
         <div className="flow__lead">
           {back ? (

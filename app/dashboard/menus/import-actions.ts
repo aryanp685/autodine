@@ -28,6 +28,13 @@ import { getStaffContextDetailed } from '@/lib/db/staff';
 import { EDITOR_MENU_COOKIE } from '@/lib/db/menu-editor';
 import { extractMenuWithAi, menuAiConfigured } from '@/lib/ai/menu-extract';
 import {
+  extractMenuFromImage,
+  validateMenuCapture,
+  visionConfigured,
+  type VisionDraft,
+} from '@/lib/ai/menu-vision';
+import { ASSET_BUCKET, dishAssetPath, publicAssetUrl } from '@/lib/storage/assets';
+import {
   MAX_IMPORT_TEXT,
   draftItemCount,
   parseMenuText,
@@ -208,6 +215,195 @@ export async function createImportedMenuAction(payload: unknown): Promise<Import
 
   revalidatePath(MENUS_PATH);
   return { ok: true, menuId, items: itemCount };
+}
+
+/**
+ * Read a photographed (or scanned) menu. Writes nothing.
+ *
+ * Separate from previewMenuImportAction because the input is different: this
+ * one takes bytes, sends them to Gemini, and returns a draft whose uncertain
+ * fields are EMPTY rather than guessed. The response also says which dishes
+ * have their own printed photo, with a box, so the review step can offer to
+ * crop them out of the same upload.
+ *
+ * Every failure is a sentence the owner can act on: no key, wrong file, too
+ * big, busy, timed out, or simply not a menu. None of them is a stack trace.
+ */
+export async function extractMenuFromPhotoAction(formData: FormData): Promise<PhotoPreview> {
+  if (!visionConfigured()) {
+    return {
+      ok: false,
+      code: 'not-configured',
+      error: 'Reading photos is not switched on for this deployment. Add dishes by hand, or paste the text.',
+    };
+  }
+
+  const staff = await getStaffContextDetailed();
+  if (!staff.ok) {
+    return {
+      ok: false,
+      code: 'not-signed-in',
+      error:
+        staff.reason === 'unconfigured'
+          ? 'The database is not connected, so there is nowhere to save an import.'
+          : 'You need to be signed in to import a menu.',
+    };
+  }
+  if (staff.context.role !== 'owner' && staff.context.role !== 'manager') {
+    return { ok: false, code: 'not-allowed', error: 'Only an owner or manager can import a menu.' };
+  }
+
+  const file = formData.get('photo');
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, code: 'bad-file', error: 'Choose a photo of your menu first.' };
+  }
+
+  const checked = validateMenuCapture(file);
+  if (!checked.ok) return { ok: false, code: checked.code, error: checked.reason };
+
+  const result = await extractMenuFromImage(await file.arrayBuffer(), checked.mimeType);
+  if (!result.ok) return { ok: false, code: result.code, error: result.reason };
+
+  return { ok: true, draft: result.draft };
+}
+
+export type PhotoPreview =
+  | { ok: true; draft: VisionDraft }
+  | { ok: false; error: string; code: string };
+
+/** One cropped dish photo, as the browser produced it. */
+export type CropUpload = {
+  /** Which category / dish in the draft this crop belongs to. */
+  categoryIndex: number;
+  itemIndex: number;
+  /** A data URL: image/jpeg base64. Produced by canvas, never by the model. */
+  dataUrl: string;
+};
+
+/**
+ * Attach crops the owner accepted, after the menu exists.
+ *
+ * Cropping happens in the browser (canvas, no server image library, no native
+ * dependency) and lands here as bytes. Each crop is validated, uploaded, and
+ * written to the item's image_url.
+ *
+ * Failure is never fatal: a menu with text and no photos is a perfectly good
+ * import, so a bad crop is counted and reported rather than rolling back the
+ * whole import.
+ */
+export async function attachImportPhotosAction(
+  menuId: string,
+  crops: CropUpload[],
+): Promise<{ ok: true; attached: number; skipped: number } | { ok: false; error: string }> {
+  const staff = await getStaffContextDetailed();
+  if (!staff.ok) return { ok: false, error: 'You need to be signed in to add photos.' };
+  if (staff.context.role !== 'owner' && staff.context.role !== 'manager') {
+    return { ok: false, error: 'Only an owner or manager can change the menu.' };
+  }
+
+  const { supabase, restaurantId } = staff.context;
+
+  // The menu must belong to this restaurant: a forged id must not let an
+  // import write photos onto somebody else's dishes.
+  const { data: menu } = await supabase
+    .from('menus')
+    .select('id')
+    .eq('id', menuId)
+    .eq('restaurant_id', restaurantId)
+    .maybeSingle();
+  if (!menu) return { ok: false, error: 'That menu is not on your account.' };
+
+  const { data: items } = await supabase
+    .from('items')
+    .select('id, category_id, name, sort_order')
+    .eq('restaurant_id', restaurantId);
+
+  if (!items) return { ok: false, error: 'Could not read the imported dishes.' };
+
+  const byCategory = new Map<string, { id: string; name: string; sortOrder: number }[]>();
+  for (const row of items) {
+    const key = String(row.category_id ?? '');
+    if (!byCategory.has(key)) byCategory.set(key, []);
+    byCategory.get(key)!.push({
+      id: String(row.id),
+      name: String(row.name ?? ''),
+      sortOrder: Number(row.sort_order ?? 0),
+    });
+  }
+
+  const { data: categories } = await supabase
+    .from('categories')
+    .select('id, name, sort_order')
+    .eq('restaurant_id', restaurantId)
+    .eq('menu_id', menuId)
+    .order('sort_order', { ascending: true });
+
+  if (!categories) return { ok: false, error: 'Could not read the imported sections.' };
+
+  let attached = 0;
+  let skipped = 0;
+
+  for (const crop of crops.slice(0, 60)) {
+    const category = categories[crop.categoryIndex];
+    if (!category) {
+      skipped += 1;
+      continue;
+    }
+
+    const bucketItems = (byCategory.get(String(category.id)) ?? []).slice().sort((a, b) => a.sortOrder - b.sortOrder);
+    const item = bucketItems[crop.itemIndex];
+    if (!item) {
+      skipped += 1;
+      continue;
+    }
+
+    const decoded = decodeDataUrl(crop.dataUrl);
+    // 600 KB per crop, 2 MB is impossible after client-side scaling, and this
+    // is the guard for a hand-crafted request.
+    if (!decoded || decoded.bytes.byteLength === 0 || decoded.bytes.byteLength > 600_000) {
+      skipped += 1;
+      continue;
+    }
+
+    const path = dishAssetPath(restaurantId, item.id, 'jpg');
+    const { error: uploadError } = await supabase.storage
+      .from(ASSET_BUCKET)
+      .upload(path, decoded.bytes, { contentType: 'image/jpeg', upsert: false, cacheControl: '31536000' });
+
+    if (uploadError) {
+      console.error('[autodine] crop upload failed', uploadError);
+      skipped += 1;
+      continue;
+    }
+
+    const { error: updateError } = await supabase
+      .from('items')
+      .update({ image_url: publicAssetUrl(path) })
+      .eq('id', item.id)
+      .eq('restaurant_id', restaurantId);
+
+    if (updateError) {
+      console.error('[autodine] crop not saved to item', updateError);
+      skipped += 1;
+      continue;
+    }
+
+    attached += 1;
+  }
+
+  return { ok: true, attached, skipped };
+}
+
+/** `data:image/jpeg;base64,...` -> bytes. Returns null for anything else. */
+function decodeDataUrl(dataUrl: string): { bytes: Buffer } | null {
+  const match = /^data:image\/(jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=]+)$/i.exec(dataUrl);
+  if (!match) return null;
+  try {
+    const bytes = Buffer.from(match[2], 'base64');
+    return bytes.byteLength > 0 ? { bytes } : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Turn Postgres's answer into something an owner can act on. */

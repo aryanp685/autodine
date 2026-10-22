@@ -7,6 +7,7 @@ import { DashboardBar } from '@/components/DashboardBar';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { VegMark } from '@/components/ui';
 import { createImportedMenuAction, previewMenuImportAction, type ImportPreview } from '@/app/dashboard/menus/import-actions';
+import { PhotoImportPanel } from '@/components/PhotoImportPanel';
 import { draftItemCount, MAX_IMPORT_TEXT } from '@/lib/menu-import';
 import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
@@ -51,6 +52,12 @@ export function MenuImportScreen({
 
   const canWrite = !blocked && (role === 'owner' || role === 'manager');
 
+  /* Which input the owner is using. Photo first, because a restaurant with a
+     printed card already has the thing this needs and typing it out is the
+     long way round. The text path stays as a peer, not a fallback: it is the
+     one that works when the AI is off, and it is faster for a short menu. */
+  const [mode, setMode] = useState<'photo' | 'text'>('photo');
+
   function readMenu() {
     setError(null);
     startReading(async () => {
@@ -93,10 +100,37 @@ export function MenuImportScreen({
           <div className="pg__kicker">Menu · import</div>
           <h1 className="pg__title">Bring in a menu you already have</h1>
           <p className="pg__lede">
-            Paste the text of your menu — one dish per line with its price at the end. Nothing is saved until you
-            check the list and press the button at the bottom.
+            Photograph your printed menu and we read the dishes, prices and pictures for you to check. Or
+            paste the text. Nothing is saved until you approve it.
           </p>
         </header>
+
+        {/* Two inputs, one result. A tab strip rather than two screens, so the
+            owner never has to guess which page to be on. */}
+        {!blocked && (
+          <div className="photoImport__modes" role="tablist" aria-label="How to import">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === 'photo'}
+              className={`photoImport__mode ${mode === 'photo' ? 'is-on' : ''}`}
+              onClick={() => setMode('photo')}
+            >
+              Photo of your menu
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === 'text'}
+              className={`photoImport__mode ${mode === 'text' ? 'is-on' : ''}`}
+              onClick={() => setMode('text')}
+            >
+              Paste the text
+            </button>
+          </div>
+        )}
+
+        {mode === 'photo' && !blocked && <PhotoImportPanel canWrite={canWrite} />}
 
         {blocked && <SignInPrompt reason={blocked} screen="menu import" />}
 
@@ -107,7 +141,7 @@ export function MenuImportScreen({
           </div>
         )}
 
-        {!preview?.ok && !blocked && (
+        {mode === 'text' && !preview?.ok && !blocked && (
           <section className="pg__formCard">
             <h2 className="pg__h">The menu text</h2>
             <p className="pg__p">

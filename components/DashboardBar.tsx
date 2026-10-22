@@ -28,6 +28,7 @@ import { signOutAction } from '@/app/auth/actions';
 export type DashboardSection =
   | 'overview'
   | 'menus'
+  | 'branding'
   | 'tables'
   | 'orders'
   | 'kitchen'
@@ -38,6 +39,7 @@ export type DashboardSection =
 export const DASHBOARD_LINKS: ReadonlyArray<{ key: DashboardSection; label: string; href: string }> = [
   { key: 'overview', label: 'Overview', href: '/dashboard' },
   { key: 'menus', label: 'Menus', href: '/dashboard/menus' },
+  { key: 'branding', label: 'Branding', href: '/dashboard/branding' },
   { key: 'tables', label: 'Tables & QR', href: '/dashboard/tables' },
   { key: 'orders', label: 'Orders', href: '/dashboard/orders' },
   { key: 'kitchen', label: 'Kitchen', href: '/kitchen' },
