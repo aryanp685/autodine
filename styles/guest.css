@@ -1501,6 +1501,28 @@
 }
 [data-app] .gnote__cta:active { transform: translateY(1px); }
 
+/* The primary action is sometimes a <button> -- "try again" on the error
+   screen -- and a button arrives with its own border, font and padding. */
+[data-app] button.gnote__cta {
+  border: 0;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* A second way out of a dead end, when the first one is not quite what the
+   visitor wanted. Same size and rhythm as the primary, plainly quieter. */
+[data-app] .gnote__cta--quiet {
+  background: transparent;
+  color: var(--p-ink);
+  border: 1px solid var(--p-line-strong);
+}
+[data-app] .gnote__cta--quiet:hover {
+  background: color-mix(in srgb, var(--p-paper-deep) 60%, transparent);
+  border-color: var(--p-ink);
+}
+
 [data-app] .gnote__rule {
   height: 0;
   margin: 44px 0 0;
