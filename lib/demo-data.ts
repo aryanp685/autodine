@@ -81,7 +81,7 @@ export const items: Item[] = [
     spice: 1,
     badge: 'Bestseller',
     available: true,
-    img: '/img/dish-paneer-tikka.jpg',
+    img: '/img/dishes/paneer-tikka.jpg',
     variants: [
       { id: 'reg', name: 'Regular · 6 pcs', price: 349 },
       { id: 'share', name: 'Sharing · 12 pcs', price: 629 },
@@ -107,6 +107,7 @@ export const items: Item[] = [
     category: 'starters',
     veg: true,
     available: true,
+    img: '/img/dishes/hara-bhara-kebab.jpg',
   },
   {
     id: 'it-chicken-malai',
@@ -117,7 +118,7 @@ export const items: Item[] = [
     veg: false,
     spice: 0,
     available: true,
-    img: '/img/dish-butter-chicken.jpg',
+    img: '/img/dishes/chicken-malai-tikka.jpg',
     modifiers: [spiceLevels],
   },
   {
@@ -129,6 +130,7 @@ export const items: Item[] = [
     veg: false,
     spice: 2,
     available: true,
+    img: '/img/dishes/tandoori-chicken.jpg',
     variants: [
       { id: 'half', name: 'Half · 4 pcs', price: 349 },
       { id: 'full', name: 'Full · 8 pcs', price: 649 },
@@ -144,6 +146,7 @@ export const items: Item[] = [
     veg: false,
     spice: 2,
     available: true,
+    img: '/img/dishes/seekh-kebab.jpg',
   },
   {
     id: 'it-butter-chicken',
@@ -155,7 +158,7 @@ export const items: Item[] = [
     spice: 1,
     badge: "Chef's pick",
     available: true,
-    img: '/img/dish-butter-chicken.jpg',
+    img: '/img/dishes/butter-chicken.jpg',
     variants: [
       { id: 'reg', name: 'Regular · 4 pcs', price: 469 },
       { id: 'share', name: 'Sharing · 8 pcs', price: 849 },
@@ -182,6 +185,7 @@ export const items: Item[] = [
     category: 'curries',
     veg: true,
     available: true,
+    img: '/img/dishes/dal-bukhara.jpg',
   },
   {
     id: 'it-paneer-butter',
@@ -192,6 +196,7 @@ export const items: Item[] = [
     veg: true,
     spice: 1,
     available: true,
+    img: '/img/dishes/paneer-butter-masala.jpg',
     variants: [
       { id: 'reg', name: 'Regular', price: 399 },
       { id: 'share', name: 'Sharing', price: 729 },
@@ -207,6 +212,7 @@ export const items: Item[] = [
     spice: 2,
     badge: 'Sold out',
     available: false,
+    img: '/img/dishes/laal-maas.jpg',
   },
   {
     id: 'it-biryani-chicken',
@@ -218,6 +224,7 @@ export const items: Item[] = [
     spice: 2,
     badge: 'Bestseller',
     available: true,
+    img: '/img/dishes/hyderabadi-chicken-biryani.jpg',
     modifiers: [
       spiceLevels,
       {
@@ -240,6 +247,7 @@ export const items: Item[] = [
     category: 'biryani',
     veg: true,
     available: true,
+    img: '/img/dishes/subz-dum-biryani.jpg',
   },
   {
     id: 'it-masala-dosa',
@@ -249,9 +257,9 @@ export const items: Item[] = [
     category: 'biryani',
     veg: true,
     available: true,
-    img: '/img/dish-masala-dosa.jpg',
+    img: '/img/dishes/masala-dosa.jpg',
   },
-  { id: 'it-naan', name: 'Butter Naan', desc: 'Tandoor-baked, brushed with butter', price: 79, category: 'breads', veg: true, available: true },
+  { id: 'it-naan', name: 'Butter Naan', desc: 'Tandoor-baked, brushed with butter', price: 79, category: 'breads', veg: true, available: true, img: '/img/dishes/butter-naan.jpg' },
   { id: 'it-garlic-naan', name: 'Garlic Naan', desc: 'Fresh garlic and coriander', price: 99, category: 'breads', veg: true, available: true },
   { id: 'it-roti', name: 'Tandoori Roti', desc: 'Whole wheat, tandoor-fired', price: 59, category: 'breads', veg: true, available: true },
   { id: 'it-paratha', name: 'Laccha Paratha', desc: 'Layered, flaky, brushed with ghee', price: 89, category: 'breads', veg: true, available: true },

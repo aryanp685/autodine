@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -16,6 +15,7 @@ import type {
   DisplayModifierGroup,
   DisplayRestaurant,
 } from '@/lib/db/adapt';
+import { DishPhoto } from '@/components/DishPhoto';
 import { GuestFlow } from '@/components/GuestFlow';
 import { useCart } from '@/components/CartProvider';
 import { priceCart } from '@/lib/cart-pricing';
@@ -286,16 +286,16 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
                 thumb is already there, and a row whose only control lives at
                 the far end of a 300px line is a stretch. */}
             <div className={`menu__dishMedia ${i.img ? '' : 'is-bare'}`}>
-              {i.img && (
-                <Image
-                  className="menu__dishImg"
-                  src={i.img}
-                  alt={i.name}
-                  width={112}
-                  height={112}
-                  sizes="(max-width: 420px) 96px, (max-width: 760px) 96px, 112px"
-                />
-              )}
+              {/* Every dish gets a tile. One the kitchen has not photographed
+                  yet shows its initials rather than the hole a missing image
+                  leaves in an otherwise even column. */}
+              <DishPhoto
+                src={i.img}
+                name={i.name}
+                size={116}
+                className="menu__dishImg"
+                sizes="(max-width: 420px) 76px, (max-width: 760px) 88px, 116px"
+              />
 
               <div className="menu__dishActions">
                 {i.available ? (
@@ -513,7 +513,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
               <p className="menu__dishDesc">{i.desc}</p>
               <div className="menu__dishPrice">{inr(i.price)}</div>
             </div>
-            {i.img && <Image className="menu__dishImg" src={i.img} alt={i.name} width={104} height={104} sizes="(max-width: 420px) 92vw, (max-width: 760px) 88px, 116px" />}
+            <DishPhoto src={i.img} name={i.name} size={104} className="menu__dishImg" />
           </article>
         ))}
       </div>

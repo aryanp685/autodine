@@ -136,7 +136,11 @@ describe('BillScreen', () => {
   it('offers WhatsApp, and says plainly that nothing is sent for you', () => {
     const html = renderToStaticMarkup(<BillScreen bill={bill()} />);
     expect(html).toContain('Send this bill on WhatsApp');
-    expect(html).toContain('you still press send yourself');
+    // The sentence explains the hand-off, and the button it belongs to does
+    // not pretend to be live before a number is typed.
+    expect(html).toContain('you still press send');
+    expect(html).toContain('Type the guest’s 10-digit mobile number to enable this.');
+    expect(html).toMatch(/<button[^>]*bill__waBtn[^>]*disabled/);
   });
 
   it('warns when the bill is missing the details it should carry', () => {

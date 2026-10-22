@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { DishPhoto } from '@/components/DishPhoto';
 import { GuestFlow } from '@/components/GuestFlow';
 import { useCart } from '@/components/CartProvider';
 import { inr } from '@/lib/demo-data';
@@ -141,6 +142,10 @@ export function Cart({
                   key={`${l.itemId}|${l.variantId ?? ''}|${(l.addonIds ?? []).join(',')}`}
                   className="cart__line"
                 >
+                  {/* The same photograph the guest tapped on the menu. A
+                      bill of names only is hard to check against a table of
+                      people deciding who ordered what. */}
+                  <DishPhoto src={l.img} name={l.name} size={56} className="cart__lineImg" />
                   <div className="cart__lineMain">
                     <div className="cart__lineTop">
                       <VegMark veg={l.isVeg} />

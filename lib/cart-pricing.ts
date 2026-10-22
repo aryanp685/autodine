@@ -30,6 +30,14 @@ export type MenuAddon = {
 export type MenuItemPrice = {
   id: string;
   name: string;
+  /**
+   * The dish's photograph, when the restaurant has one.
+   *
+   * Carried so the cart and the bill can show the same picture the guest
+   * tapped. It is a URL and nothing else: no name, no price and no amount in
+   * the browser, for the reasons in lib/cart-storage.ts.
+   */
+  img?: string;
   /** Paise, as stored. Never a float. */
   pricePaise: Paise;
   isVeg: boolean;
@@ -49,6 +57,8 @@ export type MenuItemPrice = {
 export type PricedLine = {
   itemId: string;
   name: string;
+  /** Passed through from the menu, for the thumbnail on the bill. */
+  img?: string;
   unitPricePaise: Paise;
   qty: number;
   isVeg: boolean;
@@ -202,6 +212,7 @@ export function priceCart(
     lines.push({
       itemId: item.id,
       name: item.name,
+      ...(item.img ? { img: item.img } : {}),
       unitPricePaise,
       qty: line.qty,
       isVeg: item.isVeg,

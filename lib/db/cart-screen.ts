@@ -103,7 +103,7 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
   const { data: rows, error } = categoryIds.length
     ? await supabase
         .from('items')
-        .select('id, name, price_paise, is_veg, is_available, item_variants(id, name, price_paise, sort_order)')
+        .select('id, name, price_paise, is_veg, is_available, image_url, item_variants(id, name, price_paise, sort_order)')
         .in('category_id', categoryIds)
         .eq('is_available', true)
         .order('sort_order', { ascending: true })
@@ -204,9 +204,11 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
     items: (rows ?? []).map((r) => {
       const variants = variantsOf((r as Record<string, unknown>).item_variants);
       const addons = addonsByItem.get(r.id as string) ?? [];
+      const img = (r as Record<string, unknown>).image_url;
       return {
         id: r.id as string,
         name: (r.name as string) ?? '',
+        ...(typeof img === 'string' && img ? { img } : {}),
         pricePaise: Number(r.price_paise ?? 0),
         isVeg: Boolean(r.is_veg),
         isAvailable: Boolean(r.is_available),

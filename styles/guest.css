@@ -2668,3 +2668,345 @@
 /* One action per screen. The dock holds it; the button inside the bill is the
    same submission and would read as a second, different one. */
 [data-app] .flow--docked .co__sum .co__cta { display: none; }
+
+/* =========================================================================
+   DISH PHOTOGRAPHS
+   =========================================================================
+
+   One square tile, one radius, one warm background -- on the menu, in the
+   sheet, in the cart and on the checkout. A dish with no photograph is drawn
+   as its initials on the same tile rather than left as a hole, because an
+   empty grey box in a column of photographs reads as a failed image, and the
+   kitchen simply may not have shot that dish yet.
+   ========================================================================= */
+
+[data-app] .dishPhoto {
+  display: grid;
+  place-items: center;
+  border-radius: var(--p-r);
+  background: var(--p-paper-deep);
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+[data-app] .dishPhoto--none {
+  border: 1px solid var(--p-line);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--p-ink-28);
+  text-transform: uppercase;
+  user-select: none;
+}
+
+/* The menu tile keeps its hover scale; the fallback must not look interactive,
+   so it is excluded. */
+[data-app] .menu__dishImg { border-radius: var(--p-r); }
+
+/* A row with no photograph: the media column collapses to the width of the
+   control, which is what .is-bare already assumed but a fixed 116px fought. */
+[data-app] .menu__dishMedia.is-bare { width: auto; }
+
+[data-app] .cart__lineImg {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--p-r-sm);
+}
+
+[data-app] .co__itemImg {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--p-r-sm);
+}
+
+/* The cart line is now thumb, text, stepper, total. The thumb is part of the
+   text column's row on a phone, not a column of its own. */
+@media (min-width: 641px) {
+  [data-app] .cart__line { grid-template-columns: 56px minmax(0, 1fr) auto auto; }
+}
+
+@media (max-width: 640px) {
+  [data-app] .cart__lineImg { width: 48px; height: 48px; }
+  [data-app] .cart__line { grid-template-columns: 48px minmax(0, 1fr) auto; }
+  [data-app] .cart__lineEnd { grid-column: 1 / -1; }
+}
+
+/* =========================================================================
+   THE BILL
+   =========================================================================
+
+   The one screen that leaves the building: staff check it, print it, and send
+   it to a guest. It was the last page still wearing the old sheet -- 3px
+   radii, a 12.5px muted grey, a toolbar that scrolled away with the page.
+
+   Two media, two jobs. On screen it is a page with a toolbar that stays put
+   and a WhatsApp panel; on paper it is only the bill. The rules below restyle
+   the screen onto the same paper, hairline and ink as everything else, and
+   leave the print block alone apart from the page-break rules at the end.
+   ========================================================================= */
+
+[data-app] .bill {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 var(--p-gutter) 72px;
+  display: grid;
+  gap: 20px;
+}
+
+/* Sticky, so "Print bill" is reachable from the bottom of a long order. */
+[data-app] .bill__bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 calc(-1 * var(--p-gutter));
+  padding: 12px var(--p-gutter);
+  border-bottom: 1px solid var(--p-line);
+  background: var(--p-glass);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
+}
+
+[data-app] .bill__back {
+  font-size: 0.8125rem;
+  color: var(--p-ink-64);
+  text-decoration: none;
+  transition: color var(--p-d1) linear;
+}
+
+[data-app] .bill__back:hover { color: var(--p-ink); }
+
+[data-app] .bill__barHint {
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .bill__print {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 18px;
+  border: 1px solid var(--p-ink);
+  border-radius: var(--p-pill);
+  background: var(--p-ink);
+  color: var(--p-on-ink);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform var(--p-d1) var(--p-ease);
+}
+
+[data-app] .bill__print:hover { transform: translateY(-1px); }
+[data-app] .bill__print:focus-visible { outline: 2px solid var(--p-accent); outline-offset: 3px; }
+
+[data-app] .bill__sheet {
+  padding: clamp(22px, 4vw, 40px);
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-r);
+  background: var(--p-surface);
+}
+
+[data-app] .bill__head {
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--p-line);
+  gap: 24px;
+}
+
+[data-app] .bill__name {
+  font-size: clamp(1.25rem, 2.6vw, 1.5rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--p-ink);
+}
+
+[data-app] .bill__meta {
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--p-ink-64);
+}
+
+[data-app] .bill__kicker {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .bill__code {
+  margin-top: 6px;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-ink);
+}
+
+[data-app] .bill__void {
+  margin-top: 18px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+  border-left: 3px solid var(--danger);
+  border-radius: 0 var(--p-r-sm) var(--p-r-sm) 0;
+  background: color-mix(in srgb, var(--danger) 6%, var(--p-surface));
+  color: var(--danger);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+[data-app] .bill__table { margin-top: 20px; }
+
+[data-app] .bill__table th {
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--p-line-strong);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .bill__table td {
+  padding: 11px 0;
+  border-bottom: 1px solid var(--p-line);
+  font-size: 0.875rem;
+  color: var(--p-ink);
+  vertical-align: top;
+}
+
+[data-app] .bill__table tbody tr:last-child td { border-bottom: 1px solid var(--p-line); }
+
+[data-app] .bill__num { font-variant-numeric: tabular-nums; }
+
+[data-app] .bill__totals { width: min(340px, 100%); margin-top: 20px; gap: 9px; }
+
+[data-app] .bill__row {
+  font-size: 0.875rem;
+  color: var(--p-ink-64);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-app] .bill__row--total {
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--p-line-strong);
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--p-ink);
+}
+
+[data-app] .bill__foot {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--p-line);
+  gap: 5px;
+}
+
+[data-app] .bill__thanks {
+  font-size: 0.8125rem;
+  color: var(--p-ink-46);
+}
+
+/* ------------------------------------------------------------- the panel */
+
+[data-app] .bill__wa {
+  display: grid;
+  gap: 12px;
+  padding: 22px clamp(18px, 3vw, 26px);
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-r);
+  background: var(--p-paper-deep);
+}
+
+[data-app] .bill__waTitle {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .bill__waForm { align-items: flex-end; gap: 12px; }
+
+/* The form is one field and one button; the field takes the room. */
+[data-app] .bill__waForm .ui-field { flex: 1 1 220px; min-width: 0; }
+
+[data-app] .bill__waBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 22px;
+  border: 1px solid var(--p-ink);
+  border-radius: var(--p-pill);
+  background: var(--p-ink);
+  color: var(--p-on-ink);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform var(--p-d1) var(--p-ease), opacity var(--p-d1) linear;
+}
+
+[data-app] .bill__waBtn:hover { transform: translateY(-1px); }
+[data-app] .bill__waBtn:disabled { opacity: 0.36; cursor: not-allowed; transform: none; }
+[data-app] .bill__waBtn:focus-visible { outline: 2px solid var(--p-accent); outline-offset: 3px; }
+
+[data-app] .bill__hint {
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: var(--p-ink-46);
+}
+
+[data-app] .bill__hint--warn { color: var(--danger); }
+[data-app] .bill__hint--warn a { color: inherit; }
+
+[data-app] .bill__error {
+  font-size: 0.75rem;
+  color: var(--danger);
+}
+
+[data-app] .bill__missing {
+  max-width: 34rem;
+  margin: 88px auto;
+  padding: 0 var(--p-gutter);
+  gap: 12px;
+}
+
+[data-app] .bill__missing h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+[data-app] .bill__missing p {
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: var(--p-ink-64);
+}
+
+@media (max-width: 760px) {
+  [data-app] .bill { padding-bottom: 48px; }
+  [data-app] .bill__bar { gap: 10px; }
+  [data-app] .bill__barHint { display: none; }
+  [data-app] .bill__sheet { padding: 20px 16px; }
+  [data-app] .bill__head { flex-direction: column; gap: 14px; }
+  [data-app] .bill__ref { text-align: left; }
+  [data-app] .bill__waForm .ui-field,
+  [data-app] .bill__waBtn { flex: 1 1 100%; }
+}
+
+/* On paper the toolbar is chrome, and a row split across a page break turns a
+   four-line bill into two unreadable halves. */
+@media print {
+  [data-app] .bill__bar { display: none !important; }
+  [data-app] .bill__table tr { break-inside: avoid; }
+  [data-app] .bill__totals { break-inside: avoid; }
+}
