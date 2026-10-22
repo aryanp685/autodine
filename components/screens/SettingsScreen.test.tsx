@@ -81,7 +81,7 @@ describe('SettingsScreen', () => {
       <SettingsScreen data={data({ publishedMenus: 0, totalMenus: 2 })} />
     );
     expect(html).toContain('Nothing to show yet');
-    expect(html).toContain('Publish a menu first');
+    expect(html).toContain('Publish one menu');
   });
 
   it('does not warn when a menu is published', () => {
@@ -118,7 +118,31 @@ describe('SettingsScreen', () => {
       );
 
       expect(html).toContain('Online payment');
-      expect(html).toContain('no gateway keys');
+      expect(html).toContain('No gateway keys');
+    });
+
+    it('shows the missing-keys warning before the box is ticked, not after', () => {
+      // The old card only warned once the switch was already on, which meant
+      // the first thing an owner did -- tick it, save, see nothing -- was the
+      // thing that produced the warning. Now the control is disabled up front.
+      const html = renderToStaticMarkup(
+        <SettingsScreen data={data({ onlinePaymentsEnabled: false })} gatewayConfigured={false} />,
+      );
+
+      expect(html).toContain('No gateway keys on this deployment');
+      expect(html).toContain('name="onlinePayments"');
+      // Disabled, because there is no key pair for the switch to reach.
+      expect(html).toMatch(/disabled=""[^>]*name="onlinePayments"/);
+      expect(html).toMatch(/disabled=""[^>]*>\s*Save payment setting/);
+    });
+
+    it('leaves the switch usable when the deployment does have keys', () => {
+      const html = renderToStaticMarkup(
+        <SettingsScreen data={data({ onlinePaymentsEnabled: true })} gatewayConfigured />,
+      );
+
+      expect(html).not.toContain('No gateway keys on this deployment');
+      expect(html).not.toMatch(/disabled[^>]*>\s*Save payment setting/);
     });
 
     it('says nothing is missing when the switch is on and the server has keys', () => {
@@ -126,7 +150,7 @@ describe('SettingsScreen', () => {
         <SettingsScreen data={data({ onlinePaymentsEnabled: true })} gatewayConfigured />,
       );
 
-      expect(html).not.toContain('no gateway keys');
+      expect(html).not.toContain('No gateway keys');
     });
 
     it('explains that a configured server still shows the counter until the box is ticked', () => {
@@ -136,6 +160,19 @@ describe('SettingsScreen', () => {
 
       expect(html).toContain('pay at the counter');
     });
+  });
+
+  it('gives the public menu link a real copy button and keeps the print card off screen', () => {
+    const html = renderToStaticMarkup(<SettingsScreen data={data()} />);
+
+    // Both a link to open and a button to copy: the two things people do
+    // with a menu URL.
+    expect(html).toContain('href="https://autodine.example/menu?s=maddi"');
+    expect(html).toContain('Copy link');
+    expect(html).toContain('type="button"');
+    // The printed menu card is in the DOM for window.print(), and hidden on
+    // screen so Settings does not show a second identical card at the bottom.
+    expect(html).toContain('pg__printRow--sheetOnly');
   });
 
   it('shows the sign-in prompt and no form at all when blocked', () => {

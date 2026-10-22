@@ -354,6 +354,25 @@
   background: var(--p-paper-deep);
 }
 
+/* Notes have three registers and the stylesheet used to dry them out to one:
+   a warning lost its amber the moment a scoped .pg__note rule out-voted it.
+   These are the three, in the design system's own colours. */
+[data-app] .pg__note--warn {
+  border-left-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 9%, var(--p-paper));
+}
+
+[data-app] .pg__note--info {
+  border-left-color: var(--p-accent);
+  background: var(--p-accent-soft);
+}
+
+[data-app] .pg__note strong,
+[data-app] .pg__alert strong,
+[data-app] .pg__success strong { font-weight: 600; color: var(--p-ink); }
+
+[data-app] .pg__note a { color: var(--p-ink); }
+
 /* A screen that needs a decision, not a screen that failed. Neutral surface,
    one accent rule, and the two ways forward as real buttons. */
 [data-app] .pg__signin {
@@ -1553,4 +1572,749 @@
   [data-app] .cash__methods { flex-wrap: wrap; }
   [data-app] .cash__method { min-width: 84px; }
   [data-app] .cash__cta { font-size: 0.875rem; }
+}
+
+/* =========================================================================
+   Menu editor
+   =========================================================================
+
+   Three columns and a form: categories on the left, every item in the
+   middle, the selected dish on the right. The layout is a workspace, not a
+   page, so the chrome stays out of the way:
+
+     - the menu tabs are documents, so they are marked like tabs, not buttons
+     - the publish state is one chip, read from the same flag the publish
+       button writes. It used to be a four-step "Draft · Review · Approve ·
+       Publish" strip, three steps of which did not exist
+     - categories and items are hairline rows with their counts, because an
+       owner scans them, not reads them
+   ========================================================================= */
+
+[data-app] .pg__subbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  width: min(100%, 1240px);
+  margin: 0 auto;
+  padding: 0 var(--p-gutter);
+  border-bottom: 1px solid var(--p-line);
+  background: var(--p-paper);
+}
+
+[data-app] .pg__subTabs {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  font-size: 0.8125rem;
+  color: var(--p-ink-46);
+}
+
+[data-app] .pg__subTabs::-webkit-scrollbar { display: none; }
+
+[data-app] .pg__menuTabForm { display: inline-flex; align-items: center; gap: 2px; }
+
+[data-app] .pg__menuTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 52px;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--p-ink-46);
+  white-space: nowrap;
+  cursor: pointer;
+  position: relative;
+  transition: color var(--p-d1) linear;
+}
+
+[data-app] .pg__menuTab:hover { color: var(--p-ink); }
+
+[data-app] .pg__menuTab.is-active { color: var(--p-ink); }
+
+[data-app] .pg__menuTab.is-active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: var(--p-ink);
+}
+
+[data-app] .pg__menuTabDraft {
+  padding: 2px 6px;
+  border-radius: var(--p-pill);
+  background: var(--p-paper-deep);
+  font-size: 0.5rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .pg__menuNew {
+  height: 32px;
+  width: 104px;
+  padding: 0 10px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-r-sm);
+  background: var(--p-surface);
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--p-ink);
+}
+
+[data-app] .pg__menuNew::placeholder { color: var(--p-ink-28); }
+[data-app] .pg__menuNew:focus { border-color: var(--p-ink); outline: 2px solid var(--p-accent); outline-offset: 1px; }
+
+/* The one state on this screen, and the one the publish button flips. */
+[data-app] .pg__menuState {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  padding: 5px 11px;
+  border-radius: var(--p-pill);
+  background: var(--p-paper-deep);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .pg__menuState i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--p-ink-28);
+}
+
+[data-app] .pg__menuState.is-live {
+  background: var(--p-accent-soft);
+  color: var(--p-accent);
+}
+
+[data-app] .pg__menuState.is-live i { background: var(--p-accent); }
+
+/* ------------------------------------------------------------- the grid */
+
+[data-app] .pg__split {
+  display: grid;
+  grid-template-columns: minmax(0, 250px) minmax(0, 1fr) minmax(0, 350px);
+  gap: clamp(24px, 3vw, 44px);
+  width: min(100%, 1240px);
+  margin: 0 auto;
+  padding: clamp(24px, 4vh, 40px) var(--p-gutter) 96px;
+  align-items: start;
+}
+
+[data-app] .pg__cats,
+[data-app] .pg__items,
+[data-app] .pg__editor { min-width: 0; }
+
+[data-app] .pg__catsHead,
+[data-app] .pg__itemsHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--p-line-strong);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .pg__itemsHead h2 {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .pg__itemsActions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+[data-app] .pg__itemsActions .pg__btn { min-height: 32px; font-size: 0.75rem; padding: 0 11px; }
+
+[data-app] .pg__cat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--p-line);
+  font-size: 0.875rem;
+  color: var(--p-ink-64);
+  cursor: default;
+}
+
+[data-app] .pg__cat > span:last-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--p-ink-46);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-app] .pg__cat.is-active { color: var(--p-ink); font-weight: 500; }
+
+[data-app] .pg__catDel button {
+  border: 0;
+  background: none;
+  padding: 2px 6px;
+  font-size: 0.8125rem;
+  line-height: 1;
+  color: var(--p-ink-28);
+  cursor: pointer;
+  transition: color var(--p-d1) linear;
+}
+
+[data-app] .pg__catDel button:hover { color: var(--danger); }
+
+[data-app] .pg__chipsLabel {
+  margin-top: 22px;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .pg__catChips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+[data-app] .pg__catChips form { display: inline-flex; }
+
+[data-app] .pg__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-pill);
+  background: var(--p-surface);
+  font: inherit;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  color: var(--p-ink-64);
+  cursor: pointer;
+  transition: border-color var(--p-d1) linear, color var(--p-d1) linear, background-color var(--p-d1) linear;
+}
+
+[data-app] .pg__chip:hover { border-color: var(--p-ink); color: var(--p-ink); }
+
+[data-app] .pg__chip.is-on {
+  border-color: var(--p-accent);
+  background: var(--p-accent-soft);
+  color: var(--p-accent);
+  font-weight: 600;
+}
+
+[data-app] .pg__catForm { display: flex; gap: 8px; margin-top: 16px; }
+[data-app] .pg__catsSeed { margin-top: 12px; }
+[data-app] .pg__catsSeed .pg__btn { width: 100%; }
+
+[data-app] .pg__catsFoot { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--p-line); }
+
+[data-app] .pg__importBtn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-r-sm);
+  background: var(--p-surface);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--p-ink);
+  text-decoration: none;
+  transition: border-color var(--p-d1) linear, background-color var(--p-d1) linear;
+}
+
+[data-app] .pg__importBtn:hover { border-color: var(--p-ink); background: var(--p-paper-deep); }
+
+[data-app] .pg__catsNote,
+[data-app] .pg__fine {
+  margin-top: 12px;
+  font-size: 0.75rem;
+  line-height: 1.65;
+  color: var(--p-ink-46);
+}
+
+/* -------------------------------------------------------- items table */
+
+[data-app] .pg__addRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0 20px;
+}
+
+[data-app] .pg__addRow .ui-input { flex: 1 1 150px; }
+[data-app] .pg__addRow .ui-input.tnum { flex: 0 1 110px; }
+[data-app] .pg__addRow .ui-select { flex: 0 1 130px; }
+[data-app] .pg__addRow .pg__btn { flex: 0 0 auto; }
+
+[data-app] .pg__itemCell { display: flex; align-items: flex-start; gap: 10px; }
+[data-app] .pg__itemCell strong { font-size: 0.9375rem; font-weight: 500; color: var(--p-ink); }
+[data-app] .pg__itemCell a { text-decoration: none; color: inherit; }
+[data-app] .pg__itemCell a:hover strong { text-decoration: underline; text-underline-offset: 3px; }
+
+[data-app] .pg__itemDesc {
+  margin-top: 3px;
+  max-width: 42ch;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--p-ink-46);
+}
+
+/* ------------------------------------------------------------- the editor */
+
+[data-app] .pg__editor {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  padding: clamp(18px, 2vw, 24px);
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-r);
+  background: var(--p-surface);
+  box-shadow: var(--p-shadow-1);
+}
+
+[data-app] .pg__editorHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+[data-app] .pg__editorHead h3 { font-size: 1.0625rem; font-weight: 500; letter-spacing: -0.02em; color: var(--p-ink); }
+
+[data-app] .ui-field { display: grid; gap: 6px; min-width: 0; }
+
+[data-app] .ui-label {
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .ui-label--sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+[data-app] .ui-input,
+[data-app] .ui-select {
+  min-height: 40px;
+  padding: 0 11px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-r-sm);
+  background: var(--p-surface);
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--p-ink);
+}
+
+[data-app] textarea.ui-input { padding: 10px 11px; line-height: 1.6; }
+
+[data-app] .ui-input:focus,
+[data-app] .ui-select:focus {
+  border-color: var(--p-ink);
+  outline: 2px solid var(--p-accent);
+  outline-offset: 1px;
+}
+
+[data-app] .pg__editorFoot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--p-line);
+}
+
+[data-app] .pg__liveBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border-radius: var(--p-pill);
+  background: var(--p-accent-soft);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--p-accent);
+}
+
+[data-app] .pg__liveBadge i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--p-accent);
+}
+
+/* --------------------------------------------------------------- variants */
+
+[data-app] .pg__variants { display: grid; gap: 10px; margin-top: 6px; }
+
+[data-app] .pg__variantsHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .pg__variantList { display: grid; gap: 0; }
+[data-app] .pg__variantGroup { display: grid; gap: 8px; padding: 12px 0; border-top: 1px solid var(--p-line); }
+[data-app] .pg__variantGroupHead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 0.75rem; color: var(--p-ink-64); }
+
+[data-app] .pg__variantForm { display: grid; grid-template-columns: minmax(0, 1fr) 92px auto; gap: 6px; align-items: center; }
+[data-app] .pg__variantForm--addon { grid-template-columns: minmax(0, 1fr) 92px auto auto; }
+
+[data-app] .pg__variantNone { padding: 10px 0; font-size: 0.8125rem; color: var(--p-ink-46); }
+
+[data-app] .pg__variantX {
+  border: 0;
+  background: none;
+  padding: 4px 6px;
+  font-size: 0.8125rem;
+  line-height: 1;
+  color: var(--p-ink-28);
+  cursor: pointer;
+}
+
+[data-app] .pg__variantX:hover { color: var(--danger); }
+
+[data-app] .pg__variantCount { font-size: 0.75rem; color: var(--p-ink-46); font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------------ undo */
+
+[data-app] .pg__undo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: min(100%, 1240px);
+  margin: 18px auto 0;
+  padding: 12px 16px;
+  border: 1px solid var(--p-line);
+  border-left: 2px solid var(--p-accent);
+  border-radius: 0 var(--p-r-sm) var(--p-r-sm) 0;
+  background: var(--p-surface);
+  font-size: 0.8125rem;
+  color: var(--p-ink-80);
+}
+
+[data-app] .pg__undoBtn {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--p-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------------ responsive */
+
+@media (max-width: 1180px) {
+  [data-app] .pg__split {
+    grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+    gap: 24px;
+  }
+  [data-app] .pg__editor { grid-column: 1 / -1; }
+}
+
+@media (max-width: 860px) {
+  [data-app] .pg__split { grid-template-columns: minmax(0, 1fr); padding-bottom: 64px; }
+  [data-app] .pg__subbar { gap: 12px; }
+  [data-app] .pg__menuTab { height: 46px; font-size: 0.75rem; }
+  [data-app] .pg__menuNew { width: 88px; }
+  [data-app] .pg__itemsActions .pg__btn { flex: 1 1 auto; }
+  [data-app] .pg__variantForm,
+  [data-app] .pg__variantForm--addon { grid-template-columns: minmax(0, 1fr) minmax(0, 92px); }
+}
+
+/* =========================================================================
+   Settings
+   =========================================================================
+
+   Two columns of forms and, beside them, the things that are easier to see
+   than to explain: the QR code a table card carries and the address guests
+   land on. The page is read while something is being fixed, so every field
+   says what it changes and what it does not.
+   ========================================================================= */
+
+[data-app] .pg__body--split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: clamp(28px, 4vw, 64px);
+  margin-top: clamp(24px, 3.4vh, 40px);
+  align-items: start;
+}
+
+[data-app] .pg__settingsCol { display: grid; gap: clamp(20px, 2.6vw, 28px); min-width: 0; }
+[data-app] .pg__settingsAside { display: grid; gap: clamp(20px, 2.6vw, 28px); min-width: 0; align-content: start; }
+
+[data-app] .pg__formCard {
+  padding: clamp(20px, 2.6vw, 30px);
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-r);
+  background: var(--p-surface);
+  min-width: 0;
+}
+
+[data-app] .pg__h2 {
+  font-size: 1.0625rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--p-ink);
+}
+
+[data-app] .pg__p {
+  margin-top: 8px;
+  max-width: 58ch;
+  font-size: 0.8125rem;
+  line-height: 1.65;
+  color: var(--p-ink-46);
+}
+
+[data-app] .pg__form { display: grid; gap: 16px; margin-top: 20px; }
+
+[data-app] .ui-hint {
+  font-size: 0.6875rem;
+  line-height: 1.6;
+  color: var(--p-ink-46);
+}
+
+[data-app] .ui-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--p-ink-64);
+}
+
+[data-app] .ui-check input {
+  margin-top: 2px;
+  accent-color: var(--p-accent);
+}
+
+[data-app] .pg__submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 46px;
+  padding: 0 18px;
+  border: 1px solid var(--p-ink);
+  border-radius: var(--p-r-sm);
+  background: var(--p-ink);
+  color: var(--p-on-ink);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--p-d1) linear, opacity var(--p-d1) linear;
+}
+
+[data-app] .pg__submit:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--p-ink) 88%, var(--p-on-ink));
+}
+
+[data-app] .pg__submit:disabled { opacity: 0.4; cursor: not-allowed; }
+
+[data-app] .pg__fieldRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+[data-app] .pg__bullets {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0 0 0 18px;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--p-ink-64);
+}
+
+[data-app] .pg__bullets li::marker { color: var(--p-ink-28); }
+
+[data-app] .pg__settingsUrl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-r-sm);
+  background: var(--p-paper);
+  font-size: 0.75rem;
+  color: var(--p-ink-64);
+  overflow-wrap: anywhere;
+}
+
+[data-app] .pg__settingsUrl a { color: var(--p-ink); }
+
+[data-app] .pg__tableQr {
+  display: flex;
+  justify-content: center;
+  padding: 18px;
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-r);
+  background: var(--p-paper);
+}
+
+[data-app] .pg__tableQr .qr-svg { max-width: 100%; height: auto; }
+
+@media (max-width: 1100px) {
+  [data-app] .pg__body--split { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  [data-app] .pg__fieldRow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 560px) {
+  [data-app] .pg__fieldRow { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* The page's argument, in one sentence, under the title. Narrower than the
+   card column so it reads as copy rather than as a paragraph inside a form. */
+[data-app] .pg__lede {
+  margin-top: 12px;
+  max-width: 62ch;
+  font-size: clamp(0.875rem, 1vw, 0.9375rem);
+  line-height: 1.65;
+  color: var(--p-ink-64);
+}
+
+/* The aside: two cards, the QR and the explanation of where each field shows
+   up. Sticky on a wide screen, because the QR is what someone scrolls a form
+   to check and it should still be in view when they get there. */
+[data-app] .pg__aside { display: grid; gap: clamp(20px, 2.6vw, 28px); align-content: start; min-width: 0; }
+
+[data-app] .pg__asideCard {
+  padding: clamp(20px, 2.6vw, 28px);
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-r);
+  background: var(--p-surface);
+  min-width: 0;
+}
+
+[data-app] .pg__asideCard--quiet {
+  border-color: var(--p-line);
+  background: var(--p-paper-deep);
+}
+
+[data-app] .pg__asideHead {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+  margin-bottom: 14px;
+}
+
+[data-app] .pg__asideCard > .pg__fine { margin-top: 14px; }
+
+[data-app] .pg__rowEnd {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+[data-app] .pg__formCard > .pg__fine,
+[data-app] .pg__formCard > .pg__hint { margin-top: 14px; }
+
+[data-app] .pg__formCard .pg__note { margin-top: 16px; }
+
+@media (min-width: 1101px) {
+  [data-app] .pg__settingsAside { position: sticky; top: 84px; }
+}
+
+/* The print sheet lives in the DOM so window.print() has something to print;
+   on screen it would be a second, identical menu card under a page that
+   already shows the QR, so it is hidden here and revealed by @media print. */
+@media screen {
+  [data-app] .pg__printRow--sheetOnly { display: none; }
+}
+
+/* ------------------------------------------------------------- printing */
+
+/* Settings prints one card. This is the only block in app.css that changes
+   what a sheet of paper looks like, so it stays next to the rule above. */
+@media print {
+  [data-app] .pg__printRow--sheetOnly { display: block !important; margin: 0; padding: 0; }
+  [data-app] .pg__printSheet { padding: 0; }
+  [data-app] .pg__printCard {
+    border: 1px solid var(--p-line-strong);
+    border-radius: var(--p-r-sm);
+    background: var(--p-surface);
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    padding: 16px;
+    text-align: center;
+  }
+  [data-app] .pg__printName { font-size: 11pt; }
+  [data-app] .pg__printHint { font-size: 9pt; color: var(--p-ink-64); }
+}
+
+/* The URL is a link people can open and a string people can paste. Both, in
+   one row: the text is the link, the button copies it. */
+[data-app] .pg__settingsUrlText {
+  flex: 1 1 12ch;
+  min-width: 0;
+  color: var(--p-ink);
+  text-decoration: underline;
+  text-decoration-color: var(--p-line-strong);
+  text-underline-offset: 3px;
+}
+
+[data-app] .pg__settingsUrlText:hover { text-decoration-color: var(--p-ink); }
+
+[data-app] .pg__settingsUrl .pg__miniBtn { flex: 0 0 auto; }
+
+/* A save button inside a form card is the end of a paragraph, not the width
+   of the page: a full-bleed 1240px bar reads as a banner. Full width returns
+   on phones, where it is a thumb target. */
+[data-app] .pg__formCard .pg__submit {
+  width: auto;
+  justify-self: start;
+  min-width: 168px;
+}
+
+@media (max-width: 560px) {
+  [data-app] .pg__formCard .pg__submit { width: 100%; justify-self: stretch; }
+  [data-app] .pg__settingsAside { gap: 16px; }
 }
