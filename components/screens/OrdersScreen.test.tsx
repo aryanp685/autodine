@@ -192,4 +192,36 @@ describe('OrdersScreen', () => {
     // And the CSV covers the same dates the screen shows.
     expect(html).toContain('type=orders&amp;range=custom&amp;from=2026-10-03&amp;to=2026-10-09');
   });
+
+  it('sends an unpaid bill to the counter on that ticket, not the queue in general', () => {
+    const html = renderToStaticMarkup(<OrdersScreen data={live()} />);
+
+    expect(html).toContain('/cashier?order=o1');
+    expect(html).toContain('Collect');
+    // The reference still opens the bill itself; both doors are real.
+    expect(html).toContain('/bill/o1');
+  });
+
+  it('offers nothing to collect on a settled or cancelled bill', () => {
+    const settled = renderToStaticMarkup(
+      <OrdersScreen
+        data={live({ orders: [order({ paymentStatus: 'paid', paidPaise: 84_000 })] })}
+        filter="settled"
+      />,
+    );
+    expect(settled).not.toContain('/cashier?order=');
+
+    const cancelled = renderToStaticMarkup(
+      <OrdersScreen data={live({ orders: [order({ prepStatus: 'cancelled' })] })} filter="cancelled" />,
+    );
+    expect(cancelled).not.toContain('/cashier?order=');
+  });
+
+  it('never points a sample row at a counter ticket that does not exist', () => {
+    // The fictional rows have fictional ids. A Collect link built from one
+    // would open some real table's bill at the counter.
+    const html = renderToStaticMarkup(<OrdersScreen data={null} />);
+
+    expect(html).not.toContain('/cashier?order=');
+  });
 });

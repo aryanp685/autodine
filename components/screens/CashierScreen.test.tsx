@@ -80,4 +80,28 @@ describe('Cashier', () => {
     expect(html).toContain('Queue clear');
     expect(html).not.toContain('A-1041');
   });
+
+  it('opens on the bill the ledger handed over', () => {
+    const html = renderToStaticMarkup(<Cashier nav={nav} focus="A-1038" />);
+    const pressed = [...html.matchAll(/<button[^>]*class="cash__qBtn"[^>]*>/g)]
+      .map((m) => m[0])
+      .filter((tag) => tag.includes('aria-pressed="true"'));
+    expect(pressed).toHaveLength(1);
+    // A-1038 is the second ticket in the sample queue, so the selection moved.
+    expect(pressed[0]).toContain('A-1038');
+  });
+
+  it('says so when the bill it was handed is no longer waiting', () => {
+    const html = renderToStaticMarkup(<Cashier nav={nav} focus="A-9999" />);
+
+    expect(html).toContain('not waiting any more');
+    expect(html).toContain('Got it');
+    // It still shows a ticket, because a counter with no selection is unusable.
+    expect(html).toContain('Record cash ₹1,247');
+  });
+
+  it('says nothing about a bill it was never handed', () => {
+    const html = renderToStaticMarkup(<Cashier nav={nav} />);
+    expect(html).not.toContain('not waiting any more');
+  });
 });

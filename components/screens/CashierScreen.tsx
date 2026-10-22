@@ -113,10 +113,19 @@ function newIdempotencyKey(): string {
 export function Cashier({
   data,
   nav,
+  focus,
 }: {
   data?: CashierScreenData | null;
   /** The shared app bar, rendered by the server page. */
   nav?: ReactNode;
+  /**
+   * The bill the ledger asked for, from `?order=`.
+   *
+   * The order ledger and the counter are the same queue seen twice: a row with
+   * money due says "Collect", and that has to land on THAT ticket rather than
+   * on whichever one happens to be oldest.
+   */
+  focus?: string;
 }) {
   const router = useRouter();
   const [method, setMethod] = useState<CounterMethod>('cash');
@@ -126,7 +135,9 @@ export function Cashier({
   /** Orders settled or cancelled locally, in demo mode only. */
   const [demoDone, setDemoDone] = useState<string[]>([]);
   /** Which ticket the cashier is looking at. Null means "the oldest one". */
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(focus?.trim() || null);
+  /** Has the cashier dismissed the note about a bill that is no longer waiting? */
+  const [focusDismissed, setFocusDismissed] = useState(false);
   /** The order the cashier has asked to cancel, before they confirm. */
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
@@ -155,6 +166,21 @@ export function Cashier({
   // leaves, and the panel falls back to the oldest one still waiting, which
   // is where a cashier's attention goes next anyway.
   const order = visible.find((row) => row.key === selectedKey) ?? visible[0];
+  /**
+   * A bill can leave the queue between the ledger being drawn and the tap:
+   * somebody at the counter settles it, or the kitchen cancels it.
+   *
+   * The panel still has to show something, so it falls back to the oldest
+   * ticket -- but silently, that would look like the link went to the wrong
+   * order, and at a real counter it could mean taking the wrong table's money.
+   * So the fallback says out loud that it is a fallback.
+   */
+  const wanted = focus?.trim() || null;
+  const focusMissing = Boolean(
+    wanted &&
+      !focusDismissed &&
+      !visible.some((row) => row.key === wanted || row.code === wanted),
+  );
   const outstanding = useMemo(
     () => visible.reduce((sum, item) => sum + item.outstanding, 0),
     [visible],
@@ -348,6 +374,24 @@ export function Cashier({
 
             {order ? (
               <section className="cash__detail" aria-labelledby="cashier-order-title">
+                {focusMissing ? (
+                  <div className="cash__focus" role="status">
+                    <p>
+                      The bill you came for is not waiting any more — it was settled or cancelled
+                      just now. This is the oldest ticket still open.
+                    </p>
+                    <button
+                      type="button"
+                      className="pg__miniBtn"
+                      onClick={() => {
+                        setFocusDismissed(true);
+                        setSelectedKey(null);
+                      }}
+                    >
+                      Got it
+                    </button>
+                  </div>
+                ) : null}
                 <div className="cash__detailHead">
                   <div>
                     <div className="cash__kicker">

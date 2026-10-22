@@ -322,7 +322,28 @@ export function OrdersScreen({
                         <td className="tnum">
                           <Money value={order.totalPaise} />
                         </td>
-                        <td className="tnum">{outstanding > 0 ? <Money value={outstanding} /> : '—'}</td>
+                        <td className="tnum">
+                          {/* A cancelled bill is never collectable: money must
+                              not be taken for food that will not arrive. */}
+                          {outstanding > 0 && !cancelled ? (
+                            live && !blocked ? (
+                              // The money on this row is collected on that
+                              // bill, not on an arbitrary one: the counter
+                              // opens on this ticket.
+                              <Link
+                                className="rep__collect"
+                                href={`/cashier?order=${encodeURIComponent(order.id)}`}
+                                title={`Take payment for ${order.code} at the counter`}
+                              >
+                                Collect <Money value={outstanding} />
+                              </Link>
+                            ) : (
+                              <Money value={outstanding} />
+                            )
+                          ) : (
+                            '—'
+                          )}
+                        </td>
                       </tr>
                     );
                   })}
@@ -388,10 +409,20 @@ export function OrdersScreen({
                           <Money value={order.totalPaise} />
                         </span>
                         <span className="rep__cardDue">
-                          {outstanding > 0 ? (
-                            <>
-                              Due <Money value={outstanding} />
-                            </>
+                          {outstanding > 0 && !cancelled ? (
+                            live && !blocked ? (
+                              <Link
+                                className="rep__collect"
+                                href={`/cashier?order=${encodeURIComponent(order.id)}`}
+                                title={`Take payment for ${order.code} at the counter`}
+                              >
+                                Collect <Money value={outstanding} />
+                              </Link>
+                            ) : (
+                              <>
+                                Due <Money value={outstanding} />
+                              </>
+                            )
                           ) : (
                             'Settled'
                           )}
@@ -407,8 +438,9 @@ export function OrdersScreen({
 
         {!blocked && (
           <p className="pg__note">
-            Outstanding is what the table still owes on that bill. Settle it at the counter —{' '}
-            <Link href="/cashier">open the counter</Link>. A cancelled order stays in this list
+            Outstanding is what the table still owes on that bill. <strong>Collect</strong> opens
+            the counter on that exact ticket; the queue as a whole is at{' '}
+            <Link href="/cashier">the counter</Link>. A cancelled order stays in this list
             so the day&apos;s history is complete, but it is excluded from every figure on the
             sales report.
           </p>
