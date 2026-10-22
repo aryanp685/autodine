@@ -1,0 +1,944 @@
+/* =========================================================================
+   PREMIUM EDITORIAL — design system v2
+   =========================================================================
+
+   The locked "Editorial Minimal" system is retired by an explicit decision
+   (2026-10-22): keep its bones — hairlines, big type, generous air, warm
+   paper — and give it the finish of a modern hardware site. Restraint is
+   still the rule; what changes is the craft.
+
+   WHAT IS DIFFERENT FROM v1
+
+     Type      A fluid display scale, tight optical tracking, and a 500 weight
+               instead of 600. Large type reads as expensive when it is light
+               and tightly set, and cheap when it is bold and loose.
+     Air       Section rhythm doubled. The page should feel like it has room
+               to breathe, not like it is trying to fit.
+     Depth     v1 banned shadows entirely. That was right for a flat editorial
+               sheet and wrong for anything that floats. Elevation now exists,
+               but only as two tokens, and only ever very soft: a hairline
+               contact shadow plus a wide diffuse one.
+     Glass     The bar is translucent with a backdrop blur, so content scrolls
+               under it rather than being cut off by a solid strip.
+     Motion    300–600ms, eased, staggered. Long enough to be felt, short
+               enough never to delay reading.
+
+   PACING RULES, so this stays one language rather than a pile of effects:
+
+     - Nothing animates more than once per visit except hover and parallax.
+     - Distance is small: 20–40px for arrivals, never a slide across the page.
+     - Only opacity and transform animate. Never width, height, top or left.
+     - Anything staged by CSS is opacity-only, so a failure to run the
+       animation leaves content readable rather than invisible.
+     - Every duration here maps to one of --p-d1..--p-d4. A fifth number is a
+       bug in the intent, not a new effect.
+
+   Scoping: everything is under [data-app], like v1, so the product's own
+   dense screens (kitchen, cashier) can be migrated without a rewrite.
+   ========================================================================= */
+
+[data-app] {
+  /* ---- surfaces ------------------------------------------------------- */
+  --p-paper: #f7f4ee;
+  --p-paper-deep: #efeade;
+  --p-surface: #ffffff;
+  --p-glass: rgba(247, 244, 238, 0.72);
+  --p-glass-dark: rgba(13, 12, 10, 0.55);
+
+  /* ---- ink ------------------------------------------------------------ */
+  --p-ink: #0d0c0a;
+  --p-ink-80: rgba(13, 12, 10, 0.8);
+  --p-ink-64: rgba(13, 12, 10, 0.64);
+  --p-ink-46: rgba(13, 12, 10, 0.46);
+  --p-ink-28: rgba(13, 12, 10, 0.28);
+  --p-ink-12: rgba(13, 12, 10, 0.12);
+  --p-ink-07: rgba(13, 12, 10, 0.07);
+  --p-on-ink: #fbf9f4;
+
+  /* ---- accent --------------------------------------------------------- */
+  --p-accent: #55634a;
+  --p-accent-soft: #e6ebdf;
+  /* The one "something is live" green. Only the hero's status dot uses it. */
+  --p-live: #9fb98c;
+
+  /* ---- lines ---------------------------------------------------------- */
+  --p-line: rgba(13, 12, 10, 0.09);
+  --p-line-strong: rgba(13, 12, 10, 0.18);
+  --p-line-on-ink: rgba(251, 249, 244, 0.18);
+
+  /* ---- elevation ------------------------------------------------------
+     Two steps only. The first is the contact shadow that keeps a card from
+     looking pasted on; the second is the diffuse lift for something that
+     should read as floating above the page. Both are warm-black rather than
+     pure black, because a neutral shadow on warm paper reads grey and dirty. */
+  --p-shadow-1: 0 1px 2px rgba(13, 12, 10, 0.04), 0 10px 30px -18px rgba(13, 12, 10, 0.18);
+  --p-shadow-2: 0 2px 6px rgba(13, 12, 10, 0.05), 0 32px 70px -32px rgba(13, 12, 10, 0.26);
+
+  /* ---- geometry ------------------------------------------------------- */
+  --p-r-sm: 10px;
+  --p-r: 16px;
+  --p-r-lg: 24px;
+  --p-r-xl: 34px;
+  --p-pill: 999px;
+  --p-max: 1200px;
+  --p-gutter: clamp(20px, 5.2vw, 76px);
+  --p-sect: clamp(84px, 12vh, 164px);
+
+  /* ---- motion ---------------------------------------------------------
+     --p-ease is the "settle" curve: it decelerates hard at the end, which is
+     what makes a short distance read as arriving rather than travelling.
+     --p-ease-soft is for larger, slower moves where a hard stop would look
+     mechanical. */
+  --p-d1: 180ms;
+  --p-d2: 320ms;
+  --p-d3: 520ms;
+  --p-d4: 720ms;
+  --p-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --p-ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ---- type ----------------------------------------------------------- */
+  --p-display: clamp(2.9rem, 7.4vw, 6.4rem);
+  --p-h2: clamp(1.9rem, 3.7vw, 3.1rem);
+  --p-h3: clamp(1.15rem, 1.5vw, 1.4rem);
+  --p-lede: clamp(1.0625rem, 1.15vw, 1.28rem);
+  --p-body: 1rem;
+  --p-small: 0.875rem;
+  --p-eyebrow: 0.7rem;
+}
+
+/* =========================================================================
+   Base
+   ========================================================================= */
+
+[data-app] {
+  background: var(--p-paper);
+  color: var(--p-ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+[data-app] ::selection { background: var(--p-ink); color: var(--p-on-ink); }
+
+[data-app] .p-wrap {
+  width: 100%;
+  max-width: var(--p-max);
+  margin-inline: auto;
+  padding-inline: var(--p-gutter);
+}
+
+[data-app] .p-sect {
+  position: relative;
+  padding-block: var(--p-sect);
+}
+
+[data-app] .p-sect--tight { padding-block: clamp(56px, 8vh, 104px); }
+
+[data-app] .p-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--p-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+/* The dot before an eyebrow is the one decorative mark in the system. It is
+   the same mark everywhere, which is what makes it read as a system. */
+[data-app] .p-eyebrow::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--p-accent);
+  flex: 0 0 auto;
+}
+
+[data-app] .p-display {
+  font-size: var(--p-display);
+  line-height: 0.95;
+  letter-spacing: -0.035em;
+  font-weight: 500;
+  margin: 0;
+  /* Large text at 500 can look thin on Windows; this keeps the stems from
+     disappearing without going back to the 600 weight that looked shouty. */
+  text-wrap: balance;
+}
+
+[data-app] .p-h2 {
+  font-size: var(--p-h2);
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  font-weight: 500;
+  margin: 0;
+  text-wrap: balance;
+}
+
+[data-app] .p-h3 {
+  font-size: var(--p-h3);
+  line-height: 1.22;
+  letter-spacing: -0.015em;
+  font-weight: 500;
+  margin: 0;
+}
+
+[data-app] .p-lede {
+  font-size: var(--p-lede);
+  line-height: 1.6;
+  letter-spacing: -0.005em;
+  color: var(--p-ink-64);
+  margin: 0;
+  max-width: 58ch;
+}
+
+[data-app] .p-body { font-size: var(--p-body); line-height: 1.65; color: var(--p-ink-64); margin: 0; }
+[data-app] .p-small { font-size: var(--p-small); line-height: 1.55; color: var(--p-ink-46); margin: 0; }
+
+[data-app] .p-rule {
+  height: 1px;
+  background: var(--p-line);
+  border: 0;
+  margin: 0;
+  transform-origin: 0 50%;
+}
+
+/* =========================================================================
+   Buttons
+   =========================================================================
+
+   Pill geometry, 48px tall, 15px label. One shape everywhere: a control that
+   changes silhouette between screens reads as two different products.
+
+   The hover state is a 1px lift plus elevation, not a colour flip. Colour
+   flashes are cheap; weight shifting is what a physical button does.
+   ========================================================================= */
+
+[data-app] .p-btn {
+  --btn-bg: transparent;
+  --btn-fg: var(--p-ink);
+  --btn-line: var(--p-ink-12);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 24px;
+  border-radius: var(--p-pill);
+  border: 1px solid var(--btn-line);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    transform var(--p-d2) var(--p-ease),
+    box-shadow var(--p-d2) var(--p-ease),
+    background-color var(--p-d1) linear,
+    border-color var(--p-d1) linear,
+    color var(--p-d1) linear;
+}
+
+[data-app] .p-btn:hover { transform: translateY(-1px); }
+[data-app] .p-btn:active { transform: translateY(0); transition-duration: 90ms; }
+
+[data-app] .p-btn--solid {
+  --btn-bg: var(--p-ink);
+  --btn-fg: var(--p-on-ink);
+  --btn-line: var(--p-ink);
+  box-shadow: var(--p-shadow-1);
+}
+[data-app] .p-btn--solid:hover { box-shadow: var(--p-shadow-2); }
+
+[data-app] .p-btn--line { --btn-bg: transparent; --btn-fg: var(--p-ink); --btn-line: var(--p-ink-28); }
+[data-app] .p-btn--line:hover { --btn-line: var(--p-ink); }
+
+/* On top of photography. The glass reads as a physical pane over the image
+   rather than a white box dropped on it. */
+[data-app] .p-btn--glass {
+  --btn-bg: rgba(251, 249, 244, 0.14);
+  --btn-fg: var(--p-on-ink);
+  --btn-line: rgba(251, 249, 244, 0.4);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+}
+[data-app] .p-btn--glass:hover { --btn-bg: rgba(251, 249, 244, 0.24); --btn-line: rgba(251, 249, 244, 0.7); }
+
+[data-app] .p-btn--accent { --btn-bg: var(--p-accent); --btn-fg: var(--p-on-ink); --btn-line: var(--p-accent); }
+
+/* For the one dark surface in the product, the featured plan. Kept as a named
+   variant rather than a per-screen inline style, so it cannot drift. */
+[data-app] .p-btn--onInk { --btn-bg: transparent; --btn-fg: var(--p-on-ink); --btn-line: var(--p-line-on-ink); }
+[data-app] .p-btn--onInk:hover { --btn-line: var(--p-on-ink); }
+[data-app] .p-btn--sm { min-height: 40px; padding: 0 18px; font-size: 0.875rem; }
+[data-app] .p-btn--block { width: 100%; }
+
+[data-app] .p-btn:focus-visible,
+[data-app] .p-link:focus-visible {
+  outline: 2px solid var(--p-accent);
+  outline-offset: 3px;
+}
+
+/* An inline text link that draws its underline in rather than switching it on. */
+[data-app] .p-link {
+  position: relative;
+  color: inherit;
+  text-decoration: none;
+  padding-bottom: 2px;
+}
+[data-app] .p-link::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  transition: transform var(--p-d2) var(--p-ease);
+}
+[data-app] .p-link:hover::after { transform: scaleX(1); }
+
+/* =========================================================================
+   Site navigation
+   =========================================================================
+
+   Fixed, translucent, and never taller than 76px. It begins as a transparent
+   overlay on the hero and gains its own surface once the page moves, so the
+   photograph is full-bleed at rest and the links stay legible over content.
+
+   The is-scrolled class is set by components/SiteNav.tsx -- one state
+   threshold, not a per-pixel listener.
+   ========================================================================= */
+
+[data-app] .siteNav {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 18px var(--p-gutter);
+  transition:
+    padding var(--p-d3) var(--p-ease),
+    background-color var(--p-d2) linear,
+    border-color var(--p-d2) linear,
+    backdrop-filter var(--p-d2) linear;
+  border-bottom: 1px solid transparent;
+}
+
+[data-app] .siteNav.is-scrolled {
+  padding-block: 12px;
+  background: var(--p-glass);
+  border-bottom-color: var(--p-line);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+}
+
+[data-app] .siteNav__brand {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 9px;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--p-ink);
+  text-decoration: none;
+}
+
+/* The mark: a filled square and an outlined one, the table and the ticket. */
+[data-app] .siteNav__mark {
+  display: inline-flex;
+  gap: 3px;
+  align-self: center;
+}
+[data-app] .siteNav__mark i {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--p-ink);
+}
+[data-app] .siteNav__mark i + i { background: transparent; border: 1px solid var(--p-ink); }
+
+[data-app] .siteNav__links {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+[data-app] .siteNav__link {
+  font-size: 0.9375rem;
+  font-weight: 450;
+  color: var(--p-ink-64);
+  text-decoration: none;
+  transition: color var(--p-d1) linear;
+}
+[data-app] .siteNav__link:hover,
+[data-app] .siteNav__link[aria-current='page'] { color: var(--p-ink); }
+
+[data-app] .siteNav__right { display: flex; align-items: center; gap: 10px; }
+
+/* Over the hero, before any scroll, the bar sits on a dark photograph. Invert
+   it rather than fight the image with a scrim -- the scrim is already doing
+   its job on the text below. */
+[data-app] .siteNav--onImage:not(.is-scrolled) .siteNav__brand,
+[data-app] .siteNav--onImage:not(.is-scrolled) .siteNav__link,
+[data-app] .siteNav--onImage:not(.is-scrolled) .siteNav__link:hover,
+[data-app] .siteNav--onImage:not(.is-scrolled) .siteNav__link[aria-current='page'] { color: var(--p-on-ink); }
+[data-app] .siteNav--onImage:not(.is-scrolled) .siteNav__mark i { background: var(--p-on-ink); border-color: var(--p-on-ink); }
+[data-app] .siteNav--onImage:not(.is-scrolled) .siteNav__mark i + i { background: transparent; }
+[data-app] .siteNav--onImage:not(.is-scrolled) .p-btn--line,
+[data-app] .siteNav--onImage:not(.is-scrolled) .p-btn--onInk {
+  --btn-fg: var(--p-on-ink);
+  --btn-line: rgba(251, 249, 244, 0.4);
+}
+/* The primary action inverts rather than staying ink-on-ink: a dark pill on a
+   dusk photograph disappears at exactly the moment someone wants to press it. */
+[data-app] .siteNav--onImage:not(.is-scrolled) .p-btn--solid {
+  --btn-bg: var(--p-on-ink);
+  --btn-fg: var(--p-ink);
+  --btn-line: var(--p-on-ink);
+}
+
+/* =========================================================================
+   Hero — editorial full bleed
+   =========================================================================
+
+   One photograph, one line, and the bottom third of the frame carrying the
+   copy. The image is 112% tall and offset upward so the 6% parallax travel
+   stays inside its own bounds and no edge is ever exposed.
+
+   The headline is set in three masked lines. Each line is a block inside an
+   overflow-hidden parent, and the animation moves the inner span up from
+   below. That is the whole trick: the mask does the work, so nothing has to
+   fade, and the type reads as being revealed rather than switched on.
+   ========================================================================= */
+
+[data-app] .hero {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  min-height: 100svh;
+  padding: 140px 0 clamp(56px, 9vh, 104px);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+[data-app] .hero__media {
+  position: absolute;
+  inset: -6% 0;
+  z-index: -2;
+  height: 112%;
+}
+
+[data-app] .hero__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 55%;
+  transform: scale(1.04);
+  will-change: transform;
+}
+
+/* Two layers of scrim. The vertical one darkens the bottom enough for text;
+   the horizontal one keeps the left edge readable where the type sits. A
+   single flat overlay strong enough to do both would grey out the room. */
+[data-app] .hero__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(180deg, rgba(13, 12, 10, 0.52) 0%, rgba(13, 12, 10, 0.08) 34%, rgba(13, 12, 10, 0.72) 100%),
+    linear-gradient(90deg, rgba(13, 12, 10, 0.5) 0%, rgba(13, 12, 10, 0) 62%);
+}
+
+[data-app] .hero__body {
+  width: 100%;
+  max-width: var(--p-max);
+  margin-inline: auto;
+  padding-inline: var(--p-gutter);
+  color: var(--p-on-ink);
+}
+
+[data-app] .hero__eyebrow {
+  color: rgba(251, 249, 244, 0.76);
+}
+[data-app] .hero__eyebrow::before { background: rgba(251, 249, 244, 0.76); }
+
+[data-app] .hero__title {
+  margin: 22px 0 0;
+  font-size: var(--p-display);
+  line-height: 0.94;
+  letter-spacing: -0.038em;
+  font-weight: 500;
+  max-width: 15ch;
+}
+
+/* Each line of the headline is its own mask. */
+[data-app] .hero__lineMask { display: block; overflow: hidden; padding-bottom: 0.06em; }
+[data-app] .hero__line { display: block; will-change: transform; }
+
+[data-app] .hero__lede {
+  margin: 26px 0 0;
+  font-size: var(--p-lede);
+  line-height: 1.55;
+  color: rgba(251, 249, 244, 0.82);
+  max-width: 46ch;
+}
+
+[data-app] .hero__ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 34px;
+}
+
+[data-app] .hero__note {
+  margin: 26px 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: rgba(251, 249, 244, 0.62);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+/* A slow pulse on one 5px dot is the only looping animation on the page. It
+   says "live" without a badge, and it is removed under reduced motion.
+
+   The expanding ring is a pseudo-element that scales and fades, not a
+   box-shadow with a growing spread: a shadow repaints on every frame, a
+   transform does not, and this ring runs forever on the landing page. */
+[data-app] .hero__note i {
+  position: relative;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--p-live);
+  flex: 0 0 auto;
+}
+[data-app] .hero__note i::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--p-live);
+  animation: p-pulse 2.6s var(--p-ease-soft) infinite;
+}
+
+@keyframes p-pulse {
+  0% { transform: scale(1); opacity: 0.5; }
+  70%, 100% { transform: scale(2.6); opacity: 0; }
+}
+
+/* A hairline that draws itself downward, once. It is a scroll affordance,
+   not decoration, so it is the only looping-ish motion besides the dot and
+   it disappears entirely on short viewports where the fold is obvious. */
+[data-app] .hero__cue {
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  translate: -50% 0;
+  width: 1px;
+  height: 46px;
+  background: rgba(251, 249, 244, 0.24);
+  overflow: hidden;
+}
+[data-app] .hero__cue::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 40%;
+  background: rgba(251, 249, 244, 0.9);
+  animation: p-cue 2.4s var(--p-ease-soft) infinite;
+}
+@keyframes p-cue {
+  0% { transform: translateY(-100%); }
+  60%, 100% { transform: translateY(260%); }
+}
+
+/* =========================================================================
+   Feature columns
+   ========================================================================= */
+
+[data-app] .p-grid {
+  display: grid;
+  gap: clamp(24px, 3vw, 44px);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+[data-app] .feat { display: flex; flex-direction: column; }
+
+/* The hairline is drawn on the element rather than between siblings, so the
+   three columns line up even when a title wraps to two lines. */
+[data-app] .feat__rule { background: var(--p-line-strong); margin-bottom: 26px; transform-origin: 0 50%; }
+
+[data-app] .feat__num {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--p-ink-46);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-app] .feat__title { margin: 14px 0 0; }
+[data-app] .feat__body { margin: 14px 0 0; max-width: 38ch; }
+
+/* A card variant, for the sections that want weight rather than air. */
+[data-app] .p-card {
+  position: relative;
+  background: var(--p-surface);
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-r-lg);
+  padding: clamp(24px, 2.4vw, 34px);
+  box-shadow: var(--p-shadow-1);
+  transition:
+    transform var(--p-d3) var(--p-ease),
+    box-shadow var(--p-d3) var(--p-ease),
+    border-color var(--p-d2) linear;
+}
+[data-app] .p-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--p-shadow-2);
+  border-color: var(--p-line-strong);
+}
+
+/* =========================================================================
+   Statement band
+   ========================================================================= */
+
+[data-app] .p-band {
+  border-block: 1px solid var(--p-line);
+  background: var(--p-paper-deep);
+  padding-block: clamp(44px, 6vh, 72px);
+}
+
+[data-app] .p-band__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(20px, 3vw, 40px);
+}
+
+/* Numbered process row. Four columns on paper, one column on a phone, each
+   step separated by a hairline that runs above the number rather than between
+   the columns -- a divider between columns breaks as soon as one body wraps. */
+[data-app] .p-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(20px, 2.6vw, 40px);
+}
+
+[data-app] .step__rule { background: var(--p-line-strong); margin-bottom: 18px; transform-origin: 0 50%; }
+
+[data-app] .step__num {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--p-ink-46);
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+}
+
+[data-app] .step__label {
+  margin: 10px 0 0;
+  font-size: 1.0625rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+[data-app] .step__body { margin: 8px 0 0; font-size: var(--p-small); line-height: 1.55; color: var(--p-ink-64); }
+
+[data-app] .p-stat__value {
+  font-size: clamp(1.25rem, 1.9vw, 1.65rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+[data-app] .p-stat__label { margin: 8px 0 0; font-size: var(--p-small); color: var(--p-ink-46); max-width: 28ch; }
+
+/* =========================================================================
+   Plans
+   ========================================================================= */
+
+[data-app] .p-plans {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(16px, 1.8vw, 24px);
+  align-items: stretch;
+}
+
+[data-app] .plan {
+  display: flex;
+  flex-direction: column;
+  padding: clamp(26px, 2.6vw, 36px);
+  background: var(--p-surface);
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-r-lg);
+  transition:
+    transform var(--p-d3) var(--p-ease),
+    box-shadow var(--p-d3) var(--p-ease),
+    border-color var(--p-d2) linear;
+}
+
+[data-app] .plan:hover { transform: translateY(-3px); box-shadow: var(--p-shadow-1); border-color: var(--p-line-strong); }
+
+/* The featured plan is the only dark surface in the product. It earns that
+   by being the one card the eye should land on first. */
+[data-app] .plan--featured {
+  background: var(--p-ink);
+  border-color: var(--p-ink);
+  color: var(--p-on-ink);
+  box-shadow: var(--p-shadow-2);
+}
+[data-app] .plan--featured .plan__name,
+[data-app] .plan--featured .plan__price { color: var(--p-on-ink); }
+[data-app] .plan--featured .plan__blurb,
+[data-app] .plan--featured .plan__feature { color: rgba(251, 249, 244, 0.7); }
+[data-app] .plan--featured .plan__flag { background: rgba(251, 249, 244, 0.14); color: var(--p-on-ink); border-color: var(--p-line-on-ink); }
+[data-app] .plan--featured .plan__feature::before { background: rgba(251, 249, 244, 0.5); }
+[data-app] .plan--featured .plan__rule { background: var(--p-line-on-ink); }
+
+[data-app] .plan__flag {
+  align-self: flex-start;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: var(--p-pill);
+  border: 1px solid var(--p-line);
+  background: var(--p-paper-deep);
+  color: var(--p-ink-64);
+  margin-bottom: 20px;
+}
+
+[data-app] .plan__name { font-size: 1.0625rem; font-weight: 500; letter-spacing: -0.01em; }
+
+[data-app] .plan__price {
+  margin: 16px 0 0;
+  font-size: clamp(2rem, 2.9vw, 2.6rem);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+[data-app] .plan__price span {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--p-ink-46);
+  margin-left: 8px;
+}
+[data-app] .plan--featured .plan__price span { color: rgba(251, 249, 244, 0.55); }
+
+[data-app] .plan__blurb { margin: 14px 0 0; font-size: var(--p-small); line-height: 1.6; color: var(--p-ink-64); }
+
+[data-app] .plan__rule { height: 1px; background: var(--p-line); margin: 24px 0; }
+
+[data-app] .plan__features { display: grid; gap: 11px; margin: 0 0 28px; padding: 0; list-style: none; flex: 1; }
+
+[data-app] .plan__feature {
+  position: relative;
+  padding-left: 20px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--p-ink-64);
+}
+[data-app] .plan__feature::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 9px;
+  height: 1px;
+  background: var(--p-accent);
+}
+
+/* =========================================================================
+   FAQ
+   ========================================================================= */
+
+[data-app] .p-faqs { border-top: 1px solid var(--p-line); max-width: 780px; }
+
+[data-app] .p-faq {
+  border-bottom: 1px solid var(--p-line);
+  padding: 22px 0;
+}
+[data-app] .p-faq summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  cursor: pointer;
+  font-size: 1.0625rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  list-style: none;
+}
+[data-app] .p-faq summary::-webkit-details-marker { display: none; }
+
+/* The plus rotates into a minus instead of swapping glyphs, so opening a
+   question animates rather than jumping to a different character. */
+[data-app] .p-faq summary::after {
+  content: '';
+  position: relative;
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  background:
+    linear-gradient(var(--p-ink-64), var(--p-ink-64)) center / 12px 1px no-repeat,
+    linear-gradient(var(--p-ink-64), var(--p-ink-64)) center / 1px 12px no-repeat;
+  transition: transform var(--p-d3) var(--p-ease);
+}
+[data-app] .p-faq[open] summary::after { transform: rotate(90deg); }
+[data-app] .p-faq p { margin: 14px 0 0; max-width: 62ch; color: var(--p-ink-64); line-height: 1.65; font-size: 0.9375rem; }
+
+/* =========================================================================
+   Closing statement + footer
+   ========================================================================= */
+
+[data-app] .p-close { border-top: 1px solid var(--p-line); background: var(--p-paper); }
+
+[data-app] .p-close__inner {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 40px;
+  flex-wrap: wrap;
+  padding-block: clamp(64px, 10vh, 128px);
+}
+
+[data-app] .p-close__title { max-width: 16ch; }
+
+[data-app] .foot {
+  border-top: 1px solid var(--p-line);
+  padding-block: clamp(48px, 6vh, 72px) 40px;
+}
+
+[data-app] .foot__grid {
+  display: grid;
+  grid-template-columns: 1.6fr repeat(3, 1fr);
+  gap: clamp(24px, 4vw, 56px);
+}
+
+[data-app] .foot__brand { font-size: 1.0625rem; font-weight: 600; letter-spacing: -0.02em; }
+[data-app] .foot__note { margin: 14px 0 0; font-size: var(--p-small); line-height: 1.6; color: var(--p-ink-46); max-width: 30ch; }
+
+[data-app] .foot__colTitle {
+  font-size: var(--p-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+  margin: 0 0 14px;
+}
+
+[data-app] .foot__links { display: grid; gap: 10px; list-style: none; margin: 0; padding: 0; }
+[data-app] .foot__links a { font-size: var(--p-small); color: var(--p-ink-64); text-decoration: none; transition: color var(--p-d1) linear; }
+[data-app] .foot__links a:hover { color: var(--p-ink); }
+
+[data-app] .foot__fine {
+  margin-top: clamp(36px, 5vh, 60px);
+  padding-top: 22px;
+  border-top: 1px solid var(--p-line);
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+  color: var(--p-ink-46);
+}
+
+/* =========================================================================
+   Motion staging
+   =========================================================================
+
+   Hidden ONLY while <html> carries .motion, which the inline script in
+   app/layout.tsx adds before first paint and only when the visitor has not
+   asked for reduced motion. Opacity is the only property withheld: a
+   translation written here would survive a failed animation and leave the
+   content permanently displaced.
+
+   The inline script also removes .motion if the motion layer never reports
+   in, so this can never be the reason a page is blank.
+   ========================================================================= */
+
+.motion [data-reveal],
+.motion [data-stagger] > *,
+.motion [data-hero-step],
+.motion [data-line] {
+  opacity: 0;
+  will-change: opacity, transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-app] .hero__note i,
+  [data-app] .hero__cue::after { animation: none; }
+  [data-app] .hero__cue { display: none; }
+  [data-app] .p-btn:hover,
+  [data-app] .p-card:hover,
+  [data-app] .plan:hover { transform: none; }
+  .motion [data-reveal],
+  .motion [data-stagger] > *,
+  .motion [data-hero-step],
+  .motion [data-line] { opacity: 1; }
+}
+
+/* =========================================================================
+   Responsive
+   ========================================================================= */
+
+@media (max-width: 1100px) {
+  [data-app] .p-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  [data-app] .p-grid > :last-child { grid-column: 1 / -1; }
+  [data-app] .p-plans { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  [data-app] .p-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  [data-app] .p-plans > :last-child { grid-column: 1 / -1; }
+  [data-app] .foot__grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 760px) {
+  [data-app] .hero {
+    min-height: 92svh;
+    padding-top: 116px;
+    padding-bottom: 56px;
+  }
+  [data-app] .hero__title { max-width: 100%; }
+  [data-app] .hero__lede { font-size: 1rem; margin-top: 20px; }
+  [data-app] .hero__ctas { margin-top: 26px; gap: 10px; }
+  [data-app] .hero__ctas .p-btn { flex: 1 1 auto; }
+  [data-app] .hero__cue { display: none; }
+
+  /* Links do not fit beside a brand and two actions on a phone. They remain
+     reachable in the footer, and the two actions are what the page wants
+     pressed anyway. */
+  [data-app] .siteNav__links { display: none; }
+  [data-app] .siteNav { padding-block: 14px; }
+
+  [data-app] .p-grid,
+  [data-app] .p-plans,
+  [data-app] .p-band__grid,
+  [data-app] .p-steps,
+  [data-app] .foot__grid { grid-template-columns: minmax(0, 1fr); }
+  [data-app] .p-grid > :last-child,
+  [data-app] .p-plans > :last-child { grid-column: auto; }
+
+  [data-app] .p-close__inner { align-items: flex-start; }
+
+  /* 44px minimum on every control, which is also what stops iOS zooming. */
+  [data-app] .p-btn { min-height: 48px; }
+}
+
+@media (max-width: 420px) {
+  [data-app] .hero__ctas { flex-direction: column; align-items: stretch; }
+  [data-app] .hero__ctas .p-btn { width: 100%; }
+}

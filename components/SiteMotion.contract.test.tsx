@@ -18,7 +18,7 @@ import { describe, expect, it } from 'vitest';
  * the file is read and searched for it.
  */
 
-const source = readFileSync(join(process.cwd(), 'components/HomeMotion.tsx'), 'utf8');
+const source = readFileSync(join(process.cwd(), 'components/SiteMotion.tsx'), 'utf8');
 
 /**
  * The file's own comments discuss the bug by name -- "every tween here used
@@ -32,7 +32,7 @@ const code = source
   .filter((line) => !line.trimStart().startsWith('//'))
   .join('\n');
 
-describe('HomeMotion', () => {
+describe('SiteMotion', () => {
   it('never animates from a computed value with gsap.from', () => {
     // `gsap.from(` and `gsap.fromTo(` are different calls; match the former
     // exactly so the correct one does not trip the check.
@@ -42,9 +42,9 @@ describe('HomeMotion', () => {
 
   it('stages every tween with an explicit end state', () => {
     const fromTo = code.match(/gsap\.fromTo\(/g) ?? [];
-    // hero steps, opening image, section rules, reveals, groups -- more would
-    // be fine, fewer means a tween was converted back.
-    expect(fromTo.length).toBeGreaterThanOrEqual(5);
+    // headline lines, hero steps, opening image, reveals, stagger groups,
+    // drawn rules -- more would be fine, fewer means a tween was converted back.
+    expect(fromTo.length).toBeGreaterThanOrEqual(6);
   });
 
   it('marks the motion layer alive, so the fail-open timer does not fire', () => {

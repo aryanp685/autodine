@@ -1,131 +1,293 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { inr, plans } from '@/lib/demo-data';
-import { HomeMotion } from '@/components/HomeMotion';
-import { HomeNavCondense } from '@/components/HomeNavCondense';
+import { SiteNav } from '@/components/SiteNav';
+import { SiteMotion } from '@/components/SiteMotion';
 
 /* ============================================================================
-   Editorial Minimal — locked design system
-   Full-bleed photography, display typography, hairline rules, no shadows.
+   Home — premium editorial.
+
+   A full-bleed photograph, one confident line of type anchored to the bottom
+   of the frame, then air. The sections below alternate between type on paper
+   and a beige band so the page has a rhythm rather than a scroll of boxes.
+
+   Everything here is a Server Component. The two client pieces are imports
+   that render nothing but an effect: SiteNav owns the bar's scrolled state,
+   SiteMotion owns the animation. Neither pulls the markup into the browser
+   bundle as JavaScript.
    ========================================================================== */
+
+const FEATURES = [
+  {
+    n: '01',
+    title: 'A menu that stays current',
+    body: 'Every dish, price and section is edited and published from the dashboard. Several menus can run side by side — lunch and dinner, dine-in and takeaway — without touching a single QR card.',
+  },
+  {
+    n: '02',
+    title: 'One service thread',
+    body: 'A guest scans the table code, types the six digits showing in the room, and the order lands on the kitchen board immediately. The ticket is spoken out loud, and settled at the counter.',
+  },
+  {
+    n: '03',
+    title: 'Money that reconciles',
+    body: 'Cash, card and UPI collected at the counter are recorded against the bill. Billed and collected are kept as two numbers, so the day’s takings are never an estimate.',
+  },
+];
+
+const STEPS = [
+  ['Scan', 'The QR on the table resolves to that table, in that restaurant.'],
+  ['Verify', 'A six-digit code stands in for a guest account. No app, no signup.'],
+  ['Order', 'The kitchen board picks the ticket up, ordered by what needs cooking next.'],
+  ['Settle', 'Paid at the counter, recorded against the bill, printed or sent.'],
+];
+
 export function Home() {
   return (
-    <div className="home">
-      <nav className="home__nav">
-        <Link href="/" className="home__brand">AutoDine</Link>
-        <ul className="home__links">
-          <li><a href="#product">Product</a></li>
-          <li><Link href="/pricing">Pricing</Link></li>
-          <li><Link href="/menu">Menu demo</Link></li>
-        </ul>
-        <div className="home__navRight">
-          <Link href="/login" className="home__navLink">Sign in</Link>
-          <Link href="/signup" className="home__navCta">Create account</Link>
-        </div>
-      </nav>
+    <>
+      <SiteNav
+        onImage
+        links={[
+          { label: 'Product', href: '/#product' },
+          { label: 'Pricing', href: '/pricing' },
+          { label: 'Menu demo', href: '/menu' },
+        ]}
+      />
 
-      <header className="home__hero" data-hero>
-        <Image className="home__heroImg" src="/img/restaurant-interior.jpg" alt="Restaurant dining room at dusk" fill priority sizes="100vw" data-hero-image />
-        <div className="home__heroShade" />
-        <div className="home__heroBody" data-hero-body>
-          <div className="home__kicker" data-anim="hero-kicker">Restaurant QR ordering &amp; management</div>
-          <h1 className="home__h1" data-anim="hero-title">
-            Every table,
-            <br />
-            one quiet system.
-          </h1>
-          <p className="home__lede" data-anim="hero-lede">
-            A focused preview of the restaurant ordering experience we are building. Browse the sample menu and see how the customer, kitchen and counter screens fit together.
-          </p>
-          <div className="home__ctas" data-anim="hero-ctas">
-            <Link href="/signup" className="home__btn home__btn--solid">Create account</Link>
-            <Link href="/menu" className="home__btn home__btn--line">See the demo</Link>
+      <main>
+        {/* ------------------------------------------------------------ hero */}
+        <header className="hero" data-hero>
+          <div className="hero__media">
+            <Image
+              className="hero__img"
+              src="/img/restaurant-interior.jpg"
+              alt="Restaurant dining room at dusk"
+              fill
+              priority
+              sizes="100vw"
+              data-hero-image
+            />
           </div>
-          <div className="home__note" data-anim="hero-note">Ordering is live · online payments and subscriptions are not enabled yet</div>
-        </div>
-      </header>
+          <div className="hero__scrim" />
 
-      <section className="home__section" id="product" data-anim="reveal">
-        <div className="home__rule" data-rule />
-        <div className="home__three" data-anim-group>
-          {[
-            ['01', 'A clear digital menu', 'Every dish, price and menu is edited and published from the dashboard, and several menus can run side by side — lunch and dinner, dine-in and takeaway.'],
-            ['02', 'A connected service flow', 'A guest scans the table code, types the six digits showing inside the restaurant, and the order lands on the kitchen board immediately, spoken out in Hindi, and is paid for at the counter.'],
-            ['03', 'Payments, designed carefully', 'Cash, card and UPI collected at the counter are recorded against the bill. No online payment provider is connected yet, so nothing is charged from a phone.'],
-          ].map(([n, title, body]) => (
-            <article key={n} className="home__col">
-              <div className="home__num">{n}</div>
-              <h3 className="home__colTitle">{title}</h3>
-              <p className="home__colBody">{body}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="home__band" data-anim="reveal">
-        <div className="home__bandInner" data-anim-group>
-          {[
-            ['Browser', 'No customer app install planned'],
-            ['Table QR', 'Designed around table service'],
-            ['Two paths', 'Online and counter payments planned'],
-          ].map(([v, l]) => (
-            <div key={l} className="home__stat">
-              <div className="home__statValue">{v}</div>
-              <div className="home__statLabel">{l}</div>
+          <div className="hero__body" data-hero-body>
+            <div className="p-eyebrow hero__eyebrow" data-hero-step>
+              Restaurant QR ordering &amp; management
             </div>
-          ))}
-        </div>
-      </section>
 
-      <section className="home__section" data-anim="reveal">
-        <h2 className="home__h2">Plans</h2>
-        <div className="home__plans" data-anim-group>
-          {plans.map((p) => (
-            <div key={p.id} className="home__plan">
-              <div className="home__planName">{p.name}</div>
-              <div className="home__planPrice">
-                {inr(p.price)}<span>/month</span>
+            <h1 className="hero__title">
+              {['Every table,', 'one quiet', 'system.'].map((line) => (
+                <span key={line} className="hero__lineMask">
+                  <span className="hero__line" data-line>
+                    {line}
+                  </span>
+                </span>
+              ))}
+            </h1>
+
+            <p className="hero__lede" data-hero-step>
+              A working preview of the ordering experience we are building: the menu a guest
+              reads, the board a kitchen works from, and the counter that settles the bill.
+            </p>
+
+            <div className="hero__ctas" data-hero-step>
+              <Link href="/menu" className="p-btn p-btn--solid">
+                See the demo
+              </Link>
+              <Link href="/signup" className="p-btn p-btn--glass">
+                Create an account
+              </Link>
+            </div>
+
+            <p className="hero__note" data-hero-step>
+              <i aria-hidden="true" />
+              Ordering is live · online payments and subscriptions are not enabled yet
+            </p>
+          </div>
+
+          <div className="hero__cue" aria-hidden="true" />
+        </header>
+
+        {/* --------------------------------------------------------- product */}
+        <section className="p-sect" id="product">
+          <div className="p-wrap">
+            <div data-reveal>
+              <div className="p-eyebrow">The product</div>
+              <h2 className="p-h2" style={{ marginTop: 22, maxWidth: '18ch' }}>
+                Three screens. One service.
+              </h2>
+              <p className="p-lede" style={{ marginTop: 20 }}>
+                Most restaurant software is a dashboard with a menu attached. This is the other
+                way round — the guest’s table is the centre, and everything else is plumbing.
+              </p>
+            </div>
+
+            <div className="p-grid" style={{ marginTop: 'clamp(44px, 6vh, 72px)' }} data-stagger>
+              {FEATURES.map((f) => (
+                <article key={f.n} className="feat">
+                  <hr className="p-rule feat__rule" data-draw />
+                  <div className="feat__num">{f.n}</div>
+                  <h3 className="p-h3 feat__title">{f.title}</h3>
+                  <p className="p-body feat__body">{f.body}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ------------------------------------------------------------ flow */}
+        <section className="p-band">
+          <div className="p-wrap">
+            <div className="p-steps" data-stagger>
+              {STEPS.map(([label, body], i) => (
+                <div key={label} className="step">
+                  <hr className="p-rule step__rule" data-draw />
+                  <p className="step__num">{String(i + 1).padStart(2, '0')}</p>
+                  <p className="step__label">{label}</p>
+                  <p className="step__body">{body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ----------------------------------------------------------- plans */}
+        <section className="p-sect">
+          <div className="p-wrap">
+            <div
+              data-reveal
+              style={{
+                display: 'flex',
+                alignItems: 'flex-end',
+                justifyContent: 'space-between',
+                gap: 32,
+                flexWrap: 'wrap',
+              }}
+            >
+              <div>
+                <div className="p-eyebrow">Pricing</div>
+                <h2 className="p-h2" style={{ marginTop: 22, maxWidth: '16ch' }}>
+                  Planned, not yet charged.
+                </h2>
               </div>
-              <p className="home__planBlurb">{p.blurb}</p>
-              <ul className="home__planList">
-                {p.features.slice(0, 5).map((f) => (
-                  <li key={f}>{f}</li>
-                ))}
-              </ul>
-              <Link href="/pricing" className="home__planLink">Preview {p.name} →</Link>
+              <Link href="/pricing" className="p-link" style={{ fontSize: '0.9375rem', fontWeight: 500 }}>
+                See the full comparison
+              </Link>
             </div>
-          ))}
-        </div>
-        <p className="home__fine">
-          Plan names, prices and features are illustrative preview content. Trials, subscriptions and billing
-          are not enabled.
-        </p>
-      </section>
 
-      <footer className="home__foot" data-anim="reveal">
-        <Link href="/" className="home__footBrand">AutoDine</Link>
-        <div className="home__footCols">
-          <div>
-            <div className="home__footTitle">Explore</div>
-            <p><Link href="/#product">Product preview</Link> · <Link href="/pricing">Planned pricing</Link> · <Link href="/menu">Menu demo</Link></p>
-          </div>
-          <div>
-            <div className="home__footTitle">Preview scope</div>
-            <p>Sample restaurant content. No live orders, payment collection or subscriptions.</p>
-          </div>
-          <div>
-            <div className="home__footTitle">Accounts</div>
-            <p><Link href="/login">Sign in</Link> · <Link href="/signup">Create account</Link></p>
-          </div>
-        </div>
-        <div className="home__footFine">AutoDine · Product preview · not for live restaurant operations</div>
-      </footer>
+            <div className="p-plans" style={{ marginTop: 'clamp(36px, 5vh, 56px)' }} data-stagger>
+              {plans.map((p) => (
+                <article key={p.id} className={`plan${p.highlight ? ' plan--featured' : ''}`}>
+                  {p.highlight && <div className="plan__flag">Most complete</div>}
+                  <div className="plan__name">{p.name}</div>
+                  <div className="plan__price">
+                    {inr(p.price)}
+                    <span>/month</span>
+                  </div>
+                  <p className="plan__blurb">{p.blurb}</p>
+                  <div className="plan__rule" />
+                  <ul className="plan__features">
+                    {p.features.slice(0, 5).map((f) => (
+                      <li key={f} className="plan__feature">
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link
+                    href="/pricing"
+                    className={`p-btn p-btn--block ${p.highlight ? 'p-btn--onInk' : 'p-btn--line'}`}
+                  >
+                    Preview {p.name}
+                  </Link>
+                </article>
+              ))}
+            </div>
 
-      {/* Both render nothing. HomeNavCondense toggles the bar's condensed
-          state on scroll; HomeMotion finds the [data-anim] elements above and
-          animates them. See the failure modes documented in each. */}
-      <HomeNavCondense />
-      <HomeMotion />
-    </div>
+            <p className="p-small" style={{ marginTop: 28, maxWidth: '62ch' }}>
+              Plan names, prices and features are illustrative preview content. Trials,
+              subscriptions and billing are not enabled.
+            </p>
+          </div>
+        </section>
+
+        {/* ----------------------------------------------------- closing note */}
+        <section className="p-close">
+          <div className="p-wrap p-close__inner">
+            <div>
+              <div className="p-eyebrow">Start here</div>
+              <h2 className="p-h2 p-close__title" style={{ marginTop: 22 }}>
+                Look at it the way a guest would.
+              </h2>
+              <p className="p-lede" style={{ marginTop: 20, maxWidth: '46ch' }}>
+                The demo menu is open. Browse it, build an order, and watch what the kitchen
+                and the counter would see.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <Link href="/menu" className="p-btn p-btn--solid">
+                Open the menu
+              </Link>
+              <Link href="/pricing" className="p-btn p-btn--line">
+                Planned pricing
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* ----------------------------------------------------------- footer */}
+        <footer className="foot">
+          <div className="p-wrap">
+            <div className="foot__grid">
+              <div>
+                <div className="foot__brand">AutoDine</div>
+                <p className="foot__note">
+                  Table QR ordering and restaurant operations, built around the service a
+                  restaurant actually runs.
+                </p>
+              </div>
+              <div>
+                <p className="foot__colTitle">Explore</p>
+                <ul className="foot__links">
+                  <li>
+                    <Link href="/#product">Product</Link>
+                  </li>
+                  <li>
+                    <Link href="/pricing">Planned pricing</Link>
+                  </li>
+                  <li>
+                    <Link href="/menu">Menu demo</Link>
+                  </li>
+                </ul>
+              </div>
+              <div>
+                <p className="foot__colTitle">Accounts</p>
+                <ul className="foot__links">
+                  <li>
+                    <Link href="/login">Sign in</Link>
+                  </li>
+                  <li>
+                    <Link href="/signup">Create account</Link>
+                  </li>
+                </ul>
+              </div>
+              <div>
+                <p className="foot__colTitle">Scope</p>
+                <p className="p-small">
+                  Sample restaurant content. No live orders, payment collection or
+                  subscriptions.
+                </p>
+              </div>
+            </div>
+
+            <div className="foot__fine">
+              <span>AutoDine · Product preview</span>
+              <span>Not for live restaurant operations</span>
+            </div>
+          </div>
+        </footer>
+      </main>
+
+      <SiteMotion />
+    </>
   );
 }

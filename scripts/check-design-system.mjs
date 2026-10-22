@@ -27,11 +27,18 @@ const cssFiles = [
 const problems = [];
 
 /* ---------------------------------------------------------------- rule 1 */
-/* The design has no drop shadows. Two exceptions are legitimate and are
-   allowed: `box-shadow: inset 0 -2px 0` is the hairline underline used for
-   active tabs (not a shadow at all), and the token `var(--shadow)` which is
-   set to `none` by the design system. */
-const ALLOWED_SHADOW = /inset|var\(--shadow\)|^\s*none\s*;?$/i;
+/* Elevation is a designed token, not a free-for-all.
+ *
+ * v1 of this system banned drop shadows outright. The premium pass (approved
+ * 2026-10-22) allows depth, but only through the two elevation tokens --
+ * --p-shadow-1 (contact) and --p-shadow-2 (lift) -- so every floating surface
+ * in the product shares the same two shadows and none of them is invented
+ * inline. `inset` remains allowed for hairline underlines, which are not
+ * shadows at all, and the old `var(--shadow)` token is still recognised.
+ *
+ * A literal shadow written by hand is still an error: two hand-tuned shadows in
+ * two files is how a system stops looking like a system. */
+const ALLOWED_SHADOW = /inset|var\(--shadow\)|var\(--p-shadow-[12]\)|^\s*none\s*;?$/i;
 for (const file of cssFiles) {
   const src = readFileSync(file, 'utf8');
   src.split('\n').forEach((line, i) => {
@@ -39,7 +46,7 @@ for (const file of cssFiles) {
     if (!m) return;
     const value = m[1].trim();
     if (!ALLOWED_SHADOW.test(value)) {
-      problems.push(`${rel(file)}:${i + 1} drop shadow "${value}" — the locked design uses none. Use inset for hairline underlines, or var(--shadow).`);
+      problems.push(`${rel(file)}:${i + 1} hand-written shadow "${value}" — use var(--p-shadow-1) or var(--p-shadow-2), or inset for hairline underlines.`);
     }
   });
 }
