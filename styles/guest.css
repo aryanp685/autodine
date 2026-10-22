@@ -246,7 +246,7 @@
   grid-template-columns: minmax(0, 1fr) 116px;
   gap: clamp(18px, 4vw, 38px);
   align-items: start;
-  padding: clamp(22px, 3.4vh, 32px) 0;
+  padding: clamp(18px, 2.8vh, 26px) 0;
   border-bottom: 1px solid var(--p-line);
 }
 
@@ -1350,6 +1350,14 @@
   /* A thumb is the only pointer this screen gets. */
   [data-app] .menu__dishCta { min-height: 44px; }
 
+  /* 88px of thumb, so the control that straddles it has to fit inside that
+     width rather than hang off both sides of it. */
+  [data-app] .menu__dishMedia:not(.is-bare) .menu__dishCta {
+    min-width: 84px;
+    padding: 0 10px;
+    letter-spacing: 0.1em;
+  }
+
   /* A long category rail with 26px gaps scrolls a word and a half into view;
      18px keeps the next label visible enough to read as a rail. */
   [data-app] .menu__cats { gap: 18px; }
@@ -1916,6 +1924,51 @@
 [data-app] .menu__dishMedia .menu__dishActions {
   margin-top: 12px;
   justify-content: center;
+}
+
+/* --------------------------------------------------------- the ADD straddle
+   The one control sits half on the thumb and half off it, the way a delivery
+   app does it -- and for a reason beyond the look: the button no longer owns a
+   row of its own, so a dish costs about 60px of screen instead of 100. That is
+   two more dishes per phone screen on a menu people scroll while standing up.
+
+   It has to be opaque to sit over a photograph, so this is the only place the
+   CTA gets a surface fill and a contact shadow; every other use of
+   .menu__dishCta stays a hairline outline.
+
+   A row with no photograph (.is-bare) has nothing to straddle, so its control
+   stays in the flow, bottom-right, where the eye already is. */
+
+@media (min-width: 421px) {
+  [data-app] .menu__dishMedia:not(.is-bare) .menu__dishActions {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    transform: translate(-50%, 50%);
+    margin-top: 0;
+    width: max-content;
+    z-index: 2;
+  }
+
+  [data-app] .menu__dishMedia:not(.is-bare) .menu__dishCta {
+    min-width: 96px;
+    padding: 0 14px;
+    background: var(--p-surface);
+    box-shadow: var(--p-shadow-1);
+  }
+
+  /* Sold out straddles the same edge, with the same fill: a grey word over a
+     greyscaled photograph is not readable on a phone at arm's length. */
+  [data-app] .menu__dishMedia:not(.is-bare) .menu__dishOut {
+    padding: 7px 13px;
+    border-radius: var(--p-pill);
+    background: var(--p-surface);
+    box-shadow: var(--p-shadow-1);
+  }
+
+  /* The overhanging control needs clearance below it that the row's own
+     padding used to provide. */
+  [data-app] .menu__dish { padding-bottom: clamp(34px, 4.6vh, 46px); }
 }
 
 [data-app] .menu__dishMedia.is-bare {
