@@ -172,6 +172,27 @@ export const DIFFERENCES: Capability[] = [
   },
 ];
 
+/**
+ * A count, as a word.
+ *
+ * Headlines on the marketing pages say "Six things work. Three do not." and
+ * "Five differences, not fifty." Those numbers are claims about lists that
+ * live in this file, so they are derived from the lists rather than typed.
+ * A hand-typed count is a claim that expires the first time somebody adds an
+ * item, and expires silently.
+ */
+const COUNT_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+
+export function numberWord(n: number): string {
+  return COUNT_WORDS[n] ?? String(n);
+}
+
+/** The same word, capitalised, for the start of a sentence. */
+export function NumberWord(n: number): string {
+  const word = numberWord(n);
+  return word[0].toUpperCase() + word.slice(1);
+}
+
 /** Everything the pricing page needs, in the order it should be read. */
 export const CAPABILITIES: Capability[] = [...LIVE, ...DIFFERENCES];
 

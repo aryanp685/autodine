@@ -15,6 +15,7 @@ const COLUMNS = [
     items: [
       { label: 'Overview', href: '/' },
       { label: 'How it works', href: '/#flow' },
+      { label: 'The screens', href: '/#tour' },
       { label: 'What is live', href: '/#status' },
     ],
   },

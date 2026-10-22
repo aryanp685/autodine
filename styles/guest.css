@@ -200,6 +200,44 @@
   padding: 6px var(--p-gutter) 168px;
 }
 
+/* The course name and its count, where the dishes begin. Small, quiet, and
+   the only rule above the list: the rail already states the selection, so
+   this is orientation, not navigation. */
+[data-app] .menu__listHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 0 14px;
+  border-bottom: 1px solid var(--p-line-strong);
+}
+
+[data-app] .menu__listTitle {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--p-ink);
+}
+
+[data-app] .menu__listCount {
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  color: var(--p-ink-46);
+  white-space: nowrap;
+}
+
+/* An empty course is a sentence, not a blank page. A guest who taps "Sweet"
+   at four in the afternoon should be told that nothing is on, not shown
+   nothing. */
+[data-app] .menu__listEmpty {
+  padding: 28px 0;
+  max-width: 46ch;
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  color: var(--p-ink-46);
+}
+
 /* A dish is a row, not a card. The image is a small square at the end of the
    line, and the hairline above it is the only division -- fifteen bordered
    cards in a column read as a shop, not as a menu. */

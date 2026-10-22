@@ -186,6 +186,71 @@ export function SiteMotion() {
             );
           });
 
+          /* --------------------------------------------- the product tour */
+
+          /* Three screens, one frame. Above 900px the panels stack in a
+             sticky box and cross-fade as each step scrolls past; below it,
+             and with reduced motion, every panel simply sits under its own
+             step. The layout switch is a class this layer adds, so a page
+             with no JavaScript never has a panel hidden by a script that did
+             not run.
+
+             gsap.matchMedia owns both the media query and the teardown: it
+             reverts the class and the inline styles when the viewport
+             crosses back under the breakpoint, and again when this layer
+             unmounts. */
+          const matchTour = gsap.matchMedia();
+
+          matchTour.add('(min-width: 901px)', () => {
+            const stage = document.querySelector<HTMLElement>('[data-tour]');
+            if (!stage) return;
+
+            const panels = Array.from(stage.querySelectorAll<HTMLElement>('[data-tour-panel]'));
+            const steps = Array.from(stage.querySelectorAll<HTMLElement>('[data-tour-step]'));
+            if (panels.length < 2 || panels.length !== steps.length) return;
+
+            stage.classList.add('is-live');
+
+            const show = (index: number) => {
+              panels.forEach((panel, i) => {
+                gsap.to(panel, {
+                  opacity: i === index ? 1 : 0,
+                  y: i === index ? 0 : 18,
+                  duration: 0.5,
+                  ease: 'power2.out',
+                  overwrite: 'auto',
+                });
+              });
+              steps.forEach((step, i) => step.classList.toggle('is-on', i === index));
+            };
+
+            gsap.set(panels, { opacity: 0, y: 18 });
+
+            const triggers = steps.map((step, index) =>
+              ScrollTrigger.create({
+                trigger: step,
+                start: 'top 52%',
+                end: 'bottom 48%',
+                onToggle: (self) => {
+                  if (self.isActive) show(index);
+                },
+              }),
+            );
+
+            // Landing mid-section must not leave the frame showing panel one
+            // while the reader is looking at step three.
+            const already = triggers.findIndex((trigger) => trigger.isActive);
+            show(already >= 0 ? already : 0);
+
+            ScrollTrigger.refresh();
+
+            return () => {
+              stage.classList.remove('is-live');
+              steps.forEach((step) => step.classList.remove('is-on'));
+              gsap.set(panels, { clearProps: 'all' });
+            };
+          });
+
           gsap.utils.toArray<HTMLElement>('[data-draw]').forEach((rule) => {
             gsap.fromTo(
               rule,
@@ -200,6 +265,10 @@ export function SiteMotion() {
           });
 
           ScrollTrigger.refresh();
+
+          // Runs when the context is reverted (unmount): the tour's media
+          // query group owns the class and the inline styles it added.
+          return () => matchTour.revert();
         });
 
         // Belt to the braces: see SAFETY_MS. Only on-screen elements, so the

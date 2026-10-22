@@ -10,6 +10,7 @@ import {
   DIFFERENCES,
   LIVE,
   PLANS,
+  NumberWord,
   capabilitiesFor,
 } from '@/lib/plans';
 
@@ -45,7 +46,7 @@ const FAQS = [
   },
   {
     q: 'How will a subscription work when it opens?',
-    a: 'Monthly, per restaurant, with a ten-day trial before the first charge. If a subscription lapses the account becomes read-only: menus, orders and reports stay visible and are never deleted. We will give notice before any of that is switched on.',
+    a: `Monthly, per restaurant, with a ${BILLING.trialDays}-day trial before the first charge. If a subscription lapses the account becomes read-only: menus, orders and reports stay visible and are never deleted. We will give notice before any of that is switched on.`,
   },
   {
     q: 'Do I need any hardware?',
@@ -76,6 +77,7 @@ export function PricingScreen() {
         links={[
           { label: 'Product', href: '/#product' },
           { label: 'How it works', href: '/#flow' },
+          { label: 'The screens', href: '/#tour' },
           { label: 'What is live', href: '/#status' },
           { label: 'Pricing', href: '/pricing', active: true },
         ]}
@@ -188,9 +190,6 @@ export function PricingScreen() {
                   Free while the product is in preview. No card, nothing charged.
                 </p>
               </div>
-              <Link href="/demo/menu" className="p-arrow">
-                See a sample menu <span aria-hidden="true">→</span>
-              </Link>
             </div>
           </div>
         </section>
@@ -204,8 +203,8 @@ export function PricingScreen() {
                 <h2 className="p-h2 p-head__title">Built, and switched on.</h2>
               </div>
               <p className="p-lede p-head__aside">
-                Not a roadmap. These six are running in this build, on every account, whatever
-                the plans end up costing.
+                Not a roadmap. Every one of these is running in this build, on every account,
+                whatever the plans end up costing.
               </p>
             </div>
 
@@ -244,7 +243,9 @@ export function PricingScreen() {
             <div className="p-head" data-reveal>
               <div>
                 <div className="p-eyebrow">03 · What the tiers change</div>
-                <h2 className="p-h2 p-head__title">Five differences, not fifty.</h2>
+                <h2 className="p-h2 p-head__title">
+                  {`${NumberWord(DIFFERENCES.length)} differences, not fifty.`}
+                </h2>
               </div>
               <p className="p-lede p-head__aside">
                 What each step up will add when billing opens. Nothing here exists yet, which is
@@ -346,7 +347,7 @@ export function PricingScreen() {
           title="Start with the product, decide later."
           body="An account is free today and gives you the entire product. When plans open, you will hear about it before anything is charged."
           primary={{ label: 'Create an account', href: '/signup' }}
-          secondary={{ label: 'See the sample menu', href: '/demo/menu' }}
+          secondary={{ label: 'See what is live', href: '/#status' }}
         />
 
         <SiteFooter
