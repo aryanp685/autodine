@@ -192,6 +192,47 @@ describe('OrderPlacedScreen', () => {
     expect(html).toContain('Save changes');
   });
 
+  it('draws the kitchen progress from the state the board writes', () => {
+    // Four real states, in the order a ticket moves. The screen used to say
+    // "Being cooked" in a sentence and nothing else, so a guest had no way to
+    // tell whether it was still waiting or already on the pass.
+    const html = renderToStaticMarkup(<OrderPlacedScreen data={order({ prepStatus: 'preparing' })} />);
+
+    expect(html).toContain('placed__track');
+    expect(html).toContain('Being cooked');
+    expect(html).toContain('Ready to serve');
+    // 'new' is behind it, 'served' ahead of it.
+    expect(html).toMatch(/placed__step is-done[^>]*>.*?Sent to the kitchen/s);
+    expect(html).toMatch(/placed__step is-now[^>]*>.*?Being cooked/s);
+    expect(html).toMatch(/placed__step is-todo[^>]*>.*?Served/s);
+  });
+
+  it('marks nothing on a state it does not recognise', () => {
+    const html = renderToStaticMarkup(<OrderPlacedScreen data={order({ prepStatus: 'mystery' })} />);
+    expect(html).not.toContain('placed__track');
+  });
+
+  it('puts no four-step track on a cancelled order', () => {
+    // There is nothing left to move through; four unreached steps would read
+    // as an order about to start.
+    const html = renderToStaticMarkup(<OrderPlacedScreen data={order({ prepStatus: 'cancelled' })} />);
+
+    expect(html).not.toContain('placed__track');
+    expect(html).toContain('Nothing is being cooked');
+  });
+
+  it('says the status updates itself only while it actually polls', () => {
+    // The poller is mounted when the guest can no longer edit. On an editable
+    // order it is absent, because a refresh would land on unsaved quantities.
+    const locked = renderToStaticMarkup(<OrderPlacedScreen data={order({ canGuestChange: false })} />);
+    expect(locked).toContain('Status updates on its own');
+
+    const editable = renderToStaticMarkup(
+      <OrderPlacedScreen data={order({ canGuestChange: true })} token="t-1" />
+    );
+    expect(editable).not.toContain('Status updates on its own');
+  });
+
   it('does not draw the controls on a link that carries no token', () => {
     // Without the token the server returns no order at all, but a hand-typed
     // code plus a stale page must never look like it can cancel something.

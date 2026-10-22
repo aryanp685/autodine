@@ -54,10 +54,14 @@ export function TableGateScreen({
 }) {
   const copy = COPY[reason];
 
+  // Where this screen sits in the three steps. A guest who never scanned is on
+  // step one; one whose session ended still has their card, so the next thing
+  // they do is enter the code (or scan again, which the copy also says).
   return (
     <GuestNote
       eyebrow="Table access"
       title={copy.title}
+      steps={reason === 'none' ? 'scan' : 'code'}
       foot={
         <>
           Behind the counter? Your own menu lives in the{' '}

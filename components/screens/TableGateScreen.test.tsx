@@ -78,4 +78,16 @@ describe('TableGateScreen', () => {
       expect(html).toContain('AutoDine');
     }
   });
+
+  it('says which of the three steps this screen is', () => {
+    // A guest arriving from a forwarded link has no idea whether they are at
+    // the start of the flow or two steps into it.
+    const never = renderToStaticMarkup(<TableGateScreen reason="none" />);
+    expect(never).toContain('gnote__steps');
+    expect(never).toMatch(/gnote__step is-now[^>]*>.*?Scan/s);
+
+    const stale = renderToStaticMarkup(<TableGateScreen reason="stale" />);
+    expect(stale).toMatch(/gnote__step is-now[^>]*>.*?Code/s);
+    expect(stale).toMatch(/gnote__step is-done[^>]*>.*?Scan/s);
+  });
 });
