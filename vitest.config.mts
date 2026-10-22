@@ -11,6 +11,11 @@ export default defineConfig({
     include: ['lib/**/*.test.ts', 'components/**/*.test.tsx'],
   },
   resolve: {
-    alias: { '@': fileURLToPath(new URL('./', import.meta.url)) },
+    alias: {
+      '@': fileURLToPath(new URL('./', import.meta.url)),
+      // Next aliases this marker itself at build time; Vitest has to be told.
+      // See the stub for why this beats mocking the server action per test.
+      'server-only': fileURLToPath(new URL('./test-vitest-stubs/server-only.ts', import.meta.url)),
+    },
   },
 });

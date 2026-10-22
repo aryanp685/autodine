@@ -1,28 +1,13 @@
 import { rupeesToPaise } from '@/lib/money';
-import { OutletSwitcher } from '@/components/OutletSwitcher';
 import type { OutletBar } from '@/lib/outlets';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { dashboardStats, recentOrders, restaurant, sparkline, topItems } from '@/lib/demo-data';
-import { Avatar, Money, PaymentPill, PrepPill, Sparkline } from '@/components/ui';
-import { signOutAction } from '@/app/auth/actions';
+import { Money, PaymentPill, PrepPill, Sparkline } from '@/components/ui';
 import { SignInPrompt } from '@/components/SignInPrompt';
+import { DashboardBar } from '@/components/DashboardBar';
 import type { DashboardScreenData } from '@/lib/db/dashboard-screen';
 import { clockTimeInZone } from '@/lib/db/time';
-
-/**
- * Only destinations that actually exist are listed. "Orders" and "Reports"
- * used to be rendered as bare text here and on the other two screens, which
- * read as working navigation and did nothing when clicked.
- */
-const NAV_LINKS: Record<string, string> = {
-  Overview: '/dashboard',
-  Menus: '/dashboard/menus',
-  'Tables & QR': '/dashboard/tables',
-  Orders: '/dashboard/orders',
-  Reports: '/dashboard/reports',
-};
-const NAV_A = Object.keys(NAV_LINKS);
 
 /**
  * 'refunded' reads as paid here for the same reason it does on the kitchen
@@ -41,13 +26,6 @@ function paymentState(status: string): 'paid' | 'pending' | 'failed' {
 function prepState(status: string): 'new' | 'preparing' | 'ready' | 'served' {
   if (status === 'preparing' || status === 'ready' || status === 'served') return status;
   return 'new';
-}
-
-/** Up to two initials from the venue name. '—' rather than a made-up pair. */
-function initialsOf(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
-  if (parts.length === 0) return '—';
-  return parts.map((part) => part[0]?.toUpperCase() ?? '').join('');
 }
 
 /* ============================================================================
@@ -117,61 +95,25 @@ export function Dashboard({
   const chartHasValue = live && data ? data.hourlyPaise.some((v) => v > 0) : true;
 
   return (
-    <div className="dash">
-      <aside className="dash__rail">
-        <Link href="/" className="dash__brand">
-          AutoDine
-        </Link>
-        <div className="dash__venue">
-          <div className="dash__venueName">{venueName}</div>
-          <div className="dash__venueMeta">{venueMeta}</div>
-        </div>
-        <nav className="dash__nav">
-          {NAV_A.map((n) => {
-            const href = NAV_LINKS[n];
-            return (
-              <div key={n} className={`dash__navItem ${n === 'Overview' ? 'is-active' : ''}`}>
-                {href ? <Link href={href}>{n}</Link> : n}
-              </div>
-            );
-          })}
-        </nav>
-        <div className="dash__railFoot">
-          <div className="dash__trialLine">
-            {live ? 'Live workspace · your data' : 'Demo workspace · sample data'}
-          </div>
-        </div>
-      </aside>
+    <div className="pg pg--dash app">
+      <DashboardBar active="overview" outlet={outlet} signOut={!blocked} />
 
       <main className="dash__main">
         <header className="dash__head">
           <div>
             <div className="dash__kicker">
-              {live ? 'Live dashboard · today' : 'Sample dashboard · fictional restaurant data'}
+              {live ? 'Overview · today, restaurant time' : 'Sample dashboard · fictional data'}
             </div>
-            <h1 className="dash__h1">Restaurant overview</h1>
+            <h1 className="dash__h1">{venueName || 'Restaurant overview'}</h1>
+            {venueMeta && <p className="dash__venueMeta">{venueMeta}</p>}
           </div>
           <div className="dash__headRight">
-            {/* In the header, not the rail: the rail's venue block is hidden on
-                phones, and switching outlets is exactly what an owner walking
-                between two branches reaches for. */}
-            {outlet && outlet.outlets.length > 0 && (
-              <OutletSwitcher outlets={outlet.outlets} activeId={outlet.activeId} next="/dashboard" />
-            )}
-            <Link href="/dashboard/menus" className="dash__ghostBtn">
-              Menu preview
+            <Link href="/cashier" className="dash__ghostBtn">
+              Open the counter
             </Link>
             <Link href="/kitchen" className="dash__solidBtn">
-              Kitchen preview
+              Open the kitchen board
             </Link>
-            {!blocked && (
-              <form action={signOutAction}>
-                <button type="submit" className="dash__ghostBtn">
-                  Sign out
-                </button>
-              </form>
-            )}
-            <Avatar initials={live ? initialsOf(venueName) : 'AP'} />
           </div>
         </header>
 
@@ -185,7 +127,7 @@ export function Dashboard({
               Metrics and orders are fictional. Live ordering and payment processing are disabled.
             </span>
             <Link href="/menu" className="dash__trialLink">
-              Open menu demo
+              Open the menu
             </Link>
           </div>
         )}
@@ -217,7 +159,7 @@ export function Dashboard({
                 />
               </div>
             ) : (
-              <div className="kb__empty">
+              <div className="dash__empty">
                 {chartable
                   ? 'No settled payments yet today. The chart fills in as orders are paid for.'
                   : 'Today has only just started. The chart needs an hour of trading before it can show a shape.'}
@@ -241,7 +183,7 @@ export function Dashboard({
                 ))}
               </ul>
             ) : (
-              <div className="kb__empty">
+              <div className="dash__empty">
                 Nothing sold yet today. Items rank here once the first order of the day is placed.
               </div>
             )}
@@ -290,7 +232,7 @@ export function Dashboard({
                 </tbody>
               </table>
             ) : (
-              <div className="kb__empty">
+              <div className="dash__empty">
                 No orders yet today. Orders placed from the customer menu appear here as soon as
                 they are sent to the kitchen.
               </div>

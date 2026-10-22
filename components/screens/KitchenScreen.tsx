@@ -2,6 +2,7 @@
 
 import { rupeesToPaise } from '@/lib/money';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { kitchenOrders, restaurant, type KitchenOrder } from '@/lib/demo-data';
 import { Money, VegMark } from '@/components/ui';
@@ -936,6 +937,13 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
           <h1 className="kb__h1">{live ? data?.restaurantName : restaurant.name}</h1>
         </div>
         <div className="kb__controls">
+          {/* A wall board is a full screen with no navigation, which is right
+              for a cook and wrong for everyone else: until now the only way
+              off this screen was the browser's back button. */}
+          <Link href="/dashboard" className="kb__ghost">
+            Dashboard
+          </Link>
+
           <div className={`kb__audio ${audio ? 'is-on' : 'is-off'}`}>
             <span className="kb__audioDot" />
             Kitchen audio {audio ? 'on' : 'off'}
@@ -1158,12 +1166,12 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
         <div className="kb__warn kb__warn--quiet" role="status">
           <strong>
             {data.cannotAdvance === 'plan'
-              ? 'Read-only: this restaurant’s plan is not active.'
+              ? 'Read-only: the server is refusing writes for this restaurant.'
               : 'You can watch this board, but not move tickets.'}
           </strong>
           <span>
             {data.cannotAdvance === 'plan'
-              ? 'Orders, menus and reports stay available. New customer orders and ticket updates are blocked on the server until a plan is active.'
+              ? 'Its plan or trial period is not currently active. Menus, orders and reports stay readable, and tickets start moving again the moment access is restored — nothing has been deleted.'
               : `A ${data.role ?? 'member'} can see the kitchen board; moving a ticket needs an owner, a manager or kitchen staff. Ask one of them to take a screen.`}
           </span>
         </div>
