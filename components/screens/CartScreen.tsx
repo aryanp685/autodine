@@ -74,6 +74,17 @@ export function Cart({
 
   const dropped = priced.missingIds.length + priced.unavailableIds.length;
 
+  /* The restaurant, and how much is in the order -- but only once the browser
+     has been read. Before that the count is a zero we do not believe, and a
+     header reading "Maddi · 0 items" over a cart that is about to appear is
+     the same lie as an empty-cart screen. */
+  const headerMeta = [
+    restaurantName ?? 'Your table',
+    cart.ready && cart.count > 0 ? `${cart.count} ${cart.count === 1 ? 'item' : 'items'}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
     <div className="cart">
       <header className="cart__head">
@@ -81,7 +92,7 @@ export function Cart({
           ← Back to menu
         </Link>
         <h1>Your order</h1>
-        <p>{restaurantName ?? 'Your table'}</p>
+        <p>{headerMeta}</p>
       </header>
 
       <div className="cart__grid">
