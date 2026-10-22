@@ -2262,6 +2262,108 @@
   [data-app] .pg__settingsAside { position: sticky; top: 84px; }
 }
 
+/* What a card carries. This used to be an aside sitting beside the print
+   sheet, which meant it shared a row with a preview of the sheet and read as
+   a caption for it. It is the explanation of what a guest will experience, so
+   it is its own section after the floor plan, at reading measure. */
+[data-app] .pg__tableNotes {
+  margin-top: 56px;
+  padding-top: 32px;
+  border-top: 1px solid var(--p-line);
+  max-width: 72ch;
+}
+
+[data-app] .pg__tableNotes > .pg__p { margin-top: 10px; }
+
+[data-app] .pg__tableNotes > .pg__note { margin-top: 20px; }
+
+/* --------------------------------------------------------------- the ledger
+   Seven columns of numbers are the right shape on a counter screen and the
+   wrong shape on a phone, where they became a sideways scroll with the total
+   off the edge. Below 760px each bill is a card instead: reference and time,
+   then table and state, then the two numbers that decide what happens next.
+   Exactly one of the table and the card list is displayed, so a screen reader
+   meets each bill once. */
+
+[data-app] .rep__cards { display: none; }
+
+[data-app] .rep__card {
+  display: grid;
+  gap: 10px;
+  padding: 16px 0;
+  border-top: 1px solid var(--p-line);
+}
+
+[data-app] .rep__cardTop,
+[data-app] .rep__cardMid,
+[data-app] .rep__cardFoot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+[data-app] .rep__cardRef {
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-ink);
+}
+
+[data-app] .rep__cardRef a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--p-line-strong);
+}
+
+[data-app] .rep__cardTime,
+[data-app] .rep__cardTable {
+  font-size: 0.8125rem;
+  color: var(--p-ink-46);
+}
+
+[data-app] .rep__cardMid { align-items: center; justify-content: flex-start; gap: 8px; }
+
+[data-app] .rep__cardMid .rep__cardTable { flex: 1 1 auto; }
+
+[data-app] .rep__cardTotal {
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-ink);
+}
+
+[data-app] .rep__cardDue {
+  font-size: 0.8125rem;
+  color: var(--p-ink-46);
+  display: inline-flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+[data-app] .rep__card.is-void .rep__cardRef,
+[data-app] .rep__card.is-void .rep__cardTotal { color: var(--p-ink-46); }
+
+@media (max-width: 760px) {
+  [data-app] .rep__cards { display: block; }
+  [data-app] .rep__block--wide .ui-table { display: none; }
+}
+
+/* Stands where four buttons used to stand on a card with no database behind
+   it. Muted, no border, no pointer: nothing here can be mistaken for a
+   control. */
+[data-app] .pg__tableNote {
+  margin-top: 16px;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--p-ink-46);
+}
+
+@media (max-width: 640px) {
+  [data-app] .pg__tableNotes { margin-top: 40px; padding-top: 24px; }
+}
+
 /* The print sheet lives in the DOM so window.print() has something to print;
    on screen it would be a second, identical menu card under a page that
    already shows the QR, so it is hidden here and revealed by @media print. */
@@ -2274,6 +2376,7 @@
 /* Settings prints one card. This is the only block in app.css that changes
    what a sheet of paper looks like, so it stays next to the rule above. */
 @media print {
+  [data-app] .pg__tableNotes { display: none !important; }
   [data-app] .pg__printRow--sheetOnly { display: block !important; margin: 0; padding: 0; }
   [data-app] .pg__printSheet { padding: 0; }
   [data-app] .pg__printCard {

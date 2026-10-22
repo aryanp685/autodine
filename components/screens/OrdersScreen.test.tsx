@@ -1,0 +1,161 @@
+import { describe, expect, it, vi } from 'vitest';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { OrdersScreen } from './OrdersScreen';
+import {
+  demoReport,
+  emptyPayload,
+  resolveRange,
+  zeroFillBuckets,
+  type ReportsScreenData,
+  type ReportOrderRow,
+} from '@/lib/db/reports';
+
+// The server action behind the bar pulls in the Supabase admin client, and the
+// outlet switcher needs a router. Neither is what this screen is about.
+vi.mock('@/app/auth/actions', () => ({ signOutAction: async () => undefined }));
+
+/**
+ * The order ledger.
+ *
+ * Two claims matter and both have been wrong in this product before: that the
+ * rows on screen are the rows the money came from, and that a control which
+ * looks like a link out actually leaves the page. The export is a route
+ * handler answering with a file, so it has to be an anchor with `download` --
+ * a <Link> would try to fetch a page that does not exist and then reload.
+ */
+
+const TZ = 'Asia/Kolkata';
+const NOW = new Date('2026-10-21T12:30:00Z');
+
+function order(over: Partial<ReportOrderRow> = {}): ReportOrderRow {
+  return {
+    id: 'o1',
+    code: 'MA-1042',
+    placedAt: '2026-10-21T10:00:00Z',
+    tableLabel: 'T4',
+    prepStatus: 'preparing',
+    paymentStatus: 'pending',
+    subtotalPaise: 80_000,
+    discountPaise: 0,
+    taxPaise: 4_000,
+    totalPaise: 84_000,
+    paidPaise: 0,
+    refundedPaise: 0,
+    ...over,
+  };
+}
+
+function live(over: Partial<ReportsScreenData['report']> = {}): ReportsScreenData {
+  const range = resolveRange('today', TZ, NOW);
+  return {
+    restaurantName: 'maddi',
+    tagline: null,
+    timezone: TZ,
+    range,
+    report: { ...emptyPayload(), buckets: zeroFillBuckets(range, [], TZ, NOW), orders: [order()], ...over },
+    ordersTruncated: false,
+  };
+}
+
+describe('OrdersScreen', () => {
+  it('says out loud that the rows are sample data when there is no database', () => {
+    const html = renderToStaticMarkup(<OrdersScreen data={null} />);
+
+    expect(html).toContain('Sample ledger');
+    expect(html).toContain('fictional sample data');
+    // The demo rows are real-looking bills; they must not be dressed as live.
+    expect(html).not.toContain('/bill/');
+  });
+
+  it('downloads the CSV instead of navigating away from the ledger', () => {
+    const html = renderToStaticMarkup(<OrdersScreen data={live()} />);
+
+    expect(html).toContain('/dashboard/reports/export?type=orders&amp;range=today');
+    const exportTag = [...html.matchAll(/<a\b[^>]*>/g)]
+      .map((match) => match[0])
+      .find((tag) => tag.includes('/dashboard/reports/export'));
+    expect(exportTag).toBeDefined();
+    expect(exportTag).toContain('download');
+  });
+
+  it('keeps the range and the search when a filter is picked', () => {
+    const html = renderToStaticMarkup(<OrdersScreen data={live()} filter="open" query="T4" />);
+
+    // Filter chips carry the current range and query forward, so filtering
+    // does not silently widen the window the person is looking at.
+    expect(html).toContain('href="/dashboard/orders?status=settled&amp;q=T4"');
+    expect(html).toContain('href="/dashboard/orders?range=7d&amp;status=open&amp;q=T4"');
+  });
+
+  it('marks the chosen filter as current, not only as a colour', () => {
+    const html = renderToStaticMarkup(<OrdersScreen data={live()} filter="cancelled" />);
+
+    expect(html).toContain('aria-current="true"');
+  });
+
+  it('counts what the header promises over the rows actually listed', () => {
+    const html = renderToStaticMarkup(
+      <OrdersScreen
+        data={live({
+          orders: [
+            order({ id: 'a', prepStatus: 'new' }),
+            order({ id: 'b', prepStatus: 'cancelled' }),
+            order({ id: 'c', prepStatus: 'served', paymentStatus: 'paid', paidPaise: 84_000 }),
+          ],
+        })}
+      />,
+    );
+
+    // One open, one unsettled (the open one), and the cancelled bill is not
+    // counted as money owed.
+    expect(html).toContain('1 open · 1 not settled');
+    expect(html).toContain('3 orders');
+  });
+
+  it('sends a signed-out visitor to sign in rather than showing a ledger', () => {
+    const html = renderToStaticMarkup(<OrdersScreen data={{ ...live(), blocked: 'signed-out' }} />);
+
+    expect(html).not.toContain('Order CSV');
+    expect(html).not.toContain('MA-1042');
+  });
+
+  it('links every live bill somewhere it can be settled', () => {
+    const html = renderToStaticMarkup(<OrdersScreen data={live()} />);
+
+    expect(html).toContain('href="/bill/o1"');
+    expect(html).toContain('href="/cashier"');
+  });
+
+  it('explains an empty range instead of showing a blank table', () => {
+    const html = renderToStaticMarkup(<OrdersScreen data={live({ orders: [] })} />);
+
+    expect(html).toContain('No orders in this range.');
+  });
+
+  it('has no control that cannot be used', () => {
+    const html = renderToStaticMarkup(<OrdersScreen data={null} />);
+
+    // Demo mode used to render buttons that did nothing. Nothing here may pose.
+    expect(html).not.toContain('pg__miniBtn');
+    for (const match of html.matchAll(/<button\b[^>]*>/g)) {
+      expect(match[0]).toMatch(/type="submit"|type="button"|disabled/);
+    }
+  });
+
+  it('gives a phone the same bill as a card, not a sideways scroll', () => {
+    const html = renderToStaticMarkup(<OrdersScreen data={live()} />);
+
+    expect(html).toContain('rep__cards');
+    expect(html).toContain('rep__cardRef');
+    // The table stays for the counter screen; both are in the DOM and exactly
+    // one of them is displayed at any width.
+    expect(html).toContain('ui-table');
+  });
+
+  it('renders the sample report the demo range asks for', () => {
+    // Guards the fallback: the demo rows come from demoReport(), and an empty
+    // ledger on the marketing preview would read as a broken product.
+    const sample = demoReport(resolveRange('7d', TZ, NOW), TZ);
+    expect(sample.orders.length).toBeGreaterThan(0);
+  });
+});

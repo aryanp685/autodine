@@ -154,8 +154,9 @@ export function TablesScreen({
 
         {!live && (
           <div className="pg__note pg__note--warn">
-            <strong>Sample floor plan.</strong> The database is not connected, so these twelve tables are
-            fictional and the buttons below do nothing. Connect Supabase to manage the real floor.
+            <strong>Sample floor plan.</strong> The database is not connected, so these {tables.length}{' '}
+            tables are fictional and cannot be managed. Connect Supabase to print and control the real
+            floor.
           </div>
         )}
 
@@ -222,18 +223,54 @@ export function TablesScreen({
                   </button>
                 </form>
               ) : (
-                <div className="pg__tableBtns">
-                  <span className="pg__miniBtn">Preview</span>
-                  <span className="pg__miniBtn">Regenerate</span>
-                  <span className="pg__miniBtn">{t.qr === 'disabled' ? 'Enable' : 'Disable'}</span>
-                  <span className="pg__miniBtn pg__miniBtn--danger">Revoke</span>
-                </div>
+                /* No database, no controls. These four used to render as
+                   <span>s styled exactly like the buttons above -- Preview,
+                   Regenerate, Enable and Revoke, all of which did nothing when
+                   tapped. A note below the floor plan already says the codes
+                   are sample data; four dead buttons under every card taught
+                   the opposite. */
+                <p className="pg__tableNote">Sample card — connect the database to manage codes.</p>
               )}
             </article>
           ))}
         </section>
 
-        <section className="pg__printRow">
+        <section className="pg__tableNotes">
+          <h2 className="pg__h2">What a card carries</h2>
+          <p className="pg__p">
+            These are real QR codes. Each encodes a URL containing 256 bits of randomness, bound to one table.
+            There is no restaurant name in it to guess at and no expiry on the card itself.
+          </p>
+          <ul className="pg__bullets">
+            <li>Every table is given a code when it is created — a table cannot exist without one.</li>
+            <li>
+              A card alone is not enough: the guest also types the six-digit code showing inside the
+              restaurant, which changes every {minutes}.
+            </li>
+            <li>A verified scan creates a session that expires in under an hour; the card keeps working.</li>
+            <li>An expired or revoked code shows a clear message with a recovery path, never a silent bypass.</li>
+            <li>
+              Regenerating a table code invalidates the previous one immediately, and ends any session created
+              from it.
+            </li>
+            <li>Ordering can be disabled per table without touching the menu.</li>
+            <li>
+              &ldquo;Print QR sheet&rdquo; prints one A4 page holding six cards — three across, two down. Print
+              it twice for twelve tables.
+            </li>
+            <li>No signing keys or admin tokens appear in the QR URL.</li>
+            <li>
+              The card does not carry the on-site code: that changes every {minutes}, so printing it would put
+              a dead code on every table. Show the code panel above on a screen, or print that panel separately.
+            </li>
+          </ul>
+          <div className="pg__note pg__note--warn">
+            Print a fresh sheet after regenerating. The old cards look identical and will simply stop working,
+            which is the intended behaviour but is not obvious to a guest holding one.
+          </div>
+        </section>
+
+        <section className="pg__printRow pg__printRow--sheetOnly">
           <div className="pg__printSheet">
             <div className="pg__printHead">Print sheet — 6 per A4 page</div>
             <div className="pg__printGrid">
@@ -248,37 +285,6 @@ export function TablesScreen({
             </div>
           </div>
 
-          <aside className="pg__printAside">
-            <h3 className="pg__h3">What a card carries</h3>
-            <p className="pg__p">
-              These are real QR codes. Each encodes a URL containing 256 bits of randomness, bound to one table.
-              There is no restaurant name in it to guess at and no expiry on the card itself.
-            </p>
-            <ul className="pg__bullets">
-              <li>Every table is given a code when it is created — a table cannot exist without one.</li>
-              <li>
-                A card alone is not enough: the guest also types the six-digit code showing inside the
-                restaurant, which changes every {minutes}.
-              </li>
-              <li>A verified scan creates a session that expires in under an hour; the card keeps working.</li>
-              <li>An expired or revoked code shows a clear message with a recovery path, never a silent bypass.</li>
-              <li>
-                Regenerating a table code invalidates the previous one immediately, and ends any session created
-                from it.
-              </li>
-              <li>Ordering can be disabled per table without touching the menu.</li>
-              <li>No signing keys or admin tokens appear in the QR URL.</li>
-              <li>
-                The card does not carry the on-site code: that changes every {minutes}, so printing it would put
-                a dead code on every table. Show the code panel above on a screen, or print that panel
-                separately.
-              </li>
-            </ul>
-            <div className="pg__note pg__note--warn">
-              Print a fresh sheet after regenerating. The old cards look identical and will simply stop working,
-              which is the intended behaviour but is not obvious to a guest holding one.
-            </div>
-          </aside>
         </section>
       </div>
     </div>

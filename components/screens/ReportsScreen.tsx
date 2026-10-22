@@ -111,6 +111,18 @@ export function ReportsScreen({
 
   const totals = report.totals;
   const hasBills = totals.bills > 0;
+
+  // Says what the list below actually is. The rows are capped, so a count that
+  // does not match the totals has to be admitted rather than implied.
+  const billWord = totals.bills === 1 ? 'bill' : 'bills';
+  const ledgerNote =
+    report.orders.length === 0
+      ? hasBills
+        ? `The ${totals.bills} ${billWord} behind these totals are not listed here — the totals above cover all of them`
+        : 'Newest first'
+      : report.orders.length < totals.bills
+        ? `Showing the latest ${report.orders.length} of ${totals.bills} bills — the totals above cover all of them`
+        : 'Newest first';
   const peak = Math.max(0, ...report.buckets.map((b) => b.revenuePaise));
   const itemPeak = Math.max(0, ...report.topItems.map((i) => i.revenuePaise));
   const categoryPeak = Math.max(0, ...report.categories.map((c) => c.revenuePaise));
@@ -138,15 +150,20 @@ export function ReportsScreen({
           </div>
           {live && !blocked && (
             <div className="pg__headActions">
-              <Link className="pg__btn" href={exportHref('summary', range, timezone)}>
+              {/* Plain anchors, not <Link>: these URLs are route handlers that
+                  answer with an attachment, so a client-side navigation would
+                  fetch an RSC payload the route cannot produce and then fall
+                  back to a full page load anyway. `download` names the file and
+                  keeps the report on screen. */}
+              <a className="pg__btn" href={exportHref('summary', range, timezone)} download>
                 Summary CSV
-              </Link>
-              <Link className="pg__btn" href={exportHref('items', range, timezone)}>
+              </a>
+              <a className="pg__btn" href={exportHref('items', range, timezone)} download>
                 Item CSV
-              </Link>
-              <Link className="pg__btn pg__btn--solid" href={exportHref('orders', range, timezone)}>
+              </a>
+              <a className="pg__btn pg__btn--solid" href={exportHref('orders', range, timezone)} download>
                 Order CSV
-              </Link>
+              </a>
             </div>
           )}
         </header>
@@ -158,6 +175,7 @@ export function ReportsScreen({
                 key={tab.key}
                 href={rangeHref(tab.key)}
                 className={`rep__range ${range.key === tab.key ? 'is-active' : ''}`}
+                aria-current={range.key === tab.key ? 'true' : undefined}
               >
                 {tab.label}
               </Link>
@@ -356,9 +374,12 @@ export function ReportsScreen({
             <div className="rep__blockHead">
               <h2>Order ledger</h2>
               <span className="rep__blockMeta">
-                {data && data.ordersTruncated
-                  ? `Showing the latest ${report.orders.length} of ${totals.bills} bills — the totals above cover all of them`
-                  : 'Newest first'}
+                {/* The list is capped, so it is only "the bills" when it is
+                    all of them. Derived from the rows themselves: the demo
+                    report has six sample bills against sixty in its totals,
+                    and the old flag was null there, so the sample screen
+                    claimed a complete list it did not have. */}
+                {ledgerNote}
               </span>
             </div>
             {report.orders.length > 0 ? (
