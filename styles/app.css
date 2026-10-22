@@ -1110,3 +1110,447 @@
   [data-app] .kb__head { flex-direction: column; align-items: stretch; }
   [data-app] .kb__ordId { font-size: 1.35rem; }
 }
+
+/* =========================================================================
+   Counter
+   =========================================================================
+
+   The cashier stands at a till with a guest in front of them and money in
+   hand. Two panels: what is owed (left, a queue), and the one ticket being
+   settled (right, the receipt before it exists).
+
+   - The queue is a list of BUTTONS. It used to be a list of rows with the
+     first one implicitly selected, so a cashier could only ever settle the
+     oldest ticket, whichever guest was actually standing there.
+   - The amount is the largest thing on the screen for the same reason the
+     table number is the largest thing on a kitchen ticket: it is the fact
+     that gets said out loud.
+   - Nothing here is red unless something is wrong. "Payment due" is the
+     normal state of a counter, so it is grey, not alarming.
+   ========================================================================= */
+
+[data-app] .cash {
+  width: min(100%, 1240px);
+  margin: 0 auto;
+  padding: clamp(24px, 4vh, 44px) var(--p-gutter) 96px;
+}
+
+[data-app] .cash__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px 28px;
+  padding: 0 0 clamp(16px, 2.4vh, 22px);
+  border-bottom: 1px solid var(--p-line-strong);
+}
+
+[data-app] .cash__kicker {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .cash__kicker a { color: var(--p-ink); }
+
+[data-app] .cash__h1 {
+  margin-top: 12px;
+  font-size: clamp(1.8rem, 3.4vw, 2.6rem);
+  font-weight: 500;
+  letter-spacing: -0.042em;
+  line-height: 1;
+  color: var(--p-ink);
+}
+
+[data-app] .cash__headMeta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 18px;
+  font-size: 0.8125rem;
+  color: var(--p-ink-46);
+}
+
+[data-app] .cash__outstanding {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-ink);
+}
+
+[data-app] .cash__outstanding em {
+  font-style: normal;
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .cash__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
+  gap: clamp(24px, 3.4vw, 64px);
+  margin-top: clamp(24px, 3.4vh, 38px);
+  align-items: start;
+}
+
+[data-app] .cash__col { min-width: 0; }
+
+[data-app] .cash__h2 {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--p-line-strong);
+}
+
+[data-app] .cash__queue {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: calc(100svh - 280px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+[data-app] .cash__qItem { border-bottom: 1px solid var(--p-line); }
+
+/* The whole row is the target. A 380px row with a 24px hit area in it is a
+   row that gets missed on a busy night. */
+[data-app] .cash__qBtn {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  padding: 16px 14px 16px 16px;
+  border: 0;
+  border-left: 2px solid transparent;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--p-d1) linear, border-color var(--p-d1) linear;
+}
+
+[data-app] .cash__qBtn:hover { background: color-mix(in srgb, var(--p-paper-deep) 65%, transparent); }
+
+[data-app] .cash__qItem.is-active .cash__qBtn {
+  border-left-color: var(--p-ink);
+  background: var(--p-surface);
+}
+
+[data-app] .cash__qTop {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+[data-app] .cash__qTop strong {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-ink);
+}
+
+[data-app] .cash__qTable {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .cash__qTime {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-ink-46);
+}
+
+[data-app] .cash__qItems {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--p-ink-64);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+[data-app] .cash__qFoot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+[data-app] .cash__qState {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .cash__qSel {
+  padding: 3px 8px;
+  border-radius: var(--p-pill);
+  background: var(--p-ink);
+  color: var(--p-on-ink);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+[data-app] .cash__qFoot strong {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-ink);
+}
+
+[data-app] .cash__detail {
+  padding: clamp(22px, 3vw, 34px);
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-r);
+  background: var(--p-surface);
+  box-shadow: var(--p-shadow-1);
+  align-self: start;
+  min-width: 0;
+}
+
+@media (min-width: 1101px) {
+  /* The ticket stays in view while the queue scrolls behind it: the cashier
+     reads one, presses one, and never loses the amount. */
+  [data-app] .cash__detail { position: sticky; top: 82px; }
+}
+
+[data-app] .cash__detailHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--p-line-strong);
+}
+
+[data-app] .cash__amount {
+  margin-top: 12px;
+  font-size: clamp(2.2rem, 4.4vw, 3.2rem);
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-ink);
+}
+
+[data-app] .cash__due {
+  flex: 0 0 auto;
+  padding: 5px 10px;
+  border-radius: var(--p-pill);
+  background: var(--p-paper-deep);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--p-ink-64);
+  white-space: nowrap;
+}
+
+[data-app] .cash__lines {
+  display: grid;
+  gap: 0;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+[data-app] .cash__lines li {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--p-line);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--p-ink-80);
+}
+
+[data-app] .cash__lines em { font-style: normal; color: var(--p-ink-46); }
+
+[data-app] .cash__totalRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--p-line-strong);
+  font-size: 0.8125rem;
+  color: var(--p-ink-46);
+}
+
+[data-app] .cash__totalRow strong {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-ink);
+}
+
+[data-app] .cash__methods {
+  display: flex;
+  gap: 4px;
+  margin-top: 24px;
+  padding: 4px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-pill);
+}
+
+[data-app] .cash__method {
+  flex: 1;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--p-pill);
+  background: none;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--p-ink-46);
+  cursor: pointer;
+  transition: background-color var(--p-d1) linear, color var(--p-d1) linear;
+}
+
+[data-app] .cash__method:hover { color: var(--p-ink); }
+
+[data-app] .cash__method.is-on {
+  background: var(--p-ink);
+  color: var(--p-on-ink);
+  font-weight: 600;
+}
+
+[data-app] .cash__cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 52px;
+  margin-top: 22px;
+  padding: 0 20px;
+  border: 1px solid var(--p-ink);
+  border-radius: var(--p-r-sm);
+  background: var(--p-ink);
+  color: var(--p-on-ink);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background-color var(--p-d1) linear, transform var(--p-d1) var(--p-ease);
+}
+
+[data-app] .cash__cta:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--p-ink) 88%, var(--p-on-ink));
+}
+
+[data-app] .cash__cta:active:not(:disabled) { transform: translateY(1px); }
+
+[data-app] .cash__cta:disabled { opacity: 0.4; cursor: not-allowed; }
+
+[data-app] .cash__fine {
+  margin-top: 12px;
+  font-size: 0.75rem;
+  line-height: 1.65;
+  color: var(--p-ink-46);
+}
+
+/* Cancelling is a decision, not a failure: it gets a neutral panel, not the
+   red error box it used to borrow. The one red element is the button that
+   actually destroys the order. */
+[data-app] .cash__confirm {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-r-sm);
+  background: var(--p-paper);
+}
+
+[data-app] .cash__confirm strong {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--p-ink);
+}
+
+[data-app] .cash__confirm p {
+  margin: 6px 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--p-ink-64);
+}
+
+[data-app] .cash__confirmActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+[data-app] .cash__cancel {
+  margin-top: 14px;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--p-ink-46);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--p-line-strong);
+  cursor: pointer;
+  transition: color var(--p-d1) linear;
+}
+
+[data-app] .cash__cancel:hover { color: var(--danger); }
+[data-app] .cash__cancel:disabled { opacity: 0.4; cursor: not-allowed; }
+
+@media (max-width: 1100px) {
+  [data-app] .cash__grid {
+    grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+    gap: 28px;
+  }
+  [data-app] .cash__queue { max-height: none; }
+}
+
+@media (max-width: 860px) {
+  [data-app] .cash__grid { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  [data-app] .cash__queue {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  [data-app] .cash__queue::-webkit-scrollbar { display: none; }
+  [data-app] .cash__qItem {
+    flex: 0 0 auto;
+    width: min(78vw, 300px);
+    border: 1px solid var(--p-line);
+    border-radius: var(--p-r-sm);
+    overflow: hidden;
+  }
+  [data-app] .cash__qBtn { border-left-width: 0; border-top: 2px solid transparent; height: 100%; }
+  [data-app] .cash__qItem.is-active .cash__qBtn { border-top-color: var(--p-ink); }
+}
+
+@media (max-width: 560px) {
+  [data-app] .cash__head { align-items: flex-start; flex-direction: column; }
+  [data-app] .cash__methods { flex-wrap: wrap; }
+  [data-app] .cash__method { min-width: 84px; }
+  [data-app] .cash__cta { font-size: 0.875rem; }
+}
