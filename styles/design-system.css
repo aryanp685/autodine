@@ -2126,3 +2126,100 @@
 
 @media (max-width: 760px) {
   [data-app] .kb__voicePick { max-width: 128px; }}
+
+/* --------------------------------------------------------- route changes
+   The gap between clicking a link and the next page existing.
+
+   Two pieces, and they solve different halves of the same complaint:
+
+   .routeIn is the arrival. A template re-creates this element on every
+   navigation, so the animation restarts by itself -- see app/template.tsx for
+   why it animates opacity alone.
+
+   .skel is the wait. Every screen here is server-rendered, so the skeleton is
+   what fills the round trip; before it existed the browser simply froze on the
+   old page. Shapes are approximate on purpose: a placeholder that guesses the
+   real layout jumps when the real content lands.
+
+   The pulse is opacity only, on a flat --band fill. No gradient, no shimmer
+   sweep: both cost paint on a mid-range phone and neither reads as meaning
+   anything. 1.6s is slow enough to be calm and fast enough to look alive. */
+
+.routeIn { animation: route-in var(--dur-2) var(--ease-out) both; }
+
+@keyframes route-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+[data-app] .skel {
+  max-width: 1180px; margin: 0 auto; padding: 64px 48px 96px;
+  display: grid; gap: 14px; align-content: start;
+}
+
+[data-app] .skel__bar {
+  height: 12px; border-radius: 3px; background: var(--band);
+  animation: skel-pulse 1.6s ease-in-out infinite;
+}
+
+/* Widths are declared per role rather than inline: the same heading bar should
+   be the same width on every screen, or the skeleton teaches the eye a layout
+   the page does not have. */
+[data-app] .skel__bar--kicker { width: 92px; height: 8px; }
+[data-app] .skel__bar--title { width: min(46%, 420px); height: 30px; margin-top: 10px; }
+[data-app] .skel__bar--lede { width: min(62%, 560px); }
+[data-app] .skel__bar--short { width: min(38%, 340px); }
+[data-app] .skel__bar--row { width: min(70%, 520px); }
+[data-app] .skel__bar--num { width: 64px; }
+[data-app] .skel__bar--ticketHead { width: 52%; height: 16px; }
+
+[data-app] .skel__cards,
+[data-app] .skel__stats {
+  display: grid; gap: 18px; margin-top: 26px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+[data-app] .skel__card,
+[data-app] .skel__stat {
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface);
+  animation: skel-pulse 1.6s ease-in-out infinite;
+}
+[data-app] .skel__card { height: 132px; }
+[data-app] .skel__stat { height: 96px; }
+
+[data-app] .skel__rows { display: grid; gap: 0; margin-top: 26px; border-top: 1px solid var(--border); }
+[data-app] .skel__row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 18px 0; border-bottom: 1px solid var(--border);
+}
+
+[data-app] .skel__cols {
+  display: grid; gap: 18px; margin-top: 26px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+[data-app] .skel__col { display: grid; gap: 14px; align-content: start; }
+[data-app] .skel__ticket {
+  display: grid; gap: 10px; padding: 18px; min-height: 120px;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface);
+}
+
+@keyframes skel-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 0.9; }
+}
+
+/* A skeleton is not information, so it is not worth animating for anyone who
+   asked the system to stop moving things. */
+@media (prefers-reduced-motion: reduce) {
+  [data-app] .skel__bar,
+  [data-app] .skel__card,
+  [data-app] .skel__stat { animation: none; opacity: 0.6; }
+}
+
+@media (max-width: 760px) {
+  [data-app] .skel { padding: 34px 20px 64px; gap: 12px; }
+  [data-app] .skel__bar--title { width: 74%; height: 24px; }
+  [data-app] .skel__bar--lede { width: 100%; }
+  [data-app] .skel__cards,
+  [data-app] .skel__stats,
+  [data-app] .skel__cols { grid-template-columns: 1fr; margin-top: 20px; }
+}
