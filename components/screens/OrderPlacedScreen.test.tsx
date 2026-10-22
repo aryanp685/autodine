@@ -276,4 +276,15 @@ describe('OrderPlacedScreen', () => {
     expect(html).toContain('Paneer Tikka');
     expect(html).not.toContain('Paneer Tikka · ');
   });
+
+  it('leaves a way back to the menu from the confirmation', () => {
+    // The end of the flow used to be a dead end: nothing on the screen led
+    // anywhere, so a table ordering a second round had to re-scan the card.
+    const html = renderToStaticMarkup(<OrderPlacedScreen data={order()} slug="maddi" />);
+
+    expect(html).toContain('flow__steps');
+    expect(html).toMatch(/flow__step is-now[^>]*aria-current="step"[^>]*>\s*<span class="flow__sr">Placed/);
+    expect(html).toContain('Order something else');
+    expect(html).toContain('href="/menu?s=maddi"');
+  });
 });

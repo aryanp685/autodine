@@ -114,17 +114,11 @@ export function GuestOrderEditor({
         const removed = canEdit && now === 0;
 
         return (
-          <div
-            key={l.id}
-            className="cart__line"
-            style={removed ? { opacity: 0.55 } : undefined}
-          >
+          <div key={l.id} className={`cart__line ${removed ? 'is-removed' : ''}`}>
             <div className="cart__lineMain">
               <div className="cart__lineTop">
                 <VegMark veg={l.isVeg} />
-                <strong style={removed ? { textDecoration: 'line-through' } : undefined}>
-                  {l.name}
-                </strong>
+                <strong className={removed ? 'is-struck' : undefined}>{l.name}</strong>
                 {l.variantName ? <em className="co__variant"> · {l.variantName}</em> : null}
               </div>
               {l.addons.length > 0 ? (
@@ -194,7 +188,7 @@ export function GuestOrderEditor({
             </p>
           )}
 
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '10px' }}>
+          <div className="flow__row">
             <button
               type="button"
               className="co__cta"
@@ -207,7 +201,7 @@ export function GuestOrderEditor({
             {confirming ? null : (
               <button
                 type="button"
-                className="co__method"
+                className="flow__ghost flow__ghost--danger"
                 onClick={() => {
                   setConfirming(true);
                   setError('');
@@ -227,13 +221,13 @@ export function GuestOrderEditor({
               </strong>{' '}
               The kitchen is told immediately and this cannot be undone. Order again from the
               menu instead.
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '10px' }}>
+              <div className="flow__row">
                 <button type="button" className="co__cta" onClick={cancel} disabled={pending}>
                   {pending ? 'Cancelling…' : 'Yes, cancel it'}
                 </button>
                 <button
                   type="button"
-                  className="co__method"
+                  className="flow__ghost"
                   onClick={() => setConfirming(false)}
                   disabled={pending}
                 >

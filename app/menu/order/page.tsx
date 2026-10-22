@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { CartProvider } from '@/components/CartProvider';
+import { ClearCartOnOrder } from '@/components/ClearCartOnOrder';
 import { OrderPlacedScreen } from '@/components/screens/OrderPlacedScreen';
 import { getOrderScreenData } from '@/lib/db/order-screen';
 import { onlinePaymentOffer, type OnlineOffer } from '@/lib/payments/online-availability';
@@ -44,7 +46,16 @@ export default async function OrderPage({
       })
     : null;
 
+  // The cart provider is mounted here for one reason: the order in it has just
+  // become a real order, and the cart must not survive that. See
+  // ClearCartOnOrder -- the cart used to stay full after ordering, so the next
+  // visit to the menu offered to place the same meal again.
+  const placed = Boolean(data) && data?.prepStatus !== 'cancelled';
+
   return (
-    <OrderPlacedScreen data={data} token={t} slug={s} onlinePay={onlinePay} />
+    <CartProvider slug={s}>
+      <ClearCartOnOrder clear={placed} />
+      <OrderPlacedScreen data={data} token={t} slug={s} onlinePay={onlinePay} />
+    </CartProvider>
   );
 }

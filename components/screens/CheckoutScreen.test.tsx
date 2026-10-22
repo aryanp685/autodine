@@ -108,4 +108,25 @@ describe('checkout action bar', () => {
       count: 2,
     };
   });
+
+  it('keeps both Place order buttons inside the one form', () => {
+    // They have to share the form for useFormStatus to make them agree about
+    // being busy. Two independent submits meant a second tap could write a
+    // second order while the first was still being priced.
+    const html = renderToStaticMarkup(<Checkout slug="maddi" items={items} taxRateBps={500} />);
+    const formOpen = html.indexOf('<form id="co-place-order"');
+    const dock = html.indexOf('co__bar');
+    const formClose = html.lastIndexOf('</form>');
+
+    expect(formOpen).toBeGreaterThan(-1);
+    expect(dock).toBeGreaterThan(formOpen);
+    expect(formClose).toBeGreaterThan(dock);
+    expect(html.match(/form="co-place-order"/g)?.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('shows the step the guest is on, not just the word checkout', () => {
+    const html = renderToStaticMarkup(<Checkout slug="maddi" items={items} taxRateBps={500} />);
+    expect(html).toContain('flow__steps');
+    expect(html).toMatch(/flow__step is-now[^>]*aria-current="step"[^>]*>\s*<span class="flow__sr">Pay/);
+  });
 });

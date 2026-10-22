@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { GuestFlow } from '@/components/GuestFlow';
 import { useCart } from '@/components/CartProvider';
 import { inr } from '@/lib/demo-data';
 import { VegMark } from '@/components/ui';
@@ -57,11 +58,14 @@ function Totals({ subtotalPaise, taxPaise, totalPaise, taxRateBps, compact }: {
 export function Cart({
   slug,
   restaurantName,
+  tableLabel,
   taxRateBps,
   items,
 }: {
   slug?: string;
   restaurantName?: string;
+  /** The table a live session confirmed, when there is one. */
+  tableLabel?: string | null;
   /** The restaurant's own rate. Without it the bill is priced at a sample. */
   taxRateBps?: number;
   items: MenuItemPrice[];
@@ -86,13 +90,38 @@ export function Cart({
     .join(' · ');
 
   return (
-    <div className="cart">
-      <header className="cart__head">
-        <Link href={withSlug('/menu')} className="cart__back">
-          ← Back to menu
-        </Link>
-        <h1>Your order</h1>
-        <p>{headerMeta}</p>
+    <GuestFlow
+      step="cart"
+      venue={restaurantName}
+      table={tableLabel}
+      back={{ href: withSlug('/menu'), label: 'Back to the menu' }}
+      dock={
+        priced.lines.length > 0 ? (
+          /* The one action, pinned. It used to exist twice on a phone -- once
+             in the bill and once in a fixed bar -- and the bill's was hidden
+             below 900px because two black buttons 40px apart is a choice
+             nobody asked for. Now there is one, and it is where the thumb is
+             at every width. */
+          <div className="cart__bar">
+            <span className="cart__barTotal">
+              <span className="cart__barLabel">Total</span>
+              <strong className="tnum">{inr(paiseToRupees(totalPaise))}</strong>
+            </span>
+            <Link href={withSlug('/menu/checkout')} className="cart__barCta">
+              Continue to checkout
+            </Link>
+          </div>
+        ) : null
+      }
+    >
+      <header className="flow__head">
+        <div className="flow__kicker">Your order</div>
+        <h1 className="flow__title">{headerMeta}</h1>
+        <p className="flow__lede">
+          {priced.lines.length > 0
+            ? 'Check the bill, then pay. Prices are read from the kitchen’s menu when you order.'
+            : 'Nothing has been added from the menu yet.'}
+        </p>
       </header>
 
       <div className="cart__grid">
@@ -172,8 +201,20 @@ export function Cart({
 
               {dropped > 0 && (
                 <div className="cart__notice">
-                  {dropped === 1 ? 'One item is' : `${dropped} items are`} no longer
-                  available, so {dropped === 1 ? 'it is' : 'they are'} not on the bill.
+                  <p>
+                    {dropped === 1 ? 'One dish is' : `${dropped} dishes are`} no longer available, so{' '}
+                    {dropped === 1 ? 'it is' : 'they are'} not on the bill.
+                  </p>
+                  {/* Without this the notice was permanent: the ids stayed in
+                      localStorage, so every visit re-read the same dead lines
+                      and re-printed the same warning. */}
+                  <button
+                    type="button"
+                    className="cart__noticeBtn"
+                    onClick={() => cart.removeItems([...priced.missingIds, ...priced.unavailableIds])}
+                  >
+                    Remove {dropped === 1 ? 'it' : 'them'} from my cart
+                  </button>
                 </div>
               )}
 
@@ -219,39 +260,19 @@ export function Cart({
               taxRateBps={taxRateBps}
             />
             {priced.lines.length > 0 ? (
-              <Link href={withSlug('/menu/checkout')} className="cart__cta">
-                Continue to checkout
-              </Link>
+              <div className="cart__fine">
+                Prices are read from the kitchen&rsquo;s menu when you order, so the total you are
+                charged is the one the restaurant set. Nothing is charged from this phone.
+              </div>
             ) : (
               <button type="button" className="cart__cta" disabled>
                 Cart is empty
               </button>
             )}
-            <div className="cart__fine">
-              Prices are read from the kitchen&rsquo;s menu when you order, so the total
-              you are charged is the one the restaurant set.
-            </div>
           </div>
         </aside>
       </div>
 
-      {/*
-        Phones only. The bill sits below the lines on a narrow screen, which
-        puts "Continue to checkout" past the end of a long order -- the one
-        button on the page, out of reach. This bar is the same destination,
-        always at the bottom, with the number the guest is deciding about.
-      */}
-      {priced.lines.length > 0 && (
-        <div className="cart__bar">
-          <span className="cart__barTotal">
-            <span className="cart__barLabel">Total</span>
-            <strong className="tnum">{inr(paiseToRupees(totalPaise))}</strong>
-          </span>
-          <Link href={withSlug('/menu/checkout')} className="cart__barCta">
-            Checkout
-          </Link>
-        </div>
-      )}
-    </div>
+    </GuestFlow>
   );
 }

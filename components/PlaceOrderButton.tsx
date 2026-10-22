@@ -1,0 +1,63 @@
+'use client';
+
+/**
+ * The two Place order buttons on the pay screen, both honest about being busy.
+ *
+ * WHY THIS IS A COMPONENT AND NOT A `disabled` EXPRESSION
+ *
+ * Placing an order is a server action that redirects. Between the tap and the
+ * redirect there is a real pause -- a database call that prices every line --
+ * and nothing on the screen changed during it. So a guest taps again, and a
+ * second order is written. The button said "Place order · ₹856" throughout.
+ *
+ * `useFormStatus` is the only honest source for that state: it is true from the
+ * submit until the action settles, which is exactly the window in which a
+ * second tap would be a duplicate. It has to be read by a component rendered
+ * INSIDE the <form>, which is why both buttons live here and both are declared
+ * as submits rather than as a button that calls the action itself.
+ *
+ * The docked bar and the bill each render one. They are the same form, so both
+ * go busy together -- two buttons that disagree about whether the order is
+ * being placed would be worse than no feedback at all.
+ */
+
+import { useFormStatus } from 'react-dom';
+import { inr } from '@/lib/demo-data';
+import { paiseToRupees } from '@/lib/money';
+
+export function PlaceOrderButton({
+  totalPaise,
+  canOrder,
+  form,
+  variant,
+}: {
+  totalPaise: number;
+  canOrder: boolean;
+  /** The id of the form this button submits, when it is not a descendant. */
+  form: string;
+  /** `bill` sits in the summary card; `dock` is the pinned bar on a phone. */
+  variant: 'bill' | 'dock';
+}) {
+  const { pending } = useFormStatus();
+
+  const label = !canOrder
+    ? 'Add items before checkout'
+    : pending
+      ? 'Placing your order…'
+      : variant === 'dock'
+        ? 'Place order'
+        : `Place order · ${inr(paiseToRupees(totalPaise))}`;
+
+  return (
+    <button
+      type="submit"
+      form={form}
+      className={variant === 'dock' ? 'flow__cta' : 'co__cta'}
+      disabled={!canOrder || pending}
+      aria-busy={pending || undefined}
+    >
+      {pending ? <span className="flow__spin" aria-hidden="true" /> : null}
+      {label}
+    </button>
+  );
+}
