@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { GuestNote } from '@/components/GuestNote';
 import { VerifyCodeForm } from '@/components/VerifyCodeForm';
 
 /**
@@ -46,45 +47,31 @@ export function TableVerifyScreen({
   error,
 }: TableVerifyScreenProps) {
   return (
-    <div className="pg qr">
-      <div className="pg__bar">
-        <Link href="/" className="pg__brand">
-          AutoDine
-        </Link>
-        <div className="pg__barRight">
-          <span className="pg__barMuted">{restaurantName}</span>
-        </div>
-      </div>
-
-      <main className="pg__qrVerify">
-        <section className="pg__formCard qr__card">
-          <div className="pg__kicker">Table {tableLabel}</div>
-          <h1 className="pg__title pg__title--sm">Enter the code in the restaurant</h1>
-          <p className="pg__p">
-            There is a six-digit code showing on a screen inside {restaurantName} — at the
-            counter, or wherever the staff have put it. Type it here to open the menu for
-            table {tableLabel}.
-          </p>
-
-          {error ? (
-            <div className="pg__alert" role="alert">
-              <strong>That did not work.</strong>
-              <p>{error}</p>
-            </div>
-          ) : null}
-
-          {/* A client component, because the sixth digit submits the form.
-              See components/VerifyCodeForm.tsx for the reasons. */}
-          <VerifyCodeForm token={token} windowMinutes={windowMinutes} />
-        </section>
-
-        <p className="pg__qrVerifyFoot">
+    <GuestNote
+      eyebrow={`Table ${tableLabel} · ${restaurantName}`}
+      title="Enter the code in the restaurant"
+      foot={
+        <>
           Not at table {tableLabel}? Scan the QR code on your own table.{' '}
-          <Link href="/" className="pg__fineLink">
-            What is AutoDine?
-          </Link>
-        </p>
-      </main>
-    </div>
+          <Link href="/">What is AutoDine?</Link>
+        </>
+      }
+    >
+      <p className="gnote__text">
+        There is a six-digit code showing on a screen inside {restaurantName} — at the counter,
+        or wherever the staff have put it. Type it here to open the menu for table {tableLabel}.
+      </p>
+
+      {error ? (
+        <div className="gnote__alert" role="alert">
+          <strong>That did not work.</strong>
+          <p>{error}</p>
+        </div>
+      ) : null}
+
+      {/* A client component, because the sixth digit submits the form.
+          See components/VerifyCodeForm.tsx for the reasons. */}
+      <VerifyCodeForm token={token} windowMinutes={windowMinutes} />
+    </GuestNote>
   );
 }

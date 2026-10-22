@@ -136,6 +136,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
     <div className="menu">
       <header className="menu__head">
         <div className="menu__venue">
+          <div className="menu__kicker">The menu</div>
           <div className="menu__venueName">{restaurant.name}</div>
           <div className="menu__venueMeta">{restaurant.tagline}</div>
         </div>
@@ -195,31 +196,39 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
               <div className="menu__dishTop">
                 <VegMark veg={i.veg} />
                 <h3 className="menu__dishName">{i.name}</h3>
-                {i.badge && <span className="menu__dishBadge">{i.badge}</span>}
+                {i.badge && i.available && <span className="menu__dishBadge">{i.badge}</span>}
               </div>
               <p className="menu__dishDesc">{i.desc}</p>
-              <div className="menu__dishPrice">
-                {inr(i.price)}
-                {i.variants && <span className="menu__dishFrom">from</span>}
-              </div>
-              {i.available ? (
-                needsChoice(i) ? (
-                  <Link href={itemHref(i.id)} className="menu__dishCta">
-                    Choose options
-                  </Link>
+
+              {/* Price and the one action share a baseline: a menu line reads
+                  as a menu line when the number is next to the decision, not
+                  stacked above it like a product listing. */}
+              <div className="menu__dishActions">
+                <div className="menu__dishPrice">
+                  {i.variants && <span className="menu__dishFrom">from</span>}
+                  {inr(i.price)}
+                </div>
+                {i.available ? (
+                  needsChoice(i) ? (
+                    <Link href={itemHref(i.id)} className="menu__dishCta">
+                      Choose
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      className="menu__dishCta"
+                      onClick={() => addToCart(i.id)}
+                      aria-label={`Add ${i.name}`}
+                    >
+                      Add
+                    </button>
+                  )
                 ) : (
-                  <button
-                    className="menu__dishCta"
-                    onClick={() => addToCart(i.id)}
-                  >
-                    Add
-                  </button>
-                )
-              ) : (
-                <span className="menu__dishOut">Sold out for now</span>
-              )}
+                  <span className="menu__dishOut">Sold out</span>
+                )}
+              </div>
             </div>
-            {i.img && <Image className="menu__dishImg" src={i.img} alt={i.name} width={104} height={104} sizes="(max-width: 760px) 76px, 104px" />}
+            {i.img && <Image className="menu__dishImg" src={i.img} alt={i.name} width={104} height={104} sizes="(max-width: 420px) 92vw, (max-width: 760px) 88px, 116px" />}
           </article>
         ))}
       </div>
@@ -229,7 +238,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
           feedback for a tap is a number changing somewhere off the thumb. */}
       {cart.count > 0 && (
         <div className="menu__cartBar" key={barPulse}>
-          <span className="menu__cartCount">
+          <span className="menu__cartCount" role="status" aria-live="polite">
             <strong className="tnum">{cart.count}</strong> item{cart.count === 1 ? '' : 's'} ·{' '}
             {inr(paiseToRupees(barSubtotal))}
           </span>
@@ -375,6 +384,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
       <Link href={backHref} className="sheet__scrim" aria-label="Close" tabIndex={-1} />
       <header className="menu__head">
         <div className="menu__venue">
+          <div className="menu__kicker">The menu</div>
           <div className="menu__venueName">{restaurant.name}</div>
           <div className="menu__venueMeta">{restaurant.tagline}</div>
         </div>
@@ -396,7 +406,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
               <p className="menu__dishDesc">{i.desc}</p>
               <div className="menu__dishPrice">{inr(i.price)}</div>
             </div>
-            {i.img && <Image className="menu__dishImg" src={i.img} alt={i.name} width={104} height={104} sizes="(max-width: 760px) 76px, 104px" />}
+            {i.img && <Image className="menu__dishImg" src={i.img} alt={i.name} width={104} height={104} sizes="(max-width: 420px) 92vw, (max-width: 760px) 88px, 116px" />}
           </article>
         ))}
       </div>
