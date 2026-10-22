@@ -138,7 +138,7 @@ export function Cart({
               )}
 
               {dropped > 0 && (
-                <div className="cart__empty">
+                <div className="cart__notice">
                   {dropped === 1 ? 'One item is' : `${dropped} items are`} no longer
                   available, so {dropped === 1 ? 'it is' : 'they are'} not on the bill.
                 </div>
@@ -155,7 +155,7 @@ export function Cart({
                   Saying so is the difference between a bill the guest can
                   check and one they have to take on trust. */}
               {priced.staleAddonIds.length > 0 && (
-                <div className="cart__empty">
+                <div className="cart__notice">
                   {priced.staleAddonIds.length === 1
                     ? 'One add-on you picked is'
                     : `${priced.staleAddonIds.length} add-ons you picked are`}{' '}
@@ -165,7 +165,7 @@ export function Cart({
               )}
 
               {priced.staleVariantIds.length > 0 && (
-                <div className="cart__empty">
+                <div className="cart__notice">
                   The portion you picked for{' '}
                   {priced.staleVariantIds.length === 1 ? 'one dish is' : 'some dishes is'} no
                   longer on the menu, so {priced.staleVariantIds.length === 1 ? 'it is' : 'they are'}{' '}

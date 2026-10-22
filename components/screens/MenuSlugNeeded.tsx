@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { GuestNote } from '@/components/GuestNote';
 
 /**
  * Shown when /menu is opened without ?s=<slug>.
@@ -13,27 +14,27 @@ import Link from 'next/link';
  */
 export function MenuSlugNeeded() {
   return (
-    <div className="pg pg--dash">
-      <div className="pg__bar">
-        <Link href="/" className="pg__brand">
-          AutoDine
-        </Link>
-      </div>
+    <GuestNote
+      eyebrow="Table access"
+      title="Open this menu from your table"
+      foot={
+        <>
+          Behind the counter? Your own menu lives in the{' '}
+          <Link href="/dashboard/menus">dashboard</Link>.
+        </>
+      }
+    >
+      <p className="gnote__text">
+        Scan the QR code on your table and it will bring you straight to this restaurant&rsquo;s
+        menu. The code tells us which kitchen you are sitting in, so the link works only from
+        there.
+      </p>
 
-      <div className="pg__slugNeeded">
-        <h1>Open this menu from your table</h1>
-        <p>
-          Scan the QR code on your table and it will bring you straight to this
-          restaurant&rsquo;s menu. The code tells us which kitchen you are sitting in,
-          so the link works only from there.
-        </p>
-        <p className="pg__slugNeededHint">
-          Behind the counter? Your own menu lives in the dashboard.
-        </p>
-        <Link href="/dashboard/menus" className="pg__btn pg__btn--solid">
+      <div className="gnote__actions">
+        <Link href="/dashboard/menus" className="gnote__cta">
           Go to my menu
         </Link>
       </div>
-    </div>
+    </GuestNote>
   );
 }

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { GuestNote } from '@/components/GuestNote';
 
 /**
  * Shown instead of a menu when the guest has not proved they are at a table.
@@ -54,30 +55,29 @@ export function TableGateScreen({
   const copy = COPY[reason];
 
   return (
-    <div className="pg pg--dash">
-      <div className="pg__bar">
-        <Link href="/" className="pg__brand">
-          AutoDine
-        </Link>
-      </div>
+    <GuestNote
+      eyebrow="Table access"
+      title={copy.title}
+      foot={
+        <>
+          Behind the counter? Your own menu lives in the{' '}
+          <Link href="/dashboard/menus">dashboard</Link>.
+        </>
+      }
+    >
+      <p className="gnote__text">{copy.detail}</p>
 
-      <div className="pg__slugNeeded">
-        <h1>{copy.title}</h1>
-        <p>{copy.detail}</p>
-
+      <div className="gnote__actions">
         {verifyHref ? (
-          <Link href={verifyHref} className="pg__btn pg__btn--solid">
+          <Link href={verifyHref} className="gnote__cta">
             Enter the code again
           </Link>
-        ) : null}
-
-        <p className="pg__slugNeededHint">
-          Behind the counter? Your own menu lives in the dashboard.
-        </p>
-        <Link href="/dashboard/menus" className="pg__btn">
-          Go to my menu
-        </Link>
+        ) : (
+          <Link href="/dashboard/menus" className="gnote__cta">
+            Go to my menu
+          </Link>
+        )}
       </div>
-    </div>
+    </GuestNote>
   );
 }
