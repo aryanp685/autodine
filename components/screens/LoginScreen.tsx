@@ -1,102 +1,84 @@
 import Link from 'next/link';
+import { AuthShell } from '@/components/AuthShell';
 import { signInAction } from '@/app/auth/actions';
 
 /**
  * Sign in.
  *
- * Built from the same locked page structure as the signup and pricing screens
- * (.pg bar, .pg__formCard, .ui-field, .ui-input, .pg__submit) so it is
- * consistent with the approved design rather than a new visual language.
+ * The first screen of the product a returning owner sees, so it says one
+ * thing: which two fields open the door. The aside that used to sit beside it
+ * — four bordered cards of preview status — has become three sentences under
+ * the form, where somebody who wants to know what this build does can read
+ * them and somebody who wants to sign in can ignore them.
  */
 export function LoginScreen({ error, notice, next }: { error?: string; notice?: string; next?: string }) {
   return (
-    <div className="pg">
-      <div className="pg__bar">
-        <Link href="/" className="pg__brand">
-          AutoDine
-        </Link>
-        <div className="pg__barRight">
-          <span className="pg__barMuted">New to AutoDine?</span>
-          <Link href="/signup" className="pg__barCta">
-            Create account
-          </Link>
+    <AuthShell
+      eyebrow="Welcome back"
+      title="Sign in to your restaurant"
+      lede="Use the email address you signed up with."
+      action={{ prompt: 'New to AutoDine?', label: 'Create an account', href: '/signup' }}
+      notes={[
+        <>
+          <strong>Ordering, the kitchen board and the counter are live.</strong> An order from a
+          verified table reaches the board in the same second.
+        </>,
+        <>
+          <strong>Plans are not on sale.</strong> No card is asked for, and no trial is counting
+          down.
+        </>,
+        <>
+          <strong>Payments are recorded at the counter.</strong> Card and UPI online are not
+          switched on in this build.
+        </>,
+      ]}
+    >
+      {notice ? <div className="authCard__notice">{notice}</div> : null}
+      {error ? (
+        <div className="authCard__alert" role="alert">
+          {error}
         </div>
-      </div>
+      ) : null}
 
-      <div className="pg__body pg__body--split">
-        <section className="pg__formCard">
-          <div className="pg__kicker">Welcome back</div>
-          <h1 className="pg__title pg__title--sm">Sign in to your restaurant</h1>
-          <p className="pg__p">
-            Use the email address you signed up with. Sessions are handled by Supabase Auth and expire
-            automatically when you sign out.
-          </p>
+      <form className="authForm" action={signInAction}>
+        {next && <input type="hidden" name="next" value={next} />}
 
-          {notice && <div className="pg__note">{notice}</div>}
-          {error && (
-            <div className="pg__note" role="alert">
-              {error}
-            </div>
-          )}
+        <label className="ui-field">
+          <span className="ui-label">Work email</span>
+          <input
+            className="ui-input"
+            name="email"
+            type="email"
+            autoComplete="email"
+            placeholder="owner@restaurant.in"
+            required
+          />
+        </label>
 
-          <form className="pg__form" action={signInAction}>
-            {next && <input type="hidden" name="next" value={next} />}
-            <label className="ui-field">
-              <span className="ui-label">Work email</span>
-              <input
-                className="ui-input"
-                name="email"
-                type="email"
-                autoComplete="email"
-                placeholder="owner@restaurant.in"
-                required
-              />
-            </label>
-            <label className="ui-field">
-              <span className="ui-label">Password</span>
-              <input
-                className="ui-input"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                placeholder="Your password"
-                required
-              />
-            </label>
+        <label className="ui-field">
+          <span className="ui-label">Password</span>
+          <input
+            className="ui-input"
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            placeholder="Your password"
+            required
+          />
+        </label>
 
-            <button className="pg__submit" type="submit">
-              Sign in
-            </button>
-            <p className="pg__fine">
-              Forgotten it?{' '}
-              <Link href="/forgot-password" className="pg__fineLink">
-                Reset your password
-              </Link>{' '}
-              — we email a single-use link to the address you signed up with.
-            </p>
-          </form>
-        </section>
+        <button className="authSubmit" type="submit">
+          Sign in
+        </button>
 
-        <aside className="pg__aside">
-          <div className="pg__asideCard">
-            <div className="pg__asideHead">Preview status</div>
-            <ol className="pg__steps">
-              <li><strong>Dashboard</strong> — sample metrics and fictional orders only.</li>
-              <li><strong>Menu</strong> — database-backed public menu reads are available when configured.</li>
-              <li><strong>Kitchen &amp; counter</strong> — connected to the database when configured; an order from a verified table reaches the board.</li>
-              <li><strong>Account</strong> — Supabase authentication is available when the project is configured.</li>
-            </ol>
-          </div>
-
-          <div className="pg__asideCard pg__asideCard--quiet">
-            <div className="pg__asideHead">Important</div>
-            <p className="pg__p">
-              Ordering, the kitchen board and the counter are live. Plans are not on sale, no payment gateway
-              is connected and no trial is being enforced, so nothing here will ever ask you for a card.
-            </p>
-          </div>
-        </aside>
-      </div>
-    </div>
+        <p className="authFine">
+          Forgotten it?{' '}
+          <Link href="/forgot-password" className="authFine__link">
+            Reset your password
+          </Link>{' '}
+          — we email a single-use link to the address you signed up with.
+        </p>
+      </form>
+    </AuthShell>
   );
 }

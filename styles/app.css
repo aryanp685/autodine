@@ -2318,3 +2318,211 @@
   [data-app] .pg__formCard .pg__submit { width: 100%; justify-self: stretch; }
   [data-app] .pg__settingsAside { gap: 16px; }
 }
+
+/* =========================================================================
+   Auth — sign in, sign up, recovery
+   =========================================================================
+
+   Four screens that used to be the least designed in the product: a
+   marketing-era two-column layout with three bordered cards of preview copy
+   in the aside. They are the first screens an owner sees, and they are read
+   by someone with better things to do than read them -- so the form gets the
+   column, and the honest notes sit underneath it as prose.
+   ========================================================================= */
+
+[data-app] .auth {
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+  background: var(--p-paper);
+  background-image: radial-gradient(
+    120% 50% at 50% 0%,
+    color-mix(in srgb, var(--p-surface) 92%, transparent),
+    transparent 70%
+  );
+}
+
+[data-app] .authBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: min(100%, 1120px);
+  margin: 0 auto;
+  padding: 22px var(--p-gutter);
+}
+
+[data-app] .authBar__brand {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--p-ink);
+}
+
+[data-app] .authBar__right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8125rem;
+  color: var(--p-ink-46);
+}
+
+[data-app] .authBar__link {
+  color: var(--p-ink);
+  font-weight: 500;
+  border-bottom: 1px solid var(--p-line-strong);
+  padding-bottom: 1px;
+  transition: border-color var(--p-d1) linear;
+}
+
+[data-app] .authBar__link:hover { border-color: var(--p-ink); }
+
+[data-app] .authBody {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 26rem) minmax(0, 1fr);
+  align-items: start;
+  gap: clamp(32px, 6vw, 88px);
+  width: min(100%, 1120px);
+  margin: 0 auto;
+  padding: clamp(20px, 4vh, 48px) var(--p-gutter) clamp(48px, 8vh, 96px);
+}
+
+[data-app] .authCard {
+  padding: clamp(22px, 3vw, 34px);
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-r);
+  background: var(--p-surface);
+  min-width: 0;
+}
+
+[data-app] .authCard__eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .authCard__title {
+  margin-top: 14px;
+  font-size: clamp(1.6rem, 3vw, 2.1rem);
+  font-weight: 500;
+  letter-spacing: -0.038em;
+  line-height: 1.04;
+  color: var(--p-ink);
+}
+
+[data-app] .authCard__lede {
+  margin-top: 12px;
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  color: var(--p-ink-64);
+}
+
+[data-app] .authCard__lede strong { color: var(--p-ink); font-weight: 600; }
+
+[data-app] .authForm { display: grid; gap: 16px; margin-top: 24px; }
+
+[data-app] .authRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+[data-app] .authSubmit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 20px;
+  border: 1px solid var(--p-ink);
+  border-radius: var(--p-r-sm);
+  background: var(--p-ink);
+  color: var(--p-on-ink);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--p-d1) linear;
+}
+
+[data-app] .authSubmit:hover {
+  background: color-mix(in srgb, var(--p-ink) 88%, var(--p-on-ink));
+}
+
+[data-app] .authActions { margin-top: 24px; }
+
+[data-app] .authFine {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.65;
+  color: var(--p-ink-46);
+}
+
+[data-app] .authFine__link {
+  color: var(--p-ink);
+  border-bottom: 1px solid var(--p-line-strong);
+  padding-bottom: 1px;
+}
+
+[data-app] .authFine__link:hover { border-color: var(--p-ink); }
+
+[data-app] .authConsent { align-items: flex-start; font-size: 0.8125rem; line-height: 1.55; color: var(--p-ink-64); }
+[data-app] .authConsent input { margin-top: 2px; accent-color: var(--p-accent); }
+
+[data-app] .authCard__notice,
+[data-app] .authCard__alert {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border-left: 2px solid var(--p-accent);
+  border-radius: 0 var(--p-r-sm) var(--p-r-sm) 0;
+  background: var(--p-accent-soft);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--p-ink-80);
+}
+
+[data-app] .authCard__alert {
+  border-left-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--p-paper));
+}
+
+/* The notes are not a second column and not a card: they are the small print,
+   given enough room to be read by whoever wants it. */
+[data-app] .authNotes { min-width: 0; padding-top: 6px; }
+
+[data-app] .authNotes__head {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--p-line);
+}
+
+[data-app] .authNotes__list { display: grid; }
+
+[data-app] .authNotes__list li {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--p-line);
+  font-size: 0.8125rem;
+  line-height: 1.65;
+  color: var(--p-ink-64);
+}
+
+[data-app] .authNotes__list li strong { display: block; color: var(--p-ink); font-weight: 600; margin-bottom: 3px; }
+
+@media (max-width: 900px) {
+  [data-app] .authBody { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+  [data-app] .authNotes { order: 2; }
+}
+
+@media (max-width: 560px) {
+  [data-app] .authRow { grid-template-columns: minmax(0, 1fr); }
+  [data-app] .authCard { padding: 20px; }
+  [data-app] .authBar__prompt { display: none; }
+}
