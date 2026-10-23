@@ -12,6 +12,17 @@ import {
 const CART_PATH = '/menu/cart';
 
 /**
+ * How long to wait before each retry of a failure that wrote nothing.
+ *
+ * Two seconds in total, and only for the classes that say "the database was
+ * not reachable right now" (see isTransientPlaceCode). A schema-cache reload
+ * after a database restart answers PGRST002 for a second or two, which is far
+ * longer than a single 350 ms wait; a guest genuinely waiting 2 s for a placed
+ * order is better than a guest told to tap the button again.
+ */
+const TRANSIENT_RETRY_WAITS_MS = [400, 1200];
+
+/**
  * Back to the cart with a sentence the guest can act on.
  *
  * THE SLUG IS NOT OPTIONAL
@@ -141,18 +152,21 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
    * a commit) is a thrown fetch error, not one of these codes, and is not
    * retried.
    */
-  if (isTransientPlaceCode(error?.code)) {
-    await new Promise((resolve) => setTimeout(resolve, 350));
+  for (const waitMs of TRANSIENT_RETRY_WAITS_MS) {
+    if (!isTransientPlaceCode(error?.code)) break;
+
+    console.warn('[placeOrderAction] transient failure, retrying', {
+      code: error?.code,
+      inMs: waitMs,
+    });
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+
     const retry = await supabase.rpc('place_public_order', {
       p_slug: slug,
       p_lines: lines,
       p_note: note,
       p_session_token: liveSession,
       p_guest_token: guestToken,
-    });
-    console.warn('[placeOrderAction] retried a transient failure', {
-      first: error?.code,
-      second: retry.error?.code ?? 'ok',
     });
     code = retry.data;
     error = retry.error;

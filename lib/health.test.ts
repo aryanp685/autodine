@@ -167,6 +167,7 @@ describe('health reports a rejected credential', () => {
     });
 
     expect(health.credentials).toBe('rejected');
+    expect(health.credentialProbe).toBe('PGRST301');
     expect(health.schema.trialAndWriteGate).toBe('unauthorized');
     // The database is up; it is the credential that is wrong.
     expect(health.reachable).toBe(false);
@@ -177,3 +178,18 @@ describe('health reports a rejected credential', () => {
     expect(health.credentials).toBe('accepted');
   });
 });
+
+  it('carries the class of an unclassified admin failure', async () => {
+    // 'unknown' with nothing behind it is what this endpoint said for a day
+    // while every privileged call on the deployment failed.
+    const health = await probeHealth({
+      ...base,
+      primary: picky({
+        columns: { trial_started_at: { message: 'boom', code: 'XX000' } },
+      }),
+      publicClient: picky({}),
+    });
+
+    expect(health.credentialProbe).toBe('XX000');
+    expect(health.credentials).toBe('unknown');
+  });

@@ -38,6 +38,18 @@ export type Health = {
   /** The database answered a query at all. */
   reachable: boolean;
   /**
+   * The five-character class of the first failure on a privileged read, or
+   * null when there was none.
+   *
+   * `/api/health` could say "unknown" for a year without anybody learning why:
+   * a 401, a permission denial, a timeout and a connection reset all collapsed
+   * into one word. This is the same class the guest's order screen prints, so a
+   * deployment that cannot read its own data can finally say which kind of
+   * refusal it is. It is a SQLSTATE or a PostgREST code -- five characters, no
+   * schema, no message, no rows.
+   */
+  credentialProbe: string | null;
+  /**
    * Did the database accept the credentials this deployment is holding?
    *
    * 'rejected' is the one answer that is nobody's guess: the key is wrong, the
@@ -113,10 +125,16 @@ function isMissing(error: { message: string; code?: string }): boolean {
  * the select list, so PostgREST either resolves it or refuses. No row of a real
  * restaurant is read, which matters because this runs unauthenticated.
  */
-async function columnExists(client: ProbeClient, table: string, column: string): Promise<Probe> {
+async function columnExists(
+  client: ProbeClient,
+  table: string,
+  column: string,
+  note?: (code: string) => void
+): Promise<Probe> {
   try {
     const { error } = await client.from(table).select(column).limit(0);
     if (!error) return 'applied';
+    note?.(error.code || 'none');
     if (isUnauthorized(error)) return 'unauthorized';
     return isMissing(error) ? 'missing' : 'unknown';
   } catch {
@@ -128,11 +146,13 @@ async function columnExists(client: ProbeClient, table: string, column: string):
 async function functionExists(
   client: ProbeClient,
   fn: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  note?: (code: string) => void
 ): Promise<Probe> {
   try {
     const { error } = await client.rpc(fn, args);
     if (!error) return 'applied';
+    note?.(error.code || 'none');
     if (isUnauthorized(error)) return 'unauthorized';
     return isMissing(error) ? 'missing' : 'unknown';
   } catch {
@@ -159,6 +179,7 @@ export async function probeHealth(input: {
     configured: input.configured,
     serverKey: input.serverKey,
     reachable: false,
+    credentialProbe: null,
     credentials: 'unknown',
     schema: {
       trialAndWriteGate: 'unknown',
@@ -174,10 +195,15 @@ export async function probeHealth(input: {
 
   if (!input.configured || !input.primary) return empty;
 
+  let credentialProbe: string | null = null;
+  const note = (code: string) => {
+    if (!credentialProbe) credentialProbe = code;
+  };
+
   const [trialColumn, planColumn, upiColumn, planFeatures] = await Promise.all([
-    columnExists(input.primary, 'restaurants', 'trial_started_at'),
-    columnExists(input.primary, 'restaurants', 'plan'),
-    columnExists(input.primary, 'restaurants', 'upi_id'),
+    columnExists(input.primary, 'restaurants', 'trial_started_at', note),
+    columnExists(input.primary, 'restaurants', 'plan', note),
+    columnExists(input.primary, 'restaurants', 'upi_id', note),
     input.publicClient
       ? functionExists(input.publicClient, 'plan_features', { p_plan: 'starter' })
       : input.primary
@@ -211,6 +237,7 @@ export async function probeHealth(input: {
   return {
     ...empty,
     reachable: trialColumn !== 'unreachable' && trialColumn !== 'unauthorized',
+    credentialProbe,
     credentials,
     schema: {
       trialAndWriteGate,

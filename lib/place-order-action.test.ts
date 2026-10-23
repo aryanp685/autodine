@@ -129,7 +129,8 @@ describe('placeOrderAction', () => {
     const url = await run(() => placeOrderAction(form()));
     const parsed = new URL(url, 'https://example.test');
 
-    expect(mocks.rpc).toHaveBeenCalledTimes(2);
+    // The first call plus both waits: three attempts, ~1.6 s in total.
+    expect(mocks.rpc).toHaveBeenCalledTimes(3);
     expect(parsed.searchParams.get('error')).toMatch(/system was busy for a moment/i);
     expect(parsed.searchParams.get('code')).toBe('PGRST003');
   });
