@@ -13,7 +13,7 @@
 | Order placement and kitchen sync | Connected: orders, kitchen board, cancellation and bill printing run against the database |
 | Guest UPI payment | The restaurant's own UPI ID, shown as a QR with the amount filled in. **Not** a gateway: it never marks an order paid |
 | Online payments | Built and wired end to end, but **switched off**: no gateway keys are configured on the deployment, and each restaurant's online-payment switch defaults to off |
-| Subscriptions | The seven-day trial is enforced in the database (`restaurant_can_write`). No plan can be bought, and there is no checkout — see `docs/DEMO.md` §1.3 |
+| Subscriptions | The seven-day trial is enforced in the database (`restaurant_can_write`). No plan can be bought, and there is no checkout — see `docs/SETUP.md` §6 |
 | Production readiness | Not ready for live money until a gateway key is configured and one real payment has been run through it |
 
 All restaurant names, orders, dashboard metrics, QR states and payments shown without a configured database are fictional demo content. The displayed 5% tax rate and plan prices are illustrative and must not be treated as tax or billing advice.
@@ -27,7 +27,9 @@ npm ci
 npm run dev
 ```
 
-Open <http://localhost:3000>. With no Supabase environment variables, the site runs in demo mode. To configure Supabase, copy `.env.example` to `.env.local`, fill in your own project values, and apply the migrations in `supabase/migrations/`. Never commit `.env.local` or a Supabase secret key.
+Open <http://localhost:3000>. With no Supabase environment variables, the site runs in demo mode. To configure Supabase, copy `.env.example` to `.env.local`, fill in your own project values, and apply the migrations in `supabase/migrations/`. Never commit `.env.local` or a Supabase secret key. Step by step, and the SQL to check each one: `docs/SETUP.md` (an operator runbook, kept local by `.gitignore` — see the note under Repository layout).
+
+`GET /api/health` answers "is this deployment wired up, and are the migrations on it?" in booleans — no keys, no ids, no rows.
 
 ## Quality checks
 
@@ -50,7 +52,11 @@ The SQL check parses DDL syntax; it does **not** execute migrations or prove tha
 - `supabase/` — database migrations and fictional seed data
 - `app/globals.css` — Tailwind entry, design tokens and the small amount of base CSS
 - `styles/premium.css` — the marketing layer only (the product is Tailwind)
-- `docs/DEMO.md` — setup, the demo script, and what not to claim in front of a restaurant
+- `supabase/checks/` — the SQL to run before and after the trial/plan/UPI migrations
+- `/api/health` — booleans only: is this deployment configured, and which migrations are on it?
+- `docs/SETUP.md`, `docs/DEMO.md` — the operator's runbook and the demo script. Local
+  files, not committed: `.gitignore` keeps internal notes and runbooks out of the
+  published repository, and these two contain the SQL that extends a trial by hand.
 
 ## Payments
 
