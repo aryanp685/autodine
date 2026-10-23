@@ -114,7 +114,7 @@ describe('TablesScreen', () => {
     // looked tappable and were not.
     const html = renderToStaticMarkup(<TablesScreen data={null} />);
 
-    expect(html).not.toContain('pg__miniBtn');
+    expect(html).not.toContain('data-table-action');
     expect(html).not.toContain('Regenerate');
     expect(html).toContain('Sample card');
     expect(html).toContain('cannot be managed');
@@ -125,10 +125,10 @@ describe('TablesScreen', () => {
 
     // The copy used to live in an aside next to the print sheet; the sheet is
     // print-only, so the explanation was the only part of that row people saw.
-    expect(html).toContain('pg__tableNotes');
+    expect(html).toContain('data-table-notes');
     expect(html).toContain('What a card carries');
     expect(html).toContain('256 bits of randomness');
-    expect(html).toContain('pg__printRow--sheetOnly');
+    expect(html).toContain('data-print-sheet');
   });
 
   it('previews what a guest sees: the card, not the menu', () => {

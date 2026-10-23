@@ -1,8 +1,24 @@
 import Link from 'next/link';
-import { DashboardBar } from '@/components/DashboardBar';
 import type { OutletBar } from '@/lib/outlets';
 import { Money, PaymentPill, PrepPill } from '@/components/ui';
 import { SignInPrompt } from '@/components/SignInPrompt';
+import {
+  OwnerPage,
+  PageHead,
+  SectionHead,
+  Card,
+  Panel,
+  Stat,
+  btn,
+  Tag,
+  Empty,
+  TableWrap,
+  tableClass,
+  Th,
+  Td,
+  Tr,
+  inputClass,
+} from '@/components/owner/chrome';
 import {
   demoReport,
   type ReportView,
@@ -73,14 +89,37 @@ function exportHref(type: 'summary' | 'orders' | 'items', range: ReportRange, ti
 }
 
 /** One bar in the sales chart. Height is a percentage of the busiest bucket. */
-function Bar({ label, value, peak, bills }: { label: string; value: number; peak: number; bills: number }) {
+function Bar({
+  label,
+  value,
+  peak,
+  bills,
+}: {
+  label: string;
+  value: number;
+  peak: number;
+  bills: number;
+}) {
   const height = peak > 0 ? Math.max(2, Math.round((value / peak) * 100)) : 2;
+  const empty = value <= 0;
   return (
-    <div className="rep__bar" title={`${label} · ${bills} bill${bills === 1 ? '' : 's'}`}>
-      <div className="rep__barTrack">
-        <div className="rep__barFill" style={{ height: `${height}%` }} />
+    <div
+      className="group flex min-w-0 flex-1 flex-col items-center gap-1.5"
+      title={`${label} · ${bills} bill${bills === 1 ? '' : 's'}`}
+    >
+      {/* A fixed floor so the columns have a common baseline, and the bar
+          grows up from it. The track is invisible: a bar chart with a visible
+          track at 4% reads as a value that failed. */}
+      <div className="flex h-[136px] w-full items-end justify-center">
+        <div
+          className={[
+            'w-full max-w-[40px] rounded-t-[3px] transition-[height,background-color] duration-300',
+            empty ? 'bg-gink-07' : 'bg-gink/85 group-hover:bg-gink',
+          ].join(' ')}
+          style={{ height: `${height}%` }}
+        />
       </div>
-      <span className="rep__barLabel">{label}</span>
+      <span className="w-full truncate text-center text-[10px] text-gink-46">{label}</span>
     </div>
   );
 }
@@ -128,120 +167,139 @@ export function ReportsScreen({
   const categoryPeak = Math.max(0, ...report.categories.map((c) => c.revenuePaise));
 
   return (
-    <div className="pg pg--dash" data-surface="owner">
-      <DashboardBar active="reports" outlet={outlet} />
-
-      <div className="pg__body">
-        {blocked && <SignInPrompt reason={blocked} screen="sales report" />}
-
-        <header className="pg__head pg__head--row">
-          <div>
-            <div className="pg__kicker">Reports</div>
-            <h1 className="pg__title">Sales</h1>
-            <p className="pg__lede">
-              {blocked
-                ? 'Sign in to see your takings'
-                : live
-                  ? range.label
-                  : 'Sample report · fictional takings'}
-              {' · '}
-              {timezone}
-            </p>
-          </div>
-          {live && !blocked && (
-            <div className="pg__headActions">
+    <OwnerPage active="reports" outlet={outlet} wide>
+      <PageHead
+        kicker="Reports"
+        title="Sales"
+        meta={
+          <>
+            {blocked
+              ? 'Sign in to see your takings'
+              : live
+                ? range.label
+                : 'Sample report · fictional takings'}
+            <span className="mx-2 text-gink-28">·</span>
+            {timezone}
+          </>
+        }
+        actions={
+          live && !blocked ? (
+            <div className="flex flex-wrap items-center gap-1.5">
               {/* Plain anchors, not <Link>: these URLs are route handlers that
                   answer with an attachment, so a client-side navigation would
-                  fetch an RSC payload the route cannot produce and then fall
-                  back to a full page load anyway. `download` names the file and
-                  keeps the report on screen. */}
-              <a className="pg__btn" href={exportHref('summary', range, timezone)} download>
+                  fetch an RSC payload the route cannot produce. `download`
+                  names the file and keeps the report on screen. */}
+              <a className={btn('ghost', 'sm')} href={exportHref('summary', range, timezone)} download>
                 Summary CSV
               </a>
-              <a className="pg__btn" href={exportHref('items', range, timezone)} download>
+              <a className={btn('ghost', 'sm')} href={exportHref('items', range, timezone)} download>
                 Item CSV
               </a>
-              <a className="pg__btn pg__btn--solid" href={exportHref('orders', range, timezone)} download>
+              <a className={btn('solid', 'sm')} href={exportHref('orders', range, timezone)} download>
                 Order CSV
               </a>
             </div>
-          )}
-        </header>
+          ) : null
+        }
+      />
 
-        {!blocked && (
-          <div className="rep__ranges">
-            {RANGE_TABS.map((tab) => (
-              <Link
-                key={tab.key}
-                href={rangeHref(tab.key)}
-                className={`rep__range ${range.key === tab.key ? 'is-active' : ''}`}
-                aria-current={range.key === tab.key ? 'true' : undefined}
-              >
-                {tab.label}
-              </Link>
-            ))}
+      {blocked && <SignInPrompt reason={blocked} screen="sales report" />}
 
-            <form className="rep__custom" method="get" action="/dashboard/reports">
+      {!blocked && (
+        <>
+          {/* ------------------------------------------------------- the window */}
+          <div className="mb-5 flex flex-col gap-2.5 border-b border-hair pb-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {RANGE_TABS.map((tab) => {
+                const current = range.key === tab.key;
+                return (
+                  <Link
+                    key={tab.key}
+                    href={rangeHref(tab.key)}
+                    aria-current={current ? 'true' : undefined}
+                    data-range={current ? 'current' : 'other'}
+                    className={[
+                      'inline-flex h-8 items-center rounded-full border px-3 text-[12.5px] font-medium transition-colors',
+                      'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gink',
+                      current
+                        ? 'border-gink bg-gink text-onink'
+                        : 'border-hair-strong text-gink-64 hover:border-gink-28 hover:text-gink',
+                    ].join(' ')}
+                  >
+                    {tab.label}
+                  </Link>
+                );
+              })}
+            </div>
+
+            <form
+              className="flex flex-wrap items-center gap-1.5"
+              method="get"
+              action="/dashboard/reports"
+            >
               <input type="hidden" name="range" value="custom" />
-              <label className="rep__customField">
-                <span>From</span>
-                <input type="date" name="from" required />
+              <label className="flex items-center gap-1.5 text-[11.5px] text-gink-46">
+                From
+                <input
+                  type="date"
+                  name="from"
+                  required
+                  aria-label="From"
+                  className={`${inputClass} h-8 w-[142px] text-[12px]`}
+                />
               </label>
-              <label className="rep__customField">
-                <span>To</span>
-                <input type="date" name="to" required />
+              <label className="flex items-center gap-1.5 text-[11.5px] text-gink-46">
+                To
+                <input
+                  type="date"
+                  name="to"
+                  required
+                  aria-label="To"
+                  className={`${inputClass} h-8 w-[142px] text-[12px]`}
+                />
               </label>
-              <button type="submit" className="rep__range">Apply</button>
+              <button type="submit" className={btn('ghost', 'sm')}>
+                Apply
+              </button>
             </form>
           </div>
-        )}
 
-        {!blocked && (
-          <section className="rep__stats">
-            <div className="rep__stat">
-              <div className="dash__statLabel">Sales</div>
-              <div className="dash__statValue">
-                <Money value={totals.billedPaise} />
-              </div>
-              <div className="dash__statDelta">
-                {totals.bills} bill{totals.bills === 1 ? '' : 's'} · what was sold
-              </div>
-            </div>
-            <div className="rep__stat">
-              <div className="dash__statLabel">Collected</div>
-              <div className="dash__statValue">
-                <Money value={totals.collectedPaise} />
-              </div>
-              <div className="dash__statDelta">Money actually recorded</div>
-            </div>
-            <div className="rep__stat">
-              <div className="dash__statLabel">Outstanding</div>
-              <div className="dash__statValue">
-                <Money value={totals.unpaidPaise} />
-              </div>
-              <div className="dash__statDelta">Billed, not yet settled</div>
-            </div>
-            <div className="rep__stat">
-              <div className="dash__statLabel">Average bill</div>
-              <div className="dash__statValue">
-                <Money value={totals.averageBillPaise} />
-              </div>
-              <div className="dash__statDelta">
-                {hasBills ? 'Sales ÷ bills' : 'No bills in this range'}
-              </div>
-            </div>
+          {/* ------------------------------------------------------- four figures
+              Billed and collected are never merged. Every card says, in small
+              type, exactly what its number counts. */}
+          <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Stat
+              label="Sales"
+              value={<Money value={totals.billedPaise} />}
+              meta={`${totals.bills} bill${totals.bills === 1 ? '' : 's'} · what was sold`}
+            />
+            <Stat
+              label="Collected"
+              value={<Money value={totals.collectedPaise} />}
+              meta="Money actually recorded"
+            />
+            <Stat
+              label="Outstanding"
+              value={<Money value={totals.unpaidPaise} />}
+              meta="Billed, not yet settled"
+              tone={totals.unpaidPaise > 0 ? 'live' : 'plain'}
+            />
+            <Stat
+              label="Average bill"
+              value={<Money value={totals.averageBillPaise} />}
+              meta={hasBills ? 'Sales ÷ bills' : 'No bills in this range'}
+            />
           </section>
-        )}
 
-        {!blocked && (
-          <section className="rep__grid">
-            <div className="rep__block">
-              <div className="rep__blockHead">
-                <h2>Sales by {range.bucket}</h2>
-                <span className="rep__blockMeta">Billed · {range.label}</span>
-              </div>
+          {/* ------------------------------------------------- chart + methods */}
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <Panel
+              title={`Sales by ${range.bucket}`}
+              meta={`Billed · ${range.label}`}
+              bodyClassName="px-4 py-4 sm:px-5"
+            >
               {peak > 0 ? (
-                <div className="rep__bars">
+                <div className="flex items-end gap-1.5" data-chart>
                   {report.buckets.map((bucket) => (
                     <Bar
                       key={bucket.key}
@@ -253,211 +311,237 @@ export function ReportsScreen({
                   ))}
                 </div>
               ) : (
-                <div className="kb__empty">
+                <Empty>
                   Nothing billed in this range yet. The chart fills in as orders are placed.
-                </div>
+                </Empty>
               )}
-            </div>
+            </Panel>
 
-            <div className="rep__block">
-              <div className="rep__blockHead">
-                <h2>How it was paid</h2>
-                <span className="rep__blockMeta">Recorded payments</span>
-              </div>
+            <Panel title="How it was paid" meta="Recorded payments">
               {report.methods.length > 0 || totals.unpaidPaise > 0 ? (
-                <table className="ui-table">
-                  <thead>
-                    <tr>
-                      <th>Method</th>
-                      <th className="tnum">Payments</th>
-                      <th className="tnum">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {report.methods.map((m) => (
-                      <tr key={m.method}>
-                        <td>{methodLabel(m.method)}</td>
-                        <td className="tnum">{m.count}</td>
-                        <td className="tnum">
-                          <Money value={m.recordedPaise} />
-                        </td>
-                      </tr>
-                    ))}
-                    {totals.unpaidPaise > 0 && (
+                <>
+                  <table className={tableClass}>
+                    <thead>
                       <tr>
-                        <td>Not settled yet</td>
-                        <td className="tnum">—</td>
-                        <td className="tnum">
-                          <Money value={totals.unpaidPaise} />
-                        </td>
+                        <Th>Method</Th>
+                        <Th align="right">Payments</Th>
+                        <Th align="right">Amount</Th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {report.methods.map((m) => (
+                        <Tr key={m.method}>
+                          <Td>{methodLabel(m.method)}</Td>
+                          <Td align="right">{m.count}</Td>
+                          <Td align="right">
+                            <Money value={m.recordedPaise} />
+                          </Td>
+                        </Tr>
+                      ))}
+                      {totals.unpaidPaise > 0 && (
+                        <Tr>
+                          <Td>
+                            <span className="text-gink-64">Not settled yet</span>
+                          </Td>
+                          <Td align="right">
+                            <span className="text-gink-28">—</span>
+                          </Td>
+                          <Td align="right">
+                            <Money value={totals.unpaidPaise} />
+                          </Td>
+                        </Tr>
+                      )}
+                    </tbody>
+                  </table>
+                  {totals.refundedPaise > 0 && (
+                    <p className="mt-2.5 text-[11.5px] text-gink-46">
+                      Refunded in this range: <Money value={totals.refundedPaise} />
+                    </p>
+                  )}
+                </>
               ) : (
-                <div className="kb__empty">No payments recorded in this range.</div>
+                <Empty>No payments recorded in this range.</Empty>
               )}
-              {totals.refundedPaise > 0 && (
-                <p className="rep__fine">
-                  Refunded in this range: <Money value={totals.refundedPaise} />
-                </p>
-              )}
-            </div>
-          </section>
-        )}
+            </Panel>
+          </div>
 
-        {!blocked && (
-          <section className="rep__grid">
-            <div className="rep__block">
-              <div className="rep__blockHead">
-                <h2>Top items</h2>
-                <span className="rep__blockMeta">By sales · portions counted apart</span>
-              </div>
+          {/* ------------------------------------------------ what sold, ranked */}
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <Panel title="Top items" meta="By sales · portions counted apart">
               {report.topItems.length > 0 ? (
-                <ul className="rep__rank">
+                <ul className="m-0 flex list-none flex-col p-0">
                   {report.topItems.map((item, i) => (
-                    <li key={item.name}>
-                      <span className="rep__rankNum">{String(i + 1).padStart(2, '0')}</span>
-                      <span className="rep__rankBody">
-                        <span className="rep__rankName">{item.name}</span>
-                        <span className="rep__rankBar">
+                    <li
+                      key={item.name}
+                      className="border-b border-hair py-2.5 first:pt-0 last:border-b-0 last:pb-0"
+                    >
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className="flex min-w-0 items-baseline gap-2">
+                          <span className="text-[10.5px] text-gink-28 tabular-nums">
+                            {String(i + 1).padStart(2, '0')}
+                          </span>
+                          <span className="truncate text-[12.5px] text-gink">{item.name}</span>
+                        </span>
+                        <span className="shrink-0 text-[12.5px] text-gink tabular-nums">
+                          <Money value={item.revenuePaise} />
+                        </span>
+                      </div>
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <span className="h-1 flex-1 overflow-hidden rounded-full bg-paper-deep">
                           <span
-                            className="rep__rankBarFill"
+                            className="block h-full rounded-full bg-gink/70"
                             style={{ width: `${share(item.revenuePaise, itemPeak)}%` }}
                           />
                         </span>
-                      </span>
-                      <span className="rep__rankQty">{item.qty} sold</span>
-                      <Money value={item.revenuePaise} />
+                        <span className="w-[54px] shrink-0 text-right text-[10.5px] text-gink-46 tabular-nums">
+                          {item.qty} sold
+                        </span>
+                      </div>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <div className="kb__empty">
-                  Nothing sold in this range. Items rank here once a bill exists.
-                </div>
+                <Empty>Nothing sold in this range. Items rank here once a bill exists.</Empty>
               )}
-            </div>
+            </Panel>
 
-            <div className="rep__block">
-              <div className="rep__blockHead">
-                <h2>By category</h2>
-                <span className="rep__blockMeta">From the menu, as it is today</span>
-              </div>
+            <Panel title="By category" meta="From the menu, as it is today">
               {report.categories.length > 0 ? (
-                <ul className="rep__rank">
+                <ul className="m-0 flex list-none flex-col p-0">
                   {report.categories.map((c) => (
-                    <li key={c.name}>
-                      <span className="rep__rankBody">
-                        <span className="rep__rankName">{c.name}</span>
-                        <span className="rep__rankBar">
+                    <li
+                      key={c.name}
+                      className="border-b border-hair py-2.5 first:pt-0 last:border-b-0 last:pb-0"
+                    >
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className="truncate text-[12.5px] text-gink">{c.name}</span>
+                        <span className="shrink-0 text-[12.5px] text-gink tabular-nums">
+                          <Money value={c.revenuePaise} />
+                        </span>
+                      </div>
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <span className="h-1 flex-1 overflow-hidden rounded-full bg-paper-deep">
                           <span
-                            className="rep__rankBarFill"
+                            className="block h-full rounded-full bg-gink/70"
                             style={{ width: `${share(c.revenuePaise, categoryPeak)}%` }}
                           />
                         </span>
-                      </span>
-                      <span className="rep__rankQty">{c.qty} sold</span>
-                      <Money value={c.revenuePaise} />
+                        <span className="w-[54px] shrink-0 text-right text-[10.5px] text-gink-46 tabular-nums">
+                          {c.qty} sold
+                        </span>
+                      </div>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <div className="kb__empty">No dishes sold in this range.</div>
+                <Empty>No dishes sold in this range.</Empty>
               )}
-            </div>
-          </section>
-        )}
+            </Panel>
+          </div>
 
-        {!blocked && (
-          <section className="rep__block rep__block--wide">
-            <div className="rep__blockHead">
-              <h2>Order ledger</h2>
-              <span className="rep__blockMeta">
-                {/* The list is capped, so it is only "the bills" when it is
-                    all of them. Derived from the rows themselves: the demo
-                    report has six sample bills against sixty in its totals,
-                    and the old flag was null there, so the sample screen
-                    claimed a complete list it did not have. */}
-                {ledgerNote}
-              </span>
-            </div>
-            {report.orders.length > 0 ? (
-              <table className="ui-table">
-                <thead>
-                  <tr>
-                    <th>Time</th>
-                    <th>Table</th>
-                    <th>Kitchen</th>
-                    <th>Payment</th>
-                    <th className="tnum">Total</th>
-                    <th className="tnum">Outstanding</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.orders.map((order) => {
-                    const outstanding = Math.max(0, order.totalPaise - order.paidPaise);
-                    const cancelled = order.prepStatus === 'cancelled';
-                    return (
-                      <tr key={order.id} className={cancelled ? 'rep__row--void' : undefined}>
-                        <td className="tnum">
-                          {dateTimeInZone(timezone, order.placedAt)}
-                        </td>
-                        <td>{order.tableLabel ?? 'Takeaway'}</td>
-                        <td>
-                          {cancelled ? (
-                            <span className="rep__void">Cancelled</span>
-                          ) : (
-                            <PrepPill
-                              state={
-                                order.prepStatus === 'preparing' ||
-                                order.prepStatus === 'ready' ||
-                                order.prepStatus === 'served'
-                                  ? order.prepStatus
-                                  : 'new'
-                              }
-                            />
-                          )}
-                        </td>
-                        <td>
-                          <PaymentPill
-                            state={
-                              order.paymentStatus === 'pending'
-                                ? 'pending'
-                                : order.paymentStatus === 'failed'
-                                  ? 'failed'
-                                  : 'paid'
-                            }
-                          />
-                        </td>
-                        <td className="tnum">
-                          <Money value={order.totalPaise} />
-                        </td>
-                        <td className="tnum">
-                          {outstanding > 0 ? <Money value={outstanding} /> : '—'}
-                        </td>
+          {/* --------------------------------------------------------- the ledger */}
+          <section className="mt-4" aria-labelledby="report-ledger">
+            <SectionHead
+              title={<span id="report-ledger">Order ledger</span>}
+              meta={
+                /* The list is capped, so it is only "the bills" when it is all
+                   of them. Derived from the rows themselves. */
+                ledgerNote
+              }
+            />
+            <Card className="overflow-hidden">
+              {report.orders.length > 0 ? (
+                <TableWrap>
+                  <table className={tableClass} data-report-ledger>
+                    <thead>
+                      <tr>
+                        <Th>Time</Th>
+                        <Th>Table</Th>
+                        <Th>Kitchen</Th>
+                        <Th>Payment</Th>
+                        <Th align="right">Total</Th>
+                        <Th align="right">Outstanding</Th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            ) : (
-              <div className="kb__empty">No bills in this range.</div>
-            )}
+                    </thead>
+                    <tbody>
+                      {report.orders.map((order) => {
+                        const outstanding = Math.max(0, order.totalPaise - order.paidPaise);
+                        const cancelled = order.prepStatus === 'cancelled';
+                        return (
+                          <Tr key={order.id} data-void={cancelled ? 'true' : undefined}>
+                            <Td>
+                              <span className="text-[12px] text-gink-64 tabular-nums">
+                                {dateTimeInZone(timezone, order.placedAt)}
+                              </span>
+                            </Td>
+                            <Td>{order.tableLabel ?? 'Takeaway'}</Td>
+                            <Td>
+                              {cancelled ? (
+                                <Tag tone="failed">Cancelled</Tag>
+                              ) : (
+                                <PrepPill
+                                  state={
+                                    order.prepStatus === 'preparing' ||
+                                    order.prepStatus === 'ready' ||
+                                    order.prepStatus === 'served'
+                                      ? order.prepStatus
+                                      : 'new'
+                                  }
+                                />
+                              )}
+                            </Td>
+                            <Td>
+                              <PaymentPill
+                                state={
+                                  order.paymentStatus === 'pending'
+                                    ? 'pending'
+                                    : order.paymentStatus === 'failed'
+                                      ? 'failed'
+                                      : 'paid'
+                                }
+                              />
+                            </Td>
+                            <Td align="right">
+                              <Money value={order.totalPaise} />
+                            </Td>
+                            <Td align="right">
+                              {outstanding > 0 ? (
+                                <span className="text-[var(--alert)]">
+                                  <Money value={outstanding} />
+                                </span>
+                              ) : (
+                                <span className="text-gink-28">—</span>
+                              )}
+                            </Td>
+                          </Tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </TableWrap>
+              ) : (
+                <div className="px-4 py-4">
+                  <Empty>No bills in this range.</Empty>
+                </div>
+              )}
+            </Card>
           </section>
-        )}
 
-        {!blocked && (
-          <div className="rep__notes">
-            <p className="pg__note pg__note--info">
-              <strong>Sales</strong> is what was billed: the sum of order totals, excluding
-              cancelled bills. <strong>Collected</strong> is money actually recorded against
-              those bills. <strong>Outstanding</strong> is the difference and is the figure to
-              chase. They are separate on purpose — most tables settle at the counter on the
-              way out.
+          {/* --------------------------------------------------------- the notes
+              Kept, because the difference between the two figures is the thing
+              this screen exists to make obvious. */}
+          <div className="mt-5 grid gap-2.5 lg:grid-cols-2">
+            <p className="rounded-[12px] border border-hair bg-card px-4 py-3 text-[11.5px] leading-[1.55] text-gink-64">
+              <strong className="font-semibold text-gink">Sales</strong> is what was billed: the sum
+              of order totals, excluding cancelled bills.{' '}
+              <strong className="font-semibold text-gink">Collected</strong> is money actually
+              recorded against those bills.{' '}
+              <strong className="font-semibold text-gink">Outstanding</strong> is the difference and
+              is the figure to chase. They are separate on purpose — most tables settle at the
+              counter on the way out.
             </p>
-            <p className="pg__note">
-              <strong>GST on bills:</strong>{' '}
+            <p className="rounded-[12px] border border-hair bg-card px-4 py-3 text-[11.5px] leading-[1.55] text-gink-64">
+              <strong className="font-semibold text-gink">GST on bills:</strong>{' '}
               <Money value={totals.taxPaise} /> charged across {totals.bills} bill
               {totals.bills === 1 ? '' : 's'}
               {totals.discountPaise > 0 && (
@@ -473,14 +557,16 @@ export function ReportsScreen({
               )}
               . This is what the menu charged, not a filing-ready return.
             </p>
-            {!live && (
-              <p className="pg__note pg__note--warn">
-                Database not configured — every figure on this page is fictional sample data.
-              </p>
-            )}
           </div>
-        )}
-      </div>
-    </div>
+
+          {!live && (
+            <p className="mt-2.5 rounded-[12px] border border-[var(--alert)]/25 bg-[var(--alert)]/6 px-4 py-3 text-[11.5px] leading-[1.55] text-gink-64">
+              <strong className="font-semibold text-gink">Database not configured</strong> — every
+              figure on this page is fictional sample data.
+            </p>
+          )}
+        </>
+      )}
+    </OwnerPage>
   );
 }
