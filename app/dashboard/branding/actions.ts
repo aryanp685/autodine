@@ -1,5 +1,5 @@
 /**
- * Branding writes: logo, banner, accent.
+ * Branding writes: logo and banner.
  *
  * THE ORDER OF OPERATIONS ON A REPLACE MATTERS
  *
@@ -24,7 +24,6 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { getStaffContextDetailed } from '@/lib/db/staff';
-import { ACCENT_KEYS } from '@/lib/branding/palette';
 import {
   ASSET_BUCKET,
   assetPath,
@@ -220,28 +219,15 @@ export async function removeBannerAction(): Promise<void> {
   await removeBrandAsset('banner');
 }
 
-/**
- * Pick an accent.
+/*
+ * THERE IS NO saveAccentAction ANY MORE.
  *
- * The value is checked against the closed palette before it is written, so a
- * crafted form cannot store a colour the design system has not cleared for
- * contrast. The database CHECK is the second fence.
+ * It wrote `restaurants.accent`, and the guest flow painted itself with that
+ * value -- so two restaurants were two products. The flow is now one design for
+ * every customer (lib/branding/palette.ts, guestAccentStyle), which made this
+ * action a Save button for a change nobody could see. Removed rather than left
+ * dormant: a server action is a URL, and a URL that writes a column nothing
+ * renders is a liability with no upside.
+ *
+ * The column stays. It holds each restaurant's old choice untouched.
  */
-export async function saveAccentAction(formData: FormData): Promise<void> {
-  const ctx = await context();
-  if (!ctx) fail('You need to be an owner or manager to change branding.');
-
-  const raw = String(formData.get('accent') ?? '').trim().toLowerCase();
-  const accent = ACCENT_KEYS.find((key) => key === raw);
-  if (!accent) fail('That is not one of the available colours.');
-
-  const { data: saved, error } = await ctx.supabase
-    .from('restaurants')
-    .update({ accent, updated_at: new Date().toISOString() })
-    .eq('id', ctx.restaurantId)
-    .select('id');
-
-  if (error || !saved || saved.length === 0) fail('Could not save that colour. Nothing was changed.');
-
-  done('Accent saved.');
-}

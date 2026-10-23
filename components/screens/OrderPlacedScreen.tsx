@@ -5,7 +5,7 @@ import { GuestOrderEditor } from '@/components/screens/GuestOrderEditor';
 import { PayOnline } from '@/components/PayOnline';
 import { PayUpi } from '@/components/PayUpi';
 import { GuestFlow } from '@/components/GuestFlow';
-import { accentStyle } from '@/lib/branding/palette';
+import { guestAccentStyle } from '@/lib/branding/palette';
 import { OrderStatusRefresh } from '@/components/OrderStatusRefresh';
 import { GUEST_CHANGE_WINDOW_MS, type OrderScreenData } from '@/lib/db/order-screen';
 import type { OnlineOffer } from '@/lib/payments/online-availability';
@@ -118,11 +118,8 @@ export function OrderPlacedScreen({
   token,
   slug,
   onlinePay,
-  accent,
 }: {
   data: OrderScreenData | null;
-  /** Palette key from the restaurant row; see lib/branding/palette.ts. */
-  accent?: string;
   /** The guest's credential from the URL. Absent on a stale or hand-typed link. */
   token?: string;
   /** Which restaurant, for the pay button's server call. */
@@ -138,7 +135,7 @@ export function OrderPlacedScreen({
     return (
       <div
         data-flow-root=""
-        style={accentStyle(accent)}
+        style={guestAccentStyle()}
         className="mx-auto min-h-dvh w-full max-w-[560px] px-5 py-16 text-gink"
       >
         <p className="g-eyebrow">Order</p>
@@ -168,7 +165,7 @@ export function OrderPlacedScreen({
   return (
     <GuestFlow
       step="placed"
-      style={accentStyle(accent)}
+      style={guestAccentStyle()}
       venue={data.restaurantName}
       table={data.tableLabel}
       dock={

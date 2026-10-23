@@ -19,7 +19,7 @@ import { DishPhoto } from '@/components/DishPhoto';
 import { GuestTabs } from '@/components/GuestTabs';
 import { GuestFlow } from '@/components/GuestFlow';
 import { MenuIdentity } from '@/components/MenuIdentity';
-import { accentStyle } from '@/lib/branding/palette';
+import { guestAccentStyle } from '@/lib/branding/palette';
 import { useCart } from '@/components/CartProvider';
 import { priceCart } from '@/lib/cart-pricing';
 import { filterDishes } from '@/lib/guest-search';
@@ -175,7 +175,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
     <GuestFlow
       step="menu"
       /* The accent paints the whole flow, so it is applied once at the root. */
-      style={accentStyle(data?.restaurant.accent)}
+      style={guestAccentStyle()}
       venue={restaurant.name}
       table={table?.label ?? null}
       dock={
@@ -647,7 +647,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
     return (
       <div
         data-flow-root=""
-        style={accentStyle(data?.restaurant.accent)}
+        style={guestAccentStyle()}
         className="mx-auto min-h-dvh w-full max-w-[560px] px-5 py-16 text-gink"
       >
         <p className="text-[11px] font-semibold tracking-[0.12em] text-gink-46 uppercase">Not on the menu</p>
@@ -669,7 +669,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
   }
 
   return (
-    <div data-flow-root="" style={accentStyle(data?.restaurant.accent)} className="min-h-dvh text-gink">
+    <div data-flow-root="" style={guestAccentStyle()} className="min-h-dvh text-gink">
       {/* The menu itself, still there behind the sheet. It is dimmed and made
           inert rather than removed: a guest who closes the sheet lands back on
           the dish they were reading, at the scroll position they left. */}

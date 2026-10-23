@@ -72,9 +72,29 @@ export function accentFrom(value: unknown): Accent {
   return ACCENTS.find((a) => a.key === key) ?? ACCENTS[0];
 }
 
-/** Inline style object that re-themes the guest flow. */
-export function accentStyle(value: unknown): Record<string, string> {
-  const { accent, soft } = accentFrom(value);
+/**
+ * The accent every guest sees, whichever restaurant they are sitting in.
+ *
+ * WHY THIS IS A CONSTANT AND NOT THE RESTAURANT'S ROW
+ *
+ * The flow used to take its accent from `restaurants.accent`, so two
+ * restaurants produced two different products: same menu, same buttons, one
+ * green and one maroon. A guest moving between them -- and an owner comparing
+ * what they see against what they were shown -- had no way to tell a branding
+ * choice from a design change. "Every customer should see the same UI" is the
+ * instruction, and this is it: one look, one set of colours, everywhere.
+ *
+ * The palette below still exists and is still contrast-checked, because that is
+ * what makes THIS colour safe; and `restaurants.accent` still holds whatever
+ * an owner picked, waiting for a day when per-restaurant theming is a product
+ * decision rather than an accident of plumbing. Nothing in the guest flow
+ * reads it today.
+ */
+export const GUEST_ACCENT: AccentKey = 'maroon';
+
+/** Inline style object that paints the guest flow. Takes no input, on purpose. */
+export function guestAccentStyle(): Record<string, string> {
+  const { accent, soft } = accentFrom(GUEST_ACCENT);
   return { '--p-accent': accent, '--p-accent-soft': soft };
 }
 

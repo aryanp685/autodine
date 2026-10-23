@@ -71,6 +71,30 @@ function render(table?: { label: string } | null) {
   return renderToStaticMarkup(<CustomerMenu data={data(table)} />);
 }
 
+describe('one look for every customer', () => {
+  /**
+   * The same menu, at two restaurants that picked different brands.
+   *
+   * The flow used to be painted with `restaurants.accent`, so these two would
+   * have come out in different colours -- the same product looking like two,
+   * and an owner unable to tell a branding choice from a design change. Every
+   * guest now gets the same UI; the restaurant's own colour lives in the data
+   * and nowhere on the screen.
+   */
+  it('renders identical colours for two restaurants with different accents', () => {
+    const green = renderToStaticMarkup(
+      <CustomerMenu data={{ ...data(), restaurant: { ...restaurant, accent: 'forest' } } as never} />,
+    );
+    const indigo = renderToStaticMarkup(
+      <CustomerMenu data={{ ...data(), restaurant: { ...restaurant, accent: 'indigo' } } as never} />,
+    );
+
+    const accentOf = (html: string) => html.match(/--p-accent:#[0-9A-Fa-f]{6}/)?.[0];
+    expect(accentOf(green)).toBeTruthy();
+    expect(accentOf(green)).toBe(accentOf(indigo));
+  });
+});
+
 describe('menu tabs', () => {
   it('shows a tab per published menu, and links to each one', () => {
     // Two menus used to be merged into one list, with half the dishes failing
