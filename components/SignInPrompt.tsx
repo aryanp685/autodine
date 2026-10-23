@@ -28,10 +28,16 @@ export function SignInPrompt({
   const signedOut = reason === 'signed-out';
 
   return (
-    <div className="pg__signin" role="status">
-      <div className="pg__signinBody">
-        <strong>{signedOut ? 'Sign in to see this screen.' : 'No restaurant on this account yet.'}</strong>
-        <p>
+    <div
+      role="status"
+      data-signin-prompt={reason}
+      className="mb-5 flex flex-col gap-3 rounded-[14px] border border-hair-strong bg-card px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <div className="min-w-0">
+        <strong className="text-[13.5px] font-semibold text-gink">
+          {signedOut ? 'Sign in to see this screen.' : 'No restaurant on this account yet.'}
+        </strong>
+        <p className="mt-1 max-w-[62ch] text-[12.5px] leading-[1.55] text-gink-64">
           {signedOut ? (
             <>
               The {screen} reads real data, and it is filtered to the restaurant your account
@@ -45,11 +51,17 @@ export function SignInPrompt({
           )}
         </p>
       </div>
-      <div className="pg__signinActions">
-        <Link href="/login" className="pg__btn pg__btn--solid">
+      <div className="flex shrink-0 flex-wrap gap-2">
+        <Link
+          href="/login"
+          className="inline-flex h-9 items-center rounded-full bg-gink px-4 text-[12.5px] font-medium text-onink transition-colors hover:bg-gink/88"
+        >
           Sign in
         </Link>
-        <Link href="/signup" className="pg__btn">
+        <Link
+          href="/signup"
+          className="inline-flex h-9 items-center rounded-full border border-hair-strong px-4 text-[12.5px] font-medium text-gink transition-colors hover:bg-gink-07"
+        >
           Create an account
         </Link>
       </div>

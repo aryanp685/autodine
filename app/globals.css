@@ -296,3 +296,10 @@ img { display: block; max-width: 100%; }
 @media (prefers-reduced-motion: reduce) {
   .animate-\[gbar_260ms_cubic-bezier\(0\.22\,1\,0\.36\,1\)\] { animation: none !important; }
 }
+
+/* The skeleton's pulse: opacity only, on a flat fill. No shimmer sweep -- it
+ * costs paint on a mid-range phone and does not read as meaning anything. */
+@keyframes skelpulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.95; }
+}

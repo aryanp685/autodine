@@ -27,47 +27,52 @@
  * description of a placeholder. The live region in the layout announces the
  * route change, which is the part that helps.
  */
+const bar = 'rounded-[3px] bg-paper-deep animate-[skelpulse_1.6s_ease-in-out_infinite] motion-reduce:animate-none motion-reduce:opacity-60';
+
 export function RouteSkeleton({
   variant = 'page',
 }: {
   variant?: 'page' | 'rows' | 'board' | 'dashboard';
 }) {
   return (
-    <div className="skel" aria-hidden="true">
-      <div className="skel__bar skel__bar--kicker" />
-      <div className="skel__bar skel__bar--title" />
-      <div className="skel__bar skel__bar--lede" />
+    <div
+      aria-hidden="true"
+      className="mx-auto grid w-full max-w-[1180px] content-start gap-3.5 px-5 pt-8 pb-24 sm:px-7 sm:pt-16"
+    >
+      <div className={`${bar} h-2 w-[92px]`} />
+      <div className={`${bar} mt-2.5 h-[30px] w-[min(46%,420px)] max-sm:w-[74%] max-sm:h-6`} />
+      <div className={`${bar} h-3 w-[min(62%,560px)] max-sm:w-full`} />
 
       {variant === 'page' && (
         <>
-          <div className="skel__bar skel__bar--lede skel__bar--short" />
-          <div className="skel__cards">
-            <div className="skel__card" />
-            <div className="skel__card" />
+          <div className={`${bar} h-3 w-[min(38%,340px)]`} />
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div className="h-[132px] rounded-[14px] border border-hair bg-card animate-[skelpulse_1.6s_ease-in-out_infinite] motion-reduce:animate-none" />
+            <div className="h-[132px] rounded-[14px] border border-hair bg-card animate-[skelpulse_1.6s_ease-in-out_infinite] motion-reduce:animate-none" />
           </div>
         </>
       )}
 
       {variant === 'rows' && (
-        <div className="skel__rows">
+        <div className="mt-5 border-t border-hair">
           {[0, 1, 2, 3, 4].map((i) => (
-            <div key={i} className="skel__row">
-              <div className="skel__bar skel__bar--row" />
-              <div className="skel__bar skel__bar--num" />
+            <div key={i} className="flex items-center justify-between gap-4 border-b border-hair py-4">
+              <div className={`${bar} h-3 w-[min(70%,520px)]`} />
+              <div className={`${bar} h-3 w-16`} />
             </div>
           ))}
         </div>
       )}
 
       {variant === 'board' && (
-        <div className="skel__cols">
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2].map((col) => (
-            <div key={col} className="skel__col">
+            <div key={col} className="grid content-start gap-3.5">
               {[0, 1].map((card) => (
-                <div key={card} className="skel__ticket">
-                  <div className="skel__bar skel__bar--ticketHead" />
-                  <div className="skel__bar skel__bar--lede" />
-                  <div className="skel__bar skel__bar--short" />
+                <div key={card} className="grid min-h-[120px] gap-2.5 rounded-[14px] border border-hair bg-card p-4">
+                  <div className={`${bar} h-4 w-[52%]`} />
+                  <div className={`${bar} h-3 w-[62%]`} />
+                  <div className={`${bar} h-3 w-[38%]`} />
                 </div>
               ))}
             </div>
@@ -77,16 +82,19 @@ export function RouteSkeleton({
 
       {variant === 'dashboard' && (
         <>
-          <div className="skel__stats">
+          <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
             {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="skel__stat" />
+              <div
+                key={i}
+                className="h-24 rounded-[14px] border border-hair bg-card animate-[skelpulse_1.6s_ease-in-out_infinite] motion-reduce:animate-none"
+              />
             ))}
           </div>
-          <div className="skel__rows">
+          <div className="mt-5 border-t border-hair">
             {[0, 1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="skel__row">
-                <div className="skel__bar skel__bar--row" />
-                <div className="skel__bar skel__bar--num" />
+              <div key={i} className="flex items-center justify-between gap-4 border-b border-hair py-4">
+                <div className={`${bar} h-3 w-[min(70%,520px)]`} />
+                <div className={`${bar} h-3 w-16`} />
               </div>
             ))}
           </div>

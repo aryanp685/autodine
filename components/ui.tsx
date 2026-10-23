@@ -67,14 +67,30 @@ export function QrChip({ value, size = 96 }: { value: string; size?: number }) {
 }
 
 export function VegMark({ veg, size = 14 }: { veg: boolean; size?: number }) {
+  /* The square-and-dot mark, drawn rather than typed. It is a legal marker in
+     India, not a decoration, so the colours are the two conventional ones and
+     they are hard-coded on purpose: a restaurant's accent must never repaint a
+     dietary mark. */
   return (
     <span
-      className={`ui-veg ${veg ? 'ui-veg--veg' : 'ui-veg--non'}`}
+      data-veg={veg ? 'veg' : 'non'}
+      className={[
+        'inline-grid shrink-0 place-items-center rounded-[3px] border-[1.5px] bg-transparent',
+        veg ? 'border-[#1a7f37]' : 'border-[#9b2c2c]',
+      ].join(' ')}
       style={{ width: size, height: size }}
       title={veg ? 'Vegetarian' : 'Non-vegetarian'}
       aria-label={veg ? 'Vegetarian' : 'Non-vegetarian'}
     >
-      <i />
+      <span
+        aria-hidden="true"
+        className="block rounded-full"
+        style={{
+          width: Math.max(4, Math.round(size * 0.42)),
+          height: Math.max(4, Math.round(size * 0.42)),
+          background: veg ? '#1a7f37' : '#9b2c2c',
+        }}
+      />
     </span>
   );
 }
@@ -93,9 +109,7 @@ export function VegMark({ veg, size = 14 }: { veg: boolean; size?: number }) {
  */
 export function Money({ value, strong = false }: { value: number; strong?: boolean }) {
   return (
-    <span className="money" style={strong ? { fontWeight: 600 } : undefined}>
-      {inr(paiseToRupees(value))}
-    </span>
+    <span className={strong ? 'font-semibold tabular-nums' : 'tabular-nums'}>{inr(paiseToRupees(value))}</span>
   );
 }
 
@@ -113,8 +127,34 @@ export function Sparkline({ data, width = 120, height = 34 }: { data: number[]; 
 
 export type PillTone = 'sage' | 'alert' | 'blue' | 'sand' | 'ink' | 'outline';
 
+/**
+ * A status pill.
+ *
+ * These live here rather than with the owner kit because the kitchen board, the
+ * counter and the order lists all use them, and the guest's order page uses the
+ * same two words for the same two states. The owner palette supplies the
+ * values: green for paid or ready, a muted red for money still owed, ink for
+ * something new, hairline for something finished.
+ */
 export function Pill({ children, tone = 'outline' }: { children: React.ReactNode; tone?: PillTone }) {
-  return <span className={`ui-badge ui-badge--${tone}`}>{children}</span>;
+  const tones: Record<PillTone, string> = {
+    sage: 'bg-accent-soft text-[var(--p-accent)] ring-[var(--p-accent)]/20',
+    alert: 'bg-[var(--alert)]/8 text-[var(--alert)] ring-[var(--alert)]/20',
+    blue: 'bg-accent-soft text-[var(--p-accent)] ring-[var(--p-accent)]/15',
+    sand: 'bg-paper-deep text-gink-64 ring-hair',
+    ink: 'bg-gink text-onink ring-transparent',
+    outline: 'bg-transparent text-gink-46 ring-hair-strong',
+  };
+  return (
+    <span
+      className={[
+        'inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-semibold tracking-[0.02em] whitespace-nowrap ring-1 ring-inset',
+        tones[tone],
+      ].join(' ')}
+    >
+      {children}
+    </span>
+  );
 }
 
 export function PaymentPill({ state }: { state: 'paid' | 'pending' | 'failed' }) {
@@ -135,5 +175,9 @@ export function PrepPill({ state }: { state: 'new' | 'preparing' | 'ready' | 'se
 }
 
 export function Avatar({ initials }: { initials: string }) {
-  return <span className="ui-avatar">{initials}</span>;
+  return (
+    <span className="grid size-8 shrink-0 place-items-center rounded-full bg-gink text-[11px] font-semibold text-onink">
+      {initials}
+    </span>
+  );
 }

@@ -78,8 +78,8 @@ describe('DashboardBar', () => {
    */
   it('hides the outlet picker when there is only one outlet', () => {
     const single = { outlets: [OUTLET.outlets[0]], activeId: 'r1' };
-    expect(html({ active: 'overview', outlet: single })).not.toContain('pg__outletSelect');
-    expect(html({ active: 'overview', outlet: OUTLET })).toContain('pg__outletSelect');
+    expect(html({ active: 'overview', outlet: single })).not.toContain('id="outlet-switcher"');
+    expect(html({ active: 'overview', outlet: OUTLET })).toContain('id="outlet-switcher"');
   });
 
   it('offers a way out only where somebody is signed in', () => {

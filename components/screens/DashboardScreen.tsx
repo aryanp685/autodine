@@ -5,7 +5,19 @@ import type { ReactNode } from 'react';
 import { dashboardStats, recentOrders, restaurant, sparkline, topItems } from '@/lib/demo-data';
 import { Money, PaymentPill, PrepPill, Sparkline } from '@/components/ui';
 import { SignInPrompt } from '@/components/SignInPrompt';
-import { DashboardBar } from '@/components/DashboardBar';
+import {
+  BtnLink,
+  Empty,
+  OwnerPage,
+  PageHead,
+  Panel,
+  Td,
+  Tag,
+  Th,
+  TableWrap,
+  Tr,
+  tableClass,
+} from '@/components/owner/chrome';
 import type { DashboardScreenData } from '@/lib/db/dashboard-screen';
 import { clockTimeInZone } from '@/lib/db/time';
 
@@ -94,183 +106,221 @@ export function Dashboard({
   const chartable = live && data ? data.hourlyPaise.length >= 2 : true;
   const chartHasValue = live && data ? data.hourlyPaise.some((v) => v > 0) : true;
 
+  const orders = live ? (data?.orders ?? []) : [];
+  const openCount = live && stats ? stats.openOrders : 5;
+
   return (
-    <div className="pg pg--dash app" data-surface="owner">
-      <DashboardBar active="overview" outlet={outlet} signOut={!blocked} />
-
-      <main className="dash__main">
-        <header className="dash__head">
-          <div>
-            <div className="dash__kicker">
-              {live ? 'Overview · today, restaurant time' : 'Sample dashboard · fictional data'}
-            </div>
-            <h1 className="dash__h1">{venueName || 'Restaurant overview'}</h1>
-            {venueMeta && <p className="dash__venueMeta">{venueMeta}</p>}
-          </div>
-          <div className="dash__headRight">
-            <Link href="/cashier" className="dash__ghostBtn">
+    <OwnerPage active="overview" outlet={outlet} signOut={!blocked}>
+      <PageHead
+        kicker={live ? 'Overview · today, restaurant time' : 'Sample dashboard · fictional data'}
+        title={venueName || 'Restaurant overview'}
+        meta={venueMeta || undefined}
+        actions={
+          <>
+            <BtnLink href="/cashier" tone="ghost">
               Open the counter
-            </Link>
-            <Link href="/kitchen" className="dash__solidBtn">
+            </BtnLink>
+            <BtnLink href="/kitchen" tone="solid">
               Open the kitchen board
-            </Link>
-          </div>
-        </header>
+            </BtnLink>
+          </>
+        }
+      />
 
-        {blocked && <SignInPrompt reason={blocked} screen="dashboard" />}
+      {blocked && <SignInPrompt reason={blocked} screen="dashboard" />}
 
-        {!blocked && !live && (
-          <div className="dash__trialStrip" role="note">
-            <span className="dash__trialDot" />
-            <strong>Preview mode</strong>
-            <span className="dash__trialText">
-              Metrics and orders are fictional. Live ordering and payment processing are disabled.
-            </span>
-            <Link href="/menu" className="dash__trialLink">
-              Open the menu
-            </Link>
-          </div>
-        )}
+      {!blocked && !live && (
+        <div
+          role="note"
+          className="mb-5 flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-[12px] border border-[var(--p-accent)]/20 bg-accent-soft px-3.5 py-2.5"
+        >
+          <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--p-accent)]" />
+          <strong className="text-[12.5px] font-semibold text-gink">Preview mode</strong>
+          <span className="text-[12px] text-gink-64">
+            Metrics and orders are fictional. Live ordering and payment processing are disabled.
+          </span>
+          <Link
+            href="/menu"
+            className="ml-auto text-[12px] font-medium text-[var(--p-accent)] underline underline-offset-2"
+          >
+            Open the menu
+          </Link>
+        </div>
+      )}
 
-        <section className="dash__stats">
-          {cards.map((card) => (
-            <div key={card.label} className="dash__stat">
-              <div className="dash__statLabel">{card.label}</div>
-              <div className="dash__statValue">{card.value}</div>
-              <div className="dash__statDelta">{card.meta}</div>
+      {/* Four figures, each with the sentence that says what it counts. On a
+          phone they are two by two, not one long column: a KPI you have to
+          scroll past is not a KPI. */}
+      <section aria-label="Today at a glance" className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+        {cards.map((card, index) => (
+          <div
+            key={card.label}
+            style={{ ['--i' as string]: index }}
+            className="rounded-[14px] border border-hair bg-card p-4 transition-colors hover:border-hair-strong"
+          >
+            <div className="text-[11px] font-medium tracking-[0.02em] text-gink-46">{card.label}</div>
+            <div className="mt-2.5 text-[clamp(1.5rem,2.6vw,2.1rem)] leading-none font-medium tracking-[-0.045em] text-gink tabular-nums">
+              {card.value}
             </div>
-          ))}
-        </section>
-
-        <section className="dash__split">
-          <div className="dash__block">
-            <div className="dash__blockHead">
-              <h2>Revenue today</h2>
-              <span className="dash__blockMeta">
-                {live ? 'By hour, restaurant time' : 'Peak 8:30–9:30 PM'}
-              </span>
-            </div>
-            {chartable && chartHasValue ? (
-              <div className="dash__chart">
-                <Sparkline
-                  data={live && data ? data.hourlyPaise : sparkline}
-                  width={520}
-                  height={120}
-                />
-              </div>
-            ) : (
-              <div className="dash__empty">
-                {chartable
-                  ? 'No settled payments yet today. The chart fills in as orders are paid for.'
-                  : 'Today has only just started. The chart needs an hour of trading before it can show a shape.'}
-              </div>
-            )}
+            <div className="mt-2 text-[11px] leading-[1.4] text-gink-46">{card.meta}</div>
           </div>
-          <div className="dash__block">
-            <div className="dash__blockHead">
-              <h2>Top items</h2>
-              <span className="dash__blockMeta">Today, by quantity sold</span>
+        ))}
+      </section>
+
+      <div className="mt-5 grid gap-2.5 lg:grid-cols-[1.15fr_0.85fr]">
+        {/* The chart is deliberately quiet: one line, no gridlines, no axis
+            labels. The number above it is the reading; this is the shape. */}
+        <Panel
+          title="Revenue today"
+          meta={live ? 'By hour, restaurant time' : 'Peak 8:30–9:30 PM'}
+          action={<Tag tone="neutral">{live ? 'Live' : 'Sample'}</Tag>}
+        >
+          {chartable && chartHasValue ? (
+            <div className="text-gink" data-chart>
+              <Sparkline data={live && data ? data.hourlyPaise : sparkline} width={520} height={120} />
             </div>
-            {itemRows.length > 0 ? (
-              <ul className="dash__rank">
-                {itemRows.map((t, i) => (
-                  <li key={t.name}>
-                    <span className="dash__rankNum">{String(i + 1).padStart(2, '0')}</span>
-                    <span className="dash__rankName">{t.name}</span>
-                    <span className="dash__rankSold">{t.qty} sold</span>
+          ) : (
+            <Empty>
+              {chartable
+                ? 'No settled payments yet today. The chart fills in as orders are paid for.'
+                : 'Today has only just started. The chart needs an hour of trading before it can show a shape.'}
+            </Empty>
+          )}
+        </Panel>
+
+        <Panel title="Top items" meta="Today, by quantity sold">
+          {itemRows.length > 0 ? (
+            <ul className="flex flex-col">
+              {itemRows.map((t, i) => (
+                <li
+                  key={t.name}
+                  className="flex items-baseline gap-3 border-b border-hair py-2.5 last:border-b-0 first:pt-0 last:pb-0"
+                >
+                  <span className="tnum w-5 shrink-0 text-[11px] font-semibold text-gink-46">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[13.5px] text-gink">{t.name}</span>
+                  <span className="tnum shrink-0 text-[11.5px] text-gink-46">{t.qty} sold</span>
+                  <span className="w-20 shrink-0 text-right text-[13px] font-medium text-gink">
                     <Money value={t.revenuePaise} />
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="dash__empty">
-                Nothing sold yet today. Items rank here once the first order of the day is placed.
-              </div>
-            )}
-          </div>
-        </section>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <Empty>Nothing sold yet today. Items rank here once the first order of the day is placed.</Empty>
+          )}
+        </Panel>
+      </div>
 
-        <section className="dash__block">
-          <div className="dash__blockHead">
-            <h2>{live ? 'Orders today' : 'Live orders'}</h2>
-            <span className="dash__blockMeta">
-              {live && stats
-                ? `${stats.openOrders} open · ${stats.ordersToday} today`
-                : '5 open · 2 awaiting counter payment'}
-            </span>
-          </div>
+      <div className="mt-5">
+        <Panel
+          title={live ? 'Orders today' : 'Live orders'}
+          meta={
+            live && stats
+              ? `${stats.openOrders} open · ${stats.ordersToday} today`
+              : '5 open · 2 awaiting counter payment'
+          }
+          bodyClassName=""
+          action={
+            <Link
+              href="/dashboard/orders"
+              className="text-[12px] font-medium text-gink-64 underline underline-offset-2 hover:text-gink"
+            >
+              All orders
+            </Link>
+          }
+        >
           {live ? (
-            data && data.orders.length > 0 ? (
-              <table className="ui-table">
-                <thead>
-                  <tr>
-                    <th>Order</th>
-                    <th>Table</th>
-                    <th>Placed</th>
-                    <th>Payment</th>
-                    <th>Status</th>
-                    <th style={{ textAlign: 'right' }}>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.orders.map((o) => (
-                    <tr key={o.id}>
-                      <td className="tnum">{o.code}</td>
-                      <td>{o.table}</td>
-                      <td className="tnum">{clockTimeInZone(timezone, o.placedAt)}</td>
-                      <td>
-                        <PaymentPill state={paymentState(o.paymentStatus)} />
-                      </td>
-                      <td>
-                        <PrepPill state={prepState(o.prepStatus)} />
-                      </td>
-                      <td className="tnum" style={{ textAlign: 'right' }}>
-                        <Money value={o.totalPaise} strong />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            orders.length > 0 ? (
+              <OrderTable
+                rows={orders.map((o) => ({
+                  key: o.id,
+                  code: o.code,
+                  table: o.table,
+                  placed: clockTimeInZone(timezone, o.placedAt),
+                  payment: paymentState(o.paymentStatus),
+                  prep: prepState(o.prepStatus),
+                  totalPaise: o.totalPaise,
+                }))}
+              />
             ) : (
-              <div className="dash__empty">
-                No orders yet today. Orders placed from the customer menu appear here as soon as
-                they are sent to the kitchen.
+              <div className="px-4 py-4 sm:px-5">
+                <Empty>
+                  No orders yet today. Orders placed from the customer menu appear here as soon as
+                  they are sent to the kitchen.
+                </Empty>
               </div>
             )
           ) : (
-            <table className="ui-table">
-              <thead>
-                <tr>
-                  <th>Order</th>
-                  <th>Table</th>
-                  <th>Placed</th>
-                  <th>Payment</th>
-                  <th>Status</th>
-                  <th style={{ textAlign: 'right' }}>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentOrders.map((o) => (
-                  <tr key={o.id}>
-                    <td className="tnum">{o.id}</td>
-                    <td>{o.table}</td>
-                    <td className="tnum">{o.at}</td>
-                    <td>
-                      <PaymentPill state={paymentState(o.payment)} />
-                    </td>
-                    <td>
-                      <PrepPill state={prepState(o.state.toLowerCase())} />
-                    </td>
-                    <td className="tnum" style={{ textAlign: 'right' }}>
-                      <Money value={rupeesToPaise(o.total)} strong />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <OrderTable
+              rows={recentOrders.map((o) => ({
+                key: o.id,
+                code: o.id,
+                table: o.table,
+                placed: o.at,
+                payment: paymentState(o.payment),
+                prep: prepState(o.state.toLowerCase()),
+                totalPaise: rupeesToPaise(o.total),
+              }))}
+            />
           )}
-        </section>
-      </main>
-    </div>
+        </Panel>
+      </div>
+
+      <p className="mt-4 text-[11px] text-gink-46">
+        {openCount} open now · figures are read from the restaurant&rsquo;s clock, never the server&rsquo;s.
+      </p>
+    </OwnerPage>
+  );
+}
+
+/** One table shape for both sources, so the two branches cannot drift apart. */
+function OrderTable({
+  rows,
+}: {
+  rows: Array<{
+    key: string;
+    code: string;
+    table: string;
+    placed: string;
+    payment: 'paid' | 'pending' | 'failed';
+    prep: 'new' | 'preparing' | 'ready' | 'served';
+    totalPaise: number;
+  }>;
+}) {
+  return (
+    <TableWrap>
+      <table className={tableClass}>
+        <thead>
+          <tr>
+            <Th>Order</Th>
+            <Th>Table</Th>
+            <Th>Placed</Th>
+            <Th>Payment</Th>
+            <Th>Status</Th>
+            <Th align="right">Total</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((o) => (
+            <Tr key={o.key}>
+              <Td className="tnum font-medium">{o.code}</Td>
+              <Td>{o.table}</Td>
+              <Td className="tnum text-gink-64">{o.placed}</Td>
+              <Td>
+                <PaymentPill state={o.payment} />
+              </Td>
+              <Td>
+                <PrepPill state={o.prep} />
+              </Td>
+              <Td align="right">
+                <Money value={o.totalPaise} strong />
+              </Td>
+            </Tr>
+          ))}
+        </tbody>
+      </table>
+    </TableWrap>
   );
 }
