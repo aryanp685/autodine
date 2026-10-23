@@ -21,6 +21,8 @@
  */
 
 import Link from 'next/link';
+import { BrandLockup } from '@/components/BrandMark';
+import { BRAND_GREEN } from '@/lib/brand';
 import { useEffect } from 'react';
 
 export type SiteNavLink = { label: string; href: string; active?: boolean };
@@ -78,11 +80,7 @@ export function SiteNav({
       data-site-nav
     >
       <Link href="/" className="siteNav__brand" aria-label="AutoDine home">
-        <span className="siteNav__mark" aria-hidden="true">
-          <i />
-          <i />
-        </span>
-        AutoDine
+        <BrandLockup size={22} ink="currentColor" dot={BRAND_GREEN} />
       </Link>
 
       <nav aria-label="Primary">

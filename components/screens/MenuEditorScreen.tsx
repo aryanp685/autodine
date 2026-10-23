@@ -156,7 +156,7 @@ export function MenuEditorScreen({
       : (selected as { desc: string }).desc;
 
   return (
-    <div className="pg pg--dash">
+    <div className="pg pg--dash" data-surface="owner">
       <DashboardBar active="menus" outlet={outlet} />
 
       <div className="pg__subbar">

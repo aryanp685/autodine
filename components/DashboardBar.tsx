@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { OutletSwitcher } from '@/components/OutletSwitcher';
 import { ShellSearch } from '@/components/ShellSearch';
+import { BrandLockup } from '@/components/BrandMark';
+import { BRAND_GREEN } from '@/lib/brand';
 import { DASHBOARD_LINKS, SHELL_GROUPS, type DashboardSection } from '@/components/shell-links';
 import type { OutletBar } from '@/lib/outlets';
 import { signOutAction } from '@/app/auth/actions';
@@ -105,13 +107,7 @@ export function DashboardBar({
       <aside id="app-rail" className={`shell__rail ${open ? 'is-open' : ''}`} aria-label="Restaurant">
         <div className="shell__brandRow">
           <Link href="/" className="shell__brand" aria-label="AutoDine">
-            <span className="shell__mark" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
-                <circle cx="12" cy="10" r="4.2" stroke="currentColor" strokeWidth="1.7" />
-                <path d="M6 18.5h12" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-              </svg>
-            </span>
-            AutoDine
+            <BrandLockup size={21} ink="currentColor" dot={BRAND_GREEN} />
           </Link>
 
           <button

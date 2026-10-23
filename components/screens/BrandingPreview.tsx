@@ -31,7 +31,7 @@ export function BrandingPreview({
 }) {
   if (data?.blocked) {
     return (
-      <div className="pg pg--dash">
+      <div className="pg pg--dash" data-surface="owner">
         <div className="pg__body">
           <SignInPrompt reason={data.blocked} screen="menu preview" />
         </div>

@@ -55,7 +55,7 @@ export function TablesScreen({
   const minutes = `${codeMinutes} ${codeMinutes === 1 ? 'minute' : 'minutes'}`;
 
   return (
-    <div className="pg pg--dash">
+    <div className="pg pg--dash" data-surface="owner">
       <DashboardBar active="tables" outlet={outlet} />
 
       <div className="pg__body">

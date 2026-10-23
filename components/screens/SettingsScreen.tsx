@@ -57,7 +57,7 @@ export function SettingsScreen({
   // Blocked callers get the prompt only. See the note above.
   if (data?.blocked) {
     return (
-      <div className="pg pg--dash">
+      <div className="pg pg--dash" data-surface="owner">
         <DashboardBar active="settings" outlet={outlet} />
         <div className="pg__body">
           <SignInPrompt reason={data.blocked} screen="settings screen" />
@@ -75,7 +75,7 @@ export function SettingsScreen({
   const noPublishedMenu = live && (data?.publishedMenus ?? 0) === 0;
 
   return (
-    <div className="pg pg--dash">
+    <div className="pg pg--dash" data-surface="owner">
       <DashboardBar active="settings" outlet={outlet} />
 
       <div className="pg__body">

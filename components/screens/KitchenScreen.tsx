@@ -277,6 +277,8 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
   speaksRef.current = speaksHere;
 
   const speechRef = useRef<SpeechEngine | null>(null);
+  /** The same chime the voice uses, reachable from the order pass. */
+  const chimeRef = useRef<(() => void) | null>(null);
   const speedRef = useRef<Speed>('normal');
   const queueRef = useRef<AnnounceQueue | null>(null);
   const seenRef = useRef<Set<string>>(new Set());
@@ -327,6 +329,7 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
 
   useEffect(() => {
     const chime = createChime();
+    chimeRef.current = chime;
     const engine = createKitchenSpeech(browserSpeechEnv(chime));
     speechRef.current = engine;
 
@@ -572,6 +575,25 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
     const readyToSpeak = canAnnounceRef.current;
     const canSpeak = audioRef.current && speaksRef.current && readyToSpeak;
     const announced = new Set<string>();
+
+    /**
+     * No Hindi voice, but the sound is on: the room still has to hear that a
+     * ticket landed. A board that fails silently is the one failure a kitchen
+     * cannot notice -- the screen looks fine, the food does not get cooked.
+     *
+     * One chime for the batch, not one per ticket: four orders in the same
+     * second is one arrival, and four tones in a row is noise.
+     *
+     * Not when the device is deliberately muted -- silence there is a choice
+     * somebody made, and the missed list still records the ticket.
+     */
+    if (audioRef.current && !readyToSpeak) {
+      try {
+        chimeRef.current?.();
+      } catch {
+        /* audio locked until a gesture; the ticket is still listed */
+      }
+    }
 
     for (const ticket of fresh) {
       if (!ticket.orderId) continue;

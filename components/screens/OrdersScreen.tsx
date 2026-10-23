@@ -136,7 +136,7 @@ export function OrdersScreen({
   const exportHref = `/dashboard/reports/export?${exportParams.toString()}`;
 
   return (
-    <div className="pg pg--dash">
+    <div className="pg pg--dash" data-surface="owner">
       <DashboardBar active="orders" outlet={outlet} />
 
       <div className="pg__body">
