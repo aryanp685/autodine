@@ -230,7 +230,7 @@ export function Cart({
                   <p className="text-[14px] text-gink-64">Your cart is empty — nothing has been added from the menu yet.</p>
                   <Link
                     href={withSlug('/menu')}
-                    className="mt-4 inline-flex rounded-full bg-gink px-4 py-2.5 text-[13px] font-semibold text-onink"
+                    className="g-primary mt-4 inline-flex rounded-full px-4 py-2.5 text-[13px] font-semibold"
                   >
                     Open the menu
                   </Link>

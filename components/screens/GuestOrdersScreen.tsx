@@ -103,7 +103,7 @@ export function GuestOrdersScreen({
             </p>
             <Link
               href={menuHref}
-              className="mt-5 inline-flex rounded-full bg-gink px-4 py-2.5 text-[13px] font-semibold text-onink"
+              className="g-primary mt-5 inline-flex rounded-full px-4 py-2.5 text-[13px] font-semibold"
             >
               Browse the menu
             </Link>
