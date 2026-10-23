@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { CartProvider } from '@/components/CartProvider';
 import { ClearCartOnOrder } from '@/components/ClearCartOnOrder';
+import { RememberOrder } from '@/components/RememberOrder';
 import { OrderPlacedScreen } from '@/components/screens/OrderPlacedScreen';
 import { getOrderScreenData } from '@/lib/db/order-screen';
 import { getGuestBranding } from '@/lib/db/branding';
@@ -58,6 +59,15 @@ export default async function OrderPage({
   return (
     <CartProvider slug={s}>
       <ClearCartOnOrder clear={placed} />
+      {/* Only a real, non-cancelled order is remembered: a cancelled one is not
+          something to offer back from the Orders tab. */}
+      <RememberOrder
+        slug={s}
+        code={data?.code}
+        token={t}
+        placedAt={data?.placedAt}
+        enabled={placed}
+      />
       <OrderPlacedScreen data={data} token={t} slug={s} onlinePay={onlinePay} accent={branding.accent} />
     </CartProvider>
   );

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { DishPhoto } from '@/components/DishPhoto';
 import { GuestFlow } from '@/components/GuestFlow';
+import { GuestTabs } from '@/components/GuestTabs';
 import { accentStyle } from '@/lib/branding/palette';
 import { useCart } from '@/components/CartProvider';
 import { inr } from '@/lib/demo-data';
@@ -119,6 +120,9 @@ export function Cart({
           </div>
         ) : null
       }
+      /* The cart is a place, not a step: the tabs stay, so leaving it is one
+         tap rather than the browser's back button. */
+      tabs={<GuestTabs slug={slug} active="cart" />}
     >
       <header className="flow__head">
         <div className="flow__kicker">Your order</div>
