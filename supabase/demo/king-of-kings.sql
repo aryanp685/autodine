@@ -22,13 +22,17 @@
 --
 -- FIRST, find the slug of the restaurant your account already owns:
 --
---     select slug, name from public.restaurants order by created_at desc;
+--     select slug, name, is_active,
+--            (select count(*) from public.menus m  where m.restaurant_id = r.id and m.is_published) as menus,
+--            (select count(*) from public.items i  where i.restaurant_id = r.id) as dishes
+--       from public.restaurants r;
 --
--- Then set `v_slug` below to that value. If you leave it as 'king-of-kings'
--- and your restaurant is called something else, this script CREATES a second
--- restaurant -- one your login is not a member of, so the dashboard will not
--- show it. The commented block at the bottom attaches your account if that
--- happens.
+-- Then set `v_slug` below to that value.
+--
+-- THIS SCRIPT NO LONGER CREATES A RESTAURANT. If the slug does not exist it
+-- stops with a message instead. The first version created one, and that is a
+-- trap: a restaurant created here has no membership, so it never appears in
+-- your dashboard and you end up editing a menu you cannot see.
 --
 -- WHAT IT WILL NOT DO: charge anybody, set a UPI handle (that is yours, in
 -- Settings), or invent a tax rate beyond the 5% demo value in the comment.
@@ -36,32 +40,33 @@
 
 do $$
 declare
-  v_slug     text := 'king-of-kings';   -- << change this to match your row
-  v_name     text := 'King of Kings';
+  v_slug     text := 'kings-of-kings';  -- << the slug from the query above
+  v_name     text := 'Kings of Kings';
   v_rid      uuid;
   v_menu     uuid;
   v_group    uuid;
   v_group_item uuid;
 begin
   -- ---------------------------------------------------------------- restaurant
-  -- Created if the slug does not exist; otherwise only the name and the open
-  -- sign are set, so nothing of yours is overwritten.
-  insert into public.restaurants (slug, name, tagline, address, phone, timezone, tax_rate_bps, is_active, accent)
-  values (
-    v_slug,
-    v_name,
-    'North Indian · Tandoor · Biryani',
-    'Ground floor, Main Road',
-    '+91 90000 00000',
-    'Asia/Kolkata',
-    500,          -- 5%. DEMO VALUE. Change it in Settings to your real rate.
-    true,
-    'maroon'
-  )
-  on conflict (slug) do update
-    set name = excluded.name,
-        is_active = true
-  returning id into v_rid;
+  -- Found, never created. A restaurant inserted here would have no membership
+  -- row, so it would not appear in the dashboard at all -- and the owner would
+  -- be looking at an empty menu for a restaurant they cannot open.
+  select r.id into v_rid
+    from public.restaurants r
+   where r.slug = btrim(v_slug);
+
+  if v_rid is null then
+    raise exception
+      'No restaurant with slug "%". Run: select slug, name from public.restaurants order by created_at desc;  then set v_slug on line 43 of this file.',
+      v_slug
+      using errcode = 'P0001';
+  end if;
+
+  -- Open for business. is_active is what the guest read filters on, and a
+  -- restaurant that is closed answers a scanned card with "not available".
+  update public.restaurants
+     set is_active = true
+   where id = v_rid;
 
   -- ---------------------------------------------------------------- menu
   select m.id into v_menu
@@ -259,7 +264,7 @@ select
   (select count(*) from public.items i      where i.restaurant_id = r.id and i.spoken_name is not null) as hindi_names,
   (select count(*) from public.dining_tables t where t.restaurant_id = r.id)                    as tables
 from public.restaurants r
-where r.slug = 'king-of-kings';
+where r.slug = 'kings-of-kings';
 
 -- ============================================================================
 -- Check 2 — what to scan, and the code to type on the phone
@@ -288,22 +293,20 @@ from public.dining_tables t
 join public.table_qr_codes q on q.table_id = t.id and q.revoked_at is null
 join public.restaurants r on r.id = t.restaurant_id
 join public.restaurant_verification_codes c on c.restaurant_id = r.id
-where r.slug = 'king-of-kings'
+where r.slug = 'kings-of-kings'
 order by t.label;
 
 -- ============================================================================
--- If you created a NEW restaurant by leaving v_slug as 'king-of-kings' and the
--- dashboard does not show it, attach your account. Replace the email.
+-- Menus are invisible until published. This is the other reason a scanned
+-- card shows no menu, and it has nothing to do with the QR.
 -- ============================================================================
--- insert into public.memberships (restaurant_id, user_id, role)
--- select r.id, u.id, 'owner'
---   from public.restaurants r
---   join auth.users u on u.email = 'you@example.com'
---  where r.slug = 'king-of-kings'
---    and not exists (
---      select 1 from public.memberships m
---       where m.restaurant_id = r.id and m.user_id = u.id
---    );
+-- select m.id, m.name, m.is_published,
+--        (select count(*) from public.categories c where c.menu_id = m.id) as sections,
+--        (select count(*) from public.items i where i.category_id in (select id from public.categories c where c.menu_id = m.id)) as dishes
+--   from public.menus m
+--  where m.restaurant_id = (select id from public.restaurants where slug = 'kings-of-kings');
+--
+-- update public.menus set is_published = true where restaurant_id = (select id from public.restaurants where slug = 'kings-of-kings');
 
 -- ============================================================================
 -- Undo, if you ever want the demo gone. Comments keep it from running by
