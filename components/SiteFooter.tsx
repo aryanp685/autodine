@@ -45,23 +45,27 @@ export function SiteFooter({
   fineRight = 'Not for live restaurant operations',
 }: Props = {}) {
   return (
-    <footer className="foot">
-      <div className="p-wrap">
-        <div className="foot__grid">
+    <footer className="bg-ink text-cream">
+      <div className="mx-auto w-full max-w-[1180px] px-5 pt-16 pb-10 sm:px-8">
+        <div className="grid gap-10 md:grid-cols-[1.6fr_1fr_1fr_1.2fr]">
           <div>
-            <div className="foot__brand">
+            <div className="text-cream">
               <BrandLockup size={20} ink="currentColor" dot={BRAND_GREEN} />
             </div>
-            <p className="foot__note">{note}</p>
+            <p className="mt-4 max-w-[38ch] text-[13px] leading-[1.6] text-mute">{note}</p>
           </div>
 
           {COLUMNS.map((col) => (
             <div key={col.title}>
-              <p className="foot__colTitle">{col.title}</p>
-              <ul className="foot__links">
+              <p className="text-[10.5px] font-semibold tracking-[0.12em] text-mute-dim uppercase">
+                {col.title}
+              </p>
+              <ul className="mt-3 flex flex-col gap-2 text-[13px] text-mute">
                 {col.items.map((item) => (
                   <li key={item.label}>
-                    <Link href={item.href}>{item.label}</Link>
+                    <Link href={item.href} className="transition-colors hover:text-cream">
+                      {item.label}
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -69,19 +73,24 @@ export function SiteFooter({
           ))}
 
           <div>
-            <p className="foot__colTitle">Scope</p>
-            <p className="foot__text">{scope}</p>
+            <p className="text-[10.5px] font-semibold tracking-[0.12em] text-mute-dim uppercase">Scope</p>
+            <p className="mt-3 max-w-[30ch] text-[13px] leading-[1.6] text-mute">{scope}</p>
           </div>
         </div>
 
-        <div className="foot__fine">
+        <div className="mt-14 flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.08] pt-5 text-[11px] tracking-[0.02em] text-mute-dim">
           <span>{fineLeft}</span>
           <span>{fineRight}</span>
         </div>
 
-        <span className="foot__wordmark" aria-hidden="true">
+        {/* The wordmark, drawn at the scale of a sign rather than set as a
+            heading: it is the last mark on the page, not another title. */}
+        <div
+          aria-hidden="true"
+          className="mt-8 text-[clamp(46px,11vw,132px)] leading-[0.8] font-semibold tracking-[-0.045em] text-white/[0.055] select-none"
+        >
           AutoDine
-        </span>
+        </div>
       </div>
     </footer>
   );

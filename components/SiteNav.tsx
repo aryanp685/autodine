@@ -36,9 +36,12 @@ export function SiteNav({
 }: {
   links: SiteNavLink[];
   /**
-   * True on the home page, where the bar sits on top of a dark photograph
-   * before any scroll. It inverts the links and the secondary button, then
-   * lets them return to ink once the glass surface appears underneath.
+   * True on a page whose top is a dark photograph or a dark ground: the bar
+   * starts transparent with light type, then takes a surface underneath.
+   *
+   * On a paper page the same bar is dark type on paper, because light type on
+   * near-white is not a style, it is a blank space where the navigation should
+   * be.
    */
   onImage?: boolean;
 }) {
@@ -54,7 +57,10 @@ export function SiteNav({
       const next = window.scrollY > SCROLLED_AFTER_PX;
       if (next === scrolled) return;
       scrolled = next;
-      nav.classList.toggle('is-scrolled', next);
+      /* A data attribute, not a class: the surface is written in utilities, and
+         a utility that depends on a class this component invents is exactly
+         the coupling the migration is removing. */
+      nav.dataset.scrolled = next ? 'true' : 'false';
     };
 
     const onScroll = () => {
@@ -70,42 +76,73 @@ export function SiteNav({
     return () => {
       window.removeEventListener('scroll', onScroll);
       if (frame) window.cancelAnimationFrame(frame);
-      nav.classList.remove('is-scrolled');
+      delete nav.dataset.scrolled;
     };
   }, []);
 
+  const surface = onImage
+    ? 'data-[scrolled=true]:border-white/[0.07] data-[scrolled=true]:bg-ink/80 data-[scrolled=true]:backdrop-blur-xl'
+    : 'border-b border-ink/10 bg-cream/85 backdrop-blur-xl';
+
   return (
     <header
-      className={`siteNav${onImage ? ' siteNav--onImage' : ''}`}
-      data-site-nav
+      data-site-nav=""
+      className={[
+        'sticky top-0 z-50 border-b border-transparent transition-colors duration-300',
+        surface,
+      ].join(' ')}
     >
-      <Link href="/" className="siteNav__brand" aria-label="AutoDine home">
-        <BrandLockup size={22} ink="currentColor" dot={BRAND_GREEN} />
-      </Link>
-
-      <nav aria-label="Primary">
-        <ul className="siteNav__links">
-          {links.map((link) => (
-            <li key={link.href}>
-              <Link
-                href={link.href}
-                className="siteNav__link"
-                aria-current={link.active ? 'page' : undefined}
-              >
-                {link.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
-
-      <div className="siteNav__right">
-        <Link href="/login" className="siteNav__link">
-          Sign in
+      <div className="mx-auto flex h-16 w-full max-w-[1180px] items-center gap-8 px-5 sm:px-8">
+        <Link
+          href="/"
+          aria-label="AutoDine home"
+          className={onImage ? 'shrink-0 text-cream' : 'shrink-0 text-ink'}
+        >
+          <BrandLockup size={21} ink="currentColor" dot={BRAND_GREEN} />
         </Link>
-        <Link href="/signup" className="p-btn p-btn--solid p-btn--sm">
-          Create account
-        </Link>
+
+        <nav aria-label="Primary" className="hidden flex-1 md:block">
+          <ul
+            className={[
+              'flex items-center gap-7 text-[13px]',
+              onImage ? 'text-mute' : 'text-ink/60',
+            ].join(' ')}
+          >
+            {links.map((link) => (
+              <li key={link.href}>
+                <Link
+                  href={link.href}
+                  aria-current={link.active ? 'page' : undefined}
+                  className={[
+                    'transition-colors',
+                    onImage ? 'hover:text-cream' : 'hover:text-ink',
+                    link.active ? (onImage ? 'text-cream' : 'text-ink') : '',
+                  ].join(' ')}
+                >
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <div className="ml-auto flex items-center gap-3">
+          <Link
+            href="/login"
+            className={[
+              'hidden text-[13px] transition-colors sm:block',
+              onImage ? 'text-mute hover:text-cream' : 'text-ink/60 hover:text-ink',
+            ].join(' ')}
+          >
+            Sign in
+          </Link>
+          <Link
+            href="/signup"
+            className="inline-flex h-10 items-center rounded-full bg-gold px-5 text-[13px] font-medium text-ink transition-colors hover:bg-gold-bright"
+          >
+            Create account
+          </Link>
+        </div>
       </div>
     </header>
   );

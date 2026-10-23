@@ -26,24 +26,28 @@ export function SiteClosing({
   secondary,
 }: Props) {
   return (
-    <section className="p-close">
-      <div className="p-wrap p-close__inner">
+    <section className="border-t border-white/[0.07] bg-ink text-cream">
+      <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-10 px-5 py-20 sm:px-8 md:flex-row md:items-end md:justify-between">
         <div>
-          <div className="p-eyebrow">{eyebrow}</div>
-          <h2 className="p-h2 p-close__title" style={{ marginTop: 24 }}>
+          <p className="text-[10.5px] font-semibold tracking-[0.14em] text-gold-dim uppercase">{eyebrow}</p>
+          <h2 className="mt-5 max-w-[14ch] text-[clamp(30px,4.6vw,50px)] leading-[1.02] font-semibold tracking-[-0.035em] text-balance">
             {title}
           </h2>
-          <p className="p-lede" style={{ marginTop: 22, maxWidth: '44ch' }}>
-            {body}
-          </p>
+          <p className="mt-5 max-w-[46ch] text-[15px] leading-[1.6] text-mute">{body}</p>
         </div>
 
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <Link href={primary.href} className="p-btn p-btn--solid">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href={primary.href}
+            className="inline-flex h-12 items-center rounded-full bg-gold px-6 text-[14px] font-medium text-ink transition-colors hover:bg-gold-bright"
+          >
             {primary.label}
           </Link>
           {secondary && (
-            <Link href={secondary.href} className="p-btn p-btn--line">
+            <Link
+              href={secondary.href}
+              className="inline-flex h-12 items-center rounded-full border border-white/20 px-6 text-[14px] font-medium text-cream transition-colors hover:border-white/40 hover:bg-white/[0.06]"
+            >
               {secondary.label}
             </Link>
           )}
