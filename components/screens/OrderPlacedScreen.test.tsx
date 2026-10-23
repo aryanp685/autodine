@@ -289,3 +289,48 @@ describe('OrderPlacedScreen', () => {
     expect(html).toContain('href="/menu?s=maddi"');
   });
 });
+
+/**
+ * The sentence under an unpaid bill.
+ *
+ * It was fixed: "The kitchen has your order already and is starting on it
+ * now." A guest whose food had arrived read that next to "Served", which tells
+ * them the meal in front of them has not started. The sentence now follows the
+ * same prep status the tracker draws.
+ */
+describe('OrderPlacedScreen — what happens next', () => {
+  it('never says the kitchen is starting once it has started', () => {
+    const cooking = renderToStaticMarkup(<OrderPlacedScreen data={order({ prepStatus: 'preparing' })} />);
+    expect(cooking).toContain('cooking this now');
+    expect(cooking).not.toMatch(/starting on it now/);
+
+    const ready = renderToStaticMarkup(<OrderPlacedScreen data={order({ prepStatus: 'ready' })} />);
+    expect(ready).toContain('on its way to your table');
+    expect(ready).not.toMatch(/starting on it now/);
+  });
+
+  it('asks for the bill at the counter once the food is served', () => {
+    const served = renderToStaticMarkup(<OrderPlacedScreen data={order({ prepStatus: 'served' })} />);
+    expect(served).toContain('This has been served');
+    expect(served).toContain('settle the bill at the counter');
+    expect(served).not.toMatch(/starting on it now/);
+  });
+
+  it('explains why a paid order cannot be changed', () => {
+    // This used to return an empty reason, so the bill was locked with no
+    // sentence at all.
+    const html = renderToStaticMarkup(
+      <OrderPlacedScreen
+        data={order({
+          prepStatus: 'new',
+          paymentStatus: 'paid',
+          canGuestChange: false,
+        })}
+        token="11111111-1111-1111-1111-111111111111"
+      />,
+    );
+
+    expect(html).toContain('Paid. Thank you.');
+    expect(html).toMatch(/has been paid, so it cannot be changed/);
+  });
+});

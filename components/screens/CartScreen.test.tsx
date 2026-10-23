@@ -116,7 +116,7 @@ describe('the cart actions', () => {
     expect(html).toContain('data-cart-dock');
   });
 
-  it('shows an empty state and a disabled button rather than a checkout link', () => {
+  it('says the cart is empty once, and does not draw a zero bill beside it', () => {
     const html = renderToStaticMarkup(
       <Cart slug="maddi" restaurantName="Maddi" taxRateBps={500} items={items} />,
     );
@@ -124,7 +124,10 @@ describe('the cart actions', () => {
     expect(html).toContain('Your cart is empty');
     expect(html).toContain('Open the menu');
     expect(html).not.toContain('/menu/checkout');
-    expect(html).toMatch(/data-cart-cta=""[^>]*disabled/);
+    // The empty card already explains itself and offers the menu. A bill
+    // reading "Subtotal Rs 0 / Total Rs 0" under it was a second, worse
+    // explanation of the same fact.
+    expect(html).not.toContain('Bill summary');
   });
 
   it('does not claim an order exists while localStorage is still being read', () => {
@@ -223,5 +226,37 @@ describe('Cart — a failed order', () => {
 
   it('says nothing at all when the last order went through', () => {
     expect(renderToStaticMarkup(<Cart items={[]} />)).not.toContain('data-place-error');
+  });
+});
+
+/**
+ * The number at the top of the page.
+ *
+ * It used to be `cart.count`: everything the browser remembers, including
+ * dishes that sold out while the cart sat open. The bill below it was built
+ * from the priced lines, so a cart of two dishes with one sold out read
+ * "2 items" and charged for one -- a small disagreement, on the screen where
+ * somebody decides whether to trust the total.
+ */
+describe('the cart says how many dishes it will actually order', () => {
+  const soldOut = [
+    { id: 'i1', name: 'Butter Chicken', pricePaise: 46900, isVeg: false, isAvailable: true },
+    { id: 'i2', name: 'Laal Maas', pricePaise: 52000, isVeg: false, isAvailable: false },
+  ];
+
+  it('counts only the lines that are on the bill', () => {
+    setLines([
+      { itemId: 'i1', qty: 1 },
+      { itemId: 'i2', qty: 1 },
+    ]);
+
+    const html = renderToStaticMarkup(
+      <Cart slug="maddi" restaurantName="Maddi" taxRateBps={500} items={soldOut} />,
+    );
+
+    expect(html).toContain('Maddi · 1 item');
+    expect(html).not.toContain('Maddi · 2 items');
+    // And the one that is not counted is explained rather than hidden.
+    expect(html).toMatch(/no longer available/);
   });
 });

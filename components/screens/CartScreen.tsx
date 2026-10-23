@@ -92,13 +92,25 @@ export function Cart({
 
   const dropped = priced.missingIds.length + priced.unavailableIds.length;
 
+  /**
+   * How many dishes will actually be ordered.
+   *
+   * Not `cart.count`: that counts what the browser remembers, and a dish that
+   * sold out overnight is still remembered. The header said "3 items" over a
+   * bill for one, which is the kind of small disagreement that makes a guest
+   * stop trusting the total.
+   */
+  const orderableQty = priced.lines.reduce((sum, line) => sum + line.qty, 0);
+
   /* The restaurant, and how much is in the order -- but only once the browser
      has been read. Before that the count is a zero we do not believe, and a
      header reading "Maddi · 0 items" over a cart that is about to appear is
      the same lie as an empty-cart screen. */
   const headerMeta = [
     restaurantName ?? 'Your order',
-    cart.ready && cart.count > 0 ? `${cart.count} ${cart.count === 1 ? 'item' : 'items'}` : null,
+    cart.ready && orderableQty > 0
+      ? `${orderableQty} ${orderableQty === 1 ? 'item' : 'items'}`
+      : null,
   ]
     .filter(Boolean)
     .join(' · ');
@@ -261,9 +273,13 @@ export function Cart({
                         {inr(paiseToRupees(l.lineTotalPaise))}
                       </span>
 
+                      {/* Visible text stays "Remove"; the accessible name says
+                          which dish. Four rows of an identical "Remove" is a
+                          list a screen reader cannot navigate. */}
                       <button
                         type="button"
                         onClick={() => cart.remove(l.itemId, l.variantId, l.addonIds)}
+                        aria-label={`Remove ${l.name} from your order`}
                         className="rounded-full px-1.5 py-1 text-[11.5px] font-medium text-gink-46 underline decoration-gink-28 underline-offset-2 transition hover:text-[var(--alert)]"
                       >
                         Remove
@@ -345,6 +361,11 @@ export function Cart({
             a card under the lines on a phone, which meant two layouts to keep
             agreeing; one card that reads the same at every width is the version
             a guest can actually check. */}
+        {/* A bill of zeroes is not a bill. When every line has dropped out --
+            sold out, or off the menu -- the notice above already says why, and
+            a card reading Subtotal Rs 0 next to a disabled "Cart is empty"
+            button only adds a second, worse explanation. */}
+        {priced.lines.length > 0 || !cart.ready ? (
         <section className="g-panel mt-4 px-4 py-4">
           <h2 className="g-eyebrow mb-1">Bill summary</h2>
           <Totals
@@ -358,17 +379,9 @@ export function Cart({
               Prices are read from the kitchen&rsquo;s menu when you order, so the total you are
               charged is the one the restaurant set. Nothing is charged from this phone.
             </p>
-          ) : cart.ready ? (
-            <button
-              type="button"
-              data-cart-cta=""
-              disabled
-              className="mt-4 w-full rounded-full bg-gink-07 py-2.5 text-[13px] font-semibold text-gink-46"
-            >
-              Cart is empty
-            </button>
           ) : null}
         </section>
+        ) : null}
       </div>
     </GuestFlow>
   );

@@ -218,3 +218,36 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
     }),
   };
 }
+
+/**
+ * Just the venue's name.
+ *
+ * The Orders tab needs a name in its header and nothing else, and it used to
+ * call getCartScreenData() for it -- which loads every published menu, every
+ * category, every dish, their portions and every add-on, six round trips, to
+ * print four words. On restaurant wifi that is the difference between a tab
+ * that opens and a tab that thinks.
+ *
+ * Returns null when there is nothing to name, which is the same "no
+ * restaurant" answer the heavier read gives.
+ */
+export async function getRestaurantName(slug?: string | null): Promise<string | null> {
+  if (!isSupabaseConfigured) return null;
+  if (!slug?.trim()) return null;
+
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return null;
+
+  const { data, error } = await supabase
+    .from('restaurants')
+    .select('name')
+    .eq('slug', slug.trim())
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (error) throw new Error(`Could not load restaurant: ${error.message}`);
+  if (!data) return null;
+
+  const name = (data as { name?: string | null }).name;
+  return typeof name === 'string' && name.trim() ? name : null;
+}
