@@ -12,6 +12,7 @@ import {
 } from '@/app/dashboard/menus/import-actions';
 import { MAX_MENU_PHOTO_BYTES, type VisionCategory } from '@/lib/ai/menu-vision';
 import { cropFromImage } from '@/lib/import/crop';
+import { Card, btn, inputClass } from '@/components/owner/chrome';
 
 /**
  * Photograph a menu, read it, check it, save it as a draft.
@@ -267,38 +268,64 @@ export function PhotoImportPanel({ canWrite }: { canWrite: boolean }) {
 
   if (!canWrite) {
     return (
-      <p className="pg__note pg__note--info">
-        <strong>Read-only for your role.</strong> An owner or manager can import a menu.
-      </p>
+      <div className="rounded-[12px] border border-hair bg-paper-deep px-4 py-3 text-[11.5px] leading-[1.55] text-gink-64">
+        <strong className="font-semibold text-gink">Read-only for your role.</strong> An owner or
+        manager can import a menu.
+      </div>
     );
   }
 
+  const stepBadge = (n: number) => (
+    <span
+      aria-hidden="true"
+      className="grid size-6 shrink-0 place-items-center rounded-full bg-gink text-[11.5px] font-semibold text-onink tabular-nums"
+    >
+      {n}
+    </span>
+  );
+
   return (
-    <div className="photoImport">
-      {/* ------------------------------------------------------------- pick */}
-      <section className="photoImport__step">
-        <div className="photoImport__stepHead">
-          <span className="photoImport__stepNum">1</span>
-          <h2 className="pg__h2">Photo of your menu</h2>
+    <div data-photo-import className="flex flex-col gap-4">
+      {/* --------------------------------------------------------------- pick */}
+      <Card>
+        <div className="border-b border-hair px-4 py-3 sm:px-5">
+          <div className="flex items-center gap-2.5">
+            {stepBadge(1)}
+            <h2 className="text-[13px] font-semibold text-gink">Photo of your menu</h2>
+          </div>
+          <p className="mt-1.5 text-[12px] leading-[1.5] text-gink-46">
+            Point at a printed menu — the whole card in frame, flat, in good light. JPG, PNG, WebP or
+            PDF, up to 8 MB and 3 pages.
+          </p>
         </div>
-        <p className="pg__p">
-          Point at a printed menu — the whole card in frame, flat, in good light. JPG, PNG, WebP or PDF,
-          up to 8 MB and 3 pages.
-        </p>
 
-        <div className="photoImport__pick">
-          {/* A plain <img>, not next/image: this is a blob: URL for a file
-              that only exists in this tab, which the optimiser cannot fetch. */}
-          {previewUrl ? (
-            <img src={previewUrl} alt="The menu you are about to read" className="photoImport__thumb" />
-          ) : file ? (
-            <div className="photoImport__pdf">PDF selected<br />{file.name.slice(0, 40)}</div>
-          ) : (
-            <div className="photoImport__empty">No photo yet</div>
-          )}
+        <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:px-5">
+          {/* A plain <img>, not next/image: this is a blob: URL for a file that
+              only exists in this tab, which the optimiser cannot fetch. */}
+          <div className="flex size-[104px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] border border-hair bg-paper-deep">
+            {previewUrl ? (
+              <img
+                src={previewUrl}
+                alt="The menu you are about to read"
+                className="size-full object-cover"
+              />
+            ) : file ? (
+              <div className="px-2 text-center text-[10.5px] leading-[1.4] text-gink-46">
+                PDF selected
+                <br />
+                <span className="break-all">{file.name.slice(0, 26)}</span>
+              </div>
+            ) : (
+              <div className="px-2 text-center text-[10.5px] leading-[1.4] text-gink-46">
+                No photo yet
+              </div>
+            )}
+          </div>
 
-          <div className="photoImport__pickActions">
-            <label className="brand__picker">
+          <div className="flex flex-wrap items-center gap-2">
+            <label
+              className={`${btn('ghost', 'sm')} relative cursor-pointer overflow-hidden`}
+            >
               <input
                 ref={inputRef}
                 type="file"
@@ -308,162 +335,232 @@ export function PhotoImportPanel({ canWrite }: { canWrite: boolean }) {
                    right on both. */
                 capture="environment"
                 onChange={(event) => pick(event.target.files?.[0] ?? null)}
+                className="absolute inset-0 size-full cursor-pointer opacity-0"
               />
               <span>{file ? 'Choose another' : 'Take or choose a photo'}</span>
             </label>
             {file && (
-              <button type="button" className="photoImport__link" onClick={reset}>
+              <button type="button" className={btn('quiet', 'sm')} onClick={reset}>
                 Clear
               </button>
             )}
           </div>
         </div>
-      </section>
+      </Card>
 
-      {/* ------------------------------------------------------------- read */}
+      {/* --------------------------------------------------------------- read */}
       {file && status !== 'review' && (
-        <section className="photoImport__step">
-          <div className="photoImport__stepHead">
-            <span className="photoImport__stepNum">2</span>
-            <h2 className="pg__h2">Read it</h2>
-          </div>
-          <p className="pg__p">
-            We read the dishes, prices and photos, and mark anything we are not sure about. Nothing is
-            saved until you check it.
-          </p>
-
-          <button type="button" className="pg__btn pg__btn--solid" onClick={read} disabled={working}>
-            {status === 'reading' ? 'Reading your menu…' : 'Read this menu'}
-          </button>
-
-          {status === 'reading' && (
-            <p className="photoImport__progress" role="status">
-              This usually takes about twenty seconds. Keep this tab open.
+        <Card>
+          <div className="border-b border-hair px-4 py-3 sm:px-5">
+            <div className="flex items-center gap-2.5">
+              {stepBadge(2)}
+              <h2 className="text-[13px] font-semibold text-gink">Read it</h2>
+            </div>
+            <p className="mt-1.5 text-[12px] leading-[1.5] text-gink-46">
+              We read the dishes, prices and photos, and mark anything we are not sure about. Nothing
+              is saved until you check it.
             </p>
-          )}
-        </section>
+          </div>
+          <div className="px-4 py-4 sm:px-5">
+            <button
+              type="button"
+              className={btn('solid')}
+              onClick={read}
+              disabled={working}
+            >
+              {status === 'reading' ? 'Reading your menu…' : 'Read this menu'}
+            </button>
+
+            {status === 'reading' && (
+              <p role="status" className="mt-2 text-[11.5px] leading-[1.5] text-gink-46">
+                This usually takes about twenty seconds. Keep this tab open.
+              </p>
+            )}
+          </div>
+        </Card>
       )}
 
       {error && (
-        <div className="pg__alert" role="alert">
-          <strong>That did not work.</strong>
-          <p>{error}</p>
+        <div
+          role="alert"
+          className="rounded-[12px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-4 py-3"
+        >
+          <strong className="text-[12.5px] text-[var(--alert)]">That did not work.</strong>
+          <p className="mt-1 text-[12.5px] leading-[1.5] text-gink-64">{error}</p>
         </div>
       )}
 
       {notice && (
-        <div className="pg__success" role="status">
-          <strong>Saved.</strong>
-          <p>{notice}</p>
+        <div
+          role="status"
+          className="rounded-[12px] border border-[var(--p-accent)]/25 bg-accent-soft px-4 py-2.5"
+        >
+          <strong className="text-[12.5px] text-gink">Saved.</strong>{' '}
+          <span className="text-[12.5px] text-gink-64">{notice}</span>
         </div>
       )}
 
-      {/* ----------------------------------------------------------- review */}
+      {/* ------------------------------------------------------------- review */}
       {status === 'review' && categories.length > 0 && (
-        <section className="photoImport__review">
-          <div className="photoImport__reviewHead">
+        <Card>
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-hair px-4 py-3 sm:px-5">
             <div>
-              <h2 className="pg__h2">Check every dish</h2>
-              <p className="pg__p">
-                {keptCount} dish{keptCount === 1 ? '' : 'es'} read with {model}. Rows marked in amber need
-                you. Nothing is published until you publish it.
+              <h2 className="text-[13px] font-semibold text-gink">Check every dish</h2>
+              <p className="mt-1 max-w-[62ch] text-[12px] leading-[1.5] text-gink-46">
+                {keptCount} dish{keptCount === 1 ? '' : 'es'} read with {model}. Rows marked in amber
+                need you. Nothing is published until you publish it.
               </p>
             </div>
-            <button type="button" className="pg__btn" onClick={reset} disabled={working}>
+            <button type="button" className={btn('ghost', 'sm')} onClick={reset} disabled={working}>
               Start over
             </button>
           </div>
 
-          {notes.length > 0 && (
-            <ul className="photoImport__notes">
-              {notes.map((note) => (
-                <li key={note}>{note}</li>
-              ))}
-            </ul>
-          )}
-
-          {categories.map((category, ci) => (
-            <div key={`${category.name}-${ci}`} className="photoImport__cat">
-              <div className="photoImport__catName">{category.name}</div>
-
-              {category.items.map((item, ii) => {
-                const isDropped = dropped.has(`${ci}:${ii}`);
-                const needsPrice = item.price.trim() === '';
-
-                return (
-                  <div
-                    key={`${item.name}-${ii}`}
-                    className={`photoImport__row ${isDropped ? 'is-dropped' : ''} ${needsPrice || item.flags.length ? 'is-flagged' : ''}`}
+          <div className="px-4 py-3 sm:px-5">
+            {notes.length > 0 && (
+              <ul className="m-0 mb-3 flex list-none flex-col gap-1 p-0">
+                {notes.map((note) => (
+                  <li
+                    key={note}
+                    className="flex gap-2 text-[11.5px] leading-[1.5] text-gink-64"
                   >
-                    <div className="photoImport__rowMain">
-                      <div className="photoImport__rowName">
-                        <span className="photoImport__vegDot" data-veg={item.isVeg === false ? 'non' : item.isVeg === true ? 'veg' : 'unknown'} aria-hidden="true" />
-                        {item.name}
-                      </div>
+                    <span
+                      aria-hidden="true"
+                      className="mt-[7px] size-1 shrink-0 rounded-full bg-gink-28"
+                    />
+                    <span>{note}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
 
-                      <div className="photoImport__rowMeta">
-                        {item.flags.map((flag) => (
-                          <span key={flag} className="photoImport__flag">
-                            {FLAG_TEXT[flag] ?? flag}
-                          </span>
-                        ))}
-                        {item.photo && <span className="photoImport__photoTag">Photo found</span>}
-                      </div>
-                    </div>
+            {categories.map((category, ci) => (
+              <div key={`${category.name}-${ci}`} className="mb-4 last:mb-0">
+                <div className="mb-1.5 text-[10.5px] font-semibold tracking-[0.09em] text-gink-46 uppercase">
+                  {category.name}
+                </div>
 
-                    <div className="photoImport__rowControls">
-                      <label className="ui-field photoImport__priceField">
-                        <span className="ui-label">₹</span>
-                        <input
-                          className="ui-input tnum"
-                          inputMode="decimal"
-                          value={item.price}
-                          placeholder="—"
-                          onChange={(event) => editPrice(ci, ii, event.target.value)}
-                          disabled={isDropped || working}
-                          aria-label={`Price for ${item.name}`}
-                        />
-                      </label>
+                <ul className="m-0 flex list-none flex-col p-0">
+                  {category.items.map((item, ii) => {
+                    const isDropped = dropped.has(`${ci}:${ii}`);
+                    const needsPrice = item.price.trim() === '';
+                    const flagged = needsPrice || item.flags.length > 0;
 
-                      <button
-                        type="button"
-                        className="photoImport__vegBtn"
-                        onClick={() => toggleVeg(ci, ii)}
-                        disabled={isDropped || working}
-                        aria-pressed={item.isVeg === true}
-                        title={item.isVeg === null ? 'Mark vegetarian' : 'Change veg / non-veg'}
+                    return (
+                      <li
+                        key={`${item.name}-${ii}`}
+                        data-dropped={isDropped ? 'true' : undefined}
+                        data-flagged={flagged && !isDropped ? 'true' : undefined}
+                        className={[
+                          'flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-hair py-2 last:border-b-0',
+                          isDropped ? 'opacity-40' : '',
+                        ].join(' ')}
                       >
-                        <VegMark veg={item.isVeg !== false} />
-                        <span>{item.isVeg === null ? 'Set' : item.isVeg ? 'Veg' : 'Non-veg'}</span>
-                      </button>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 text-[12.5px] font-medium text-gink">
+                            <span
+                              data-veg={
+                                item.isVeg === false ? 'non' : item.isVeg === true ? 'veg' : 'unknown'
+                              }
+                              aria-hidden="true"
+                            >
+                              <VegMark veg={item.isVeg !== false} />
+                            </span>
+                            <span className="truncate">{item.name}</span>
+                          </div>
 
-                      <button
-                        type="button"
-                        className="photoImport__link"
-                        onClick={() => drop(ci, ii)}
-                        disabled={working}
-                      >
-                        {isDropped ? 'Keep' : 'Remove'}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+                          {(item.flags.length > 0 || item.photo) && (
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                              {item.flags.map((flag) => (
+                                <span
+                                  key={flag}
+                                  className="inline-flex items-center rounded-full bg-[var(--alert)]/8 px-2 py-0.5 text-[10.5px] font-medium text-[var(--alert)]"
+                                >
+                                  {FLAG_TEXT[flag] ?? flag}
+                                </span>
+                              ))}
+                              {item.photo && (
+                                <span className="inline-flex items-center rounded-full bg-accent-soft px-2 py-0.5 text-[10.5px] font-medium text-[var(--p-accent)]">
+                                  Photo found
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
 
-          <div className="photoImport__footer">
-            <p className="brand__fine">Saves as a draft. Publish from Menus when it looks right.</p>
+                        <div className="flex items-center gap-1.5">
+                          {/* An empty price is a question, not a zero: it stays
+                              empty and blocks the save until it is answered. */}
+                          <label className="relative">
+                            <span className="sr-only">{`Price for ${item.name}`}</span>
+                            <span
+                              aria-hidden="true"
+                              className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-[12px] text-gink-46"
+                            >
+                              ₹
+                            </span>
+                            <input
+                              className={`${inputClass} h-8 w-[86px] pl-6 text-[12.5px] tabular-nums`}
+                              inputMode="decimal"
+                              value={item.price}
+                              placeholder="—"
+                              onChange={(event) => editPrice(ci, ii, event.target.value)}
+                              disabled={isDropped || working}
+                              aria-label={`Price for ${item.name}`}
+                            />
+                          </label>
+
+                          <button
+                            type="button"
+                            className={`${btn('ghost', 'sm')} gap-1 px-2`}
+                            onClick={() => toggleVeg(ci, ii)}
+                            disabled={isDropped || working}
+                            aria-pressed={item.isVeg === true}
+                            title={
+                              item.isVeg === null ? 'Mark vegetarian' : 'Change veg / non-veg'
+                            }
+                          >
+                            <span data-veg={item.isVeg === false ? 'non' : 'veg'} aria-hidden="true">
+                              <VegMark veg={item.isVeg !== false} />
+                            </span>
+                            <span className="text-[11px]">
+                              {item.isVeg === null ? 'Set' : item.isVeg ? 'Veg' : 'Non-veg'}
+                            </span>
+                          </button>
+
+                          <button
+                            type="button"
+                            className={btn('quiet', 'sm')}
+                            onClick={() => drop(ci, ii)}
+                            disabled={working}
+                          >
+                            {isDropped ? 'Keep' : 'Remove'}
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hair px-4 py-3 sm:px-5">
+            <p className="m-0 text-[11px] leading-[1.45] text-gink-46">
+              Saves as a draft. Publish from Menus when it looks right.
+            </p>
             <button
               type="button"
-              className="pg__btn pg__btn--solid"
+              className={btn('solid')}
               onClick={save}
               disabled={working || keptCount === 0}
             >
-              {working ? 'Saving…' : `Save ${keptCount} dish${keptCount === 1 ? '' : 'es'} as a draft`}
+              {working
+                ? 'Saving…'
+                : `Save ${keptCount} dish${keptCount === 1 ? '' : 'es'} as a draft`}
             </button>
           </div>
-        </section>
+        </Card>
       )}
     </div>
   );
