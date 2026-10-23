@@ -109,26 +109,37 @@ export function GuestFlow({
   const currentIndex = step ? GUEST_STEPS.findIndex((entry) => entry.key === step) : -1;
   const position = currentIndex + 1;
   const hasDock = Boolean(dock || docked);
+  const hasTabs = Boolean(tabs);
+
+  /* THE TWO BARS STACK; THEY DO NOT SIT ON EACH OTHER
+   *
+   * The dock and the tab bar were both `fixed bottom-0`. On the menu they are
+   * both present the moment a cart has something in it -- so the cart bar
+   * landed exactly on top of the tabs, and the tabs became untappable at the
+   * one moment a guest most wants them. The dock now floats above the tabs by
+   * the tab bar's own height, and the page reserves room for both. */
+  const TABS_SPACE = 74;
+  const DOCK_SPACE = 78;
 
   return (
     <div
       data-flow-root=""
       data-flow-docked={hasDock ? 'true' : undefined}
-      className="min-h-dvh bg-paper text-gink antialiased"
-      /* Room for the pinned action and, on the screens that have one, the tab
-         bar. Both are fixed, so the page has to reserve the space itself --
-         otherwise the last dish sits under the cart bar and can never be
-         tapped. */
+      className="min-h-dvh text-gink antialiased"
+      /* Room for the floating bars. Both are fixed, so the page reserves the
+         space itself -- otherwise the last dish sits under the cart bar and
+         can never be tapped. */
       style={{
         ...style,
-        paddingBottom: hasDock
-          ? 'calc(76px + env(safe-area-inset-bottom))'
-          : tabs
-            ? 'calc(64px + env(safe-area-inset-bottom))'
-            : undefined,
+        paddingBottom: `calc(${
+          16 + (hasDock ? DOCK_SPACE : 0) + (hasTabs ? TABS_SPACE : 0)
+        }px + env(safe-area-inset-bottom))`,
       }}
     >
-      <header className="sticky top-0 z-30 border-b border-hair bg-paper/85 backdrop-blur-xl">
+      <header
+        data-flow-chrome="header"
+        className="sticky top-0 z-30"
+      >
         <div className="mx-auto flex h-14 w-full max-w-[720px] items-center gap-3 px-4">
           <div className="flex min-w-0 items-center gap-2.5">
             {back ? (
@@ -165,10 +176,7 @@ export function GuestFlow({
             </span>
 
             {table ? (
-              <span
-                data-flow-table=""
-                className="shrink-0 rounded-full bg-accent-soft px-2.5 py-1 text-[11px] font-semibold tracking-[0.06em] text-[var(--p-accent)] uppercase"
-              >
+              <span data-flow-table="" className="g-badge shrink-0">
                 {table}
               </span>
             ) : null}
@@ -194,9 +202,10 @@ export function GuestFlow({
                     /* Done and current are solid ink, the rest are hairline:
                        at a glance the shape says "two thirds of the way". */
                     className={[
-                      'h-1 w-6 rounded-full transition-colors',
-                      state === 'todo' ? 'bg-gink-12' : 'bg-[var(--p-accent)]',
-                      state === 'done' ? 'opacity-45' : '',
+                      'h-1 rounded-full transition-all',
+                      state === 'now' ? 'w-6 bg-[var(--p-accent)]' : 'w-4',
+                      state === 'done' ? 'bg-[var(--p-accent)]/40' : '',
+                      state === 'todo' ? 'bg-gink-12' : '',
                     ]
                       .filter(Boolean)
                       .join(' ')}
@@ -218,10 +227,21 @@ export function GuestFlow({
       {dock ? (
         <div
           data-flow-dock=""
-          className="fixed inset-x-0 bottom-0 z-40 border-t border-hair bg-paper/92 backdrop-blur-xl"
-          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+          className="fixed inset-x-0 z-40 px-3"
+          /* Above the tabs when there are tabs, on the floor when there are
+             not. Both are floating panels, so this is one gap either way. */
+          style={{
+            bottom: hasTabs
+              ? 'calc(74px + env(safe-area-inset-bottom))'
+              : 'calc(12px + env(safe-area-inset-bottom))',
+          }}
         >
-          <div className="mx-auto w-full max-w-[720px] px-4 py-3">{dock}</div>
+          <div
+            data-flow-chrome="dock"
+            className="mx-auto w-full max-w-[720px] rounded-[22px] px-3 py-2.5"
+          >
+            {dock}
+          </div>
         </div>
       ) : null}
 

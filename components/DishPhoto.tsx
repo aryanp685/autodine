@@ -56,7 +56,7 @@ export function DishPhoto({
              restaurant's accent wash. A tile with a letter on it reads as
              "not photographed yet"; an empty grey box reads as a broken
              image, which is a different and worse statement. */
-          'grid shrink-0 place-items-center overflow-hidden rounded-xl bg-accent-soft text-[var(--p-accent)] ring-1 ring-[var(--p-accent)]/15',
+          'grid shrink-0 place-items-center overflow-hidden rounded-[14px] bg-[var(--p-accent-soft)] text-[var(--p-accent)] ring-1 ring-[var(--p-accent)]/15',
           className ?? '',
         ].join(' ')}
         style={{ width: size, height: size }}
@@ -72,7 +72,7 @@ export function DishPhoto({
 
   return (
     <Image
-      className={['shrink-0 rounded-xl object-cover', className ?? ''].join(' ')}
+      className={['shrink-0 rounded-[14px] object-cover', className ?? ''].join(' ')}
       src={src}
       alt={name}
       width={size}

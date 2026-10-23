@@ -136,9 +136,13 @@ export function OrderPlacedScreen({
 }) {
   if (!data) {
     return (
-      <div className="mx-auto min-h-dvh w-full max-w-[560px] bg-paper px-5 py-16 text-gink">
-        <p className="text-[11px] font-semibold tracking-[0.12em] text-gink-46 uppercase">Order</p>
-        <h1 className="mt-2 text-[28px] leading-tight font-semibold tracking-[-0.025em]">Order not found</h1>
+      <div
+        data-flow-root=""
+        style={accentStyle(accent)}
+        className="mx-auto min-h-dvh w-full max-w-[560px] px-5 py-16 text-gink"
+      >
+        <p className="g-eyebrow">Order</p>
+        <h1 className="g-display mt-2">Order not found</h1>
         <p className="mt-3 text-[14.5px] leading-[1.55] text-gink-64">
           We could not find that order. It may have been closed, or the link may be
           incomplete.
@@ -172,7 +176,7 @@ export function OrderPlacedScreen({
            screen used to offer no way back to the menu at all. */
         <Link
           href={menuHref}
-          className="flex h-12 w-full items-center justify-center rounded-full bg-[var(--p-accent)] text-[14px] font-semibold text-white shadow-g1 transition active:scale-[0.99]"
+          className="g-primary flex h-12 w-full items-center justify-center rounded-full text-[14px] font-semibold"
         >
           Order something else
         </Link>
@@ -203,13 +207,13 @@ export function OrderPlacedScreen({
           )}
         </span>
 
-        <p className="mt-3.5 text-[10.5px] font-semibold tracking-[0.12em] text-gink-46 uppercase">
+        <p className="g-eyebrow mt-3.5">
           {data.prepStatus === 'cancelled' ? 'Order cancelled' : 'Order placed'}
         </p>
-        <h1 className="mt-1 text-[28px] leading-tight font-semibold tracking-[-0.025em] text-gink">
+        <h1 className="g-display mt-1">
           {data.tableLabel ? `Table ${data.tableLabel}` : 'Counter order'}
         </h1>
-        <p className="mt-1 text-[13.5px] leading-[1.5] text-gink-64">
+        <p className="g-lede mt-1">
           {data.restaurantName} · {prepLabel}
           {data.prepStatus === 'cancelled' ? ' · nothing is owed' : ''}
         </p>
@@ -226,7 +230,7 @@ export function OrderPlacedScreen({
             through, and drawing four steps with none of them reached would
             read as an order about to start. */}
         {data.prepStatus === 'cancelled' ? (
-          <p className="mt-4 rounded-2xl bg-gink-07 px-4 py-3 text-[13px] leading-[1.5] text-gink-64">
+          <p className="g-card mt-4 px-4 py-3 text-[13px] leading-[1.5] text-gink-64">
             Nothing is being cooked and nothing is owed. Order again from the menu whenever you
             are ready.
           </p>

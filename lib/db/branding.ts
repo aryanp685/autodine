@@ -30,7 +30,16 @@ export type GuestBranding = {
   accent: string;
 };
 
-export const NO_BRANDING: GuestBranding = { logoUrl: null, bannerUrl: null, accent: 'forest' };
+import { DEFAULT_ACCENT } from '@/lib/branding/palette';
+
+export const NO_BRANDING: GuestBranding = {
+  logoUrl: null,
+  bannerUrl: null,
+  // The one place a missing accent is decided. It reads the palette's default
+  // rather than repeating the key, so changing the default cannot leave this
+  // constant pointing at a colour the product no longer prefers.
+  accent: DEFAULT_ACCENT,
+};
 
 /**
  * Branding for one restaurant, by public slug.
@@ -66,6 +75,6 @@ export const getGuestBranding = cache(async (slug?: string | null): Promise<Gues
   return {
     logoUrl: publicAssetUrl(row.logo_path),
     bannerUrl: publicAssetUrl(row.banner_path),
-    accent: row.accent?.trim() || 'forest',
+    accent: row.accent?.trim() || DEFAULT_ACCENT,
   };
 });

@@ -39,15 +39,22 @@ export type Accent = {
  * first because it is the default for every restaurant that never picks one.
  */
 export const ACCENTS: readonly Accent[] = [
-  { key: 'forest', label: 'Forest', accent: '#26664F', soft: '#e3ece7' },
-  { key: 'terracotta', label: 'Terracotta', accent: '#A9531F', soft: '#f7e9df' },
-  { key: 'maroon', label: 'Maroon', accent: '#7D2B3B', soft: '#f6e5e8' },
-  { key: 'indigo', label: 'Indigo', accent: '#3B4A6B', soft: '#e8ebf2' },
+  /* Maroon leads because it is the default, and because the flow's whole
+   * surface is warm cream: a wine-dark accent sits on it like ink on a menu
+   * card, where the green this used to default to read as a status colour
+   * next to photographs of food. Every value below was re-tuned darker and
+   * less saturated than the first set for the same reason -- an accent used
+   * at 12-26% in a background wash has to be deep, or the wash turns into a
+   * tint of the page. */
+  { key: 'maroon', label: 'Maroon', accent: '#6B2338', soft: '#f7e9ee' },
+  { key: 'terracotta', label: 'Terracotta', accent: '#A34E24', soft: '#f8e9df' },
+  { key: 'forest', label: 'Forest', accent: '#1F5B47', soft: '#e3ece7' },
+  { key: 'indigo', label: 'Indigo', accent: '#37456B', soft: '#e8ebf2' },
   { key: 'ochre', label: 'Ochre', accent: '#8A5A12', soft: '#f6eeda' },
-  { key: 'slate', label: 'Slate', accent: '#4A5A63', soft: '#e9edee' },
+  { key: 'slate', label: 'Slate', accent: '#445A63', soft: '#e9edee' },
 ] as const;
 
-export const DEFAULT_ACCENT: AccentKey = 'forest';
+export const DEFAULT_ACCENT: AccentKey = 'maroon';
 
 /** Every key, for tests and for the database CHECK's mirror image. */
 export const ACCENT_KEYS: readonly AccentKey[] = ACCENTS.map((a) => a.key);
@@ -73,8 +80,13 @@ export function accentStyle(value: unknown): Record<string, string> {
 
 /* ------------------------------------------------------------------ contrast */
 
-/** The paper the guest flow is drawn on. Mirrored from `--p-paper`. */
-export const PAPER = '#f8f5ef';
+/**
+ * The paper the guest flow is drawn on. Mirrored from `--p-paper` on
+ * [data-flow-root] in app/globals.css, which is the warm oat the wash is built
+ * on. If that value moves, this one has to move with it or these contrast
+ * checks stop describing the screen they claim to.
+ */
+export const PAPER = '#f7f2e9';
 
 function channel(hex: string, index: number): number {
   return parseInt(hex.slice(1 + index * 2, 3 + index * 2), 16) / 255;

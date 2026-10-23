@@ -118,8 +118,8 @@ export function GuestOrderEditor({
             <div
               key={l.id}
               className={[
-                'flex items-center gap-3 rounded-2xl border bg-card p-3',
-                removed ? 'border-dashed border-hair-strong opacity-55' : 'border-hair',
+                'g-card flex items-center gap-3 p-3',
+                removed ? 'g-void' : '',
               ].join(' ')}
             >
               <div className="flex min-w-0 flex-1 flex-col">
@@ -145,7 +145,7 @@ export function GuestOrderEditor({
               </div>
 
               {canEdit ? (
-                <div className="flex shrink-0 items-center rounded-full border border-hair-strong">
+                <div className="g-quiet flex shrink-0 items-center rounded-full">
                   <button
                     type="button"
                     onClick={() => step(l, -1)}
@@ -208,7 +208,7 @@ export function GuestOrderEditor({
               type="button"
               onClick={save}
               disabled={pending || !dirty || remaining === 0}
-              className="h-10 rounded-full bg-gink px-4 text-[12.5px] font-semibold text-onink transition disabled:opacity-40"
+              className="g-primary h-10 rounded-full px-4 text-[12.5px] font-semibold"
             >
               {pending ? 'Saving…' : 'Save changes'}
             </button>
@@ -222,7 +222,7 @@ export function GuestOrderEditor({
                   setNotice('');
                 }}
                 disabled={pending}
-                className="h-10 rounded-full border border-hair-strong px-4 text-[12.5px] font-semibold text-[var(--alert)] transition hover:bg-[var(--alert)]/8 disabled:opacity-40"
+                className="g-quiet h-10 rounded-full px-4 text-[12.5px] font-semibold text-[var(--alert)] disabled:opacity-40"
               >
                 Cancel this order
               </button>

@@ -40,7 +40,14 @@ begin
       using errcode = 'P0001';
   end if;
 
-  update public.restaurants set is_active = true where id = v_rid;
+  -- Open for business, wearing the flow's colour. is_active is what the guest
+  -- read filters on; `accent` is a palette key, and maroon is the one the guest
+  -- flow is designed around (wine-dark on warm cream). Only a row still on the
+  -- old green default is moved -- a colour somebody chose is left alone.
+  update public.restaurants
+     set is_active = true,
+         accent = case when accent = 'forest' then 'maroon' else accent end
+   where id = v_rid;
 
   -- --------------------------------------------------------------------- menu
   -- The published menu the guest already lands on: lowest sort_order, oldest

@@ -116,7 +116,7 @@ export function Cart({
             </span>
             <Link
               href={withSlug('/menu/checkout')}
-              className="ml-auto flex items-center gap-2 rounded-full bg-[var(--p-accent)] px-5 py-3 text-[13.5px] font-semibold text-white shadow-g1 transition active:scale-[0.99]"
+              className="g-primary ml-auto flex items-center gap-2 rounded-full px-5 py-3 text-[13.5px] font-semibold"
             >
               Continue to checkout
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -131,9 +131,9 @@ export function Cart({
       tabs={<GuestTabs slug={slug} active="cart" />}
     >
       <header className="px-4 pt-6 pb-4">
-        <p className="text-[10.5px] font-semibold tracking-[0.12em] text-gink-46 uppercase">Your order</p>
-        <h1 className="mt-1.5 text-[27px] leading-tight font-semibold tracking-[-0.025em] text-gink">{headerMeta}</h1>
-        <p className="mt-1.5 max-w-[52ch] text-[13.5px] leading-[1.55] text-gink-64">
+        <p className="g-eyebrow">Your order</p>
+        <h1 className="g-display mt-1.5">{headerMeta}</h1>
+        <p className="g-lede mt-1.5">
           {priced.lines.length > 0
             ? 'Check the bill, then pay. Prices are read from the kitchen’s menu when you order.'
             : 'Nothing has been added from the menu yet.'}
@@ -146,7 +146,7 @@ export function Cart({
               localStorage. Showing that emptiness for a moment over a cart
               that is not empty reads as the order having been lost. */}
           {!cart.ready ? (
-            <div className="rounded-2xl border border-hair bg-card px-4 py-8 text-center text-[13.5px] text-gink-46">
+            <div className="g-card px-4 py-8 text-center text-[13.5px] text-gink-46">
               Loading your order…
             </div>
           ) : (
@@ -157,7 +157,7 @@ export function Cart({
                 // element, so changing one quantity re-rendered the other.
                 <div
                   key={`${l.itemId}|${l.variantId ?? ''}|${(l.addonIds ?? []).join(',')}`}
-                  className="flex gap-3 rounded-2xl border border-hair bg-card p-3"
+                  className="g-card flex gap-3 p-3"
                 >
                   {/* The same photograph the guest tapped on the menu. A
                       bill of names only is hard to check against a table of
@@ -189,7 +189,7 @@ export function Cart({
                         because they are the same question: how many, and what
                         does that come to. */}
                     <div className="mt-2 flex items-center gap-3">
-                      <div className="flex items-center rounded-full border border-hair-strong">
+                      <div className="g-quiet flex items-center rounded-full">
                         <button
                           type="button"
                           onClick={() => cart.setQty(l.itemId, l.qty - 1, l.variantId, l.addonIds)}
@@ -226,7 +226,7 @@ export function Cart({
               ))}
 
               {cart.lines.length === 0 && (
-                <div className="rounded-2xl border border-hair bg-card px-5 py-9 text-center">
+                <div className="g-card px-5 py-9 text-center">
                   <p className="text-[14px] text-gink-64">Your cart is empty — nothing has been added from the menu yet.</p>
                   <Link
                     href={withSlug('/menu')}
@@ -242,7 +242,7 @@ export function Cart({
                   yesterday. So they are a quiet paper card with one action, not
                   a red banner. */}
               {dropped > 0 && (
-                <div className="rounded-2xl border border-hair bg-accent-soft px-4 py-3">
+                <div className="g-card g-soft px-4 py-3">
                   <p className="text-[13px] leading-[1.5] text-gink-80">
                     {dropped === 1 ? 'One dish is' : `${dropped} dishes are`} no longer available, so{' '}
                     {dropped === 1 ? 'it is' : 'they are'} not on the bill.
@@ -272,7 +272,7 @@ export function Cart({
                   Saying so is the difference between a bill the guest can
                   check and one they have to take on trust. */}
               {priced.staleAddonIds.length > 0 && (
-                <div className="rounded-2xl border border-hair bg-accent-soft px-4 py-3 text-[13px] leading-[1.5] text-gink-80">
+                <div className="g-card g-soft px-4 py-3 text-[13px] leading-[1.5] text-gink-80">
                   {priced.staleAddonIds.length === 1
                     ? 'One add-on you picked is'
                     : `${priced.staleAddonIds.length} add-ons you picked are`}{' '}
@@ -282,7 +282,7 @@ export function Cart({
               )}
 
               {priced.staleVariantIds.length > 0 && (
-                <div className="rounded-2xl border border-hair bg-accent-soft px-4 py-3 text-[13px] leading-[1.5] text-gink-80">
+                <div className="g-card g-soft px-4 py-3 text-[13px] leading-[1.5] text-gink-80">
                   The portion you picked for{' '}
                   {priced.staleVariantIds.length === 1 ? 'one dish is' : 'some dishes is'} no
                   longer on the menu, so {priced.staleVariantIds.length === 1 ? 'it is' : 'they are'}{' '}
@@ -297,8 +297,8 @@ export function Cart({
             a card under the lines on a phone, which meant two layouts to keep
             agreeing; one card that reads the same at every width is the version
             a guest can actually check. */}
-        <section className="mt-4 rounded-2xl border border-hair-strong bg-card px-4 py-4">
-          <h2 className="mb-1 text-[11px] font-semibold tracking-[0.1em] text-gink-46 uppercase">Bill summary</h2>
+        <section className="g-panel mt-4 px-4 py-4">
+          <h2 className="g-eyebrow mb-1">Bill summary</h2>
           <Totals
             subtotalPaise={subtotalPaise}
             taxPaise={taxPaise}
