@@ -2,7 +2,7 @@
  * Subscription trial state.
  *
  * RULES (from the product spec — these are not negotiable):
- *   - Every new account gets a 10-day trial with all main features on.
+ *   - Every new account gets a 7-day trial with all main features on.
  *   - When the trial ends and there is no subscription: the account becomes
  *     READ-ONLY. New orders are BLOCKED.
  *   - Data is NEVER deleted for non-payment. Not after a week, not after a
@@ -11,7 +11,14 @@
  *     browser's clock is not evidence of anything.
  */
 
-export const TRIAL_DAYS = 10;
+/**
+ * Seven days. Change this and the database must change with it:
+ * `public.restaurant_can_write()` and `public.restaurant_trial_ends_at()` both
+ * hard-code `interval '7 days'`, and lib/trial.test.ts asserts the two agree by
+ * reading this number. The server is the authority; this constant exists so the
+ * app can describe the same clock without a round trip.
+ */
+export const TRIAL_DAYS = 7;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 

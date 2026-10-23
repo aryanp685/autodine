@@ -39,6 +39,13 @@ export type SettingsScreenData = {
   taxRateBps: number;
   /** Has the owner switched card/UPI payment on? */
   onlinePaymentsEnabled: boolean;
+  /** Migration 20261026001300. The restaurant's own handle, or ''. */
+  upiId: string;
+  /**
+   * The name a guest's UPI app shows. Empty means the restaurant's own name is
+   * used at render time -- never a platform name.
+   */
+  upiPayeeName: string;
   /** Read-only: it decides what "today" means in Reports. See the screen. */
   timezone: string;
   /** Absolute when a request origin is known, otherwise the path. */
@@ -69,6 +76,8 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
       details: { name: '', tagline: '', address: '', phone: '', gstin: '', slug: '' },
       taxRateBps: 0,
       onlinePaymentsEnabled: false,
+      upiId: '',
+      upiPayeeName: '',
       timezone: 'Asia/Kolkata',
       publicMenuUrl: '',
       publicMenuSvg: null,
@@ -85,7 +94,9 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
   const [restaurantResult, menusResult] = await Promise.all([
     supabase
       .from('restaurants')
-      .select('name, tagline, address, phone, gstin, slug, timezone, tax_rate_bps, online_payments_enabled')
+      .select(
+        'name, tagline, address, phone, gstin, slug, timezone, tax_rate_bps, online_payments_enabled, upi_id, upi_payee_name'
+      )
       .eq('id', restaurantId)
       .maybeSingle(),
     supabase.from('menus').select('id, is_published').eq('restaurant_id', restaurantId),
@@ -108,6 +119,8 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
       details: { name: '', tagline: '', address: '', phone: '', gstin: '', slug: '' },
       taxRateBps: 0,
       onlinePaymentsEnabled: false,
+      upiId: '',
+      upiPayeeName: '',
       timezone: 'Asia/Kolkata',
       publicMenuUrl: '',
       publicMenuSvg: null,
@@ -143,6 +156,8 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
     // inventing a tax nobody set.
     taxRateBps: Number(row.tax_rate_bps ?? 0),
     onlinePaymentsEnabled: row.online_payments_enabled === true,
+    upiId: String((row as { upi_id?: string | null }).upi_id ?? ''),
+    upiPayeeName: String((row as { upi_payee_name?: string | null }).upi_payee_name ?? ''),
     timezone: String(row.timezone ?? 'Asia/Kolkata'),
     publicMenuUrl,
     publicMenuSvg,

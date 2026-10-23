@@ -106,3 +106,58 @@ export async function setGuestOrderLinesAction(input: {
 
   return { ok: true, message: 'Updated. The kitchen has the new quantities.' };
 }
+
+/**
+ * "I have paid" — the guest's claim, not a receipt.
+ *
+ * WHAT THIS DOES NOT DO
+ *
+ * It does not mark the order paid, and it cannot: public.claim_upi_payment()
+ * writes a row with status 'pending' and provider 'upi-claim'. Every total in
+ * the product sums 'recorded' only, so the claim cannot flatter a report, and
+ * payment_status on the order stays 'pending' until a cashier records the
+ * collection against the restaurant's own bank app.
+ *
+ * Why record it at all: a counter that can see "this guest says they paid by
+ * UPI" checks one more screen instead of taking the money twice. A claim that
+ * exists nowhere is a conversation the guest has to win from memory.
+ *
+ * The order token is the credential, the same one that reads the order. Without
+ * it the function raises "This order could not be found."
+ */
+export async function claimUpiPaymentAction(input: {
+  slug: string;
+  code: string;
+  token: string;
+}): Promise<GuestActionResult> {
+  if (!input.slug || !input.code || !input.token) {
+    return { ok: false, error: 'That order could not be found.' };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return { ok: false, error: 'Payment is not available right now.' };
+
+  const { data, error } = await supabase.rpc('claim_upi_payment', {
+    p_slug: input.slug,
+    p_code: input.code,
+    p_token: input.token,
+  });
+
+  if (error) {
+    if (error.code === 'P0001') return { ok: false, error: friendly(error.message) };
+    console.error('[claimUpiPaymentAction] unexpected failure', error);
+    return { ok: false, error: 'We could not tell the counter. Please show them your payment.' };
+  }
+
+  revalidatePath(ORDER_PATH);
+
+  if (data && typeof data === 'object' && (data as { already_paid?: unknown }).already_paid === true) {
+    return { ok: true, message: 'This order is already settled. Nothing more to pay.' };
+  }
+
+  return {
+    ok: true,
+    message:
+      'Told the counter. They will confirm the transfer against their own UPI app — until then this order shows as unpaid.',
+  };
+}

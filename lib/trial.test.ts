@@ -6,32 +6,32 @@ const DAY = 24 * 60 * 60 * 1000;
 const at = (days: number, ms = 0) => new Date(START.getTime() + days * DAY + ms);
 
 describe('trial basics', () => {
-  it('is 10 days long', () => {
-    expect(TRIAL_DAYS).toBe(10);
+  it('is 7 days long', () => {
+    expect(TRIAL_DAYS).toBe(7);
   });
 
   it('gives the full trial the moment an account is created', () => {
     const s = computeTrialState({ startedAt: START, now: START });
     expect(s.status).toBe('trialing');
-    expect(s.daysRemaining).toBe(10);
+    expect(s.daysRemaining).toBe(7);
     expect(s.canPlaceOrders).toBe(true);
     expect(s.readOnly).toBe(false);
   });
 
-  it('ends exactly 10 days after it started', () => {
+  it('ends exactly 7 days after it started', () => {
     const s = computeTrialState({ startedAt: START, now: START });
-    expect(s.endsAt.toISOString()).toBe('2026-10-29T10:00:00.000Z');
+    expect(s.endsAt.toISOString()).toBe('2026-10-26T10:00:00.000Z');
   });
 
   it('counts down', () => {
-    expect(computeTrialState({ startedAt: START, now: at(3) }).daysRemaining).toBe(7);
-    expect(computeTrialState({ startedAt: START, now: at(9) }).daysRemaining).toBe(1);
+    expect(computeTrialState({ startedAt: START, now: at(3) }).daysRemaining).toBe(4);
+    expect(computeTrialState({ startedAt: START, now: at(6) }).daysRemaining).toBe(1);
   });
 });
 
 describe('expiry', () => {
   it('is still trialing one second before the end', () => {
-    const s = computeTrialState({ startedAt: START, now: at(10, -1000) });
+    const s = computeTrialState({ startedAt: START, now: at(7, -1000) });
     expect(s.status).toBe('trialing');
     expect(s.canPlaceOrders).toBe(true);
   });
@@ -44,7 +44,7 @@ describe('expiry', () => {
   });
 
   it('blocks new orders once expired', () => {
-    const s = computeTrialState({ startedAt: START, now: at(11) });
+    const s = computeTrialState({ startedAt: START, now: at(8) });
     expect(s.canPlaceOrders).toBe(false);
     expect(s.readOnly).toBe(true);
   });
@@ -85,7 +85,7 @@ describe('clock skew', () => {
     // A bad clock must not lock a paying restaurant out of service.
     const s = computeTrialState({ startedAt: START, now: at(-1) });
     expect(s.status).toBe('trialing');
-    expect(s.daysRemaining).toBe(10);
+    expect(s.daysRemaining).toBe(7);
     expect(s.canPlaceOrders).toBe(true);
   });
 });
@@ -97,7 +97,7 @@ describe('orderBlockedReason', () => {
   });
 
   it('explains itself to a human at the counter when blocked', () => {
-    const reason = orderBlockedReason(computeTrialState({ startedAt: START, now: at(12) }));
+    const reason = orderBlockedReason(computeTrialState({ startedAt: START, now: at(9) }));
     expect(reason).not.toBeNull();
     // The message must reassure that nothing was lost: that is the promise.
     expect(reason).toContain('still here');

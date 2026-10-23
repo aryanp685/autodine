@@ -98,8 +98,9 @@ export function PricingScreen() {
                 Priced for one restaurant, not a chain.
               </h1>
               <p className="max-w-[46ch] text-[15px] leading-[1.65] text-mute">
-                Three sizes of operation, one product. Everything below is a planning figure —
-                plans are not on sale, and no account is limited by them today.
+                Three sizes of operation, one product. The prices are planning figures: no plan can
+                be bought yet. Every new account runs on the whole product for seven days, then goes
+                read-only until access is extended — nothing is deleted.
               </p>
             </div>
 

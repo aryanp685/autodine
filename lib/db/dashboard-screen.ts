@@ -24,6 +24,7 @@
  * instead, which is derivable and is what the owner actually acts on.
  */
 
+import type { RestaurantAccess } from '@/lib/access';
 import { getStaffContextDetailed } from './staff';
 import { hourInZone, RESTAURANT_TIME_ZONE, startOfDayUtc } from './time';
 
@@ -82,6 +83,12 @@ export type DashboardScreenData = {
   hourlyPaise: number[];
   /** Set when the database answered but this caller has no restaurant. */
   blocked?: 'signed-out' | 'no-membership';
+  /**
+   * Plan and trial state. Read from the database on every load, never from a
+   * cookie: the line above the figures has to agree with the gate that refuses
+   * writes. Null in demo mode and when the read failed.
+   */
+  access?: RestaurantAccess | null;
 };
 
 /** How many rows the Live orders table shows. */
@@ -120,6 +127,7 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
       topItems: [],
       hourlyPaise: [],
       blocked: staff.reason,
+      access: null,
     };
   }
 
@@ -192,6 +200,7 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
       orders: [],
       topItems: [],
       hourlyPaise,
+      access: staff.context.access,
     };
   }
 
@@ -256,5 +265,6 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
       .sort((a, b) => b.qty - a.qty || b.revenuePaise - a.revenuePaise)
       .slice(0, TOP_ITEM_LIMIT),
     hourlyPaise,
+    access: staff.context.access,
   };
 }

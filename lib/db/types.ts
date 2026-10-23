@@ -37,6 +37,23 @@ export type Restaurant = {
   accent: string;
   updated_at: string;
   created_at: string;
+  /**
+   * Migration 20261026001100. The trial clock and the plan. Present on every
+   * row; `trial_started_at` is written once by the database and moved by
+   * nobody. These are display inputs -- the authority is
+   * public.restaurant_access(), which the server reads.
+   */
+  trial_started_at?: string;
+  plan?: 'trial' | 'starter' | 'professional' | 'business';
+  plan_status?: 'trialing' | 'active' | 'expired' | 'cancelled';
+  plan_started_at?: string | null;
+  plan_expires_at?: string | null;
+  /**
+   * Migration 20261026001300. The restaurant's OWN UPI handle, shown to its
+   * guests as a QR. Null means no QR is drawn -- never a placeholder payee.
+   */
+  upi_id?: string | null;
+  upi_payee_name?: string | null;
 };
 
 export type Category = {

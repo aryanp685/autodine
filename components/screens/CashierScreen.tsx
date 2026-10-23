@@ -37,6 +37,12 @@ type QueueRow = {
   outstanding: number;
   paid: number;
   items: string;
+  /**
+   * The guest pressed "I have paid" against the restaurant's UPI QR. A claim,
+   * not money: the transfer happened in an app we cannot see. Shown so the
+   * cashier checks the shop's own bank app before taking cash twice.
+   */
+  claimed: boolean;
 };
 
 function fromDemo(order: (typeof counterQueue)[number]): QueueRow {
@@ -51,6 +57,7 @@ function fromDemo(order: (typeof counterQueue)[number]): QueueRow {
     outstanding: order.total,
     paid: 0,
     items: order.items,
+    claimed: false,
   };
 }
 
@@ -66,6 +73,7 @@ function fromLive(order: CounterOrder): QueueRow {
     outstanding: order.outstanding,
     paid: order.paid,
     items: order.items,
+    claimed: order.claimed === true,
   };
 }
 
@@ -386,6 +394,9 @@ export function Cashier({
                             <span className="mt-2.5 flex items-baseline justify-between gap-3">
                               <span className="flex items-center gap-2">
                                 {selected ? <Tag tone="ink">Selected</Tag> : null}
+                                {item.claimed ? (
+                                  <Tag tone="due">Says paid by UPI</Tag>
+                                ) : null}
                                 <span className="text-[11.5px] text-gink-46">{item.state}</span>
                               </span>
                               <span className="text-[13.5px] font-medium text-gink tabular-nums">

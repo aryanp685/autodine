@@ -35,7 +35,13 @@ function fakeSupabase(rows: Record<string, Row[]>) {
     };
     return chain;
   };
-  return { from } as never;
+  return {
+    from,
+    // Migration 20261026001300's UPI claims. This mock has none: the queue's
+    // "guest says paid" marker is exercised separately, and every row here is
+    // therefore a plain unpaid ticket.
+    rpc: () => Promise.resolve({ data: [], error: null }),
+  } as never;
 }
 
 function signedIn(supabase: unknown) {

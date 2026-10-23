@@ -50,6 +50,7 @@ const order = (over: Partial<OrderScreenData> = {}): OrderScreenData => ({
   customerNote: null,
   placedAt: '2026-10-21T12:00:00Z',
   onlineEnabled: false,
+  upi: null,
   lines: [
     {
       id: 'l-1',

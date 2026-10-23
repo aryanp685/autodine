@@ -11,8 +11,9 @@
 | Public menu reading | Supabase-backed read path is present, with a demo-data fallback |
 | Database schema and row-level security | Initial migrations exist; must be applied and tested against a real Supabase project |
 | Order placement and kitchen sync | Connected: orders, kitchen board, cancellation and bill printing run against the database |
+| Guest UPI payment | The restaurant's own UPI ID, shown as a QR with the amount filled in. **Not** a gateway: it never marks an order paid |
 | Online payments | Built and wired end to end, but **switched off**: no gateway keys are configured on the deployment, and each restaurant's online-payment switch defaults to off |
-| Subscriptions | Not implemented |
+| Subscriptions | The seven-day trial is enforced in the database (`restaurant_can_write`). No plan can be bought, and there is no checkout — see `docs/DEMO.md` §1.3 |
 | Production readiness | Not ready for live money until a gateway key is configured and one real payment has been run through it |
 
 All restaurant names, orders, dashboard metrics, QR states and payments shown without a configured database are fictional demo content. The displayed 5% tax rate and plan prices are illustrative and must not be treated as tax or billing advice.
@@ -47,7 +48,9 @@ The SQL check parses DDL syntax; it does **not** execute migrations or prove tha
 - `components/` — screen components and shared UI
 - `lib/` — demo data, money/pricing logic, Supabase clients and database adapters
 - `supabase/` — database migrations and fictional seed data
-- `styles/design-system.css` — shared product styling and responsive breakpoints
+- `app/globals.css` — Tailwind entry, design tokens and the small amount of base CSS
+- `styles/premium.css` — the marketing layer only (the product is Tailwind)
+- `docs/DEMO.md` — setup, the demo script, and what not to claim in front of a restaurant
 
 ## Payments
 
