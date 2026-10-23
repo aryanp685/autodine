@@ -16,8 +16,8 @@ const COLUMNS = [
     title: 'Product',
     items: [
       { label: 'Overview', href: '/' },
-      { label: 'How it works', href: '/#flow' },
-      { label: 'The screens', href: '/#tour' },
+      { label: 'How it works', href: '/#how' },
+      { label: 'The screens', href: '/#screens' },
       { label: 'What is live', href: '/#status' },
     ],
   },
@@ -27,6 +27,19 @@ const COLUMNS = [
       { label: 'Pricing', href: '/pricing' },
       { label: 'Sign in', href: '/login' },
       { label: 'Create account', href: '/signup' },
+    ],
+  },
+  {
+    /*
+      Anchors above were wrong for a while -- /#flow and /#tour do not exist on
+      the page, so three of the footer's links scrolled nowhere. They now match
+      the section ids in HomeScreen, and a link to a page that does not exist is
+      worse than no link at all, so the two below point at real routes.
+    */
+    title: 'Reading',
+    items: [
+      { label: 'Privacy', href: '/privacy' },
+      { label: 'Terms', href: '/terms' },
     ],
   },
 ];

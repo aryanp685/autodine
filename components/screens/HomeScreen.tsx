@@ -564,7 +564,7 @@ function Features() {
  */
 function Honest() {
   return (
-    <section className="border-t border-white/[0.06] py-24">
+    <section id="status" className="border-t border-white/[0.06] py-24">
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
         <h2 className="text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.05] tracking-[-0.04em]" data-reveal>
           {/* Spelled out from the lists, never typed: a number in a headline
