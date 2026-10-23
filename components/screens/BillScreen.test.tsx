@@ -140,7 +140,7 @@ describe('BillScreen', () => {
     // not pretend to be live before a number is typed.
     expect(html).toContain('you still press send');
     expect(html).toContain('Type the guest’s 10-digit mobile number to enable this.');
-    expect(html).toMatch(/<button[^>]*bill__waBtn[^>]*disabled/);
+    expect(html).toMatch(/<button[^>]*data-bill-wa-button[^>]*disabled=""/);
   });
 
   it('warns when the bill is missing the details it should carry', () => {
@@ -156,11 +156,16 @@ describe('BillScreen', () => {
   });
 
   it('marks the toolbar and the WhatsApp panel as print chrome', () => {
-    // The @media print block hides these two classes; if a refactor renames
-    // one of them the printed page silently gains a toolbar and a text box.
+    // These two nodes carry `print:hidden`; if a refactor drops it the printed
+    // page silently gains a toolbar and a text box.
     const html = renderToStaticMarkup(<BillScreen bill={bill()} />);
-    expect(html).toContain('bill__bar');
-    expect(html).toContain('bill__wa');
+    expect(html).toContain('data-print-chrome="toolbar"');
+    expect(html).toContain('data-print-chrome="whatsapp"');
     expect(html).toContain('Print bill');
+
+    // Both are actually hidden on paper, not merely labelled.
+    const chrome = [...html.matchAll(/data-print-chrome="[a-z]+"[^>]*class="([^"]*)"/g)];
+    expect(chrome).toHaveLength(2);
+    for (const [, classes] of chrome) expect(classes).toContain('print:hidden');
   });
 });
