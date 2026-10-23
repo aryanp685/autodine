@@ -111,15 +111,20 @@ export function GuestFlow({
   const hasDock = Boolean(dock || docked);
   const hasTabs = Boolean(tabs);
 
-  /* THE TWO BARS STACK; THEY DO NOT SIT ON EACH OTHER
+  /* ONE SHELF, TWO ROWS
    *
-   * The dock and the tab bar were both `fixed bottom-0`. On the menu they are
-   * both present the moment a cart has something in it -- so the cart bar
-   * landed exactly on top of the tabs, and the tabs became untappable at the
-   * one moment a guest most wants them. The dock now floats above the tabs by
-   * the tab bar's own height, and the page reserves room for both. */
-  const TABS_SPACE = 74;
-  const DOCK_SPACE = 78;
+   * The dock and the tab bar were two floating islands, one inset above the
+   * other, each with its own radius and shadow. They no longer overlap -- but
+   * they still read as two notifications with a strip of page between them,
+   * and together they ate the bottom quarter of a phone.
+   *
+   * Now they are two rows of one docked sheet (see the chrome section in
+   * globals.css). These are the row heights, and the page reserves their sum:
+   * the numbers have to match the markup below or the last dish hides under
+   * the shelf, which is the bug this whole block exists to prevent.
+   */
+  const TABS_SPACE = 58;
+  const DOCK_SPACE = 86;
 
   return (
     <div
@@ -132,7 +137,7 @@ export function GuestFlow({
       style={{
         ...style,
         paddingBottom: `calc(${
-          16 + (hasDock ? DOCK_SPACE : 0) + (hasTabs ? TABS_SPACE : 0)
+          14 + (hasDock ? DOCK_SPACE : 0) + (hasTabs ? TABS_SPACE : 0)
         }px + env(safe-area-inset-bottom))`,
       }}
     >
@@ -224,28 +229,36 @@ export function GuestFlow({
 
       <main className="mx-auto w-full max-w-[720px]">{children}</main>
 
-      {dock ? (
+      {/* The shelf is drawn only for rows GuestFlow itself owns: a screen that
+          renders its own pinned bar (checkout) passes `docked` for the padding
+          and carries its own sheet, so an empty shelf here would be a blur with
+          nothing on it. */}
+      {dock || tabs ? (
         <div
-          data-flow-dock=""
-          className="fixed inset-x-0 z-40 px-3"
-          /* Above the tabs when there are tabs, on the floor when there are
-             not. Both are floating panels, so this is one gap either way. */
-          style={{
-            bottom: hasTabs
-              ? 'calc(74px + env(safe-area-inset-bottom))'
-              : 'calc(12px + env(safe-area-inset-bottom))',
-          }}
+          data-flow-shelf=""
+          className="fixed inset-x-0 bottom-0 z-40"
+          /* Docked, not floating: no bottom offset, because the sheet is the
+             edge of the screen now. */
+          style={{ bottom: 0 }}
         >
-          <div
-            data-flow-chrome="dock"
-            className="mx-auto w-full max-w-[720px] rounded-[22px] px-3 py-2.5"
-          >
-            {dock}
+          <div data-flow-chrome="shelf" className="w-full">
+            {dock ? (
+              <div
+                data-flow-dock=""
+                className="mx-auto w-full max-w-[720px] px-3 pt-2.5 pb-2"
+              >
+                <div data-flow-chrome="dock" className="flex items-center gap-3">
+                  {dock}
+                </div>
+              </div>
+            ) : null}
+
+            {tabs ? (
+              <div data-shelf-divider={dock ? '' : undefined}>{tabs}</div>
+            ) : null}
           </div>
         </div>
       ) : null}
-
-      {tabs}
     </div>
   );
 }

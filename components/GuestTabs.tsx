@@ -74,14 +74,15 @@ export function GuestTabs({ slug, active }: { slug?: string | null; active: Gues
   ];
 
   return (
+    /* A row, not an island. The sheet behind it, the blur and the safe-area
+       padding all belong to the shelf in GuestFlow -- see the chrome section in
+       globals.css. This component only decides what is on the row. */
     <nav
       aria-label="Your order"
       data-gtab-bar=""
-      data-flow-chrome="tabs"
-      className="fixed inset-x-3 z-30 mx-auto max-w-[696px] rounded-[22px] px-1.5 py-1.5"
-      style={{ bottom: 'calc(10px + env(safe-area-inset-bottom))' }}
+      className="mx-auto w-full max-w-[720px] px-2 pt-1 pb-1.5"
     >
-      <div className="grid w-full grid-cols-3">
+      <div className="grid w-full grid-cols-3 gap-1">
         {tabs.map((tab) => {
           const current = tab.key === active;
           return (
@@ -92,13 +93,21 @@ export function GuestTabs({ slug, active }: { slug?: string | null; active: Gues
               data-gtab-active={current ? 'true' : undefined}
               aria-current={current ? 'page' : undefined}
               className={[
-                'group relative flex flex-col items-center gap-0.5 rounded-[16px] py-2 text-[10.5px] font-medium tracking-[0.01em] transition-colors',
+                'group relative flex flex-col items-center gap-1 rounded-[14px] py-1.5 text-[10.5px] font-medium tracking-[0.01em] transition-colors',
                 current
-                  ? 'bg-white/70 text-[var(--p-accent)] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]'
+                  ? 'text-[var(--p-accent)]'
                   : 'text-gink-46 hover:text-gink-80',
               ].join(' ')}
             >
-              <span className="relative">
+              {/* The active state is a soft accent lozenge behind the glyph --
+                  shape first, colour second, so the selected tab reads at a
+                  glance without relying on hue. */}
+              <span
+                className={[
+                  'relative grid place-items-center rounded-full transition-colors',
+                  current ? 'size-8 bg-[var(--p-accent)]/12' : 'size-8',
+                ].join(' ')}
+              >
                 {tab.icon}
                 {/* The number is not decoration: it is the answer to "did my
                     last tap work", and it is the only cart count on the screen

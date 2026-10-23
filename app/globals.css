@@ -631,9 +631,22 @@ p { margin: 0; }
 }
 
 /* ---- the chrome ---------------------------------------------------------
-   Header, dock and tabs. These three are the only surfaces with a real
-   backdrop-filter, because these three really do have content scrolling
-   underneath. */
+   Header and shelf. These are the only two surfaces with a real
+   backdrop-filter, because these are the only two with content scrolling
+   underneath them.
+
+   THE SHELF
+
+   The bottom of the guest screen used to be two floating islands: a cart bar
+   inset 12px from the edges, then a tab bar inset 12px again below it, each
+   with its own radius, blur and shadow, and a strip of page visible in the
+   three gaps. On a phone that is 160px of stacked glass with four hard edges
+   inside it, and it reads as two notifications rather than one place to stand.
+
+   It is now one shelf: full-bleed, docked to the bottom edge, rounded only at
+   the top, carrying the cart row and the tabs on a single sheet. That is how a
+   native app does it, and it buys back the two gaps plus a shadow -- most of a
+   dish card on a 700px viewport. */
 [data-flow-root] [data-flow-chrome] {
   background: rgba(250, 246, 238, 0.74);
   backdrop-filter: blur(22px) saturate(160%);
@@ -643,13 +656,71 @@ p { margin: 0; }
   box-shadow: var(--p-shadow-2);
 }
 
-/* The header is docked to the top edge, so it is only rounded underneath --
-   a floating pill at the top of the page leaves two slivers of wash above it
-   and reads as a card that has slipped. */
+/* The header is docked to the top edge, so it is only rounded underneath -- a
+   floating pill at the top of the page leaves two slivers of wash above it and
+   reads as a card that has slipped. */
 [data-flow-root] [data-flow-chrome='header'] {
   border-radius: 0 0 var(--g-r-lg) var(--g-r-lg);
   border-top: 0;
   box-shadow: var(--p-shadow-1);
+}
+
+/* ---- the shelf ---------------------------------------------------------
+   One sheet, two rows. Opaque enough (84%) that a dish scrolling under it is a
+   suggestion of colour rather than a competitor to the total, and blurred more
+   than the cards because this is the one surface that always has something
+   moving underneath it. The safe-area padding lives here, once, so neither row
+   has to know about the home indicator. */
+[data-flow-root] [data-flow-chrome='shelf'] {
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: var(--g-r-lg) var(--g-r-lg) 0 0;
+  background: rgba(250, 246, 238, 0.84);
+  backdrop-filter: blur(26px) saturate(170%);
+  -webkit-backdrop-filter: blur(26px) saturate(170%);
+  box-shadow:
+    0 -1px 0 rgba(16, 24, 40, 0.05),
+    0 -26px 48px -32px rgba(16, 24, 40, 0.32);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* A hairline only when the shelf really has two rows under it. A single-row
+   shelf (the checkout bar) otherwise gets a line across empty glass. */
+[data-flow-root] [data-flow-chrome='shelf'] [data-shelf-divider] {
+  border-top: 1px solid var(--p-line);
+}
+
+/* The cart row sits ON the sheet, so it must not paint a second surface. */
+[data-flow-root] [data-flow-chrome='shelf'] [data-flow-chrome='dock'] {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ---- the rail -----------------------------------------------------------
+   A row of course chips is wider than a phone, so it scrolls sideways. Two
+   things make that obvious rather than broken: the row softens at both edges
+   so a cut-off chip reads as "there is more", and it snaps, so the row settles
+   on a chip instead of between two.
+
+   The mask is written with rgb() rather than a hex so it stays inside the
+   design guard's colour budget -- it is an alpha ramp, not a colour. */
+[data-flow-root] [data-rail] {
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 12px;
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    rgb(0 0 0) 10px,
+    rgb(0 0 0) calc(100% - 22px),
+    transparent 100%
+  );
+}
+[data-flow-root] [data-rail] > * {
+  scroll-snap-align: start;
 }
 
 /* ---- motion -------------------------------------------------------------

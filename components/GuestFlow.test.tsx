@@ -82,3 +82,63 @@ describe('GuestFlow', () => {
     expect(GUEST_STEPS.map((step) => step.label)).toEqual(['Menu', 'Cart', 'Pay', 'Placed']);
   });
 });
+
+/**
+ * The bottom of the screen.
+ *
+ * This was two floating islands -- a cart bar above a tab bar, both inset from
+ * the edges, each with its own blur, radius and shadow. On a phone they ate the
+ * bottom quarter of the viewport and read as two notifications. They are one
+ * docked shelf now, and this is the test that keeps them one: a dock that
+ * escapes the shelf, or a page that forgets to reserve the shelf's height,
+ * puts the last dish under the bar where nobody can tap it.
+ */
+describe('GuestFlow — the bottom shelf', () => {
+  const dock = <span>Cart bar</span>;
+  const tabs = <span>Tabs</span>;
+
+  it('puts the dock and the tabs on one sheet', () => {
+    const html = renderToStaticMarkup(
+      <GuestFlow step="cart" dock={dock} tabs={tabs}>
+        <p>cart</p>
+      </GuestFlow>,
+    );
+
+    const shelf = html.slice(html.indexOf('data-flow-chrome="shelf"'));
+    expect(shelf).toContain('Cart bar');
+    expect(shelf).toContain('Tabs');
+    // And the sheet is docked to the edge rather than floating above it.
+    expect(html).toMatch(/data-flow-shelf=""[^>]*style="bottom:0"/);
+  });
+
+  it('draws no sheet at all when it owns neither row', () => {
+    // Checkout renders its own pinned bar and passes `docked` only for the
+    // padding. An empty shelf there would be a blur with nothing on it.
+    const html = renderToStaticMarkup(
+      <GuestFlow step="pay" docked>
+        <p>pay</p>
+      </GuestFlow>,
+    );
+    expect(html).not.toContain('data-flow-chrome="shelf"');
+  });
+
+  it('reserves room for both rows, not just one', () => {
+    const both = renderToStaticMarkup(
+      <GuestFlow step="cart" dock={dock} tabs={tabs}>
+        <p>cart</p>
+      </GuestFlow>,
+    );
+    const dockOnly = renderToStaticMarkup(
+      <GuestFlow step="cart" dock={dock}>
+        <p>cart</p>
+      </GuestFlow>,
+    );
+
+    const pad = (html: string) =>
+      Number(html.match(/padding-bottom:calc\((\d+)px/)?.[1] ?? '0');
+    // 14 (breathing room) + 86 (dock) + 58 (tabs).
+    expect(pad(both)).toBe(158);
+    expect(pad(dockOnly)).toBe(100);
+    expect(pad(both)).toBeGreaterThan(pad(dockOnly));
+  });
+});

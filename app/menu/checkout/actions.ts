@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { parseCart } from '@/lib/cart-storage';
 import { loadTableAccess } from '@/lib/table-access';
+import { describePlaceFailure } from '@/lib/place-order-failure';
 
 const CART_PATH = '/menu/cart';
 
@@ -23,9 +24,21 @@ const CART_PATH = '/menu/cart';
  * The cart page reads `s` and gates on it, so dropping it also dropped the
  * table gate. Passing it through fixes both at once.
  */
-function fail(message: string, slug?: string): never {
+function fail(message: string, slug?: string, code?: string): never {
   const query = new URLSearchParams({ error: message });
   if (slug) query.set('s', slug);
+  /**
+   * A failure nobody has classified yet says what class it was.
+   *
+   * Every branch below that a guest can cause has its own sentence. What is
+   * left is the unknown, and an unknown used to render one fixed sentence with
+   * nothing to search for -- which is how a demo died in front of an owner
+   * with no way to tell whether the database, the deploy or the wifi was at
+   * fault. The SQLSTATE (five characters, e.g. 23502) is not the database's
+   * shape; it is the class of refusal. It costs a guest nothing to read and it
+   * turns "please try again" into a fact somebody can act on.
+   */
+  if (code) query.set('code', code);
   redirect(`${CART_PATH}?${query.toString()}`);
 }
 
@@ -147,19 +160,23 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
     // The function raises P0001 for the failures a customer can cause --
     // empty cart, sold out, wrong restaurant -- and its messages are written
     // to be read by a customer, so those pass straight through.
-    //
-    // Anything else is not. A permission error or a constraint violation
-    // would leak the shape of the database into an error banner, so those
-    // become one fixed sentence and the detail goes to the server log.
     if (error.code === 'P0001') {
       fail(error.message, slug);
     }
-    fail('We could not place that order. Please try again.', slug);
+
+    // The rest are classified rather than flattened into one sentence. A
+    // constraint violation and a dropped connection are not the same problem
+    // and the guest cannot fix them the same way -- "one of the dishes came
+    // off the menu" is actionable, "please try again" is a loop.
+    //
+    // The database's own words never reach the banner: these are the classes
+    // of refusal, written for the person reading them at a table.
+    fail(describePlaceFailure(error.code), slug, error.code || 'net');
   }
 
   if (typeof code !== 'string' || code === '') {
     console.error('[placeOrderAction] function returned no code', code);
-    fail('We could not place that order. Please try again.', slug);
+    fail('The order did not come back with a number, so it is not confirmed. Please try again.', slug);
   }
 
   redirect(
