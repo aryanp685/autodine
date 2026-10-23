@@ -60,9 +60,12 @@ const FAQS = [
 
 function TierTags({ tiers }: { tiers: string[] }) {
   return (
-    <span className="diff__tiers">
+    <span className="mt-2 flex flex-wrap gap-1.5">
       {tiers.map((tier) => (
-        <span key={tier} className="diff__tier">
+        <span
+          key={tier}
+          className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] font-medium tracking-[0.06em] text-mute uppercase"
+        >
           {tier}
         </span>
       ))}
@@ -81,28 +84,29 @@ export function PricingScreen() {
           { label: 'What is live', href: '/#status' },
           { label: 'Pricing', href: '/pricing', active: true },
         ]}
+        onImage
       />
 
-      <main>
+      <main className="bg-ink text-cream antialiased">
         {/* ---------------------------------------------------------- header */}
-        <header className="p-sect pricing__head">
-          <div className="p-wrap">
-            <div className="p-head" data-reveal>
-              <div>
-                <div className="p-eyebrow">01 · Plans</div>
-                <h1 className="p-display p-head__title">
-                  Priced for one restaurant,
-                  <br />
-                  not a chain.
-                </h1>
-              </div>
-              <p className="p-lede p-head__aside">
+        <header className="border-b border-white/[0.07] px-5 pt-20 pb-14 sm:px-8">
+          <div className="mx-auto w-full max-w-[1180px]">
+            <p className="text-[10.5px] font-semibold tracking-[0.14em] text-gold-dim uppercase">01 · Plans</p>
+
+            <div className="mt-6 grid gap-8 md:grid-cols-[1.15fr_0.85fr] md:items-end">
+              <h1 className="max-w-[15ch] text-[clamp(34px,5.6vw,62px)] leading-[0.98] font-semibold tracking-[-0.04em] text-balance">
+                Priced for one restaurant, not a chain.
+              </h1>
+              <p className="max-w-[46ch] text-[15px] leading-[1.65] text-mute">
                 Three sizes of operation, one product. Everything below is a planning figure —
                 plans are not on sale, and no account is limited by them today.
               </p>
             </div>
 
-            <div className="pricing__bar" data-reveal>
+            <div
+              data-reveal
+              className="mt-10 flex flex-col gap-3 rounded-2xl border border-white/[0.08] bg-ink-soft px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"
+            >
               <PlanMatcher
                 options={PLANS.map((plan) => ({
                   planId: plan.id,
@@ -110,8 +114,8 @@ export function PricingScreen() {
                   hint: plan.fit,
                 }))}
               />
-              <span className="pricing__state">
-                <span className="pricing__stateDot" aria-hidden="true" />
+              <span className="inline-flex items-center gap-2 text-[11.5px] font-medium tracking-[0.03em] text-mute">
+                <span aria-hidden="true" className="size-1.5 rounded-full bg-gold" />
                 {BILLING.connected ? 'Billing connected' : 'Preview · billing not connected'}
               </span>
             </div>
@@ -119,42 +123,56 @@ export function PricingScreen() {
         </header>
 
         {/* ----------------------------------------------------------- plans */}
-        <section className="p-sect p-sect--tight" style={{ paddingTop: 0 }} id="plans">
-          <div className="p-wrap">
-            <div className="p-plans" data-stagger>
+        <section id="plans" className="px-5 pt-14 pb-16 sm:px-8">
+          <div className="mx-auto w-full max-w-[1180px]">
+            <div data-stagger className="grid gap-4 md:grid-cols-3">
               {PLANS.map((plan) => {
                 const included = capabilitiesFor(plan.id);
                 return (
                   <article
                     key={plan.id}
                     id={`plan-${plan.id}`}
-                    className={`plan${plan.recommended ? ' plan--featured' : ''}`}
                     data-plan-id={plan.id}
+                    className={[
+                      'relative flex flex-col rounded-[22px] border p-6',
+                      /* The middle tier is lifted rather than decorated: a
+                         warmer ground and a gold rule say "this one" without a
+                         badge shouting over the other two. */
+                      plan.recommended
+                        ? 'border-gold/35 bg-ink-card shadow-[0_40px_80px_-50px_rgba(224,168,106,0.55)]'
+                        : 'border-white/[0.09] bg-ink-soft',
+                    ].join(' ')}
                   >
-                    {plan.recommended && <div className="plan__flag">Recommended</div>}
+                    {plan.recommended && (
+                      <div className="absolute -top-3 left-6 rounded-full bg-gold px-2.5 py-1 text-[10px] font-semibold tracking-[0.08em] text-ink uppercase">
+                        Recommended
+                      </div>
+                    )}
 
-                    <div className="plan__name">{plan.name}</div>
-                    <p className="plan__fit">{plan.fit}</p>
+                    <h2 className="text-[13px] font-semibold tracking-[0.09em] text-mute uppercase">
+                      {plan.name}
+                    </h2>
+                    <p className="mt-2 min-h-10 text-[13.5px] leading-[1.5] text-cream/75">{plan.fit}</p>
 
-                    <div className="plan__price">
-                      {inr(plan.price)}
-                      <span>/month · planned</span>
+                    <div className="mt-5 flex items-baseline gap-1.5">
+                      <span className="tnum text-[34px] leading-none font-semibold tracking-[-0.03em] text-cream">
+                        {inr(plan.price)}
+                      </span>
+                      <span className="text-[12px] text-mute-dim">/month · planned</span>
                     </div>
 
-                    <div className="plan__rule" />
+                    <hr className="my-5 border-white/[0.08]" />
 
-                    <ul className="plan__features">
+                    <ul className="flex flex-1 flex-col gap-2.5 text-[13.5px] leading-[1.45] text-cream/80">
                       {plan.id === 'starter' ? (
                         <>
-                          <li className="plan__feature">All {LIVE.length} live capabilities</li>
-                          <li className="plan__feature">Unlimited orders and tables</li>
-                          <li className="plan__feature">Available today, nothing charged</li>
+                          <li>All {LIVE.length} live capabilities</li>
+                          <li>Unlimited orders and tables</li>
+                          <li>Available today, nothing charged</li>
                         </>
                       ) : (
                         <>
-                          <li className="plan__feature">
-                            Everything in {PLANS[PLANS.indexOf(plan) - 1].name}, plus:
-                          </li>
+                          <li>Everything in {PLANS[PLANS.indexOf(plan) - 1].name}, plus:</li>
                           {/* Only what this tier adds over the one below it.
                               Repeating Professional's rows on Business reads as
                               a longer list and is the same list. */}
@@ -165,14 +183,18 @@ export function PricingScreen() {
                               return !c.tiers.includes(below);
                             })
                             .map((c) => (
-                              <li key={c.id} className="plan__feature">
+                              <li key={c.id} className="flex gap-2">
+                                <span aria-hidden="true" className="mt-1.5 size-1 shrink-0 rounded-full bg-gold-dim" />
                                 {c.label}
                               </li>
                             ))}
                         </>
                       )}
                     </ul>
-                    <p className="plan__stage">Planned · not on sale</p>
+
+                    <p className="mt-5 border-t border-white/[0.08] pt-3 text-[10.5px] font-medium tracking-[0.09em] text-mute-dim uppercase">
+                      Planned · not on sale
+                    </p>
                   </article>
                 );
               })}
@@ -181,40 +203,48 @@ export function PricingScreen() {
             {/* One action for the whole page. Three "Choose" buttons would be
                 three ways to do the same thing, and none of them would put the
                 account on a plan. */}
-            <div className="pricing__action" data-reveal>
-              <div>
-                <Link href="/signup" className="p-btn p-btn--solid">
-                  Create an account
-                </Link>
-                <p className="pricing__actionNote">
-                  Free while the product is in preview. No card, nothing charged.
-                </p>
-              </div>
+            <div data-reveal className="mt-10 flex flex-col items-start gap-2">
+              <Link
+                href="/signup"
+                className="inline-flex h-12 items-center rounded-full bg-gold px-6 text-[14px] font-medium text-ink transition-colors hover:bg-gold-bright"
+              >
+                Create an account
+              </Link>
+              <p className="text-[12px] text-mute-dim">
+                Free while the product is in preview. No card, nothing charged.
+              </p>
             </div>
           </div>
         </section>
 
         {/* ------------------------------------------------------ live today */}
-        <section className="p-sect" id="live">
-          <div className="p-wrap">
-            <div className="p-head" data-reveal>
+        <section id="live" className="border-t border-white/[0.07] px-5 py-16 sm:px-8">
+          <div className="mx-auto w-full max-w-[1180px]">
+            <div data-reveal className="grid gap-6 md:grid-cols-[1fr_0.9fr] md:items-end">
               <div>
-                <div className="p-eyebrow">02 · In the product today</div>
-                <h2 className="p-h2 p-head__title">Built, and switched on.</h2>
+                <p className="text-[10.5px] font-semibold tracking-[0.14em] text-gold-dim uppercase">
+                  02 · In the product today
+                </p>
+                <h2 className="mt-4 max-w-[16ch] text-[clamp(28px,4vw,44px)] leading-[1.03] font-semibold tracking-[-0.035em]">
+                  Built, and switched on.
+                </h2>
               </div>
-              <p className="p-lede p-head__aside">
+              <p className="max-w-[44ch] text-[14.5px] leading-[1.65] text-mute">
                 Not a roadmap. Every one of these is running in this build, on every account,
                 whatever the plans end up costing.
               </p>
             </div>
 
-            <div className="p-grid" style={{ marginTop: 'clamp(48px, 7vh, 88px)' }} data-stagger>
+            <div data-stagger className="mt-12 grid gap-x-8 gap-y-9 sm:grid-cols-2 lg:grid-cols-3">
               {LIVE.map((capability, index) => (
-                <article key={capability.id} className="feat">
-                  <hr className="p-rule feat__rule" data-draw />
-                  <p className="feat__num">{String(index + 1).padStart(2, '0')}</p>
-                  <h3 className="p-h3 feat__title">{capability.label}</h3>
-                  <p className="p-body feat__body">{capability.detail}</p>
+                <article key={capability.id} className="border-t border-white/[0.12] pt-4">
+                  <p className="tnum text-[10.5px] font-semibold tracking-[0.1em] text-mute-dim">
+                    {String(index + 1).padStart(2, '0')}
+                  </p>
+                  <h3 className="mt-2 text-[16px] font-semibold tracking-[-0.015em] text-cream">
+                    {capability.label}
+                  </h3>
+                  <p className="mt-1.5 text-[13px] leading-[1.6] text-mute">{capability.detail}</p>
                 </article>
               ))}
             </div>
@@ -222,15 +252,18 @@ export function PricingScreen() {
         </section>
 
         {/* ------------------------------------------------------- statement */}
-        <section className="statement">
-          <div className="p-wrap">
-            <p className="p-label" data-reveal>
+        <section className="border-y border-white/[0.07] bg-ink-soft px-5 py-20 sm:px-8">
+          <div className="mx-auto w-full max-w-[1180px]">
+            <p data-reveal className="text-[10.5px] font-semibold tracking-[0.14em] text-mute-dim uppercase">
               Why nothing is gated
             </p>
-            <h2 className="statement__text" style={{ marginTop: 26 }} data-reveal>
+            <h2
+              data-reveal
+              className="mt-6 max-w-[24ch] text-[clamp(26px,4vw,42px)] leading-[1.06] font-semibold tracking-[-0.035em] text-cream"
+            >
               A restaurant that cannot take an order is not a smaller customer.
             </h2>
-            <p className="p-lede statement__sub" data-reveal>
+            <p data-reveal className="mt-5 max-w-[52ch] text-[14.5px] leading-[1.65] text-mute">
               The parts that run service are in every plan, and today they are not metered at
               all. Billing, when it arrives, will not take away the kitchen board.
             </p>
@@ -238,31 +271,33 @@ export function PricingScreen() {
         </section>
 
         {/* -------------------------------------------------------- differs */}
-        <section className="p-sect" id="differs">
-          <div className="p-wrap">
-            <div className="p-head" data-reveal>
+        <section id="differs" className="px-5 py-16 sm:px-8">
+          <div className="mx-auto w-full max-w-[1180px]">
+            <div data-reveal className="grid gap-6 md:grid-cols-[1fr_0.9fr] md:items-end">
               <div>
-                <div className="p-eyebrow">03 · What the tiers change</div>
-                <h2 className="p-h2 p-head__title">
+                <p className="text-[10.5px] font-semibold tracking-[0.14em] text-gold-dim uppercase">
+                  03 · What the tiers change
+                </p>
+                <h2 className="mt-4 max-w-[18ch] text-[clamp(28px,4vw,44px)] leading-[1.03] font-semibold tracking-[-0.035em]">
                   {`${NumberWord(DIFFERENCES.length)} differences, not fifty.`}
                 </h2>
               </div>
-              <p className="p-lede p-head__aside">
+              <p className="max-w-[44ch] text-[14.5px] leading-[1.65] text-mute">
                 What each step up will add when billing opens. Nothing here exists yet, which is
                 why every row is marked planned.
               </p>
             </div>
 
-            <div className="diff" style={{ marginTop: 'clamp(32px, 5vh, 52px)' }} data-stagger>
+            <div data-stagger className="mt-10 divide-y divide-white/[0.08] border-y border-white/[0.08]">
               {DIFFERENCES.map((difference) => {
                 const tiers = difference.tiers === 'all' ? [] : difference.tiers;
                 return (
-                  <div key={difference.id} className="diff__row">
-                    <div className="diff__lead">
-                      <p className="diff__label">{difference.label}</p>
+                  <div key={difference.id} className="grid gap-2 py-5 md:grid-cols-[0.8fr_1.2fr] md:gap-8">
+                    <div>
+                      <p className="text-[14.5px] font-medium text-cream">{difference.label}</p>
                       <TierTags tiers={tiers.map((t) => PLANS.find((p) => p.id === t)!.name)} />
                     </div>
-                    <p className="diff__detail">{difference.detail}</p>
+                    <p className="text-[13.5px] leading-[1.6] text-mute">{difference.detail}</p>
                   </div>
                 );
               })}
@@ -271,75 +306,79 @@ export function PricingScreen() {
         </section>
 
         {/* --------------------------------------------------------- billing */}
-        <section className="p-sect p-sect--tight" id="billing">
-          <div className="p-wrap">
-            <div className="pflow">
-              <div className="pflow__aside">
-                <div data-reveal>
-                  <div className="p-eyebrow">04 · The money side</div>
-                  <h2 className="p-h2" style={{ marginTop: 24, maxWidth: '14ch' }}>
-                    How billing will work.
-                  </h2>
-                  <p className="p-lede" style={{ marginTop: 22, maxWidth: '34ch' }}>
-                    None of this is switched on. It is written down so the shape is not a
-                    surprise when it is.
-                  </p>
-                </div>
-              </div>
+        <section id="billing" className="border-t border-white/[0.07] px-5 py-16 sm:px-8">
+          <div className="mx-auto grid w-full max-w-[1180px] gap-10 md:grid-cols-[0.85fr_1.15fr]">
+            <div data-reveal>
+              <p className="text-[10.5px] font-semibold tracking-[0.14em] text-gold-dim uppercase">
+                04 · The money side
+              </p>
+              <h2 className="mt-4 max-w-[14ch] text-[clamp(26px,3.6vw,40px)] leading-[1.04] font-semibold tracking-[-0.035em]">
+                How billing will work.
+              </h2>
+              <p className="mt-4 max-w-[34ch] text-[14px] leading-[1.65] text-mute">
+                None of this is switched on. It is written down so the shape is not a
+                surprise when it is.
+              </p>
+            </div>
 
-              <div className="pflow__steps" data-stagger>
-                {[
-                  {
-                    n: '01',
-                    title: `${BILLING.trialDays} days, everything on`,
-                    body: 'A new account starts on the whole product. No card is taken to begin, and the trial is not a cut-down tier.',
-                  },
-                  {
-                    n: '02',
-                    title: 'Monthly, per restaurant',
-                    body: 'One amount in rupees, once a month. No setup fee, no percentage of sales, no charge per order or per table.',
-                  },
-                  {
-                    n: '03',
-                    title: 'If it lapses, it goes quiet',
-                    body: 'The account becomes read-only: menus, orders, receipts and reports stay visible and are never deleted. New orders stop until a plan is active.',
-                  },
-                ].map((step) => (
-                  <div key={step.n} className="pflow__step">
-                    <p className="pflow__num">{step.n}</p>
-                    <div>
-                      <h3 className="p-h3 pflow__title">{step.title}</h3>
-                      <p className="p-body pflow__body">{step.body}</p>
-                    </div>
+            <div data-stagger className="flex flex-col gap-6">
+              {[
+                {
+                  n: '01',
+                  title: `${BILLING.trialDays} days, everything on`,
+                  body: 'A new account starts on the whole product. No card is taken to begin, and the trial is not a cut-down tier.',
+                },
+                {
+                  n: '02',
+                  title: 'Monthly, per restaurant',
+                  body: 'One amount in rupees, once a month. No setup fee, no percentage of sales, no charge per order or per table.',
+                },
+                {
+                  n: '03',
+                  title: 'If it lapses, it goes quiet',
+                  body: 'The account becomes read-only: menus, orders, receipts and reports stay visible and are never deleted. New orders stop until a plan is active.',
+                },
+              ].map((step) => (
+                <div key={step.n} className="grid grid-cols-[auto_1fr] gap-4 border-t border-white/[0.1] pt-4">
+                  <p className="tnum text-[11px] font-semibold tracking-[0.08em] text-gold-dim">{step.n}</p>
+                  <div>
+                    <h3 className="text-[15.5px] font-semibold tracking-[-0.01em] text-cream">{step.title}</h3>
+                    <p className="mt-1.5 text-[13.5px] leading-[1.6] text-mute">{step.body}</p>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           </div>
         </section>
 
         {/* ------------------------------------------------------------- FAQ */}
-        <section className="p-sect p-sect--tight" id="questions">
-          <div className="p-wrap">
-            <div className="p-head" data-reveal>
-              <div>
-                <div className="p-eyebrow">05 · Questions</div>
-                <h2 className="p-h2 p-head__title">The ones worth asking first.</h2>
-              </div>
+        <section id="questions" className="border-t border-white/[0.07] px-5 py-16 sm:px-8">
+          <div className="mx-auto w-full max-w-[1180px]">
+            <div data-reveal>
+              <p className="text-[10.5px] font-semibold tracking-[0.14em] text-gold-dim uppercase">05 · Questions</p>
+              <h2 className="mt-4 max-w-[20ch] text-[clamp(26px,3.6vw,40px)] leading-[1.04] font-semibold tracking-[-0.035em]">
+                The ones worth asking first.
+              </h2>
             </div>
 
-            <div className="p-faqs" style={{ marginTop: 'clamp(28px, 4vh, 44px)' }} data-stagger>
+            <div data-stagger className="mt-8 max-w-[820px] divide-y divide-white/[0.08] border-y border-white/[0.08]">
               {FAQS.map((item) => (
-                <details key={item.q} className="p-faq">
-                  <summary>{item.q}</summary>
-                  <p>{item.a}</p>
+                <details key={item.q} className="group py-4">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[14.5px] font-medium text-cream marker:hidden">
+                    {item.q}
+                    <span
+                      aria-hidden="true"
+                      className="shrink-0 text-[18px] leading-none text-mute transition-transform group-open:rotate-45"
+                    >
+                      +
+                    </span>
+                  </summary>
+                  <p className="mt-2.5 max-w-[62ch] text-[13.5px] leading-[1.65] text-mute">{item.a}</p>
                 </details>
               ))}
             </div>
 
-            <p className="p-small" style={{ marginTop: 30, maxWidth: '70ch' }}>
-              {BILLING.note}
-            </p>
+            <p className="mt-7 max-w-[70ch] text-[12px] leading-[1.6] text-mute-dim">{BILLING.note}</p>
           </div>
         </section>
 
