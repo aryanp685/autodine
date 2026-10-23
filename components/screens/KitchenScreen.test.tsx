@@ -127,7 +127,7 @@ describe('Kitchen board', () => {
       />,
     );
 
-    expect(html).toContain('kb-itemAddon');
+    expect(html).toContain('data-addon');
     expect(html).toContain('Extra cheese');
     expect(html).toContain('Jain');
     // The portion stays a qualifier on the dish, not a tag.
@@ -161,7 +161,10 @@ describe('Kitchen board', () => {
     const html = renderToStaticMarkup(<Kitchen />);
 
     expect(html).toContain('Start preparing');
-    expect(html).not.toMatch(/<button[^>]*disabled[^>]*>Start preparing/);
+    // React renders a disabled control as `disabled=""`, so match the
+    // attribute rather than the word: the class list legitimately contains
+    // `disabled:opacity-45` on every one of these buttons.
+    expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*>Start preparing/);
     // And it says out loud that the change stays in this browser.
     expect(html).toContain('Sample board.');
   });
@@ -169,7 +172,7 @@ describe('Kitchen board', () => {
   it('lets a demo ticket be replayed and cancelled without a database id', () => {
     const html = renderToStaticMarkup(<Kitchen />);
 
-    expect(html).not.toMatch(/<button[^>]*disabled[^>]*aria-label="Replay order/);
+    expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*aria-label="Replay order/);
     expect(html).toContain('aria-label="Cancel order for');
   });
 
@@ -242,11 +245,13 @@ describe('Kitchen board', () => {
       ],
     }} />);
 
-    expect(html).toContain('kb__tabs');
+    // Three switcher buttons, each carrying its own queue length, and the
+    // chosen column marked so a phone shows one queue rather than three
+    // stacked on top of each other.
+    expect(html.split('aria-pressed="true"').length - 1).toBeGreaterThanOrEqual(1);
     expect(html).toContain('New');
     expect(html).toContain('Preparing');
-    expect(html).toContain('kb__tabCount');
-    expect(html).toContain('is-mobileActive');
+    expect(html).toMatch(/data-state="new"/);
   });
 
   it('marks a ticket with its prep state so the card can be read at a glance', () => {

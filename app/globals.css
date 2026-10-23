@@ -303,3 +303,11 @@ img { display: block; max-width: 100%; }
   0%, 100% { opacity: 0.5; }
   50% { opacity: 0.95; }
 }
+
+/* A ticket landing on the kitchen board. Transform and opacity only, and it is
+ * decoration: the card is readable the moment it exists, whether or not this
+ * plays. */
+@keyframes kbrise {
+  from { opacity: 0; transform: translateY(-6px) scale(0.99); }
+  to { opacity: 1; transform: none; }
+}
