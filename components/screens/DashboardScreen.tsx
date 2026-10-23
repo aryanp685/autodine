@@ -19,7 +19,7 @@ import {
   tableClass,
 } from '@/components/owner/chrome';
 import type { DashboardScreenData } from '@/lib/db/dashboard-screen';
-import { READ_ONLY_SENTENCE, accessSummary } from '@/lib/access';
+import { accessSummary, planSentence } from '@/lib/access';
 import { clockTimeInZone } from '@/lib/db/time';
 
 /**
@@ -143,11 +143,11 @@ export function Dashboard({
       {!blocked && live && data?.access ? (
         <div
           data-plan-line
-          className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[12px] border border-hair bg-card px-3.5 py-3"
+          className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[14px] border border-hair bg-card px-4 py-3.5"
         >
           <Tag tone={data.access.readOnly ? 'due' : 'live'}>{accessSummary(data.access)}</Tag>
           <span className="text-[12.5px] leading-[1.5] text-gink-64">
-            {data.access.readOnly ? READ_ONLY_SENTENCE : 'Every feature in the product is on during the trial.'}
+            {planSentence(data.access)}
           </span>
           <Link
             href="/pricing"
@@ -177,6 +177,29 @@ export function Dashboard({
         </div>
       )}
 
+      {/*
+        A live workspace with nothing in it yet. The four cards below all read
+        zero, and two empty panels explain themselves -- but an owner opening
+        this for the first time needs the next step, not four zeros. This strip
+        is only the truthful next action: it does not invent an order, and it
+        disappears the moment the first one lands.
+      */}
+      {!blocked && live && stats && stats.ordersToday === 0 ? (
+        <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[14px] border border-hair bg-card px-4 py-3.5">
+          <Tag tone="neutral">No orders yet</Tag>
+          <span className="text-[12.5px] leading-[1.5] text-gink-64">
+            Scan a table&rsquo;s QR and place one yourself &mdash; it reaches the kitchen board in
+            seconds, and today&rsquo;s figures start filling in from there.
+          </span>
+          <Link
+            href="/dashboard/tables"
+            className="ml-auto text-[12.5px] font-semibold text-gink underline decoration-hair-strong underline-offset-[3px] hover:decoration-gink"
+          >
+            Tables &amp; QR
+          </Link>
+        </div>
+      ) : null}
+
       {/* Four figures, each with the sentence that says what it counts. On a
           phone they are two by two, not one long column: a KPI you have to
           scroll past is not a KPI. */}
@@ -185,7 +208,7 @@ export function Dashboard({
           <div
             key={card.label}
             style={{ ['--i' as string]: index }}
-            className="rounded-[14px] border border-hair bg-card p-4 transition-colors hover:border-hair-strong"
+            className="rounded-[16px] border border-hair bg-card p-4 transition-shadow duration-200 sm:hover:shadow-[var(--p-shadow-2)]"
           >
             <div className="text-[11px] font-medium tracking-[0.02em] text-gink-46">{card.label}</div>
             <div className="mt-2.5 text-[clamp(1.5rem,2.6vw,2.1rem)] leading-none font-medium tracking-[-0.045em] text-gink tabular-nums">
@@ -298,7 +321,9 @@ export function Dashboard({
       </div>
 
       <p className="mt-4 text-[11px] text-gink-46">
-        {openCount} open now · figures are read from the restaurant&rsquo;s clock, never the server&rsquo;s.
+        {live
+          ? `${openCount} open now · figures are read from the restaurant’s clock, never the server’s.`
+          : `${openCount} open now in the sample · figures below are fictional.`}
       </p>
     </OwnerPage>
   );

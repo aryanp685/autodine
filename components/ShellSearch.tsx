@@ -30,6 +30,14 @@ export function ShellSearch({ onLaunch }: { onLaunch?: () => void }) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [cursor, setCursor] = useState(0);
+  /**
+   * Which modifier to print on the shortcut legend.
+   *
+   * Starts false so the server and the first client render agree (a mismatch
+   * here would be a hydration warning on every staff screen), then corrected
+   * once on mount -- a legend nobody reads for 200ms.
+   */
+  const [isApple, setIsApple] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const optionRefs = useRef<Array<HTMLAnchorElement | null>>([]);
@@ -48,6 +56,10 @@ export function ShellSearch({ onLaunch }: { onLaunch?: () => void }) {
   useEffect(() => {
     setCursor(0);
   }, [query]);
+
+  useEffect(() => {
+    setIsApple(/mac|iphone|ipad/i.test(navigator.userAgent));
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -127,8 +139,12 @@ export function ShellSearch({ onLaunch }: { onLaunch?: () => void }) {
           }}
           className="w-[92px] bg-transparent text-[12.5px] text-gink placeholder:text-gink-46 focus:w-[150px] focus:outline-none sm:w-[132px] sm:focus:w-[190px] transition-[width] duration-150"
         />
+        {/* The key shown has to be the key that works. This printed ⌘K on every
+            platform, including Windows, where the shortcut is Ctrl+K and the
+            legend named a key the keyboard does not have. The modifier is read
+            after mount so the server-rendered mark stays stable. */}
         <kbd className="hidden shrink-0 rounded border border-hair-strong px-1 py-px text-[9.5px] font-medium text-gink-46 sm:block">
-          ⌘K
+          {isApple ? '⌘K' : 'Ctrl K'}
         </kbd>
       </div>
 

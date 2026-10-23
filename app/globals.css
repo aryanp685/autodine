@@ -1,3 +1,21 @@
+/* LAYER ORDER, DECLARED BEFORE ANYTHING IS IN IT.
+ *
+ * Tailwind's own entry stylesheet starts with this line, and this project does
+ * not import that file -- it imports theme.css and utilities.css separately, so
+ * the ordering statement was missing. Without it, a layer's position is decided
+ * by where its first rule appears, and `@layer base` sits FURTHER DOWN this file
+ * than the two imports. Base therefore came last, which means it won.
+ *
+ * The cost of that was not theoretical. `a { color: inherit }` in base beat
+ * `text-onink` in utilities, so a black pill with a white label rendered its
+ * label in black -- a button with no visible text, which was reported twice
+ * from a phone and once from the owner dashboard.
+ *
+ * This line is the fix: lowest priority first. base < components < utilities,
+ * which is what every className in this repository already assumes.
+ */
+@layer theme, base, components, utilities;
+
 /* Tailwind, imported WITHOUT its preflight.
  *
  * Preflight is a global reset: it zeroes margins, rewrites border styles and
@@ -643,6 +661,135 @@ p { margin: 0; }
 }
 [data-flow-root] .g-rise {
   animation: g-rise 260ms var(--p-ease) both;
+}
+
+/* =========================================================================
+   THE OWNER SURFACE — glass over a cool wash
+
+   The staff screens were flat white cards on flat white, and the complaint was
+   exact: nothing sat above anything. This is the same glass language the guest
+   flow wears, retuned for a person who reads it for six hours under tube
+   lights.
+
+   WHAT IS DELIBERATELY DIFFERENT FROM THE GUEST FLOW
+
+   - Cool, not warm. The wash is a blue-grey bloom and one faint green, because
+     warm cream at dashboard size reads as beige -- and the previous note on
+     this surface (a restaurateur is not a diner) still holds.
+   - Almost opaque. Cards sit at 70% white where the guest's sit at 64%: this
+     surface carries long numbers in small type, and legibility outranks the
+     effect. The glass is in the edge, the lift and the blur behind the rail --
+     not in making the content hard to read.
+   - No backdrop-filter on the cards. There are forty of them on a reports page
+     and the wash behind them is smooth; blurring each one would buy nothing a
+     person can see and cost a laptop's battery.
+
+   Scoping: this block is [data-surface='owner'] only. The guest flow has its
+   own section above, and the two must not leak into each other.
+   ========================================================================= */
+[data-surface='owner'] {
+  /* ---- the wash -------------------------------------------------------
+     `bg-paper` still paints the base white; these gradients sit above it, so a
+     plain white page becomes a page with light falling across it. Fixed, so
+     scrolling a long table does not slide the light up the screen. */
+  background-image:
+    radial-gradient(56% 42% at 8% -10%, rgba(32, 112, 48, 0.09), transparent 72%),
+    radial-gradient(48% 38% at 98% -4%, rgba(59, 74, 107, 0.10), transparent 74%),
+    radial-gradient(80% 60% at 50% 112%, rgba(255, 255, 255, 0.9), transparent 66%);
+  background-attachment: fixed;
+
+  /* ---- surfaces -------------------------------------------------------
+     70% white. Enough wash shows through to read as a panel rather than a
+     hole cut in the page, without ever fighting the type on top of it. */
+  --p-surface: rgba(255, 255, 255, 0.7);
+  --o-glass: rgba(255, 255, 255, 0.66);
+  --o-glass-raised: rgba(255, 255, 255, 0.86);
+
+  /* One hairline for a resting edge, one for an edge that is doing something.
+     Slightly cooler than the guest flow's, to match the wash. */
+  --p-line: rgba(16, 24, 40, 0.08);
+  --p-line-strong: rgba(16, 24, 40, 0.16);
+
+  /* ---- elevation ------------------------------------------------------
+     Retuned for a translucent surface: the contact shadow is tighter and the
+     lift is cooler, because a warm shadow under glass over a cool wash reads
+     as dirt rather than as depth. */
+  --p-shadow-1: 0 1px 2px rgba(16, 24, 40, 0.04), 0 12px 28px -20px rgba(16, 24, 40, 0.2);
+  --p-shadow-2: 0 2px 8px rgba(16, 24, 40, 0.05), 0 32px 64px -36px rgba(16, 24, 40, 0.26);
+
+  /* ---- geometry -------------------------------------------------------
+     Owner cards are a touch tighter than the guest's: this is a workspace, and
+     16px reads as a panel where 22px reads as a card on a phone. */
+  --o-r: 16px;
+  --o-r-sm: 10px;
+}
+
+/* ---- the panel --------------------------------------------------------
+   One rule for every card on every staff screen. Applied to `bg-card` rather
+   than to a new class so the fifteen screens that already compose `Card` and
+   `Panel` pick it up without being touched -- and so a screen that writes a raw
+   card by hand cannot end up on a different surface from its neighbours. */
+[data-surface='owner'] .bg-card {
+  background: var(--o-glass);
+  border-color: var(--p-line);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), var(--p-shadow-1);
+}
+
+/* The rail and the top bar are the two pieces of chrome that have content
+   scrolling underneath them, so they are the two that get a real blur. */
+[data-surface='owner'] #app-rail {
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+}
+
+/* A table inside a card: the header row gets a hairline of its own and the
+   body gets nothing, so the numbers are the only thing with weight. */
+[data-surface='owner'] table thead th {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* The focus ring has to survive a translucent surface. The default ink outline
+   disappears on a card that is 70% white over a white page; the accent does not. */
+[data-surface='owner'] :focus-visible {
+  outline: 2px solid var(--p-accent);
+  outline-offset: 2px;
+}
+
+/* ---- a choice row -------------------------------------------------------
+   A list of orders to pick from on the counter screen. It cannot be `.bg-card`:
+   the rule above sets the background of every card unconditionally, and being
+   unlayered it beats any `bg-…` utility a selected state could add. So the
+   selectable thing gets its own object with its own states. */
+[data-surface='owner'] .o-choice {
+  background: var(--o-glass);
+  border: 1px solid var(--p-line);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  transition: border-color 160ms var(--p-ease), background-color 160ms var(--p-ease);
+}
+[data-surface='owner'] .o-choice[aria-pressed='true'] {
+  background: color-mix(in oklab, var(--p-accent-soft) 68%, white);
+  border-color: color-mix(in oklab, var(--p-accent) 42%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), var(--p-shadow-1);
+}
+@media (hover: hover) {
+  [data-surface='owner'] .o-choice[aria-pressed='false']:hover {
+    background: var(--o-glass-raised);
+    border-color: var(--p-line-strong);
+  }
+}
+
+/* ---- hover, for the things that are actually clickable ------------------
+   A card that lifts is a card that says "you can open me". A card that only
+   changes border colour is a card that says nothing, which is what the old
+   `hover:border-hair-strong` on every stat did. */
+[data-surface='owner'] .o-lift {
+  transition: box-shadow 220ms var(--p-ease), transform 220ms var(--p-ease);
+}
+@media (hover: hover) {
+  [data-surface='owner'] .o-lift:hover {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), var(--p-shadow-2);
+    transform: translateY(-1px);
+  }
 }
 
 /* =========================================================================

@@ -48,8 +48,12 @@ describe('DashboardBar', () => {
     // One current page, never several.
     expect(out.split('aria-current="page"').length - 1).toBe(1);
     // And it is the right one: the aria-current sits on the Reports link.
+    // Slice to the anchor's own closing bracket rather than a character window:
+    // a fixed window breaks every time somebody adds a class to the link, which
+    // says nothing about whether the right link is marked.
     const at = out.indexOf('aria-current="page"');
-    const around = out.slice(Math.max(0, at - 400), at + 200);
+    const open = out.lastIndexOf('<a', at);
+    const around = out.slice(open, out.indexOf('>', at) + 1);
     expect(around).toContain('href="/dashboard/reports"');
   });
 

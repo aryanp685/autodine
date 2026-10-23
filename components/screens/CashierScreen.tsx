@@ -370,11 +370,8 @@ export function Cashier({
                               setError('');
                             }}
                             className={[
-                              'w-full rounded-[14px] border px-4 py-3 text-left transition-[border-color,background-color,box-shadow] duration-150',
-                              'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gink',
-                              selected
-                                ? 'border-gink bg-card shadow-[0_1px_0_var(--hair)]'
-                                : 'border-hair bg-card hover:border-hair-strong hover:bg-paper-deep',
+                              'o-choice w-full rounded-[14px] px-4 py-3 text-left',
+                              'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]',
                             ].join(' ')}
                           >
                             <span className="flex items-baseline justify-between gap-3">

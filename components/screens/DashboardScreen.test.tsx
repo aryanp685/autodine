@@ -72,3 +72,98 @@ describe('Dashboard money', () => {
     expect(html).toContain('href="/dashboard/reports"');
   });
 });
+
+/**
+ * The same screen with a restaurant that has not traded yet.
+ *
+ * Everything here is about the difference between "quiet" and "broken". A new
+ * workspace reads zero in all four cards; that is the truth and it stays. What
+ * must not happen is the page then saying something false -- claiming a trial
+ * that has ended over a paid plan, or leaving four zeros on screen with no next
+ * step at all.
+ */
+
+const EMPTY: DashboardScreenData = {
+  restaurantName: 'Kings of Kings',
+  timezone: 'Asia/Kolkata',
+  tagline: 'North Indian, since 1998',
+  stats: { ordersToday: 0, revenueTodayPaise: 0, averageTicketPaise: 0, openOrders: 0 },
+  orders: [],
+  topItems: [],
+  hourlyPaise: [0, 0, 0],
+  access: {
+    plan: 'trial',
+    status: 'trialing',
+    trialEndsAt: '2026-11-01T00:00:00.000Z',
+    daysRemaining: 4,
+    canWrite: true,
+    readOnly: false,
+    features: [],
+  },
+};
+
+describe('Dashboard, live and empty', () => {
+  it('says there are no orders yet today instead of dressing up the silence', () => {
+    const html = renderToStaticMarkup(<Dashboard data={EMPTY} />);
+    expect(html).toContain('No orders yet');
+    expect(html).toContain('Nothing sold yet today');
+    expect(html).not.toContain('fictional');
+  });
+
+  it('keeps the real zeros', () => {
+    const html = renderToStaticMarkup(<Dashboard data={EMPTY} />);
+    expect(html).toContain('0 open · 0 today');
+  });
+
+  it('offers the next step rather than leaving four zeros on screen', () => {
+    const html = renderToStaticMarkup(<Dashboard data={EMPTY} />);
+    expect(html).toContain('href="/dashboard/tables"');
+  });
+
+  it('prints the plan the workspace is actually on', () => {
+    const trial = renderToStaticMarkup(<Dashboard data={EMPTY} />);
+    expect(trial).toContain('Free trial · 4 days left');
+    expect(trial).toContain('during the trial');
+
+    const paid = renderToStaticMarkup(
+      <Dashboard
+        data={{
+          ...EMPTY,
+          access: { ...EMPTY.access!, plan: 'professional', status: 'active', daysRemaining: 0 },
+        }}
+      />,
+    );
+    expect(paid).toContain('Professional');
+    expect(paid).not.toMatch(/during the trial/);
+  });
+
+  it('tells a read-only workspace its data is still there', () => {
+    const html = renderToStaticMarkup(
+      <Dashboard
+        data={{
+          ...EMPTY,
+          access: {
+            ...EMPTY.access!,
+            status: 'expired',
+            readOnly: true,
+            canWrite: false,
+            daysRemaining: 0,
+          },
+        }}
+      />,
+    );
+    expect(html).toContain('read-only');
+    expect(html).toMatch(/nothing has been deleted/i);
+  });
+
+  it('explains an empty chart instead of drawing a flat line', () => {
+    const html = renderToStaticMarkup(<Dashboard data={EMPTY} />);
+    expect(html).toContain('No settled payments yet today');
+  });
+
+  it('does not print the plan line on a signed-out screen', () => {
+    const html = renderToStaticMarkup(<Dashboard data={{ ...EMPTY, blocked: 'signed-out' }} />);
+    expect(html).not.toMatch(/during the trial/);
+    expect(html).not.toContain('data-plan-line');
+  });
+});

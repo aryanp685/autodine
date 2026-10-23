@@ -63,6 +63,28 @@ export function accessSummary(access: RestaurantAccess): string {
 }
 
 /**
+ * What the plan line says under the plan tag.
+ *
+ * There were two sentences and one of them was a lie most of the time: the
+ * dashboard printed "Every feature in the product is on during the trial." for
+ * every workspace that could write, including one on a paid plan whose trial
+ * ended weeks ago. An owner reading their own billing status is entitled to a
+ * sentence that is about their plan and not somebody else's.
+ *
+ * Three cases, three sentences, and none of them claim a payment happened:
+ *
+ *   read-only   what still works, so nobody goes looking for a backup.
+ *   trial       every feature is on, because a trial is not a cut-down tier.
+ *   paid        what the tier includes -- and NOT "active", because whether
+ *               money has been collected is the bank's answer, not this page's.
+ */
+export function planSentence(access: RestaurantAccess): string {
+  if (access.readOnly) return READ_ONLY_SENTENCE;
+  if (access.plan === 'trial') return 'Every feature in the product is on during the trial.';
+  return `${planLabel(access.plan)} plan · every feature in this tier is switched on.`;
+}
+
+/**
  * The sentence a read-only workspace is owed. It says what still works, because
  * a screen that only says "you cannot write" leaves the owner guessing whether
  * their data is gone. It is not gone; that is the point.
