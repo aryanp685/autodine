@@ -78,10 +78,13 @@ describe('the marketing step sections', () => {
    * itself. lib/style-scopes.test.ts guards the stylesheets; this guards the
    * markup that has to use the prefixed names.
    */
-  it('wears the pflow prefix on both pages, never the guest flow’s names', () => {
+  it('never borrows the guest flow’s class names', () => {
+    // The home page is Tailwind now, so the specific `pflow__` prefix that
+    // replaced `.flow` here no longer exists. What still has to hold -- and is
+    // the reason this test was written -- is that no marketing markup uses the
+    // guest flow's own names, because styles/guest.css loads after this page
+    // and used to redraw the four steps as progress-bar segments.
     for (const html of [home, pricing]) {
-      expect(html).toContain('pflow__steps');
-      expect(html).toContain('pflow__step');
       expect(html).not.toContain('class="flow');
       expect(html).not.toMatch(/class="[^"]*\bflow__/);
     }

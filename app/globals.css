@@ -1,3 +1,16 @@
+/* Tailwind, imported WITHOUT its preflight.
+ *
+ * Preflight is a global reset: it zeroes margins, rewrites border styles and
+ * changes heading sizes for the whole document. This app already has its own
+ * reset and a locked design system across twenty screens that are being
+ * migrated one at a time -- dropping a second reset underneath them would move
+ * every existing page on the day it landed.
+ *
+ * So only the theme and the utility layer are imported. New screens use
+ * utilities; old screens keep their class names until they are rewritten. */
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
 /* Inter, self-hosted from npm rather than fetched from Google Fonts.
  *
  * Two reasons. First, a third-party font request costs a round trip to a
@@ -205,3 +218,34 @@ img { display: block; max-width: 100%; }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }}
+
+/* =========================================================================
+   Design tokens for Tailwind utilities.
+
+   These are the same values the product already uses: warm near-black for the
+   dark surfaces, a single gold for action, the brand green for "this is
+   alive". Declared once here so a utility like `text-gold` and a hand-written
+   rgba() can never drift apart.
+   ========================================================================= */
+@theme {
+  --color-ink: #0b0a08;
+  --color-ink-soft: #14120f;
+  --color-ink-card: #1a1714;
+  --color-ink-line: #2a2521;
+
+  --color-gold: #e0a86a;
+  --color-gold-bright: #f2c188;
+  --color-gold-dim: #b9854e;
+
+  --color-brand: #207030;
+  --color-brand-soft: #2c8a3f;
+
+  --color-cream: #f7f3ea;
+  --color-mute: #a49c90;
+  --color-mute-dim: #7d7568;
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --radius-card: 18px;
+  --radius-panel: 24px;
+}
