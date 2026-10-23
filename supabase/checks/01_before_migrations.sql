@@ -64,6 +64,25 @@ from pg_policies
 where schemaname = 'public' and tablename = 'orders'
 order by cmd, policyname;
 
+-- 3b. Does table_qr_codes exist, and what is in it?
+--
+--     The repository references this table 27 times -- the table QR scheme --
+--     and no migration creates it. Like restaurant_can_write() before this
+--     branch, it exists in the deployment and not in the repo, which means the
+--     repo cannot rebuild the deployment. This prints the real definition so a
+--     migration can be written to match, instead of guessing at columns.
+select
+  to_regclass('public.table_qr_codes') is not null as table_exists;
+
+select column_name, data_type, is_nullable, column_default
+from information_schema.columns
+where table_schema = 'public' and table_name = 'table_qr_codes'
+order by ordinal_position;
+
+select indexname, indexdef
+from pg_indexes
+where schemaname = 'public' and tablename = 'table_qr_codes';
+
 -- 4. How many restaurants will start a seven-day clock when 01100 lands? ---
 --    Every existing row gets trial_started_at = now(), so nothing that works
 --    today expires. This is the count of rows that will be in that state.
