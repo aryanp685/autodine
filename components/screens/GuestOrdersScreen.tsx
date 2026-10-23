@@ -69,78 +69,91 @@ export function GuestOrdersScreen({
       back={{ href: menuHref, label: 'Back to the menu' }}
       tabs={<GuestTabs slug={slug} active="orders" />}
     >
-      <header className="flow__head">
-        <div className="flow__kicker">Your order</div>
-        <h1 className="flow__title">On this device</h1>
-        <p className="flow__lede">
+      <header className="px-4 pt-6 pb-4">
+        <p className="text-[10.5px] font-semibold tracking-[0.12em] text-gink-46 uppercase">Your order</p>
+        <h1 className="mt-1.5 text-[27px] leading-tight font-semibold tracking-[-0.025em] text-gink">On this device</h1>
+        <p className="mt-1.5 max-w-[48ch] text-[13.5px] leading-[1.55] text-gink-64">
           {state === 'found'
             ? 'The last order placed from this phone. Open it to see how the kitchen is doing.'
             : 'Orders are tied to the phone that placed them. This one has none yet.'}
         </p>
       </header>
 
-      {state === 'checking' && (
-        <p className="gtabs__checking">
-          Checking this device…
-          {/* Without JavaScript the read never happens, so the screen would sit
-              on that sentence for ever. Say what is true instead. */}
-          <noscript>
-            <span className="gtabs__fine">
-              This needs JavaScript on. Your order code is still at the counter —
-              the staff can look it up there.
-            </span>
-          </noscript>
-        </p>
-      )}
-
-      {state === 'none' && (
-        <div className="gtabs__empty">
-          <p className="gtabs__emptyTitle">Nothing ordered yet</p>
-          <p className="gtabs__emptyBody">
-            Once you order, it will be here with its status, and you can open it again without
-            scanning the card.
+      <div className="px-4 pb-8">
+        {state === 'checking' && (
+          <p className="text-[13.5px] text-gink-46">
+            Checking this device…
+            {/* Without JavaScript the read never happens, so the screen would sit
+                on that sentence for ever. Say what is true instead. */}
+            <noscript>
+              <span className="mt-2 block text-[12.5px] leading-[1.5]">
+                This needs JavaScript on. Your order code is still at the counter —
+                the staff can look it up there.
+              </span>
+            </noscript>
           </p>
-          <Link href={menuHref} className="gtabs__cta">
-            Browse the menu
-          </Link>
-        </div>
-      )}
+        )}
 
-      {state === 'found' && order && slug && (
-        <div className="gtabs__card">
-          <div className="gtabs__cardRow">
-            <span className="gtabs__cardLabel">Order</span>
-            <strong className="gtabs__cardCode">{order.code}</strong>
-          </div>
-          <div className="gtabs__cardRow">
-            <span className="gtabs__cardLabel">Placed</span>
-            <span>{formatPlacedAt(order.placedAt)}</span>
-          </div>
-
-          <Link href={orderHref(order, slug)} className="gtabs__cta gtabs__cta--solid">
-            Track this order
-          </Link>
-          <Link href={menuHref} className="gtabs__cta">
-            Order something else
-          </Link>
-
-          <p className="gtabs__fine">
-            Only the most recent order is kept here, and only on this phone.{' '}
-            <button
-              type="button"
-              className="gtabs__forget"
-              onClick={() => {
-                forgetLastOrder(browserStorage(), slug);
-                setOrder(null);
-                setState('none');
-              }}
+        {state === 'none' && (
+          <div className="rounded-2xl border border-hair bg-card px-5 py-8 text-center">
+            <p className="text-[16px] font-semibold tracking-[-0.01em] text-gink">Nothing ordered yet</p>
+            <p className="mx-auto mt-1.5 max-w-[36ch] text-[13px] leading-[1.55] text-gink-64">
+              Once you order, it will be here with its status, and you can open it again without
+              scanning the card.
+            </p>
+            <Link
+              href={menuHref}
+              className="mt-5 inline-flex rounded-full bg-gink px-4 py-2.5 text-[13px] font-semibold text-onink"
             >
-              Forget it
-            </button>{' '}
-            to clear it. Staff can always find it by the code at the counter.
-          </p>
-        </div>
-      )}
+              Browse the menu
+            </Link>
+          </div>
+        )}
+
+        {state === 'found' && order && slug && (
+          <div className="rounded-2xl border border-hair-strong bg-card px-4 py-4">
+            <dl className="text-[13.5px]">
+              <div className="flex items-baseline justify-between py-1.5">
+                <dt className="text-[11px] font-semibold tracking-[0.09em] text-gink-46 uppercase">Order</dt>
+                <dd className="tnum text-[15px] font-semibold tracking-[0.12em] text-gink">{order.code}</dd>
+              </div>
+              <div className="flex items-baseline justify-between border-t border-hair py-1.5">
+                <dt className="text-[11px] font-semibold tracking-[0.09em] text-gink-46 uppercase">Placed</dt>
+                <dd className="text-gink-64">{formatPlacedAt(order.placedAt)}</dd>
+              </div>
+            </dl>
+
+            <Link
+              href={orderHref(order, slug)}
+              className="mt-4 flex h-11 items-center justify-center rounded-full bg-[var(--p-accent)] text-[13.5px] font-semibold text-white shadow-g1"
+            >
+              Track this order
+            </Link>
+            <Link
+              href={menuHref}
+              className="mt-2 flex h-11 items-center justify-center rounded-full border border-hair-strong text-[13.5px] font-semibold text-gink"
+            >
+              Order something else
+            </Link>
+
+            <p className="mt-3 text-[11.5px] leading-[1.55] text-gink-46">
+              Only the most recent order is kept here, and only on this phone.{' '}
+              <button
+                type="button"
+                className="font-semibold text-[var(--p-accent)] underline underline-offset-2"
+                onClick={() => {
+                  forgetLastOrder(browserStorage(), slug);
+                  setOrder(null);
+                  setState('none');
+                }}
+              >
+                Forget it
+              </button>{' '}
+              to clear it. Staff can always find it by the code at the counter.
+            </p>
+          </div>
+        )}
+      </div>
     </GuestFlow>
   );
 }

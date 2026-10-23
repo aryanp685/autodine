@@ -113,7 +113,7 @@ describe('the cart actions', () => {
     expect(html).toContain('href="/menu/checkout?s=maddi"');
     expect(html).toContain('Continue to checkout');
     // The phone bar is the same destination, with the number being decided on.
-    expect(html).toContain('cart__bar');
+    expect(html).toContain('data-cart-dock');
   });
 
   it('shows an empty state and a disabled button rather than a checkout link', () => {
@@ -124,7 +124,7 @@ describe('the cart actions', () => {
     expect(html).toContain('Your cart is empty');
     expect(html).toContain('Open the menu');
     expect(html).not.toContain('/menu/checkout');
-    expect(html).toMatch(/class="cart__cta"[^>]*disabled/);
+    expect(html).toMatch(/data-cart-cta=""[^>]*disabled/);
   });
 
   it('does not claim an order exists while localStorage is still being read', () => {
@@ -158,7 +158,7 @@ describe('the cart actions', () => {
     // The notice used to be permanent: the dead ids stayed in localStorage, so
     // every visit found them again and warned about them again.
     expect(html).toContain('no longer available');
-    expect(html).toContain('cart__noticeBtn');
+    expect(html).toContain('data-cart-notice-action');
     expect(html).toContain('Remove it from my cart');
   });
 
@@ -170,7 +170,7 @@ describe('the cart actions', () => {
     expect(withTable).toContain('T4');
 
     const without = renderToStaticMarkup(<Cart slug="maddi" items={items} taxRateBps={500} />);
-    expect(without).not.toContain('flow__table');
+    expect(without).not.toContain('data-flow-table');
   });
 
   it('does not call the cart empty before it has been read', () => {

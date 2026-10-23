@@ -50,19 +50,29 @@ export function DishPhoto({
   if (!src) {
     return (
       <span
-        className={`dishPhoto dishPhoto--none ${className ?? ''}`.trim()}
+        data-dish-photo="none"
+        className={[
+          /* The same rounded square the photograph would occupy, in the
+             restaurant's accent wash. A tile with a letter on it reads as
+             "not photographed yet"; an empty grey box reads as a broken
+             image, which is a different and worse statement. */
+          'grid shrink-0 place-items-center overflow-hidden rounded-xl bg-accent-soft text-[var(--p-accent)] ring-1 ring-[var(--p-accent)]/15',
+          className ?? '',
+        ].join(' ')}
         style={{ width: size, height: size }}
         role="img"
         aria-label={`${name} — no photograph yet`}
       >
-        <span aria-hidden="true">{initials}</span>
+        <span aria-hidden="true" className="text-[15px] font-semibold tracking-[0.04em]">
+          {initials}
+        </span>
       </span>
     );
   }
 
   return (
     <Image
-      className={`dishPhoto ${className ?? ''}`.trim()}
+      className={['shrink-0 rounded-xl object-cover', className ?? ''].join(' ')}
       src={src}
       alt={name}
       width={size}

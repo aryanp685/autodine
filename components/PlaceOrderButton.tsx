@@ -52,11 +52,22 @@ export function PlaceOrderButton({
     <button
       type="submit"
       form={form}
-      className={variant === 'dock' ? 'flow__cta' : 'co__cta'}
+      data-place-order={variant}
+      className={[
+        'inline-flex items-center justify-center gap-2 font-semibold transition active:scale-[0.99] disabled:opacity-50',
+        variant === 'dock'
+          ? 'h-12 flex-1 rounded-full bg-[var(--p-accent)] px-5 text-[14px] text-white shadow-g1'
+          : 'mt-4 h-12 w-full rounded-full bg-gink px-5 text-[13.5px] text-onink',
+      ].join(' ')}
       disabled={!canOrder || pending}
       aria-busy={pending || undefined}
     >
-      {pending ? <span className="flow__spin" aria-hidden="true" /> : null}
+      {pending ? (
+        <span
+          aria-hidden="true"
+          className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent opacity-80"
+        />
+      ) : null}
       {label}
     </button>
   );

@@ -57,14 +57,18 @@ export function VerifyCodeForm({
   }, [code]);
 
   return (
-    <form ref={formRef} className="gnote__form" action={verifyTableCodeAction}>
+    <form ref={formRef} className="mt-6 max-w-[380px]" action={verifyTableCodeAction}>
       <input type="hidden" name="token" value={token} />
 
-      <label className="gnote__label">
-        <span className="gnote__labelText">Six-digit code</span>
+      <label className="block">
+        <span className="mb-2 block text-[10.5px] font-semibold tracking-[0.11em] text-gink-46 uppercase">
+          Six-digit code
+        </span>
         <input
           ref={inputRef}
-          className="gnote__code"
+          /* Six monospaced cells' worth of space, so the digits sit where
+             the eye expects them and the field does not jump as they arrive. */
+          className="tnum w-full rounded-xl border border-hair-strong bg-card px-4 py-3 text-center text-[26px] font-semibold tracking-[0.42em] text-gink placeholder:tracking-[0.34em] placeholder:text-gink-46 focus:border-[var(--p-accent)] focus:ring-2 focus:ring-[var(--p-accent)]/20 focus:outline-none"
           name="code"
           // inputMode brings up the keypad on a phone; one-time-code lets iOS
           // and Android offer the code from the message that delivered it.
@@ -96,11 +100,15 @@ export function VerifyCodeForm({
         />
       </label>
 
-      <button className="gnote__submit" type="submit" disabled={sending || !complete}>
+      <button
+        type="submit"
+        disabled={sending || !complete}
+        className="mt-3 h-11 w-full rounded-full bg-[var(--p-accent)] text-[13.5px] font-semibold text-white transition active:scale-[0.99] disabled:opacity-40"
+      >
         {sending ? 'Checking…' : 'Open the menu'}
       </button>
 
-      <p className="gnote__hintText" id="code-hint">
+      <p className="mt-2.5 text-[11.5px] leading-[1.6] text-gink-46" id="code-hint">
         {complete && !sending
           ? 'Checking that code…'
           : `The code changes every ${windowMinutes === 1 ? 'minute' : `${windowMinutes} minutes`}. If you cannot see it, ask a member of staff — they can read it out for you.`}

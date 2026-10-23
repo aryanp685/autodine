@@ -20,13 +20,13 @@ describe('DishPhoto', () => {
     // asserted on the value that actually reaches the browser.
     expect(decodeURIComponent(html)).toContain('/img/dishes/butter-chicken.jpg');
     expect(html).toContain('alt="Butter Chicken"');
-    expect(html).not.toContain('dishPhoto--none');
+    expect(html).not.toContain('data-dish-photo="none"');
   });
 
   it('draws initials on the same tile when there is not', () => {
     const html = renderToStaticMarkup(<DishPhoto src={null} name="Mango Lassi" size={56} />);
 
-    expect(html).toContain('dishPhoto--none');
+    expect(html).toContain('data-dish-photo="none"');
     expect(html).toContain('>ML<');
     // It is an image placeholder, so it says so to a screen reader rather than
     // reading out two letters.

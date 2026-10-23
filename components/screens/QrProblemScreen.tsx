@@ -1,4 +1,4 @@
-import { GuestNote } from '@/components/GuestNote';
+import { GuestNote, GuestNoteActions, GuestNoteCta, GuestNoteText } from '@/components/GuestNote';
 
 /**
  * Shown when a scanned code cannot be turned into a table.
@@ -37,15 +37,15 @@ export function QrProblemScreen({ title, detail, staffHint }: QrProblemScreenPro
         </>
       }
     >
-      <p className="gnote__text">{detail}</p>
+      <GuestNoteText>{detail}</GuestNoteText>
 
-      {staffHint ? <p className="gnote__staff">{staffHint}</p> : null}
+      {staffHint ? (
+        <p className="mt-3 max-w-[54ch] text-[12.5px] leading-[1.6] text-gink-46">{staffHint}</p>
+      ) : null}
 
-      <div className="gnote__actions">
-        <a className="gnote__cta" href="/">
-          AutoDine home
-        </a>
-      </div>
+      <GuestNoteActions>
+        <GuestNoteCta href="/">AutoDine home</GuestNoteCta>
+      </GuestNoteActions>
     </GuestNote>
   );
 }

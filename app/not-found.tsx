@@ -1,7 +1,5 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
-
-import { GuestNote } from '@/components/GuestNote';
+import { GuestNote, GuestNoteActions, GuestNoteCta, GuestNoteText } from '@/components/GuestNote';
 
 /**
  * The 404.
@@ -36,19 +34,17 @@ export default function NotFound() {
         </>
       }
     >
-      <p className="gnote__text">
+      <GuestNoteText>
         The link may be old, or the address may have a letter wrong in it. Nothing here is a
         dead end: the menu and the dashboard both have a way in.
-      </p>
+      </GuestNoteText>
 
-      <div className="gnote__actions">
-        <Link className="gnote__cta" href="/">
-          AutoDine home
-        </Link>
-        <Link className="gnote__cta gnote__cta--quiet" href="/pricing">
+      <GuestNoteActions>
+        <GuestNoteCta href="/">AutoDine home</GuestNoteCta>
+        <GuestNoteCta href="/pricing" quiet>
           What it costs
-        </Link>
-      </div>
+        </GuestNoteCta>
+      </GuestNoteActions>
     </GuestNote>
   );
 }

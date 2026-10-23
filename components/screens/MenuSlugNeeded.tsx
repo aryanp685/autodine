@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { GuestNote } from '@/components/GuestNote';
+import { GuestNote, GuestNoteActions, GuestNoteGhost, GuestNoteText } from '@/components/GuestNote';
 
 /**
  * Shown when /menu is opened without ?s=<slug>.
@@ -24,21 +24,19 @@ export function MenuSlugNeeded() {
         </>
       }
     >
-      <p className="gnote__text">
+      <GuestNoteText>
         Scan the QR code on your table and it will bring you straight to this restaurant&rsquo;s
         menu. The code tells us which kitchen you are sitting in, so the link works only from
         there.
-      </p>
+      </GuestNoteText>
 
       {/* One quiet action. There is nothing else a guest can do from here --
           the menu opens from a card and from nowhere else -- and a primary
           button pointing at a staff dashboard was the wrong thing to offer
           the person holding the phone. */}
-      <div className="gnote__actions">
-        <Link href="/demo/menu" className="gnote__ghost">
-          See what a menu looks like
-        </Link>
-      </div>
+      <GuestNoteActions>
+        <GuestNoteGhost href="/demo/menu">See what a menu looks like</GuestNoteGhost>
+      </GuestNoteActions>
     </GuestNote>
   );
 }

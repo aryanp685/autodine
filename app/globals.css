@@ -249,3 +249,50 @@ img { display: block; max-width: 100%; }
   --radius-card: 18px;
   --radius-panel: 24px;
 }
+
+/* The guest flow's own palette, inlined rather than copied.
+ *
+ * These are the same values the product already uses, but they live on
+ * [data-app] and change per surface -- warm paper for a guest, white for the
+ * owner. `inline` keeps the var() reference intact so a utility resolves
+ * against whichever surface the element is actually sitting on, instead of
+ * freezing one surface's values at :root. */
+@theme inline {
+  --color-paper: var(--p-paper);
+  --color-paper-deep: var(--p-paper-deep);
+  --color-card: var(--p-surface);
+
+  --color-gink: var(--p-ink);
+  --color-gink-80: var(--p-ink-80);
+  --color-gink-64: var(--p-ink-64);
+  --color-gink-46: var(--p-ink-46);
+  --color-gink-28: var(--p-ink-28);
+  --color-gink-12: var(--p-ink-12);
+  --color-gink-07: var(--p-ink-07);
+
+  --color-onink: var(--p-on-ink);
+  --color-onink-64: var(--p-on-ink-64);
+
+  --color-accent: var(--p-accent);
+  --color-accent-soft: var(--p-accent-soft);
+
+  --color-hair: var(--p-line);
+  --color-hair-strong: var(--p-line-strong);
+
+  --radius-g: var(--p-r);
+  --radius-g-lg: var(--p-r-lg);
+
+  --shadow-g1: var(--p-shadow-1);
+  --shadow-g2: var(--p-shadow-2);
+}
+
+/* The cart bar's entrance. Only transform and opacity, 260ms, and it is
+ * decoration: the bar is already in the DOM and already readable when this
+ * never runs. */
+@keyframes gbar {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[gbar_260ms_cubic-bezier\(0\.22\,1\,0\.36\,1\)\] { animation: none !important; }
+}

@@ -74,29 +74,52 @@ export function GuestTabs({ slug, active }: { slug?: string | null; active: Gues
   ];
 
   return (
-    <nav className="gtabs" aria-label="Your order">
-      <div className="gtabs__inner">
+    <nav
+      aria-label="Your order"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-hair bg-paper/92 backdrop-blur-xl"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
+      <div className="mx-auto grid w-full max-w-[720px] grid-cols-3">
         {tabs.map((tab) => {
           const current = tab.key === active;
           return (
             <Link
               key={tab.key}
               href={tab.href}
-              className={`gtabs__tab ${current ? 'is-active' : ''}`}
+              data-gtab={tab.key}
+              data-gtab-active={current ? 'true' : undefined}
               aria-current={current ? 'page' : undefined}
+              className={[
+                'group relative flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium tracking-[0.01em] transition-colors',
+                current ? 'text-[var(--p-accent)]' : 'text-gink-46 hover:text-gink-80',
+              ].join(' ')}
             >
-              <span className="gtabs__icon">
+              {/* The current tab is marked by a hairline above it as well as by
+                  colour: colour alone is not a state a colour-blind guest can
+                  read, and this bar is the only navigation on the screen. */}
+              <span
+                aria-hidden="true"
+                className={[
+                  'absolute inset-x-5 top-0 h-0.5 rounded-full transition-opacity',
+                  current ? 'bg-[var(--p-accent)] opacity-100' : 'opacity-0',
+                ].join(' ')}
+              />
+              <span className="relative">
                 {tab.icon}
                 {/* The number is not decoration: it is the answer to "did my
                     last tap work", and it is the only cart count on the screen
                     once the floating bar has been dismissed by adding nothing. */}
                 {tab.key === 'cart' && count > 0 && (
-                  <span className="gtabs__badge tnum" aria-label={`${count} in the cart`}>
+                  <span
+                    data-gtab-badge=""
+                    aria-label={`${count} in the cart`}
+                    className="tnum absolute -top-1.5 -right-2 grid min-w-[17px] place-items-center rounded-full bg-[var(--p-accent)] px-1 text-[10px] leading-[17px] font-semibold text-white"
+                  >
                     {count}
                   </span>
                 )}
               </span>
-              <span className="gtabs__label">{tab.label}</span>
+              <span>{tab.label}</span>
             </Link>
           );
         })}

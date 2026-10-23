@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { GuestNote } from '@/components/GuestNote';
+import { GuestNote, GuestNoteAlert, GuestNoteText } from '@/components/GuestNote';
 import { VerifyCodeForm } from '@/components/VerifyCodeForm';
 
 /**
@@ -58,17 +58,12 @@ export function TableVerifyScreen({
         </>
       }
     >
-      <p className="gnote__text">
+      <GuestNoteText>
         There is a six-digit code showing on a screen inside {restaurantName} — at the counter,
         or wherever the staff have put it. Type it here to open the menu for table {tableLabel}.
-      </p>
+      </GuestNoteText>
 
-      {error ? (
-        <div className="gnote__alert" role="alert">
-          <strong>That did not work.</strong>
-          <p>{error}</p>
-        </div>
-      ) : null}
+      {error ? <GuestNoteAlert title="That did not work.">{error}</GuestNoteAlert> : null}
 
       {/* A client component, because the sixth digit submits the form.
           See components/VerifyCodeForm.tsx for the reasons. */}

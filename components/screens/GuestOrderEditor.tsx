@@ -109,91 +109,106 @@ export function GuestOrderEditor({
 
   return (
     <>
-      {lines.map((l) => {
-        const now = qty[l.id] ?? l.qty;
-        const removed = canEdit && now === 0;
+      <div className="flex flex-col gap-2.5">
+        {lines.map((l) => {
+          const now = qty[l.id] ?? l.qty;
+          const removed = canEdit && now === 0;
 
-        return (
-          <div key={l.id} className={`cart__line ${removed ? 'is-removed' : ''}`}>
-            <div className="cart__lineMain">
-              <div className="cart__lineTop">
-                <VegMark veg={l.isVeg} />
-                <strong className={removed ? 'is-struck' : undefined}>{l.name}</strong>
-                {l.variantName ? <em className="co__variant"> · {l.variantName}</em> : null}
+          return (
+            <div
+              key={l.id}
+              className={[
+                'flex items-center gap-3 rounded-2xl border bg-card p-3',
+                removed ? 'border-dashed border-hair-strong opacity-55' : 'border-hair',
+              ].join(' ')}
+            >
+              <div className="flex min-w-0 flex-1 flex-col">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <VegMark veg={l.isVeg} />
+                  <strong
+                    className={[
+                      'truncate text-[14.5px] font-semibold text-gink',
+                      removed ? 'line-through decoration-gink-28' : '',
+                    ].join(' ')}
+                  >
+                    {l.name}
+                  </strong>
+                  {l.variantName ? <em className="text-[12.5px] text-gink-46 not-italic"> · {l.variantName}</em> : null}
+                </div>
+                {l.addons.length > 0 ? (
+                  <div className="mt-0.5 text-[12px] leading-[1.45] text-gink-64">+ {l.addons.join(', ')}</div>
+                ) : null}
+                <div className="tnum mt-0.5 text-[12.5px] text-gink-46">
+                  {inr(paiseToRupees(l.unitPricePaise))} each
+                  {removed ? ' · will be removed' : ''}
+                </div>
               </div>
-              {l.addons.length > 0 ? (
-                <div className="cart__linePrice">+ {l.addons.join(', ')}</div>
-              ) : null}
-              <div className="cart__linePrice tnum">
-                {inr(paiseToRupees(l.unitPricePaise))} each
-                {removed ? ' · will be removed' : ''}
-              </div>
+
+              {canEdit ? (
+                <div className="flex shrink-0 items-center rounded-full border border-hair-strong">
+                  <button
+                    type="button"
+                    onClick={() => step(l, -1)}
+                    disabled={pending || now === 0}
+                    aria-label={`One fewer ${l.name}`}
+                    className="grid size-7 place-items-center rounded-full text-[14px] text-gink-80 transition hover:bg-gink-07 disabled:opacity-30"
+                  >
+                    −
+                  </button>
+                  <span className="tnum min-w-5 text-center text-[12.5px] font-semibold text-gink">{now}</span>
+                  <button
+                    type="button"
+                    onClick={() => step(l, +1)}
+                    disabled={pending || now >= 99}
+                    aria-label={`One more ${l.name}`}
+                    className="grid size-7 place-items-center rounded-full text-[14px] text-gink-80 transition hover:bg-gink-07 disabled:opacity-30"
+                  >
+                    +
+                  </button>
+                </div>
+              ) : (
+                <span className="tnum shrink-0 text-[13px] font-semibold text-gink-64">{l.qty}</span>
+              )}
+
+              <span className="tnum w-16 shrink-0 text-right text-[13.5px] font-semibold text-gink">
+                {removed ? '—' : inr(paiseToRupees(l.unitPricePaise * now))}
+              </span>
             </div>
-
-            {canEdit ? (
-              <div className="cart__qty">
-                <button
-                  type="button"
-                  onClick={() => step(l, -1)}
-                  disabled={pending || now === 0}
-                  aria-label={`One fewer ${l.name}`}
-                >
-                  −
-                </button>
-                <span className="tnum">{now}</span>
-                <button
-                  type="button"
-                  onClick={() => step(l, +1)}
-                  disabled={pending || now >= 99}
-                  aria-label={`One more ${l.name}`}
-                >
-                  +
-                </button>
-              </div>
-            ) : (
-              <div className="cart__qty">
-                <span className="tnum">{l.qty}</span>
-              </div>
-            )}
-
-            <div className="cart__lineTotal tnum">
-              {removed ? '—' : inr(paiseToRupees(l.unitPricePaise * now))}
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
 
       <div aria-live="polite">
         {error ? (
-          <p className="cart__fine" role="alert">
+          <p role="alert" className="mt-2 text-[12.5px] leading-[1.5] text-[var(--alert)]">
             {error}
           </p>
         ) : null}
-        {notice ? <p className="cart__fine">{notice}</p> : null}
+        {notice ? <p className="mt-2 text-[12.5px] leading-[1.5] text-gink-64">{notice}</p> : null}
       </div>
 
       {canEdit ? (
-        <div className="cart__fine">
+        <div className="mt-3">
           {dirty ? (
-            <p>
+            <p className="text-[12px] leading-[1.55] text-gink-64">
               New subtotal {inr(paiseToRupees(nextSubtotal))}
               {nextSubtotal !== subtotalPaise ? ` (was ${inr(paiseToRupees(subtotalPaise))})` : ''}
               . Taxes and the total are recalculated when you save.
               {remaining === 0 ? ' At least one dish has to stay on the order.' : ''}
             </p>
           ) : (
-            <p>
+            <p className="text-[12px] leading-[1.55] text-gink-46">
               You can change quantities or cancel for ten minutes, until the kitchen starts on
               the order.
             </p>
           )}
 
-          <div className="flow__row">
+          <div className="mt-2.5 flex flex-wrap gap-2">
             <button
               type="button"
-              className="co__cta"
               onClick={save}
               disabled={pending || !dirty || remaining === 0}
+              className="h-10 rounded-full bg-gink px-4 text-[12.5px] font-semibold text-onink transition disabled:opacity-40"
             >
               {pending ? 'Saving…' : 'Save changes'}
             </button>
@@ -201,13 +216,13 @@ export function GuestOrderEditor({
             {confirming ? null : (
               <button
                 type="button"
-                className="flow__ghost flow__ghost--danger"
                 onClick={() => {
                   setConfirming(true);
                   setError('');
                   setNotice('');
                 }}
                 disabled={pending}
+                className="h-10 rounded-full border border-hair-strong px-4 text-[12.5px] font-semibold text-[var(--alert)] transition hover:bg-[var(--alert)]/8 disabled:opacity-40"
               >
                 Cancel this order
               </button>
@@ -215,21 +230,32 @@ export function GuestOrderEditor({
           </div>
 
           {confirming ? (
-            <div className="cart__empty" role="group" aria-label="Confirm cancellation">
-              <strong>
+            <div
+              role="group"
+              aria-label="Confirm cancellation"
+              className="mt-2.5 rounded-2xl border border-[var(--alert)]/25 bg-[var(--alert)]/6 px-4 py-3.5"
+            >
+              <strong className="text-[13.5px] font-semibold text-gink">
                 Cancel all {lines.length === 1 ? 'of it' : `${lines.length} dishes`}?
               </strong>{' '}
-              The kitchen is told immediately and this cannot be undone. Order again from the
-              menu instead.
-              <div className="flow__row">
-                <button type="button" className="co__cta" onClick={cancel} disabled={pending}>
+              <span className="text-[12.5px] leading-[1.55] text-gink-64">
+                The kitchen is told immediately and this cannot be undone. Order again from the
+                menu instead.
+              </span>
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={cancel}
+                  disabled={pending}
+                  className="h-10 rounded-full bg-[var(--alert)] px-4 text-[12.5px] font-semibold text-white disabled:opacity-50"
+                >
                   {pending ? 'Cancelling…' : 'Yes, cancel it'}
                 </button>
                 <button
                   type="button"
-                  className="flow__ghost"
                   onClick={() => setConfirming(false)}
                   disabled={pending}
+                  className="h-10 rounded-full border border-hair-strong px-4 text-[12.5px] font-semibold text-gink disabled:opacity-50"
                 >
                   Keep the order
                 </button>
@@ -238,7 +264,7 @@ export function GuestOrderEditor({
           ) : null}
         </div>
       ) : lockedReason ? (
-        <p className="cart__fine">{lockedReason}</p>
+        <p className="mt-3 text-[12px] leading-[1.55] text-gink-46">{lockedReason}</p>
       ) : null}
     </>
   );

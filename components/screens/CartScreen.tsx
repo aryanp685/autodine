@@ -21,18 +21,18 @@ function Totals({ subtotalPaise, taxPaise, totalPaise, taxRateBps, compact }: {
   compact?: boolean;
 }) {
   return (
-    <div className={compact ? 'totals totals--compact' : 'totals'}>
-      <div className="totals__row">
-        <span>Subtotal</span>
-        <span className="tnum">{inr(paiseToRupees(subtotalPaise))}</span>
+    <dl className={compact ? 'text-[13px]' : 'text-[14px]'}>
+      <div className="flex items-baseline justify-between py-1.5 text-gink-64">
+        <dt>Subtotal</dt>
+        <dd className="tnum">{inr(paiseToRupees(subtotalPaise))}</dd>
       </div>
-      <div className="totals__row">
-        <span>Taxes ({gstLabel(taxRateBps)})</span>
-        <span className="tnum">{inr(paiseToRupees(taxPaise))}</span>
+      <div className="flex items-baseline justify-between py-1.5 text-gink-64">
+        <dt>Taxes ({gstLabel(taxRateBps)})</dt>
+        <dd className="tnum">{inr(paiseToRupees(taxPaise))}</dd>
       </div>
-      <div className="totals__row totals__row--total">
-        <span>Total</span>
-        <span className="tnum">{inr(paiseToRupees(totalPaise))}</span>
+      <div className="mt-1.5 flex items-baseline justify-between border-t border-hair pt-2.5 text-[16px] font-semibold text-gink">
+        <dt>Total</dt>
+        <dd className="tnum">{inr(paiseToRupees(totalPaise))}</dd>
       </div>
       {/* Only when there is no restaurant rate to price against. This note
           used to render for every guest, including one sitting in a real
@@ -40,12 +40,12 @@ function Totals({ subtotalPaise, taxPaise, totalPaise, taxRateBps, compact }: {
           about to pay was a layout sample. On a demo it is true and worth
           saying; on a live menu it is a lie about someone's bill. */}
       {taxRateBps === undefined && (
-        <p className="totals__note">
+        <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
           This menu has no tax rate configured, so the tax above is a sample for layout review rather than a
           rate the restaurant set.
         </p>
       )}
-    </div>
+    </dl>
   );
 }
 
@@ -109,13 +109,19 @@ export function Cart({
              below 900px because two black buttons 40px apart is a choice
              nobody asked for. Now there is one, and it is where the thumb is
              at every width. */
-          <div className="cart__bar">
-            <span className="cart__barTotal">
-              <span className="cart__barLabel">Total</span>
-              <strong className="tnum">{inr(paiseToRupees(totalPaise))}</strong>
+          <div data-cart-dock="" className="flex items-center gap-3">
+            <span className="flex flex-col leading-tight">
+              <span className="text-[10.5px] font-semibold tracking-[0.09em] text-gink-46 uppercase">Total</span>
+              <strong className="tnum text-[17px] font-semibold text-gink">{inr(paiseToRupees(totalPaise))}</strong>
             </span>
-            <Link href={withSlug('/menu/checkout')} className="cart__barCta">
+            <Link
+              href={withSlug('/menu/checkout')}
+              className="ml-auto flex items-center gap-2 rounded-full bg-[var(--p-accent)] px-5 py-3 text-[13.5px] font-semibold text-white shadow-g1 transition active:scale-[0.99]"
+            >
               Continue to checkout
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="M9 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </Link>
           </div>
         ) : null
@@ -124,23 +130,25 @@ export function Cart({
          tap rather than the browser's back button. */
       tabs={<GuestTabs slug={slug} active="cart" />}
     >
-      <header className="flow__head">
-        <div className="flow__kicker">Your order</div>
-        <h1 className="flow__title">{headerMeta}</h1>
-        <p className="flow__lede">
+      <header className="px-4 pt-6 pb-4">
+        <p className="text-[10.5px] font-semibold tracking-[0.12em] text-gink-46 uppercase">Your order</p>
+        <h1 className="mt-1.5 text-[27px] leading-tight font-semibold tracking-[-0.025em] text-gink">{headerMeta}</h1>
+        <p className="mt-1.5 max-w-[52ch] text-[13.5px] leading-[1.55] text-gink-64">
           {priced.lines.length > 0
             ? 'Check the bill, then pay. Prices are read from the kitchen’s menu when you order.'
             : 'Nothing has been added from the menu yet.'}
         </p>
       </header>
 
-      <div className="cart__grid">
-        <div className="cart__lines">
+      <div className="px-4 pb-8">
+        <div className="flex flex-col gap-2.5">
           {/* The server renders an empty cart because it cannot read
               localStorage. Showing that emptiness for a moment over a cart
               that is not empty reads as the order having been lost. */}
           {!cart.ready ? (
-            <div className="cart__empty">Loading your order…</div>
+            <div className="rounded-2xl border border-hair bg-card px-4 py-8 text-center text-[13.5px] text-gink-46">
+              Loading your order…
+            </div>
           ) : (
             <>
               {priced.lines.map((l) => (
@@ -149,73 +157,93 @@ export function Cart({
                 // element, so changing one quantity re-rendered the other.
                 <div
                   key={`${l.itemId}|${l.variantId ?? ''}|${(l.addonIds ?? []).join(',')}`}
-                  className="cart__line"
+                  className="flex gap-3 rounded-2xl border border-hair bg-card p-3"
                 >
                   {/* The same photograph the guest tapped on the menu. A
                       bill of names only is hard to check against a table of
                       people deciding who ordered what. */}
-                  <DishPhoto src={l.img} name={l.name} size={56} className="cart__lineImg" />
-                  <div className="cart__lineMain">
-                    <div className="cart__lineTop">
+                  <DishPhoto src={l.img} name={l.name} size={56} className="size-14" />
+
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <div className="flex items-center gap-1.5">
                       <VegMark veg={l.isVeg} />
-                      <strong>{l.name}</strong>
+                      <strong className="truncate text-[14.5px] font-semibold text-gink">{l.name}</strong>
                     </div>
-                    <div className="cart__linePrice tnum">
+
+                    <div className="tnum mt-0.5 text-[12.5px] text-gink-46">
                       {l.variantName ? `${l.variantName} · ` : ''}
                       {inr(paiseToRupees(l.unitPricePaise))} each
                     </div>
+
                     {/* The add-ons the guest picked, named. A line total that
                         is higher than the menu price with no reason on screen
                         reads as a wrong bill. */}
                     {l.addonNames && l.addonNames.length > 0 && (
-                      <div className="cart__lineAddons">
+                      <div className="mt-0.5 text-[12px] leading-[1.45] text-gink-64">
                         + {l.addonNames.join(' · ')}
                         {l.addonPaise ? ` (${inr(paiseToRupees(l.addonPaise))} each)` : ' (free)'}
                       </div>
                     )}
-                  </div>
-                  <div className="cart__qty">
-                    <button
-                      onClick={() => cart.setQty(l.itemId, l.qty - 1, l.variantId, l.addonIds)}
-                      aria-label={`Decrease ${l.name}`}
-                    >
-                      −
-                    </button>
-                    <span className="tnum">{l.qty}</span>
-                    <button
-                      onClick={() => cart.setQty(l.itemId, l.qty + 1, l.variantId, l.addonIds)}
-                      aria-label={`Increase ${l.name}`}
-                    >
-                      +
-                    </button>
-                  </div>
-                  <div className="cart__lineEnd">
-                    <div className="cart__lineTotal tnum">
-                      {inr(paiseToRupees(l.lineTotalPaise))}
+
+                    {/* Quantity and the line total share a row under the name,
+                        because they are the same question: how many, and what
+                        does that come to. */}
+                    <div className="mt-2 flex items-center gap-3">
+                      <div className="flex items-center rounded-full border border-hair-strong">
+                        <button
+                          type="button"
+                          onClick={() => cart.setQty(l.itemId, l.qty - 1, l.variantId, l.addonIds)}
+                          aria-label={`Decrease ${l.name}`}
+                          className="grid size-7 place-items-center rounded-full text-[14px] text-gink-80 transition hover:bg-gink-07"
+                        >
+                          −
+                        </button>
+                        <span className="tnum min-w-5 text-center text-[12.5px] font-semibold text-gink">{l.qty}</span>
+                        <button
+                          type="button"
+                          onClick={() => cart.setQty(l.itemId, l.qty + 1, l.variantId, l.addonIds)}
+                          aria-label={`Increase ${l.name}`}
+                          className="grid size-7 place-items-center rounded-full text-[14px] text-gink-80 transition hover:bg-gink-07"
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      <span className="tnum ml-auto text-[14px] font-semibold text-gink">
+                        {inr(paiseToRupees(l.lineTotalPaise))}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() => cart.remove(l.itemId, l.variantId, l.addonIds)}
+                        className="rounded-full px-1.5 py-1 text-[11.5px] font-medium text-gink-46 underline decoration-gink-28 underline-offset-2 transition hover:text-[var(--alert)]"
+                      >
+                        Remove
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      className="cart__remove"
-                      onClick={() => cart.remove(l.itemId, l.variantId, l.addonIds)}
-                    >
-                      Remove
-                    </button>
                   </div>
                 </div>
               ))}
 
               {cart.lines.length === 0 && (
-                <div className="cart__empty">
-                  <p>Your cart is empty — nothing has been added from the menu yet.</p>
-                  <Link href={withSlug('/menu')} className="cart__emptyCta">
+                <div className="rounded-2xl border border-hair bg-card px-5 py-9 text-center">
+                  <p className="text-[14px] text-gink-64">Your cart is empty — nothing has been added from the menu yet.</p>
+                  <Link
+                    href={withSlug('/menu')}
+                    className="mt-4 inline-flex rounded-full bg-gink px-4 py-2.5 text-[13px] font-semibold text-onink"
+                  >
                     Open the menu
                   </Link>
                 </div>
               )}
 
+              {/* Warnings are not errors: nothing is broken and nothing needs
+                  undoing, the menu simply moved under a cart that was filled
+                  yesterday. So they are a quiet paper card with one action, not
+                  a red banner. */}
               {dropped > 0 && (
-                <div className="cart__notice">
-                  <p>
+                <div className="rounded-2xl border border-hair bg-accent-soft px-4 py-3">
+                  <p className="text-[13px] leading-[1.5] text-gink-80">
                     {dropped === 1 ? 'One dish is' : `${dropped} dishes are`} no longer available, so{' '}
                     {dropped === 1 ? 'it is' : 'they are'} not on the bill.
                   </p>
@@ -224,8 +252,9 @@ export function Cart({
                       and re-printed the same warning. */}
                   <button
                     type="button"
-                    className="cart__noticeBtn"
+                    data-cart-notice-action=""
                     onClick={() => cart.removeItems([...priced.missingIds, ...priced.unavailableIds])}
+                    className="mt-1.5 text-[12.5px] font-semibold text-[var(--p-accent)] underline underline-offset-2"
                   >
                     Remove {dropped === 1 ? 'it' : 'them'} from my cart
                   </button>
@@ -243,7 +272,7 @@ export function Cart({
                   Saying so is the difference between a bill the guest can
                   check and one they have to take on trust. */}
               {priced.staleAddonIds.length > 0 && (
-                <div className="cart__notice">
+                <div className="rounded-2xl border border-hair bg-accent-soft px-4 py-3 text-[13px] leading-[1.5] text-gink-80">
                   {priced.staleAddonIds.length === 1
                     ? 'One add-on you picked is'
                     : `${priced.staleAddonIds.length} add-ons you picked are`}{' '}
@@ -253,7 +282,7 @@ export function Cart({
               )}
 
               {priced.staleVariantIds.length > 0 && (
-                <div className="cart__notice">
+                <div className="rounded-2xl border border-hair bg-accent-soft px-4 py-3 text-[13px] leading-[1.5] text-gink-80">
                   The portion you picked for{' '}
                   {priced.staleVariantIds.length === 1 ? 'one dish is' : 'some dishes is'} no
                   longer on the menu, so {priced.staleVariantIds.length === 1 ? 'it is' : 'they are'}{' '}
@@ -264,29 +293,35 @@ export function Cart({
           )}
         </div>
 
-        <aside className="cart__sum">
-          <div className="cart__sumCard">
-            <h2>Bill summary</h2>
-            <Totals
-              subtotalPaise={subtotalPaise}
-              taxPaise={taxPaise}
-              totalPaise={totalPaise}
-              taxRateBps={taxRateBps}
-            />
-            {priced.lines.length > 0 ? (
-              <div className="cart__fine">
-                Prices are read from the kitchen&rsquo;s menu when you order, so the total you are
-                charged is the one the restaurant set. Nothing is charged from this phone.
-              </div>
-            ) : cart.ready ? (
-              <button type="button" className="cart__cta" disabled>
-                Cart is empty
-              </button>
-            ) : null}
-          </div>
-        </aside>
+        {/* The bill, inline. It used to be a second column on a wide screen and
+            a card under the lines on a phone, which meant two layouts to keep
+            agreeing; one card that reads the same at every width is the version
+            a guest can actually check. */}
+        <section className="mt-4 rounded-2xl border border-hair-strong bg-card px-4 py-4">
+          <h2 className="mb-1 text-[11px] font-semibold tracking-[0.1em] text-gink-46 uppercase">Bill summary</h2>
+          <Totals
+            subtotalPaise={subtotalPaise}
+            taxPaise={taxPaise}
+            totalPaise={totalPaise}
+            taxRateBps={taxRateBps}
+          />
+          {priced.lines.length > 0 ? (
+            <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
+              Prices are read from the kitchen&rsquo;s menu when you order, so the total you are
+              charged is the one the restaurant set. Nothing is charged from this phone.
+            </p>
+          ) : cart.ready ? (
+            <button
+              type="button"
+              data-cart-cta=""
+              disabled
+              className="mt-4 w-full rounded-full bg-gink-07 py-2.5 text-[13px] font-semibold text-gink-46"
+            >
+              Cart is empty
+            </button>
+          ) : null}
+        </section>
       </div>
-
     </GuestFlow>
   );
 }

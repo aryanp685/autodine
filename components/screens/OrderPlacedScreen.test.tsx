@@ -198,18 +198,18 @@ describe('OrderPlacedScreen', () => {
     // tell whether it was still waiting or already on the pass.
     const html = renderToStaticMarkup(<OrderPlacedScreen data={order({ prepStatus: 'preparing' })} />);
 
-    expect(html).toContain('placed__track');
+    expect(html).toContain('data-placed-track');
     expect(html).toContain('Being cooked');
     expect(html).toContain('Ready to serve');
     // 'new' is behind it, 'served' ahead of it.
-    expect(html).toMatch(/placed__step is-done[^>]*>.*?Sent to the kitchen/s);
-    expect(html).toMatch(/placed__step is-now[^>]*>.*?Being cooked/s);
-    expect(html).toMatch(/placed__step is-todo[^>]*>.*?Served/s);
+    expect(html).toMatch(/data-placed-step="done"[^>]*>.*?Sent to the kitchen/s);
+    expect(html).toMatch(/data-placed-step="now"[^>]*>.*?Being cooked/s);
+    expect(html).toMatch(/data-placed-step="todo"[^>]*>.*?Served/s);
   });
 
   it('marks nothing on a state it does not recognise', () => {
     const html = renderToStaticMarkup(<OrderPlacedScreen data={order({ prepStatus: 'mystery' })} />);
-    expect(html).not.toContain('placed__track');
+    expect(html).not.toContain('data-placed-track');
   });
 
   it('puts no four-step track on a cancelled order', () => {
@@ -217,7 +217,7 @@ describe('OrderPlacedScreen', () => {
     // as an order about to start.
     const html = renderToStaticMarkup(<OrderPlacedScreen data={order({ prepStatus: 'cancelled' })} />);
 
-    expect(html).not.toContain('placed__track');
+    expect(html).not.toContain('data-placed-track');
     expect(html).toContain('Nothing is being cooked');
   });
 
@@ -282,8 +282,8 @@ describe('OrderPlacedScreen', () => {
     // anywhere, so a table ordering a second round had to re-scan the card.
     const html = renderToStaticMarkup(<OrderPlacedScreen data={order()} slug="maddi" />);
 
-    expect(html).toContain('flow__steps');
-    expect(html).toMatch(/flow__step is-now[^>]*aria-current="step"[^>]*>\s*<span class="flow__sr">Placed/);
+    expect(html).toContain('data-flow-steps');
+    expect(html).toMatch(/data-flow-step="now"[^>]*aria-current="step"[^>]*>\s*<span class="sr-only">Placed/);
     expect(html).toContain('Order something else');
     expect(html).toContain('href="/menu?s=maddi"');
   });

@@ -84,58 +84,85 @@ export function MenuIdentity({
 
   if (bannerUrl) {
     return (
-      <header className="ident ident--banner">
-        <div className="ident__banner">
-          {/* Sized by CSS, not by the intrinsic image: a portrait phone photo
-              used as a banner would otherwise be taller than the menu. */}
+      <header className="relative">
+        <div className="relative h-[196px] w-full overflow-hidden bg-gink-12">
+          {/* Sized by the frame, not by the intrinsic image: a portrait phone
+              photo used as a banner would otherwise be taller than the menu. */}
           <Image
             src={bannerUrl}
             alt=""
             fill
             priority
-            sizes="(max-width: 760px) 100vw, 880px"
-            className="ident__bannerImg"
+            sizes="(max-width: 760px) 100vw, 720px"
+            className="object-cover"
           />
-          <div className="ident__scrim" aria-hidden="true" />
+          {/* The scrim is what makes white type on an unknown photograph
+              readable. It is a gradient to transparent rather than a flat veil,
+              so the top of the picture keeps its colour and only the text
+              corner is darkened. */}
+          <div
+            className="absolute inset-0 bg-linear-to-t from-[rgb(12_11_9/0.86)] via-[rgb(12_11_9/0.3)] to-transparent"
+            aria-hidden="true"
+          />
         </div>
 
-        <div className="ident__badge">
-          {logoUrl ? (
-            <Image src={logoUrl} alt="" width={64} height={64} className="ident__logo" />
-          ) : (
-            <span className="ident__monogram ident__monogram--onBanner" aria-hidden="true">
-              {monogram}
-            </span>
-          )}
-        </div>
+        {/* The name sits ON the photograph, over the dark end of the scrim.
+            Putting it under the banner instead would have meant white type on
+            paper -- the one place in this flow where that is unreadable. */}
+        <div className="absolute inset-x-0 bottom-0 mx-auto flex w-full max-w-[720px] items-end gap-3 px-4 pb-4">
+          <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-paper shadow-g1 ring-1 ring-white/50">
+            {logoUrl ? (
+              <Image src={logoUrl} alt="" width={44} height={44} className="size-11 object-cover" />
+            ) : (
+              <span aria-hidden="true" className="text-[14px] font-semibold tracking-[0.02em] text-[var(--p-accent)]">
+                {monogram}
+              </span>
+            )}
+          </span>
 
-        <div className="ident__text ident__text--onBanner">
-          <h1 className="ident__name">{name}</h1>
-          {line && <div className="ident__line">{line}</div>}
-        </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-[24px] leading-tight font-semibold tracking-[-0.02em] text-white">
+              {name}
+            </h1>
+            {line && <div className="mt-0.5 truncate text-[11px] tracking-[0.05em] text-white/72">{line}</div>}
+          </div>
 
-        {tableLabel && <TableChip label={tableLabel} />}
+          {tableLabel && <TableChip label={tableLabel} onPhoto />}
+        </div>
       </header>
     );
   }
 
+  /* The paper header: a ringed monogram, the name, one line of place. It is a
+     finished design, not the absence of one -- the ring is the same geometry as
+     the brand mark, so a restaurant with no photograph still gets something
+     that looks drawn for it. */
   return (
-    <header className="ident ident--paper">
-      <div className="ident__paperTop">
-        <div className="ident__ring">
+    <header className="px-4 pt-7 pb-5">
+      <div className="mx-auto flex w-full max-w-[720px] items-center gap-4">
+        <div className="grid size-14 shrink-0 place-items-center rounded-full bg-accent-soft ring-1 ring-[var(--p-accent)]/22">
           {logoUrl ? (
-            <Image src={logoUrl} alt="" width={56} height={56} className="ident__logo ident__logo--onPaper" />
+            <Image src={logoUrl} alt="" width={56} height={56} className="size-14 rounded-full object-cover" />
           ) : (
-            <span className="ident__monogram" aria-hidden="true">
+            <span aria-hidden="true" className="text-[17px] font-semibold tracking-[0.02em] text-[var(--p-accent)]">
               {monogram}
             </span>
           )}
         </div>
-        <h1 className="ident__name ident__name--paper">{name}</h1>
-        {line && <div className="ident__line ident__line--paper">{line}</div>}
-      </div>
 
-      {tableLabel && <TableChip label={tableLabel} />}
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-[27px] leading-tight font-semibold tracking-[-0.025em] text-gink">
+            {name}
+          </h1>
+          {line && (
+            <div className="mt-1 truncate text-[11px] font-medium tracking-[0.1em] text-gink-46 uppercase">
+              {line}
+            </div>
+          )}
+        </div>
+
+        {tableLabel && <TableChip label={tableLabel} />}
+      </div>
     </header>
   );
 }
@@ -146,10 +173,19 @@ export function MenuIdentity({
  * Only ever rendered from a live, verified session -- never from a guess. See
  * the note on MenuScreenTable: this badge used to say "Table 7" to everyone.
  */
-function TableChip({ label }: { label: string }) {
+function TableChip({ label, onPhoto }: { label: string; onPhoto?: boolean }) {
   return (
-    <div className="ident__table">
-      <span className="ident__tableDot" aria-hidden="true" />
+    <div
+      data-table-chip=""
+      className={[
+        'flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] font-semibold tracking-[0.07em] uppercase',
+        /* On a photograph the chip has to survive whatever was uploaded, so it
+           is a frosted white pill with dark type rather than a paper-coloured
+           one that might be the same value as the banner behind it. */
+        onPhoto ? 'bg-white/15 text-white backdrop-blur-md ring-1 ring-white/25' : 'bg-accent-soft text-[var(--p-accent)]',
+      ].join(' ')}
+    >
+      <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
       {label}
     </div>
   );

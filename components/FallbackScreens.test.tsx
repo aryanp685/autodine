@@ -18,7 +18,7 @@ describe('the 404', () => {
   const html = renderToStaticMarkup(<NotFound />);
 
   it('wears the product’s own shell, not the browser default', () => {
-    expect(html).toContain('gnote');
+    expect(html).toContain('data-gnote-body');
     expect(html).toContain('AutoDine');
     // The exact sentence from Next's default page, which is not ours.
     expect(html).not.toContain('This page could not be found');
@@ -39,7 +39,7 @@ describe('the error screen', () => {
 
   it('offers a retry that remounts the segment', () => {
     expect(html).toContain('Try again');
-    expect(html).toMatch(/<button[^>]*class="gnote__cta"/);
+    expect(html).toMatch(/<button[^>]*data-gnote-cta="primary"/);
   });
 
   it('tells the reader that nothing recorded was lost', () => {
