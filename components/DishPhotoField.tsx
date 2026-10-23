@@ -5,6 +5,7 @@ import { useFormStatus } from 'react-dom';
 import { DishPhoto } from '@/components/DishPhoto';
 import { MAX_BYTES, validateImage } from '@/lib/storage/assets';
 import { removeDishPhotoAction, uploadDishPhotoAction } from '@/app/dashboard/menus/actions';
+import { btn } from '@/components/owner/chrome';
 
 /**
  * The dish photo control.
@@ -34,7 +35,7 @@ import { removeDishPhotoAction, uploadDishPhotoAction } from '@/app/dashboard/me
 function Submit({ label, pendingLabel }: { label: string; pendingLabel: string }) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" className="pg__btn" disabled={pending} aria-busy={pending}>
+    <button type="submit" className={btn('solid', 'sm')} disabled={pending} aria-busy={pending}>
       {pending ? pendingLabel : label}
     </button>
   );
@@ -64,23 +65,33 @@ export function DishPhotoField({
   }, [itemId]);
 
   return (
-    <div className="dishPhotoField">
-      <div className="dishPhotoField__head">
-        <h4 className="dishPhotoField__title">Photo</h4>
-        <span className="pg__fine">
+    <div data-dish-photo-field>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h4 className="text-[12px] font-medium text-gink">Photo</h4>
+        <span className="text-[11px] leading-[1.4] text-gink-46">
           {imageUrl ? 'Shown on the menu and the cart.' : 'Optional. Without one, guests see initials.'}
         </span>
       </div>
 
-      <div className="dishPhotoField__body">
-        <div className="dishPhotoField__preview">
-          <DishPhoto src={picked ?? imageUrl} name={dishName} size={84} className="dishPhotoField__img" />
-        </div>
+      <div className="mt-2 flex items-start gap-3">
+        {/* The photo is the control's own preview, at the size it is drawn in
+            the editor, so a replacement can be judged without saving it. */}
+        <DishPhoto src={picked ?? imageUrl} name={dishName} size={84} />
 
-        <div className="dishPhotoField__controls">
-          <form action={uploadDishPhotoAction} className="dishPhotoField__form">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <form action={uploadDishPhotoAction} className="flex flex-wrap items-center gap-1.5">
             <input type="hidden" name="itemId" value={itemId} />
-            <label className="brand__picker">
+            {/* A label wrapping a file input: one target, and the browser's
+                own picker. The input itself is 1px and invisible rather than
+                `display:none`, which some browsers refuse to open. */}
+            <label
+              className={[
+                'relative inline-flex h-8 cursor-pointer items-center rounded-full border border-hair-strong px-3',
+                'text-[12px] font-medium text-gink transition-colors hover:border-gink-28 hover:bg-gink-07',
+                'focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-gink',
+                disabled ? 'pointer-events-none opacity-45' : '',
+              ].join(' ')}
+            >
               <input
                 ref={inputRef}
                 type="file"
@@ -88,6 +99,7 @@ export function DishPhotoField({
                 accept="image/png,image/jpeg,image/webp"
                 disabled={disabled}
                 required
+                className="absolute inset-0 size-full cursor-pointer opacity-0"
                 onChange={(event) => {
                   const file = event.target.files?.[0];
                   if (!file) {
@@ -120,7 +132,12 @@ export function DishPhotoField({
           {imageUrl && (
             <form action={removeDishPhotoAction}>
               <input type="hidden" name="itemId" value={itemId} />
-              <button type="submit" className="dishPhotoField__remove" disabled={disabled}>
+              <button
+                type="submit"
+                data-remove-photo
+                className="h-7 rounded-full px-2 text-[11.5px] font-medium text-gink-46 transition-colors hover:bg-[var(--alert)]/8 hover:text-[var(--alert)] disabled:opacity-45"
+                disabled={disabled}
+              >
                 Remove photo
               </button>
             </form>
@@ -129,11 +146,11 @@ export function DishPhotoField({
       </div>
 
       {localError && (
-        <p className="dishPhotoField__error" role="alert">
+        <p role="alert" className="mt-2 text-[11.5px] leading-[1.45] text-[var(--alert)]">
           {localError}
         </p>
       )}
-      <p className="pg__fine">JPG, PNG or WebP · up to 4 MB</p>
+      <p className="mt-1.5 text-[11px] leading-[1.45] text-gink-46">JPG, PNG or WebP · up to 4 MB</p>
     </div>
   );
 }

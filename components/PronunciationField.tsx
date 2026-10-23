@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { toDevanagari, unknownWords } from '@/lib/hindi';
+import { Field, inputClass } from '@/components/owner/chrome';
 
 /**
  * How a dish is said out loud.
@@ -38,32 +39,46 @@ export function PronunciationField({
   const guessed = unknownWords(effective);
 
   return (
-    <div className="ui-field pg__pron">
-      <label className="ui-label" htmlFor="spokenName">
-        Spoken name <span className="pg__fine">— how the kitchen hears it</span>
-      </label>
-      <input
-        id="spokenName"
-        className="ui-input"
-        name="spokenName"
-        value={override}
-        disabled={disabled}
-        placeholder={toDevanagari(name)}
-        maxLength={120}
-        onChange={(event) => setOverride(event.target.value)}
-      />
+    <div data-pronunciation-field>
+      <Field
+        htmlFor="spokenName"
+        label={
+          <>
+            Spoken name{' '}
+            <span className="font-normal text-gink-46">— how the kitchen hears it</span>
+          </>
+        }
+      >
+        <input
+          id="spokenName"
+          className={inputClass}
+          name="spokenName"
+          value={override}
+          disabled={disabled}
+          placeholder={toDevanagari(name)}
+          maxLength={120}
+          onChange={(event) => setOverride(event.target.value)}
+        />
+      </Field>
 
-      <p className="pg__pronPreview">
-        <span className="pg__fine">Board says</span> {preview}
+      {/* The sentence the voice actually gets, not a promise about it. */}
+      <p className="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 rounded-[8px] bg-paper-deep px-2.5 py-1.5">
+        <span className="text-[10.5px] font-semibold tracking-[0.06em] text-gink-46 uppercase">
+          Board says
+        </span>
+        <span className="text-[12.5px] text-gink">{preview}</span>
       </p>
 
       {guessed.length > 0 ? (
-        <p className="pg__fine">
-          Guessed, not known: <strong>{guessed.join(', ')}</strong>. Type the pronunciation above if
-          it is wrong — the menu name stays as it is.
+        <p className="mt-1.5 text-[11px] leading-[1.45] text-gink-46">
+          Guessed, not known:{' '}
+          <strong className="font-medium text-gink">{guessed.join(', ')}</strong>. Type the
+          pronunciation above if it is wrong — the menu name stays as it is.
         </p>
       ) : (
-        <p className="pg__fine">Every word is known. Nothing to check.</p>
+        <p className="mt-1.5 text-[11px] leading-[1.45] text-gink-46">
+          Every word is known. Nothing to check.
+        </p>
       )}
     </div>
   );
