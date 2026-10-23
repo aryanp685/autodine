@@ -95,8 +95,36 @@ describe('placeOrderAction', () => {
     const parsed = new URL(url, 'https://example.test');
 
     expect(parsed.searchParams.get('s')).toBe('kings-of-kings');
+    // The sentence says nothing was charged, and it does not promise a reason.
     expect(parsed.searchParams.get('error')).toBe(
-      'We could not place that order. Please try again.'
+      'We could not place that order. Nothing was charged — please try again, or order with staff.'
+    );
+    // The class of failure rides along so an unexplained break is diagnosable
+    // instead of a sentence with nothing behind it.
+    expect(parsed.searchParams.get('code')).toBe('XX000');
+  });
+
+  it('tells a guest their cart is stale rather than to tap again', async () => {
+    // 22P02 is invalid_text_representation: an id in the cart is not a uuid,
+    // which is what a cart left over from an older menu sends.
+    mocks.rpc.mockResolvedValue({
+      data: null,
+      error: { code: '22P02', message: 'invalid input syntax for type uuid' },
+    });
+
+    const url = await run(() => placeOrderAction(form()));
+    const parsed = new URL(url, 'https://example.test');
+
+    expect(parsed.searchParams.get('error')).toMatch(/no longer on this menu/i);
+    expect(parsed.searchParams.get('error')).not.toMatch(/invalid input syntax/i);
+  });
+
+  it('does not tell a guest to order twice when a double tap duplicated it', async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: { code: '23505', message: 'duplicate key' } });
+
+    const url = await run(() => placeOrderAction(form()));
+    expect(new URL(url, 'https://example.test').searchParams.get('error')).toMatch(
+      /already went through/i
     );
   });
 

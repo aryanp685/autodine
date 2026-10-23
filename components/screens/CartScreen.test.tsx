@@ -184,3 +184,44 @@ describe('the cart actions', () => {
     expect(html).not.toContain('Cart is empty');
   });
 });
+
+/**
+ * A failed order.
+ *
+ * The message used to float in a fixed banner over the top of the page, on top
+ * of the guest's header, and repeated its own headline. Worse, it never said
+ * whether the cart survived -- which is the only thing a guest wants to know
+ * when an order does not go through.
+ */
+describe('Cart — a failed order', () => {
+  it('says what happened to the cart and to the money', () => {
+    const html = renderToStaticMarkup(
+      <Cart items={[]} placedError="One of the dishes in your cart is no longer on this menu." />,
+    );
+
+    expect(html).toContain('data-place-error');
+    expect(html).toContain('That order was not placed');
+    expect(html).toContain('no longer on this menu');
+    // The two facts that turn a dead end into a decision.
+    expect(html).toMatch(/nothing has been charged/i);
+    expect(html).toMatch(/cart is still here/i);
+  });
+
+  it('renders in the page, not over the guest’s header', () => {
+    const html = renderToStaticMarkup(<Cart items={[]} placedError="Something broke." />);
+    const at = html.indexOf('data-place-error');
+    // The alert is a child of the flow, never a fixed overlay on top of it.
+    const alertTag = html.slice(html.lastIndexOf('<div', at), at);
+    expect(alertTag).not.toContain('fixed');
+  });
+
+  it('offers to dismiss the message without losing the order', () => {
+    const html = renderToStaticMarkup(<Cart slug="kings-of-kings" items={[]} placedError="x" />);
+    expect(html).toContain('href="/menu/cart?s=kings-of-kings"');
+    expect(html).toContain('aria-label="Dismiss this message"');
+  });
+
+  it('says nothing at all when the last order went through', () => {
+    expect(renderToStaticMarkup(<Cart items={[]} />)).not.toContain('data-place-error');
+  });
+});

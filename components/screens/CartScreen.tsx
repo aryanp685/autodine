@@ -64,6 +64,7 @@ export function Cart({
   tableLabel,
   taxRateBps,
   items,
+  placedError,
 }: {
   slug?: string;
   restaurantName?: string;
@@ -72,6 +73,16 @@ export function Cart({
   /** The restaurant's own rate. Without it the bill is priced at a sample. */
   taxRateBps?: number;
   items: MenuItemPrice[];
+  /**
+   * Why the last attempt to place this order failed, in the action's own words.
+   *
+   * The message used to float in a fixed banner over the top of the page, on
+   * top of the guest's header, and repeated its own headline: "Could not place
+   * that order. / We could not place that order. Please try again." A guest
+   * reads that and has no idea whether the cart survived. It sits in the page
+   * now, under the heading it belongs to, and says what happened to the cart.
+   */
+  placedError?: string;
 }) {
   const cart = useCart();
 
@@ -136,6 +147,46 @@ export function Cart({
             : 'Nothing has been added from the menu yet.'}
         </p>
       </header>
+
+      {placedError ? (
+        <div className="px-4 pb-2">
+          <div
+            role="alert"
+            data-place-error=""
+            className="g-panel border-[color-mix(in_oklab,var(--alert)_32%,transparent)] px-4 py-3"
+          >
+            <div className="flex items-start gap-2.5">
+              <span
+                aria-hidden="true"
+                className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-[color-mix(in_oklab,var(--alert)_14%,white)] text-[12px] font-semibold text-[var(--alert)]"
+              >
+                !
+              </span>
+              <div className="min-w-0">
+                <strong className="block text-[13px] font-semibold text-gink">
+                  That order was not placed
+                </strong>
+                <p className="mt-0.5 text-[12.5px] leading-[1.55] text-gink-64">{placedError}</p>
+                {/* The one thing a guest actually wants to know at this point.
+                    Nothing was charged, and the cart is still here -- saying it
+                    turns a dead end back into a decision. */}
+                <p className="mt-1 text-[11.5px] leading-[1.5] text-gink-46">
+                  Nothing has been charged, and your cart is still here.
+                </p>
+              </div>
+              <Link
+                href={withSlug('/menu/cart')}
+                aria-label="Dismiss this message"
+                className="ml-auto -mr-1 grid size-7 shrink-0 place-items-center rounded-full text-gink-46 transition hover:bg-gink-07 hover:text-gink"
+              >
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+                </svg>
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="px-4 pb-8">
         <div className="flex flex-col gap-2.5">

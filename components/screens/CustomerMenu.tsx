@@ -233,7 +233,11 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
         button does what it says.
       */}
       {menus.length > 1 && (
-        <nav aria-label="Menus" className="scrollbar-none -mx-1 mt-4 flex gap-2 overflow-x-auto px-5 pb-1">
+        <nav
+          aria-label="Menus"
+          data-rail=""
+          className="scrollbar-none -mx-1 mt-4 flex gap-2 overflow-x-auto px-5 pb-1"
+        >
           {menus.map((option) => {
             const params = new URLSearchParams({ s: slug ?? '' });
             params.set('m', option.id);
@@ -302,7 +306,11 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
             filters anything, and a row of chips that does nothing is worse
             than no row. */}
         {!searching && (
-          <nav aria-label="Courses" className="scrollbar-none flex gap-1.5 overflow-x-auto px-4 pb-2.5">
+          <nav
+            aria-label="Courses"
+            data-rail=""
+            className="scrollbar-none flex gap-1.5 overflow-x-auto px-4 pb-2.5"
+          >
             <button
               type="button"
               aria-pressed={cat === 'all'}
@@ -364,9 +372,18 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
 
         <div className="flex flex-col gap-2.5">
           {list.map((i) => (
-            /* One row per dish, in the order a hungry person reads it: what it
-               is, what it costs, what is in it -- then the decision, in the
-               column the eye already uses for pictures. */
+            /* THE APP ROW
+             *
+             * Words on the left, picture on the right, and the one decision --
+             * Add, a quantity, or Sold out -- directly under the picture. That
+             * is the shape every food app uses, and it is not decoration: the
+             * photo and the button are the same target area, so a thumb that
+             * lands on the dish lands on the way to order it.
+             *
+             * The button used to sit at the bottom of the text column, which
+             * put it half a card away from the picture, under a description of
+             * varying length -- so no two cards were the same height and the
+             * Add row wandered down the page. */
             <article
               key={i.id}
               className={[
@@ -386,80 +403,76 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
                     {i.name}
                   </h3>
                   {i.badge && i.available && (
-                    <span className="g-badge shrink-0 px-2 py-0.5">
-                      {i.badge}
-                    </span>
+                    <span className="g-badge shrink-0 px-2 py-0.5">{i.badge}</span>
                   )}
                 </div>
 
                 <div className="mt-1 flex items-baseline gap-1.5">
-                  {i.variants && <span className="text-[10.5px] font-medium tracking-[0.05em] text-gink-46 uppercase">from</span>}
+                  {i.variants && (
+                    <span className="text-[10.5px] font-medium tracking-[0.05em] text-gink-46 uppercase">
+                      from
+                    </span>
+                  )}
                   <span className="tnum text-[15px] font-semibold text-gink">{inr(i.price)}</span>
                 </div>
 
                 <p className="mt-1 line-clamp-2 text-[13px] leading-[1.45] text-gink-64">{i.desc}</p>
+              </div>
 
-                {/* The action sits under the words on a phone and beside them
-                    on a wide screen, but it is always in the thumb's reach
-                    rather than at the end of a 300px line. */}
-                <div className="mt-2.5">
-                  {i.available ? (
-                    needsChoice(i) ? (
-                      <Link
-                        href={itemHref(i.id)}
-                        className="g-primary inline-flex items-center gap-1 rounded-full px-4 py-2 text-[12.5px] font-semibold"
+              {/* The picture column owns the action. Equal width on every row,
+                  so a long description cannot push one card's button below its
+                  neighbour's. */}
+              <div className="flex w-[92px] shrink-0 flex-col items-stretch gap-1.5">
+                <DishPhoto src={i.img} name={i.name} size={92} className="w-full" />
+
+                {i.available ? (
+                  needsChoice(i) ? (
+                    <Link
+                      href={itemHref(i.id)}
+                      className="g-primary inline-flex items-center justify-center rounded-full px-3 py-1.5 text-[12px] font-semibold"
+                    >
+                      Choose
+                    </Link>
+                  ) : plainQty(i.id) > 0 ? (
+                    <div className="g-quiet flex items-center justify-between rounded-full px-1">
+                      <button
+                        type="button"
+                        onClick={() => cart.setQty(i.id, plainQty(i.id) - 1)}
+                        aria-label={`One fewer ${i.name}`}
+                        className="grid size-7 place-items-center rounded-full text-[15px] text-gink-80 transition hover:bg-gink-07"
                       >
-                        Choose
-                      </Link>
-                    ) : plainQty(i.id) > 0 ? (
-                      <div className="g-quiet inline-flex items-center rounded-full">
-                        <button
-                          type="button"
-                          onClick={() => cart.setQty(i.id, plainQty(i.id) - 1)}
-                          aria-label={`One fewer ${i.name}`}
-                          className="grid size-8 place-items-center rounded-full text-[15px] text-gink-80 transition hover:bg-gink-07"
-                        >
-                          −
-                        </button>
-                        <span className="tnum min-w-5 text-center text-[13px] font-semibold text-gink" aria-live="polite">
-                          {plainQty(i.id)}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => addToCart(i.id)}
-                          aria-label={`One more ${i.name}`}
-                          className="grid size-8 place-items-center rounded-full text-[15px] text-gink-80 transition hover:bg-gink-07"
-                        >
-                          +
-                        </button>
-                      </div>
-                    ) : (
+                        −
+                      </button>
+                      <span
+                        className="tnum min-w-4 text-center text-[13px] font-semibold text-gink"
+                        aria-live="polite"
+                      >
+                        {plainQty(i.id)}
+                      </span>
                       <button
                         type="button"
                         onClick={() => addToCart(i.id)}
-                        aria-label={`Add ${i.name}`}
-                        className="g-primary inline-flex items-center gap-1 rounded-full px-4 py-2 text-[12.5px] font-semibold"
+                        aria-label={`One more ${i.name}`}
+                        className="grid size-7 place-items-center rounded-full text-[15px] text-gink-80 transition hover:bg-gink-07"
                       >
-                        Add
+                        +
                       </button>
-                    )
+                    </div>
                   ) : (
-                    <span className="text-[12px] font-medium tracking-[0.03em] text-gink-46 uppercase">Sold out</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Every dish gets a tile. One the kitchen has not photographed
-                  yet shows its initials rather than the hole a missing image
-                  leaves in an otherwise even column. */}
-              <div className="shrink-0 self-start">
-                <DishPhoto
-                  src={i.img}
-                  name={i.name}
-                  size={96}
-                  className="size-[96px]"
-                  sizes="(max-width: 420px) 96px, 116px"
-                />
+                    <button
+                      type="button"
+                      onClick={() => addToCart(i.id)}
+                      aria-label={`Add ${i.name}`}
+                      className="g-primary inline-flex items-center justify-center rounded-full px-3 py-1.5 text-[12px] font-semibold"
+                    >
+                      Add
+                    </button>
+                  )
+                ) : (
+                  <span className="text-center text-[10.5px] font-medium tracking-[0.03em] text-gink-46 uppercase">
+                    Sold out
+                  </span>
+                )}
               </div>
             </article>
           ))}

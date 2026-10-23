@@ -235,20 +235,19 @@ export function Checkout({
             descendant of, and both Place order buttons have to go busy
             together or a second tap writes a second order. */}
         {canOrder && (
-          <div
-            data-co-bar=""
-            className="fixed inset-x-0 z-40 px-3"
-            style={{ bottom: 'calc(12px + env(safe-area-inset-bottom))' }}
-          >
-            <div
-              data-flow-chrome="dock"
-              className="mx-auto flex w-full max-w-[720px] items-center gap-3 rounded-[22px] px-3 py-2.5"
-            >
+          /* The same shelf the menu and cart wear, so the primary action does
+             not change shape between two taps of one flow. It is docked rather
+             than floating: a bar that hovers 12px above the edge leaves a strip
+             of page under the thumb, which is where a thumb lands. */
+          <div data-co-bar="" className="fixed inset-x-0 bottom-0 z-40">
+            <div data-flow-chrome="shelf" className="w-full">
+              <div className="mx-auto flex w-full max-w-[720px] items-center gap-3 px-3 pt-2.5 pb-2">
               <span className="flex flex-col leading-tight">
                 <span className="text-[10px] font-semibold tracking-[0.09em] text-gink-46 uppercase">Total payable</span>
                 <strong className="tnum text-[17px] font-semibold text-gink">{inr(paiseToRupees(totalPaise))}</strong>
               </span>
-              <PlaceOrderButton totalPaise={totalPaise} canOrder={canOrder} form="co-place-order" variant="dock" />
+                <PlaceOrderButton totalPaise={totalPaise} canOrder={canOrder} form="co-place-order" variant="dock" />
+              </div>
             </div>
           </div>
         )}
