@@ -65,6 +65,7 @@ export function Cart({
   taxRateBps,
   items,
   placedError,
+  placedErrorCode,
 }: {
   slug?: string;
   restaurantName?: string;
@@ -83,6 +84,15 @@ export function Cart({
    * now, under the heading it belongs to, and says what happened to the cart.
    */
   placedError?: string;
+  /**
+   * The five-character class of the failure (a SQLSTATE or a PostgREST code).
+   *
+   * It is not the database's shape and it is not a secret: it says WHICH kind of
+   * refusal this was. Without it, an unclassified failure is a sentence a guest
+   * can only screenshot, and the next person has no way to tell a busy
+   * connection from a missing column.
+   */
+  placedErrorCode?: string;
 }) {
   const cart = useCart();
 
@@ -185,6 +195,11 @@ export function Cart({
                 <p className="mt-1 text-[11.5px] leading-[1.5] text-gink-46">
                   Nothing has been charged, and your cart is still here.
                 </p>
+                {placedErrorCode ? (
+                  <p className="mt-1 text-[10.5px] leading-[1.45] text-gink-46">
+                    Reference {placedErrorCode} — quote this to staff if it happens again.
+                  </p>
+                ) : null}
               </div>
               <Link
                 href={withSlug('/menu/cart')}

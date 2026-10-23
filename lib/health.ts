@@ -28,7 +28,7 @@
  * network, a database or an environment.
  */
 
-export type Probe = 'applied' | 'missing' | 'unknown' | 'unreachable';
+export type Probe = 'applied' | 'missing' | 'unknown' | 'unreachable' | 'unauthorized';
 
 export type Health = {
   /** Everything the app needs to run live is present. */
@@ -37,6 +37,16 @@ export type Health = {
   serverKey: boolean;
   /** The database answered a query at all. */
   reachable: boolean;
+  /**
+   * Did the database accept the credentials this deployment is holding?
+   *
+   * 'rejected' is the one answer that is nobody's guess: the key is wrong, the
+   * key was rolled, or the project it belongs to is different. Every
+   * privileged path -- payments, staff sign-in, the health probe itself -- is
+   * dead, and without this word the endpoint reported `serverKey: true` while
+   * all of them failed, which is the least useful thing a health check can say.
+   */
+  credentials: 'accepted' | 'rejected' | 'unknown';
   schema: {
     /** trial_started_at / plan columns + restaurant_can_write(). Migration 01100. */
     trialAndWriteGate: Probe;
@@ -78,6 +88,19 @@ export type ProbeClient = {
  * fallback, because a project on an older PostgREST returns a plain 404 with no
  * code at all.
  */
+/**
+ * Is this the database saying "I do not know that key"?
+ *
+ * A rolled or mistyped secret key comes back as 401 with PGRST301 (or a plain
+ * "Invalid API key"). It is not a missing migration and it is not a database
+ * outage, and treating it as either sends somebody to re-run a migration or to
+ * restart a project that is running perfectly well.
+ */
+function isUnauthorized(error: { message: string; code?: string }): boolean {
+  if (error.code === 'PGRST301' || error.code === '401' || error.code === 'PGRST302') return true;
+  return /invalid api key|invalid jwt|jwt expired|unauthorized|no api key/i.test(error.message);
+}
+
 function isMissing(error: { message: string; code?: string }): boolean {
   if (error.code === 'PGRST202' || error.code === '42703' || error.code === 'PGRST204') return true;
   return /could not find the function|column .* does not exist|schema cache/i.test(error.message);
@@ -94,6 +117,7 @@ async function columnExists(client: ProbeClient, table: string, column: string):
   try {
     const { error } = await client.from(table).select(column).limit(0);
     if (!error) return 'applied';
+    if (isUnauthorized(error)) return 'unauthorized';
     return isMissing(error) ? 'missing' : 'unknown';
   } catch {
     return 'unreachable';
@@ -109,6 +133,7 @@ async function functionExists(
   try {
     const { error } = await client.rpc(fn, args);
     if (!error) return 'applied';
+    if (isUnauthorized(error)) return 'unauthorized';
     return isMissing(error) ? 'missing' : 'unknown';
   } catch {
     return 'unreachable';
@@ -134,6 +159,7 @@ export async function probeHealth(input: {
     configured: input.configured,
     serverKey: input.serverKey,
     reachable: false,
+    credentials: 'unknown',
     schema: {
       trialAndWriteGate: 'unknown',
       planEntitlements: 'unknown',
@@ -165,15 +191,27 @@ export async function probeHealth(input: {
   const trialAndWriteGate: Probe =
     trialColumn === 'applied' && planColumn === 'applied'
       ? 'applied'
-      : trialColumn === 'unreachable' || planColumn === 'unreachable'
-        ? 'unreachable'
-        : trialColumn === 'missing' || planColumn === 'missing'
-          ? 'missing'
-          : 'unknown';
+      : trialColumn === 'unauthorized' || planColumn === 'unauthorized'
+        ? 'unauthorized'
+        : trialColumn === 'unreachable' || planColumn === 'unreachable'
+          ? 'unreachable'
+          : trialColumn === 'missing' || planColumn === 'missing'
+            ? 'missing'
+            : 'unknown';
+
+  const probes = [trialColumn, planColumn, upiColumn, planFeatures];
+  const credentials: Health['credentials'] = probes.includes('unauthorized')
+    ? 'rejected'
+    : !input.serverKey
+      ? 'unknown'
+      : trialColumn === 'applied' && planColumn === 'applied' && upiColumn === 'applied'
+        ? 'accepted'
+        : 'unknown';
 
   return {
     ...empty,
-    reachable: trialColumn !== 'unreachable',
+    reachable: trialColumn !== 'unreachable' && trialColumn !== 'unauthorized',
+    credentials,
     schema: {
       trialAndWriteGate,
       planEntitlements: planFeatures,

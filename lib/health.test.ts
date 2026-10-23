@@ -148,3 +148,32 @@ describe('probeHealth', () => {
     expect(serialised).not.toContain('sb_secret');
   });
 });
+
+describe('health reports a rejected credential', () => {
+  it('names a rolled secret key as unauthorized, not as a missing migration', async () => {
+    // A revoked key answers 401. Saying "missing" sends somebody to re-run a
+    // migration that is already applied; saying "unknown" is what the endpoint
+    // said while every privileged path on the deployment was dead.
+    const health = await probeHealth({
+      ...base,
+      primary: picky({
+        columns: {
+          trial_started_at: { message: 'Invalid API key', code: 'PGRST301' },
+          plan: { message: 'Invalid API key', code: 'PGRST301' },
+          upi_id: { message: 'Invalid API key', code: 'PGRST301' },
+        },
+      }),
+      publicClient: picky({}),
+    });
+
+    expect(health.credentials).toBe('rejected');
+    expect(health.schema.trialAndWriteGate).toBe('unauthorized');
+    // The database is up; it is the credential that is wrong.
+    expect(health.reachable).toBe(false);
+  });
+
+  it('says the credential was accepted when the probes can read', async () => {
+    const health = await probeHealth({ ...base, primary: picky({}), publicClient: picky({}) });
+    expect(health.credentials).toBe('accepted');
+  });
+});
