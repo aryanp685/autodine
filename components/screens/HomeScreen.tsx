@@ -34,23 +34,33 @@ import { BRAND_GREEN } from '@/lib/brand';
 const STEPS = [
   {
     n: '01',
-    title: 'Scan QR',
-    body: 'The card on the table resolves to that table in that restaurant. A card from a closed table is refused, and says so.',
+    title: 'Set up once',
+    body: 'Dishes, prices, photographs and the tables in the room. Publish when it is right, and print a card per table.',
   },
   {
     n: '02',
-    title: 'Explore Menu',
-    body: 'Dishes with photographs, prices and what is in them. Sold-out dishes say so instead of taking the order.',
+    title: 'Scan the card',
+    body: 'The card resolves to that table in that restaurant. A six-digit code shown in the room proves the guest is sitting there.',
   },
   {
     n: '03',
-    title: 'Place Order',
-    body: 'A portion, an add-on, a note for the kitchen. The ticket lands on the board in the same second.',
+    title: 'Order from the phone',
+    body: 'A portion, an add-on, a note for the kitchen. The total updates as the cart does, and sold-out dishes say so.',
   },
   {
     n: '04',
-    title: 'Kitchen Dashboard',
-    body: 'Tickets ordered by what needs cooking next, read aloud in Hindi, and settled at the counter.',
+    title: 'Saved, then sent',
+    body: 'The order is priced and written by the database — never by the browser — and the guest gets a reference they can quote.',
+  },
+  {
+    n: '05',
+    title: 'The kitchen sees it',
+    body: 'A ticket on the board with its table, its notes and its age, read aloud in Hindi when a new one arrives.',
+  },
+  {
+    n: '06',
+    title: 'Settle at the counter',
+    body: 'Cash or card at the till, or the restaurant\'s own UPI QR on the guest\'s phone. Staff record what actually arrived.',
   },
 ];
 
@@ -94,6 +104,18 @@ const FAQ = [
     q: 'Is my restaurant data secure?',
     a: 'Every screen is behind a signed-in account, and a restaurant can only ever read and write its own rows. Guests see a menu, never a dashboard.',
   },
+  {
+    q: 'What happens after the free trial?',
+    a: 'A new restaurant gets seven days on the whole product. After that the workspace becomes read-only until a plan is added: menus, past orders and reports stay visible, and nothing is deleted. Plans cannot be bought on this site yet — access is extended by hand.',
+  },
+  {
+    q: 'How does the kitchen hear about an order?',
+    a: 'A ticket appears on the kitchen board as soon as it is saved, with the table number and the guest\'s notes. The board can read new tickets aloud in Hindi using the voice already on the device — no extra service, no monthly fee. If the device has no Hindi voice or audio is blocked, the ticket is still on screen and a chime plays instead.',
+  },
+  {
+    q: 'How do guests pay?',
+    a: 'At the counter, by cash or card, where staff record what they collected. If the restaurant sets its own UPI ID, guests can also scan the restaurant\'s QR from the order page with the amount filled in — that is the restaurant\'s own account, and staff still confirm the transfer before marking the bill paid.',
+  },
 ];
 
 export function Home() {
@@ -102,6 +124,7 @@ export function Home() {
       <SiteMotion />
       <Nav />
       <Hero />
+      <Problem />
       <Steps />
       <Screens />
       <Features />
@@ -187,9 +210,10 @@ function Hero() {
             experience.
           </h1>
 
-          <p className="mt-7 max-w-[46ch] text-[15px] leading-relaxed text-mute" data-hero-step>
-            A modern ordering system designed for restaurants. QR menu, faster ordering and
-            smoother operations — all in one place.
+          <p className="mt-7 max-w-[48ch] text-[15px] leading-relaxed text-mute" data-hero-step>
+            A guest scans the card on the table, orders from their own phone, and the kitchen sees
+            the ticket in the same second — table number and notes attached. No app to install, no
+            account to create, nothing to learn behind the counter.
           </p>
 
           <div className="mt-9 flex flex-wrap items-center gap-3" data-hero-step>
@@ -197,7 +221,7 @@ function Hero() {
               href="/signup"
               className="inline-flex h-12 items-center gap-2 rounded-full bg-gold px-6 text-[14px] font-medium text-ink transition-colors hover:bg-gold-bright"
             >
-              Create your restaurant
+              Start the 7-day trial
               <span aria-hidden="true">→</span>
             </Link>
             <Link
@@ -206,6 +230,7 @@ function Hero() {
             >
               See how it works
             </Link>
+            <span className="text-[12px] text-mute-dim">No card. Nothing charged during preview.</span>
           </div>
         </div>
 
@@ -323,6 +348,68 @@ function PhoneMockup() {
   );
 }
 
+/* --------------------------------------------------------------- problem */
+
+/**
+ * The problem, before the product.
+ *
+ * No numbers, no percentages, no "restaurants lose ₹X crore a year". Those
+ * figures would be invented, and an owner who has run a room for ten years can
+ * tell an invented one from a real one in a line. Three sentences about what
+ * actually happens on a Friday night do the job better.
+ */
+function Problem() {
+  const items = [
+    {
+      title: 'The menu is on paper',
+      body: 'A price changes, a dish runs out, a section is added — and the menu in the guest\'s hand is out of date until somebody reprints it.',
+    },
+    {
+      title: 'Orders are carried, not sent',
+      body: 'A request goes from the table to a server\'s pad to the kitchen pass. Every hand-off is a chance for a table number or a note to be lost.',
+    },
+    {
+      title: 'The bill comes last',
+      body: 'The guest waits to catch an eye, the server walks to the till, and the table sits finished for ten minutes it did not need to.',
+    },
+  ];
+
+  return (
+    <section className="border-t border-white/[0.06] py-24">
+      <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
+        <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-gold">Why it exists</p>
+            <h2 className="mt-5 max-w-[18ch] text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.05] tracking-[-0.04em]" data-reveal>
+              Service is not slow. The hand-offs are.
+            </h2>
+            <p className="mt-4 max-w-[46ch] text-[15px] leading-relaxed text-mute" data-reveal>
+              AutoDine removes the walk between the table and the kitchen — not the people who do it
+              well. Staff still run the room; they just stop being the messaging layer.
+            </p>
+          </div>
+
+          <ol className="divide-y divide-white/[0.07] border-y border-white/[0.07]" data-stagger>
+            {items.map((item, index) => (
+              <li key={item.title} className="flex gap-5 py-6">
+                <span className="mt-0.5 text-[11px] font-semibold tracking-[0.16em] text-mute-dim">
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <span>
+                  <span className="block text-[16px] font-medium tracking-tight text-cream">{item.title}</span>
+                  <span className="mt-1.5 block max-w-[52ch] text-[13.5px] leading-relaxed text-mute">
+                    {item.body}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ---------------------------------------------------------------- steps */
 
 function Steps() {
@@ -334,7 +421,7 @@ function Steps() {
           From scan to serving.
         </h2>
         <p className="mt-4 max-w-[52ch] text-[15px] leading-relaxed text-mute" data-reveal>
-          Four steps, under a minute, and none of it needs an install.
+          Six steps, from setting the room up to settling the bill. None of it needs an install.
         </p>
 
         <ol className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4" data-stagger>
@@ -530,8 +617,8 @@ function Pricing() {
           Start with what you need.
         </h2>
         <p className="mt-4 max-w-[52ch] text-[15px] leading-relaxed text-mute" data-reveal>
-          Planned pricing for restaurants of all sizes. Nothing is charged while the product is in
-          preview.
+          Three sizes of operation, one product. A new restaurant starts on all of it for seven
+          days, and no card is taken to begin.
         </p>
 
         <div className="mt-12 grid gap-5 lg:grid-cols-3" data-stagger>
@@ -584,8 +671,9 @@ function Pricing() {
         </div>
 
         <p className="mt-8 text-[12.5px] leading-relaxed text-mute-dim">
-          Plans are not on sale. Nothing is charged, no card is taken, and no account is limited by
-          which of these you would pick.
+          Plans are not on sale yet: nothing can be bought on this site, and no card is taken. The
+          trial is a real seven days, enforced on the server — after it ends the workspace is
+          read-only until access is extended, and nothing is deleted.
         </p>
       </div>
     </section>
