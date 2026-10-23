@@ -1,8 +1,6 @@
 'use client';
 
-import Link from 'next/link';
-
-import { GuestNote } from '@/components/GuestNote';
+import { GuestNote, GuestNoteActions, GuestNoteCta, GuestNoteText } from '@/components/GuestNote';
 
 /**
  * What a break in a page looks like.
@@ -35,19 +33,17 @@ export default function AppError({ reset }: { error: Error; reset: () => void })
         </>
       }
     >
-      <p className="gnote__text">
+      <GuestNoteText>
         The page hit an error while it was being built. It is usually a dropped connection or a
         momentary database hiccup, and trying again is often enough.
-      </p>
+      </GuestNoteText>
 
-      <div className="gnote__actions">
-        <button type="button" className="gnote__cta" onClick={() => reset()}>
-          Try again
-        </button>
-        <Link className="gnote__cta gnote__cta--quiet" href="/dashboard">
+      <GuestNoteActions>
+        <GuestNoteCta onClick={() => reset()}>Try again</GuestNoteCta>
+        <GuestNoteCta href="/dashboard" quiet>
           Back to the dashboard
-        </Link>
-      </div>
+        </GuestNoteCta>
+      </GuestNoteActions>
     </GuestNote>
   );
 }

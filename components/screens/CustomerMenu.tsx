@@ -180,15 +180,27 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
       table={table?.label ?? null}
       dock={
         /* The cart is the dock: it is the one action on a menu, and it has to
-           stay under the thumb while a guest scrolls past thirty dishes. */
+           stay under the thumb while a guest scrolls past thirty dishes. It is
+           a single bar rather than two controls because there is one decision
+           on this screen -- look, or go and pay -- and the number is the reason
+           to go. */
         cart.count > 0 ? (
-          <div className="menu__cartBar" key={barPulse}>
-            <span className="menu__cartCount" role="status" aria-live="polite">
-              <strong className="tnum">{cart.count}</strong> item{cart.count === 1 ? '' : 's'} ·{' '}
-              {inr(paiseToRupees(barSubtotal))} before taxes
-            </span>
-            <Link href={cartHref} className="menu__cartBtn">
-              Review order
+          <div key={barPulse} className="animate-[gbar_260ms_cubic-bezier(0.22,1,0.36,1)]">
+            <Link
+              href={cartHref}
+              className="flex items-center gap-3 rounded-2xl bg-[var(--p-accent)] px-4 py-3.5 text-white shadow-g2 transition active:scale-[0.99]"
+            >
+              <span aria-live="polite" role="status" className="text-[13px] font-medium">
+                <strong className="tnum font-semibold">{cart.count}</strong> item
+                {cart.count === 1 ? '' : 's'} · <span className="tnum">{inr(paiseToRupees(barSubtotal))}</span> before
+                taxes
+              </span>
+              <span className="ml-auto flex items-center gap-1.5 text-[13px] font-semibold tracking-[0.01em]">
+                Review order
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M9 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
             </Link>
           </div>
         ) : null
@@ -221,16 +233,22 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
         button does what it says.
       */}
       {menus.length > 1 && (
-        <nav className="menu__menus" aria-label="Menus">
+        <nav aria-label="Menus" className="scrollbar-none -mx-1 mt-4 flex gap-2 overflow-x-auto px-5 pb-1">
           {menus.map((option) => {
             const params = new URLSearchParams({ s: slug ?? '' });
             params.set('m', option.id);
+            const current = option.id === menuId;
             return (
               <a
                 key={option.id}
                 href={`/menu?${params.toString()}`}
-                className={`menu__menuLink ${option.id === menuId ? 'is-active' : ''}`}
-                aria-current={option.id === menuId ? 'page' : undefined}
+                aria-current={current ? 'page' : undefined}
+                className={[
+                  'shrink-0 rounded-full border px-3.5 py-1.5 text-[12.5px] font-medium whitespace-nowrap transition',
+                  current
+                    ? 'border-transparent bg-gink text-onink'
+                    : 'border-hair-strong text-gink-64 hover:border-gink-28 hover:text-gink',
+                ].join(' ')}
               >
                 {option.name}
               </a>
@@ -239,77 +257,101 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
         </nav>
       )}
 
-      {/* Search sits above the courses because it questions all of them. It is
-          a real input, not a decorative one: typing filters the list below in
-          the same frame, with no round trip -- the menu is already here. */}
-      <div className="menu__search" role="search">
-        <svg
-          className="menu__searchIcon"
-          viewBox="0 0 24 24"
-          width="17"
-          height="17"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.7"
-          aria-hidden="true"
-        >
-          <circle cx="11" cy="11" r="6.2" />
-          <path d="M15.6 15.6 20 20" strokeLinecap="round" />
-        </svg>
-        <input
-          type="search"
-          className="menu__searchInput"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search dishes"
-          aria-label="Search dishes"
-          autoComplete="off"
-        />
-        {searching && (
-          <button type="button" className="menu__searchClear" onClick={() => setQuery('')}>
-            Clear
-          </button>
+      {/* Sticky, because a guest scrolls forty dishes and then decides to look
+          for one: a search box that has scrolled away is a search box that does
+          not exist. It sits directly under the flow bar and the two share the
+          same hairline so they read as one piece of chrome. */}
+      <div className="sticky top-14 z-20 mt-4 border-y border-hair bg-paper/94 backdrop-blur-xl">
+        <div className="px-4 pt-3 pb-2">
+          {/* Search sits above the courses because it questions all of them. It
+              is a real input, not a decorative one: typing filters the list
+              below in the same frame, with no round trip -- the menu is already
+              here. */}
+          <div className="flex items-center gap-2 rounded-xl bg-gink-07 px-3 py-2.5" role="search">
+            <svg
+              className="shrink-0 text-gink-46"
+              viewBox="0 0 24 24"
+              width="17"
+              height="17"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="6.2" />
+              <path d="M15.6 15.6 20 20" strokeLinecap="round" />
+            </svg>
+            <input
+              type="search"
+              className="w-full bg-transparent text-[14px] text-gink placeholder:text-gink-46 focus:outline-none"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search dishes"
+              aria-label="Search dishes"
+              autoComplete="off"
+            />
+            {searching && (
+              <button
+                type="button"
+                className="shrink-0 rounded-full px-1.5 text-[12px] font-semibold text-[var(--p-accent)]"
+                onClick={() => setQuery('')}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* The course rail steps aside while a search runs: it no longer
+            filters anything, and a row of chips that does nothing is worse
+            than no row. */}
+        {!searching && (
+          <nav aria-label="Courses" className="scrollbar-none flex gap-1.5 overflow-x-auto px-4 pb-2.5">
+            <button
+              type="button"
+              aria-pressed={cat === 'all'}
+              onClick={() => setCat('all')}
+              className={[
+                'shrink-0 rounded-full px-3.5 py-1.5 text-[12.5px] font-medium whitespace-nowrap transition-colors',
+                cat === 'all'
+                  ? 'bg-[var(--p-accent)] text-white'
+                  : 'bg-gink-07 text-gink-64 hover:text-gink',
+              ].join(' ')}
+            >
+              All
+            </button>
+            {categories.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                aria-pressed={cat === c.id}
+                onClick={() => setCat(c.id)}
+                className={[
+                  'shrink-0 rounded-full px-3.5 py-1.5 text-[12.5px] font-medium whitespace-nowrap transition-colors',
+                  cat === c.id
+                    ? 'bg-[var(--p-accent)] text-white'
+                    : 'bg-gink-07 text-gink-64 hover:text-gink',
+                ].join(' ')}
+              >
+                {c.name}
+              </button>
+            ))}
+          </nav>
         )}
       </div>
 
-      {/* The course rail steps aside while a search runs: it no longer filters
-          anything, and a row of chips that does nothing is worse than no row. */}
-      {!searching && (
-      <nav className="menu__cats" aria-label="Courses">
-        <button
-          type="button"
-          className={`menu__cat ${cat === 'all' ? 'is-active' : ''}`}
-          aria-pressed={cat === 'all'}
-          onClick={() => setCat('all')}
-        >
-          All
-        </button>
-        {categories.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            className={`menu__cat ${cat === c.id ? 'is-active' : ''}`}
-            aria-pressed={cat === c.id}
-            onClick={() => setCat(c.id)}
-          >
-            {c.name}
-          </button>
-        ))}
-      </nav>
-      )}
-
-      <div className="menu__list">
+      <div className="px-4 pt-5 pb-8">
         {/* What is below, named and counted. The rail above says which course
             is selected; this says it again where the dishes start, so a guest
             who scrolled past the rail still knows what they are reading. The
             count is the filtered list's own length -- never a typed number. */}
-        <div className="menu__listHead">
-          <span className="menu__listTitle">
+        <div className="mb-3 flex items-baseline justify-between gap-3">
+          <h2 className="truncate text-[13px] font-semibold tracking-[0.09em] text-gink-46 uppercase">
             {searching
               ? `Results for “${query.trim()}”`
               : categories.find((c) => c.id === cat)?.name ?? 'The full menu'}
-          </span>
-          <span className="menu__listCount tnum">
+          </h2>
+          <span className="tnum shrink-0 text-[12px] text-gink-46">
             {list.length} {list.length === 1 ? 'dish' : 'dishes'}
           </span>
         </div>
@@ -318,100 +360,125 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
           (searching ? (
             /* A search that finds nothing says what to do, and keeps the query
                visible so the guest can see what they typed. */
-            <div className="menu__listEmpty">
-              <p>No dish on this menu matches “{query.trim()}”.</p>
-              <button type="button" className="menu__searchClear" onClick={() => setQuery('')}>
+            <div className="rounded-2xl border border-hair bg-card px-4 py-6 text-center">
+              <p className="text-[14px] text-gink-64">No dish on this menu matches “{query.trim()}”.</p>
+              <button
+                type="button"
+                className="mt-3 rounded-full bg-gink-07 px-3.5 py-1.5 text-[12.5px] font-semibold text-gink"
+                onClick={() => setQuery('')}
+              >
                 Show the whole menu
               </button>
             </div>
           ) : (
-            <p className="menu__listEmpty">
+            <p className="rounded-2xl border border-hair bg-card px-4 py-6 text-center text-[14px] text-gink-64">
               Nothing in this course is available right now. Try another, or ask the counter.
             </p>
           ))}
 
-        {list.map((i) => (
-          /* One row per dish, in the order a hungry person reads it: what it
-             is, what it costs, what is in it -- then the decision, in the
-             column the eye already uses for pictures. The price moved above
-             the description for that reason; it is the second thing anyone
-             looks for and it was three lines down. */
-          <article key={i.id} className={`menu__dish ${i.available ? '' : 'is-out'}`}>
-            <div className="menu__dishBody">
-              <div className="menu__dishTop">
-                <VegMark veg={i.veg} />
-                <h2 className="menu__dishName">{i.name}</h2>
-                {i.badge && i.available && <span className="menu__dishBadge">{i.badge}</span>}
-              </div>
+        <div className="flex flex-col gap-2.5">
+          {list.map((i) => (
+            /* One row per dish, in the order a hungry person reads it: what it
+               is, what it costs, what is in it -- then the decision, in the
+               column the eye already uses for pictures. */
+            <article
+              key={i.id}
+              className={[
+                'flex gap-3 rounded-2xl border bg-card p-3 transition-colors',
+                i.available ? 'border-hair hover:border-hair-strong' : 'border-hair opacity-55',
+              ].join(' ')}
+            >
+              <div className="flex min-w-0 flex-1 flex-col">
+                <div className="flex items-center gap-1.5">
+                  <VegMark veg={i.veg} />
+                  <h3
+                    className={[
+                      'truncate text-[15.5px] font-semibold tracking-[-0.01em] text-gink',
+                      i.available ? '' : 'line-through decoration-gink-28',
+                    ].join(' ')}
+                  >
+                    {i.name}
+                  </h3>
+                  {i.badge && i.available && (
+                    <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-semibold tracking-[0.04em] text-[var(--p-accent)] uppercase">
+                      {i.badge}
+                    </span>
+                  )}
+                </div>
 
-              <div className="menu__dishPrice">
-                {i.variants && <span className="menu__dishFrom">from</span>}
-                {inr(i.price)}
-              </div>
+                <div className="mt-1 flex items-baseline gap-1.5">
+                  {i.variants && <span className="text-[10.5px] font-medium tracking-[0.05em] text-gink-46 uppercase">from</span>}
+                  <span className="tnum text-[15px] font-semibold text-gink">{inr(i.price)}</span>
+                </div>
 
-              <p className="menu__dishDesc">{i.desc}</p>
-            </div>
+                <p className="mt-1 line-clamp-2 text-[13px] leading-[1.45] text-gink-64">{i.desc}</p>
 
-            {/* The media column is also the action column: on a phone the
-                thumb is already there, and a row whose only control lives at
-                the far end of a 300px line is a stretch. */}
-            <div className={`menu__dishMedia ${i.img ? '' : 'is-bare'}`}>
-              {/* Every dish gets a tile. One the kitchen has not photographed
-                  yet shows its initials rather than the hole a missing image
-                  leaves in an otherwise even column. */}
-              <DishPhoto
-                src={i.img}
-                name={i.name}
-                size={116}
-                className="menu__dishImg"
-                sizes="(max-width: 420px) 76px, (max-width: 760px) 88px, 116px"
-              />
-
-              <div className="menu__dishActions">
-                {i.available ? (
-                  needsChoice(i) ? (
-                    <Link href={itemHref(i.id)} className="menu__dishCta">
-                      Choose
-                    </Link>
-                  ) : plainQty(i.id) > 0 ? (
-                    <div className="menu__stepper">
-                      <button
-                        type="button"
-                        onClick={() => cart.setQty(i.id, plainQty(i.id) - 1)}
-                        aria-label={`One fewer ${i.name}`}
+                {/* The action sits under the words on a phone and beside them
+                    on a wide screen, but it is always in the thumb's reach
+                    rather than at the end of a 300px line. */}
+                <div className="mt-2.5">
+                  {i.available ? (
+                    needsChoice(i) ? (
+                      <Link
+                        href={itemHref(i.id)}
+                        className="inline-flex items-center gap-1 rounded-full bg-gink px-3.5 py-1.5 text-[12.5px] font-semibold text-onink transition hover:opacity-90"
                       >
-                        −
-                      </button>
-                      <span className="tnum" aria-live="polite">
-                        {plainQty(i.id)}
-                      </span>
+                        Choose
+                      </Link>
+                    ) : plainQty(i.id) > 0 ? (
+                      <div className="inline-flex items-center rounded-full border border-hair-strong">
+                        <button
+                          type="button"
+                          onClick={() => cart.setQty(i.id, plainQty(i.id) - 1)}
+                          aria-label={`One fewer ${i.name}`}
+                          className="grid size-8 place-items-center rounded-full text-[15px] text-gink-80 transition hover:bg-gink-07"
+                        >
+                          −
+                        </button>
+                        <span className="tnum min-w-5 text-center text-[13px] font-semibold text-gink" aria-live="polite">
+                          {plainQty(i.id)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => addToCart(i.id)}
+                          aria-label={`One more ${i.name}`}
+                          className="grid size-8 place-items-center rounded-full text-[15px] text-gink-80 transition hover:bg-gink-07"
+                        >
+                          +
+                        </button>
+                      </div>
+                    ) : (
                       <button
                         type="button"
                         onClick={() => addToCart(i.id)}
-                        aria-label={`One more ${i.name}`}
+                        aria-label={`Add ${i.name}`}
+                        className="inline-flex items-center gap-1 rounded-full bg-gink px-3.5 py-1.5 text-[12.5px] font-semibold text-onink transition hover:opacity-90"
                       >
-                        +
+                        Add
                       </button>
-                    </div>
+                    )
                   ) : (
-                    <button
-                      type="button"
-                      className="menu__dishCta"
-                      onClick={() => addToCart(i.id)}
-                      aria-label={`Add ${i.name}`}
-                    >
-                      Add
-                    </button>
-                  )
-                ) : (
-                  <span className="menu__dishOut">Sold out</span>
-                )}
+                    <span className="text-[12px] font-medium tracking-[0.03em] text-gink-46 uppercase">Sold out</span>
+                  )}
+                </div>
               </div>
-            </div>
-          </article>
-        ))}
-      </div>
 
+              {/* Every dish gets a tile. One the kitchen has not photographed
+                  yet shows its initials rather than the hole a missing image
+                  leaves in an otherwise even column. */}
+              <div className="shrink-0 self-start">
+                <DishPhoto
+                  src={i.img}
+                  name={i.name}
+                  size={96}
+                  className="size-[96px]"
+                  sizes="(max-width: 420px) 96px, 116px"
+                />
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
     </GuestFlow>
   );
 }
@@ -592,198 +659,289 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
 
   if (missing) {
     return (
-      <div className="cart cart--plain">
-        <header className="cart__head">
-          <h1>That dish is not on the menu</h1>
-          <p>
-            The link may be from an older menu, or the restaurant has taken the dish off today.
-            Nothing has been added to your order.
-          </p>
-        </header>
-        <div className="cart__grid">
-          <div className="cart__empty">
-            <Link href={backHref}>Back to the menu</Link>
-          </div>
-        </div>
+      <div className="mx-auto min-h-dvh w-full max-w-[560px] bg-paper px-5 py-16 text-gink">
+        <p className="text-[11px] font-semibold tracking-[0.12em] text-gink-46 uppercase">Not on the menu</p>
+        <h1 className="mt-2 text-[28px] leading-tight font-semibold tracking-[-0.025em]">
+          That dish is not on the menu
+        </h1>
+        <p className="mt-3 text-[14.5px] leading-[1.55] text-gink-64">
+          The link may be from an older menu, or the restaurant has taken the dish off today.
+          Nothing has been added to your order.
+        </p>
+        <Link
+          href={backHref}
+          className="mt-6 inline-flex items-center gap-2 rounded-full bg-gink px-4 py-2.5 text-[13px] font-semibold text-onink"
+        >
+          Back to the menu
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="menu menu--dim">
-      <Link href={backHref} className="sheet__scrim" aria-label="Close" tabIndex={-1} />
-      <header className="menu__head">
-        <div className="menu__venue">
-          <div className="menu__kicker">The menu</div>
-          <h1 className="menu__venueName">{restaurant.name}</h1>
-          <div className="menu__venueMeta">{restaurant.tagline}</div>
-        </div>
-        {table ? (
-          <div className="menu__verified">
-            <span className="menu__verifiedDot" /> {table.label}
-          </div>
-        ) : null}
-      </header>
-
-      <div className="menu__list menu__list--dim">
-        {allItems.slice(0, 3).map((i) => (
-          <article key={i.id} className="menu__dish">
-            <div className="menu__dishBody">
-              <div className="menu__dishTop">
-                <VegMark veg={i.veg} />
-                <h2 className="menu__dishName">{i.name}</h2>
-              </div>
-              <p className="menu__dishDesc">{i.desc}</p>
-              <div className="menu__dishPrice">{inr(i.price)}</div>
+    <div className="min-h-dvh bg-paper text-gink">
+      {/* The menu itself, still there behind the sheet. It is dimmed and made
+          inert rather than removed: a guest who closes the sheet lands back on
+          the dish they were reading, at the scroll position they left. */}
+      <div className="pointer-events-none opacity-30 blur-[1.5px] select-none" aria-hidden="true">
+        <header className="px-5 pt-6">
+          <p className="text-[10.5px] font-semibold tracking-[0.12em] text-gink-46 uppercase">The menu</p>
+          <h1 className="mt-1 truncate text-[24px] font-semibold tracking-[-0.02em]">{restaurant.name}</h1>
+          <div className="mt-0.5 truncate text-[12px] text-gink-46">{restaurant.tagline}</div>
+          {table ? (
+            <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-1 text-[10.5px] font-semibold tracking-[0.07em] text-[var(--p-accent)] uppercase">
+              <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--p-accent)]" />
+              {table.label}
             </div>
-            <DishPhoto src={i.img} name={i.name} size={104} className="menu__dishImg" />
-          </article>
-        ))}
+          ) : null}
+        </header>
+
+        <div className="mt-4 flex flex-col gap-2 px-4">
+          {allItems.slice(0, 4).map((i) => (
+            <article key={i.id} className="flex gap-3 rounded-2xl border border-hair bg-card p-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <VegMark veg={i.veg} />
+                  <h2 className="truncate text-[15px] font-semibold">{i.name}</h2>
+                </div>
+                <p className="mt-1 line-clamp-2 text-[13px] text-gink-64">{i.desc}</p>
+                <div className="tnum mt-1 text-[13.5px] font-semibold">{inr(i.price)}</div>
+              </div>
+              <DishPhoto src={i.img} name={i.name} size={84} className="size-[84px]" />
+            </article>
+          ))}
+        </div>
       </div>
 
-      <div className="sheet">
-        <div className="sheet__panel">
-          <div className="sheet__head">
-            <div>
-              {/* "Customize" over a dish with no portions and no add-ons is a
-                  heading for a decision that does not exist. */}
-              <div className="sheet__kicker">
-                {variants.length > 0 || groups.length > 0 ? 'Customize' : 'Add to order'}
-              </div>
-              <h2 className="sheet__title">{item.name}</h2>
-            </div>
-            <Link href={backHref} className="sheet__close" aria-label="Close">
-              ×
-            </Link>
+      {/* Two ways out that are not the small ×: the scrim, and Escape. The
+          scrim is a link, not a div with a handler, so it works before any
+          JavaScript has run and reads to a keyboard as what it is. */}
+      <Link href={backHref} data-sheet-scrim="" aria-label="Close" tabIndex={-1} className="fixed inset-0 z-30" />
+
+      <div className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-[560px]">
+        <div
+          className="max-h-[86dvh] overflow-y-auto rounded-t-[26px] border border-hair bg-paper pb-[calc(14px+env(safe-area-inset-bottom))] shadow-g2"
+          role="dialog"
+          aria-modal="true"
+          aria-label={item.name}
+        >
+          {/* The grab handle. A phone sheet without one does not read as a
+              sheet, and the guest looks for a close button that is 20px from
+              their thumb. */}
+          <div className="sticky top-0 z-10 flex justify-center bg-paper pt-2.5 pb-1">
+            <span aria-hidden="true" className="h-1 w-9 rounded-full bg-gink-28" />
           </div>
-          <p className="sheet__desc">{item.desc}</p>
 
-          {variants.length > 0 && (
-            <div className="sheet__group">
-              <div className="sheet__label">Portion</div>
-              {variants.map((v) => (
-                <label key={v.id} className={`sheet__opt ${variant === v.id ? 'is-on' : ''}`}>
-                  <input type="radio" name="variant" checked={variant === v.id} onChange={() => setVariant(v.id)} />
-                  <span>{v.name}</span>
-                  <span className="tnum">{inr(v.price)}</span>
-                </label>
-              ))}
+          <div className="px-5 pt-2">
+            <div className="flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                {/* "Customize" over a dish with no portions and no add-ons is a
+                    heading for a decision that does not exist. */}
+                <p className="text-[10.5px] font-semibold tracking-[0.12em] text-[var(--p-accent)] uppercase">
+                  {variants.length > 0 || groups.length > 0 ? 'Customize' : 'Add to order'}
+                </p>
+                <h2 className="mt-1 text-[23px] leading-tight font-semibold tracking-[-0.02em]">{item.name}</h2>
+              </div>
+              <Link
+                href={backHref}
+                aria-label="Close"
+                className="-mr-1.5 grid size-9 shrink-0 place-items-center rounded-full bg-gink-07 text-[18px] text-gink-64 transition hover:text-gink"
+              >
+                ×
+              </Link>
             </div>
-          )}
 
-          {/* The dish's own add-ons, defined by the restaurant. Every price
-              shown here is one the till will charge: place_public_order reads
-              item_addons for the amount. */}
-          {groups.map((group) => {
-            const chosen = picks[group.id] ?? [];
-            const max = group.max ?? group.options.length;
-            const atMax = group.type === 'multi' && chosen.length >= max;
+            <p className="mt-2 text-[13.5px] leading-[1.5] text-gink-64">{item.desc}</p>
 
-            return (
-              <div key={group.id} className="sheet__group">
-                <div className="sheet__label">
-                  {group.name}
-                  {group.required ? ' · required' : ''}
-                  {group.type === 'multi' ? ` · pick up to ${max}` : ''}
-                </div>
-
-                {group.type === 'single' ? (
-                  <div>
-                    {group.options.map((option) => (
+            {variants.length > 0 && (
+              <section className="mt-5">
+                <h3 className="text-[11px] font-semibold tracking-[0.1em] text-gink-46 uppercase">Portion</h3>
+                <div className="mt-2 flex flex-col gap-1.5">
+                  {variants.map((v) => {
+                    const on = variant === v.id;
+                    return (
                       <label
-                        key={option.id}
-                        className={`sheet__opt ${chosen.includes(option.id) ? 'is-on' : ''}`}
+                        key={v.id}
+                        className={[
+                          'flex cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-2.5 transition-colors',
+                          on ? 'border-[var(--p-accent)] bg-accent-soft' : 'border-hair bg-card hover:border-hair-strong',
+                        ].join(' ')}
                       >
                         <input
                           type="radio"
-                          name={`addon-${group.id}`}
-                          checked={chosen.includes(option.id)}
-                          onChange={() => toggle(group, option.id)}
+                          name="variant"
+                          checked={on}
+                          onChange={() => setVariant(v.id)}
+                          className="sr-only"
                         />
-                        <span>{option.name}</span>
-                        <span className="tnum">{option.price ? `+ ${inr(option.price)}` : '—'}</span>
-                      </label>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="sheet__chips">
-                    {group.options.map((option) => {
-                      const on = chosen.includes(option.id);
-                      return (
-                        <button
-                          key={option.id}
-                          type="button"
-                          className={`sheet__chip ${on ? 'is-on' : ''}`}
-                          aria-pressed={on}
-                          disabled={!on && atMax}
-                          onClick={() => toggle(group, option.id)}
+                        <span
+                          aria-hidden="true"
+                          className={[
+                            'grid size-4 shrink-0 place-items-center rounded-full border',
+                            on ? 'border-[var(--p-accent)]' : 'border-gink-28',
+                          ].join(' ')}
                         >
-                          {option.name}
-                          {option.price ? ` + ${inr(option.price)}` : ''}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                          {on && <span className="size-2 rounded-full bg-[var(--p-accent)]" />}
+                        </span>
+                        <span className="flex-1 text-[14px] font-medium">{v.name}</span>
+                        <span className="tnum text-[14px] font-semibold">{inr(v.price)}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
 
-          <div className="sheet__foot">
-            <div className="sheet__qty">
+            {/* The dish's own add-ons, defined by the restaurant. Every price
+                shown here is one the till will charge: place_public_order reads
+                item_addons for the amount. */}
+            {groups.map((group) => {
+              const chosen = picks[group.id] ?? [];
+              const max = group.max ?? group.options.length;
+              const atMax = group.type === 'multi' && chosen.length >= max;
+
+              return (
+                <section key={group.id} className="mt-5">
+                  <h3 className="flex flex-wrap items-baseline gap-1.5 text-[11px] font-semibold tracking-[0.1em] text-gink-46 uppercase">
+                    <span className="text-gink-64">{group.name}</span>
+                    {group.required ? <span className="text-[var(--p-accent)]">· required</span> : null}
+                    {group.type === 'multi' ? <span className="normal-case">· pick up to {max}</span> : null}
+                  </h3>
+
+                  {group.type === 'single' ? (
+                    <div className="mt-2 flex flex-col gap-1.5">
+                      {group.options.map((option) => {
+                        const on = chosen.includes(option.id);
+                        return (
+                          <label
+                            key={option.id}
+                            className={[
+                              'flex cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-2.5 transition-colors',
+                              on ? 'border-[var(--p-accent)] bg-accent-soft' : 'border-hair bg-card hover:border-hair-strong',
+                            ].join(' ')}
+                          >
+                            <input
+                              type="radio"
+                              name={`addon-${group.id}`}
+                              checked={on}
+                              onChange={() => toggle(group, option.id)}
+                              className="sr-only"
+                            />
+                            <span
+                              aria-hidden="true"
+                              className={[
+                                'grid size-4 shrink-0 place-items-center rounded-full border',
+                                on ? 'border-[var(--p-accent)]' : 'border-gink-28',
+                              ].join(' ')}
+                            >
+                              {on && <span className="size-2 rounded-full bg-[var(--p-accent)]" />}
+                            </span>
+                            <span className="flex-1 text-[14px] font-medium">{option.name}</span>
+                            <span className="tnum text-[13.5px] text-gink-64">
+                              {option.price ? `+ ${inr(option.price)}` : '—'}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {group.options.map((option) => {
+                        const on = chosen.includes(option.id);
+                        return (
+                          <button
+                            key={option.id}
+                            type="button"
+                            aria-pressed={on}
+                            disabled={!on && atMax}
+                            onClick={() => toggle(group, option.id)}
+                            className={[
+                              'rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors',
+                              on
+                                ? 'border-[var(--p-accent)] bg-accent-soft text-[var(--p-accent)]'
+                                : 'border-hair-strong text-gink-64 hover:text-gink',
+                              'disabled:cursor-not-allowed disabled:opacity-40',
+                            ].join(' ')}
+                          >
+                            {option.name}
+                            {option.price ? ` + ${inr(option.price)}` : ''}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+
+          {/* The action is part of the sheet, pinned to the bottom of it: a
+              guest choosing an add-on at the top of a long sheet must still see
+              what the plate costs before they commit. */}
+          <div className="sticky bottom-0 mt-5 border-t border-hair bg-paper/96 px-5 pt-3 backdrop-blur-xl">
+            <div className="flex items-center gap-3">
+              <div className="flex shrink-0 items-center rounded-full border border-hair-strong">
+                <button
+                  type="button"
+                  onClick={() => setQty(Math.max(1, qty - 1))}
+                  aria-label="Decrease"
+                  disabled={qty <= 1 || atCeiling}
+                  className="grid size-9 place-items-center rounded-full text-[16px] text-gink-80 transition hover:bg-gink-07 disabled:opacity-30"
+                >
+                  −
+                </button>
+                <span className="tnum min-w-6 text-center text-[14px] font-semibold">{Math.max(1, addQty)}</span>
+                <button
+                  type="button"
+                  onClick={() => setQty(Math.min(room, qty + 1))}
+                  aria-label="Increase"
+                  disabled={qty >= room || atCeiling}
+                  className="grid size-9 place-items-center rounded-full text-[16px] text-gink-80 transition hover:bg-gink-07 disabled:opacity-30"
+                >
+                  +
+                </button>
+              </div>
+
               <button
                 type="button"
-                onClick={() => setQty(Math.max(1, qty - 1))}
-                aria-label="Decrease"
-                disabled={qty <= 1 || atCeiling}
+                aria-live="polite"
+                disabled={atCeiling}
+                onClick={() => {
+                  // The dish, how many, which portion, and which add-ons. All
+                  // ids: the server prices every one of them from the database,
+                  // so what is sent can never be what is charged.
+                  cart.add(item.id, addQty, chosenVariant?.id, chosenAddonIds);
+
+                  // Confirm, then leave. Adding used to change a number on a bar
+                  // behind an overlay and nothing else, so the obvious next move
+                  // was to hunt for the close button -- which was broken. The
+                  // button says what happened for a moment, then the guest is
+                  // back on the menu, where the next dish is.
+                  setAdded(true);
+                  returnTimer.current = window.setTimeout(() => router.push(backHref), 700);
+                }}
+                className={[
+                  'flex-1 rounded-full px-4 py-3 text-[13.5px] font-semibold transition active:scale-[0.99]',
+                  added ? 'bg-brand text-white' : 'bg-[var(--p-accent)] text-white',
+                  'disabled:opacity-50',
+                ].join(' ')}
               >
-                −
-              </button>
-              <span className="tnum">{Math.max(1, addQty)}</span>
-              <button
-                type="button"
-                onClick={() => setQty(Math.min(room, qty + 1))}
-                aria-label="Increase"
-                disabled={qty >= room || atCeiling}
-              >
-                +
+                {added ? (
+                  'Added to your order ✓'
+                ) : atCeiling ? (
+                  '99 is the most of one dish we take online'
+                ) : (
+                  <>
+                    {/* Both are rupees already: item.price and variant.price
+                        come from DisplayItem, which is in display units.
+                        Passing them through paiseToRupees divided an
+                        already-rupees number by a hundred, so a Rs 250 plate
+                        showed as Rs 3. */}
+                    Add to order · {inr(chosenUnitPrice * Math.max(1, addQty))}
+                  </>
+                )}
               </button>
             </div>
-            <button
-              type="button"
-              className={`sheet__add ${added ? 'is-added' : ''}`}
-              aria-live="polite"
-              disabled={atCeiling}
-              onClick={() => {
-                // The dish, how many, which portion, and which add-ons. All
-                // ids: the server prices every one of them from the database,
-                // so what is sent can never be what is charged.
-                cart.add(item.id, addQty, chosenVariant?.id, chosenAddonIds);
-
-                // Confirm, then leave. Adding used to change a number on a bar
-                // behind an overlay and nothing else, so the obvious next move
-                // was to hunt for the close button -- which was broken. The
-                // button says what happened for a moment, then the guest is
-                // back on the menu, where the next dish is.
-                setAdded(true);
-                returnTimer.current = window.setTimeout(() => router.push(backHref), 700);
-              }}
-            >
-              {added ? (
-                'Added to your order ✓'
-              ) : atCeiling ? (
-                '99 is the most of one dish we take online'
-              ) : (
-                <>
-                  {/* Both are rupees already: item.price and variant.price
-                      come from DisplayItem, which is in display units.
-                      Passing them through paiseToRupees divided an
-                      already-rupees number by a hundred, so a Rs 250 plate
-                      showed as Rs 3. */}
-                  Add to order · {inr(chosenUnitPrice * Math.max(1, addQty))}
-                </>
-              )}
-            </button>
           </div>
         </div>
       </div>

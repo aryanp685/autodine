@@ -25,7 +25,7 @@ describe('GuestFlow', () => {
         <p>menu</p>
       </GuestFlow>,
     );
-    expect(without).not.toContain('flow__table');
+    expect(without).not.toContain('data-flow-table');
   });
 
   it('marks the current step, and only the current one', () => {
@@ -36,9 +36,12 @@ describe('GuestFlow', () => {
     );
 
     expect(html.match(/aria-current="step"/g)).toHaveLength(1);
-    expect(html).toMatch(/flow__step is-done[^>]*>\s*<span class="flow__sr">Menu/);
-    expect(html).toMatch(/flow__step is-now[^>]*aria-current="step"[^>]*>\s*<span class="flow__sr">Pay/);
-    expect(html).toMatch(/flow__step is-todo[^>]*>\s*<span class="flow__sr">Placed/);
+    // Each segment carries its state as data, and its label as the first text
+    // inside it. The state used to be an `is-done` CSS class, which meant the
+    // test was asserting a stylesheet rather than the screen.
+    expect(html).toMatch(/data-flow-step="done"[^>]*>\s*<span class="sr-only">Menu/);
+    expect(html).toMatch(/data-flow-step="now"[^>]*aria-current="step"[^>]*>\s*<span class="sr-only">Pay/);
+    expect(html).toMatch(/data-flow-step="todo"[^>]*>\s*<span class="sr-only">Placed/);
   });
 
   it('offers a way back only where there is somewhere to go back to', () => {
@@ -47,7 +50,7 @@ describe('GuestFlow', () => {
         <p>menu</p>
       </GuestFlow>,
     );
-    expect(root).not.toContain('flow__back');
+    expect(root).not.toContain('data-flow-back');
 
     const cart = renderToStaticMarkup(
       <GuestFlow step="cart" venue="Maddi" back={{ href: '/menu?s=maddi', label: 'Back to the menu' }}>
@@ -64,15 +67,15 @@ describe('GuestFlow', () => {
         <p>cart</p>
       </GuestFlow>,
     );
-    expect(docked).toContain('flow--docked');
-    expect(docked).toContain('flow__dock');
+    expect(docked).toContain('data-flow-docked="true"');
+    expect(docked).toContain('data-flow-dock');
 
     const plain = renderToStaticMarkup(
       <GuestFlow step="menu" venue="Maddi">
         <p>menu</p>
       </GuestFlow>,
     );
-    expect(plain).not.toContain('flow__dock');
+    expect(plain).not.toContain('data-flow-dock');
   });
 
   it('has four steps, in the order a guest goes through them', () => {

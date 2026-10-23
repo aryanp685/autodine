@@ -25,7 +25,7 @@ describe('GuestTabs', () => {
   it('renders exactly the three destinations, with the slug carried through', () => {
     const html = render(<GuestTabs slug="copper-pot" active="menu" />);
 
-    expect(html.split('class="gtabs__tab').length - 1).toBe(3);
+    expect(html.split('data-gtab=').length - 1).toBe(3);
     expect(html).toContain('href="/menu?s=copper-pot"');
     expect(html).toContain('href="/menu/cart?s=copper-pot"');
     expect(html).toContain('href="/menu/orders?s=copper-pot"');
@@ -36,8 +36,8 @@ describe('GuestTabs', () => {
     const html = render(<GuestTabs slug="copper-pot" active="cart" />);
 
     expect(html.split('aria-current="page"').length - 1).toBe(1);
-    const at = html.indexOf('aria-current="page"');
-    expect(html.slice(at, at + 120)).toContain('href="/menu/cart');
+    // The marked tab is the cart's, and the mark is on the link itself.
+    expect(html).toMatch(/<a[^>]*data-gtab="cart"[^>]*aria-current="page"/);
   });
 
   /**
@@ -47,13 +47,15 @@ describe('GuestTabs', () => {
    */
   it('shows no badge before the cart has been read', () => {
     const html = render(<GuestTabs slug="copper-pot" active="menu" />);
-    expect(html).not.toContain('gtabs__badge');
+    expect(html).not.toContain('data-gtab-badge');
   });
 
   it('does not put a cart count on the menu or orders tab', () => {
     const html = render(<GuestTabs slug="copper-pot" active="menu" />);
     // Every badge that appears must sit next to the Cart label.
-    expect(html).not.toMatch(/gtabs__badge[\s\S]*gtabs__label">(Menu|Orders)/);
+    // The badge is rendered inside the cart tab's icon, so the only label
+    // after it can be Cart's own.
+    expect(html).not.toMatch(/data-gtab-badge[\s\S]*data-gtab="(menu|orders)"/);
   });
 
   it('works without a slug, so a broken link still has navigation', () => {
@@ -74,7 +76,7 @@ describe('menu search', () => {
   /** With nothing typed there is nothing to clear, and Clear would be a lie. */
   it('offers no clear button before anything is typed', () => {
     const html = render(<CustomerMenu />);
-    expect(html).not.toContain('menu__searchClear');
+    expect(html).not.toContain('Clear</button>');
   });
 
   it('keeps the course rail while no search is running', () => {
@@ -90,7 +92,7 @@ describe('where the tabs are allowed to be', () => {
         <CustomerMenu />
       </CartProvider>,
     );
-    expect(html).toContain('gtabs__inner');
+    expect(html).toContain('data-gtab=');
   });
 
   /**

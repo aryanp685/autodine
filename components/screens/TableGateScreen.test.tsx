@@ -65,8 +65,8 @@ describe('TableGateScreen', () => {
     // phone, and the most prominent thing on the page.
     const html = renderToStaticMarkup(<TableGateScreen reason="none" />);
 
-    expect(html).not.toContain('gnote__cta');
-    expect(html).toContain('gnote__ghost');
+    expect(html).not.toContain('data-gnote-cta');
+    expect(html).toContain('data-gnote-ghost');
     // The staff route is still there, as a footnote rather than a button.
     expect(html).toContain('Behind the counter?');
   });
@@ -83,11 +83,11 @@ describe('TableGateScreen', () => {
     // A guest arriving from a forwarded link has no idea whether they are at
     // the start of the flow or two steps into it.
     const never = renderToStaticMarkup(<TableGateScreen reason="none" />);
-    expect(never).toContain('gnote__steps');
-    expect(never).toMatch(/gnote__step is-now[^>]*>.*?Scan/s);
+    expect(never).toContain('data-gnote-steps');
+    expect(never).toMatch(/data-gnote-step="now"[^>]*>.*?Scan/s);
 
     const stale = renderToStaticMarkup(<TableGateScreen reason="stale" />);
-    expect(stale).toMatch(/gnote__step is-now[^>]*>.*?Code/s);
-    expect(stale).toMatch(/gnote__step is-done[^>]*>.*?Scan/s);
+    expect(stale).toMatch(/data-gnote-step="now"[^>]*>.*?Code/s);
+    expect(stale).toMatch(/data-gnote-step="done"[^>]*>.*?Scan/s);
   });
 });

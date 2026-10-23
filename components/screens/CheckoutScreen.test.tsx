@@ -70,7 +70,7 @@ describe('checkout payment step', () => {
     // Nothing here is a control the guest could try and fail to use.
     expect(html).not.toContain('aria-disabled');
     expect(html).not.toContain('Not available here');
-    expect(html).toMatch(/co__pay/);
+    expect(html).toMatch(/data-co-pay/);
   });
 
   it('says what happens to the order while the bill is unpaid', () => {
@@ -89,17 +89,17 @@ describe('checkout action bar', () => {
   it('carries the total and submits the same order form', () => {
     const html = render();
 
-    expect(html).toContain('co__bar');
+    expect(html).toContain('data-co-bar');
     expect(html).toContain('form="co-place-order"');
     // The total appears in the bar as well as the bill, so the guest deciding
     // at the bottom of a long order sees the number they are agreeing to.
-    expect(html).toMatch(/co__barTotal[\s\S]*?₹985/);
+    expect(html).toMatch(/data-co-bar[\s\S]*?₹985/);
   });
 
   it('is not rendered when there is nothing to order', () => {
     mocks.cart = { ...mocks.cart, lines: [], count: 0 };
     const html = render();
-    expect(html).not.toContain('co__bar');
+    expect(html).not.toContain('data-co-bar');
 
     // Restore for any later test in this file.
     mocks.cart = {
@@ -115,7 +115,7 @@ describe('checkout action bar', () => {
     // second order while the first was still being priced.
     const html = renderToStaticMarkup(<Checkout slug="maddi" items={items} taxRateBps={500} />);
     const formOpen = html.indexOf('<form id="co-place-order"');
-    const dock = html.indexOf('co__bar');
+    const dock = html.indexOf('data-co-bar');
     const formClose = html.lastIndexOf('</form>');
 
     expect(formOpen).toBeGreaterThan(-1);
@@ -126,8 +126,8 @@ describe('checkout action bar', () => {
 
   it('shows the step the guest is on, not just the word checkout', () => {
     const html = renderToStaticMarkup(<Checkout slug="maddi" items={items} taxRateBps={500} />);
-    expect(html).toContain('flow__steps');
-    expect(html).toMatch(/flow__step is-now[^>]*aria-current="step"[^>]*>\s*<span class="flow__sr">Pay/);
+    expect(html).toContain('data-flow-steps');
+    expect(html).toMatch(/data-flow-step="now"[^>]*aria-current="step"[^>]*>\s*<span class="sr-only">Pay/);
   });
 
   it('says a dish sold out instead of quietly shrinking the bill', () => {

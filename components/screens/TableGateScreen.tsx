@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { GuestNote } from '@/components/GuestNote';
+import { GuestNote, GuestNoteActions, GuestNoteCta, GuestNoteGhost, GuestNoteText } from '@/components/GuestNote';
 
 /**
  * Shown instead of a menu when the guest has not proved they are at a table.
@@ -69,25 +69,19 @@ export function TableGateScreen({
         </>
       }
     >
-      <p className="gnote__text">{copy.detail}</p>
+      <GuestNoteText>{copy.detail}</GuestNoteText>
 
-      <div className="gnote__actions">
+      <GuestNoteActions>
         {/* The only thing a guest can DO here is re-enter the code, and only
             when we still know which card they scanned. The dashboard used to
             be the primary button on this screen, which handed a guest whose
             code had expired the least useful action available. It stays in
             the footnote, where staff look for it. */}
-        {verifyHref ? (
-          <Link href={verifyHref} className="gnote__cta">
-            Enter the code again
-          </Link>
-        ) : null}
+        {verifyHref ? <GuestNoteCta href={verifyHref}>Enter the code again</GuestNoteCta> : null}
         {/* Not able to scan? There is still something to look at, and it is
             labelled as a sample rather than as this restaurant's menu. */}
-        <Link href="/demo/menu" className="gnote__ghost">
-          See what a menu looks like
-        </Link>
-      </div>
+        <GuestNoteGhost href="/demo/menu">See what a menu looks like</GuestNoteGhost>
+      </GuestNoteActions>
     </GuestNote>
   );
 }

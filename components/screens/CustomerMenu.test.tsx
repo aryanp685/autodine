@@ -176,8 +176,8 @@ describe('QrProblemScreen', () => {
       <QrProblemScreen title="This code did not work" detail="Ask staff." />
     );
 
-    expect(html).toContain('gnote__body');
-    expect(html).toContain('gnote__eyebrow');
+    expect(html).toContain('data-gnote-body');
+    expect(html).toContain('data-gnote-eyebrow');
     expect(html).toContain('Table access');
     expect(html).not.toContain('pg__qrProblem');
   });
@@ -425,7 +425,7 @@ describe('leaving the dish sheet', () => {
 
   it('offers a scrim and Escape as ways out, not only a small ×', () => {
     const html = renderToStaticMarkup(<ItemSheet data={withMenu('m-2')} />);
-    expect(html).toContain('sheet__scrim');
+    expect(html).toContain('data-sheet-scrim');
     expect(html).toContain('aria-label="Close"');
   });
 

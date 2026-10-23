@@ -70,12 +70,12 @@ export function Checkout({
       back={{ href: withSlug('/menu/cart'), label: 'Back to your order' }}
       docked={canOrder}
     >
-      <header className="flow__head">
-        <div className="flow__kicker">Pay</div>
-        <h1 className="flow__title">Checkout</h1>
+      <header className="px-4 pt-6 pb-4">
+        <p className="text-[10.5px] font-semibold tracking-[0.12em] text-gink-46 uppercase">Pay</p>
+        <h1 className="mt-1.5 text-[27px] leading-tight font-semibold tracking-[-0.025em] text-gink">Checkout</h1>
         {/* The count appears once the stored cart has been read. Until then
             it would read "0 items" over an order that is still loading. */}
-        <p className="flow__lede">
+        <p className="mt-1.5 text-[13.5px] leading-[1.55] text-gink-64">
           {cart.ready && cart.count > 0
             ? `${cart.count} ${cart.count === 1 ? 'item' : 'items'} · the kitchen starts as soon as you place it.`
             : 'Nothing to order yet — add a dish from the menu first.'}
@@ -86,14 +86,16 @@ export function Checkout({
           in the bill and the one pinned at the bottom -- can read the same
           pending state. Two independent submits would have needed the action
           to be called twice, and would have disagreed about being busy. */}
-      <form id="co-place-order" action={placeOrderAction} className="co__formOuter">
+      <form id="co-place-order" action={placeOrderAction} className="px-4 pb-8">
         <input type="hidden" name="slug" value={slug ?? ''} />
         {/* Only ids and quantities go to the server. The prices are read from
             the database when the order is written. */}
         <input type="hidden" name="lines" value={JSON.stringify(cart.lines)} />
 
-        <div className="co__grid">
-          <div>
+        {/* One column at every width. The bill used to sit in a second column
+            on a wide screen and inside the form on a phone; the money is the
+            last thing read either way, so it goes last here too. */}
+        <div>
           {/*
             ONE method, stated, not two buttons with one of them disabled.
 
@@ -105,49 +107,59 @@ export function Checkout({
             before it can be paid for, so the screen states the one thing that
             will happen and says plainly what comes next.
           */}
-          <h2 className="co__h2">How you will pay</h2>
+          <h2 className="mb-2 text-[11px] font-semibold tracking-[0.1em] text-gink-46 uppercase">How you will pay</h2>
 
-          <div className="co__pay">
-            <div className="co__payRow">
-              <span className="co__payMark" aria-hidden="true" />
-              <div>
-                <strong>At the counter</strong>
-                <span>Cash · Card · UPI</span>
+          <div data-co-pay="" className="rounded-2xl border border-hair-strong bg-card px-4 py-4">
+            <div className="flex items-center gap-3">
+              {/* A drawn mark, not a tick: a tick would say "paid", and nothing
+                  has been paid on this screen. */}
+              <span aria-hidden="true" className="grid size-8 place-items-center rounded-full bg-accent-soft">
+                <span className="size-2 rounded-full bg-[var(--p-accent)]" />
+              </span>
+              <div className="flex flex-col leading-tight">
+                <strong className="text-[14.5px] font-semibold text-gink">At the counter</strong>
+                <span className="text-[12.5px] text-gink-46">Cash · Card · UPI</span>
               </div>
             </div>
-            <p className="co__payNote">
+
+            <p className="mt-3 text-[12.5px] leading-[1.55] text-gink-64">
               Your order goes to the kitchen straight away and is marked payment pending. Pay the
               cashier before you leave; the receipt is issued once the payment is recorded.
             </p>
-            <p className="co__payNote co__payNote--soft">
+            <p className="mt-2 text-[12.5px] leading-[1.55] text-gink-46">
               {onlinePaymentAvailable
                 ? 'This restaurant also takes card or UPI online, on the order page you reach after placing — the order is marked paid only when the gateway confirms it.'
                 : 'Card and UPI are accepted at the counter. Nothing is charged from your phone.'}
             </p>
           </div>
 
-          <h2 className="co__h2">Your order</h2>
-          <ul className="co__items">
+          <h2 className="mt-5 mb-2 text-[11px] font-semibold tracking-[0.1em] text-gink-46 uppercase">Your order</h2>
+          <ul className="divide-y divide-hair rounded-2xl border border-hair bg-card px-4">
             {priced.lines.map((l) => (
               // Keyed by portion as well as item: two portions of one dish
               // are two rows, and keying only by item made them collide.
-              <li key={`${l.itemId}|${l.variantId ?? ''}|${(l.addonIds ?? []).join(',')}`}>
-                <DishPhoto src={l.img} name={l.name} size={44} className="co__itemImg" />
+              <li
+                key={`${l.itemId}|${l.variantId ?? ''}|${(l.addonIds ?? []).join(',')}`}
+                className="flex items-center gap-2.5 py-3"
+              >
+                <DishPhoto src={l.img} name={l.name} size={40} className="size-10" />
                 <VegMark veg={l.isVeg} />
-                <span>
-                  <strong>{l.qty} ×</strong> {l.name}
-                  {l.variantName ? <em className="co__variant"> · {l.variantName}</em> : null}
+                <span className="min-w-0 flex-1 text-[13.5px] leading-[1.45] text-gink">
+                  <strong className="tnum font-semibold">{l.qty} ×</strong> {l.name}
+                  {l.variantName ? <em className="text-[12.5px] text-gink-46 not-italic"> · {l.variantName}</em> : null}
                   {l.addonNames && l.addonNames.length > 0 ? (
-                    <em className="co__variant"> · {l.addonNames.join(', ')}</em>
+                    <em className="text-[12.5px] text-gink-46 not-italic"> · {l.addonNames.join(', ')}</em>
                   ) : null}
                 </span>
-                <span className="tnum">{inr(paiseToRupees(l.lineTotalPaise))}</span>
+                <span className="tnum shrink-0 text-[13.5px] font-semibold text-gink">
+                  {inr(paiseToRupees(l.lineTotalPaise))}
+                </span>
               </li>
             ))}
             {cart.ready && priced.lines.length === 0 && (
-              <li className="co__empty">
+              <li className="py-5 text-center text-[13.5px] text-gink-64">
                 Nothing to order yet —{' '}
-                <Link href={withSlug('/menu')} className="co__emptyLink">
+                <Link href={withSlug('/menu')} className="font-semibold text-[var(--p-accent)] underline underline-offset-2">
                   open the menu
                 </Link>
                 .
@@ -155,99 +167,87 @@ export function Checkout({
             )}
           </ul>
 
-          {/*
-            A dish that sold out while the cart was open is dropped from the
-            bill (priceCart does that, and must: an unavailable dish cannot be
-            ordered). Dropping it silently left the guest looking at a total
-            that had quietly got smaller, with no idea why. The cart screen
-            already said so; this is the last screen before the money, so it
-            has to say it too.
-          */}
+          {/* A dish that sold out while the cart was open is dropped from the
+              bill (priceCart does that, and must: an unavailable dish cannot be
+              ordered). Dropping it silently left the guest looking at a total
+              that had quietly got smaller, with no idea why. */}
           {priced.unavailableIds.length > 0 && (
-            <div className="cart__notice" role="status">
-              <p>
-                {priced.unavailableIds.length === 1
-                  ? 'One dish has sold out since you added it, so it is not in this bill.'
-                  : `${priced.unavailableIds.length} dishes have sold out since you added them, so they are not in this bill.`}{' '}
-                <Link href={withSlug('/menu/cart')} className="co__emptyLink">
-                  Review your order
-                </Link>
-              </p>
+            <div role="status" className="mt-3 rounded-2xl bg-accent-soft px-4 py-3 text-[12.5px] leading-[1.55] text-gink-80">
+              {priced.unavailableIds.length === 1
+                ? 'One dish has sold out since you added it, so it is not in this bill.'
+                : `${priced.unavailableIds.length} dishes have sold out since you added them, so they are not in this bill.`}{' '}
+              <Link href={withSlug('/menu/cart')} className="font-semibold text-[var(--p-accent)] underline underline-offset-2">
+                Review your order
+              </Link>
             </div>
           )}
 
           {priced.staleVariantIds.length > 0 && (
-            <div className="cart__notice" role="status">
-              <p>
-                A portion you picked is no longer on the menu, so that dish is priced at the
-                menu price. Check the bill before you place it.
-              </p>
+            <div role="status" className="mt-3 rounded-2xl bg-accent-soft px-4 py-3 text-[12.5px] leading-[1.55] text-gink-80">
+              A portion you picked is no longer on the menu, so that dish is priced at the
+              menu price. Check the bill before you place it.
             </div>
           )}
 
-          <div className="co__noteForm">
-            <label className="ui-field">
-              <span className="ui-label">Anything the kitchen should know?</span>
+          <div className="mt-5">
+            <label className="block">
+              <span className="mb-1.5 block text-[11px] font-semibold tracking-[0.09em] text-gink-46 uppercase">
+                Anything the kitchen should know?
+              </span>
               <textarea
-                className="ui-input"
                 name="note"
                 rows={2}
                 maxLength={300}
                 placeholder="No onion in the raita, less chilli…"
+                className="w-full resize-none rounded-xl border border-hair-strong bg-card px-3 py-2.5 text-[14px] text-gink placeholder:text-gink-28 focus:border-[var(--p-accent)] focus:ring-2 focus:ring-[var(--p-accent)]/20 focus:outline-none"
               />
-              <span className="ui-hint">
+              <span className="mt-1.5 block text-[11.5px] leading-[1.5] text-gink-46">
                 A note is read by the kitchen, not a special instruction the bill is priced
                 against.
               </span>
             </label>
           </div>
+
+          <section className="mt-5 rounded-2xl border border-hair-strong bg-card px-4 py-4">
+            <h2 className="mb-1 text-[11px] font-semibold tracking-[0.1em] text-gink-46 uppercase">Bill</h2>
+            <dl className="text-[13.5px]">
+              <div className="flex items-baseline justify-between py-1 text-gink-64">
+                <dt>Subtotal</dt>
+                <dd className="tnum">{inr(paiseToRupees(subtotalPaise))}</dd>
+              </div>
+              <div className="flex items-baseline justify-between py-1 text-gink-64">
+                <dt>Taxes ({gstLabel(taxRateBps)})</dt>
+                <dd className="tnum">{inr(paiseToRupees(taxPaise))}</dd>
+              </div>
+              <div className="mt-1.5 flex items-baseline justify-between border-t border-hair pt-2.5 text-[16px] font-semibold text-gink">
+                <dt>Total payable</dt>
+                <dd className="tnum">{inr(paiseToRupees(totalPaise))}</dd>
+              </div>
+            </dl>
+
+            <PlaceOrderButton totalPaise={totalPaise} canOrder={canOrder} form="co-place-order" variant="bill" />
+            <p role="note" className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
+              {onlinePaymentAvailable
+                ? 'Pay at the counter, or by card/UPI on the next screen. The kitchen starts straight away either way.'
+                : 'You pay at the counter. The kitchen starts on this straight away.'}
+            </p>
+          </section>
         </div>
-
-        <aside className="co__sum">
-          <h2>Bill</h2>
-          <div className="co__row">
-            <span>Subtotal</span>
-            <span className="tnum">{inr(paiseToRupees(subtotalPaise))}</span>
-          </div>
-          <div className="co__row">
-            <span>Taxes ({gstLabel(taxRateBps)})</span>
-            <span className="tnum">{inr(paiseToRupees(taxPaise))}</span>
-          </div>
-          <div className="co__row co__row--total">
-            <span>Total payable</span>
-            <span className="tnum">{inr(paiseToRupees(totalPaise))}</span>
-          </div>
-
-          <PlaceOrderButton
-            totalPaise={totalPaise}
-            canOrder={canOrder}
-            form="co-place-order"
-            variant="bill"
-          />
-          <p className="co__fine" role="note">
-            {onlinePaymentAvailable
-              ? 'Pay at the counter, or by card/UPI on the next screen. The kitchen starts straight away either way.'
-              : 'You pay at the counter. The kitchen starts on this straight away.'}
-          </p>
-        </aside>
-      </div>
 
         {/* Inside the form on purpose: useFormStatus only sees a form it is a
             descendant of, and both Place order buttons have to go busy
             together or a second tap writes a second order. */}
         {canOrder && (
-          <div className="flow__dock">
-            <div className="co__bar">
-              <span className="co__barTotal">
-                <span className="co__barLabel">Total payable</span>
-                <strong className="tnum">{inr(paiseToRupees(totalPaise))}</strong>
+          <div data-co-bar="" className="fixed inset-x-0 bottom-0 z-40">
+            <div
+              className="mx-auto flex w-full max-w-[720px] items-center gap-3 border-t border-hair bg-paper/95 px-4 py-3 backdrop-blur-xl"
+              style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}
+            >
+              <span className="flex flex-col leading-tight">
+                <span className="text-[10px] font-semibold tracking-[0.09em] text-gink-46 uppercase">Total payable</span>
+                <strong className="tnum text-[17px] font-semibold text-gink">{inr(paiseToRupees(totalPaise))}</strong>
               </span>
-              <PlaceOrderButton
-                totalPaise={totalPaise}
-                canOrder={canOrder}
-                form="co-place-order"
-                variant="dock"
-              />
+              <PlaceOrderButton totalPaise={totalPaise} canOrder={canOrder} form="co-place-order" variant="dock" />
             </div>
           </div>
         )}
