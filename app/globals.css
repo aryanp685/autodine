@@ -17,8 +17,10 @@
 @import '../styles/design-system.css';
 @import '../styles/premium.css';
 @import '../styles/guest.css';
-@import '../styles/owner.css';
 @import '../styles/app.css';
+/* Owner last: it re-points the product's tokens, and a later stylesheet cannot
+   win on token values it never sees resolved. */
+@import '../styles/owner.css';
 
 /* =========================================================================
    AutoDine — global base
