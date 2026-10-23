@@ -27,116 +27,6 @@
   background: var(--p-paper);
 }
 
-[data-app] .appBar {
-  position: sticky;
-  top: 0;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  gap: clamp(12px, 2vw, 28px);
-  padding: 0 var(--p-gutter);
-  height: 62px;
-  border-bottom: 1px solid var(--p-line);
-  background: var(--p-glass);
-  -webkit-backdrop-filter: saturate(1.4) blur(18px);
-  backdrop-filter: saturate(1.4) blur(18px);
-}
-
-[data-app] .appBar__left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 0 0 auto;
-}
-
-[data-app] .appBar__brand {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--p-ink);
-  text-decoration: none;
-}
-
-/* The outlet the session is working on, as an initial mark. Not an avatar:
-   this is a workspace selector, and it is also a switcher two elements away. */
-[data-app] .appBar__venue {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 1px solid var(--p-line-strong);
-  font-size: 0.5625rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--p-ink-64);
-}
-
-[data-app] .appBar__nav {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
-  flex: 1 1 auto;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-[data-app] .appBar__nav::-webkit-scrollbar { display: none; }
-
-[data-app] .appBar__nav a {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  height: 62px;
-  padding: 0 12px;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  letter-spacing: -0.005em;
-  color: var(--p-ink-46);
-  text-decoration: none;
-  position: relative;
-  transition: color var(--p-d1) linear;
-}
-
-[data-app] .appBar__nav a:hover { color: var(--p-ink); }
-
-/* The current page is marked with a rule, not a pill: eight pills in a row
-   would read as eight buttons rather than as a place in a product. */
-[data-app] .appBar__nav a.is-active { color: var(--p-ink); }
-
-[data-app] .appBar__nav a.is-active::after {
-  content: '';
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: -1px;
-  height: 1px;
-  background: var(--p-ink);
-}
-
-[data-app] .appBar__right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 0 0 auto;
-}
-
-[data-app] .appBar__signOut {
-  border: 0;
-  background: none;
-  padding: 8px 0;
-  font: inherit;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--p-ink-46);
-  cursor: pointer;
-  transition: color var(--p-d1) linear;
-}
-
-[data-app] .appBar__signOut:hover { color: var(--p-ink); }
-
 /* --------------------------------------------------------- page frames */
 
 /* The loading boundary has to occupy the same box as the page it replaces, or
@@ -1068,11 +958,6 @@
 }
 
 @media (max-width: 860px) {
-  [data-app] .appBar { height: auto; flex-wrap: wrap; padding-block: 10px; gap: 8px 14px; }
-  [data-app] .appBar__nav { order: 3; width: 100%; }
-  [data-app] .appBar__nav a { height: 36px; padding: 0 10px; }
-  [data-app] .appBar__nav a.is-active::after { left: 10px; right: 10px; bottom: 0; }
-  [data-app] .appBar__right { margin-left: auto; }
 
   [data-app] .kb__cols { grid-template-columns: minmax(0, 1fr); }
   [data-app] .kb__col { display: none; }
@@ -2671,4 +2556,1368 @@
   [data-app] .authRow { grid-template-columns: minmax(0, 1fr); }
   [data-app] .authCard { padding: 20px; }
   [data-app] .authBar__prompt { display: none; }
+}
+
+/* =========================================================================
+   Menu branding (components/screens/BrandingScreen.tsx)
+
+   Two columns on a laptop, one on a tablet, stacked on a phone. The preview
+   card spans the full width because it is the thing worth looking at, and it
+   is the last card on purpose: change something, look, change again.
+
+   No new hex values: the swatch colour arrives as an inline --swatch, and the
+   preview re-themes itself by overriding --p-accent on its own subtree.
+   ========================================================================= */
+
+[data-app] .brand__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(18px, 2.4vw, 26px);
+  margin-top: clamp(22px, 3vh, 34px);
+  align-items: start;
+}
+
+[data-app] .brand__previewCard {
+  grid-column: 1 / -1;
+}
+
+[data-app] .brand__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+[data-app] .brand__logoPreview {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 1px solid var(--p-line-strong);
+  background: var(--p-paper);
+  overflow: hidden;
+}
+
+[data-app] .brand__logoImg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+[data-app] .brand__logoEmpty {
+  font-size: 1.25rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--p-accent);
+}
+
+/* ---- file picker --------------------------------------------------------
+   A native <input type="file"> renders as "Choose File / No file chosen" in
+   the browser's own font and colour, which is the one control on this screen
+   that would look like a different product. The input stays in the DOM (and
+   focusable) and the label is what is drawn. */
+
+[data-app] .brand__upload {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+
+[data-app] .brand__picker {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-pill);
+  background: var(--p-surface);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--p-ink);
+  cursor: pointer;
+  transition: border-color var(--p-d1) var(--p-ease), background var(--p-d1) var(--p-ease);
+}
+
+[data-app] .brand__picker:hover { border-color: var(--p-ink-46); }
+[data-app] .brand__picker:focus-within { outline: 2px solid var(--p-accent); outline-offset: 2px; }
+
+/* Visually hidden but still the real control: clicking the label opens it,
+   and a keyboard user tabs to it. */
+[data-app] .brand__picker input[type='file'] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 0;
+}
+
+[data-app] .brand__picker:has(input:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+[data-app] .brand__fine {
+  margin-top: 10px;
+  font-size: 0.6875rem;
+  line-height: 1.6;
+  color: var(--p-ink-46);
+}
+
+[data-app] .brand__remove {
+  margin-top: 14px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.8125rem;
+  /* --danger is declared on :root in design-system.css (not --p-prefixed). */
+  color: var(--danger);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+[data-app] .brand__remove:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ---- banner preview ---------------------------------------------------- */
+
+[data-app] .brand__bannerPreview {
+  position: relative;
+  margin-top: 18px;
+  aspect-ratio: 21 / 9;
+  border-radius: var(--p-r-sm);
+  overflow: hidden;
+  border: 1px solid var(--p-line);
+  background: var(--p-paper);
+}
+
+[data-app] .brand__bannerImg { object-fit: cover; }
+
+[data-app] .brand__bannerEmpty {
+  display: grid;
+  place-items: center;
+  margin-top: 18px;
+  aspect-ratio: 21 / 9;
+  border-radius: var(--p-r-sm);
+  border: 1px dashed var(--p-line-strong);
+  background: var(--p-paper);
+  font-size: 0.75rem;
+  color: var(--p-ink-46);
+  text-align: center;
+  padding: 12px;
+}
+
+/* ---- accent swatches ---------------------------------------------------
+   44px hit area around a 32px dot: the label is the target, so the ring is
+   spacing, not a smaller button. */
+
+[data-app] .brand__swatches {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+[data-app] .brand__swatches .pg__btn { margin-left: auto; }
+
+[data-app] .brand__swatch {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+[data-app] .brand__swatch input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+[data-app] .brand__swatchDot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--swatch);
+  border: 1px solid var(--p-ink-12);
+  transition: transform var(--p-d1) var(--p-ease), box-shadow var(--p-d2) var(--p-ease);
+}
+
+[data-app] .brand__swatch:hover .brand__swatchDot { transform: scale(1.06); }
+
+[data-app] .brand__swatch input:focus-visible + .brand__swatchDot {
+  outline: 2px solid var(--p-ink);
+  outline-offset: 3px;
+}
+
+/* The selected ring is an outline rather than a shadow: this is a border,
+   not depth, and the guard reserves shadows for the elevation tokens. */
+[data-app] .brand__swatch.is-on .brand__swatchDot {
+  outline: 2px solid var(--swatch);
+  outline-offset: 3px;
+}
+
+[data-app] .brand__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---- phone preview ----------------------------------------------------- */
+
+[data-app] .brand__phone {
+  margin-top: 20px;
+  padding: 14px;
+  border-radius: calc(var(--p-r-lg) + 6px);
+  background: var(--p-paper-deep);
+  border: 1px solid var(--p-line);
+}
+
+[data-app] .brand__phoneInner {
+  border-radius: var(--p-r);
+  overflow: hidden;
+  background: var(--p-paper);
+  border: 1px solid var(--p-line);
+}
+
+/* The preview header is drawn at the real component's own size; only the
+   surrounding list is scaled down, because it is context, not the subject. */
+[data-app] .brand__previewList {
+  padding: 4px 16px 16px;
+  display: grid;
+  gap: 2px;
+}
+
+[data-app] .brand__previewRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--p-line);
+}
+
+[data-app] .brand__previewName { font-size: 0.875rem; font-weight: 500; color: var(--p-ink); }
+[data-app] .brand__previewPrice { margin-top: 3px; font-size: 0.8125rem; color: var(--p-ink-64); }
+
+[data-app] .brand__previewAdd {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--p-accent);
+  color: var(--p-on-ink);
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+[data-app] .brand__previewEmpty {
+  padding: 18px 0;
+  font-size: 0.8125rem;
+  color: var(--p-ink-46);
+}
+
+/* ---- responsive -------------------------------------------------------- */
+
+@media (max-width: 1100px) {
+  [data-app] .brand__grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 560px) {
+  [data-app] .brand__row { flex-direction: column; gap: 14px; }
+  [data-app] .brand__logoPreview { width: 64px; height: 64px; }
+  [data-app] .brand__upload { gap: 8px; }
+  [data-app] .brand__picker,
+  [data-app] .brand__upload .pg__btn { flex: 1 1 auto; justify-content: center; min-height: 44px; }
+  [data-app] .brand__swatches .pg__btn { margin-left: 0; width: 100%; }
+  [data-app] .brand__phone { padding: 8px; }
+}
+
+/* =========================================================================
+   Owner preview of the guest menu (app/dashboard/branding/preview)
+
+   Deliberately full-width and chrome-free: the point is to look at it as a
+   diner would, not as a form field.
+   ========================================================================= */
+
+[data-app] .brandPreview {
+  min-height: 100svh;
+  background: var(--p-paper-deep);
+  padding-bottom: 48px;
+}
+
+[data-app] .brandPreview__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px var(--p-gutter);
+  background: var(--p-surface);
+  border-bottom: 1px solid var(--p-line);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+[data-app] .brandPreview__back {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  margin-left: -14px;
+  border-radius: var(--p-pill);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--p-ink);
+  text-decoration: none;
+}
+
+[data-app] .brandPreview__back:hover { background: var(--p-ink-07); }
+
+[data-app] .brandPreview__tag {
+  padding: 5px 11px;
+  border-radius: var(--p-pill);
+  background: var(--p-accent-soft);
+  color: var(--p-ink);
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+[data-app] .brandPreview__hint {
+  font-size: 0.75rem;
+  color: var(--p-ink-46);
+}
+
+[data-app] .brandPreview__stage {
+  display: flex;
+  justify-content: center;
+  padding: clamp(18px, 4vh, 40px) var(--p-gutter);
+}
+
+/* On a laptop it is a phone, so the owner sees the same thing a guest does.
+   On an actual phone the frame disappears and it is simply the page. */
+[data-app] .brandPreview__phone {
+  width: min(100%, 420px);
+  background: var(--p-paper);
+  border-radius: 26px;
+  overflow: hidden;
+  border: 1px solid var(--p-line);
+  box-shadow: var(--p-shadow-2);
+  min-width: 0;
+}
+
+[data-app] .brandPreview__cats {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 14px 16px 6px;
+  scrollbar-width: none;
+}
+
+[data-app] .brandPreview__cats::-webkit-scrollbar { display: none; }
+
+[data-app] .brandPreview__cat {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  border-radius: var(--p-pill);
+  border: 1px solid var(--p-line-strong);
+  font-size: 0.75rem;
+  color: var(--p-ink-64);
+  white-space: nowrap;
+}
+
+[data-app] .brandPreview__cat.is-on {
+  background: var(--p-accent);
+  border-color: var(--p-accent);
+  color: var(--p-on-ink);
+}
+
+[data-app] .brandPreview__list { padding: 6px 16px 20px; }
+
+[data-app] .brandPreview__row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  padding: 16px 0;
+  border-top: 1px solid var(--p-line);
+  align-items: start;
+}
+
+[data-app] .brandPreview__row.is-out { opacity: 0.55; }
+
+[data-app] .brandPreview__rowBody { min-width: 0; }
+[data-app] .brandPreview__rowName { font-size: 0.9375rem; font-weight: 500; color: var(--p-ink); }
+[data-app] .brandPreview__rowDesc {
+  margin-top: 4px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--p-ink-46);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+[data-app] .brandPreview__rowPrice { margin-top: 8px; font-size: 0.875rem; color: var(--p-ink-80); }
+
+[data-app] .brandPreview__rowImg {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--p-r-sm);
+  object-fit: cover;
+}
+
+[data-app] .brandPreview__add {
+  position: absolute;
+  right: 0;
+  top: 64px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--p-accent);
+  color: var(--p-on-ink);
+  font-size: 1.05rem;
+  line-height: 1;
+  border: 2px solid var(--p-paper);
+}
+
+[data-app] .brandPreview__empty {
+  padding: 28px 4px 36px;
+  font-size: 0.875rem;
+  color: var(--p-ink-64);
+}
+
+[data-app] .brandPreview__empty strong { color: var(--p-ink); font-weight: 500; }
+[data-app] .brandPreview__empty p { margin-top: 6px; font-size: 0.8125rem; color: var(--p-ink-46); }
+
+[data-app] .brandPreview__cta {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 14px;
+  padding: 0 18px;
+  border-radius: var(--p-pill);
+  background: var(--p-ink);
+  color: var(--p-on-ink);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+@media (max-width: 560px) {
+  [data-app] .brandPreview__stage { padding-inline: 0; }
+  [data-app] .brandPreview__phone {
+    width: 100%;
+    border-radius: 0;
+    border-inline: 0;
+    box-shadow: none;
+  }
+}
+
+/* =========================================================================
+   Dish photo control (components/DishPhotoField.tsx) and the availability
+   switch in the editor table.
+
+   The toggle already existed as a read-only badge; it is now a button, so it
+   needs a hit area and a focus ring. 44px is the target on a phone, and the
+   row it sits in is a table cell on a laptop -- padding rather than height
+   keeps the table dense on a big screen without shrinking the tap target.
+   ========================================================================= */
+
+[data-app] .pg__toggle--btn {
+  padding: 10px 8px;
+  margin: -10px -8px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--p-ink-80);
+  border-radius: var(--p-r-sm);
+  cursor: pointer;
+  transition: background var(--p-d1) var(--p-ease);
+}
+
+[data-app] .pg__toggle--btn:hover { background: var(--p-ink-07); }
+[data-app] .pg__toggle--btn:focus-visible { outline: 2px solid var(--p-accent); outline-offset: 2px; }
+[data-app] .pg__toggle--btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* Availability is never colour-only: the word changes too, and a sold-out row
+   also loses its thumbnail colour. */
+[data-app] .pg__toggle--btn.is-off span { color: var(--danger); }
+
+[data-app] .dishPhotoField {
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--p-line);
+}
+
+[data-app] .dishPhotoField__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+[data-app] .dishPhotoField__title {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--p-ink);
+}
+
+[data-app] .dishPhotoField__body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+[data-app] .dishPhotoField__preview {
+  flex: 0 0 auto;
+  border-radius: var(--p-r-sm);
+  overflow: hidden;
+}
+
+[data-app] .dishPhotoField__img {
+  width: 84px;
+  height: 84px;
+  border-radius: var(--p-r-sm);
+  object-fit: cover;
+}
+
+[data-app] .dishPhotoField__controls { display: grid; gap: 10px; min-width: 0; }
+
+[data-app] .dishPhotoField__form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+[data-app] .dishPhotoField__remove {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--danger);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+[data-app] .dishPhotoField__remove:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* An invalid file is rejected in the browser, before anything is sent, so the
+   message has to be as specific as a server error would be. */
+[data-app] .dishPhotoField__error {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: var(--p-r-sm);
+  background: var(--p-ink-07);
+  border-left: 2px solid var(--danger);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--p-ink-80);
+}
+
+@media (max-width: 560px) {
+  [data-app] .dishPhotoField__body { align-items: flex-start; }
+  [data-app] .dishPhotoField__form { width: 100%; }
+  [data-app] .dishPhotoField__form .brand__picker,
+  [data-app] .dishPhotoField__form .pg__btn { flex: 1 1 auto; justify-content: center; }
+}
+
+/* =========================================================================
+   Menu import — photo, review (components/PhotoImportPanel.tsx)
+
+   The review is the product here, so it is laid out as a list of decisions
+   rather than a preview: one row per dish, the price field always visible, and
+   anything the model was unsure about marked in the one warning colour.
+   ========================================================================= */
+
+[data-app] .photoImport__modes {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  margin-top: 20px;
+  border-radius: var(--p-pill);
+  background: var(--p-ink-07);
+}
+
+[data-app] .photoImport__mode {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: var(--p-pill);
+  background: transparent;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--p-ink-64);
+  cursor: pointer;
+  transition: background var(--p-d1) var(--p-ease), color var(--p-d1) var(--p-ease);
+}
+
+[data-app] .photoImport__mode:hover { color: var(--p-ink); }
+
+[data-app] .photoImport__mode.is-on {
+  background: var(--p-surface);
+  color: var(--p-ink);
+}
+
+[data-app] .photoImport__mode:focus-visible { outline: 2px solid var(--p-accent); outline-offset: 2px; }
+
+[data-app] .photoImport { display: grid; gap: clamp(18px, 2.4vw, 26px); margin-top: 22px; }
+
+[data-app] .photoImport__step {
+  padding: clamp(18px, 2.4vw, 26px);
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-r);
+  background: var(--p-surface);
+}
+
+[data-app] .photoImport__stepHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+[data-app] .photoImport__stepNum {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--p-accent-soft);
+  color: var(--p-ink);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+[data-app] .photoImport__pick {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+[data-app] .photoImport__thumb {
+  width: 132px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: var(--p-r-sm);
+  border: 1px solid var(--p-line);
+  background: var(--p-paper);
+}
+
+[data-app] .photoImport__pdf,
+[data-app] .photoImport__empty {
+  display: grid;
+  place-items: center;
+  width: 132px;
+  height: 100px;
+  padding: 8px;
+  border-radius: var(--p-r-sm);
+  border: 1px dashed var(--p-line-strong);
+  background: var(--p-paper);
+  font-size: 0.6875rem;
+  line-height: 1.5;
+  color: var(--p-ink-46);
+  text-align: center;
+  overflow: hidden;
+}
+
+[data-app] .photoImport__pickActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+[data-app] .photoImport__link {
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--p-ink-64);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+[data-app] .photoImport__link:hover { color: var(--p-ink); }
+[data-app] .photoImport__link:disabled { opacity: 0.5; cursor: not-allowed; }
+
+[data-app] .photoImport__progress {
+  margin-top: 12px;
+  font-size: 0.75rem;
+  color: var(--p-ink-46);
+}
+
+/* ---- review ------------------------------------------------------------ */
+
+[data-app] .photoImport__review {
+  padding: clamp(18px, 2.4vw, 26px);
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-r);
+  background: var(--p-surface);
+}
+
+[data-app] .photoImport__reviewHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+[data-app] .photoImport__notes {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: var(--p-r-sm);
+  background: var(--p-paper);
+  border-left: 2px solid var(--p-accent);
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: var(--p-ink-80);
+  display: grid;
+  gap: 4px;
+}
+
+[data-app] .photoImport__cat { margin-top: 22px; }
+
+[data-app] .photoImport__catName {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--p-line);
+}
+
+[data-app] .photoImport__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--p-line);
+  flex-wrap: wrap;
+}
+
+[data-app] .photoImport__row.is-flagged { background: var(--p-paper); }
+[data-app] .photoImport__row.is-dropped { opacity: 0.45; }
+[data-app] .photoImport__row.is-dropped .photoImport__rowName { text-decoration: line-through; }
+
+[data-app] .photoImport__rowMain { min-width: 0; flex: 1 1 220px; }
+
+[data-app] .photoImport__rowName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--p-ink);
+}
+
+[data-app] .photoImport__vegDot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 2px;
+  border: 1px solid var(--p-ink-46);
+  position: relative;
+}
+
+[data-app] .photoImport__vegDot[data-veg='veg'] { border-color: var(--p-accent); }
+[data-app] .photoImport__vegDot[data-veg='veg']::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background: var(--p-accent);
+}
+[data-app] .photoImport__vegDot[data-veg='non'] { border-color: var(--danger); }
+[data-app] .photoImport__vegDot[data-veg='non']::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+[data-app] .photoImport__vegDot[data-veg='unknown'] { border-style: dashed; }
+
+[data-app] .photoImport__rowMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+[data-app] .photoImport__flag {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--p-ink-80);
+  background: var(--p-paper-deep);
+  border-radius: var(--p-pill);
+  padding: 3px 9px;
+}
+
+[data-app] .photoImport__photoTag {
+  font-size: 0.6875rem;
+  color: var(--p-ink-46);
+}
+
+[data-app] .photoImport__rowControls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+[data-app] .photoImport__priceField {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+[data-app] .photoImport__priceField .ui-label {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--p-ink-46);
+}
+
+[data-app] .photoImport__priceField .ui-input {
+  width: 96px;
+  min-height: 44px;
+  text-align: right;
+}
+
+/* An empty price is a question. It is marked with a left rule rather than a
+   red field: the row still has to be pleasant to fill in. */
+[data-app] .photoImport__row:has(input[value='']) .ui-input {
+  border-color: var(--p-ink-46);
+  background: var(--p-paper);
+}
+
+[data-app] .photoImport__vegBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-pill);
+  background: var(--p-surface);
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--p-ink-80);
+  cursor: pointer;
+}
+
+[data-app] .photoImport__vegBtn:hover { border-color: var(--p-ink-46); }
+[data-app] .photoImport__vegBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+[data-app] .photoImport__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--p-line);
+}
+
+[data-app] .photoImport__footer .brand__fine { margin: 0; }
+
+@media (max-width: 560px) {
+  [data-app] .photoImport__modes { width: 100%; }
+  [data-app] .photoImport__mode { flex: 1 1 auto; padding: 0 10px; }
+  [data-app] .photoImport__row { align-items: flex-start; }
+  [data-app] .photoImport__rowControls { width: 100%; justify-content: space-between; }
+  [data-app] .photoImport__priceField .ui-input { width: 100%; }
+  [data-app] .photoImport__footer { flex-direction: column; align-items: stretch; }
+  [data-app] .photoImport__footer .pg__btn { width: 100%; }
+}
+
+/* =========================================================================
+   The staff shell (components/DashboardBar.tsx)
+
+   A fixed rail + a sticky top bar. The rail is padding on `.pg--dash` rather
+   than a grid column, because every screen already renders the bar as its
+   first child and a fixed element needs no change to the tree it sits in --
+   which is what keeps this from being a rewrite of nine screens.
+   ========================================================================= */
+
+/* The rail's width. One number, used by the rail and by the padding that keeps
+   content out from under it -- declared on the app root rather than on
+   `.pg--dash` so a screen cannot half-adopt the shell. */
+[data-app] { --shell-rail: 232px; }
+
+[data-app] .shell__rail {
+  position: fixed;
+  inset-block: 0;
+  left: 0;
+  z-index: 40;
+  width: var(--shell-rail);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 18px 12px 12px;
+  background: var(--p-surface);
+  border-right: 1px solid var(--p-line);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+[data-app] .shell__brandRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 14px;
+}
+
+[data-app] .shell__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--p-ink);
+  text-decoration: none;
+  border-radius: var(--p-r-sm);
+}
+
+[data-app] .shell__brand:focus-visible { outline: 2px solid var(--p-accent); outline-offset: 3px; }
+
+[data-app] .shell__mark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--p-accent);
+  color: var(--p-on-ink);
+  flex: 0 0 auto;
+}
+
+[data-app] .shell__close {
+  display: none;
+  width: 44px;
+  height: 44px;
+  margin-right: -8px;
+  border: 0;
+  background: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--p-ink-64);
+  cursor: pointer;
+  border-radius: var(--p-r-sm);
+}
+
+[data-app] .shell__outlet {
+  padding: 0 8px 12px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--p-line);
+}
+
+[data-app] .shell__nav { display: grid; gap: 18px; padding-top: 12px; }
+
+[data-app] .shell__group { display: grid; gap: 2px; }
+
+[data-app] .shell__groupName {
+  padding: 0 10px 6px;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .shell__link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 9px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--p-ink-64);
+  text-decoration: none;
+  transition: background var(--p-d1) var(--p-ease), color var(--p-d1) var(--p-ease);
+}
+
+[data-app] .shell__link:hover { background: var(--p-ink-07); color: var(--p-ink); }
+
+[data-app] .shell__link.is-active {
+  background: var(--p-accent-soft);
+  color: var(--p-ink);
+}
+
+[data-app] .shell__link:focus-visible { outline: 2px solid var(--p-accent); outline-offset: -1px; }
+
+[data-app] .shell__icon { display: grid; place-items: center; color: currentColor; opacity: 0.9; }
+
+[data-app] .shell__link.is-active .shell__icon { color: var(--p-accent); opacity: 1; }
+
+[data-app] .shell__foot {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--p-line);
+  display: grid;
+  gap: 6px;
+}
+
+[data-app] .shell__who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  min-width: 0;
+}
+
+[data-app] .shell__avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--p-paper-deep);
+  color: var(--p-ink);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+[data-app] .shell__whoText { display: grid; min-width: 0; }
+
+[data-app] .shell__whoName {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--p-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-app] .shell__whoRole {
+  font-size: 0.6875rem;
+  color: var(--p-ink-46);
+  text-transform: capitalize;
+}
+
+[data-app] .shell__signOut {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--p-ink-64);
+  cursor: pointer;
+  text-align: left;
+}
+
+[data-app] .shell__signOut:hover { background: var(--p-ink-07); color: var(--p-ink); }
+
+/* ---- top bar ----------------------------------------------------------- */
+
+[data-app] .shell__top {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px clamp(16px, 3vw, 28px);
+  background: color-mix(in srgb, var(--p-surface) 88%, transparent);
+  backdrop-filter: saturate(150%) blur(10px);
+  border-bottom: 1px solid var(--p-line);
+}
+
+[data-app] .shell__menuBtn {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px 0 8px;
+  margin-left: -8px;
+  border: 0;
+  border-radius: var(--p-r-sm);
+  background: none;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--p-ink);
+  cursor: pointer;
+}
+
+[data-app] .shell__menuBtn:hover { background: var(--p-ink-07); }
+
+[data-app] .shell__menuBars { display: grid; gap: 3px; width: 16px; }
+[data-app] .shell__menuBars i {
+  display: block;
+  height: 1.5px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+[data-app] .shell__crumbs {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+[data-app] .shell__crumbNow {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--p-ink);
+  white-space: nowrap;
+}
+
+[data-app] .shell__crumbVenue {
+  font-size: 0.75rem;
+  color: var(--p-ink-46);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-app] .shell__topRight { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+/* ---- "Go to…" ---------------------------------------------------------- */
+
+[data-app] .shellSearch { position: relative; }
+
+[data-app] .shellSearch__input {
+  width: 200px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-pill);
+  background: var(--p-surface);
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--p-ink);
+  transition: width var(--p-d2) var(--p-ease), border-color var(--p-d1) var(--p-ease);
+}
+
+[data-app] .shellSearch__input::placeholder { color: var(--p-ink-46); }
+[data-app] .shellSearch__input:focus {
+  width: 260px;
+  outline: none;
+  border-color: var(--p-ink-46);
+  box-shadow: var(--p-shadow-1);
+}
+
+/* The browser's own clear button on type=search is a grey X at a different
+   optical size than everything else here. */
+[data-app] .shellSearch__input::-webkit-search-cancel-button { display: none; }
+
+[data-app] .shellSearch__panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 264px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
+  border-radius: var(--p-r);
+  border: 1px solid var(--p-line);
+  background: var(--p-surface);
+  box-shadow: var(--p-shadow-2);
+}
+
+[data-app] .shellSearch__item {
+  display: flex;
+  text-decoration: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--p-ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+[data-app] .shellSearch__item.is-on { background: var(--p-accent-soft); }
+
+[data-app] .shellSearch__group {
+  font-size: 0.6875rem;
+  color: var(--p-ink-46);
+}
+
+[data-app] .shellSearch__empty {
+  padding: 12px 10px;
+  font-size: 0.8125rem;
+  color: var(--p-ink-46);
+}
+
+/* ---- scrim ------------------------------------------------------------- */
+
+[data-app] .shell__scrim {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  border: 0;
+  padding: 0;
+  background: rgba(12, 11, 9, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--p-d2) var(--p-ease);
+  cursor: pointer;
+}
+
+/* ---- layouts ----------------------------------------------------------- */
+
+@media (min-width: 1101px) {
+  [data-app] .pg--dash { padding-left: var(--shell-rail); }
+
+  /* The rail is always on screen, so the drawer affordances do not exist. */
+  [data-app] .shell__close { display: none; }
+}
+
+@media (max-width: 1100px) {
+  [data-app] .shell__rail {
+    transform: translateX(-100%);
+    transition: transform var(--p-d2) var(--p-ease);
+    box-shadow: var(--p-shadow-2);
+    width: min(286px, 84vw);
+  }
+
+  [data-app] .shell__rail.is-open { transform: translateX(0); }
+  [data-app] .shell__close { display: grid; place-items: center; }
+
+  [data-app] .shell__scrim { display: block; }
+  [data-app] .shell__scrim.is-open { opacity: 1; pointer-events: auto; }
+
+  [data-app] .shell__menuBtn { display: inline-flex; }
+}
+
+/* On a phone the rail is the wrong shape. A 232px column on a 390px screen is
+   two thirds of the screen gone, and a full-height drawer is a desktop idea
+   wearing a phone's clothes -- the thumb cannot reach the top of it. So on a
+   phone it becomes a sheet that rises from the bottom edge, which is where the
+   nearest third of the screen already is at a glance. Same content, same
+   markup, only the box changes. */
+@media (max-width: 640px) {
+  [data-app] .shell__rail {
+    inset: auto 0 0 0;
+    width: 100%;
+    max-height: min(84svh, 620px);
+    padding: 0 12px calc(12px + env(safe-area-inset-bottom));
+    border-right: 0;
+    border-top: 1px solid var(--p-line);
+    border-radius: 22px 22px 0 0;
+    transform: translateY(110%);
+    transition: transform var(--p-d2) var(--p-ease);
+  }
+
+  [data-app] .shell__rail.is-open { transform: translateY(0); }
+
+  /* The grab handle. It is decoration -- there is nothing to drag -- so it is
+     drawn, not announced: a control that does nothing is worse than a hint
+     that something came up from the edge. */
+  [data-app] .shell__brandRow { position: relative; padding-top: 20px; }
+  [data-app] .shell__brandRow::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    margin-left: -18px;
+    border-radius: 999px;
+    background: var(--p-line-strong);
+  }
+
+  [data-app] .shell__nav { padding-bottom: 4px; }
+
+  [data-app] .shell__foot { position: sticky; bottom: 0; background: var(--p-surface); }
+}
+
+@media (max-width: 760px) {
+  [data-app] .shell__top { gap: 8px; }
+  [data-app] .shellSearch { display: none; }
+  [data-app] .shell__crumbVenue { display: none; }
+}
+
+@media (max-width: 400px) {
+  [data-app] .shell__top { padding-inline: 12px; }
+}
+
+/* The rail is chrome: it must not print, and it must not eat a page of paper. */
+@media print {
+  [data-app] .shell__rail,
+  [data-app] .shell__top,
+  [data-app] .shell__scrim { display: none !important; }
+  [data-app] .pg--dash { padding-left: 0 !important; }
+}
+
+/* The outlet picker, wearing the rail's proportions instead of the old bar's. */
+[data-app] .shell__outletLabel {
+  display: block;
+  padding: 0 0 6px;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+
+[data-app] .shell__outlet .pg__outletForm { width: 100%; }
+
+[data-app] .shell__outlet .pg__outletSelect {
+  width: 100%;
+  max-width: none;
+  min-height: 36px;
+  border-radius: 8px;
 }

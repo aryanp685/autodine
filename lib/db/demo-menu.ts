@@ -78,6 +78,13 @@ export function demoMenu(slug: string): RestaurantMenu {
     // The demo says "pay at the counter", which is what an unconnected
     // deployment shows a guest. See lib/payments/online-availability.ts.
     online_payments_enabled: false,
+    // The demo restaurant has no uploaded branding: no logo, no banner, and
+    // the default accent. That is the state the guest header is designed
+    // around, so the sample data should exercise it rather than a photograph.
+    logo_path: null,
+    banner_path: null,
+    accent: 'forest',
+    updated_at: '2026-10-19T00:00:00Z',
     created_at: '1970-01-01T00:00:00Z',
   };
 

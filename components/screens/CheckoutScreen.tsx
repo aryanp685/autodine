@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { DishPhoto } from '@/components/DishPhoto';
 import { GuestFlow } from '@/components/GuestFlow';
+import { accentStyle } from '@/lib/branding/palette';
 import { PlaceOrderButton } from '@/components/PlaceOrderButton';
 import { useCart } from '@/components/CartProvider';
 import { inr } from '@/lib/demo-data';
@@ -35,9 +36,12 @@ export function Checkout({
   taxRateBps,
   items,
   onlinePaymentAvailable = false,
+  accent,
 }: {
   slug?: string;
   restaurantName?: string;
+  /** Palette key from the restaurant row; see lib/branding/palette.ts. */
+  accent?: string;
   /** The table a live session confirmed, when there is one. */
   tableLabel?: string | null;
   /** The restaurant's own rate. Without it the bill is priced at a sample. */
@@ -59,6 +63,7 @@ export function Checkout({
 
   return (
     <GuestFlow
+      style={accentStyle(accent)}
       step="pay"
       venue={restaurantName}
       table={tableLabel}

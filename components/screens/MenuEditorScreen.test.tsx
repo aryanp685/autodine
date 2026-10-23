@@ -37,6 +37,9 @@ vi.mock('@/app/dashboard/menus/actions', () => ({
   restoreItemAction: mocks.action('restoreItemAction'),
   saveItemAction: mocks.action('saveItemAction'),
   setAllAvailabilityAction: mocks.action('setAllAvailabilityAction'),
+  setItemAvailabilityAction: mocks.action('setItemAvailabilityAction'),
+  uploadDishPhotoAction: mocks.action('uploadDishPhotoAction'),
+  removeDishPhotoAction: mocks.action('removeDishPhotoAction'),
 }));
 
 import { MenuEditorScreen } from './MenuEditorScreen';
@@ -64,6 +67,7 @@ const item = (id: string, name: string, over: ItemOverride = {}): EditorItem => 
   pricePaise: 25000,
   veg: true,
   available: true,
+  img: null,
   sortOrder: 0,
   categoryId: 'c-1',
   spokenName: '',

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import Link from 'next/link';
 
 /**
@@ -45,9 +45,18 @@ export function GuestFlow({
   back,
   children,
   dock,
+  tabs,
   docked,
+  style,
 }: {
-  step: GuestStep;
+  /**
+   * Which step of the ordering flow this is.
+   *
+   * Optional, and omitted by the Orders tab: that screen is a place a guest
+   * can stand, not a step they are moving through. Marking it as a step would
+   * put the four-segment indicator in a state that is simply not true.
+   */
+  step?: GuestStep;
   /** The restaurant's name, as the guest knows it. */
   venue?: string | null;
   /** The table, only when a live session confirmed it. */
@@ -58,6 +67,23 @@ export function GuestFlow({
   /** The one primary action for this screen, pinned to the bottom. */
   dock?: ReactNode;
   /**
+   * The guest tab bar, on the screens that are places rather than steps.
+   *
+   * Passed in rather than imported here so this stays a server-safe component
+   * and so each screen decides for itself whether it is a destination worth
+   * having tabs under.
+   */
+  tabs?: ReactNode;
+  /**
+   * Per-restaurant accent, as `--p-accent` / `--p-accent-soft`.
+   *
+   * Applied to the flow root rather than each screen, because the accent is a
+   * property of the restaurant and not of a step: a guest who moves from menu
+   * to cart must not see the colour change. Consumers build this with
+   * `accentStyle()` from lib/branding/palette.ts.
+   */
+  style?: CSSProperties;
+  /**
    * Forces the docked padding when the screen renders its own dock.
    *
    * The pay screen has to render its action INSIDE the order form -- that is
@@ -67,11 +93,11 @@ export function GuestFlow({
    */
   docked?: boolean;
 }) {
-  const currentIndex = GUEST_STEPS.findIndex((entry) => entry.key === step);
+  const currentIndex = step ? GUEST_STEPS.findIndex((entry) => entry.key === step) : -1;
   const position = currentIndex + 1;
 
   return (
-    <div className={`flow ${dock || docked ? 'flow--docked' : ''}`}>
+    <div className={`flow ${dock || docked ? 'flow--docked' : ''} ${tabs ? 'flow--tabs' : ''}`} style={style}>
       <header className="flow__bar">
         <div className="flow__lead">
           {back ? (
@@ -93,7 +119,9 @@ export function GuestFlow({
 
         {/* Four segments, not four labels: at arm's length on a phone the
             shape is what reads. The words are there for a screen reader, and
-            the current one is also stated in text for anyone who wants it. */}
+            the current one is also stated in text for anyone who wants it.
+            Omitted entirely when the screen is not a step in the flow. */}
+        {step && (
         <ol className="flow__steps" aria-label={`Step ${position} of ${GUEST_STEPS.length}`}>
           {GUEST_STEPS.map((entry, index) => {
             const state = index < currentIndex ? 'is-done' : index === currentIndex ? 'is-now' : 'is-todo';
@@ -107,11 +135,13 @@ export function GuestFlow({
             );
           })}
         </ol>
+        )}
       </header>
 
       <div className="flow__body">{children}</div>
 
       {dock ? <div className="flow__dock">{dock}</div> : null}
+      {tabs}
     </div>
   );
 }

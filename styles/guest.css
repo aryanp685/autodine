@@ -3042,3 +3042,543 @@
   [data-app] .bill__table tr { break-inside: avoid; }
   [data-app] .bill__totals { break-inside: avoid; }
 }
+
+/* =========================================================================
+   The venue header (components/MenuIdentity.tsx)
+
+   Two designed states, one component. The banner layout is photographic; the
+   paper layout is typographic. Neither is a hole where the other would be.
+
+   No hex colours are introduced here on purpose: --p-accent and
+   --p-accent-soft are set inline from the restaurant's palette key, so every
+   rule below re-themes itself per restaurant. The design-system ratchet is at
+   its ceiling and stays there.
+   ========================================================================= */
+
+[data-app] .ident {
+  --ident-ink: var(--p-ink);
+  --ident-muted: var(--p-ink-46);
+  color: var(--ident-ink);
+}
+
+/* ---------------------------------------------------------------- paper */
+
+[data-app] .ident--paper {
+  background: var(--p-paper);
+  /* A whisper of warmth so the header is not a flat band of paper. It uses the
+     restaurant's own soft accent, which is how an unbranded venue still picks
+     up its colour identity before it has uploaded anything. */
+  background-image: radial-gradient(
+    120% 90% at 50% -10%,
+    var(--p-accent-soft) 0%,
+    transparent 62%
+  );
+  border-bottom: 1px solid var(--p-line);
+  padding: clamp(22px, 5vh, 40px) var(--p-gutter) clamp(18px, 3vh, 26px);
+  text-align: center;
+}
+
+[data-app] .ident__paperTop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+[data-app] .ident__ring {
+  display: grid;
+  place-items: center;
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  border: 1px solid var(--p-line-strong);
+  background: var(--p-surface);
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+
+[data-app] .ident__monogram {
+  /* Inter, not a serif. The product ships one typeface and the mockups'
+     serif was a proposal; a Georgia fallback would render differently on
+     every OS, which is the opposite of a consistent type system. */
+  font-size: 1.35rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--p-accent);
+  line-height: 1;
+}
+
+/* Over a photograph the monogram needs its own surface to stay legible. */
+[data-app] .ident__monogram--onBanner {
+  color: var(--p-on-ink);
+}
+
+[data-app] .ident__logo {
+  object-fit: contain;
+  border-radius: 50%;
+}
+
+[data-app] .ident__logo--onPaper {
+  width: 100%;
+  height: 100%;
+}
+
+[data-app] .ident__name {
+  font-size: clamp(1.65rem, 6.4vw, 2.4rem);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+  margin: 0;
+  text-wrap: balance;
+}
+
+[data-app] .ident__line {
+  margin-top: 10px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ident-muted);
+  line-height: 1.5;
+}
+
+/* --------------------------------------------------------------- banner */
+
+[data-app] .ident--banner {
+  position: relative;
+  background: var(--p-ink);
+}
+
+[data-app] .ident__banner {
+  position: relative;
+  height: clamp(168px, 34vh, 260px);
+  overflow: hidden;
+}
+
+[data-app] .ident__bannerImg {
+  object-fit: cover;
+  /* A portrait photo in a wide slot is cropped from the middle-top, which is
+     where a restaurant interior's lights and signage usually are. */
+  object-position: center 38%;
+}
+
+[data-app] .ident__scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(12, 11, 9, 0.18) 0%,
+    rgba(12, 11, 9, 0.34) 55%,
+    rgba(12, 11, 9, 0.62) 100%
+  );
+}
+
+[data-app] .ident__badge {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin: -32px auto 0;
+  border-radius: 50%;
+  background: var(--p-surface);
+  border: 1px solid var(--p-line-strong);
+  overflow: hidden;
+  z-index: 1;
+}
+
+[data-app] .ident__text--onBanner {
+  /* Sits over the bottom of the photograph, so it is drawn on the scrim, not
+     on a card. The badge above is the only thing that crosses the boundary. */
+  margin-top: -34px;
+  padding: 0 var(--p-gutter) clamp(18px, 3vh, 26px);
+  text-align: center;
+  color: var(--p-on-ink);
+  position: relative;
+  z-index: 1;
+}
+
+[data-app] .ident__text--onBanner .ident__name {
+  margin-top: 8px;
+  color: var(--p-on-ink);
+  text-shadow: 0 1px 18px rgba(12, 11, 9, 0.35);
+}
+
+[data-app] .ident__text--onBanner .ident__line {
+  color: var(--p-on-ink-64);
+}
+
+/* ----------------------------------------------------------- table chip */
+
+[data-app] .ident__table {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px auto 0;
+  padding: 7px 14px;
+  border-radius: var(--p-pill);
+  border: 1px solid var(--p-line-strong);
+  background: var(--p-surface);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--p-ink-80);
+  white-space: nowrap;
+  /* Centred without needing the parent to be a flex container. */
+  width: fit-content;
+}
+
+[data-app] .ident--paper .ident__table {
+  margin-top: 18px;
+}
+
+[data-app] .ident--banner .ident__table {
+  display: flex;
+  position: relative;
+  z-index: 1;
+  margin: 0 auto 18px;
+  background: rgba(250, 247, 241, 0.94);
+  border-color: rgba(250, 247, 241, 0.3);
+  color: var(--p-ink);
+}
+
+[data-app] .ident__tableDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--p-accent);
+  flex: 0 0 auto;
+}
+
+/* ---------------------------------------------------- menu list header */
+
+/* The old .menu__head is replaced by .ident, but the screens still render the
+   list heading, so the spacing under the header is set once here. */
+[data-app] .menu .ident {
+  margin-bottom: 0;
+}
+
+@media (max-width: 420px) {
+  [data-app] .ident__ring {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 12px;
+  }
+  [data-app] .ident__badge {
+    width: 56px;
+    height: 56px;
+    margin-top: -28px;
+  }
+  [data-app] .ident__line {
+    letter-spacing: 0.12em;
+  }
+  [data-app] .ident__banner {
+    height: clamp(148px, 30vh, 200px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-app] .ident__bannerImg {
+    animation: identSettle var(--p-d4) var(--p-ease) both;
+  }
+}
+
+@keyframes identSettle {
+  from { transform: scale(1.04); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+/* =========================================================================
+   Guest tabs + menu search (components/GuestTabs.tsx, lib/guest-search.ts)
+
+   The tab bar is the bottom edge of the app. Everything else that pins itself
+   to the bottom -- the cart pill on the menu, the docked action on the cart --
+   has to sit ABOVE it rather than under it, which is what the
+   `--gtabs-h` offsets below are for. One variable, so a change of height
+   cannot leave the cart bar half swallowed.
+   ========================================================================= */
+
+[data-app] .flow--tabs { --gtabs-h: 58px; }
+
+[data-app] .gtabs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 46;
+  border-top: 1px solid var(--p-line);
+  background: var(--p-glass);
+  -webkit-backdrop-filter: saturate(180%) blur(18px);
+  backdrop-filter: saturate(180%) blur(18px);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+[data-app] .gtabs__inner {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  width: min(100%, 560px);
+  margin: 0 auto;
+}
+
+[data-app] .gtabs__tab {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  min-height: 56px;
+  padding: 8px 4px 7px;
+  color: var(--p-ink-46);
+  text-decoration: none;
+  transition: color var(--p-d1) linear;
+  -webkit-tap-highlight-color: transparent;
+}
+
+[data-app] .gtabs__tab:hover { color: var(--p-ink-80); }
+[data-app] .gtabs__tab:focus-visible {
+  outline: 2px solid var(--p-accent);
+  outline-offset: -3px;
+  border-radius: var(--p-r-sm);
+}
+
+/* Colour alone never marks the current tab: the accent bar above the icon and
+   the aria-current on the link both say it, the way a native bar does. */
+[data-app] .gtabs__tab.is-active { color: var(--p-accent); }
+
+[data-app] .gtabs__tab.is-active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 22px;
+  height: 2px;
+  margin-left: -11px;
+  border-radius: 0 0 2px 2px;
+  background: var(--p-accent);
+}
+
+[data-app] .gtabs__icon { position: relative; display: grid; place-items: center; }
+
+[data-app] .gtabs__label {
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+[data-app] .gtabs__badge {
+  position: absolute;
+  top: -5px;
+  right: -9px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--p-accent);
+  color: var(--p-on-ink);
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 17px;
+  text-align: center;
+}
+
+/* ---- everything anchored to the bottom moves up ------------------------- */
+
+/* Any tabbed screen keeps its last line clear of the bar, whether or not it has
+   a docked action. The menu with an empty cart has no dock and was the case
+   that would have hidden its own last dish. */
+[data-app] .flow--tabs .flow__body {
+  padding-bottom: calc(var(--gtabs-h) + env(safe-area-inset-bottom) + 24px);
+}
+
+[data-app] .flow--tabs .flow__dock {
+  bottom: calc(var(--gtabs-h) + env(safe-area-inset-bottom));
+}
+
+[data-app] .flow--tabs.flow--docked .flow__body {
+  padding-bottom: calc(108px + var(--gtabs-h) + env(safe-area-inset-bottom));
+}
+
+[data-app] .flow--tabs .menu__cartBar {
+  bottom: calc(20px + var(--gtabs-h) + env(safe-area-inset-bottom));
+}
+
+/* ---- the orders screen ------------------------------------------------- */
+
+[data-app] .gtabs__checking {
+  color: var(--p-ink-46);
+  font-size: 0.875rem;
+}
+
+[data-app] .gtabs__empty,
+[data-app] .gtabs__card {
+  margin-top: 22px;
+  padding: clamp(18px, 3vw, 26px);
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-r);
+  background: var(--p-surface);
+}
+
+[data-app] .gtabs__emptyTitle {
+  color: var(--p-ink);
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+[data-app] .gtabs__emptyBody {
+  margin-top: 6px;
+  max-width: 46ch;
+  color: var(--p-ink-64);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+[data-app] .gtabs__cardRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--p-line);
+  font-size: 0.9375rem;
+  color: var(--p-ink-80);
+}
+
+[data-app] .gtabs__cardLabel {
+  color: var(--p-ink-46);
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* Inter, tabular, spaced -- the system has no monospace face and adding one
+   for a six-character code would be the only different font in the product. */
+[data-app] .gtabs__cardCode {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-ink);
+}
+
+[data-app] .gtabs__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  margin-top: 14px;
+  padding: 0 18px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-pill);
+  background: var(--p-surface);
+  color: var(--p-ink);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+[data-app] .gtabs__cta + .gtabs__cta { margin-left: 8px; }
+
+[data-app] .gtabs__cta:hover { border-color: var(--p-ink); background: var(--p-paper-deep); }
+
+[data-app] .gtabs__cta--solid {
+  border-color: var(--p-ink);
+  background: var(--p-ink);
+  color: var(--p-on-ink);
+}
+
+[data-app] .gtabs__cta--solid:hover {
+  border-color: var(--p-ink);
+  background: color-mix(in srgb, var(--p-ink) 88%, var(--p-on-ink));
+  color: var(--p-on-ink);
+}
+
+[data-app] .gtabs__fine {
+  margin-top: 16px;
+  color: var(--p-ink-46);
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+
+[data-app] .gtabs__forget {
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  font-size: inherit;
+  color: var(--p-ink-80);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+[data-app] .gtabs__forget:hover { color: var(--p-ink); }
+
+/* ---- menu search ------------------------------------------------------- */
+
+[data-app] .menu__search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(100%, 880px);
+  margin: 18px auto 0;
+  padding: 0 var(--p-gutter);
+}
+
+[data-app] .menu__searchIcon {
+  position: absolute;
+  left: calc(var(--p-gutter) + 14px);
+  color: var(--p-ink-46);
+  pointer-events: none;
+}
+
+[data-app] .menu__searchInput {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 82px 0 42px;
+  border: 1px solid var(--p-line-strong);
+  border-radius: var(--p-pill);
+  background: var(--p-surface);
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--p-ink);
+  transition: border-color var(--p-d1) linear;
+}
+
+[data-app] .menu__searchInput::placeholder { color: var(--p-ink-46); }
+[data-app] .menu__searchInput:focus { outline: none; border-color: var(--p-ink-46); }
+[data-app] .menu__searchInput::-webkit-search-cancel-button { display: none; }
+
+[data-app] .menu__searchClear {
+  position: absolute;
+  right: calc(var(--p-gutter) + 6px);
+  min-height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--p-pill);
+  background: var(--p-paper-deep);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--p-ink-80);
+  cursor: pointer;
+}
+
+[data-app] .menu__searchClear:hover { color: var(--p-ink); }
+
+/* The empty state keeps the search field's own button inline, so the whole
+   block reads as one sentence with an action, not a paragraph and an orphan. */
+[data-app] .menu__listEmpty .menu__searchClear {
+  position: static;
+  margin-top: 10px;
+}
+
+@media (max-width: 560px) {
+  [data-app] .gtabs__inner { width: 100%; }
+  [data-app] .menu__search { margin-top: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-app] .gtabs__tab { transition: none; }
+}
