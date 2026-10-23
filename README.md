@@ -31,6 +31,8 @@ Open <http://localhost:3000>. With no Supabase environment variables, the site r
 
 `GET /api/health` answers "is this deployment wired up, and are the migrations on it?" in booleans — no keys, no ids, no rows.
 
+Before that, `npm run env:check` reads `.env.local` and names what is missing, catches a placeholder left in place, and refuses to pass if a secret key is in a `NEXT_PUBLIC_` variable — the one mistake that would hand every visitor full database access. It prints key prefixes, never values.
+
 ## Quality checks
 
 ```bash

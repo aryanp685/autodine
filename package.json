@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "design:check": "node scripts/check-design-system.mjs",
     "sql:check": "node scripts/check-sql.mjs",
-    "seed:sql": "tsx scripts/emit-seed.ts"
+    "seed:sql": "tsx scripts/emit-seed.ts",
+    "env:check": "node scripts/check-env.mjs"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",
