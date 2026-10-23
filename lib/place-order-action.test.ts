@@ -88,9 +88,38 @@ describe('placeOrderAction', () => {
     expect(parsed.searchParams.get('error')).toBe('Hara Bhara Kebab is sold out.');
   });
 
+  it('tells the guest when the database found more than one match', async () => {
+    // 21000 = cardinality_violation: a query returned two rows where the order
+    // transaction needed one. Nothing was written, and repeating the same
+    // ambiguous question gets the same refusal -- so: no retry, no "try again",
+    // and a reference staff can search the logs for.
+    mocks.rpc.mockResolvedValue({ data: null, error: { code: '21000', message: 'more than one row' } });
+
+    const url = await run(() => placeOrderAction(form()));
+    const parsed = new URL(url, 'https://example.test');
+
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+    expect(parsed.searchParams.get('s')).toBe('kings-of-kings');
+    expect(parsed.searchParams.get('error')).toBe(
+      'The kitchen’s system found more than one match for something in this order, so nothing was sent. Please order with staff, quoting the reference below.'
+    );
+    expect(parsed.searchParams.get('code')).toBe('21000');
+  });
+
+  it('treats an ambiguous singular response the same way', async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: { code: 'PGRST116', message: 'json' } });
+
+    const url = await run(() => placeOrderAction(form()));
+    const parsed = new URL(url, 'https://example.test');
+
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+    expect(parsed.searchParams.get('error')).toMatch(/more than one match/i);
+    expect(parsed.searchParams.get('code')).toBe('PGRST116');
+  });
+
   it('keeps the restaurant in the URL when the failure is unexplained', async () => {
-    // 21000 is a class we do not classify and do not retry: a genuine unknown.
-    mocks.rpc.mockResolvedValue({ data: null, error: { code: '21000', message: 'boom' } });
+    // A code nobody has classified yet: no retry, no claim about the cause.
+    mocks.rpc.mockResolvedValue({ data: null, error: { code: '42804', message: 'boom' } });
 
     const url = await run(() => placeOrderAction(form()));
     const parsed = new URL(url, 'https://example.test');
@@ -102,7 +131,7 @@ describe('placeOrderAction', () => {
     );
     // The class of failure rides along so an unexplained break is diagnosable
     // instead of a sentence with nothing behind it.
-    expect(parsed.searchParams.get('code')).toBe('21000');
+    expect(parsed.searchParams.get('code')).toBe('42804');
   });
 
   it('tries once more when the database was merely unreachable', async () => {
@@ -120,7 +149,24 @@ describe('placeOrderAction', () => {
     expect(parsed.searchParams.get('code')).toBe('KI-ABC12');
   });
 
-  it('says the system was busy when even the retry could not reach it', async () => {
+  it('lands on the second retry when the schema cache was still reloading', async () => {
+    // A free-tier database answers PGRST002 for a second or two after a restart.
+    // One 400 ms wait is inside that window; the second wait is what makes the
+    // difference between a placed order and a guest told to tap the button.
+    mocks.rpc
+      .mockResolvedValueOnce({ data: null, error: { code: 'PGRST002', message: 'loading' } })
+      .mockResolvedValueOnce({ data: null, error: { code: 'PGRST002', message: 'loading' } })
+      .mockResolvedValueOnce({ data: 'KI-ZZZ99', error: null });
+
+    const url = await run(() => placeOrderAction(form()));
+    const parsed = new URL(url, 'https://example.test');
+
+    expect(mocks.rpc).toHaveBeenCalledTimes(3);
+    expect(parsed.pathname).toBe('/menu/order');
+    expect(parsed.searchParams.get('code')).toBe('KI-ZZZ99');
+  });
+
+  it('says the system was busy when even the retries could not reach it', async () => {
     mocks.rpc.mockResolvedValue({
       data: null,
       error: { code: 'PGRST003', message: 'pool timeout' },
@@ -129,7 +175,7 @@ describe('placeOrderAction', () => {
     const url = await run(() => placeOrderAction(form()));
     const parsed = new URL(url, 'https://example.test');
 
-    expect(mocks.rpc).toHaveBeenCalledTimes(2);
+    expect(mocks.rpc).toHaveBeenCalledTimes(3);
     expect(parsed.searchParams.get('error')).toMatch(/system was busy for a moment/i);
     expect(parsed.searchParams.get('code')).toBe('PGRST003');
   });

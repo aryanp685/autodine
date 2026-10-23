@@ -26,6 +26,10 @@
  *   23514 check violation       - the bill's arithmetic did not satisfy the
  *                                 orders_math_check constraint.
  *   57014 statement timeout     - the write took too long; nothing was saved.
+ *   21000 cardinality viol.     - a query inside the order transaction matched
+ *   PGRST116 singular response    more than one row where it needed exactly
+ *                                 one. The database refused to guess, which is
+ *                                 correct, and nothing was written.
  *
  * Everything else is the catch-all, and it is the only branch that carries a
  * code back to the screen.
@@ -84,6 +88,15 @@ export function describePlaceFailure(code?: string): string {
     case '42703':
     case '42P01':
       return 'This restaurant is still being set up for ordering. Please ask a member of staff to take your order.';
+    case '21000':
+    case 'PGRST116':
+      // "More than one row where one was needed." Nothing was written, and
+      // trying again sends the same ambiguous question to the same database,
+      // so this must not be retried and must not say "try again". It is not
+      // the guest's mistake either: a duplicated row on the menu or the card
+      // is the restaurant's to fix, and the reference tells them what to look
+      // for in the logs.
+      return 'The kitchen’s system found more than one match for something in this order, so nothing was sent. Please order with staff, quoting the reference below.';
     case '23514':
       return 'The bill did not add up when the kitchen checked it, so nothing was sent. Please try again, or order with staff.';
     case '57014':
