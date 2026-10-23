@@ -21,10 +21,14 @@ import type { ReactNode } from 'react';
  * context but never a containing block, so this is the one property that can
  * be animated here without breaking the layout underneath it.
  *
- * 220ms is the design system's --dur-2, "an element arriving". Any longer and
- * the page feels like it is loading; any shorter and it is not perceived at
- * all. The global reduced-motion rule collapses it to nothing.
+ * 220ms is the product's "an element arriving" duration. Any longer and the
+ * page feels like it is loading; any shorter and it is not perceived at all.
+ * The global reduced-motion rule collapses it to nothing.
  */
 export default function Template({ children }: { children: ReactNode }) {
-  return <div className="routeIn">{children}</div>;
+  return (
+    <div className="animate-[routein_220ms_cubic-bezier(0.22,1,0.36,1)_both] motion-reduce:animate-none">
+      {children}
+    </div>
+  );
 }

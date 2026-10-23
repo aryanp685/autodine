@@ -57,8 +57,11 @@ export function OrderStatusRefresh({ intervalMs = 25_000 }: { intervalMs?: numbe
   }, [router, intervalMs]);
 
   return (
-    <p className="placed__live">
-      <span className="placed__liveDot" aria-hidden="true" />
+    <p className="inline-flex items-center gap-1.5 text-[11.5px] text-gink-46">
+      <span
+        aria-hidden="true"
+        className="size-1.5 rounded-full bg-[var(--p-accent)] [animation:gbar_260ms_ease-out_both] motion-reduce:animate-none"
+      />
       Status updates on its own — no need to reload
     </p>
   );

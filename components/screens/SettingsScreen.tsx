@@ -464,7 +464,7 @@ export function SettingsScreen({
                       There is no path from anything a restaurant types to this
                       string, so it is injected rather than parsed. */}
                   <span
-                    className="qr-svg block"
+                    className="block [&>svg]:block [&>svg]:size-full"
                     style={{ width: 176, height: 176 }}
                     dangerouslySetInnerHTML={{ __html: data.publicMenuSvg }}
                   />
@@ -570,7 +570,7 @@ export function SettingsScreen({
         <div className="flex flex-col items-center gap-2 border border-hair px-6 py-8 text-center">
           {data?.publicMenuSvg ? (
             <span
-              className="qr-svg block"
+              className="block [&>svg]:block [&>svg]:size-full"
               style={{ width: 160, height: 160 }}
               dangerouslySetInnerHTML={{ __html: data.publicMenuSvg }}
             />
