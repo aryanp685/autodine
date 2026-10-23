@@ -26,9 +26,9 @@ export const metadata: Metadata = { title: 'Your order · AutoDine' };
 export default async function CartPage({
   searchParams,
 }: {
-  searchParams: Promise<{ s?: string; error?: string }>;
+  searchParams: Promise<{ s?: string; error?: string; code?: string }>;
 }) {
-  const { s, error } = await searchParams;
+  const { s, error, code } = await searchParams;
 
   const access = await loadTableAccess(s);
 
@@ -59,6 +59,10 @@ export default async function CartPage({
         // guest learns why. It renders inside the screen, under the order it
         // is about, rather than as a banner over the guest's own header.
         placedError={error}
+        // The class of the failure, when the action could classify it. Shown as
+        // a small reference so a failure nobody has seen before can be named
+        // from a screenshot instead of reproduced.
+        placedErrorCode={code}
       />
     </CartProvider>
   );

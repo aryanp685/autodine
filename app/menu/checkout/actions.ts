@@ -4,7 +4,10 @@ import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { parseCart } from '@/lib/cart-storage';
 import { loadTableAccess } from '@/lib/table-access';
-import { describePlaceFailure } from '@/lib/place-order-failure';
+import {
+  describePlaceFailure,
+  isTransientPlaceCode,
+} from '@/lib/place-order-failure';
 
 const CART_PATH = '/menu/cart';
 
@@ -118,13 +121,42 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
   // bill.
   const guestToken = crypto.randomUUID();
 
-  const { data: code, error } = await supabase.rpc('place_public_order', {
+  let { data: code, error } = await supabase.rpc('place_public_order', {
     p_slug: slug,
     p_lines: lines,
     p_note: note,
     p_session_token: liveSession,
     p_guest_token: guestToken,
   });
+
+  /**
+   * One more try, but only for failures that prove nothing was written.
+   *
+   * A free-tier database answers PGRST002 while its schema cache reloads after a
+   * restart, PGRST003 when the connection pool is momentarily full, and 57P01
+   * when the server is being recycled. All of these abort before the order is
+   * written, so a second call cannot produce a second order -- and the guest's
+   * only alternative is to tap Place order again and hope, which is what this
+   * whole screen exists to avoid. A lost response (the connection dropping after
+   * a commit) is a thrown fetch error, not one of these codes, and is not
+   * retried.
+   */
+  if (isTransientPlaceCode(error?.code)) {
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    const retry = await supabase.rpc('place_public_order', {
+      p_slug: slug,
+      p_lines: lines,
+      p_note: note,
+      p_session_token: liveSession,
+      p_guest_token: guestToken,
+    });
+    console.warn('[placeOrderAction] retried a transient failure', {
+      first: error?.code,
+      second: retry.error?.code ?? 'ok',
+    });
+    code = retry.data;
+    error = retry.error;
+  }
 
   if (error) {
     // Every branch that reaches a guest is logged with its code. Without this

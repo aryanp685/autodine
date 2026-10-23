@@ -260,3 +260,41 @@ describe('the cart says how many dishes it will actually order', () => {
     expect(html).toMatch(/no longer available/);
   });
 });
+
+/**
+ * The reference on a failed order.
+ *
+ * Every branch the guest can cause has its own sentence. What is left is the
+ * unknown, and an unknown with nothing behind it is a screenshot and a shrug.
+ * The five-character class is not the database's shape -- it says which kind of
+ * refusal it was, so the next failure can be named instead of guessed.
+ */
+describe('the failure reference', () => {
+  it('shows the class of failure when the action carried one', () => {
+    setLines([{ itemId: 'i1', qty: 1 }]);
+
+    const html = renderToStaticMarkup(
+      <Cart
+        slug="maddi"
+        restaurantName="Maddi"
+        taxRateBps={500}
+        items={items}
+        placedError="The kitchen’s system was busy for a moment."
+        placedErrorCode="PGRST003"
+      />,
+    );
+
+    expect(html).toContain('Reference PGRST003');
+    expect(html).toContain('quote this to staff');
+  });
+
+  it('does not invent a reference when there is none', () => {
+    setLines([{ itemId: 'i1', qty: 1 }]);
+
+    const html = renderToStaticMarkup(
+      <Cart slug="maddi" restaurantName="Maddi" taxRateBps={500} items={items} placedError="Nope." />,
+    );
+
+    expect(html).not.toContain('Reference');
+  });
+});

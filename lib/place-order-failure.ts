@@ -30,6 +30,45 @@
  * Everything else is the catch-all, and it is the only branch that carries a
  * code back to the screen.
  */
+/**
+ * Failures that mean the order was never written, and may not even have been
+ * attempted.
+ *
+ * WHY THESE ARE SAFE TO TRY AGAIN
+ *
+ * A PostgREST or Postgres error is returned only after the statement failed:
+ * the transaction was aborted, so nothing was committed. Retrying therefore
+ * cannot create a second order. (A *lost response* -- the connection dropping
+ * after a commit -- arrives as a thrown fetch error, not one of these codes,
+ * and is deliberately not retried.)
+ *
+ * The list is the class that says "the database was not reachable right now":
+ * the schema cache still loading, the connection pool full, an admin shutdown,
+ * a serialisation conflict, or a statement that timed out. On a free-tier
+ * project these are ordinary and transient, and the guest's alternative is to
+ * tap Place order again and hope -- which is what this code exists to avoid.
+ */
+const TRANSIENT_PLACE_CODES = new Set([
+  'PGRST000', // could not connect to the database
+  'PGRST001', // internal server error before the query
+  'PGRST002', // schema cache still loading after a restart
+  'PGRST003', // timed out waiting for a connection from the pool
+  '08000',
+  '08003',
+  '08006', // connection exception
+  '53300', // too many connections
+  '57P01', // admin shutdown / server restart
+  '40001', // serialisation failure
+  '40P01', // deadlock detected
+  '55P03', // could not obtain lock
+  '57014', // statement timeout
+  'XX000', // internal error
+]);
+
+export function isTransientPlaceCode(code?: string | null): boolean {
+  return Boolean(code && TRANSIENT_PLACE_CODES.has(code));
+}
+
 export function describePlaceFailure(code?: string): string {
   if (!code) {
     return 'The kitchen’s system did not answer. Your cart is safe — please try again in a moment.';
@@ -52,6 +91,22 @@ export function describePlaceFailure(code?: string): string {
     case 'PGRST301':
     case '401':
       return 'Your session timed out. Reopen the menu from the QR code on your table and order again.';
+    case 'PGRST000':
+    case 'PGRST001':
+    case 'PGRST002':
+    case 'PGRST003':
+    case '08000':
+    case '08003':
+    case '08006':
+    case '53300':
+    case '57P01':
+    case '40001':
+    case '40P01':
+    case '55P03':
+    case 'XX000':
+      // The database was unreachable or busy, not wrong. The action has
+      // already tried once more by the time a guest reads this.
+      return 'The kitchen’s system was busy for a moment, so this order was not sent. Nothing was charged — tap Place order once more.';
     default:
       // The database's own message is logged by the action and never rendered
       // here: a Postgres sentence would tell a guest the shape of the schema.

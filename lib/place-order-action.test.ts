@@ -89,7 +89,8 @@ describe('placeOrderAction', () => {
   });
 
   it('keeps the restaurant in the URL when the failure is unexplained', async () => {
-    mocks.rpc.mockResolvedValue({ data: null, error: { code: 'XX000', message: 'boom' } });
+    // 21000 is a class we do not classify and do not retry: a genuine unknown.
+    mocks.rpc.mockResolvedValue({ data: null, error: { code: '21000', message: 'boom' } });
 
     const url = await run(() => placeOrderAction(form()));
     const parsed = new URL(url, 'https://example.test');
@@ -101,7 +102,49 @@ describe('placeOrderAction', () => {
     );
     // The class of failure rides along so an unexplained break is diagnosable
     // instead of a sentence with nothing behind it.
-    expect(parsed.searchParams.get('code')).toBe('XX000');
+    expect(parsed.searchParams.get('code')).toBe('21000');
+  });
+
+  it('tries once more when the database was merely unreachable', async () => {
+    // PGRST002/003 and friends abort before the order is written, so a second
+    // call cannot make two orders. The first call fails, the second lands.
+    mocks.rpc
+      .mockResolvedValueOnce({ data: null, error: { code: 'PGRST003', message: 'pool timeout' } })
+      .mockResolvedValueOnce({ data: 'KI-ABC12', error: null });
+
+    const url = await run(() => placeOrderAction(form()));
+    const parsed = new URL(url, 'https://example.test');
+
+    expect(mocks.rpc).toHaveBeenCalledTimes(2);
+    expect(parsed.pathname).toBe('/menu/order');
+    expect(parsed.searchParams.get('code')).toBe('KI-ABC12');
+  });
+
+  it('says the system was busy when even the retry could not reach it', async () => {
+    mocks.rpc.mockResolvedValue({
+      data: null,
+      error: { code: 'PGRST003', message: 'pool timeout' },
+    });
+
+    const url = await run(() => placeOrderAction(form()));
+    const parsed = new URL(url, 'https://example.test');
+
+    expect(mocks.rpc).toHaveBeenCalledTimes(2);
+    expect(parsed.searchParams.get('error')).toMatch(/system was busy for a moment/i);
+    expect(parsed.searchParams.get('code')).toBe('PGRST003');
+  });
+
+  it('does not retry a refusal the guest has to act on', async () => {
+    // A sold-out dish will be sold out on the second call too; retrying only
+    // makes the guest wait longer for the same sentence.
+    mocks.rpc.mockResolvedValue({
+      data: null,
+      error: { code: 'P0001', message: 'Hara Bhara Kebab is sold out.' },
+    });
+
+    await run(() => placeOrderAction(form()));
+
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
   });
 
   it('tells a guest their cart is stale rather than to tap again', async () => {
