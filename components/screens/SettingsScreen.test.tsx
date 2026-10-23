@@ -142,7 +142,9 @@ describe('SettingsScreen', () => {
       );
 
       expect(html).not.toContain('No gateway keys on this deployment');
-      expect(html).not.toMatch(/disabled[^>]*>\s*Save payment setting/);
+      // `disabled:` also appears as a Tailwind variant in the class list, so
+      // the assertion is on the attribute that actually disables the control.
+      expect(html).not.toMatch(/<button[^>]*\sdisabled=""[^>]*>\s*Save payment setting/);
     });
 
     it('says nothing is missing when the switch is on and the server has keys', () => {
@@ -172,7 +174,9 @@ describe('SettingsScreen', () => {
     expect(html).toContain('type="button"');
     // The printed menu card is in the DOM for window.print(), and hidden on
     // screen so Settings does not show a second identical card at the bottom.
-    expect(html).toContain('pg__printRow--sheetOnly');
+    expect(html).toContain('data-print-sheet');
+    // ...and it is the only thing that prints.
+    expect(html).toContain('print:hidden');
   });
 
   it('shows the sign-in prompt and no form at all when blocked', () => {
@@ -223,7 +227,7 @@ describe('SettingsScreen', () => {
     expect(html).toContain('Outlets');
     expect(html).toContain('Maddi');
     expect(html).toContain('Maddi Baner');
-    expect(html).toContain('open now');
+    expect(html).toContain('Open now');
     expect(html).toContain('action="/dashboard/outlet/new"');
   });
 

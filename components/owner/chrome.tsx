@@ -127,9 +127,20 @@ export function SectionHead({
 /* ----------------------------------------------------------------- surfaces */
 
 /** A hairline card. No shadow: on white, a shadow reads as a smudge. */
-export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
+export function Card({
+  children,
+  className = '',
+  style,
+}: {
+  children: ReactNode;
+  className?: string;
+  /** For the one card that carries a preview's accent variables. */
+  style?: React.CSSProperties;
+}) {
   return (
-    <div className={['rounded-[14px] border border-hair bg-card', className].join(' ')}>{children}</div>
+    <div className={['rounded-[14px] border border-hair bg-card', className].join(' ')} style={style}>
+      {children}
+    </div>
   );
 }
 

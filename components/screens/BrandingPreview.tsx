@@ -6,6 +6,7 @@ import type { BrandingScreenData } from '@/lib/db/branding-screen';
 import type { MenuScreenData } from '@/lib/db/menu-screen';
 import { accentFrom } from '@/lib/branding/palette';
 import { inr } from '@/lib/demo-data';
+import { btn } from '@/components/owner/chrome';
 
 /**
  * The guest menu, in an owner's browser, with a toolbar that says so.
@@ -31,8 +32,11 @@ export function BrandingPreview({
 }) {
   if (data?.blocked) {
     return (
-      <div className="pg pg--dash" data-surface="owner">
-        <div className="pg__body">
+      <div
+        data-surface="owner"
+        className="min-h-dvh bg-paper px-5 py-10 text-gink antialiased sm:py-16"
+      >
+        <div className="mx-auto w-full max-w-[460px]">
           <SignInPrompt reason={data.blocked} screen="menu preview" />
         </div>
       </div>
@@ -45,19 +49,34 @@ export function BrandingPreview({
 
   return (
     <div
-      className="brandPreview"
-      style={{ ['--p-accent' as string]: accent.accent, ['--p-accent-soft' as string]: accent.soft }}
+      // The accent belongs to the previewed restaurant, not to the staff
+      // surface around it, so it is set here and nowhere higher.
+      style={
+        {
+          ['--p-accent' as string]: accent.accent,
+          ['--p-accent-soft' as string]: accent.soft,
+        } as React.CSSProperties
+      }
+      className="min-h-dvh bg-paper-deep text-gink antialiased"
     >
-      <header className="brandPreview__bar">
-        <Link href={backHref} className="brandPreview__back">
-          ← Branding
-        </Link>
-        <span className="brandPreview__tag">Preview</span>
-        <span className="brandPreview__hint">Guests see this after scanning. The table badge is a sample.</span>
+      <header className="sticky top-0 z-10 border-b border-hair bg-paper/92 backdrop-blur-xl">
+        <div className="mx-auto flex w-full max-w-[760px] flex-wrap items-center gap-2.5 px-5 py-3">
+          <Link href={backHref} className={`${btn('quiet', 'sm')} -ml-2`}>
+            ← Branding
+          </Link>
+          <span className="inline-flex h-6 items-center rounded-full bg-gink px-2.5 text-[10.5px] font-semibold tracking-[0.06em] text-onink uppercase">
+            Preview
+          </span>
+          <span className="text-[11.5px] text-gink-46">
+            Guests see this after scanning. The table badge is a sample.
+          </span>
+        </div>
       </header>
 
-      <div className="brandPreview__stage">
-        <div className="brandPreview__phone">
+      <div className="mx-auto flex w-full max-w-[760px] justify-center px-5 py-7">
+        {/* The phone. Same width as the editor preview, so switching between
+            the two does not reflow the header. */}
+        <div className="w-full max-w-[360px] overflow-hidden rounded-[22px] border border-hair-strong bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-24px_rgba(0,0,0,0.28)]">
           <MenuIdentity
             name={name}
             tagline={restaurant?.tagline}
@@ -68,36 +87,57 @@ export function BrandingPreview({
           />
 
           {menu && menu.categories.length > 0 && (
-            <nav className="brandPreview__cats" aria-label="Courses (preview)">
-              <span className="brandPreview__cat is-on">All</span>
+            <nav aria-label="Courses (preview)" className="flex gap-1.5 overflow-x-auto px-4 py-3">
+              <span className="inline-flex h-7 shrink-0 items-center rounded-full bg-gink px-3 text-[11.5px] font-medium text-onink">
+                All
+              </span>
               {menu.categories.slice(0, 4).map((c) => (
-                <span key={c.id} className="brandPreview__cat">
+                <span
+                  key={c.id}
+                  className="inline-flex h-7 shrink-0 items-center rounded-full border border-hair-strong px-3 text-[11.5px] text-gink-64"
+                >
                   {c.name}
                 </span>
               ))}
             </nav>
           )}
 
-          <div className="brandPreview__list">
+          <div className="px-4 pb-4">
             {menu?.items.slice(0, 8).map((item) => (
-              <article key={item.id} className={`brandPreview__row ${item.available ? '' : 'is-out'}`}>
-                <div className="brandPreview__rowBody">
-                  <div className="brandPreview__rowName">{item.name}</div>
-                  {item.desc && <div className="brandPreview__rowDesc">{item.desc}</div>}
-                  <div className="brandPreview__rowPrice tnum">{inr(item.price)}</div>
+              <article
+                key={item.id}
+                data-out={item.available ? undefined : 'true'}
+                className={[
+                  'flex items-start gap-3 border-b border-hair py-3 last:border-b-0',
+                  item.available ? '' : 'opacity-45',
+                ].join(' ')}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] font-medium text-gink">{item.name}</div>
+                  {item.desc && (
+                    <div className="mt-0.5 line-clamp-2 text-[11.5px] leading-[1.45] text-gink-46">
+                      {item.desc}
+                    </div>
+                  )}
+                  <div className="mt-1 text-[12.5px] text-gink tabular-nums">{inr(item.price)}</div>
                 </div>
-                <DishPhoto src={item.img} name={item.name} size={72} className="brandPreview__rowImg" />
-                <span className="brandPreview__add" aria-hidden="true">
+                <DishPhoto src={item.img} name={item.name} size={64} />
+                <span
+                  aria-hidden="true"
+                  className="mt-1 grid size-6 shrink-0 place-items-center rounded-full bg-[var(--p-accent)] text-[15px] leading-none text-white"
+                >
                   +
                 </span>
               </article>
             ))}
 
             {(!menu || menu.items.length === 0) && (
-              <div className="brandPreview__empty">
-                <strong>No dishes yet.</strong>
-                <p>Add dishes in Menus and they will appear here, with your branding around them.</p>
-                <Link href="/dashboard/menus" className="brandPreview__cta">
+              <div className="rounded-[12px] border border-dashed border-hair-strong px-4 py-8 text-center">
+                <strong className="text-[12.5px] font-medium text-gink">No dishes yet.</strong>
+                <p className="mt-1 text-[11.5px] leading-[1.5] text-gink-46">
+                  Add dishes in Menus and they will appear here, with your branding around them.
+                </p>
+                <Link href="/dashboard/menus" className={`${btn('solid', 'sm')} mt-3`}>
                   Go to Menus
                 </Link>
               </div>

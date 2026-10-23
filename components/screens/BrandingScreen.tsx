@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { DashboardBar } from '@/components/DashboardBar';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { MenuIdentity } from '@/components/MenuIdentity';
 import type { OutletBar } from '@/lib/outlets';
@@ -14,6 +13,7 @@ import {
   uploadLogoAction,
 } from '@/app/dashboard/branding/actions';
 import { inr } from '@/lib/demo-data';
+import { OwnerPage, PageHead, Panel, Card, btn } from '@/components/owner/chrome';
 
 /**
  * Menu branding.
@@ -40,6 +40,9 @@ import { inr } from '@/lib/demo-data';
  * restaurant id never travels in the payload -- it comes from the session on
  * the server (see lib/db/staff.ts).
  */
+const pickerLabel =
+  'relative inline-flex h-8 cursor-pointer items-center rounded-full border border-hair-strong px-3 text-[12px] font-medium text-gink transition-colors hover:border-gink-28 hover:bg-gink-07 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-gink';
+
 export function BrandingScreen({
   data,
   outlet,
@@ -53,12 +56,9 @@ export function BrandingScreen({
 }) {
   if (data?.blocked) {
     return (
-      <div className="pg pg--dash" data-surface="owner">
-        <DashboardBar active="branding" outlet={outlet} />
-        <div className="pg__body">
-          <SignInPrompt reason={data.blocked} screen="branding screen" />
-        </div>
-      </div>
+      <OwnerPage active="branding" outlet={outlet}>
+        <SignInPrompt reason={data.blocked} screen="branding screen" />
+      </OwnerPage>
     );
   }
 
@@ -69,169 +69,198 @@ export function BrandingScreen({
   const name = data?.name || 'Your restaurant';
 
   return (
-    <div className="pg pg--dash" data-surface="owner">
-      <DashboardBar active="branding" outlet={outlet} />
+    <OwnerPage active="branding" outlet={outlet}>
+      <PageHead
+        kicker="Menu branding"
+        title={name}
+        meta="Your mark, a banner if you have one, and one accent colour. The menu layout is shared; these are the four things that make it yours."
+      />
 
-      <div className="pg__body">
-        <header className="pg__head">
-          <div className="pg__kicker">Menu branding</div>
-          <h1 className="pg__title">{name}</h1>
-          <p className="pg__lede">
-            Your mark, a banner if you have one, and one accent colour. The menu layout is shared; these
-            are the four things that make it yours.
-          </p>
-        </header>
+      {error && (
+        <div
+          role="alert"
+          className="mb-3 rounded-[12px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-4 py-3"
+        >
+          <strong className="text-[12.5px] text-[var(--alert)]">Nothing was saved.</strong>
+          <p className="mt-1 text-[12.5px] leading-[1.5] text-gink-64">{error}</p>
+        </div>
+      )}
+      {notice && (
+        <div
+          role="status"
+          className="mb-3 rounded-[12px] border border-[var(--p-accent)]/25 bg-accent-soft px-4 py-2.5"
+        >
+          <strong className="text-[12.5px] text-gink">Saved.</strong>{' '}
+          <span className="text-[12.5px] text-gink-64">{notice}</span>
+        </div>
+      )}
 
-        {error && (
-          <div className="pg__alert" role="alert">
-            <strong>Nothing was saved.</strong>
-            <p>{error}</p>
-          </div>
-        )}
-        {notice && (
-          <div className="pg__success" role="status">
-            <strong>Saved.</strong>
-            <p>{notice}</p>
-          </div>
-        )}
+      {!live && (
+        <div className="mb-3 rounded-[12px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-4 py-3 text-[11.5px] leading-[1.55] text-gink-64">
+          <strong className="font-semibold text-gink">The database is not connected.</strong> There is
+          no restaurant to brand, so these controls cannot save. Nothing here is sample data.
+        </div>
+      )}
 
-        {!live && (
-          <div className="pg__note pg__note--warn">
-            <strong>The database is not connected.</strong> There is no restaurant to brand, so these
-            controls cannot save. Nothing here is sample data.
-          </div>
-        )}
+      {live && !canEdit && (
+        <div className="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-[12px] border border-hair bg-paper-deep px-4 py-3 text-[11.5px] leading-[1.55] text-gink-64">
+          <strong className="font-semibold text-gink">Read-only for your role.</strong> Branding is
+          changed by the owner or a manager.
+        </div>
+      )}
 
-        {live && !canEdit && (
-          <div className="pg__note pg__note--info">
-            <strong>Read-only for your role.</strong> Branding is changed by the owner or a manager.
-          </div>
-        )}
+      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+        {/* --------------------------------------------------------------- logo */}
+        <Panel title="Logo" meta="Shown beside your name" bodyClassName="px-4 py-4 sm:px-5">
+          <div className="flex items-start justify-between gap-4">
+            <p className="m-0 max-w-[38ch] text-[12px] leading-[1.5] text-gink-46">
+              Shown in a circle next to your name. A square image works best; we crop nothing.
+            </p>
 
-        <div className="brand__grid">
-          {/* ------------------------------------------------------------ logo */}
-          <section className="pg__formCard">
-            <div className="brand__row">
-              <div>
-                <h2 className="pg__h2">Logo</h2>
-                <p className="pg__p">
-                  Shown in a circle next to your name. A square image works best; we crop nothing.
-                </p>
-              </div>
-
-              <div className="brand__logoPreview">
-                {data?.logoUrl ? (
-                  <Image
-                    src={data.logoUrl}
-                    alt={`${name} logo`}
-                    width={72}
-                    height={72}
-                    className="brand__logoImg"
-                  />
-                ) : (
-                  <span className="brand__logoEmpty" aria-hidden="true">
-                    {initials(name)}
-                  </span>
-                )}
-              </div>
+            {/* The mark at the size a guest sees it, not a thumbnail. */}
+            <div className="shrink-0">
+              {data?.logoUrl ? (
+                <Image
+                  src={data.logoUrl}
+                  alt={`${name} logo`}
+                  width={72}
+                  height={72}
+                  className="size-[72px] rounded-full object-cover ring-1 ring-hair"
+                />
+              ) : (
+                <span
+                  aria-hidden="true"
+                  className="grid size-[72px] place-items-center rounded-full bg-paper-deep text-[20px] font-medium tracking-[-0.02em] text-gink-46"
+                >
+                  {initials(name)}
+                </span>
+              )}
             </div>
+          </div>
 
-            <form action={uploadLogoAction} className="brand__upload">
-              <label className="brand__picker">
+          <div className="mt-4 flex flex-wrap items-center gap-1.5">
+            <form action={uploadLogoAction} className="flex flex-wrap items-center gap-1.5">
+              <label className={[pickerLabel, disabled ? 'pointer-events-none opacity-45' : ''].join(' ')}>
                 <input
                   type="file"
                   name="logo"
                   accept="image/png,image/jpeg,image/webp"
                   disabled={disabled}
                   required
+                  className="absolute inset-0 size-full cursor-pointer opacity-0"
                 />
                 <span>{data?.logoUrl ? 'Replace logo' : 'Choose a logo'}</span>
               </label>
-              <button type="submit" className="pg__btn" disabled={disabled}>
+              <button type="submit" className={btn('solid', 'sm')} disabled={disabled}>
                 Upload
               </button>
             </form>
-            <p className="brand__fine">JPG, PNG or WebP · up to 2 MB</p>
 
             {data?.logoUrl && (
               <form action={removeLogoAction}>
-                <button type="submit" className="brand__remove" disabled={disabled}>
+                <button
+                  type="submit"
+                  className={`${btn('quiet', 'sm')} hover:text-[var(--alert)]`}
+                  disabled={disabled}
+                >
                   Remove logo
                 </button>
               </form>
             )}
-          </section>
+          </div>
+          <p className="mt-2 text-[11px] leading-[1.45] text-gink-46">JPG, PNG or WebP · up to 2 MB</p>
+        </Panel>
 
-          {/* ---------------------------------------------------------- banner */}
-          <section className="pg__formCard">
-            <div className="brand__row">
-              <div>
-                <h2 className="pg__h2">Banner</h2>
-                <p className="pg__p">
-                  Optional. A wide photo of the room or a signature dish. Skip it and the header uses
-                  your paper background instead — both are finished designs.
-                </p>
-              </div>
-            </div>
+        {/* ------------------------------------------------------------- banner */}
+        <Panel title="Banner" meta="Optional" bodyClassName="px-4 py-4 sm:px-5">
+          <p className="m-0 max-w-[46ch] text-[12px] leading-[1.5] text-gink-46">
+            A wide photo of the room or a signature dish. Skip it and the header uses your paper
+            background instead — both are finished designs.
+          </p>
 
+          <div className="relative mt-3 aspect-[16/7] w-full overflow-hidden rounded-[10px] border border-hair bg-paper-deep">
             {data?.bannerUrl ? (
-              <div className="brand__bannerPreview">
-                <Image
-                  src={data.bannerUrl}
-                  alt="Current banner"
-                  fill
-                  sizes="(max-width: 900px) 100vw, 520px"
-                  className="brand__bannerImg"
-                />
-              </div>
+              <Image
+                src={data.bannerUrl}
+                alt="Current banner"
+                fill
+                sizes="(max-width: 900px) 100vw, 520px"
+                className="object-cover"
+              />
             ) : (
-              <div className="brand__bannerEmpty" aria-hidden="true">
-                <span>No banner — paper header</span>
-              </div>
+              <span
+                aria-hidden="true"
+                className="grid size-full place-items-center text-[11.5px] text-gink-46"
+              >
+                No banner — paper header
+              </span>
             )}
+          </div>
 
-            <form action={uploadBannerAction} className="brand__upload">
-              <label className="brand__picker">
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            <form action={uploadBannerAction} className="flex flex-wrap items-center gap-1.5">
+              <label className={[pickerLabel, disabled ? 'pointer-events-none opacity-45' : ''].join(' ')}>
                 <input
                   type="file"
                   name="banner"
                   accept="image/png,image/jpeg,image/webp"
                   disabled={disabled}
                   required
+                  className="absolute inset-0 size-full cursor-pointer opacity-0"
                 />
                 <span>{data?.bannerUrl ? 'Replace banner' : 'Choose a banner'}</span>
               </label>
-              <button type="submit" className="pg__btn" disabled={disabled}>
+              <button type="submit" className={btn('solid', 'sm')} disabled={disabled}>
                 Upload
               </button>
             </form>
-            <p className="brand__fine">JPG, PNG or WebP · up to 4 MB · wide, at least 1200px across</p>
 
             {data?.bannerUrl && (
               <form action={removeBannerAction}>
-                <button type="submit" className="brand__remove" disabled={disabled}>
+                <button
+                  type="submit"
+                  className={`${btn('quiet', 'sm')} hover:text-[var(--alert)]`}
+                  disabled={disabled}
+                >
                   Remove banner
                 </button>
               </form>
             )}
-          </section>
+          </div>
+          <p className="mt-2 text-[11px] leading-[1.45] text-gink-46">
+            JPG, PNG or WebP · up to 4 MB · wide, at least 1200px across
+          </p>
+        </Panel>
 
-          {/* ---------------------------------------------------------- accent */}
-          <section className="pg__formCard">
-            <h2 className="pg__h2">Accent colour</h2>
-            <p className="pg__p">
-              Used for buttons, the add control and the table badge. These six are the only options:
-              each one is checked to stay readable on paper and under white text.
-            </p>
+        {/* ------------------------------------------------------------- accent */}
+        <Panel
+          title="Accent colour"
+          meta={`${accent.key} in use`}
+          bodyClassName="px-4 py-4 sm:px-5"
+        >
+          <p className="m-0 max-w-[52ch] text-[12px] leading-[1.5] text-gink-46">
+            Used for buttons, the add control and the table badge. These six are the only options:
+            each one is checked to stay readable on paper and under white text.
+          </p>
 
-            <form action={saveAccentAction} className="brand__swatches">
+          <form action={saveAccentAction} className="mt-4">
+            <fieldset className="m-0 flex flex-wrap gap-2 border-0 p-0">
+              <legend className="sr-only">Accent colour</legend>
               {ACCENTS.map((option) => {
                 const checked = option.key === accent.key;
                 return (
                   <label
                     key={option.key}
-                    className={`brand__swatch ${checked ? 'is-on' : ''}`}
-                    style={{ ['--swatch' as string]: option.accent }}
+                    data-swatch={checked ? 'on' : 'off'}
+                    className={[
+                      'relative grid size-[42px] cursor-pointer place-items-center rounded-full transition-[box-shadow,transform]',
+                      checked
+                        ? 'ring-2 ring-gink ring-offset-2'
+                        : 'ring-1 ring-hair-strong hover:scale-[1.04]',
+                      disabled ? 'pointer-events-none opacity-45' : '',
+                    ].join(' ')}
+                    style={{ backgroundColor: option.accent }}
+                    title={option.label}
                   >
                     <input
                       type="radio"
@@ -239,74 +268,105 @@ export function BrandingScreen({
                       value={option.key}
                       defaultChecked={checked}
                       disabled={disabled}
+                      className="absolute inset-0 size-full cursor-pointer opacity-0"
                     />
-                    <span className="brand__swatchDot" aria-hidden="true" />
-                    <span className="brand__sr">{option.label}</span>
+                    {checked ? (
+                      <span aria-hidden="true" className="text-[15px] leading-none text-white">
+                        ✓
+                      </span>
+                    ) : null}
+                    <span className="sr-only">{option.label}</span>
                   </label>
                 );
               })}
-              <button type="submit" className="pg__btn" disabled={disabled}>
+            </fieldset>
+            <div className="mt-4">
+              <button type="submit" className={btn('solid', 'sm')} disabled={disabled}>
                 Save colour
               </button>
-            </form>
-          </section>
-
-          {/* --------------------------------------------------------- preview */}
-          <section className="pg__formCard brand__previewCard">
-            <div className="brand__row">
-              <div>
-                <h2 className="pg__h2">Preview</h2>
-                <p className="pg__p">The real header, with your data.</p>
-              </div>
-              {live && (
-                <Link href="/dashboard/branding/preview" className="pg__btn">
-                  Open full preview
-                </Link>
-              )}
             </div>
+          </form>
+        </Panel>
 
-            <div className="brand__phone" style={{ ['--p-accent' as string]: accent.accent, ['--p-accent-soft' as string]: accent.soft }}>
-              <div className="brand__phoneInner">
-                <MenuIdentity
-                  name={name}
-                  tagline={data?.tagline}
-                  logoUrl={data?.logoUrl}
-                  bannerUrl={data?.bannerUrl}
-                  tableLabel="Table 7"
-                />
-
-                <div className="brand__previewList">
-                  {(data?.sampleDishes ?? []).slice(0, 3).map((dish) => (
-                    <div key={dish.id} className="brand__previewRow">
-                      <div>
-                        <div className="brand__previewName">{dish.name}</div>
-                        <div className="brand__previewPrice tnum">{inr(dish.price)}</div>
-                      </div>
-                      <span className="brand__previewAdd" aria-hidden="true">
-                        +
-                      </span>
-                    </div>
-                  ))}
-
-                  {(data?.sampleDishes ?? []).length === 0 && (
-                    <p className="brand__previewEmpty">
-                      Add a dish and it appears here, in your colours.
-                    </p>
-                  )}
-                </div>
-              </div>
+        {/* ------------------------------------------------------------ preview */}
+        <section aria-labelledby="branding-preview">
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+            <div className="flex items-baseline gap-2.5">
+              <h2 id="branding-preview" className="text-[13px] font-semibold text-gink">
+                Preview
+              </h2>
+              <span className="text-[12px] text-gink-46">The real header, with your data.</span>
             </div>
-
-            {live && !data?.hasPublishedMenu && (
-              <p className="brand__fine">
-                Nothing is published yet, so guests still see a closed menu. Publish from{' '}
-                <Link href="/dashboard/menus">Menus</Link> when you are ready.
-              </p>
+            {live && (
+              <Link href="/dashboard/branding/preview" className={btn('ghost', 'sm')}>
+                Open full preview
+              </Link>
             )}
-          </section>
-        </div>
+          </div>
+
+          <Card
+            className="bg-paper-deep px-4 py-6"
+            style={
+              {
+                ['--p-accent' as string]: accent.accent,
+                ['--p-accent-soft' as string]: accent.soft,
+              } as React.CSSProperties
+            }
+          >
+            {/* A phone, at phone width. Narrower and the header wraps differently
+                from the real thing; wider and it stops being a preview. */}
+            <div className="mx-auto w-full max-w-[340px] overflow-hidden rounded-[18px] border border-hair-strong bg-card">
+              <MenuIdentity
+                name={name}
+                tagline={data?.tagline}
+                logoUrl={data?.logoUrl}
+                bannerUrl={data?.bannerUrl}
+                tableLabel="Table 7"
+              />
+
+              <div className="px-4 py-3">
+                {(data?.sampleDishes ?? []).slice(0, 3).map((dish) => (
+                  <div
+                    key={dish.id}
+                    className="flex items-center justify-between gap-3 border-b border-hair py-2 last:border-b-0"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-[12.5px] font-medium text-gink">{dish.name}</div>
+                      <div className="text-[11.5px] text-gink-46 tabular-nums">{inr(dish.price)}</div>
+                    </div>
+                    <span
+                      aria-hidden="true"
+                      className="grid size-6 shrink-0 place-items-center rounded-full bg-[var(--p-accent)] text-[15px] leading-none text-white"
+                    >
+                      +
+                    </span>
+                  </div>
+                ))}
+
+                {(data?.sampleDishes ?? []).length === 0 && (
+                  <p className="m-0 py-2 text-center text-[11.5px] leading-[1.5] text-gink-46">
+                    Add a dish and it appears here, in your colours.
+                  </p>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          {live && !data?.hasPublishedMenu && (
+            <p className="mt-2 text-[11px] leading-[1.5] text-gink-46">
+              Nothing is published yet, so guests still see a closed menu. Publish from{' '}
+              <Link
+                href="/dashboard/menus"
+                className="font-medium text-gink underline decoration-hair-strong underline-offset-2"
+              >
+                Menus
+              </Link>{' '}
+              when you are ready.
+            </p>
+          )}
+        </section>
       </div>
-    </div>
+    </OwnerPage>
   );
 }
 
