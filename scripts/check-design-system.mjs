@@ -71,9 +71,14 @@ for (const file of [...cssFiles, join(ROOT, 'app'), join(ROOT, 'components')]) {
    the approved design). Instead of forbidding them, the count is frozen: it may
    go down, never up. New styles must use the tokens. */
 function countHexOutsideTokens(src) {
-  // Skip the token declaration block, where hex is expected and correct.
-  const withoutTokens = src.replace(/\[data-app\]\s*\{[\s\S]*?\n\}/, '');
-  return (withoutTokens.match(/#[0-9a-fA-F]{3,8}\b/g) || []).length;
+  // A colour inside a custom property IS the token layer, wherever that block
+  // happens to live: `--p-ink: #0c0b09;` is exactly the thing every other rule
+  // is supposed to use. Stripping only the first [data-app] block counted the
+  // second surface's palette as hardcoded, which is the opposite of the rule's
+  // intent. What the ratchet is really about is a hex written into a property
+  // that paints something -- `color: #333`, `background: #fff`.
+  const withoutDeclarations = src.replace(/^\s*--[\w-]+\s*:\s*[^;]+;/gm, '');
+  return (withoutDeclarations.match(/#[0-9a-fA-F]{3,8}\b/g) || []).length;
 }
 const hexCount = cssFiles.reduce((n, f) => n + countHexOutsideTokens(readFileSync(f, 'utf8')), 0);
 

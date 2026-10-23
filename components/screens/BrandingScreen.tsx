@@ -53,7 +53,7 @@ export function BrandingScreen({
 }) {
   if (data?.blocked) {
     return (
-      <div className="pg pg--dash">
+      <div className="pg pg--dash" data-surface="owner">
         <DashboardBar active="branding" outlet={outlet} />
         <div className="pg__body">
           <SignInPrompt reason={data.blocked} screen="branding screen" />
@@ -69,7 +69,7 @@ export function BrandingScreen({
   const name = data?.name || 'Your restaurant';
 
   return (
-    <div className="pg pg--dash">
+    <div className="pg pg--dash" data-surface="owner">
       <DashboardBar active="branding" outlet={outlet} />
 
       <div className="pg__body">

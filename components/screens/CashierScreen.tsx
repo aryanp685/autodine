@@ -287,7 +287,7 @@ export function Cashier({
   };
 
   return (
-    <div className="pg pg--dash app">
+    <div className="pg pg--dash app" data-surface="owner">
       {nav}
 
       <main className="cash">

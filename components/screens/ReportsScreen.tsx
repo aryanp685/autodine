@@ -128,7 +128,7 @@ export function ReportsScreen({
   const categoryPeak = Math.max(0, ...report.categories.map((c) => c.revenuePaise));
 
   return (
-    <div className="pg pg--dash">
+    <div className="pg pg--dash" data-surface="owner">
       <DashboardBar active="reports" outlet={outlet} />
 
       <div className="pg__body">

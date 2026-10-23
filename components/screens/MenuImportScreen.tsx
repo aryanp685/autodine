@@ -92,7 +92,7 @@ export function MenuImportScreen({
     : 0;
 
   return (
-    <div className="pg pg--dash">
+    <div className="pg pg--dash" data-surface="owner">
       <DashboardBar active="import" outlet={outlet} />
 
       <div className="pg__body">

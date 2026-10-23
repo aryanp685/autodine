@@ -1,5 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import Link from 'next/link';
+import { BrandMark } from '@/components/BrandMark';
+import { BRAND_GREEN } from '@/lib/brand';
 
 /**
  * The shell every screen in the ordering flow wears.
@@ -108,7 +110,7 @@ export function GuestFlow({
             </Link>
           ) : (
             <Link href="/" className="flow__brand" aria-label="AutoDine">
-              AutoDine
+              <BrandMark size={22} ink="currentColor" dot={BRAND_GREEN} tone="flow" />
             </Link>
           )}
           <span className="flow__venue" title={venue ?? 'AutoDine'}>

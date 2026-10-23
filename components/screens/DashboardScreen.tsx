@@ -95,7 +95,7 @@ export function Dashboard({
   const chartHasValue = live && data ? data.hourlyPaise.some((v) => v > 0) : true;
 
   return (
-    <div className="pg pg--dash app">
+    <div className="pg pg--dash app" data-surface="owner">
       <DashboardBar active="overview" outlet={outlet} signOut={!blocked} />
 
       <main className="dash__main">
