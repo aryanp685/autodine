@@ -133,10 +133,25 @@ p { margin: 0; }
   opacity: 0;
   will-change: opacity, transform;
 }
-a { color: inherit; text-decoration: none; }
-ul, ol { margin: 0; padding: 0; list-style: none; }
-button { font: inherit; color: inherit; }
-img { display: block; max-width: 100%; }
+/* Element resets live in a LAYER, not loose at the top level.
+ *
+ * This is not tidying. An unlayered rule beats every layered one regardless of
+ * specificity, and Tailwind's utilities are layered. So `a { color: inherit }`
+ * silently won against `text-onink` on a link -- and the button that lost was
+ * a black pill with black text on it, which is to say no text at all. It was
+ * reported as "the button looks empty"; the label was rendering the whole time,
+ * in the colour of the surface behind it.
+ *
+ * @layer base sits before utilities in Tailwind's order, so a utility can now
+ * override a reset, which is what everybody writing `className` already
+ * assumes happens.
+ */
+@layer base {
+  a { color: inherit; text-decoration: none; }
+  ul, ol { margin: 0; padding: 0; list-style: none; }
+  button { font: inherit; color: inherit; }
+  img { display: block; max-width: 100%; }
+}
 
 :focus-visible {
   outline: 2px solid var(--ink);
@@ -272,6 +287,85 @@ img { display: block; max-width: 100%; }
   background: var(--p-paper);
   color: var(--p-ink);
 }
+
+/* =========================================================================
+   Guest flow — frosted surfaces
+
+   Every visitor who scans a card is on a phone, in a restaurant, at arm's
+   length from a warm cream page. Solid white cards on flat cream read as a
+   printout: nothing sits above anything. The guest flow is therefore built out
+   of translucent surfaces over one warm wash, so a card, the docked action and
+   the tab bar all read as glass lying on the same page rather than three
+   different slabs of paint.
+
+   Two decisions worth stating, because both were reported as problems:
+
+   1. NO BLACK BUTTONS IN THE GUEST FLOW. Pure ink fills were carrying every
+      primary action, which made a menu of twenty photographs read as a page of
+      black pills. The guest's primary action is now the restaurant's own
+      accent -- the colour already used for "this is where you are" -- and ink
+      is reserved for text. Owners keep their black-and-white screens; a
+      restaurateur reading a report is not a diner choosing a biryani.
+
+   2. THE WASH IS ON THE ROOT, NOT ON A PSEUDO-ELEMENT. A fixed background on
+      [data-flow-root] is what backdrop-filter has something to blur. Painted
+      on a child with z-index:-1 it would sit behind the root's own opaque
+      background and the blur would have nothing to sample.
+
+   Scoped to [data-flow-root] so owner screens keep the flat white surface the
+   design guard pins an opaque paper under [data-surface='owner']).
+   ========================================================================= */
+[data-flow-root] {
+  /* A little more transparent than the owner's glass: the wash behind is warm
+     and light, so a card can afford to show it. */
+  --p-surface: rgba(255, 255, 255, 0.58);
+  --p-glass: rgba(255, 255, 255, 0.46);
+  --p-line: rgba(12, 11, 9, 0.07);
+  --p-line-strong: rgba(12, 11, 9, 0.13);
+
+  /* Three sources of light: the restaurant's accent in the top-left, a warm
+     amber bloom top-right, and the page's own cream underneath. Enough for the
+     frosted cards to have something to hold, not enough to compete with a
+     photograph. */
+  background:
+    radial-gradient(62% 46% at 8% -8%, color-mix(in oklab, var(--p-accent) 26%, transparent), transparent 72%),
+    radial-gradient(56% 40% at 96% 0%, rgba(224, 168, 106, 0.3), transparent 74%),
+    radial-gradient(80% 60% at 50% 112%, rgba(255, 255, 255, 0.92), transparent 70%),
+    var(--p-paper);
+  background-attachment: fixed;
+}
+
+/* The cards the screens already use (`bg-card`) become the glass. One rule
+   rather than a class on two hundred elements: every card in the flow is the
+   same object, and a restyle that has to be repeated per screen drifts the
+   moment one screen is edited.
+
+   NO backdrop-filter HERE, DELIBERATELY. A frosted card earns its cost when
+   something is moving behind it. These sit on a smooth gradient -- there is
+   nothing to blur, so the filter would be a full-screen GPU pass repeated once
+   per dish, on a phone, for no visible difference. The translucency is what
+   reads as glass; the blur is kept for the three surfaces that really do have
+   content scrolling under them: the header, the docked action and the tab bar. */
+[data-flow-root] .bg-card {
+  border-color: rgba(255, 255, 255, 0.62);
+}
+
+/* The guest's primary action: the accent, lit from above.
+   Deliberately a component class rather than a utility chain, because it is
+   four nested backgrounds and a hairline highlight, and it must look identical
+   on the menu, in the cart, on the placed screen and in the dock. */
+.g-primary {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0)),
+    var(--p-accent);
+  color: var(--p-on-ink);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), var(--p-shadow-1);
+  transition: filter 180ms var(--p-ease), transform 180ms var(--p-ease);
+}
+.g-primary:hover { filter: brightness(1.06); }
+.g-primary:active { transform: scale(0.99); }
+.g-primary:disabled { filter: grayscale(0.35); opacity: 0.55; }
 
 /* =========================================================================
    Design tokens for Tailwind utilities.

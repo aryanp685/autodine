@@ -56,8 +56,8 @@ export function PlaceOrderButton({
       className={[
         'inline-flex items-center justify-center gap-2 font-semibold transition active:scale-[0.99] disabled:opacity-50',
         variant === 'dock'
-          ? 'h-12 flex-1 rounded-full bg-[var(--p-accent)] px-5 text-[14px] text-white shadow-g1'
-          : 'mt-4 h-12 w-full rounded-full bg-gink px-5 text-[13.5px] text-onink',
+          ? 'g-primary h-12 flex-1 rounded-full px-5 text-[14px]'
+          : 'g-primary mt-4 h-12 w-full rounded-full px-5 text-[13.5px]',
       ].join(' ')}
       disabled={!canOrder || pending}
       aria-busy={pending || undefined}

@@ -246,7 +246,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
                 className={[
                   'shrink-0 rounded-full border px-3.5 py-1.5 text-[12.5px] font-medium whitespace-nowrap transition',
                   current
-                    ? 'border-transparent bg-gink text-onink'
+                    ? 'g-primary border-transparent'
                     : 'border-hair-strong text-gink-64 hover:border-gink-28 hover:text-gink',
                 ].join(' ')}
               >
@@ -421,7 +421,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
                     needsChoice(i) ? (
                       <Link
                         href={itemHref(i.id)}
-                        className="inline-flex items-center gap-1 rounded-full bg-gink px-3.5 py-1.5 text-[12.5px] font-semibold text-onink transition hover:opacity-90"
+                        className="g-primary inline-flex items-center gap-1 rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold"
                       >
                         Choose
                       </Link>
@@ -452,7 +452,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
                         type="button"
                         onClick={() => addToCart(i.id)}
                         aria-label={`Add ${i.name}`}
-                        className="inline-flex items-center gap-1 rounded-full bg-gink px-3.5 py-1.5 text-[12.5px] font-semibold text-onink transition hover:opacity-90"
+                        className="g-primary inline-flex items-center gap-1 rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold"
                       >
                         Add
                       </button>
@@ -670,7 +670,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
         </p>
         <Link
           href={backHref}
-          className="mt-6 inline-flex items-center gap-2 rounded-full bg-gink px-4 py-2.5 text-[13px] font-semibold text-onink"
+          className="g-primary mt-6 inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-semibold"
         >
           Back to the menu
         </Link>
@@ -922,7 +922,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
                 }}
                 className={[
                   'flex-1 rounded-full px-4 py-3 text-[13.5px] font-semibold transition active:scale-[0.99]',
-                  added ? 'bg-brand text-white' : 'bg-[var(--p-accent)] text-white',
+                  added ? 'bg-brand text-white' : 'g-primary',
                   'disabled:opacity-50',
                 ].join(' ')}
               >

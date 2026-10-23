@@ -172,7 +172,7 @@ export function GuestNoteCta({
     'inline-flex h-11 items-center justify-center rounded-full px-5 text-[13px] font-semibold transition active:scale-[0.99]',
     quiet
       ? 'border border-hair-strong text-gink hover:bg-gink-07'
-      : 'bg-gink text-onink hover:opacity-90',
+      : 'g-primary',
   ].join(' ');
 
   if (href) {

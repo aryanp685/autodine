@@ -7,8 +7,26 @@ import { loadTableAccess } from '@/lib/table-access';
 
 const CART_PATH = '/menu/cart';
 
-function fail(message: string): never {
-  redirect(`${CART_PATH}?error=${encodeURIComponent(message)}`);
+/**
+ * Back to the cart with a sentence the guest can act on.
+ *
+ * THE SLUG IS NOT OPTIONAL
+ *
+ * This redirected to a bare /menu/cart for its whole life, and the slug is what
+ * the cart is keyed by -- the localStorage entry, the restaurant it belongs to,
+ * the table session that has to still be live. So every failed order sent the
+ * guest to a page that believed their cart was empty, next to a message saying
+ * the order had failed. A guest reads that as "my order vanished", which is
+ * worse than the failure itself: the cart was in their browser the whole time,
+ * under a key the redirected page never asked for.
+ *
+ * The cart page reads `s` and gates on it, so dropping it also dropped the
+ * table gate. Passing it through fixes both at once.
+ */
+function fail(message: string, slug?: string): never {
+  const query = new URLSearchParams({ error: message });
+  if (slug) query.set('s', slug);
+  redirect(`${CART_PATH}?${query.toString()}`);
 }
 
 /**
@@ -39,7 +57,7 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
 
   // The cart is the customer's to edit, so it is read as untrusted input.
   const lines = parseCart(String(formData.get('lines') ?? ''));
-  if (lines.length === 0) fail('Your cart is empty.');
+  if (lines.length === 0) fail('Your cart is empty.', slug);
 
   const note = String(formData.get('note') ?? '').trim().slice(0, 300) || null;
 
@@ -65,16 +83,16 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
   }
 
   if (access.status === 'stale') {
-    fail('Your table session has ended. Scan the QR code on your table and enter the current code to order.');
+    fail('Your table session has ended. Scan the QR code on your table and enter the current code to order.', slug);
   }
   if (access.status === 'none') {
-    fail('This menu takes orders from a table. Scan the QR code on your table and enter the code showing inside the restaurant.');
+    fail('This menu takes orders from a table. Scan the QR code on your table and enter the code showing inside the restaurant.', slug);
   }
   if (access.status === 'unavailable') {
-    fail('We could not check your table just now. Please try again, or order with staff.');
+    fail('We could not check your table just now. Please try again, or order with staff.', slug);
   }
   if (access.status !== 'verified') {
-    fail('This menu takes orders from a table. Please scan the QR code on your table.');
+    fail('This menu takes orders from a table. Please scan the QR code on your table.', slug);
   }
 
   const liveSession = access.session.token;
@@ -96,6 +114,36 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
   });
 
   if (error) {
+    // Every branch that reaches a guest is logged with its code. Without this
+    // an "unexpected failure" was untraceable from the server: the guest saw
+    // one fixed sentence and the log carried nothing to search for.
+    console.error('[placeOrderAction] place_public_order failed', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+
+    // A missing function or a missing column is a deployment problem, not a
+    // guest problem, and "please try again" sends them round the same loop.
+    // Supabase answers PGRST202/PGRST203 when the RPC is not in the schema
+    // cache -- i.e. the migration that defines it has not been applied here.
+    if (error.code === 'PGRST202' || error.code === 'PGRST203') {
+      fail(
+        'Ordering is not switched on for this restaurant yet. Please ask a member of staff to take your order.',
+        slug
+      );
+    }
+    if (error.code === '42501') {
+      fail('Ordering is not switched on for this restaurant yet. Please order with staff.', slug);
+    }
+    if (error.code === '42883' || error.code === '42P01' || error.code === '42703') {
+      fail(
+        'This restaurant is still being set up, so the order could not be placed. Please order with staff.',
+        slug
+      );
+    }
+
     // The function raises P0001 for the failures a customer can cause --
     // empty cart, sold out, wrong restaurant -- and its messages are written
     // to be read by a customer, so those pass straight through.
@@ -104,15 +152,14 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
     // would leak the shape of the database into an error banner, so those
     // become one fixed sentence and the detail goes to the server log.
     if (error.code === 'P0001') {
-      fail(error.message);
+      fail(error.message, slug);
     }
-    console.error('[placeOrderAction] unexpected failure', error);
-    fail('We could not place that order. Please try again.');
+    fail('We could not place that order. Please try again.', slug);
   }
 
   if (typeof code !== 'string' || code === '') {
     console.error('[placeOrderAction] function returned no code', code);
-    fail('We could not place that order. Please try again.');
+    fail('We could not place that order. Please try again.', slug);
   }
 
   redirect(

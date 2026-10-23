@@ -149,7 +149,7 @@ export function OrderPlacedScreen({
             somebody whose order has just failed to load. */}
         <Link
           href={slug ? `/menu?s=${encodeURIComponent(slug)}` : '/menu'}
-          className="mt-6 inline-flex rounded-full bg-gink px-4 py-2.5 text-[13px] font-semibold text-onink"
+          className="g-primary mt-6 inline-flex rounded-full px-4 py-2.5 text-[13px] font-semibold"
         >
           Back to the menu
         </Link>
