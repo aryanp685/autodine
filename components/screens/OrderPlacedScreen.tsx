@@ -20,7 +20,13 @@ function lockedReason(data: OrderScreenData): string {
   if (data.prepStatus === 'cancelled') {
     return 'This order was cancelled, so nothing is being cooked and nothing is owed.';
   }
-  if (data.paymentStatus !== 'pending') return '';
+  if (data.paymentStatus !== 'pending') {
+    // Money has changed hands, so the order is closed to edits here. Returning
+    // '' left the guest looking at a locked bill with no explanation at all.
+    return data.paymentStatus === 'paid'
+      ? 'This order has been paid, so it cannot be changed here. Please ask the staff if something is wrong.'
+      : 'This order has a payment against it, so it cannot be changed here. Please ask the staff if something is wrong.';
+  }
   if (data.prepStatus !== 'new') {
     return 'The kitchen has started on this order, so it cannot be changed here. Please ask the staff.';
   }
@@ -103,6 +109,30 @@ function OrderTrack({ prepStatus }: { prepStatus: string }) {
       })}
     </ol>
   );
+}
+
+/**
+ * The sentence under the bill while it is still unpaid.
+ *
+ * "The kitchen has your order already and is starting on it now" was printed in
+ * every unpaid state -- including once the food had arrived. A guest reading
+ * that next to "Served" is being told that the meal on their table has not
+ * begun. The sentence now follows the same prep status the tracker above it
+ * draws, so the two cannot contradict each other.
+ */
+function unpaidNextStep(prepStatus: string, tableLabel: string | null): string {
+  switch (prepStatus) {
+    case 'preparing':
+      return 'The kitchen is cooking this now.';
+    case 'ready':
+      return tableLabel
+        ? 'This is ready — it is on its way to your table.'
+        : 'This is ready — please collect it at the counter.';
+    case 'served':
+      return 'This has been served. Please settle the bill at the counter before you leave.';
+    default:
+      return 'The kitchen has your order and is starting on it now.';
+  }
 }
 
 /**
@@ -309,7 +339,8 @@ export function OrderPlacedScreen({
 
               {data.upi ? (
                 <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
-                  Or pay at the counter before you leave — the kitchen has your order already.
+                  {unpaidNextStep(data.prepStatus, data.tableLabel)} Or pay at the counter before
+                  you leave.
                 </p>
               ) : onlinePay?.available && slug && token ? (
                 <>
@@ -320,8 +351,7 @@ export function OrderPlacedScreen({
                     duePaise={data.totalPaise}
                   />
                   <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
-                    Or pay at the counter before you leave — the kitchen has your order
-                    already and is starting on it now.
+                    Or pay at the counter before you leave. {unpaidNextStep(data.prepStatus, data.tableLabel)}
                   </p>
                 </>
               ) : (
@@ -330,8 +360,8 @@ export function OrderPlacedScreen({
                     <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">{onlinePay.note}</p>
                   ) : null}
                   <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
-                    <strong className="font-semibold text-gink">Pay at the counter before you leave.</strong> The kitchen has
-                    your order already and is starting on it now.
+                    <strong className="font-semibold text-gink">Pay at the counter before you leave.</strong>{' '}
+                    {unpaidNextStep(data.prepStatus, data.tableLabel)}
                   </p>
                 </>
               )}

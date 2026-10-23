@@ -125,8 +125,34 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
         maxSelect: group.max ?? group.options.length,
       })),
     ),
+    /**
+     * Portions, for the same reason as the add-ons.
+     *
+     * Without them a line bought as "Full" was priced at the dish's base
+     * price on the bar -- so the running total showed less than the cart was
+     * about to charge, on the one screen where the guest is deciding whether
+     * to trust the number. The cart screen resolves portions from the
+     * database; this is the same join against the menu already on the page.
+     */
+    variants: (i.variants ?? []).map((variant) => ({
+      id: variant.id,
+      name: variant.name,
+      pricePaise: rupeesToPaise(variant.price),
+    })),
   }));
-  const barSubtotal = priceCart(cart.lines, menuPrices).subtotalPaise;
+  /**
+   * What the bar is allowed to say.
+   *
+   * `cart.count` is everything stored in the browser, and `priceCart` drops
+   * dishes that sold out or left the menu -- so the bar could read "3 items ·
+   * Rs 120" for a cart holding one dish and two ghosts. Both numbers now come
+   * from the priced cart, which is the same list the bill is built from, so the
+   * bar and the bill cannot disagree. A stored line that is not priced is
+   * named on the cart screen instead, where there is room to explain it.
+   */
+  const pricedBar = priceCart(cart.lines, menuPrices);
+  const barSubtotal = pricedBar.subtotalPaise;
+  const barCount = pricedBar.lines.reduce((sum, line) => sum + line.qty, 0);
   const cartHref = slug ? `/menu/cart?s=${encodeURIComponent(slug)}` : '/menu/cart';
   /**
    * Searching looks across the whole menu, not only the course that happens to
@@ -184,15 +210,15 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
            a single bar rather than two controls because there is one decision
            on this screen -- look, or go and pay -- and the number is the reason
            to go. */
-        cart.count > 0 ? (
+        barCount > 0 ? (
           <div key={barPulse} className="animate-[gbar_260ms_cubic-bezier(0.22,1,0.36,1)]">
             <Link
               href={cartHref}
               className="g-primary flex items-center gap-3 rounded-[16px] px-4 py-3"
             >
               <span aria-live="polite" role="status" className="text-[13px] font-medium">
-                <strong className="tnum font-semibold">{cart.count}</strong> item
-                {cart.count === 1 ? '' : 's'} · <span className="tnum">{inr(paiseToRupees(barSubtotal))}</span> before
+                <strong className="tnum font-semibold">{barCount}</strong> item
+                {barCount === 1 ? '' : 's'} · <span className="tnum">{inr(paiseToRupees(barSubtotal))}</span> before
                 taxes
               </span>
               <span className="ml-auto flex items-center gap-1.5 text-[13px] font-semibold tracking-[0.01em]">
@@ -482,6 +508,32 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
   );
 }
 
+/**
+ * The starting picks for a dish's add-on groups.
+ *
+ * Exported so the rule can be tested without rendering the sheet: this is the
+ * difference between an add-on being offered and an add-on being charged.
+ */
+export function initialPicks(
+  groups: ReadonlyArray<{
+    id: string;
+    type: 'single' | 'multi';
+    required?: boolean;
+    options: ReadonlyArray<{ id: string; price: number }>;
+  }>,
+): Record<string, string[]> {
+  const initial: Record<string, string[]> = {};
+  for (const group of groups) {
+    if (!group.required || group.type !== 'single') {
+      initial[group.id] = [];
+      continue;
+    }
+    const free = group.options.find((option) => !option.price);
+    initial[group.id] = free ? [free.id] : [];
+  }
+  return initial;
+}
+
 /* Option A — item customization: centred sheet, hairlines, no chrome */
 export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?: string }; itemId?: string } = {}) {
   const table = data?.table ?? null;
@@ -570,21 +622,19 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
   /**
    * What has been picked in each add-on group, by option id.
    *
-   * A required single-choice group starts with its first option already
-   * picked. That is the honest reading of "required": a guest who does not
-   * care still ends up with a valid answer, instead of a disabled button and
-   * no explanation.
+   * A required single-choice group starts with a FREE option already picked --
+   * never the first one, which may be the expensive one. Pre-selecting by
+   * position charged guests for an add-on they never chose: a "Size" group
+   * listing Large first quietly added Rs 60 to a plate, and the only way to
+   * discover it was to read the total and remember that it used to be lower.
+   *
+   * If every option in a required group costs money, nothing is picked and the
+   * Add button asks for a choice. That is one tap more than an opinionated
+   * default and it is the only version that cannot take money nobody agreed to.
    */
-  const [picks, setPicks] = useState<Record<string, string[]>>(() => {
-    const initial: Record<string, string[]> = {};
-    for (const group of groups) {
-      initial[group.id] =
-        group.required && group.type === 'single' && group.options[0]
-          ? [group.options[0].id]
-          : [];
-    }
-    return initial;
-  });
+  const [picks, setPicks] = useState<Record<string, string[]>>(() =>
+    initialPicks(groups),
+  );
 
   const toggle = (group: DisplayModifierGroup, optionId: string) => {
     setPicks((current) => {
@@ -607,6 +657,17 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
   };
 
   const chosenAddonIds = groups.flatMap((group) => picks[group.id] ?? []);
+
+  /**
+   * Required groups the guest has not answered.
+   *
+   * The button waits for these rather than adding a plate the restaurant said
+   * must be configured -- and, since the only groups we pre-select are the free
+   * ones, anything left here is a real decision the guest has to make.
+   */
+  const unmet = groups.filter(
+    (group) => group.required && (picks[group.id] ?? []).length === 0,
+  );
 
   /**
    * What the add-ons add to ONE plate.
@@ -878,12 +939,16 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
                   type="button"
                   onClick={() => setQty(Math.max(1, qty - 1))}
                   aria-label="Decrease"
-                  disabled={qty <= 1 || atCeiling}
+                  disabled={addQty <= 1 || atCeiling}
                   className="grid size-9 place-items-center rounded-full text-[16px] text-gink-80 transition hover:bg-gink-07 disabled:opacity-30"
                 >
                   −
                 </button>
-                <span className="tnum min-w-6 text-center text-[14px] font-semibold">{Math.max(1, addQty)}</span>
+                {/* The number that will be added, which is what the guest is
+                    deciding. It used to print max(1, addQty), so at the 99
+                    ceiling -- where nothing can be added -- the sheet still
+                    read "1", next to a price for one plate and a dead button. */}
+                <span className="tnum min-w-6 text-center text-[14px] font-semibold">{addQty}</span>
                 <button
                   type="button"
                   onClick={() => setQty(Math.min(room, qty + 1))}
@@ -898,7 +963,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
               <button
                 type="button"
                 aria-live="polite"
-                disabled={atCeiling}
+                disabled={atCeiling || unmet.length > 0}
                 onClick={() => {
                   // The dish, how many, which portion, and which add-ons. All
                   // ids: the server prices every one of them from the database,
@@ -921,8 +986,10 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
               >
                 {added ? (
                   'Added to your order ✓'
+                ) : unmet.length > 0 ? (
+                  `Choose ${unmet[0].name.toLowerCase()}`
                 ) : atCeiling ? (
-                  '99 is the most of one dish we take online'
+                  'You already have 99 — change it in the cart'
                 ) : (
                   <>
                     {/* Both are rupees already: item.price and variant.price
@@ -930,7 +997,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
                         Passing them through paiseToRupees divided an
                         already-rupees number by a hundred, so a Rs 250 plate
                         showed as Rs 3. */}
-                    Add to order · {inr(chosenUnitPrice * Math.max(1, addQty))}
+                    Add to order · {inr(chosenUnitPrice * addQty)}
                   </>
                 )}
               </button>

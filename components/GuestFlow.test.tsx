@@ -136,9 +136,11 @@ describe('GuestFlow — the bottom shelf', () => {
 
     const pad = (html: string) =>
       Number(html.match(/padding-bottom:calc\((\d+)px/)?.[1] ?? '0');
-    // 14 (breathing room) + 86 (dock) + 58 (tabs).
-    expect(pad(both)).toBe(158);
-    expect(pad(dockOnly)).toBe(100);
+    // 14 (breathing room) + 68 (dock row) + 72 (tab row). The two rows are
+    // measured, not guessed: under-reserving is the bug (a dish you cannot
+    // tap), and these are the heights the markup actually renders at.
+    expect(pad(both)).toBe(154);
+    expect(pad(dockOnly)).toBe(82);
     expect(pad(both)).toBeGreaterThan(pad(dockOnly));
   });
 });

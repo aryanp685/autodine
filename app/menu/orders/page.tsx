@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { CartProvider } from '@/components/CartProvider';
 import { GuestOrdersScreen } from '@/components/screens/GuestOrdersScreen';
-import { getCartScreenData } from '@/lib/db/cart-screen';
+import { getRestaurantName } from '@/lib/db/cart-screen';
 import { loadTableAccess } from '@/lib/table-access';
 
 export const metadata: Metadata = { title: 'Your order · AutoDine', robots: { index: false } };
@@ -28,16 +28,15 @@ export default async function GuestOrdersPage({
 }) {
   const { s } = await searchParams;
 
-  // The venue's name comes from the same read the cart uses. The branding
-  // query that used to sit here existed for the accent, and the guest flow no
-  // longer varies by restaurant: one design, every customer.
-  const [access, data] = await Promise.all([loadTableAccess(s), getCartScreenData(s)]);
+  // The venue's name, and nothing else: this screen only prints it. The full
+  // menu read that used to sit here was six queries for four words.
+  const [access, restaurantName] = await Promise.all([loadTableAccess(s), getRestaurantName(s)]);
 
   return (
     <CartProvider slug={s}>
       <GuestOrdersScreen
         slug={s}
-        restaurantName={data?.restaurantName}
+        restaurantName={restaurantName}
         /* Only a verified session names a table; a stale one names nothing
            rather than keeping a claim the QR gate would have dropped. */
         tableLabel={access.status === 'verified' ? access.tableLabel : null}

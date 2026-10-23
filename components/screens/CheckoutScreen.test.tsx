@@ -20,7 +20,12 @@ import { Checkout } from './CheckoutScreen';
 
 const mocks = vi.hoisted(() => ({
   cart: {
-    lines: [{ itemId: 'i1', qty: 2, variantId: undefined, addonIds: [] }],
+    lines: [{ itemId: 'i1', qty: 2, variantId: undefined, addonIds: [] }] as {
+      itemId: string;
+      qty: number;
+      variantId?: string;
+      addonIds?: string[];
+    }[],
     count: 2,
     ready: true,
     add: () => {},
@@ -152,5 +157,50 @@ describe('checkout action bar', () => {
       mocks.cart.lines = [{ itemId: 'i1', qty: 2, variantId: undefined, addonIds: [] }];
       mocks.cart.count = 2;
     }
+  });
+});
+
+/**
+ * Dishes that leave the bill before it is placed.
+ *
+ * priceCart drops a sold-out dish, a dish deleted from the menu, and a portion
+ * that no longer exists. The cart screen names all three. This screen named
+ * only the first two, so a guest who came back to a checkout tab after the
+ * owner deleted a dish paid for a shorter order without a word about the row
+ * that vanished.
+ */
+describe('checkout shows what fell off the bill', () => {
+  type Lines = (typeof mocks.cart.lines)[number][];
+  const renderWith = (catalogue = items) =>
+    renderToStaticMarkup(
+      <Checkout slug="maddi" restaurantName="Maddi" taxRateBps={500} items={catalogue} />,
+    );
+
+  it('names a dish that is no longer on the menu', () => {
+    const lines: Lines = [
+      { itemId: 'i1', qty: 1 },
+      { itemId: 'deleted-dish', qty: 1 },
+    ];
+    mocks.cart.lines = lines;
+    const html = renderWith();
+    mocks.cart.lines = [{ itemId: 'i1', qty: 2 }];
+
+    expect(html).toContain('no longer on the menu');
+    expect(html).toContain('not in this bill');
+    expect(html).toContain('Review your order');
+  });
+
+  it('names a dish that sold out too, and counts them separately in words', () => {
+    const lines: Lines = [
+      { itemId: 'i1', qty: 1 },
+      { itemId: 'sold-out', qty: 1 },
+    ];
+    mocks.cart.lines = lines;
+    const soldOut = [...items, { id: 'sold-out', name: 'Laal Maas', pricePaise: 52000, isVeg: false, isAvailable: false }];
+    const html = renderWith(soldOut);
+    mocks.cart.lines = [{ itemId: 'i1', qty: 2 }];
+
+    expect(html).toContain('sold out');
+    expect(html).not.toContain('no longer on the menu');
   });
 });

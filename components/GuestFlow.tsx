@@ -123,8 +123,8 @@ export function GuestFlow({
    * the numbers have to match the markup below or the last dish hides under
    * the shelf, which is the bug this whole block exists to prevent.
    */
-  const TABS_SPACE = 58;
-  const DOCK_SPACE = 86;
+  const TABS_SPACE = 72;
+  const DOCK_SPACE = 68;
 
   return (
     <div

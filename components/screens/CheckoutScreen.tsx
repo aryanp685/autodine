@@ -57,6 +57,12 @@ export function Checkout({
 
   const withSlug = (path: string) => (slug ? `${path}?s=${encodeURIComponent(slug)}` : path);
   const canOrder = cart.ready && priced.lines.length > 0;
+  /**
+   * The count in the header, from the priced cart -- not from the browser's
+   * copy of it. A dish that sold out is still in localStorage and is not on
+   * this bill; see the same note on the cart screen.
+   */
+  const orderableQty = priced.lines.reduce((sum, line) => sum + line.qty, 0);
 
   return (
     <GuestFlow
@@ -73,8 +79,8 @@ export function Checkout({
         {/* The count appears once the stored cart has been read. Until then
             it would read "0 items" over an order that is still loading. */}
         <p className="g-lede mt-1.5">
-          {cart.ready && cart.count > 0
-            ? `${cart.count} ${cart.count === 1 ? 'item' : 'items'} · the kitchen starts as soon as you place it.`
+          {cart.ready && orderableQty > 0
+            ? `${orderableQty} ${orderableQty === 1 ? 'item' : 'items'} · the kitchen starts as soon as you place it.`
             : 'Nothing to order yet — add a dish from the menu first.'}
         </p>
       </header>
@@ -173,6 +179,22 @@ export function Checkout({
               {priced.unavailableIds.length === 1
                 ? 'One dish has sold out since you added it, so it is not in this bill.'
                 : `${priced.unavailableIds.length} dishes have sold out since you added them, so they are not in this bill.`}{' '}
+              <Link href={withSlug('/menu/cart')} className="font-semibold text-[var(--p-accent)] underline underline-offset-2">
+                Review your order
+              </Link>
+            </div>
+          )}
+
+          {/* The other way a line can be off this bill: the dish or the
+              restaurant's whole menu was withdrawn after it was added. The cart
+              screen names it; this screen used to say nothing at all, so a
+              guest who reached checkout by a stale link paid for a shorter
+              order without ever being told. */}
+          {priced.missingIds.length > 0 && (
+            <div role="status" className="g-card mt-3 bg-accent-soft px-4 py-3 text-[12.5px] leading-[1.55] text-gink-80">
+              {priced.missingIds.length === 1
+                ? 'One dish is no longer on the menu, so it is not in this bill.'
+                : `${priced.missingIds.length} dishes are no longer on the menu, so they are not in this bill.`}{' '}
               <Link href={withSlug('/menu/cart')} className="font-semibold text-[var(--p-accent)] underline underline-offset-2">
                 Review your order
               </Link>

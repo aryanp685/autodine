@@ -356,9 +356,10 @@ describe('ItemSheet add-ons', () => {
     expect(button(html)).toBe('Add to order · ₹80');
   });
 
-  it('starts a required group with its first option chosen, and charges it', () => {
-    // "Required" has to mean the guest leaves with an answer. A disabled
-    // button and no explanation is not an answer.
+  it('starts a required group on its FREE option, never a paid one', () => {
+    // Positional pre-selection charged for something the guest never chose:
+    // a menu that lists "With dal and rice +Rs 30" first added Rs 30 to the
+    // plate, and the only clue was a total that had always been higher.
     const html = renderToStaticMarkup(
       <ItemSheet
         data={withAddons([
@@ -377,7 +378,34 @@ describe('ItemSheet add-ons', () => {
     );
 
     expect(html).toContain('required');
-    expect(button(html)).toBe('Add to order · ₹110');
+    expect(button(html)).toBe('Add to order · ₹80');
+  });
+
+  it('asks for a required choice instead of charging for one', () => {
+    // Every option costs money, so there is no default that is not a charge.
+    // The button waits, and says what it is waiting for.
+    const html = renderToStaticMarkup(
+      <ItemSheet
+        data={withAddons([
+          {
+            id: 'g-size',
+            name: 'Portion',
+            type: 'single',
+            required: true,
+            options: [
+              { id: 'a-half', name: 'Half', price: 20 },
+              { id: 'a-full', name: 'Full', price: 40 },
+            ],
+          },
+        ])}
+      />,
+    );
+
+    // The add button in the sheet, not the checkout button: it is the one that
+    // says what it is waiting for, and it is disabled until the group is
+    // answered.
+    expect(html).toContain('Choose portion</button>');
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Choose portion/);
   });
 
   it('no longer offers presets for a dish the restaurant has not customised', () => {
@@ -505,7 +533,8 @@ describe('leaving the dish sheet', () => {
     try {
       const html = renderToStaticMarkup(<ItemSheet itemId="it-naan" />);
 
-      expect(html).toContain('99 is the most of one dish');
+      expect(html).toContain('You already have 99');
+      // And no price, because no plate can be added.
       expect(html).not.toContain('Add to order ·');
     } finally {
       mocks.cart.lines = [];
