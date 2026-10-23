@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { TRIAL_DAYS } from './trial';
 import {
   BILLING,
+  ENTITLEMENTS,
+  planHasFeature,
   DIFFERENCES,
   LIVE,
   NOT_CONNECTED,
@@ -65,12 +69,73 @@ describe('plans', () => {
 
   it('states that billing is not connected, and says so once', () => {
     expect(BILLING.connected).toBe(false);
-    expect(BILLING.trialDays).toBe(10);
+    expect(BILLING.trialDays).toBe(7);
     expect(BILLING.note).toMatch(/not on sale/i);
   });
 
   it('lists what is missing as plainly as what is present', () => {
     expect(NOT_CONNECTED.map((n) => n.id)).toEqual(['payments', 'billing', 'messages']);
     for (const item of NOT_CONNECTED) expect(item.detail.length).toBeGreaterThan(20);
+  });
+});
+
+/**
+ * The matrix exists twice on purpose: once in TypeScript so a screen can label
+ * a control, once in SQL so the database can refuse the request. Those two
+ * copies disagreeing is the failure mode this block exists to catch — a
+ * pricing page that sells "menu import" while the server refuses it, or the
+ * reverse, which is worse because nobody notices.
+ *
+ * The SQL is read as text. It is not parsed: the test looks for the exact
+ * `when '<plan>' then array[...]` shape migration 20261026001200 uses, and
+ * fails loudly if that shape changes, because a silent regex miss would turn
+ * this test into a no-op.
+ */
+describe('plan matrix cannot drift from the database', () => {
+  const SQL = readFileSync(
+    new URL(
+      '../supabase/migrations/20261026001200_plan_entitlements.sql',
+      import.meta.url
+    ),
+    'utf8'
+  );
+
+  const WRITE_GATE_SQL = readFileSync(
+    new URL('../supabase/migrations/20261026001100_trial_plans_and_write_gate.sql', import.meta.url),
+    'utf8'
+  );
+
+  function featuresInSql(plan: string): string[] {
+    const match = SQL.match(
+      new RegExp(`when '${plan}' then array\\[([\\s\\S]*?)\\]`)
+    );
+    if (!match) throw new Error(`migration has no feature list for ${plan}`);
+    return [...match[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+  }
+
+  for (const plan of ['trial', 'starter', 'professional', 'business'] as const) {
+    it(`${plan}: SQL and TypeScript list the same features`, () => {
+      expect(featuresInSql(plan).sort()).toEqual([...ENTITLEMENTS[plan]].sort());
+    });
+  }
+
+  it('denies by default', () => {
+    expect(planHasFeature('enterprise', 'menus')).toBe(false);
+    expect(planHasFeature('starter', 'outlets')).toBe(false);
+    expect(planHasFeature('starter', 'import')).toBe(false);
+    expect(planHasFeature('professional', 'outlets')).toBe(false);
+    expect(planHasFeature('business', 'outlets')).toBe(true);
+  });
+
+  it(`in SQL and in TypeScript, the trial is ${BILLING.trialDays} days`, () => {
+    // Both write-gate functions hard-code the interval. One drifting from the
+    // other means a restaurant is refused writes a day before its dashboard
+    // says the trial ends.
+    const intervals = WRITE_GATE_SQL.match(/interval '(\d+) days'/g) ?? [];
+    expect(intervals.length).toBeGreaterThanOrEqual(2);
+    for (const interval of intervals) {
+      expect(interval).toBe(`interval '${BILLING.trialDays} days'`);
+    }
+    expect(TRIAL_DAYS).toBe(BILLING.trialDays);
   });
 });

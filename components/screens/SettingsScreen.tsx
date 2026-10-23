@@ -5,7 +5,12 @@ import { PrintButton } from '@/components/PrintButton';
 import type { OutletBar } from '@/lib/outlets';
 import type { SettingsScreenData } from '@/lib/db/settings-screen';
 import { formatTaxPercent, taxExamplePaise } from '@/lib/settings-input';
-import { saveDetailsAction, saveOnlinePaymentsAction, saveTaxAction } from '@/app/dashboard/settings/actions';
+import {
+  saveDetailsAction,
+  saveOnlinePaymentsAction,
+  saveTaxAction,
+  saveUpiAction,
+} from '@/app/dashboard/settings/actions';
 import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
 import {
@@ -380,6 +385,73 @@ export function SettingsScreen({
               <p className="mt-3 text-[11px] leading-[1.5] text-gink-46">
                 Turning this off does not touch orders already paid, and does not refund anything.
                 Counter payments — cash, card and UPI at the till — keep working either way.
+              </p>
+            </Panel>
+
+            {/* ------------------------------------------------------ your own UPI */}
+            <Panel
+              title="Your UPI QR"
+              meta={data?.upiId ? 'Shown to guests' : 'Not set'}
+              bodyClassName="px-4 py-4 sm:px-5"
+            >
+              <p className="m-0 max-w-[62ch] text-[12px] leading-[1.5] text-gink-46">
+                Your own UPI handle, on the guest&apos;s phone, with the amount already filled in.
+                The money goes to your account — AutoDine never holds it and takes no cut.
+              </p>
+
+              <p className="mt-3 rounded-[10px] border border-hair bg-paper-deep px-3.5 py-2.5 text-[11.5px] leading-[1.5] text-gink-64">
+                <strong className="font-semibold text-gink">This is not a payment gateway.</strong>{' '}
+                When a guest scans it, nothing is marked paid here. They say they have paid, and you
+                or your cashier confirm the transfer in your own UPI app before recording it at the
+                counter. That keeps the record honest — and it is why this works today, with no
+                gateway and no KYC.
+              </p>
+
+              <form action={saveUpiAction} className="mt-3 grid gap-3">
+                <Field
+                  label="UPI ID"
+                  htmlFor="upiId"
+                  hint="The handle printed on your counter standee. Leave it empty to show no QR."
+                >
+                  <input
+                    id="upiId"
+                    name="upiId"
+                    type="text"
+                    inputMode="email"
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder="thegulmohar@okhdfcbank"
+                    defaultValue={data?.upiId ?? ''}
+                    disabled={disabled}
+                    className={inputClass}
+                  />
+                </Field>
+
+                <Field
+                  label="Name shown in the guest's UPI app"
+                  htmlFor="upiPayeeName"
+                  hint="Optional. Defaults to your restaurant name above."
+                >
+                  <input
+                    id="upiPayeeName"
+                    name="upiPayeeName"
+                    type="text"
+                    defaultValue={data?.upiPayeeName ?? ''}
+                    disabled={disabled}
+                    className={inputClass}
+                  />
+                </Field>
+
+                <div>
+                  <button type="submit" className={btn('solid', 'sm')} disabled={disabled}>
+                    Save UPI details
+                  </button>
+                </div>
+              </form>
+
+              <p className="mt-3 text-[11px] leading-[1.5] text-gink-46">
+                Test it before a service: open your guest menu on a phone, place an order, and scan
+                the code with your own UPI app. If the payee name is wrong, guests will not trust it.
               </p>
             </Panel>
 

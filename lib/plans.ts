@@ -24,6 +24,58 @@
 
 export type PlanId = 'starter' | 'professional' | 'business';
 
+/**
+ * What a plan may use, in code.
+ *
+ * This is the same six-line matrix as public.plan_features() in migration
+ * 20261026001200, and lib/plans.test.ts parses that file and fails if the two
+ * disagree. It exists client-side for one reason: a screen must be able to say
+ * "menu import is on Professional" before it renders the control. The SERVER
+ * still decides — lib/entitlements.ts asks the database — because a hidden
+ * button is not a permission.
+ *
+ * `trial` carries everything. A restaurant evaluating the product for a week
+ * and unable to import its menu is not evaluating the product.
+ */
+export type FeatureId =
+  | 'menus'
+  | 'qr'
+  | 'ordering'
+  | 'kitchen'
+  | 'cashier'
+  | 'reports'
+  | 'roles'
+  | 'import'
+  | 'outlets'
+  | 'support';
+
+export const ALL_FEATURES: FeatureId[] = [
+  'menus',
+  'qr',
+  'ordering',
+  'kitchen',
+  'cashier',
+  'reports',
+  'roles',
+  'import',
+  'outlets',
+  'support',
+];
+
+/** Deny by default: an unknown plan is not in this record at all. */
+export const ENTITLEMENTS: Record<PlanId | 'trial', FeatureId[]> = {
+  trial: ALL_FEATURES,
+  starter: ['menus', 'qr', 'ordering', 'kitchen', 'cashier', 'reports'],
+  professional: ['menus', 'qr', 'ordering', 'kitchen', 'cashier', 'reports', 'roles', 'import'],
+  business: ALL_FEATURES,
+};
+
+/** Does this plan include this feature? Unknown plan or feature -> false. */
+export function planHasFeature(plan: string, feature: string): boolean {
+  const list = (ENTITLEMENTS as Record<string, FeatureId[] | undefined>)[plan];
+  return Array.isArray(list) && list.includes(feature as FeatureId);
+}
+
 export type Plan = {
   id: PlanId;
   name: string;
@@ -216,13 +268,15 @@ export function liveCountFor(planId: PlanId): number {
 export const NOT_CONNECTED = [
   {
     id: 'payments',
-    label: 'Card and UPI payments',
-    detail: 'No gateway is connected. Orders are paid at the counter and recorded there.',
+    label: 'Card payments',
+    detail:
+      'No card gateway is connected and no money is taken by AutoDine. Guests pay at the counter, or into the restaurant\'s own UPI QR, and staff record what arrived.',
   },
   {
     id: 'billing',
-    label: 'Plans and subscriptions',
-    detail: 'No plan can be bought and no account is limited, metered or locked.',
+    label: 'Buying a plan',
+    detail:
+      'No plan can be bought yet. A new account runs on the whole product for seven days; after that it is read-only until access is extended by hand.',
   },
   {
     id: 'messages',
@@ -239,8 +293,12 @@ export const NOT_CONNECTED = [
  */
 export const BILLING = {
   connected: false,
-  /** When billing opens, plans are monthly and the trial runs this long. */
-  trialDays: 10,
+  /**
+   * Seven days, and it is not copy: public.restaurant_can_write() enforces the
+   * same interval, and lib/plans.test.ts reads both files to make sure the two
+   * numbers cannot drift. lib/trial.ts holds the app-side constant.
+   */
+  trialDays: 7,
   /** Shown wherever a price appears. */
   note: 'Planning figures. Plans are not on sale and nothing is charged.',
 } as const;

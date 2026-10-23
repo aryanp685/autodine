@@ -22,6 +22,7 @@ vi.mock('@/app/dashboard/settings/actions', () => ({
   saveDetailsAction: mocks.action('saveDetailsAction'),
   saveTaxAction: mocks.action('saveTaxAction'),
   saveOnlinePaymentsAction: mocks.action('saveOnlinePaymentsAction'),
+  saveUpiAction: mocks.action('saveUpiAction'),
 }));
 
 import { SettingsScreen } from './SettingsScreen';
@@ -41,6 +42,8 @@ function data(over: Partial<SettingsScreenData> = {}): SettingsScreenData {
     },
     taxRateBps: 1800,
     onlinePaymentsEnabled: false,
+    upiId: '',
+    upiPayeeName: '',
     timezone: 'Asia/Kolkata',
     publicMenuUrl: 'https://autodine.example/menu?s=maddi',
     publicMenuSvg: '<svg role="img" aria-label="QR"></svg>',

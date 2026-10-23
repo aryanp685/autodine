@@ -3,6 +3,7 @@ import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
 import { GuestOrderEditor } from '@/components/screens/GuestOrderEditor';
 import { PayOnline } from '@/components/PayOnline';
+import { PayUpi } from '@/components/PayUpi';
 import { GuestFlow } from '@/components/GuestFlow';
 import { accentStyle } from '@/lib/branding/palette';
 import { OrderStatusRefresh } from '@/components/OrderStatusRefresh';
@@ -295,7 +296,21 @@ export function OrderPlacedScreen({
             </p>
           ) : data.paymentStatus === 'pending' ? (
             <>
-              {onlinePay?.available && slug && token ? (
+              {/*
+                The restaurant's own UPI QR comes first when it has one: it is
+                the way most guests will actually pay, and it needs no gateway.
+                It is offered alongside the counter, never instead of it -- a
+                phone with a dead battery still has to be able to leave.
+              */}
+              {data.upi && slug && token ? (
+                <PayUpi upi={data.upi} slug={slug} code={data.code} token={token} />
+              ) : null}
+
+              {data.upi ? (
+                <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
+                  Or pay at the counter before you leave — the kitchen has your order already.
+                </p>
+              ) : onlinePay?.available && slug && token ? (
                 <>
                   <PayOnline
                     slug={slug}

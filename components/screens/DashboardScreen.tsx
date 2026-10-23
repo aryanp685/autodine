@@ -19,6 +19,7 @@ import {
   tableClass,
 } from '@/components/owner/chrome';
 import type { DashboardScreenData } from '@/lib/db/dashboard-screen';
+import { READ_ONLY_SENTENCE, accessSummary } from '@/lib/access';
 import { clockTimeInZone } from '@/lib/db/time';
 
 /**
@@ -128,6 +129,34 @@ export function Dashboard({
       />
 
       {blocked && <SignInPrompt reason={blocked} screen="dashboard" />}
+
+      {/*
+        The plan, on the first screen, because it is the one fact that changes
+        what the rest of the dashboard can do. It is read from the database on
+        every load -- not from a cookie, and not from the pricing page's copy --
+        so it agrees with the gate that refuses a write.
+
+        A read-only workspace gets the full sentence rather than a red chip: an
+        owner who cannot save a menu needs to know their records are still
+        there, or the first call they make is about a missing backup.
+      */}
+      {!blocked && live && data?.access ? (
+        <div
+          data-plan-line
+          className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[12px] border border-hair bg-card px-3.5 py-3"
+        >
+          <Tag tone={data.access.readOnly ? 'due' : 'live'}>{accessSummary(data.access)}</Tag>
+          <span className="text-[12.5px] leading-[1.5] text-gink-64">
+            {data.access.readOnly ? READ_ONLY_SENTENCE : 'Every feature in the product is on during the trial.'}
+          </span>
+          <Link
+            href="/pricing"
+            className="ml-auto text-[12.5px] font-semibold text-gink underline decoration-hair-strong underline-offset-[3px] hover:decoration-gink"
+          >
+            Plans
+          </Link>
+        </div>
+      ) : null}
 
       {!blocked && !live && (
         <div

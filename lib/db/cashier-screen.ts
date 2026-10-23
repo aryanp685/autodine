@@ -58,6 +58,14 @@ export type CounterOrder = {
   paid: number;
   /** One-line summary of the ticket, e.g. '2 × Biryani · 3 × Roti'. */
   items: string;
+  /**
+   * The guest pressed "I have paid" on the restaurant's UPI QR.
+   *
+   * NOT money. The transfer happens in the guest's app, which tells nobody
+   * here, so this is a prompt to check the restaurant's own bank app before
+   * taking cash — the difference between one more screen and a double payment.
+   */
+  claimed: boolean;
 };
 
 export type CashierScreenData = {
@@ -116,7 +124,7 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
   // recorded against it, and record_cash_payment will only accept the exact
   // outstanding balance -- so showing the full total would be a lie that
   // fails at the till.
-  const [itemsResult, tablesResult, paymentsResult] = await Promise.all([
+  const [itemsResult, tablesResult, paymentsResult, claimsResult] = await Promise.all([
     supabase
       .from('order_items')
       .select('order_id, qty, name_snapshot, sort_order')
@@ -126,6 +134,10 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
       ? supabase.from('dining_tables').select('id, label').in('id', tableIds)
       : Promise.resolve({ data: [], error: null }),
     supabase.from('payments').select('order_id, amount_paise, status').in('order_id', orderIds),
+    // Optional: a deployment that has not applied migration 20261026001300 has
+    // no counter_claims(). The queue must work either way, so a missing
+    // function reads as "no claims", not as a failed screen.
+    supabase.rpc('counter_claims', { p_restaurant_id: restaurantId }),
   ]);
 
   if (itemsResult.error) {
@@ -153,6 +165,10 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
     itemsByOrder.set(item.order_id, list);
   }
 
+  const claimedOrders = new Set<string>(
+    claimsResult.error ? [] : (claimsResult.data ?? []).map((row) => row.order_id)
+  );
+
   const labelByTable = new Map<string, string>();
   for (const table of tablesResult.data ?? []) {
     labelByTable.set(table.id, table.label);
@@ -175,6 +191,7 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
       paid: paiseToRupees(Math.min(paidByOrder.get(row.id) ?? 0, row.total_paise)),
       outstanding: paiseToRupees(Math.max(row.total_paise - (paidByOrder.get(row.id) ?? 0), 0)),
       items: lines.join(' · ') || 'No items recorded',
+      claimed: claimedOrders.has(row.id),
     };
   });
 

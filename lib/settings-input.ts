@@ -225,3 +225,52 @@ export function taxExamplePaise(bps: number): { basePaise: number; taxPaise: num
 export function publicMenuPath(slug: string): string {
   return `/menu?s=${encodeURIComponent(slug)}`;
 }
+
+
+/**
+ * A UPI handle, validated the way the database validates it.
+ *
+ * The same pattern as the restaurants_upi_id_check constraint in migration
+ * 20261026001300, on purpose: a form that accepts `thegulmohar` and gets a
+ * Postgres error back is a form that wasted the owner's time. Deliberately
+ * loose — one `@`, a plausible local part, a 2+ letter handle — because real
+ * handles contain dots, digits and hyphens, and a stricter rule would reject
+ * them.
+ *
+ * An empty string is a VALID answer: it means "no UPI QR", and it clears the
+ * column. It is not the same as malformed.
+ */
+export type UpiResult =
+  | { ok: true; value: { upiId: string | null; payeeName: string | null } }
+  | { ok: false; message: string };
+
+const UPI_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{1,255}@[A-Za-z][A-Za-z0-9]{1,63}$/;
+
+export function validateUpi(raw: { upiId: unknown; payeeName: unknown }): UpiResult {
+  const upiId = String(raw.upiId ?? '').trim();
+  const payeeName = String(raw.payeeName ?? '').trim();
+
+  if (upiId === '') {
+    return { ok: true, value: { upiId: null, payeeName: null } };
+  }
+
+  if (upiId.length > 300) {
+    return { ok: false, message: 'That UPI ID is too long. It should look like name@bank.' };
+  }
+
+  if (!UPI_PATTERN.test(upiId)) {
+    return {
+      ok: false,
+      message: 'That does not look like a UPI ID. It should look like name@bank — for example thegulmohar@okhdfcbank.',
+    };
+  }
+
+  if (payeeName.length > 80) {
+    return { ok: false, message: 'Keep the payee name under 80 characters — it has to fit in a UPI app.' };
+  }
+
+  return {
+    ok: true,
+    value: { upiId, payeeName: payeeName === '' ? null : payeeName },
+  };
+}

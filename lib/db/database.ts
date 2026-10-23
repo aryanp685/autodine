@@ -584,6 +584,73 @@ export type Database = {
         };
         Returns: string; // new restaurant id (uuid)
       };
+      /**
+       * Migration 20261026001200. Plan, trial clock, the write gate and the
+       * feature list in one object. This is what the dashboard's plan line and
+       * every "this plan does not include that" message read. Returns null for
+       * an id the caller cannot resolve through membership (the function is
+       * SECURITY DEFINER but the id always comes from the membership row).
+       */
+      restaurant_access: {
+        Args: { p_restaurant_id: string };
+        Returns: {
+          plan: string;
+          status: string;
+          started_at: string;
+          trial_ends_at: string;
+          plan_expires_at: string | null;
+          days_remaining: number;
+          can_write: boolean;
+          read_only: boolean;
+          features: string[];
+        } | null;
+      };
+      /** Migration 20261026001200. The entitlement matrix for one plan. */
+      plan_features: {
+        Args: { p_plan: string };
+        Returns: string[];
+      };
+      restaurant_features: {
+        Args: { p_restaurant_id: string };
+        Returns: string[];
+      };
+      restaurant_has_feature: {
+        Args: { p_restaurant_id: string; p_feature: string };
+        Returns: boolean;
+      };
+      /**
+       * Migration 20261026001300. The restaurant's own UPI details for ONE
+       * order, to a caller holding that order's guest token. Never a
+       * platform-wide payee.
+       */
+      public_upi_details: {
+        Args: { p_slug: string; p_code: string; p_token: string };
+        Returns: {
+          upi_id: string | null;
+          payee_name: string;
+          restaurant_name: string;
+          code: string;
+          payment_status: string;
+          due_paise: number;
+          claimed_at: string | null;
+        } | null;
+      };
+      /** "I have paid" -> a PENDING row. Never marks an order paid. */
+      claim_upi_payment: {
+        Args: { p_slug: string; p_code: string; p_token: string };
+        Returns: {
+          ok: boolean;
+          already_paid?: boolean;
+          already_claimed?: boolean;
+          claim_recorded?: boolean;
+          due_paise?: number;
+        };
+      };
+      /** Orders where the guest says they paid by UPI. Cashier-facing. */
+      counter_claims: {
+        Args: { p_restaurant_id: string };
+        Returns: Array<{ order_id: string; claimed_at: string }>;
+      };
     };
     Enums: {
       member_role: MemberRole;
