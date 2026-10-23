@@ -99,7 +99,7 @@ export function GuestNote({
                         ].join(' ')}
                       />
                     ) : null}
-                    <span className="tnum">{String(index + 1).padStart(2, '0')}</span>
+                    <span className="tabular-nums">{String(index + 1).padStart(2, '0')}</span>
                     <span>{step.label}</span>
                     {index === currentIndex ? <span className="sr-only">— you are here</span> : null}
                   </li>

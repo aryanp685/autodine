@@ -181,12 +181,13 @@ export function PayOnline({
   const busy = status.kind === 'starting' || status.kind === 'verifying';
 
   return (
-    <div className="pg__form">
+    <div data-pay-online className="mt-1">
       <button
         type="button"
-        className="pg__submit"
+        data-pay-online-button
         onClick={pay}
         disabled={busy || status.kind === 'paid'}
+        className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[var(--p-accent)] px-5 text-[13.5px] font-semibold text-white transition-[opacity,transform] duration-150 active:translate-y-px disabled:opacity-55"
       >
         {status.kind === 'starting'
           ? 'Opening the payment window…'
@@ -198,21 +199,25 @@ export function PayOnline({
       </button>
 
       {status.kind === 'error' && (
-        <p className="cart__fine" role="alert">
-          <strong>Nothing was recorded as paid.</strong> {status.message}
+        <p
+          role="alert"
+          className="mt-2 rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3 py-2 text-[11.5px] leading-[1.5] text-gink-64"
+        >
+          <strong className="font-semibold text-[var(--alert)]">Nothing was recorded as paid.</strong>{' '}
+          {status.message}
         </p>
       )}
 
       {status.kind === 'paid' && (
-        <p className="cart__fine" role="status">
+        <p role="status" className="mt-2 text-[11.5px] leading-[1.5] text-gink-64">
           Payment confirmed. The counter has it too — nothing more to do.
         </p>
       )}
 
       {status.kind === 'idle' && (
-        <p className="cart__fine">
-          Card or UPI, through the payment gateway. The kitchen is already cooking; paying now saves you a
-          queue at the counter.
+        <p className="mt-2 text-[11px] leading-[1.5] text-gink-46">
+          Card or UPI, through the payment gateway. The kitchen is already cooking; paying now saves
+          you a queue at the counter.
         </p>
       )}
     </div>

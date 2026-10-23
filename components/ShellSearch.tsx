@@ -82,42 +82,65 @@ export function ShellSearch({ onLaunch }: { onLaunch?: () => void }) {
   }
 
   return (
-    <div className="shellSearch" ref={wrapperRef}>
-      <input
-        ref={inputRef}
-        type="search"
-        className="shellSearch__input"
-        placeholder="Go to…"
-        aria-label="Go to a screen"
-        aria-expanded={open}
-        aria-controls="shell-search-results"
-        autoComplete="off"
-        value={query}
-        onFocus={() => setOpen(true)}
-        onChange={(event) => {
-          setQuery(event.target.value);
-          setOpen(true);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'ArrowDown') {
-            event.preventDefault();
-            setCursor((c) => Math.min(c + 1, results.length - 1));
-          }
-          if (event.key === 'ArrowUp') {
-            event.preventDefault();
-            setCursor((c) => Math.max(c - 1, 0));
-          }
-          if (event.key === 'Enter' && results[cursor]) {
-            event.preventDefault();
-            optionRefs.current[cursor]?.click();
-          }
-        }}
-      />
+    <div className="relative" ref={wrapperRef}>
+      <div className="flex items-center gap-2 rounded-full border border-transparent bg-paper-deep px-3 py-1.5 transition-colors focus-within:border-hair-strong focus-within:bg-card">
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          width="14"
+          height="14"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          className="shrink-0 text-gink-46"
+        >
+          <circle cx="11" cy="11" r="6.2" />
+          <path d="M15.6 15.6 20 20" strokeLinecap="round" />
+        </svg>
+        <input
+          ref={inputRef}
+          type="search"
+          placeholder="Go to…"
+          aria-label="Go to a screen"
+          aria-expanded={open}
+          aria-controls="shell-search-results"
+          autoComplete="off"
+          value={query}
+          onFocus={() => setOpen(true)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setOpen(true);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowDown') {
+              event.preventDefault();
+              setCursor((c) => Math.min(c + 1, results.length - 1));
+            }
+            if (event.key === 'ArrowUp') {
+              event.preventDefault();
+              setCursor((c) => Math.max(c - 1, 0));
+            }
+            if (event.key === 'Enter' && results[cursor]) {
+              event.preventDefault();
+              optionRefs.current[cursor]?.click();
+            }
+          }}
+          className="w-[92px] bg-transparent text-[12.5px] text-gink placeholder:text-gink-46 focus:w-[150px] focus:outline-none sm:w-[132px] sm:focus:w-[190px] transition-[width] duration-150"
+        />
+        <kbd className="hidden shrink-0 rounded border border-hair-strong px-1 py-px text-[9.5px] font-medium text-gink-46 sm:block">
+          ⌘K
+        </kbd>
+      </div>
 
       {open && (
-        <div className="shellSearch__panel" id="shell-search-results" role="listbox" aria-label="Screens">
+        <div
+          id="shell-search-results"
+          role="listbox"
+          aria-label="Screens"
+          className="absolute top-[calc(100%+6px)] right-0 z-50 w-[280px] overflow-hidden rounded-xl border border-hair bg-card py-1 shadow-g2"
+        >
           {results.length === 0 ? (
-            <p className="shellSearch__empty">No screen matches “{query.trim()}”.</p>
+            <p className="px-3.5 py-3 text-[12.5px] text-gink-46">No screen matches “{query.trim()}”.</p>
           ) : (
             results.map((link, index) => (
               <Link
@@ -128,12 +151,17 @@ export function ShellSearch({ onLaunch }: { onLaunch?: () => void }) {
                 }}
                 role="option"
                 aria-selected={index === cursor}
-                className={`shellSearch__item ${index === cursor ? 'is-on' : ''}`}
                 onMouseEnter={() => setCursor(index)}
                 onClick={close}
+                className={[
+                  'flex items-center justify-between gap-3 px-3.5 py-2 text-[13px] transition-colors',
+                  index === cursor ? 'bg-gink-07 text-gink' : 'text-gink-64',
+                ].join(' ')}
               >
                 <span>{link.label}</span>
-                <span className="shellSearch__group">{link.group}</span>
+                <span className="text-[10px] font-medium tracking-[0.08em] text-gink-46 uppercase">
+                  {link.group}
+                </span>
               </Link>
             ))
           )}

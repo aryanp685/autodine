@@ -146,11 +146,10 @@ describe('OrdersScreen', () => {
   it('gives a phone the same bill as a card, not a sideways scroll', () => {
     const html = renderToStaticMarkup(<OrdersScreen data={live()} />);
 
-    expect(html).toContain('rep__cards');
-    expect(html).toContain('rep__cardRef');
-    // The table stays for the counter screen; both are in the DOM and exactly
-    // one of them is displayed at any width.
-    expect(html).toContain('ui-table');
+    // Both shapes are in the DOM and exactly one of them is displayed at any
+    // width: a table with seven columns on a phone is a sideways scroll.
+    expect(html).toMatch(/<table/);
+    expect(html).toMatch(/<ul[^>]*lg:hidden/);
   });
 
   it('renders the sample report the demo range asks for', () => {

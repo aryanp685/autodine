@@ -1,5 +1,6 @@
 import { AuthShell } from '@/components/AuthShell';
 import { signUpAction } from '@/app/auth/actions';
+import { btn, Field, inputClass } from '@/components/owner/chrome';
 
 /**
  * Create an account.
@@ -34,57 +35,69 @@ export function SignupScreen({ error }: { error?: string }) {
       ]}
     >
       {error ? (
-        <div className="authCard__alert" role="alert">
+        <div
+          role="alert"
+          className="mb-4 rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-2.5 text-[12px] leading-[1.5] text-[var(--alert)]"
+        >
           {error}
         </div>
       ) : null}
 
-      <form className="authForm" action={signUpAction}>
-        <div className="authRow">
-          <label className="ui-field">
-            <span className="ui-label">Full name</span>
-            <input className="ui-input" name="fullName" autoComplete="name" placeholder="Aryan Patel" required />
-          </label>
-
-          <label className="ui-field">
-            <span className="ui-label">Restaurant name</span>
+      <form className="flex flex-col gap-3.5" action={signUpAction}>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Full name" htmlFor="signup-name">
             <input
-              className="ui-input"
+              id="signup-name"
+              className={inputClass}
+              name="fullName"
+              autoComplete="name"
+              placeholder="Aryan Patel"
+              required
+            />
+          </Field>
+
+          <Field label="Restaurant name" htmlFor="signup-restaurant">
+            <input
+              id="signup-restaurant"
+              className={inputClass}
               name="restaurantName"
               autoComplete="organization"
               placeholder="Saffron & Smoke"
               required
             />
-          </label>
+          </Field>
         </div>
 
-        <label className="ui-field">
-          <span className="ui-label">Work email</span>
+        <Field label="Work email" htmlFor="signup-email" hint="Used to create and secure your account.">
           <input
-            className="ui-input"
+            id="signup-email"
+            className={inputClass}
             name="email"
             type="email"
             autoComplete="email"
             placeholder="owner@restaurant.in"
             required
           />
-          <span className="ui-hint">Used to create and secure your account.</span>
-        </label>
+        </Field>
 
-        <label className="ui-field">
-          <span className="ui-label">Mobile number</span>
+        <Field label="Mobile number" htmlFor="signup-phone">
           <input
-            className="ui-input"
+            id="signup-phone"
+            className={inputClass}
             name="phone"
             autoComplete="tel"
             placeholder="+91 90000 00000"
           />
-        </label>
+        </Field>
 
-        <label className="ui-field">
-          <span className="ui-label">Password</span>
+        <Field
+          label="Password"
+          htmlFor="signup-password"
+          hint="Minimum 10 characters. Stored hashed — never in plain text."
+        >
           <input
-            className="ui-input"
+            id="signup-password"
+            className={inputClass}
             name="password"
             type="password"
             autoComplete="new-password"
@@ -92,27 +105,30 @@ export function SignupScreen({ error }: { error?: string }) {
             minLength={10}
             required
           />
-          <span className="ui-hint">Minimum 10 characters. Stored hashed — never in plain text.</span>
-        </label>
+        </Field>
 
         {/*
           NOT pre-ticked, deliberately. A pre-checked consent box is not valid
           consent under India's DPDP Act, which requires consent to be free,
           specific, informed, unconditional and unambiguous.
         */}
-        <label className="ui-check authConsent">
-          <input type="checkbox" name="agree" />
-          <span>
+        <label className="flex items-start gap-2.5 rounded-[10px] border border-hair bg-paper-deep px-3 py-2.5">
+          <input
+            type="checkbox"
+            name="agree"
+            className="mt-[2px] size-4 shrink-0 accent-[var(--p-accent)]"
+          />
+          <span className="text-[11.5px] leading-[1.5] text-gink-64">
             I understand this is a preview, and that my details are used to create this account in
             the configured Supabase project.
           </span>
         </label>
 
-        <button className="authSubmit" type="submit">
+        <button className={`${btn('solid')} mt-1 w-full`} type="submit">
           Create account
         </button>
 
-        <p className="authFine">
+        <p className="text-[11px] leading-[1.5] text-gink-46">
           Signing up creates a restaurant workspace with one menu and one owner. No trial and no
           subscription is created by this form.
         </p>

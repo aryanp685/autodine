@@ -35,23 +35,25 @@ describe('Cashier', () => {
 
   it('makes every ticket in the queue a real button', () => {
     const html = renderToStaticMarkup(<Cashier nav={nav} />);
-    const rows = html.match(/class="cash__qBtn"/g) ?? [];
+    const rows = html.match(/data-counter-ticket="true"/g) ?? [];
     // The demo queue holds three counter tickets.
     expect(rows.length).toBe(3);
   });
 
   it('marks the oldest ticket as selected and no other', () => {
     const html = renderToStaticMarkup(<Cashier nav={nav} />);
-    const pressed = html.match(/class="cash__qBtn" aria-pressed="true"/g) ?? [];
+    const pressed = html.match(/<button[^>]*data-counter-ticket[^>]*aria-pressed="true"/g) ?? [];
     expect(pressed.length).toBe(1);
     expect(html).toContain('A-1041');
   });
 
   it('leaves the preview settle button pressable', () => {
     const html = renderToStaticMarkup(<Cashier nav={nav} />);
-    const cta = html.match(/<button[^>]*class="cash__cta"[^>]*>[\s\S]*?<\/button>/)?.[0] ?? '';
+    const cta = html.match(/<button[^>]*data-counter-cta[^>]*>[\s\S]*?<\/button>/)?.[0] ?? '';
     expect(cta).toContain('Record cash ₹1,247');
-    expect(cta).not.toContain('disabled');
+    // `disabled:` also appears as a Tailwind variant in the class list, so the
+    // attribute is what has to be absent -- not the word.
+    expect(cta).not.toMatch(/\sdisabled=""/);
   });
 
   it('says the preview records nothing', () => {
@@ -64,7 +66,7 @@ describe('Cashier', () => {
       <Cashier nav={nav} data={{ restaurantName: '', queue: [], blocked: 'signed-out' }} />,
     );
     expect(html).toContain('Sign in to see this screen.');
-    expect(html).not.toContain('cash__queue');
+    expect(html).not.toContain('data-counter-queue');
     expect(html).not.toContain('outstanding');
   });
 
@@ -83,7 +85,7 @@ describe('Cashier', () => {
 
   it('opens on the bill the ledger handed over', () => {
     const html = renderToStaticMarkup(<Cashier nav={nav} focus="A-1038" />);
-    const pressed = [...html.matchAll(/<button[^>]*class="cash__qBtn"[^>]*>/g)]
+    const pressed = [...html.matchAll(/<button[^>]*data-counter-ticket[^>]*>/g)]
       .map((m) => m[0])
       .filter((tag) => tag.includes('aria-pressed="true"'));
     expect(pressed).toHaveLength(1);

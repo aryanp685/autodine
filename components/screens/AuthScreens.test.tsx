@@ -42,7 +42,9 @@ describe('sign in', () => {
     // beside a stack of aside cards.
     expect(html).not.toContain('pg__bar');
     expect(html).not.toContain('pg__asideCard');
-    expect(html).toContain('authBody');
+    // One shell, one card, and the notes under it as a list.
+    expect(html).toContain('data-auth-shell');
+    expect(html).toContain('What this build actually does');
   });
 
   it('keeps the recovery route next to the password field', () => {

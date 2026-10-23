@@ -39,7 +39,7 @@ export function TableQr({
 
   return (
     <span
-      className="qr-svg"
+      className="block [&>svg]:block [&>svg]:size-full"
       style={{ width: size, height: size }}
       // Generated server-side by lib/qr.ts; see the note above.
       dangerouslySetInnerHTML={{ __html: svg }}

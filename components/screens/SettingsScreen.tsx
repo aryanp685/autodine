@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { DashboardBar } from '@/components/DashboardBar';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { CopyButton } from '@/components/CopyButton';
 import { PrintButton } from '@/components/PrintButton';
@@ -9,6 +8,16 @@ import { formatTaxPercent, taxExamplePaise } from '@/lib/settings-input';
 import { saveDetailsAction, saveOnlinePaymentsAction, saveTaxAction } from '@/app/dashboard/settings/actions';
 import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
+import {
+  OwnerPage,
+  PageHead,
+  Card,
+  Panel,
+  btn,
+  Field,
+  inputClass,
+  Tag,
+} from '@/components/owner/chrome';
 
 /**
  * Restaurant settings: the details guests and bills read, the tax rate, and
@@ -57,12 +66,9 @@ export function SettingsScreen({
   // Blocked callers get the prompt only. See the note above.
   if (data?.blocked) {
     return (
-      <div className="pg pg--dash" data-surface="owner">
-        <DashboardBar active="settings" outlet={outlet} />
-        <div className="pg__body">
-          <SignInPrompt reason={data.blocked} screen="settings screen" />
-        </div>
-      </div>
+      <OwnerPage active="settings" outlet={outlet}>
+        <SignInPrompt reason={data.blocked} screen="settings screen" />
+      </OwnerPage>
     );
   }
 
@@ -75,63 +81,72 @@ export function SettingsScreen({
   const noPublishedMenu = live && (data?.publishedMenus ?? 0) === 0;
 
   return (
-    <div className="pg pg--dash" data-surface="owner">
-      <DashboardBar active="settings" outlet={outlet} />
-
-      <div className="pg__body">
-        <header className="pg__head">
-          <div className="pg__kicker">Settings</div>
-          <h1 className="pg__title">{details.name || 'Your restaurant'}</h1>
-          <p className="pg__lede">
-            What guests see, what the bill charges, and the code that opens your menu. Changes take effect
-            immediately — the guest menu reads these the next time somebody scans.
-          </p>
-        </header>
+    <OwnerPage active="settings" outlet={outlet}>
+      {/* Everything but the menu card is screen-only. The card is print-only. */}
+      <div className="print:hidden">
+        <PageHead
+          kicker="Settings"
+          title={details.name || 'Your restaurant'}
+          meta="What guests see, what the bill charges, and the code that opens your menu. Changes take effect immediately — the guest menu reads these the next time somebody scans."
+        />
 
         {/* The result of a save belongs under the title, not above it: a page
             that opens on a red band reads as broken before it reads as fixed. */}
         {error && (
-          <div className="pg__alert" role="alert">
-            <strong>Nothing was saved.</strong>
-            <p>{error}</p>
+          <div
+            role="alert"
+            className="mb-3 rounded-[12px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-4 py-3"
+          >
+            <strong className="text-[12.5px] text-[var(--alert)]">Nothing was saved.</strong>
+            <p className="mt-1 text-[12.5px] leading-[1.5] text-gink-64">{error}</p>
           </div>
         )}
         {notice && (
-          <div className="pg__success" role="status">
-            <strong>Saved.</strong>
-            <p>{notice}</p>
+          <div
+            role="status"
+            className="mb-3 rounded-[12px] border border-[var(--p-accent)]/25 bg-accent-soft px-4 py-2.5"
+          >
+            <strong className="text-[12.5px] text-gink">Saved.</strong>{' '}
+            <span className="text-[12.5px] text-gink-64">{notice}</span>
           </div>
         )}
 
         {!live && (
-          <div className="pg__note pg__note--warn">
-            <strong>The database is not connected.</strong> These fields are empty because there is no
-            restaurant to read, and they cannot be saved. Nothing here is sample data — that is the point.
+          <div className="mb-3 rounded-[12px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-4 py-3 text-[11.5px] leading-[1.55] text-gink-64">
+            <strong className="font-semibold text-gink">The database is not connected.</strong> These
+            fields are empty because there is no restaurant to read, and they cannot be saved. Nothing
+            here is sample data — that is the point.
           </div>
         )}
 
         {live && !canEdit && (
-          <div className="pg__note pg__note--info">
-            <strong>Read-only for your role.</strong> You are signed in as{' '}
-            <strong>{data?.role ?? 'staff'}</strong>. Your restaurant&apos;s name, address, tax rate and web
-            address are changed by the owner or a manager. You can see them here so the tax on a bill is
-            never a mystery.
+          <div className="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-[12px] border border-hair bg-paper-deep px-4 py-3 text-[11.5px] leading-[1.55] text-gink-64">
+            <Tag tone="neutral">{data?.role ?? 'staff'}</Tag>
+            <span>
+              <strong className="font-semibold text-gink">Read-only for your role.</strong> Your
+              restaurant&apos;s name, address, tax rate and web address are changed by the owner or a
+              manager. You can see them here so the tax on a bill is never a mystery.
+            </span>
           </div>
         )}
 
-        <div className="pg__body--split">
-          <div className="pg__settingsCol">
-            <section className="pg__formCard">
-              <h2 className="pg__h2">Restaurant details</h2>
-              <p className="pg__p">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_318px] xl:items-start">
+          <div className="flex min-w-0 flex-col gap-4">
+            {/* ------------------------------------------------------- details */}
+            <Panel
+              title="Restaurant details"
+              meta="Name, address and what the bill carries"
+              bodyClassName="px-4 py-4 sm:px-5"
+            >
+              <p className="m-0 mb-4 max-w-[62ch] text-[12px] leading-[1.5] text-gink-46">
                 The name and tagline are the first two things a guest reads on the menu.
               </p>
 
-              <form action={saveDetailsAction} className="pg__form">
-                <label className="ui-field">
-                  <span className="ui-label">Restaurant name</span>
+              <form action={saveDetailsAction} className="flex flex-col gap-3">
+                <Field label="Restaurant name" htmlFor="settings-name">
                   <input
-                    className="ui-input"
+                    id="settings-name"
+                    className={inputClass}
                     name="name"
                     type="text"
                     defaultValue={details.name}
@@ -140,12 +155,16 @@ export function SettingsScreen({
                     disabled={disabled}
                     autoComplete="organization"
                   />
-                </label>
+                </Field>
 
-                <label className="ui-field">
-                  <span className="ui-label">Tagline</span>
+                <Field
+                  label="Tagline"
+                  htmlFor="settings-tagline"
+                  hint="Shown under your name on the guest menu. Optional."
+                >
                   <input
-                    className="ui-input"
+                    id="settings-tagline"
+                    className={inputClass}
                     name="tagline"
                     type="text"
                     defaultValue={details.tagline}
@@ -153,13 +172,16 @@ export function SettingsScreen({
                     disabled={disabled}
                     placeholder="Bombay street food, made fresh"
                   />
-                  <span className="ui-hint">Shown under your name on the guest menu. Optional.</span>
-                </label>
+                </Field>
 
-                <label className="ui-field">
-                  <span className="ui-label">Address</span>
+                <Field
+                  label="Address"
+                  htmlFor="settings-address"
+                  hint="Printed on the bill, under the restaurant name, and on the menu card you can print from this page. A missing address is called out on the bill rather than left blank silently."
+                >
                   <input
-                    className="ui-input"
+                    id="settings-address"
+                    className={inputClass}
                     name="address"
                     type="text"
                     defaultValue={details.address}
@@ -167,17 +189,13 @@ export function SettingsScreen({
                     disabled={disabled}
                     autoComplete="street-address"
                   />
-                  <span className="ui-hint">
-                    Printed on the bill, under the restaurant name, and on the menu card you can print from
-                    this page. A missing address is called out on the bill rather than left blank silently.
-                  </span>
-                </label>
+                </Field>
 
-                <div className="pg__fieldRow">
-                  <label className="ui-field">
-                    <span className="ui-label">Phone</span>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Phone" htmlFor="settings-phone">
                     <input
-                      className="ui-input"
+                      id="settings-phone"
+                      className={inputClass}
                       name="phone"
                       type="tel"
                       defaultValue={details.phone}
@@ -186,12 +204,16 @@ export function SettingsScreen({
                       autoComplete="tel"
                       placeholder="+91 98765 43210"
                     />
-                  </label>
+                  </Field>
 
-                  <label className="ui-field">
-                    <span className="ui-label">GSTIN</span>
+                  <Field
+                    label="GSTIN"
+                    htmlFor="settings-gstin"
+                    hint="Leave it blank if you are not registered. The 15-character format is checked here rather than discovered on a filed invoice."
+                  >
                     <input
-                      className="ui-input"
+                      id="settings-gstin"
+                      className={inputClass}
                       name="gstin"
                       type="text"
                       defaultValue={details.gstin}
@@ -200,17 +222,17 @@ export function SettingsScreen({
                       autoCapitalize="characters"
                       placeholder="22AAAAA0000A1Z5"
                     />
-                  </label>
+                  </Field>
                 </div>
-                <span className="ui-hint">
-                  Leave the GSTIN blank if you are not registered. It is checked for the 15-character GST
-                  format here rather than discovered on a filed invoice.
-                </span>
 
-                <label className="ui-field">
-                  <span className="ui-label">Public web address</span>
+                <Field
+                  label="Public web address"
+                  htmlFor="settings-slug"
+                  hint={`/menu?s=${details.slug || 'your-address'} — the one link that names your restaurant.`}
+                >
                   <input
-                    className="ui-input"
+                    id="settings-slug"
+                    className={inputClass}
                     name="slug"
                     type="text"
                     defaultValue={details.slug}
@@ -218,51 +240,63 @@ export function SettingsScreen({
                     disabled={disabled}
                     spellCheck={false}
                   />
-                  <span className="ui-hint">
-                    /menu?s={details.slug || 'your-address'} — the one link that names your restaurant.
-                  </span>
-                </label>
+                </Field>
 
                 {canEdit && (
-                  <label className="ui-check">
-                    <input type="checkbox" name="slugConfirm" />
-                    <span>
-                      I changed the web address and understand that existing links, bookmarks and printed
-                      standees with the old one stop working.
+                  <label className="flex items-start gap-2.5 rounded-[10px] border border-hair bg-paper-deep px-3 py-2.5">
+                    <input
+                      type="checkbox"
+                      name="slugConfirm"
+                      className="mt-[2px] size-4 shrink-0 accent-[var(--p-accent)]"
+                    />
+                    <span className="text-[11.5px] leading-[1.5] text-gink-64">
+                      I changed the web address and understand that existing links, bookmarks and
+                      printed standees with the old one stop working.
                     </span>
                   </label>
                 )}
 
-                <button type="submit" className="pg__submit" disabled={disabled}>
-                  Save details
-                </button>
+                <div>
+                  <button type="submit" className={btn('solid', 'sm')} disabled={disabled}>
+                    Save details
+                  </button>
+                </div>
               </form>
-            </section>
+            </Panel>
 
-            <section className="pg__formCard">
-              <h2 className="pg__h2">Tax</h2>
-              <p className="pg__p">
-                The rate the bill adds on top of the menu prices. Set what your accountant told you — this
-                screen does not guess a rate.
+            {/* ------------------------------------------------------------ tax */}
+            <Panel
+              title="Tax"
+              meta={taxBps === 0 ? '0% — nothing added' : `${formatTaxPercent(taxBps)}%`}
+              bodyClassName="px-4 py-4 sm:px-5"
+            >
+              <p className="m-0 max-w-[62ch] text-[12px] leading-[1.5] text-gink-46">
+                The rate the bill adds on top of the menu prices. Set what your accountant told you —
+                this screen does not guess a rate.
               </p>
 
               {taxBps === 0 ? (
-                <div className="pg__note pg__note--warn">
-                  <strong>Tax is 0%.</strong> Every bill right now charges the menu price with no tax. If you
-                  are registered for GST, set the rate here before service.
-                </div>
+                <p className="mt-3 rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-2.5 text-[11.5px] leading-[1.5] text-gink-64">
+                  <strong className="font-semibold text-gink">Tax is 0%.</strong> Every bill right now
+                  charges the menu price with no tax. If you are registered for GST, set the rate here
+                  before service.
+                </p>
               ) : (
-                <p className="pg__note">
+                <p className="mt-3 rounded-[10px] border border-hair bg-paper-deep px-3.5 py-2.5 text-[11.5px] leading-[1.5] text-gink-64">
                   A dish priced {inr(100)} currently bills {inr(paiseToRupees(example.totalPaise))} —{' '}
                   {inr(100)} plus {inr(paiseToRupees(example.taxPaise))} tax.
                 </p>
               )}
 
-              <form action={saveTaxAction} className="pg__form">
-                <label className="ui-field">
-                  <span className="ui-label">Tax rate (%)</span>
+              <form action={saveTaxAction} className="mt-3 flex flex-col gap-3">
+                <Field
+                  label="Tax rate (%)"
+                  htmlFor="settings-tax"
+                  hint={`Up to two decimals, 0 to ${formatTaxPercent(3000)}. Menu prices are treated as tax-exclusive, so tax is added at checkout.`}
+                >
                   <input
-                    className="ui-input tnum"
+                    id="settings-tax"
+                    className={`${inputClass} w-[140px] tabular-nums`}
                     name="taxRate"
                     type="text"
                     inputMode="decimal"
@@ -270,153 +304,173 @@ export function SettingsScreen({
                     disabled={disabled}
                     required
                   />
-                  <span className="ui-hint">
-                    Up to two decimals, 0 to {formatTaxPercent(3000)}. Menu prices are treated as
-                    tax-exclusive, so tax is added at checkout.
-                  </span>
-                </label>
+                </Field>
 
-                <button type="submit" className="pg__submit" disabled={disabled}>
-                  Save tax rate
-                </button>
+                <div>
+                  <button type="submit" className={btn('ghost', 'sm')} disabled={disabled}>
+                    Save tax rate
+                  </button>
+                </div>
               </form>
 
-              <p className="pg__fine">
-                Orders already placed keep the tax they were charged — a bill is a record of the rate at that
-                moment, not a live calculation. New orders use the new rate immediately.
+              <p className="mt-3 text-[11px] leading-[1.5] text-gink-46">
+                Orders already placed keep the tax they were charged — a bill is a record of the rate at
+                that moment, not a live calculation. New orders use the new rate immediately.
               </p>
-            </section>
+            </Panel>
 
-            <section className="pg__formCard">
-              <h2 className="pg__h2">Online payment</h2>
-              <p className="pg__p">
-                Let guests pay by card or UPI from their own order page. Money goes to your payment-gateway
-                account, and the order is marked paid as soon as the gateway confirms it.
+            {/* -------------------------------------------------- online payment */}
+            <Panel
+              title="Online payment"
+              meta={gatewayConfigured ? 'Gateway keys present' : 'No gateway keys'}
+              bodyClassName="px-4 py-4 sm:px-5"
+            >
+              <p className="m-0 max-w-[62ch] text-[12px] leading-[1.5] text-gink-46">
+                Let guests pay by card or UPI from their own order page. Money goes to your
+                payment-gateway account, and the order is marked paid as soon as the gateway confirms
+                it.
               </p>
 
               {/* Shown whenever the keys are missing, not only when the box is
                   already ticked. The switch is a database flag; the keys are an
-                  environment fact, and this deployment has none. Offering a
-                  control that cannot change anything -- and only explaining
-                  why after it is saved -- is how an owner concludes the
-                  feature is broken. */}
+                  environment fact. */}
               {!gatewayConfigured && (
-                <div className="pg__note pg__note--warn">
-                  <strong>No gateway keys on this deployment.</strong> This switch is disabled because there
-                  is nothing behind it: the server has no payment-gateway key pair, so no pay button can
-                  appear for a guest. Ask whoever deploys AutoDine to add the keys, then come back.
-                </div>
+                <p className="mt-3 rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-2.5 text-[11.5px] leading-[1.5] text-gink-64">
+                  <strong className="font-semibold text-gink">No gateway keys on this deployment.</strong>{' '}
+                  This switch is disabled because there is nothing behind it: the server has no
+                  payment-gateway key pair, so no pay button can appear for a guest. Ask whoever
+                  deploys AutoDine to add the keys, then come back.
+                </p>
               )}
 
               {!data?.onlinePaymentsEnabled && gatewayConfigured && (
-                <div className="pg__note pg__note--info">
-                  <strong>Off.</strong> This server has gateway keys, but guests still see &quot;pay at the
-                  counter&quot;. Tick the box and save to change that.
-                </div>
+                <p className="mt-3 rounded-[10px] border border-hair bg-paper-deep px-3.5 py-2.5 text-[11.5px] leading-[1.5] text-gink-64">
+                  <strong className="font-semibold text-gink">Off.</strong> This server has gateway
+                  keys, but guests still see &quot;pay at the counter&quot;. Tick the box and save to
+                  change that.
+                </p>
               )}
 
-              <form action={saveOnlinePaymentsAction} className="pg__form">
-                <label className="ui-check">
+              <form action={saveOnlinePaymentsAction} className="mt-3 flex flex-col gap-3">
+                <label className="flex items-start gap-2.5 rounded-[10px] border border-hair bg-paper-deep px-3 py-2.5">
                   <input
                     type="checkbox"
+                    disabled={disabled || !gatewayConfigured}
                     name="onlinePayments"
                     defaultChecked={Boolean(data?.onlinePaymentsEnabled)}
-                    disabled={disabled || !gatewayConfigured}
+                    className="mt-[2px] size-4 shrink-0 accent-[var(--p-accent)]"
                   />
-                  <span>
-                    Take card and UPI payment online. Orders stay unpaid until the gateway confirms the money,
-                    so nothing is ever marked paid on the guest&apos;s word.
+                  <span className="text-[11.5px] leading-[1.5] text-gink-64">
+                    Take card and UPI payment online. Orders stay unpaid until the gateway confirms the
+                    money, so nothing is ever marked paid on the guest&apos;s word.
                   </span>
                 </label>
 
-                <button
-                  type="submit"
-                  className="pg__submit"
-                  disabled={disabled || !gatewayConfigured}
-                >
-                  Save payment setting
-                </button>
+                <div>
+                  <button
+                    type="submit"
+                    className={btn('solid', 'sm')}
+                    disabled={disabled || !gatewayConfigured}
+                  >
+                    Save payment setting
+                  </button>
+                </div>
               </form>
 
-              <p className="pg__fine">
-                Turning this off does not touch orders already paid, and does not refund anything. Counter
-                payments — cash, card and UPI at the till — keep working either way.
+              <p className="mt-3 text-[11px] leading-[1.5] text-gink-46">
+                Turning this off does not touch orders already paid, and does not refund anything.
+                Counter payments — cash, card and UPI at the till — keep working either way.
               </p>
-            </section>
+            </Panel>
 
-            <section className="pg__formCard">
-              <h2 className="pg__h2">Outlets</h2>
-              <p className="pg__p">
-                Every outlet has its own menu, tables, QR codes, orders and bills. Whatever is open here is what
-                the rest of the dashboard shows.
+            {/* --------------------------------------------------------- outlets */}
+            <Panel
+              title="Outlets"
+              meta={live ? `${data?.outlets?.length ?? 0} on this account` : 'none'}
+              bodyClassName="px-4 py-4 sm:px-5"
+            >
+              <p className="m-0 max-w-[62ch] text-[12px] leading-[1.5] text-gink-46">
+                Every outlet has its own menu, tables, QR codes, orders and bills. Whatever is open here
+                is what the rest of the dashboard shows.
               </p>
 
               {!live && (
-                <p className="pg__fine">
-                  The database is not connected, so there are no outlets to list and none can be
-                  added. The sample restaurant elsewhere in this preview is a single outlet.
+                <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
+                  The database is not connected, so there are no outlets to list and none can be added.
+                  The sample restaurant elsewhere in this preview is a single outlet.
                 </p>
               )}
 
               {live && (
-                <ul className="pg__bullets">
+                <ul className="m-0 mt-3 flex list-none flex-col p-0">
                   {(data?.outlets ?? []).map((entry) => (
-                    <li key={entry.id}>
-                      <strong>{entry.name}</strong> — {entry.role}
-                      {entry.id === data?.activeOutletId ? ' · open now' : ''}
+                    <li
+                      key={entry.id}
+                      className="flex flex-wrap items-baseline justify-between gap-2 border-b border-hair py-2 text-[12.5px] text-gink last:border-b-0"
+                    >
+                      <span className="font-medium">{entry.name}</span>
+                      <span className="flex items-center gap-2 text-[11.5px] text-gink-46">
+                        {entry.role}
+                        {entry.id === data?.activeOutletId ? <Tag tone="live">Open now</Tag> : null}
+                      </span>
                     </li>
                   ))}
                 </ul>
               )}
 
               {live && data?.role === 'owner' && (
-                <form className="pg__form" method="post" action="/dashboard/outlet/new">
-                  <label className="ui-field">
-                    <span className="ui-label">Add another outlet</span>
+                <form className="mt-3 flex flex-col gap-2.5" method="post" action="/dashboard/outlet/new">
+                  <Field
+                    label="Add another outlet"
+                    htmlFor="new-outlet-name"
+                    hint="Up to five per account. A new outlet starts empty, with its own web address and a 0% tax rate to set."
+                  >
                     <input
-                      className="ui-input"
+                      id="new-outlet-name"
+                      className={inputClass}
                       name="name"
                       placeholder="Maddi — Baner"
                       minLength={2}
                       maxLength={80}
                       required
                     />
-                    <span className="ui-hint">
-                      Up to five per account. A new outlet starts empty, with its own web address and a 0% tax rate
-                      to set.
-                    </span>
-                  </label>
-                  <button className="pg__submit" type="submit">
-                    Create outlet
-                  </button>
+                  </Field>
+                  <div>
+                    <button className={btn('ghost', 'sm')} type="submit">
+                      Create outlet
+                    </button>
+                  </div>
                 </form>
               )}
 
               {live && data?.role !== 'owner' && (
-                <p className="pg__fine">
+                <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
                   Only an owner can add an outlet. You are signed in as {data?.role ?? 'staff'}.
                 </p>
               )}
-            </section>
+            </Panel>
           </div>
 
-          <aside className="pg__aside pg__settingsAside">
-            <div className="pg__asideCard">
-              <div className="pg__asideHead">Public menu QR</div>
+          {/* ------------------------------------------------------------- aside */}
+          <aside className="flex min-w-0 flex-col gap-4">
+            <Card className="px-4 py-4">
+              <div className="text-[10.5px] font-semibold tracking-[0.1em] text-gink-46 uppercase">
+                Public menu QR
+              </div>
 
               {data?.publicMenuSvg ? (
-                <div className="pg__tableQr">
+                <div className="mt-3 flex justify-center rounded-[10px] border border-hair bg-white p-3">
                   {/* Generated on the server by lib/qr.ts from a URL we build.
                       There is no path from anything a restaurant types to this
                       string, so it is injected rather than parsed. */}
                   <span
-                    className="qr-svg"
+                    className="block [&>svg]:block [&>svg]:size-full"
                     style={{ width: 176, height: 176 }}
                     dangerouslySetInnerHTML={{ __html: data.publicMenuSvg }}
                   />
                 </div>
               ) : (
-                <p className="pg__p">
+                <p className="mt-3 text-[12px] leading-[1.5] text-gink-46">
                   {live
                     ? 'The code could not be drawn for this address. The link below still works.'
                     : 'No code: there is no restaurant to encode until the database is connected.'}
@@ -424,92 +478,107 @@ export function SettingsScreen({
               )}
 
               {data?.publicMenuUrl && (
-                <div className="pg__settingsUrl">
+                <div className="mt-3 flex items-center gap-1.5">
                   <a
                     id="settings-menu-url"
                     href={data.publicMenuUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="pg__settingsUrlText"
+                    className="min-w-0 flex-1 truncate rounded-[8px] border border-hair bg-paper-deep px-2.5 py-1.5 text-[11.5px] text-gink underline decoration-hair-strong underline-offset-2 hover:decoration-gink"
                   >
                     {data.publicMenuUrl}
                   </a>
                   <CopyButton
                     value={data.publicMenuUrl}
                     selectId="settings-menu-url"
-                    className="pg__miniBtn"
+                    className={btn('ghost', 'sm')}
                   />
                 </div>
               )}
 
-              <p className="pg__fine">
-                This is the menu, not a table. It opens for anyone, with no table attached, so it works for
-                takeaway and for sharing. Table cards — the ones that pin an order to a table — are in{' '}
-                <Link href="/dashboard/tables">Tables &amp; QR</Link>.
+              <p className="mt-3 text-[11px] leading-[1.5] text-gink-46">
+                This is the menu, not a table. It opens for anyone, with no table attached, so it works
+                for takeaway and for sharing. Table cards — the ones that pin an order to a table — are
+                in{' '}
+                <Link
+                  href="/dashboard/tables"
+                  className="font-medium text-gink underline decoration-hair-strong underline-offset-2"
+                >
+                  Tables &amp; QR
+                </Link>
+                .
               </p>
 
               {noPublishedMenu && (
-                <div className="pg__note pg__note--warn">
+                <p className="mt-3 rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3 py-2.5 text-[11.5px] leading-[1.5] text-gink-64">
                   {(data?.totalMenus ?? 0) === 0 ? (
                     <>
-                      <strong>Nothing to show yet.</strong> You have no menus at all, so a guest scanning this
-                      lands on an empty page. Add dishes first, then publish the menu.
+                      <strong className="font-semibold text-gink">Nothing to show yet.</strong> You
+                      have no menus at all, so a guest scanning this lands on an empty page. Add dishes
+                      first, then publish the menu.
                     </>
                   ) : (
                     <>
-                      <strong>Nothing to show yet.</strong> None of your {data?.totalMenus} menus is
-                      published, so a guest scanning this lands on an empty page. Publish one menu and this
-                      code starts working.
+                      <strong className="font-semibold text-gink">Nothing to show yet.</strong> None
+                      of your {data?.totalMenus} menus is published, so a guest scanning this lands on
+                      an empty page. Publish one menu and this code starts working.
                     </>
                   )}
-                </div>
+                </p>
               )}
 
               {live && data?.publicMenuSvg && (
-                <div className="pg__rowEnd">
-                  <PrintButton className="pg__btn">Print menu card</PrintButton>
+                <div className="mt-3">
+                  <PrintButton className={btn('ghost', 'sm')}>Print menu card</PrintButton>
                 </div>
               )}
-            </div>
+            </Card>
 
-            <div className="pg__asideCard pg__asideCard--quiet">
-              <div className="pg__asideHead">Where these appear</div>
-              <ul className="pg__bullets">
-                <li>Name and tagline: the top of the guest menu, and the browser tab title.</li>
-                <li>Tax rate: the cart, the checkout total and every order placed from now on.</li>
-                <li>Web address: the QR above and every link to your menu.</li>
-                <li>Address, phone and GSTIN: printed on the bill. A bill with either the address or the GSTIN missing says so.</li>
+            <Card className="bg-paper-deep px-4 py-4">
+              <div className="text-[10.5px] font-semibold tracking-[0.1em] text-gink-46 uppercase">
+                Where these appear
+              </div>
+              <ul className="m-0 mt-2.5 flex list-none flex-col gap-1.5 p-0">
+                {[
+                  'Name and tagline: the top of the guest menu, and the browser tab title.',
+                  'Tax rate: the cart, the checkout total and every order placed from now on.',
+                  'Web address: the QR above and every link to your menu.',
+                  'Address, phone and GSTIN: printed on the bill. A bill with either the address or the GSTIN missing says so.',
+                ].map((line) => (
+                  <li key={line} className="flex gap-2 text-[11.5px] leading-[1.5] text-gink-64">
+                    <span
+                      aria-hidden="true"
+                      className="mt-[7px] size-1 shrink-0 rounded-full bg-gink-28"
+                    />
+                    <span>{line}</span>
+                  </li>
+                ))}
               </ul>
-              <p className="pg__fine">
-                Timezone: <strong>{data?.timezone ?? 'Asia/Kolkata'}</strong>. Fixed at signup, because it
-                decides which day a sale belongs to in Reports; changing it mid-day would move yesterday&apos;s
-                money into today.
+              <p className="mt-2.5 text-[11px] leading-[1.5] text-gink-46">
+                Timezone: <strong className="text-gink">{data?.timezone ?? 'Asia/Kolkata'}</strong>.
+                Fixed at signup, because it decides which day a sale belongs to in Reports; changing it
+                mid-day would move yesterday&apos;s money into today.
               </p>
-            </div>
+            </Card>
           </aside>
         </div>
+      </div>
 
-        {/* Printed by the Print menu card button. The @media print block hides
-            the forms and the aside, and leaves only this card. */}
-        <div className="pg__printRow pg__printRow--sheetOnly">
-          <div className="pg__printSheet">
-            <div className="pg__printHead">Menu card</div>
-            <div className="pg__printGrid pg__printGrid--single">
-              <div className="pg__printCard">
-                {data?.publicMenuSvg ? (
-                  <span
-                    className="qr-svg"
-                    style={{ width: 160, height: 160 }}
-                    dangerouslySetInnerHTML={{ __html: data.publicMenuSvg }}
-                  />
-                ) : null}
-                <div className="pg__printName">{details.name || 'Your restaurant'}</div>
-                <div className="pg__printHint">Scan for the menu</div>
-              </div>
-            </div>
-          </div>
+      {/* Printed by the Print menu card button: forms and aside are hidden, and
+          this card is the page. */}
+      <div className="hidden print:block" data-print-sheet>
+        <div className="flex flex-col items-center gap-2 border border-hair px-6 py-8 text-center">
+          {data?.publicMenuSvg ? (
+            <span
+              className="block [&>svg]:block [&>svg]:size-full"
+              style={{ width: 160, height: 160 }}
+              dangerouslySetInnerHTML={{ __html: data.publicMenuSvg }}
+            />
+          ) : null}
+          <div className="text-[15px] font-medium text-gink">{details.name || 'Your restaurant'}</div>
+          <div className="text-[11px] text-gink-46">Scan for the menu</div>
         </div>
       </div>
-    </div>
+    </OwnerPage>
   );
 }

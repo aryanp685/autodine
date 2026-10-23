@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { AuthShell } from '@/components/AuthShell';
 import { updatePasswordAction } from '@/app/auth/actions';
 import { MIN_PASSWORD } from '@/lib/password';
+import { btn, Field, inputClass } from '@/components/owner/chrome';
 
 /**
  * Choose a new password, on the session the emailed link created.
@@ -12,6 +13,15 @@ import { MIN_PASSWORD } from '@/lib/password';
  * password was wrong rather than the link.
  */
 export function ResetPasswordScreen({ email, error }: { email: string | null; error?: string }) {
+  const alert = error ? (
+    <div
+      role="alert"
+      className="mb-4 rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-2.5 text-[12px] leading-[1.5] text-[var(--alert)]"
+    >
+      {error}
+    </div>
+  ) : null;
+
   if (!email) {
     return (
       <AuthShell
@@ -31,19 +41,13 @@ export function ResetPasswordScreen({ email, error }: { email: string | null; er
           </>,
         ]}
       >
-        {error ? (
-          <div className="authCard__alert" role="alert">
-            {error}
-          </div>
-        ) : null}
+        {alert}
 
-        <div className="authActions">
-          <Link className="authSubmit" href="/forgot-password">
-            Send a new reset link
-          </Link>
-        </div>
+        <Link className={`${btn('solid')} w-full`} href="/forgot-password">
+          Send a new reset link
+        </Link>
 
-        <p className="authFine">
+        <p className="mt-3 text-center text-[11px] leading-[1.5] text-gink-46">
           If you are already signed in, sign out first and ask for the link from this browser.
         </p>
       </AuthShell>
@@ -56,8 +60,8 @@ export function ResetPasswordScreen({ email, error }: { email: string | null; er
       title="Choose a new password"
       lede={
         <>
-          Setting the password for <strong>{email}</strong>. This also signs out every other device
-          that was signed in to the account.
+          Setting the password for <strong className="font-medium text-gink">{email}</strong>. This
+          also signs out every other device that was signed in to the account.
         </>
       }
       action={{ prompt: 'Changed your mind?', label: 'Sign in', href: '/login' }}
@@ -73,17 +77,17 @@ export function ResetPasswordScreen({ email, error }: { email: string | null; er
         </>,
       ]}
     >
-      {error ? (
-        <div className="authCard__alert" role="alert">
-          {error}
-        </div>
-      ) : null}
+      {alert}
 
-      <form className="authForm" action={updatePasswordAction}>
-        <label className="ui-field">
-          <span className="ui-label">New password</span>
+      <form className="flex flex-col gap-3.5" action={updatePasswordAction}>
+        <Field
+          label="New password"
+          htmlFor="reset-password"
+          hint={`At least ${MIN_PASSWORD} characters. Longer is safer than complicated.`}
+        >
           <input
-            className="ui-input"
+            id="reset-password"
+            className={inputClass}
             name="password"
             type="password"
             autoComplete="new-password"
@@ -91,15 +95,12 @@ export function ResetPasswordScreen({ email, error }: { email: string | null; er
             minLength={MIN_PASSWORD}
             required
           />
-          <span className="ui-hint">
-            At least {MIN_PASSWORD} characters. Longer is safer than complicated.
-          </span>
-        </label>
+        </Field>
 
-        <label className="ui-field">
-          <span className="ui-label">Repeat the new password</span>
+        <Field label="Repeat the new password" htmlFor="reset-confirmation">
           <input
-            className="ui-input"
+            id="reset-confirmation"
+            className={inputClass}
             name="confirmation"
             type="password"
             autoComplete="new-password"
@@ -107,9 +108,9 @@ export function ResetPasswordScreen({ email, error }: { email: string | null; er
             minLength={MIN_PASSWORD}
             required
           />
-        </label>
+        </Field>
 
-        <button className="authSubmit" type="submit">
+        <button className={`${btn('solid')} mt-1 w-full`} type="submit">
           Save the new password
         </button>
       </form>

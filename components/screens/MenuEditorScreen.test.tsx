@@ -155,8 +155,8 @@ describe('MenuEditorScreen, live', () => {
     );
 
     // Two portions on the first row, an em dash on the one with none.
-    expect(html).toContain('pg__variantCount">2</span>');
-    expect(html).toContain('pg__variantNone');
+    expect(html).toContain('data-portion-count="2"');
+    expect(html).toContain('data-portion-none');
   });
 
   it('says the menu is live and offers to take it down when published', () => {
@@ -199,7 +199,7 @@ describe('MenuEditorScreen, live', () => {
 
     expect(html).toContain('Delete Paneer Tikka');
     expect(html).toContain('Delete Chicken 65');
-    expect(html).toContain('pg__rowDel');
+    expect(html).toContain('data-row-delete');
     expect(html).toContain('name="itemId" value="i-1"');
   });
 
@@ -228,16 +228,16 @@ describe('MenuEditorScreen, live', () => {
   it('shows one banner after a delete, not a notice and an undo stacked', () => {
     const html = render(data(), JSON.stringify({ id: '05979fc9-ad4d-482d-950f-27d3d0e1e519', name: 'X', pricePaise: 0 }));
 
-    expect(html).toContain('pg__undo');
+    expect(html).toContain('data-banner="undo"');
     // Two strips would read as two things having happened when one did.
-    expect(html).not.toContain('pg__success');
+    expect(html).not.toContain('data-banner="notice"');
   });
 
   it('shows the plain notice when there is nothing to undo', () => {
     const html = renderToStaticMarkup(<MenuEditorScreen data={data()} notice="Saved." />);
 
-    expect(html).toContain('pg__success');
-    expect(html).not.toContain('pg__undo');
+    expect(html).toContain('data-banner="notice"');
+    expect(html).not.toContain('data-banner="undo"');
   });
 
   it('keeps the demo board when there is no data', () => {
@@ -254,7 +254,7 @@ describe('MenuEditorScreen, live', () => {
     // Nothing to delete: there is no database behind these rows. The editor
     // form still carries an itemId field of its own, so the check is on the
     // delete control, not on the field name.
-    expect(html).not.toContain('pg__rowDel');
+    expect(html).not.toContain('data-row-delete');
   });
 });
 
@@ -293,7 +293,7 @@ describe('portions', () => {
     );
 
     expect(html).toContain('name="variantId"');
-    expect(html).toContain('pg__variantX');
+    expect(html).toContain('data-remove-portion');
   });
 
   it('offers a form to add a portion, carrying the item id', () => {
@@ -440,7 +440,7 @@ describe('MenuEditorScreen menu tabs', () => {
     // ever goes back to being decoration these will not be submit buttons.
     expect(html).toContain('Breakfast');
     expect(html).toContain('Dinner');
-    expect(html).toContain('pg__menuTab');
+    expect(html).toContain('data-menu-tab=');
     expect(html).toContain('Draft');
     // A real form carrying the id, so switching actually switches.
     expect(html).toContain('name="menuId" value="m-1"');

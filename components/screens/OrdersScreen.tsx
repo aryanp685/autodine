@@ -1,10 +1,22 @@
 import Link from 'next/link';
-import { DashboardBar } from '@/components/DashboardBar';
 import type { OutletBar } from '@/lib/outlets';
 import { Money, PaymentPill, PrepPill } from '@/components/ui';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { demoReport, resolveRange, type ReportOrderRow, type ReportsScreenData } from '@/lib/db/reports';
 import { dateTimeInZone } from '@/lib/db/time';
+import {
+  BtnLink,
+  Card,
+  Empty,
+  OwnerPage,
+  PageHead,
+  Td,
+  TableWrap,
+  Th,
+  Tr,
+  btn,
+  tableClass,
+} from '@/components/owner/chrome';
 
 /**
  * The order ledger.
@@ -136,50 +148,49 @@ export function OrdersScreen({
   const exportHref = `/dashboard/reports/export?${exportParams.toString()}`;
 
   return (
-    <div className="pg pg--dash" data-surface="owner">
-      <DashboardBar active="orders" outlet={outlet} />
-
-      <div className="pg__body">
-        {blocked && <SignInPrompt reason={blocked} screen="order ledger" />}
-
-        <header className="pg__head pg__head--row">
-          <div>
-            <div className="pg__kicker">Orders</div>
-            <h1 className="pg__title">Order ledger</h1>
-            <p className="pg__lede">
-              {live && !blocked ? data?.range.label : 'Sample ledger · fictional orders'}
-              {' · '}
-              {openCount} open · {unsettledCount} not settled
-              {cancelledCount > 0 ? ` · ${cancelledCount} cancelled` : ''}
-            </p>
-          </div>
-          {live && !blocked && (
-            <div className="pg__headActions">
-              <Link className="pg__btn" href="/kitchen">
+    <OwnerPage active="orders" outlet={outlet} wide>
+      <PageHead
+        kicker="Orders"
+        title="Order ledger"
+        meta={
+          <>
+            {live && !blocked ? data?.range.label : 'Sample ledger · fictional orders'}
+            {' · '}
+            {openCount} open · {unsettledCount} not settled
+            {cancelledCount > 0 ? ` · ${cancelledCount} cancelled` : ''}
+          </>
+        }
+        actions={
+          live && !blocked ? (
+            <>
+              <BtnLink href="/kitchen" tone="ghost">
                 Kitchen board
-              </Link>
+              </BtnLink>
               {/* A route handler that answers with a file, so an anchor with
                   `download` rather than <Link>: client-side navigation has no
                   RSC payload to fetch here. */}
-              <a
-                className="pg__btn pg__btn--solid"
-                href={exportHref}
-                download
-              >
+              <a className={btn('solid')} href={exportHref} download>
                 Order CSV
               </a>
-            </div>
-          )}
-        </header>
+            </>
+          ) : null
+        }
+      />
 
-        {!blocked && (
-          <div className="rep__ranges">
+      {blocked && <SignInPrompt reason={blocked} screen="order ledger" />}
+
+      {!blocked && (
+        <div className="mb-4 flex flex-col gap-2.5">
+          {/* The window and the filter are two different questions -- "which
+              days" and "which rows" -- so they are two separate rows of chips
+              rather than one long one that mixes them. */}
+          <div className="flex flex-wrap items-center gap-1.5">
             {RANGE_LINKS.map((r) => (
               <Link
                 key={r.key}
                 href={href(r.key, filter, query, dates)}
-                className={`rep__range ${rangeKey === r.key ? 'is-active' : ''}`}
                 aria-current={rangeKey === r.key ? 'true' : undefined}
+                className={chip(rangeKey === r.key)}
               >
                 {r.label}
               </Link>
@@ -189,24 +200,44 @@ export function OrdersScreen({
                 which reads the same aggregate, only had three presets. A
                 dispute about one evening is exactly the question this screen
                 gets asked. */}
-            <form className="rep__custom rep__custom--dates" method="get" action="/dashboard/orders">
+            <form
+              method="get"
+              action="/dashboard/orders"
+              className="flex flex-wrap items-center gap-1.5 rounded-full border border-hair bg-card py-1 pr-1 pl-3"
+            >
               <input type="hidden" name="range" value="custom" />
               {filter !== 'all' && <input type="hidden" name="status" value={filter} />}
               {query ? <input type="hidden" name="q" value={query} /> : null}
-              <label className="rep__customField">
-                <span>From</span>
-                <input type="date" name="from" defaultValue={customFrom} required />
+              <label className="flex items-center gap-1.5 text-[11.5px] text-gink-46">
+                From
+                <input
+                  type="date"
+                  name="from"
+                  defaultValue={customFrom}
+                  required
+                  className="h-7 rounded-md border border-hair px-1.5 text-[11.5px] text-gink focus:border-gink focus:outline-none"
+                />
               </label>
-              <label className="rep__customField">
-                <span>To</span>
-                <input type="date" name="to" defaultValue={customTo} required />
+              <label className="flex items-center gap-1.5 text-[11.5px] text-gink-46">
+                To
+                <input
+                  type="date"
+                  name="to"
+                  defaultValue={customTo}
+                  required
+                  className="h-7 rounded-md border border-hair px-1.5 text-[11.5px] text-gink focus:border-gink focus:outline-none"
+                />
               </label>
-              <button type="submit" className="rep__range">
+              <button type="submit" className={chip(false)}>
                 Apply dates
               </button>
             </form>
 
-            <form className="rep__custom" method="get" action="/dashboard/orders">
+            <form
+              method="get"
+              action="/dashboard/orders"
+              className="ml-auto flex items-center gap-1.5 rounded-full border border-hair bg-card py-1 pr-1 pl-3"
+            >
               {rangeKey !== 'today' && <input type="hidden" name="range" value={rangeKey} />}
               {rangeKey === 'custom' && customFrom ? (
                 <input type="hidden" name="from" value={customFrom} />
@@ -215,158 +246,154 @@ export function OrdersScreen({
                 <input type="hidden" name="to" value={customTo} />
               ) : null}
               {filter !== 'all' && <input type="hidden" name="status" value={filter} />}
-              <label className="rep__customField">
-                <span>Find</span>
-                <input
-                  type="search"
-                  name="q"
-                  defaultValue={query}
-                  placeholder="Table or reference"
-                  aria-label="Find an order by table or reference"
-                />
-              </label>
-              <button type="submit" className="rep__range">
+              <input
+                type="search"
+                name="q"
+                defaultValue={query}
+                placeholder="Table or reference"
+                aria-label="Find an order by table or reference"
+                className="h-7 w-[150px] bg-transparent text-[12px] text-gink placeholder:text-gink-46 focus:outline-none"
+              />
+              <button type="submit" className={chip(false)}>
                 Search
               </button>
             </form>
           </div>
-        )}
 
-        {!blocked && (
-          <div className="rep__ranges rep__ranges--tight">
+          <div className="flex flex-wrap items-center gap-1.5">
             {FILTERS.map((f) => (
               <Link
                 key={f.key}
                 href={href(rangeKey, f.key, query, dates)}
-                className={`rep__range ${filter === f.key ? 'is-active' : ''}`}
                 aria-current={filter === f.key ? 'true' : undefined}
+                className={chip(filter === f.key)}
               >
                 {f.label}
               </Link>
             ))}
           </div>
-        )}
+        </div>
+      )}
 
-        {!blocked && (
-          <section className="rep__block rep__block--wide">
-            <div className="rep__blockHead">
-              <h2>
-                {visible.length} order{visible.length === 1 ? '' : 's'}
-              </h2>
-              <span className="rep__blockMeta">
-                {query ? `Matching “${query}”` : 'Newest first'}
-                {data?.ordersTruncated ? ' · the range holds more than this list' : ''}
-              </span>
-            </div>
+      {!blocked && (
+        <Card>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 py-3 sm:px-5">
+            <h2 className="text-[13px] font-semibold text-gink">
+              {visible.length} order{visible.length === 1 ? '' : 's'}
+            </h2>
+            <span className="text-[11.5px] text-gink-46">
+              {query ? `Matching “${query}”` : 'Newest first'}
+              {data?.ordersTruncated ? ' · the range holds more than this list' : ''}
+            </span>
+          </div>
 
-            {visible.length > 0 ? (
-              <table className="ui-table">
-                <thead>
-                  <tr>
-                    <th>Time</th>
-                    <th>Reference</th>
-                    <th>Table</th>
-                    <th>Kitchen</th>
-                    <th>Payment</th>
-                    <th className="tnum">Total</th>
-                    <th className="tnum">Outstanding</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visible.map((order) => {
-                    const outstanding = Math.max(0, order.totalPaise - order.paidPaise);
-                    const cancelled = order.prepStatus === 'cancelled';
-                    return (
-                      <tr key={order.id} className={cancelled ? 'rep__row--void' : undefined}>
-                        <td className="tnum">
-                          {dateTimeInZone(timezone, order.placedAt)}
-                        </td>
-                        <td className="pg__barMuted">
-                          {live && !blocked ? (
-                            // The code is the natural door into one bill: it is
-                            // what the counter and the guest both quote.
-                            <Link href={`/bill/${order.id}`} title="Open this bill">
-                              {order.code}
-                            </Link>
-                          ) : (
-                            order.code
-                          )}
-                        </td>
-                        <td>{order.tableLabel ?? 'Takeaway'}</td>
-                        <td>
-                          {cancelled ? (
-                            <span className="rep__void">Cancelled</span>
-                          ) : (
-                            <PrepPill
-                              state={
-                                order.prepStatus === 'preparing' ||
-                                order.prepStatus === 'ready' ||
-                                order.prepStatus === 'served'
-                                  ? order.prepStatus
-                                  : 'new'
-                              }
-                            />
-                          )}
-                        </td>
-                        <td>
-                          <PaymentPill
-                            state={
-                              order.paymentStatus === 'pending'
-                                ? 'pending'
-                                : order.paymentStatus === 'failed'
-                                  ? 'failed'
-                                  : 'paid'
-                            }
-                          />
-                        </td>
-                        <td className="tnum">
-                          <Money value={order.totalPaise} />
-                        </td>
-                        <td className="tnum">
-                          {/* A cancelled bill is never collectable: money must
-                              not be taken for food that will not arrive. */}
-                          {outstanding > 0 && !cancelled ? (
-                            // The money on this row is collected on that bill,
-                            // not on an arbitrary one: the counter opens on
-                            // this ticket. Without a database the sample rows
-                            // are the counter's own sample queue, so the code
-                            // is the handle that works there.
-                            <Link
-                              className="rep__collect"
-                              href={`/cashier?order=${encodeURIComponent(live && !blocked ? order.id : order.code)}`}
-                              title={`Take payment for ${order.code} at the counter`}
-                            >
-                              Collect <Money value={outstanding} />
-                            </Link>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
+          {visible.length > 0 ? (
+            <>
+              {/* Seven columns of numbers is a laptop shape. On a phone the same
+                  bills are cards below; exactly one of the two is shown, so
+                  neither is read twice by a screen reader. */}
+              <div className="hidden lg:block">
+                <TableWrap>
+                  <table className={tableClass}>
+                    <thead>
+                      <tr>
+                        <Th>Time</Th>
+                        <Th>Reference</Th>
+                        <Th>Table</Th>
+                        <Th>Kitchen</Th>
+                        <Th>Payment</Th>
+                        <Th align="right">Total</Th>
+                        <Th align="right">Outstanding</Th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            ) : (
-              <div className="kb__empty">
-                {orders.length === 0
-                  ? 'No orders in this range.'
-                  : 'No orders match this filter.'}
+                    </thead>
+                    <tbody>
+                      {visible.map((order) => {
+                        const outstanding = Math.max(0, order.totalPaise - order.paidPaise);
+                        const cancelled = order.prepStatus === 'cancelled';
+                        return (
+                          <Tr key={order.id} className={cancelled ? 'opacity-55' : undefined}>
+                            <Td className="tnum whitespace-nowrap text-gink-64">
+                              {dateTimeInZone(timezone, order.placedAt)}
+                            </Td>
+                            <Td>
+                              {live && !blocked ? (
+                                // The code is the natural door into one bill: it
+                                // is what the counter and the guest both quote.
+                                <Link
+                                  href={`/bill/${order.id}`}
+                                  title="Open this bill"
+                                  className="font-medium underline decoration-hair-strong underline-offset-2 hover:text-gink"
+                                >
+                                  {order.code}
+                                </Link>
+                              ) : (
+                                <span className="text-gink-64">{order.code}</span>
+                              )}
+                            </Td>
+                            <Td>{order.tableLabel ?? 'Takeaway'}</Td>
+                            <Td>
+                              {cancelled ? (
+                                <span className="text-[11px] font-semibold tracking-[0.05em] text-gink-46 uppercase">
+                                  Cancelled
+                                </span>
+                              ) : (
+                                <PrepPill
+                                  state={
+                                    order.prepStatus === 'preparing' ||
+                                    order.prepStatus === 'ready' ||
+                                    order.prepStatus === 'served'
+                                      ? order.prepStatus
+                                      : 'new'
+                                  }
+                                />
+                              )}
+                            </Td>
+                            <Td>
+                              <PaymentPill
+                                state={
+                                  order.paymentStatus === 'pending'
+                                    ? 'pending'
+                                    : order.paymentStatus === 'failed'
+                                      ? 'failed'
+                                      : 'paid'
+                                }
+                              />
+                            </Td>
+                            <Td align="right">
+                              <Money value={order.totalPaise} />
+                            </Td>
+                            <Td align="right">
+                              {/* A cancelled bill is never collectable: money
+                                  must not be taken for food that will not
+                                  arrive. */}
+                              {outstanding > 0 && !cancelled ? (
+                                <Link
+                                  href={`/cashier?order=${encodeURIComponent(live && !blocked ? order.id : order.code)}`}
+                                  title={`Take payment for ${order.code} at the counter`}
+                                  className="inline-flex items-center gap-1 rounded-full bg-gink px-2.5 py-1 text-[11.5px] font-medium text-onink transition-colors hover:bg-gink/88"
+                                >
+                                  Collect <Money value={outstanding} />
+                                </Link>
+                              ) : (
+                                <span className="text-gink-28">—</span>
+                              )}
+                            </Td>
+                          </Tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </TableWrap>
               </div>
-            )}
 
-            {/* The same bills as cards, for the width where seven columns of
-                numbers become a sideways scroll. One of the two is always
-                display:none, so neither is read twice. */}
-            {visible.length > 0 && (
-              <ul className="rep__cards">
+              <ul className="flex flex-col divide-y divide-hair lg:hidden">
                 {visible.map((order) => {
                   const outstanding = Math.max(0, order.totalPaise - order.paidPaise);
                   const cancelled = order.prepStatus === 'cancelled';
                   return (
-                    <li key={order.id} className={`rep__card ${cancelled ? 'is-void' : ''}`}>
-                      <div className="rep__cardTop">
-                        <span className="rep__cardRef">
+                    <li key={order.id} className={['px-4 py-3', cancelled ? 'opacity-55' : ''].join(' ')}>
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className="text-[13px] font-semibold text-gink">
                           {live && !blocked ? (
                             <Link href={`/bill/${order.id}`} title="Open this bill">
                               {order.code}
@@ -375,12 +402,17 @@ export function OrdersScreen({
                             order.code
                           )}
                         </span>
-                        <span className="rep__cardTime">{dateTimeInZone(timezone, order.placedAt)}</span>
+                        <span className="tnum text-[11px] text-gink-46">
+                          {dateTimeInZone(timezone, order.placedAt)}
+                        </span>
                       </div>
-                      <div className="rep__cardMid">
-                        <span className="rep__cardTable">{order.tableLabel ?? 'Takeaway'}</span>
+
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <span className="text-[13px] text-gink-64">{order.tableLabel ?? 'Takeaway'}</span>
                         {cancelled ? (
-                          <span className="rep__void">Cancelled</span>
+                          <span className="text-[10.5px] font-semibold tracking-[0.05em] text-gink-46 uppercase">
+                            Cancelled
+                          </span>
                         ) : (
                           <PrepPill
                             state={
@@ -402,47 +434,70 @@ export function OrdersScreen({
                           }
                         />
                       </div>
-                      <div className="rep__cardFoot">
-                        <span className="rep__cardTotal">
+
+                      <div className="mt-2 flex items-center justify-between gap-3">
+                        <span className="text-[14px] font-semibold text-gink">
                           <Money value={order.totalPaise} />
                         </span>
-                        <span className="rep__cardDue">
-                          {outstanding > 0 && !cancelled ? (
-                            <Link
-                              className="rep__collect"
-                              href={`/cashier?order=${encodeURIComponent(live && !blocked ? order.id : order.code)}`}
-                              title={`Take payment for ${order.code} at the counter`}
-                            >
-                              Collect <Money value={outstanding} />
-                            </Link>
-                          ) : (
-                            'Settled'
-                          )}
-                        </span>
+                        {outstanding > 0 && !cancelled ? (
+                          <Link
+                            href={`/cashier?order=${encodeURIComponent(live && !blocked ? order.id : order.code)}`}
+                            title={`Take payment for ${order.code} at the counter`}
+                            className="inline-flex items-center gap-1 rounded-full bg-gink px-3 py-1.5 text-[11.5px] font-medium text-onink"
+                          >
+                            Collect <Money value={outstanding} />
+                          </Link>
+                        ) : (
+                          <span className="text-[11.5px] text-gink-46">Settled</span>
+                        )}
                       </div>
                     </li>
                   );
                 })}
               </ul>
-            )}
-          </section>
-        )}
+            </>
+          ) : (
+            <div className="px-4 py-4 sm:px-5">
+              <Empty>{orders.length === 0 ? 'No orders in this range.' : 'No orders match this filter.'}</Empty>
+            </div>
+          )}
+        </Card>
+      )}
 
-        {!blocked && (
-          <p className="pg__note">
-            Outstanding is what the table still owes on that bill. <strong>Collect</strong> opens
-            the counter on that exact ticket; the queue as a whole is at{' '}
-            <Link href="/cashier">the counter</Link>. A cancelled order stays in this list
-            so the day&apos;s history is complete, but it is excluded from every figure on the
-            sales report.
-          </p>
-        )}
-        {!live && !blocked && (
-          <p className="pg__note pg__note--warn">
-            Database not configured — the rows above are fictional sample data.
-          </p>
-        )}
-      </div>
-    </div>
+      {!blocked && (
+        <p className="mt-4 max-w-[92ch] text-[11.5px] leading-[1.6] text-gink-46">
+          Outstanding is what the table still owes on that bill. <strong className="font-semibold text-gink-64">Collect</strong> opens
+          the counter on that exact ticket; the queue as a whole is at{' '}
+          <Link href="/cashier" className="underline underline-offset-2">
+            the counter
+          </Link>
+          . A cancelled order stays in this list
+          so the day&apos;s history is complete, but it is excluded from every figure on the
+          sales report.
+        </p>
+      )}
+      {!live && !blocked && (
+        <p className="mt-2 inline-flex items-center gap-2 rounded-full bg-paper-deep px-3 py-1.5 text-[11.5px] text-gink-64">
+          <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--alert)]" />
+          Database not configured — the rows above are fictional sample data.
+        </p>
+      )}
+    </OwnerPage>
   );
+}
+
+/**
+ * A chip, for a filter or a range.
+ *
+ * Selected chips are black, not green: on this screen green means "paid", and a
+ * green filter chip beside a green payment pill reads as a statement about the
+ * rows rather than about the filter.
+ */
+function chip(active: boolean): string {
+  return [
+    'inline-flex h-8 items-center rounded-full px-3 text-[12px] font-medium whitespace-nowrap transition-colors',
+    active
+      ? 'bg-gink text-onink'
+      : 'border border-hair-strong text-gink-64 hover:border-gink-28 hover:text-gink',
+  ].join(' ');
 }

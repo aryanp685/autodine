@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { BillScreen } from '@/components/screens/BillScreen';
 import { SignInPrompt } from '@/components/SignInPrompt';
+import { btn } from '@/components/owner/chrome';
 import { getBillData } from '@/lib/db/bill';
 
 export const metadata: Metadata = {
@@ -29,37 +30,64 @@ export default async function BillPage({ params }: { params: Promise<{ id: strin
 
   if (result.ok) return <BillScreen bill={result.bill} />;
 
+  /**
+   * Everything that is not a bill: no order, no database, nobody signed in.
+   *
+   * It wears the same sheet as a real bill, because the person reading it is
+   * standing at a counter holding a printout and needs to know in one glance
+   * that this is not it.
+   */
   return (
-    <div className="bill">
-      <div className="bill__missing">
-        {result.reason === 'not-found' ? (
-          <>
-            <h1>Bill not found</h1>
-            <p>
-              That order does not exist, or it belongs to a different restaurant. Bills are only
-              visible to the restaurant that took the order.
-            </p>
-            <p>
-              <Link href="/cashier">Open the counter</Link>
-              {' · '}
-              <Link href="/dashboard/orders">Open the order ledger</Link>
-            </p>
-          </>
-        ) : result.reason === 'unconfigured' ? (
-          <>
-            <h1>Not connected</h1>
-            <p>
-              This deployment has no database configured, so there is no bill to print. The rest of
-              the app is showing sample data.
-            </p>
-            <p>
-              <Link href="/cashier">Open the counter</Link>
-            </p>
-          </>
-        ) : (
-          <SignInPrompt reason={result.reason} screen="bill" />
-        )}
-      </div>
+    <div
+      data-surface="owner"
+      className="min-h-dvh bg-paper-deep px-5 py-10 text-gink antialiased sm:py-16"
+    >
+      <main className="mx-auto w-full max-w-[520px]">
+        <div className="rounded-[14px] border border-hair bg-card px-6 py-8 sm:px-8">
+          {result.reason === 'not-found' ? (
+            <>
+              <div className="text-[10.5px] font-semibold tracking-[0.11em] text-gink-46 uppercase">
+                Bill
+              </div>
+              <h1 className="mt-2 text-[21px] leading-[1.25] font-medium tracking-[-0.03em] text-gink">
+                Bill not found
+              </h1>
+              <p className="mt-2 text-[13px] leading-[1.55] text-gink-64">
+                That order does not exist, or it belongs to a different restaurant. Bills are only
+                visible to the restaurant that took the order.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <Link href="/cashier" className={btn('solid', 'sm')}>
+                  Open the counter
+                </Link>
+                <Link href="/dashboard/orders" className={btn('ghost', 'sm')}>
+                  Open the order ledger
+                </Link>
+              </div>
+            </>
+          ) : result.reason === 'unconfigured' ? (
+            <>
+              <div className="text-[10.5px] font-semibold tracking-[0.11em] text-gink-46 uppercase">
+                Bill
+              </div>
+              <h1 className="mt-2 text-[21px] leading-[1.25] font-medium tracking-[-0.03em] text-gink">
+                Not connected
+              </h1>
+              <p className="mt-2 text-[13px] leading-[1.55] text-gink-64">
+                This deployment has no database configured, so there is no bill to print. The rest
+                of the app is showing sample data.
+              </p>
+              <div className="mt-5">
+                <Link href="/cashier" className={btn('solid', 'sm')}>
+                  Open the counter
+                </Link>
+              </div>
+            </>
+          ) : (
+            <SignInPrompt reason={result.reason} screen="bill" />
+          )}
+        </div>
+      </main>
     </div>
   );
 }

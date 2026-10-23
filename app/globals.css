@@ -27,13 +27,21 @@
 @import '@fontsource/inter/latin-600.css';
 @import '@fontsource/inter/latin-700.css';
 
-@import '../styles/design-system.css';
+/* The marketing layer. It also carries the product's default (warm) token
+   values, which is why it is still shipped with the app rather than to the
+   public pages alone. */
 @import '../styles/premium.css';
-@import '../styles/guest.css';
-@import '../styles/app.css';
-/* Owner last: it re-points the product's tokens, and a later stylesheet cannot
-   win on token values it never sees resolved. */
-@import '../styles/owner.css';
+
+/* THE PRODUCT IS TAILWIND
+ *
+ * There used to be four more stylesheets here -- design-system, app, guest and
+ * owner -- holding about 9,000 lines of class-based CSS that every screen
+ * depended on. Screen by screen those screens moved to utilities, and the
+ * stylesheets became a second, invisible design system that no longer matched
+ * any markup: `.kb__ticket`, `.dash__stat`, `.cart__bar`, `.ui-table`. They are
+ * gone. What survives from them is the owner palette below, because a token is
+ * the one thing a utility cannot express on its own.
+ */
 
 /* =========================================================================
    AutoDine — global base
@@ -219,6 +227,52 @@ img { display: block; max-width: 100%; }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }}
 
+[data-app] [data-surface='owner'] {
+  /* ---- surfaces ------------------------------------------------------- */
+  --p-paper: #ffffff;
+  --p-paper-deep: #f4f4f5;
+  --p-surface: #ffffff;
+  --p-glass: rgba(255, 255, 255, 0.82);
+
+  /* ---- ink ------------------------------------------------------------
+     Neutral, not warm. The warm ink was chosen to sit on cream; on pure white
+     it turns brown-grey and the whole screen looks slightly dirty. */
+  --p-ink: #0b0b0c;
+  --p-ink-80: rgba(11, 11, 12, 0.82);
+  --p-ink-64: rgba(11, 11, 12, 0.6);
+  --p-ink-46: rgba(11, 11, 12, 0.44);
+  --p-ink-28: rgba(11, 11, 12, 0.24);
+  --p-ink-12: rgba(11, 11, 12, 0.1);
+  --p-ink-07: rgba(11, 11, 12, 0.05);
+  --p-on-ink: #ffffff;
+  --p-on-ink-64: rgba(255, 255, 255, 0.66);
+  --p-on-ink-40: rgba(255, 255, 255, 0.42);
+
+  /* ---- accent ----------------------------------------------------------
+     The logo's green, sampled from the owner's own artwork. Reserved for "this
+     is where you are" and "this is alive" -- never for a button that could
+     just as well be black. */
+  --p-accent: #207030;
+  --p-accent-soft: #e9f2ec;
+  --p-live: #3f9a5c;
+
+  /* ---- lines ----------------------------------------------------------- */
+  --p-line: rgba(11, 11, 12, 0.075);
+  --p-line-strong: rgba(11, 11, 12, 0.15);
+  --p-line-on-ink: rgba(255, 255, 255, 0.16);
+
+  /* ---- elevation -------------------------------------------------------
+     Cooler and tighter than the warm pair. On white, a warm shadow reads as a
+     smudge; a neutral one reads as a surface above another surface. */
+  --p-shadow-1: 0 1px 2px rgba(11, 11, 12, 0.04), 0 10px 28px -20px rgba(11, 11, 12, 0.18);
+  --p-shadow-2: 0 2px 6px rgba(11, 11, 12, 0.05), 0 32px 64px -40px rgba(11, 11, 12, 0.3);
+
+  /* The page paints its own surface with utilities; these two are the last
+     resort for content that has not been wrapped yet. */
+  background: var(--p-paper);
+  color: var(--p-ink);
+}
+
 /* =========================================================================
    Design tokens for Tailwind utilities.
 
@@ -295,4 +349,27 @@ img { display: block; max-width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
   .animate-\[gbar_260ms_cubic-bezier\(0\.22\,1\,0\.36\,1\)\] { animation: none !important; }
+}
+
+/* The skeleton's pulse: opacity only, on a flat fill. No shimmer sweep -- it
+ * costs paint on a mid-range phone and does not read as meaning anything. */
+/* Every route arrives: lib/template.tsx puts this animation on its wrapper and
+ * nothing else. Opacity only -- an ancestor with a transform would become the
+ * containing block for the guest's fixed action bars and slide them. */
+@keyframes routein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes skelpulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.95; }
+}
+
+/* A ticket landing on the kitchen board. Transform and opacity only, and it is
+ * decoration: the card is readable the moment it exists, whether or not this
+ * plays. */
+@keyframes kbrise {
+  from { opacity: 0; transform: translateY(-6px) scale(0.99); }
+  to { opacity: 1; transform: none; }
 }

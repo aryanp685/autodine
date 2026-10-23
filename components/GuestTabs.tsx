@@ -113,7 +113,7 @@ export function GuestTabs({ slug, active }: { slug?: string | null; active: Gues
                   <span
                     data-gtab-badge=""
                     aria-label={`${count} in the cart`}
-                    className="tnum absolute -top-1.5 -right-2 grid min-w-[17px] place-items-center rounded-full bg-[var(--p-accent)] px-1 text-[10px] leading-[17px] font-semibold text-white"
+                    className="tabular-nums absolute -top-1.5 -right-2 grid min-w-[17px] place-items-center rounded-full bg-[var(--p-accent)] px-1 text-[10px] leading-[17px] font-semibold text-white"
                   >
                     {count}
                   </span>

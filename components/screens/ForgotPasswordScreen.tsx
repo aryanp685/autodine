@@ -1,5 +1,6 @@
 import { AuthShell } from '@/components/AuthShell';
 import { requestPasswordResetAction } from '@/app/auth/actions';
+import { btn, Field, inputClass } from '@/components/owner/chrome';
 
 /**
  * Ask for a reset link.
@@ -34,31 +35,41 @@ export function ForgotPasswordScreen({ error, notice }: { error?: string; notice
         </>,
       ]}
     >
-      {notice ? <div className="authCard__notice">{notice}</div> : null}
+      {notice ? (
+        <div
+          role="status"
+          className="mb-4 rounded-[10px] border border-[var(--p-accent)]/25 bg-accent-soft px-3.5 py-2.5 text-[12px] leading-[1.5] text-gink-64"
+        >
+          {notice}
+        </div>
+      ) : null}
       {error ? (
-        <div className="authCard__alert" role="alert">
+        <div
+          role="alert"
+          className="mb-4 rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-2.5 text-[12px] leading-[1.5] text-[var(--alert)]"
+        >
           {error}
         </div>
       ) : null}
 
-      <form className="authForm" action={requestPasswordResetAction}>
-        <label className="ui-field">
-          <span className="ui-label">Work email</span>
+      <form className="flex flex-col gap-3.5" action={requestPasswordResetAction}>
+        <Field label="Work email" htmlFor="forgot-email">
           <input
-            className="ui-input"
+            id="forgot-email"
+            className={inputClass}
             name="email"
             type="email"
             autoComplete="email"
             placeholder="owner@restaurant.in"
             required
           />
-        </label>
+        </Field>
 
-        <button className="authSubmit" type="submit">
+        <button className={`${btn('solid')} mt-1 w-full`} type="submit">
           Send reset link
         </button>
 
-        <p className="authFine">
+        <p className="text-[11px] leading-[1.5] text-gink-46">
           The link is single-use and expires in an hour. Open it in this browser — a link asked for
           here will not work on a different device.
         </p>

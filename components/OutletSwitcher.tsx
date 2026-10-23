@@ -30,23 +30,23 @@ export function OutletSwitcher({
 
   if (outlets.length === 1) {
     return (
-      <span className="pg__outletName" title="This account has one outlet">
+      <span title="This account has one outlet" className="text-[12.5px] text-gink-64">
         {active.name}
       </span>
     );
   }
 
   return (
-    <form className="pg__outletForm" method="post" action="/dashboard/outlet">
-      <label className="ui-label--sr" htmlFor="outlet-switcher">
+    <form method="post" action="/dashboard/outlet">
+      <label className="sr-only" htmlFor="outlet-switcher">
         Outlet
       </label>
       <select
         id="outlet-switcher"
         name="outlet"
-        className="pg__outletSelect"
         defaultValue={active.id}
         onChange={(event) => event.currentTarget.form?.requestSubmit()}
+        className="h-8 w-full rounded-[7px] border border-hair-strong bg-card px-2 pr-7 text-[12.5px] text-gink focus:border-gink focus:outline-none"
       >
         {outlets.map((outlet) => (
           <option key={outlet.id} value={outlet.id}>
@@ -57,7 +57,7 @@ export function OutletSwitcher({
       <input type="hidden" name="next" value={next} />
       {/* Without JavaScript the select cannot submit itself. */}
       <noscript>
-        <button type="submit" className="pg__outletGo">
+        <button type="submit" className="mt-1.5 text-[11.5px] font-medium text-gink underline">
           Switch
         </button>
       </noscript>

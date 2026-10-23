@@ -33,9 +33,6 @@ import {
 
 /* The thresholds live next to the query that computes the age, so the badge
    and the board cannot disagree about what "late" means. */
-const AGE_TONE = (age: number) =>
-  age >= LATE_AFTER_MIN ? 'is-late' : age >= WARN_AFTER_MIN ? 'is-warn' : 'is-fresh';
-
 /** How many past announcements the on-screen log keeps. */
 const LOG_LIMIT = 6;
 
@@ -151,19 +148,39 @@ type Status = {
 
 function Items({ order, compact }: { order: BoardTicket; compact?: boolean }) {
   return (
-    <ul className={compact ? 'kb-items kb-items--compact' : 'kb-items'}>
+    <ul className={compact ? 'mt-2.5 grid gap-1.5' : 'mt-3 grid gap-2'}>
       {order.items.map((it, i) => (
-        <li key={i}>
-          <span className="kb-qty">{it.qty}×</span>
-          <span className="kb-itemName">
-            <VegMark veg={it.veg} size={11} /> {it.name}
+        <li
+          key={i}
+          className={[
+            'flex items-baseline gap-2.5',
+            compact ? 'text-[13.5px]' : 'text-[15px] leading-[1.35]',
+          ].join(' ')}
+        >
+          <span
+            className={[
+              'shrink-0 text-right font-semibold text-gink-64 tabular-nums',
+              compact ? 'w-6 text-[12.5px]' : 'w-7',
+            ].join(' ')}
+          >
+            {it.qty}×
+          </span>
+          <span className="min-w-0 text-gink">
+            <span className="inline-flex items-center gap-1.5">
+              <VegMark veg={it.veg} size={11} />
+              <span className="font-medium">{it.name}</span>
+            </span>
             {/* Portion first, then each add-on as its own tag. A ticket that
                 reads "Butter Naan · Half · Extra cheese · Jain" makes the cook
                 hunt for the part they must not get wrong; the tags survive a
                 glance from a metre away. */}
-            {it.portion ? <em> · {it.portion}</em> : !it.addons && it.detail && <em> · {it.detail}</em>}
+            {it.portion ? <em className="text-[12.5px] text-gink-64 not-italic"> · {it.portion}</em> : !it.addons && it.detail && <em className="text-[12.5px] text-gink-64 not-italic"> · {it.detail}</em>}
             {it.addons?.map((addon) => (
-              <span key={addon} className="kb-itemAddon">
+              <span
+                key={addon}
+                data-addon=""
+                className="ml-1.5 inline-block rounded-[3px] border border-hair-strong px-1.5 py-px text-[11px] whitespace-nowrap text-gink-64"
+              >
                 {addon}
               </span>
             ))}
@@ -952,386 +969,538 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
   };
 
   return (
-    <div className="kb">
-      <header className="kb__head">
-        <div>
-          <div className="kb__kicker">Kitchen · {live ? 'live board' : 'demo mode'}</div>
-          <h1 className="kb__h1">{live ? data?.restaurantName : restaurant.name}</h1>
-        </div>
-        <div className="kb__controls">
-          {/* A wall board is a full screen with no navigation, which is right
-              for a cook and wrong for everyone else: until now the only way
-              off this screen was the browser's back button. */}
-          <Link href="/dashboard" className="kb__ghost">
-            Dashboard
-          </Link>
+    <div data-surface="owner" className="min-h-dvh bg-paper text-gink antialiased">
+      {/* A wall board: no rail, no search. The one way off it is a link back to
+          the dashboard, because until this existed the only exit was the
+          browser's back button on a screen that is mounted on a wall. */}
+      <header className="sticky top-0 z-30 border-b border-hair bg-paper/92 backdrop-blur-xl">
+        <div className="mx-auto w-full max-w-[1600px] px-4 py-3 sm:px-6">
+          <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold tracking-[0.16em] text-gink-46 uppercase">
+                Kitchen · {live ? 'live board' : 'demo mode'}
+              </p>
+              <h1 className="mt-1 truncate text-[clamp(1.4rem,2.2vw,1.95rem)] leading-none font-semibold tracking-[-0.035em] text-gink">
+                {live ? data?.restaurantName : restaurant.name}
+              </h1>
+            </div>
 
-          <div className={`kb__audio ${audio ? 'is-on' : 'is-off'}`}>
-            <span className="kb__audioDot" />
-            Kitchen audio {audio ? 'on' : 'off'}
-            <button type="button" className="kb__linkBtn" onClick={() => setAudio((value) => !value)}>
-              {audio ? 'Turn off' : 'Turn on'}
-            </button>
-          </div>
-
-          {/* What will actually be spoken, named. Not a language picker: there
-              is one language, and a picker would imply a second one exists. */}
-          <span
-            className={`kb__pill ${voiceState === 'ready' ? 'is-ok' : ''}`}
-            title={voiceName ? `Voice: ${voiceName}` : 'No Hindi voice on this device'}
-          >
-            {voiceState === 'starting'
-              ? 'हिंदी · आवाज़ खोज रहे हैं'
-              : voiceState === 'ready'
-                ? 'हिंदी · तैयार'
-                : 'हिंदी · आवाज़ नहीं'}
-          </span>
-
-          {/* Speed. A hurried Hindi voice is what sounds slurred, so the
-              operator gets the last word on pace instead of a constant. */}
-          <div className="kb__speeds" role="group" aria-label="आवाज़ की रफ़्तार — voice speed">
-            {(['slow', 'normal', 'fast'] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                className={`kb__speed ${speed === value ? 'is-on' : ''}`}
-                aria-pressed={speed === value}
-                onClick={() => {
-                  setSpeed(value);
-                  speedRef.current = value;
-                  speechRef.current?.setRateScale(SPEEDS[value]);
-                }}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Link
+                href="/dashboard"
+                className="inline-flex h-8 items-center rounded-full border border-hair-strong px-3 text-[11.5px] font-medium text-gink-64 transition-colors hover:border-gink-28 hover:text-gink"
               >
-                {value === 'slow' ? 'धीमा' : value === 'normal' ? 'सामान्य' : 'तेज़'}
+                Dashboard
+              </Link>
+
+              {/* Sound is the point of this screen, so its state is a control
+                  and not a setting buried somewhere: one tap turns it off. */}
+              <div
+                className={[
+                  'flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[11.5px] font-medium',
+                  audio
+                    ? 'bg-accent-soft text-[var(--p-accent)]'
+                    : 'border border-hair-strong text-gink-64',
+                ].join(' ')}
+              >
+                <span
+                  aria-hidden="true"
+                  className={['size-1.5 rounded-full', audio ? 'bg-[var(--p-accent)]' : 'bg-gink-28'].join(' ')}
+                />
+                Kitchen audio {audio ? 'on' : 'off'}
+                <button
+                  type="button"
+                  onClick={() => setAudio((value) => !value)}
+                  className="ml-0.5 rounded-full px-1.5 py-0.5 text-[11px] underline decoration-current/40 underline-offset-2 hover:no-underline"
+                >
+                  {audio ? 'Turn off' : 'Turn on'}
+                </button>
+              </div>
+
+              {/* What will actually be spoken, named. Not a language picker:
+                  there is one language, and a picker would imply a second one
+                  exists. */}
+              <span
+                title={voiceName ? `Voice: ${voiceName}` : 'No Hindi voice on this device'}
+                className={[
+                  'inline-flex h-8 items-center rounded-full px-2.5 text-[11.5px] font-medium',
+                  voiceState === 'ready'
+                    ? 'bg-accent-soft text-[var(--p-accent)]'
+                    : 'border border-[var(--alert)]/30 text-[var(--alert)]',
+                ].join(' ')}
+              >
+                {voiceState === 'starting'
+                  ? 'हिंदी · आवाज़ खोज रहे हैं'
+                  : voiceState === 'ready'
+                    ? 'हिंदी · तैयार'
+                    : 'हिंदी · आवाज़ नहीं'}
+              </span>
+
+              {/* Speed. A hurried Hindi voice is what sounds slurred, so the
+                  operator gets the last word on pace instead of a constant. */}
+              <div
+                role="group"
+                aria-label="आवाज़ की रफ़्तार — voice speed"
+                className="inline-flex h-8 items-center rounded-full border border-hair-strong p-0.5"
+              >
+                {(['slow', 'normal', 'fast'] as const).map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={speed === value}
+                    onClick={() => {
+                      setSpeed(value);
+                      speedRef.current = value;
+                      speechRef.current?.setRateScale(SPEEDS[value]);
+                    }}
+                    className={[
+                      'h-7 rounded-full px-2.5 text-[11px] font-medium transition-colors',
+                      speed === value ? 'bg-gink text-onink' : 'text-gink-46 hover:text-gink',
+                    ].join(' ')}
+                  >
+                    {value === 'slow' ? 'धीमा' : value === 'normal' ? 'सामान्य' : 'तेज़'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Which Hindi voice. A device can carry two, and they are not
+                  equally good -- an embedded engine and a downloaded neural one
+                  both answer to hi-IN. Only shown when there is a real choice. */}
+              {voiceList.length > 1 && (
+                <select
+                  aria-label="Hindi voice"
+                  value={voicePref}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    setVoicePref(next);
+                    speechRef.current?.setVoiceName(next || null);
+                    setVoiceName(speechRef.current?.voiceName() ?? null);
+                  }}
+                  className="h-8 max-w-[190px] rounded-full border border-hair-strong bg-card px-2 pr-6 text-[11.5px] text-gink focus:border-gink focus:outline-none"
+                >
+                  <option value="">सबसे अच्छी आवाज़ (auto)</option>
+                  {voiceList.map((voice) => (
+                    <option key={voice.name} value={voice.name}>
+                      {voice.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {live && (
+                <button
+                  type="button"
+                  onClick={() => setSpeaksHere((value) => !value)}
+                  title="Turn this off on a second screen in the same kitchen, so orders are not read out twice"
+                  className={[
+                    'h-8 rounded-full px-2.5 text-[11.5px] font-medium transition-colors',
+                    speaksHere
+                      ? 'bg-accent-soft text-[var(--p-accent)]'
+                      : 'border border-hair-strong text-gink-46',
+                  ].join(' ')}
+                >
+                  {speaksHere ? 'This screen speaks' : 'Screen muted'}
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => replay(`test:${Date.now()}`, sampleText, 'Test')}
+                className="h-8 rounded-full border border-hair-strong px-3 text-[11.5px] font-medium text-gink-64 transition-colors hover:text-gink"
+              >
+                Test announcement
               </button>
-            ))}
-          </div>
+              <button
+                type="button"
+                disabled={!latest}
+                onClick={() => {
+                  if (!latest) return;
+                  replay(
+                    `new:${latest.orderId ?? latest.key}`,
+                    orderAnnouncement(latest),
+                    announceLogLabel(latest.table, latest.items),
+                  );
+                }}
+                className="h-8 rounded-full border border-hair-strong px-3 text-[11.5px] font-medium text-gink-64 transition-colors hover:text-gink disabled:opacity-40"
+              >
+                Replay latest
+              </button>
 
-          {/* Which Hindi voice. A device can carry two, and they are not
-              equally good -- an embedded engine and a downloaded neural one
-              both answer to hi-IN. Only shown when there is a real choice. */}
-          {voiceList.length > 1 && (
-            <select
-              className="kb__voicePick"
-              aria-label="Hindi voice"
-              value={voicePref}
-              onChange={(event) => {
-                const next = event.target.value;
-                setVoicePref(next);
-                speechRef.current?.setVoiceName(next || null);
-                setVoiceName(speechRef.current?.voiceName() ?? null);
-              }}
-            >
-              <option value="">सबसे अच्छी आवाज़ (auto)</option>
-              {voiceList.map((voice) => (
-                <option key={voice.name} value={voice.name}>
-                  {voice.name}
-                </option>
-              ))}
-            </select>
-          )}
-
-          {live && (
-            <button
-              type="button"
-              className={`kb__toggle ${speaksHere ? 'is-on' : ''}`}
-              onClick={() => setSpeaksHere((value) => !value)}
-              title="Turn this off on a second screen in the same kitchen, so orders are not read out twice"
-            >
-              {speaksHere ? 'This screen speaks' : 'Screen muted'}
-            </button>
-          )}
-          <button
-            type="button"
-            className="kb__ghost"
-            onClick={() => replay(`test:${Date.now()}`, sampleText, 'Test')}
-          >
-            Test announcement
-          </button>
-          <button
-            type="button"
-            className="kb__ghost"
-            disabled={!latest}
-            onClick={() => {
-              if (!latest) return;
-              replay(
-                `new:${latest.orderId ?? latest.key}`,
-                orderAnnouncement(latest),
-                announceLogLabel(latest.table, latest.items),
-              );
-            }}
-          >
-            Replay latest
-          </button>
-          <div className="kb__live">
-            <span className="kb__liveDot" />
-            {live
-              ? delivery === 'live'
-                ? 'Live · instant'
-                : delivery === 'connecting'
-                  ? 'Live · connecting…'
-                  : 'Live · checking every 5s'
-              : 'Demo board · local only'}
+              <div className="inline-flex h-8 items-center gap-1.5 rounded-full bg-paper-deep px-2.5 text-[11.5px] font-medium text-gink-64">
+                <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--p-accent)]" />
+                {live
+                  ? delivery === 'live'
+                    ? 'Live · instant'
+                    : delivery === 'connecting'
+                      ? 'Live · connecting…'
+                      : 'Live · checking every 5s'
+                  : 'Demo board · local only'}
+              </div>
+              {waiting > 0 && <span className="inline-flex h-8 items-center rounded-full bg-gink px-2.5 text-[11.5px] font-medium text-onink">{waiting} waiting</span>}
+            </div>
           </div>
-          {waiting > 0 && <span className="kb__pill">{waiting} waiting</span>}
         </div>
       </header>
 
-      {/* ------------------------------------------------------- the one banner */}
+      <main className="mx-auto w-full max-w-[1600px] px-4 pt-4 pb-10 sm:px-6">
+        {/* ----------------------------------------------------- the one banner */}
 
-      {/* The sample board behaves. Saying so is what stops a tap from looking
-          like it did nothing: the ticket moves, and only this browser knows. */}
-      {!live && (
-        <div className="kb__warn kb__warn--quiet" role="note">
-          <strong>Sample board.</strong>
-          <span>
-            These tickets are fictional. A tap moves one here and nowhere else — connect the database
-            to run a real service.
-          </span>
-        </div>
-      )}
-
-      {status && (
-        <div className={`kb__warn ${status.tone === 'quiet' ? 'kb__warn--quiet' : ''}`} role={status.tone === 'alert' ? 'alert' : 'status'}>
-          <strong>{status.title}</strong>
-          <span>{status.body}</span>
-          {status.action && (
-            <button type="button" className="kb__ghost" onClick={status.action.run}>
-              {status.action.label}
-            </button>
+        <div className="flex flex-col gap-2">
+          {/* The sample board behaves. Saying so is what stops a tap from
+              looking like it did nothing: the ticket moves, and only this
+              browser knows. */}
+          {!live && (
+            <div role="note" className="rounded-[10px] border border-hair bg-card px-3.5 py-2.5 text-[12.5px] leading-[1.5] text-gink-64">
+              <strong className="font-semibold text-gink">Sample board.</strong>{' '}
+              These tickets are fictional. A tap moves one here and nowhere else — connect the database
+              to run a real service.
+            </div>
           )}
-        </div>
-      )}
 
-      {missed.length > 0 && (
-        <div className="kb__warn kb__warn--quiet" role="status">
-          <strong>
-            {missed.length} order{missed.length === 1 ? '' : 's'} {missed.length === 1 ? 'has' : 'have'} not
-            been read out.
-          </strong>
-          <span>
-            {/* Two honest reasons, and they are not the same thing. */}
-            {missedReason === 'muted'
-              ? 'They arrived while this screen was muted or the sound was off.'
-              : voiceState === 'ready'
-                ? 'They were placed before this board was opened. The pass may have seen them already.'
-                : 'They arrived while this device had no voice to read them with.'}{' '}
-            They are on the board below.
-          </span>
-          <button type="button" className="kb__ghost" onClick={readMissed}>
-            Read them out
-          </button>
-          <button type="button" className="kb__ghost" onClick={() => setMissed([])}>
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      {log.length > 0 && (
-        <section className="kb__log" aria-label="Recent announcements">
-          <div className="kb__logHead">
-            {/* "Spoken" would be a lie while muted: the entries are what the
-                board WOULD have read out. The text is the exact string handed
-                to the voice, Devanagari and all -- so the owner can read what
-                the kitchen will hear. */}
-            <span>Announcements</span>
-            <span className="kb__logVoice">
-              {audio && speaksHere
-                ? voiceState === 'ready'
-                  ? `हिंदी · ${voiceName ?? 'voice'}`
-                  : 'हिंदी · no voice on this device'
-                : 'muted on this screen — nothing was read aloud'}
-            </span>
-          </div>
-          <ul>
-            {log.map((entry) => (
-              <li key={`${entry.key}-${entry.at}`}>
-                <span className="kb__logAt">{entry.at}</span>
-                <span className="kb__logLabel">{entry.label}</span>
-                <span className="kb__logText">{entry.text}</span>
+          {status && (
+            <div
+              role={status.tone === 'alert' ? 'alert' : 'status'}
+              className={[
+                'flex flex-wrap items-center gap-x-2.5 gap-y-1.5 rounded-[10px] px-3.5 py-2.5 text-[12.5px] leading-[1.5]',
+                status.tone === 'alert'
+                  ? 'border border-[var(--alert)]/30 bg-[var(--alert)]/6 text-gink'
+                  : 'border border-hair bg-card text-gink-64',
+              ].join(' ')}
+            >
+              <strong className="font-semibold text-gink">{status.title}</strong>
+              <span>{status.body}</span>
+              {status.action && (
                 <button
                   type="button"
-                  className="kb__linkBtn"
-                  aria-label={`Replay ${entry.label}`}
-                  onClick={() => replay(`${entry.key}:replay:${entry.at}`, entry.text, entry.label)}
+                  onClick={status.action.run}
+                  className="rounded-full border border-hair-strong px-2.5 py-1 text-[11.5px] font-medium text-gink"
                 >
-                  Replay
+                  {status.action.label}
                 </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {announcement && (
-        <span className="ui-hint" role="status" style={{ display: 'block', marginBottom: 8 }}>
-          {/* "Last announcement" was a half-truth: it was the last thing the
-              queue ACCEPTED, which in a burst is not the thing being said. */}
-          {speaking ? 'Speaking now' : 'Last announcement'}: {announcement}
-        </span>
-      )}
-
-      {error && (
-        <div className="pg__alert" role="alert" style={{ margin: '0 0 16px' }}>
-          <strong>Could not update the ticket.</strong>
-          <p>{error}</p>
-        </div>
-      )}
-
-      {data?.blocked && <SignInPrompt reason={data.blocked} screen="kitchen board" />}
-
-      {/* -------------------------------------------------- why nothing moves */}
-
-      {/* One banner, naming the actual obstacle. The buttons below are not
-          rendered in this state, so this is the only explanation on screen. */}
-      {live && data && !data.blocked && !data.canAdvance && (
-        <div className="kb__warn kb__warn--quiet" role="status">
-          <strong>
-            {data.cannotAdvance === 'plan'
-              ? 'Read-only: the server is refusing writes for this restaurant.'
-              : 'You can watch this board, but not move tickets.'}
-          </strong>
-          <span>
-            {data.cannotAdvance === 'plan'
-              ? 'Its plan or trial period is not currently active. Menus, orders and reports stay readable, and tickets start moving again the moment access is restored — nothing has been deleted.'
-              : `A ${data.role ?? 'member'} can see the kitchen board; moving a ticket needs an owner, a manager or kitchen staff. Ask one of them to take a screen.`}
-          </span>
-        </div>
-      )}
-
-      {live && data && !data.blocked && data.tickets.length === 0 && (
-        <div className="kb__empty" style={{ marginBottom: 16 }}>
-          No open tickets in the last few hours. Orders placed from the customer menu appear here
-          the moment the guest confirms.
-        </div>
-      )}
-
-      {/* ------------------------------------------------------- phone columns */}
-
-      {/* Hidden above 760px, where all three columns are on screen at once.
-          Counts live in the tabs so an empty column can be skipped without
-          opening it -- on a phone, the queue you cannot see still has to be
-          legible. */}
-      <nav className="kb__tabs" aria-label="Ticket columns">
-        {cols.map((c) => (
-          <button
-            key={c.key}
-            type="button"
-            className={`kb__tab ${mobileCol === c.key ? 'is-on' : ''}`}
-            aria-pressed={mobileCol === c.key}
-            onClick={() => setMobileCol(c.key as typeof mobileCol)}
-          >
-            {c.title}
-            <span className="kb__tabCount tnum">{c.orders.length}</span>
-          </button>
-        ))}
-      </nav>
-
-      <div className="kb__cols">
-        {cols.map((c) => (
-          <section
-            key={c.key}
-            className={`kb__col ${mobileCol === c.key ? 'is-mobileActive' : ''}`}
-            aria-label={c.title}
-          >
-            <div className="kb__colHead">
-              <h2>{c.title}</h2>
-              <span className="tnum">{c.orders.length}</span>
+              )}
             </div>
-            {c.orders.map((o) => (
-              <article
-                key={o.key}
-                data-state={o.state}
-                className={`kb__ord ${o.state === 'served' ? 'is-served' : ''} ${
-                  arrivals.includes(o.key) ? 'is-arriving' : ''
-                }`}
+          )}
+
+          {missed.length > 0 && (
+            <div
+              role="status"
+              className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1.5 rounded-[10px] border border-hair bg-accent-soft px-3.5 py-2.5 text-[12.5px] leading-[1.5] text-gink-64"
+            >
+              <strong className="font-semibold text-gink">
+                {missed.length} order{missed.length === 1 ? '' : 's'} {missed.length === 1 ? 'has' : 'have'} not
+                been read out.
+              </strong>
+              <span>
+                {/* Two honest reasons, and they are not the same thing. */}
+                {missedReason === 'muted'
+                  ? 'They arrived while this screen was muted or the sound was off.'
+                  : voiceState === 'ready'
+                    ? 'They were placed before this board was opened. The pass may have seen them already.'
+                    : 'They arrived while this device had no voice to read them with.'}{' '}
+                They are on the board below.
+              </span>
+              <button
+                type="button"
+                onClick={readMissed}
+                className="rounded-full bg-gink px-2.5 py-1 text-[11.5px] font-medium text-onink"
               >
-                <div className="kb__ordTop">
-                  <div className="kb__ordId">{o.code}</div>
-                  <div className="kb__ordTable">{o.table}</div>
-                  <div className={`kb__ordAge ${AGE_TONE(o.ageMin)}`}>{o.ageMin} min</div>
-                </div>
-                {o.payment === 'pending' && <div className="kb__unpaid">Unpaid · pay at counter</div>}
-                <Items order={o} />
-                {o.note && <div className="kb__note">“{o.note}”</div>}
-                <div className="kb__ordFoot">
-                  <Money value={rupeesToPaise(o.total)} strong />
-                  <div className="kb__actions">
-                    {interactive && o.state === 'new' && (
-                      <button type="button" className="kb__act" onClick={() => advance(o)}>
-                        Start preparing
-                      </button>
-                    )}
-                    {interactive && o.state === 'preparing' && (
-                      <button type="button" className="kb__act" onClick={() => advance(o)}>
-                        Mark ready
-                      </button>
-                    )}
-                    {interactive && o.state === 'ready' && (
-                      <button type="button" className="kb__act" onClick={() => advance(o)}>
-                        Mark served
-                      </button>
-                    )}
-                    {o.state === 'served' && (
-                      <span className="kb__act kb__act--quiet" aria-label="Order served">
-                        Served
-                      </span>
-                    )}
+                Read them out
+              </button>
+              <button
+                type="button"
+                onClick={() => setMissed([])}
+                className="rounded-full px-1.5 py-1 text-[11.5px] font-medium text-gink-64 underline underline-offset-2"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {log.length > 0 && (
+            <section
+              aria-label="Recent announcements"
+              className="rounded-[10px] border border-hair bg-card"
+            >
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-hair px-3.5 py-2">
+                {/* "Spoken" would be a lie while muted: the entries are what the
+                    board WOULD have read out. The text is the exact string
+                    handed to the voice, Devanagari and all -- so the owner can
+                    read what the kitchen will hear. */}
+                <span className="text-[10.5px] font-semibold tracking-[0.12em] text-gink-46 uppercase">
+                  Announcements
+                </span>
+                <span className="text-[11px] text-gink-46">
+                  {audio && speaksHere
+                    ? voiceState === 'ready'
+                      ? `हिंदी · ${voiceName ?? 'voice'}`
+                      : 'हिंदी · no voice on this device'
+                    : 'muted on this screen — nothing was read aloud'}
+                </span>
+              </div>
+              <ul className="divide-y divide-hair">
+                {log.map((entry) => (
+                  <li key={`${entry.key}-${entry.at}`} className="flex items-baseline gap-2.5 px-3.5 py-1.5 text-[12px]">
+                    <span className="tnum shrink-0 text-gink-46">{entry.at}</span>
+                    <span className="shrink-0 font-medium text-gink-64">{entry.label}</span>
+                    <span className="min-w-0 flex-1 truncate text-gink">{entry.text}</span>
                     <button
                       type="button"
-                      className="kb__act kb__act--quiet"
-                      title="Replay voice announcement"
-                      aria-label={`Replay order ${o.code}`}
-                      onClick={() =>
-                        replay(
-                          `new:${o.orderId ?? o.key}`,
-                          orderAnnouncement(o),
-                          announceLogLabel(o.table, o.items),
-                        )
-                      }
+                      aria-label={`Replay ${entry.label}`}
+                      onClick={() => replay(`${entry.key}:replay:${entry.at}`, entry.text, entry.label)}
+                      className="shrink-0 text-[11px] font-medium text-gink-64 underline underline-offset-2 hover:text-gink"
                     >
-                      🔊
+                      Replay
                     </button>
-                    {interactive && o.state !== 'served' ? (
-                      confirmCancel === (o.orderId ?? o.key) ? (
-                        <>
-                          <button
-                            type="button"
-                            className="kb__act kb__act--danger"
-                            disabled={Boolean(o.orderId) && cancelBusy === o.orderId}
-                            onClick={() => cancelTicket(o)}
-                          >
-                            {o.orderId && cancelBusy === o.orderId ? 'Cancelling…' : 'Yes, cancel'}
-                          </button>
-                          <button
-                            type="button"
-                            className="kb__act kb__act--quiet"
-                            onClick={() => setConfirmCancel(null)}
-                          >
-                            No
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          className="kb__act kb__act--quiet"
-                          aria-label={`Cancel order for ${o.table}`}
-                          onClick={() => cancelTicket(o)}
-                        >
-                          Cancel
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {announcement && (
+            <p role="status" className="text-[12px] text-gink-46">
+              {/* "Last announcement" was a half-truth: it was the last thing the
+                  queue ACCEPTED, which in a burst is not the thing being said. */}
+              {speaking ? 'Speaking now' : 'Last announcement'}: {announcement}
+            </p>
+          )}
+
+          {error && (
+            <div
+              role="alert"
+              className="rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/6 px-3.5 py-2.5"
+            >
+              <strong className="text-[12.5px] font-semibold text-gink">Could not update the ticket.</strong>
+              <p className="mt-0.5 text-[12.5px] text-gink-64">{error}</p>
+            </div>
+          )}
+
+          {data?.blocked && <SignInPrompt reason={data.blocked} screen="kitchen board" />}
+
+          {/* -------------------------------------------------- why nothing moves */}
+
+          {/* One banner, naming the actual obstacle. The buttons below are not
+              rendered in this state, so this is the only explanation on screen. */}
+          {live && data && !data.blocked && !data.canAdvance && (
+            <div role="status" className="rounded-[10px] border border-hair-strong bg-card px-3.5 py-2.5 text-[12.5px] leading-[1.5]">
+              <strong className="font-semibold text-gink">
+                {data.cannotAdvance === 'plan'
+                  ? 'Read-only: the server is refusing writes for this restaurant.'
+                  : 'You can watch this board, but not move tickets.'}
+              </strong>{' '}
+              <span className="text-gink-64">
+                {data.cannotAdvance === 'plan'
+                  ? 'Its plan or trial period is not currently active. Menus, orders and reports stay readable, and tickets start moving again the moment access is restored — nothing has been deleted.'
+                  : `A ${data.role ?? 'member'} can see the kitchen board; moving a ticket needs an owner, a manager or kitchen staff. Ask one of them to take a screen.`}
+              </span>
+            </div>
+          )}
+
+          {live && data && !data.blocked && data.tickets.length === 0 && (
+            <div className="rounded-[10px] border border-dashed border-hair-strong px-3.5 py-4 text-center text-[13px] text-gink-46">
+              No open tickets in the last few hours. Orders placed from the customer menu appear here
+              the moment the guest confirms.
+            </div>
+          )}
+        </div>
+
+        {/* ----------------------------------------------------- phone columns */}
+
+        {/* Hidden above 900px, where all three columns are on screen at once.
+            Counts live in the tabs so an empty column can be skipped without
+            opening it -- on a phone, the queue you cannot see still has to be
+            legible. */}
+        <nav aria-label="Ticket columns" className="mt-3 flex gap-1.5 lg:hidden">
+          {cols.map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              aria-pressed={mobileCol === c.key}
+              onClick={() => setMobileCol(c.key as typeof mobileCol)}
+              className={[
+                'flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full text-[12.5px] font-medium transition-colors',
+                mobileCol === c.key
+                  ? 'bg-gink text-onink'
+                  : 'border border-hair-strong text-gink-64',
+              ].join(' ')}
+            >
+              {c.title}
+              <span className="tnum text-[11px] opacity-70">{c.orders.length}</span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="mt-3 grid gap-3 lg:grid-cols-3">
+          {cols.map((c) => (
+            <section
+              key={c.key}
+              aria-label={c.title}
+              className={[
+                'min-w-0',
+                /* On a phone only the chosen column is shown. Above 900px all
+                   three are, side by side, because a cook reads the queue by
+                   shape rather than by tapping. */
+                mobileCol === c.key ? 'block' : 'hidden lg:block',
+              ].join(' ')}
+            >
+              <div className="mb-2 flex items-baseline justify-between gap-2 border-b border-hair pb-1.5">
+                <h2 className="text-[11px] font-semibold tracking-[0.12em] text-gink uppercase">{c.title}</h2>
+                <span className="tnum text-[11.5px] font-medium text-gink-46">{c.orders.length}</span>
+              </div>
+
+              <div className="grid gap-2">
+                {c.orders.map((o) => (
+                  <article
+                    key={o.key}
+                    data-state={o.state}
+                    data-arriving={arrivals.includes(o.key) ? 'true' : undefined}
+                    className={[
+                      'rounded-[12px] border bg-card p-3',
+                      /* Served tickets stay on the board until the pass clears
+                         them, so they fade rather than disappear: a card that
+                         vanishes has no history. */
+                      o.state === 'served' ? 'border-hair opacity-55' : 'border-hair-strong',
+                      arrivals.includes(o.key) ? 'animate-[kbrise_320ms_cubic-bezier(0.22,1,0.36,1)]' : '',
+                    ].join(' ')}
+                  >
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-[15px] font-semibold tracking-[-0.01em] text-gink">{o.code}</span>
+                      <span className="rounded-[4px] bg-paper-deep px-1.5 py-0.5 text-[11.5px] font-semibold tracking-[0.04em] text-gink-80">
+                        {o.table}
+                      </span>
+                      {/* Age is the one number a cook acts on without reading
+                          anything else, so it is the loudest thing on the row. */}
+                      <span
+                        className={[
+                          'tnum ml-auto rounded-full px-2 py-0.5 text-[11.5px] font-semibold ring-1 ring-inset',
+                          o.ageMin >= LATE_AFTER_MIN
+                            ? 'bg-[var(--alert)]/8 text-[var(--alert)] ring-[var(--alert)]/25'
+                            : o.ageMin >= WARN_AFTER_MIN
+                              ? 'bg-gink-07 text-gink ring-hair-strong'
+                              : 'bg-accent-soft text-[var(--p-accent)] ring-[var(--p-accent)]/20',
+                        ].join(' ')}
+                      >
+                        {o.ageMin} min
+                      </span>
+                    </div>
+
+                    {o.payment === 'pending' && (
+                      <div className="mt-2 rounded-[5px] bg-[var(--alert)]/8 px-2 py-1 text-[11px] font-semibold tracking-[0.02em] text-[var(--alert)]">
+                        Unpaid · pay at counter
+                      </div>
+                    )}
+
+                    <Items order={o} compact={o.state === 'served'} />
+
+                    {o.note && (
+                      <div className="mt-2 border-l-2 border-gink-28 pl-2.5 text-[12.5px] leading-[1.45] text-gink-64 italic">
+                        “{o.note}”
+                      </div>
+                    )}
+
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-hair pt-2.5">
+                      <span className="mr-auto text-[13px] font-semibold text-gink">
+                        <Money value={rupeesToPaise(o.total)} strong />
+                      </span>
+
+                      {interactive && o.state === 'new' && (
+                        <button type="button" className={kbBtn('solid')} onClick={() => advance(o)}>
+                          Start preparing
                         </button>
-                      )
-                    ) : null}
+                      )}
+                      {interactive && o.state === 'preparing' && (
+                        <button type="button" className={kbBtn('solid')} onClick={() => advance(o)}>
+                          Mark ready
+                        </button>
+                      )}
+                      {interactive && o.state === 'ready' && (
+                        <button type="button" className={kbBtn('solid')} onClick={() => advance(o)}>
+                          Mark served
+                        </button>
+                      )}
+                      {o.state === 'served' && (
+                        <span aria-label="Order served" className="text-[11.5px] font-medium text-gink-46">
+                          Served
+                        </span>
+                      )}
+
+                      <button
+                        type="button"
+                        title="Replay voice announcement"
+                        aria-label={`Replay order ${o.code}`}
+                        onClick={() =>
+                          replay(
+                            `new:${o.orderId ?? o.key}`,
+                            orderAnnouncement(o),
+                            announceLogLabel(o.table, o.items),
+                          )
+                        }
+                        className={kbBtn('quiet')}
+                      >
+                        🔊
+                      </button>
+
+                      {interactive && o.state !== 'served' ? (
+                        confirmCancel === (o.orderId ?? o.key) ? (
+                          <>
+                            <button
+                              type="button"
+                              disabled={Boolean(o.orderId) && cancelBusy === o.orderId}
+                              onClick={() => cancelTicket(o)}
+                              className={kbBtn('danger')}
+                            >
+                              {o.orderId && cancelBusy === o.orderId ? 'Cancelling…' : 'Yes, cancel'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmCancel(null)}
+                              className={kbBtn('quiet')}
+                            >
+                              No
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            aria-label={`Cancel order for ${o.table}`}
+                            onClick={() => cancelTicket(o)}
+                            className={kbBtn('quiet')}
+                          >
+                            Cancel
+                          </button>
+                        )
+                      ) : null}
+                    </div>
+                  </article>
+                ))}
+
+                {c.orders.length === 0 && (
+                  <div className="rounded-[10px] border border-dashed border-hair-strong px-3 py-6 text-center text-[12.5px] text-gink-46">
+                    Nothing here
                   </div>
-                </div>
-              </article>
-            ))}
-            {c.orders.length === 0 && <div className="kb__empty">Nothing here</div>}
-          </section>
-        ))}
-      </div>
+                )}
+              </div>
+            </section>
+          ))}
+        </div>
+      </main>
     </div>
   );
+}
+
+/**
+ * The board's own buttons.
+ *
+ * Bigger than the rest of the product on purpose: this screen is read from a
+ * metre and a half away, often with wet hands, and a 44px target is the only
+ * size that survives that.
+ */
+function kbBtn(tone: 'solid' | 'quiet' | 'danger'): string {
+  const base =
+    'inline-flex h-9 items-center justify-center rounded-full px-3 text-[12px] font-medium transition-colors disabled:opacity-45';
+  if (tone === 'solid') return `${base} bg-gink text-onink hover:bg-gink/88`;
+  if (tone === 'danger') return `${base} bg-[var(--alert)] text-white hover:opacity-90`;
+  return `${base} border border-hair-strong text-gink-64 hover:bg-gink-07 hover:text-gink`;
 }
 
 /* ------------------------------------------------------------------ storage */

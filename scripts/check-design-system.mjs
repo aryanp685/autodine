@@ -98,18 +98,37 @@ if (process.argv.includes('--update-baseline') || baseline === null) {
 }
 
 /* ---------------------------------------------------------------- rule 4 */
-/* Full-screen layouts must keep explicit viewport breakpoints. This catches a
-   regression to an inert named container query (the product root is not a CSS
-   container), which previously left phones using desktop layouts. */
-const designSystemPath = join(ROOT, 'styles', 'design-system.css');
-const designSystem = readFileSync(designSystemPath, 'utf8');
-for (const breakpoint of ['1100px', '760px', '420px']) {
-  if (!designSystem.includes(`@media (max-width: ${breakpoint})`)) {
-    problems.push(`styles/design-system.css is missing the ${breakpoint} responsive breakpoint.`);
+/* The product's visual language must stay declared in one place.
+ *
+ * This used to inspect styles/design-system.css for its 1100/760/420 media
+ * queries -- a guard against a named container query leaving phones on the
+ * desktop layout. That stylesheet is gone: every screen is Tailwind, whose
+ * sm/md/lg/xl variants are viewport queries by construction. What can still go
+ * wrong is the token layer: an owner screen with no palette of its own falls
+ * back to the warm marketing values and reads as beige.
+ */
+const globals = readFileSync(join(ROOT, 'app', 'globals.css'), 'utf8');
+for (const token of [
+  "--color-paper: var(--p-paper)",
+  "--color-gink: var(--p-ink)",
+  "--color-hair: var(--p-line)",
+  "--color-accent: var(--p-accent)",
+]) {
+  if (!globals.includes(token)) {
+    problems.push(`app/globals.css no longer maps the Tailwind utility ${token} — screens would drift back to raw colours.`);
   }
 }
-if (/@container\s+frame/.test(designSystem) && !/container-type\s*:/.test(designSystem)) {
-  problems.push('styles/design-system.css uses @container frame without declaring a container-type.');
+if (!/\[data-surface='owner'\]\s*\{[^}]*--p-paper:\s*#ffffff/.test(globals)) {
+  problems.push("app/globals.css is missing the owner surface's white paper token; owner screens would inherit the warm palette.");
+}
+
+/* A container query with no container-type is inert, and an inert breakpoint
+   looks exactly like a working one until somebody opens the page on a phone. */
+for (const file of cssFiles) {
+  const src = readFileSync(file, 'utf8');
+  if (/@container\s+\w/.test(src) && !/container-type\s*:/.test(src)) {
+    problems.push(`${rel(file)} uses @container without declaring a container-type.`);
+  }
 }
 
 /* --------------------------------------------------------------- report */

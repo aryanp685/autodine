@@ -98,23 +98,40 @@ export function DashboardBar({
           drawer closes it without intercepting taps on the drawer itself. */}
       <button
         type="button"
-        className={`shell__scrim ${open ? 'is-open' : ''}`}
         aria-label="Close navigation"
         tabIndex={open ? 0 : -1}
         onClick={() => setOpen(false)}
+        className={[
+          'fixed inset-0 z-40 bg-gink/35 backdrop-blur-[2px] transition-opacity duration-200 lg:hidden',
+          open ? 'opacity-100' : 'pointer-events-none opacity-0',
+        ].join(' ')}
       />
 
-      <aside id="app-rail" className={`shell__rail ${open ? 'is-open' : ''}`} aria-label="Restaurant">
-        <div className="shell__brandRow">
-          <Link href="/" className="shell__brand" aria-label="AutoDine">
+      <aside
+        id="app-rail"
+        aria-label="Restaurant"
+        data-rail-open={open ? 'true' : 'false'}
+        className={[
+          /* Phone: a sheet from the bottom edge, because the thumb is there.
+             Tablet: the same sheet. Laptop: a fixed rail that is part of the
+             layout and never moves. One tree, three positions. */
+          'fixed z-50 flex flex-col bg-card',
+          'inset-x-0 bottom-0 max-h-[80dvh] rounded-t-2xl border-t border-hair pb-[env(safe-area-inset-bottom)]',
+          'transition-transform duration-250 ease-out',
+          open ? 'translate-y-0' : 'translate-y-full',
+          'lg:inset-y-0 lg:left-0 lg:w-[232px] lg:max-h-none lg:translate-y-0 lg:rounded-none lg:border-t-0 lg:border-r lg:pb-0',
+        ].join(' ')}
+      >
+        <div className="flex items-center justify-between px-4 pt-4 pb-2 lg:px-5 lg:pt-5">
+          <Link href="/" aria-label="AutoDine" className="text-gink">
             <BrandLockup size={21} ink="currentColor" dot={BRAND_GREEN} />
           </Link>
 
           <button
             type="button"
-            className="shell__close"
             aria-label="Close navigation"
             onClick={() => setOpen(false)}
+            className="grid size-8 place-items-center rounded-full text-[18px] text-gink-46 hover:bg-gink-07 hover:text-gink lg:hidden"
           >
             ×
           </button>
@@ -124,47 +141,77 @@ export function DashboardBar({
             foot of the rail already names the venue, and printing the same name
             twice in a 232px column reads as a bug. */}
         {outlet && outlet.outlets.length > 1 && (
-          <div className="shell__outlet">
-            <span className="shell__outletLabel">Switch outlet</span>
+          <div className="border-b border-hair px-4 py-3 lg:px-5">
+            <span className="mb-1.5 block text-[10px] font-semibold tracking-[0.13em] text-gink-46 uppercase">
+              Switch outlet
+            </span>
             <OutletSwitcher outlets={outlet.outlets} activeId={outlet.activeId} next={activeLink?.href ?? '/dashboard'} />
           </div>
         )}
 
-        <nav className="shell__nav" aria-label="Restaurant">
+        <nav aria-label="Restaurant" className="flex-1 overflow-y-auto px-2.5 py-3">
           {SHELL_GROUPS.map((group) => (
-            <div key={group.name} className="shell__group">
-              <div className="shell__groupName">{group.name}</div>
-              {group.links.map((link) => (
-                <Link
-                  key={link.key}
-                  href={link.href}
-                  className={`shell__link ${link.key === active ? 'is-active' : ''}`}
-                  aria-current={link.key === active ? 'page' : undefined}
-                >
-                  <span className="shell__icon" aria-hidden="true">
-                    {ICONS[link.key]}
-                  </span>
-                  {link.label}
-                </Link>
-              ))}
+            <div key={group.name} className="mb-4 last:mb-0">
+              <div className="px-2.5 pb-1.5 text-[10px] font-semibold tracking-[0.15em] text-gink-46 uppercase">
+                {group.name}
+              </div>
+              {group.links.map((link) => {
+                const current = link.key === active;
+                return (
+                  <Link
+                    key={link.key}
+                    href={link.href}
+                    data-nav={link.key}
+                    data-nav-active={current ? 'true' : undefined}
+                    aria-current={current ? 'page' : undefined}
+                    /* The current screen is the one black object in the rail:
+                       an owner glancing up from a table can see where they are
+                       without reading a word. */
+                    className={[
+                      'mb-0.5 flex items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-[13px] transition-colors',
+                      current
+                        ? 'bg-gink font-medium text-onink'
+                        : 'text-gink-64 hover:bg-gink-07 hover:text-gink',
+                    ].join(' ')}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={['shrink-0', current ? 'text-onink' : 'text-gink-46'].join(' ')}
+                    >
+                      {ICONS[link.key]}
+                    </span>
+                    {link.label}
+                  </Link>
+                );
+              })}
             </div>
           ))}
         </nav>
 
-        <div className="shell__foot">
-          <div className="shell__who">
-            <span className="shell__avatar" aria-hidden="true">
+        <div className="border-t border-hair px-4 py-3 lg:px-5 lg:py-4">
+          <div className="flex items-center gap-2.5">
+            <span
+              aria-hidden="true"
+              className="grid size-8 shrink-0 place-items-center rounded-full bg-gink text-[11px] font-semibold text-onink"
+            >
               {initialsOf(activeOutlet?.name ?? 'AutoDine')}
             </span>
-            <span className="shell__whoText">
-              <span className="shell__whoName">{activeOutlet?.name ?? 'AutoDine'}</span>
-              <span className="shell__whoRole">{activeOutlet?.role ?? 'Staff'}</span>
+            <span className="min-w-0 leading-tight">
+              <span className="block truncate text-[12.5px] font-medium text-gink">
+                {activeOutlet?.name ?? 'AutoDine'}
+              </span>
+              <span className="block truncate text-[11px] text-gink-46 capitalize">
+                {activeOutlet?.role ?? 'Staff'}
+              </span>
             </span>
           </div>
 
           {signOut && (
-            <form action={signOutAction}>
-              <button type="submit" className="shell__signOut">
+            <form action={signOutAction} className="mt-2.5">
+              <button
+                type="submit"
+                className="w-full rounded-full border border-hair-strong py-1.5 text-[11.5px] font-medium text-gink-64 transition-colors hover:border-gink-28 hover:text-gink"
+              >
                 Sign out
               </button>
             </form>
@@ -172,29 +219,37 @@ export function DashboardBar({
         </div>
       </aside>
 
-      <header className="shell__top">
-        <button
-          type="button"
-          className="shell__menuBtn"
-          aria-expanded={open}
-          aria-controls="app-rail"
-          onClick={() => setOpen(true)}
-        >
-          <span className="shell__menuBars" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </span>
-          Menu
-        </button>
+      {/* The top bar. It is the only chrome on a phone, so it carries the way
+          into the rail, the name of where you are, and the jump search. */}
+      <header className="sticky top-0 z-30 border-b border-hair bg-paper/85 backdrop-blur-xl lg:pl-[232px]">
+        <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-controls="app-rail"
+            onClick={() => setOpen(true)}
+            className="flex items-center gap-2 rounded-full border border-hair-strong py-1.5 pr-3 pl-2 text-[12px] font-medium text-gink lg:hidden"
+          >
+            <span aria-hidden="true" className="flex flex-col gap-[3px]">
+              <i className="block h-px w-3.5 bg-current" />
+              <i className="block h-px w-3.5 bg-current" />
+              <i className="block h-px w-2.5 bg-current" />
+            </span>
+            Menu
+          </button>
 
-        <div className="shell__crumbs">
-          <span className="shell__crumbNow">{activeLink?.label ?? 'Dashboard'}</span>
-          {activeOutlet && <span className="shell__crumbVenue">{activeOutlet.name}</span>}
-        </div>
+          <div className="flex min-w-0 items-baseline gap-2">
+            <span className="truncate text-[13px] font-semibold tracking-[-0.01em] text-gink">
+              {activeLink?.label ?? 'Dashboard'}
+            </span>
+            {activeOutlet && (
+              <span className="hidden truncate text-[12px] text-gink-46 sm:block">· {activeOutlet.name}</span>
+            )}
+          </div>
 
-        <div className="shell__topRight">
-          <ShellSearch onLaunch={() => setOpen(false)} />
+          <div className="ml-auto">
+            <ShellSearch onLaunch={() => setOpen(false)} />
+          </div>
         </div>
       </header>
     </>

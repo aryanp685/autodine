@@ -12,6 +12,17 @@ import { COUNTER_METHODS, COUNTER_METHOD_LABEL, type CounterMethod } from '@/lib
 import { recordPaymentAction } from '@/app/cashier/actions';
 import { cancelStaffOrderAction } from '@/app/orders/actions';
 import { SignInPrompt } from '@/components/SignInPrompt';
+import {
+  PageHead,
+  SectionHead,
+  Card,
+  Panel,
+  BtnLink,
+  btn,
+  Dot,
+  Tag,
+  Empty,
+} from '@/components/owner/chrome';
 
 /** One row in the queue, in the shape the locked markup renders. */
 type QueueRow = {
@@ -286,271 +297,349 @@ export function Cashier({
     router.refresh();
   };
 
+  const outstandingNote =
+    visible.length === 1 ? '1 ticket awaiting payment' : `${visible.length} tickets awaiting payment`;
+
   return (
-    <div className="pg pg--dash app" data-surface="owner">
+    <div data-surface="owner" className="min-h-dvh bg-paper text-gink antialiased">
       {nav}
 
-      <main className="cash">
-        <header className="cash__head">
-          <div>
-            <div className="cash__kicker">
-              {live ? 'Counter · open' : 'Counter · demo mode'}
-            </div>
-            <h1 className="cash__h1">
-              {blocked ? 'The counter' : live ? data?.restaurantName : restaurant.name}
-            </h1>
-          </div>
+      <div className="lg:pl-[232px]">
+        <main className="mx-auto w-full max-w-[1180px] px-5 pt-6 pb-20 sm:px-7 lg:pt-9">
+          <PageHead
+            kicker={
+              <span className="inline-flex items-center gap-1.5">
+                <Dot tone={live ? 'live' : 'idle'} />
+                {live ? 'Counter · open' : 'Counter · demo mode'}
+              </span>
+            }
+            title={blocked ? 'The counter' : live ? data?.restaurantName || 'This restaurant' : restaurant.name}
+            meta={
+              blocked ? (
+                'Payments can only be recorded by a signed-in member of staff.'
+              ) : (
+                <>
+                  {outstandingNote}
+                  <span className="mx-2 text-gink-28">·</span>
+                  <span className="text-gink tabular-nums">{inr(outstanding)}</span> outstanding
+                </>
+              )
+            }
+            actions={
+              !blocked ? (
+                <BtnLink href="/dashboard/orders" tone="ghost" size="sm">
+                  The ledger
+                </BtnLink>
+              ) : null
+            }
+          />
+
+          {blocked && <SignInPrompt reason={blocked} screen="counter" />}
+
           {!blocked && (
-            <div className="cash__headMeta">
-              <span>
-                <strong className="tnum">{visible.length}</strong>{' '}
-                {visible.length === 1 ? 'ticket' : 'tickets'} awaiting payment
-              </span>
-              <span className="cash__outstanding">
-                {inr(outstanding)} <em>outstanding</em>
-              </span>
-            </div>
-          )}
-        </header>
+            <div className="grid gap-5 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)] lg:items-start lg:gap-6">
+              {/* -------------------------------------------------------- queue */}
+              <section aria-labelledby="counter-queue">
+                <SectionHead
+                  title={<span id="counter-queue">Awaiting payment</span>}
+                  meta={visible.length ? `${visible.length} open` : 'clear'}
+                />
+                {visible.length ? (
+                  <ul className="m-0 flex list-none flex-col gap-2 p-0" data-counter-queue>
+                    {visible.map((item) => {
+                      const selected = order?.key === item.key;
+                      return (
+                        <li key={item.key}>
+                          <button
+                            type="button"
+                            data-counter-ticket
+                            data-selected={selected ? 'true' : 'false'}
+                            aria-pressed={selected}
+                            aria-label={`Select ${item.code} at ${item.table}, ${inr(item.outstanding)} outstanding`}
+                            onClick={() => {
+                              setSelectedKey(item.key);
+                              setConfirmCancel(null);
+                              setError('');
+                            }}
+                            className={[
+                              'w-full rounded-[14px] border px-4 py-3 text-left transition-[border-color,background-color,box-shadow] duration-150',
+                              'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gink',
+                              selected
+                                ? 'border-gink bg-card shadow-[0_1px_0_var(--hair)]'
+                                : 'border-hair bg-card hover:border-hair-strong hover:bg-paper-deep',
+                            ].join(' ')}
+                          >
+                            <span className="flex items-baseline justify-between gap-3">
+                              <span className="flex items-baseline gap-2">
+                                <strong className="text-[14px] font-semibold tracking-[-0.01em] text-gink">
+                                  {item.code}
+                                </strong>
+                                <span className="text-[12px] text-gink-46">{item.table}</span>
+                              </span>
+                              <span className="text-[11.5px] text-gink-46 tabular-nums">{item.at}</span>
+                            </span>
 
-        {blocked && <SignInPrompt reason={blocked} screen="counter" />}
+                            <span className="mt-1.5 block truncate text-[12.5px] leading-[1.45] text-gink-64">
+                              {item.items}
+                            </span>
 
-        {!blocked && (
-          <div className="cash__grid">
-            <section className="cash__col">
-              <h2 className="cash__h2">Awaiting payment</h2>
-              {visible.length ? (
-                <ul className="cash__queue">
-                  {visible.map((item) => {
-                    const selected = order?.key === item.key;
-                    return (
-                      <li key={item.key} className={`cash__qItem ${selected ? 'is-active' : ''}`}>
+                            <span className="mt-2.5 flex items-baseline justify-between gap-3">
+                              <span className="flex items-center gap-2">
+                                {selected ? <Tag tone="ink">Selected</Tag> : null}
+                                <span className="text-[11.5px] text-gink-46">{item.state}</span>
+                              </span>
+                              <span className="text-[13.5px] font-medium text-gink tabular-nums">
+                                {/* Outstanding, not total: what the till actually wants. */}
+                                {inr(item.outstanding)}
+                                {item.paid > 0 && (
+                                  <span className="ml-1 text-[11.5px] font-normal text-gink-46">
+                                    of {inr(item.total)}
+                                  </span>
+                                )}
+                              </span>
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <Empty>
+                    {live
+                      ? 'No orders are waiting for payment.'
+                      : 'No demo orders are waiting for payment.'}
+                  </Empty>
+                )}
+              </section>
+
+              {/* ------------------------------------------------------- detail */}
+              {order ? (
+                <section aria-labelledby="cashier-order-title" className="min-w-0">
+                  {focusMissing ? (
+                    <div
+                      role="status"
+                      className="mb-3 flex flex-wrap items-baseline justify-between gap-3 rounded-[12px] border border-hair-strong bg-paper-deep px-4 py-3"
+                    >
+                      <p className="m-0 max-w-[54ch] text-[12.5px] leading-[1.5] text-gink-64">
+                        The bill you came for is not waiting any more — it was settled or cancelled
+                        just now. This is the oldest ticket still open.
+                      </p>
+                      <button
+                        type="button"
+                        className={btn('ghost', 'sm')}
+                        onClick={() => {
+                          setFocusDismissed(true);
+                          setSelectedKey(null);
+                        }}
+                      >
+                        Got it
+                      </button>
+                    </div>
+                  ) : null}
+
+                  <Card>
+                    {/* the amount is the one large thing on this screen */}
+                    <div className="flex flex-wrap items-start justify-between gap-4 border-b border-hair px-5 py-5">
+                      <div className="min-w-0">
+                        <div className="text-[11px] font-medium tracking-[0.03em] text-gink-46">
+                          Order {order.code} · {order.table}
+                          {order.orderId ? (
+                            <>
+                              {' · '}
+                              <Link
+                                href={`/bill/${order.orderId}`}
+                                className="text-gink underline decoration-hair-strong underline-offset-2 hover:decoration-gink"
+                              >
+                                bill
+                              </Link>
+                            </>
+                          ) : null}
+                        </div>
+                        <h2
+                          id="cashier-order-title"
+                          className="mt-1.5 text-[clamp(2rem,3.4vw,2.6rem)] leading-none font-medium tracking-[-0.045em] text-gink tabular-nums"
+                        >
+                          {inr(order.outstanding)}
+                        </h2>
+                      </div>
+                      <Tag tone="due">Payment due</Tag>
+                    </div>
+
+                    <div className="px-5 py-4">
+                      {order.paid > 0 && (
+                        <p className="mb-3 text-[12.5px] leading-[1.5] text-gink-64">
+                          {inr(order.paid)} already recorded on this order, against a bill of{' '}
+                          {inr(order.total)}. Take the remaining {inr(order.outstanding)}.
+                        </p>
+                      )}
+
+                      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+                        <li className="flex items-baseline justify-between gap-4 text-[13px] text-gink-64">
+                          <span className="min-w-0">{order.items}</span>
+                          <span className="shrink-0 tabular-nums">{inr(order.total)}</span>
+                        </li>
+                      </ul>
+                      <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-hair pt-3 text-[13px]">
+                        <span className="font-medium text-gink">Outstanding</span>
+                        <strong className="tabular-nums text-gink">{inr(order.outstanding)}</strong>
+                      </div>
+
+                      <div className="mt-5">
+                        <div className="mb-2 text-[11.5px] font-medium text-gink-64">Payment method</div>
+                        <div
+                          role="group"
+                          aria-label="Payment method"
+                          className="inline-flex rounded-full border border-hair-strong bg-paper-deep p-0.5"
+                        >
+                          {COUNTER_METHODS.map((value) => (
+                            <button
+                              type="button"
+                              key={value}
+                              aria-pressed={method === value}
+                              onClick={() => setMethod(value)}
+                              className={[
+                                'h-8 rounded-full px-3.5 text-[12px] font-medium transition-colors duration-150',
+                                'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gink',
+                                method === value
+                                  ? 'bg-gink text-onink'
+                                  : 'text-gink-64 hover:text-gink',
+                              ].join(' ')}
+                            >
+                              {COUNTER_METHOD_LABEL[value]}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <p className="mt-4 text-[11.5px] leading-[1.5] text-gink-46">
+                        Recorded as a counter {method === 'cash' ? 'cash' : method.toUpperCase()}{' '}
+                        payment. Nothing is charged here — the guest pays on a terminal or by
+                        scanning a code, and this only writes the record.
+                      </p>
+
+                      {error && (
+                        <div
+                          role="alert"
+                          className="mt-3 rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-3"
+                        >
+                          <strong className="text-[12.5px] text-[var(--alert)]">
+                            Could not record the payment.
+                          </strong>
+                          <p className="mt-1 text-[12px] leading-[1.5] text-gink-64">{error}</p>
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        data-counter-cta
+                        className={`${btn('solid')} mt-4 w-full`}
+                        disabled={isPending || Boolean(live && !order.orderId)}
+                        onClick={recordPayment}
+                      >
+                        {isPending
+                          ? 'Recording…'
+                          : `Record ${method === 'cash' ? 'cash' : method.toUpperCase()} ${inr(order.outstanding)}`}
+                      </button>
+
+                      {confirmCancel === order.orderId && order.orderId ? (
+                        <div
+                          role="group"
+                          aria-label="Confirm cancellation"
+                          className="mt-3 rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/6 px-3.5 py-3"
+                        >
+                          <strong className="text-[12.5px] text-gink">
+                            Cancel {order.code} for {order.table}?
+                          </strong>
+                          <p className="mt-1 text-[12px] leading-[1.5] text-gink-64">
+                            Nothing is charged. The kitchen is told at once and the ticket leaves
+                            this queue — this cannot be undone.
+                          </p>
+                          <div className="mt-2.5 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              className={btn('danger', 'sm')}
+                              disabled={cancelling === order.orderId}
+                              onClick={cancelOrder}
+                            >
+                              {cancelling === order.orderId ? 'Cancelling…' : 'Yes, cancel it'}
+                            </button>
+                            <button
+                              type="button"
+                              className={btn('ghost', 'sm')}
+                              onClick={() => setConfirmCancel(null)}
+                            >
+                              Keep it
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
                         <button
                           type="button"
-                          className="cash__qBtn"
-                          aria-pressed={selected}
-                          aria-label={`Select ${item.code} at ${item.table}, ${inr(item.outstanding)} outstanding`}
-                          onClick={() => {
-                            setSelectedKey(item.key);
-                            setConfirmCancel(null);
-                            setError('');
-                          }}
+                          className={`${btn('quiet', 'sm')} mt-1`}
+                          disabled={isPending || Boolean(live && !order.orderId)}
+                          onClick={cancelOrder}
                         >
-                          <span className="cash__qTop">
-                            <strong>{item.code}</strong>
-                            <span className="cash__qTable">{item.table}</span>
-                            <span className="cash__qTime">{item.at}</span>
-                          </span>
-                          <span className="cash__qItems">{item.items}</span>
-                          <span className="cash__qFoot">
-                            <span className="cash__qState">
-                              {selected ? <span className="cash__qSel">Selected</span> : null}
-                              {item.state}
-                            </span>
-                            <strong className="tnum">
-                              {/* Outstanding, not total: what the till actually wants. */}
-                              {inr(item.outstanding)}
-                              {item.paid > 0 && (
-                                <em style={{ fontStyle: 'normal', opacity: 0.6 }}>
-                                  {' '}
-                                  of {inr(item.total)}
-                                </em>
-                              )}
-                            </strong>
-                          </span>
+                          Cancel this order
                         </button>
-                      </li>
-                    );
-                  })}
-                </ul>
+                      )}
+
+                      {message && (
+                        <p
+                          role="status"
+                          className="mt-3 rounded-[10px] border border-hair bg-paper-deep px-3.5 py-2.5 text-[12px] leading-[1.5] text-gink-64"
+                        >
+                          {message}
+                        </p>
+                      )}
+                      <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
+                        {live
+                          ? 'Written to the database with an audit entry. No card terminal or payment provider is contacted — this is a record, not a charge.'
+                          : 'Preview only. Nothing is persisted, nothing is charged, and the queue is reset by reloading this page.'}
+                      </p>
+                    </div>
+                  </Card>
+                </section>
               ) : (
-                <p className="cash__fine">
-                  {live
-                    ? 'No orders are waiting for payment.'
-                    : 'No demo orders are waiting for payment.'}
-                </p>
+                <section aria-live="polite" className="min-w-0">
+                  <Panel title="Queue clear" meta={live ? 'all settled' : 'preview'}>
+                    <p className="m-0 text-[13px] leading-[1.55] text-gink-64">
+                      {live
+                        ? 'Every order from the last day has been settled.'
+                        : 'Every demo order in this preview has been settled.'}
+                    </p>
+                    {message && (
+                      <p role="status" className="mt-3 text-[12px] leading-[1.5] text-gink-64">
+                        {message}
+                      </p>
+                    )}
+                    {error && (
+                      <div
+                        role="alert"
+                        className="mt-3 rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-3 text-[12px] text-[var(--alert)]"
+                      >
+                        {error}
+                      </div>
+                    )}
+                    {!live && demoDone.length > 0 && (
+                      <button
+                        type="button"
+                        className={`${btn('ghost')} mt-4`}
+                        onClick={() => {
+                          setDemoDone([]);
+                          setSettling([]);
+                          setMessage('Demo queue reset. No real payments were recorded.');
+                        }}
+                      >
+                        Reset demo queue
+                      </button>
+                    )}
+                  </Panel>
+                </section>
               )}
-            </section>
-
-            {order ? (
-              <section className="cash__detail" aria-labelledby="cashier-order-title">
-                {focusMissing ? (
-                  <div className="cash__focus" role="status">
-                    <p>
-                      The bill you came for is not waiting any more — it was settled or cancelled
-                      just now. This is the oldest ticket still open.
-                    </p>
-                    <button
-                      type="button"
-                      className="pg__miniBtn"
-                      onClick={() => {
-                        setFocusDismissed(true);
-                        setSelectedKey(null);
-                      }}
-                    >
-                      Got it
-                    </button>
-                  </div>
-                ) : null}
-                <div className="cash__detailHead">
-                  <div>
-                    <div className="cash__kicker">
-                      Order {order.code} · {order.table}
-                      {order.orderId ? (
-                        <>
-                          {' · '}
-                          <Link href={`/bill/${order.orderId}`}>bill</Link>
-                        </>
-                      ) : null}
-                    </div>
-                    <h2 className="cash__amount" id="cashier-order-title">
-                      {inr(order.outstanding)}
-                    </h2>
-                  </div>
-                  <span className="cash__due">Payment due</span>
-                </div>
-
-                {order.paid > 0 && (
-                  <p className="cash__fine">
-                    {inr(order.paid)} already recorded on this order, against a bill of{' '}
-                    {inr(order.total)}. Take the remaining {inr(order.outstanding)}.
-                  </p>
-                )}
-
-                <ul className="cash__lines">
-                  <li>
-                    <span>{order.items}</span>
-                    <span className="tnum">{inr(order.total)}</span>
-                  </li>
-                </ul>
-                <div className="cash__totalRow">
-                  <span>Outstanding</span>
-                  <strong className="tnum">{inr(order.outstanding)}</strong>
-                </div>
-
-                <div className="cash__methods" role="group" aria-label="Payment method">
-                  {COUNTER_METHODS.map((value) => (
-                    <button
-                      type="button"
-                      key={value}
-                      className={`cash__method ${method === value ? 'is-on' : ''}`}
-                      onClick={() => setMethod(value)}
-                      aria-pressed={method === value}
-                    >
-                      {COUNTER_METHOD_LABEL[value]}
-                    </button>
-                  ))}
-                </div>
-
-                <p className="cash__fine">
-                  Recorded as a counter {method === 'cash' ? 'cash' : method.toUpperCase()} payment.
-                  Nothing is charged here — the guest pays on a terminal or by scanning a code, and
-                  this only writes the record.
-                </p>
-
-                {error && (
-                  <div className="pg__alert" role="alert">
-                    <strong>Could not record the payment.</strong>
-                    <p>{error}</p>
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  className="cash__cta"
-                  disabled={isPending || (live && !order.orderId)}
-                  onClick={recordPayment}
-                >
-                  {isPending
-                    ? 'Recording…'
-                    : `Record ${method === 'cash' ? 'cash' : method.toUpperCase()} ${inr(order.outstanding)}`}
-                </button>
-
-                {confirmCancel === order.orderId && order.orderId ? (
-                  <div className="cash__confirm" role="group" aria-label="Confirm cancellation">
-                    <strong>
-                      Cancel {order.code} for {order.table}?
-                    </strong>
-                    <p>
-                      Nothing is charged. The kitchen is told at once and the ticket leaves this
-                      queue — this cannot be undone.
-                    </p>
-                    <div className="cash__confirmActions">
-                      <button
-                        type="button"
-                        className="pg__miniBtn pg__miniBtn--danger"
-                        disabled={cancelling === order.orderId}
-                        onClick={cancelOrder}
-                      >
-                        {cancelling === order.orderId ? 'Cancelling…' : 'Yes, cancel it'}
-                      </button>
-                      <button
-                        type="button"
-                        className="pg__miniBtn"
-                        onClick={() => setConfirmCancel(null)}
-                      >
-                        Keep it
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    className="cash__cancel"
-                    disabled={isPending || (live && !order.orderId)}
-                    onClick={cancelOrder}
-                  >
-                    Cancel this order
-                  </button>
-                )}
-
-                {message && (
-                  <p className="cash__fine" role="status">
-                    {message}
-                  </p>
-                )}
-                <p className="cash__fine">
-                  {live
-                    ? 'Written to the database with an audit entry. No card terminal or payment provider is contacted — this is a record, not a charge.'
-                    : 'Preview only. Nothing is persisted, nothing is charged, and the queue is reset by reloading this page.'}
-                </p>
-              </section>
-            ) : (
-              <section className="cash__detail" aria-live="polite">
-                <h2 className="cash__h2">Queue clear</h2>
-                <p className="cash__fine">
-                  {live
-                    ? 'Every order from the last day has been settled.'
-                    : 'Every demo order in this preview has been settled.'}
-                </p>
-                {message && (
-                  <p className="cash__fine" role="status">
-                    {message}
-                  </p>
-                )}
-                {error && (
-                  <div className="pg__alert" role="alert">
-                    <p>{error}</p>
-                  </div>
-                )}
-                {!live && demoDone.length > 0 && (
-                  <button
-                    type="button"
-                    className="cash__cta"
-                    onClick={() => {
-                      setDemoDone([]);
-                      setSettling([]);
-                      setMessage('Demo queue reset. No real payments were recorded.');
-                    }}
-                  >
-                    Reset demo queue
-                  </button>
-                )}
-              </section>
-            )}
-          </div>
-        )}
-      </main>
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
