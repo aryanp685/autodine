@@ -131,6 +131,44 @@ for (const file of cssFiles) {
   }
 }
 
+/* ---------------------------------------------------------------- rule 5 */
+/*
+ * TAILWIND'S LAYER ORDER MUST BE DECLARED.
+ *
+ * This project imports theme.css and utilities.css individually rather than
+ * Tailwind's entry stylesheet, which means the `@layer theme, base, components,
+ * utilities;` ordering statement does not come with them. Without it a layer's
+ * priority is decided by where its first rule appears in the output -- and
+ * `@layer base` sits further down globals.css than the imports, so base came
+ * LAST and therefore WON.
+ *
+ * The bug that cost: `a { color: inherit }` in base beat `text-onink` in
+ * utilities, so a solid button rendered its label in the colour of its own
+ * background. It looked like a button with no text on it, and it was reported
+ * from a phone and again from the owner dashboard before anybody found it,
+ * because it is invisible in the markup and invisible in the CSS unless you
+ * check the layer order.
+ *
+ * This is a build-time guard rather than a unit test because it is a fact about
+ * the compiled stylesheet, and the compiled stylesheet is what ships.
+ */
+const ORDER = /@layer\s+theme\s*,\s*base\s*,\s*components\s*,\s*utilities\s*;/;
+if (!ORDER.test(globals)) {
+  problems.push(
+    'app/globals.css is missing `@layer theme, base, components, utilities;` before its imports. ' +
+      'Without it, base lands after utilities and every element reset beats every utility class ' +
+      '(this is what rendered a black button with a black label).',
+  );
+}
+const orderAt = globals.search(ORDER);
+const firstImport = globals.indexOf("@import 'tailwindcss/theme.css'");
+if (orderAt !== -1 && firstImport !== -1 && orderAt > firstImport) {
+  problems.push(
+    'app/globals.css declares the Tailwind layer order after its imports; the statement has to ' +
+      'come first, or the layers are ordered by first use instead.',
+  );
+}
+
 /* --------------------------------------------------------------- report */
 function rel(p) {
   return p.replace(`${ROOT}/`, '');

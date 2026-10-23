@@ -126,19 +126,38 @@ export function SectionHead({
 
 /* ----------------------------------------------------------------- surfaces */
 
-/** A hairline card. No shadow: on white, a shadow reads as a smudge. */
+/**
+ * The panel every staff screen is built from.
+ *
+ * A translucent surface with an inset highlight and one contact shadow -- see
+ * the owner section of app/globals.css for the tokens. It used to be a flat
+ * white card with no shadow, on the argument that a shadow on white is a
+ * smudge; on a wash, the absence of an edge is what makes a page of cards look
+ * like a page of rectangles.
+ *
+ * `lift` is for a card that opens something. A card that only changes its
+ * border on hover says nothing about being clickable.
+ */
 export function Card({
   children,
   className = '',
   style,
+  lift = false,
 }: {
   children: ReactNode;
   className?: string;
   /** For the one card that carries a preview's accent variables. */
   style?: React.CSSProperties;
+  /** Set on a card that is itself a link target. */
+  lift?: boolean;
 }) {
   return (
-    <div className={['rounded-[14px] border border-hair bg-card', className].join(' ')} style={style}>
+    <div
+      className={['rounded-[16px] border border-hair bg-card', lift ? 'o-lift' : '', className]
+        .filter(Boolean)
+        .join(' ')}
+      style={style}
+    >
       {children}
     </div>
   );
@@ -162,7 +181,7 @@ export function Panel({
 }) {
   return (
     <Card className={className}>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-hair px-4 py-3 sm:px-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-t-[15px] border-b border-hair bg-white/40 px-4 py-3 sm:px-5">
         <div className="flex items-baseline gap-2.5">
           <h2 className="text-[13px] font-semibold text-gink">{title}</h2>
           {meta ? <span className="text-[12px] text-gink-46">{meta}</span> : null}
@@ -198,8 +217,10 @@ export function Stat({
   return (
     <div
       className={[
-        'rounded-[14px] border p-4 sm:p-[18px]',
-        tone === 'live' ? 'border-[var(--p-accent)]/25 bg-accent-soft' : 'border-hair bg-card',
+        'rounded-[16px] border p-4 sm:p-[18px] transition-shadow duration-200 sm:hover:shadow-[var(--p-shadow-2)]',
+        tone === 'live'
+          ? 'border-[color-mix(in_oklab,var(--p-accent)_25%,transparent)] bg-[color-mix(in_oklab,var(--p-accent-soft)_70%,white)]'
+          : 'border-hair bg-card',
       ].join(' ')}
     >
       <div className="text-[11px] font-medium tracking-[0.03em] text-gink-46">{label}</div>
@@ -215,7 +236,7 @@ export function Empty({ children, className = '' }: { children: ReactNode; class
   return (
     <p
       className={[
-        'rounded-[12px] border border-dashed border-hair-strong px-4 py-8 text-center text-[13px] leading-[1.55] text-gink-46',
+        'rounded-[14px] border border-dashed border-hair-strong bg-white/30 px-4 py-8 text-center text-[13px] leading-[1.55] text-gink-46',
         className,
       ].join(' ')}
     >
@@ -244,12 +265,14 @@ export function btn(tone: BtnTone = 'solid', size: BtnSize = 'md'): string {
   const tones: Record<BtnTone, string> = {
     /* Black is the default action on white. It is the strongest thing on the
        screen without introducing a colour the product does not own. */
-    solid: 'bg-gink text-onink hover:bg-gink/88',
+    solid:
+      'bg-gink text-onink shadow-[var(--p-shadow-1)] hover:bg-gink/90 hover:shadow-[var(--p-shadow-2)]',
     /* Green is for the one action a screen exists for -- the counter's
        "Record payment", the menu's "Publish". Used twice on a page it stops
        meaning anything. */
-    primary: 'bg-[var(--p-accent)] text-white hover:opacity-92',
-    ghost: 'border border-hair-strong text-gink hover:border-gink-28 hover:bg-gink-07',
+    primary:
+      'bg-[var(--p-accent)] text-onink shadow-[var(--p-shadow-1)] hover:brightness-110 hover:shadow-[var(--p-shadow-2)]',
+    ghost: 'border border-hair-strong bg-white/50 text-gink backdrop-blur-sm hover:border-gink-28 hover:bg-white/80',
     quiet: 'text-gink-64 hover:text-gink hover:bg-gink-07',
     danger: 'border border-[var(--alert)]/30 text-[var(--alert)] hover:bg-[var(--alert)]/8',
   };
@@ -312,7 +335,7 @@ export function Field({
 }
 
 const control =
-  'w-full rounded-[9px] border border-hair-strong bg-card px-3 text-[13.5px] text-gink transition-colors placeholder:text-gink-28 focus:border-gink focus:ring-2 focus:ring-gink/10 focus:outline-none disabled:cursor-not-allowed disabled:bg-gink-07 disabled:text-gink-46';
+  'w-full rounded-[10px] border border-hair-strong bg-white/60 px-3 text-[13.5px] text-gink shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-colors placeholder:text-gink-28 focus:border-[var(--p-accent)] focus:bg-white/90 focus:ring-2 focus:ring-[color-mix(in_oklab,var(--p-accent)_18%,transparent)] focus:outline-none disabled:cursor-not-allowed disabled:bg-gink-07 disabled:text-gink-46';
 
 export const inputClass = `${control} h-10`;
 export const textareaClass = `${control} resize-y py-2.5 leading-[1.5]`;
@@ -375,7 +398,7 @@ export function Td({
 /** A table row. The tint on hover is the whole interaction budget for a row. */
 export function Tr({ children, className = '', ...rest }: React.ComponentProps<'tr'>) {
   return (
-    <tr className={['transition-colors hover:bg-paper-deep', className].join(' ')} {...rest}>
+    <tr className={['transition-colors hover:bg-white/55', className].join(' ')} {...rest}>
       {children}
     </tr>
   );

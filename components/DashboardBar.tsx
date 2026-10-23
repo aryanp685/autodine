@@ -115,7 +115,7 @@ export function DashboardBar({
           /* Phone: a sheet from the bottom edge, because the thumb is there.
              Tablet: the same sheet. Laptop: a fixed rail that is part of the
              layout and never moves. One tree, three positions. */
-          'fixed z-50 flex flex-col bg-card',
+          'fixed z-50 flex flex-col bg-card shadow-[var(--p-shadow-2)]',
           'inset-x-0 bottom-0 max-h-[80dvh] rounded-t-2xl border-t border-hair pb-[env(safe-area-inset-bottom)]',
           'transition-transform duration-250 ease-out',
           open ? 'translate-y-0' : 'translate-y-full',
@@ -164,19 +164,26 @@ export function DashboardBar({
                     data-nav={link.key}
                     data-nav-active={current ? 'true' : undefined}
                     aria-current={current ? 'page' : undefined}
-                    /* The current screen is the one black object in the rail:
-                       an owner glancing up from a table can see where they are
-                       without reading a word. */
+                    /* The current screen used to be the one black block in the
+                       rail. Inside a glass panel that read as a hole punched in
+                       the navigation, and it was the heaviest thing on a screen
+                       whose job is to show numbers. It is now a tinted glass
+                       chip with an accent edge -- still unmistakable at a
+                       glance, no longer competing with the page's one real
+                       action. */
                     className={[
-                      'mb-0.5 flex items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-[13px] transition-colors',
+                      'group relative mb-0.5 flex items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-[13px] transition-all duration-150',
                       current
-                        ? 'bg-gink font-medium text-onink'
-                        : 'text-gink-64 hover:bg-gink-07 hover:text-gink',
+                        ? 'bg-[color-mix(in_oklab,var(--p-accent)_11%,white)] font-medium text-gink shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] ring-1 ring-[color-mix(in_oklab,var(--p-accent)_22%,transparent)] ring-inset'
+                        : 'text-gink-64 hover:bg-white/70 hover:text-gink',
                     ].join(' ')}
                   >
                     <span
                       aria-hidden="true"
-                      className={['shrink-0', current ? 'text-onink' : 'text-gink-46'].join(' ')}
+                      className={[
+                        'shrink-0 transition-colors',
+                        current ? 'text-[var(--p-accent)]' : 'text-gink-46 group-hover:text-gink-64',
+                      ].join(' ')}
                     >
                       {ICONS[link.key]}
                     </span>
@@ -192,7 +199,7 @@ export function DashboardBar({
           <div className="flex items-center gap-2.5">
             <span
               aria-hidden="true"
-              className="grid size-8 shrink-0 place-items-center rounded-full bg-gink text-[11px] font-semibold text-onink"
+              className="grid size-8 shrink-0 place-items-center rounded-full bg-[color-mix(in_oklab,var(--p-accent)_88%,black)] text-[11px] font-semibold text-onink"
             >
               {initialsOf(activeOutlet?.name ?? 'AutoDine')}
             </span>
@@ -210,7 +217,7 @@ export function DashboardBar({
             <form action={signOutAction} className="mt-2.5">
               <button
                 type="submit"
-                className="w-full rounded-full border border-hair-strong py-1.5 text-[11.5px] font-medium text-gink-64 transition-colors hover:border-gink-28 hover:text-gink"
+                className="w-full rounded-full border border-hair-strong bg-white/40 py-2 text-[11.5px] font-medium text-gink-64 transition-colors hover:border-gink-28 hover:bg-white/80 hover:text-gink"
               >
                 Sign out
               </button>
@@ -221,7 +228,7 @@ export function DashboardBar({
 
       {/* The top bar. It is the only chrome on a phone, so it carries the way
           into the rail, the name of where you are, and the jump search. */}
-      <header className="sticky top-0 z-30 border-b border-hair bg-paper/85 backdrop-blur-xl lg:pl-[232px]">
+      <header className="sticky top-0 z-30 border-b border-hair bg-white/60 backdrop-blur-xl lg:pl-[232px]">
         <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
           <button
             type="button"
