@@ -68,7 +68,7 @@ export function VerifyCodeForm({
           ref={inputRef}
           /* Six monospaced cells' worth of space, so the digits sit where
              the eye expects them and the field does not jump as they arrive. */
-          className="tnum w-full rounded-xl border border-hair-strong bg-card px-4 py-3 text-center text-[26px] font-semibold tracking-[0.42em] text-gink placeholder:tracking-[0.34em] placeholder:text-gink-46 focus:border-[var(--p-accent)] focus:ring-2 focus:ring-[var(--p-accent)]/20 focus:outline-none"
+          className="tnum w-full rounded-[16px] border border-white/70 bg-white/70 px-4 py-3.5 text-center text-[27px] font-semibold tracking-[0.42em] text-gink shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] placeholder:tracking-[0.34em] placeholder:text-gink-46 focus:border-[color-mix(in_oklab,var(--p-accent)_45%,transparent)] focus:bg-white focus:outline-none"
           name="code"
           // inputMode brings up the keypad on a phone; one-time-code lets iOS
           // and Android offer the code from the message that delivered it.

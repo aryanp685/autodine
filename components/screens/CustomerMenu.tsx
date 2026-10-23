@@ -188,7 +188,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
           <div key={barPulse} className="animate-[gbar_260ms_cubic-bezier(0.22,1,0.36,1)]">
             <Link
               href={cartHref}
-              className="flex items-center gap-3 rounded-2xl bg-[var(--p-accent)] px-4 py-3.5 text-white shadow-g2 transition active:scale-[0.99]"
+              className="g-primary flex items-center gap-3 rounded-[16px] px-4 py-3"
             >
               <span aria-live="polite" role="status" className="text-[13px] font-medium">
                 <strong className="tnum font-semibold">{cart.count}</strong> item
@@ -243,12 +243,8 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
                 key={option.id}
                 href={`/menu?${params.toString()}`}
                 aria-current={current ? 'page' : undefined}
-                className={[
-                  'shrink-0 rounded-full border px-3.5 py-1.5 text-[12.5px] font-medium whitespace-nowrap transition',
-                  current
-                    ? 'g-primary border-transparent'
-                    : 'border-hair-strong text-gink-64 hover:border-gink-28 hover:text-gink',
-                ].join(' ')}
+                className="g-chip shrink-0"
+                data-chip-on={current ? 'true' : undefined}
               >
                 {option.name}
               </a>
@@ -261,13 +257,13 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
           for one: a search box that has scrolled away is a search box that does
           not exist. It sits directly under the flow bar and the two share the
           same hairline so they read as one piece of chrome. */}
-      <div className="sticky top-14 z-20 mt-4 border-y border-hair bg-paper/94 backdrop-blur-xl">
-        <div className="px-4 pt-3 pb-2">
+      <div className="sticky top-16 z-20 mt-3 px-3">
+        <div data-flow-chrome="rail" className="rounded-[20px] px-2 pt-2 pb-1.5">
           {/* Search sits above the courses because it questions all of them. It
               is a real input, not a decorative one: typing filters the list
               below in the same frame, with no round trip -- the menu is already
               here. */}
-          <div className="flex items-center gap-2 rounded-xl bg-gink-07 px-3 py-2.5" role="search">
+          <div className="g-field" role="search">
             <svg
               className="shrink-0 text-gink-46"
               viewBox="0 0 24 24"
@@ -283,7 +279,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
             </svg>
             <input
               type="search"
-              className="w-full bg-transparent text-[14px] text-gink placeholder:text-gink-46 focus:outline-none"
+              className="w-full bg-transparent focus:outline-none"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search dishes"
@@ -311,12 +307,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
               type="button"
               aria-pressed={cat === 'all'}
               onClick={() => setCat('all')}
-              className={[
-                'shrink-0 rounded-full px-3.5 py-1.5 text-[12.5px] font-medium whitespace-nowrap transition-colors',
-                cat === 'all'
-                  ? 'bg-[var(--p-accent)] text-white'
-                  : 'bg-gink-07 text-gink-64 hover:text-gink',
-              ].join(' ')}
+              className="g-chip shrink-0"
             >
               All
             </button>
@@ -326,12 +317,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
                 type="button"
                 aria-pressed={cat === c.id}
                 onClick={() => setCat(c.id)}
-                className={[
-                  'shrink-0 rounded-full px-3.5 py-1.5 text-[12.5px] font-medium whitespace-nowrap transition-colors',
-                  cat === c.id
-                    ? 'bg-[var(--p-accent)] text-white'
-                    : 'bg-gink-07 text-gink-64 hover:text-gink',
-                ].join(' ')}
+                className="g-chip shrink-0"
               >
                 {c.name}
               </button>
@@ -346,7 +332,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
             who scrolled past the rail still knows what they are reading. The
             count is the filtered list's own length -- never a typed number. */}
         <div className="mb-3 flex items-baseline justify-between gap-3">
-          <h2 className="truncate text-[13px] font-semibold tracking-[0.09em] text-gink-46 uppercase">
+          <h2 className="g-eyebrow truncate">
             {searching
               ? `Results for “${query.trim()}”`
               : categories.find((c) => c.id === cat)?.name ?? 'The full menu'}
@@ -360,18 +346,18 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
           (searching ? (
             /* A search that finds nothing says what to do, and keeps the query
                visible so the guest can see what they typed. */
-            <div className="rounded-2xl border border-hair bg-card px-4 py-6 text-center">
+            <div className="g-card px-4 py-6 text-center">
               <p className="text-[14px] text-gink-64">No dish on this menu matches “{query.trim()}”.</p>
               <button
                 type="button"
-                className="mt-3 rounded-full bg-gink-07 px-3.5 py-1.5 text-[12.5px] font-semibold text-gink"
+                className="g-quiet mt-3 rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold"
                 onClick={() => setQuery('')}
               >
                 Show the whole menu
               </button>
             </div>
           ) : (
-            <p className="rounded-2xl border border-hair bg-card px-4 py-6 text-center text-[14px] text-gink-64">
+            <p className="g-card px-4 py-6 text-center text-[14px] text-gink-64">
               Nothing in this course is available right now. Try another, or ask the counter.
             </p>
           ))}
@@ -384,8 +370,8 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
             <article
               key={i.id}
               className={[
-                'flex gap-3 rounded-2xl border bg-card p-3 transition-colors',
-                i.available ? 'border-hair hover:border-hair-strong' : 'border-hair opacity-55',
+                'g-card g-card--tappable flex gap-3 p-3',
+                i.available ? '' : 'opacity-60',
               ].join(' ')}
             >
               <div className="flex min-w-0 flex-1 flex-col">
@@ -400,7 +386,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
                     {i.name}
                   </h3>
                   {i.badge && i.available && (
-                    <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-semibold tracking-[0.04em] text-[var(--p-accent)] uppercase">
+                    <span className="g-badge shrink-0 px-2 py-0.5">
                       {i.badge}
                     </span>
                   )}
@@ -421,12 +407,12 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
                     needsChoice(i) ? (
                       <Link
                         href={itemHref(i.id)}
-                        className="g-primary inline-flex items-center gap-1 rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold"
+                        className="g-primary inline-flex items-center gap-1 rounded-full px-4 py-2 text-[12.5px] font-semibold"
                       >
                         Choose
                       </Link>
                     ) : plainQty(i.id) > 0 ? (
-                      <div className="inline-flex items-center rounded-full border border-hair-strong">
+                      <div className="g-quiet inline-flex items-center rounded-full">
                         <button
                           type="button"
                           onClick={() => cart.setQty(i.id, plainQty(i.id) - 1)}
@@ -452,7 +438,7 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
                         type="button"
                         onClick={() => addToCart(i.id)}
                         aria-label={`Add ${i.name}`}
-                        className="g-primary inline-flex items-center gap-1 rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold"
+                        className="g-primary inline-flex items-center gap-1 rounded-full px-4 py-2 text-[12.5px] font-semibold"
                       >
                         Add
                       </button>
@@ -659,7 +645,11 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
 
   if (missing) {
     return (
-      <div className="mx-auto min-h-dvh w-full max-w-[560px] bg-paper px-5 py-16 text-gink">
+      <div
+        data-flow-root=""
+        style={accentStyle(data?.restaurant.accent)}
+        className="mx-auto min-h-dvh w-full max-w-[560px] px-5 py-16 text-gink"
+      >
         <p className="text-[11px] font-semibold tracking-[0.12em] text-gink-46 uppercase">Not on the menu</p>
         <h1 className="mt-2 text-[28px] leading-tight font-semibold tracking-[-0.025em]">
           That dish is not on the menu
@@ -679,7 +669,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
   }
 
   return (
-    <div className="min-h-dvh bg-paper text-gink">
+    <div data-flow-root="" style={accentStyle(data?.restaurant.accent)} className="min-h-dvh text-gink">
       {/* The menu itself, still there behind the sheet. It is dimmed and made
           inert rather than removed: a guest who closes the sheet lands back on
           the dish they were reading, at the scroll position they left. */}
@@ -720,7 +710,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
 
       <div className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-[560px]">
         <div
-          className="max-h-[86dvh] overflow-y-auto rounded-t-[26px] border border-hair bg-paper pb-[calc(14px+env(safe-area-inset-bottom))] shadow-g2"
+          className="max-h-[86dvh] overflow-y-auto rounded-t-[26px] border border-white/70 shadow-g2" style={{ backgroundColor: 'var(--g-panel-solid)', paddingBottom: 'calc(14px + env(safe-area-inset-bottom))' }}
           role="dialog"
           aria-modal="true"
           aria-label={item.name}
@@ -728,7 +718,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
           {/* The grab handle. A phone sheet without one does not read as a
               sheet, and the guest looks for a close button that is 20px from
               their thumb. */}
-          <div className="sticky top-0 z-10 flex justify-center bg-paper pt-2.5 pb-1">
+          <div className="sticky top-0 z-10 flex justify-center pt-2.5 pb-1" style={{ backgroundColor: 'var(--g-panel-solid)' }}>
             <span aria-hidden="true" className="h-1 w-9 rounded-full bg-gink-28" />
           </div>
 
@@ -745,7 +735,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
               <Link
                 href={backHref}
                 aria-label="Close"
-                className="-mr-1.5 grid size-9 shrink-0 place-items-center rounded-full bg-gink-07 text-[18px] text-gink-64 transition hover:text-gink"
+                className="g-quiet -mr-1.5 grid size-9 shrink-0 place-items-center rounded-full text-[18px]"
               >
                 ×
               </Link>
@@ -762,10 +752,8 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
                     return (
                       <label
                         key={v.id}
-                        className={[
-                          'flex cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-2.5 transition-colors',
-                          on ? 'border-[var(--p-accent)] bg-accent-soft' : 'border-hair bg-card hover:border-hair-strong',
-                        ].join(' ')}
+                        data-choice={on ? 'on' : 'off'}
+                        className="g-choice flex cursor-pointer items-center gap-3 px-3.5 py-3"
                       >
                         <input
                           type="radio"
@@ -815,10 +803,8 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
                         return (
                           <label
                             key={option.id}
-                            className={[
-                              'flex cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-2.5 transition-colors',
-                              on ? 'border-[var(--p-accent)] bg-accent-soft' : 'border-hair bg-card hover:border-hair-strong',
-                            ].join(' ')}
+                            data-choice={on ? 'on' : 'off'}
+                            className="g-choice flex cursor-pointer items-center gap-3 px-3.5 py-3"
                           >
                             <input
                               type="radio"
@@ -855,13 +841,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
                             aria-pressed={on}
                             disabled={!on && atMax}
                             onClick={() => toggle(group, option.id)}
-                            className={[
-                              'rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors',
-                              on
-                                ? 'border-[var(--p-accent)] bg-accent-soft text-[var(--p-accent)]'
-                                : 'border-hair-strong text-gink-64 hover:text-gink',
-                              'disabled:cursor-not-allowed disabled:opacity-40',
-                            ].join(' ')}
+                            className="g-chip disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             {option.name}
                             {option.price ? ` + ${inr(option.price)}` : ''}
@@ -878,9 +858,9 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
           {/* The action is part of the sheet, pinned to the bottom of it: a
               guest choosing an add-on at the top of a long sheet must still see
               what the plate costs before they commit. */}
-          <div className="sticky bottom-0 mt-5 border-t border-hair bg-paper/96 px-5 pt-3 backdrop-blur-xl">
+          <div data-flow-chrome="sheet-foot" className="sticky bottom-0 mt-5 rounded-t-[20px] border-b-0 px-5 pt-3 pb-1">
             <div className="flex items-center gap-3">
-              <div className="flex shrink-0 items-center rounded-full border border-hair-strong">
+              <div className="g-quiet flex shrink-0 items-center rounded-full">
                 <button
                   type="button"
                   onClick={() => setQty(Math.max(1, qty - 1))}

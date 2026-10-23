@@ -70,9 +70,9 @@ export function GuestOrdersScreen({
       tabs={<GuestTabs slug={slug} active="orders" />}
     >
       <header className="px-4 pt-6 pb-4">
-        <p className="text-[10.5px] font-semibold tracking-[0.12em] text-gink-46 uppercase">Your order</p>
-        <h1 className="mt-1.5 text-[27px] leading-tight font-semibold tracking-[-0.025em] text-gink">On this device</h1>
-        <p className="mt-1.5 max-w-[48ch] text-[13.5px] leading-[1.55] text-gink-64">
+        <p className="g-eyebrow">Your order</p>
+        <h1 className="g-display mt-1.5">On this device</h1>
+        <p className="g-lede mt-1.5">
           {state === 'found'
             ? 'The last order placed from this phone. Open it to see how the kitchen is doing.'
             : 'Orders are tied to the phone that placed them. This one has none yet.'}
@@ -95,7 +95,7 @@ export function GuestOrdersScreen({
         )}
 
         {state === 'none' && (
-          <div className="rounded-2xl border border-hair bg-card px-5 py-8 text-center">
+          <div className="g-card px-5 py-8 text-center">
             <p className="text-[16px] font-semibold tracking-[-0.01em] text-gink">Nothing ordered yet</p>
             <p className="mx-auto mt-1.5 max-w-[36ch] text-[13px] leading-[1.55] text-gink-64">
               Once you order, it will be here with its status, and you can open it again without
@@ -111,7 +111,7 @@ export function GuestOrdersScreen({
         )}
 
         {state === 'found' && order && slug && (
-          <div className="rounded-2xl border border-hair-strong bg-card px-4 py-4">
+          <div className="g-panel px-4 py-4">
             <dl className="text-[13.5px]">
               <div className="flex items-baseline justify-between py-1.5">
                 <dt className="text-[11px] font-semibold tracking-[0.09em] text-gink-46 uppercase">Order</dt>
@@ -125,13 +125,13 @@ export function GuestOrdersScreen({
 
             <Link
               href={orderHref(order, slug)}
-              className="mt-4 flex h-11 items-center justify-center rounded-full bg-[var(--p-accent)] text-[13.5px] font-semibold text-white shadow-g1"
+              className="g-primary mt-4 flex h-11 items-center justify-center rounded-full text-[13.5px] font-semibold"
             >
               Track this order
             </Link>
             <Link
               href={menuHref}
-              className="mt-2 flex h-11 items-center justify-center rounded-full border border-hair-strong text-[13.5px] font-semibold text-gink"
+              className="g-quiet mt-2 flex h-11 items-center justify-center rounded-full text-[13.5px] font-semibold"
             >
               Order something else
             </Link>

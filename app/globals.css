@@ -289,83 +289,361 @@ p { margin: 0; }
 }
 
 /* =========================================================================
-   Guest flow — frosted surfaces
+   THE GUEST FLOW — one design system, built out of glass
 
-   Every visitor who scans a card is on a phone, in a restaurant, at arm's
-   length from a warm cream page. Solid white cards on flat cream read as a
-   printout: nothing sits above anything. The guest flow is therefore built out
-   of translucent surfaces over one warm wash, so a card, the docked action and
-   the tab bar all read as glass lying on the same page rather than three
-   different slabs of paint.
+   A guest is on a phone, in a restaurant, at arm's length. They are not
+   reading a website; they are deciding what to eat. Every screen in the flow
+   (menu, dish sheet, cart, pay, placed, orders) is therefore built from the
+   same five objects and nothing else:
 
-   Two decisions worth stating, because both were reported as problems:
+     .g-card      a frosted panel that holds content
+     .g-panel     the same, denser -- bills and sheets, where numbers are read
+     .g-primary   the one action on a screen
+     .g-quiet     a secondary action that must not compete with it
+     .g-chip      a filter, a menu switch, a state
 
-   1. NO BLACK BUTTONS IN THE GUEST FLOW. Pure ink fills were carrying every
-      primary action, which made a menu of twenty photographs read as a page of
-      black pills. The guest's primary action is now the restaurant's own
-      accent -- the colour already used for "this is where you are" -- and ink
-      is reserved for text. Owners keep their black-and-white screens; a
-      restaurateur reading a report is not a diner choosing a biryani.
+   WHY THE ACCENT IS NO LONGER THE PAGE
 
-   2. THE WASH IS ON THE ROOT, NOT ON A PSEUDO-ELEMENT. A fixed background on
-      [data-flow-root] is what backdrop-filter has something to blur. Painted
-      on a child with z-index:-1 it would sit behind the root's own opaque
-      background and the blur would have nothing to sample.
+   The first version of this surface tinted the whole page with the
+   restaurant's accent. On a green restaurant that meant a green haze behind
+   every dish, and green is a colour that reads as "system message" next to
+   food photography. The accent now appears only where it MEANS something --
+   the table you are at, the course you have chosen, the dish you just added --
+   and at 12-26% strength in the wash, never as a field.
 
-   Scoped to [data-flow-root] so owner screens keep the flat white surface the
-   design guard pins an opaque paper under [data-surface='owner']).
+   The page itself is warm neutral: oat, cream, one amber bloom for light.
+
+   WHY GLASS AND NOT FLAT WHITE
+
+   Solid white cards on flat cream read as a printout: nothing sits above
+   anything. A translucent panel over a wash, with a hairline highlight along
+   its top edge, reads as something laid on the page. That is the whole of the
+   glassmorphism here -- translucency, a light border, a soft shadow. No
+   backdrop-filter on the cards: they sit on a smooth gradient with nothing
+   moving behind them, so a blur pass per dish would cost a phone's GPU and
+   change nothing an eye can see. The blur is kept for the three surfaces that
+   really do have content scrolling underneath: the header, the dock and the
+   tabs.
+
+   SCOPED, SO THE OWNER'S SCREENS DO NOT MOVE
+
+   Everything below is under [data-flow-root]. The owner surface is pinned to
+   opaque white by the design guard, and a restaurateur reading a report is
+   not a diner choosing a biryani. The two surfaces share tokens and nothing
+   else.
    ========================================================================= */
-[data-flow-root] {
-  /* A little more transparent than the owner's glass: the wash behind is warm
-     and light, so a card can afford to show it. */
-  --p-surface: rgba(255, 255, 255, 0.58);
-  --p-glass: rgba(255, 255, 255, 0.46);
-  --p-line: rgba(12, 11, 9, 0.07);
-  --p-line-strong: rgba(12, 11, 9, 0.13);
 
-  /* Three sources of light: the restaurant's accent in the top-left, a warm
-     amber bloom top-right, and the page's own cream underneath. Enough for the
-     frosted cards to have something to hold, not enough to compete with a
-     photograph. */
+[data-flow-root] {
+  /* ---- geometry ---------------------------------------------------------
+     Five radii, one per kind of object, so nothing on the flow is rounded by
+     feel. A chip is a pill; a card is 22; a sheet is 28. */
+  --g-r-sm: 12px;
+  --g-r: 16px;
+  --g-r-lg: 22px;
+  --g-r-xl: 28px;
+  --g-pill: 999px;
+
+  /* ---- surfaces ---------------------------------------------------------
+     Cards are 64% white over the wash. Below ~55% the text starts to lose
+     its footing on the amber bloom; above 75% the glass stops reading as
+     glass and the page goes flat again. */
+  --p-surface: rgba(255, 255, 255, 0.64);
+  --p-paper: #f7f2e9;
+  --p-paper-deep: #efe8dc;
+
+  /* A denser white for the two places money is read: the bill and the sheet. */
+  --g-panel: rgba(255, 255, 255, 0.84);
+  --g-panel-solid: #fffdf9;
+
+  /* Lines: one hairline for a resting edge, one for an edge that is doing
+     something (a selected chip, a focused field). */
+  --p-line: rgba(28, 22, 16, 0.08);
+  --p-line-strong: rgba(28, 22, 16, 0.14);
+  --g-line-light: rgba(255, 255, 255, 0.7);
+
+  /* ---- elevation -------------------------------------------------------
+     Two steps. The first is contact -- a card on a page. The second is lift,
+     for the dock, the tabs and the sheet, which float over content. */
+  --p-shadow-1: 0 1px 2px rgba(46, 33, 20, 0.05), 0 10px 26px -18px rgba(46, 33, 20, 0.22);
+  --p-shadow-2: 0 2px 10px rgba(46, 33, 20, 0.06), 0 34px 64px -34px rgba(46, 33, 20, 0.3);
+
+  /* ---- the wash --------------------------------------------------------
+     Three sources: the restaurant's accent at the top-left, warm amber at the
+     top-right, and the page's own cream. Fixed, so it does not slide under
+     the content while a thumb scrolls -- a background that moves with the
+     page stops reading as a surface and starts reading as a very slow
+     animation. */
   background:
-    radial-gradient(62% 46% at 8% -8%, color-mix(in oklab, var(--p-accent) 26%, transparent), transparent 72%),
-    radial-gradient(56% 40% at 96% 0%, rgba(224, 168, 106, 0.3), transparent 74%),
-    radial-gradient(80% 60% at 50% 112%, rgba(255, 255, 255, 0.92), transparent 70%),
+    radial-gradient(58% 42% at 6% -6%, color-mix(in oklab, var(--p-accent) 22%, transparent), transparent 74%),
+    radial-gradient(52% 38% at 98% 2%, rgba(214, 158, 88, 0.26), transparent 72%),
+    radial-gradient(90% 55% at 50% 108%, rgba(255, 255, 255, 0.9), transparent 68%),
     var(--p-paper);
   background-attachment: fixed;
+  color: var(--p-ink);
 }
 
-/* The cards the screens already use (`bg-card`) become the glass. One rule
-   rather than a class on two hundred elements: every card in the flow is the
-   same object, and a restyle that has to be repeated per screen drifts the
-   moment one screen is edited.
-
-   NO backdrop-filter HERE, DELIBERATELY. A frosted card earns its cost when
-   something is moving behind it. These sit on a smooth gradient -- there is
-   nothing to blur, so the filter would be a full-screen GPU pass repeated once
-   per dish, on a phone, for no visible difference. The translucency is what
-   reads as glass; the blur is kept for the three surfaces that really do have
-   content scrolling under them: the header, the docked action and the tab bar. */
-[data-flow-root] .bg-card {
-  border-color: rgba(255, 255, 255, 0.62);
+/* ---- type ---------------------------------------------------------------
+   Four roles, so a heading is a heading on every screen. The sizes are the
+   ones the flow already used; naming them is what stops a fifth screen from
+   inventing a 26px title. */
+[data-flow-root] .g-eyebrow {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+[data-flow-root] .g-display {
+  font-size: 29px;
+  line-height: 1.08;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--p-ink);
+  text-wrap: balance;
+}
+[data-flow-root] .g-title {
+  font-size: 21px;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  color: var(--p-ink);
+}
+[data-flow-root] .g-lede {
+  font-size: 13.5px;
+  line-height: 1.58;
+  color: var(--p-ink-64);
+  max-width: 52ch;
+}
+[data-flow-root] .g-meta {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--p-ink-46);
 }
 
-/* The guest's primary action: the accent, lit from above.
-   Deliberately a component class rather than a utility chain, because it is
-   four nested backgrounds and a hairline highlight, and it must look identical
-   on the menu, in the cart, on the placed screen and in the dock. */
-.g-primary {
+/* ---- card ---------------------------------------------------------------
+   The one panel. A hairline highlight along the top edge is what gives a
+   translucent surface an edge under a light source; without it the panel's
+   top disappears into the wash and the card looks like a smudge. */
+[data-flow-root] .g-card {
+  background: var(--p-surface);
+  border: 1px solid var(--g-line-light);
+  border-radius: var(--g-r-lg);
+  box-shadow: var(--p-shadow-1), inset 0 1px 0 var(--g-line-light);
+}
+
+/* The bill, the sheet, the "how you will pay" block: denser, because a number
+   read against a wash is a number read twice. */
+[data-flow-root] .g-panel {
+  background: var(--g-panel);
+  border: 1px solid var(--g-line-light);
+  border-radius: var(--g-r-lg);
+  box-shadow: var(--p-shadow-1), inset 0 1px 0 var(--g-line-light);
+}
+
+/* The accent-washed variant, for a notice that belongs to this restaurant --
+   "one dish has sold out", "prices here are yours". It is a modifier rather
+   than a Tailwind `bg-` utility because .g-card sets a background of its own,
+   and an unlayered component class beats a layered utility every time. */
+[data-flow-root] .g-card.g-soft {
+  background: color-mix(in oklab, var(--p-accent-soft) 76%, white);
+  border-color: color-mix(in oklab, var(--p-accent) 16%, white);
+}
+
+/* A card that can be tapped gets a lift rather than a colour change: the
+   whole row is a target, and tinting the whole row on hover made the menu
+   flash as a finger passed over it. */
+[data-flow-root] .g-card--tappable {
+  transition: box-shadow 220ms var(--p-ease), transform 220ms var(--p-ease);
+}
+@media (hover: hover) {
+  [data-flow-root] .g-card--tappable:hover {
+    box-shadow: var(--p-shadow-2), inset 0 1px 0 var(--g-line-light);
+    transform: translateY(-1px);
+  }
+}
+
+/* ---- actions ------------------------------------------------------------
+   The primary action is the restaurant's accent, lit from above: a white
+   gradient over the fill plus an inset highlight, which is what separates a
+   coloured button from a coloured rectangle. Contrast for white-on-accent is
+   guaranteed by lib/branding/palette.test.ts, which refuses any accent below
+   4.5:1. */
+[data-flow-root] .g-primary {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0)),
     var(--p-accent);
   color: var(--p-on-ink);
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), var(--p-shadow-1);
-  transition: filter 180ms var(--p-ease), transform 180ms var(--p-ease);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 8px 20px -12px color-mix(in oklab, var(--p-accent) 70%, transparent);
+  transition: filter 180ms var(--p-ease), transform 180ms var(--p-ease), opacity 180ms linear;
 }
-.g-primary:hover { filter: brightness(1.06); }
-.g-primary:active { transform: scale(0.99); }
-.g-primary:disabled { filter: grayscale(0.35); opacity: 0.55; }
+@media (hover: hover) {
+  [data-flow-root] .g-primary:hover { filter: brightness(1.07); }
+}
+[data-flow-root] .g-primary:active { transform: scale(0.985); }
+[data-flow-root] .g-primary:disabled { filter: grayscale(0.4); opacity: 0.5; }
+
+/* Secondary: glass, not ink. A second dark button next to the primary is two
+   primary actions, and the guest has to guess which one is the way forward. */
+[data-flow-root] .g-quiet {
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--p-ink);
+  border: 1px solid var(--p-line-strong);
+  transition: background-color 180ms var(--p-ease);
+}
+@media (hover: hover) {
+  [data-flow-root] .g-quiet:hover { background: rgba(255, 255, 255, 0.78); }
+}
+
+/* ---- chips --------------------------------------------------------------
+   One chip, three states. Pressed is the accent; the accent-soft wash was
+   tested for dark text and is not strong enough to carry white, so a pressed
+   chip is a solid accent with white type. */
+[data-flow-root] .g-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--g-pill);
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--p-ink-64);
+  /* An ink hairline, not a white one: these pills sit INSIDE the frosted rail,
+     where a white edge on a white pill has nothing to be seen against. */
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid var(--p-line);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transition: background-color 160ms var(--p-ease), color 160ms var(--p-ease);
+}
+@media (hover: hover) {
+  [data-flow-root] .g-chip:hover { color: var(--p-ink); background: rgba(255, 255, 255, 0.85); }
+}
+[data-flow-root] .g-chip[aria-pressed='true'],
+[data-flow-root] .g-chip[data-chip-on='true'] {
+  background: var(--p-accent);
+  border-color: transparent;
+  color: var(--p-on-ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* A state badge: "Table 3", "Veg", "Sold out". Never a button. */
+[data-flow-root] .g-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: var(--g-pill);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--p-accent-soft);
+  color: var(--p-accent);
+}
+
+/* Horizontal rails on a phone: a visible scrollbar under a row of chips is
+   8px of grey under a 28px control, and it makes the row look like a mistake.
+   Hidden on the rail only, never on a page: a page that hides its scrollbar on
+   a desktop is a page somebody cannot tell is scrollable. */
+[data-flow-root] .scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+[data-flow-root] .scrollbar-none::-webkit-scrollbar { display: none; }
+
+/* ---- choice rows --------------------------------------------------------
+   A portion, a required add-on: a row you pick from. Selected is an accent
+   edge plus a whisper of accent behind it -- not a filled accent field, which
+   at four rows on a sheet turns the sheet into a colour block. */
+[data-flow-root] .g-choice {
+  border: 1px solid var(--g-line-light);
+  border-radius: var(--g-r);
+  background: rgba(255, 255, 255, 0.6);
+  transition: border-color 160ms var(--p-ease), background-color 160ms var(--p-ease);
+}
+[data-flow-root] .g-choice[data-choice='on'] {
+  border-color: color-mix(in oklab, var(--p-accent) 55%, transparent);
+  background: color-mix(in oklab, var(--p-accent-soft) 72%, white);
+}
+@media (hover: hover) {
+  [data-flow-root] .g-choice[data-choice='off']:hover {
+    border-color: var(--p-line-strong);
+    background: rgba(255, 255, 255, 0.82);
+  }
+}
+
+/* ---- fields -------------------------------------------------------------
+   The search box. Inset rather than outlined: a field that sits slightly
+   below the surface reads as somewhere to type, where an outlined box on
+   glass reads as another button. */
+[data-flow-root] .g-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--g-r);
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid var(--p-line);
+  transition: border-color 160ms var(--p-ease), background-color 160ms var(--p-ease);
+}
+[data-flow-root] .g-field:focus-within {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: color-mix(in oklab, var(--p-accent) 45%, transparent);
+}
+[data-flow-root] .g-field input {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  font-size: 14px;
+  color: var(--p-ink);
+  outline: none;
+}
+[data-flow-root] .g-field input::placeholder { color: var(--p-ink-46); }
+
+/* ---- removal / void -----------------------------------------------------
+   A line the guest has taken off the order stays on screen, dashed, so the
+   change is visible before it is saved. Dashed has to be set here rather than
+   with Tailwind's border-dashed, because .g-card's border shorthand is
+   unlayered and would win. */
+[data-flow-root] .g-card.g-void {
+  border-style: dashed;
+  border-color: var(--p-line-strong);
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* ---- the chrome ---------------------------------------------------------
+   Header, dock and tabs. These three are the only surfaces with a real
+   backdrop-filter, because these three really do have content scrolling
+   underneath. */
+[data-flow-root] [data-flow-chrome] {
+  background: rgba(250, 246, 238, 0.74);
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.66);
+  border-radius: var(--g-r-lg);
+  box-shadow: var(--p-shadow-2);
+}
+
+/* The header is docked to the top edge, so it is only rounded underneath --
+   a floating pill at the top of the page leaves two slivers of wash above it
+   and reads as a card that has slipped. */
+[data-flow-root] [data-flow-chrome='header'] {
+  border-radius: 0 0 var(--g-r-lg) var(--g-r-lg);
+  border-top: 0;
+  box-shadow: var(--p-shadow-1);
+}
+
+/* ---- motion -------------------------------------------------------------
+   One entry animation for a whole card list, staggered by index, and nothing
+   else. Anything longer than 260ms on a menu is a menu that feels slow. */
+@keyframes g-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+[data-flow-root] .g-rise {
+  animation: g-rise 260ms var(--p-ease) both;
+}
 
 /* =========================================================================
    Design tokens for Tailwind utilities.

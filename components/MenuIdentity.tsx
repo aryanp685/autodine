@@ -85,7 +85,7 @@ export function MenuIdentity({
   if (bannerUrl) {
     return (
       <header className="relative">
-        <div className="relative h-[196px] w-full overflow-hidden bg-gink-12">
+        <div className="relative h-[188px] w-full overflow-hidden rounded-b-[22px] bg-gink-12">
           {/* Sized by the frame, not by the intrinsic image: a portrait phone
               photo used as a banner would otherwise be taller than the menu. */}
           <Image
@@ -101,7 +101,7 @@ export function MenuIdentity({
               so the top of the picture keeps its colour and only the text
               corner is darkened. */}
           <div
-            className="absolute inset-0 bg-linear-to-t from-[rgb(12_11_9/0.86)] via-[rgb(12_11_9/0.3)] to-transparent"
+            className="absolute inset-0 bg-linear-to-t from-[rgb(12_11_9/0.82)] via-[rgb(12_11_9/0.24)] to-transparent"
             aria-hidden="true"
           />
         </div>
@@ -138,30 +138,36 @@ export function MenuIdentity({
      the brand mark, so a restaurant with no photograph still gets something
      that looks drawn for it. */
   return (
-    <header className="px-4 pt-7 pb-5">
-      <div className="mx-auto flex w-full max-w-[720px] items-center gap-4">
-        <div className="grid size-14 shrink-0 place-items-center rounded-full bg-accent-soft ring-1 ring-[var(--p-accent)]/22">
-          {logoUrl ? (
-            <Image src={logoUrl} alt="" width={56} height={56} className="size-14 rounded-full object-cover" />
-          ) : (
-            <span aria-hidden="true" className="text-[17px] font-semibold tracking-[0.02em] text-[var(--p-accent)]">
-              {monogram}
-            </span>
-          )}
-        </div>
+    /* The restaurant, as a card. It is the first thing on the screen and the
+       only place the guest is told where they are -- so it gets the flow's
+       panel treatment rather than floating loose on the wash, which made the
+       name look like a heading that had lost its page. */
+    <header className="px-4 pt-4 pb-1">
+      <div data-venue-card="" className="g-card mx-auto w-full max-w-[720px] p-3.5">
+        <div className="flex items-center gap-3.5">
+          <div className="grid size-12 shrink-0 place-items-center rounded-full bg-white/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] ring-1 ring-[var(--p-accent)]/25">
+            {logoUrl ? (
+              <Image src={logoUrl} alt="" width={48} height={48} className="size-12 rounded-full object-cover" />
+            ) : (
+              <span aria-hidden="true" className="text-[15px] font-semibold tracking-[0.02em] text-[var(--p-accent)]">
+                {monogram}
+              </span>
+            )}
+          </div>
 
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-[27px] leading-tight font-semibold tracking-[-0.025em] text-gink">
-            {name}
-          </h1>
-          {line && (
-            <div className="mt-1 truncate text-[11px] font-medium tracking-[0.1em] text-gink-46 uppercase">
-              {line}
-            </div>
-          )}
-        </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-[22px] leading-tight font-semibold tracking-[-0.025em] text-gink">
+              {name}
+            </h1>
+            {line && (
+              <div className="mt-1 truncate text-[10.5px] font-medium tracking-[0.11em] text-gink-46 uppercase">
+                {line}
+              </div>
+            )}
+          </div>
 
-        {tableLabel && <TableChip label={tableLabel} />}
+          {tableLabel && <TableChip label={tableLabel} />}
+        </div>
       </div>
     </header>
   );
@@ -182,7 +188,9 @@ function TableChip({ label, onPhoto }: { label: string; onPhoto?: boolean }) {
         /* On a photograph the chip has to survive whatever was uploaded, so it
            is a frosted white pill with dark type rather than a paper-coloured
            one that might be the same value as the banner behind it. */
-        onPhoto ? 'bg-white/15 text-white backdrop-blur-md ring-1 ring-white/25' : 'bg-accent-soft text-[var(--p-accent)]',
+        onPhoto
+          ? 'bg-white/18 text-white backdrop-blur-md ring-1 ring-white/30'
+          : 'bg-[var(--p-accent-soft)] text-[var(--p-accent)] ring-1 ring-[var(--p-accent)]/18',
       ].join(' ')}
     >
       <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />

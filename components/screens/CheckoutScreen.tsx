@@ -71,11 +71,11 @@ export function Checkout({
       docked={canOrder}
     >
       <header className="px-4 pt-6 pb-4">
-        <p className="text-[10.5px] font-semibold tracking-[0.12em] text-gink-46 uppercase">Pay</p>
-        <h1 className="mt-1.5 text-[27px] leading-tight font-semibold tracking-[-0.025em] text-gink">Checkout</h1>
+        <p className="g-eyebrow">Pay</p>
+        <h1 className="g-display mt-1.5">Checkout</h1>
         {/* The count appears once the stored cart has been read. Until then
             it would read "0 items" over an order that is still loading. */}
-        <p className="mt-1.5 text-[13.5px] leading-[1.55] text-gink-64">
+        <p className="g-lede mt-1.5">
           {cart.ready && cart.count > 0
             ? `${cart.count} ${cart.count === 1 ? 'item' : 'items'} · the kitchen starts as soon as you place it.`
             : 'Nothing to order yet — add a dish from the menu first.'}
@@ -107,13 +107,13 @@ export function Checkout({
             before it can be paid for, so the screen states the one thing that
             will happen and says plainly what comes next.
           */}
-          <h2 className="mb-2 text-[11px] font-semibold tracking-[0.1em] text-gink-46 uppercase">How you will pay</h2>
+          <h2 className="g-eyebrow mb-2">How you will pay</h2>
 
-          <div data-co-pay="" className="rounded-2xl border border-hair-strong bg-card px-4 py-4">
+          <div data-co-pay="" className="g-panel px-4 py-4">
             <div className="flex items-center gap-3">
               {/* A drawn mark, not a tick: a tick would say "paid", and nothing
                   has been paid on this screen. */}
-              <span aria-hidden="true" className="grid size-8 place-items-center rounded-full bg-accent-soft">
+              <span aria-hidden="true" className="grid size-8 place-items-center rounded-full bg-[var(--p-accent-soft)] ring-1 ring-[var(--p-accent)]/20">
                 <span className="size-2 rounded-full bg-[var(--p-accent)]" />
               </span>
               <div className="flex flex-col leading-tight">
@@ -133,8 +133,8 @@ export function Checkout({
             </p>
           </div>
 
-          <h2 className="mt-5 mb-2 text-[11px] font-semibold tracking-[0.1em] text-gink-46 uppercase">Your order</h2>
-          <ul className="divide-y divide-hair rounded-2xl border border-hair bg-card px-4">
+          <h2 className="g-eyebrow mt-5 mb-2">Your order</h2>
+          <ul className="g-card divide-y divide-hair px-4">
             {priced.lines.map((l) => (
               // Keyed by portion as well as item: two portions of one dish
               // are two rows, and keying only by item made them collide.
@@ -172,7 +172,7 @@ export function Checkout({
               ordered). Dropping it silently left the guest looking at a total
               that had quietly got smaller, with no idea why. */}
           {priced.unavailableIds.length > 0 && (
-            <div role="status" className="mt-3 rounded-2xl bg-accent-soft px-4 py-3 text-[12.5px] leading-[1.55] text-gink-80">
+            <div role="status" className="g-card mt-3 bg-accent-soft px-4 py-3 text-[12.5px] leading-[1.55] text-gink-80">
               {priced.unavailableIds.length === 1
                 ? 'One dish has sold out since you added it, so it is not in this bill.'
                 : `${priced.unavailableIds.length} dishes have sold out since you added them, so they are not in this bill.`}{' '}
@@ -183,7 +183,7 @@ export function Checkout({
           )}
 
           {priced.staleVariantIds.length > 0 && (
-            <div role="status" className="mt-3 rounded-2xl bg-accent-soft px-4 py-3 text-[12.5px] leading-[1.55] text-gink-80">
+            <div role="status" className="g-card mt-3 bg-accent-soft px-4 py-3 text-[12.5px] leading-[1.55] text-gink-80">
               A portion you picked is no longer on the menu, so that dish is priced at the
               menu price. Check the bill before you place it.
             </div>
@@ -191,7 +191,7 @@ export function Checkout({
 
           <div className="mt-5">
             <label className="block">
-              <span className="mb-1.5 block text-[11px] font-semibold tracking-[0.09em] text-gink-46 uppercase">
+              <span className="g-eyebrow mb-1.5 block">
                 Anything the kitchen should know?
               </span>
               <textarea
@@ -199,7 +199,7 @@ export function Checkout({
                 rows={2}
                 maxLength={300}
                 placeholder="No onion in the raita, less chilli…"
-                className="w-full resize-none rounded-xl border border-hair-strong bg-card px-3 py-2.5 text-[14px] text-gink placeholder:text-gink-28 focus:border-[var(--p-accent)] focus:ring-2 focus:ring-[var(--p-accent)]/20 focus:outline-none"
+                className="w-full resize-none rounded-[16px] border border-white/70 bg-white/60 px-3.5 py-3 text-[14px] text-gink shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] placeholder:text-gink-28 focus:border-[color-mix(in_oklab,var(--p-accent)_45%,transparent)] focus:bg-white/90 focus:outline-none"
               />
               <span className="mt-1.5 block text-[11.5px] leading-[1.5] text-gink-46">
                 A note is read by the kitchen, not a special instruction the bill is priced
@@ -208,8 +208,8 @@ export function Checkout({
             </label>
           </div>
 
-          <section className="mt-5 rounded-2xl border border-hair-strong bg-card px-4 py-4">
-            <h2 className="mb-1 text-[11px] font-semibold tracking-[0.1em] text-gink-46 uppercase">Bill</h2>
+          <section className="g-panel mt-5 px-4 py-4">
+            <h2 className="g-eyebrow mb-1">Bill</h2>
             <dl className="text-[13.5px]">
               <div className="flex items-baseline justify-between py-1 text-gink-64">
                 <dt>Subtotal</dt>
@@ -238,10 +238,14 @@ export function Checkout({
             descendant of, and both Place order buttons have to go busy
             together or a second tap writes a second order. */}
         {canOrder && (
-          <div data-co-bar="" className="fixed inset-x-0 bottom-0 z-40">
+          <div
+            data-co-bar=""
+            className="fixed inset-x-0 z-40 px-3"
+            style={{ bottom: 'calc(12px + env(safe-area-inset-bottom))' }}
+          >
             <div
-              className="mx-auto flex w-full max-w-[720px] items-center gap-3 border-t border-hair bg-paper/95 px-4 py-3 backdrop-blur-xl"
-              style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}
+              data-flow-chrome="dock"
+              className="mx-auto flex w-full max-w-[720px] items-center gap-3 rounded-[22px] px-3 py-2.5"
             >
               <span className="flex flex-col leading-tight">
                 <span className="text-[10px] font-semibold tracking-[0.09em] text-gink-46 uppercase">Total payable</span>

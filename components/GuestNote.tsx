@@ -60,12 +60,16 @@ export function GuestNote({
   const currentIndex = steps ? STEPS.findIndex((step) => step.key === steps) : -1;
 
   return (
-    <div className="flex min-h-dvh flex-col bg-paper text-gink">
-      <header className="border-b border-hair">
+    /* data-flow-root as well as its own layout: this page is where a scanned
+       card lands, so it wears the same wash and the same glass as the menu it
+       opens. Without it the flow began with a flat page and then changed
+       surface at the first tap, which read as two different products. */
+    <div data-flow-root="" className="flex min-h-dvh flex-col text-gink">
+      <header data-flow-chrome="header" className="sticky top-0 z-20">
         <div className="mx-auto flex h-14 w-full max-w-[620px] items-center gap-4 px-5">
           <Link
             href="/"
-            className="text-[13px] font-semibold tracking-[0.14em] text-gink uppercase"
+            className="text-[12.5px] font-semibold tracking-[0.16em] text-gink uppercase"
           >
             AutoDine
           </Link>
@@ -114,13 +118,13 @@ export function GuestNote({
         {eyebrow ? (
           <p
             data-gnote-eyebrow=""
-            className="text-[10.5px] font-semibold tracking-[0.13em] text-gink-46 uppercase"
+            className="g-eyebrow"
           >
             {eyebrow}
           </p>
         ) : null}
 
-        <h1 className="mt-2.5 text-[30px] leading-[1.1] font-semibold tracking-[-0.03em] text-balance text-gink">
+        <h1 className="g-display mt-2.5 text-[30px]">
           {title}
         </h1>
 
@@ -171,7 +175,7 @@ export function GuestNoteCta({
   const className = [
     'inline-flex h-11 items-center justify-center rounded-full px-5 text-[13px] font-semibold transition active:scale-[0.99]',
     quiet
-      ? 'border border-hair-strong text-gink hover:bg-gink-07'
+      ? 'g-quiet'
       : 'g-primary',
   ].join(' ');
 

@@ -43,15 +43,19 @@ describe('accent palette', () => {
   it('falls back to the default instead of throwing on junk', () => {
     // The guest menu must never fail to render because a row carries a value
     // this build does not know about.
-    for (const junk of [null, undefined, '', 'neon', 42, {}, 'FOREST ']) {
+    for (const junk of [null, undefined, '', 'neon', 42, {}, 'GREY']) {
       expect(accentFrom(junk).key).toBe(DEFAULT_ACCENT);
     }
-    expect(accentFrom('maroon').key).toBe('maroon');
+    // Case and surrounding space are folded, so a stored row written by hand
+    // still resolves to the colour it names -- and the default is no longer
+    // the same key as the one this line checks, so a fallback cannot pass it.
+    expect(accentFrom(' MAROON ').key).toBe('maroon');
+    expect(accentFrom('terracotta').key).toBe('terracotta');
   });
 
   it('emits exactly the two variables the stylesheets consume', () => {
     expect(Object.keys(accentStyle('indigo')).sort()).toEqual(['--p-accent', '--p-accent-soft']);
-    expect(accentStyle('indigo')['--p-accent']).toBe('#3B4A6B');
+    expect(accentStyle('indigo')['--p-accent']).toBe('#37456B');
   });
 
   /**
