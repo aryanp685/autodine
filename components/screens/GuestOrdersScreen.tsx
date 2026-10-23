@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { GuestFlow } from '@/components/GuestFlow';
 import { GuestTabs } from '@/components/GuestTabs';
-import { accentStyle } from '@/lib/branding/palette';
+import { guestAccentStyle } from '@/lib/branding/palette';
 import {
   browserStorage,
   forgetLastOrder,
@@ -38,12 +38,10 @@ export function GuestOrdersScreen({
   slug,
   restaurantName,
   tableLabel,
-  accent,
 }: {
   slug?: string | null;
   restaurantName?: string | null;
   tableLabel?: string | null;
-  accent?: string;
 }) {
   const [state, setState] = useState<'checking' | 'none' | 'found'>('checking');
   const [order, setOrder] = useState<RememberedOrder | null>(null);
@@ -65,7 +63,7 @@ export function GuestOrdersScreen({
       /* Not a step in the flow: this is somewhere the tabs can take you. */
       venue={restaurantName}
       table={tableLabel}
-      style={accentStyle(accent)}
+      style={guestAccentStyle()}
       back={{ href: menuHref, label: 'Back to the menu' }}
       tabs={<GuestTabs slug={slug} active="orders" />}
     >

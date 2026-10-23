@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -77,6 +77,33 @@ describe('guest flow design system', () => {
     expect(css).toContain('@layer base {');
     const unlayeredLinkReset = /^a\s*\{[^}]*color:\s*inherit/m;
     expect(css).not.toMatch(unlayeredLinkReset);
+  });
+
+  it('gives every customer the same UI, whichever restaurant they are in', () => {
+    // The flow used to be painted with the restaurant's stored accent, so two
+    // restaurants rendered two different products. Nothing in the guest flow
+    // may read that column again: the colour comes from guestAccentStyle(),
+    // which takes no input.
+    const screens = readdirSync(new URL('../components/screens/', import.meta.url))
+      .filter((f) => f.endsWith('.tsx') && !f.endsWith('.test.tsx'))
+      .map((f) => [
+        f,
+        readFileSync(new URL(`../components/screens/${f}`, import.meta.url), 'utf8'),
+      ] as const);
+
+    expect(screens.length).toBeGreaterThan(5);
+    for (const [file, source] of screens) {
+      expect(source, `${file} reads a per-restaurant accent`).not.toMatch(
+        /restaurant\.accent|accentFrom\(|\.accent\)/,
+      );
+      expect(source, `${file} imports the old accentStyle`).not.toContain('accentStyle(');
+    }
+
+    // And the shared header/branding components, same rule.
+    for (const file of ['MenuIdentity.tsx', 'GuestFlow.tsx', 'GuestTabs.tsx']) {
+      const source = readFileSync(new URL(`../components/${file}`, import.meta.url), 'utf8');
+      expect(source, `${file} reads a per-restaurant accent`).not.toMatch(/restaurant\.accent/);
+    }
   });
 
   it('scopes every guest rule, so owner screens keep their white surface', () => {

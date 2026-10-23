@@ -5,8 +5,9 @@ import {
   ACCENT_KEYS,
   DEFAULT_ACCENT,
   PAPER,
+  GUEST_ACCENT,
   accentFrom,
-  accentStyle,
+  guestAccentStyle,
   contrast,
 } from './palette';
 
@@ -54,8 +55,23 @@ describe('accent palette', () => {
   });
 
   it('emits exactly the two variables the stylesheets consume', () => {
-    expect(Object.keys(accentStyle('indigo')).sort()).toEqual(['--p-accent', '--p-accent-soft']);
-    expect(accentStyle('indigo')['--p-accent']).toBe('#37456B');
+    expect(Object.keys(guestAccentStyle()).sort()).toEqual(['--p-accent', '--p-accent-soft']);
+  });
+
+  /**
+   * One look for every customer.
+   *
+   * The flow used to paint itself with `restaurants.accent`, so the same product
+   * appeared in a different colour at every restaurant -- and an owner
+   * comparing their menu against a screenshot could not tell a branding choice
+   * from a design change. guestAccentStyle() takes NO input: there is no
+   * argument through which a per-restaurant colour could get back in.
+   */
+  it('paints the same accent for every restaurant, and takes no input', () => {
+    expect(guestAccentStyle).toHaveLength(0);
+    expect(guestAccentStyle()['--p-accent']).toBe(accentFrom(GUEST_ACCENT).accent);
+    expect(guestAccentStyle()['--p-accent-soft']).toBe(accentFrom(GUEST_ACCENT).soft);
+    expect(GUEST_ACCENT).toBe(DEFAULT_ACCENT);
   });
 
   /**

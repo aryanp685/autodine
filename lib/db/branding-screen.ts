@@ -13,7 +13,6 @@
 
 import { getStaffContextDetailed } from '@/lib/db/staff';
 import { publicAssetUrl } from '@/lib/storage/assets';
-import { accentFrom } from '@/lib/branding/palette';
 
 export type BrandingScreenData = {
   role: string;
@@ -28,7 +27,6 @@ export type BrandingScreenData = {
   /** The stored path, needed to delete the object when replacing it. */
   logoPath: string | null;
   bannerPath: string | null;
-  accent: string;
   /** A few real dishes, so the preview shows this restaurant's own menu. */
   sampleDishes: { id: string; name: string; price: number; img: string | null }[];
   /** False when nothing is published: the preview then says so. */
@@ -51,7 +49,6 @@ export async function getBrandingScreenData(): Promise<BrandingScreenData | null
       bannerUrl: null,
       logoPath: null,
       bannerPath: null,
-      accent: 'forest',
       sampleDishes: [],
       hasPublishedMenu: false,
       blocked: staff.reason,
@@ -63,7 +60,7 @@ export async function getBrandingScreenData(): Promise<BrandingScreenData | null
   const [restaurant, menus, dishes] = await Promise.all([
     supabase
       .from('restaurants')
-      .select('logo_path, banner_path, accent')
+      .select('logo_path, banner_path')
       .eq('id', restaurantId)
       .maybeSingle(),
     supabase.from('menus').select('id, is_published').eq('restaurant_id', restaurantId),
@@ -78,7 +75,6 @@ export async function getBrandingScreenData(): Promise<BrandingScreenData | null
   const row = (restaurant.data ?? {}) as {
     logo_path?: string | null;
     banner_path?: string | null;
-    accent?: string | null;
   };
 
   return {
@@ -91,7 +87,6 @@ export async function getBrandingScreenData(): Promise<BrandingScreenData | null
     bannerPath: row.banner_path ?? null,
     logoUrl: publicAssetUrl(row.logo_path),
     bannerUrl: publicAssetUrl(row.banner_path),
-    accent: accentFrom(row.accent).key,
     sampleDishes: (dishes.data ?? []).map((d) => ({
       id: String(d.id),
       name: String(d.name),

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { DishPhoto } from '@/components/DishPhoto';
 import { GuestFlow } from '@/components/GuestFlow';
 import { GuestTabs } from '@/components/GuestTabs';
-import { accentStyle } from '@/lib/branding/palette';
+import { guestAccentStyle } from '@/lib/branding/palette';
 import { useCart } from '@/components/CartProvider';
 import { inr } from '@/lib/demo-data';
 import { VegMark } from '@/components/ui';
@@ -64,12 +64,9 @@ export function Cart({
   tableLabel,
   taxRateBps,
   items,
-  accent,
 }: {
   slug?: string;
   restaurantName?: string;
-  /** Palette key from the restaurant row; see lib/branding/palette.ts. */
-  accent?: string;
   /** The table a live session confirmed, when there is one. */
   tableLabel?: string | null;
   /** The restaurant's own rate. Without it the bill is priced at a sample. */
@@ -98,7 +95,7 @@ export function Cart({
   return (
     <GuestFlow
       step="cart"
-      style={accentStyle(accent)}
+      style={guestAccentStyle()}
       venue={restaurantName}
       table={tableLabel}
       back={{ href: withSlug('/menu'), label: 'Back to the menu' }}

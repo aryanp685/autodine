@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { CartProvider } from '@/components/CartProvider';
 import { GuestOrdersScreen } from '@/components/screens/GuestOrdersScreen';
-import { getGuestBranding } from '@/lib/db/branding';
 import { getCartScreenData } from '@/lib/db/cart-screen';
 import { loadTableAccess } from '@/lib/table-access';
 
@@ -29,21 +28,16 @@ export default async function GuestOrdersPage({
 }) {
   const { s } = await searchParams;
 
-  // The venue's name comes from the same read the cart uses; branding comes
-  // from its own narrow query. Neither can name a restaurant the guest has not
-  // already reached by slug.
-  const [access, branding, data] = await Promise.all([
-    loadTableAccess(s),
-    getGuestBranding(s),
-    getCartScreenData(s),
-  ]);
+  // The venue's name comes from the same read the cart uses. The branding
+  // query that used to sit here existed for the accent, and the guest flow no
+  // longer varies by restaurant: one design, every customer.
+  const [access, data] = await Promise.all([loadTableAccess(s), getCartScreenData(s)]);
 
   return (
     <CartProvider slug={s}>
       <GuestOrdersScreen
         slug={s}
         restaurantName={data?.restaurantName}
-        accent={branding.accent}
         /* Only a verified session names a table; a stale one names nothing
            rather than keeping a claim the QR gate would have dropped. */
         tableLabel={access.status === 'verified' ? access.tableLabel : null}

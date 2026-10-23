@@ -4,11 +4,10 @@ import { SignInPrompt } from '@/components/SignInPrompt';
 import { MenuIdentity } from '@/components/MenuIdentity';
 import type { OutletBar } from '@/lib/outlets';
 import type { BrandingScreenData } from '@/lib/db/branding-screen';
-import { ACCENTS, accentFrom } from '@/lib/branding/palette';
+import { guestAccentStyle } from '@/lib/branding/palette';
 import {
   removeBannerAction,
   removeLogoAction,
-  saveAccentAction,
   uploadBannerAction,
   uploadLogoAction,
 } from '@/app/dashboard/branding/actions';
@@ -21,10 +20,21 @@ import { OwnerPage, PageHead, Panel, Card, btn } from '@/components/owner/chrome
  * WHAT THIS SCREEN IS FOR
  *
  * A guest's first two seconds on the menu are spent deciding whether this is
- * the restaurant they sat down in. The name, a mark, a photograph and one
- * accent colour are what answer that. Nothing here changes the layout -- the
- * menu is shared and stays shared -- so the whole task is four decisions, and
- * the screen is built to make them in that order: mark, banner, colour, look.
+ * the restaurant they sat down in. The name, a mark and a photograph are what
+ * answer that. Nothing here changes the layout or the colours -- the menu is
+ * shared and stays shared, and every restaurant's guests see the same design
+ * (lib/branding/palette.ts, guestAccentStyle) -- so the whole task is three
+ * decisions: mark, banner, and checking the result.
+ *
+ * THE ACCENT PICKER IS GONE, AND WHY
+ *
+ * It used to sit here, with six swatches and a Save button, and it repainted
+ * the guest menu. When the guest flow became one design for every customer
+ * that control stopped doing anything visible -- a colour an owner could
+ * choose, save, and never see. A control that changes nothing is worse than no
+ * control: it costs a decision and returns a lie. `restaurants.accent` still
+ * holds the old value, untouched, in case per-restaurant theming ever becomes
+ * a product decision rather than a side effect of plumbing.
  *
  * THE PREVIEW IS THE REAL HEADER
  *
@@ -65,7 +75,6 @@ export function BrandingScreen({
   const live = Boolean(data);
   const canEdit = Boolean(data?.canEdit);
   const disabled = !live || !canEdit;
-  const accent = accentFrom(data?.accent);
   const name = data?.name || 'Your restaurant';
 
   return (
@@ -73,7 +82,7 @@ export function BrandingScreen({
       <PageHead
         kicker="Menu branding"
         title={name}
-        meta="Your mark, a banner if you have one, and one accent colour. The menu layout is shared; these are the four things that make it yours."
+        meta="Your mark and a banner if you have one. The layout and the colours are shared, so every guest at every table reads the same menu."
       />
 
       {error && (
@@ -232,62 +241,6 @@ export function BrandingScreen({
           </p>
         </Panel>
 
-        {/* ------------------------------------------------------------- accent */}
-        <Panel
-          title="Accent colour"
-          meta={`${accent.key} in use`}
-          bodyClassName="px-4 py-4 sm:px-5"
-        >
-          <p className="m-0 max-w-[52ch] text-[12px] leading-[1.5] text-gink-46">
-            Used for buttons, the add control and the table badge. These six are the only options:
-            each one is checked to stay readable on paper and under white text.
-          </p>
-
-          <form action={saveAccentAction} className="mt-4">
-            <fieldset className="m-0 flex flex-wrap gap-2 border-0 p-0">
-              <legend className="sr-only">Accent colour</legend>
-              {ACCENTS.map((option) => {
-                const checked = option.key === accent.key;
-                return (
-                  <label
-                    key={option.key}
-                    data-swatch={checked ? 'on' : 'off'}
-                    className={[
-                      'relative grid size-[42px] cursor-pointer place-items-center rounded-full transition-[box-shadow,transform]',
-                      checked
-                        ? 'ring-2 ring-gink ring-offset-2'
-                        : 'ring-1 ring-hair-strong hover:scale-[1.04]',
-                      disabled ? 'pointer-events-none opacity-45' : '',
-                    ].join(' ')}
-                    style={{ backgroundColor: option.accent }}
-                    title={option.label}
-                  >
-                    <input
-                      type="radio"
-                      name="accent"
-                      value={option.key}
-                      defaultChecked={checked}
-                      disabled={disabled}
-                      className="absolute inset-0 size-full cursor-pointer opacity-0"
-                    />
-                    {checked ? (
-                      <span aria-hidden="true" className="text-[15px] leading-none text-white">
-                        ✓
-                      </span>
-                    ) : null}
-                    <span className="sr-only">{option.label}</span>
-                  </label>
-                );
-              })}
-            </fieldset>
-            <div className="mt-4">
-              <button type="submit" className={btn('solid', 'sm')} disabled={disabled}>
-                Save colour
-              </button>
-            </div>
-          </form>
-        </Panel>
-
         {/* ------------------------------------------------------------ preview */}
         <section aria-labelledby="branding-preview">
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
@@ -306,12 +259,10 @@ export function BrandingScreen({
 
           <Card
             className="bg-paper-deep px-4 py-6"
-            style={
-              {
-                ['--p-accent' as string]: accent.accent,
-                ['--p-accent-soft' as string]: accent.soft,
-              } as React.CSSProperties
-            }
+            /* The flow's own colours, not this restaurant's row: the preview
+               has to show what a guest will actually see, and that is the same
+               for every restaurant. */
+            style={guestAccentStyle() as React.CSSProperties}
           >
             {/* A phone, at phone width. Narrower and the header wraps differently
                 from the real thing; wider and it stops being a preview. */}
@@ -345,7 +296,7 @@ export function BrandingScreen({
 
                 {(data?.sampleDishes ?? []).length === 0 && (
                   <p className="m-0 py-2 text-center text-[11.5px] leading-[1.5] text-gink-46">
-                    Add a dish and it appears here, in your colours.
+                    Add a dish and it appears here.
                   </p>
                 )}
               </div>

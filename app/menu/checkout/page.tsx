@@ -3,7 +3,6 @@ import { CartProvider } from '@/components/CartProvider';
 import { Checkout } from '@/components/screens/CheckoutScreen';
 import { TableGateScreen } from '@/components/screens/TableGateScreen';
 import { getCartScreenData } from '@/lib/db/cart-screen';
-import { getGuestBranding } from '@/lib/db/branding';
 import { onlinePaymentsConfigured } from '@/lib/payments/razorpay';
 import { loadTableAccess, verifyAgainHref } from '@/lib/table-access';
 
@@ -39,14 +38,13 @@ export default async function CheckoutPage({
     return <TableGateScreen reason="stale" verifyHref={verifyAgainHref(access)} />;
   }
 
-  const [data, branding] = await Promise.all([getCartScreenData(s), getGuestBranding(s)]);
+  const data = await getCartScreenData(s);
 
   return (
     <CartProvider slug={s}>
       <Checkout
         slug={s}
         restaurantName={data?.restaurantName}
-        accent={branding.accent}
         tableLabel={access.status === 'verified' ? access.tableLabel : null}
         taxRateBps={data?.taxRateBps}
         items={data?.items ?? []}

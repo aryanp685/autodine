@@ -4,7 +4,7 @@ import { DishPhoto } from '@/components/DishPhoto';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import type { BrandingScreenData } from '@/lib/db/branding-screen';
 import type { MenuScreenData } from '@/lib/db/menu-screen';
-import { accentFrom } from '@/lib/branding/palette';
+import { guestAccentStyle } from '@/lib/branding/palette';
 import { inr } from '@/lib/demo-data';
 import { btn } from '@/components/owner/chrome';
 
@@ -43,20 +43,16 @@ export function BrandingPreview({
     );
   }
 
-  const accent = accentFrom(data?.accent);
   const restaurant = menu?.restaurant;
   const name = restaurant?.name ?? data?.name ?? 'Your restaurant';
 
   return (
     <div
-      // The accent belongs to the previewed restaurant, not to the staff
-      // surface around it, so it is set here and nowhere higher.
-      style={
-        {
-          ['--p-accent' as string]: accent.accent,
-          ['--p-accent-soft' as string]: accent.soft,
-        } as React.CSSProperties
-      }
+      /* The guest flow's own colours, not the restaurant's row. The preview is
+         a promise about what a guest will see, and every guest now sees one
+         design -- so a preview painted with a stored accent would be promising
+         something the menu no longer does. */
+      style={guestAccentStyle() as React.CSSProperties}
       className="min-h-dvh bg-paper-deep text-gink antialiased"
     >
       <header className="sticky top-0 z-10 border-b border-hair bg-paper/92 backdrop-blur-xl">
