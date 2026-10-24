@@ -12,7 +12,17 @@ import {
   uploadLogoAction,
 } from '@/app/dashboard/branding/actions';
 import { inr } from '@/lib/demo-data';
-import { OwnerPage, PageHead, Panel, Card, btn } from '@/components/owner/chrome';
+import {
+  BtnLink,
+  Card,
+  Notice,
+  OwnerPage,
+  PageHead,
+  Panel,
+  SectionHead,
+  Tag,
+  btn,
+} from '@/components/owner/chrome';
 import { SubmitButton } from '@/components/owner/SubmitButton';
 import { ImagePick } from '@/components/owner/ImagePick';
 
@@ -27,6 +37,23 @@ import { ImagePick } from '@/components/owner/ImagePick';
  * shared and stays shared, and every restaurant's guests see the same design
  * (lib/branding/palette.ts, guestAccentStyle) -- so the whole task is three
  * decisions: mark, banner, and checking the result.
+ *
+ * WHAT THE AUDIT FOUND (2026-10-24)
+ *
+ *   - Four hand-drawn callouts (failed save, saved, no database, read-only) in
+ *     the same three reds the rest of the product had already replaced with the
+ *     kit's Notice.
+ *   - The screen's PRIMARY control was a `rounded-full h-8` pill: a status
+ *     shape at a height nothing else on the surface uses, next to a rectangular
+ *     Upload button on the same line. Fixed in owner/ImagePick.tsx.
+ *   - Two buttons both called "Upload", on the same page, writing two different
+ *     things.
+ *   - `slug` was loaded by the data loader and never used, so the screen
+ *     promised "this is what they see" with no way to reach what they see. It
+ *     now offers the real guest menu, in a new tab.
+ *   - The preview's dish rows ended in a copper circle with a "+" in it:
+ *     pixel-for-pixel the guest menu's add button, and not a control. The row
+ *     is now explicitly inert and says so once.
  *
  * THE ACCENT PICKER IS GONE, AND WHY
  *
@@ -76,56 +103,74 @@ export function BrandingScreen({
   const disabled = !live || !canEdit;
   const name = data?.name || 'Your restaurant';
 
+  // The real guest page for this restaurant. Built from the loaded slug, never
+  // from a query string on this side -- and `data.slug` only exists when the
+  // caller has a restaurant of their own.
+  const guestMenuHref = live && data?.slug ? `/menu?s=${encodeURIComponent(data.slug)}` : null;
+
   return (
     <OwnerPage active="branding" outlet={outlet}>
       <PageHead
         kicker="Menu branding"
         title={name}
-        meta="Your mark and a banner if you have one. The layout and the colours are shared, so every guest at every table reads the same menu."
+        meta="Your mark and a banner, on the guest menu. The layout and the colours are shared, so every guest at every table reads the same menu."
+        actions={
+          live ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {guestMenuHref ? (
+                <a
+                  href={guestMenuHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={btn('ghost', 'md')}
+                >
+                  Open guest menu
+                </a>
+              ) : null}
+              <BtnLink href="/dashboard/branding/preview" tone="solid" size="md">
+                Preview as a guest
+              </BtnLink>
+            </div>
+          ) : null
+        }
       />
 
-      {error && (
-        <div
-          role="alert"
-          className="mb-3 rounded-[12px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-4 py-3"
-        >
-          <strong className="text-[12.5px] text-[var(--alert)]">Nothing was saved.</strong>
-          <p className="mt-1 text-[12.5px] leading-[1.5] text-gink-64">{error}</p>
-        </div>
-      )}
-      {notice && (
-        <div
-          role="status"
-          className="mb-3 rounded-[12px] border border-[var(--p-accent)]/25 bg-accent-soft px-4 py-2.5"
-        >
-          <strong className="text-[12.5px] text-gink">Saved.</strong>{' '}
-          <span className="text-[12.5px] text-gink-64">{notice}</span>
-        </div>
-      )}
+      {error ? (
+        <Notice tone="due" role="alert" label="Nothing was saved.">
+          {error}
+        </Notice>
+      ) : null}
+      {notice ? (
+        <Notice tone="accent" role="status" label="Saved.">
+          {notice}
+        </Notice>
+      ) : null}
 
-      {!live && (
-        <div className="mb-3 rounded-[12px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-4 py-3 text-[11.5px] leading-[1.55] text-gink-64">
-          <strong className="font-semibold text-gink">The database is not connected.</strong> There is
-          no restaurant to brand, so these controls cannot save. Nothing here is sample data.
-        </div>
-      )}
+      {!live ? (
+        <Notice tone="due" label="The database is not connected.">
+          There is no restaurant to brand, so these controls cannot save. Nothing here is sample
+          data.
+        </Notice>
+      ) : null}
 
-      {live && !canEdit && (
-        <div className="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-[12px] border border-hair bg-paper-deep px-4 py-3 text-[11.5px] leading-[1.55] text-gink-64">
+      {live && !canEdit ? (
+        <Notice tone="plain" label={<Tag tone="neutral">{data?.role || 'staff'}</Tag>}>
           <strong className="font-semibold text-gink">Read-only for your role.</strong> Branding is
           changed by the owner or a manager.
-        </div>
-      )}
+        </Notice>
+      ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
-        {/* --------------------------------------------------------------- logo */}
-        <Panel title="Logo" meta="Shown beside your name" bodyClassName="px-4 py-4 sm:px-5">
-          <div className="flex items-start justify-between gap-4">
-            <p className="m-0 max-w-[38ch] text-[12.5px] leading-[1.5] text-gink-46">
-              Shown in a circle next to your name. A square image works best; we crop nothing.
-            </p>
-
-            {/* The mark at the size a guest sees it, not a thumbnail. */}
+      <div className="grid gap-4 lg:grid-cols-2 lg:items-stretch">
+        {/* --------------------------------------------------------------- logo
+            Both asset panels have the same anatomy -- the artefact at the size a
+            guest sees it, one line of copy, then the controls -- so the two sit
+            side by side without one looking like an afterthought. */}
+        <Panel
+          title="Logo"
+          meta={data?.logoUrl ? 'Set' : 'Not set'}
+          bodyClassName="flex flex-1 flex-col px-4 py-4 sm:px-5"
+        >
+          <div className="flex items-start gap-4">
             <div className="shrink-0">
               {data?.logoUrl ? (
                 <Image
@@ -144,21 +189,27 @@ export function BrandingScreen({
                 </span>
               )}
             </div>
+            <p className="m-0 max-w-[34ch] text-[12.5px] leading-[1.55] text-gink-46">
+              Shown in a circle next to your name at the top of the guest menu. A square image works
+              best; nothing is cropped away.
+              {!data?.logoUrl ? ' Until one is uploaded, the circle carries your initials.' : ''}
+            </p>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-start gap-2">
+          <div className="mt-auto flex flex-wrap items-start gap-2 pt-4">
             <ImagePick
               kind="logo"
               name="logo"
               action={uploadLogoAction}
               label="Choose a logo"
               replaceLabel="Replace logo"
+              uploadLabel="Upload logo"
               hint="JPG, PNG or WebP · up to 2 MB"
               disabled={disabled}
               current={Boolean(data?.logoUrl)}
             />
 
-            {data?.logoUrl && (
+            {data?.logoUrl ? (
               <form action={removeLogoAction}>
                 <SubmitButton
                   tone="quiet"
@@ -169,18 +220,17 @@ export function BrandingScreen({
                   Remove logo
                 </SubmitButton>
               </form>
-            )}
+            ) : null}
           </div>
         </Panel>
 
         {/* ------------------------------------------------------------- banner */}
-        <Panel title="Banner" meta="Optional" bodyClassName="px-4 py-4 sm:px-5">
-          <p className="m-0 max-w-[46ch] text-[12.5px] leading-[1.5] text-gink-46">
-            A wide photo of the room or a signature dish. Skip it and the header uses your paper
-            background instead — both are finished designs.
-          </p>
-
-          <div className="relative mt-3 aspect-[16/7] w-full overflow-hidden rounded-[10px] border border-hair bg-paper-deep">
+        <Panel
+          title="Banner"
+          meta={data?.bannerUrl ? 'Set' : 'Optional'}
+          bodyClassName="flex flex-1 flex-col px-4 py-4 sm:px-5"
+        >
+          <div className="relative aspect-[16/7] w-full overflow-hidden rounded-[10px] border border-hair bg-paper-deep">
             {data?.bannerUrl ? (
               <Image
                 src={data.bannerUrl}
@@ -192,26 +242,32 @@ export function BrandingScreen({
             ) : (
               <span
                 aria-hidden="true"
-                className="grid size-full place-items-center text-[11.5px] text-gink-46"
+                className="grid size-full place-items-center px-4 text-center text-[11.5px] leading-[1.4] text-gink-46"
               >
-                No banner — paper header
+                No banner — the header uses your paper background instead
               </span>
             )}
           </div>
 
-          <div className="mt-3 flex flex-wrap items-start gap-2">
+          <p className="mt-2.5 max-w-[46ch] text-[12.5px] leading-[1.55] text-gink-46">
+            A wide photo of the room or a signature dish. Skip it and the header uses paper instead —
+            both are finished designs, and neither leaves a hole.
+          </p>
+
+          <div className="mt-auto flex flex-wrap items-start gap-2 pt-4">
             <ImagePick
               kind="banner"
               name="banner"
               action={uploadBannerAction}
               label="Choose a banner"
               replaceLabel="Replace banner"
+              uploadLabel="Upload banner"
               hint="JPG, PNG or WebP · up to 4 MB · wide, at least 1200px across"
               disabled={disabled}
               current={Boolean(data?.bannerUrl)}
             />
 
-            {data?.bannerUrl && (
+            {data?.bannerUrl ? (
               <form action={removeBannerAction}>
                 <SubmitButton
                   tone="quiet"
@@ -222,85 +278,118 @@ export function BrandingScreen({
                   Remove banner
                 </SubmitButton>
               </form>
-            )}
+            ) : null}
           </div>
         </Panel>
+      </div>
 
-        {/* ------------------------------------------------------------ preview */}
-        <section aria-labelledby="branding-preview" className="lg:col-span-2">
-          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-            <div className="flex items-baseline gap-2.5">
-              <h2 id="branding-preview" className="text-[13px] font-semibold text-gink">
-                Preview
-              </h2>
-              <span className="text-[12.5px] text-gink-46">The real header, with your data.</span>
-            </div>
-            {live && (
-              <Link href="/dashboard/branding/preview" className={btn('ghost', 'sm')}>
+      {/* -------------------------------------------------------------- preview */}
+      <section aria-labelledby="branding-preview" className="mt-6">
+        <SectionHead
+          title={<span id="branding-preview">Preview</span>}
+          meta="The real header, with your data — not a mock-up"
+          action={
+            live ? (
+              <BtnLink href="/dashboard/branding/preview" tone="ghost" size="sm">
                 Open full preview
-              </Link>
-            )}
-          </div>
+              </BtnLink>
+            ) : null
+          }
+        />
 
-          <Card
-            className="bg-paper-deep px-4 py-6"
-            /* The flow's own colours, not this restaurant's row: the preview
-               has to show what a guest will actually see, and that is the same
-               for every restaurant. */
-            style={guestAccentStyle() as React.CSSProperties}
-          >
-            {/* A phone, at phone width. Narrower and the header wraps differently
-                from the real thing; wider and it stops being a preview. */}
-            <div className="mx-auto w-full max-w-[340px] overflow-hidden rounded-[18px] border border-hair-strong bg-card">
-              <MenuIdentity
-                name={name}
-                tagline={data?.tagline}
-                logoUrl={data?.logoUrl}
-                bannerUrl={data?.bannerUrl}
-                tableLabel="Table 7"
-              />
+        <Card
+          className="bg-paper-deep px-4 py-6"
+          /* The flow's own colours, not this restaurant's row: the preview has
+             to show what a guest will actually see, and that is the same for
+             every restaurant. */
+          style={guestAccentStyle() as React.CSSProperties}
+        >
+          {/* A phone, at phone width. Narrower and the header wraps differently
+              from the real thing; wider and it stops being a preview. */}
+          <div className="mx-auto w-full max-w-[340px] overflow-hidden rounded-[18px] border border-hair-strong bg-card">
+            <MenuIdentity
+              name={name}
+              tagline={data?.tagline}
+              logoUrl={data?.logoUrl}
+              bannerUrl={data?.bannerUrl}
+              tableLabel="Table 7"
+            />
 
-              <div className="px-4 py-3">
-                {(data?.sampleDishes ?? []).slice(0, 3).map((dish) => (
-                  <div
-                    key={dish.id}
-                    className="flex items-center justify-between gap-3 border-b border-hair py-2 last:border-b-0"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate text-[12.5px] font-medium text-gink">{dish.name}</div>
-                      <div className="text-[11.5px] text-gink-46 tabular-nums">{inr(dish.price)}</div>
-                    </div>
-                    <span
-                      aria-hidden="true"
-                      className="grid size-6 shrink-0 place-items-center rounded-full bg-[var(--p-accent)] text-[15px] leading-none text-white"
-                    >
-                      +
-                    </span>
+            {/*
+             * Inert on purpose, and marked as such.
+             *
+             * This block wears the guest menu's dish rows -- including the
+             * copper "+" -- and none of it is a control. Without
+             * `pointer-events-none` and `aria-hidden` the row is
+             * pixel-for-pixel the real add button, which is the exact class of
+             * fake control this product has had to remove before.
+             */}
+            <div aria-hidden="true" className="pointer-events-none select-none px-4 py-3">
+              {(data?.sampleDishes ?? []).slice(0, 3).map((dish) => (
+                <div
+                  key={dish.id}
+                  className="flex items-center justify-between gap-3 border-b border-hair py-2 last:border-b-0"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-[12.5px] font-medium text-gink">{dish.name}</div>
+                    <div className="text-[11.5px] text-gink-46 tabular-nums">{inr(dish.price)}</div>
                   </div>
-                ))}
+                  <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[var(--p-accent)] text-[15px] leading-none text-white">
+                    +
+                  </span>
+                </div>
+              ))}
 
-                {(data?.sampleDishes ?? []).length === 0 && (
-                  <p className="m-0 py-2 text-center text-[11.5px] leading-[1.5] text-gink-46">
-                    Add a dish and it appears here.
-                  </p>
-                )}
-              </div>
+              {(data?.sampleDishes ?? []).length === 0 ? (
+                <p className="m-0 py-2 text-center text-[11.5px] leading-[1.5] text-gink-46">
+                  Add a dish and it appears here.
+                </p>
+              ) : null}
             </div>
-          </Card>
+          </div>
+        </Card>
 
-          {live && !data?.hasPublishedMenu && (
-            <p className="mt-2 text-[11.5px] leading-[1.5] text-gink-46">
-              Nothing is published yet, so guests still see a closed menu. Publish from{' '}
-              <Link
-                href="/dashboard/menus"
-                className="font-medium text-gink underline decoration-hair-strong underline-offset-2"
-              >
-                Menus
-              </Link>{' '}
-              when you are ready.
-            </p>
-          )}
-        </section>
+        <p className="mt-2 text-[11.5px] leading-[1.55] text-gink-46">
+          The header above is the real component, so it cannot drift from the menu. The dishes under
+          it are a sample and are not tappable here — open the guest menu to try a real row.
+        </p>
+
+        {live && !data?.hasPublishedMenu ? (
+          <Notice
+            tone="due"
+            label="Nothing is published yet."
+            className="mt-3 mb-0"
+            action={
+              <Link href="/dashboard/menus" className={btn('ghost', 'sm')}>
+                Go to Menus
+              </Link>
+            }
+          >
+            Guests still see a closed menu, so none of this is visible to them yet. Publish a menu
+            when you are ready.
+          </Notice>
+        ) : null}
+      </section>
+
+      {/* ------------------------------------------------------------- the notes
+          One short list, because the questions this screen raises are always the
+          same three: what changes, and does the name live here? */}
+      <div className="mt-4 grid gap-2.5 lg:grid-cols-2">
+        <Notice tone="plain" label="Where these appear">
+          The logo and the banner are the top of the guest menu, and nothing else — not the bill, not
+          the kitchen board. Name and tagline live in{' '}
+          <Link
+            href="/dashboard/settings"
+            className="font-medium text-gink underline decoration-hair-strong underline-offset-2"
+          >
+            Settings
+          </Link>
+          .
+        </Notice>
+        <Notice tone="plain" label="Shared on purpose">
+          Every restaurant&apos;s menu looks the same: same layout, same colours, same type. That is
+          what lets a guest order at any table in any restaurant without learning a new screen.
+        </Notice>
       </div>
     </OwnerPage>
   );

@@ -41,6 +41,7 @@ export function ImagePick({
   hint,
   disabled = false,
   current,
+  uploadLabel = 'Upload',
 }: {
   /** `logo` or `banner`: decides the size limit and the wording. */
   kind: Extract<AssetKind, 'logo' | 'banner'>;
@@ -54,6 +55,12 @@ export function ImagePick({
   disabled?: boolean;
   /** Whether one is already set -- changes the label, not the behaviour. */
   current?: boolean;
+  /**
+   * The word on the submit button. Two of these render on one screen, and two
+   * buttons called "Upload" are two identical names for two different writes
+   * to a screen reader, to voice control, and to anybody skimming.
+   */
+  uploadLabel?: string;
 }) {
   const [picked, setPicked] = useState<{ name: string; size: number } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -90,11 +97,21 @@ export function ImagePick({
 
   return (
     <form action={action} className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+      {/*
+       * The picker wears the kit's button geometry, not a pill.
+       *
+       * It was `rounded-full h-8` -- a status shape at a height no other
+       * control uses -- sitting next to a 36px rectangular Upload button on
+       * the same line, so the row read as a chip beside a button. Pills on this
+       * surface mean "a state", and this is a control. 10px radius, 36px, the
+       * copper focus ring: the same object as every other action.
+       */}
       <label
         className={[
-          'relative inline-flex h-8 cursor-pointer items-center rounded-full border border-hair-strong px-3',
-          'text-[12.5px] font-medium text-gink transition-colors hover:border-gink-28 hover:bg-gink-07',
-          'focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-gink',
+          'relative inline-flex h-9 cursor-pointer items-center rounded-[10px] border border-hair-strong bg-card px-3',
+          'text-[12.5px] font-medium text-gink shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition-colors',
+          'hover:border-gink-28 hover:bg-white',
+          'focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--p-accent)]',
           disabled ? 'pointer-events-none opacity-45' : '',
         ].join(' ')}
       >
@@ -120,7 +137,7 @@ export function ImagePick({
        * an empty submit in the browser, and the server validates regardless.
        */}
       <SubmitButton pendingLabel="Uploading…" disabled={disabled || Boolean(problem)}>
-        Upload
+        {uploadLabel}
       </SubmitButton>
 
       {problem ? (

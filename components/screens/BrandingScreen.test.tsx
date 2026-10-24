@@ -37,9 +37,29 @@ function data(over: Partial<BrandingScreenData> = {}): BrandingScreenData {
 const render = (d: BrandingScreenData | null) => renderToStaticMarkup(<BrandingScreen data={d} />);
 
 describe('BrandingScreen', () => {
-  it('gives the preview the full width of the page', () => {
+  it('keeps the preview out of the two-column asset grid', () => {
+    // It used to be a `lg:col-span-2` child of that grid, so half the row beside
+    // it was empty while the thing being previewed was 340px wide. It is a
+    // section after the grid now, at the page's own width.
     const html = render(data());
-    expect(html).toContain('lg:col-span-2');
+    const gridAt = html.indexOf('<div class="grid gap-4 lg:grid-cols-2');
+    expect(gridAt).toBeGreaterThan(-1);
+
+    // Where that grid closes, by matching its own div tags.
+    let depth = 0;
+    let closesAt = -1;
+    const re = /<div\b|<\/div>/g;
+    re.lastIndex = gridAt;
+    for (let m = re.exec(html); m; m = re.exec(html)) {
+      depth += m[0] === '</div>' ? -1 : 1;
+      if (depth === 0) {
+        closesAt = m.index;
+        break;
+      }
+    }
+
+    expect(closesAt).toBeGreaterThan(gridAt);
+    expect(html.indexOf('aria-labelledby="branding-preview"')).toBeGreaterThan(closesAt);
   });
 
   it('names each picker by the slot it fills', () => {
@@ -64,7 +84,7 @@ describe('BrandingScreen', () => {
 
   it('leaves the upload reachable when the bundle never arrives', () => {
     const html = render(data());
-    const uploads = html.match(/<button[^>]*>Upload<\/button>/g) ?? [];
+    const uploads = html.match(/<button[^>]*>Upload (?:logo|banner)<\/button>/g) ?? [];
     expect(uploads.length).toBe(2);
     for (const button of uploads) expect(button).not.toMatch(/\sdisabled=""/);
   });
@@ -75,5 +95,84 @@ describe('BrandingScreen', () => {
     const inputs = html.match(/<input[^>]*data-image-pick="[a-z]+"[^>]*>/g) ?? [];
     expect(inputs.length).toBe(2);
     for (const input of inputs) expect(input).toContain('disabled=""');
+  });
+});
+
+/**
+ * THE REDESIGN, AND WHAT IT WAS HIDING
+ *
+ * Three of these guard things that looked perfectly fine on screen: a control
+ * that was a status pill, two buttons with the same name that write different
+ * things, and a copper "+" that is the guest menu's real add button rendered
+ * where nothing can be tapped.
+ */
+describe('Branding, the redesign', () => {
+  it('reaches the real guest menu, not only an in-app preview', () => {
+    // `slug` was loaded by the data loader and never used, so the page promised
+    // "this is what they see" with no way to get to what they see.
+    const html = render(data({ slug: 'maddi' } as Partial<BrandingScreenData>));
+
+    expect(html).toContain('href="/menu?s=maddi"');
+    expect(html).toContain('Open guest menu');
+  });
+
+  it('offers no guest-menu link when there is no restaurant to open', () => {
+    const html = render(data({ slug: '' } as Partial<BrandingScreenData>));
+    expect(html).not.toContain('href="/menu?s=');
+  });
+
+  it('gives the two uploads two different names', () => {
+    // Two buttons called "Upload" write two different things: identical names
+    // to a screen reader, to voice control, and to anyone skimming.
+    const html = render(data());
+    expect(html).toContain('>Upload logo<');
+    expect(html).toContain('>Upload banner<');
+    expect(html).not.toContain('>Upload<');
+  });
+
+  it('dresses the picker as a control, not as a status pill', () => {
+    const html = render(data());
+    const picker = html.slice(html.indexOf('data-image-pick="logo"') - 400);
+
+    // The label is the kit's diameter and radius; `h-8 rounded-full` was a chip
+    // sitting beside a 36px rectangular button on the same line.
+    expect(picker).toContain('h-9');
+    expect(picker).toContain('rounded-[10px]');
+    expect(picker).not.toContain('rounded-full border border-hair-strong');
+  });
+
+  it('marks the sample dish row as inert, because it is not tappable', () => {
+    const html = render(
+      data({
+        sampleDishes: [{ id: 'd1', name: 'Butter Chicken', price: 42_000, img: null }],
+      } as Partial<BrandingScreenData>),
+    );
+    const at = html.indexOf('pointer-events-none select-none');
+    // React writes `aria-hidden` before `class`, so the whole opening tag is the
+    // slice to inspect.
+    const row = html.slice(Math.max(0, html.lastIndexOf('<div', at)), at + 400);
+
+    expect(row).toContain('aria-hidden="true"');
+    expect(row).toContain('Butter Chicken');
+    // ...and the page says so once, in words.
+    expect(html).toContain('are not tappable here');
+  });
+
+  it('draws no hand-made callouts any more', () => {
+    const html = render(data({ canEdit: false }));
+    expect(html).not.toContain('bg-[var(--alert)]/8');
+    expect(html).toContain('Read-only for your role');
+  });
+
+  it('sends the owner to Settings for the name, which is not editable here', () => {
+    const html = render(data());
+    expect(html).toContain('href="/dashboard/settings"');
+    expect(html).toContain('Name and tagline live in');
+  });
+
+  it('points at Menus when nothing is published, instead of a dead end', () => {
+    const html = render(data({ hasPublishedMenu: false } as Partial<BrandingScreenData>));
+    expect(html).toContain('Nothing is published yet.');
+    expect(html).toContain('href="/dashboard/menus"');
   });
 });
