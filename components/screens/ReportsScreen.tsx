@@ -66,6 +66,20 @@ function share(part: number, whole: number): number {
   return Math.min(100, Math.round((part / whole) * 100));
 }
 
+/**
+ * Whether the bar at `index` prints its label.
+ *
+ * Up to a dozen buckets every one is legible; past that the label is dropped
+ * to every Nth so the axis reads as dates rather than as a grey band. The last
+ * bucket always prints -- on a 30-day range the right-hand edge is "today",
+ * and an axis that stops at the 26th looks like the data does.
+ */
+export function everyNth(count: number, index: number): boolean {
+  if (count <= 12) return true;
+  if (index === count - 1) return true;
+  return index % Math.ceil(count / 8) === 0;
+}
+
 function rangeHref(key: ReportRangeKey): string {
   return key === 'today' ? '/dashboard/reports' : `/dashboard/reports?range=${key}`;
 }
@@ -95,11 +109,19 @@ function Bar({
   value,
   peak,
   bills,
+  showLabel = true,
 }: {
   label: string;
   value: number;
   peak: number;
   bills: number;
+  /**
+   * A 30-day range draws thirty bars. Thirty labels in the same width are not
+   * small type, they are a smear -- so the axis prints every Nth tick and the
+   * rest stay in the hover title. The bar itself never disappears: thinning
+   * the labels must not thin the data.
+   */
+  showLabel?: boolean;
 }) {
   const height = peak > 0 ? Math.max(2, Math.round((value / peak) * 100)) : 2;
   const empty = value <= 0;
@@ -120,7 +142,9 @@ function Bar({
           style={{ height: `${height}%` }}
         />
       </div>
-      <span className="w-full truncate text-center text-[10px] text-gink-46">{label}</span>
+      <span className="w-full truncate text-center text-[10px] text-gink-46">
+        {showLabel ? label : '\u00a0'}
+      </span>
     </div>
   );
 }
@@ -277,7 +301,9 @@ export function ReportsScreen({
               label="Outstanding"
               value={<Money value={totals.unpaidPaise} />}
               meta="Billed, not yet settled"
-              tone={totals.unpaidPaise > 0 ? 'live' : 'plain'}
+              /* Alert, not green: this is the figure to chase. Green said
+                 "this is running", which is the opposite of the meaning. */
+              tone={totals.unpaidPaise > 0 ? 'due' : 'plain'}
             />
             <Stat
               label="Average bill"
@@ -294,16 +320,19 @@ export function ReportsScreen({
               bodyClassName="px-4 py-4 sm:px-5"
             >
               {peak > 0 ? (
-                <div className="flex items-end gap-1.5" data-chart>
-                  {report.buckets.map((bucket) => (
-                    <Bar
-                      key={bucket.key}
-                      label={bucket.label}
-                      value={bucket.revenuePaise}
-                      peak={peak}
-                      bills={bucket.bills}
-                    />
-                  ))}
+                <div className="overflow-x-auto" data-chart>
+                  <div className="flex min-w-full items-end gap-1.5">
+                    {report.buckets.map((bucket, i) => (
+                      <Bar
+                        key={bucket.key}
+                        label={bucket.label}
+                        value={bucket.revenuePaise}
+                        peak={peak}
+                        bills={bucket.bills}
+                        showLabel={everyNth(report.buckets.length, i)}
+                      />
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <Empty>

@@ -107,3 +107,47 @@ describe('Cashier', () => {
     expect(html).not.toContain('not waiting any more');
   });
 });
+
+/**
+ * A guest pressing "I have paid" against the shop's UPI QR is a claim, not
+ * money -- the transfer happens in an app this product cannot see. The queue
+ * row already said so; the panel that actually records the cash did not, and
+ * that is the screen where collecting a paid bill twice can happen.
+ */
+describe('Cashier, the UPI claim', () => {
+  const claimed = {
+    restaurantName: 'Kabir',
+    queue: [
+      {
+        id: 'order-1',
+        code: 'K-9001',
+        table: 'T4',
+        at: '8:42 pm',
+        state: 'Ready',
+        total: 640,
+        outstanding: 640,
+        paid: 0,
+        items: '2 × Thali',
+        claimed: true,
+      },
+    ],
+  };
+
+  it('repeats the claim on the ticket being settled', () => {
+    const html = renderToStaticMarkup(<Cashier nav={nav} data={claimed} />);
+
+    expect(html).toContain('data-claim');
+    expect(html).toContain('Guest says paid by UPI');
+    expect(html).toContain('Check the restaurant');
+  });
+
+  it('says nothing about a claim that was never made', () => {
+    const html = renderToStaticMarkup(
+      <Cashier nav={nav} data={{ ...claimed, queue: [{ ...claimed.queue[0], claimed: false }] }} />,
+    );
+
+    expect(html).not.toContain('data-claim');
+    expect(html).not.toContain('Guest says paid by UPI');
+    expect(html).toContain('Record cash ₹640');
+  });
+});

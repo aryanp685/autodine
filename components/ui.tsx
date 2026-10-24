@@ -113,14 +113,56 @@ export function Money({ value, strong = false }: { value: number; strong?: boole
   );
 }
 
-export function Sparkline({ data, width = 120, height = 34 }: { data: number[]; width?: number; height?: number }) {
+/**
+ * A trend line.
+ *
+ * `className` exists so a chart can be fluid instead of pinned to a pixel
+ * width. The overview's chart was drawn at a hard 520px and overflowed every
+ * phone it was opened on -- the panel scrolled sideways and the last hour was
+ * off-screen, which is exactly the part an owner looks for.
+ *
+ * `markIndex` puts a dot on one bucket. It is the only point in the data the
+ * line cannot say by itself: which hour was the busy one.
+ *
+ * The padding is not decoration. A stroke drawn at the very edge of the
+ * viewBox is clipped in half by it, so the first and last points sit inside a
+ * hairline instead of being shaved.
+ */
+export function Sparkline({
+  data,
+  width = 120,
+  height = 34,
+  className,
+  markIndex,
+}: {
+  data: number[];
+  width?: number;
+  height?: number;
+  /** Fluid sizing, e.g. `h-[120px] w-full`. Omit to keep the pixel size. */
+  className?: string;
+  /** Index of the bucket to dot -- the peak, when the chart names one. */
+  markIndex?: number;
+}) {
   const max = Math.max(...data);
   const min = Math.min(...data);
-  const step = width / (data.length - 1);
-  const pts = data.map((d, i) => `${i * step},${height - ((d - min) / (max - min || 1)) * height}`).join(' ');
+  const step = data.length > 1 ? width / (data.length - 1) : 0;
+  const y = (d: number) => height - ((d - min) / (max - min || 1)) * height;
+  const pts = data.map((d, i) => `${i * step},${y(d)}`).join(' ');
+  const mark = markIndex !== undefined && data[markIndex] !== undefined ? markIndex : null;
+
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Trend">
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      role="img"
+      aria-label="Revenue by hour"
+      className={className}
+    >
       <polyline points={pts} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
+      {mark !== null ? (
+        <circle data-peak="true" cx={mark * step} cy={y(data[mark])} r="3" fill="currentColor" />
+      ) : null}
     </svg>
   );
 }

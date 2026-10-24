@@ -460,3 +460,36 @@ describe('MenuEditorScreen menu tabs', () => {
     expect(html).not.toContain('aria-label="Add this menu"');
   });
 });
+
+/**
+ * The item table used to carry a "Status" column holding the MENU's Live/Draft
+ * badge, printed identically on every row. A column of one value reads as
+ * per-dish state and is not: a dish is live because the menu is. What the table
+ * actually needs to say is which row the editor on the right is holding open.
+ */
+describe('the item table', () => {
+  it('marks the row being edited instead of repeating the menu badge', () => {
+    const html = render(
+      data({
+        categories: [{ id: 'c-1', name: 'Starters', itemCount: 1 }],
+        items: [item('it-1', 'Paneer Tikka')],
+      }),
+    );
+
+    expect(html).toContain('Editing');
+    expect(html).toContain('data-row-selected="true"');
+    // The menu's own state stays on the page head, not in a column of rows.
+    expect(html).not.toContain('>Status</th>');
+  });
+
+  it('keeps the delete control in the row it belongs to', () => {
+    const html = render(
+      data({
+        categories: [{ id: 'c-1', name: 'Starters', itemCount: 1 }],
+        items: [item('it-1', 'Paneer Tikka')],
+      }),
+    );
+    expect(html).toContain('data-menu-items');
+    expect(html).toContain('aria-label="Delete');
+  });
+});

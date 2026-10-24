@@ -219,8 +219,13 @@ export function Stat({
   label: string;
   value: ReactNode;
   meta?: ReactNode;
-  /** `live` tints the card green: in use right now, not just a figure. */
-  tone?: 'plain' | 'live';
+  /**
+   * `live` tints the card green: in use right now, not just a figure.
+   * `due` tints it with the alert colour: a number somebody has to act on,
+   * such as money still outstanding. Green on an unpaid total told the owner
+   * the opposite of what the figure meant.
+   */
+  tone?: 'plain' | 'live' | 'due';
 }) {
   return (
     <div
@@ -228,11 +233,18 @@ export function Stat({
         'rounded-[16px] border p-4 sm:p-[18px] transition-shadow duration-200 sm:hover:shadow-[var(--p-shadow-2)]',
         tone === 'live'
           ? 'border-[color-mix(in_oklab,var(--p-accent)_25%,transparent)] bg-[color-mix(in_oklab,var(--p-accent-soft)_70%,white)]'
-          : 'border-hair bg-card',
+          : tone === 'due'
+            ? 'border-[color-mix(in_oklab,var(--alert)_22%,transparent)] bg-[color-mix(in_oklab,var(--alert)_5%,white)]'
+            : 'border-hair bg-card',
       ].join(' ')}
     >
       <div className="text-[11.5px] font-medium tracking-[0.03em] text-gink-46">{label}</div>
-      <div className="mt-2.5 text-[clamp(1.6rem,2.6vw,2.15rem)] leading-none font-medium tracking-[-0.045em] text-gink tabular-nums">
+      <div
+        className={[
+          'mt-2.5 text-[clamp(1.6rem,2.6vw,2.15rem)] leading-none font-medium tracking-[-0.045em] tabular-nums',
+          tone === 'due' ? 'text-[var(--alert)]' : 'text-gink',
+        ].join(' ')}
+      >
         {value}
       </div>
       {meta ? <div className="mt-2 text-[11.5px] leading-[1.4] text-gink-46">{meta}</div> : null}

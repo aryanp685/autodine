@@ -242,3 +242,35 @@ describe('SettingsScreen', () => {
     expect(html).toContain('Only an owner can add an outlet');
   });
 });
+
+/**
+ * The save result used to render once, at the top of a page that is five forms
+ * tall. Saving the UPI details -- the last form -- wrote its confirmation
+ * above the fold, so from where the owner was standing nothing happened at
+ * all. The answer now follows them down the page.
+ */
+describe('Settings, where the save result lands', () => {
+  it('pins the notice under the app bar instead of leaving it off-screen', () => {
+    const html = renderToStaticMarkup(<SettingsScreen data={data()} notice="Saved the UPI details." />);
+
+    expect(html).toContain('sticky top-14');
+    expect(html).toContain('Saved the UPI details.');
+  });
+
+  it('pins an error the same way, because a failed save is the one you must see', () => {
+    const html = renderToStaticMarkup(<SettingsScreen data={data()} error="That UPI ID is not valid." />);
+
+    expect(html).toContain('sticky top-14');
+    expect(html).toContain('Nothing was saved.');
+  });
+
+  it('draws no banner at all when there is nothing to report', () => {
+    const html = renderToStaticMarkup(<SettingsScreen data={data()} />);
+    expect(html).not.toContain('sticky top-14');
+  });
+
+  it('puts the QR aside beside the forms from a laptop, not only from 1280', () => {
+    const html = renderToStaticMarkup(<SettingsScreen data={data()} />);
+    expect(html).toContain('lg:grid-cols-[minmax(0,1fr)_318px]');
+  });
+});

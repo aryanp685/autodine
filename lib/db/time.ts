@@ -156,20 +156,42 @@ export function hourInZone(timeZone: string, at: Date): number {
 }
 
 /**
- * Time of day as a person reads it off a ticket: '12:31 pm'.
+ * An hour of the day as a range label: `8–9 pm`.
  *
- * This used to exist three times over -- on the kitchen board, in the cashier
- * queue and on the dashboard -- and each copy formatted in the SERVER's zone.
- * Every Vercel lambda runs in UTC, so a bill placed at half past twelve in
- * Noida was shown as 07:01, and a cook working the board was reading times
- * from a different clock than the guest who placed the order. One function,
- * one zone, and the zone comes from restaurants.timezone like everything else
- * in this file.
- *
- * The em dash on an unparseable timestamp is deliberate: a wrong time is worse
- * than an obvious gap, and every caller renders this inside a <td> or a pill
- * where an empty string would look like a bug in the layout.
+ * The dashboard chart buckets revenue by hour index (0-23) rather than by a
+ * timestamp, because that is what `hourInZone` returns for each order. Reading
+ * a squiggle is not an answer to "when was the busy hour"; naming the hour is.
+ * A fixed table rather than Intl formatting: the input is already local to the
+ * restaurant, so there is no zone left to apply, and a formatter given a bare
+ * number would need an arbitrary date to put it on.
  */
+export function hourRangeLabel(hour: number): string {
+  const from = wrapHour(hour);
+  const to = wrapHour(hour + 1);
+  const sameMeridiem = meridiem(from) === meridiem(to);
+  return sameMeridiem
+    ? `${clockHour(from)}–${clockHour(to)} ${meridiem(from)}`
+    : `${clockHour(from)} ${meridiem(from)}–${clockHour(to)} ${meridiem(to)}`;
+}
+
+function wrapHour(hour: number): number {
+  return ((Math.trunc(hour) % 24) + 24) % 24;
+}
+
+function meridiem(hour: number): 'am' | 'pm' {
+  return hour >= 12 ? 'pm' : 'am';
+}
+
+function clockHour(hour: number): number {
+  return hour % 12 === 0 ? 12 : hour % 12;
+}
+
+/** One hour as a short axis tick: `8 pm`, `12 am`. */
+export function hourLabel(hour: number): string {
+  const h = wrapHour(hour);
+  return `${clockHour(h)} ${meridiem(h)}`;
+}
+
 export function clockTimeInZone(
   timeZone: string | null | undefined,
   at: string | Date,
