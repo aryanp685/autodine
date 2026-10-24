@@ -121,3 +121,30 @@ describe('DashboardBar', () => {
     expect(out).not.toContain('role="listbox"');
   });
 });
+
+/**
+ * The dark rail, added 2026-10-24.
+ *
+ * The rail used to be white on a white page, separated from the content by a
+ * single hairline. On the screenshot that prompted the redesign there was no
+ * edge anywhere on the screen: navigation, page and cards were one value.
+ */
+describe('DashboardBar, the rail', () => {
+  it('is the one dark surface in the product', () => {
+    const out = html({ active: 'overview' });
+    expect(out).toContain('bg-rail');
+    expect(out).toContain('text-rail-ink');
+  });
+
+  it('marks the current screen with a copper edge, not a filled block', () => {
+    const out = html({ active: 'overview' });
+    const active = out.slice(out.indexOf('data-nav-active="true"'));
+    expect(active.slice(0, 700)).toContain('--p-rail-active');
+  });
+
+  it('keeps sign out beside the account instead of as a full-width pill', () => {
+    const out = html({ active: 'overview' });
+    const form = out.slice(out.indexOf('Sign out') - 400, out.indexOf('Sign out'));
+    expect(form).not.toContain('w-full');
+  });
+});

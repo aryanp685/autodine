@@ -95,7 +95,7 @@ export function ShellSearch({ onLaunch }: { onLaunch?: () => void }) {
 
   return (
     <div className="relative" ref={wrapperRef}>
-      <div className="flex items-center gap-2 rounded-full border border-transparent bg-paper-deep px-3 py-1.5 transition-colors focus-within:border-hair-strong focus-within:bg-card">
+      <div className="flex items-center gap-2 rounded-[10px] border border-hair-strong bg-card px-3 py-2 transition-colors focus-within:border-[var(--p-accent)]">
         <svg
           aria-hidden="true"
           viewBox="0 0 24 24"

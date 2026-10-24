@@ -125,8 +125,23 @@ for (const token of [
     problems.push(`app/globals.css no longer maps the Tailwind utility ${token} — screens would drift back to raw colours.`);
   }
 }
-if (!/\[data-surface='owner'\]\s*\{[^}]*--p-paper:\s*#ffffff/.test(globals)) {
-  problems.push("app/globals.css is missing the owner surface's white paper token; owner screens would inherit the warm palette.");
+/*
+ * This used to assert a literal `--p-paper: #ffffff`, which stopped being the
+ * design on 2026-10-24: the owner surface moved to warm paper with a dark rail
+ * (docs/owner-audit.md). The rule was never about the value -- it was about the
+ * owner surface having its OWN palette so it cannot silently inherit the guest
+ * flow's warm tokens. That is what is checked now: the block must declare the
+ * four tokens every staff screen depends on.
+ */
+const ownerBlock = globals.match(/\[data-surface='owner'\]\s*\{[^}]*\}/);
+if (!ownerBlock) {
+  problems.push("app/globals.css has no [data-surface='owner'] token block; owner screens would inherit the guest palette.");
+} else {
+  for (const token of ['--p-paper', '--p-ink', '--p-accent', '--p-rail']) {
+    if (!ownerBlock[0].includes(`${token}:`)) {
+      problems.push(`app/globals.css: the owner surface does not declare ${token}; staff screens would fall back to another surface's value.`);
+    }
+  }
 }
 
 /* A container query with no container-type is inert, and an inert breakpoint

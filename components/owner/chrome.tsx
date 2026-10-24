@@ -53,7 +53,7 @@ export function OwnerPage({
   return (
     <div data-surface="owner" className="min-h-dvh bg-paper text-gink antialiased">
       <DashboardBar active={active} outlet={outlet} signOut={signOut} />
-      <div className="lg:pl-[232px]">
+      <div className="lg:pl-[244px]">
         <main
           className={[
             'mx-auto w-full px-5 pt-6 pb-20 sm:px-7 lg:pt-9',
@@ -94,15 +94,19 @@ export function PageHead({
   actions?: ReactNode;
 }) {
   return (
-    <header className="mb-7 flex flex-col gap-4 sm:mb-9 sm:flex-row sm:items-end sm:justify-between">
+    <header className="mb-7 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
         {kicker ? (
-          <p className="text-[10.5px] font-semibold tracking-[0.16em] text-gink-46 uppercase">{kicker}</p>
+          <p className="text-[10.5px] font-semibold tracking-[0.18em] text-[var(--p-accent)] uppercase">
+            {kicker}
+          </p>
         ) : null}
-        <h1 className="mt-2 text-[clamp(1.65rem,3vw,2.35rem)] leading-[1.05] font-semibold tracking-[-0.035em] text-balance text-gink">
+        {/* The one display size on a staff screen. Tight tracking and a short
+            leading are what separate a masthead from a heading in a form. */}
+        <h1 className="mt-2.5 text-[clamp(1.75rem,2.6vw,2.5rem)] leading-[1.02] font-semibold tracking-[-0.045em] text-balance text-gink">
           {title}
         </h1>
-        {meta ? <p className="mt-2 max-w-[62ch] text-[13.5px] leading-[1.55] text-gink-64">{meta}</p> : null}
+        {meta ? <p className="mt-2.5 max-w-[62ch] text-[13.5px] leading-[1.6] text-gink-64">{meta}</p> : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2 sm:shrink-0">{actions}</div> : null}
     </header>
@@ -124,7 +128,7 @@ export function SectionHead({
   return (
     <div className={['mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1', className].join(' ')}>
       <div className="flex items-baseline gap-2.5">
-        <h2 className="text-[13px] font-semibold tracking-[0.01em] text-gink">{title}</h2>
+        <h2 className="text-[13px] font-semibold tracking-[-0.005em] text-gink">{title}</h2>
         {meta ? <span className="text-[12.5px] text-gink-46">{meta}</span> : null}
       </div>
       {action}
@@ -161,7 +165,7 @@ export function Card({
 }) {
   return (
     <div
-      className={['rounded-[16px] border border-hair bg-card', lift ? 'o-lift' : '', className]
+      className={['rounded-[18px] border border-hair bg-card', lift ? 'o-lift' : '', className]
         .filter(Boolean)
         .join(' ')}
       style={style}
@@ -189,9 +193,9 @@ export function Panel({
 }) {
   return (
     <Card className={className}>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-t-[15px] border-b border-hair bg-white/40 px-4 py-3 sm:px-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-t-[17px] border-b border-hair bg-[rgba(25,20,17,0.022)] px-4 py-3.5 sm:px-5">
         <div className="flex items-baseline gap-2.5">
-          <h2 className="text-[13px] font-semibold text-gink">{title}</h2>
+          <h2 className="text-[13px] font-semibold tracking-[-0.005em] text-gink">{title}</h2>
           {meta ? <span className="text-[12.5px] text-gink-46">{meta}</span> : null}
         </div>
         {action}
@@ -230,24 +234,24 @@ export function Stat({
   return (
     <div
       className={[
-        'rounded-[16px] border p-4 sm:p-[18px] transition-shadow duration-200 sm:hover:shadow-[var(--p-shadow-2)]',
+        'rounded-[18px] border p-4 transition-shadow duration-200 sm:p-[18px] sm:hover:shadow-[var(--p-shadow-2)]',
         tone === 'live'
-          ? 'border-[color-mix(in_oklab,var(--p-accent)_25%,transparent)] bg-[color-mix(in_oklab,var(--p-accent-soft)_70%,white)]'
+          ? 'border-[color-mix(in_oklab,var(--p-accent)_26%,transparent)] bg-[color-mix(in_oklab,var(--p-accent-soft)_62%,white)]'
           : tone === 'due'
             ? 'border-[color-mix(in_oklab,var(--alert)_22%,transparent)] bg-[color-mix(in_oklab,var(--alert)_5%,white)]'
             : 'border-hair bg-card',
       ].join(' ')}
     >
-      <div className="text-[11.5px] font-medium tracking-[0.03em] text-gink-46">{label}</div>
+      <div className="text-[12.5px] font-medium tracking-[0.005em] text-gink-64">{label}</div>
       <div
         className={[
-          'mt-2.5 text-[clamp(1.6rem,2.6vw,2.15rem)] leading-none font-medium tracking-[-0.045em] tabular-nums',
+          'mt-2.5 text-[clamp(1.75rem,2.8vw,2.35rem)] leading-[0.95] font-semibold tracking-[-0.05em] tabular-nums',
           tone === 'due' ? 'text-[var(--alert)]' : 'text-gink',
         ].join(' ')}
       >
         {value}
       </div>
-      {meta ? <div className="mt-2 text-[11.5px] leading-[1.4] text-gink-46">{meta}</div> : null}
+      {meta ? <div className="mt-2 text-[11.5px] leading-[1.45] text-gink-46">{meta}</div> : null}
     </div>
   );
 }
@@ -270,7 +274,7 @@ export function Empty({ children, className = '' }: { children: ReactNode; class
   return (
     <p
       className={[
-        'grid min-h-[104px] place-items-center rounded-[12px] border border-hair bg-white/40 px-5 py-7 text-center text-[12.5px] leading-[1.6] text-gink-46',
+        'grid min-h-[104px] place-items-center rounded-[12px] border border-hair bg-[rgba(25,20,17,0.018)] px-5 py-7 text-center text-[12.5px] leading-[1.6] text-gink-46',
         className,
       ].join(' ')}
     >
@@ -293,21 +297,34 @@ export type BtnSize = 'sm' | 'md';
  * matters is that they are identical, which the string guarantees.
  */
 export function btn(tone: BtnTone = 'solid', size: BtnSize = 'md'): string {
+  /*
+   * ONE GEOMETRY.
+   *
+   * These were pills (rounded-full) at four different heights across the
+   * product, and a pill is a status shape: it is what a tag uses. A row of a
+   * pill button, a pill chip, a pill switch and a pill tag is a row of four
+   * things that all look like the same kind of object.
+   *
+   * So actions are rectangles with a 10px radius, 36px tall (sm) or 44px (md),
+   * and they are the only element on the surface with that radius. Pills come
+   * back only for status, where the shape means "a state, not a control".
+   */
   const base =
-    'inline-flex items-center justify-center gap-2 rounded-full font-medium whitespace-nowrap transition-[background-color,border-color,color,transform] duration-150 active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gink disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0';
-  const box = size === 'sm' ? 'h-8 px-3 text-[12.5px]' : 'h-10 px-4 text-[13px]';
+    'inline-flex items-center justify-center gap-2 rounded-[10px] font-medium whitespace-nowrap transition-[background-color,border-color,color,box-shadow,transform] duration-150 active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0';
+  const box = size === 'sm' ? 'h-9 px-3 text-[12.5px]' : 'h-11 px-4 text-[13px]';
   const tones: Record<BtnTone, string> = {
-    /* Black is the default action on white. It is the strongest thing on the
-       screen without introducing a colour the product does not own. */
+    /* Ink is the default action. It is the strongest thing on paper without
+       introducing a colour the product does not own. */
     solid:
-      'bg-gink text-onink shadow-[var(--p-shadow-1)] hover:bg-gink/90 hover:shadow-[var(--p-shadow-2)]',
-    /* Green is for the one action a screen exists for -- the counter's
+      'bg-gink text-onink shadow-[var(--p-shadow-1)] hover:bg-gink/92 hover:shadow-[var(--p-shadow-2)]',
+    /* Copper is for the one action a screen exists for -- the counter's
        "Record payment", the menu's "Publish". Used twice on a page it stops
        meaning anything. */
     primary:
       'bg-[var(--p-accent)] text-onink shadow-[var(--p-shadow-1)] hover:brightness-110 hover:shadow-[var(--p-shadow-2)]',
-    ghost: 'border border-hair-strong bg-white/50 text-gink backdrop-blur-sm hover:border-gink-28 hover:bg-white/80',
-    quiet: 'text-gink-64 hover:text-gink hover:bg-gink-07',
+    ghost:
+      'border border-hair-strong bg-card text-gink shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] hover:border-gink-28 hover:bg-white',
+    quiet: 'text-gink-64 hover:bg-gink-07 hover:text-gink',
     danger: 'border border-[var(--alert)]/30 text-[var(--alert)] hover:bg-[var(--alert)]/8',
   };
   return `${base} ${box} ${tones[tone]}`;
@@ -388,14 +405,14 @@ export function Segmented<T extends string>({
   fill?: boolean;
   className?: string;
 }) {
-  const box = size === 'sm' ? 'h-8' : 'h-10';
+  const box = size === 'sm' ? 'h-9' : 'h-11';
   const item = size === 'sm' ? 'h-7 px-2.5 text-[11.5px]' : 'h-9 px-3.5 text-[12.5px]';
   return (
     <div
       role="group"
       aria-label={label}
       className={[
-        'items-center rounded-full border border-hair-strong bg-paper-deep p-0.5',
+        'items-center rounded-[10px] border border-hair-strong bg-paper-deep p-1',
         fill ? 'flex w-full' : 'inline-flex',
         box,
         className,
@@ -412,11 +429,11 @@ export function Segmented<T extends string>({
             onClick={() => onChange(option.value)}
             {...option.data}
             className={[
-              'rounded-full font-medium whitespace-nowrap transition-colors duration-150',
-              'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gink',
+              'rounded-[7px] font-medium whitespace-nowrap transition-colors duration-150',
+              'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]',
               fill ? 'flex flex-1 items-center justify-center gap-1.5' : '',
               item,
-              on ? 'bg-gink text-onink shadow-[var(--p-shadow-1)]' : 'text-gink-64 hover:text-gink',
+              on ? 'bg-card text-gink shadow-[var(--p-shadow-1)]' : 'text-gink-46 hover:text-gink',
             ].join(' ')}
           >
             {option.label}
@@ -439,11 +456,11 @@ export function Segmented<T extends string>({
  */
 export function chipClass(active: boolean): string {
   return [
-    'inline-flex h-8 items-center rounded-full px-3 text-[12.5px] font-medium whitespace-nowrap transition-colors',
-    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gink',
+    'inline-flex h-9 items-center rounded-[10px] px-3.5 text-[12.5px] font-medium whitespace-nowrap transition-colors',
+    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]',
     active
       ? 'bg-gink text-onink shadow-[var(--p-shadow-1)]'
-      : 'border border-hair-strong text-gink-64 hover:border-gink-28 hover:text-gink',
+      : 'border border-hair-strong bg-card text-gink-64 hover:border-gink-28 hover:text-gink',
   ].join(' ');
 }
 
@@ -467,25 +484,30 @@ export function Field({
 }) {
   return (
     <div className={className}>
-      <label htmlFor={htmlFor} className="mb-1.5 block text-[11.5px] font-medium text-gink-64">
+      <label htmlFor={htmlFor} className="mb-1.5 block text-[12.5px] font-medium text-gink-64">
         {label}
       </label>
       {children}
       {error ? (
         <p className="mt-1.5 text-[11.5px] leading-[1.45] text-[var(--alert)]">{error}</p>
       ) : hint ? (
-        <p className="mt-1.5 text-[11.5px] leading-[1.45] text-gink-46">{hint}</p>
+        <p className="mt-1.5 text-[11.5px] leading-[1.5] text-gink-46">{hint}</p>
       ) : null}
     </div>
   );
 }
 
+/*
+ * A field is a white sheet on paper, with a warm hairline and a copper focus
+ * ring. It was a 60%-white box that turned greyer as the page behind it got
+ * lighter -- on paper, translucent inputs look like holes.
+ */
 const control =
-  'w-full rounded-[10px] border border-hair-strong bg-white/60 px-3 text-[13.5px] text-gink shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-colors placeholder:text-gink-28 focus:border-[var(--p-accent)] focus:bg-white/90 focus:ring-2 focus:ring-[color-mix(in_oklab,var(--p-accent)_18%,transparent)] focus:outline-none disabled:cursor-not-allowed disabled:bg-gink-07 disabled:text-gink-46';
+  'w-full rounded-[10px] border border-hair-strong bg-card px-3.5 text-[13.5px] text-gink shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition-[border-color,box-shadow] duration-150 placeholder:text-gink-28 hover:border-gink-28 focus:border-[var(--p-accent)] focus:ring-2 focus:ring-[color-mix(in_oklab,var(--p-accent)_16%,transparent)] focus:outline-none disabled:cursor-not-allowed disabled:bg-gink-07 disabled:text-gink-46';
 
-export const inputClass = `${control} h-10`;
-export const textareaClass = `${control} resize-y py-2.5 leading-[1.5]`;
-export const selectClass = `${control} h-10 pr-8`;
+export const inputClass = `${control} h-11`;
+export const textareaClass = `${control} resize-y py-3 leading-[1.55]`;
+export const selectClass = `${control} h-11 pr-8`;
 
 /* ------------------------------------------------------------------- tables */
 
@@ -510,7 +532,7 @@ export function Th({
     <th
       scope="col"
       className={[
-        'border-b border-hair px-4 py-2.5 text-[10.5px] font-semibold tracking-[0.09em] whitespace-nowrap text-gink-46 uppercase',
+        'border-b border-hair px-4 py-2.5 text-[10.5px] font-semibold tracking-[0.1em] whitespace-nowrap text-gink-46 uppercase',
         align === 'right' ? 'text-right' : 'text-left',
         className,
       ].join(' ')}
@@ -530,7 +552,7 @@ export function Td({
   return (
     <td
       className={[
-        'border-b border-hair px-4 py-3 align-middle text-gink',
+        'border-b border-hair px-4 py-3.5 align-middle text-gink',
         align === 'right' ? 'text-right tabular-nums' : 'text-left',
         className,
       ].join(' ')}
@@ -544,7 +566,7 @@ export function Td({
 /** A table row. The tint on hover is the whole interaction budget for a row. */
 export function Tr({ children, className = '', ...rest }: React.ComponentProps<'tr'>) {
   return (
-    <tr className={['transition-colors hover:bg-white/55', className].join(' ')} {...rest}>
+    <tr className={['transition-colors hover:bg-[rgba(25,20,17,0.025)]', className].join(' ')} {...rest}>
       {children}
     </tr>
   );
@@ -563,18 +585,26 @@ export type PillTone = 'live' | 'due' | 'failed' | 'neutral' | 'ink' | 'work';
  * up.
  */
 export function Tag({ tone = 'neutral', children }: { tone?: PillTone; children: ReactNode }) {
+  /*
+   * Status, not button. A tag keeps the pill shape -- that is the one place a
+   * pill still means something -- but loses the ring it used to carry, which
+   * on a warm card read as a second border around a word.
+   *
+   * `live` is bottle green because it means "settled / ready"; copper is the
+   * accent and is reserved for position and on-states.
+   */
   const tones: Record<PillTone, string> = {
-    live: 'bg-accent-soft text-[var(--p-accent)] ring-[var(--p-accent)]/20',
-    work: 'bg-[color-mix(in_srgb,var(--p-accent-soft)_55%,white)] text-[var(--p-accent)] ring-[var(--p-accent)]/15',
-    due: 'bg-[var(--alert)]/8 text-[var(--alert)] ring-[var(--alert)]/20',
-    failed: 'bg-[var(--alert)]/8 text-[var(--alert)] ring-[var(--alert)]/20',
-    neutral: 'bg-paper-deep text-gink-64 ring-hair',
-    ink: 'bg-gink text-onink ring-transparent',
+    live: 'bg-[color-mix(in_oklab,var(--p-live)_12%,white)] text-[var(--p-live)]',
+    work: 'bg-[color-mix(in_oklab,var(--p-accent)_12%,white)] text-[var(--p-accent)]',
+    due: 'bg-[color-mix(in_oklab,var(--p-due)_10%,white)] text-[var(--p-due)]',
+    failed: 'bg-[color-mix(in_oklab,var(--p-due)_10%,white)] text-[var(--p-due)]',
+    neutral: 'bg-paper-deep text-gink-64',
+    ink: 'bg-gink text-onink',
   };
   return (
     <span
       className={[
-        'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10.5px] font-semibold tracking-[0.02em] whitespace-nowrap ring-1 ring-inset',
+        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-[3px] text-[11.5px] font-semibold tracking-[0.01em] whitespace-nowrap',
         tones[tone],
       ].join(' ')}
     >

@@ -131,15 +131,15 @@ export function DashboardBar({
           /* Phone: a sheet from the bottom edge, because the thumb is there.
              Tablet: the same sheet. Laptop: a fixed rail that is part of the
              layout and never moves. One tree, three positions. */
-          'fixed z-50 flex flex-col bg-card shadow-[var(--p-shadow-2)]',
-          'inset-x-0 bottom-0 max-h-[80dvh] rounded-t-2xl border-t border-hair pb-[env(safe-area-inset-bottom)]',
+          'fixed z-50 flex flex-col bg-rail text-rail-ink shadow-[var(--p-shadow-2)]',
+          'inset-x-0 bottom-0 max-h-[80dvh] rounded-t-2xl border-t border-rail-line pb-[env(safe-area-inset-bottom)]',
           'transition-transform duration-250 ease-out',
           open ? 'translate-y-0' : 'translate-y-full',
-          'lg:inset-y-0 lg:left-0 lg:w-[232px] lg:max-h-none lg:translate-y-0 lg:rounded-none lg:border-t-0 lg:border-r lg:pb-0',
+          'lg:inset-y-0 lg:left-0 lg:w-[244px] lg:max-h-none lg:translate-y-0 lg:rounded-none lg:border-t-0 lg:border-r lg:pb-0',
         ].join(' ')}
       >
         <div className="flex items-center justify-between px-4 pt-4 pb-2 lg:px-5 lg:pt-5">
-          <Link href="/" aria-label="AutoDine" className="text-gink">
+          <Link href="/" aria-label="AutoDine" className="text-rail-ink">
             <BrandLockup size={21} ink="currentColor" dot={BRAND_GREEN} />
           </Link>
 
@@ -147,7 +147,7 @@ export function DashboardBar({
             type="button"
             aria-label="Close navigation"
             onClick={() => setOpen(false)}
-            className="grid size-8 place-items-center rounded-full text-[18px] text-gink-46 hover:bg-gink-07 hover:text-gink lg:hidden"
+            className="grid size-8 place-items-center rounded-full text-[18px] text-rail-ink-64 hover:bg-white/10 hover:text-rail-ink lg:hidden"
           >
             ×
           </button>
@@ -157,18 +157,18 @@ export function DashboardBar({
             foot of the rail already names the venue, and printing the same name
             twice in a 232px column reads as a bug. */}
         {outlet && outlet.outlets.length > 1 && (
-          <div className="border-b border-hair px-4 py-3 lg:px-5">
-            <span className="mb-1.5 block text-[10px] font-semibold tracking-[0.13em] text-gink-46 uppercase">
+          <div className="border-b border-rail-line px-4 py-3 lg:px-5">
+            <span className="mb-1.5 block text-[10px] font-semibold tracking-[0.16em] text-rail-ink-40 uppercase">
               Switch outlet
             </span>
             <OutletSwitcher outlets={outlet.outlets} activeId={outlet.activeId} next={activeLink?.href ?? '/dashboard'} />
           </div>
         )}
 
-        <nav aria-label="Restaurant" className="flex-1 overflow-y-auto px-2.5 py-3">
+        <nav aria-label="Restaurant" className="flex-1 overflow-y-auto px-3 py-3">
           {SHELL_GROUPS.map((group) => (
             <div key={group.name} className="mb-4 last:mb-0">
-              <div className="px-2.5 pb-1.5 text-[10px] font-semibold tracking-[0.15em] text-gink-46 uppercase">
+              <div className="px-3 pt-1 pb-2 text-[10px] font-semibold tracking-[0.18em] text-rail-ink-40 uppercase">
                 {group.name}
               </div>
               {group.links.map((link) => {
@@ -180,25 +180,29 @@ export function DashboardBar({
                     data-nav={link.key}
                     data-nav-active={current ? 'true' : undefined}
                     aria-current={current ? 'page' : undefined}
-                    /* The current screen used to be the one black block in the
-                       rail. Inside a glass panel that read as a hole punched in
-                       the navigation, and it was the heaviest thing on a screen
-                       whose job is to show numbers. It is now a tinted glass
-                       chip with an accent edge -- still unmistakable at a
-                       glance, no longer competing with the page's one real
-                       action. */
+                    /* On a dark rail the current screen is marked by a copper
+                       bar and a lifted row, not by a coloured block. A filled
+                       block here competed with the page's own primary action
+                       across the whole width of the screen. */
                     className={[
-                      'group relative mb-0.5 flex items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-[13px] transition-all duration-150',
+                      'group relative mb-1 flex items-center gap-2.5 rounded-[9px] px-3 py-2.5 text-[13px] transition-colors duration-150',
                       current
-                        ? 'bg-[color-mix(in_oklab,var(--p-accent)_11%,white)] font-medium text-gink shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] ring-1 ring-[color-mix(in_oklab,var(--p-accent)_22%,transparent)] ring-inset'
-                        : 'text-gink-64 hover:bg-white/70 hover:text-gink',
+                        ? 'bg-[var(--p-rail-active)] font-medium text-rail-ink'
+                        : 'text-rail-ink-64 hover:bg-white/[0.06] hover:text-rail-ink',
                     ].join(' ')}
                   >
                     <span
                       aria-hidden="true"
                       className={[
+                        'absolute top-1/2 -left-3 h-5 w-[2px] -translate-y-1/2 rounded-full transition-colors',
+                        current ? 'bg-[var(--p-accent)]' : 'bg-transparent',
+                      ].join(' ')}
+                    />
+                    <span
+                      aria-hidden="true"
+                      className={[
                         'shrink-0 transition-colors',
-                        current ? 'text-[var(--p-accent)]' : 'text-gink-46 group-hover:text-gink-64',
+                        current ? 'text-[var(--p-accent)]' : 'text-rail-ink-40 group-hover:text-rail-ink-64',
                       ].join(' ')}
                     >
                       {ICONS[link.key]}
@@ -211,34 +215,37 @@ export function DashboardBar({
           ))}
         </nav>
 
-        <div className="border-t border-hair px-4 py-3 lg:px-5 lg:py-4">
-          <div className="flex items-center gap-2.5">
+        <div className="border-t border-rail-line px-3 py-3 lg:px-4 lg:py-4">
+          <div className="flex items-center gap-2.5 px-1">
             <span
               aria-hidden="true"
-              className="grid size-8 shrink-0 place-items-center rounded-full bg-[color-mix(in_oklab,var(--p-accent)_88%,black)] text-[11.5px] font-semibold text-onink"
+              className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--p-accent)] text-[11.5px] font-semibold text-onink"
             >
               {initialsOf(activeOutlet?.name ?? 'AutoDine')}
             </span>
             <span className="min-w-0 leading-tight">
-              <span className="block truncate text-[12.5px] font-medium text-gink">
+              <span className="block truncate text-[12.5px] font-medium text-rail-ink">
                 {activeOutlet?.name ?? 'AutoDine'}
               </span>
-              <span className="block truncate text-[11.5px] text-gink-46 capitalize">
+              <span className="block truncate text-[11.5px] text-rail-ink-40 capitalize">
                 {activeOutlet?.role ?? 'Staff'}
               </span>
             </span>
-          </div>
 
-          {signOut && (
-            <form action={signOutAction} className="mt-2.5">
-              <button
-                type="submit"
-                className="w-full rounded-full border border-hair-strong bg-white/40 py-2 text-[11.5px] font-medium text-gink-64 transition-colors hover:border-gink-28 hover:bg-white/80 hover:text-gink"
-              >
-                Sign out
-              </button>
-            </form>
-          )}
+            {/* Sign out sits with the account, not at the bottom of the page.
+                It used to be a full-width outlined pill the same weight as a
+                destination, which is the wrong thing to put under a thumb. */}
+            {signOut && (
+              <form action={signOutAction} className="ml-auto">
+                <button
+                  type="submit"
+                  className="rounded-[8px] px-2 py-1.5 text-[11.5px] font-medium text-rail-ink-40 transition-colors hover:bg-white/[0.06] hover:text-rail-ink"
+                >
+                  Sign out
+                </button>
+              </form>
+            )}
+          </div>
         </div>
       </aside>
 
@@ -247,7 +254,7 @@ export function DashboardBar({
       {/* Solid, not frosted. A translucent header over a scrolling table is
           glassmorphism, and it also lets a table row read through the
           venue name. The hairline is what separates the two. */}
-      <header className="sticky top-0 z-30 border-b border-hair bg-card lg:pl-[232px]">
+      <header className="sticky top-0 z-30 border-b border-hair bg-card/95 lg:pl-[244px]">
         <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
           <button
             type="button"
