@@ -33,7 +33,7 @@ create or replace function public.place_public_order_core(
 language plpgsql
 security definer
 set search_path to 'public', 'pg_temp'
-as $function$
+as $$
 declare
   k_max_lines constant int := 100;
   k_max_qty   constant int := 99;
@@ -351,7 +351,7 @@ begin
 
   return v_code;
 end;
-$function$;
+$$;
 
 revoke all on function public.place_public_order_core(text, jsonb, text, text) from public;
 revoke all on function public.place_public_order_core(text, jsonb, text, text) from anon;
