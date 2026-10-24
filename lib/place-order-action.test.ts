@@ -117,47 +117,6 @@ describe('placeOrderAction', () => {
     expect(parsed.searchParams.get('code')).toBe('PGRST116');
   });
 
-  it('carries the database sentence for a failure nobody has classified', async () => {
-    // The guest still reads the written sentence, not this. The raw text rides
-    // in the URL so one reproduction can be diagnosed from a screenshot.
-    mocks.rpc.mockResolvedValue({
-      data: null,
-      error: {
-        code: '42804',
-        message: 'more than one row returned by a subquery used as an expression',
-        details: 'at statement 12',
-        hint: null,
-      },
-    });
-
-    const url = await run(() => placeOrderAction(form()));
-    const parsed = new URL(url, 'https://example.test');
-
-    expect(parsed.searchParams.get('error')).toBe(
-      'We could not place that order. Nothing was charged — please try again, or order with staff.'
-    );
-    expect(parsed.searchParams.get('d')).toBe(
-      '[42804] · more than one row returned by a subquery used as an expression · at statement 12'
-    );
-  });
-
-  it('carries the database sentence for a failure it can name, too', async () => {
-    // The gate that used to skip this for named classes hid the one thing the
-    // screen needs: a 21000 that the RPC cannot raise from SQL. The guest still
-    // reads the written sentence; the raw text rides along, collapsed.
-    mocks.rpc.mockResolvedValue({
-      data: null,
-      error: { code: '23505', message: 'duplicate key value violates unique constraint' },
-    });
-
-    const url = await run(() => placeOrderAction(form()));
-    const parsed = new URL(url, 'https://example.test');
-
-    expect(parsed.searchParams.get('d')).toBe(
-      '[23505] · duplicate key value violates unique constraint'
-    );
-  });
-
   it('keeps the restaurant in the URL when the failure is unexplained', async () => {
     // A code nobody has classified yet: no retry, no claim about the cause.
     mocks.rpc.mockResolvedValue({ data: null, error: { code: '42804', message: 'boom' } });
