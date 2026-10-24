@@ -19,18 +19,23 @@
  *
  * STATUS MAPPING
  *
- * The demo rows carry four QR states. The database has no "printed" column,
- * so the mapping is:
+ * The mapping is:
  *
  *   is_active = false   -> 'disabled'  (table out of service)
- *   no live code        -> 'revoked'   (needs a code before it can sell)
+ *   is_active, no live code -> 'no-code'  (nothing to scan; needs a code)
  *   a live code         -> 'active'
  *
- * 'revoked' should now be unreachable for a live table: migration 0007 puts a
- * trigger on dining_tables so a row cannot be inserted without a code
- * following it, and backfills every table that predates the trigger. The
- * branch is kept because the trigger can be dropped, and because finding out
- * that a table has no code is exactly what this screen is for.
+ * 'no-code' was called 'revoked' and that word caused a real support report.
+ * A table switched on with no live code showed "Revoked", which reads as
+ * "somebody took your code away" when the truth is "this table has no code,
+ * so nobody can scan in". Worse, the card still drew a QR-shaped pattern, so
+ * the screen looked like it had a code that would not turn on. Production had
+ * exactly this: T1 with three retired codes and no live one.
+ *
+ * Migration 0007 puts a trigger on dining_tables so a row cannot be inserted
+ * without a code following it, and backfills every table that predates the
+ * trigger. Codes retired after that are still reachable, which is why the
+ * branch stays.
  *
  * 'printed' is not derivable from the schema and is never returned here. A
  * real deployment would need a printed_at column to tell whether the card
@@ -47,7 +52,18 @@
 import { getStaffContextDetailed } from './staff';
 import { qrSvg, siteOrigin, tableScanUrl } from '../qr';
 
-export type TableStatus = 'active' | 'revoked' | 'disabled';
+/**
+ * A table's code state, as the floor plan has to show it.
+ *
+ *   active     a live code exists and the table can take orders
+ *   no-code    the table is switched on but has NO printable code. This is a
+ *              real state and it used to be mislabelled 'revoked', which read
+ *              as "somebody took your code away". It is not: the table has
+ *              never had one since its last code was retired, so nobody can
+ *              scan in and the owner has to be told plainly.
+ *   disabled   switched off; scans are refused before a code is even read.
+ */
+export type TableStatus = 'active' | 'no-code' | 'disabled';
 
 export type TableRow = {
   /**
@@ -60,7 +76,7 @@ export type TableRow = {
   /** Location descriptor. The schema has no area column, so this is derived. */
   label: string;
   seats: number;
-  qr: TableStatus | 'printed';
+  qr: TableStatus;
   /** Humanised time of the most recent order at this table, or '—'. */
   lastScan: string;
   orders: number;
@@ -240,7 +256,7 @@ export async function getTablesScreenData(): Promise<TablesScreenData | null> {
       code: row.label,
       label: `${row.seats} seater`,
       seats: row.seats,
-      qr: !row.is_active ? 'disabled' : token ? 'active' : 'revoked',
+      qr: !row.is_active ? 'disabled' : token ? 'active' : 'no-code',
       lastScan: ago(stats?.last ?? null),
       orders: stats?.orders ?? 0,
       token,

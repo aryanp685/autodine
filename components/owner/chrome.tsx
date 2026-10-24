@@ -240,15 +240,29 @@ export function Stat({
   );
 }
 
+/**
+ * Nothing to show, said plainly.
+ *
+ * The dashed border is gone. A dashed rectangle is the visual grammar of a
+ * placeholder -- a box waiting for content that has not arrived yet -- and this
+ * product put one under every empty chart, every empty list and every empty
+ * report. On a screen with four of them, the page read as unfinished rather
+ * than as quiet, which is the opposite of what an empty day at a restaurant
+ * means.
+ *
+ * What replaces it: a solid hairline on the same surface as the card it sits
+ * in, a minimum height so a row of them lines up, and the message set at the
+ * same size as the body text around it instead of a shade smaller.
+ */
 export function Empty({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
     <p
       className={[
-        'rounded-[14px] border border-dashed border-hair-strong bg-white/30 px-4 py-8 text-center text-[13px] leading-[1.55] text-gink-46',
+        'grid min-h-[104px] place-items-center rounded-[12px] border border-hair bg-white/40 px-5 py-7 text-center text-[12.5px] leading-[1.6] text-gink-46',
         className,
       ].join(' ')}
     >
-      {children}
+      <span className="max-w-[46ch]">{children}</span>
     </p>
   );
 }
