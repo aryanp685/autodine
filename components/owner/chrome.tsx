@@ -549,12 +549,24 @@ export function Segmented<T extends string>({
  * hand-written copy on the orders screen did not do.
  */
 export function chipClass(active: boolean): string {
+  /*
+   * A selected chip is copper, not a black block.
+   *
+   * The chip is an on-state -- "this window", "these rows" -- and copper is
+   * what this product uses for position: the active rail row, the focus ring,
+   * the page kicker. A black filled chip was the loudest thing on the orders
+   * screen, louder than the row it was filtering, and it was the only control
+   * on the surface that was a solid block of ink.
+   *
+   * Both states keep a border, so a chip does not change size when it is
+   * picked and the row does not shiver.
+   */
   return [
-    'inline-flex h-9 items-center rounded-[10px] px-3.5 text-[12.5px] font-medium whitespace-nowrap transition-colors',
+    'inline-flex h-9 items-center rounded-[10px] border px-3.5 text-[12.5px] font-medium whitespace-nowrap transition-colors',
     'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]',
     active
-      ? 'bg-gink text-onink shadow-[var(--p-shadow-1)]'
-      : 'border border-hair-strong bg-card text-gink-64 hover:border-gink-28 hover:text-gink',
+      ? 'border-[color-mix(in_oklab,var(--p-accent)_45%,transparent)] bg-accent-soft text-gink'
+      : 'border-hair-strong bg-card text-gink-64 hover:border-gink-28 hover:text-gink',
   ].join(' ');
 }
 

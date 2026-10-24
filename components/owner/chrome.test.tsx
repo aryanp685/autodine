@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { Segmented, Tag, btn, inputClass } from './chrome';
+import { Segmented, Tag, btn, chipClass, inputClass } from './chrome';
 import { PageMotion } from './PageMotion';
 
 /**
@@ -123,5 +123,22 @@ describe('the owner kit, after the redesign', () => {
 
     const work = renderToStaticMarkup(<Tag tone="work">Editing</Tag>);
     expect(work).toContain('--p-accent');
+  });
+
+  it('paints a chosen chip with the accent, not with a block of ink', () => {
+    // A selected filter is an on-state -- "these rows" -- and copper is what
+    // this product uses for position. A solid ink chip was the heaviest thing
+    // on the ledger, heavier than the rows it was filtering.
+    const on = chipClass(true);
+    expect(on).toContain('bg-accent-soft');
+    expect(on).not.toContain('bg-gink');
+
+    // Both states carry a border and the same height, so picking a chip does
+    // not change the size of the row it sits in.
+    expect(chipClass(false)).toContain('border-hair-strong');
+    for (const cls of [chipClass(true), chipClass(false)]) {
+      expect(cls).toContain('h-9');
+      expect(cls).toContain('border ');
+    }
   });
 });

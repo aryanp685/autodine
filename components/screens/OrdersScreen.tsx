@@ -6,16 +6,19 @@ import { demoReport, resolveRange, type ReportOrderRow, type ReportsScreenData }
 import { dateTimeInZone } from '@/lib/db/time';
 import {
   BtnLink,
-  Card,
   Empty,
+  Notice,
   OwnerPage,
   PageHead,
+  Panel,
   Td,
+  Tag,
   TableWrap,
   Th,
   Tr,
   btn,
   chipClass,
+  inputClass,
   tableClass,
 } from '@/components/owner/chrome';
 
@@ -64,11 +67,16 @@ function isOpen(order: ReportOrderRow): boolean {
  * is why they are worth having.
  */
 function matches(order: ReportOrderRow, filter: OrderFilter, query: string): boolean {
-  if (filter === 'cancelled') return order.prepStatus === 'cancelled';
-  if (filter !== 'all' && order.prepStatus === 'cancelled') return false;
+  // The tab narrows first...
+  if (filter === 'cancelled' && order.prepStatus !== 'cancelled') return false;
+  if (filter !== 'all' && filter !== 'cancelled' && order.prepStatus === 'cancelled') return false;
   if (filter === 'open' && !isOpen(order)) return false;
   if (filter === 'settled' && order.paymentStatus !== 'paid') return false;
 
+  // ...and then the search narrows what is left. The Cancelled tab used to
+  // return before this point, so typing a table into the search box while that
+  // tab was open did nothing at all -- the one case where the box looked
+  // broken rather than empty.
   if (!query) return true;
   const needle = query.toLowerCase();
   return (
@@ -137,6 +145,29 @@ export function OrdersScreen({
   const openCount = orders.filter(isOpen).length;
   const unsettledCount = orders.filter((o) => o.prepStatus !== 'cancelled' && o.paymentStatus !== 'paid').length;
   const cancelledCount = orders.filter((o) => o.prepStatus === 'cancelled').length;
+  const settledCount = orders.filter(
+    (o) => o.prepStatus !== 'cancelled' && o.paymentStatus === 'paid'
+  ).length;
+  // Each chip says how many rows it would show, from the same array the table
+  // is drawn from. A filter that turns out to be empty is then a fact about the
+  // day rather than something you find out by clicking it.
+  const filterCounts: Record<OrderFilter, number> = {
+    all: orders.length,
+    open: openCount,
+    settled: settledCount,
+    cancelled: cancelledCount,
+  };
+  const narrowed = filter !== 'all' || Boolean(query.trim());
+
+  /**
+   * A compact field at a chosen width.
+   *
+   * `inputClass` carries `w-full`, and stacking `w-[150px]` after it is a coin
+   * toss: whichever utility the stylesheet emits last wins. Replacing the one
+   * that is there is the only version that cannot flip.
+   */
+  const fieldSm = (width: string) =>
+    inputClass.replace('h-11', 'h-9').replace('w-full', width);
 
   // The CSV has to cover the window on screen. A custom range is sent as the
   // two local dates it was asked for, because the resolved range holds ISO
@@ -170,7 +201,10 @@ export function OrdersScreen({
               {/* A route handler that answers with a file, so an anchor with
                   `download` rather than <Link>: client-side navigation has no
                   RSC payload to fetch here. */}
-              <a className={btn('solid')} href={exportHref} download>
+              {/* Ghost, not solid. Exporting is something you do *about* the
+                  ledger, not the thing the screen is for; a solid button here
+                  outranked every row on the page. */}
+              <a className={btn('ghost')} href={exportHref} download>
                 Order CSV
               </a>
             </>
@@ -181,10 +215,10 @@ export function OrdersScreen({
       {blocked && <SignInPrompt reason={blocked} screen="order ledger" />}
 
       {!blocked && (
-        <div className="mb-4 flex flex-col gap-2.5">
-          {/* The window and the filter are two different questions -- "which
-              days" and "which rows" -- so they are two separate rows of chips
-              rather than one long one that mixes them. */}
+        <div className="mb-3 flex flex-col gap-2">
+          {/* Two questions, two rows: which days, and which rows. They used to
+              share one wrapping row of identical chips, so "Last 7 days" and
+              "Open" looked like the same kind of choice. */}
           <div className="flex flex-wrap items-center gap-1.5">
             {RANGE_LINKS.map((r) => (
               <Link
@@ -200,44 +234,79 @@ export function OrdersScreen({
             {/* The sales report has always had a custom range; the ledger,
                 which reads the same aggregate, only had three presets. A
                 dispute about one evening is exactly the question this screen
-                gets asked. */}
-            <form
-              method="get"
-              action="/dashboard/orders"
-              className="flex flex-wrap items-center gap-1.5 rounded-full border border-hair bg-card py-1 pr-1 pl-3"
-            >
-              <input type="hidden" name="range" value="custom" />
-              {filter !== 'all' && <input type="hidden" name="status" value={filter} />}
-              {query ? <input type="hidden" name="q" value={query} /> : null}
-              <label className="flex items-center gap-1.5 text-[11.5px] text-gink-46">
-                From
-                <input
-                  type="date"
-                  name="from"
-                  defaultValue={customFrom}
-                  required
-                  className="h-8 rounded-md border border-hair px-2 text-[12.5px] text-gink focus:border-gink focus:outline-none"
-                />
-              </label>
-              <label className="flex items-center gap-1.5 text-[11.5px] text-gink-46">
-                To
-                <input
-                  type="date"
-                  name="to"
-                  defaultValue={customTo}
-                  required
-                  className="h-8 rounded-md border border-hair px-2 text-[12.5px] text-gink focus:border-gink focus:outline-none"
-                />
-              </label>
-              <button type="submit" className={chipClass(false)}>
-                Apply dates
-              </button>
-            </form>
+                gets asked.
+
+                `details` rather than a hidden panel: it opens without
+                JavaScript, it is keyboard-reachable, and it stays open when a
+                custom range is the one in force -- a range you cannot see is a
+                range you will forget you set. */}
+            <details open={rangeKey === 'custom'} className="w-full sm:w-auto">
+              <summary
+                className={`${chipClass(rangeKey === 'custom')} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}
+              >
+                {rangeKey === 'custom' && customFrom && customTo
+                  ? `${customFrom} → ${customTo}`
+                  : 'Custom dates'}
+              </summary>
+              <form
+                method="get"
+                action="/dashboard/orders"
+                className="mt-2 flex flex-wrap items-end gap-2 rounded-[12px] border border-hair bg-card p-2.5"
+              >
+                <input type="hidden" name="range" value="custom" />
+                {filter !== 'all' && <input type="hidden" name="status" value={filter} />}
+                {query ? <input type="hidden" name="q" value={query} /> : null}
+                <label className="block">
+                  <span className="mb-1 block text-[11.5px] font-medium text-gink-46">From</span>
+                  <input
+                    type="date"
+                    name="from"
+                    defaultValue={customFrom}
+                    required
+                    className={fieldSm('w-[150px]')}
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[11.5px] font-medium text-gink-46">To</span>
+                  <input
+                    type="date"
+                    name="to"
+                    defaultValue={customTo}
+                    required
+                    className={fieldSm('w-[150px]')}
+                  />
+                </label>
+                <button type="submit" className={btn('ghost', 'sm')}>
+                  Apply dates
+                </button>
+              </form>
+            </details>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            {FILTERS.map((f) => (
+              <Link
+                key={f.key}
+                href={href(rangeKey, f.key, query, dates)}
+                aria-current={filter === f.key ? 'true' : undefined}
+                className={`${chipClass(filter === f.key)} gap-1.5`}
+              >
+                {f.label}
+                <span
+                  className={[
+                    'tnum text-[11.5px]',
+                    filter === f.key ? 'text-[var(--p-accent)]' : 'text-gink-46',
+                  ].join(' ')}
+                >
+                  {filterCounts[f.key]}
+                </span>
+              </Link>
+            ))}
 
             <form
               method="get"
               action="/dashboard/orders"
-              className="ml-auto flex items-center gap-1.5 rounded-full border border-hair bg-card py-1 pr-1 pl-3"
+              className="ml-auto flex flex-wrap items-end gap-2"
             >
               {rangeKey !== 'today' && <input type="hidden" name="range" value={rangeKey} />}
               {rangeKey === 'custom' && customFrom ? (
@@ -253,40 +322,31 @@ export function OrdersScreen({
                 defaultValue={query}
                 placeholder="Table or reference"
                 aria-label="Find an order by table or reference"
-                className="h-8 w-[150px] bg-transparent text-[12.5px] text-gink placeholder:text-gink-46 focus:outline-none"
+                className={fieldSm('w-[180px]')}
               />
-              <button type="submit" className={chipClass(false)}>
+              <button type="submit" className={btn('ghost', 'sm')}>
                 Search
               </button>
             </form>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-1.5">
-            {FILTERS.map((f) => (
-              <Link
-                key={f.key}
-                href={href(rangeKey, f.key, query, dates)}
-                aria-current={filter === f.key ? 'true' : undefined}
-                className={chipClass(filter === f.key)}
-              >
-                {f.label}
-              </Link>
-            ))}
           </div>
         </div>
       )}
 
       {!blocked && (
-        <Card>
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 py-3 sm:px-5">
-            <h2 className="text-[13px] font-semibold text-gink">
-              {visible.length} order{visible.length === 1 ? '' : 's'}
-            </h2>
-            <span className="text-[11.5px] text-gink-46">
+        <Panel
+          /* The same headed card as every other panel on the surface. This one
+             was a bare card with a hand-made title row, so the ledger's own
+             heading sat at a different height and on a different background
+             from the panels two screens away. */
+          title={`${visible.length} order${visible.length === 1 ? '' : 's'}`}
+          meta={
+            <>
               {query ? `Matching “${query}”` : 'Newest first'}
-              {data?.ordersTruncated ? ' · the range holds more than this list' : ''}
-            </span>
-          </div>
+              {data?.ordersTruncated ? ' · showing the most recent hundred' : ''}
+            </>
+          }
+          bodyClassName=""
+        >
 
           {visible.length > 0 ? (
             <>
@@ -334,9 +394,7 @@ export function OrdersScreen({
                             <Td>{order.tableLabel ?? 'Takeaway'}</Td>
                             <Td>
                               {cancelled ? (
-                                <span className="text-[11.5px] font-semibold tracking-[0.05em] text-gink-46 uppercase">
-                                  Cancelled
-                                </span>
+                                <Tag tone="neutral">Cancelled</Tag>
                               ) : (
                                 <PrepPill
                                   state={
@@ -371,12 +429,18 @@ export function OrdersScreen({
                                 <Link
                                   href={`/cashier?order=${encodeURIComponent(live && !blocked ? order.id : order.code)}`}
                                   title={`Take payment for ${order.code} at the counter`}
-                                  className={btn('solid', 'sm')}
+                                  className={btn('ghost', 'sm')}
                                 >
                                   Collect <Money value={outstanding} />
                                 </Link>
                               ) : (
-                                <span className="text-gink-28">—</span>
+                                /* "—" in a column headed Outstanding reads as a
+                                   missing value. These two rows are not
+                                   missing anything: one is paid, and one is a
+                                   bill nobody may collect. */
+                                <span className="text-[11.5px] text-gink-46">
+                                  {cancelled ? 'Not collectable' : 'Settled'}
+                                </span>
                               )}
                             </Td>
                           </Tr>
@@ -411,9 +475,7 @@ export function OrdersScreen({
                       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                         <span className="text-[13px] text-gink-64">{order.tableLabel ?? 'Takeaway'}</span>
                         {cancelled ? (
-                          <span className="text-[10.5px] font-semibold tracking-[0.05em] text-gink-46 uppercase">
-                            Cancelled
-                          </span>
+                          <Tag tone="neutral">Cancelled</Tag>
                         ) : (
                           <PrepPill
                             state={
@@ -444,12 +506,14 @@ export function OrdersScreen({
                           <Link
                             href={`/cashier?order=${encodeURIComponent(live && !blocked ? order.id : order.code)}`}
                             title={`Take payment for ${order.code} at the counter`}
-                            className="inline-flex items-center gap-1 rounded-full bg-gink px-3 py-1.5 text-[11.5px] font-medium text-onink"
+                            className={btn('ghost', 'sm')}
                           >
                             Collect <Money value={outstanding} />
                           </Link>
                         ) : (
-                          <span className="text-[11.5px] text-gink-46">Settled</span>
+                          <span className="text-[11.5px] text-gink-46">
+                            {cancelled ? 'Not collectable' : 'Settled'}
+                          </span>
                         )}
                       </div>
                     </li>
@@ -458,30 +522,49 @@ export function OrdersScreen({
               </ul>
             </>
           ) : (
-            <div className="px-4 py-4 sm:px-5">
-              <Empty>{orders.length === 0 ? 'No orders in this range.' : 'No orders match this filter.'}</Empty>
+            <div className="px-4 py-5 sm:px-5">
+              <Empty>
+                <span className="block">
+                  {orders.length === 0
+                    ? 'No orders in this range.'
+                    : 'No orders match this filter.'}
+                </span>
+                {/* An empty view of a full ledger is not the same thing as an
+                    empty day, and the way out has to be on the screen. */}
+                {orders.length > 0 && narrowed ? (
+                  <Link
+                    href={href(rangeKey, 'all', '', dates)}
+                    className="mt-2 inline-block text-[12.5px] font-medium text-[var(--p-accent)] underline decoration-[color-mix(in_oklab,var(--p-accent)_35%,transparent)] underline-offset-2 hover:decoration-[var(--p-accent)]"
+                  >
+                    Show all {orders.length} in this range
+                  </Link>
+                ) : null}
+              </Empty>
             </div>
           )}
-        </Card>
+        </Panel>
       )}
 
       {!blocked && (
         <p className="mt-4 max-w-[92ch] text-[11.5px] leading-[1.6] text-gink-46">
-          Outstanding is what the table still owes on that bill. <strong className="font-semibold text-gink-64">Collect</strong> opens
-          the counter on that exact ticket; the queue as a whole is at{' '}
+          Outstanding is what the table still owes on that bill;{' '}
+          <strong className="font-semibold text-gink-64">Collect</strong> opens the counter on
+          that exact ticket, and the queue as a whole is at{' '}
           <Link href="/cashier" className="underline underline-offset-2">
             the counter
           </Link>
-          . A cancelled order stays in this list
-          so the day&apos;s history is complete, but it is excluded from every figure on the
-          sales report.
+          . Cancelled bills stay here so the day&apos;s history is complete, and are excluded
+          from every figure on the sales report.
         </p>
       )}
       {!live && !blocked && (
-        <p className="mt-2 inline-flex items-center gap-2 rounded-full bg-paper-deep px-3 py-1.5 text-[11.5px] text-gink-64">
-          <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--alert)]" />
+        <Notice
+          tone="accent"
+          label={<Tag tone="work">Sample data</Tag>}
+          className="mt-4 mb-0"
+        >
           Database not configured — the rows above are fictional sample data.
-        </p>
+        </Notice>
       )}
     </OwnerPage>
   );
