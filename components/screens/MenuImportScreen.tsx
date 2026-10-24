@@ -194,7 +194,7 @@ export function MenuImportScreen({
             </label>
             <textarea
               id="menu-import-text"
-              className={`${textareaClass} min-h-[280px] font-mono text-[12.5px]`}
+              className={`${textareaClass} min-h-[280px] font-mono text-[12.5px]!`}
               name="menuText"
               rows={14}
               maxLength={MAX_IMPORT_TEXT}

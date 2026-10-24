@@ -274,3 +274,57 @@ describe('Settings, where the save result lands', () => {
     expect(html).toContain('lg:grid-cols-[minmax(0,1fr)_318px]');
   });
 });
+
+/**
+ * THE REDESIGN
+ *
+ * The screen is five forms that write to one row, and the audit found it had
+ * drifted in the two ways a long screen always does: nine hand-drawn callouts
+ * wearing four different shapes, and a page index that did not exist, on a page
+ * five cards tall.
+ */
+const count = (haystack: string, needle: string) => haystack.split(needle).length - 1;
+
+describe('Settings, the redesign', () => {
+  it('gives the page an index, and every anchor in it lands somewhere', () => {
+    const html = renderToStaticMarkup(<SettingsScreen data={data()} />);
+    const anchors = [...html.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]);
+    const ids = new Set([...html.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]));
+
+    expect(anchors).toHaveLength(4);
+    for (const anchor of anchors) expect(ids.has(anchor)).toBe(true);
+  });
+
+  it('groups the five forms under three named sections', () => {
+    const html = renderToStaticMarkup(<SettingsScreen data={data()} />);
+
+    expect(html).toContain('What guests see');
+    expect(html).toContain('What the bill charges');
+    expect(html).toContain('Account');
+  });
+
+  it('gives every form the same commit button', () => {
+    // Five forms, five saves, one appearance: solid ink at the same size, so
+    // "which control commits this card" is answered the same way every time.
+    const html = renderToStaticMarkup(<SettingsScreen data={data()} gatewayConfigured />);
+    expect(count(html, 'bg-gink text-onink')).toBe(5);
+  });
+
+  it('draws no hand-made alert boxes any more', () => {
+    const html = renderToStaticMarkup(<SettingsScreen data={data()} error="Nope." />);
+
+    // The raw alert-token callout is what the five other shapes were built
+    // from; everything goes through Notice's tone now.
+    expect(html).not.toContain('bg-[var(--alert)]/8');
+    expect(html).toContain('role="alert"');
+    expect(html).toContain('Nope.');
+  });
+
+  it('keeps the tax field the width it asks for', () => {
+    const html = renderToStaticMarkup(<SettingsScreen data={data()} />);
+    // `w-[180px]` on its own loses to the kit's `w-full`: Tailwind emits
+    // `.w-[180px]` before `.w-full`, so the field rendered full width while the
+    // code said 180px.
+    expect(html).toContain('w-[180px]!');
+  });
+});
