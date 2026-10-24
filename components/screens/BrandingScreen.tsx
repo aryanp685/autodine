@@ -14,6 +14,7 @@ import {
 import { inr } from '@/lib/demo-data';
 import { OwnerPage, PageHead, Panel, Card, btn } from '@/components/owner/chrome';
 import { SubmitButton } from '@/components/owner/SubmitButton';
+import { ImagePick } from '@/components/owner/ImagePick';
 
 /**
  * Menu branding.
@@ -51,9 +52,6 @@ import { SubmitButton } from '@/components/owner/SubmitButton';
  * restaurant id never travels in the payload -- it comes from the session on
  * the server (see lib/db/staff.ts).
  */
-const pickerLabel =
-  'relative inline-flex h-8 cursor-pointer items-center rounded-full border border-hair-strong px-3 text-[12.5px] font-medium text-gink transition-colors hover:border-gink-28 hover:bg-gink-07 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-gink';
-
 export function BrandingScreen({
   data,
   outlet,
@@ -148,23 +146,17 @@ export function BrandingScreen({
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-1.5">
-            <form action={uploadLogoAction} className="flex flex-wrap items-center gap-1.5">
-              <label className={[pickerLabel, disabled ? 'pointer-events-none opacity-45' : ''].join(' ')}>
-                <input
-                  type="file"
-                  name="logo"
-                  accept="image/png,image/jpeg,image/webp"
-                  disabled={disabled}
-                  required
-                  className="absolute inset-0 size-full cursor-pointer opacity-0"
-                />
-                <span>{data?.logoUrl ? 'Replace logo' : 'Choose a logo'}</span>
-              </label>
-              <SubmitButton pendingLabel="Uploading…" disabled={disabled}>
-                Upload
-              </SubmitButton>
-            </form>
+          <div className="mt-4 flex flex-wrap items-start gap-2">
+            <ImagePick
+              kind="logo"
+              name="logo"
+              action={uploadLogoAction}
+              label="Choose a logo"
+              replaceLabel="Replace logo"
+              hint="JPG, PNG or WebP · up to 2 MB"
+              disabled={disabled}
+              current={Boolean(data?.logoUrl)}
+            />
 
             {data?.logoUrl && (
               <form action={removeLogoAction}>
@@ -179,7 +171,6 @@ export function BrandingScreen({
               </form>
             )}
           </div>
-          <p className="mt-2 text-[11.5px] leading-[1.45] text-gink-46">JPG, PNG or WebP · up to 2 MB</p>
         </Panel>
 
         {/* ------------------------------------------------------------- banner */}
@@ -208,23 +199,17 @@ export function BrandingScreen({
             )}
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <form action={uploadBannerAction} className="flex flex-wrap items-center gap-1.5">
-              <label className={[pickerLabel, disabled ? 'pointer-events-none opacity-45' : ''].join(' ')}>
-                <input
-                  type="file"
-                  name="banner"
-                  accept="image/png,image/jpeg,image/webp"
-                  disabled={disabled}
-                  required
-                  className="absolute inset-0 size-full cursor-pointer opacity-0"
-                />
-                <span>{data?.bannerUrl ? 'Replace banner' : 'Choose a banner'}</span>
-              </label>
-              <SubmitButton pendingLabel="Uploading…" disabled={disabled}>
-                Upload
-              </SubmitButton>
-            </form>
+          <div className="mt-3 flex flex-wrap items-start gap-2">
+            <ImagePick
+              kind="banner"
+              name="banner"
+              action={uploadBannerAction}
+              label="Choose a banner"
+              replaceLabel="Replace banner"
+              hint="JPG, PNG or WebP · up to 4 MB · wide, at least 1200px across"
+              disabled={disabled}
+              current={Boolean(data?.bannerUrl)}
+            />
 
             {data?.bannerUrl && (
               <form action={removeBannerAction}>
@@ -239,13 +224,10 @@ export function BrandingScreen({
               </form>
             )}
           </div>
-          <p className="mt-2 text-[11.5px] leading-[1.45] text-gink-46">
-            JPG, PNG or WebP · up to 4 MB · wide, at least 1200px across
-          </p>
         </Panel>
 
         {/* ------------------------------------------------------------ preview */}
-        <section aria-labelledby="branding-preview">
+        <section aria-labelledby="branding-preview" className="lg:col-span-2">
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
             <div className="flex items-baseline gap-2.5">
               <h2 id="branding-preview" className="text-[13px] font-semibold text-gink">
