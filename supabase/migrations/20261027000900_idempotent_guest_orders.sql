@@ -40,6 +40,13 @@
 -- replacement whose signature is unchanged. The app sends the attempt key
 -- already; before this is applied it is simply an extra argument the function
 -- stores, and the behaviour is the old one.
+--
+-- APPLIED
+--
+-- Project bdbaqpevwmgdvghszjno, 2026-10-24, before the app that sends the
+-- attempt key was promoted. Verified live afterwards, in a rolled-back
+-- transaction as anon: two posts with one key returned AU-G9HYN / AU-G9HYN and
+-- left one order row.
 -- ============================================================================
 
 -- One row per attempt. Partial, because staff counter orders carry no token
