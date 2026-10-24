@@ -11,6 +11,7 @@ import {
   OwnerPage,
   PageHead,
   Panel,
+  Stat,
   Td,
   Tag,
   Th,
@@ -203,19 +204,25 @@ export function Dashboard({
       {/* Four figures, each with the sentence that says what it counts. On a
           phone they are two by two, not one long column: a KPI you have to
           scroll past is not a KPI. */}
+      {/* Four figures, each with the sentence that says what it counts. On a
+          phone they are two by two, not one long column: a KPI you have to
+          scroll past is not a KPI.
+
+          These were hand-rolled copies of `Stat`, which is the kit's whole
+          point -- one figure size, one label size, one note size, one border.
+          The only difference the copy had was a slightly smaller numeral. */}
       <section aria-label="Today at a glance" className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-        {cards.map((card, index) => (
-          <div
+        {cards.map((card) => (
+          <Stat
             key={card.label}
-            style={{ ['--i' as string]: index }}
-            className="rounded-[16px] border border-hair bg-card p-4 transition-shadow duration-200 sm:hover:shadow-[var(--p-shadow-2)]"
-          >
-            <div className="text-[11.5px] font-medium tracking-[0.02em] text-gink-46">{card.label}</div>
-            <div className="mt-2.5 text-[clamp(1.5rem,2.6vw,2.1rem)] leading-none font-medium tracking-[-0.045em] text-gink tabular-nums">
-              {card.value}
-            </div>
-            <div className="mt-2 text-[11.5px] leading-[1.4] text-gink-46">{card.meta}</div>
-          </div>
+            label={card.label}
+            value={card.value}
+            meta={card.meta}
+            /* Green means "somebody is working right now", so it belongs on
+               open orders and only when there are some. A permanently tinted
+               card is decoration. */
+            tone={card.label === 'Open orders' && openCount > 0 ? 'live' : 'plain'}
+          />
         ))}
       </section>
 

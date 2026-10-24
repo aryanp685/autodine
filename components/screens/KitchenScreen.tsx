@@ -1333,25 +1333,27 @@ export function Kitchen({
           Counts live in the tabs so an empty column can be skipped without
           opening it -- on a phone, the queue you cannot see still has to be
           legible. */}
-      <nav aria-label="Ticket columns" className="mt-3 flex gap-1.5 lg:hidden">
-        {cols.map((c) => (
-          <button
-            key={c.key}
-            type="button"
-            aria-pressed={mobileCol === c.key}
-            onClick={() => setMobileCol(c.key as typeof mobileCol)}
-            className={[
-              'flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full text-[12.5px] font-medium transition-colors',
-              mobileCol === c.key
-                ? 'bg-gink text-onink'
-                : 'border border-hair-strong text-gink-64',
-            ].join(' ')}
-          >
-            {c.title}
-            <span className="tnum text-[11.5px] opacity-70">{c.orders.length}</span>
-          </button>
-        ))}
-      </nav>
+      {/* On a phone the board shows one column at a time; the three pills are
+          the whole of that navigation, so they stretch to the width of the
+          screen instead of huddling at the left edge where a thumb has to aim
+          at 90px. The count is in the label, because "New 3" is the reason to
+          tap it. */}
+      <Segmented
+        label="Ticket columns"
+        className="mt-3 lg:hidden"
+        fill
+        value={mobileCol}
+        onChange={(next) => setMobileCol(next as typeof mobileCol)}
+        options={cols.map((c) => ({
+          value: c.key,
+          label: (
+            <>
+              {c.title}
+              <span className="tnum text-[11.5px] opacity-70">{c.orders.length}</span>
+            </>
+          ),
+        }))}
+      />
 
       <div className="mt-3 grid gap-3 lg:grid-cols-3">
         {cols.map((c) => (

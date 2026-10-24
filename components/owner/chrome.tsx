@@ -345,6 +345,7 @@ export function Segmented<T extends string>({
   onChange,
   options,
   size = 'md',
+  fill = false,
   className = '',
 }: {
   /** Names the group. A group of three buttons with no name is three buttons. */
@@ -353,6 +354,12 @@ export function Segmented<T extends string>({
   onChange: (next: T) => void;
   options: ReadonlyArray<SegmentedOption<T>>;
   size?: 'sm' | 'md';
+  /**
+   * Stretch to the container with equal-width items. For a control that is
+   * the screen's only navigation on a phone, where three pills huddled at the
+   * left edge are three small targets instead of one row.
+   */
+  fill?: boolean;
   className?: string;
 }) {
   const box = size === 'sm' ? 'h-8' : 'h-10';
@@ -362,7 +369,8 @@ export function Segmented<T extends string>({
       role="group"
       aria-label={label}
       className={[
-        'inline-flex items-center rounded-full border border-hair-strong bg-paper-deep p-0.5',
+        'items-center rounded-full border border-hair-strong bg-paper-deep p-0.5',
+        fill ? 'flex w-full' : 'inline-flex',
         box,
         className,
       ].join(' ')}
@@ -380,6 +388,7 @@ export function Segmented<T extends string>({
             className={[
               'rounded-full font-medium whitespace-nowrap transition-colors duration-150',
               'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gink',
+              fill ? 'flex flex-1 items-center justify-center gap-1.5' : '',
               item,
               on ? 'bg-gink text-onink shadow-[var(--p-shadow-1)]' : 'text-gink-64 hover:text-gink',
             ].join(' ')}
@@ -390,6 +399,26 @@ export function Segmented<T extends string>({
       })}
     </div>
   );
+}
+
+/**
+ * The chip look, as a class, for a control that must be a link.
+ *
+ * Segmenteds are buttons because they change what is on the page. A time range
+ * and an order filter are not: they are places, with a URL somebody can send to
+ * a colleague, so they have to stay <Link> and cannot use the component. They
+ * should still look and behave identically -- same height, same radius, same
+ * pressed state -- and the keyboard must be able to see where it is, which the
+ * hand-written copy on the orders screen did not do.
+ */
+export function chipClass(active: boolean): string {
+  return [
+    'inline-flex h-8 items-center rounded-full px-3 text-[12.5px] font-medium whitespace-nowrap transition-colors',
+    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gink',
+    active
+      ? 'bg-gink text-onink shadow-[var(--p-shadow-1)]'
+      : 'border border-hair-strong text-gink-64 hover:border-gink-28 hover:text-gink',
+  ].join(' ');
 }
 
 /* -------------------------------------------------------------------- forms */

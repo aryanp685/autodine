@@ -65,6 +65,16 @@ describe('Segmented', () => {
     expect(html).not.toContain('aria-selected');
   });
 
+  it('stretches to fill when it is the only control on a phone', () => {
+    const html = renderToStaticMarkup(
+      <Segmented label="Ticket columns" value="new" onChange={() => {}} options={options} fill />,
+    );
+
+    // Three equal targets across the width, not three pills at the left edge.
+    expect(html).toContain('flex w-full');
+    expect((html.match(/flex-1/g) ?? []).length).toBe(2);
+  });
+
   it('keeps every option reachable as a real button', () => {
     const html = renderToStaticMarkup(
       <Segmented label="Voice speed" value="normal" onChange={() => {}} options={options} size="sm" />,
