@@ -12,6 +12,7 @@ import {
 } from '@/app/dashboard/tables/actions';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { VerificationCodeRefresh } from '@/components/VerificationCodeRefresh';
+import { ConfirmSubmit } from '@/components/owner/ConfirmSubmit';
 import {
   OwnerPage,
   PageHead,
@@ -261,14 +262,20 @@ export function TablesScreen({
                       >
                         {t.qr === 'disabled' ? 'Enable' : 'Disable'}
                       </button>
-                      <button
-                        type="submit"
+                      {/* Revoking is not like disabling. The card taped to
+                          the table stops working and someone has to print,
+                          laminate and re-stick a new one -- so it asks, and
+                          the question names the table. */}
+                      <ConfirmSubmit
                         formAction={revokeQrAction}
                         data-table-action="revoke"
-                        className={`${btn('danger', 'sm')} ml-auto`}
+                        tone="danger"
+                        question={`Revoke ${t.code}? Its printed card stops working.`}
+                        confirmLabel="Revoke it"
+                        className="ml-auto"
                       >
                         Revoke
-                      </button>
+                      </ConfirmSubmit>
                     </form>
                   ) : (
                     /* No database, no controls: four dead buttons under every
