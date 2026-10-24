@@ -13,6 +13,7 @@ import {
   chipClass,
   Tag,
   Empty,
+  Notice,
   TableWrap,
   tableClass,
   Th,
@@ -28,6 +29,8 @@ import {
   type ReportsScreenData,
 } from '@/lib/db/reports';
 import { dateTimeInZone, localDateKey } from '@/lib/db/time';
+import { inr } from '@/lib/demo-data';
+import { paiseToRupees } from '@/lib/money';
 
 /**
  * Sales report.
@@ -127,6 +130,7 @@ function Bar({
   const empty = value <= 0;
   return (
     <div
+      aria-hidden="true"
       className="group flex min-w-0 flex-1 flex-col items-center gap-1.5"
       title={`${label} · ${bills} bill${bills === 1 ? '' : 's'}`}
     >
@@ -149,29 +153,91 @@ function Bar({
   );
 }
 
+/**
+ * A ranked list -- top items, or categories.
+ *
+ * The two blocks were the same markup written twice: same row, same bar, same
+ * "sold" column, differing only in what the number means. Written twice they
+ * had already drifted (one counted portions apart, the other not), and the
+ * next change would have drifted them again.
+ */
+function RankList({
+  rows,
+  peak,
+  quantityLabel,
+}: {
+  rows: ReadonlyArray<{ name: string; qty: number; revenuePaise: number }>;
+  peak: number;
+  /** "sold" on items, "sold" on categories too -- the figure is portions. */
+  quantityLabel: string;
+}) {
+  return (
+    <ul className="m-0 flex list-none flex-col p-0">
+      {rows.map((row) => (
+        <li
+          key={row.name}
+          className="border-b border-hair py-2.5 first:pt-0 last:border-b-0 last:pb-0"
+        >
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="truncate text-[12.5px] text-gink">{row.name}</span>
+            <span className="shrink-0 text-[12.5px] text-gink tabular-nums">
+              <Money value={row.revenuePaise} />
+            </span>
+          </div>
+          <div className="mt-1.5 flex items-center gap-2">
+            <span className="h-1 flex-1 overflow-hidden rounded-full bg-paper-deep">
+              <span
+                className="block h-full rounded-full bg-[var(--p-accent)]/70"
+                style={{ width: `${share(row.revenuePaise, peak)}%` }}
+              />
+            </span>
+            <span className="w-[58px] shrink-0 text-right text-[10.5px] text-gink-46 tabular-nums">
+              {row.qty} {quantityLabel}
+            </span>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function ReportsScreen({
   data,
   outlet,
+  sampleRange,
 }: {
   data?: ReportsScreenData | null;
   /** Which outlet is open, for the switcher in the bar. */
   outlet?: OutletBar | null;
+  /**
+   * The range the URL asked for, when there is no database to resolve it.
+   *
+   * Without this the sample report was always the last seven days whatever the
+   * URL said: the range chips changed the address bar and nothing else. That is
+   * a dead control, and this screen is supposed to have none.
+   */
+  sampleRange?: ReportRange;
 }) {
   const live = Boolean(data);
   const blocked = data?.blocked;
 
   // No database configured: a clearly-labelled sample report so the layout can
   // be judged. Never mixed with live numbers.
-  const range: ReportRange = data?.range ?? {
-    key: '7d',
-    fromIso: new Date(Date.now() - 6 * 86_400_000).toISOString(),
-    toIso: new Date().toISOString(),
-    label: 'Sample · last 7 days',
-    bucket: 'day',
-    days: 7,
-  };
+  const range: ReportRange = data?.range ??
+    sampleRange ?? {
+      key: '7d',
+      fromIso: new Date(Date.now() - 6 * 86_400_000).toISOString(),
+      toIso: new Date().toISOString(),
+      label: 'Sample · last 7 days',
+      bucket: 'day',
+      days: 7,
+    };
   const timezone = data?.timezone ?? 'Asia/Kolkata';
-  const report: ReportView = data?.report ?? demoReport(range, timezone);
+  /* The sample bills are placed relative to `now`, and `now` is the END OF THE
+     RANGE it is previewing. Passed the wall clock instead, a custom window in
+     the past drew an empty chart under the words "nothing billed" -- the sample
+     saying there was no trade on a day it had itself just invented. */
+  const report: ReportView = data?.report ?? demoReport(range, timezone, new Date(range.toIso));
 
   const totals = report.totals;
   const hasBills = totals.bills > 0;
@@ -188,6 +254,19 @@ export function ReportsScreen({
         ? `Showing the latest ${report.orders.length} of ${totals.bills} bills — the totals above cover all of them`
         : 'Newest first';
   const peak = Math.max(0, ...report.buckets.map((b) => b.revenuePaise));
+  // The busiest bucket, named under the chart title. A bar chart with no scale
+  // tells you the shape of the day but not one number on it, and the number
+  // people ask for is "what was my best hour".
+  const peakBucket = report.buckets.find((b) => b.revenuePaise === peak);
+
+  // The two dates the range actually covers, in the restaurant's own timezone.
+  // Filled back into the picker: a custom range used to load with two blank
+  // date fields, so the owner could see the span in the heading but not in the
+  // control that set it -- and pressing Apply with them empty submitted
+  // nothing at all.
+  const fromDate = localDateKey(timezone, new Date(range.fromIso));
+  const toDate = localDateKey(timezone, new Date(new Date(range.toIso).getTime() - 1));
+  const customActive = range.key === 'custom';
   const itemPeak = Math.max(0, ...report.topItems.map((i) => i.revenuePaise));
   const categoryPeak = Math.max(0, ...report.categories.map((c) => c.revenuePaise));
 
@@ -232,63 +311,111 @@ export function ReportsScreen({
 
       {!blocked && (
         <>
-          {/* ------------------------------------------------------- the window */}
-          <div className="mb-5 flex flex-col gap-2.5 border-b border-hair pb-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap items-center gap-1.5">
-              {RANGE_TABS.map((tab) => {
-                const current = range.key === tab.key;
-                return (
-                  <Link
-                    key={tab.key}
-                    href={rangeHref(tab.key)}
-                    aria-current={current ? 'true' : undefined}
-                    data-range={current ? 'current' : 'other'}
-                    className={chipClass(current)}
-                  >
-                    {tab.label}
-                  </Link>
-                );
-              })}
-            </div>
+          {/* Two facts stated once, at the top, before any figure is read: the
+              numbers below are fictional, or the range is empty. Both used to
+              be said at the bottom of a page of scrolling, or not at all. */}
+          {!live ? (
+            <Notice tone="due" label="Database not configured.">
+              Every figure on this page is fictional sample data — the layout can be judged, and
+              nothing here is a takings record.
+            </Notice>
+          ) : null}
 
-            <form
-              className="flex flex-wrap items-center gap-1.5"
-              method="get"
-              action="/dashboard/reports"
+          {live && !hasBills ? (
+            <Notice
+              tone="plain"
+              label="Nothing billed in this range."
+              action={
+                <Link href={rangeHref('7d')} className={btn('ghost', 'sm')}>
+                  Last 7 days
+                </Link>
+              }
             >
-              <input type="hidden" name="range" value="custom" />
-              <label className="flex items-center gap-1.5 text-[11.5px] text-gink-46">
-                From
-                <input
-                  type="date"
-                  name="from"
-                  required
-                  aria-label="From"
-                  className={`${inputClass} h-9! w-[142px]! text-[12.5px]!`}
-                />
-              </label>
-              <label className="flex items-center gap-1.5 text-[11.5px] text-gink-46">
-                To
-                <input
-                  type="date"
-                  name="to"
-                  required
-                  aria-label="To"
-                  className={`${inputClass} h-9! w-[142px]! text-[12.5px]!`}
-                />
-              </label>
-              <button type="submit" className={btn('ghost', 'sm')}>
-                Apply
-              </button>
-            </form>
-          </div>
+              Nothing was billed {customActive ? 'between the dates you picked' : 'in this window'},
+              so every block below is empty rather than wrong.
+            </Notice>
+          ) : null}
+
+          {/* ------------------------------------------------------- the window
+              One bar, two jobs: pick a preset, or edit the exact days. The
+              custom fields are pre-filled with the range that is on screen --
+              they used to be blank, which meant the owner could read the span
+              in the heading but not in the control that set it, and Apply on an
+              empty form submitted nothing. */}
+          <Card className="mb-4 px-3.5 py-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="mr-0.5 text-[11.5px] text-gink-46">Range</span>
+                {RANGE_TABS.map((tab) => {
+                  const current = range.key === tab.key;
+                  return (
+                    <Link
+                      key={tab.key}
+                      href={rangeHref(tab.key)}
+                      aria-current={current ? 'true' : undefined}
+                      data-range={current ? 'current' : 'other'}
+                      className={chipClass(current)}
+                    >
+                      {tab.label}
+                    </Link>
+                  );
+                })}
+              </div>
+
+              <form
+                className="flex flex-wrap items-center gap-1.5"
+                method="get"
+                action="/dashboard/reports"
+              >
+                <input type="hidden" name="range" value="custom" />
+                {/* A label, not a control: "Custom" is not a destination, it is
+                    the state the two date fields below are in. */}
+                {customActive ? (
+                  <Tag tone="work">Custom</Tag>
+                ) : (
+                  <span className="text-[11.5px] text-gink-46">Custom</span>
+                )}
+                <label className="flex items-center gap-1.5 text-[11.5px] text-gink-46">
+                  From
+                  <input
+                    type="date"
+                    name="from"
+                    required
+                    aria-label="From"
+                    defaultValue={fromDate}
+                    className={`${inputClass} h-9! w-[142px]! text-[12.5px]!`}
+                  />
+                </label>
+                <label className="flex items-center gap-1.5 text-[11.5px] text-gink-46">
+                  To
+                  <input
+                    type="date"
+                    name="to"
+                    required
+                    aria-label="To"
+                    defaultValue={toDate}
+                    className={`${inputClass} h-9! w-[142px]! text-[12.5px]!`}
+                  />
+                </label>
+                <button type="submit" className={btn('ghost', 'sm')}>
+                  Apply
+                </button>
+              </form>
+            </div>
+          </Card>
 
           {/* ------------------------------------------------------- four figures
               Billed and collected are never merged. Every card says, in small
               type, exactly what its number counts. */}
           <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {/* Sales leads: it is the figure an owner opens this screen for, so
+                it gets the size and the only warm wash on the row. Collected
+                and Outstanding stay the same object at the same weight -- they
+                are answers to a question asked because of this number, not
+                four equal boxes. */}
             <Stat
               label="Sales"
+              lead
               value={<Money value={totals.billedPaise} />}
               meta={`${totals.bills} bill${totals.bills === 1 ? '' : 's'} · what was sold`}
             />
@@ -316,12 +443,28 @@ export function ReportsScreen({
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <Panel
               title={`Sales by ${range.bucket}`}
-              meta={`Billed · ${range.label}`}
+              meta={
+                /* The chart's own scale, in words. A bar chart with no axis
+                   tells you the shape of the day and not one number on it, and
+                   the number people ask is "what was my best hour". */
+                peak > 0 && peakBucket
+                  ? `Peak ${inr(paiseToRupees(peak))} · ${peakBucket.label}`
+                  : `Billed · ${range.label}`
+              }
               bodyClassName="px-4 py-4 sm:px-5"
             >
               {peak > 0 ? (
                 <div className="overflow-x-auto" data-chart>
-                  <div className="flex min-w-full items-end gap-1.5">
+                  {/* One image for a screen reader, because thirty <div> bars
+                      announce as nothing at all. The detail stays in each
+                      bar's title for a mouse. */}
+                  <div
+                    role="img"
+                    aria-label={`Sales by ${range.bucket}, ${range.label}. Busiest: ${peakBucket?.label ?? ''}, ${inr(
+                      paiseToRupees(peak),
+                    )}. ${totals.bills} bill${totals.bills === 1 ? '' : 's'} in the range.`}
+                    className="flex min-w-full items-end gap-1.5"
+                  >
                     {report.buckets.map((bucket, i) => (
                       <Bar
                         key={bucket.key}
@@ -393,37 +536,7 @@ export function ReportsScreen({
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <Panel title="Top items" meta="By sales · portions counted apart">
               {report.topItems.length > 0 ? (
-                <ul className="m-0 flex list-none flex-col p-0">
-                  {report.topItems.map((item, i) => (
-                    <li
-                      key={item.name}
-                      className="border-b border-hair py-2.5 first:pt-0 last:border-b-0 last:pb-0"
-                    >
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="flex min-w-0 items-baseline gap-2">
-                          <span className="text-[10.5px] text-gink-28 tabular-nums">
-                            {String(i + 1).padStart(2, '0')}
-                          </span>
-                          <span className="truncate text-[12.5px] text-gink">{item.name}</span>
-                        </span>
-                        <span className="shrink-0 text-[12.5px] text-gink tabular-nums">
-                          <Money value={item.revenuePaise} />
-                        </span>
-                      </div>
-                      <div className="mt-1.5 flex items-center gap-2">
-                        <span className="h-1 flex-1 overflow-hidden rounded-full bg-paper-deep">
-                          <span
-                            className="block h-full rounded-full bg-gink/70"
-                            style={{ width: `${share(item.revenuePaise, itemPeak)}%` }}
-                          />
-                        </span>
-                        <span className="w-[54px] shrink-0 text-right text-[10.5px] text-gink-46 tabular-nums">
-                          {item.qty} sold
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                <RankList rows={report.topItems} peak={itemPeak} quantityLabel="sold" />
               ) : (
                 <Empty>Nothing sold in this range. Items rank here once a bill exists.</Empty>
               )}
@@ -431,32 +544,7 @@ export function ReportsScreen({
 
             <Panel title="By category" meta="From the menu, as it is today">
               {report.categories.length > 0 ? (
-                <ul className="m-0 flex list-none flex-col p-0">
-                  {report.categories.map((c) => (
-                    <li
-                      key={c.name}
-                      className="border-b border-hair py-2.5 first:pt-0 last:border-b-0 last:pb-0"
-                    >
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="truncate text-[12.5px] text-gink">{c.name}</span>
-                        <span className="shrink-0 text-[12.5px] text-gink tabular-nums">
-                          <Money value={c.revenuePaise} />
-                        </span>
-                      </div>
-                      <div className="mt-1.5 flex items-center gap-2">
-                        <span className="h-1 flex-1 overflow-hidden rounded-full bg-paper-deep">
-                          <span
-                            className="block h-full rounded-full bg-gink/70"
-                            style={{ width: `${share(c.revenuePaise, categoryPeak)}%` }}
-                          />
-                        </span>
-                        <span className="w-[54px] shrink-0 text-right text-[10.5px] text-gink-46 tabular-nums">
-                          {c.qty} sold
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                <RankList rows={report.categories} peak={categoryPeak} quantityLabel="sold" />
               ) : (
                 <Empty>No dishes sold in this range.</Empty>
               )}
@@ -555,17 +643,16 @@ export function ReportsScreen({
               Kept, because the difference between the two figures is the thing
               this screen exists to make obvious. */}
           <div className="mt-5 grid gap-2.5 lg:grid-cols-2">
-            <p className="rounded-[12px] border border-hair bg-card px-4 py-3 text-[11.5px] leading-[1.55] text-gink-64">
-              <strong className="font-semibold text-gink">Sales</strong> is what was billed: the sum
-              of order totals, excluding cancelled bills.{' '}
+            <Notice tone="plain" label="How to read these figures" className="mb-0">
+              <strong className="font-semibold text-gink">Sales</strong> is what was billed: the
+              sum of order totals, excluding cancelled bills.{' '}
               <strong className="font-semibold text-gink">Collected</strong> is money actually
               recorded against those bills.{' '}
               <strong className="font-semibold text-gink">Outstanding</strong> is the difference and
               is the figure to chase. They are separate on purpose — most tables settle at the
               counter on the way out.
-            </p>
-            <p className="rounded-[12px] border border-hair bg-card px-4 py-3 text-[11.5px] leading-[1.55] text-gink-64">
-              <strong className="font-semibold text-gink">GST on bills:</strong>{' '}
+            </Notice>
+            <Notice tone="plain" label="GST on bills" className="mb-0">
               <Money value={totals.taxPaise} /> charged across {totals.bills} bill
               {totals.bills === 1 ? '' : 's'}
               {totals.discountPaise > 0 && (
@@ -580,15 +667,8 @@ export function ReportsScreen({
                 </>
               )}
               . This is what the menu charged, not a filing-ready return.
-            </p>
+            </Notice>
           </div>
-
-          {!live && (
-            <p className="mt-2.5 rounded-[12px] border border-[var(--alert)]/25 bg-[var(--alert)]/6 px-4 py-3 text-[11.5px] leading-[1.55] text-gink-64">
-              <strong className="font-semibold text-gink">Database not configured</strong> — every
-              figure on this page is fictional sample data.
-            </p>
-          )}
         </>
       )}
     </OwnerPage>

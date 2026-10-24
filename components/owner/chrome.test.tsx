@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { Segmented, SwitchTrack, Tag, btn, chipClass, inputClass } from './chrome';
+import { Notice, Segmented, SwitchTrack, Tag, btn, chipClass, inputClass } from './chrome';
 import { PageMotion } from './PageMotion';
 
 /**
@@ -160,5 +160,33 @@ describe('SwitchTrack', () => {
     expect(on).toContain('--p-accent');
     expect(off).toContain('left-[3px]');
     expect(on).toContain('left-[19px]');
+  });
+});
+
+/**
+ * The Notice margin, which was not a style preference.
+ *
+ * `mb-4` used to live inside the Notice's class string. Nine call sites asked
+ * for `mb-0` or `mb-3` at the end of a stack, and every one of them was
+ * silently given 16px anyway -- Tailwind emits `.mb-0` and `.mb-3` BEFORE
+ * `.mb-4`, so the class a caller appended never won. The margin is a default
+ * now, which means a caller that passes one replaces it instead of arguing with
+ * it.
+ */
+describe('Notice, and the margin a caller asks for', () => {
+  it('honours mb-0 instead of keeping its own mb-4', () => {
+    const html = renderToStaticMarkup(
+      <Notice tone="plain" className="mb-0">
+        Anything.
+      </Notice>,
+    );
+
+    expect(html).toContain('mb-0');
+    expect(html).not.toMatch(/class="[^"]*\bmb-4\b/);
+  });
+
+  it('keeps the 16px rhythm when the caller says nothing', () => {
+    const html = renderToStaticMarkup(<Notice tone="plain">Anything.</Notice>);
+    expect(html).toMatch(/class="[^"]*\bmb-4\b/);
   });
 });
