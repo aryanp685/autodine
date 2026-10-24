@@ -32,10 +32,20 @@ import { btn } from '@/components/owner/chrome';
  * both sides, and the Storage bucket enforces mime and size again.
  */
 
-function Submit({ label, pendingLabel }: { label: string; pendingLabel: string }) {
+function Submit({
+  label,
+  pendingLabel,
+  blocked,
+}: {
+  label: string;
+  pendingLabel: string;
+  /** The file the browser holds already failed a check here. */
+  blocked?: boolean;
+}) {
   const { pending } = useFormStatus();
+  const disabled = pending || Boolean(blocked);
   return (
-    <button type="submit" className={btn('solid', 'sm')} disabled={pending} aria-busy={pending}>
+    <button type="submit" className={btn('solid', 'sm')} disabled={disabled} aria-busy={pending}>
       {pending ? pendingLabel : label}
     </button>
   );
@@ -79,16 +89,20 @@ export function DishPhotoField({
         <DishPhoto src={picked ?? imageUrl} name={dishName} size={84} />
 
         <div className="flex min-w-0 flex-col gap-1.5">
-          <form action={uploadDishPhotoAction} className="flex flex-wrap items-center gap-1.5">
+          <form action={uploadDishPhotoAction} className="o-pick flex flex-wrap items-center gap-1.5">
             <input type="hidden" name="itemId" value={itemId} />
             {/* A label wrapping a file input: one target, and the browser's
                 own picker. The input itself is 1px and invisible rather than
-                `display:none`, which some browsers refuse to open. */}
+                `display:none`, which some browsers refuse to open.
+
+                The shape is `btn('ghost','sm')` on purpose. It used to be its
+                own pill at its own height, which is how this screen ended up
+                with four button geometries in one column. */}
             <label
               className={[
-                'relative inline-flex h-8 cursor-pointer items-center rounded-full border border-hair-strong px-3',
-                'text-[12.5px] font-medium text-gink transition-colors hover:border-gink-28 hover:bg-gink-07',
-                'focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-gink',
+                'relative inline-flex h-9 cursor-pointer items-center rounded-[10px] border border-hair-strong bg-card px-3',
+                'text-[12.5px] font-medium text-gink shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition-colors hover:border-gink-28',
+                'focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--p-accent)]',
                 disabled ? 'pointer-events-none opacity-45' : '',
               ].join(' ')}
             >
@@ -124,9 +138,19 @@ export function DishPhotoField({
                   setPicked(URL.createObjectURL(file));
                 }}
               />
-              <span>{imageUrl ? 'Choose another' : 'Choose a photo'}</span>
+              <span>{imageUrl ? 'Choose a different photo' : 'Choose a photo'}</span>
             </label>
-            <Submit label={imageUrl ? 'Replace' : 'Upload'} pendingLabel="Uploading…" />
+            {/* Shown only once the browser reports a chosen file -- see the
+                .o-pick rule in globals.css. Two buttons that both sound like
+                "replace the photo" read as two commands; this reads as the
+                second half of one. */}
+            <span className="o-pick-go contents">
+              <Submit
+                label={imageUrl ? 'Save photo' : 'Add photo'}
+                pendingLabel="Uploading…"
+                blocked={Boolean(localError)}
+              />
+            </span>
           </form>
 
           {imageUrl && (
@@ -135,7 +159,7 @@ export function DishPhotoField({
               <button
                 type="submit"
                 data-remove-photo
-                className="h-7 rounded-full px-2 text-[11.5px] font-medium text-gink-46 transition-colors hover:bg-[var(--alert)]/8 hover:text-[var(--alert)] disabled:opacity-45"
+                className="h-9 rounded-[10px] px-2.5 text-[12.5px] font-medium text-gink-46 transition-colors hover:bg-[var(--alert)]/8 hover:text-[var(--alert)] disabled:opacity-45"
                 disabled={disabled}
               >
                 Remove photo

@@ -30,7 +30,7 @@ export function OutletSwitcher({
 
   if (outlets.length === 1) {
     return (
-      <span title="This account has one outlet" className="text-[12.5px] text-gink-64">
+      <span title="This account has one outlet" className="text-[12.5px] text-rail-ink-64">
         {active.name}
       </span>
     );
@@ -46,7 +46,7 @@ export function OutletSwitcher({
         name="outlet"
         defaultValue={active.id}
         onChange={(event) => event.currentTarget.form?.requestSubmit()}
-        className="h-8 w-full rounded-[7px] border border-hair-strong bg-card px-2 pr-7 text-[12.5px] text-gink focus:border-gink focus:outline-none"
+        className="h-9 w-full rounded-[8px] border border-rail-line bg-rail-raised px-2.5 pr-7 text-[12.5px] text-rail-ink focus:border-[var(--p-accent)] focus:outline-none"
       >
         {outlets.map((outlet) => (
           <option key={outlet.id} value={outlet.id}>
@@ -57,7 +57,7 @@ export function OutletSwitcher({
       <input type="hidden" name="next" value={next} />
       {/* Without JavaScript the select cannot submit itself. */}
       <noscript>
-        <button type="submit" className="mt-1.5 text-[11.5px] font-medium text-gink underline">
+        <button type="submit" className="mt-1.5 text-[11.5px] font-medium text-rail-ink-64 underline hover:text-rail-ink">
           Switch
         </button>
       </noscript>

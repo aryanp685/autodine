@@ -26,6 +26,7 @@ import {
   Tr,
 } from '@/components/owner/chrome';
 import { SubmitButton } from '@/components/owner/SubmitButton';
+import { ConfirmSubmit } from '@/components/owner/ConfirmSubmit';
 import {
   addAddonAction,
   addAddonGroupAction,
@@ -65,6 +66,9 @@ export function MenuEditorScreen({
   error,
   notice,
   undo,
+  query,
+  show,
+  sort,
 }: {
   data?: MenuEditorData | null;
   /** Which outlet is open, for the switcher in the bar. */
@@ -74,6 +78,12 @@ export function MenuEditorScreen({
   notice?: string;
   /** Serialised UndoItem from the delete that just happened, if any. */
   undo?: string;
+  /** Name search from `?q=`. */
+  query?: string;
+  /** `all` | `available` | `soldout` from `?show=`. */
+  show?: string;
+  /** `menu` | `name` | `price-asc` | `price-desc` from `?sort=`. */
+  sort?: string;
 }) {
   const live = Boolean(data);
   // A blocked caller has a database and no restaurant. The editor below is
@@ -175,13 +185,57 @@ export function MenuEditorScreen({
       ? (data.items.find((i) => i.id === selected.id) ?? data.items[0])?.desc ?? ''
       : (selected as { desc: string }).desc;
 
-  /** Kit inputs are 40px tall; the rails here run at 32px. */
-  const inputSm = (extra = '') => `${inputClass.replace('h-10', 'h-8')} ${extra}`.trim();
-  const selectSm = (extra = '') => `${selectClass.replace('h-10', 'h-8')} ${extra}`.trim();
+  /**
+   * The compact fields that sit inside a dish panel.
+   *
+   * These used to be derived from the kit with `.replace('h-10', 'h-8')`, and
+   * when the kit moved to `h-11` that string stopped matching: the replace
+   * became a no-op and every one of these inline fields quietly grew back to
+   * 44px inside a 13-inch panel. Deriving from `h-11` keeps the intent — a
+   * small field is the `sm` action height, 36px — while staying a single
+   * geometry rather than a second one invented per panel.
+   */
+  const inputSm = (extra = '') => `${inputClass.replace('h-11', 'h-9')} ${extra}`.trim();
+  const selectSm = (extra = '') => `${selectClass.replace('h-11', 'h-9')} ${extra}`.trim();
 
   const menuName =
     data?.menus.find((m) => m.id === data.menuId)?.name ?? (live ? 'This menu' : 'Main menu');
   const itemCount = tableRows.filter((i) => (live ? true : i.category === 'curries')).length;
+
+  /*
+   * FINDING A DISH.
+   *
+   * The table is the whole menu and only grows. There was no way to narrow it,
+   * so at sixty dishes "is the paneer sold out?" meant scrolling and reading.
+   * This is a plain GET form: it works before hydration, it survives a reload,
+   * and the state lives in the URL where the back button can undo it.
+   *
+   * Every value is re-derived from the URL on the server, so a hand-typed
+   * `?show=anything` falls back to showing everything rather than to an empty
+   * table that looks like a broken menu.
+   */
+  const q = (query ?? '').trim();
+  const showFilter = show === 'available' || show === 'soldout' ? show : 'all';
+  const sortOrder =
+    sort === 'name' || sort === 'price-asc' || sort === 'price-desc' ? sort : 'menu';
+  const filtered = tableRows.length > 5;
+  const rows = (() => {
+    const base = tableRows.filter((i) => (live ? true : i.category === 'curries'));
+    if (!live || !filtered) return base;
+    const needle = q.toLowerCase();
+    const narrowed = base.filter((i) => {
+      if (needle && !i.name.toLowerCase().includes(needle)) return false;
+      if (showFilter === 'available') return Boolean(i.available);
+      if (showFilter === 'soldout') return !i.available;
+      return true;
+    });
+    if (sortOrder === 'menu') return narrowed;
+    const byName = [...narrowed].sort((a, b) => a.name.localeCompare(b.name));
+    if (sortOrder === 'name') return byName;
+    const byPrice = [...narrowed].sort((a, b) => a.price - b.price);
+    return sortOrder === 'price-asc' ? byPrice : byPrice.reverse();
+  })();
+  const narrowActive = Boolean(q) || showFilter !== 'all' || sortOrder !== 'menu';
 
   return (
     <OwnerPage active="menus" outlet={outlet} wide>
@@ -196,18 +250,13 @@ export function MenuEditorScreen({
           </>
         }
         actions={
-          <>
-            {live && !data?.blocked ? (
-              data?.published ? (
-                <Tag tone="live">Live</Tag>
-              ) : (
-                <Tag tone="neutral">Draft</Tag>
-              )
-            ) : null}
-            <BtnLink href="/dashboard/menus/import" tone="ghost" size="sm">
-              Import a menu
-            </BtnLink>
-          </>
+          /* The menu's published state is in the meta line under the title
+             ("Live to guests" / "Draft"). It used to be printed there AND as a
+             tag here AND as a badge on the chip below -- three times in one
+             viewport, which is two times too many. */
+          <BtnLink href="/dashboard/menus/import" tone="ghost" size="sm">
+            Import a menu
+          </BtnLink>
         }
       />
 
@@ -235,13 +284,12 @@ export function MenuEditorScreen({
                     className={`${chipClass(current)} gap-1.5`}
                   >
                     {menu.name}
-                    {!menu.published && (
-                      <span
-                        className={[
-                          'rounded-full px-1.5 py-px text-[10px] font-semibold tracking-[0.02em]',
-                          current ? 'bg-white/18 text-onink' : 'bg-paper-deep text-gink-46',
-                        ].join(' ')}
-                      >
+                    {/* Only on the menus you are NOT looking at. The open
+                        menu's state is the page subtitle two lines above, and
+                        printing it twice in one viewport is how "Draft" ended
+                        up on screen three times. */}
+                    {!menu.published && !current && (
+                      <span className="rounded-full bg-paper-deep px-1.5 py-px text-[10.5px] font-semibold tracking-[0.02em] text-gink-46">
                         Draft
                       </span>
                     )}
@@ -259,13 +307,14 @@ export function MenuEditorScreen({
                 maxLength={40}
                 required
               />
+              {/* A labelled control, not a 32px circle with a plus in it.
+                  Creating a menu is a real write; it should look like one. */}
               <SubmitButton
                 aria-label="Add this menu"
-                pendingLabel="+"
-                className="w-8 px-0"
+                pendingLabel="Adding…"
                 tone="ghost"
               >
-                +
+                Add
               </SubmitButton>
             </form>
           </>
@@ -356,7 +405,7 @@ export function MenuEditorScreen({
                                 <button
                                   type="submit"
                                   aria-label={`Delete category ${c.name}`}
-                                  className="ml-0.5 grid size-5 place-items-center rounded-full text-[13px] leading-none text-gink-46 hover:bg-gink-07 hover:text-gink"
+                                  className="ml-0.5 grid size-6 place-items-center rounded-full text-[13px] leading-none text-gink-46 hover:bg-gink-07 hover:text-gink"
                                 >
                                   ×
                                 </button>
@@ -383,7 +432,7 @@ export function MenuEditorScreen({
                           <button
                             type="submit"
                             aria-label={`Remove category ${name}`}
-                            className="inline-flex h-7 items-center rounded-full border border-gink bg-gink px-2.5 text-[11.5px] font-medium text-onink transition-colors hover:bg-gink/88"
+                            className="inline-flex h-9 items-center rounded-[10px] border border-[color-mix(in_oklab,var(--p-accent)_42%,transparent)] bg-accent-soft px-3 text-[12.5px] font-medium text-[var(--p-accent)] transition-colors hover:border-[var(--p-accent)]"
                           >
                             {name} ✓
                           </button>
@@ -395,7 +444,7 @@ export function MenuEditorScreen({
                           <button
                             type="submit"
                             aria-label={`Add category ${name}`}
-                            className="inline-flex h-7 items-center rounded-full border border-hair-strong px-2.5 text-[11.5px] font-medium text-gink-64 transition-colors hover:border-gink-28 hover:bg-gink-07 hover:text-gink"
+                            className="inline-flex h-9 items-center rounded-[10px] border border-hair-strong bg-card px-3 text-[12.5px] font-medium text-gink-64 transition-colors hover:border-gink-28 hover:text-gink"
                           >
                             + {name}
                           </button>
@@ -463,17 +512,42 @@ export function MenuEditorScreen({
           <section aria-labelledby="menu-items" className="min-w-0">
             <SectionHead
               title={<span id="menu-items">{live ? 'All items' : 'Curries & Mains'}</span>}
-              meta={live ? `${tableRows.length} total` : 'sample'}
+              meta={
+                live
+                  ? narrowActive
+                    ? `${rows.length} of ${tableRows.length}`
+                    : `${tableRows.length} total`
+                  : 'sample'
+              }
               action={
                 live ? (
+                  /* Two bulk writes over every dish in the menu. They used to
+                     sit beside the page's real action with the same weight, and
+                     the destructive one fired on a single press. "Sold out"
+                     now asks; "available" does not, because there is nothing to
+                     lose by putting a dish back on sale. */
                   <div className="flex flex-wrap items-center gap-1.5">
                     <form action={setAllAvailabilityAction}>
-                      <SubmitButton tone="ghost" name="available" value="false" pendingLabel="Marking…">
+                      <ConfirmSubmit
+                        tone="quiet"
+                        size="sm"
+                        name="available"
+                        value="false"
+                        question={`Mark all ${tableRows.length} dishes sold out? Guests cannot order them until you put them back.`}
+                        confirmLabel="Yes, all sold out"
+                        className="px-2.5"
+                      >
                         Mark all sold out
-                      </SubmitButton>
+                      </ConfirmSubmit>
                     </form>
                     <form action={setAllAvailabilityAction}>
-                      <SubmitButton tone="ghost" name="available" value="true" pendingLabel="Marking…">
+                      <SubmitButton
+                        tone="quiet"
+                        name="available"
+                        value="true"
+                        pendingLabel="Marking…"
+                        className="px-2.5"
+                      >
                         Mark all available
                       </SubmitButton>
                     </form>
@@ -492,49 +566,64 @@ export function MenuEditorScreen({
             {live && liveCategories.length > 0 && (
               <form
                 action={addItemAction}
-                className="mb-3 grid grid-cols-2 gap-2 rounded-[12px] border border-hair bg-card p-3 sm:grid-cols-[minmax(0,1fr)_88px_96px_minmax(0,1fr)_auto] sm:items-center"
+                aria-label="Add a dish"
+                className="mb-3 grid grid-cols-2 items-end gap-2 rounded-[14px] border border-hair bg-card p-3 sm:grid-cols-[minmax(0,1.4fr)_92px_104px_minmax(0,1fr)_auto]"
               >
-                <input
-                  className={`${inputClass.replace('h-10', 'h-9')} col-span-2 sm:col-span-1`}
-                  name="name"
-                  placeholder="Item name"
-                  aria-label="New item name"
-                  maxLength={120}
-                  required
-                />
-                <input
-                  className={`${inputClass.replace('h-10', 'h-9')} tabular-nums`}
-                  name="price"
-                  type="number"
-                  min="0"
-                  step="1"
-                  placeholder="Price"
-                  aria-label="New item price in rupees"
-                  required
-                />
-                <select
-                  className={selectClass.replace('h-10', 'h-9')}
-                  name="veg"
-                  defaultValue="veg"
-                  aria-label="New item food type"
-                >
-                  <option value="veg">Veg</option>
-                  <option value="non">Non-veg</option>
-                </select>
-                <select
-                  className={selectClass.replace('h-10', 'h-9')}
-                  name="categoryId"
-                  defaultValue={defaultCategoryId}
-                  aria-label="New item category"
-                >
-                  {liveCategories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-                <SubmitButton pendingLabel="Adding…" className="h-9">
-                  Add item
+                {/* Four inputs used to sit here unlabelled, each explaining
+                    itself only in a placeholder that vanishes on the first
+                    keystroke. Every field now carries a visible label, so the
+                    `aria-label`s that used to be the only name are gone —
+                    a hidden name that disagrees with the visible one is worse
+                    than no hidden name at all. */}
+                <label className="col-span-2 block sm:col-span-1">
+                  <span className="mb-1 block text-[11.5px] font-medium text-gink-46">Dish</span>
+                  <input
+                    className={`${inputClass.replace('h-11', 'h-9')}`}
+                    name="name"
+                    placeholder="e.g. Paneer Tikka"
+                    maxLength={120}
+                    required
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[11.5px] font-medium text-gink-46">Price (₹)</span>
+                  <input
+                    className={`${inputClass.replace('h-11', 'h-9')} tabular-nums`}
+                    name="price"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="0"
+                    required
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[11.5px] font-medium text-gink-46">Type</span>
+                  <select
+                    className={selectClass.replace('h-11', 'h-9')}
+                    name="veg"
+                    defaultValue="veg"
+                  >
+                    <option value="veg">Veg</option>
+                    <option value="non">Non-veg</option>
+                  </select>
+                </label>
+                <label className="col-span-2 block sm:col-span-1">
+                  <span className="mb-1 block text-[11.5px] font-medium text-gink-46">Category</span>
+                  <select
+                    className={selectClass.replace('h-11', 'h-9')}
+                    name="categoryId"
+                    defaultValue={defaultCategoryId}
+                  >
+                    {liveCategories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <SubmitButton pendingLabel="Adding…" className="col-span-2 w-full sm:col-span-1 sm:w-auto">
+                  Add dish
                 </SubmitButton>
               </form>
             )}
@@ -543,6 +632,67 @@ export function MenuEditorScreen({
               <Empty className="mb-3">
                 Add a category on the left and you can start adding items here.
               </Empty>
+            )}
+
+            {live && filtered && (
+              <form
+                method="get"
+                action="/dashboard/menus"
+                aria-label="Find a dish"
+                data-menu-filter
+                className="mb-2.5 flex flex-wrap items-end gap-2"
+              >
+                {selectedId && <input type="hidden" name="item" value={selectedId} />}
+                <label className="block min-w-[180px] flex-1">
+                  <span className="mb-1 block text-[11.5px] font-medium text-gink-46">
+                    Find a dish
+                  </span>
+                  <input
+                    type="search"
+                    name="q"
+                    defaultValue={q}
+                    className={inputClass.replace('h-11', 'h-9')}
+                    placeholder={`Search ${itemCount} ${itemCount === 1 ? 'dish' : 'dishes'}`}
+                    aria-label="Search dishes by name"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[11.5px] font-medium text-gink-46">Show</span>
+                  <select
+                    name="show"
+                    defaultValue={showFilter}
+                    className={selectClass.replace('h-11', 'h-9')}
+                  >
+                    <option value="all">All dishes</option>
+                    <option value="available">Available</option>
+                    <option value="soldout">Sold out</option>
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[11.5px] font-medium text-gink-46">Order</span>
+                  <select
+                    name="sort"
+                    defaultValue={sortOrder}
+                    className={selectClass.replace('h-11', 'h-9')}
+                  >
+                    <option value="menu">As on the menu</option>
+                    <option value="name">Name, A to Z</option>
+                    <option value="price-asc">Price, low to high</option>
+                    <option value="price-desc">Price, high to low</option>
+                  </select>
+                </label>
+                <button type="submit" className={btn('quiet', 'sm')}>
+                  Apply
+                </button>
+                {narrowActive && (
+                  <Link
+                    href={selectedId ? `/dashboard/menus?item=${encodeURIComponent(selectedId)}` : '/dashboard/menus'}
+                    className={btn('quiet', 'sm')}
+                  >
+                    Clear
+                  </Link>
+                )}
+              </form>
             )}
 
             <Card className="overflow-hidden">
@@ -555,7 +705,7 @@ export function MenuEditorScreen({
                       <Th>Availability</Th>
                       {/* Portions are real now, so the column applies to live
                           rows too. */}
-                      <Th>Portions</Th>
+                      <Th>Sizes</Th>
                       {/* The last column is this row's action, and the row
                           itself says which one is being edited. It used to be
                           headed "Status" and hold the MENU's Live/Draft badge,
@@ -567,12 +717,7 @@ export function MenuEditorScreen({
                     </tr>
                   </thead>
                   <tbody>
-                    {tableRows
-                      // The demo board was locked showing one category's worth
-                      // of rows. Live, that constant would match nothing -- so
-                      // the filter applies to the demo only.
-                      .filter((i) => (live ? true : i.category === 'curries'))
-                      .map((i) => (
+                    {rows.map((i) => (
                         <Tr
                           key={i.id}
                           data-row-selected={i.id === selected.id ? 'true' : undefined}
@@ -622,12 +767,17 @@ export function MenuEditorScreen({
                                   name="available"
                                   value={i.available ? 'false' : 'true'}
                                 />
+                                {/* A switch, drawn like a switch: a track and a
+                                    knob, no border, no pill around the label.
+                                    It used to be a bordered pill containing a
+                                    green track -- the only control of that
+                                    shape on the page. */}
                                 <SubmitButton
                                   bare
                                   data-availability={i.available ? 'on' : 'off'}
                                   aria-pressed={i.available}
                                   pendingLabel="Saving…"
-                                  className="inline-flex items-center gap-1.5 rounded-full text-[11.5px] font-medium text-gink-64 transition-colors hover:text-gink disabled:opacity-60"
+                                  className="group inline-flex h-9 items-center gap-2 rounded-[8px] pr-2 text-[12.5px] font-medium text-gink-64 transition-colors hover:text-gink disabled:opacity-60"
                                   title={
                                     i.available
                                       ? `Mark ${i.name} sold out`
@@ -637,14 +787,16 @@ export function MenuEditorScreen({
                                   <span
                                     aria-hidden="true"
                                     className={[
-                                      'relative inline-flex h-[18px] w-[30px] items-center rounded-full transition-colors',
-                                      i.available ? 'bg-[var(--p-accent)]' : 'bg-gink-28',
+                                      'relative inline-flex h-[22px] w-[38px] shrink-0 items-center rounded-full transition-colors duration-200',
+                                      i.available
+                                        ? 'bg-[var(--p-accent)]'
+                                        : 'bg-[rgba(25,20,17,0.16)] group-hover:bg-[rgba(25,20,17,0.22)]',
                                     ].join(' ')}
                                   >
                                     <span
                                       className={[
-                                        'absolute size-3.5 rounded-full bg-white shadow-[0_1px_1px_rgba(0,0,0,0.12)] transition-[left]',
-                                        i.available ? 'left-[13px]' : 'left-[2px]',
+                                        'absolute size-[16px] rounded-full bg-white shadow-[0_1px_2px_rgba(60,40,24,0.28)] transition-[left] duration-200 ease-out',
+                                        i.available ? 'left-[19px]' : 'left-[3px]',
                                       ].join(' ')}
                                     />
                                   </span>
@@ -679,8 +831,8 @@ export function MenuEditorScreen({
                                   {i.variants.length}
                                 </span>
                               ) : (
-                                <span data-portion-none className="text-gink-28">
-                                  —
+                                <span data-portion-none className="text-[12.5px] text-gink-46">
+                                  One price
                                 </span>
                               )
                             ) : i.variants ? (
@@ -691,8 +843,8 @@ export function MenuEditorScreen({
                                 {i.variants.length}
                               </span>
                             ) : (
-                              <span data-portion-none className="text-gink-28">
-                                —
+                              <span data-portion-none className="text-[12.5px] text-gink-46">
+                                One price
                               </span>
                             )}
                           </Td>
@@ -725,6 +877,30 @@ export function MenuEditorScreen({
                           </Td>
                         </Tr>
                       ))}
+                    {narrowActive && rows.length === 0 && (
+                      <tr>
+                        <Td colSpan={5} className="py-8 text-center">
+                          {/* Named honestly: the menu has dishes, the filter
+                              just does not match them. Saying "no dishes" here
+                              would be a lie about the restaurant's own menu. */}
+                          <p className="m-0 text-[13px] text-gink">
+                            {itemCount === 0
+                              ? 'This menu has no dishes yet.'
+                              : `No dishes match this view. All ${itemCount} are still here.`}
+                          </p>
+                          <Link
+                            href={
+                              selectedId
+                                ? `/dashboard/menus?item=${encodeURIComponent(selectedId)}`
+                                : '/dashboard/menus'
+                            }
+                            className="mt-2 inline-block text-[12.5px] font-medium text-[var(--p-accent)] underline decoration-[color-mix(in_oklab,var(--p-accent)_35%,transparent)] underline-offset-2 hover:decoration-[var(--p-accent)]"
+                          >
+                            Clear the filter
+                          </Link>
+                        </Td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </TableWrap>
@@ -855,7 +1031,7 @@ export function MenuEditorScreen({
                               data-remove-portion
                               aria-label={`Remove the ${v.name} portion`}
                               title={`Remove ${v.name}`}
-                              className="grid size-5 place-items-center rounded-full text-[13px] leading-none text-gink-46 hover:bg-gink-07 hover:text-gink"
+                              className="grid size-6 place-items-center rounded-full text-[13px] leading-none text-gink-46 hover:bg-gink-07 hover:text-gink"
                             >
                               ×
                             </button>
@@ -937,7 +1113,7 @@ export function MenuEditorScreen({
                             type="submit"
                             aria-label={`Remove the ${group.name} group`}
                             title={`Remove ${group.name}`}
-                            className="grid size-5 place-items-center rounded-full text-[13px] leading-none text-gink-46 hover:bg-gink-07 hover:text-gink"
+                            className="grid size-6 place-items-center rounded-full text-[13px] leading-none text-gink-46 hover:bg-gink-07 hover:text-gink"
                           >
                             ×
                           </button>
@@ -963,7 +1139,7 @@ export function MenuEditorScreen({
                                   type="submit"
                                   aria-label={`Remove ${addon.name}`}
                                   title={`Remove ${addon.name}`}
-                                  className="grid size-5 place-items-center rounded-full text-[13px] leading-none text-gink-46 hover:bg-gink-07 hover:text-gink"
+                                  className="grid size-6 place-items-center rounded-full text-[13px] leading-none text-gink-46 hover:bg-gink-07 hover:text-gink"
                                 >
                                   ×
                                 </button>

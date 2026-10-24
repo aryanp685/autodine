@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { Segmented } from './chrome';
+import { Segmented, Tag, btn, inputClass } from './chrome';
 import { PageMotion } from './PageMotion';
 
 /**
@@ -81,5 +81,47 @@ describe('Segmented', () => {
     );
 
     expect((html.match(/type="button"/g) ?? []).length).toBe(2);
+  });
+});
+
+/**
+ * The 2026-10-24 redesign, pinned as invariants rather than as screenshots.
+ *
+ * Three things made the old screen read as a developer tool: everything was a
+ * pill, every small label was 10-11px upper case, and the accent did three
+ * unrelated jobs at once. Each is easy to reintroduce one component at a time,
+ * which is exactly why they are asserted here.
+ */
+describe('the owner kit, after the redesign', () => {
+  it('makes actions rectangles, so a pill always means status', () => {
+    for (const size of ['sm', 'md'] as const) {
+      const cls = btn('solid', size);
+      expect(cls).toContain('rounded-[10px]');
+      expect(cls).not.toContain('rounded-full');
+    }
+  });
+
+  it('gives every action the same two heights', () => {
+    expect(btn('solid', 'sm')).toContain('h-9');
+    expect(btn('solid', 'md')).toContain('h-11');
+    // The 8px and 10px steps that produced four heights in one row are gone.
+    expect(btn('solid', 'sm')).not.toContain('h-8');
+    expect(btn('solid', 'md')).not.toContain('h-10');
+  });
+
+  it('gives a field the same 44px geometry as a md action', () => {
+    expect(inputClass).toContain('h-11');
+    expect(inputClass).toContain('rounded-[10px]');
+  });
+
+  it('keeps the pill for status, and never paints status with the accent', () => {
+    const live = renderToStaticMarkup(<Tag tone="live">Ready</Tag>);
+    expect(live).toContain('rounded-full');
+    // Green means settled/ready; copper is position and on-state only.
+    expect(live).toContain('--p-live');
+    expect(live).not.toContain('--p-accent');
+
+    const work = renderToStaticMarkup(<Tag tone="work">Editing</Tag>);
+    expect(work).toContain('--p-accent');
   });
 });
