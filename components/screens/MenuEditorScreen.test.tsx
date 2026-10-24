@@ -76,8 +76,48 @@ const item = (id: string, name: string, over: ItemOverride = {}): EditorItem => 
   ...over,
 });
 
-const render = (d: MenuEditorData | null, undo?: string) =>
-  renderToStaticMarkup(<MenuEditorScreen data={d} undo={undo} />);
+const render = (
+  d: MenuEditorData | null,
+  undo?: string,
+  filters: { query?: string; show?: string; sort?: string } = {}
+) => renderToStaticMarkup(<MenuEditorScreen data={d} undo={undo} {...filters} />);
+
+/** Nine dishes, enough that the find bar is worth showing. */
+const crowded = (over: Partial<MenuEditorData> = {}) =>
+  data({
+    categories: [{ id: 'c-1', name: 'Starters', itemCount: 9 }],
+    items: [
+      item('it-1', 'Paneer Tikka', { pricePaise: 32000 }),
+      item('it-2', 'Chicken Tikka', { pricePaise: 38000, veg: false }),
+      item('it-3', 'Dal Bukhara', { pricePaise: 27000 }),
+      item('it-4', 'Butter Naan', { pricePaise: 6000 }),
+      item('it-5', 'Masala Papad', { pricePaise: 9000, available: false }),
+      item('it-6', 'Tomato Shorba', { pricePaise: 18000 }),
+      item('it-7', 'Malai Kofta', { pricePaise: 34000, available: false }),
+      item('it-8', 'Jeera Rice', { pricePaise: 14000 }),
+      item('it-9', 'Gulab Jamun', { pricePaise: 12000 }),
+    ],
+    ...over,
+  });
+
+/**
+ * Every table row, in order, as its own markup string.
+ *
+ * Searching the whole document for a dish name is a trap: the detail panel
+ * beside the table also names every field it edits, so the first hit is often
+ * the panel rather than the row. Rows are what the filter changes.
+ */
+const rowsOf = (html: string) => html.match(/<tr[\s\S]*?<\/tr>/g) ?? [];
+
+/** The row markup for one dish, or '' when that dish is not in the table. */
+const rowOf = (html: string, name: string) =>
+  rowsOf(html).find((row) => row.includes(name)) ?? '';
+
+/** The dish names as they appear down the table, top to bottom. */
+const orderOf = (html: string, names: string[]) =>
+  rowsOf(html)
+    .map((row) => names.find((n) => row.includes(n)))
+    .filter((n): n is string => Boolean(n));
 
 describe('MenuEditorScreen, live', () => {
   it('offers every preset category as a chip when none exist yet', () => {
@@ -120,22 +160,24 @@ describe('MenuEditorScreen, live', () => {
     expect(html).toContain('name="price"');
     expect(html).toContain('name="veg"');
     expect(html).toContain('name="categoryId"');
-    expect(html).toContain('Add item');
+    // Renamed from "Add item" to "Add dish" in the 2026-10-24 redesign: the
+    // screen is a menu, and "item" is what the database calls it.
+    expect(html).toContain('Add dish');
   });
 
   it('hides the add row until a category exists, since an uncategorised item is invisible', () => {
     const html = render(data());
     expect(html).toContain('Add a category on the left');
-    expect(html).not.toContain('New item name');
+    expect(html).not.toContain('New dish name');
   });
 
-  it('shows a Portions column, now that portions exist', () => {
-    // The column used to be hidden when live: variants were not built, so it
-    // put an em dash on every row, which reads as a broken feature rather
-    // than an absent one. They are built, so it is shown.
+  it('heads the sizes column with what a guest actually picks', () => {
+    // Renamed from "Portions" in the 2026-10-24 redesign. A guest choosing
+    // Half or Full is picking a size at one price; the detail panel still
+    // talks about portions, which is the word the action names use.
     const html = render(data({ items: [item('i-1', 'Paneer Tikka')] }));
 
-    expect(html).toContain('Portions');
+    expect(html).toContain('>Sizes<');
     expect(html).not.toContain('Variants');
   });
 
@@ -154,9 +196,11 @@ describe('MenuEditorScreen, live', () => {
       })
     );
 
-    // Two portions on the first row, an em dash on the one with none.
+    // Two sizes on the first row, plain words on the one with none — an em
+    // dash there read as a broken column rather than a dish sold one way.
     expect(html).toContain('data-portion-count="2"');
     expect(html).toContain('data-portion-none');
+    expect(html).toContain('One price');
   });
 
   it('says the menu is live and offers to take it down when published', () => {
@@ -491,5 +535,121 @@ describe('the item table', () => {
     );
     expect(html).toContain('data-menu-items');
     expect(html).toContain('aria-label="Delete');
+  });
+});
+
+describe('MenuEditorScreen, finding a dish in a menu that grows', () => {
+  it('leaves a short menu alone', () => {
+    // Four rows need no filter, and a search box over four rows is furniture.
+    const html = render(
+      data({
+        categories: [{ id: 'c-1', name: 'Starters', itemCount: 2 }],
+        items: [item('a', 'Paneer Tikka'), item('b', 'Dal Bukhara')],
+      })
+    );
+    expect(html).not.toContain('data-menu-filter');
+  });
+
+  it('offers a find bar once the table is long enough to need one', () => {
+    const html = render(crowded());
+
+    expect(html).toContain('data-menu-filter');
+    expect(html).toContain('name="q"');
+    expect(html).toContain('name="show"');
+    expect(html).toContain('name="sort"');
+    // A GET form: it must work before hydration and survive a reload.
+    expect(html).toContain('method="get"');
+  });
+
+  it('narrows to the dish being searched for', () => {
+    const html = render(crowded(), undefined, { query: 'tik' });
+
+    expect(rowOf(html, 'Paneer Tikka')).not.toBe('');
+    expect(rowOf(html, 'Chicken Tikka')).not.toBe('');
+    expect(rowOf(html, 'Dal Bukhara')).toBe('');
+    expect(rowOf(html, 'Gulab Jamun')).toBe('');
+  });
+
+  it('ignores case, because nobody types it', () => {
+    const html = render(crowded(), undefined, { query: 'GULAB' });
+    expect(rowOf(html, 'Gulab Jamun')).not.toBe('');
+  });
+
+  it('shows only what is sold out when asked', () => {
+    const html = render(crowded(), undefined, { show: 'soldout' });
+
+    expect(rowOf(html, 'Masala Papad')).not.toBe('');
+    expect(rowOf(html, 'Malai Kofta')).not.toBe('');
+    expect(rowOf(html, 'Paneer Tikka')).toBe('');
+  });
+
+  it('shows only what is on sale when asked', () => {
+    const html = render(crowded(), undefined, { show: 'available' });
+
+    expect(rowOf(html, 'Paneer Tikka')).not.toBe('');
+    expect(rowOf(html, 'Masala Papad')).toBe('');
+  });
+
+  it('orders by price, and reverses it', () => {
+    const names = ['Butter Naan', 'Masala Papad', 'Paneer Tikka', 'Chicken Tikka'];
+    const low = orderOf(render(crowded(), undefined, { sort: 'price-asc' }), names);
+    const high = orderOf(render(crowded(), undefined, { sort: 'price-desc' }), names);
+
+    expect(low).toEqual(['Butter Naan', 'Masala Papad', 'Paneer Tikka', 'Chicken Tikka']);
+    expect(high).toEqual(['Chicken Tikka', 'Paneer Tikka', 'Masala Papad', 'Butter Naan']);
+  });
+
+  it('orders by name', () => {
+    const names = ['Butter Naan', 'Chicken Tikka', 'Dal Bukhara'];
+    expect(orderOf(render(crowded(), undefined, { sort: 'name' }), names)).toEqual(names);
+  });
+
+  it('keeps every dish on screen for a filter value it does not recognise', () => {
+    // A hand-edited URL must not produce an empty table that reads as an
+    // empty menu.
+    const html = render(crowded(), undefined, { show: 'veg-only' });
+    expect(rowOf(html, 'Paneer Tikka')).not.toBe('');
+    expect(rowOf(html, 'Gulab Jamun')).not.toBe('');
+  });
+
+  it('says the dishes still exist when a search finds none', () => {
+    const html = render(crowded(), undefined, { query: 'sushi' });
+
+    expect(html).toContain('No dishes match this view. All 9 are still here.');
+    expect(html).toContain('Clear the filter');
+  });
+
+  it('offers a clear control only while something is narrowed', () => {
+    // Two different clears, for two different situations: the bar offers one
+    // as soon as anything is narrowed, and the empty table offers its own.
+    expect(render(crowded())).not.toContain('>Clear<');
+    expect(render(crowded(), undefined, { query: 'dal' })).toContain('>Clear<');
+  });
+});
+
+describe('MenuEditorScreen, the bulk writes', () => {
+  const bulk = (html: string) => {
+    const start = html.indexOf('Mark all sold out');
+    const from = html.lastIndexOf('<button', start);
+    const to = html.indexOf('</form>', start);
+    return html.slice(from, to);
+  };
+
+  it('asks before marking the whole menu sold out', () => {
+    const html = render(crowded());
+    const control = bulk(html);
+
+    // Armed by a click, not fired by it: the first press is a plain button,
+    // and the write only happens from the confirm the press reveals.
+    expect(control).toContain('type="button"');
+    expect(control).not.toContain('type="submit"');
+    expect(html).not.toContain('Yes, all sold out');
+  });
+
+  it('puts dishes back on sale in one press, because nothing is lost', () => {
+    const html = render(crowded());
+    const start = html.indexOf('Mark all available');
+    const from = html.lastIndexOf('<button', start);
+    expect(html.slice(from, start)).toContain('type="submit"');
   });
 });

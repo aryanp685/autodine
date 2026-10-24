@@ -851,6 +851,19 @@ p { margin: 0; }
   outline-offset: 2px;
 }
 
+/* ---- a file picker -----------------------------------------------------
+   Picking a file and sending it are two steps, but they must not look like two
+   competing buttons. The upload control is in the DOM from the first paint (so
+   it works with JavaScript blocked) and is only SHOWN once the browser itself
+   considers the file input valid -- `:valid` on a required file input is true
+   the moment a file is chosen, with no script involved.
+
+   That is what stops "Choose another" and "Replace" from sitting side by side
+   as if they were two different commands. */
+[data-surface='owner'] .o-pick:not(:has(input[type='file']:valid)) .o-pick-go {
+  display: none;
+}
+
 /* ---- a choice row -------------------------------------------------------
    A list of orders to pick from on the counter screen. It cannot be `.bg-card`:
    the rule above sets the background of every card unconditionally, and being
