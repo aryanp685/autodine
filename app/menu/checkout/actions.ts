@@ -6,6 +6,7 @@ import { parseCart } from '@/lib/cart-storage';
 import { loadTableAccess } from '@/lib/table-access';
 import {
   describePlaceFailure,
+  isNamedPlaceFailure,
   isTransientPlaceCode,
 } from '@/lib/place-order-failure';
 
@@ -38,7 +39,7 @@ const TRANSIENT_RETRY_WAITS_MS = [400, 1200];
  * The cart page reads `s` and gates on it, so dropping it also dropped the
  * table gate. Passing it through fixes both at once.
  */
-function fail(message: string, slug?: string, code?: string): never {
+function fail(message: string, slug?: string, code?: string, detail?: string): never {
   const query = new URLSearchParams({ error: message });
   if (slug) query.set('s', slug);
   /**
@@ -53,6 +54,22 @@ function fail(message: string, slug?: string, code?: string): never {
    * turns "please try again" into a fact somebody can act on.
    */
   if (code) query.set('code', code);
+  /**
+   * The database's own words, for a failure nobody has classified.
+   *
+   * TEMPORARY, AND DELETED ONCE THE CAUSE IS KNOWN
+   *
+   * Production runtime logs are not readable by the person who reported this,
+   * so a failure that only exists in `console.error` is unreachable: the guest
+   * sees "Reference 21000" and nobody can say which statement raised it. This
+   * carries the sentence as far as the screen, collapsed under "Details for
+   * staff", so one reproduction is enough to end the guessing.
+   *
+   * Only the unclassified branch passes this, and only alongside the reference
+   * it already asks the guest to quote. Every named class keeps its plain
+   * sentence and nothing else.
+   */
+  if (detail) query.set('d', detail.slice(0, 400));
   redirect(`${CART_PATH}?${query.toString()}`);
 }
 
@@ -225,7 +242,16 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
     //
     // The database's own words never reach the banner: these are the classes
     // of refusal, written for the person reading them at a table.
-    fail(describePlaceFailure(error.code), slug, error.code || 'net');
+    fail(
+      describePlaceFailure(error.code),
+      slug,
+      error.code || 'net',
+      isNamedPlaceFailure(error.code)
+        ? undefined
+        : [error.message, error.details, error.hint && `hint: ${error.hint}`]
+            .filter(Boolean)
+            .join(' · ')
+    );
   }
 
   if (typeof code !== 'string' || code === '') {

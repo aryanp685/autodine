@@ -66,6 +66,7 @@ export function Cart({
   items,
   placedError,
   placedErrorCode,
+  placedErrorDetail,
 }: {
   slug?: string;
   restaurantName?: string;
@@ -93,6 +94,15 @@ export function Cart({
    * connection from a missing column.
    */
   placedErrorCode?: string;
+  /**
+   * The database's own message for a failure nobody has classified yet.
+   *
+   * Never the guest's primary sentence -- that is `placedError`, written for a
+   * person at a table. This is the raw text, collapsed, so a demonstration that
+   * breaks can be diagnosed from a screenshot instead of from server logs the
+   * operator cannot open.
+   */
+  placedErrorDetail?: string;
 }) {
   const cart = useCart();
 
@@ -199,6 +209,16 @@ export function Cart({
                   <p className="mt-1 text-[10.5px] leading-[1.45] text-gink-46">
                     Reference {placedErrorCode} — quote this to staff if it happens again.
                   </p>
+                ) : null}
+                {placedErrorDetail ? (
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-[10.5px] leading-[1.45] text-gink-46 underline underline-offset-2">
+                      Details for staff
+                    </summary>
+                    <p className="mt-1 break-words font-mono text-[10.5px] leading-[1.45] text-gink-46">
+                      {placedErrorDetail}
+                    </p>
+                  </details>
                 ) : null}
               </div>
               <Link

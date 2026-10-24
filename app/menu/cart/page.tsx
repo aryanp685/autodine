@@ -26,9 +26,9 @@ export const metadata: Metadata = { title: 'Your order · AutoDine' };
 export default async function CartPage({
   searchParams,
 }: {
-  searchParams: Promise<{ s?: string; error?: string; code?: string }>;
+  searchParams: Promise<{ s?: string; error?: string; code?: string; d?: string }>;
 }) {
-  const { s, error, code } = await searchParams;
+  const { s, error, code, d } = await searchParams;
 
   const access = await loadTableAccess(s);
 
@@ -63,6 +63,9 @@ export default async function CartPage({
         // a small reference so a failure nobody has seen before can be named
         // from a screenshot instead of reproduced.
         placedErrorCode={code}
+        // The unclassified failure's own sentence, for whoever fixes it. The
+        // banner keeps it collapsed; see the note in the checkout action.
+        placedErrorDetail={d}
       />
     </CartProvider>
   );
