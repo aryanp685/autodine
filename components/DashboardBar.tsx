@@ -43,8 +43,24 @@ export { DASHBOARD_LINKS };
  * Only the box changes between those three: one tree, one order, one set of
  * names, so a destination cannot exist on a laptop and not on a phone.
  *
- * The kitchen board does not use this shell at all: it is a full-screen wall
- * display with no navigation, by design.
+ * EVERY STAFF SCREEN USES THIS SHELL, INCLUDING THE KITCHEN BOARD
+ *
+ * The kitchen board used to be exempt: it rendered its own full-screen frame,
+ * with its own header and one "Dashboard" link as the only way out. That read
+ * as a separate application. A manager watching service moves between the
+ * rail and the board dozens of times a shift, and each move threw the venue,
+ * the outlet and the way back away.
+ *
+ * The board now renders this bar like the other nine screens. What it keeps is
+ * its density -- a wider content column and its audio controls as page
+ * actions -- because that is a layout decision, not a reason to leave the
+ * product's navigation behind.
+ *
+ * A screen is never asked to import this and render it directly: pages render
+ * <DashboardBar> on the server and hand it to a client screen as a node (see
+ * app/cashier/page.tsx and app/kitchen/page.tsx). Importing it into a client
+ * component would pull the sign-out action and its server-only admin imports
+ * into the browser bundle.
  */
 export function DashboardBar({
   active,

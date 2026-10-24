@@ -199,9 +199,9 @@ export function TablesScreen({
                         </span>
                         <Tag tone={state.tone}>{state.word}</Tag>
                       </div>
-                      <div className="mt-1 text-[11.5px] text-gink-46">
-                        {t.label} · {t.seats} seats
-                      </div>
+                      {/* `label` is already "4 seater": printing the seat
+                          count after it read "4 seater · 4 seats". */}
+                      <div className="mt-1 text-[11.5px] text-gink-46">{t.label}</div>
                     </div>
                     {/* The code is the card's whole point, so it is drawn at a
                         size a phone can still read across a table. */}

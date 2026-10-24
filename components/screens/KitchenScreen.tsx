@@ -2,10 +2,11 @@
 
 import { rupeesToPaise } from '@/lib/money';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { kitchenOrders, restaurant, type KitchenOrder } from '@/lib/demo-data';
 import { Money, VegMark } from '@/components/ui';
+import { OwnerPage, PageHead } from '@/components/owner/chrome';
+import type { OutletBar } from '@/lib/outlets';
 import type { KitchenScreenData, KitchenTicket } from '@/lib/db/kitchen-screen';
 import { clockTimeInZone } from '@/lib/db/time';
 import { LATE_AFTER_MIN, WARN_AFTER_MIN, nextPrepState, type PrepState } from '@/lib/db/prep';
@@ -213,7 +214,16 @@ function Items({ order, compact }: { order: BoardTicket; compact?: boolean }) {
                 sound off, engine wedged -- the board says so in one banner,
                 in the words the operator needs, and says how to fix it
    ========================================================================== */
-export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
+export function Kitchen({
+  data,
+  outlet,
+  signOut,
+}: {
+  data?: KitchenScreenData | null;
+  outlet?: OutletBar | null;
+  /** Off when the trial or subscription gate has closed the workspace. */
+  signOut?: boolean;
+}) {
   const router = useRouter();
 
   const [audio, setAudio] = useState(true);
@@ -969,522 +979,543 @@ export function Kitchen({ data }: { data?: KitchenScreenData | null }) {
   };
 
   return (
-    <div data-surface="owner" className="min-h-dvh bg-paper text-gink antialiased">
-      {/* A wall board: no rail, no search. The one way off it is a link back to
-          the dashboard, because until this existed the only exit was the
-          browser's back button on a screen that is mounted on a wall. */}
-      <header className="sticky top-0 z-30 border-b border-hair bg-paper/92 backdrop-blur-xl">
-        <div className="mx-auto w-full max-w-[1600px] px-4 py-3 sm:px-6">
-          <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold tracking-[0.16em] text-gink-46 uppercase">
-                Kitchen · {live ? 'live board' : 'demo mode'}
-              </p>
-              <h1 className="mt-1 truncate text-[clamp(1.4rem,2.2vw,1.95rem)] leading-none font-semibold tracking-[-0.035em] text-gink">
-                {live ? data?.restaurantName : restaurant.name}
-              </h1>
+    /*
+     * THE SAME SHELL AS EVERY OTHER STAFF SCREEN
+     *
+     * This board used to be a full-screen wall display with no navigation: its
+     * own header, its own frame, and one link back to the dashboard as the only
+     * way out. That was a deliberate decision, and it was wrong for how the
+     * product is actually used -- a manager moves between the floor, the
+     * counter and the board all shift, and every trip to Kitchen dropped the
+     * rail, the venue and the way back.
+     *
+     * It is now an OwnerPage like the other nine screens. The rail, the top
+     * bar, the outlet switcher and sign-out are the shared ones, `active`
+     * marks Kitchen in it, and navigation to and from it is ordinary client
+     * navigation -- no reload, and the URL still works on a refresh.
+     *
+     * The board keeps its own density: a wider column, the ticket grid, and the
+     * audio controls as this page's actions rather than chrome above the shell.
+     */
+    <OwnerPage active="kitchen" outlet={outlet} signOut={signOut} wide>
+      <PageHead
+        kicker={live ? 'Kitchen · live board' : 'Kitchen · demo mode'}
+        title={live ? data?.restaurantName || 'Kitchen' : restaurant.name}
+        meta={
+          live
+            ? 'Tickets arrive the moment a guest confirms. Nothing here is cached.'
+            : 'A rehearsal board: nothing here reaches a kitchen.'
+        }
+        actions={
+          <div className="flex flex-wrap items-center gap-1.5">
+            <div className="inline-flex h-8 items-center gap-1.5 rounded-full bg-paper-deep px-2.5 text-[11.5px] font-medium text-gink-64">
+              <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--p-accent)]" />
+              {live
+                ? delivery === 'live'
+                  ? 'Live · instant'
+                  : delivery === 'connecting'
+                    ? 'Live · connecting…'
+                    : 'Live · checking every 5s'
+                : 'Demo board · local only'}
             </div>
-
-            <div className="flex flex-wrap items-center gap-1.5">
-              <Link
-                href="/dashboard"
-                className="inline-flex h-8 items-center rounded-full border border-hair-strong px-3 text-[11.5px] font-medium text-gink-64 transition-colors hover:border-gink-28 hover:text-gink"
-              >
-                Dashboard
-              </Link>
-
-              {/* Sound is the point of this screen, so its state is a control
-                  and not a setting buried somewhere: one tap turns it off. */}
-              <div
-                className={[
-                  'flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[11.5px] font-medium',
-                  audio
-                    ? 'bg-accent-soft text-[var(--p-accent)]'
-                    : 'border border-hair-strong text-gink-64',
-                ].join(' ')}
-              >
-                <span
-                  aria-hidden="true"
-                  className={['size-1.5 rounded-full', audio ? 'bg-[var(--p-accent)]' : 'bg-gink-28'].join(' ')}
-                />
-                Kitchen audio {audio ? 'on' : 'off'}
-                <button
-                  type="button"
-                  onClick={() => setAudio((value) => !value)}
-                  className="ml-0.5 rounded-full px-1.5 py-0.5 text-[11px] underline decoration-current/40 underline-offset-2 hover:no-underline"
-                >
-                  {audio ? 'Turn off' : 'Turn on'}
-                </button>
-              </div>
-
-              {/* What will actually be spoken, named. Not a language picker:
-                  there is one language, and a picker would imply a second one
-                  exists. */}
-              <span
-                title={voiceName ? `Voice: ${voiceName}` : 'No Hindi voice on this device'}
-                className={[
-                  'inline-flex h-8 items-center rounded-full px-2.5 text-[11.5px] font-medium',
-                  voiceState === 'ready'
-                    ? 'bg-accent-soft text-[var(--p-accent)]'
-                    : 'border border-[var(--alert)]/30 text-[var(--alert)]',
-                ].join(' ')}
-              >
-                {voiceState === 'starting'
-                  ? 'हिंदी · आवाज़ खोज रहे हैं'
-                  : voiceState === 'ready'
-                    ? 'हिंदी · तैयार'
-                    : 'हिंदी · आवाज़ नहीं'}
+            {waiting > 0 && (
+              <span className="inline-flex h-8 items-center rounded-full bg-gink px-2.5 text-[11.5px] font-medium text-onink">
+                {waiting} waiting
               </span>
-
-              {/* Speed. A hurried Hindi voice is what sounds slurred, so the
-                  operator gets the last word on pace instead of a constant. */}
-              <div
-                role="group"
-                aria-label="आवाज़ की रफ़्तार — voice speed"
-                className="inline-flex h-8 items-center rounded-full border border-hair-strong p-0.5"
-              >
-                {(['slow', 'normal', 'fast'] as const).map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    aria-pressed={speed === value}
-                    onClick={() => {
-                      setSpeed(value);
-                      speedRef.current = value;
-                      speechRef.current?.setRateScale(SPEEDS[value]);
-                    }}
-                    className={[
-                      'h-7 rounded-full px-2.5 text-[11px] font-medium transition-colors',
-                      speed === value ? 'bg-gink text-onink' : 'text-gink-46 hover:text-gink',
-                    ].join(' ')}
-                  >
-                    {value === 'slow' ? 'धीमा' : value === 'normal' ? 'सामान्य' : 'तेज़'}
-                  </button>
-                ))}
-              </div>
-
-              {/* Which Hindi voice. A device can carry two, and they are not
-                  equally good -- an embedded engine and a downloaded neural one
-                  both answer to hi-IN. Only shown when there is a real choice. */}
-              {voiceList.length > 1 && (
-                <select
-                  aria-label="Hindi voice"
-                  value={voicePref}
-                  onChange={(event) => {
-                    const next = event.target.value;
-                    setVoicePref(next);
-                    speechRef.current?.setVoiceName(next || null);
-                    setVoiceName(speechRef.current?.voiceName() ?? null);
-                  }}
-                  className="h-8 max-w-[190px] rounded-full border border-hair-strong bg-card px-2 pr-6 text-[11.5px] text-gink focus:border-gink focus:outline-none"
-                >
-                  <option value="">सबसे अच्छी आवाज़ (auto)</option>
-                  {voiceList.map((voice) => (
-                    <option key={voice.name} value={voice.name}>
-                      {voice.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-
-              {live && (
-                <button
-                  type="button"
-                  onClick={() => setSpeaksHere((value) => !value)}
-                  title="Turn this off on a second screen in the same kitchen, so orders are not read out twice"
-                  className={[
-                    'h-8 rounded-full px-2.5 text-[11.5px] font-medium transition-colors',
-                    speaksHere
-                      ? 'bg-accent-soft text-[var(--p-accent)]'
-                      : 'border border-hair-strong text-gink-46',
-                  ].join(' ')}
-                >
-                  {speaksHere ? 'This screen speaks' : 'Screen muted'}
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => replay(`test:${Date.now()}`, sampleText, 'Test')}
-                className="h-8 rounded-full border border-hair-strong px-3 text-[11.5px] font-medium text-gink-64 transition-colors hover:text-gink"
-              >
-                Test announcement
-              </button>
-              <button
-                type="button"
-                disabled={!latest}
-                onClick={() => {
-                  if (!latest) return;
-                  replay(
-                    `new:${latest.orderId ?? latest.key}`,
-                    orderAnnouncement(latest),
-                    announceLogLabel(latest.table, latest.items),
-                  );
-                }}
-                className="h-8 rounded-full border border-hair-strong px-3 text-[11.5px] font-medium text-gink-64 transition-colors hover:text-gink disabled:opacity-40"
-              >
-                Replay latest
-              </button>
-
-              <div className="inline-flex h-8 items-center gap-1.5 rounded-full bg-paper-deep px-2.5 text-[11.5px] font-medium text-gink-64">
-                <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--p-accent)]" />
-                {live
-                  ? delivery === 'live'
-                    ? 'Live · instant'
-                    : delivery === 'connecting'
-                      ? 'Live · connecting…'
-                      : 'Live · checking every 5s'
-                  : 'Demo board · local only'}
-              </div>
-              {waiting > 0 && <span className="inline-flex h-8 items-center rounded-full bg-gink px-2.5 text-[11.5px] font-medium text-onink">{waiting} waiting</span>}
-            </div>
+            )}
           </div>
-        </div>
-      </header>
+        }
+      />
 
-      <main className="mx-auto w-full max-w-[1600px] px-4 pt-4 pb-10 sm:px-6">
-        {/* ----------------------------------------------------- the one banner */}
-
-        <div className="flex flex-col gap-2">
-          {/* The sample board behaves. Saying so is what stops a tap from
-              looking like it did nothing: the ticket moves, and only this
-              browser knows. */}
-          {!live && (
-            <div role="note" className="rounded-[10px] border border-hair bg-card px-3.5 py-2.5 text-[12.5px] leading-[1.5] text-gink-64">
-              <strong className="font-semibold text-gink">Sample board.</strong>{' '}
-              These tickets are fictional. A tap moves one here and nowhere else — connect the database
-              to run a real service.
-            </div>
-          )}
-
-          {status && (
-            <div
-              role={status.tone === 'alert' ? 'alert' : 'status'}
-              className={[
-                'flex flex-wrap items-center gap-x-2.5 gap-y-1.5 rounded-[10px] px-3.5 py-2.5 text-[12.5px] leading-[1.5]',
-                status.tone === 'alert'
-                  ? 'border border-[var(--alert)]/30 bg-[var(--alert)]/6 text-gink'
-                  : 'border border-hair bg-card text-gink-64',
-              ].join(' ')}
-            >
-              <strong className="font-semibold text-gink">{status.title}</strong>
-              <span>{status.body}</span>
-              {status.action && (
-                <button
-                  type="button"
-                  onClick={status.action.run}
-                  className="rounded-full border border-hair-strong px-2.5 py-1 text-[11.5px] font-medium text-gink"
-                >
-                  {status.action.label}
-                </button>
-              )}
-            </div>
-          )}
-
-          {missed.length > 0 && (
-            <div
-              role="status"
-              className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1.5 rounded-[10px] border border-hair bg-accent-soft px-3.5 py-2.5 text-[12.5px] leading-[1.5] text-gink-64"
-            >
-              <strong className="font-semibold text-gink">
-                {missed.length} order{missed.length === 1 ? '' : 's'} {missed.length === 1 ? 'has' : 'have'} not
-                been read out.
-              </strong>
-              <span>
-                {/* Two honest reasons, and they are not the same thing. */}
-                {missedReason === 'muted'
-                  ? 'They arrived while this screen was muted or the sound was off.'
-                  : voiceState === 'ready'
-                    ? 'They were placed before this board was opened. The pass may have seen them already.'
-                    : 'They arrived while this device had no voice to read them with.'}{' '}
-                They are on the board below.
-              </span>
-              <button
-                type="button"
-                onClick={readMissed}
-                className="rounded-full bg-gink px-2.5 py-1 text-[11.5px] font-medium text-onink"
-              >
-                Read them out
-              </button>
-              <button
-                type="button"
-                onClick={() => setMissed([])}
-                className="rounded-full px-1.5 py-1 text-[11.5px] font-medium text-gink-64 underline underline-offset-2"
-              >
-                Dismiss
-              </button>
-            </div>
-          )}
-
-          {log.length > 0 && (
-            <section
-              aria-label="Recent announcements"
-              className="rounded-[10px] border border-hair bg-card"
-            >
-              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-hair px-3.5 py-2">
-                {/* "Spoken" would be a lie while muted: the entries are what the
-                    board WOULD have read out. The text is the exact string
-                    handed to the voice, Devanagari and all -- so the owner can
-                    read what the kitchen will hear. */}
-                <span className="text-[10.5px] font-semibold tracking-[0.12em] text-gink-46 uppercase">
-                  Announcements
-                </span>
-                <span className="text-[11px] text-gink-46">
-                  {audio && speaksHere
-                    ? voiceState === 'ready'
-                      ? `हिंदी · ${voiceName ?? 'voice'}`
-                      : 'हिंदी · no voice on this device'
-                    : 'muted on this screen — nothing was read aloud'}
-                </span>
-              </div>
-              <ul className="divide-y divide-hair">
-                {log.map((entry) => (
-                  <li key={`${entry.key}-${entry.at}`} className="flex items-baseline gap-2.5 px-3.5 py-1.5 text-[12px]">
-                    <span className="tnum shrink-0 text-gink-46">{entry.at}</span>
-                    <span className="shrink-0 font-medium text-gink-64">{entry.label}</span>
-                    <span className="min-w-0 flex-1 truncate text-gink">{entry.text}</span>
-                    <button
-                      type="button"
-                      aria-label={`Replay ${entry.label}`}
-                      onClick={() => replay(`${entry.key}:replay:${entry.at}`, entry.text, entry.label)}
-                      className="shrink-0 text-[11px] font-medium text-gink-64 underline underline-offset-2 hover:text-gink"
-                    >
-                      Replay
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {announcement && (
-            <p role="status" className="text-[12px] text-gink-46">
-              {/* "Last announcement" was a half-truth: it was the last thing the
-                  queue ACCEPTED, which in a burst is not the thing being said. */}
-              {speaking ? 'Speaking now' : 'Last announcement'}: {announcement}
-            </p>
-          )}
-
-          {error && (
-            <div
-              role="alert"
-              className="rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/6 px-3.5 py-2.5"
-            >
-              <strong className="text-[12.5px] font-semibold text-gink">Could not update the ticket.</strong>
-              <p className="mt-0.5 text-[12.5px] text-gink-64">{error}</p>
-            </div>
-          )}
-
-          {data?.blocked && <SignInPrompt reason={data.blocked} screen="kitchen board" />}
-
-          {/* -------------------------------------------------- why nothing moves */}
-
-          {/* One banner, naming the actual obstacle. The buttons below are not
-              rendered in this state, so this is the only explanation on screen. */}
-          {live && data && !data.blocked && !data.canAdvance && (
-            <div role="status" className="rounded-[10px] border border-hair-strong bg-card px-3.5 py-2.5 text-[12.5px] leading-[1.5]">
-              <strong className="font-semibold text-gink">
-                {data.cannotAdvance === 'plan'
-                  ? 'Read-only: the server is refusing writes for this restaurant.'
-                  : 'You can watch this board, but not move tickets.'}
-              </strong>{' '}
-              <span className="text-gink-64">
-                {data.cannotAdvance === 'plan'
-                  ? 'Its plan or trial period is not currently active. Menus, orders and reports stay readable, and tickets start moving again the moment access is restored — nothing has been deleted.'
-                  : `A ${data.role ?? 'member'} can see the kitchen board; moving a ticket needs an owner, a manager or kitchen staff. Ask one of them to take a screen.`}
-              </span>
-            </div>
-          )}
-
-          {live && data && !data.blocked && data.tickets.length === 0 && (
-            <div className="rounded-[10px] border border-dashed border-hair-strong px-3.5 py-4 text-center text-[13px] text-gink-46">
-              No open tickets in the last few hours. Orders placed from the customer menu appear here
-              the moment the guest confirms.
-            </div>
-          )}
+      {/*
+       * THE SOUND DESK
+       *
+       * Everything about the voice lives in one band directly under the title,
+       * because it is one job: is it on, which voice, how fast, and can I hear
+       * it. In the old full-screen header these controls were mixed in with
+       * navigation and the delivery pill, which made the one thing a cook
+       * actually adjusts at 9pm the hardest thing to find.
+       *
+       * They are controls, not settings: each writes only to this screen --
+       * speed and voice to the speech engine, mute to this device -- and none
+       * of them touches an order.
+       */}
+      <section
+        aria-label="Announcements"
+        className="mb-5 flex flex-wrap items-center gap-1.5 rounded-[12px] border border-hair bg-card px-3 py-2.5"
+      >
+        {/* Sound is the point of this screen, so its state is a control and not
+            a setting buried somewhere: one tap turns it off. */}
+        <div
+          className={[
+            'flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[11.5px] font-medium',
+            audio ? 'bg-accent-soft text-[var(--p-accent)]' : 'border border-hair-strong text-gink-64',
+          ].join(' ')}
+        >
+          <span
+            aria-hidden="true"
+            className={['size-1.5 rounded-full', audio ? 'bg-[var(--p-accent)]' : 'bg-gink-28'].join(' ')}
+          />
+          Kitchen audio {audio ? 'on' : 'off'}
+          <button
+            type="button"
+            onClick={() => setAudio((value) => !value)}
+            className="ml-0.5 rounded-full px-1.5 py-0.5 text-[11px] underline decoration-current/40 underline-offset-2 hover:no-underline"
+          >
+            {audio ? 'Turn off' : 'Turn on'}
+          </button>
         </div>
 
-        {/* ----------------------------------------------------- phone columns */}
+        {/* What will actually be spoken, named. Not a language picker: there is
+            one language, and a picker would imply a second one exists. */}
+        <span
+          title={voiceName ? `Voice: ${voiceName}` : 'No Hindi voice on this device'}
+          className={[
+            'inline-flex h-8 items-center rounded-full px-2.5 text-[11.5px] font-medium',
+            voiceState === 'ready'
+              ? 'bg-accent-soft text-[var(--p-accent)]'
+              : 'border border-[var(--alert)]/30 text-[var(--alert)]',
+          ].join(' ')}
+        >
+          {voiceState === 'starting'
+            ? 'हिंदी · आवाज़ खोज रहे हैं'
+            : voiceState === 'ready'
+              ? 'हिंदी · तैयार'
+              : 'हिंदी · आवाज़ नहीं'}
+        </span>
 
-        {/* Hidden above 900px, where all three columns are on screen at once.
-            Counts live in the tabs so an empty column can be skipped without
-            opening it -- on a phone, the queue you cannot see still has to be
-            legible. */}
-        <nav aria-label="Ticket columns" className="mt-3 flex gap-1.5 lg:hidden">
-          {cols.map((c) => (
+        {/* Speed. A hurried Hindi voice is what sounds slurred, so the operator
+            gets the last word on pace instead of a constant. */}
+        <div
+          role="group"
+          aria-label="आवाज़ की रफ़्तार — voice speed"
+          className="inline-flex h-8 items-center rounded-full border border-hair-strong p-0.5"
+        >
+          {(['slow', 'normal', 'fast'] as const).map((value) => (
             <button
-              key={c.key}
+              key={value}
               type="button"
-              aria-pressed={mobileCol === c.key}
-              onClick={() => setMobileCol(c.key as typeof mobileCol)}
+              aria-pressed={speed === value}
+              onClick={() => {
+                setSpeed(value);
+                speedRef.current = value;
+                speechRef.current?.setRateScale(SPEEDS[value]);
+              }}
               className={[
-                'flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full text-[12.5px] font-medium transition-colors',
-                mobileCol === c.key
-                  ? 'bg-gink text-onink'
-                  : 'border border-hair-strong text-gink-64',
+                'h-7 rounded-full px-2.5 text-[11px] font-medium transition-colors',
+                speed === value ? 'bg-gink text-onink' : 'text-gink-46 hover:text-gink',
               ].join(' ')}
             >
-              {c.title}
-              <span className="tnum text-[11px] opacity-70">{c.orders.length}</span>
+              {value === 'slow' ? 'धीमा' : value === 'normal' ? 'सामान्य' : 'तेज़'}
             </button>
           ))}
-        </nav>
+        </div>
 
-        <div className="mt-3 grid gap-3 lg:grid-cols-3">
-          {cols.map((c) => (
-            <section
-              key={c.key}
-              aria-label={c.title}
-              className={[
-                'min-w-0',
-                /* On a phone only the chosen column is shown. Above 900px all
-                   three are, side by side, because a cook reads the queue by
-                   shape rather than by tapping. */
-                mobileCol === c.key ? 'block' : 'hidden lg:block',
-              ].join(' ')}
+        {/* Which Hindi voice. A device can carry two, and they are not equally
+            good -- an embedded engine and a downloaded neural one both answer
+            to hi-IN. Only shown when there is a real choice. */}
+        {voiceList.length > 1 && (
+          <select
+            aria-label="Hindi voice"
+            value={voicePref}
+            onChange={(event) => {
+              const next = event.target.value;
+              setVoicePref(next);
+              speechRef.current?.setVoiceName(next || null);
+              setVoiceName(speechRef.current?.voiceName() ?? null);
+            }}
+            className="h-8 max-w-[190px] rounded-full border border-hair-strong bg-card px-2 pr-6 text-[11.5px] text-gink focus:border-gink focus:outline-none"
+          >
+            <option value="">सबसे अच्छी आवाज़ (auto)</option>
+            {voiceList.map((voice) => (
+              <option key={voice.name} value={voice.name}>
+                {voice.name}
+              </option>
+            ))}
+          </select>
+        )}
+
+        <span className="mx-1 hidden h-5 w-px bg-hair sm:block" aria-hidden="true" />
+
+        {live && (
+          <button
+            type="button"
+            onClick={() => setSpeaksHere((value) => !value)}
+            title="Turn this off on a second screen in the same kitchen, so orders are not read out twice"
+            className={[
+              'h-8 rounded-full px-2.5 text-[11.5px] font-medium transition-colors',
+              speaksHere ? 'bg-accent-soft text-[var(--p-accent)]' : 'border border-hair-strong text-gink-46',
+            ].join(' ')}
+          >
+            {speaksHere ? 'This screen speaks' : 'Screen muted'}
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => replay(`test:${Date.now()}`, sampleText, 'Test')}
+          className="h-8 rounded-full border border-hair-strong px-3 text-[11.5px] font-medium text-gink-64 transition-colors hover:text-gink"
+        >
+          Test announcement
+        </button>
+        <button
+          type="button"
+          disabled={!latest}
+          onClick={() => {
+            if (!latest) return;
+            replay(
+              `new:${latest.orderId ?? latest.key}`,
+              orderAnnouncement(latest),
+              announceLogLabel(latest.table, latest.items),
+            );
+          }}
+          className="h-8 rounded-full border border-hair-strong px-3 text-[11.5px] font-medium text-gink-64 transition-colors hover:text-gink disabled:opacity-40"
+        >
+          Replay latest
+        </button>
+      </section>
+
+        {/* ----------------------------------------------------- the one banner */}
+
+      <div className="flex flex-col gap-2">
+        {/* The sample board behaves. Saying so is what stops a tap from
+            looking like it did nothing: the ticket moves, and only this
+            browser knows. */}
+        {!live && (
+          <div role="note" className="rounded-[10px] border border-hair bg-card px-3.5 py-2.5 text-[12.5px] leading-[1.5] text-gink-64">
+            <strong className="font-semibold text-gink">Sample board.</strong>{' '}
+            These tickets are fictional. A tap moves one here and nowhere else — connect the database
+            to run a real service.
+          </div>
+        )}
+
+        {status && (
+          <div
+            role={status.tone === 'alert' ? 'alert' : 'status'}
+            className={[
+              'flex flex-wrap items-center gap-x-2.5 gap-y-1.5 rounded-[10px] px-3.5 py-2.5 text-[12.5px] leading-[1.5]',
+              status.tone === 'alert'
+                ? 'border border-[var(--alert)]/30 bg-[var(--alert)]/6 text-gink'
+                : 'border border-hair bg-card text-gink-64',
+            ].join(' ')}
+          >
+            <strong className="font-semibold text-gink">{status.title}</strong>
+            <span>{status.body}</span>
+            {status.action && (
+              <button
+                type="button"
+                onClick={status.action.run}
+                className="rounded-full border border-hair-strong px-2.5 py-1 text-[11.5px] font-medium text-gink"
+              >
+                {status.action.label}
+              </button>
+            )}
+          </div>
+        )}
+
+        {missed.length > 0 && (
+          <div
+            role="status"
+            className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1.5 rounded-[10px] border border-hair bg-accent-soft px-3.5 py-2.5 text-[12.5px] leading-[1.5] text-gink-64"
+          >
+            <strong className="font-semibold text-gink">
+              {missed.length} order{missed.length === 1 ? '' : 's'} {missed.length === 1 ? 'has' : 'have'} not
+              been read out.
+            </strong>
+            <span>
+              {/* Two honest reasons, and they are not the same thing. */}
+              {missedReason === 'muted'
+                ? 'They arrived while this screen was muted or the sound was off.'
+                : voiceState === 'ready'
+                  ? 'They were placed before this board was opened. The pass may have seen them already.'
+                  : 'They arrived while this device had no voice to read them with.'}{' '}
+              They are on the board below.
+            </span>
+            <button
+              type="button"
+              onClick={readMissed}
+              className="rounded-full bg-gink px-2.5 py-1 text-[11.5px] font-medium text-onink"
             >
-              <div className="mb-2 flex items-baseline justify-between gap-2 border-b border-hair pb-1.5">
-                <h2 className="text-[11px] font-semibold tracking-[0.12em] text-gink uppercase">{c.title}</h2>
-                <span className="tnum text-[11.5px] font-medium text-gink-46">{c.orders.length}</span>
-              </div>
+              Read them out
+            </button>
+            <button
+              type="button"
+              onClick={() => setMissed([])}
+              className="rounded-full px-1.5 py-1 text-[11.5px] font-medium text-gink-64 underline underline-offset-2"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
-              <div className="grid gap-2">
-                {c.orders.map((o) => (
-                  <article
-                    key={o.key}
-                    data-state={o.state}
-                    data-arriving={arrivals.includes(o.key) ? 'true' : undefined}
-                    className={[
-                      'rounded-[12px] border bg-card p-3',
-                      /* Served tickets stay on the board until the pass clears
-                         them, so they fade rather than disappear: a card that
-                         vanishes has no history. */
-                      o.state === 'served' ? 'border-hair opacity-55' : 'border-hair-strong',
-                      arrivals.includes(o.key) ? 'animate-[kbrise_320ms_cubic-bezier(0.22,1,0.36,1)]' : '',
-                    ].join(' ')}
+        {log.length > 0 && (
+          <section
+            aria-label="Recent announcements"
+            className="rounded-[10px] border border-hair bg-card"
+          >
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-hair px-3.5 py-2">
+              {/* "Spoken" would be a lie while muted: the entries are what the
+                  board WOULD have read out. The text is the exact string
+                  handed to the voice, Devanagari and all -- so the owner can
+                  read what the kitchen will hear. */}
+              <span className="text-[10.5px] font-semibold tracking-[0.12em] text-gink-46 uppercase">
+                Announcements
+              </span>
+              <span className="text-[11px] text-gink-46">
+                {audio && speaksHere
+                  ? voiceState === 'ready'
+                    ? `हिंदी · ${voiceName ?? 'voice'}`
+                    : 'हिंदी · no voice on this device'
+                  : 'muted on this screen — nothing was read aloud'}
+              </span>
+            </div>
+            <ul className="divide-y divide-hair">
+              {log.map((entry) => (
+                <li key={`${entry.key}-${entry.at}`} className="flex items-baseline gap-2.5 px-3.5 py-1.5 text-[12px]">
+                  <span className="tnum shrink-0 text-gink-46">{entry.at}</span>
+                  <span className="shrink-0 font-medium text-gink-64">{entry.label}</span>
+                  <span className="min-w-0 flex-1 truncate text-gink">{entry.text}</span>
+                  <button
+                    type="button"
+                    aria-label={`Replay ${entry.label}`}
+                    onClick={() => replay(`${entry.key}:replay:${entry.at}`, entry.text, entry.label)}
+                    className="shrink-0 text-[11px] font-medium text-gink-64 underline underline-offset-2 hover:text-gink"
                   >
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-[15px] font-semibold tracking-[-0.01em] text-gink">{o.code}</span>
-                      <span className="rounded-[4px] bg-paper-deep px-1.5 py-0.5 text-[11.5px] font-semibold tracking-[0.04em] text-gink-80">
-                        {o.table}
-                      </span>
-                      {/* Age is the one number a cook acts on without reading
-                          anything else, so it is the loudest thing on the row. */}
-                      <span
-                        className={[
-                          'tnum ml-auto rounded-full px-2 py-0.5 text-[11.5px] font-semibold ring-1 ring-inset',
-                          o.ageMin >= LATE_AFTER_MIN
-                            ? 'bg-[var(--alert)]/8 text-[var(--alert)] ring-[var(--alert)]/25'
-                            : o.ageMin >= WARN_AFTER_MIN
-                              ? 'bg-gink-07 text-gink ring-hair-strong'
-                              : 'bg-accent-soft text-[var(--p-accent)] ring-[var(--p-accent)]/20',
-                        ].join(' ')}
-                      >
-                        {o.ageMin} min
-                      </span>
+                    Replay
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {announcement && (
+          <p role="status" className="text-[12px] text-gink-46">
+            {/* "Last announcement" was a half-truth: it was the last thing the
+                queue ACCEPTED, which in a burst is not the thing being said. */}
+            {speaking ? 'Speaking now' : 'Last announcement'}: {announcement}
+          </p>
+        )}
+
+        {error && (
+          <div
+            role="alert"
+            className="rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/6 px-3.5 py-2.5"
+          >
+            <strong className="text-[12.5px] font-semibold text-gink">Could not update the ticket.</strong>
+            <p className="mt-0.5 text-[12.5px] text-gink-64">{error}</p>
+          </div>
+        )}
+
+        {data?.blocked && <SignInPrompt reason={data.blocked} screen="kitchen board" />}
+
+        {/* -------------------------------------------------- why nothing moves */}
+
+        {/* One banner, naming the actual obstacle. The buttons below are not
+            rendered in this state, so this is the only explanation on screen. */}
+        {live && data && !data.blocked && !data.canAdvance && (
+          <div role="status" className="rounded-[10px] border border-hair-strong bg-card px-3.5 py-2.5 text-[12.5px] leading-[1.5]">
+            <strong className="font-semibold text-gink">
+              {data.cannotAdvance === 'plan'
+                ? 'Read-only: the server is refusing writes for this restaurant.'
+                : 'You can watch this board, but not move tickets.'}
+            </strong>{' '}
+            <span className="text-gink-64">
+              {data.cannotAdvance === 'plan'
+                ? 'Its plan or trial period is not currently active. Menus, orders and reports stay readable, and tickets start moving again the moment access is restored — nothing has been deleted.'
+                : `A ${data.role ?? 'member'} can see the kitchen board; moving a ticket needs an owner, a manager or kitchen staff. Ask one of them to take a screen.`}
+            </span>
+          </div>
+        )}
+
+        {live && data && !data.blocked && data.tickets.length === 0 && (
+          <div className="rounded-[10px] border border-dashed border-hair-strong px-3.5 py-4 text-center text-[13px] text-gink-46">
+            No open tickets in the last few hours. Orders placed from the customer menu appear here
+            the moment the guest confirms.
+          </div>
+        )}
+      </div>
+
+      {/* ----------------------------------------------------- phone columns */}
+
+      {/* Hidden above 900px, where all three columns are on screen at once.
+          Counts live in the tabs so an empty column can be skipped without
+          opening it -- on a phone, the queue you cannot see still has to be
+          legible. */}
+      <nav aria-label="Ticket columns" className="mt-3 flex gap-1.5 lg:hidden">
+        {cols.map((c) => (
+          <button
+            key={c.key}
+            type="button"
+            aria-pressed={mobileCol === c.key}
+            onClick={() => setMobileCol(c.key as typeof mobileCol)}
+            className={[
+              'flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full text-[12.5px] font-medium transition-colors',
+              mobileCol === c.key
+                ? 'bg-gink text-onink'
+                : 'border border-hair-strong text-gink-64',
+            ].join(' ')}
+          >
+            {c.title}
+            <span className="tnum text-[11px] opacity-70">{c.orders.length}</span>
+          </button>
+        ))}
+      </nav>
+
+      <div className="mt-3 grid gap-3 lg:grid-cols-3">
+        {cols.map((c) => (
+          <section
+            key={c.key}
+            aria-label={c.title}
+            className={[
+              'min-w-0',
+              /* On a phone only the chosen column is shown. Above 900px all
+                 three are, side by side, because a cook reads the queue by
+                 shape rather than by tapping. */
+              mobileCol === c.key ? 'block' : 'hidden lg:block',
+            ].join(' ')}
+          >
+            <div className="mb-2 flex items-baseline justify-between gap-2 border-b border-hair pb-1.5">
+              <h2 className="text-[11px] font-semibold tracking-[0.12em] text-gink uppercase">{c.title}</h2>
+              <span className="tnum text-[11.5px] font-medium text-gink-46">{c.orders.length}</span>
+            </div>
+
+            <div className="grid gap-2">
+              {c.orders.map((o) => (
+                <article
+                  key={o.key}
+                  data-state={o.state}
+                  data-arriving={arrivals.includes(o.key) ? 'true' : undefined}
+                  className={[
+                    'rounded-[12px] border bg-card p-3',
+                    /* Served tickets stay on the board until the pass clears
+                       them, so they fade rather than disappear: a card that
+                       vanishes has no history. */
+                    o.state === 'served' ? 'border-hair opacity-55' : 'border-hair-strong',
+                    arrivals.includes(o.key) ? 'animate-[kbrise_320ms_cubic-bezier(0.22,1,0.36,1)]' : '',
+                  ].join(' ')}
+                >
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-[15px] font-semibold tracking-[-0.01em] text-gink">{o.code}</span>
+                    <span className="rounded-[4px] bg-paper-deep px-1.5 py-0.5 text-[11.5px] font-semibold tracking-[0.04em] text-gink-80">
+                      {o.table}
+                    </span>
+                    {/* Age is the one number a cook acts on without reading
+                        anything else, so it is the loudest thing on the row. */}
+                    <span
+                      className={[
+                        'tnum ml-auto rounded-full px-2 py-0.5 text-[11.5px] font-semibold ring-1 ring-inset',
+                        o.ageMin >= LATE_AFTER_MIN
+                          ? 'bg-[var(--alert)]/8 text-[var(--alert)] ring-[var(--alert)]/25'
+                          : o.ageMin >= WARN_AFTER_MIN
+                            ? 'bg-gink-07 text-gink ring-hair-strong'
+                            : 'bg-accent-soft text-[var(--p-accent)] ring-[var(--p-accent)]/20',
+                      ].join(' ')}
+                    >
+                      {o.ageMin} min
+                    </span>
+                  </div>
+
+                  {o.payment === 'pending' && (
+                    <div className="mt-2 rounded-[5px] bg-[var(--alert)]/8 px-2 py-1 text-[11px] font-semibold tracking-[0.02em] text-[var(--alert)]">
+                      Unpaid · pay at counter
                     </div>
+                  )}
 
-                    {o.payment === 'pending' && (
-                      <div className="mt-2 rounded-[5px] bg-[var(--alert)]/8 px-2 py-1 text-[11px] font-semibold tracking-[0.02em] text-[var(--alert)]">
-                        Unpaid · pay at counter
-                      </div>
-                    )}
+                  <Items order={o} compact={o.state === 'served'} />
 
-                    <Items order={o} compact={o.state === 'served'} />
+                  {o.note && (
+                    <div className="mt-2 border-l-2 border-gink-28 pl-2.5 text-[12.5px] leading-[1.45] text-gink-64 italic">
+                      “{o.note}”
+                    </div>
+                  )}
 
-                    {o.note && (
-                      <div className="mt-2 border-l-2 border-gink-28 pl-2.5 text-[12.5px] leading-[1.45] text-gink-64 italic">
-                        “{o.note}”
-                      </div>
-                    )}
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-hair pt-2.5">
+                    <span className="mr-auto text-[13px] font-semibold text-gink">
+                      <Money value={rupeesToPaise(o.total)} strong />
+                    </span>
 
-                    <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-hair pt-2.5">
-                      <span className="mr-auto text-[13px] font-semibold text-gink">
-                        <Money value={rupeesToPaise(o.total)} strong />
-                      </span>
-
-                      {interactive && o.state === 'new' && (
-                        <button type="button" className={kbBtn('solid')} onClick={() => advance(o)}>
-                          Start preparing
-                        </button>
-                      )}
-                      {interactive && o.state === 'preparing' && (
-                        <button type="button" className={kbBtn('solid')} onClick={() => advance(o)}>
-                          Mark ready
-                        </button>
-                      )}
-                      {interactive && o.state === 'ready' && (
-                        <button type="button" className={kbBtn('solid')} onClick={() => advance(o)}>
-                          Mark served
-                        </button>
-                      )}
-                      {o.state === 'served' && (
-                        <span aria-label="Order served" className="text-[11.5px] font-medium text-gink-46">
-                          Served
-                        </span>
-                      )}
-
-                      <button
-                        type="button"
-                        title="Replay voice announcement"
-                        aria-label={`Replay order ${o.code}`}
-                        onClick={() =>
-                          replay(
-                            `new:${o.orderId ?? o.key}`,
-                            orderAnnouncement(o),
-                            announceLogLabel(o.table, o.items),
-                          )
-                        }
-                        className={kbBtn('quiet')}
-                      >
-                        🔊
+                    {interactive && o.state === 'new' && (
+                      <button type="button" className={kbBtn('solid')} onClick={() => advance(o)}>
+                        Start preparing
                       </button>
+                    )}
+                    {interactive && o.state === 'preparing' && (
+                      <button type="button" className={kbBtn('solid')} onClick={() => advance(o)}>
+                        Mark ready
+                      </button>
+                    )}
+                    {interactive && o.state === 'ready' && (
+                      <button type="button" className={kbBtn('solid')} onClick={() => advance(o)}>
+                        Mark served
+                      </button>
+                    )}
+                    {o.state === 'served' && (
+                      <span aria-label="Order served" className="text-[11.5px] font-medium text-gink-46">
+                        Served
+                      </span>
+                    )}
 
-                      {interactive && o.state !== 'served' ? (
-                        confirmCancel === (o.orderId ?? o.key) ? (
-                          <>
-                            <button
-                              type="button"
-                              disabled={Boolean(o.orderId) && cancelBusy === o.orderId}
-                              onClick={() => cancelTicket(o)}
-                              className={kbBtn('danger')}
-                            >
-                              {o.orderId && cancelBusy === o.orderId ? 'Cancelling…' : 'Yes, cancel'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setConfirmCancel(null)}
-                              className={kbBtn('quiet')}
-                            >
-                              No
-                            </button>
-                          </>
-                        ) : (
+                    <button
+                      type="button"
+                      title="Replay voice announcement"
+                      aria-label={`Replay order ${o.code}`}
+                      onClick={() =>
+                        replay(
+                          `new:${o.orderId ?? o.key}`,
+                          orderAnnouncement(o),
+                          announceLogLabel(o.table, o.items),
+                        )
+                      }
+                      className={kbBtn('quiet')}
+                    >
+                      🔊
+                    </button>
+
+                    {interactive && o.state !== 'served' ? (
+                      confirmCancel === (o.orderId ?? o.key) ? (
+                        <>
                           <button
                             type="button"
-                            aria-label={`Cancel order for ${o.table}`}
+                            disabled={Boolean(o.orderId) && cancelBusy === o.orderId}
                             onClick={() => cancelTicket(o)}
+                            className={kbBtn('danger')}
+                          >
+                            {o.orderId && cancelBusy === o.orderId ? 'Cancelling…' : 'Yes, cancel'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmCancel(null)}
                             className={kbBtn('quiet')}
                           >
-                            Cancel
+                            No
                           </button>
-                        )
-                      ) : null}
-                    </div>
-                  </article>
-                ))}
-
-                {c.orders.length === 0 && (
-                  <div className="rounded-[10px] border border-dashed border-hair-strong px-3 py-6 text-center text-[12.5px] text-gink-46">
-                    Nothing here
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          aria-label={`Cancel order for ${o.table}`}
+                          onClick={() => cancelTicket(o)}
+                          className={kbBtn('quiet')}
+                        >
+                          Cancel
+                        </button>
+                      )
+                    ) : null}
                   </div>
-                )}
-              </div>
-            </section>
-          ))}
-        </div>
-      </main>
-    </div>
+                </article>
+              ))}
+
+              {c.orders.length === 0 && (
+                <div className="rounded-[10px] border border-dashed border-hair-strong px-3 py-6 text-center text-[12.5px] text-gink-46">
+                  Nothing here
+                </div>
+              )}
+            </div>
+          </section>
+        ))}
+      </div>
+    </OwnerPage>
   );
 }
 
