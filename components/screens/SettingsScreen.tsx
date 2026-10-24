@@ -97,25 +97,35 @@ export function SettingsScreen({
         />
 
         {/* The result of a save belongs under the title, not above it: a page
-            that opens on a red band reads as broken before it reads as fixed. */}
-        {error && (
-          <div
-            role="alert"
-            className="mb-3 rounded-[12px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-4 py-3"
-          >
-            <strong className="text-[12.5px] text-[var(--alert)]">Nothing was saved.</strong>
-            <p className="mt-1 text-[12.5px] leading-[1.5] text-gink-64">{error}</p>
+            that opens on a red band reads as broken before it reads as fixed.
+            It is also STICKY under the app bar, because this page is five
+            forms tall and four of them end far below the fold -- saving the
+            UPI details used to write the answer off-screen, so the honest
+            reading of the screen was "nothing happened". */}
+        {error || notice ? (
+          /* Opaque, not blurred: the staff surface is paper, and the design
+             guard counts every glass panel drawn on it. */
+          <div className="sticky top-14 z-20 mb-3 space-y-2 bg-paper">
+            {error && (
+              <div
+                role="alert"
+                className="rounded-[12px] border border-[var(--alert)]/30 bg-[color-mix(in_srgb,var(--alert)_8%,white)] px-4 py-3"
+              >
+                <strong className="text-[12.5px] text-[var(--alert)]">Nothing was saved.</strong>
+                <p className="mt-1 text-[12.5px] leading-[1.5] text-gink-64">{error}</p>
+              </div>
+            )}
+            {notice && (
+              <div
+                role="status"
+                className="rounded-[12px] border border-[var(--p-accent)]/25 bg-accent-soft px-4 py-2.5"
+              >
+                <strong className="text-[12.5px] text-gink">Saved.</strong>{' '}
+                <span className="text-[12.5px] text-gink-64">{notice}</span>
+              </div>
+            )}
           </div>
-        )}
-        {notice && (
-          <div
-            role="status"
-            className="mb-3 rounded-[12px] border border-[var(--p-accent)]/25 bg-accent-soft px-4 py-2.5"
-          >
-            <strong className="text-[12.5px] text-gink">Saved.</strong>{' '}
-            <span className="text-[12.5px] text-gink-64">{notice}</span>
-          </div>
-        )}
+        ) : null}
 
         {!live && (
           <div className="mb-3 rounded-[12px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-4 py-3 text-[11.5px] leading-[1.55] text-gink-64">
@@ -136,7 +146,7 @@ export function SettingsScreen({
           </div>
         )}
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_318px] xl:items-start">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_318px] lg:items-start">
           <div className="flex min-w-0 flex-col gap-4">
             {/* ------------------------------------------------------- details */}
             <Panel
