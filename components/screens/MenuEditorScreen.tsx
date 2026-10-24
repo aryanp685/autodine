@@ -468,24 +468,14 @@ export function MenuEditorScreen({
                 live ? (
                   <div className="flex flex-wrap items-center gap-1.5">
                     <form action={setAllAvailabilityAction}>
-                      <button
-                        type="submit"
-                        name="available"
-                        value="false"
-                        className={btn('ghost', 'sm')}
-                      >
+                      <SubmitButton tone="ghost" name="available" value="false" pendingLabel="Marking…">
                         Mark all sold out
-                      </button>
+                      </SubmitButton>
                     </form>
                     <form action={setAllAvailabilityAction}>
-                      <button
-                        type="submit"
-                        name="available"
-                        value="true"
-                        className={btn('ghost', 'sm')}
-                      >
+                      <SubmitButton tone="ghost" name="available" value="true" pendingLabel="Marking…">
                         Mark all available
-                      </button>
+                      </SubmitButton>
                     </form>
                   </div>
                 ) : (
@@ -810,9 +800,9 @@ export function MenuEditorScreen({
                   </Field>
                 </div>
 
-                <button type="submit" className={`${btn('ghost')} w-full`} disabled={!live}>
+                <SubmitButton tone="ghost" size="md" pendingLabel="Saving…" className="w-full" disabled={!live}>
                   Save draft
-                </button>
+                </SubmitButton>
               </form>
             </Card>
 

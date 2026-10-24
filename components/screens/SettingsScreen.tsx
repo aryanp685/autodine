@@ -508,9 +508,9 @@ export function SettingsScreen({
                     />
                   </Field>
                   <div>
-                    <button className={btn('ghost', 'sm')} type="submit">
+                    <SubmitButton tone="ghost" pendingLabel="Creating…">
                       Create outlet
-                    </button>
+                    </SubmitButton>
                   </div>
                 </form>
               )}
