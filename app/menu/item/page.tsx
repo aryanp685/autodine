@@ -43,7 +43,7 @@ export default async function ItemPage({
   if (isSupabaseConfigured && !data) notFound();
 
   const table =
-    access.status === 'verified'
+    access.status === 'verified' || access.status === 'browse'
       ? { label: access.tableLabel }
       : access.status === 'demo' && access.tableLabel
         ? { label: access.tableLabel }

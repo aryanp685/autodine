@@ -12,6 +12,7 @@ import { loadTableAccess, verifyAgainHref } from './table-access';
 
 const state = vi.hoisted(() => ({
   cookie: undefined as string | undefined,
+  cardCookie: undefined as string | undefined,
   rpc: null as null | ((name: string, args: unknown) => Promise<unknown>),
   calls: [] as { name: string; args: unknown }[],
   cookieWrites: [] as { name: string; value: string }[],
@@ -30,10 +31,15 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('next/headers', () => ({
   cookies: async () => ({
-    get: (name: string) =>
-      name === 'autodine_table' && state.cookie !== undefined
-        ? { name, value: state.cookie }
-        : undefined,
+    get: (name: string) => {
+      if (name === 'autodine_table' && state.cookie !== undefined) {
+        return { name, value: state.cookie };
+      }
+      if (name === 'autodine_table_card' && state.cardCookie !== undefined) {
+        return { name, value: state.cardCookie };
+      }
+      return undefined;
+    },
     set: (name: string, value: string) => state.cookieWrites.push({ name, value }),
     delete: () => {
       state.cookie = undefined;
@@ -43,6 +49,7 @@ vi.mock('next/headers', () => ({
 
 afterEach(() => {
   state.cookie = undefined;
+  state.cardCookie = undefined;
   state.rpc = null;
   state.calls = [];
   state.cookieWrites = [];
@@ -141,7 +148,8 @@ describe('loadTableAccess', () => {
     expect(access.status).toBe('stale');
     if (access.status !== 'stale') return;
     expect(access.qrToken).toBe(QR_TOKEN);
-    expect(verifyAgainHref(access)).toBe(`/t/${QR_TOKEN}`);
+    // The code form, not the card's own address: /t/<token> now opens the menu.
+    expect(verifyAgainHref(access)).toBe(`/t/${QR_TOKEN}/code`);
   });
 
   it('is stale, with no shortcut back, for a cookie written before the card token was kept', async () => {
@@ -189,12 +197,135 @@ describe('loadTableAccess', () => {
   });
 });
 
+/**
+ * Browsing without the code.
+ *
+ * These are the tests for the flow the brief asked for: scanning a live card
+ * lets a guest read the menu, and the code is asked for at checkout. The two
+ * things that must stay true are that the card is resolved by the DATABASE on
+ * every request (not read from the cookie's own claims) and that a dead card
+ * cannot browse at all.
+ */
+describe('loadTableAccess — browsing on a scanned card', () => {
+  it('is browse, not none, when a live card is scanned but no code was entered', async () => {
+    state.cardCookie = QR_TOKEN;
+    state.rpc = async (name) =>
+      name === 'public_qr_intro'
+        ? {
+            data: [
+              {
+                restaurant_slug: 'maddi',
+                restaurant_name: 'Maddi',
+                table_label: 'T3',
+                window_seconds: 600,
+              },
+            ],
+            error: null,
+          }
+        : noRow();
+
+    const access = await loadTableAccess('maddi');
+
+    expect(access.status).toBe('browse');
+    if (access.status !== 'browse') return;
+    // The label and slug are the database's answer, not the cookie's.
+    expect(access.tableLabel).toBe('T3');
+    expect(access.slug).toBe('maddi');
+    expect(access.qrToken).toBe(QR_TOKEN);
+    expect(access.windowSeconds).toBe(600);
+  });
+
+  it('does not browse a revoked card', async () => {
+    state.cardCookie = QR_TOKEN;
+    // public_qr_intro returns no row for a card that is not live.
+    state.rpc = async () => noRow();
+
+    const access = await loadTableAccess('maddi');
+
+    expect(access.status).toBe('none');
+  });
+
+  it('does not browse another restaurant with a live card for a different one', async () => {
+    state.cardCookie = QR_TOKEN;
+    state.rpc = async () => ({
+      data: [
+        {
+          restaurant_slug: 'somewhere-else',
+          restaurant_name: 'Elsewhere',
+          table_label: 'T9',
+          window_seconds: 600,
+        },
+      ],
+      error: null,
+    });
+
+    const access = await loadTableAccess('maddi');
+
+    expect(access.status).toBe('none');
+  });
+
+  it('still browses after the session expires, because the card is still on the table', async () => {
+    // The cookie holds an expired session AND the card. The session lookup
+    // refuses, the card lookup answers: the guest keeps reading the menu and
+    // is asked for a fresh code at checkout.
+    state.cookie = cookie();
+    state.cardCookie = QR_TOKEN;
+    state.rpc = async (name) =>
+      name === 'current_table_session'
+        ? noRow()
+        : {
+            data: [
+              {
+                restaurant_slug: 'maddi',
+                restaurant_name: 'Maddi',
+                table_label: 'T1',
+                window_seconds: 600,
+              },
+            ],
+            error: null,
+          };
+
+    const access = await loadTableAccess('maddi');
+
+    expect(access.status).toBe('browse');
+  });
+
+  it('fails closed when the card lookup itself cannot be answered', async () => {
+    state.cardCookie = QR_TOKEN;
+    state.rpc = async () => ({ data: null, error: { message: 'connection refused' } });
+
+    const access = await loadTableAccess('maddi');
+
+    expect(access.status).toBe('unavailable');
+  });
+
+  it('ignores a card cookie that is not shaped like a token', async () => {
+    state.cardCookie = '<script>alert(1)</script>';
+    state.rpc = async () => {
+      throw new Error('the database must not be asked with a junk token');
+    };
+
+    const access = await loadTableAccess('maddi');
+
+    expect(access.status).toBe('none');
+  });
+});
+
 describe('verifyAgainHref', () => {
   it('offers the card form only when the card is known', () => {
     expect(verifyAgainHref({ status: 'none' })).toBeNull();
     expect(verifyAgainHref({ status: 'unavailable' })).toBeNull();
     expect(verifyAgainHref({ status: 'demo', tableLabel: null })).toBeNull();
     expect(verifyAgainHref({ status: 'stale', qrToken: null, slug: 'maddi' })).toBeNull();
-    expect(verifyAgainHref({ status: 'stale', qrToken: 'abc', slug: 'maddi' })).toBe('/t/abc');
+    expect(verifyAgainHref({ status: 'stale', qrToken: 'abc', slug: 'maddi' })).toBe('/t/abc/code');
+    expect(
+      verifyAgainHref({
+        status: 'browse',
+        qrToken: 'qr_abcdefghijklmnop',
+        slug: 'maddi',
+        tableLabel: 'T1',
+        windowSeconds: 600,
+      }),
+    ).toBe('/t/qr_abcdefghijklmnop/code');
   });
 });

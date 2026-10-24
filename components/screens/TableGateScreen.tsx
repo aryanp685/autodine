@@ -30,12 +30,12 @@ const COPY: Record<TableGateReason, { title: string; detail: string }> = {
   none: {
     title: 'Open this menu from your table',
     detail:
-      'Scan the QR code on your table and enter the code showing inside the restaurant. That is what tells us which table the order belongs to — and it is the only way this menu opens.',
+      'Scan the QR code on your table to read the menu. That is what tells us which table your order belongs to — and it is what lets you order without saying your table number to anyone.',
   },
   stale: {
     title: 'Your table session has ended',
     detail:
-      'Sessions last about an hour so that a table cannot be ordered from after the guests have left. Scan the QR code on your table again and enter the current code to carry on.',
+      'Sessions last about an hour so a table cannot be ordered from after the guests have left. Scan the QR code on your table again — the menu opens straight away, and the current code is asked for when you place an order.',
   },
   unavailable: {
     title: 'We could not check your table',

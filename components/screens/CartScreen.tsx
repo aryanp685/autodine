@@ -66,6 +66,7 @@ export function Cart({
   items,
   placedError,
   placedErrorCode,
+  needsCode = false,
 }: {
   slug?: string;
   restaurantName?: string;
@@ -73,6 +74,12 @@ export function Cart({
   tableLabel?: string | null;
   /** The restaurant's own rate. Without it the bill is priced at a sample. */
   taxRateBps?: number;
+  /**
+   * The guest scanned a live card but has not entered the on-site code yet.
+   * Said here, once, so the code at checkout is expected rather than a
+   * surprise at the last tap.
+   */
+  needsCode?: boolean;
   items: MenuItemPrice[];
   /**
    * Why the last attempt to place this order failed, in the action's own words.
@@ -168,6 +175,18 @@ export function Cart({
             ? 'Check the bill, then pay. Prices are read from the kitchen’s menu when you order.'
             : 'Nothing has been added from the menu yet.'}
         </p>
+        {needsCode && priced.lines.length > 0 ? (
+          <p className="mt-2 flex items-start gap-2 text-[12px] leading-[1.55] text-gink-46">
+            <span
+              aria-hidden="true"
+              className="mt-[6px] size-1.5 shrink-0 rounded-full bg-[var(--p-accent)]"
+            />
+            <span>
+              One step left at checkout: the six-digit code showing inside the restaurant. Your
+              order is not sent to the kitchen until it is entered.
+            </span>
+          </p>
+        ) : null}
       </header>
 
       {placedError ? (

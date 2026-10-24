@@ -24,16 +24,18 @@ export const metadata: Metadata = { title: 'Order · AutoDine' };
  *
  * THE TABLE GATE
  *
- * A slug is not access. The menu is now only rendered for a browser the
- * database has confirmed is at a live table in this restaurant: a session
- * that has not expired, has not been revoked, belongs to a table that is
- * still in service, and was issued against a card that is still live. The
- * check is loadTableAccess(), which asks the database rather than reading the
- * cookie, because every field in the cookie is the guest's to edit.
+ * A slug is not access. The menu is rendered for a browser the database has
+ * confirmed holds either a live table session OR a live card that was scanned
+ * (the `browse` state). Both are resolved server-side from a cookie the guest
+ * cannot usefully forge: the session token is hashed and re-read on every
+ * request, and the card token is resolved through public_qr_intro, which
+ * answers only for a live card on a table in service in a restaurant that is
+ * taking orders.
  *
- * The menu data itself has to be loaded to know the restaurant's name, so the
- * order here is: resolve access first, then load the menu only for an allowed
- * guest. A refused guest gets the gate screen, which says what to do about it.
+ * Browsing is deliberately not gated behind the six-digit code. The code is
+ * asked for at checkout, at the one moment it changes anything -- whether an
+ * order may be written. A guest who scanned a real card at a real table reads
+ * the menu first and types six digits once, instead of twice nothing.
  */
 export default async function CustomerMenuPage({
   searchParams,
@@ -66,7 +68,7 @@ export default async function CustomerMenuPage({
   // the cookie only -- the pre-existing behaviour of the sample screens, where
   // nothing real can be ordered.
   const table =
-    access.status === 'verified'
+    access.status === 'verified' || access.status === 'browse'
       ? { label: access.tableLabel }
       : access.status === 'demo' && access.tableLabel
         ? { label: access.tableLabel }

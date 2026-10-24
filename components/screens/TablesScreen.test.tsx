@@ -15,8 +15,10 @@ vi.mock('@/app/dashboard/tables/actions', () => ({
   setTableActiveAction: async () => undefined,
 }));
 
-vi.mock('@/components/VerificationCodeRefresh', () => ({
-  VerificationCodeRefresh: () => null,
+vi.mock('@/components/owner/CodeExpiry', () => ({
+  // It needs a mounted app router (useRouter) and a clock; the panel's text is
+  // what these tests are about, not the countdown.
+  CodeExpiry: () => null,
 }));
 
 /**

@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { parseCart } from '@/lib/cart-storage';
-import { loadTableAccess } from '@/lib/table-access';
+import { codePageHref, loadTableAccess } from '@/lib/table-access';
 import {
   describePlaceFailure,
   isTransientPlaceCode,
@@ -103,10 +103,25 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
   // is sent back to the code form rather than left staring at a cart.
   const access = await loadTableAccess(slug);
 
+  /**
+   * A guest who scanned a live card but has not entered the code yet.
+   *
+   * This is the expected case now, not an error: browsing is open, ordering is
+   * not, and the code form is one screen away with the cart untouched. The
+   * `next` names the checkout so the code lands them back on it, and
+   * safeNextPath narrows it to a path this app knows before anything is
+   * redirected to.
+   */
+  if (access.status === 'browse') {
+    const back = `/menu/checkout?s=${encodeURIComponent(slug)}`;
+    redirect(`${codePageHref(access.qrToken)}?next=${encodeURIComponent(back)}`);
+  }
+
   if (access.status === 'stale' && access.qrToken) {
-    // One tap back to the card's form. The cart lives in localStorage, so
+    // One tap back to the code form. The cart lives in localStorage, so
     // nothing is lost by leaving the page.
-    redirect(`/t/${access.qrToken}`);
+    const back = `/menu/checkout?s=${encodeURIComponent(slug)}`;
+    redirect(`${codePageHref(access.qrToken)}?next=${encodeURIComponent(back)}`);
   }
 
   if (access.status === 'stale') {
@@ -130,7 +145,20 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
   // The order code cannot do that job: it is short, it is read out at the
   // counter, and a page that opened on a guessed code would show a stranger's
   // bill.
-  const guestToken = crypto.randomUUID();
+  /**
+   * The attempt key, when the browser sent one.
+   *
+   * It is a UUID or nothing: a value that is not one is replaced rather than
+   * forwarded, so the database never has to reason about a caller-controlled
+   * string, and a guest who re-posts the same form gets the order the first
+   * post wrote instead of a second one. See migration 20261027000900 for the
+   * other half -- the function returns the existing code for a key it has
+   * already used.
+   */
+  const attempt = String(formData.get('attempt') ?? '').trim();
+  const guestToken = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(attempt)
+    ? attempt
+    : crypto.randomUUID();
 
   let { data: code, error } = await supabase.rpc('place_public_order', {
     p_slug: slug,
