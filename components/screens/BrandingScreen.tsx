@@ -13,6 +13,7 @@ import {
 } from '@/app/dashboard/branding/actions';
 import { inr } from '@/lib/demo-data';
 import { OwnerPage, PageHead, Panel, Card, btn } from '@/components/owner/chrome';
+import { SubmitButton } from '@/components/owner/SubmitButton';
 
 /**
  * Menu branding.
@@ -160,20 +161,21 @@ export function BrandingScreen({
                 />
                 <span>{data?.logoUrl ? 'Replace logo' : 'Choose a logo'}</span>
               </label>
-              <button type="submit" className={btn('solid', 'sm')} disabled={disabled}>
+              <SubmitButton pendingLabel="Uploading…" disabled={disabled}>
                 Upload
-              </button>
+              </SubmitButton>
             </form>
 
             {data?.logoUrl && (
               <form action={removeLogoAction}>
-                <button
-                  type="submit"
-                  className={`${btn('quiet', 'sm')} hover:text-[var(--alert)]`}
+                <SubmitButton
+                  tone="quiet"
+                  pendingLabel="Removing…"
+                  className="hover:text-[var(--alert)]"
                   disabled={disabled}
                 >
                   Remove logo
-                </button>
+                </SubmitButton>
               </form>
             )}
           </div>
@@ -219,20 +221,21 @@ export function BrandingScreen({
                 />
                 <span>{data?.bannerUrl ? 'Replace banner' : 'Choose a banner'}</span>
               </label>
-              <button type="submit" className={btn('solid', 'sm')} disabled={disabled}>
+              <SubmitButton pendingLabel="Uploading…" disabled={disabled}>
                 Upload
-              </button>
+              </SubmitButton>
             </form>
 
             {data?.bannerUrl && (
               <form action={removeBannerAction}>
-                <button
-                  type="submit"
-                  className={`${btn('quiet', 'sm')} hover:text-[var(--alert)]`}
+                <SubmitButton
+                  tone="quiet"
+                  pendingLabel="Removing…"
+                  className="hover:text-[var(--alert)]"
                   disabled={disabled}
                 >
                   Remove banner
-                </button>
+                </SubmitButton>
               </form>
             )}
           </div>

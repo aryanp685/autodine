@@ -10,6 +10,7 @@ import {
   Panel,
   Stat,
   btn,
+  chipClass,
   Tag,
   Empty,
   TableWrap,
@@ -218,13 +219,7 @@ export function ReportsScreen({
                     href={rangeHref(tab.key)}
                     aria-current={current ? 'true' : undefined}
                     data-range={current ? 'current' : 'other'}
-                    className={[
-                      'inline-flex h-8 items-center rounded-full border px-3 text-[12.5px] font-medium transition-colors',
-                      'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gink',
-                      current
-                        ? 'border-gink bg-gink text-onink'
-                        : 'border-hair-strong text-gink-64 hover:border-gink-28 hover:text-gink',
-                    ].join(' ')}
+                    className={chipClass(current)}
                   >
                     {tab.label}
                   </Link>

@@ -13,6 +13,7 @@ import {
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { VerificationCodeRefresh } from '@/components/VerificationCodeRefresh';
 import { ConfirmSubmit } from '@/components/owner/ConfirmSubmit';
+import { SubmitButton } from '@/components/owner/SubmitButton';
 import {
   OwnerPage,
   PageHead,
@@ -98,9 +99,11 @@ export function TablesScreen({
               </select>
               {/* Without a database this submit can only fail, so it does not
                   render as live. */}
-              <button type="submit" className={btn('solid', 'sm')} disabled={!live}>
+              {/* A form that creates rows: pressing twice on a slow network
+                  used to create two tables. */}
+              <SubmitButton pendingLabel="Adding…" disabled={!live}>
                 Add table
-              </button>
+              </SubmitButton>
             </form>
           </>
         }
@@ -146,9 +149,9 @@ export function TablesScreen({
                 Nothing to remember, nothing to reset.
               </p>
               <form className="mt-3">
-                <button type="submit" formAction={rotateVerificationCodeAction} className={btn('ghost', 'sm')}>
+                <SubmitButton tone="ghost" formAction={rotateVerificationCodeAction} pendingLabel="Changing…">
                   New code now
-                </button>
+                </SubmitButton>
               </form>
               <VerificationCodeRefresh expiresAt={data.verification.expiresAt} />
             </div>

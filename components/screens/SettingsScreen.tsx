@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { CopyButton } from '@/components/CopyButton';
 import { PrintButton } from '@/components/PrintButton';
+import { SubmitButton } from '@/components/owner/SubmitButton';
 import type { OutletBar } from '@/lib/outlets';
 import type { SettingsScreenData } from '@/lib/db/settings-screen';
 import { formatTaxPercent, taxExamplePaise } from '@/lib/settings-input';
@@ -262,9 +263,9 @@ export function SettingsScreen({
                 )}
 
                 <div>
-                  <button type="submit" className={btn('solid', 'sm')} disabled={disabled}>
+                  <SubmitButton pendingLabel="Saving details…" disabled={disabled}>
                     Save details
-                  </button>
+                  </SubmitButton>
                 </div>
               </form>
             </Panel>
@@ -312,9 +313,9 @@ export function SettingsScreen({
                 </Field>
 
                 <div>
-                  <button type="submit" className={btn('ghost', 'sm')} disabled={disabled}>
+                  <SubmitButton tone="ghost" pendingLabel="Saving rate…" disabled={disabled}>
                     Save tax rate
-                  </button>
+                  </SubmitButton>
                 </div>
               </form>
 
@@ -372,13 +373,12 @@ export function SettingsScreen({
                 </label>
 
                 <div>
-                  <button
-                    type="submit"
-                    className={btn('solid', 'sm')}
+                  <SubmitButton
+                    pendingLabel="Saving setting…"
                     disabled={disabled || !gatewayConfigured}
                   >
                     Save payment setting
-                  </button>
+                  </SubmitButton>
                 </div>
               </form>
 
@@ -443,9 +443,9 @@ export function SettingsScreen({
                 </Field>
 
                 <div>
-                  <button type="submit" className={btn('solid', 'sm')} disabled={disabled}>
+                  <SubmitButton pendingLabel="Saving UPI…" disabled={disabled}>
                     Save UPI details
-                  </button>
+                  </SubmitButton>
                 </div>
               </form>
 
