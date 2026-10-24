@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ReportsScreen } from './ReportsScreen';
+import { ReportsScreen, everyNth } from './ReportsScreen';
 import { demoReport, emptyPayload, resolveRange, zeroFillBuckets, type ReportsScreenData } from '@/lib/db/reports';
 
 /**
@@ -146,5 +146,55 @@ describe('ReportsScreen', () => {
     const range = resolveRange('7d', TZ, NOW);
     expect(demoReport(range, TZ, NOW).buckets).toHaveLength(7);
     expect(html).toContain('Top items');
+  });
+});
+
+/**
+ * Two things a 30-day range broke on a phone: thirty labels in one card, and
+ * an "Outstanding" figure tinted green -- the colour this product uses for
+ * "running right now" -- on the one number that means "collect this".
+ */
+describe('ReportsScreen, the chart axis and the outstanding card', () => {
+  it('prints every axis label when there are few buckets', () => {
+    expect([0, 1, 2].every((i) => everyNth(3, i))).toBe(true);
+  });
+
+  it('thins the axis on a month of bars instead of smearing thirty labels', () => {
+    const printed = Array.from({ length: 30 }, (_, i) => everyNth(30, i)).filter(Boolean);
+    expect(printed.length).toBeLessThan(12);
+    expect(printed.length).toBeGreaterThan(3);
+  });
+
+  it('always labels the last bucket, so the axis does not appear to stop early', () => {
+    expect(everyNth(30, 29)).toBe(true);
+    expect(everyNth(45, 44)).toBe(true);
+  });
+
+  it('draws every bar even when it drops the label', () => {
+    const range = resolveRange('30d', TZ, NOW);
+    const buckets = zeroFillBuckets(
+      range,
+      range.bucket === 'hour' ? [] : [{ key: '2026-10-20 00:00', bills: 2, revenuePaise: 90_000 }],
+      TZ,
+      NOW,
+    );
+    const html = renderToStaticMarkup(<ReportsScreen data={live({ buckets })} />);
+
+    expect(buckets.length).toBeGreaterThan(12);
+    expect(html.match(/rounded-t-\[3px\]/g)?.length).toBe(buckets.length);
+  });
+
+  it('tints Outstanding as money to chase, not as something running', () => {
+    const empty = emptyPayload();
+    const report = {
+      ...empty,
+      totals: { ...empty.totals, billedPaise: 50_000, unpaidPaise: 20_000, bills: 1 },
+      buckets: zeroFillBuckets(resolveRange('today', TZ, NOW), [], TZ, NOW),
+    };
+    const html = renderToStaticMarkup(<ReportsScreen data={live(report)} />);
+    const card = html.slice(html.indexOf('Outstanding'));
+
+    expect(card).toContain('Billed, not yet settled');
+    expect(card.slice(0, 1200)).toContain('var(--alert)');
   });
 });
