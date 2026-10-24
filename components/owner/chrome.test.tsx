@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { Segmented, Tag, btn, chipClass, inputClass } from './chrome';
+import { Segmented, SwitchTrack, Tag, btn, chipClass, inputClass } from './chrome';
 import { PageMotion } from './PageMotion';
 
 /**
@@ -140,5 +140,25 @@ describe('the owner kit, after the redesign', () => {
       expect(cls).toContain('h-9');
       expect(cls).toContain('border ');
     }
+  });
+});
+
+describe('SwitchTrack', () => {
+  it('draws the switch once, so two screens cannot drift by two pixels', () => {
+    const on = renderToStaticMarkup(<SwitchTrack on />);
+    const off = renderToStaticMarkup(<SwitchTrack on={false} />);
+
+    for (const html of [on, off]) {
+      // The one size. The menu editor and the kitchen both use this.
+      expect(html).toContain('h-[22px] w-[38px]');
+      expect(html).toContain('size-[16px]');
+      // The state is announced by the control around it, never by the shape.
+      expect(html).toContain('aria-hidden="true"');
+      expect(html).not.toContain('<button');
+    }
+
+    expect(on).toContain('--p-accent');
+    expect(off).toContain('left-[3px]');
+    expect(on).toContain('left-[19px]');
   });
 });

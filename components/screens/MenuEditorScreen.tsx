@@ -19,6 +19,7 @@ import {
   textareaClass,
   Tag,
   Empty,
+  SwitchTrack,
   TableWrap,
   tableClass,
   Th,
@@ -784,22 +785,10 @@ export function MenuEditorScreen({
                                       : `Put ${i.name} back on sale`
                                   }
                                 >
-                                  <span
-                                    aria-hidden="true"
-                                    className={[
-                                      'relative inline-flex h-[22px] w-[38px] shrink-0 items-center rounded-full transition-colors duration-200',
-                                      i.available
-                                        ? 'bg-[var(--p-accent)]'
-                                        : 'bg-[rgba(25,20,17,0.16)] group-hover:bg-[rgba(25,20,17,0.22)]',
-                                    ].join(' ')}
-                                  >
-                                    <span
-                                      className={[
-                                        'absolute size-[16px] rounded-full bg-white shadow-[0_1px_2px_rgba(60,40,24,0.28)] transition-[left] duration-200 ease-out',
-                                        i.available ? 'left-[19px]' : 'left-[3px]',
-                                      ].join(' ')}
-                                    />
-                                  </span>
+                                  <SwitchTrack
+                                    on={i.available}
+                                    className="group-hover:bg-[rgba(25,20,17,0.22)]"
+                                  />
                                   <span className={i.available ? 'text-gink' : ''}>
                                     {i.available ? 'Available' : 'Sold out'}
                                   </span>

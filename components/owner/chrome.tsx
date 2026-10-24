@@ -719,6 +719,37 @@ export function Tag({ tone = 'neutral', children }: { tone?: PillTone; children:
   );
 }
 
+/**
+ * The track and knob of a switch, without owning the control.
+ *
+ * Two screens draw a switch and they cannot share the control: the menu editor
+ * submits a form (so it works with JavaScript off) and the kitchen toggles a
+ * client-side preference. What they must share is the drawing -- 38x22 track,
+ * 16px knob, no border -- or the product ends up with two switches that differ
+ * by two pixels and look like two different ideas.
+ *
+ * `aria-hidden`: the state is announced by the control around it.
+ */
+export function SwitchTrack({ on, className = '' }: { on: boolean; className?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={[
+        'relative inline-flex h-[22px] w-[38px] shrink-0 items-center rounded-full transition-colors duration-200',
+        on ? 'bg-[var(--p-accent)]' : 'bg-[rgba(25,20,17,0.16)]',
+        className,
+      ].join(' ')}
+    >
+      <span
+        className={[
+          'absolute size-[16px] rounded-full bg-white shadow-[0_1px_2px_rgba(60,40,24,0.28)] transition-[left] duration-200 ease-out',
+          on ? 'left-[19px]' : 'left-[3px]',
+        ].join(' ')}
+      />
+    </span>
+  );
+}
+
 /** A dot, for a status that is stated in words next to it. */
 export function Dot({ tone = 'live' }: { tone?: 'live' | 'idle' | 'alert' }) {
   const tones = {
