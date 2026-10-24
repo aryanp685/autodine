@@ -314,3 +314,138 @@ describe('Kitchen board', () => {
     expect(html).toContain('Mark ready');
   });
 });
+
+/**
+ * The board after the 2026-10-24 pass.
+ *
+ * The kitchen is the one screen a cook works with wet hands at arm's length,
+ * and it had the least consistent controls in the product: a flat band of eight
+ * pills in five shapes, a 36px "44px" button, and an emoji standing in for an
+ * icon.
+ */
+describe('Kitchen board, the redesign', () => {
+  const live = (over: Partial<Parameters<typeof Kitchen>[0]['data'] & object> = {}) =>
+    renderToStaticMarkup(
+      <Kitchen
+        data={{
+          restaurantName: 'maddi',
+          restaurantId: 'r-1',
+          cancelled: [],
+          role: 'kitchen',
+          canAdvance: true,
+          tickets: [
+            {
+              id: 'o-1',
+              code: 'MA-1',
+              table: 'T1',
+              placedAt: '7:42 pm',
+              placedAtIso: new Date().toISOString(),
+              ageMin: 2,
+              payment: 'pending',
+              state: 'new',
+              items: [{ qty: 1, name: 'Chai', veg: true }],
+              total: 40,
+            },
+          ],
+          ...over,
+        }}
+      />,
+    );
+
+  const soundDesk = (html: string) => {
+    const at = html.indexOf('aria-label="Announcements"');
+    return html.slice(at, html.indexOf('</section>', at));
+  };
+
+  it('keeps the sound desk on the shared control geometry', () => {
+    const desk = soundDesk(live());
+
+    // Controls, not the status tags beside them: a tag is a pill on purpose.
+    const buttons = desk.match(/<button\b[^>]*>/g) ?? [];
+    expect(buttons.length).toBeGreaterThan(2);
+    for (const tag of buttons) {
+      expect(tag).not.toContain('rounded-full');
+      expect(tag).not.toMatch(/\bh-8\b/);
+    }
+    expect(desk).toContain('rounded-[10px]');
+  });
+
+  it('makes the audio state one button instead of a pill with a link inside', () => {
+    const desk = soundDesk(live());
+
+    // One element to press, carrying its own pressed state.
+    const at = desk.indexOf('Kitchen audio');
+    const button = desk.slice(desk.lastIndexOf('<button', at), desk.indexOf('>', at) + 1);
+    expect(button).toContain('aria-pressed=');
+    expect(desk).toMatch(/Kitchen audio (on|off)/);
+    // The old markup nested a text button inside a styled div, so the visible
+    // control and the clickable one were different elements.
+    expect(desk).not.toContain('>Turn off<');
+  });
+
+  it('draws the switch it toggles, at the same size as the menu switch', () => {
+    const desk = soundDesk(live());
+    expect(desk).toContain('h-[22px] w-[38px]');
+    expect(desk).toContain('aria-hidden="true"');
+  });
+
+  it('gives the one tap that moves a ticket a 44px target, and everything else 36px', () => {
+    const html = live();
+
+    const advance = html.slice(html.indexOf('Start preparing') - 400, html.indexOf('Start preparing'));
+    expect(advance).toContain('h-11');
+    expect(advance).not.toContain('rounded-full');
+
+    const at = html.indexOf('aria-label="Replay order');
+    const replay = html.slice(html.lastIndexOf('<button', at), html.indexOf('>', at) + 1);
+    expect(replay).toContain('h-9');
+    expect(replay).not.toContain('rounded-full');
+  });
+
+  it('uses an icon for replay rather than an emoji the device gets to choose', () => {
+    const html = live();
+    expect(html).not.toContain('🔊');
+    const at = html.indexOf('aria-label="Replay order');
+    expect(html.slice(at, at + 600)).toContain('<svg');
+  });
+
+  it('marks each card with the colour of the stage it is in', () => {
+    const html = live();
+    expect(html).toContain('data-stage-edge="new"');
+
+    const preparing = live({
+      tickets: [
+        {
+          id: 'o-2',
+          code: 'MA-2',
+          table: 'T2',
+          placedAt: '7:50 pm',
+          placedAtIso: new Date().toISOString(),
+          ageMin: 5,
+          payment: 'paid',
+          state: 'preparing',
+          items: [{ qty: 1, name: 'Chai', veg: true }],
+          total: 40,
+        },
+      ],
+    });
+    expect(preparing).toContain('data-stage-edge="preparing"');
+  });
+
+  it('draws its notices as the same strip the rest of the product uses', () => {
+    const html = renderToStaticMarkup(<Kitchen />);
+    const at = html.indexOf('Sample board.');
+    const from = html.lastIndexOf('<div', at);
+    const opening = html.slice(from, html.indexOf('>', from) + 1);
+
+    expect(opening).toContain('rounded-[14px]');
+    expect(opening).not.toContain('rounded-full');
+  });
+
+  it('tells the reader which age is late, not only colours it', () => {
+    // Age stays a number in every state; the colour is a second signal, never
+    // the only one.
+    const html = live();
+    expect(html).toContain('2 min');
+  });
+});

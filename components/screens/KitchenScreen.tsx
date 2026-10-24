@@ -5,7 +5,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { kitchenOrders, restaurant, type KitchenOrder } from '@/lib/demo-data';
 import { Money, VegMark } from '@/components/ui';
-import { OwnerPage, PageHead, Segmented } from '@/components/owner/chrome';
+import {
+  Dot,
+  Empty,
+  Notice,
+  OwnerPage,
+  PageHead,
+  Panel,
+  Segmented,
+  SwitchTrack,
+  Tag,
+  btn,
+} from '@/components/owner/chrome';
 import type { OutletBar } from '@/lib/outlets';
 import type { KitchenScreenData, KitchenTicket } from '@/lib/db/kitchen-screen';
 import { clockTimeInZone } from '@/lib/db/time';
@@ -175,12 +186,18 @@ function Items({ order, compact }: { order: BoardTicket; compact?: boolean }) {
                 reads "Butter Naan · Half · Extra cheese · Jain" makes the cook
                 hunt for the part they must not get wrong; the tags survive a
                 glance from a metre away. */}
-            {it.portion ? <em className="text-[12.5px] text-gink-64 not-italic"> · {it.portion}</em> : !it.addons && it.detail && <em className="text-[12.5px] text-gink-64 not-italic"> · {it.detail}</em>}
+            {/* The portion is the part a cook must not get wrong, so it is
+                ink at the same size as the dish, not a grey aside. */}
+            {it.portion ? (
+              <span className="font-medium text-gink-80"> · {it.portion}</span>
+            ) : !it.addons && it.detail ? (
+              <span className="text-[12.5px] text-gink-64"> · {it.detail}</span>
+            ) : null}
             {it.addons?.map((addon) => (
               <span
                 key={addon}
                 data-addon=""
-                className="ml-1.5 inline-block rounded-[3px] border border-hair-strong px-1.5 py-px text-[11.5px] whitespace-nowrap text-gink-64"
+                className="ml-1.5 inline-block rounded-[6px] border border-hair bg-paper-deep px-1.5 py-[2px] text-[11.5px] font-medium whitespace-nowrap text-gink-64"
               >
                 {addon}
               </span>
@@ -841,10 +858,36 @@ export function Kitchen({
 
   /* ---------------------------------------------------------------- actions */
 
+  /**
+   * Tickets with a write in flight.
+   *
+   * This board moves a card the instant you tap it -- the optimistic overlay
+   * below puts it in the next column before the server has answered -- which is
+   * right for a cook watching the board, and is also what made a double tap
+   * dangerous: the card lands in "Preparing" with "Mark ready" under the thumb
+   * that just tapped, so two quick taps could write two transitions and skip a
+   * stage. A ticket that skips "Preparing" is a dish nobody started.
+   *
+   * A ref rather than state on purpose: it must be read at the moment of the
+   * tap, not on the render that the tap itself triggers.
+   */
+  const advancingRef = useRef<Set<string>>(new Set());
+
   const advance = async (ticket: BoardTicket) => {
     const next = nextPrepState(ticket.state);
     if (!next) return;
 
+    const lockKey = ticket.orderId ?? ticket.key;
+    if (advancingRef.current.has(lockKey)) return;
+    advancingRef.current.add(lockKey);
+    try {
+      await advanceOnce(ticket, next);
+    } finally {
+      advancingRef.current.delete(lockKey);
+    }
+  };
+
+  const advanceOnce = async (ticket: BoardTicket, next: PrepState) => {
     // The sample board keeps its own books. See demoState above: the alternative
     // is a button that errors, which reads as a broken product.
     if (!ticket.orderId) {
@@ -1008,8 +1051,11 @@ export function Kitchen({
         }
         actions={
           <div className="flex flex-wrap items-center gap-1.5">
-            <div className="inline-flex h-8 items-center gap-1.5 rounded-full bg-paper-deep px-2.5 text-[11.5px] font-medium text-gink-64">
-              <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--p-accent)]" />
+            {/* Delivery is a status, so it is a tag. It was a hand-made pill
+                with its own 8px step, which made the head of this screen the
+                only place in the product using that height. */}
+            <Tag tone={live ? (delivery === 'live' ? 'live' : 'neutral') : 'neutral'}>
+              <Dot tone={live && delivery === 'live' ? 'live' : 'idle'} />
               {live
                 ? delivery === 'live'
                   ? 'Live · instant'
@@ -1017,12 +1063,8 @@ export function Kitchen({
                     ? 'Live · connecting…'
                     : 'Live · checking every 5s'
                 : 'Demo board · local only'}
-            </div>
-            {waiting > 0 && (
-              <span className="inline-flex h-8 items-center rounded-full bg-gink px-2.5 text-[11.5px] font-medium text-onink">
-                {waiting} waiting
-              </span>
-            )}
+            </Tag>
+            {waiting > 0 && <Tag tone="work">{waiting} waiting</Tag>}
           </div>
         }
       />
@@ -1040,130 +1082,141 @@ export function Kitchen({
        * speed and voice to the speech engine, mute to this device -- and none
        * of them touches an order.
        */}
-      <section
-        aria-label="Announcements"
-        className="mb-5 flex flex-wrap items-center gap-1.5 rounded-[12px] border border-hair bg-card px-3 py-2.5"
-      >
-        {/* Sound is the point of this screen, so its state is a control and not
-            a setting buried somewhere: one tap turns it off. */}
-        <div
-          className={[
-            'flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[11.5px] font-medium',
-            audio ? 'bg-accent-soft text-[var(--p-accent)]' : 'border border-hair-strong text-gink-64',
-          ].join(' ')}
-        >
-          <span
-            aria-hidden="true"
-            className={['size-1.5 rounded-full', audio ? 'bg-[var(--p-accent)]' : 'bg-gink-28'].join(' ')}
-          />
-          Kitchen audio {audio ? 'on' : 'off'}
-          <button
-            type="button"
-            onClick={() => setAudio((value) => !value)}
-            className="ml-0.5 rounded-full px-1.5 py-0.5 text-[11.5px] underline decoration-current/40 underline-offset-2 hover:no-underline"
-          >
-            {audio ? 'Turn off' : 'Turn on'}
-          </button>
+      <section aria-label="Announcements" className="mb-3 overflow-hidden rounded-[18px] border border-hair bg-card">
+        {/* THE SOUND DESK
+            Everything about the voice lives in one card, because it is one job:
+            is it on, which voice, how fast, and can I hear it. It used to be a
+            flat band of eight pills of five different shapes and two of its own
+            heights, so the one thing a cook adjusts at 9pm was also the least
+            legible thing on the screen. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-hair px-4 py-2.5">
+          <h2 className="text-[13px] font-semibold tracking-[-0.005em] text-gink">Sound</h2>
+          <span className="text-[11.5px] text-gink-46">
+            Orders are read out in Hindi, one sentence at a time.
+          </span>
+          <span className="ml-auto flex flex-wrap items-center gap-1.5">
+            <Tag tone={voiceState === 'ready' ? 'live' : 'due'}>
+              {voiceState === 'starting'
+                ? 'हिंदी · आवाज़ खोज रहे हैं'
+                : voiceState === 'ready'
+                  ? 'हिंदी · तैयार'
+                  : 'हिंदी · आवाज़ नहीं'}
+            </Tag>
+            {live && (
+              <Tag tone={speaksHere ? 'neutral' : 'due'}>
+                {speaksHere ? 'This screen speaks' : 'Screen muted'}
+              </Tag>
+            )}
+          </span>
         </div>
 
-        {/* What will actually be spoken, named. Not a language picker: there is
-            one language, and a picker would imply a second one exists. */}
-        <span
-          title={voiceName ? `Voice: ${voiceName}` : 'No Hindi voice on this device'}
-          className={[
-            'inline-flex h-8 items-center rounded-full px-2.5 text-[11.5px] font-medium',
-            voiceState === 'ready'
-              ? 'bg-accent-soft text-[var(--p-accent)]'
-              : 'border border-[var(--alert)]/30 text-[var(--alert)]',
-          ].join(' ')}
-        >
-          {voiceState === 'starting'
-            ? 'हिंदी · आवाज़ खोज रहे हैं'
-            : voiceState === 'ready'
-              ? 'हिंदी · तैयार'
-              : 'हिंदी · आवाज़ नहीं'}
-        </span>
-
-        {/* Speed. A hurried Hindi voice is what sounds slurred, so the operator
-            gets the last word on pace instead of a constant. */}
-        <Segmented
-          label="आवाज़ की रफ़्तार — voice speed"
-          size="sm"
-          value={speed}
-          onChange={(next) => {
-            setSpeed(next);
-            speedRef.current = next;
-            speechRef.current?.setRateScale(SPEEDS[next]);
-          }}
-          options={[
-            { value: 'slow', label: 'धीमा' },
-            { value: 'normal', label: 'सामान्य' },
-            { value: 'fast', label: 'तेज़' },
-          ]}
-        />
-
-        {/* Which Hindi voice. A device can carry two, and they are not equally
-            good -- an embedded engine and a downloaded neural one both answer
-            to hi-IN. Only shown when there is a real choice. */}
-        {voiceList.length > 1 && (
-          <select
-            aria-label="Hindi voice"
-            value={voicePref}
-            onChange={(event) => {
-              const next = event.target.value;
-              setVoicePref(next);
-              speechRef.current?.setVoiceName(next || null);
-              setVoiceName(speechRef.current?.voiceName() ?? null);
-            }}
-            className="h-8 max-w-[190px] rounded-full border border-hair-strong bg-card px-2 pr-6 text-[11.5px] text-gink focus:border-gink focus:outline-none"
-          >
-            <option value="">सबसे अच्छी आवाज़ (auto)</option>
-            {voiceList.map((voice) => (
-              <option key={voice.name} value={voice.name}>
-                {voice.name}
-              </option>
-            ))}
-          </select>
-        )}
-
-        <span className="mx-1 hidden h-5 w-px bg-hair sm:block" aria-hidden="true" />
-
-        {live && (
+        <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+          {/* One control, not a pill with a link inside it. The state is the
+              button: pressing it is the only thing you can do to it. */}
           <button
             type="button"
-            onClick={() => setSpeaksHere((value) => !value)}
-            title="Turn this off on a second screen in the same kitchen, so orders are not read out twice"
+            aria-pressed={audio}
+            onClick={() => setAudio((value) => !value)}
+            title={audio ? 'Turn the announcements off on this screen' : 'Turn the announcements on'}
             className={[
-              'h-8 rounded-full px-2.5 text-[11.5px] font-medium transition-colors',
-              speaksHere ? 'bg-accent-soft text-[var(--p-accent)]' : 'border border-hair-strong text-gink-46',
+              'inline-flex h-9 items-center gap-2 rounded-[10px] border px-2.5 text-[12.5px] font-medium transition-colors',
+              'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]',
+              audio
+                ? 'border-[color-mix(in_oklab,var(--p-accent)_45%,transparent)] bg-accent-soft text-gink'
+                : 'border-hair-strong bg-card text-gink-64 hover:border-gink-28 hover:text-gink',
             ].join(' ')}
           >
-            {speaksHere ? 'This screen speaks' : 'Screen muted'}
+            <SwitchTrack on={audio} />
+            Kitchen audio {audio ? 'on' : 'off'}
           </button>
-        )}
 
-        <button
-          type="button"
-          onClick={() => replay(`test:${Date.now()}`, sampleText, 'Test')}
-          className="h-8 rounded-full border border-hair-strong px-3 text-[11.5px] font-medium text-gink-64 transition-colors hover:text-gink"
-        >
-          Test announcement
-        </button>
-        <button
-          type="button"
-          disabled={!latest}
-          onClick={() => {
-            if (!latest) return;
-            replay(
-              `new:${latest.orderId ?? latest.key}`,
-              orderAnnouncement(latest),
-              announceLogLabel(latest.table, latest.items),
-            );
-          }}
-          className="h-8 rounded-full border border-hair-strong px-3 text-[11.5px] font-medium text-gink-64 transition-colors hover:text-gink disabled:opacity-40"
-        >
-          Replay latest
-        </button>
+          {/* Speed. A hurried Hindi voice is what sounds slurred, so the
+              operator gets the last word on pace instead of a constant. */}
+          <Segmented
+            label="आवाज़ की रफ़्तार — voice speed"
+            size="sm"
+            value={speed}
+            onChange={(next) => {
+              setSpeed(next);
+              speedRef.current = next;
+              speechRef.current?.setRateScale(SPEEDS[next]);
+            }}
+            options={[
+              { value: 'slow', label: 'धीमा' },
+              { value: 'normal', label: 'सामान्य' },
+              { value: 'fast', label: 'तेज़' },
+            ]}
+          />
+
+          {/* Which Hindi voice. A device can carry two, and they are not
+              equally good -- an embedded engine and a downloaded neural one
+              both answer to hi-IN. Only shown when there is a real choice. */}
+          {voiceList.length > 1 && (
+            <select
+              aria-label="Hindi voice"
+              value={voicePref}
+              onChange={(event) => {
+                const next = event.target.value;
+                setVoicePref(next);
+                speechRef.current?.setVoiceName(next || null);
+                setVoiceName(speechRef.current?.voiceName() ?? null);
+              }}
+              className="h-9 max-w-[190px] rounded-[10px] border border-hair-strong bg-card px-2.5 pr-7 text-[12.5px] text-gink transition-colors hover:border-gink-28 focus:border-[var(--p-accent)] focus:ring-2 focus:ring-[color-mix(in_oklab,var(--p-accent)_16%,transparent)] focus:outline-none"
+            >
+              <option value="">सबसे अच्छी आवाज़ (auto)</option>
+              {voiceList.map((voice) => (
+                <option key={voice.name} value={voice.name}>
+                  {voice.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <span className="mx-0.5 hidden h-5 w-px bg-hair sm:block" aria-hidden="true" />
+
+          {live && (
+            <button
+              type="button"
+              aria-pressed={speaksHere}
+              onClick={() => setSpeaksHere((value) => !value)}
+              title="Turn this off on a second screen in the same kitchen, so orders are not read out twice"
+              className={[
+                'h-9 rounded-[10px] border px-3 text-[12.5px] font-medium transition-colors',
+                'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]',
+                speaksHere
+                  ? 'border-[color-mix(in_oklab,var(--p-accent)_45%,transparent)] bg-accent-soft text-gink'
+                  : 'border-hair-strong bg-card text-gink-64 hover:border-gink-28 hover:text-gink',
+              ].join(' ')}
+            >
+              {speaksHere ? 'This screen speaks' : 'Screen muted'}
+            </button>
+          )}
+
+          <span className="ml-auto flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => replay(`test:${Date.now()}`, sampleText, 'Test')}
+              className={btn('ghost', 'sm')}
+            >
+              Test announcement
+            </button>
+            <button
+              type="button"
+              disabled={!latest}
+              onClick={() => {
+                if (!latest) return;
+                replay(
+                  `new:${latest.orderId ?? latest.key}`,
+                  orderAnnouncement(latest),
+                  announceLogLabel(latest.table, latest.items),
+                );
+              }}
+              className={btn('quiet', 'sm')}
+            >
+              Replay latest
+            </button>
+          </span>
+        </div>
       </section>
 
         {/* ----------------------------------------------------- the one banner */}
@@ -1173,93 +1226,83 @@ export function Kitchen({
             looking like it did nothing: the ticket moves, and only this
             browser knows. */}
         {!live && (
-          <div role="note" className="rounded-[10px] border border-hair bg-card px-3.5 py-2.5 text-[12.5px] leading-[1.5] text-gink-64">
-            <strong className="font-semibold text-gink">Sample board.</strong>{' '}
+          <Notice
+            role="note"
+            className="mb-0"
+            label={<strong className="text-[12.5px] font-semibold text-gink">Sample board.</strong>}
+          >
             These tickets are fictional. A tap moves one here and nowhere else — connect the database
             to run a real service.
-          </div>
+          </Notice>
         )}
 
         {status && (
-          <div
+          <Notice
             role={status.tone === 'alert' ? 'alert' : 'status'}
-            className={[
-              'flex flex-wrap items-center gap-x-2.5 gap-y-1.5 rounded-[10px] px-3.5 py-2.5 text-[12.5px] leading-[1.5]',
-              status.tone === 'alert'
-                ? 'border border-[var(--alert)]/30 bg-[var(--alert)]/6 text-gink'
-                : 'border border-hair bg-card text-gink-64',
-            ].join(' ')}
+            tone={status.tone === 'alert' ? 'due' : 'plain'}
+            className="mb-0"
+            label={<strong className="text-[12.5px] font-semibold text-gink">{status.title}</strong>}
+            action={
+              status.action ? (
+                <button type="button" onClick={status.action.run} className={btn('ghost', 'sm')}>
+                  {status.action.label}
+                </button>
+              ) : undefined
+            }
           >
-            <strong className="font-semibold text-gink">{status.title}</strong>
-            <span>{status.body}</span>
-            {status.action && (
-              <button
-                type="button"
-                onClick={status.action.run}
-                className="rounded-full border border-hair-strong px-2.5 py-1 text-[11.5px] font-medium text-gink"
-              >
-                {status.action.label}
-              </button>
-            )}
-          </div>
+            {status.body}
+          </Notice>
         )}
 
         {missed.length > 0 && (
-          <div
+          <Notice
             role="status"
-            className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1.5 rounded-[10px] border border-hair bg-accent-soft px-3.5 py-2.5 text-[12.5px] leading-[1.5] text-gink-64"
+            tone="accent"
+            className="mb-0"
+            label={
+              <strong className="text-[12.5px] font-semibold text-gink">
+                {missed.length} order{missed.length === 1 ? '' : 's'} {missed.length === 1 ? 'has' : 'have'} not
+                been read out.
+              </strong>
+            }
+            action={
+              <span className="flex items-center gap-1.5">
+                <button type="button" onClick={readMissed} className={btn('solid', 'sm')}>
+                  Read them out
+                </button>
+                <button type="button" onClick={() => setMissed([])} className={btn('quiet', 'sm')}>
+                  Dismiss
+                </button>
+              </span>
+            }
           >
-            <strong className="font-semibold text-gink">
-              {missed.length} order{missed.length === 1 ? '' : 's'} {missed.length === 1 ? 'has' : 'have'} not
-              been read out.
-            </strong>
-            <span>
-              {/* Two honest reasons, and they are not the same thing. */}
-              {missedReason === 'muted'
-                ? 'They arrived while this screen was muted or the sound was off.'
-                : voiceState === 'ready'
-                  ? 'They were placed before this board was opened. The pass may have seen them already.'
-                  : 'They arrived while this device had no voice to read them with.'}{' '}
-              They are on the board below.
-            </span>
-            <button
-              type="button"
-              onClick={readMissed}
-              className="rounded-full bg-gink px-2.5 py-1 text-[11.5px] font-medium text-onink"
-            >
-              Read them out
-            </button>
-            <button
-              type="button"
-              onClick={() => setMissed([])}
-              className="rounded-full px-1.5 py-1 text-[11.5px] font-medium text-gink-64 underline underline-offset-2"
-            >
-              Dismiss
-            </button>
-          </div>
+            {/* Two honest reasons, and they are not the same thing. */}
+            {missedReason === 'muted'
+              ? 'They arrived while this screen was muted or the sound was off.'
+              : voiceState === 'ready'
+                ? 'They were placed before this board was opened. The pass may have seen them already.'
+                : 'They arrived while this device had no voice to read them with.'}{' '}
+            They are on the board below.
+          </Notice>
         )}
 
         {log.length > 0 && (
-          <section
-            aria-label="Recent announcements"
-            className="rounded-[10px] border border-hair bg-card"
-          >
-            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-hair px-3.5 py-2">
-              {/* "Spoken" would be a lie while muted: the entries are what the
-                  board WOULD have read out. The text is the exact string
-                  handed to the voice, Devanagari and all -- so the owner can
-                  read what the kitchen will hear. */}
-              <span className="text-[10.5px] font-semibold tracking-[0.12em] text-gink-46 uppercase">
-                Announcements
-              </span>
-              <span className="text-[11.5px] text-gink-46">
-                {audio && speaksHere
+          <div aria-label="Recent announcements">
+            <Panel
+              /* "Spoken" would be a lie while muted: the entries are what the
+                 board WOULD have read out. The text is the exact string handed
+                 to the voice, Devanagari and all -- so the owner can read what
+                 the kitchen will hear. */
+              title="Announcements"
+              meta={
+                audio && speaksHere
                   ? voiceState === 'ready'
                     ? `हिंदी · ${voiceName ?? 'voice'}`
                     : 'हिंदी · no voice on this device'
-                  : 'muted on this screen — nothing was read aloud'}
-              </span>
-            </div>
+                  : 'muted on this screen — nothing was read aloud'
+              }
+              bodyClassName=""
+            >
             <ul className="divide-y divide-hair">
               {log.map((entry) => (
                 <li key={`${entry.key}-${entry.at}`} className="flex items-baseline gap-2.5 px-3.5 py-1.5 text-[12.5px]">
@@ -1277,7 +1320,8 @@ export function Kitchen({
                 </li>
               ))}
             </ul>
-          </section>
+            </Panel>
+          </div>
         )}
 
         {announcement && (
@@ -1289,13 +1333,18 @@ export function Kitchen({
         )}
 
         {error && (
-          <div
+          <Notice
             role="alert"
-            className="rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/6 px-3.5 py-2.5"
+            tone="due"
+            className="mb-0"
+            label={
+              <strong className="text-[12.5px] font-semibold text-gink">
+                Could not update the ticket.
+              </strong>
+            }
           >
-            <strong className="text-[12.5px] font-semibold text-gink">Could not update the ticket.</strong>
-            <p className="mt-0.5 text-[12.5px] text-gink-64">{error}</p>
-          </div>
+            {error}
+          </Notice>
         )}
 
         {data?.blocked && <SignInPrompt reason={data.blocked} screen="kitchen board" />}
@@ -1305,25 +1354,29 @@ export function Kitchen({
         {/* One banner, naming the actual obstacle. The buttons below are not
             rendered in this state, so this is the only explanation on screen. */}
         {live && data && !data.blocked && !data.canAdvance && (
-          <div role="status" className="rounded-[10px] border border-hair-strong bg-card px-3.5 py-2.5 text-[12.5px] leading-[1.5]">
-            <strong className="font-semibold text-gink">
-              {data.cannotAdvance === 'plan'
-                ? 'Read-only: the server is refusing writes for this restaurant.'
-                : 'You can watch this board, but not move tickets.'}
-            </strong>{' '}
-            <span className="text-gink-64">
-              {data.cannotAdvance === 'plan'
-                ? 'Its plan or trial period is not currently active. Menus, orders and reports stay readable, and tickets start moving again the moment access is restored — nothing has been deleted.'
-                : `A ${data.role ?? 'member'} can see the kitchen board; moving a ticket needs an owner, a manager or kitchen staff. Ask one of them to take a screen.`}
-            </span>
-          </div>
+          <Notice
+            role="status"
+            tone={data.cannotAdvance === 'plan' ? 'due' : 'plain'}
+            className="mb-0"
+            label={
+              <strong className="text-[12.5px] font-semibold text-gink">
+                {data.cannotAdvance === 'plan'
+                  ? 'Read-only: the server is refusing writes for this restaurant.'
+                  : 'You can watch this board, but not move tickets.'}
+              </strong>
+            }
+          >
+            {data.cannotAdvance === 'plan'
+              ? 'Its plan or trial period is not currently active. Menus, orders and reports stay readable, and tickets start moving again the moment access is restored — nothing has been deleted.'
+              : `A ${data.role ?? 'member'} can see the kitchen board; moving a ticket needs an owner, a manager or kitchen staff. Ask one of them to take a screen.`}
+          </Notice>
         )}
 
         {live && data && !data.blocked && data.tickets.length === 0 && (
-          <div className="rounded-[10px] border border-dashed border-hair-strong px-3.5 py-4 text-center text-[13px] text-gink-46">
+          <Empty className="mb-0">
             No open tickets in the last few hours. Orders placed from the customer menu appear here
             the moment the guest confirms.
-          </div>
+          </Empty>
         )}
       </div>
 
@@ -1368,9 +1421,26 @@ export function Kitchen({
               mobileCol === c.key ? 'block' : 'hidden lg:block',
             ].join(' ')}
           >
-            <div className="mb-2 flex items-baseline justify-between gap-2 border-b border-hair pb-1.5">
-              <h2 className="text-[11.5px] font-semibold tracking-[0.12em] text-gink uppercase">{c.title}</h2>
-              <span className="tnum text-[11.5px] font-medium text-gink-46">{c.orders.length}</span>
+            {/* A column is a stage, so its head says which stage in colour as
+                well as in words: copper is waiting to start, ink is in hand,
+                green is ready to leave. The count is a tag because it is the
+                one number the head carries. */}
+            <div className="mb-2 flex items-center justify-between gap-2 border-b border-hair pb-2">
+              <h2 className="flex items-center gap-2 text-[12.5px] font-semibold tracking-[-0.005em] text-gink">
+                <span
+                  aria-hidden="true"
+                  className={[
+                    'size-1.5 rounded-full',
+                    c.key === 'new'
+                      ? 'bg-[var(--p-accent)]'
+                      : c.key === 'preparing'
+                        ? 'bg-gink'
+                        : 'bg-[var(--p-live)]',
+                  ].join(' ')}
+                />
+                {c.title}
+              </h2>
+              <Tag tone="neutral">{c.orders.length}</Tag>
             </div>
 
             <div className="grid gap-2">
@@ -1380,7 +1450,7 @@ export function Kitchen({
                   data-state={o.state}
                   data-arriving={arrivals.includes(o.key) ? 'true' : undefined}
                   className={[
-                    'rounded-[12px] border bg-card p-3',
+                    'relative overflow-hidden rounded-[14px] border bg-card p-3',
                     /* Served tickets stay on the board until the pass clears
                        them, so they fade rather than disappear: a card that
                        vanishes has no history. */
@@ -1388,21 +1458,39 @@ export function Kitchen({
                     arrivals.includes(o.key) ? 'animate-[kbrise_320ms_cubic-bezier(0.22,1,0.36,1)]' : '',
                   ].join(' ')}
                 >
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-[15px] font-semibold tracking-[-0.01em] text-gink">{o.code}</span>
-                    <span className="rounded-[4px] bg-paper-deep px-1.5 py-0.5 text-[11.5px] font-semibold tracking-[0.04em] text-gink-80">
+                  {/* One 3px edge in the stage's colour. A board is read from
+                      a metre and a half away, and this is what makes a column
+                      a column rather than a stack of identical cards. */}
+                  <span
+                    aria-hidden="true"
+                    data-stage-edge={o.state}
+                    className={[
+                      'absolute inset-y-0 left-0 w-[3px]',
+                      o.state === 'new'
+                        ? 'bg-[var(--p-accent)]'
+                        : o.state === 'preparing'
+                          ? 'bg-gink'
+                          : o.state === 'ready'
+                            ? 'bg-[var(--p-live)]'
+                            : 'bg-gink-28',
+                    ].join(' ')}
+                  />
+                  <div className="flex items-center gap-2">
+                    <span className="tnum text-[15px] font-semibold tracking-[-0.01em] text-gink">{o.code}</span>
+                    <span className="rounded-[6px] bg-paper-deep px-1.5 py-0.5 text-[11.5px] font-semibold tracking-[0.04em] text-gink-80">
                       {o.table}
                     </span>
                     {/* Age is the one number a cook acts on without reading
-                        anything else, so it is the loudest thing on the row. */}
+                        anything else, so it is the loudest thing on the row --
+                        inside the geometry every other status uses. */}
                     <span
                       className={[
-                        'tnum ml-auto rounded-full px-2 py-0.5 text-[11.5px] font-semibold ring-1 ring-inset',
+                        'tnum ml-auto rounded-full px-2.5 py-[3px] text-[11.5px] font-semibold tracking-[0.01em]',
                         o.ageMin >= LATE_AFTER_MIN
-                          ? 'bg-[var(--alert)]/8 text-[var(--alert)] ring-[var(--alert)]/25'
+                          ? 'bg-[color-mix(in_oklab,var(--p-due)_10%,white)] text-[var(--p-due)]'
                           : o.ageMin >= WARN_AFTER_MIN
-                            ? 'bg-gink-07 text-gink ring-hair-strong'
-                            : 'bg-accent-soft text-[var(--p-accent)] ring-[var(--p-accent)]/20',
+                            ? 'bg-paper-deep text-gink-64'
+                            : 'bg-accent-soft text-[var(--p-accent)]',
                       ].join(' ')}
                     >
                       {o.ageMin} min
@@ -1410,7 +1498,8 @@ export function Kitchen({
                   </div>
 
                   {o.payment === 'pending' && (
-                    <div className="mt-2 rounded-[5px] bg-[var(--alert)]/8 px-2 py-1 text-[11.5px] font-semibold tracking-[0.02em] text-[var(--alert)]">
+                    <div className="mt-2 flex items-center gap-1.5 rounded-[7px] bg-[color-mix(in_oklab,var(--p-due)_8%,white)] px-2 py-1 text-[11.5px] font-medium text-[var(--p-due)]">
+                      <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--p-due)]" />
                       Unpaid · pay at counter
                     </div>
                   )}
@@ -1449,6 +1538,9 @@ export function Kitchen({
                       </span>
                     )}
 
+                    {/* An icon, not an emoji. The emoji renders as whatever
+                        the device's font decides -- colour, weight and size all
+                        vary -- on the one control a cook may hunt for by shape. */}
                     <button
                       type="button"
                       title="Replay voice announcement"
@@ -1460,9 +1552,21 @@ export function Kitchen({
                           announceLogLabel(o.table, o.items),
                         )
                       }
-                      className={kbBtn('quiet')}
+                      className={`${btn('ghost', 'sm')} w-9 px-0`}
                     >
-                      🔊
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        width="16"
+                        height="16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.7"
+                      >
+                        <path d="M4 9.5h3.2L12 5.8v12.4L7.2 14.5H4z" strokeLinejoin="round" />
+                        <path d="M15.6 9.2a4 4 0 0 1 0 5.6" strokeLinecap="round" />
+                        <path d="M17.9 6.9a7.2 7.2 0 0 1 0 10.2" strokeLinecap="round" />
+                      </svg>
                     </button>
 
                     {interactive && o.state !== 'served' ? (
@@ -1500,9 +1604,7 @@ export function Kitchen({
               ))}
 
               {c.orders.length === 0 && (
-                <div className="rounded-[10px] border border-dashed border-hair-strong px-3 py-6 text-center text-[12.5px] text-gink-46">
-                  Nothing here
-                </div>
+                <Empty className="min-h-[76px] py-5">Nothing here</Empty>
               )}
             </div>
           </section>
@@ -1515,16 +1617,17 @@ export function Kitchen({
 /**
  * The board's own buttons.
  *
- * Bigger than the rest of the product on purpose: this screen is read from a
- * metre and a half away, often with wet hands, and a 44px target is the only
- * size that survives that.
+ * The comment here used to say "44px targets", and the code drew 36px pills --
+ * which is exactly the kind of drift a comment cannot catch. So: the one tap
+ * that moves a ticket is `md` (44px), because this screen is read from a metre
+ * and a half away and often tapped with wet hands; everything around it is
+ * `sm`, the same 36px action the rest of the product uses. No pills: an action
+ * is a rectangle, and a pill means "status" everywhere else in this product.
  */
 function kbBtn(tone: 'solid' | 'quiet' | 'danger'): string {
-  const base =
-    'inline-flex h-9 items-center justify-center rounded-full px-3 text-[12.5px] font-medium transition-colors disabled:opacity-45';
-  if (tone === 'solid') return `${base} bg-gink text-onink hover:bg-gink/88`;
-  if (tone === 'danger') return `${base} bg-[var(--alert)] text-white hover:opacity-90`;
-  return `${base} border border-hair-strong text-gink-64 hover:bg-gink-07 hover:text-gink`;
+  if (tone === 'solid') return btn('solid', 'md');
+  if (tone === 'danger') return btn('danger', 'sm');
+  return btn('quiet', 'sm');
 }
 
 /* ------------------------------------------------------------------ storage */
