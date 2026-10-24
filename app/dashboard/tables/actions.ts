@@ -96,6 +96,27 @@ export async function addTableAction(formData: FormData): Promise<void> {
   redirect(`${TABLES_PATH}?notice=${encodeURIComponent(`${label} added with a new QR code.`)}`);
 }
 
+/**
+ * Switch a table on or off.
+ *
+ * ENABLING A TABLE WITH NO CODE CREATES ONE FIRST.
+ *
+ * This is the fix for a reported bug: "I pressed Enable and the table's QR
+ * still is not enabled." The write was working -- is_active went true -- but
+ * the table had no live code (its last one had been retired), so the card had
+ * nothing to scan and the screen called that state "Revoked". The owner was
+ * left with a table switched on, showing a QR-shaped pattern that decoded to
+ * nothing, and no code that could ever be printed.
+ *
+ * A switched-on table nobody can scan is not a success, so enabling now
+ * finishes the job: if there is no live code, one is issued first, through the
+ * same SECURITY DEFINER function the Regenerate button uses (which checks
+ * membership itself -- nothing about the restaurant is taken from the form).
+ *
+ * The order matters. Code first, then is_active: if the second write fails the
+ * table has a code and is still off, which is safe. The reverse would leave an
+ * enabled table with nothing to scan.
+ */
 export async function setTableActiveAction(formData: FormData): Promise<void> {
   const ctx = await currentRestaurant();
   if (!ctx) fail('You need to be signed in to manage tables.');
@@ -103,6 +124,28 @@ export async function setTableActiveAction(formData: FormData): Promise<void> {
   const tableId = String(formData.get('tableId') ?? '').trim();
   const makeActive = formData.get('active') === 'true';
   if (!tableId) fail('Missing table.');
+
+  let issuedCode = false;
+
+  if (makeActive) {
+    const { data: liveCodes } = await ctx.supabase
+      .from('table_qr_codes')
+      .select('id')
+      .eq('table_id', tableId)
+      .eq('restaurant_id', ctx.restaurantId)
+      .is('revoked_at', null)
+      .limit(1);
+
+    if (!liveCodes || liveCodes.length === 0) {
+      const { error: codeError } = await ctx.supabase.rpc('rotate_table_qr_code', {
+        p_table_id: tableId,
+      });
+      // Not fatal for the disable path -- we are not in it -- but a table
+      // switched on without a code is the bug we are fixing, so it is.
+      if (codeError) fail(`Could not create a code for this table: ${codeError.message}`);
+      issuedCode = true;
+    }
+  }
 
   const { error } = await ctx.supabase
     .from('dining_tables')
@@ -113,11 +156,14 @@ export async function setTableActiveAction(formData: FormData): Promise<void> {
   if (error) fail(`Could not update table: ${error.message}`);
 
   revalidatePath(TABLES_PATH);
-  redirect(
-    `${TABLES_PATH}?notice=${encodeURIComponent(
-      makeActive ? 'Table enabled.' : 'Table disabled. It can no longer take orders.'
-    )}`
-  );
+
+  const message = !makeActive
+    ? 'Table disabled. It can no longer take orders.'
+    : issuedCode
+      ? 'Table enabled with a new QR code. Print that card before service.'
+      : 'Table enabled.';
+
+  redirect(`${TABLES_PATH}?notice=${encodeURIComponent(message)}`);
 }
 
 export async function rotateQrAction(formData: FormData): Promise<void> {

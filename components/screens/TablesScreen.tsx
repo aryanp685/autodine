@@ -14,6 +14,7 @@ import { SignInPrompt } from '@/components/SignInPrompt';
 import { VerificationCodeRefresh } from '@/components/VerificationCodeRefresh';
 import { ConfirmSubmit } from '@/components/owner/ConfirmSubmit';
 import { SubmitButton } from '@/components/owner/SubmitButton';
+import { Reveal } from '@/components/owner/Reveal';
 import {
   OwnerPage,
   PageHead,
@@ -29,8 +30,10 @@ import {
 /** The QR state as a word and a tone. Colour is never the only signal. */
 const STATE: Record<string, { tone: PillTone; word: string }> = {
   active: { tone: 'live', word: 'Live' },
-  printed: { tone: 'neutral', word: 'Printed' },
-  revoked: { tone: 'failed', word: 'Revoked' },
+  /* Not "Revoked". See the mapping note in lib/db/tables-screen.ts: a table
+     that is switched on with no code has nothing to scan, and calling it
+     revoked sent an owner looking for who took their code away. */
+  'no-code': { tone: 'due', word: 'No code' },
   disabled: { tone: 'neutral', word: 'Disabled' },
 };
 /**
@@ -189,7 +192,10 @@ export function TablesScreen({
           title={<span id="floor-plan">The floor</span>}
           meta={live ? `${tables.length} tables` : 'sample'}
         />
-        <ul className="m-0 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 xl:grid-cols-3">
+        <Reveal
+          as="ul"
+          className="m-0 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 xl:grid-cols-3"
+        >
           {tables.map((t) => {
             const state = STATE[t.qr] ?? { tone: 'neutral' as PillTone, word: t.qr };
             return (
@@ -208,10 +214,23 @@ export function TablesScreen({
                       <div className="mt-1 text-[11.5px] text-gink-46">{t.label}</div>
                     </div>
                     {/* The code is the card's whole point, so it is drawn at a
-                        size a phone can still read across a table. */}
-                    <div className="shrink-0 rounded-[8px] border border-hair bg-white p-1">
-                      <TableQr svg={t.qrSvg} fallbackValue={`${restaurantName}-${t.code}`} size={64} />
-                    </div>
+                        size a phone can still read across a table.
+
+                        A live card only ever draws a REAL code. There used to
+                        be a fallback here that rendered a QR-shaped pattern
+                        when the table had no live code, which is how a table
+                        with nothing to scan came to look perfectly fine --
+                        and how "Enable does not work" was really "there is no
+                        code". Absent means absent, and it is said in words. */}
+                    {t.qrSvg ? (
+                      <div className="shrink-0 rounded-[10px] border border-hair bg-white p-1.5">
+                        <TableQr svg={t.qrSvg} fallbackValue={`${restaurantName}-${t.code}`} size={64} />
+                      </div>
+                    ) : (
+                      <div className="grid h-[78px] w-[78px] shrink-0 place-items-center rounded-[10px] border border-dashed border-hair-strong bg-paper-deep px-1.5 text-center text-[10px] leading-[1.3] font-medium text-gink-46">
+                        {live ? 'No code yet' : 'Sample'}
+                      </div>
+                    )}
                   </div>
 
                   <dl className="mt-3 grid grid-cols-2 gap-2 border-t border-hair pt-2.5">
@@ -230,55 +249,117 @@ export function TablesScreen({
                   </dl>
 
                   {live && t.id ? (
-                    /* One form per card. Every button shares the hidden table
-                       id and overrides only the action, so all four are real
-                       submissions rather than inert spans. */
+                    /*
+                     * One form per card: every button shares the hidden table
+                     * id and overrides only the action, so all of them are
+                     * real submissions rather than inert spans.
+                     *
+                     * WHICH ACTIONS APPEAR DEPENDS ON THE STATE
+                     *
+                     * Four buttons on every card meant three of them did
+                     * nothing useful most of the time: "Regenerate" and
+                     * "Revoke" on a card with no code are both no-ops, and
+                     * "Enable" on a table that has no code left the owner with
+                     * a switched-on table nobody could scan -- which is exactly
+                     * the bug that was reported as "Enable does not work".
+                     *
+                     * So a card offers the one next step it actually needs,
+                     * as the solid button, and the secondary options beside
+                     * it.
+                     */
                     <form className="mt-auto flex flex-wrap items-center gap-1 pt-3">
                       <input type="hidden" name="tableId" value={t.id} />
+
+                      {t.qr === 'no-code' && (
+                        /* The code is what is missing, so creating one is the
+                           primary action, not an afterthought behind
+                           "Regenerate". */
+                        <SubmitButton
+                          formAction={rotateQrAction}
+                          data-table-action="create"
+                          pendingLabel="Creating…"
+                        >
+                          Create code
+                        </SubmitButton>
+                      )}
+
+                      {t.qr === 'disabled' && (
+                        /* Enabling issues a code first when there is none --
+                           see setTableActiveAction. A switched-on table with
+                           nothing to scan is not a success. */
+                        <SubmitButton
+                          formAction={setTableActiveAction}
+                          name="active"
+                          value="true"
+                          data-table-action="toggle"
+                          pendingLabel="Enabling…"
+                        >
+                          Enable
+                        </SubmitButton>
+                      )}
+
                       {/* Preview opens the card's own URL, which is what a
                           guest actually sees: the verification form, not a
-                          menu. */}
-                      <a
-                        href={t.scanUrl ?? '/menu'}
-                        target="_blank"
-                        rel="noreferrer"
-                        data-table-action="preview"
-                        className={btn('quiet', 'sm')}
-                      >
-                        Preview
-                      </a>
-                      <button
-                        type="submit"
-                        formAction={rotateQrAction}
-                        data-table-action="rotate"
-                        className={btn('quiet', 'sm')}
-                      >
-                        Regenerate
-                      </button>
-                      <button
-                        type="submit"
-                        formAction={setTableActiveAction}
-                        name="active"
-                        value={t.qr === 'disabled' ? 'true' : 'false'}
-                        data-table-action="toggle"
-                        className={btn('quiet', 'sm')}
-                      >
-                        {t.qr === 'disabled' ? 'Enable' : 'Disable'}
-                      </button>
-                      {/* Revoking is not like disabling. The card taped to
-                          the table stops working and someone has to print,
-                          laminate and re-stick a new one -- so it asks, and
-                          the question names the table. */}
-                      <ConfirmSubmit
-                        formAction={revokeQrAction}
-                        data-table-action="revoke"
-                        tone="danger"
-                        question={`Revoke ${t.code}? Its printed card stops working.`}
-                        confirmLabel="Revoke it"
-                        className="ml-auto"
-                      >
-                        Revoke
-                      </ConfirmSubmit>
+                          menu. Useless with no code, so it is not offered. */}
+                      {t.qr !== 'no-code' && (
+                        <a
+                          href={t.scanUrl ?? '/menu'}
+                          target="_blank"
+                          rel="noreferrer"
+                          data-table-action="preview"
+                          className={btn('quiet', 'sm')}
+                        >
+                          Preview
+                        </a>
+                      )}
+
+                      {t.qr === 'active' && (
+                        <>
+                          <SubmitButton
+                            formAction={rotateQrAction}
+                            data-table-action="rotate"
+                            tone="quiet"
+                            pendingLabel="Replacing…"
+                          >
+                            Regenerate
+                          </SubmitButton>
+                          <SubmitButton
+                            formAction={setTableActiveAction}
+                            name="active"
+                            value="false"
+                            data-table-action="toggle"
+                            tone="quiet"
+                            pendingLabel="Disabling…"
+                          >
+                            Disable
+                          </SubmitButton>
+                          {/* Revoking is not like disabling. The card taped to
+                              the table stops working and someone has to print,
+                              laminate and re-stick a new one -- so it asks, and
+                              the question names the table. */}
+                          <ConfirmSubmit
+                            formAction={revokeQrAction}
+                            data-table-action="revoke"
+                            tone="danger"
+                            question={`Revoke ${t.code}? Its printed card stops working.`}
+                            confirmLabel="Revoke it"
+                            className="ml-auto"
+                          >
+                            Revoke
+                          </ConfirmSubmit>
+                        </>
+                      )}
+
+                      {t.qr === 'disabled' && t.token && (
+                        <SubmitButton
+                          formAction={rotateQrAction}
+                          data-table-action="rotate"
+                          tone="quiet"
+                          pendingLabel="Replacing…"
+                        >
+                          New code
+                        </SubmitButton>
+                      )}
                     </form>
                   ) : (
                     /* No database, no controls: four dead buttons under every
@@ -291,7 +372,7 @@ export function TablesScreen({
               </li>
             );
           })}
-        </ul>
+        </Reveal>
       </section>
 
       {/* -------------------------------------------------------------- notes
@@ -380,13 +461,22 @@ export function TablesScreen({
                 key={t.code}
                 className="flex flex-col items-center rounded-[10px] border border-hair px-3 py-4 text-center"
               >
-                <TableQr svg={t.qrSvg} fallbackValue={`print-${t.code}`} size={64} />
+                {t.qrSvg ? (
+                  <TableQr svg={t.qrSvg} fallbackValue={`print-${t.code}`} size={64} />
+                ) : (
+                  /* Printing a card for a table with no code puts an
+                     unscannable square on a table and looks exactly like a
+                     working one. The sheet says what is missing instead. */
+                  <div className="grid size-[64px] place-items-center rounded-[6px] border border-dashed border-hair-strong px-1 text-center text-[10px] leading-[1.2] font-medium text-gink-46">
+                    No code
+                  </div>
+                )}
                 <div className="mt-2 text-[18px] font-semibold tracking-[0.02em] text-gink">
                   {t.code}
                 </div>
                 <div className="text-[11.5px] text-gink-64">{restaurantName}</div>
                 <div className="mt-1 text-[10.5px] leading-[1.35] text-gink-46">
-                  Scan, then enter the code on screen
+                  {t.qrSvg ? 'Scan, then enter the code on screen' : 'Create a code first'}
                 </div>
               </div>
             ))}

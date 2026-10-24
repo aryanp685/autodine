@@ -10,6 +10,7 @@ import type { Metadata } from 'next';
 import { MenuImportScreen } from '@/components/screens/MenuImportScreen';
 import { getOutletBar } from '@/lib/db/outlet-bar';
 import { getStaffContextDetailed } from '@/lib/db/staff';
+import { visionConfigured } from '@/lib/ai/menu-vision';
 
 /**
  * Reads the session through cookies(), so it must never be prerendered: a
@@ -29,5 +30,14 @@ export default async function MenuImportPage() {
   // there is no restaurant to write into, so the save button refuses.
   const blocked = !staff.ok && staff.reason !== 'unconfigured' ? staff.reason : undefined;
 
-  return <MenuImportScreen outlet={outlet} role={staff.ok ? staff.context.role : undefined} blocked={blocked} />;
+  return (
+    <MenuImportScreen
+      outlet={outlet}
+      role={staff.ok ? staff.context.role : undefined}
+      blocked={blocked}
+      // An environment fact, so it is read here rather than in the screen: the
+      // photo path is only offered when a model can actually read the photo.
+      visionEnabled={visionConfigured()}
+    />
+  );
 }

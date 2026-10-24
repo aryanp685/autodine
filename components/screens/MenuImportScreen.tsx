@@ -44,11 +44,22 @@ export function MenuImportScreen({
   outlet,
   role,
   blocked,
+  visionEnabled = false,
 }: {
   outlet?: OutletBar | null;
   /** owner/manager can write; anyone else can read this screen and not save. */
   role?: string;
   blocked?: 'signed-out' | 'no-membership';
+  /**
+   * Does this deployment have a vision key?
+   *
+   * Passed from the server because it is an environment fact. When it is false
+   * the photo path cannot work at all: there is no model to read the picture.
+   * The screen used to offer it anyway, as the DEFAULT tab, so the first thing
+   * an owner tried on this page was the one thing guaranteed to fail. A path
+   * that cannot succeed is not an option.
+   */
+  visionEnabled?: boolean;
 }) {
   const router = useRouter();
   const [text, setText] = useState('');
@@ -60,11 +71,15 @@ export function MenuImportScreen({
 
   const canWrite = !blocked && (role === 'owner' || role === 'manager');
 
-  /* Which input the owner is using. Photo first, because a restaurant with a
-     printed card already has the thing this needs and typing it out is the
-     long way round. The text path stays as a peer, not a fallback: it is the
-     one that works when the AI is off, and it is faster for a short menu. */
-  const [mode, setMode] = useState<'photo' | 'text'>('photo');
+  /*
+   * Which input the owner is using.
+   *
+   * Photo first when there is a model to read it: a restaurant with a printed
+   * card already has the thing this needs, and typing it out is the long way
+   * round. With no vision key the photo path is not a slower option, it is an
+   * impossible one, so the screen starts on text and does not offer the tab.
+   */
+  const [mode, setMode] = useState<'photo' | 'text'>(visionEnabled ? 'photo' : 'text');
 
   function readMenu() {
     setError(null);
@@ -106,7 +121,11 @@ export function MenuImportScreen({
       <PageHead
         kicker="Menu · import"
         title="Bring in a menu you already have"
-        meta="Photograph your printed menu and we read the dishes, prices and pictures for you to check. Or paste the text. Nothing is saved until you approve it."
+        meta={
+          visionEnabled
+            ? 'Photograph your printed menu and we read the dishes, prices and pictures for you to check. Or paste the text. Nothing is saved until you approve it.'
+            : 'Paste your menu’s text and we read the dishes and prices for you to check. Nothing is saved until you approve it.'
+        }
         actions={
           <Link href="/dashboard/menus" className={btn('ghost', 'sm')}>
             Back to the menu editor
@@ -115,8 +134,12 @@ export function MenuImportScreen({
       />
 
       {/* Two inputs, one result. A segmented control rather than two screens,
-          so the owner never has to guess which page to be on. */}
-      {!blocked && (
+          so the owner never has to guess which page to be on.
+
+          It only appears when there really are two. A one-option control is
+          furniture, and "Photo of your menu" on a deployment with no vision
+          key is a tab that can only disappoint. */}
+      {!blocked && visionEnabled && (
         <div className="mb-4">
           <Segmented
             label="How to import"
@@ -130,7 +153,18 @@ export function MenuImportScreen({
         </div>
       )}
 
-      {mode === 'photo' && !blocked && <PhotoImportPanel canWrite={canWrite} />}
+      {!blocked && !visionEnabled && (
+        <div className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-[12px] border border-hair bg-card px-4 py-3">
+          <Tag tone="neutral">Paste the text</Tag>
+          <p className="m-0 flex-1 text-[12.5px] leading-[1.5] text-gink-64">
+            Reading a photograph needs a vision model, and this deployment does not have one
+            configured. Paste the menu&rsquo;s text instead &mdash; it is parsed by rules, and you check
+            every line before anything is saved.
+          </p>
+        </div>
+      )}
+
+      {mode === 'photo' && visionEnabled && !blocked && <PhotoImportPanel canWrite={canWrite} />}
 
       {blocked && <SignInPrompt reason={blocked} screen="menu import" />}
 

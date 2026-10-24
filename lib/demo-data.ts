@@ -407,7 +407,7 @@ export type TableRow = {
   code: string;
   label: string;
   seats: number;
-  qr: 'active' | 'printed' | 'revoked' | 'disabled';
+  qr: 'active' | 'no-code' | 'disabled';
   lastScan: string;
   orders: number;
 };
@@ -416,11 +416,11 @@ export const tables: TableRow[] = [
   { code: 'T1', label: 'Window · 2 seater', seats: 2, qr: 'active', lastScan: '2 min ago', orders: 3 },
   { code: 'T2', label: 'Window · 4 seater', seats: 4, qr: 'active', lastScan: '18 min ago', orders: 1 },
   { code: 'T3', label: 'Main floor', seats: 4, qr: 'active', lastScan: 'just now', orders: 2 },
-  { code: 'T4', label: 'Main floor', seats: 4, qr: 'printed', lastScan: '1 h ago', orders: 0 },
+  { code: 'T4', label: 'Main floor', seats: 4, qr: 'active', lastScan: '1 h ago', orders: 0 },
   { code: 'T5', label: 'Main floor', seats: 6, qr: 'active', lastScan: '24 min ago', orders: 4 },
   { code: 'T6', label: 'Corner booth', seats: 6, qr: 'active', lastScan: '6 min ago', orders: 2 },
   { code: 'T7', label: 'Corner booth', seats: 4, qr: 'active', lastScan: 'just now', orders: 1 },
-  { code: 'T8', label: 'Mezzanine', seats: 2, qr: 'revoked', lastScan: '3 days ago', orders: 0 },
+  { code: 'T8', label: 'Mezzanine', seats: 2, qr: 'no-code', lastScan: '3 days ago', orders: 0 },
   { code: 'T9', label: 'Mezzanine', seats: 4, qr: 'active', lastScan: '27 min ago', orders: 2 },
   { code: 'T10', label: 'Outdoor', seats: 4, qr: 'active', lastScan: '41 min ago', orders: 1 },
   { code: 'T11', label: 'Outdoor', seats: 6, qr: 'disabled', lastScan: '—', orders: 0 },

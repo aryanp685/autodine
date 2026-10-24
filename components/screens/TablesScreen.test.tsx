@@ -51,6 +51,64 @@ function data(over: Partial<TablesScreenData> = {}): TablesScreenData {
   };
 }
 
+/**
+ * THE BUG THIS SUITE NOW GUARDS
+ *
+ * Production had a table that was switched on with no live code: its last code
+ * had been retired, so there was nothing to scan. The screen called that state
+ * "Revoked", drew a QR-shaped pattern in the corner, and offered Enable --
+ * pressing which flipped the table on and changed nothing anyone could see.
+ * The report that came back was "Enable does not work".
+ *
+ * Three properties, all checkable from the server's markup:
+ *   - the state is named in words a person can act on ("No code");
+ *   - the card never draws a code that cannot be scanned;
+ *   - the action offered is the one that fixes it ("Create code").
+ */
+describe('a table with no live code', () => {
+  const codeless = data({
+    tables: [
+      {
+        id: '11111111-1111-1111-1111-111111111111',
+        code: 'T1',
+        label: '4 seater',
+        seats: 4,
+        qr: 'no-code',
+        lastScan: '—',
+        orders: 0,
+        token: null,
+        scanUrl: null,
+        qrSvg: null,
+      },
+    ],
+  });
+
+  it('says "No code" rather than "Revoked"', () => {
+    const html = renderToStaticMarkup(<TablesScreen data={codeless} />);
+
+    expect(html).toContain('No code');
+    expect(html).not.toContain('Revoked');
+  });
+
+  it('offers the action that fixes it, and not the ones that cannot', () => {
+    const html = renderToStaticMarkup(<TablesScreen data={codeless} />);
+
+    expect(html).toContain('Create code');
+    // Regenerating nothing and previewing nothing are both no-ops.
+    expect(html).not.toContain('data-table-action="rotate"');
+    expect(html).not.toContain('data-table-action="preview"');
+  });
+
+  it('does not print a card for a table that cannot be scanned', () => {
+    const html = renderToStaticMarkup(<TablesScreen data={codeless} />);
+
+    // The print sheet is the dangerous one: a pattern on paper looks exactly
+    // like a working card until a guest tries it.
+    expect(html).toContain('Create a code first');
+    expect(html).not.toContain('Scan, then enter the code on screen');
+  });
+});
+
 describe('TablesScreen', () => {
   it('shows the six digits staff have to read out', () => {
     const html = renderToStaticMarkup(<TablesScreen data={data()} />);
