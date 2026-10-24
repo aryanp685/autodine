@@ -151,8 +151,11 @@ export function TablesScreen({
                   control with no way to fix it is a dead end with a border. */}
               {live ? (
                 <form action={addTableAction} className="flex items-center gap-1.5">
+                  {/* `w-[122px]!`: the kit select is `w-full`, and Tailwind
+                      emits `.w-[122px]` before `.w-full`, so the unmarked form
+                      of this override does nothing at all. */}
                   <select
-                    className={`${selectClass} w-[122px]`}
+                    className={`${selectClass} w-[122px]!`}
                     name="seats"
                     defaultValue="4"
                     aria-label="Seats at the new table"

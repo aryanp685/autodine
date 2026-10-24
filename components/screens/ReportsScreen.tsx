@@ -264,7 +264,7 @@ export function ReportsScreen({
                   name="from"
                   required
                   aria-label="From"
-                  className={`${inputClass} h-8 w-[142px] text-[12.5px]`}
+                  className={`${inputClass} h-9! w-[142px]! text-[12.5px]!`}
                 />
               </label>
               <label className="flex items-center gap-1.5 text-[11.5px] text-gink-46">
@@ -274,7 +274,7 @@ export function ReportsScreen({
                   name="to"
                   required
                   aria-label="To"
-                  className={`${inputClass} h-8 w-[142px] text-[12.5px]`}
+                  className={`${inputClass} h-9! w-[142px]! text-[12.5px]!`}
                 />
               </label>
               <button type="submit" className={btn('ghost', 'sm')}>

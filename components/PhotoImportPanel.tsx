@@ -500,7 +500,7 @@ export function PhotoImportPanel({ canWrite }: { canWrite: boolean }) {
                               ₹
                             </span>
                             <input
-                              className={`${inputClass} h-8 w-[86px] pl-6 text-[12.5px] tabular-nums`}
+                              className={`${inputClass} h-9! w-[86px]! pl-6! text-[12.5px]! tabular-nums`}
                               inputMode="decimal"
                               value={item.price}
                               placeholder="—"

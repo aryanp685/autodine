@@ -111,6 +111,50 @@ describe('every internal link goes somewhere', () => {
   });
 });
 
+describe('kit class strings are overridden explicitly', () => {
+  /**
+   * The kit's field strings carry `h-11`, `w-full` and `text-[13.5px]`. Tailwind
+   * sorts same-property utilities by value, so appending a SMALLER one is a
+   * silent no-op: `.h-8` lands before `.h-11` in the stylesheet, `.w-[142px]`
+   * before `.w-full`. Three fields shipped that way, rendering full-width and
+   * 44px tall while their code said 142px and 32px.
+   *
+   * The fix is the important suffix (`w-[142px]!`), and this is the rule that
+   * keeps it from creeping back.
+   */
+  const KIT = ['inputClass', 'selectClass', 'textareaClass'] as const;
+  const CONFLICTS = /^(h|w|p|px|py|pl|pr|pt|pb|text-\[)/;
+
+  it('never appends a conflicting utility without the important suffix', () => {
+    const files = [...walk(join(ROOT, 'components')), ...walk(join(ROOT, 'app'))].filter(
+      // The kit is where those defaults are DEFINED; it is not a call site.
+      (file) => !file.endsWith(join('owner', 'chrome.tsx')),
+    );
+
+    const offenders: string[] = [];
+    for (const file of files) {
+      const lines = readFileSync(file, 'utf8').split('\n');
+      lines.forEach((line, index) => {
+        for (const kit of KIT) {
+          const at = line.indexOf('${' + kit + '}');
+          if (at === -1) continue;
+          const tail = line.slice(at + kit.length + 3).split('`')[0];
+          for (const token of tail.split(/\s+/)) {
+            if (!token || token.endsWith('!')) continue;
+            if (CONFLICTS.test(token)) {
+              offenders.push(
+                `${file.slice(ROOT.length + 1)}:${index + 1} "${token}" needs a trailing ! to override ${kit}`,
+              );
+            }
+          }
+        }
+      });
+    }
+
+    expect(offenders).toEqual([]);
+  });
+});
+
 describe('every button does something', () => {
   /**
    * Components that render a submit button for a form their caller supplies.

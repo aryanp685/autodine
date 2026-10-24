@@ -607,6 +607,21 @@ export function Field({
  * A field is a white sheet on paper, with a warm hairline and a copper focus
  * ring. It was a 60%-white box that turned greyer as the page behind it got
  * lighter -- on paper, translucent inputs look like holes.
+ *
+ * OVERRIDING THESE STRINGS: USE THE `!` SUFFIX
+ *
+ * `inputClass` already carries a height, a width and a font size. Appending a
+ * SMALLER value does NOT override them, because Tailwind decides by stylesheet
+ * order and sorts by value -- `.h-8` is emitted before `.h-11`, `.w-[142px]`
+ * before `.w-full`, `.text-[12.5px]` before `.text-[13.5px]`. Measured in the
+ * built CSS on 2026-10-24, after three call sites had silently shipped
+ * full-width, 44px-tall "compact" fields.
+ *
+ * The deterministic override is Tailwind v4's important suffix:
+ *
+ *   className={`${inputClass} w-[142px]! h-9! text-[12.5px]!`}
+ *
+ * A test in components/live-controls.test.tsx fails on the unmarked form.
  */
 const control =
   'w-full rounded-[10px] border border-hair-strong bg-card px-3.5 text-[13.5px] text-gink shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition-[border-color,box-shadow] duration-150 placeholder:text-gink-28 hover:border-gink-28 focus:border-[var(--p-accent)] focus:ring-2 focus:ring-[color-mix(in_oklab,var(--p-accent)_16%,transparent)] focus:outline-none disabled:cursor-not-allowed disabled:bg-gink-07 disabled:text-gink-46';
