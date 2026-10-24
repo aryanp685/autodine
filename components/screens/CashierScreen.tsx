@@ -22,6 +22,7 @@ import {
   Dot,
   Tag,
   Empty,
+  Notice,
   Segmented,
 } from '@/components/owner/chrome';
 
@@ -170,6 +171,17 @@ export function Cashier({
    */
   const keys = useRef<Record<string, string>>({});
 
+  /**
+   * Tickets with a payment write in flight.
+   *
+   * `isPending` is a render flag: two taps inside the same frame both read
+   * `false` and both start a transition. The idempotency key makes the second
+   * one harmless at the database, but "harmless" still means a second round
+   * trip and a second voice in the room saying it worked. A ref is read at the
+   * moment of the tap, which is the only place a double tap can be stopped.
+   */
+  const paying = useRef<Set<string>>(new Set());
+
   const live = Boolean(data);
   const blocked = data?.blocked;
   const queue: QueueRow[] = live
@@ -208,6 +220,11 @@ export function Cashier({
 
   const recordPayment = () => {
     if (!order) return;
+    if (paying.current.has(order.key)) return;
+    paying.current.add(order.key);
+    // Released in every exit path below; the sample path is synchronous, the
+    // live one releases when the write answers.
+    const release = () => paying.current.delete(order.key);
     setError('');
     setMessage('');
 
@@ -216,6 +233,7 @@ export function Cashier({
     // says exactly that -- a disabled button with no explanation is how a
     // demo reads as broken.
     if (!order.orderId) {
+      release();
       if (!live) {
         setDemoDone((current) => [...current, order.key]);
         setMessage(
@@ -241,6 +259,8 @@ export function Cashier({
         method,
         idempotencyKey: keys.current[paidId],
       });
+
+      release();
 
       if (!result.ok) {
         setSettling((current) => current.filter((id) => id !== paidId));
@@ -313,7 +333,13 @@ export function Cashier({
     <div data-surface="owner" className="min-h-dvh bg-paper text-gink antialiased">
       {nav}
 
-      <div className="lg:pl-[232px]">
+      {/* The rail is 244px wide, and this screen used to offset by 232 -- so
+          twelve pixels of the content column sat underneath it on every laptop.
+          The number lives in one place (`OwnerPage`), and this screen cannot
+          use `OwnerPage` because it is a Client Component whose nav is rendered
+          by the server; the offset is therefore written here and pinned by a
+          test. */}
+      <div className="lg:pl-[244px]">
         <main className="mx-auto w-full max-w-[1180px] px-5 pt-6 pb-20 sm:px-7 lg:pt-9">
           <PageHead
             kicker={
@@ -389,16 +415,20 @@ export function Cashier({
                               {item.items}
                             </span>
 
-                            <span className="mt-2.5 flex items-baseline justify-between gap-3">
-                              <span className="flex items-center gap-2">
-                                {selected ? <Tag tone="ink">Selected</Tag> : null}
+                            <span className="mt-2.5 flex items-center justify-between gap-3">
+                              <span className="flex flex-wrap items-center gap-1.5">
                                 {item.claimed ? (
                                   <Tag tone="due">Says paid by UPI</Tag>
                                 ) : null}
-                                <span className="text-[11.5px] text-gink-46">{item.state}</span>
+                                {/* The kitchen's own word for where the food is,
+                                    as a status tag: the string was bare 11.5px
+                                    grey text sitting beside two real tags. */}
+                                <Tag tone="neutral">{item.state}</Tag>
                               </span>
-                              <span className="text-[13.5px] font-medium text-gink tabular-nums">
-                                {/* Outstanding, not total: what the till actually wants. */}
+                              <span className="text-[15px] font-semibold text-gink tabular-nums">
+                                {/* Outstanding, not total: what the till actually
+                                    wants, at the size a cashier reads across a
+                                    counter. It was 13.5px next to a 13.5px code. */}
                                 {inr(item.outstanding)}
                                 {item.paid > 0 && (
                                   <span className="ml-1 text-[11.5px] font-normal text-gink-46">
@@ -425,25 +455,25 @@ export function Cashier({
               {order ? (
                 <section aria-labelledby="cashier-order-title" className="min-w-0">
                   {focusMissing ? (
-                    <div
+                    <Notice
                       role="status"
-                      className="mb-3 flex flex-wrap items-baseline justify-between gap-3 rounded-[12px] border border-hair-strong bg-paper-deep px-4 py-3"
+                      className="mb-3"
+                      action={
+                        <button
+                          type="button"
+                          className={btn('ghost', 'sm')}
+                          onClick={() => {
+                            setFocusDismissed(true);
+                            setSelectedKey(null);
+                          }}
+                        >
+                          Got it
+                        </button>
+                      }
                     >
-                      <p className="m-0 max-w-[54ch] text-[12.5px] leading-[1.5] text-gink-64">
-                        The bill you came for is not waiting any more — it was settled or cancelled
-                        just now. This is the oldest ticket still open.
-                      </p>
-                      <button
-                        type="button"
-                        className={btn('ghost', 'sm')}
-                        onClick={() => {
-                          setFocusDismissed(true);
-                          setSelectedKey(null);
-                        }}
-                      >
-                        Got it
-                      </button>
-                    </div>
+                      The bill you came for is not waiting any more — it was settled or cancelled
+                      just now. This is the oldest ticket still open.
+                    </Notice>
                   ) : null}
 
                   <Card>
@@ -486,19 +516,20 @@ export function Cashier({
                        * repeats the claim and names the check to make.
                        */}
                       {order.claimed ? (
-                        <div
+                        <Notice
                           data-claim
                           role="note"
-                          className="mb-3 rounded-[10px] border border-[color-mix(in_oklab,var(--p-accent)_28%,transparent)] bg-accent-soft px-3.5 py-2.5"
+                          tone="accent"
+                          className="mb-3"
+                          label={
+                            <strong className="text-[12.5px] font-semibold text-gink">
+                              The guest has marked this bill paid by UPI.
+                            </strong>
+                          }
                         >
-                          <strong className="text-[12.5px] text-gink">
-                            The guest has marked this bill paid by UPI.
-                          </strong>{' '}
-                          <span className="text-[12.5px] leading-[1.5] text-gink-64">
-                            Check the restaurant&rsquo;s own UPI app before recording it as cash
-                            &mdash; nothing in this app can see that transfer.
-                          </span>
-                        </div>
+                          Check the restaurant&rsquo;s own UPI app before recording it as cash
+                          &mdash; nothing in this app can see that transfer.
+                        </Notice>
                       ) : null}
 
                       {order.paid > 0 && (
@@ -520,7 +551,9 @@ export function Cashier({
                       </div>
 
                       <div className="mt-5">
-                        <div className="mb-2 text-[11.5px] font-medium text-gink-64">Payment method</div>
+                        <div className="mb-1.5 text-[12.5px] font-medium text-gink-64">
+                          Payment method
+                        </div>
                         <Segmented
                           label="Payment method"
                           value={method}
@@ -532,35 +565,48 @@ export function Cashier({
                         />
                       </div>
 
-                      <p className="mt-4 text-[11.5px] leading-[1.5] text-gink-46">
-                        Recorded as a counter {method === 'cash' ? 'cash' : method.toUpperCase()}{' '}
-                        payment. Nothing is charged here — the guest pays on a terminal or by
-                        scanning a code, and this only writes the record.
+                      <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
+                        This records a counter payment. Nothing is charged here &mdash; the guest
+                        pays on the terminal or by scanning the shop&rsquo;s code, and this writes
+                        down that it happened.
                       </p>
 
                       {error && (
-                        <div
+                        <Notice
                           role="alert"
-                          className="mt-3 rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-3"
+                          tone="due"
+                          className="mt-3 mb-0"
+                          label={
+                            <strong className="text-[12.5px] font-semibold text-gink">
+                              Could not record the payment.
+                            </strong>
+                          }
                         >
-                          <strong className="text-[12.5px] text-[var(--alert)]">
-                            Could not record the payment.
-                          </strong>
-                          <p className="mt-1 text-[12.5px] leading-[1.5] text-gink-64">{error}</p>
-                        </div>
+                          {error}
+                        </Notice>
                       )}
 
                       <button
                         type="button"
                         data-counter-cta
-                        className={`${btn('solid')} mt-4 w-full`}
+                        className={`${btn('primary')} mt-4 w-full`}
                         disabled={isPending || Boolean(live && !order.orderId)}
+                        aria-busy={isPending}
                         onClick={recordPayment}
                       >
                         {isPending
                           ? 'Recording…'
                           : `Record ${method === 'cash' ? 'cash' : method.toUpperCase()} ${inr(order.outstanding)}`}
                       </button>
+                      {/* A disabled button with no reason is the failure this
+                          screen has already had once. If the ticket cannot be
+                          paid, the screen says so under the button. */}
+                      {live && !order.orderId && (
+                        <p className="mt-2 text-[11.5px] leading-[1.5] text-gink-46">
+                          This ticket arrived without an id, so no payment can be recorded against
+                          it. Ask the kitchen to re-send the order.
+                        </p>
+                      )}
 
                       {confirmCancel === order.orderId && order.orderId ? (
                         <div
@@ -605,17 +651,16 @@ export function Cashier({
                       )}
 
                       {message && (
-                        <p
-                          role="status"
-                          className="mt-3 rounded-[10px] border border-hair bg-paper-deep px-3.5 py-2.5 text-[12.5px] leading-[1.5] text-gink-64"
-                        >
+                        <Notice role="status" tone="live" className="mt-3 mb-0" label={<span className="text-[11.5px] font-semibold text-[var(--p-live)]">Recorded</span>}>
                           {message}
-                        </p>
+                        </Notice>
                       )}
-                      <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
+                      {/* One footnote, not two saying the same thing: the
+                          paragraph above already says nothing is charged. */}
+                      <p className="mt-2 text-[11.5px] leading-[1.5] text-gink-46">
                         {live
-                          ? 'Written to the database with an audit entry. No card terminal or payment provider is contacted — this is a record, not a charge.'
-                          : 'Preview only. Nothing is persisted, nothing is charged, and the queue is reset by reloading this page.'}
+                          ? 'Every write here leaves an audit entry.'
+                          : 'Preview only: nothing is persisted, and reloading this page brings the queue back.'}
                       </p>
                     </div>
                   </Card>
