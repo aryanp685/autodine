@@ -86,16 +86,24 @@ export const QR_PROBLEM_COPY: Record<
   QrProblemReason,
   { title: string; detail: string; staffHint?: string }
 > = {
+  /*
+   * These two are about the printed card, not a typed code. The guest has not
+   * reached the code form -- there is no form to reach -- so "ask staff for the
+   * current code" sent them looking for six digits they had no way to use.
+   * What actually fixes it is a card that still works, or a person.
+   */
   unreadable: {
-    title: 'This code did not work',
-    detail: 'Please ask staff for the current code for your table.',
+    title: 'This card is not in use',
+    detail:
+      'Scan the card standing on your table, or ask staff for one. They can also take your order at the counter.',
     staffHint:
-      'If this code is printed and still failing, the table may have been taken out of service or its code replaced.',
+      'The card was replaced or the table was taken out of service. Print a fresh card from Tables & QR.',
   },
   revoked: {
-    title: 'This code is no longer in use',
-    detail: 'Your table has a newer code. Please ask staff for the current one.',
-    staffHint: 'Codes stop working when a table is reset or its QR is replaced.',
+    title: 'This card has been replaced',
+    detail:
+      'Scan the card on your table, or ask staff for the current one. They can also take your order at the counter.',
+    staffHint: 'Cards stop working when a table is reset or its QR is replaced.',
   },
   limited: {
     title: 'Too many attempts',
