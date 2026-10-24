@@ -556,7 +556,14 @@ export function MenuEditorScreen({
                       {/* Portions are real now, so the column applies to live
                           rows too. */}
                       <Th>Portions</Th>
-                      <Th>Status</Th>
+                      {/* The last column is this row's action, and the row
+                          itself says which one is being edited. It used to be
+                          headed "Status" and hold the MENU's Live/Draft badge,
+                          repeated identically on every row -- a column of one
+                          value, which reads as per-dish state and is not. */}
+                      <Th align="right">
+                        <span className="sr-only">Actions</span>
+                      </Th>
                     </tr>
                   </thead>
                   <tbody>
@@ -569,7 +576,11 @@ export function MenuEditorScreen({
                         <Tr
                           key={i.id}
                           data-row-selected={i.id === selected.id ? 'true' : undefined}
-                          className={i.id === selected.id ? 'bg-gink-07' : undefined}
+                          className={
+                            i.id === selected.id
+                              ? 'bg-gink-07 shadow-[inset_2px_0_0_var(--p-accent)]'
+                              : undefined
+                          }
                         >
                           <Td>
                             <div className="flex items-start gap-2">
@@ -687,9 +698,11 @@ export function MenuEditorScreen({
                           </Td>
                           <Td>
                             <div className="flex items-center justify-end gap-2">
-                              <Tag tone={data?.published ? 'live' : 'neutral'}>
-                                {data?.published ? 'Live' : 'Draft'}
-                              </Tag>
+                              {/* Which row the editor on the right is changing.
+                                  The menu's own Live/Draft state is on the page
+                                  head and on every menu chip; repeating it here
+                                  told the owner nothing about the dish. */}
+                              {i.id === selected.id ? <Tag tone="ink">Editing</Tag> : null}
                               {/* Deleting is immediate and reversible. A confirm
                                   dialog on every press would slow down the one
                                   edit a busy owner makes most, so the safeguard
