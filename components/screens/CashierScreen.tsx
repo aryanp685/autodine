@@ -471,10 +471,36 @@ export function Cashier({
                           {inr(order.outstanding)}
                         </h2>
                       </div>
-                      <Tag tone="due">Payment due</Tag>
+                      <div className="flex flex-col items-end gap-1.5">
+                        <Tag tone="due">Payment due</Tag>
+                        {order.claimed ? <Tag tone="work">Guest says paid by UPI</Tag> : null}
+                      </div>
                     </div>
 
                     <div className="px-5 py-4">
+                      {/**
+                       * The claim is on the queue row, which is easy to miss once
+                       * the ticket is selected -- and this panel is where the
+                       * money gets recorded. Recording cash on a bill the guest
+                       * has already paid by UPI collects it twice, so the panel
+                       * repeats the claim and names the check to make.
+                       */}
+                      {order.claimed ? (
+                        <div
+                          data-claim
+                          role="note"
+                          className="mb-3 rounded-[10px] border border-[color-mix(in_oklab,var(--p-accent)_28%,transparent)] bg-accent-soft px-3.5 py-2.5"
+                        >
+                          <strong className="text-[12.5px] text-gink">
+                            The guest has marked this bill paid by UPI.
+                          </strong>{' '}
+                          <span className="text-[12.5px] leading-[1.5] text-gink-64">
+                            Check the restaurant&rsquo;s own UPI app before recording it as cash
+                            &mdash; nothing in this app can see that transfer.
+                          </span>
+                        </div>
+                      ) : null}
+
                       {order.paid > 0 && (
                         <p className="mb-3 text-[12.5px] leading-[1.5] text-gink-64">
                           {inr(order.paid)} already recorded on this order, against a bill of{' '}
