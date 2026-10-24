@@ -230,3 +230,135 @@ describe('OrdersScreen', () => {
     }
   });
 });
+
+/**
+ * The ledger after the 2026-10-24 pass. Three things were wrong with it as a
+ * page, not as a table: the controls were four different shapes, a column
+ * answered "—", and a filter that matched nothing left you with no way back.
+ */
+describe('OrdersScreen, the ledger as a page', () => {
+  const three = () =>
+    live({
+      orders: [
+        order({ id: 'a', prepStatus: 'new' }),
+        order({ id: 'b', prepStatus: 'cancelled' }),
+        order({ id: 'c', prepStatus: 'served', paymentStatus: 'paid', paidPaise: 84_000 }),
+      ],
+    });
+
+  it('tells you how many rows each filter would show', () => {
+    const html = renderToStaticMarkup(<OrdersScreen data={three()} />);
+
+    // All 3, Open 1 (the new one), Settled 1 (the served and paid one),
+    // Cancelled 1. Every count comes from the array the table is drawn from.
+    const chip = (label: string) => {
+      const at = html.indexOf(`>${label}`);
+      const from = html.lastIndexOf('<a', at);
+      return html.slice(from, html.indexOf('</a>', at));
+    };
+    expect(chip('All')).toContain('>3<');
+    expect(chip('Open')).toContain('>1<');
+    expect(chip('Settled')).toContain('>1<');
+    expect(chip('Cancelled')).toContain('>1<');
+  });
+
+  it('marks the chosen window as current, in copper, not as a block of ink', () => {
+    const html = renderToStaticMarkup(<OrdersScreen data={three()} />);
+    // Scoped to the chip row: the rail has a group heading called "Today" too.
+    const row = html.slice(html.indexOf('mb-3 flex flex-col gap-2'));
+    const today = row.slice(0, row.indexOf('</a>'));
+
+    expect(html).toContain('aria-current="true"');
+    expect(today).toContain('bg-accent-soft');
+    expect(today).not.toContain('bg-gink text-onink');
+  });
+
+  it('keeps the custom dates behind a summary that opens without JavaScript', () => {
+    const html = renderToStaticMarkup(<OrdersScreen data={three()} />);
+
+    expect(html).toContain('<details');
+    expect(html).toContain('<summary');
+    expect(html).toContain('Custom dates');
+  });
+
+  it('holds that summary open while a custom range is the one in force', () => {
+    const html = renderToStaticMarkup(
+      <OrdersScreen
+        data={{ ...live(), range: resolveRange('custom', TZ, NOW, { from: '2026-10-03', to: '2026-10-09' }) }}
+        customFrom="2026-10-03"
+        customTo="2026-10-09"
+      />,
+    );
+
+    const details = html.slice(html.indexOf('<details'), html.indexOf('>', html.indexOf('<details')));
+    expect(details).toContain('open');
+    // And the chip says which days, rather than making you open it to find out.
+    expect(html).toContain('2026-10-03 → 2026-10-09');
+  });
+
+  it('answers the outstanding column in words, never with a dash', () => {
+    const html = renderToStaticMarkup(
+      <OrdersScreen
+        data={live({
+          orders: [
+            order({ id: 'paid', paymentStatus: 'paid', paidPaise: 84_000 }),
+            order({ id: 'dead', prepStatus: 'cancelled' }),
+          ],
+        })}
+      />,
+    );
+
+    expect(html).toContain('Settled');
+    expect(html).toContain('Not collectable');
+    expect(html).not.toContain('>—<');
+  });
+
+  it('gives an empty filter a way back to the full range', () => {
+    const html = renderToStaticMarkup(<OrdersScreen data={three()} filter="cancelled" query="T9" />);
+
+    expect(html).toContain('No orders match this filter.');
+    expect(html).toContain('Show all 3 in this range');
+    expect(html).toContain('href="/dashboard/orders"');
+  });
+
+  it('narrows inside a tab, instead of ignoring the search box', () => {
+    // The Cancelled branch of the row matcher returned before the query was
+    // ever read, so searching on that tab did nothing.
+    const html = renderToStaticMarkup(<OrdersScreen data={three()} filter="cancelled" query="T4" />);
+    expect(html).toContain('1 order');
+
+    const none = renderToStaticMarkup(<OrdersScreen data={three()} filter="cancelled" query="T9" />);
+    expect(none).toContain('No orders match this filter.');
+  });
+
+  it('still says plainly when the range itself is empty', () => {
+    const html = renderToStaticMarkup(<OrdersScreen data={live({ orders: [] })} filter="open" />);
+
+    expect(html).toContain('No orders in this range.');
+    // Nothing to go back to, so no invitation to go back to it.
+    expect(html).not.toContain('Show all');
+  });
+
+  it('uses the same action geometry in the phone card as in the table', () => {
+    const html = renderToStaticMarkup(<OrdersScreen data={live()} />);
+    const collects = [...html.matchAll(/<a\b[^>]*>[\s\S]{0,40}Collect/g)].map((m) => m[0]);
+
+    expect(collects.length).toBeGreaterThan(1);
+    for (const tag of collects) {
+      expect(tag).toContain('h-9 px-3');
+      expect(tag).not.toContain('rounded-full');
+    }
+  });
+
+  it('draws the sample-data note as the same strip as every other notice', () => {
+    const html = renderToStaticMarkup(<OrdersScreen data={null} />);
+    const at = html.indexOf('fictional sample data');
+    const from = html.lastIndexOf('<div', at);
+    // The opening tag only: the status tag inside the strip is a pill, and a
+    // pill inside a card is not the thing being tested.
+    const opening = html.slice(from, html.indexOf('>', from) + 1);
+
+    expect(opening).toContain('rounded-[14px]');
+    expect(opening).not.toContain('rounded-full');
+  });
+});
