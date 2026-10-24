@@ -58,7 +58,7 @@ describe('Cashier', () => {
 
   it('says the preview records nothing', () => {
     const html = renderToStaticMarkup(<Cashier nav={nav} />);
-    expect(html).toContain('Nothing is persisted, nothing is charged');
+    expect(html).toContain('nothing is persisted');
   });
 
   it('explains a signed-out visitor instead of showing a quiet counter', () => {
@@ -149,5 +149,102 @@ describe('Cashier, the UPI claim', () => {
     expect(html).not.toContain('data-claim');
     expect(html).not.toContain('Guest says paid by UPI');
     expect(html).toContain('Record cash ₹640');
+  });
+});
+
+/**
+ * The counter after the 2026-10-24 pass.
+ *
+ * Two things were wrong here that a screenshot alone would not have caught:
+ * the content column was offset by 232px against a rail that had become 244px
+ * wide, so twelve pixels sat underneath it; and the button the whole screen
+ * exists for was painted the same ink as a secondary action.
+ */
+describe('Counter, the redesign', () => {
+  const html = () => renderToStaticMarkup(<Cashier nav={nav} />);
+
+  it('clears the rail by its actual width', () => {
+    // The foundation widened the rail to 244px. This screen writes its own
+    // offset because its bar is rendered on the server, so it has to be pinned.
+    expect(html()).toContain('lg:pl-[244px]');
+    expect(html()).not.toContain('lg:pl-[232px]');
+  });
+
+  it('paints the settle action with the accent, because it is the reason the screen exists', () => {
+    const doc = html();
+    const at = doc.indexOf('data-counter-cta');
+    const tag = doc.slice(doc.lastIndexOf('<button', at), doc.indexOf('>', at) + 1);
+
+    expect(tag).toContain('bg-[var(--p-accent)]');
+    expect(tag).not.toContain('bg-gink');
+  });
+
+  it('labels the queue row status with the same tag every other status uses', () => {
+    const doc = html();
+    const tile = doc.slice(doc.indexOf('data-counter-ticket'), doc.indexOf('</button>', doc.indexOf('data-counter-ticket')));
+
+    expect(tile).toContain('rounded-full');
+    expect(tile).toContain('Preparing');
+  });
+
+  it('says why the settle button is disabled on a ticket that cannot be paid', () => {
+    const doc = renderToStaticMarkup(
+      <Cashier
+        nav={nav}
+        data={{
+          restaurantName: 'Kabir',
+          queue: [
+            // A live row with no id: the one case where the CTA is disabled
+            // and the cashier cannot work out why.
+            {
+              code: 'K-1',
+              table: 'T1',
+              at: '8:00 pm',
+              state: 'Ready',
+              total: 100,
+              outstanding: 100,
+              paid: 0,
+              items: '1 × Chai',
+            } as never,
+          ],
+        }}
+      />,
+    );
+
+    const at = doc.indexOf('data-counter-cta');
+    const tag = doc.slice(doc.lastIndexOf('<button', at), doc.indexOf('>', at) + 1);
+    expect(tag).toContain('disabled=""');
+    expect(doc).toContain('arrived without an id');
+  });
+
+  it('draws its notices as the same strip the rest of the product uses', () => {
+    const doc = renderToStaticMarkup(
+      <Cashier
+        nav={nav}
+        data={{
+          restaurantName: 'Kabir',
+          queue: [
+            {
+              id: 'o-1',
+              code: 'K-1',
+              table: 'T1',
+              at: '8:00 pm',
+              state: 'Ready',
+              total: 640,
+              outstanding: 640,
+              paid: 0,
+              items: '2 × Thali',
+              claimed: true,
+            },
+          ],
+        }}
+      />,
+    );
+
+    const at = doc.indexOf('data-claim');
+    const from = doc.lastIndexOf('<div', at);
+    const opening = doc.slice(from, doc.indexOf('>', from) + 1);
+    expect(opening).toContain('rounded-[14px]');
+    expect(opening).not.toContain('rounded-full');
   });
 });
