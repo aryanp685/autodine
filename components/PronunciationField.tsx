@@ -70,13 +70,13 @@ export function PronunciationField({
       </p>
 
       {guessed.length > 0 ? (
-        <p className="mt-1.5 text-[11px] leading-[1.45] text-gink-46">
+        <p className="mt-1.5 text-[11.5px] leading-[1.45] text-gink-46">
           Guessed, not known:{' '}
           <strong className="font-medium text-gink">{guessed.join(', ')}</strong>. Type the
           pronunciation above if it is wrong — the menu name stays as it is.
         </p>
       ) : (
-        <p className="mt-1.5 text-[11px] leading-[1.45] text-gink-46">
+        <p className="mt-1.5 text-[11.5px] leading-[1.45] text-gink-46">
           Every word is known. Nothing to check.
         </p>
       )}

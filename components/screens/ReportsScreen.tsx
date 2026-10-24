@@ -245,7 +245,7 @@ export function ReportsScreen({
                   name="from"
                   required
                   aria-label="From"
-                  className={`${inputClass} h-8 w-[142px] text-[12px]`}
+                  className={`${inputClass} h-8 w-[142px] text-[12.5px]`}
                 />
               </label>
               <label className="flex items-center gap-1.5 text-[11.5px] text-gink-46">
@@ -255,7 +255,7 @@ export function ReportsScreen({
                   name="to"
                   required
                   aria-label="To"
-                  className={`${inputClass} h-8 w-[142px] text-[12px]`}
+                  className={`${inputClass} h-8 w-[142px] text-[12.5px]`}
                 />
               </label>
               <button type="submit" className={btn('ghost', 'sm')}>
@@ -470,7 +470,7 @@ export function ReportsScreen({
                         return (
                           <Tr key={order.id} data-void={cancelled ? 'true' : undefined}>
                             <Td>
-                              <span className="text-[12px] text-gink-64 tabular-nums">
+                              <span className="text-[12.5px] text-gink-64 tabular-nums">
                                 {dateTimeInZone(timezone, order.placedAt)}
                               </span>
                             </Td>

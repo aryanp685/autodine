@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { kitchenOrders, restaurant, type KitchenOrder } from '@/lib/demo-data';
 import { Money, VegMark } from '@/components/ui';
-import { OwnerPage, PageHead } from '@/components/owner/chrome';
+import { OwnerPage, PageHead, Segmented } from '@/components/owner/chrome';
 import type { OutletBar } from '@/lib/outlets';
 import type { KitchenScreenData, KitchenTicket } from '@/lib/db/kitchen-screen';
 import { clockTimeInZone } from '@/lib/db/time';
@@ -180,7 +180,7 @@ function Items({ order, compact }: { order: BoardTicket; compact?: boolean }) {
               <span
                 key={addon}
                 data-addon=""
-                className="ml-1.5 inline-block rounded-[3px] border border-hair-strong px-1.5 py-px text-[11px] whitespace-nowrap text-gink-64"
+                className="ml-1.5 inline-block rounded-[3px] border border-hair-strong px-1.5 py-px text-[11.5px] whitespace-nowrap text-gink-64"
               >
                 {addon}
               </span>
@@ -1060,7 +1060,7 @@ export function Kitchen({
           <button
             type="button"
             onClick={() => setAudio((value) => !value)}
-            className="ml-0.5 rounded-full px-1.5 py-0.5 text-[11px] underline decoration-current/40 underline-offset-2 hover:no-underline"
+            className="ml-0.5 rounded-full px-1.5 py-0.5 text-[11.5px] underline decoration-current/40 underline-offset-2 hover:no-underline"
           >
             {audio ? 'Turn off' : 'Turn on'}
           </button>
@@ -1086,30 +1086,21 @@ export function Kitchen({
 
         {/* Speed. A hurried Hindi voice is what sounds slurred, so the operator
             gets the last word on pace instead of a constant. */}
-        <div
-          role="group"
-          aria-label="आवाज़ की रफ़्तार — voice speed"
-          className="inline-flex h-8 items-center rounded-full border border-hair-strong p-0.5"
-        >
-          {(['slow', 'normal', 'fast'] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={speed === value}
-              onClick={() => {
-                setSpeed(value);
-                speedRef.current = value;
-                speechRef.current?.setRateScale(SPEEDS[value]);
-              }}
-              className={[
-                'h-7 rounded-full px-2.5 text-[11px] font-medium transition-colors',
-                speed === value ? 'bg-gink text-onink' : 'text-gink-46 hover:text-gink',
-              ].join(' ')}
-            >
-              {value === 'slow' ? 'धीमा' : value === 'normal' ? 'सामान्य' : 'तेज़'}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          label="आवाज़ की रफ़्तार — voice speed"
+          size="sm"
+          value={speed}
+          onChange={(next) => {
+            setSpeed(next);
+            speedRef.current = next;
+            speechRef.current?.setRateScale(SPEEDS[next]);
+          }}
+          options={[
+            { value: 'slow', label: 'धीमा' },
+            { value: 'normal', label: 'सामान्य' },
+            { value: 'fast', label: 'तेज़' },
+          ]}
+        />
 
         {/* Which Hindi voice. A device can carry two, and they are not equally
             good -- an embedded engine and a downloaded neural one both answer
@@ -1261,7 +1252,7 @@ export function Kitchen({
               <span className="text-[10.5px] font-semibold tracking-[0.12em] text-gink-46 uppercase">
                 Announcements
               </span>
-              <span className="text-[11px] text-gink-46">
+              <span className="text-[11.5px] text-gink-46">
                 {audio && speaksHere
                   ? voiceState === 'ready'
                     ? `हिंदी · ${voiceName ?? 'voice'}`
@@ -1271,7 +1262,7 @@ export function Kitchen({
             </div>
             <ul className="divide-y divide-hair">
               {log.map((entry) => (
-                <li key={`${entry.key}-${entry.at}`} className="flex items-baseline gap-2.5 px-3.5 py-1.5 text-[12px]">
+                <li key={`${entry.key}-${entry.at}`} className="flex items-baseline gap-2.5 px-3.5 py-1.5 text-[12.5px]">
                   <span className="tnum shrink-0 text-gink-46">{entry.at}</span>
                   <span className="shrink-0 font-medium text-gink-64">{entry.label}</span>
                   <span className="min-w-0 flex-1 truncate text-gink">{entry.text}</span>
@@ -1279,7 +1270,7 @@ export function Kitchen({
                     type="button"
                     aria-label={`Replay ${entry.label}`}
                     onClick={() => replay(`${entry.key}:replay:${entry.at}`, entry.text, entry.label)}
-                    className="shrink-0 text-[11px] font-medium text-gink-64 underline underline-offset-2 hover:text-gink"
+                    className="shrink-0 text-[11.5px] font-medium text-gink-64 underline underline-offset-2 hover:text-gink"
                   >
                     Replay
                   </button>
@@ -1290,7 +1281,7 @@ export function Kitchen({
         )}
 
         {announcement && (
-          <p role="status" className="text-[12px] text-gink-46">
+          <p role="status" className="text-[12.5px] text-gink-46">
             {/* "Last announcement" was a half-truth: it was the last thing the
                 queue ACCEPTED, which in a burst is not the thing being said. */}
             {speaking ? 'Speaking now' : 'Last announcement'}: {announcement}
@@ -1357,7 +1348,7 @@ export function Kitchen({
             ].join(' ')}
           >
             {c.title}
-            <span className="tnum text-[11px] opacity-70">{c.orders.length}</span>
+            <span className="tnum text-[11.5px] opacity-70">{c.orders.length}</span>
           </button>
         ))}
       </nav>
@@ -1376,7 +1367,7 @@ export function Kitchen({
             ].join(' ')}
           >
             <div className="mb-2 flex items-baseline justify-between gap-2 border-b border-hair pb-1.5">
-              <h2 className="text-[11px] font-semibold tracking-[0.12em] text-gink uppercase">{c.title}</h2>
+              <h2 className="text-[11.5px] font-semibold tracking-[0.12em] text-gink uppercase">{c.title}</h2>
               <span className="tnum text-[11.5px] font-medium text-gink-46">{c.orders.length}</span>
             </div>
 
@@ -1417,7 +1408,7 @@ export function Kitchen({
                   </div>
 
                   {o.payment === 'pending' && (
-                    <div className="mt-2 rounded-[5px] bg-[var(--alert)]/8 px-2 py-1 text-[11px] font-semibold tracking-[0.02em] text-[var(--alert)]">
+                    <div className="mt-2 rounded-[5px] bg-[var(--alert)]/8 px-2 py-1 text-[11.5px] font-semibold tracking-[0.02em] text-[var(--alert)]">
                       Unpaid · pay at counter
                     </div>
                   )}
@@ -1528,7 +1519,7 @@ export function Kitchen({
  */
 function kbBtn(tone: 'solid' | 'quiet' | 'danger'): string {
   const base =
-    'inline-flex h-9 items-center justify-center rounded-full px-3 text-[12px] font-medium transition-colors disabled:opacity-45';
+    'inline-flex h-9 items-center justify-center rounded-full px-3 text-[12.5px] font-medium transition-colors disabled:opacity-45';
   if (tone === 'solid') return `${base} bg-gink text-onink hover:bg-gink/88`;
   if (tone === 'danger') return `${base} bg-[var(--alert)] text-white hover:opacity-90`;
   return `${base} border border-hair-strong text-gink-64 hover:bg-gink-07 hover:text-gink`;

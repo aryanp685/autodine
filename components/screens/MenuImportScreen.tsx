@@ -12,12 +12,13 @@ import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
 import type { OutletBar } from '@/lib/outlets';
 import {
+  Card,
   OwnerPage,
   PageHead,
-  Card,
+  Segmented,
+  Tag,
   btn,
   textareaClass,
-  Tag,
 } from '@/components/owner/chrome';
 
 const SAMPLE = `STARTERS
@@ -116,33 +117,16 @@ export function MenuImportScreen({
       {/* Two inputs, one result. A segmented control rather than two screens,
           so the owner never has to guess which page to be on. */}
       {!blocked && (
-        <div
-          role="tablist"
-          aria-label="How to import"
-          className="mb-4 inline-flex rounded-full border border-hair-strong bg-paper-deep p-0.5"
-        >
-          {(
-            [
-              ['photo', 'Photo of your menu'],
-              ['text', 'Paste the text'],
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={mode === key}
-              data-import-tab={mode === key ? 'on' : 'off'}
-              onClick={() => setMode(key)}
-              className={[
-                'h-8 rounded-full px-3.5 text-[12.5px] font-medium transition-colors duration-150',
-                'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gink',
-                mode === key ? 'bg-gink text-onink' : 'text-gink-64 hover:text-gink',
-              ].join(' ')}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="mb-4">
+          <Segmented
+            label="How to import"
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: 'photo', label: 'Photo of your menu', data: { 'data-import-tab': mode === 'photo' ? 'on' : 'off' } },
+              { value: 'text', label: 'Paste the text', data: { 'data-import-tab': mode === 'text' ? 'on' : 'off' } },
+            ]}
+          />
         </div>
       )}
 
@@ -164,7 +148,7 @@ export function MenuImportScreen({
         <Card>
           <div className="border-b border-hair px-4 py-3 sm:px-5">
             <h2 className="text-[13px] font-semibold text-gink">The menu text</h2>
-            <p className="mt-1 max-w-[62ch] text-[12px] leading-[1.5] text-gink-46">
+            <p className="mt-1 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
               Section headings on their own line, then the dishes. Prices can be written as 320, ₹320,
               320/- or 1,200.
             </p>
@@ -184,7 +168,7 @@ export function MenuImportScreen({
               value={text}
               onChange={(event) => setText(event.target.value)}
             />
-            <p className="mt-1.5 text-[11px] leading-[1.45] text-gink-46">
+            <p className="mt-1.5 text-[11.5px] leading-[1.45] text-gink-46">
               {text.length.toLocaleString('en-IN')} of {MAX_IMPORT_TEXT.toLocaleString('en-IN')}{' '}
               characters. A photograph of a menu cannot be pasted — type or copy the text.
             </p>
@@ -208,7 +192,7 @@ export function MenuImportScreen({
               </button>
             </div>
 
-            <p className="mt-3 text-[11px] leading-[1.5] text-gink-46">
+            <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
               Reading a menu with a language model is optional and off unless this deployment has a key
               configured. When it is off, the text is read by rules: a line with a price is a dish, a
               short line without one is a section. Either way you see the result before anything is
@@ -223,14 +207,14 @@ export function MenuImportScreen({
           <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-hair px-4 py-3 sm:px-5">
             <div>
               <h2 className="text-[13px] font-semibold text-gink">Check before importing</h2>
-              <p className="mt-1 text-[12px] leading-[1.5] text-gink-46">
+              <p className="mt-1 text-[12.5px] leading-[1.5] text-gink-46">
                 {draft.categories.length} section{draft.categories.length === 1 ? '' : 's'} ·{' '}
                 {draftItemCount(draft)} dish{draftItemCount(draft) === 1 ? '' : 'es'}. Untick a section
                 to leave it out.
               </p>
             </div>
             {preview?.ok && preview.note && (
-              <span className="text-[11px] text-gink-46">{preview.note}</span>
+              <span className="text-[11.5px] text-gink-46">{preview.note}</span>
             )}
           </div>
 
@@ -268,7 +252,7 @@ export function MenuImportScreen({
                     {category.items.map((item, itemIndex) => (
                       <li
                         key={`${item.name}-${itemIndex}`}
-                        className="flex items-baseline justify-between gap-2 text-[12px] text-gink-64"
+                        className="flex items-baseline justify-between gap-2 text-[12.5px] text-gink-64"
                       >
                         <span className="flex min-w-0 items-baseline gap-1.5">
                           <VegMark veg={item.isVeg} />
@@ -286,7 +270,7 @@ export function MenuImportScreen({
 
             {draft.issues.length > 0 && (
               <div className="rounded-[12px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-3">
-                <strong className="text-[12px] font-semibold text-gink">
+                <strong className="text-[12.5px] font-semibold text-gink">
                   {draft.issues.length} line(s) were not imported.
                 </strong>{' '}
                 <span className="text-[11.5px] leading-[1.5] text-gink-64">
@@ -295,7 +279,7 @@ export function MenuImportScreen({
                 <ul className="m-0 mt-2 flex list-none flex-col gap-1 p-0">
                   {draft.issues.slice(0, 12).map((issue, index) => (
                     <li key={index} className="text-[11.5px] leading-[1.45] text-gink-64">
-                      <code className="rounded bg-card px-1 py-0.5 text-[11px] text-gink">
+                      <code className="rounded bg-card px-1 py-0.5 text-[11.5px] text-gink">
                         {issue.line}
                       </code>{' '}
                       — {issue.reason}
@@ -354,7 +338,7 @@ export function MenuImportScreen({
               </div>
             )}
 
-            <p className="m-0 text-[11px] leading-[1.5] text-gink-46">
+            <p className="m-0 text-[11.5px] leading-[1.5] text-gink-46">
               The import becomes a new <strong className="text-gink">draft</strong> menu called
               &quot;Imported menu&quot;, so your live menu is not touched. Review it in the editor, then
               publish when it is right.

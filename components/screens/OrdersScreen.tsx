@@ -252,7 +252,7 @@ export function OrdersScreen({
                 defaultValue={query}
                 placeholder="Table or reference"
                 aria-label="Find an order by table or reference"
-                className="h-7 w-[150px] bg-transparent text-[12px] text-gink placeholder:text-gink-46 focus:outline-none"
+                className="h-7 w-[150px] bg-transparent text-[12.5px] text-gink placeholder:text-gink-46 focus:outline-none"
               />
               <button type="submit" className={chip(false)}>
                 Search
@@ -333,7 +333,7 @@ export function OrdersScreen({
                             <Td>{order.tableLabel ?? 'Takeaway'}</Td>
                             <Td>
                               {cancelled ? (
-                                <span className="text-[11px] font-semibold tracking-[0.05em] text-gink-46 uppercase">
+                                <span className="text-[11.5px] font-semibold tracking-[0.05em] text-gink-46 uppercase">
                                   Cancelled
                                 </span>
                               ) : (
@@ -402,7 +402,7 @@ export function OrdersScreen({
                             order.code
                           )}
                         </span>
-                        <span className="tnum text-[11px] text-gink-46">
+                        <span className="tnum text-[11.5px] text-gink-46">
                           {dateTimeInZone(timezone, order.placedAt)}
                         </span>
                       </div>
@@ -436,7 +436,7 @@ export function OrdersScreen({
                       </div>
 
                       <div className="mt-2 flex items-center justify-between gap-3">
-                        <span className="text-[14px] font-semibold text-gink">
+                        <span className="text-[13.5px] font-semibold text-gink">
                           <Money value={order.totalPaise} />
                         </span>
                         {outstanding > 0 && !cancelled ? (
@@ -495,7 +495,7 @@ export function OrdersScreen({
  */
 function chip(active: boolean): string {
   return [
-    'inline-flex h-8 items-center rounded-full px-3 text-[12px] font-medium whitespace-nowrap transition-colors',
+    'inline-flex h-8 items-center rounded-full px-3 text-[12.5px] font-medium whitespace-nowrap transition-colors',
     active
       ? 'bg-gink text-onink'
       : 'border border-hair-strong text-gink-64 hover:border-gink-28 hover:text-gink',

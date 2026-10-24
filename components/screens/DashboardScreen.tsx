@@ -165,12 +165,12 @@ export function Dashboard({
         >
           <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--p-accent)]" />
           <strong className="text-[12.5px] font-semibold text-gink">Preview mode</strong>
-          <span className="text-[12px] text-gink-64">
+          <span className="text-[12.5px] text-gink-64">
             Metrics and orders are fictional. Live ordering and payment processing are disabled.
           </span>
           <Link
             href="/menu"
-            className="ml-auto text-[12px] font-medium text-[var(--p-accent)] underline underline-offset-2"
+            className="ml-auto text-[12.5px] font-medium text-[var(--p-accent)] underline underline-offset-2"
           >
             Open the menu
           </Link>
@@ -210,11 +210,11 @@ export function Dashboard({
             style={{ ['--i' as string]: index }}
             className="rounded-[16px] border border-hair bg-card p-4 transition-shadow duration-200 sm:hover:shadow-[var(--p-shadow-2)]"
           >
-            <div className="text-[11px] font-medium tracking-[0.02em] text-gink-46">{card.label}</div>
+            <div className="text-[11.5px] font-medium tracking-[0.02em] text-gink-46">{card.label}</div>
             <div className="mt-2.5 text-[clamp(1.5rem,2.6vw,2.1rem)] leading-none font-medium tracking-[-0.045em] text-gink tabular-nums">
               {card.value}
             </div>
-            <div className="mt-2 text-[11px] leading-[1.4] text-gink-46">{card.meta}</div>
+            <div className="mt-2 text-[11.5px] leading-[1.4] text-gink-46">{card.meta}</div>
           </div>
         ))}
       </section>
@@ -248,7 +248,7 @@ export function Dashboard({
                   key={t.name}
                   className="flex items-baseline gap-3 border-b border-hair py-2.5 last:border-b-0 first:pt-0 last:pb-0"
                 >
-                  <span className="tnum w-5 shrink-0 text-[11px] font-semibold text-gink-46">
+                  <span className="tnum w-5 shrink-0 text-[11.5px] font-semibold text-gink-46">
                     {String(i + 1).padStart(2, '0')}
                   </span>
                   <span className="min-w-0 flex-1 truncate text-[13.5px] text-gink">{t.name}</span>
@@ -277,7 +277,7 @@ export function Dashboard({
           action={
             <Link
               href="/dashboard/orders"
-              className="text-[12px] font-medium text-gink-64 underline underline-offset-2 hover:text-gink"
+              className="text-[12.5px] font-medium text-gink-64 underline underline-offset-2 hover:text-gink"
             >
               All orders
             </Link>
@@ -320,7 +320,7 @@ export function Dashboard({
         </Panel>
       </div>
 
-      <p className="mt-4 text-[11px] text-gink-46">
+      <p className="mt-4 text-[11.5px] text-gink-46">
         {live
           ? `${openCount} open now · figures are read from the restaurant’s clock, never the server’s.`
           : `${openCount} open now in the sample · figures below are fictional.`}

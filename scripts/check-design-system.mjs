@@ -85,7 +85,14 @@ const hexCount = cssFiles.reduce((n, f) => n + countHexOutsideTokens(readFileSyn
 let baseline = existsSync(BASELINE_PATH) ? JSON.parse(readFileSync(BASELINE_PATH, 'utf8')).hexColours : null;
 
 if (process.argv.includes('--update-baseline') || baseline === null) {
-  writeFileSync(BASELINE_PATH, `${JSON.stringify({ hexColours: hexCount, note: 'Hardcoded hex outside the token block. May decrease, never increase.' }, null, 2)}\n`);
+  writeFileSync(
+    BASELINE_PATH,
+    `${JSON.stringify(
+      { hexColours: hexCount, note: 'Hardcoded hex outside the token block. May decrease, never increase.' },
+      null,
+      2,
+    )}\n`,
+  );
   console.log(`Baseline recorded: ${hexCount} hardcoded hex values.`);
   if (baseline !== null && hexCount < baseline) console.log(`Ratchet tightened from ${baseline}.`);
   baseline = hexCount;
@@ -169,6 +176,109 @@ if (orderAt !== -1 && firstImport !== -1 && orderAt > firstImport) {
   );
 }
 
+/* ---------------------------------------------------------------- rule 6 */
+/*
+ * THE OWNER SURFACE IS PAPER, NOT GLASS.
+ *
+ * The redesign brief bans gradients and glassmorphism on the staff dashboard.
+ * Both had crept into the shell: a frosted sticky header over a scrolling table
+ * (rows read *through* the venue name) and a blurred drawer scrim. Neither is a
+ * colour, so the hex ratchet could never have caught them, and both are one
+ * class away from coming back.
+ *
+ * Gradients are a hard ban: there is no owner screen where a gradient is the
+ * right answer, so a new one is always a mistake.
+ *
+ * `backdrop-blur` is a ratchet instead of a ban, because two surfaces outside
+ * the shell (the printed bill, the branding preview's sticky header) predate
+ * this rule and were not part of the redesign. The number may go down. It may
+ * never go up.
+ */
+/* A staff surface is a file that composes the staff kit -- not merely a file
+   that happens to live in components/screens, which also holds the marketing
+   landing page (dark, gold, gradients by design) and the guest menu. */
+const OWNER_TSX = [
+  join(ROOT, 'components', 'DashboardBar.tsx'),
+  ...walk(join(ROOT, 'components', 'owner')),
+  ...walk(join(ROOT, 'components', 'screens')),
+]
+  .filter((f) => /\.tsx$/.test(f) && !f.endsWith('.test.tsx'))
+  .filter((f) => {
+    const src = readFileSync(f, 'utf8');
+    return (
+      f.includes(join('components', 'owner')) ||
+      f.endsWith('DashboardBar.tsx') ||
+      src.includes("@/components/owner/chrome")
+    );
+  });
+
+let glassCount = 0;
+for (const file of OWNER_TSX) {
+  const src = readFileSync(file, 'utf8');
+  src.split('\n').forEach((line, i) => {
+    if (/\bbg-gradient-[a-z]+|\bbg-clip-text\b/.test(line)) {
+      problems.push(
+        `${rel(file)}:${i + 1} gradient on a staff surface — the owner surface is flat paper; use a token colour.`,
+      );
+    }
+    if (/backdrop-blur/.test(line)) glassCount += 1;
+  });
+}
+
+const stored = existsSync(BASELINE_PATH) ? JSON.parse(readFileSync(BASELINE_PATH, 'utf8')) : {};
+const forceBaseline = process.argv.includes('--update-baseline');
+
+let glassBaseline = stored.glassSurfaces ?? null;
+
+if (forceBaseline || glassBaseline === null) {
+  glassBaseline = glassCount;
+} else if (glassCount > glassBaseline) {
+  problems.push(
+    `Glassmorphism on staff surfaces grew from ${glassBaseline} to ${glassCount}. ` +
+      'The dashboard is opaque paper with hairline borders; drop the blur.',
+  );
+}
+
+/* ---------------------------------------------------------------- rule 7 */
+/*
+ * A TYPE SCALE THAT IS ONE SCALE.
+ *
+ * Seventeen distinct font sizes were in use across the staff screens --
+ * 11, 11.5, 12, 12.5 and 13px all doing "small label" somewhere. To the eye
+ * that is not a scale, it is a shiver: the same kind of text is a different
+ * size on the next card.
+ *
+ * Rewriting 400 call sites in one commit is how a redesign breaks a product, so
+ * this is a ratchet: the count is frozen where it is and may only fall. Every
+ * new string uses one of the sanctioned steps.
+ */
+/* The scale, small to large. 20 and 22 are the two display sizes a bill and a
+   branding preview legitimately use; everything else is one of these. */
+const SANCTIONED_SIZES = new Set([
+  '10px', '10.5px', '11.5px', '12.5px', '13px', '13.5px',
+  '15px', '17px', '18px', '20px', '22px', '24px', '30px',
+]);
+let adHocSizes = 0;
+for (const file of OWNER_TSX) {
+  const src = readFileSync(file, 'utf8');
+  for (const m of src.matchAll(/text-\[(\d+(?:\.\d+)?)px\]/g)) {
+    if (!SANCTIONED_SIZES.has(m[1] + 'px')) adHocSizes += 1;
+  }
+}
+let sizeBaseline =
+  existsSync(BASELINE_PATH) && JSON.parse(readFileSync(BASELINE_PATH, 'utf8')).adHocFontSizes !== undefined
+    ? JSON.parse(readFileSync(BASELINE_PATH, 'utf8')).adHocFontSizes
+    : null;
+if (forceBaseline || sizeBaseline === null) {
+  sizeBaseline = adHocSizes;
+} else if (adHocSizes > sizeBaseline) {
+  problems.push(
+    `Off-scale font sizes grew from ${sizeBaseline} to ${adHocSizes}. ` +
+      'Use one of: ' +
+      [...SANCTIONED_SIZES].join(', '),
+  );
+}
+
 /* --------------------------------------------------------------- report */
 function rel(p) {
   return p.replace(`${ROOT}/`, '');
@@ -184,6 +294,30 @@ function walk(target) {
   return out;
 }
 
+/* ONE FILE, THREE RATCHETS.
+ *
+ * The hex ratchet above records itself, but it runs before the two newer rules
+ * exist, so they cannot be written there -- referencing them at that point is a
+ * temporal dead zone error, which is how this file crashed on --update-baseline
+ * the first time it was written. They are merged in here instead, once all
+ * three counts are known.
+ */
+if (forceBaseline || stored.glassSurfaces === undefined) {
+  writeFileSync(
+    BASELINE_PATH,
+    `${JSON.stringify(
+      {
+        hexColours: baseline,
+        glassSurfaces: glassBaseline,
+        adHocFontSizes: sizeBaseline,
+        note: 'Ratchets. Each may decrease, never increase. Reset only after a deliberate, approved reduction.',
+      },
+      null,
+      2,
+    )}\n`,
+  );
+}
+
 if (problems.length) {
   console.error('\nDesign system check FAILED:\n');
   for (const p of problems) console.error(`  ✗ ${p}`);
@@ -191,4 +325,8 @@ if (problems.length) {
   process.exit(1);
 }
 
-console.log(`Design system check passed. (hex colours: ${hexCount} / budget ${baseline})`);
+console.log(
+  `Design system check passed. (hex colours: ${hexCount} / budget ${baseline}, ` +
+    `glass: ${glassCount} / budget ${glassBaseline}, ` +
+    `off-scale font sizes: ${adHocSizes} / budget ${sizeBaseline})`,
+);

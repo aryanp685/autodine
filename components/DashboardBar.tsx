@@ -118,7 +118,7 @@ export function DashboardBar({
         tabIndex={open ? 0 : -1}
         onClick={() => setOpen(false)}
         className={[
-          'fixed inset-0 z-40 bg-gink/35 backdrop-blur-[2px] transition-opacity duration-200 lg:hidden',
+          'fixed inset-0 z-40 bg-gink/35 transition-opacity duration-200 lg:hidden',
           open ? 'opacity-100' : 'pointer-events-none opacity-0',
         ].join(' ')}
       />
@@ -215,7 +215,7 @@ export function DashboardBar({
           <div className="flex items-center gap-2.5">
             <span
               aria-hidden="true"
-              className="grid size-8 shrink-0 place-items-center rounded-full bg-[color-mix(in_oklab,var(--p-accent)_88%,black)] text-[11px] font-semibold text-onink"
+              className="grid size-8 shrink-0 place-items-center rounded-full bg-[color-mix(in_oklab,var(--p-accent)_88%,black)] text-[11.5px] font-semibold text-onink"
             >
               {initialsOf(activeOutlet?.name ?? 'AutoDine')}
             </span>
@@ -223,7 +223,7 @@ export function DashboardBar({
               <span className="block truncate text-[12.5px] font-medium text-gink">
                 {activeOutlet?.name ?? 'AutoDine'}
               </span>
-              <span className="block truncate text-[11px] text-gink-46 capitalize">
+              <span className="block truncate text-[11.5px] text-gink-46 capitalize">
                 {activeOutlet?.role ?? 'Staff'}
               </span>
             </span>
@@ -244,14 +244,17 @@ export function DashboardBar({
 
       {/* The top bar. It is the only chrome on a phone, so it carries the way
           into the rail, the name of where you are, and the jump search. */}
-      <header className="sticky top-0 z-30 border-b border-hair bg-white/60 backdrop-blur-xl lg:pl-[232px]">
+      {/* Solid, not frosted. A translucent header over a scrolling table is
+          glassmorphism, and it also lets a table row read through the
+          venue name. The hairline is what separates the two. */}
+      <header className="sticky top-0 z-30 border-b border-hair bg-card lg:pl-[232px]">
         <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
           <button
             type="button"
             aria-expanded={open}
             aria-controls="app-rail"
             onClick={() => setOpen(true)}
-            className="flex items-center gap-2 rounded-full border border-hair-strong py-1.5 pr-3 pl-2 text-[12px] font-medium text-gink lg:hidden"
+            className="flex items-center gap-2 rounded-full border border-hair-strong py-1.5 pr-3 pl-2 text-[12.5px] font-medium text-gink lg:hidden"
           >
             <span aria-hidden="true" className="flex flex-col gap-[3px]">
               <i className="block h-px w-3.5 bg-current" />
@@ -266,7 +269,7 @@ export function DashboardBar({
               {activeLink?.label ?? 'Dashboard'}
             </span>
             {activeOutlet && (
-              <span className="hidden truncate text-[12px] text-gink-46 sm:block">· {activeOutlet.name}</span>
+              <span className="hidden truncate text-[12.5px] text-gink-46 sm:block">· {activeOutlet.name}</span>
             )}
           </div>
 

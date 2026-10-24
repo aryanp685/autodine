@@ -4,6 +4,7 @@ import { DashboardBar } from '@/components/DashboardBar';
 import type { DashboardSection } from '@/components/shell-links';
 import type { OutletBar } from '@/lib/outlets';
 import { RouteSkeleton } from '@/components/RouteSkeleton';
+import { PageMotion } from '@/components/owner/PageMotion';
 
 /**
  * The staff-side kit.
@@ -59,7 +60,14 @@ export function OwnerPage({
             wide ? 'max-w-[1320px]' : 'max-w-[1180px]',
           ].join(' ')}
         >
-          {children}
+          {/*
+           * The arrival, not the layout. PageMotion sends its final state from
+           * the server and animates from keyframes only once the client is
+           * alive, so a blocked bundle leaves a visible page rather than an
+           * invisible one -- see the file for why that distinction is the
+           * whole point of using it instead of `initial={{ opacity: 0 }}`.
+           */}
+          <PageMotion>{children}</PageMotion>
         </main>
       </div>
     </div>
@@ -117,7 +125,7 @@ export function SectionHead({
     <div className={['mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1', className].join(' ')}>
       <div className="flex items-baseline gap-2.5">
         <h2 className="text-[13px] font-semibold tracking-[0.01em] text-gink">{title}</h2>
-        {meta ? <span className="text-[12px] text-gink-46">{meta}</span> : null}
+        {meta ? <span className="text-[12.5px] text-gink-46">{meta}</span> : null}
       </div>
       {action}
     </div>
@@ -184,7 +192,7 @@ export function Panel({
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-t-[15px] border-b border-hair bg-white/40 px-4 py-3 sm:px-5">
         <div className="flex items-baseline gap-2.5">
           <h2 className="text-[13px] font-semibold text-gink">{title}</h2>
-          {meta ? <span className="text-[12px] text-gink-46">{meta}</span> : null}
+          {meta ? <span className="text-[12.5px] text-gink-46">{meta}</span> : null}
         </div>
         {action}
       </div>
@@ -223,7 +231,7 @@ export function Stat({
           : 'border-hair bg-card',
       ].join(' ')}
     >
-      <div className="text-[11px] font-medium tracking-[0.03em] text-gink-46">{label}</div>
+      <div className="text-[11.5px] font-medium tracking-[0.03em] text-gink-46">{label}</div>
       <div className="mt-2.5 text-[clamp(1.6rem,2.6vw,2.15rem)] leading-none font-medium tracking-[-0.045em] text-gink tabular-nums">
         {value}
       </div>
@@ -261,7 +269,7 @@ export type BtnSize = 'sm' | 'md';
 export function btn(tone: BtnTone = 'solid', size: BtnSize = 'md'): string {
   const base =
     'inline-flex items-center justify-center gap-2 rounded-full font-medium whitespace-nowrap transition-[background-color,border-color,color,transform] duration-150 active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gink disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0';
-  const box = size === 'sm' ? 'h-8 px-3 text-[12px]' : 'h-10 px-4 text-[13px]';
+  const box = size === 'sm' ? 'h-8 px-3 text-[12.5px]' : 'h-10 px-4 text-[13px]';
   const tones: Record<BtnTone, string> = {
     /* Black is the default action on white. It is the strongest thing on the
        screen without introducing a colour the product does not own. */
@@ -298,6 +306,89 @@ export function BtnLink({
     <Link href={href} className={`${btn(tone, size)} ${className}`} {...rest}>
       {children}
     </Link>
+  );
+}
+
+/**
+ * A single-select row of pills: the payment method, the voice speed, how to
+ * import a menu.
+ *
+ * WHY THIS IS ONE COMPONENT NOW
+ *
+ * Three screens had written this by hand -- one with `bg-paper-deep` and 12px
+ * labels, one with a bare border and 11.5px labels, one announcing itself as a
+ * tablist with no tabpanels to point at. All three meant the same thing: pick
+ * exactly one of these. Written three times, they also had three different
+ * heights, three focus rings, and one of them told a screen reader it was a tab
+ * strip.
+ *
+ * `aria-pressed` on a group of toggle buttons is the honest description of
+ * "one of these is the current choice". A tablist claim requires tabpanels,
+ * arrow-key roving and `aria-controls`; a control that switches a panel it
+ * cannot name is not a tab strip.
+ *
+ * The buttons are real buttons, so keyboard order is left to right, Enter and
+ * Space both work, and the height matches `btn('sm')` so a segmented control
+ * can sit beside a button without a step.
+ */
+export type SegmentedOption<T extends string> = {
+  value: T;
+  label: ReactNode;
+  title?: string;
+  /** Extra data attributes, for a test that needs to name one item. */
+  data?: Record<string, string>;
+};
+
+export function Segmented<T extends string>({
+  label,
+  value,
+  onChange,
+  options,
+  size = 'md',
+  className = '',
+}: {
+  /** Names the group. A group of three buttons with no name is three buttons. */
+  label: string;
+  value: T;
+  onChange: (next: T) => void;
+  options: ReadonlyArray<SegmentedOption<T>>;
+  size?: 'sm' | 'md';
+  className?: string;
+}) {
+  const box = size === 'sm' ? 'h-8' : 'h-10';
+  const item = size === 'sm' ? 'h-7 px-2.5 text-[11.5px]' : 'h-9 px-3.5 text-[12.5px]';
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      className={[
+        'inline-flex items-center rounded-full border border-hair-strong bg-paper-deep p-0.5',
+        box,
+        className,
+      ].join(' ')}
+    >
+      {options.map((option) => {
+        const on = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={on}
+            title={option.title}
+            onClick={() => onChange(option.value)}
+            {...option.data}
+            className={[
+              'rounded-full font-medium whitespace-nowrap transition-colors duration-150',
+              'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gink',
+              item,
+              on ? 'bg-gink text-onink shadow-[var(--p-shadow-1)]' : 'text-gink-64 hover:text-gink',
+            ].join(' ')}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

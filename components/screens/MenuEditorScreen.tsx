@@ -329,7 +329,7 @@ export function MenuEditorScreen({
                 <>
                   {liveCategories.length === 0 ? (
                     <>
-                      <p className="m-0 text-[12px] leading-[1.5] text-gink-46">
+                      <p className="m-0 text-[12.5px] leading-[1.5] text-gink-46">
                         Diners reach an item through its category. Start with the ones most
                         restaurants use — you can remove any of them.
                       </p>
@@ -422,7 +422,7 @@ export function MenuEditorScreen({
                   {uncategorised > 0 && (
                     <>
                       <div className="mt-3 flex items-baseline justify-between gap-2 rounded-[9px] bg-[var(--alert)]/8 px-2.5 py-1.5">
-                        <span className="text-[12px] font-medium text-gink">Uncategorised</span>
+                        <span className="text-[12.5px] font-medium text-gink">Uncategorised</span>
                         <span className="text-[11.5px] text-[var(--alert)] tabular-nums">
                           {uncategorised}
                         </span>
@@ -711,7 +711,7 @@ export function MenuEditorScreen({
                                     data-row-delete
                                     aria-label={`Delete ${i.name}`}
                                     title={`Delete ${i.name}`}
-                                    className="grid size-6 place-items-center rounded-full text-[14px] leading-none text-gink-46 transition-colors hover:bg-[var(--alert)]/8 hover:text-[var(--alert)]"
+                                    className="grid size-6 place-items-center rounded-full text-[13.5px] leading-none text-gink-46 transition-colors hover:bg-[var(--alert)]/8 hover:text-[var(--alert)]"
                                   >
                                     ×
                                   </button>
@@ -890,7 +890,7 @@ export function MenuEditorScreen({
                     Add portion
                   </button>
                 </form>
-                <p className="mt-2 text-[11px] leading-[1.45] text-gink-46">
+                <p className="mt-2 text-[11.5px] leading-[1.45] text-gink-46">
                   Orders already placed keep their own record of the portion they were sold at.
                 </p>
               </Card>
@@ -922,7 +922,7 @@ export function MenuEditorScreen({
                         <strong className="text-[12.5px] font-medium text-gink">
                           {group.name}
                         </strong>
-                        <span className="text-[11px] text-gink-46">
+                        <span className="text-[11.5px] text-gink-46">
                           {group.maxSelect === 1 ? 'Choose one' : `Choose up to ${group.maxSelect}`}
                           {' · '}
                           {group.minSelect > 0 ? 'required' : 'optional'}
@@ -946,9 +946,9 @@ export function MenuEditorScreen({
                             key={addon.id}
                             className="flex items-baseline justify-between gap-2 border-b border-hair py-1.5 last:border-b-0"
                           >
-                            <span className="text-[12px] text-gink-64">{addon.name}</span>
+                            <span className="text-[12.5px] text-gink-64">{addon.name}</span>
                             <span className="flex items-center gap-1.5">
-                              <span className="text-[12px] text-gink tabular-nums">
+                              <span className="text-[12.5px] text-gink tabular-nums">
                                 {addon.pricePaise > 0
                                   ? inr(paiseToRupees(addon.pricePaise))
                                   : 'Free'}
@@ -1027,7 +1027,7 @@ export function MenuEditorScreen({
                   </div>
                   <div className="flex items-center gap-1.5">
                     <select
-                      className={selectSm('text-[12px]')}
+                      className={selectSm('text-[12.5px]')}
                       name="maxSelect"
                       defaultValue="1"
                       aria-label="How many may be picked"
@@ -1039,7 +1039,7 @@ export function MenuEditorScreen({
                       <option value="5">Up to 5</option>
                     </select>
                     <select
-                      className={selectSm('text-[12px]')}
+                      className={selectSm('text-[12.5px]')}
                       name="required"
                       defaultValue="no"
                       aria-label="Skippable"
@@ -1050,7 +1050,7 @@ export function MenuEditorScreen({
                     </select>
                   </div>
                 </form>
-                <p className="mt-2 text-[11px] leading-[1.45] text-gink-46">
+                <p className="mt-2 text-[11.5px] leading-[1.45] text-gink-46">
                   The price here is what a guest pays — the kitchen ticket and the bill both carry
                   the add-on by name.
                 </p>
@@ -1064,7 +1064,7 @@ export function MenuEditorScreen({
             <div className="mt-5">
               {data?.published ? (
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-[12px] border border-[var(--p-accent)]/25 bg-accent-soft px-3.5 py-3">
-                  <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-gink">
+                  <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-gink">
                     <span
                       aria-hidden="true"
                       className="size-1.5 rounded-full bg-[var(--p-accent)]"
@@ -1091,7 +1091,7 @@ export function MenuEditorScreen({
                   </button>
                 </form>
               )}
-              <p className="mt-2 text-[11px] leading-[1.45] text-gink-46">
+              <p className="mt-2 text-[11.5px] leading-[1.45] text-gink-46">
                 Published changes never alter past orders or receipts — every order keeps its own
                 snapshot of items, prices and modifiers.
               </p>

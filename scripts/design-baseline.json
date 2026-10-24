@@ -1,4 +1,6 @@
 {
   "hexColours": 5,
-  "note": "Hardcoded hex outside the token block. May decrease, never increase."
+  "glassSurfaces": 3,
+  "adHocFontSizes": 0,
+  "note": "Ratchets. Each may decrease, never increase. Reset only after a deliberate, approved reduction."
 }

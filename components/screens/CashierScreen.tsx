@@ -22,6 +22,7 @@ import {
   Dot,
   Tag,
   Empty,
+  Segmented,
 } from '@/components/owner/chrome';
 
 /** One row in the queue, in the shape the locked markup renders. */
@@ -376,10 +377,10 @@ export function Cashier({
                           >
                             <span className="flex items-baseline justify-between gap-3">
                               <span className="flex items-baseline gap-2">
-                                <strong className="text-[14px] font-semibold tracking-[-0.01em] text-gink">
+                                <strong className="text-[13.5px] font-semibold tracking-[-0.01em] text-gink">
                                   {item.code}
                                 </strong>
-                                <span className="text-[12px] text-gink-46">{item.table}</span>
+                                <span className="text-[12.5px] text-gink-46">{item.table}</span>
                               </span>
                               <span className="text-[11.5px] text-gink-46 tabular-nums">{item.at}</span>
                             </span>
@@ -449,7 +450,7 @@ export function Cashier({
                     {/* the amount is the one large thing on this screen */}
                     <div className="flex flex-wrap items-start justify-between gap-4 border-b border-hair px-5 py-5">
                       <div className="min-w-0">
-                        <div className="text-[11px] font-medium tracking-[0.03em] text-gink-46">
+                        <div className="text-[11.5px] font-medium tracking-[0.03em] text-gink-46">
                           Order {order.code} · {order.table}
                           {order.orderId ? (
                             <>
@@ -494,29 +495,15 @@ export function Cashier({
 
                       <div className="mt-5">
                         <div className="mb-2 text-[11.5px] font-medium text-gink-64">Payment method</div>
-                        <div
-                          role="group"
-                          aria-label="Payment method"
-                          className="inline-flex rounded-full border border-hair-strong bg-paper-deep p-0.5"
-                        >
-                          {COUNTER_METHODS.map((value) => (
-                            <button
-                              type="button"
-                              key={value}
-                              aria-pressed={method === value}
-                              onClick={() => setMethod(value)}
-                              className={[
-                                'h-8 rounded-full px-3.5 text-[12px] font-medium transition-colors duration-150',
-                                'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gink',
-                                method === value
-                                  ? 'bg-gink text-onink'
-                                  : 'text-gink-64 hover:text-gink',
-                              ].join(' ')}
-                            >
-                              {COUNTER_METHOD_LABEL[value]}
-                            </button>
-                          ))}
-                        </div>
+                        <Segmented
+                          label="Payment method"
+                          value={method}
+                          onChange={setMethod}
+                          options={COUNTER_METHODS.map((value) => ({
+                            value,
+                            label: COUNTER_METHOD_LABEL[value],
+                          }))}
+                        />
                       </div>
 
                       <p className="mt-4 text-[11.5px] leading-[1.5] text-gink-46">
@@ -533,7 +520,7 @@ export function Cashier({
                           <strong className="text-[12.5px] text-[var(--alert)]">
                             Could not record the payment.
                           </strong>
-                          <p className="mt-1 text-[12px] leading-[1.5] text-gink-64">{error}</p>
+                          <p className="mt-1 text-[12.5px] leading-[1.5] text-gink-64">{error}</p>
                         </div>
                       )}
 
@@ -558,7 +545,7 @@ export function Cashier({
                           <strong className="text-[12.5px] text-gink">
                             Cancel {order.code} for {order.table}?
                           </strong>
-                          <p className="mt-1 text-[12px] leading-[1.5] text-gink-64">
+                          <p className="mt-1 text-[12.5px] leading-[1.5] text-gink-64">
                             Nothing is charged. The kitchen is told at once and the ticket leaves
                             this queue — this cannot be undone.
                           </p>
@@ -594,7 +581,7 @@ export function Cashier({
                       {message && (
                         <p
                           role="status"
-                          className="mt-3 rounded-[10px] border border-hair bg-paper-deep px-3.5 py-2.5 text-[12px] leading-[1.5] text-gink-64"
+                          className="mt-3 rounded-[10px] border border-hair bg-paper-deep px-3.5 py-2.5 text-[12.5px] leading-[1.5] text-gink-64"
                         >
                           {message}
                         </p>
@@ -616,14 +603,14 @@ export function Cashier({
                         : 'Every demo order in this preview has been settled.'}
                     </p>
                     {message && (
-                      <p role="status" className="mt-3 text-[12px] leading-[1.5] text-gink-64">
+                      <p role="status" className="mt-3 text-[12.5px] leading-[1.5] text-gink-64">
                         {message}
                       </p>
                     )}
                     {error && (
                       <div
                         role="alert"
-                        className="mt-3 rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-3 text-[12px] text-[var(--alert)]"
+                        className="mt-3 rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-3 text-[12.5px] text-[var(--alert)]"
                       >
                         {error}
                       </div>
