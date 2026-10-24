@@ -101,7 +101,7 @@ describe('placeOrderAction', () => {
     expect(mocks.rpc).toHaveBeenCalledTimes(1);
     expect(parsed.searchParams.get('s')).toBe('kings-of-kings');
     expect(parsed.searchParams.get('error')).toBe(
-      'The kitchen’s system found more than one match for something in this order, so nothing was sent. Please order with staff, quoting the reference below.'
+      'The kitchen’s system refused this order while writing it, so nothing was sent. Please order with staff, quoting the reference below.'
     );
     expect(parsed.searchParams.get('code')).toBe('21000');
   });
