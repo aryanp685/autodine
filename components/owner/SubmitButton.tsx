@@ -38,6 +38,7 @@ export function SubmitButton({
   tone = 'solid',
   size = 'sm',
   disabled = false,
+  bare = false,
   className = '',
   ...rest
 }: {
@@ -47,6 +48,12 @@ export function SubmitButton({
   tone?: BtnTone;
   size?: BtnSize;
   disabled?: boolean;
+  /**
+   * Skip the kit's button look and use `className` alone, for a control that
+   * is a real form submit but not a pill -- the availability switch on the menu
+   * editor. It still needs to know it is in flight.
+   */
+  bare?: boolean;
   className?: string;
 } & Omit<React.ComponentProps<'button'>, 'type' | 'className' | 'children' | 'disabled'>) {
   const { pending } = useFormStatus();
@@ -56,7 +63,7 @@ export function SubmitButton({
       type="submit"
       disabled={disabled || pending}
       aria-busy={pending || undefined}
-      className={`${btn(tone, size)} ${className}`.trim()}
+      className={(bare ? className : `${btn(tone, size)} ${className}`).trim()}
       {...rest}
     >
       {pending ? pendingLabel : children}
