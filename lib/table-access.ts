@@ -31,12 +31,20 @@
  * who never had one) or a dead end. The reasons each guest page shows are
  * built from these.
  *
+ * `browse` is the fifth answer and it is a different KIND of answer: the guest
+ * has a live card for this restaurant but has not entered the on-site code.
+ * They may read the menu and build a cart -- that is what they sat down to do
+ * -- and the code is asked for at the one moment it has to be: before an order
+ * is written. The database still refuses place_public_order without a session,
+ * so this state cannot become an order on its own.
+ *
  * `demo` exists for the same reason lib/db/menu-screen.ts has one: the site
  * must build and render with no environment variables at all.
  */
 
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { readCardPass } from '@/lib/table-card';
 import {
   isExpired,
   readTableSession,
@@ -53,6 +61,18 @@ export type TableAccess =
   | { status: 'verified'; session: TableSession; slug: string; tableLabel: string }
   /** No database configured: render the demo screens, as before. */
   | { status: 'demo'; tableLabel: string | null }
+  /**
+   * A live card for this restaurant, no table session. Read the menu, build a
+   * cart; the code is asked for at checkout. `qrToken` is the card that was
+   * scanned, so the code form can be offered without a second scan.
+   */
+  | {
+      status: 'browse';
+      qrToken: string;
+      slug: string;
+      tableLabel: string;
+      windowSeconds: number;
+    }
   /** No usable cookie: this guest has not scanned a card. */
   | { status: 'none' }
   /**
@@ -83,13 +103,57 @@ export async function loadTableAccess(slug?: string | null): Promise<TableAccess
     return { status: 'demo', tableLabel };
   }
 
-  if (!session) return { status: 'none' };
-
   const supabase = await createSupabaseServerClient();
   // Configured but no client is not a state that should happen; if it ever
   // does, fail closed. Rendering the menu here would be the exact hole this
   // file exists to close.
   if (!supabase) return { status: 'unavailable' };
+
+  /**
+   * The browse fallback.
+   *
+   * Consulted whenever there is no session that the database will stand
+   * behind -- including a session that exists in the cookie but has expired,
+   * been revoked, or belongs to a card that is no longer live. The card token
+   * is resolved here, on the server, every time: `public_qr_intro` answers
+   * only for a live card on a table in service in a restaurant that is taking
+   * orders, so a revoked card cannot browse and a forged cookie cannot invent
+   * a restaurant.
+   */
+  const browse = async (): Promise<TableAccess | null> => {
+    const qrToken = await readCardPass();
+    if (!qrToken) return null;
+
+    const { data, error } = await supabase.rpc('public_qr_intro', {
+      p_public_token: qrToken,
+    });
+
+    if (error) {
+      console.error('[table-access] could not resolve the scanned card', error);
+      return { status: 'unavailable' };
+    }
+
+    const intro = Array.isArray(data) ? data[0] : undefined;
+    // Dead card, dead table, closed restaurant, nothing published: there is
+    // nothing to browse, and the honest next step is the card on the table.
+    if (!intro) return null;
+
+    if (slug && slug.trim() !== '' && slug.trim() !== intro.restaurant_slug) {
+      // A live card, but for a different restaurant than this page. The guest
+      // is looking at the wrong link; this page is not theirs to browse.
+      return null;
+    }
+
+    return {
+      status: 'browse',
+      qrToken,
+      slug: intro.restaurant_slug,
+      tableLabel: intro.table_label,
+      windowSeconds: intro.window_seconds,
+    };
+  };
+
+  if (!session) return (await browse()) ?? { status: 'none' };
 
   const { data, error } = await supabase.rpc('current_table_session', {
     p_token: session.token,
@@ -105,7 +169,16 @@ export async function loadTableAccess(slug?: string | null): Promise<TableAccess
   const row = Array.isArray(data) ? data[0] : undefined;
 
   if (!row) {
-    return { status: 'stale', qrToken: session.qrToken ?? null, slug: session.slug };
+    // The session is gone, but the card behind it may well still be on the
+    // table. Falling back to browsing is what lets an hour-old guest keep
+    // reading the menu instead of being sent back to a scanner.
+    return (
+      (await browse()) ?? {
+        status: 'stale',
+        qrToken: session.qrToken ?? null,
+        slug: session.slug,
+      }
+    );
   }
 
   if (slug && slug.trim() !== '' && slug.trim() !== row.restaurant_slug) {
@@ -129,10 +202,19 @@ export async function loadTableAccess(slug?: string | null): Promise<TableAccess
 }
 
 /**
- * Where a guest goes to prove they are at a table, when we know which card
- * they scanned. Null when the cookie has been cleared or predates the field --
- * in that case the only honest answer is "scan the code on your table".
+ * Where a guest goes to enter the on-site code, when we know which card they
+ * scanned. Null when the cookie has been cleared or predates the field -- in
+ * that case the only honest answer is "scan the code on your table".
+ *
+ * The code form lives at /t/<token>/code, NOT at /t/<token>: that address is
+ * the card's own URL and now opens the menu, because browsing should not be
+ * interrupted by a form.
  */
+export function codePageHref(qrToken: string): string {
+  return `/t/${encodeURIComponent(qrToken)}/code`;
+}
+
 export function verifyAgainHref(access: TableAccess): string | null {
-  return access.status === 'stale' && access.qrToken ? `/t/${access.qrToken}` : null;
+  if (access.status === 'browse') return codePageHref(access.qrToken);
+  return access.status === 'stale' && access.qrToken ? codePageHref(access.qrToken) : null;
 }

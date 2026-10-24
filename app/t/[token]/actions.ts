@@ -7,6 +7,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { qrProblemReasonForStatus } from '@/lib/qr-problem';
 import { isQrToken, saveTableSession, type TableSession } from '@/lib/table-session';
+import { safeNextPath } from '@/lib/verify-next';
 
 /**
  * Redeem a table code: the card's public token plus the six digits showing
@@ -67,6 +68,15 @@ function problemReason(reason: string): never {
 export async function verifyTableCodeAction(formData: FormData): Promise<void> {
   const token = String(formData.get('token') ?? '').trim();
 
+  /**
+   * Where this guest was going before we asked them for a code -- from the
+   * checkout, usually. Not a URL: safeNextPath only returns a path this app
+   * knows, so a crafted `next` cannot turn the form into an open redirect.
+   */
+  const next = safeNextPath(formData.get('next')?.toString(), null);
+  const codeHref = (query: string) =>
+    `/t/${encodeURIComponent(token)}/code?${query}&next=${encodeURIComponent(next)}`;
+
   // Shape check before anything else: this value goes into a URL on every
   // failure path, so it must never be arbitrary text.
   if (!isQrToken(token)) problemReason('unreadable');
@@ -77,7 +87,7 @@ export async function verifyTableCodeAction(formData: FormData): Promise<void> {
     .replace(/[^0-9]/g, '')
     .slice(0, 6);
 
-  if (code.length !== 6) redirect(`/t/${token}?e=wrong`);
+  if (code.length !== 6) redirect(codeHref('e=wrong'));
 
   if (!isSupabaseConfigured) problemReason('offline');
 
@@ -104,11 +114,11 @@ export async function verifyTableCodeAction(formData: FormData): Promise<void> {
   if (row.status === 'wrong') {
     // A mistyped digit is fixed by typing it again, so the guest goes back to
     // the form rather than to a page telling them to find a member of staff.
-    redirect(`/t/${token}?e=${row.code_rotated ? 'rotated' : 'wrong'}`);
+    redirect(codeHref(`e=${row.code_rotated ? 'rotated' : 'wrong'}`));
   }
 
   if (row.status === 'limited') {
-    redirect(`/t/${token}?e=limited`);
+    redirect(codeHref('e=limited'));
   }
 
   if (row.status !== 'ok') {
@@ -132,5 +142,11 @@ export async function verifyTableCodeAction(formData: FormData): Promise<void> {
 
   await saveTableSession(session);
 
-  redirect(`/menu?s=${encodeURIComponent(row.restaurant_slug)}`);
+  /**
+   * Back to where they were: the checkout, usually, with the cart untouched in
+   * localStorage. `next` was narrowed to a known path at the top of this
+   * function, and the slug comes from the database's answer rather than from
+   * the form, so the destination cannot name a restaurant they are not in.
+   */
+  redirect(safeNextPath(next, row.restaurant_slug));
 }

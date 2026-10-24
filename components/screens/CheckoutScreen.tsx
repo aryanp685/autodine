@@ -5,6 +5,7 @@ import { DishPhoto } from '@/components/DishPhoto';
 import { GuestFlow } from '@/components/GuestFlow';
 import { guestAccentStyle } from '@/lib/branding/palette';
 import { PlaceOrderButton } from '@/components/PlaceOrderButton';
+import { AttemptToken } from '@/components/AttemptToken';
 import { useCart } from '@/components/CartProvider';
 import { inr } from '@/lib/demo-data';
 import { VegMark } from '@/components/ui';
@@ -94,6 +95,9 @@ export function Checkout({
         {/* Only ids and quantities go to the server. The prices are read from
             the database when the order is written. */}
         <input type="hidden" name="lines" value={JSON.stringify(cart.lines)} />
+        {/* One key per checkout attempt: a replayed POST lands on the order it
+            already wrote instead of writing a second one. */}
+        <AttemptToken />
 
         {/* One column at every width. The bill used to sit in a second column
             on a wide screen and inside the form on a phone; the money is the

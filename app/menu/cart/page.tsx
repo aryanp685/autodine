@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: 'Your order · AutoDine' };
  * restaurant: one cart spanning two kitchens would put a dish from one on
  * another's bill.
  *
- * GATED LIKE /menu
+ * GATED LIKE /menu -- AND NO STRICTER
  *
  * The cart holds the things a guest is about to order, and the button on it
  * posts to the checkout action. An open cart page was therefore a working step
@@ -22,6 +22,11 @@ export const metadata: Metadata = { title: 'Your order · AutoDine' };
  * refuses a sessionless order, and the action refuses one too -- but a page
  * that renders a "Place order" button and then fails is worse than a page that
  * says where to scan.
+ *
+ * A guest who scanned a live card (`browse`) sees their own cart. That is not a
+ * weakening: the cart is their own browser's localStorage, the page does not
+ * write anything, and the next screen asks for the code before a single row
+ * reaches a kitchen.
  */
 export default async function CartPage({
   searchParams,
@@ -50,7 +55,9 @@ export default async function CartPage({
         restaurantName={data?.restaurantName}
         // Only a verified session names a table. Demo mode can carry one from
         // the sample cookie; a real database read decides it above.
-        tableLabel={access.status === 'verified' ? access.tableLabel : null}
+        tableLabel={
+          access.status === 'verified' || access.status === 'browse' ? access.tableLabel : null
+        }
         taxRateBps={data?.taxRateBps}
         // No restaurant resolved: show the empty state rather than a menu of
         // prices that came from nowhere.
@@ -63,6 +70,9 @@ export default async function CartPage({
         // a small reference so a failure nobody has seen before can be named
         // from a screenshot instead of reproduced.
         placedErrorCode={code}
+        // Browsing on a scanned card: say now that the code is coming, rather
+        // than at the last tap.
+        needsCode={access.status === 'browse'}
       />
     </CartProvider>
   );

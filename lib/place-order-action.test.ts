@@ -30,7 +30,10 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('@/lib/cart-storage', () => ({ parseCart: mocks.parseCart }));
 
-vi.mock('@/lib/table-access', () => ({ loadTableAccess: mocks.loadTableAccess }));
+vi.mock('@/lib/table-access', () => ({
+  loadTableAccess: mocks.loadTableAccess,
+  codePageHref: (token: string) => `/t/${encodeURIComponent(token)}/code`,
+}));
 
 vi.mock('next/navigation', () => ({
   // Next's redirect() throws to unwind the render; a plain throw keeps the
@@ -243,6 +246,69 @@ describe('placeOrderAction', () => {
 
     expect(parsed.searchParams.get('s')).toBe('kings-of-kings');
     expect(parsed.searchParams.get('error')).toBe('Your cart is empty.');
+  });
+
+  it('sends a guest who scanned a card but has not entered the code to the code form, not a dead end', async () => {
+    // The browsing state: the menu and the cart are open, and the order has to
+    // ask for the on-site code. This is the ordinary path now, not an error.
+    mocks.loadTableAccess.mockResolvedValue({
+      status: 'browse',
+      qrToken: 'qr_abcdefghijklmnop',
+      slug: 'kings-of-kings',
+      tableLabel: 'T2',
+      windowSeconds: 600,
+    });
+
+    const url = await run(() => placeOrderAction(form()));
+    const parsed = new URL(url, 'https://example.test');
+
+    expect(parsed.pathname).toBe('/t/qr_abcdefghijklmnop/code');
+    // …and back to the checkout afterwards, so the cart is one tap away.
+    expect(parsed.searchParams.get('next')).toBe('/menu/checkout?s=kings-of-kings');
+    // Nothing was written.
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it('will not write an order for a guest the database did not verify', async () => {
+    mocks.loadTableAccess.mockResolvedValue({ status: 'none' });
+
+    const url = await run(() => placeOrderAction(form()));
+
+    const parsed = new URL(url, 'https://example.test');
+    expect(parsed.pathname).toBe('/menu/cart');
+    expect(parsed.searchParams.get('error')).toContain('Scan the QR code');
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it('sends one attempt key, so a re-post cannot write a second order', async () => {
+    mocks.rpc.mockResolvedValue({ data: 'ORD-9', error: null });
+
+    const attempt = '01234567-89ab-4cde-8f01-23456789abcd';
+    const data = form();
+    data.set('attempt', attempt);
+
+    const url = await run(() => placeOrderAction(data));
+
+    expect(mocks.rpc).toHaveBeenCalledWith(
+      'place_public_order',
+      expect.objectContaining({ p_guest_token: attempt })
+    );
+    // The same key is what the confirmation link carries.
+    expect(url).toContain(`t=${attempt}`);
+  });
+
+  it('replaces an attempt key that is not a UUID', async () => {
+    mocks.rpc.mockResolvedValue({ data: 'ORD-10', error: null });
+
+    const data = form();
+    data.set('attempt', '../../etc/passwd');
+
+    await run(() => placeOrderAction(data));
+
+    const [, args] = mocks.rpc.mock.calls[0] as [string, { p_guest_token: string }];
+    expect(args.p_guest_token).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    );
   });
 
   it('sends a verified guest to their order, with the table session used', async () => {

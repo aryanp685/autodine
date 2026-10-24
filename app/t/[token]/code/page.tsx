@@ -5,43 +5,42 @@ import { isVerifyErrorReason, verifyErrorText } from '@/lib/qr-problem';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { loadTableAccess } from '@/lib/table-access';
+import { safeNextPath } from '@/lib/verify-next';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Verify your table · AutoDine',
-  // A table's card URL is not something to be indexed: it names a seat in a
-  // restaurant, and there is nothing on the other side for a search visitor.
+  title: 'Enter the code · AutoDine',
+  // A table's card URL names a seat in a restaurant; there is nothing here for
+  // a search visitor.
   robots: { index: false, follow: false },
 };
 
 /**
- * What a printed QR code points at: /t/<public token>.
+ * The six-digit form: /t/<card token>/code.
  *
- * This page used to be a route handler that exchanged the token for a session
- * on sight. Anyone holding a photograph of a card got the table. Now the card
- * only names the table; the session is minted by the form on this page, once
- * the guest has typed the code showing inside the restaurant.
+ * WHY IT IS NO LONGER AT /t/<token>
  *
- * WHY THE PAGE FETCHES THE RESTAURANT NAME
+ * That address is what the QR itself carries, and it now opens the menu. A
+ * guest who has just sat down should be reading dishes, not typing digits --
+ * the code is asked for at checkout, where it decides whether an order may be
+ * written. This page is the place to enter it when the guest arrives another
+ * way: an expired session, the "enter the code" button on a gate screen, or a
+ * link a member of staff sends them.
  *
- * A guest who scans a card should see the place they are standing in, not a
- * form asking for a code with no context. public_qr_intro() returns the
- * restaurant and the table, and -- importantly -- returns nothing at all for a
- * card that is not live, so the page can send them to the explanation instead
- * of asking them to type a code for a table that no longer exists.
- *
- * It creates nothing and proves nothing.
+ * Already verified? Straight back to where they were going, because asking a
+ * guest to type a code they have already proved is exactly the friction the
+ * brief asked to remove.
  */
-export default async function TableVerifyPage({
+export default async function TableVerifyCodePage({
   params,
   searchParams,
 }: {
   params: Promise<{ token: string }>;
-  searchParams: Promise<{ e?: string }>;
+  searchParams: Promise<{ e?: string; next?: string }>;
 }) {
   const { token } = await params;
-  const { e } = await searchParams;
+  const { e, next } = await searchParams;
 
   if (!isSupabaseConfigured) redirect('/t/problem?r=offline');
 
@@ -60,18 +59,16 @@ export default async function TableVerifyPage({
   const row = Array.isArray(data) ? data[0] : undefined;
 
   // No row means the token is not a live card for a table in service, and no
-  // code will make it one. /t/problem says so instead of asking for a code
-  // that cannot work.
+  // code will make it one.
   if (!row) redirect('/t/problem?r=unreadable');
 
-  // Already verified here? The database is asked, not the cookie -- a cookie
-  // that merely looks unexpired proves nothing. This keeps "back" and a
-  // re-scan from making a guest type a second code for a table they already
-  // hold.
+  const destination = safeNextPath(next, row.restaurant_slug);
+
+  // The database is asked, not the cookie: a cookie that merely looks
+  // unexpired proves nothing. Already holding a live session means there is
+  // nothing to type.
   const access = await loadTableAccess(row.restaurant_slug);
-  if (access.status === 'verified') {
-    redirect(`/menu?s=${encodeURIComponent(row.restaurant_slug)}`);
-  }
+  if (access.status === 'verified') redirect(destination);
 
   return (
     <TableVerifyScreen
@@ -79,6 +76,8 @@ export default async function TableVerifyPage({
       restaurantName={row.restaurant_name}
       tableLabel={row.table_label}
       windowMinutes={Math.max(1, Math.round(row.window_seconds / 60))}
+      // Only a path this file already knows survives; see lib/verify-next.ts.
+      next={destination}
       {...(isVerifyErrorReason(e) ? { error: verifyErrorText(e) } : {})}
     />
   );

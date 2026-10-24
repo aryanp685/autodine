@@ -11,7 +11,7 @@ import {
   setTableActiveAction,
 } from '@/app/dashboard/tables/actions';
 import { SignInPrompt } from '@/components/SignInPrompt';
-import { VerificationCodeRefresh } from '@/components/VerificationCodeRefresh';
+import { CodeExpiry } from '@/components/owner/CodeExpiry';
 import { ConfirmSubmit } from '@/components/owner/ConfirmSubmit';
 import { SubmitButton } from '@/components/owner/SubmitButton';
 import { Reveal } from '@/components/owner/Reveal';
@@ -20,6 +20,7 @@ import {
   PageHead,
   SectionHead,
   Card,
+  BtnLink,
   btn,
   selectClass,
   Tag,
@@ -147,16 +148,28 @@ export function TablesScreen({
                 </span>
               </div>
               <p className="mt-2 max-w-[52ch] text-[12.5px] leading-[1.55] text-gink-64">
-                Guests type these six digits after scanning a table&apos;s QR. Put this screen — or a
-                printout of it — where guests can see it, and it changes every {minutes} on its own.
-                Nothing to remember, nothing to reset.
+                This is what a guest types after scanning a table&apos;s QR — and it is only asked
+                for at checkout, so they can read the menu first. It changes every {minutes} by
+                itself; there is nothing to remember and nothing to reset.
               </p>
-              <form className="mt-3">
-                <SubmitButton tone="ghost" formAction={rotateVerificationCodeAction} pendingLabel="Changing…">
-                  New code now
-                </SubmitButton>
-              </form>
-              <VerificationCodeRefresh expiresAt={data.verification.expiresAt} />
+              {/* The one thing that makes the code reachable without staff
+                  reading it out: a full-size board for a tablet or TV. */}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <BtnLink href="/dashboard/display" tone="solid" size="sm">
+                  Open guest display
+                </BtnLink>
+                <form>
+                  <SubmitButton tone="ghost" size="sm" formAction={rotateVerificationCodeAction} pendingLabel="Changing…">
+                    New code now
+                  </SubmitButton>
+                </form>
+              </div>
+              <p className="mt-2.5 max-w-[52ch] text-[11.5px] leading-[1.55] text-gink-46">
+                Guests cannot verify? Check that the table they scanned says <em>Live</em> below,
+                then read the current code from the display. &ldquo;New code now&rdquo; retires the
+                digits on every screen immediately — use it if a code has been shared outside the
+                restaurant.
+              </p>
             </div>
 
             <div
@@ -166,8 +179,8 @@ export function TablesScreen({
               <div className="text-[clamp(1.9rem,3.4vw,2.5rem)] leading-none font-medium tracking-[0.16em] text-gink tabular-nums">
                 {data.verification.code}
               </div>
-              <div className="mt-2 text-[10.5px] tracking-[0.06em] text-gink-46 uppercase">
-                changes every {minutes}
+              <div className="mt-2">
+                <CodeExpiry expiresAt={data.verification.expiresAt} />
               </div>
             </div>
           </div>

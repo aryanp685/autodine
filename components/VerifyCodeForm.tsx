@@ -29,9 +29,15 @@ import { verifyTableCodeAction } from '@/app/t/[token]/actions';
 export function VerifyCodeForm({
   token,
   windowMinutes,
+  next,
+  cta,
 }: {
   token: string;
   windowMinutes: number;
+  /** Path to return to after the code is accepted; narrowed server-side. */
+  next?: string;
+  /** Label for the submit button, so it says what the code unlocks. */
+  cta?: string;
 }) {
   const [code, setCode] = useState('');
   const [sending, setSending] = useState(false);
@@ -59,6 +65,9 @@ export function VerifyCodeForm({
   return (
     <form ref={formRef} className="mt-6 max-w-[380px]" action={verifyTableCodeAction}>
       <input type="hidden" name="token" value={token} />
+      {/* Posted in the body, like the token: it is a path this app knows, and
+          the action narrows it again before redirecting. */}
+      {next ? <input type="hidden" name="next" value={next} /> : null}
 
       <label className="block">
         <span className="mb-2 block text-[10.5px] font-semibold tracking-[0.11em] text-gink-46 uppercase">
@@ -105,13 +114,13 @@ export function VerifyCodeForm({
         disabled={sending || !complete}
         className="mt-3 h-11 w-full rounded-full bg-[var(--p-accent)] text-[13.5px] font-semibold text-white transition active:scale-[0.99] disabled:opacity-40"
       >
-        {sending ? 'Checking…' : 'Open the menu'}
+        {sending ? 'Checking…' : (cta ?? 'Open the menu')}
       </button>
 
       <p className="mt-2.5 text-[11.5px] leading-[1.6] text-gink-46" id="code-hint">
         {complete && !sending
           ? 'Checking that code…'
-          : `The code changes every ${windowMinutes === 1 ? 'minute' : `${windowMinutes} minutes`}. If you cannot see it, ask a member of staff — they can read it out for you.`}
+          : `The code changes every ${windowMinutes === 1 ? 'minute' : `${windowMinutes} minutes`}. If you cannot see it, ask a member of staff — they can read it out for you. Too many tries from one phone pause this for fifteen minutes, so please check the digits first.`}
       </p>
     </form>
   );

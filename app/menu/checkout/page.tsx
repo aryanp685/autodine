@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { CartProvider } from '@/components/CartProvider';
 import { Checkout } from '@/components/screens/CheckoutScreen';
 import { TableGateScreen } from '@/components/screens/TableGateScreen';
+import { VerifyToOrderScreen } from '@/components/screens/VerifyToOrderScreen';
 import { getCartScreenData } from '@/lib/db/cart-screen';
 import { onlinePaymentsConfigured } from '@/lib/payments/razorpay';
 import { loadTableAccess, verifyAgainHref } from '@/lib/table-access';
@@ -11,17 +12,20 @@ export const metadata: Metadata = { title: 'Checkout · AutoDine' };
 /**
  * ?s=<slug> names the restaurant. See the note on the cart page.
  *
- * GATED LIKE THE CART
+ * WHERE THE CODE IS ACTUALLY ASKED FOR
  *
- * This page was the one step of the ordering flow that never asked for a
- * table. The action it posts to does refuse an unverified guest, so nothing
- * could actually be ordered from here -- but the page still rendered a
- * complete, working-looking checkout with a live "Place order" button, and
- * only failed after the tap. A guest who pasted a forwarded link got eleven
- * seconds of believing they were about to eat.
+ * This is the step at which an order would be written, so this is the step
+ * that needs the on-site code. A guest who scanned a live card but has not
+ * entered the code sees their own bill and the six-digit form in one place --
+ * `browse` below -- instead of a checkout with a "Place order" button that
+ * could only fail. The cart is in localStorage, so the hop costs them nothing.
  *
- * An unverified guest is sent to the same gate the cart uses, which names the
- * fix (scan the card, type the code) instead of a form that will reject them.
+ * The states after that are unchanged and still fail closed:
+ *
+ *   none         no card, no session. Scan the code on the table.
+ *   stale        a card that is no longer live. Rescan.
+ *   unavailable  the database could not be asked. Do not guess.
+ *   verified     the database confirmed a live session -- render checkout.
  */
 export default async function CheckoutPage({
   searchParams,
@@ -39,6 +43,29 @@ export default async function CheckoutPage({
   }
 
   const data = await getCartScreenData(s);
+
+  /**
+   * A live card, no session: show the bill and ask for the code, on one screen.
+   *
+   * The card has already been resolved by public_qr_intro inside
+   * loadTableAccess, so the restaurant, the table and the code window here are
+   * the database's answer, not the cookie's.
+   */
+  if (access.status === 'browse') {
+    return (
+      <CartProvider slug={s}>
+        <VerifyToOrderScreen
+          slug={access.slug}
+          token={access.qrToken}
+          restaurantName={data?.restaurantName}
+          tableLabel={access.tableLabel}
+          windowMinutes={Math.max(1, Math.round(access.windowSeconds / 60))}
+          items={data?.items ?? []}
+          taxRateBps={data?.taxRateBps}
+        />
+      </CartProvider>
+    );
+  }
 
   return (
     <CartProvider slug={s}>

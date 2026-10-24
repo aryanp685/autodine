@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { GuestNote, GuestNoteAlert, GuestNoteText } from '@/components/GuestNote';
 import { VerifyCodeForm } from '@/components/VerifyCodeForm';
+import { WhereToFindCode } from '@/components/WhereToFindCode';
 
 /**
  * The step between scanning a table's card and seeing its menu.
@@ -37,6 +38,14 @@ export type TableVerifyScreenProps = {
   windowMinutes: number;
   /** One sentence, already mapped from a closed set. Never a database message. */
   error?: string;
+  /** Where to go once the code is accepted: a path this app knows. */
+  next?: string;
+  /**
+   * What the form is FOR. The card page opens the menu; the checkout places
+   * the order. The button says which, because a guest who taps "Open the menu"
+   * at a payment step is being told the wrong thing about what just happened.
+   */
+  cta?: string;
 };
 
 export function TableVerifyScreen({
@@ -45,6 +54,8 @@ export function TableVerifyScreen({
   tableLabel,
   windowMinutes,
   error,
+  next,
+  cta,
 }: TableVerifyScreenProps) {
   return (
     <GuestNote
@@ -59,15 +70,18 @@ export function TableVerifyScreen({
       }
     >
       <GuestNoteText>
-        There is a six-digit code showing on a screen inside {restaurantName} — at the counter,
-        or wherever the staff have put it. Type it here to open the menu for table {tableLabel}.
+        Type the six-digit code showing inside {restaurantName} to order at table {tableLabel}. It
+        is not printed on the table and nobody will ask you for it — it is on a screen in the
+        restaurant, so it can change every few minutes.
       </GuestNoteText>
 
       {error ? <GuestNoteAlert title="That did not work.">{error}</GuestNoteAlert> : null}
 
+      <WhereToFindCode windowMinutes={windowMinutes} variant="panel" />
+
       {/* A client component, because the sixth digit submits the form.
           See components/VerifyCodeForm.tsx for the reasons. */}
-      <VerifyCodeForm token={token} windowMinutes={windowMinutes} />
+      <VerifyCodeForm token={token} windowMinutes={windowMinutes} next={next} cta={cta} />
     </GuestNote>
   );
 }
