@@ -21,7 +21,7 @@ import {
 } from '@/components/owner/chrome';
 import type { DashboardScreenData } from '@/lib/db/dashboard-screen';
 import { accessSummary, planSentence } from '@/lib/access';
-import { clockTimeInZone } from '@/lib/db/time';
+import { clockTimeInZone, hourLabel, hourRangeLabel } from '@/lib/db/time';
 
 /**
  * 'refunded' reads as paid here for the same reason it does on the kitchen
@@ -106,7 +106,14 @@ export function Dashboard({
   // The Sparkline divides by (length - 1); a single bucket at ten past
   // midnight would hand it a zero step and draw nothing. Two points minimum.
   const chartable = live && data ? data.hourlyPaise.length >= 2 : true;
-  const chartHasValue = live && data ? data.hourlyPaise.some((v) => v > 0) : true;
+  const hourly = live && data ? data.hourlyPaise : sparkline;
+  const chartHasValue = hourly.some((v) => v > 0);
+
+  // Ties go to the earliest hour: two hours that took the same money are both
+  // "the busiest", and naming the later one would imply a run that is not in
+  // the data. `hasPeak` keeps a flat zero day from dotting midnight.
+  const peakIndex = hourly.reduce((best, value, i) => (value > hourly[best] ? i : best), 0);
+  const hasPeak = (hourly[peakIndex] ?? 0) > 0;
 
   const orders = live ? (data?.orders ?? []) : [];
   const openCount = live && stats ? stats.openOrders : 5;
@@ -203,15 +210,12 @@ export function Dashboard({
 
       {/* Four figures, each with the sentence that says what it counts. On a
           phone they are two by two, not one long column: a KPI you have to
-          scroll past is not a KPI. */}
-      {/* Four figures, each with the sentence that says what it counts. On a
-          phone they are two by two, not one long column: a KPI you have to
           scroll past is not a KPI.
 
           These were hand-rolled copies of `Stat`, which is the kit's whole
           point -- one figure size, one label size, one note size, one border.
           The only difference the copy had was a slightly smaller numeral. */}
-      <section aria-label="Today at a glance" className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+      <section aria-label="Today at a glance" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {cards.map((card) => (
           <Stat
             key={card.label}
@@ -226,17 +230,46 @@ export function Dashboard({
         ))}
       </section>
 
-      <div className="mt-5 grid gap-2.5 lg:grid-cols-[1.15fr_0.85fr]">
+      <div className="mt-4 grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
         {/* The chart is deliberately quiet: one line, no gridlines, no axis
             labels. The number above it is the reading; this is the shape. */}
         <Panel
           title="Revenue today"
-          meta={live ? 'By hour, restaurant time' : 'Peak 8:30–9:30 PM'}
+          meta={live ? 'By hour, restaurant time' : 'Sample shape · fictional'}
           action={<Tag tone="neutral">{live ? 'Live' : 'Sample'}</Tag>}
         >
           {chartable && chartHasValue ? (
             <div className="text-gink" data-chart>
-              <Sparkline data={live && data ? data.hourlyPaise : sparkline} width={520} height={120} />
+              {/* Fluid, not a fixed 520px: the old width overflowed a phone and
+                  pushed the most recent hour off the edge of the card. */}
+              <Sparkline
+                data={hourly}
+                width={520}
+                height={120}
+                className="h-[112px] w-full"
+                markIndex={hasPeak ? peakIndex : undefined}
+              />
+              {/* The axis and the reading are only for live data. The sample
+                  series is a shape with no clock behind it, so labelling its
+                  twelve buckets midnight-to-11am invented a trading day the
+                  demo never had. */}
+              {live ? (
+                <>
+                  <div className="mt-1.5 flex items-baseline justify-between gap-3">
+                    <span className="text-[10.5px] text-gink-46 tabular-nums">{hourLabel(0)}</span>
+                    <span className="text-[10.5px] text-gink-46 tabular-nums">
+                      Every hour to {hourLabel(hourly.length - 1)}
+                    </span>
+                  </div>
+                  {/* The line says the shape; this says the answer. A peak with
+                      no hour and no amount is a picture of a busy evening, not
+                      a fact an owner can staff against. */}
+                  <p className="mt-2.5 border-t border-hair pt-2.5 text-[11.5px] text-gink-64">
+                    <span className="font-medium text-gink">Busiest hour</span> ·{' '}
+                    {hourRangeLabel(peakIndex)} · <Money value={hourly[peakIndex]} strong />
+                  </p>
+                </>
+              ) : null}
             </div>
           ) : (
             <Empty>
@@ -272,7 +305,7 @@ export function Dashboard({
         </Panel>
       </div>
 
-      <div className="mt-5">
+      <div className="mt-4">
         <Panel
           title={live ? 'Orders today' : 'Live orders'}
           meta={

@@ -167,3 +167,45 @@ describe('Dashboard, live and empty', () => {
     expect(html).not.toContain('data-plan-line');
   });
 });
+
+/**
+ * The chart used to be a fixed 520px squiggle with no axis and no reading --
+ * and on a phone it hung out of its card. These pin the three things that
+ * turned it into information: it fits the card, it names the busy hour, and a
+ * day with no money does not answer a question nobody asked.
+ */
+describe('Dashboard revenue chart', () => {
+  it('names the busiest hour and what it took', () => {
+    // Hour 19 is 7-8 pm in the restaurant's zone.
+    const html = renderToStaticMarkup(<Dashboard data={live({ hourlyPaise: [0, 10_000, 84_500, 20_000] })} />);
+
+    expect(html).toContain('Busiest hour');
+    expect(html).toContain('2–3 am'); // bucket 2, from the hour label table
+    expect(html).toContain('₹845'); // 84,500 paise
+    expect(html).toContain('Every hour to 3 am');
+  });
+
+  it('dots the peak and scales with the card instead of a fixed pixel width', () => {
+    const html = renderToStaticMarkup(<Dashboard data={live({ hourlyPaise: [0, 10_000, 84_500] })} />);
+
+    expect(html).toContain('viewBox="0 0 520 120"');
+    expect(html).toContain('w-full');
+    expect(html).toContain('data-peak="true"');
+  });
+
+  it('does not name a busiest hour on a day with no settled payments', () => {
+    const html = renderToStaticMarkup(<Dashboard data={live({ hourlyPaise: [0, 0, 0] })} />);
+
+    expect(html).not.toContain('Busiest hour');
+    expect(html).not.toContain('data-peak');
+    expect(html).toContain('No settled payments yet today');
+  });
+
+  it('leaves the sample chart unlabelled, because it has no trading day behind it', () => {
+    const html = renderToStaticMarkup(<Dashboard />);
+
+    expect(html).toContain('Sample shape');
+    expect(html).not.toContain('Busiest hour');
+    expect(html).not.toContain('Every hour to');
+  });
+});

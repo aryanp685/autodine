@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { clockTimeInZone, dateTimeInZone, RESTAURANT_TIME_ZONE } from './time';
+import {
+  clockTimeInZone,
+  dateTimeInZone,
+  hourLabel,
+  hourRangeLabel,
+  RESTAURANT_TIME_ZONE,
+} from './time';
 
 /**
  * These two exist because the same formatting was copied into the kitchen
@@ -51,5 +57,44 @@ describe('dateTimeInZone', () => {
 
   it('shows an em dash rather than NaN for an unparseable timestamp', () => {
     expect(dateTimeInZone(RESTAURANT_TIME_ZONE, 'not-a-date')).toBe('—');
+  });
+});
+
+/**
+ * The chart on the overview buckets revenue by hour index, so the labels are
+ * built from a bare number. These are the two places a fixed table beats an
+ * Intl formatter: noon and midnight, where the 12-hour clock has to start over
+ * rather than count up.
+ */
+describe('hourRangeLabel', () => {
+  it('names a morning hour as one range', () => {
+    expect(hourRangeLabel(8)).toBe('8–9 am');
+  });
+
+  it('names an evening hour as one range', () => {
+    expect(hourRangeLabel(20)).toBe('8–9 pm');
+  });
+
+  it('starts the 12-hour clock over at noon and midnight', () => {
+    expect(hourRangeLabel(0)).toBe('12–1 am');
+    expect(hourRangeLabel(12)).toBe('12–1 pm');
+  });
+
+  it('names both halves when the hour crosses midday or midnight', () => {
+    expect(hourRangeLabel(11)).toBe('11 am–12 pm');
+    expect(hourRangeLabel(23)).toBe('11 pm–12 am');
+  });
+
+  it('wraps rather than printing hour 24', () => {
+    expect(hourRangeLabel(24)).toBe('12–1 am');
+    expect(hourRangeLabel(-1)).toBe('11 pm–12 am');
+  });
+});
+
+describe('hourLabel', () => {
+  it('prints one hour for an axis tick', () => {
+    expect(hourLabel(0)).toBe('12 am');
+    expect(hourLabel(12)).toBe('12 pm');
+    expect(hourLabel(20)).toBe('8 pm');
   });
 });
