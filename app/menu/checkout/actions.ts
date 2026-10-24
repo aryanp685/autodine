@@ -6,7 +6,6 @@ import { parseCart } from '@/lib/cart-storage';
 import { loadTableAccess } from '@/lib/table-access';
 import {
   describePlaceFailure,
-  isNamedPlaceFailure,
   isTransientPlaceCode,
 } from '@/lib/place-order-failure';
 
@@ -246,11 +245,9 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
       describePlaceFailure(error.code),
       slug,
       error.code || 'net',
-      isNamedPlaceFailure(error.code)
-        ? undefined
-        : [error.message, error.details, error.hint && `hint: ${error.hint}`]
-            .filter(Boolean)
-            .join(' · ')
+      [error.code && `[${error.code}]`, error.message, error.details, error.hint && `hint: ${error.hint}`]
+        .filter(Boolean)
+        .join(' · ')
     );
   }
 

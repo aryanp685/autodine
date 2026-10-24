@@ -137,11 +137,14 @@ describe('placeOrderAction', () => {
       'We could not place that order. Nothing was charged — please try again, or order with staff.'
     );
     expect(parsed.searchParams.get('d')).toBe(
-      'more than one row returned by a subquery used as an expression · at statement 12'
+      '[42804] · more than one row returned by a subquery used as an expression · at statement 12'
     );
   });
 
-  it('does not carry the database sentence for a failure it can name', async () => {
+  it('carries the database sentence for a failure it can name, too', async () => {
+    // The gate that used to skip this for named classes hid the one thing the
+    // screen needs: a 21000 that the RPC cannot raise from SQL. The guest still
+    // reads the written sentence; the raw text rides along, collapsed.
     mocks.rpc.mockResolvedValue({
       data: null,
       error: { code: '23505', message: 'duplicate key value violates unique constraint' },
@@ -150,7 +153,9 @@ describe('placeOrderAction', () => {
     const url = await run(() => placeOrderAction(form()));
     const parsed = new URL(url, 'https://example.test');
 
-    expect(parsed.searchParams.get('d')).toBeNull();
+    expect(parsed.searchParams.get('d')).toBe(
+      '[23505] · duplicate key value violates unique constraint'
+    );
   });
 
   it('keeps the restaurant in the URL when the failure is unexplained', async () => {

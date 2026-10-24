@@ -73,34 +73,6 @@ export function isTransientPlaceCode(code?: string | null): boolean {
   return Boolean(code && TRANSIENT_PLACE_CODES.has(code));
 }
 
-/**
- * Codes this module has a written sentence for.
- *
- * Used for one decision only: the database's own words are attached to the
- * screen for the *unclassified* failures, because those are the ones nobody can
- * explain yet. A named class already says what happened in a sentence written
- * for a guest, and a Postgres message beside it would only leak the schema.
- */
-const NAMED_PLACE_CODES = new Set([
-  '23505',
-  '22P02',
-  '23503',
-  '23502',
-  '42703',
-  '42P01',
-  '21000',
-  'PGRST116',
-  '23514',
-  '57014',
-  'PGRST301',
-  '401',
-  ...TRANSIENT_PLACE_CODES,
-]);
-
-export function isNamedPlaceFailure(code?: string | null): boolean {
-  return Boolean(code && NAMED_PLACE_CODES.has(code));
-}
-
 export function describePlaceFailure(code?: string): string {
   if (!code) {
     return 'The kitchen’s system did not answer. Your cart is safe — please try again in a moment.';
