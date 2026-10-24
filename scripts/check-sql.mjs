@@ -52,7 +52,13 @@ if (!files.length) {
 function stripUnsupported(sql) {
   let out = sql;
   // create or replace function ... $$ body $$  ... ;
-  out = out.replace(/create\s+or\s+replace\s+function[\s\S]*?\$\$[\s\S]*?\$\s*;/gi, '');
+  // The tag is optional: `$function$` is what pg_get_functiondef emits, so a
+  // function pasted out of the live database is stripped too instead of
+  // failing the parse of the file around it.
+  out = out.replace(
+    /create\s+or\s+replace\s+function[\s\S]*?\$(\w*)\$[\s\S]*?\$\1\$\s*;/gi,
+    '',
+  );
   // create policy ... ;
   out = out.replace(/^\s*create\s+policy[\s\S]*?;\s*$/gim, '');
   // drop policy ... ;  (added: migration 0002 uses drop-then-create to be

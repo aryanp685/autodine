@@ -26,6 +26,14 @@
  *   23514 check violation       - the bill's arithmetic did not satisfy the
  *                                 orders_math_check constraint.
  *   57014 statement timeout     - the write took too long; nothing was saved.
+ *   21000 cardinality viol.     - a statement inside the order transaction was
+ *   PGRST116 singular response    refused by the database itself. 21000 covers
+ *                                 two different refusals: a query that matched
+ *                                 more than one row where it needed one, and
+ *                                 Supabase's preloaded `safeupdate` guard
+ *                                 refusing an UPDATE with no WHERE clause.
+ *                                 PGRST116 is the singular-response one. In all
+ *                                 three cases nothing was written.
  *
  * Everything else is the catch-all, and it is the only branch that carries a
  * code back to the screen.
@@ -84,6 +92,18 @@ export function describePlaceFailure(code?: string): string {
     case '42703':
     case '42P01':
       return 'This restaurant is still being set up for ordering. Please ask a member of staff to take your order.';
+    case '21000':
+      // Two different refusals share this class: an ambiguous query, and
+      // Supabase's `safeupdate` guard rejecting a statement the order
+      // transaction needed. Both mean the database declined to write, neither
+      // is the guest's to fix, and neither gets better by asking again -- so
+      // the sentence says only what is certain, and the reference carries the
+      // rest to whoever can read it.
+      return 'The kitchen’s system refused this order while writing it, so nothing was sent. Please order with staff, quoting the reference below.';
+    case 'PGRST116':
+      // PostgREST's own wording for "you asked for one row and there were not
+      // exactly one". Distinct from 21000 now that 21000 has a second meaning.
+      return 'The kitchen’s system found more than one match for something in this order, so nothing was sent. Please order with staff, quoting the reference below.';
     case '23514':
       return 'The bill did not add up when the kitchen checked it, so nothing was sent. Please try again, or order with staff.';
     case '57014':

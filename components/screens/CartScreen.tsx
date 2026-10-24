@@ -200,6 +200,7 @@ export function Cart({
                     Reference {placedErrorCode} — quote this to staff if it happens again.
                   </p>
                 ) : null}
+
               </div>
               <Link
                 href={withSlug('/menu/cart')}
