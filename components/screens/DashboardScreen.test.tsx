@@ -182,7 +182,11 @@ describe('Dashboard revenue chart', () => {
     expect(html).toContain('Busiest hour');
     expect(html).toContain('2–3 am'); // bucket 2, from the hour label table
     expect(html).toContain('₹845'); // 84,500 paise
-    expect(html).toContain('Every hour to 3 am');
+    // The axis is two ticks, the first and the last hour of trading so far --
+    // not a sentence about "every hour to".
+    expect(html).toContain('12 am');
+    expect(html).toContain('3 am');
+    expect(html).not.toContain('Every hour to');
   });
 
   it('dots the peak and scales with the card instead of a fixed pixel width', () => {
@@ -207,5 +211,152 @@ describe('Dashboard revenue chart', () => {
     expect(html).toContain('Sample shape');
     expect(html).not.toContain('Busiest hour');
     expect(html).not.toContain('Every hour to');
+  });
+});
+
+/**
+ * The chart drew the shape of the day against its own minimum, so a stretch of
+ * quiet hours that varied by two hundred rupees filled the whole card height
+ * like a dinner rush. Money on an axis has to start at zero; that is the whole
+ * difference between a picture and a reading.
+ */
+describe('Dashboard chart scale', () => {
+  it('stands the line on zero rather than on the smallest hour', () => {
+    const html = renderToStaticMarkup(
+      <Dashboard data={live({ hourlyPaise: [80_000, 82_000, 81_000] })} />,
+    );
+
+    expect(html).toContain('data-baseline="true"');
+    expect(html).toContain('data-area="true"');
+  });
+
+  it('draws a quiet hour low, which is what the old scale could not do', () => {
+    const flat = renderToStaticMarkup(
+      <Dashboard data={live({ hourlyPaise: [80_000, 82_000, 81_000] })} />,
+    );
+    const dying = renderToStaticMarkup(
+      <Dashboard data={live({ hourlyPaise: [80_000, 82_000, 1_000] })} />,
+    );
+
+    // 80,000 of a 82,000 maximum is 97.5% of the height; 1,000 is 1.2%.
+    const yOf = (html: string, i: number) => {
+      const pts = html.match(/<polyline points="([^"]+)"/)?.[1] ?? '';
+      const pair = pts.split(' ')[i] ?? '';
+      return Number(pair.split(',')[1]);
+    };
+    expect(yOf(flat, 1)).toBeLessThan(10);
+    expect(yOf(dying, 1)).toBeLessThan(10);
+    // ...and the quiet hour sits near the floor in the second chart only.
+    expect(yOf(flat, 2)).toBeLessThan(10);
+    expect(yOf(dying, 2)).toBeGreaterThan(110);
+  });
+});
+
+/**
+ * The row of figures had no hierarchy: four cards of equal size, and the one
+ * an owner opens the screen for happened to be second.
+ */
+describe('Dashboard, the figures', () => {
+  it('leads with revenue, whatever order the source listed them in', () => {
+    const html = renderToStaticMarkup(<Dashboard data={live()} />);
+    expect(html.indexOf('Revenue today')).toBeLessThan(html.indexOf('Orders today'));
+  });
+
+  it('draws revenue larger and lets it have the width', () => {
+    const html = renderToStaticMarkup(<Dashboard data={live()} />);
+    expect(html).toContain('lg:grid-cols-[1.6fr_1fr_1fr_1fr]');
+    expect(html).toContain('clamp(1.75rem,4.4vw,3.1rem)');
+  });
+
+  it('still tints only open orders, and only when there are some', () => {
+    const busy = renderToStaticMarkup(<Dashboard data={live()} />);
+    expect(busy).toContain('--p-accent-soft)_62%');
+
+    const quiet = renderToStaticMarkup(
+      <Dashboard data={{ ...live(), stats: { ...live().stats!, openOrders: 0 } }} />,
+    );
+    expect(quiet).not.toContain('--p-accent-soft)_62%');
+  });
+});
+
+/**
+ * Three strips used to be drawn by hand with three radii, three paddings and
+ * three ways of ending in a link.
+ */
+describe('Dashboard, the notices', () => {
+  const strip = (html: string) => {
+    const at = html.indexOf('data-plan-line');
+    return at < 0 ? '' : html.slice(at, at + 700);
+  };
+
+  it('draws the plan line as the same strip as everything else', () => {
+    const html = renderToStaticMarkup(<Dashboard data={EMPTY} />);
+    const plan = strip(html);
+    expect(plan).toContain('rounded-[14px]');
+    expect(plan).toContain('Free trial');
+  });
+
+  it('says a read-only workspace is read-only, in the due tone', () => {
+    const html = renderToStaticMarkup(
+      <Dashboard data={{ ...EMPTY, access: { ...EMPTY.access!, status: 'expired', readOnly: true, canWrite: false } }} />,
+    );
+    expect(html).toContain('--p-due)_24%');
+  });
+
+  it('keeps the preview notice for a workspace with no database', () => {
+    const html = renderToStaticMarkup(<Dashboard />);
+    expect(html).toContain('Preview mode');
+    expect(html).toContain('fictional');
+  });
+});
+
+/**
+ * "Top items" was a list of numbers with no scale: three dishes ranked, and no
+ * way to see whether the first outsold the third by one or by a hundred.
+ */
+describe('Dashboard, top items', () => {
+  it('scales each bar against the best seller', () => {
+    const html = renderToStaticMarkup(
+      <Dashboard
+        data={live({
+          topItems: [
+            { name: 'A', qty: 10, revenuePaise: 100_000 },
+            { name: 'B', qty: 5, revenuePaise: 50_000 },
+          ],
+        })}
+      />,
+    );
+
+    expect(html).toContain('width:100%');
+    expect(html).toContain('width:50%');
+  });
+
+  it('leaves the bars out when nothing sold', () => {
+    const html = renderToStaticMarkup(<Dashboard data={EMPTY} />);
+    expect(html).not.toContain('width:100%');
+  });
+});
+
+/**
+ * The closing paragraph repeated the open-order count a third time and then
+ * explained the restaurant clock to a screen that says so under its title.
+ */
+describe('Dashboard, what it does not repeat', () => {
+  it('prints the open count once in the panel and once in the card', () => {
+    const html = renderToStaticMarkup(<Dashboard data={live()} />);
+    expect(html.match(/1 open/g) ?? []).toHaveLength(1);
+  });
+
+  it('does not tag the chart Live when the page already says it', () => {
+    const html = renderToStaticMarkup(<Dashboard data={live()} />);
+    const panel = html.slice(html.indexOf('Revenue today', html.indexOf('data-chart') - 900));
+    expect(panel).not.toContain('>Live<');
+  });
+
+  it('gives the orders panel a real action, not an underlined word', () => {
+    const html = renderToStaticMarkup(<Dashboard data={live()} />);
+    const at = html.indexOf('All orders');
+    const opening = html.slice(html.lastIndexOf('<a', at), at + 20);
+    expect(opening).toContain('h-9 px-3');
   });
 });
