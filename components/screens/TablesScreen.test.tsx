@@ -196,3 +196,188 @@ describe('TablesScreen', () => {
     expect(html).toContain('href="https://example.test/t/qr_abcdefghijklmnop"');
   });
 });
+
+/**
+ * THE REDESIGN
+ *
+ * The screen answers two questions — which code do I read out, and which table
+ * needs something — and the tests below are about that order being visible in
+ * the markup rather than only in the copy.
+ *
+ * Two of them guard real regressions rather than taste:
+ *
+ *   - the print sheet must sit OUTSIDE the `print:hidden` wrapper. It is one
+ *     closing tag away from printing a blank page, and nothing on screen would
+ *     look wrong if it did.
+ *   - printing must cover the whole floor. It used to print the first six cards
+ *     on every press while the copy told the owner to "print it twice for twelve
+ *     tables" — the second sheet was the same six.
+ */
+
+function table(over: Partial<TablesScreenData['tables'][number]> = {}) {
+  return {
+    id: '11111111-1111-1111-1111-111111111111',
+    code: 'T1',
+    label: '4 seater',
+    seats: 4,
+    qr: 'active' as const,
+    lastScan: '—',
+    orders: 0,
+    token: 'qr_abcdefghijklmnop',
+    scanUrl: 'https://example.test/t/qr_abcdefghijklmnop',
+    qrSvg: null,
+    ...over,
+  };
+}
+
+/** The print sheet is the last thing on the page, so everything after its
+    marker is the sheet. */
+const printSheet = (html: string) => html.slice(html.indexOf('data-print-sheet'));
+
+/** Where the `print:hidden` wrapper closes, by matching its own div tags. */
+function printHiddenClosesAt(html: string): number {
+  const start = html.indexOf('<div class="print:hidden">');
+  if (start === -1) return -1;
+  let depth = 0;
+  const tags = /<div\b|<\/div>/g;
+  tags.lastIndex = start;
+  for (let m = tags.exec(html); m; m = tags.exec(html)) {
+    depth += m[0] === '</div>' ? -1 : 1;
+    if (depth === 0) return m.index;
+  }
+  return -1;
+}
+
+const count = (haystack: string, needle: string) => haystack.split(needle).length - 1;
+
+describe('the redesign', () => {
+  it('gives the six digits their own plate, announced when they roll', () => {
+    const html = renderToStaticMarkup(<TablesScreen data={data()} />);
+    const plate = html.slice(html.indexOf('aria-live="polite"'));
+
+    expect(html).toContain('On-site code');
+    // Display type, not body type: this is the one number read across a room.
+    expect(plate.slice(0, 400)).toContain('text-[30px]');
+    expect(plate.slice(0, 400)).toContain('948111');
+        // The countdown lives under the digits, not across the page from them.
+    expect(plate.slice(0, 900)).toContain('Type it at checkout');
+  });
+
+  it('reserves ink for the table that needs a decision', () => {
+    // Two solid controls are the page's own: "Add table" in the head and "Open
+    // guest display" beside the code. No card draws one while every table is
+    // healthy -- twelve black buttons under twelve healthy tables is how the
+    // screen told the owner nothing.
+    const healthy = renderToStaticMarkup(
+      <TablesScreen data={data({ tables: [table({}), table({ code: 'T2' })] })} />
+    );
+    expect(count(healthy, 'bg-gink text-onink')).toBe(2);
+
+    // One table without a code: it, and only it, gains a solid button.
+    const broken = renderToStaticMarkup(
+      <TablesScreen
+        data={data({
+          tables: [table({}), table({ code: 'T8', qr: 'no-code', token: null, scanUrl: null })],
+        })}
+      />
+    );
+    expect(count(broken, 'bg-gink text-onink')).toBe(3);
+    expect(broken).toContain('data-table-action="create"');
+  });
+
+  it('names the tables that cannot take an order, once', () => {
+    const html = renderToStaticMarkup(
+      <TablesScreen
+        data={data({
+          tables: [
+            table({ code: 'T1' }),
+            table({ code: 'T8', qr: 'no-code' }),
+            table({ code: 'T9', qr: 'no-code' }),
+          ],
+        })}
+      />
+    );
+
+    expect(html).toContain('2 tables have no code');
+    expect(html).toContain('T8, T9');
+  });
+
+  it('says nothing about missing codes on a floor that has none missing', () => {
+    const html = renderToStaticMarkup(<TablesScreen data={data()} />);
+    expect(html).not.toContain('tables have no code');
+  });
+
+  it('offers no add-table form on the sample floor plan', () => {
+    // A disabled select and a disabled submit are a dead end with a border.
+    const html = renderToStaticMarkup(<TablesScreen data={null} />);
+    expect(html).not.toContain('Add table');
+    expect(html).not.toContain('name="seats"');
+    expect(html).toContain('Print QR sheet');
+  });
+
+  it('says the floor is empty instead of drawing an empty grid', () => {
+    const html = renderToStaticMarkup(<TablesScreen data={data({ tables: [] })} />);
+    expect(html).toContain('No tables yet');
+  });
+
+  it('keeps the print sheet out of the print:hidden wrapper', () => {
+    // If it moves inside, the page prints blank -- and looks perfect on screen.
+    const html = renderToStaticMarkup(<TablesScreen data={data()} />);
+    const closes = printHiddenClosesAt(html);
+
+    expect(closes).toBeGreaterThan(-1);
+    expect(html.indexOf('data-print-sheet')).toBeGreaterThan(closes);
+  });
+
+  it('prints the whole floor, six cards to a page', () => {
+    const eight = Array.from({ length: 8 }, (_, i) =>
+      table({ code: `T${i + 1}`, id: `11111111-1111-1111-1111-11111111111${i}` })
+    );
+    const sheet = printSheet(renderToStaticMarkup(<TablesScreen data={data({ tables: eight })} />));
+
+    for (let i = 1; i <= 8; i++) expect(sheet).toContain(`T${i}`);
+    expect(count(sheet, 'data-print-grid')).toBe(2);
+    // One break, between the pages -- not after the last one, which would print
+    // a blank second sheet.
+    expect(count(sheet, 'print:break-after-page')).toBe(1);
+  });
+
+  it('tells a missing code apart from one that would not draw', () => {
+    // Both render no square, and they need opposite actions: one needs a code
+    // created, the other a code regenerated. Calling the second "No code yet"
+    // is a false statement about the table.
+    const html = renderToStaticMarkup(
+      <TablesScreen
+        data={data({ tables: [table({ qr: 'active', token: 'qr_abcdefghijklmnop', qrSvg: null })] })}
+      />
+    );
+
+    expect(html).toContain('Code not drawn');
+    expect(html).not.toContain('No code yet');
+    expect(printSheet(html)).toContain('Regenerate this code');
+  });
+
+  it('says what a missing code costs: the table cannot take an order', () => {
+    const html = renderToStaticMarkup(
+      <TablesScreen data={data({ tables: [table({ code: 'T8', qr: 'no-code', token: null })] })} />
+    );
+    // "orders will not be stamped with a table" was wrong: with no way to scan
+    // in, there is no order at that table at all.
+    expect(html).toContain('nobody can order from them');
+  });
+
+  it('does not claim the sample floor plan carries working codes', () => {
+    const html = renderToStaticMarkup(<TablesScreen data={null} />);
+    // It used to say "real QR codes", directly above twelve cards that draw no
+    // code at all.
+    expect(html).not.toContain('real QR codes');
+    expect(html).toContain('No code is drawn here');
+  });
+
+  it('labels the sheet once, with a page count that matches', () => {
+    const html = renderToStaticMarkup(<TablesScreen data={data()} />);
+    // It used to be titled in the section head AND on the sheet itself.
+    expect(html).not.toContain('Print sheet — 6 per A4 page');
+    expect(html).toContain('A4 page · six cards each');
+  });
+});
