@@ -37,7 +37,7 @@ export function SignupScreen({ error }: { error?: string }) {
       {error ? (
         <div
           role="alert"
-          className="mb-4 rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-2.5 text-[12px] leading-[1.5] text-[var(--alert)]"
+          className="mb-4 rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-2.5 text-[12.5px] leading-[1.5] text-[var(--alert)]"
         >
           {error}
         </div>
@@ -128,7 +128,7 @@ export function SignupScreen({ error }: { error?: string }) {
           Create account
         </button>
 
-        <p className="text-[11px] leading-[1.5] text-gink-46">
+        <p className="text-[11.5px] leading-[1.5] text-gink-46">
           Signing up creates a restaurant workspace with one menu and one owner. No trial and no
           subscription is created by this form.
         </p>

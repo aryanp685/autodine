@@ -16,7 +16,7 @@ export function ResetPasswordScreen({ email, error }: { email: string | null; er
   const alert = error ? (
     <div
       role="alert"
-      className="mb-4 rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-2.5 text-[12px] leading-[1.5] text-[var(--alert)]"
+      className="mb-4 rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-2.5 text-[12.5px] leading-[1.5] text-[var(--alert)]"
     >
       {error}
     </div>
@@ -47,7 +47,7 @@ export function ResetPasswordScreen({ email, error }: { email: string | null; er
           Send a new reset link
         </Link>
 
-        <p className="mt-3 text-center text-[11px] leading-[1.5] text-gink-46">
+        <p className="mt-3 text-center text-[11.5px] leading-[1.5] text-gink-46">
           If you are already signed in, sign out first and ask for the link from this browser.
         </p>
       </AuthShell>

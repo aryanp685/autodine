@@ -10,6 +10,7 @@ import {
   Panel,
   Stat,
   btn,
+  chipClass,
   Tag,
   Empty,
   TableWrap,
@@ -218,13 +219,7 @@ export function ReportsScreen({
                     href={rangeHref(tab.key)}
                     aria-current={current ? 'true' : undefined}
                     data-range={current ? 'current' : 'other'}
-                    className={[
-                      'inline-flex h-8 items-center rounded-full border px-3 text-[12.5px] font-medium transition-colors',
-                      'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gink',
-                      current
-                        ? 'border-gink bg-gink text-onink'
-                        : 'border-hair-strong text-gink-64 hover:border-gink-28 hover:text-gink',
-                    ].join(' ')}
+                    className={chipClass(current)}
                   >
                     {tab.label}
                   </Link>
@@ -245,7 +240,7 @@ export function ReportsScreen({
                   name="from"
                   required
                   aria-label="From"
-                  className={`${inputClass} h-8 w-[142px] text-[12px]`}
+                  className={`${inputClass} h-8 w-[142px] text-[12.5px]`}
                 />
               </label>
               <label className="flex items-center gap-1.5 text-[11.5px] text-gink-46">
@@ -255,7 +250,7 @@ export function ReportsScreen({
                   name="to"
                   required
                   aria-label="To"
-                  className={`${inputClass} h-8 w-[142px] text-[12px]`}
+                  className={`${inputClass} h-8 w-[142px] text-[12.5px]`}
                 />
               </label>
               <button type="submit" className={btn('ghost', 'sm')}>
@@ -470,7 +465,7 @@ export function ReportsScreen({
                         return (
                           <Tr key={order.id} data-void={cancelled ? 'true' : undefined}>
                             <Td>
-                              <span className="text-[12px] text-gink-64 tabular-nums">
+                              <span className="text-[12.5px] text-gink-64 tabular-nums">
                                 {dateTimeInZone(timezone, order.placedAt)}
                               </span>
                             </Td>

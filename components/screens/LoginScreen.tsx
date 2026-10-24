@@ -37,7 +37,7 @@ export function LoginScreen({ error, notice, next }: { error?: string; notice?: 
       {notice ? (
         <div
           role="status"
-          className="mb-4 rounded-[10px] border border-[var(--p-accent)]/25 bg-accent-soft px-3.5 py-2.5 text-[12px] leading-[1.5] text-gink-64"
+          className="mb-4 rounded-[10px] border border-[var(--p-accent)]/25 bg-accent-soft px-3.5 py-2.5 text-[12.5px] leading-[1.5] text-gink-64"
         >
           {notice}
         </div>
@@ -45,7 +45,7 @@ export function LoginScreen({ error, notice, next }: { error?: string; notice?: 
       {error ? (
         <div
           role="alert"
-          className="mb-4 rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-2.5 text-[12px] leading-[1.5] text-[var(--alert)]"
+          className="mb-4 rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-2.5 text-[12.5px] leading-[1.5] text-[var(--alert)]"
         >
           {error}
         </div>

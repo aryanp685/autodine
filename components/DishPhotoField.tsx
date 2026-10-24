@@ -67,8 +67,8 @@ export function DishPhotoField({
   return (
     <div data-dish-photo-field>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h4 className="text-[12px] font-medium text-gink">Photo</h4>
-        <span className="text-[11px] leading-[1.4] text-gink-46">
+        <h4 className="text-[12.5px] font-medium text-gink">Photo</h4>
+        <span className="text-[11.5px] leading-[1.4] text-gink-46">
           {imageUrl ? 'Shown on the menu and the cart.' : 'Optional. Without one, guests see initials.'}
         </span>
       </div>
@@ -87,7 +87,7 @@ export function DishPhotoField({
             <label
               className={[
                 'relative inline-flex h-8 cursor-pointer items-center rounded-full border border-hair-strong px-3',
-                'text-[12px] font-medium text-gink transition-colors hover:border-gink-28 hover:bg-gink-07',
+                'text-[12.5px] font-medium text-gink transition-colors hover:border-gink-28 hover:bg-gink-07',
                 'focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-gink',
                 disabled ? 'pointer-events-none opacity-45' : '',
               ].join(' ')}
@@ -150,7 +150,7 @@ export function DishPhotoField({
           {localError}
         </p>
       )}
-      <p className="mt-1.5 text-[11px] leading-[1.45] text-gink-46">JPG, PNG or WebP · up to 4 MB</p>
+      <p className="mt-1.5 text-[11.5px] leading-[1.45] text-gink-46">JPG, PNG or WebP · up to 4 MB</p>
     </div>
   );
 }

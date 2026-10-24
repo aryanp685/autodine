@@ -124,15 +124,15 @@ export function BillScreen({ bill }: { bill: BillData }) {
                 {restaurant.name}
               </h1>
               {restaurant.address ? (
-                <p className="mt-1.5 max-w-[34ch] text-[12px] leading-[1.5] text-gink-46">
+                <p className="mt-1.5 max-w-[34ch] text-[12.5px] leading-[1.5] text-gink-46">
                   {restaurant.address}
                 </p>
               ) : null}
               {restaurant.phone ? (
-                <p className="mt-0.5 text-[12px] text-gink-46">Phone {restaurant.phone}</p>
+                <p className="mt-0.5 text-[12.5px] text-gink-46">Phone {restaurant.phone}</p>
               ) : null}
               {restaurant.gstin ? (
-                <p className="mt-0.5 text-[12px] text-gink-46">GSTIN {restaurant.gstin}</p>
+                <p className="mt-0.5 text-[12.5px] text-gink-46">GSTIN {restaurant.gstin}</p>
               ) : null}
             </div>
 
@@ -143,8 +143,8 @@ export function BillScreen({ bill }: { bill: BillData }) {
               <div className="mt-1 text-[15px] font-medium tracking-[-0.01em] text-gink tabular-nums">
                 {order.code}
               </div>
-              <p className="mt-1 text-[12px] text-gink-46">{order.placedAt}</p>
-              <p className="text-[12px] text-gink-46">{order.tableLabel ?? 'Takeaway'}</p>
+              <p className="mt-1 text-[12.5px] text-gink-46">{order.placedAt}</p>
+              <p className="text-[12.5px] text-gink-46">{order.tableLabel ?? 'Takeaway'}</p>
             </div>
           </header>
 
@@ -209,7 +209,7 @@ export function BillScreen({ bill }: { bill: BillData }) {
           </table>
 
           {order.customerNote ? (
-            <p className="mt-4 rounded-[10px] bg-paper-deep px-3.5 py-2.5 text-[12px] leading-[1.5] text-gink-64">
+            <p className="mt-4 rounded-[10px] bg-paper-deep px-3.5 py-2.5 text-[12.5px] leading-[1.5] text-gink-64">
               <span className="font-medium text-gink">Note for the kitchen:</span>{' '}
               {order.customerNote}
             </p>
@@ -234,7 +234,7 @@ export function BillScreen({ bill }: { bill: BillData }) {
               <span className="text-[12.5px] font-semibold tracking-[0.01em] text-gink uppercase">
                 Total
               </span>
-              <span className="text-[16px] font-medium tracking-[-0.02em] text-gink tabular-nums">
+              <span className="text-[15px] font-medium tracking-[-0.02em] text-gink tabular-nums">
                 {formatBillMoney(order.totalPaise)}
               </span>
             </div>
@@ -245,7 +245,7 @@ export function BillScreen({ bill }: { bill: BillData }) {
           </div>
 
           <footer className="mt-7 border-t border-hair pt-4">
-            <p className="text-[12px] leading-[1.55] text-gink-64">{paymentLine}</p>
+            <p className="text-[12.5px] leading-[1.55] text-gink-64">{paymentLine}</p>
             {payments.length > 0 && !order.cancelled ? (
               <p className="mt-1 text-[11.5px] leading-[1.5] text-gink-46">
                 {payments
@@ -256,7 +256,7 @@ export function BillScreen({ bill }: { bill: BillData }) {
                   .join('  ·  ')}
               </p>
             ) : null}
-            <p className="mt-3 text-[12px] text-gink-46">Thank you.</p>
+            <p className="mt-3 text-[12.5px] text-gink-46">Thank you.</p>
           </footer>
         </article>
 

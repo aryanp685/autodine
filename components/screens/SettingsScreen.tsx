@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { CopyButton } from '@/components/CopyButton';
 import { PrintButton } from '@/components/PrintButton';
+import { SubmitButton } from '@/components/owner/SubmitButton';
 import type { OutletBar } from '@/lib/outlets';
 import type { SettingsScreenData } from '@/lib/db/settings-screen';
 import { formatTaxPercent, taxExamplePaise } from '@/lib/settings-input';
@@ -143,7 +144,7 @@ export function SettingsScreen({
               meta="Name, address and what the bill carries"
               bodyClassName="px-4 py-4 sm:px-5"
             >
-              <p className="m-0 mb-4 max-w-[62ch] text-[12px] leading-[1.5] text-gink-46">
+              <p className="m-0 mb-4 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
                 The name and tagline are the first two things a guest reads on the menu.
               </p>
 
@@ -262,9 +263,9 @@ export function SettingsScreen({
                 )}
 
                 <div>
-                  <button type="submit" className={btn('solid', 'sm')} disabled={disabled}>
+                  <SubmitButton pendingLabel="Saving details…" disabled={disabled}>
                     Save details
-                  </button>
+                  </SubmitButton>
                 </div>
               </form>
             </Panel>
@@ -275,7 +276,7 @@ export function SettingsScreen({
               meta={taxBps === 0 ? '0% — nothing added' : `${formatTaxPercent(taxBps)}%`}
               bodyClassName="px-4 py-4 sm:px-5"
             >
-              <p className="m-0 max-w-[62ch] text-[12px] leading-[1.5] text-gink-46">
+              <p className="m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
                 The rate the bill adds on top of the menu prices. Set what your accountant told you —
                 this screen does not guess a rate.
               </p>
@@ -312,13 +313,13 @@ export function SettingsScreen({
                 </Field>
 
                 <div>
-                  <button type="submit" className={btn('ghost', 'sm')} disabled={disabled}>
+                  <SubmitButton tone="ghost" pendingLabel="Saving rate…" disabled={disabled}>
                     Save tax rate
-                  </button>
+                  </SubmitButton>
                 </div>
               </form>
 
-              <p className="mt-3 text-[11px] leading-[1.5] text-gink-46">
+              <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
                 Orders already placed keep the tax they were charged — a bill is a record of the rate at
                 that moment, not a live calculation. New orders use the new rate immediately.
               </p>
@@ -330,7 +331,7 @@ export function SettingsScreen({
               meta={gatewayConfigured ? 'Gateway keys present' : 'No gateway keys'}
               bodyClassName="px-4 py-4 sm:px-5"
             >
-              <p className="m-0 max-w-[62ch] text-[12px] leading-[1.5] text-gink-46">
+              <p className="m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
                 Let guests pay by card or UPI from their own order page. Money goes to your
                 payment-gateway account, and the order is marked paid as soon as the gateway confirms
                 it.
@@ -372,17 +373,16 @@ export function SettingsScreen({
                 </label>
 
                 <div>
-                  <button
-                    type="submit"
-                    className={btn('solid', 'sm')}
+                  <SubmitButton
+                    pendingLabel="Saving setting…"
                     disabled={disabled || !gatewayConfigured}
                   >
                     Save payment setting
-                  </button>
+                  </SubmitButton>
                 </div>
               </form>
 
-              <p className="mt-3 text-[11px] leading-[1.5] text-gink-46">
+              <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
                 Turning this off does not touch orders already paid, and does not refund anything.
                 Counter payments — cash, card and UPI at the till — keep working either way.
               </p>
@@ -394,7 +394,7 @@ export function SettingsScreen({
               meta={data?.upiId ? 'Shown to guests' : 'Not set'}
               bodyClassName="px-4 py-4 sm:px-5"
             >
-              <p className="m-0 max-w-[62ch] text-[12px] leading-[1.5] text-gink-46">
+              <p className="m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
                 Your own UPI handle, on the guest&apos;s phone, with the amount already filled in.
                 The money goes to your account — AutoDine never holds it and takes no cut.
               </p>
@@ -443,13 +443,13 @@ export function SettingsScreen({
                 </Field>
 
                 <div>
-                  <button type="submit" className={btn('solid', 'sm')} disabled={disabled}>
+                  <SubmitButton pendingLabel="Saving UPI…" disabled={disabled}>
                     Save UPI details
-                  </button>
+                  </SubmitButton>
                 </div>
               </form>
 
-              <p className="mt-3 text-[11px] leading-[1.5] text-gink-46">
+              <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
                 Test it before a service: open your guest menu on a phone, place an order, and scan
                 the code with your own UPI app. If the payee name is wrong, guests will not trust it.
               </p>
@@ -461,7 +461,7 @@ export function SettingsScreen({
               meta={live ? `${data?.outlets?.length ?? 0} on this account` : 'none'}
               bodyClassName="px-4 py-4 sm:px-5"
             >
-              <p className="m-0 max-w-[62ch] text-[12px] leading-[1.5] text-gink-46">
+              <p className="m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
                 Every outlet has its own menu, tables, QR codes, orders and bills. Whatever is open here
                 is what the rest of the dashboard shows.
               </p>
@@ -508,9 +508,9 @@ export function SettingsScreen({
                     />
                   </Field>
                   <div>
-                    <button className={btn('ghost', 'sm')} type="submit">
+                    <SubmitButton tone="ghost" pendingLabel="Creating…">
                       Create outlet
-                    </button>
+                    </SubmitButton>
                   </div>
                 </form>
               )}
@@ -542,7 +542,7 @@ export function SettingsScreen({
                   />
                 </div>
               ) : (
-                <p className="mt-3 text-[12px] leading-[1.5] text-gink-46">
+                <p className="mt-3 text-[12.5px] leading-[1.5] text-gink-46">
                   {live
                     ? 'The code could not be drawn for this address. The link below still works.'
                     : 'No code: there is no restaurant to encode until the database is connected.'}
@@ -568,7 +568,7 @@ export function SettingsScreen({
                 </div>
               )}
 
-              <p className="mt-3 text-[11px] leading-[1.5] text-gink-46">
+              <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
                 This is the menu, not a table. It opens for anyone, with no table attached, so it works
                 for takeaway and for sharing. Table cards — the ones that pin an order to a table — are
                 in{' '}
@@ -626,7 +626,7 @@ export function SettingsScreen({
                   </li>
                 ))}
               </ul>
-              <p className="mt-2.5 text-[11px] leading-[1.5] text-gink-46">
+              <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
                 Timezone: <strong className="text-gink">{data?.timezone ?? 'Asia/Kolkata'}</strong>.
                 Fixed at signup, because it decides which day a sale belongs to in Reports; changing it
                 mid-day would move yesterday&apos;s money into today.
@@ -648,7 +648,7 @@ export function SettingsScreen({
             />
           ) : null}
           <div className="text-[15px] font-medium text-gink">{details.name || 'Your restaurant'}</div>
-          <div className="text-[11px] text-gink-46">Scan for the menu</div>
+          <div className="text-[11.5px] text-gink-46">Scan for the menu</div>
         </div>
       </div>
     </OwnerPage>

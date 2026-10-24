@@ -13,6 +13,7 @@ import {
 } from '@/app/dashboard/branding/actions';
 import { inr } from '@/lib/demo-data';
 import { OwnerPage, PageHead, Panel, Card, btn } from '@/components/owner/chrome';
+import { SubmitButton } from '@/components/owner/SubmitButton';
 
 /**
  * Menu branding.
@@ -51,7 +52,7 @@ import { OwnerPage, PageHead, Panel, Card, btn } from '@/components/owner/chrome
  * the server (see lib/db/staff.ts).
  */
 const pickerLabel =
-  'relative inline-flex h-8 cursor-pointer items-center rounded-full border border-hair-strong px-3 text-[12px] font-medium text-gink transition-colors hover:border-gink-28 hover:bg-gink-07 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-gink';
+  'relative inline-flex h-8 cursor-pointer items-center rounded-full border border-hair-strong px-3 text-[12.5px] font-medium text-gink transition-colors hover:border-gink-28 hover:bg-gink-07 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-gink';
 
 export function BrandingScreen({
   data,
@@ -122,7 +123,7 @@ export function BrandingScreen({
         {/* --------------------------------------------------------------- logo */}
         <Panel title="Logo" meta="Shown beside your name" bodyClassName="px-4 py-4 sm:px-5">
           <div className="flex items-start justify-between gap-4">
-            <p className="m-0 max-w-[38ch] text-[12px] leading-[1.5] text-gink-46">
+            <p className="m-0 max-w-[38ch] text-[12.5px] leading-[1.5] text-gink-46">
               Shown in a circle next to your name. A square image works best; we crop nothing.
             </p>
 
@@ -160,29 +161,30 @@ export function BrandingScreen({
                 />
                 <span>{data?.logoUrl ? 'Replace logo' : 'Choose a logo'}</span>
               </label>
-              <button type="submit" className={btn('solid', 'sm')} disabled={disabled}>
+              <SubmitButton pendingLabel="Uploading…" disabled={disabled}>
                 Upload
-              </button>
+              </SubmitButton>
             </form>
 
             {data?.logoUrl && (
               <form action={removeLogoAction}>
-                <button
-                  type="submit"
-                  className={`${btn('quiet', 'sm')} hover:text-[var(--alert)]`}
+                <SubmitButton
+                  tone="quiet"
+                  pendingLabel="Removing…"
+                  className="hover:text-[var(--alert)]"
                   disabled={disabled}
                 >
                   Remove logo
-                </button>
+                </SubmitButton>
               </form>
             )}
           </div>
-          <p className="mt-2 text-[11px] leading-[1.45] text-gink-46">JPG, PNG or WebP · up to 2 MB</p>
+          <p className="mt-2 text-[11.5px] leading-[1.45] text-gink-46">JPG, PNG or WebP · up to 2 MB</p>
         </Panel>
 
         {/* ------------------------------------------------------------- banner */}
         <Panel title="Banner" meta="Optional" bodyClassName="px-4 py-4 sm:px-5">
-          <p className="m-0 max-w-[46ch] text-[12px] leading-[1.5] text-gink-46">
+          <p className="m-0 max-w-[46ch] text-[12.5px] leading-[1.5] text-gink-46">
             A wide photo of the room or a signature dish. Skip it and the header uses your paper
             background instead — both are finished designs.
           </p>
@@ -219,24 +221,25 @@ export function BrandingScreen({
                 />
                 <span>{data?.bannerUrl ? 'Replace banner' : 'Choose a banner'}</span>
               </label>
-              <button type="submit" className={btn('solid', 'sm')} disabled={disabled}>
+              <SubmitButton pendingLabel="Uploading…" disabled={disabled}>
                 Upload
-              </button>
+              </SubmitButton>
             </form>
 
             {data?.bannerUrl && (
               <form action={removeBannerAction}>
-                <button
-                  type="submit"
-                  className={`${btn('quiet', 'sm')} hover:text-[var(--alert)]`}
+                <SubmitButton
+                  tone="quiet"
+                  pendingLabel="Removing…"
+                  className="hover:text-[var(--alert)]"
                   disabled={disabled}
                 >
                   Remove banner
-                </button>
+                </SubmitButton>
               </form>
             )}
           </div>
-          <p className="mt-2 text-[11px] leading-[1.45] text-gink-46">
+          <p className="mt-2 text-[11.5px] leading-[1.45] text-gink-46">
             JPG, PNG or WebP · up to 4 MB · wide, at least 1200px across
           </p>
         </Panel>
@@ -248,7 +251,7 @@ export function BrandingScreen({
               <h2 id="branding-preview" className="text-[13px] font-semibold text-gink">
                 Preview
               </h2>
-              <span className="text-[12px] text-gink-46">The real header, with your data.</span>
+              <span className="text-[12.5px] text-gink-46">The real header, with your data.</span>
             </div>
             {live && (
               <Link href="/dashboard/branding/preview" className={btn('ghost', 'sm')}>
@@ -304,7 +307,7 @@ export function BrandingScreen({
           </Card>
 
           {live && !data?.hasPublishedMenu && (
-            <p className="mt-2 text-[11px] leading-[1.5] text-gink-46">
+            <p className="mt-2 text-[11.5px] leading-[1.5] text-gink-46">
               Nothing is published yet, so guests still see a closed menu. Publish from{' '}
               <Link
                 href="/dashboard/menus"

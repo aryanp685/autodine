@@ -14,6 +14,10 @@ import { Kitchen } from './KitchenScreen';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: () => {}, push: () => {} }),
+  // The board now renders the shared staff shell, and the rail reads the
+  // current path to close itself after a tap. Without this the whole screen
+  // throws before it can be asserted on.
+  usePathname: () => '/kitchen',
 }));
 
 vi.mock('@/app/kitchen/actions', () => ({
@@ -64,6 +68,35 @@ describe('Kitchen board', () => {
     const html = renderToStaticMarkup(<Kitchen />);
     expect(html).toContain('demo mode');
     expect(html).toContain('Demo board · local only');
+  });
+
+  /*
+   * THE SHELL CONTRACT
+   *
+   * The board used to be a full-screen wall display: no rail, no venue, and a
+   * single "Dashboard" link as the only way out. These two tests are the ones
+   * that would have caught that, and they are the reason it cannot come back
+   * quietly.
+   */
+  it('renders inside the shared staff shell with Kitchen marked current', () => {
+    const html = renderToStaticMarkup(<Kitchen />);
+
+    // The rail, and the destinations that live in it.
+    expect(html).toContain('id="app-rail"');
+    expect(html).toContain('href="/dashboard/orders"');
+    expect(html).toContain('href="/cashier"');
+
+    // Kitchen is the current page, not just a link that happens to be there.
+    expect(html).toContain('data-nav="kitchen" data-nav-active="true"');
+    expect(html).toContain('aria-current="page"');
+  });
+
+  it('does not fall back to the old full-screen escape hatch', () => {
+    const html = renderToStaticMarkup(<Kitchen />);
+
+    // The lone "Dashboard" button existed because there was no rail. With the
+    // rail present it is a second, worse way to do the same thing.
+    expect(html).not.toMatch(/>Dashboard<\/a>/);
   });
 
   it('renders the sample tickets so the layout can be judged', () => {

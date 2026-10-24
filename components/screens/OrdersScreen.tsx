@@ -15,6 +15,7 @@ import {
   Th,
   Tr,
   btn,
+  chipClass,
   tableClass,
 } from '@/components/owner/chrome';
 
@@ -190,7 +191,7 @@ export function OrdersScreen({
                 key={r.key}
                 href={href(r.key, filter, query, dates)}
                 aria-current={rangeKey === r.key ? 'true' : undefined}
-                className={chip(rangeKey === r.key)}
+                className={chipClass(rangeKey === r.key)}
               >
                 {r.label}
               </Link>
@@ -215,7 +216,7 @@ export function OrdersScreen({
                   name="from"
                   defaultValue={customFrom}
                   required
-                  className="h-7 rounded-md border border-hair px-1.5 text-[11.5px] text-gink focus:border-gink focus:outline-none"
+                  className="h-8 rounded-md border border-hair px-2 text-[12.5px] text-gink focus:border-gink focus:outline-none"
                 />
               </label>
               <label className="flex items-center gap-1.5 text-[11.5px] text-gink-46">
@@ -225,10 +226,10 @@ export function OrdersScreen({
                   name="to"
                   defaultValue={customTo}
                   required
-                  className="h-7 rounded-md border border-hair px-1.5 text-[11.5px] text-gink focus:border-gink focus:outline-none"
+                  className="h-8 rounded-md border border-hair px-2 text-[12.5px] text-gink focus:border-gink focus:outline-none"
                 />
               </label>
-              <button type="submit" className={chip(false)}>
+              <button type="submit" className={chipClass(false)}>
                 Apply dates
               </button>
             </form>
@@ -252,9 +253,9 @@ export function OrdersScreen({
                 defaultValue={query}
                 placeholder="Table or reference"
                 aria-label="Find an order by table or reference"
-                className="h-7 w-[150px] bg-transparent text-[12px] text-gink placeholder:text-gink-46 focus:outline-none"
+                className="h-8 w-[150px] bg-transparent text-[12.5px] text-gink placeholder:text-gink-46 focus:outline-none"
               />
-              <button type="submit" className={chip(false)}>
+              <button type="submit" className={chipClass(false)}>
                 Search
               </button>
             </form>
@@ -266,7 +267,7 @@ export function OrdersScreen({
                 key={f.key}
                 href={href(rangeKey, f.key, query, dates)}
                 aria-current={filter === f.key ? 'true' : undefined}
-                className={chip(filter === f.key)}
+                className={chipClass(filter === f.key)}
               >
                 {f.label}
               </Link>
@@ -333,7 +334,7 @@ export function OrdersScreen({
                             <Td>{order.tableLabel ?? 'Takeaway'}</Td>
                             <Td>
                               {cancelled ? (
-                                <span className="text-[11px] font-semibold tracking-[0.05em] text-gink-46 uppercase">
+                                <span className="text-[11.5px] font-semibold tracking-[0.05em] text-gink-46 uppercase">
                                   Cancelled
                                 </span>
                               ) : (
@@ -370,7 +371,7 @@ export function OrdersScreen({
                                 <Link
                                   href={`/cashier?order=${encodeURIComponent(live && !blocked ? order.id : order.code)}`}
                                   title={`Take payment for ${order.code} at the counter`}
-                                  className="inline-flex items-center gap-1 rounded-full bg-gink px-2.5 py-1 text-[11.5px] font-medium text-onink transition-colors hover:bg-gink/88"
+                                  className={btn('solid', 'sm')}
                                 >
                                   Collect <Money value={outstanding} />
                                 </Link>
@@ -402,7 +403,7 @@ export function OrdersScreen({
                             order.code
                           )}
                         </span>
-                        <span className="tnum text-[11px] text-gink-46">
+                        <span className="tnum text-[11.5px] text-gink-46">
                           {dateTimeInZone(timezone, order.placedAt)}
                         </span>
                       </div>
@@ -436,7 +437,7 @@ export function OrdersScreen({
                       </div>
 
                       <div className="mt-2 flex items-center justify-between gap-3">
-                        <span className="text-[14px] font-semibold text-gink">
+                        <span className="text-[13.5px] font-semibold text-gink">
                           <Money value={order.totalPaise} />
                         </span>
                         {outstanding > 0 && !cancelled ? (
@@ -493,11 +494,4 @@ export function OrdersScreen({
  * green filter chip beside a green payment pill reads as a statement about the
  * rows rather than about the filter.
  */
-function chip(active: boolean): string {
-  return [
-    'inline-flex h-8 items-center rounded-full px-3 text-[12px] font-medium whitespace-nowrap transition-colors',
-    active
-      ? 'bg-gink text-onink'
-      : 'border border-hair-strong text-gink-64 hover:border-gink-28 hover:text-gink',
-  ].join(' ');
-}
+

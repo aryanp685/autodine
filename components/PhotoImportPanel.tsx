@@ -293,7 +293,7 @@ export function PhotoImportPanel({ canWrite }: { canWrite: boolean }) {
             {stepBadge(1)}
             <h2 className="text-[13px] font-semibold text-gink">Photo of your menu</h2>
           </div>
-          <p className="mt-1.5 text-[12px] leading-[1.5] text-gink-46">
+          <p className="mt-1.5 text-[12.5px] leading-[1.5] text-gink-46">
             Point at a printed menu — the whole card in frame, flat, in good light. JPG, PNG, WebP or
             PDF, up to 8 MB and 3 pages.
           </p>
@@ -356,7 +356,7 @@ export function PhotoImportPanel({ canWrite }: { canWrite: boolean }) {
               {stepBadge(2)}
               <h2 className="text-[13px] font-semibold text-gink">Read it</h2>
             </div>
-            <p className="mt-1.5 text-[12px] leading-[1.5] text-gink-46">
+            <p className="mt-1.5 text-[12.5px] leading-[1.5] text-gink-46">
               We read the dishes, prices and photos, and mark anything we are not sure about. Nothing
               is saved until you check it.
             </p>
@@ -406,7 +406,7 @@ export function PhotoImportPanel({ canWrite }: { canWrite: boolean }) {
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-hair px-4 py-3 sm:px-5">
             <div>
               <h2 className="text-[13px] font-semibold text-gink">Check every dish</h2>
-              <p className="mt-1 max-w-[62ch] text-[12px] leading-[1.5] text-gink-46">
+              <p className="mt-1 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
                 {keptCount} dish{keptCount === 1 ? '' : 'es'} read with {model}. Rows marked in amber
                 need you. Nothing is published until you publish it.
               </p>
@@ -495,7 +495,7 @@ export function PhotoImportPanel({ canWrite }: { canWrite: boolean }) {
                             <span className="sr-only">{`Price for ${item.name}`}</span>
                             <span
                               aria-hidden="true"
-                              className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-[12px] text-gink-46"
+                              className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-[12.5px] text-gink-46"
                             >
                               ₹
                             </span>
@@ -523,7 +523,7 @@ export function PhotoImportPanel({ canWrite }: { canWrite: boolean }) {
                             <span data-veg={item.isVeg === false ? 'non' : 'veg'} aria-hidden="true">
                               <VegMark veg={item.isVeg !== false} />
                             </span>
-                            <span className="text-[11px]">
+                            <span className="text-[11.5px]">
                               {item.isVeg === null ? 'Set' : item.isVeg ? 'Veg' : 'Non-veg'}
                             </span>
                           </button>
@@ -546,7 +546,7 @@ export function PhotoImportPanel({ canWrite }: { canWrite: boolean }) {
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hair px-4 py-3 sm:px-5">
-            <p className="m-0 text-[11px] leading-[1.45] text-gink-46">
+            <p className="m-0 text-[11.5px] leading-[1.45] text-gink-46">
               Saves as a draft. Publish from Menus when it looks right.
             </p>
             <button

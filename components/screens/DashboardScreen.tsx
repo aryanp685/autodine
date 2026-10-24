@@ -11,6 +11,7 @@ import {
   OwnerPage,
   PageHead,
   Panel,
+  Stat,
   Td,
   Tag,
   Th,
@@ -165,12 +166,12 @@ export function Dashboard({
         >
           <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--p-accent)]" />
           <strong className="text-[12.5px] font-semibold text-gink">Preview mode</strong>
-          <span className="text-[12px] text-gink-64">
+          <span className="text-[12.5px] text-gink-64">
             Metrics and orders are fictional. Live ordering and payment processing are disabled.
           </span>
           <Link
             href="/menu"
-            className="ml-auto text-[12px] font-medium text-[var(--p-accent)] underline underline-offset-2"
+            className="ml-auto text-[12.5px] font-medium text-[var(--p-accent)] underline underline-offset-2"
           >
             Open the menu
           </Link>
@@ -203,19 +204,25 @@ export function Dashboard({
       {/* Four figures, each with the sentence that says what it counts. On a
           phone they are two by two, not one long column: a KPI you have to
           scroll past is not a KPI. */}
+      {/* Four figures, each with the sentence that says what it counts. On a
+          phone they are two by two, not one long column: a KPI you have to
+          scroll past is not a KPI.
+
+          These were hand-rolled copies of `Stat`, which is the kit's whole
+          point -- one figure size, one label size, one note size, one border.
+          The only difference the copy had was a slightly smaller numeral. */}
       <section aria-label="Today at a glance" className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-        {cards.map((card, index) => (
-          <div
+        {cards.map((card) => (
+          <Stat
             key={card.label}
-            style={{ ['--i' as string]: index }}
-            className="rounded-[16px] border border-hair bg-card p-4 transition-shadow duration-200 sm:hover:shadow-[var(--p-shadow-2)]"
-          >
-            <div className="text-[11px] font-medium tracking-[0.02em] text-gink-46">{card.label}</div>
-            <div className="mt-2.5 text-[clamp(1.5rem,2.6vw,2.1rem)] leading-none font-medium tracking-[-0.045em] text-gink tabular-nums">
-              {card.value}
-            </div>
-            <div className="mt-2 text-[11px] leading-[1.4] text-gink-46">{card.meta}</div>
-          </div>
+            label={card.label}
+            value={card.value}
+            meta={card.meta}
+            /* Green means "somebody is working right now", so it belongs on
+               open orders and only when there are some. A permanently tinted
+               card is decoration. */
+            tone={card.label === 'Open orders' && openCount > 0 ? 'live' : 'plain'}
+          />
         ))}
       </section>
 
@@ -248,7 +255,7 @@ export function Dashboard({
                   key={t.name}
                   className="flex items-baseline gap-3 border-b border-hair py-2.5 last:border-b-0 first:pt-0 last:pb-0"
                 >
-                  <span className="tnum w-5 shrink-0 text-[11px] font-semibold text-gink-46">
+                  <span className="tnum w-5 shrink-0 text-[11.5px] font-semibold text-gink-46">
                     {String(i + 1).padStart(2, '0')}
                   </span>
                   <span className="min-w-0 flex-1 truncate text-[13.5px] text-gink">{t.name}</span>
@@ -277,7 +284,7 @@ export function Dashboard({
           action={
             <Link
               href="/dashboard/orders"
-              className="text-[12px] font-medium text-gink-64 underline underline-offset-2 hover:text-gink"
+              className="text-[12.5px] font-medium text-gink-64 underline underline-offset-2 hover:text-gink"
             >
               All orders
             </Link>
@@ -320,7 +327,7 @@ export function Dashboard({
         </Panel>
       </div>
 
-      <p className="mt-4 text-[11px] text-gink-46">
+      <p className="mt-4 text-[11.5px] text-gink-46">
         {live
           ? `${openCount} open now · figures are read from the restaurant’s clock, never the server’s.`
           : `${openCount} open now in the sample · figures below are fictional.`}

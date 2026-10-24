@@ -12,6 +12,8 @@ import {
 } from '@/app/dashboard/tables/actions';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { VerificationCodeRefresh } from '@/components/VerificationCodeRefresh';
+import { ConfirmSubmit } from '@/components/owner/ConfirmSubmit';
+import { SubmitButton } from '@/components/owner/SubmitButton';
 import {
   OwnerPage,
   PageHead,
@@ -83,7 +85,7 @@ export function TablesScreen({
             <PrintButton className={btn('ghost', 'sm')}>Print QR sheet</PrintButton>
             <form action={addTableAction} className="flex items-center gap-1.5">
               <select
-                className={`${selectClass} h-8 w-[104px] text-[12px]`}
+                className={`${selectClass} h-8 w-[104px] text-[12.5px]`}
                 name="seats"
                 defaultValue="4"
                 aria-label="Seats"
@@ -97,9 +99,11 @@ export function TablesScreen({
               </select>
               {/* Without a database this submit can only fail, so it does not
                   render as live. */}
-              <button type="submit" className={btn('solid', 'sm')} disabled={!live}>
+              {/* A form that creates rows: pressing twice on a slow network
+                  used to create two tables. */}
+              <SubmitButton pendingLabel="Adding…" disabled={!live}>
                 Add table
-              </button>
+              </SubmitButton>
             </form>
           </>
         }
@@ -145,9 +149,9 @@ export function TablesScreen({
                 Nothing to remember, nothing to reset.
               </p>
               <form className="mt-3">
-                <button type="submit" formAction={rotateVerificationCodeAction} className={btn('ghost', 'sm')}>
+                <SubmitButton tone="ghost" formAction={rotateVerificationCodeAction} pendingLabel="Changing…">
                   New code now
-                </button>
+                </SubmitButton>
               </form>
               <VerificationCodeRefresh expiresAt={data.verification.expiresAt} />
             </div>
@@ -199,9 +203,9 @@ export function TablesScreen({
                         </span>
                         <Tag tone={state.tone}>{state.word}</Tag>
                       </div>
-                      <div className="mt-1 text-[11.5px] text-gink-46">
-                        {t.label} · {t.seats} seats
-                      </div>
+                      {/* `label` is already "4 seater": printing the seat
+                          count after it read "4 seater · 4 seats". */}
+                      <div className="mt-1 text-[11.5px] text-gink-46">{t.label}</div>
                     </div>
                     {/* The code is the card's whole point, so it is drawn at a
                         size a phone can still read across a table. */}
@@ -215,13 +219,13 @@ export function TablesScreen({
                       <dt className="text-[10px] font-medium tracking-[0.05em] text-gink-46 uppercase">
                         Last scan
                       </dt>
-                      <dd className="mt-0.5 text-[12px] text-gink">{t.lastScan}</dd>
+                      <dd className="mt-0.5 text-[12.5px] text-gink">{t.lastScan}</dd>
                     </div>
                     <div>
                       <dt className="text-[10px] font-medium tracking-[0.05em] text-gink-46 uppercase">
                         Orders today
                       </dt>
-                      <dd className="mt-0.5 text-[12px] text-gink tabular-nums">{t.orders}</dd>
+                      <dd className="mt-0.5 text-[12.5px] text-gink tabular-nums">{t.orders}</dd>
                     </div>
                   </dl>
 
@@ -261,19 +265,25 @@ export function TablesScreen({
                       >
                         {t.qr === 'disabled' ? 'Enable' : 'Disable'}
                       </button>
-                      <button
-                        type="submit"
+                      {/* Revoking is not like disabling. The card taped to
+                          the table stops working and someone has to print,
+                          laminate and re-stick a new one -- so it asks, and
+                          the question names the table. */}
+                      <ConfirmSubmit
                         formAction={revokeQrAction}
                         data-table-action="revoke"
-                        className={`${btn('danger', 'sm')} ml-auto`}
+                        tone="danger"
+                        question={`Revoke ${t.code}? Its printed card stops working.`}
+                        confirmLabel="Revoke it"
+                        className="ml-auto"
                       >
                         Revoke
-                      </button>
+                      </ConfirmSubmit>
                     </form>
                   ) : (
                     /* No database, no controls: four dead buttons under every
                        card taught that the codes were manageable. */
-                    <p className="mt-auto pt-3 text-[11px] leading-[1.45] text-gink-46">
+                    <p className="mt-auto pt-3 text-[11.5px] leading-[1.45] text-gink-46">
                       Sample card — connect the database to manage codes.
                     </p>
                   )}
@@ -289,7 +299,7 @@ export function TablesScreen({
           second is the one a restaurant will only discover the hard way. */}
       <div className="mt-6 grid gap-3 lg:grid-cols-2">
         <div className="rounded-[12px] border border-hair bg-card px-4 py-3.5">
-          <strong className="text-[12px] font-semibold text-gink">How a scan works</strong>
+          <strong className="text-[12.5px] font-semibold text-gink">How a scan works</strong>
           <p className="mt-1 text-[11.5px] leading-[1.55] text-gink-64">
             The card on the table carries an unguessable token, not a link to the restaurant. Scanning
             it opens a short form that asks for the six-digit code above, and only then is a session
@@ -299,7 +309,7 @@ export function TablesScreen({
           </p>
         </div>
         <div className="rounded-[12px] border border-[var(--alert)]/25 bg-[var(--alert)]/6 px-4 py-3.5">
-          <strong className="text-[12px] font-semibold text-gink">Honest limitation</strong>
+          <strong className="text-[12.5px] font-semibold text-gink">Honest limitation</strong>
           <p className="mt-1 text-[11.5px] leading-[1.55] text-gink-64">
             Somebody in the room can read the code out to somebody outside on the phone. A shared code
             is a deterrent, not proof of presence — no design that a seated guest has to be able to use
@@ -327,7 +337,7 @@ export function TablesScreen({
             These are real QR codes. Each encodes a URL containing 256 bits of randomness, bound to one
             table. There is no restaurant name in it to guess at and no expiry on the card itself.
           </p>
-          <ul className="mt-3 grid list-none gap-x-6 gap-y-2 p-0 text-[12px] leading-[1.5] text-gink-64 lg:grid-cols-2">
+          <ul className="mt-3 grid list-none gap-x-6 gap-y-2 p-0 text-[12.5px] leading-[1.5] text-gink-64 lg:grid-cols-2">
             {[
               'Every table is given a code when it is created — a table cannot exist without one.',
               `A card alone is not enough: the guest also types the six-digit code showing inside the restaurant, which changes every ${minutes}.`,

@@ -12,6 +12,7 @@ import {
   Card,
   BtnLink,
   btn,
+  chipClass,
   Field,
   inputClass,
   selectClass,
@@ -24,6 +25,7 @@ import {
   Td,
   Tr,
 } from '@/components/owner/chrome';
+import { SubmitButton } from '@/components/owner/SubmitButton';
 import {
   addAddonAction,
   addAddonGroupAction,
@@ -230,13 +232,7 @@ export function MenuEditorScreen({
                         ? `${menu.name} — live`
                         : `${menu.name} — draft, not visible to guests`
                     }
-                    className={[
-                      'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-medium transition-colors',
-                      'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gink',
-                      current
-                        ? 'border-gink bg-gink text-onink'
-                        : 'border-hair-strong text-gink-64 hover:border-gink-28 hover:text-gink',
-                    ].join(' ')}
+                    className={`${chipClass(current)} gap-1.5`}
                   >
                     {menu.name}
                     {!menu.published && (
@@ -263,13 +259,14 @@ export function MenuEditorScreen({
                 maxLength={40}
                 required
               />
-              <button
-                type="submit"
+              <SubmitButton
                 aria-label="Add this menu"
-                className={`${btn('ghost', 'sm')} w-8 px-0`}
+                pendingLabel="+"
+                className="w-8 px-0"
+                tone="ghost"
               >
                 +
-              </button>
+              </SubmitButton>
             </form>
           </>
         ) : (
@@ -329,15 +326,18 @@ export function MenuEditorScreen({
                 <>
                   {liveCategories.length === 0 ? (
                     <>
-                      <p className="m-0 text-[12px] leading-[1.5] text-gink-46">
+                      <p className="m-0 text-[12.5px] leading-[1.5] text-gink-46">
                         Diners reach an item through its category. Start with the ones most
                         restaurants use — you can remove any of them.
                       </p>
                       <form action={addPresetCategoriesAction} className="mt-2.5">
                         <input type="hidden" name="menuId" value={data?.menuId ?? ''} />
-                        <button type="submit" className={`${btn('solid', 'sm')} w-full`}>
+                        <SubmitButton
+                          pendingLabel="Adding…"
+                          className="w-full"
+                        >
                           Add the usual {PRESET_CATEGORIES.length} categories
-                        </button>
+                        </SubmitButton>
                       </form>
                     </>
                   ) : (
@@ -414,15 +414,15 @@ export function MenuEditorScreen({
                       maxLength={60}
                       required
                     />
-                    <button type="submit" className={btn('ghost', 'sm')}>
+                    <SubmitButton tone="ghost" pendingLabel="Adding…">
                       Add
-                    </button>
+                    </SubmitButton>
                   </form>
 
                   {uncategorised > 0 && (
                     <>
                       <div className="mt-3 flex items-baseline justify-between gap-2 rounded-[9px] bg-[var(--alert)]/8 px-2.5 py-1.5">
-                        <span className="text-[12px] font-medium text-gink">Uncategorised</span>
+                        <span className="text-[12.5px] font-medium text-gink">Uncategorised</span>
                         <span className="text-[11.5px] text-[var(--alert)] tabular-nums">
                           {uncategorised}
                         </span>
@@ -468,24 +468,14 @@ export function MenuEditorScreen({
                 live ? (
                   <div className="flex flex-wrap items-center gap-1.5">
                     <form action={setAllAvailabilityAction}>
-                      <button
-                        type="submit"
-                        name="available"
-                        value="false"
-                        className={btn('ghost', 'sm')}
-                      >
+                      <SubmitButton tone="ghost" name="available" value="false" pendingLabel="Marking…">
                         Mark all sold out
-                      </button>
+                      </SubmitButton>
                     </form>
                     <form action={setAllAvailabilityAction}>
-                      <button
-                        type="submit"
-                        name="available"
-                        value="true"
-                        className={btn('ghost', 'sm')}
-                      >
+                      <SubmitButton tone="ghost" name="available" value="true" pendingLabel="Marking…">
                         Mark all available
-                      </button>
+                      </SubmitButton>
                     </form>
                   </div>
                 ) : (
@@ -543,9 +533,9 @@ export function MenuEditorScreen({
                     </option>
                   ))}
                 </select>
-                <button type="submit" className={`${btn('solid', 'sm')} h-9`}>
+                <SubmitButton pendingLabel="Adding…" className="h-9">
                   Add item
-                </button>
+                </SubmitButton>
               </form>
             )}
 
@@ -621,16 +611,17 @@ export function MenuEditorScreen({
                                   name="available"
                                   value={i.available ? 'false' : 'true'}
                                 />
-                                <button
-                                  type="submit"
+                                <SubmitButton
+                                  bare
                                   data-availability={i.available ? 'on' : 'off'}
                                   aria-pressed={i.available}
+                                  pendingLabel="Saving…"
+                                  className="inline-flex items-center gap-1.5 rounded-full text-[11.5px] font-medium text-gink-64 transition-colors hover:text-gink disabled:opacity-60"
                                   title={
                                     i.available
                                       ? `Mark ${i.name} sold out`
                                       : `Put ${i.name} back on sale`
                                   }
-                                  className="inline-flex items-center gap-1.5 rounded-full text-[11.5px] font-medium text-gink-64 transition-colors hover:text-gink"
                                 >
                                   <span
                                     aria-hidden="true"
@@ -649,7 +640,7 @@ export function MenuEditorScreen({
                                   <span className={i.available ? 'text-gink' : ''}>
                                     {i.available ? 'Available' : 'Sold out'}
                                   </span>
-                                </button>
+                                </SubmitButton>
                               </form>
                             ) : (
                               <span
@@ -711,7 +702,7 @@ export function MenuEditorScreen({
                                     data-row-delete
                                     aria-label={`Delete ${i.name}`}
                                     title={`Delete ${i.name}`}
-                                    className="grid size-6 place-items-center rounded-full text-[14px] leading-none text-gink-46 transition-colors hover:bg-[var(--alert)]/8 hover:text-[var(--alert)]"
+                                    className="grid size-6 place-items-center rounded-full text-[13.5px] leading-none text-gink-46 transition-colors hover:bg-[var(--alert)]/8 hover:text-[var(--alert)]"
                                   >
                                     ×
                                   </button>
@@ -809,9 +800,9 @@ export function MenuEditorScreen({
                   </Field>
                 </div>
 
-                <button type="submit" className={`${btn('ghost')} w-full`} disabled={!live}>
+                <SubmitButton tone="ghost" size="md" pendingLabel="Saving…" className="w-full" disabled={!live}>
                   Save draft
-                </button>
+                </SubmitButton>
               </form>
             </Card>
 
@@ -886,11 +877,11 @@ export function MenuEditorScreen({
                     inputMode="decimal"
                     disabled={!live}
                   />
-                  <button type="submit" className={btn('ghost', 'sm')} disabled={!live}>
+                  <SubmitButton tone="ghost" pendingLabel="Adding…" disabled={!live}>
                     Add portion
-                  </button>
+                  </SubmitButton>
                 </form>
-                <p className="mt-2 text-[11px] leading-[1.45] text-gink-46">
+                <p className="mt-2 text-[11.5px] leading-[1.45] text-gink-46">
                   Orders already placed keep their own record of the portion they were sold at.
                 </p>
               </Card>
@@ -922,7 +913,7 @@ export function MenuEditorScreen({
                         <strong className="text-[12.5px] font-medium text-gink">
                           {group.name}
                         </strong>
-                        <span className="text-[11px] text-gink-46">
+                        <span className="text-[11.5px] text-gink-46">
                           {group.maxSelect === 1 ? 'Choose one' : `Choose up to ${group.maxSelect}`}
                           {' · '}
                           {group.minSelect > 0 ? 'required' : 'optional'}
@@ -946,9 +937,9 @@ export function MenuEditorScreen({
                             key={addon.id}
                             className="flex items-baseline justify-between gap-2 border-b border-hair py-1.5 last:border-b-0"
                           >
-                            <span className="text-[12px] text-gink-64">{addon.name}</span>
+                            <span className="text-[12.5px] text-gink-64">{addon.name}</span>
                             <span className="flex items-center gap-1.5">
-                              <span className="text-[12px] text-gink tabular-nums">
+                              <span className="text-[12.5px] text-gink tabular-nums">
                                 {addon.pricePaise > 0
                                   ? inr(paiseToRupees(addon.pricePaise))
                                   : 'Free'}
@@ -991,9 +982,9 @@ export function MenuEditorScreen({
                           aria-label="Price added"
                           inputMode="decimal"
                         />
-                        <button type="submit" className={btn('ghost', 'sm')}>
+                        <SubmitButton tone="ghost" pendingLabel="Adding…">
                           Add choice
-                        </button>
+                        </SubmitButton>
                       </form>
                     </div>
                   ))}
@@ -1021,13 +1012,13 @@ export function MenuEditorScreen({
                       maxLength={60}
                       disabled={!live}
                     />
-                    <button type="submit" className={btn('ghost', 'sm')} disabled={!live}>
+                    <SubmitButton tone="ghost" pendingLabel="Adding…" disabled={!live}>
                       Add group
-                    </button>
+                    </SubmitButton>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <select
-                      className={selectSm('text-[12px]')}
+                      className={selectSm('text-[12.5px]')}
                       name="maxSelect"
                       defaultValue="1"
                       aria-label="How many may be picked"
@@ -1039,7 +1030,7 @@ export function MenuEditorScreen({
                       <option value="5">Up to 5</option>
                     </select>
                     <select
-                      className={selectSm('text-[12px]')}
+                      className={selectSm('text-[12.5px]')}
                       name="required"
                       defaultValue="no"
                       aria-label="Skippable"
@@ -1050,7 +1041,7 @@ export function MenuEditorScreen({
                     </select>
                   </div>
                 </form>
-                <p className="mt-2 text-[11px] leading-[1.45] text-gink-46">
+                <p className="mt-2 text-[11.5px] leading-[1.45] text-gink-46">
                   The price here is what a guest pays — the kitchen ticket and the bill both carry
                   the add-on by name.
                 </p>
@@ -1064,7 +1055,7 @@ export function MenuEditorScreen({
             <div className="mt-5">
               {data?.published ? (
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-[12px] border border-[var(--p-accent)]/25 bg-accent-soft px-3.5 py-3">
-                  <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-gink">
+                  <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-gink">
                     <span
                       aria-hidden="true"
                       className="size-1.5 rounded-full bg-[var(--p-accent)]"
@@ -1074,24 +1065,25 @@ export function MenuEditorScreen({
                   <form action={publishMenuAction}>
                     <input type="hidden" name="menuId" value={data?.menuId ?? ''} />
                     <input type="hidden" name="published" value="false" />
-                    <button type="submit" className={btn('ghost', 'sm')}>
+                    <SubmitButton tone="ghost" pendingLabel="Unpublishing…">
                       Unpublish
-                    </button>
+                    </SubmitButton>
                   </form>
                 </div>
               ) : (
                 <form action={publishMenuAction}>
                   <input type="hidden" name="menuId" value={data?.menuId ?? ''} />
-                  <button
-                    type="submit"
-                    className={`${btn('solid')} w-full`}
+                  <SubmitButton
+                    pendingLabel="Publishing…"
+                    className="w-full"
+                    size="md"
                     disabled={!live}
                   >
                     Publish menu
-                  </button>
+                  </SubmitButton>
                 </form>
               )}
-              <p className="mt-2 text-[11px] leading-[1.45] text-gink-46">
+              <p className="mt-2 text-[11.5px] leading-[1.45] text-gink-46">
                 Published changes never alter past orders or receipts — every order keeps its own
                 snapshot of items, prices and modifiers.
               </p>

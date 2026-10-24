@@ -38,7 +38,7 @@ export function ForgotPasswordScreen({ error, notice }: { error?: string; notice
       {notice ? (
         <div
           role="status"
-          className="mb-4 rounded-[10px] border border-[var(--p-accent)]/25 bg-accent-soft px-3.5 py-2.5 text-[12px] leading-[1.5] text-gink-64"
+          className="mb-4 rounded-[10px] border border-[var(--p-accent)]/25 bg-accent-soft px-3.5 py-2.5 text-[12.5px] leading-[1.5] text-gink-64"
         >
           {notice}
         </div>
@@ -46,7 +46,7 @@ export function ForgotPasswordScreen({ error, notice }: { error?: string; notice
       {error ? (
         <div
           role="alert"
-          className="mb-4 rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-2.5 text-[12px] leading-[1.5] text-[var(--alert)]"
+          className="mb-4 rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-2.5 text-[12.5px] leading-[1.5] text-[var(--alert)]"
         >
           {error}
         </div>
@@ -69,7 +69,7 @@ export function ForgotPasswordScreen({ error, notice }: { error?: string; notice
           Send reset link
         </button>
 
-        <p className="text-[11px] leading-[1.5] text-gink-46">
+        <p className="text-[11.5px] leading-[1.5] text-gink-46">
           The link is single-use and expires in an hour. Open it in this browser — a link asked for
           here will not work on a different device.
         </p>
