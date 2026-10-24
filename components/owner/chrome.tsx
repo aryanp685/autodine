@@ -219,6 +219,7 @@ export function Stat({
   value,
   meta,
   tone = 'plain',
+  lead = false,
 }: {
   label: string;
   value: ReactNode;
@@ -230,28 +231,121 @@ export function Stat({
    * the opposite of what the figure meant.
    */
   tone?: 'plain' | 'live' | 'due';
+  /**
+   * The one figure the screen is about, drawn larger than its neighbours.
+   *
+   * Four equal cards is not a hierarchy; it is a grid. On the overview the
+   * day's takings are the number an owner opens the screen for, so it gets the
+   * width, the size and the only warm wash on the row. Everything else stays
+   * the same object at the same weight as its siblings.
+   */
+  lead?: boolean;
 }) {
   return (
     <div
       className={[
-        'rounded-[18px] border p-4 transition-shadow duration-200 sm:p-[18px] sm:hover:shadow-[var(--p-shadow-2)]',
+        'relative overflow-hidden rounded-[18px] border transition-shadow duration-200',
+        lead ? 'p-4 sm:p-5' : 'p-4 sm:p-[18px]',
+        'sm:hover:shadow-[var(--p-shadow-2)]',
         tone === 'live'
           ? 'border-[color-mix(in_oklab,var(--p-accent)_26%,transparent)] bg-[color-mix(in_oklab,var(--p-accent-soft)_62%,white)]'
           : tone === 'due'
             ? 'border-[color-mix(in_oklab,var(--alert)_22%,transparent)] bg-[color-mix(in_oklab,var(--alert)_5%,white)]'
-            : 'border-hair bg-card',
+            : lead
+              ? 'border-[color-mix(in_oklab,var(--p-accent)_18%,transparent)] bg-card'
+              : 'border-hair bg-card',
       ].join(' ')}
     >
-      <div className="text-[12.5px] font-medium tracking-[0.005em] text-gink-64">{label}</div>
+      {/* A wash, not a gradient: one low-opacity copper shadow in the corner of
+          the lead card, so it reads as the important one before a word is
+          read. */}
+      {lead ? (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-16 -right-12 size-40 rounded-full bg-[radial-gradient(circle,color-mix(in_oklab,var(--p-accent)_13%,transparent),transparent_68%)]"
+        />
+      ) : null}
       <div
         className={[
-          'mt-2.5 text-[clamp(1.75rem,2.8vw,2.35rem)] leading-[0.95] font-semibold tracking-[-0.05em] tabular-nums',
+          'relative',
+          lead
+            ? 'text-[11.5px] font-semibold tracking-[0.1em] text-gink-46 uppercase'
+            : 'text-[12.5px] font-medium tracking-[0.005em] text-gink-64',
+        ].join(' ')}
+      >
+        {label}
+      </div>
+      <div
+        className={[
+          'relative leading-[0.95] font-semibold tracking-[-0.05em] tabular-nums',
+          lead
+            ? 'mt-3 text-[clamp(1.75rem,4.4vw,3.1rem)]'
+            : 'mt-2.5 text-[clamp(1.75rem,2.8vw,2.35rem)]',
           tone === 'due' ? 'text-[var(--alert)]' : 'text-gink',
         ].join(' ')}
       >
         {value}
       </div>
-      {meta ? <div className="mt-2 text-[11.5px] leading-[1.45] text-gink-46">{meta}</div> : null}
+      {meta ? (
+        <div className="relative mt-2 text-[11.5px] leading-[1.45] text-gink-46">{meta}</div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * A strip that states a fact about the workspace.
+ *
+ * The overview grew three of these, each drawn by hand: the plan line, the
+ * preview notice and the "no orders yet" nudge. They had three different
+ * radii, three paddings and three ways of ending in a link, which made a screen
+ * that says at most one important thing look like an error log. This is that
+ * shape, once: a hairline card, a small marker in the tone's colour, a short
+ * bold lead, the sentence, and at most one quiet action pinned right.
+ */
+export function Notice({
+  tone = 'plain',
+  label,
+  children,
+  action,
+  className = '',
+  ...rest
+}: {
+  tone?: 'plain' | 'live' | 'due' | 'accent';
+  /** A short lead, bold: two or three words, or a status tag. Named `label`
+      rather than `title` so it does not shadow the div's own title attribute. */
+  label?: ReactNode;
+  children: ReactNode;
+  action?: ReactNode;
+  className?: string;
+} & Omit<React.ComponentProps<'div'>, 'children' | 'className' | 'title'>) {
+  const marks = {
+    plain: 'bg-gink-28',
+    live: 'bg-[var(--p-live)]',
+    due: 'bg-[var(--p-due)]',
+    accent: 'bg-[var(--p-accent)]',
+  } as const;
+  const rules = {
+    plain: 'border-hair',
+    live: 'border-[color-mix(in_oklab,var(--p-live)_22%,transparent)]',
+    due: 'border-[color-mix(in_oklab,var(--p-due)_24%,transparent)]',
+    accent: 'border-[color-mix(in_oklab,var(--p-accent)_24%,transparent)]',
+  } as const;
+  return (
+    <div
+      {...rest}
+      className={[
+        'mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[14px] border bg-card px-4 py-3',
+        rules[tone],
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
+      <span aria-hidden="true" className={['size-1.5 shrink-0 rounded-full', marks[tone]].join(' ')} />
+      {label ? <span className="text-[12.5px] font-medium text-gink">{label}</span> : null}
+      <span className="min-w-0 text-[12.5px] leading-[1.5] text-gink-64">{children}</span>
+      {action ? <span className="ml-auto shrink-0">{action}</span> : null}
     </div>
   );
 }

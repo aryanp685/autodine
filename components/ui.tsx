@@ -134,6 +134,9 @@ export function Sparkline({
   height = 34,
   className,
   markIndex,
+  baseline = 'zero',
+  area = false,
+  label = 'Revenue by hour',
 }: {
   data: number[];
   width?: number;
@@ -142,12 +145,32 @@ export function Sparkline({
   className?: string;
   /** Index of the bucket to dot -- the peak, when the chart names one. */
   markIndex?: number;
+  /**
+   * Where the bottom of the line sits.
+   *
+   * `min` scales to the smallest value in the series, which is right for a
+   * genuine sparkline -- a 34px squiggle where the shape is the whole message.
+   * It is wrong for money on a card with an axis under it: a day that took
+   * between Rs 8,000 and Rs 8,200 an hour drew a mountain range, and the eye
+   * reads a mountain range as a busy day.
+   *
+   * `zero` is the honest baseline for an amount. An hour that took nothing
+   * sits on the floor, and the height of a point is proportional to the money.
+   */
+  baseline?: 'zero' | 'min';
+  /** A soft wash under the line. Only meaningful with `baseline="zero"`. */
+  area?: boolean;
+  /** What the shape is, for a screen reader. */
+  label?: string;
 }) {
-  const max = Math.max(...data);
+  const max = Math.max(...data, 1);
   const min = Math.min(...data);
   const step = data.length > 1 ? width / (data.length - 1) : 0;
-  const y = (d: number) => height - ((d - min) / (max - min || 1)) * height;
-  const pts = data.map((d, i) => `${i * step},${y(d)}`).join(' ');
+  const y = (d: number) =>
+    baseline === 'zero'
+      ? height - (d / max) * height
+      : height - ((d - min) / (max - min || 1)) * height;
+  const pts = data.map((d, i) => `${(i * step).toFixed(2)},${y(d).toFixed(2)}`).join(' ');
   const mark = markIndex !== undefined && data[markIndex] !== undefined ? markIndex : null;
 
   return (
@@ -156,10 +179,41 @@ export function Sparkline({
       height={height}
       viewBox={`0 0 ${width} ${height}`}
       role="img"
-      aria-label="Revenue by hour"
+      aria-label={label}
       className={className}
+      /* The stroke would otherwise be clipped by a pixel at the top of the
+         viewBox on the busiest hour of the day. */
+      style={{ overflow: 'visible' }}
     >
-      <polyline points={pts} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
+      {area && baseline === 'zero' ? (
+        <polygon
+          data-area="true"
+          points={`0,${height} ${pts} ${width},${height}`}
+          fill="currentColor"
+          fillOpacity="0.055"
+        />
+      ) : null}
+      {/* The floor. Without it a line that starts at zero has nothing to stand
+          on, and the card reads as a shape floating in space. */}
+      {baseline === 'zero' ? (
+        <line
+          data-baseline="true"
+          x1="0"
+          y1={height - 0.5}
+          x2={width}
+          y2={height - 0.5}
+          stroke="currentColor"
+          strokeOpacity="0.14"
+        />
+      ) : null}
+      <polyline
+        points={pts}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
       {mark !== null ? (
         <circle data-peak="true" cx={mark * step} cy={y(data[mark])} r="3" fill="currentColor" />
       ) : null}
@@ -179,18 +233,27 @@ export type PillTone = 'sage' | 'alert' | 'blue' | 'sand' | 'ink' | 'outline';
  * something new, hairline for something finished.
  */
 export function Pill({ children, tone = 'outline' }: { children: React.ReactNode; tone?: PillTone }) {
+  /*
+   * ONE STATUS SHAPE, TWO HOUSES.
+   *
+   * `Tag` in the owner kit is the same object: a pill, no ring, 11.5px. This
+   * one kept its own ring, its own 10.5px type and its own padding for a year,
+   * so a dashboard row could carry a "Paid online" at one size and a "Live" at
+   * another in the same column. The tones are named differently here because
+   * the callers predate the kit; the geometry is identical.
+   */
   const tones: Record<PillTone, string> = {
-    sage: 'bg-accent-soft text-[var(--p-accent)] ring-[var(--p-accent)]/20',
-    alert: 'bg-[var(--alert)]/8 text-[var(--alert)] ring-[var(--alert)]/20',
-    blue: 'bg-accent-soft text-[var(--p-accent)] ring-[var(--p-accent)]/15',
-    sand: 'bg-paper-deep text-gink-64 ring-hair',
-    ink: 'bg-gink text-onink ring-transparent',
-    outline: 'bg-transparent text-gink-46 ring-hair-strong',
+    sage: 'bg-[color-mix(in_oklab,var(--p-live)_12%,white)] text-[var(--p-live)]',
+    alert: 'bg-[color-mix(in_oklab,var(--p-due)_10%,white)] text-[var(--p-due)]',
+    blue: 'bg-[color-mix(in_oklab,var(--p-accent)_12%,white)] text-[var(--p-accent)]',
+    sand: 'bg-paper-deep text-gink-64',
+    ink: 'bg-gink text-onink',
+    outline: 'border border-hair-strong bg-transparent text-gink-46',
   };
   return (
     <span
       className={[
-        'inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-semibold tracking-[0.02em] whitespace-nowrap ring-1 ring-inset',
+        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-[3px] text-[11.5px] font-semibold tracking-[0.01em] whitespace-nowrap',
         tones[tone],
       ].join(' ')}
     >

@@ -10,6 +10,7 @@ import {
   Empty,
   OwnerPage,
   PageHead,
+  Notice,
   Panel,
   Stat,
   Td,
@@ -93,6 +94,19 @@ export function Dashboard({
       ]
     : dashboardStats.map((s) => ({ label: s.label, value: s.value, meta: s.delta }));
 
+  /*
+   * The day's takings lead, wherever the source put them.
+   *
+   * These four cards were equal in every respect, so the eye had nowhere to
+   * land: "Orders today" happened to be first because it was written first.
+   * Revenue is what an owner opens this screen for, so it goes first and it is
+   * drawn larger; the rest keep their weight and their order.
+   */
+  const LEAD = 'Revenue today';
+  const orderedCards = [...cards].sort(
+    (a, b) => Number(b.label === LEAD) - Number(a.label === LEAD)
+  );
+
   // One shape for both sources: the demo rows call the quantity 'sold' and the
   // live ones 'qty'. Normalising here keeps the union out of the markup.
   const itemRows: Array<{ name: string; qty: number; revenuePaise: number }> =
@@ -102,6 +116,10 @@ export function Dashboard({
       // so the demo branch converts at the boundary rather than teaching the
       // component two units.
       : topItems.map((t) => ({ name: t.name, qty: t.sold, revenuePaise: rupeesToPaise(t.revenue) }));
+
+  // The bar under each ranked dish is relative to the best seller, so both the
+  // width and the "N sold" beside it describe the same set of orders.
+  const topQty = itemRows.reduce((max, t) => Math.max(max, t.qty), 1);
 
   // The Sparkline divides by (length - 1); a single bucket at ten past
   // midnight would hand it a zero step and draw nothing. Two points minimum.
@@ -149,40 +167,39 @@ export function Dashboard({
         there, or the first call they make is about a missing backup.
       */}
       {!blocked && live && data?.access ? (
-        <div
+        <Notice
           data-plan-line
-          className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[14px] border border-hair bg-card px-4 py-3.5"
+          tone={data.access.readOnly ? 'due' : 'live'}
+          label={<Tag tone={data.access.readOnly ? 'due' : 'live'}>{accessSummary(data.access)}</Tag>}
+          action={
+            <Link
+              href="/pricing"
+              className="text-[12.5px] font-medium text-gink-64 underline decoration-hair-strong underline-offset-[3px] hover:text-gink hover:decoration-gink"
+            >
+              Plans
+            </Link>
+          }
         >
-          <Tag tone={data.access.readOnly ? 'due' : 'live'}>{accessSummary(data.access)}</Tag>
-          <span className="text-[12.5px] leading-[1.5] text-gink-64">
-            {planSentence(data.access)}
-          </span>
-          <Link
-            href="/pricing"
-            className="ml-auto text-[12.5px] font-semibold text-gink underline decoration-hair-strong underline-offset-[3px] hover:decoration-gink"
-          >
-            Plans
-          </Link>
-        </div>
+          {planSentence(data.access)}
+        </Notice>
       ) : null}
 
       {!blocked && !live && (
-        <div
+        <Notice
           role="note"
-          className="mb-5 flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-[12px] border border-[var(--p-accent)]/20 bg-accent-soft px-3.5 py-2.5"
+          tone="accent"
+          label={<Tag tone="work">Preview mode</Tag>}
+          action={
+            <Link
+              href="/menu"
+              className="text-[12.5px] font-medium text-[var(--p-accent)] underline decoration-[color-mix(in_oklab,var(--p-accent)_35%,transparent)] underline-offset-2 hover:decoration-[var(--p-accent)]"
+            >
+              Open the menu
+            </Link>
+          }
         >
-          <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--p-accent)]" />
-          <strong className="text-[12.5px] font-semibold text-gink">Preview mode</strong>
-          <span className="text-[12.5px] text-gink-64">
-            Metrics and orders are fictional. Live ordering and payment processing are disabled.
-          </span>
-          <Link
-            href="/menu"
-            className="ml-auto text-[12.5px] font-medium text-[var(--p-accent)] underline underline-offset-2"
-          >
-            Open the menu
-          </Link>
-        </div>
+          Metrics and orders are fictional. Live ordering and payment processing are disabled.
+        </Notice>
       )}
 
       {/*
@@ -193,19 +210,21 @@ export function Dashboard({
         disappears the moment the first one lands.
       */}
       {!blocked && live && stats && stats.ordersToday === 0 ? (
-        <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[14px] border border-hair bg-card px-4 py-3.5">
-          <Tag tone="neutral">No orders yet</Tag>
-          <span className="text-[12.5px] leading-[1.5] text-gink-64">
-            Scan a table&rsquo;s QR and place one yourself &mdash; it reaches the kitchen board in
-            seconds, and today&rsquo;s figures start filling in from there.
-          </span>
-          <Link
-            href="/dashboard/tables"
-            className="ml-auto text-[12.5px] font-semibold text-gink underline decoration-hair-strong underline-offset-[3px] hover:decoration-gink"
-          >
-            Tables &amp; QR
-          </Link>
-        </div>
+        <Notice
+          tone="plain"
+          label={<Tag tone="neutral">No orders yet</Tag>}
+          action={
+            <Link
+              href="/dashboard/tables"
+              className="text-[12.5px] font-medium text-gink-64 underline decoration-hair-strong underline-offset-[3px] hover:text-gink hover:decoration-gink"
+            >
+              Tables &amp; QR
+            </Link>
+          }
+        >
+          Scan a table&rsquo;s QR and place one yourself &mdash; it reaches the kitchen board in
+          seconds, and today&rsquo;s figures start filling in from there.
+        </Notice>
       ) : null}
 
       {/* Four figures, each with the sentence that says what it counts. On a
@@ -215,13 +234,17 @@ export function Dashboard({
           These were hand-rolled copies of `Stat`, which is the kit's whole
           point -- one figure size, one label size, one note size, one border.
           The only difference the copy had was a slightly smaller numeral. */}
-      <section aria-label="Today at a glance" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {cards.map((card) => (
+      <section
+        aria-label="Today at a glance"
+        className="grid grid-cols-2 gap-3 lg:grid-cols-[1.6fr_1fr_1fr_1fr]"
+      >
+        {orderedCards.map((card) => (
           <Stat
             key={card.label}
             label={card.label}
             value={card.value}
             meta={card.meta}
+            lead={card.label === LEAD}
             /* Green means "somebody is working right now", so it belongs on
                open orders and only when there are some. A permanently tinted
                card is decoration. */
@@ -234,9 +257,12 @@ export function Dashboard({
         {/* The chart is deliberately quiet: one line, no gridlines, no axis
             labels. The number above it is the reading; this is the shape. */}
         <Panel
-          title="Revenue today"
-          meta={live ? 'By hour, restaurant time' : 'Sample shape · fictional'}
-          action={<Tag tone="neutral">{live ? 'Live' : 'Sample'}</Tag>}
+          /* Not "Revenue today": the lead card above already says exactly
+             that, and two headings with one name on one screen is how a page
+             starts looking like it has a bug. This one is the hour-by-hour
+             detail, and says so. */
+          title="Revenue by hour"
+          meta={live ? 'Restaurant time' : 'Sample shape · fictional'}
         >
           {chartable && chartHasValue ? (
             <div className="text-gink" data-chart>
@@ -246,6 +272,9 @@ export function Dashboard({
                 data={hourly}
                 width={520}
                 height={120}
+                baseline="zero"
+                area
+                label="Revenue by hour of the day"
                 className="h-[112px] w-full"
                 markIndex={hasPeak ? peakIndex : undefined}
               />
@@ -255,19 +284,27 @@ export function Dashboard({
                   demo never had. */}
               {live ? (
                 <>
+                  {/* Two ticks and nothing between them. The chart is a shape,
+                      and a grid would be a claim about precision the buckets
+                      do not have -- an hour is an hour, not a measurement.
+                      They are the first and last hour of trading so far, so
+                      the line starts and ends on the axis it is drawn on. */}
                   <div className="mt-1.5 flex items-baseline justify-between gap-3">
                     <span className="text-[10.5px] text-gink-46 tabular-nums">{hourLabel(0)}</span>
                     <span className="text-[10.5px] text-gink-46 tabular-nums">
-                      Every hour to {hourLabel(hourly.length - 1)}
+                      {hourLabel(hourly.length - 1)}
                     </span>
                   </div>
                   {/* The line says the shape; this says the answer. A peak with
                       no hour and no amount is a picture of a busy evening, not
                       a fact an owner can staff against. */}
-                  <p className="mt-2.5 border-t border-hair pt-2.5 text-[11.5px] text-gink-64">
-                    <span className="font-medium text-gink">Busiest hour</span> ·{' '}
-                    {hourRangeLabel(peakIndex)} · <Money value={hourly[peakIndex]} strong />
-                  </p>
+                  <div className="mt-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-hair pt-2.5">
+                    <span className="text-[11.5px] font-medium text-gink">Busiest hour</span>
+                    <span className="text-[11.5px] text-gink-46">{hourRangeLabel(peakIndex)}</span>
+                    <span className="ml-auto text-[13px] font-semibold text-gink tabular-nums">
+                      <Money value={hourly[peakIndex]} />
+                    </span>
+                  </div>
                 </>
               ) : null}
             </div>
@@ -280,22 +317,38 @@ export function Dashboard({
           )}
         </Panel>
 
-        <Panel title="Top items" meta="Today, by quantity sold">
+        <Panel title="Top items" meta={live ? 'Today · by quantity' : 'Sample · fictional'}>
           {itemRows.length > 0 ? (
-            <ul className="flex flex-col">
+            <ul className="flex flex-col" data-top-items>
               {itemRows.map((t, i) => (
                 <li
                   key={t.name}
-                  className="flex items-baseline gap-3 border-b border-hair py-2.5 last:border-b-0 first:pt-0 last:pb-0"
+                  className="border-b border-hair py-2.5 last:border-b-0 first:pt-0 last:pb-0"
                 >
-                  <span className="tnum w-5 shrink-0 text-[11.5px] font-semibold text-gink-46">
-                    {String(i + 1).padStart(2, '0')}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-[13.5px] text-gink">{t.name}</span>
-                  <span className="tnum shrink-0 text-[11.5px] text-gink-46">{t.qty} sold</span>
-                  <span className="w-20 shrink-0 text-right text-[13px] font-medium text-gink">
-                    <Money value={t.revenuePaise} />
-                  </span>
+                  <div className="flex items-baseline gap-3">
+                    <span className="tnum w-5 shrink-0 text-[11.5px] font-semibold text-gink-46">
+                      {String(i + 1).padStart(2, '0')}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-[13.5px] text-gink">{t.name}</span>
+                    <span className="tnum shrink-0 text-[11.5px] text-gink-46">{t.qty} sold</span>
+                    <span className="w-20 shrink-0 text-right text-[13px] font-medium text-gink">
+                      <Money value={t.revenuePaise} />
+                    </span>
+                  </div>
+                  {/* A ranking of numbers with no scale is a list. The bar is
+                      each dish's quantity against the leader's, which is the
+                      comparison the heading promises -- and it is drawn from
+                      the same figure printed beside it, so the two cannot
+                      disagree. */}
+                  <div
+                    aria-hidden="true"
+                    className="mt-1.5 ml-8 h-1 overflow-hidden rounded-full bg-[rgba(25,20,17,0.055)]"
+                  >
+                    <div
+                      className="h-full rounded-full bg-[var(--p-accent)]/55"
+                      style={{ width: `${Math.max(4, Math.round((t.qty / topQty) * 100))}%` }}
+                    />
+                  </div>
                 </li>
               ))}
             </ul>
@@ -307,7 +360,9 @@ export function Dashboard({
 
       <div className="mt-4">
         <Panel
-          title={live ? 'Orders today' : 'Live orders'}
+          /* "Orders today" is the label on the first-row card; this is the
+             five most recent, so it says that. */
+          title={live ? 'Latest orders' : 'Recent orders'}
           meta={
             live && stats
               ? `${stats.openOrders} open · ${stats.ordersToday} today`
@@ -315,12 +370,12 @@ export function Dashboard({
           }
           bodyClassName=""
           action={
-            <Link
-              href="/dashboard/orders"
-              className="text-[12.5px] font-medium text-gink-64 underline underline-offset-2 hover:text-gink"
-            >
+            /* A ghost action, not an underlined word. On a panel header the
+               underlined link read as a footnote to the table rather than as
+               the way to the ledger. */
+            <BtnLink href="/dashboard/orders" tone="ghost" size="sm">
               All orders
-            </Link>
+            </BtnLink>
           }
         >
           {live ? (
@@ -360,11 +415,13 @@ export function Dashboard({
         </Panel>
       </div>
 
-      <p className="mt-4 text-[11.5px] text-gink-46">
-        {live
-          ? `${openCount} open now · figures are read from the restaurant’s clock, never the server’s.`
-          : `${openCount} open now in the sample · figures below are fictional.`}
-      </p>
+      {/*
+        A closing line used to repeat the open-order count for the third time on
+        one screen -- once in the stat card, once in this panel's meta -- and
+        then explain the restaurant clock to somebody who had already read
+        "today, restaurant time" under the title. Both facts are still stated;
+        neither is stated twice.
+      */}
     </OwnerPage>
   );
 }
