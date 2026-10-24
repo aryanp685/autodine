@@ -4,7 +4,12 @@ import { VerifyCodeForm } from '@/components/VerifyCodeForm';
 import { WhereToFindCode } from '@/components/WhereToFindCode';
 
 /**
- * The step between scanning a table's card and seeing its menu.
+ * The step that turns a scanned card into an order.
+ *
+ * The menu itself no longer waits on this screen: a scan puts the guest in
+ * front of the food straight away, and the six digits are asked for once, when
+ * they place the order (the card page still offers this form for a guest who
+ * wants to unlock their table before they start).
  *
  * WHY THIS SCREEN EXISTS
  *

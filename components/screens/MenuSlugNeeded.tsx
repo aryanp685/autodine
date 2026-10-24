@@ -26,8 +26,7 @@ export function MenuSlugNeeded() {
     >
       <GuestNoteText>
         Scan the QR code on your table and it will bring you straight to this restaurant&rsquo;s
-        menu. The code tells us which kitchen you are sitting in, so the link works only from
-        there.
+        menu. The QR code is what names the restaurant, so a bare link has nothing to open.
       </GuestNoteText>
 
       {/* One quiet action. There is nothing else a guest can do from here --
