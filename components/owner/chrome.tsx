@@ -308,7 +308,11 @@ export function Notice({
   label,
   children,
   action,
-  className = '',
+  /* The bottom margin is the default HERE, not in the class string below.
+     Baked into the base it could not be changed: `.mb-0` and `.mb-3` sort
+     before `.mb-4` in Tailwind's output, so nine call sites asking for no
+     margin at the end of a stack were silently given 16px. */
+  className = 'mb-4',
   ...rest
 }: {
   tone?: 'plain' | 'live' | 'due' | 'accent';
@@ -335,7 +339,7 @@ export function Notice({
     <div
       {...rest}
       className={[
-        'mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[14px] border bg-card px-4 py-3',
+        'flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[14px] border bg-card px-4 py-3',
         rules[tone],
         className,
       ]
