@@ -1501,7 +1501,7 @@ export function Kitchen({
                       className={[
                         'tnum ml-auto rounded-full px-2.5 py-[3px] text-[11.5px] font-semibold tracking-[0.01em]',
                         o.ageMin >= LATE_AFTER_MIN
-                          ? 'bg-[color-mix(in_oklab,var(--p-due)_10%,white)] text-[var(--p-due)]'
+                          ? 'bg-[color-mix(in_oklab,var(--p-due)_10%,var(--p-card))] text-[var(--p-due)]'
                           : o.ageMin >= WARN_AFTER_MIN
                             ? 'bg-paper-deep text-gink-64'
                             : 'bg-accent-soft text-[var(--p-accent)]',
@@ -1512,7 +1512,7 @@ export function Kitchen({
                   </div>
 
                   {o.payment === 'pending' && (
-                    <div className="mt-2 flex items-center gap-1.5 rounded-[7px] bg-[color-mix(in_oklab,var(--p-due)_8%,white)] px-2 py-1 text-[11.5px] font-medium text-[var(--p-due)]">
+                    <div className="mt-2 flex items-center gap-1.5 rounded-[7px] bg-[color-mix(in_oklab,var(--p-due)_8%,var(--p-card))] px-2 py-1 text-[11.5px] font-medium text-[var(--p-due)]">
                       <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--p-due)]" />
                       Unpaid · pay at counter
                     </div>

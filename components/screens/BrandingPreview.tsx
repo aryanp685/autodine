@@ -120,7 +120,7 @@ export function BrandingPreview({
                 <DishPhoto src={item.img} name={item.name} size={64} />
                 <span
                   aria-hidden="true"
-                  className="mt-1 grid size-6 shrink-0 place-items-center rounded-full bg-[var(--p-accent)] text-[15px] leading-none text-white"
+                  className="mt-1 grid size-6 shrink-0 place-items-center rounded-full bg-[var(--p-accent)] text-[15px] leading-none text-onink"
                 >
                   +
                 </span>

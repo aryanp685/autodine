@@ -300,9 +300,9 @@ export function Stat({
         lead ? 'p-5 sm:p-6' : 'p-4 sm:p-5',
         'sm:hover:shadow-[var(--p-shadow-2)]',
         tone === 'live'
-          ? 'border-[color-mix(in_oklab,var(--p-accent)_26%,transparent)] bg-[color-mix(in_oklab,var(--p-accent-soft)_62%,white)]'
+          ? 'border-[color-mix(in_oklab,var(--p-accent)_26%,transparent)] bg-[color-mix(in_oklab,var(--p-accent-soft)_62%,var(--p-card))]'
           : tone === 'due'
-            ? 'border-[color-mix(in_oklab,var(--p-due)_22%,transparent)] bg-[color-mix(in_oklab,var(--p-due)_5%,white)]'
+            ? 'border-[color-mix(in_oklab,var(--p-due)_22%,transparent)] bg-[color-mix(in_oklab,var(--p-due)_5%,var(--p-card))]'
             : lead
               ? 'border-[color-mix(in_oklab,var(--p-accent)_20%,transparent)] bg-card'
               : 'border-hair bg-card',
@@ -741,7 +741,7 @@ export function Field({
  * A test in components/live-controls.test.tsx fails on the unmarked form.
  */
 const control =
-  'w-full rounded-[var(--p-r-control)] border border-hair-strong bg-card px-3.5 text-[13.5px] text-gink shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition-[border-color,box-shadow] duration-150 ease-[var(--o-ease)] placeholder:text-gink-28 hover:border-gink-28 focus:border-[var(--p-accent)] focus:ring-2 focus:ring-[color-mix(in_oklab,var(--p-accent)_16%,transparent)] focus:outline-none disabled:cursor-not-allowed disabled:bg-gink-07 disabled:text-gink-46';
+  'w-full rounded-[var(--p-r-control)] border border-hair-strong bg-card px-3.5 text-[13.5px] text-gink shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] transition-[border-color,box-shadow] duration-150 ease-[var(--o-ease)] placeholder:text-gink-28 hover:border-gink-28 focus:border-[var(--p-accent)] focus:ring-2 focus:ring-[color-mix(in_oklab,var(--p-accent)_16%,transparent)] focus:outline-none disabled:cursor-not-allowed disabled:bg-gink-07 disabled:text-gink-46';
 
 export const inputClass = `${control} h-11`;
 export const textareaClass = `${control} resize-y py-3 leading-[1.55]`;
@@ -770,7 +770,7 @@ export function Th({
     <th
       scope="col"
       className={[
-        'border-b border-hair-strong bg-[rgba(23,17,13,0.024)] px-4 py-2.5 text-[10.5px] font-semibold tracking-[0.11em] whitespace-nowrap text-gink-46 uppercase',
+        'border-b border-hair-strong bg-[rgba(255,255,255,0.035)] px-4 py-2.5 text-[10.5px] font-semibold tracking-[0.11em] whitespace-nowrap text-gink-46 uppercase',
         align === 'right' ? 'text-right' : 'text-left',
         className,
       ].join(' ')}

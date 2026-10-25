@@ -298,95 +298,110 @@ p { margin: 0; }
 
 [data-app] [data-surface='owner'] {
   /* ---- the palette, in one place ---------------------------------------
-     A RESTAURANT, not a spreadsheet. Three colours carry the whole surface:
+     MIDNIGHT MENU. The surface is a dining room after dark: the page is the
+     room, the cards are the tables, and the two colours that carry the whole
+     thing are marigold and wine.
 
-       cream    the tablecloth
-       green    the banquette and the awning   (the rail, and only the rail)
-       saffron  the tandoor, the brass, the "you are here"
+       ink-black  the room           (the canvas)
+       wine       the banquette      (the rail, and the account card on it)
+       marigold   the candle, the "you are here", the action
 
-     The previous palette was beige on beige with a brown accent, and that is
-     why it photographed as dull even after the layers were fixed: there was
-     no second hue anywhere, so the eye had nothing to resolve. Green against
-     cream with a saffron thread is a palette with a subject.
+     Why DARK, and why this is a change and not a nudge: two previous passes
+     kept a light page and moved only the accent, and a light page with a warm
+     accent is exactly the thing that read as dull. Value is the variable the
+     eye resolves first -- a dark canvas flips every card, every table and every
+     form on fifteen screens at once, from one block, because every screen
+     reads these tokens and none of them writes a colour of its own.
 
-     Cream is the canvas and white is the sheet, a real 1.29:1 apart, so a card
-     reads as paper on a table rather than a border drawn on a wall. */
+     The card is lighter than the room around it by one visible step, and it
+     carries a lit top edge, so a panel is a table under a lamp rather than a
+     rectangle drawn on a wall.
 
-  /* ---- surfaces -------------------------------------------------------- */
-  --p-paper: #e9e0cd;
-  --p-paper-deep: #ddd0b6;
-  --p-paper-veil: rgba(255, 253, 249, 0.62);
-  --p-surface: #fffdf9;
-  --p-card: #fffdf9;
-  --p-glass: rgba(255, 253, 249, 0.94);
+     Every pair below was measured, not chosen by eye; the ratios are in the
+     comment on each group. */
+
+  /* ---- surfaces --------------------------------------------------------
+     Room, then table. The card is 1.20:1 against the canvas -- on a dark
+     surface separation is carried by the hairline and the lit top edge as much
+     as by value, but the step has to be there or a card is a hole. */
+  --p-paper: #171014;
+  --p-paper-deep: #100b0e;
+  --p-paper-veil: rgba(9, 6, 8, 0.45);
+  --p-surface: #2b2127;
+  --p-card: #2b2127;
+  --p-glass: rgba(27, 18, 22, 0.94);
 
   /* ---- ink -------------------------------------------------------------
-     Espresso, not neutral black. It sits on cream the way printed ink does;
-     pure black on ivory reads as a screenshot of a document. */
-  --p-ink: #1c1512;
-  --p-ink-80: rgba(28, 21, 18, 0.84);
-  --p-ink-64: rgba(28, 21, 18, 0.66);
-  /* The token keeps its name (237 call sites read `text-gink-46`); the value
-     is the interesting part. At 0.46 this measured 3.1:1 on paper -- a grey
-     that reads as switched off -- and it is the colour of every meta line and
-     table cell. 0.58 measures 4.4:1 on a card while staying clearly secondary
-     to the ink (15:1). */
-  --p-ink-46: rgba(28, 21, 18, 0.58);
-  --p-ink-28: rgba(28, 21, 18, 0.28);
-  --p-ink-12: rgba(28, 21, 18, 0.11);
-  --p-ink-07: rgba(28, 21, 18, 0.055);
-  --p-on-ink: #fffdf9;
-  --p-on-ink-64: rgba(255, 253, 249, 0.7);
-  --p-on-ink-40: rgba(255, 253, 249, 0.46);
+     Ivory, not white: pure white on a near-black page glows, and this product
+     is candlelit. 12.7:1 on the room, 10.8:1 on a card. */
+  --p-ink: #f7eee2;
+  --p-ink-80: rgba(247, 238, 226, 0.88);
+  --p-ink-64: rgba(247, 238, 226, 0.72);
+  /* Meta lines and table cells: 6.1:1 on a card, still clearly below the ink.
+     At 0.46 this was 3.1:1 on the old paper -- a grey that read as switched
+     off -- and it is the colour of every note on the surface. */
+  --p-ink-46: rgba(247, 238, 226, 0.62);
+  /* Placeholders and quiet rules. 2.8:1: present, plainly not content. */
+  --p-ink-28: rgba(247, 238, 226, 0.4);
+  --p-ink-12: rgba(247, 238, 226, 0.16);
+  --p-ink-07: rgba(247, 238, 226, 0.09);
+  /* The ink that goes ON a light fill -- a marigold button, an ivory button.
+     The pair is inverted here for the same reason everything else is. */
+  --p-on-ink: #191013;
+  --p-on-ink-64: rgba(25, 16, 19, 0.72);
+  --p-on-ink-40: rgba(25, 16, 19, 0.5);
 
   /* ---- accent ----------------------------------------------------------
-     SAFFRON. It is the action colour: a filled primary button, the mark on the
-     current rail row, the kicker rule. 5.4:1 on white text and 4.6:1 on its own
-     wash -- both measured, both above AA at the sizes they are used.
+     MARIGOLD. It is the candle on the table and the action on the screen:
+     a filled primary button, the mark on the current rail row, the kicker
+     rule. 9.0:1 on the room and 7.5:1 on a card, so it works as text as well
+     as fill; the label on a filled marigold button is the ink above (9.0:1).
 
-     `--p-accent-strong` is the same hue one step down, for a pressed state and
-     for 10.5px tracked-out uppercase, which needs the extra step at that size.
-     `--p-brass` exists for exactly one kind of detail -- hairline rules and the
-     brand mark on dark chrome -- and is never used for text. */
-  --p-accent: #b34712;
-  --p-accent-strong: #8a3410;
-  --p-accent-soft: #fbe7d2;
-  --p-accent-wash: rgba(179, 71, 18, 0.085);
-  --p-brass: #b98a3c;
+     `--p-accent-strong` is the same hue lifted, because on a dark surface the
+     "stronger" step is the brighter one: it is the hover fill and the colour
+     of 10.5px tracked-out uppercase, which needs the extra step at that size.
+     `--p-accent-soft` is the deep amber a selected chip sits on (12.1:1 for
+     the ivory on it); `--p-brass` is one kind of detail -- hairline rules and
+     the brand mark on the wine rail -- and is never body text. */
+  --p-accent: #f2a33c;
+  --p-accent-strong: #ffc074;
+  --p-accent-soft: #40270f;
+  --p-accent-wash: rgba(242, 163, 60, 0.12);
+  --p-brass: #d9a45a;
 
   /* ---- status ----------------------------------------------------------
-     Two meanings, never borrowed for decoration: green is settled/ready/paid,
-     brick is money to chase. Both carry a matching wash so a tag can be one
-     token instead of a colour-mix at every call site. */
-  --p-live: #1f6b45;
-  --p-live-soft: #e3efe7;
-  --p-due: #a3341f;
-  --p-due-soft: #fbe8e4;
+     Two meanings, never borrowed for decoration: mint is settled/ready/paid,
+     coral is money to chase. Both carry a matching deep wash so a tag is one
+     token instead of a colour-mix at every call site, and both are readable
+     as text on that wash (6.9:1 and 6.6:1). */
+  --p-live: #4ec98e;
+  --p-live-soft: #12301f;
+  --p-due: #ff7d63;
+  --p-due-soft: #351613;
 
   /* ---- the rail --------------------------------------------------------
-     BOTTLE GREEN, not charcoal. This is the single change that stops the
-     surface reading as a beige form: the dark chrome now belongs to the same
-     restaurant as the cream and the saffron. Warm cream ink on it measures
-     11:1; the hairline is a lit edge rather than a seam. */
-  --p-rail: #123a2e;
-  --p-rail-raised: #1b4a3b;
-  --p-rail-ink: #f7f1e3;
-  --p-rail-ink-64: rgba(247, 241, 227, 0.68);
-  /* 0.38 measured 3.4:1 for the 10px uppercase group labels -- the smallest
-     type in the product wearing the faintest colour. 0.48 puts them at 4.6:1
-     without lifting them above the link labels themselves. */
-  --p-rail-ink-40: rgba(247, 241, 227, 0.52);
-  --p-rail-line: rgba(247, 241, 227, 0.12);
-  --p-rail-active: rgba(179, 71, 18, 0.42);
+     WINE. A column of bordeaux against a near-black room is the one large
+     block of colour on the screen -- it is what stops a dark dashboard from
+     reading as a spreadsheet with the lights off, and it is where the
+     restaurant lives. Ivory on it measures 15:1; the 0.55 step is 5.4:1, so
+     even the 10px group labels clear AA. */
+  --p-rail: #36111e;
+  --p-rail-raised: #48192a;
+  --p-rail-ink: #f9f1e6;
+  --p-rail-ink-64: rgba(249, 241, 230, 0.72);
+  --p-rail-ink-40: rgba(249, 241, 230, 0.55);
+  --p-rail-line: rgba(249, 241, 230, 0.16);
+  --p-rail-active: rgba(242, 163, 60, 0.18);
 
   /* ---- lines -----------------------------------------------------------
-     Warm. On cream a hairline has to do the work a shadow does on white.
-     `--p-line-soft` is for dividers INSIDE a card, which must be quieter than
-     the card's own edge. */
-  --p-line: rgba(28, 21, 18, 0.12);
-  --p-line-soft: rgba(28, 21, 18, 0.07);
-  --p-line-strong: rgba(28, 21, 18, 0.22);
-  --p-line-on-ink: rgba(247, 241, 227, 0.2);
+     Ivory hairlines. On a dark surface a hairline is the edge of a lit object,
+     so it is drawn in the light's colour rather than in a darker ink -- a
+     darker line between two dark values is invisible. `--p-line-soft` is the
+     quieter one for dividers INSIDE a card. */
+  --p-line: rgba(247, 238, 226, 0.14);
+  --p-line-soft: rgba(247, 238, 226, 0.08);
+  --p-line-strong: rgba(247, 238, 226, 0.26);
+  --p-line-on-ink: rgba(25, 16, 19, 0.22);
 
   /* ---- geometry --------------------------------------------------------
      One radius per kind of object, so nothing is rounded by feel: a card is
@@ -396,15 +411,16 @@ p { margin: 0; }
   --p-r-control: 10px;
 
   /* ---- elevation -------------------------------------------------------
-     Warm, low and wide, and every step carries its own lit top edge. On cream
-     a neutral shadow reads as grey dirt under the card; a warm one reads as
-     the card being lit from above, and the inset line is the lit edge. */
-  --p-shadow-1: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 1px 2px rgba(70, 45, 20, 0.08),
-    0 10px 24px -18px rgba(70, 45, 20, 0.32);
-  --p-shadow-2: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 2px 6px rgba(70, 45, 20, 0.1),
-    0 22px 44px -26px rgba(70, 45, 20, 0.44);
-  --p-shadow-3: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 8px 18px rgba(70, 45, 20, 0.11),
-    0 40px 72px -36px rgba(70, 45, 20, 0.54);
+     Black and low, with a faint lit top edge. On the old paper the shadows
+     were warm because a neutral one read as grey dirt; here the room is
+     already dark, so a shadow can only be deeper darkness, and the lit edge is
+     what says a card is above the table rather than cut into it. */
+  --p-shadow-1: inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 1px 2px rgba(0, 0, 0, 0.45),
+    0 10px 24px -18px rgba(0, 0, 0, 0.7);
+  --p-shadow-2: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 2px 6px rgba(0, 0, 0, 0.5),
+    0 22px 44px -26px rgba(0, 0, 0, 0.8);
+  --p-shadow-3: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 18px rgba(0, 0, 0, 0.5),
+    0 40px 72px -36px rgba(0, 0, 0, 0.85);
 
   /* The page paints its own surface with utilities; these two are the last
      resort for content that has not been wrapped yet. */
@@ -913,21 +929,24 @@ p { margin: 0; }
    Two rules were also deleted rather than retuned:
 
    - `backdrop-filter: blur(24px)` on the rail. The rail is opaque (`--p-rail`,
-     a deep espresso); a blur behind an opaque box is a full-screen GPU pass
+     a deep wine); a blur behind an opaque box is a full-screen GPU pass
      that composites nothing. It cost battery on the tablets these run on.
    - `table thead th { background: … }`. It was an unlayered rule, so it beat
      the `bg-…` utility the kit's `TableHead` sets — the header band could not
      be changed from the component. The kit owns it now.
    ========================================================================= */
 
-/* The wash: one warm light from above and nothing else.
-   The page is warm paper and the cards are LIGHTER than it, so the wash only
-   has to say which corner the light comes from. Fixed, so scrolling a long
-   table does not slide the light up the screen. */
+/* The wash: two lights in a dark room.
+   Marigold at the top left (the pass, the candle) and wine at the top right
+   (the rail's own hue bleeding onto the wall). Both are radial and both are
+   under a tenth of the value they would need to read as a gradient, which is
+   the point: on a near-black canvas a light has to be a bloom, not a band.
+   Flat, a dark page of one value reads as a screenshot of a colour. Fixed, so
+   scrolling a long table does not slide the light up the screen. */
 [data-surface='owner'] {
   background-image:
-    radial-gradient(74% 50% at 8% -16%, rgba(179, 71, 18, 0.14), transparent 66%),
-    radial-gradient(64% 48% at 100% 0%, rgba(18, 58, 46, 0.1), transparent 70%);
+    radial-gradient(72% 48% at 6% -14%, rgba(242, 163, 60, 0.1), transparent 66%),
+    radial-gradient(66% 50% at 100% -4%, rgba(120, 26, 52, 0.28), transparent 70%);
   background-attachment: fixed;
 }
 
@@ -992,6 +1011,62 @@ p { margin: 0; }
 @media print {
   [data-surface='owner']::before {
     display: none;
+  }
+
+  /* A printed sheet is paper, not a dining room.
+     The surface is dark now, and a QR card or a bill printed from it would be
+     ivory type on white -- invisible. So print gets the palette inverted back:
+     dark ink on white, no shadows, and `--p-on-ink` dark as well, because
+     browsers drop background fills but keep the labels that sat on them. This
+     is a token override, not a second design: every rule on the surface already
+     reads these tokens. */
+  [data-surface='owner'] {
+    --p-paper: #ffffff;
+    --p-paper-deep: #ffffff;
+    --p-surface: #ffffff;
+    --p-card: #ffffff;
+    --p-glass: #ffffff;
+    --p-paper-veil: rgba(0, 0, 0, 0.04);
+
+    --p-ink: #12100e;
+    --p-ink-80: rgba(18, 16, 14, 0.88);
+    --p-ink-64: rgba(18, 16, 14, 0.72);
+    --p-ink-46: rgba(18, 16, 14, 0.62);
+    --p-ink-28: rgba(18, 16, 14, 0.4);
+    --p-ink-12: rgba(18, 16, 14, 0.16);
+    --p-ink-07: rgba(18, 16, 14, 0.09);
+    --p-on-ink: #12100e;
+    --p-on-ink-64: rgba(18, 16, 14, 0.72);
+    --p-on-ink-40: rgba(18, 16, 14, 0.5);
+
+    --p-accent: #8a4a12;
+    --p-accent-strong: #6f3a0d;
+    --p-accent-soft: #fdf1e0;
+    --p-accent-wash: rgba(138, 74, 18, 0.08);
+    --p-brass: #8a5a1e;
+
+    --p-live: #1d6b45;
+    --p-live-soft: #e8f3ec;
+    --p-due: #9e2f1c;
+    --p-due-soft: #fbeae6;
+
+    --p-rail: #ffffff;
+    --p-rail-raised: #ffffff;
+    --p-rail-ink: #12100e;
+    --p-rail-ink-64: rgba(18, 16, 14, 0.72);
+    --p-rail-ink-40: rgba(18, 16, 14, 0.55);
+    --p-rail-line: rgba(18, 16, 14, 0.2);
+
+    --p-line: rgba(18, 16, 14, 0.16);
+    --p-line-soft: rgba(18, 16, 14, 0.09);
+    --p-line-strong: rgba(18, 16, 14, 0.28);
+
+    --p-shadow-1: none;
+    --p-shadow-2: none;
+    --p-shadow-3: none;
+
+    background: var(--p-paper);
+    color: var(--p-ink);
   }
 }
 

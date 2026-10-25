@@ -326,7 +326,10 @@ export function DashboardBar({
       <header
         data-bar-scrolled={scrolled ? 'true' : 'false'}
         className={[
-          'sticky top-0 z-30 border-b border-hair bg-card lg:pl-[244px]',
+          /* Page colour, not card colour: on the dark surface the bar is part
+             of the room, and the cards below are the only things that lift.
+             A lighter bar read as a band across the top of every screen. */
+          'sticky top-0 z-30 border-b border-hair bg-paper lg:pl-[244px]',
           'transition-shadow duration-200 ease-[var(--o-ease)]',
           /* One elevation token, not a hand-tuned shadow: the bar lifts to the
              same contact shadow as a card, so the shell and the content agree
