@@ -179,13 +179,35 @@ p { margin: 0; }
 @layer base {
   a { color: inherit; text-decoration: none; }
   ul, ol { margin: 0; padding: 0; list-style: none; }
-  /* `background: transparent` is NOT cosmetic. A <button> with no background
-     class keeps the user agent's `buttonface` -- a light grey box. On the dark
-     rail that rendered the account row's "Sign out" as a blank white rectangle
-     with light text inside it: a control that looked like a rendering fault and
-     read as nothing at all. Every styled button in the product sets its own
-     background, so this only ever removes a default nobody asked for. */
-  button { font: inherit; color: inherit; background: transparent; }
+  /* THE BUTTON RESET IS FOUR PROPERTIES AND ONE OF THEM WAS MISSING.
+   *
+   * `background: transparent` was here because a <button> with no background
+   * class kept the user agent's `buttonface` grey box. What it did NOT reset is
+   * the border and the native appearance -- so every button whose look comes
+   * from spacing and type alone (the quiet "Regenerate" / "Disable" pair on
+   * Tables, the availability switch on Menus) still painted the platform's own
+   * 1px grey outline around itself, and the pill inside it looked like a
+   * control that had been dropped into a second, older control.
+   *
+   * `appearance: none` also fixes the search field: a native `searchfield`
+   * ignores `outline: none` on some engines and draws its own black focus
+   * rectangle inside whatever rounded box it is sitting in.
+   *
+   * `padding: 0` and `border: 0` are safe because every button in the product
+   * declares its own geometry in the class string; the kit's `btn()` carries
+   * the height and the horizontal padding, and a bare button carries its own. */
+  button {
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  /* The same for a text field: a `type="search"` control is the one input the
+     platform still decorates, and the decoration is the black box. */
+  input[type='search'] { -webkit-appearance: none; appearance: none; }
   img { display: block; max-width: 100%; }
 }
 
@@ -204,12 +226,19 @@ p { margin: 0; }
  * In @layer base the ring is a DEFAULT: everything still gets one -- which is
  * what a keyboard user needs -- and a component that draws a better one can
  * say so. Nothing is lost by the move, and nothing is won by leaving it.
+ *
+ * Two things changed after the light pass. The ring is the ACCENT, not the
+ * ink: a near-black rectangle is the platform's ring, not this product's, and
+ * on a white sheet it read as a rendering fault. And `border-radius: 4px` is
+ * gone from this rule -- it was setting the RADIUS of whatever got focused, so
+ * tabbing to a pill turned it into a small rounded rectangle for as long as it
+ * held focus. An outline already follows the element's own radius; this rule
+ * never needed to say anything about shape.
  */
 @layer base {
   :focus-visible {
-    outline: 2px solid var(--ink);
+    outline: 2px solid var(--p-accent);
     outline-offset: 2px;
-    border-radius: 4px;
   }
 }
 

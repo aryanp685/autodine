@@ -1119,11 +1119,12 @@ export function Kitchen({
             onClick={() => setAudio((value) => !value)}
             title={audio ? 'Turn the announcements off on this screen' : 'Turn the announcements on'}
             className={[
-              'inline-flex h-9 items-center gap-2 rounded-[var(--p-r-control)] border px-2.5 text-[12.5px] font-medium transition-colors',
+              /* A switch with a box drawn around it is two controls stacked: the
+                 platform's outline inside a bordered pill. The row is the
+                 control; the switch is its state. */
+              'inline-flex h-9 items-center gap-2.5 rounded-full px-2 text-[12.5px] font-medium transition-colors',
               'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]',
-              audio
-                ? 'border-[color-mix(in_oklab,var(--p-accent)_45%,transparent)] bg-accent-soft text-gink'
-                : 'border-hair-strong bg-card text-gink-64 hover:border-gink-28 hover:text-gink',
+              audio ? 'text-gink' : 'text-gink-64 hover:text-gink',
             ].join(' ')}
           >
             <SwitchTrack on={audio} />
@@ -1181,11 +1182,11 @@ export function Kitchen({
               onClick={() => setSpeaksHere((value) => !value)}
               title="Turn this off on a second screen in the same kitchen, so orders are not read out twice"
               className={[
-                'h-9 rounded-[var(--p-r-control)] border px-3 text-[12.5px] font-medium transition-colors',
+                'h-9 rounded-full px-3 text-[12.5px] font-medium transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]',
                 speaksHere
-                  ? 'border-[color-mix(in_oklab,var(--p-accent)_45%,transparent)] bg-accent-soft text-gink'
-                  : 'border-hair-strong bg-card text-gink-64 hover:border-gink-28 hover:text-gink',
+                  ? 'bg-[color-mix(in_oklab,var(--p-accent)_12%,transparent)] text-gink'
+                  : 'text-gink-64 hover:bg-gink-07 hover:text-gink',
               ].join(' ')}
             >
               {speaksHere ? 'This screen speaks' : 'Screen muted'}

@@ -303,12 +303,14 @@ export function DashboardBar({
                 It is a plain 28px row under the name now, with a real
                 `background` of its own -- a <button> with no background class
                 was inheriting the browser's light grey box, and on this rail it
-                rendered as a blank white rectangle. */}
+                rendered as a blank white rectangle. The reset in globals.css
+                removes that default at the source now; this row is only left
+                with its own fill, in the pill the rest of the product uses. */}
             {signOut && (
               <form action={signOutAction} className="mt-2 border-t border-rail-line pt-2">
                 <button
                   type="submit"
-                  className="w-auto rounded-[7px] px-1.5 py-1 text-[11.5px] font-medium text-rail-ink-40 transition-colors duration-150 hover:bg-gink-07 hover:text-rail-ink focus-visible:outline-[var(--p-rail-ink)]"
+                  className="w-auto rounded-full px-2.5 py-1.5 text-[11.5px] font-medium text-rail-ink-40 transition-colors duration-150 hover:bg-gink-07 hover:text-rail-ink focus-visible:outline-[var(--p-rail-ink)]"
                 >
                   Sign out
                 </button>
@@ -343,7 +345,7 @@ export function DashboardBar({
             aria-expanded={open}
             aria-controls="app-rail"
             onClick={() => setOpen(true)}
-            className="flex items-center gap-2 rounded-[var(--p-r-control)] border border-hair-strong bg-card py-1.5 pr-3 pl-2 text-[12.5px] font-medium text-gink shadow-[var(--p-shadow-1)] transition-[border-color,box-shadow] duration-150 ease-[var(--o-ease)] hover:border-gink-28 hover:shadow-[var(--p-shadow-2)] lg:hidden"
+            className="flex items-center gap-2 rounded-full bg-[color-mix(in_oklab,var(--p-ink)_7%,transparent)] py-2 pr-4 pl-3 text-[12.5px] font-medium text-gink transition-colors duration-150 ease-[var(--o-ease)] hover:bg-[color-mix(in_oklab,var(--p-ink)_11%,transparent)] lg:hidden"
           >
             <span aria-hidden="true" className="flex flex-col gap-[3px]">
               <i className="block h-px w-3.5 bg-current" />

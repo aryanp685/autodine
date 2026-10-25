@@ -52,7 +52,7 @@ export function AuthShell({
               <span className="hidden text-gink-46 sm:inline">{action.prompt}</span>
               <Link
                 href={action.href}
-                className="rounded-full border border-hair-strong px-3 py-1.5 font-medium text-gink transition-colors hover:border-gink-28 hover:bg-gink-07"
+                className="rounded-full bg-[color-mix(in_oklab,var(--p-ink)_7%,transparent)] px-3.5 py-2 font-medium text-gink transition-colors hover:bg-[color-mix(in_oklab,var(--p-ink)_11%,transparent)]"
               >
                 {action.label}
               </Link>

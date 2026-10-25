@@ -504,42 +504,46 @@ export type BtnSize = 'sm' | 'md';
  */
 export function btn(tone: BtnTone = 'solid', size: BtnSize = 'md'): string {
   /*
-   * ONE GEOMETRY.
+   * PILLS, LIKE APPLE'S OWN BUTTONS.
    *
-   * These were pills (rounded-full) at four different heights across the
-   * product, and a pill is a status shape: it is what a tag uses. A row of a
-   * pill button, a pill chip, a pill switch and a pill tag is a row of four
-   * things that all look like the same kind of object.
+   * An earlier pass made actions rectangles on the argument that a pill should
+   * mean "status, not control". That was a rule about a design nobody wanted:
+   * on a white surface a rectangular action with a grey border is the shape of
+   * a form control from 2010, and a screen with four of them reads as a form,
+   * not as a product. Apple's web buttons are pills -- "Buy", "Learn more",
+   * "Get started" -- and the pill reads as a thing you press.
    *
-   * So actions are rectangles with a 10px radius, 36px tall (sm) or 44px (md),
-   * and they are the only element on the surface with that radius. Pills come
-   * back only for status, where the shape means "a state, not a control".
-   */
-  /*
-   * The press is 1px down and a hair of scale, on the surface's own spring.
-   * It used to be `active:translate-y-px` alone, which is a fine press but a
-   * silent hover: on a pointer, a solid button did not change at all until it
-   * was pressed. Every tone now lifts its shadow on hover and settles on press,
-   * which is the same cue the cards give, so the surface has one idea of "this
-   * is interactive" instead of two.
+   * So the geometry is 999px, the height is 36 (sm) or 44 (md), and the
+   * difference between the tones is FILL and WEIGHT, not outline:
+   *
+   *   solid    graphite fill, white label -- the default action
+   *   primary  accent fill, white label -- the one action the screen exists for
+   *   ghost    a pale grey fill, no border -- a secondary action
+   *   quiet    no fill at all, accent label -- a text button
+   *   danger   no fill, alert label, a red wash on hover
+   *
+   * NONE of them draws a border. That is the point: the platform's own 1px
+   * button border used to survive under every class string in the product (see
+   * the button reset in app/globals.css), and the fix is to have nothing to
+   * override -- a fill or a colour, never an outline.
+   *
+   * The press is still 1px of travel and the shadow still lifts, because a
+   * control that does nothing when a finger lands on it reads as disabled.
    */
   const base =
-    'inline-flex items-center justify-center gap-2 rounded-[var(--p-r-control)] font-medium whitespace-nowrap transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-[var(--o-ease)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0 disabled:active:scale-100 active:translate-y-px active:scale-[0.99]';
-  const box = size === 'sm' ? 'h-9 px-3 text-[12.5px]' : 'h-11 px-4 text-[13px]';
+    'inline-flex items-center justify-center gap-2 rounded-full font-medium whitespace-nowrap transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-[var(--o-ease)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0 disabled:active:scale-100 active:translate-y-px active:scale-[0.98]';
+  const box = size === 'sm' ? 'h-9 px-4 text-[12.5px]' : 'h-11 px-5 text-[13px]';
   const tones: Record<BtnTone, string> = {
-    /* Ink is the default action. It is the strongest thing on paper without
-       introducing a colour the product does not own. */
     solid:
-      'bg-gink text-onink shadow-[var(--p-shadow-1)] hover:bg-gink/92 hover:shadow-[var(--p-shadow-2)]',
-    /* Copper is for the one action a screen exists for -- the counter's
-       "Record payment", the menu's "Publish". Used twice on a page it stops
-       meaning anything. */
+      'bg-gink text-onink hover:bg-[color-mix(in_oklab,var(--p-ink)_88%,white)] active:bg-[color-mix(in_oklab,var(--p-ink)_82%,white)]',
     primary:
-      'bg-[var(--p-accent)] text-onink shadow-[var(--p-shadow-1)] hover:bg-[var(--p-accent-strong)] hover:shadow-[var(--p-shadow-2)] active:bg-[var(--p-accent-strong)]',
+      'bg-[var(--p-accent)] text-onink hover:bg-[var(--p-accent-strong)] active:bg-[var(--p-accent-strong)]',
     ghost:
-      'border border-hair-strong bg-card text-gink shadow-[var(--p-shadow-1)] hover:border-gink-28 hover:bg-[color-mix(in_oklab,var(--p-accent-wash)_45%,var(--p-card))] hover:shadow-[var(--p-shadow-2)]',
-    quiet: 'text-gink-64 hover:bg-gink-07 hover:text-gink',
-    danger: 'border border-[var(--p-due)]/30 text-[var(--p-due)] hover:bg-[var(--p-due)]/8',
+      'bg-[color-mix(in_oklab,var(--p-ink)_7%,transparent)] text-gink hover:bg-[color-mix(in_oklab,var(--p-ink)_11%,transparent)]',
+    quiet:
+      'text-[var(--p-accent)] hover:bg-[color-mix(in_oklab,var(--p-accent)_10%,transparent)]',
+    danger:
+      'text-[var(--p-due)] hover:bg-[color-mix(in_oklab,var(--p-due)_10%,transparent)]',
   };
   return `${base} ${box} ${tones[tone]}`;
 }
@@ -626,7 +630,10 @@ export function Segmented<T extends string>({
       role="group"
       aria-label={label}
       className={[
-        'items-center rounded-[10px] border border-hair-strong bg-paper-deep p-1',
+        /* iOS segmented control: a grey track with a white thumb, no border.
+           The border was doing the work the fill does better, and on a white
+           card it drew a second rectangle inside the card's own rectangle. */
+        'items-center rounded-[11px] bg-[color-mix(in_oklab,var(--p-ink)_7%,transparent)] p-1',
         fill ? 'flex w-full' : 'inline-flex',
         box,
         className,
@@ -643,11 +650,13 @@ export function Segmented<T extends string>({
             onClick={() => onChange(option.value)}
             {...option.data}
             className={[
-              'rounded-[7px] font-medium whitespace-nowrap transition-colors duration-150',
+              'rounded-[8px] font-medium whitespace-nowrap transition-[background-color,color,box-shadow] duration-150',
               'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]',
               fill ? 'flex flex-1 items-center justify-center gap-1.5' : '',
               item,
-              on ? 'bg-card text-gink shadow-[var(--p-shadow-1)]' : 'text-gink-46 hover:text-gink',
+              on
+                ? 'bg-card text-gink shadow-[0_1px_3px_rgba(29,29,31,0.12),0_1px_1px_rgba(29,29,31,0.04)]'
+                : 'text-gink-64 hover:text-gink',
             ].join(' ')}
           >
             {option.label}
@@ -670,24 +679,24 @@ export function Segmented<T extends string>({
  */
 export function chipClass(active: boolean): string {
   /*
-   * A selected chip is copper, not a black block.
+   * A filter chip is a pill too, and it carries NO border in either state.
    *
-   * The chip is an on-state -- "this window", "these rows" -- and copper is
-   * what this product uses for position: the active rail row, the focus ring,
-   * the page kicker. A black filled chip was the loudest thing on the orders
-   * screen, louder than the row it was filtering, and it was the only control
-   * on the surface that was a solid block of ink.
+   * The old chip was a bordered rectangle that switched its border colour when
+   * picked, which meant the resting state was already an outlined box -- three
+   * of them in a row looked like a form. A pill with a fill reads as a filter,
+   * and the selected one is the accent itself: "these rows" is a state, and
+   * the accent is what this surface uses for a state.
    *
-   * Both states keep a border, so a chip does not change size when it is
-   * picked and the row does not shiver.
+   * Both states keep the same height and the same horizontal padding, so
+   * picking one does not resize the row it sits in.
    */
   return [
-    'inline-flex h-9 items-center rounded-[var(--p-r-control)] border px-3.5 text-[12.5px] font-medium whitespace-nowrap',
-    'transition-[background-color,border-color,color,box-shadow] duration-150 ease-[var(--o-ease)]',
+    'inline-flex h-9 items-center rounded-full px-4 text-[12.5px] font-medium whitespace-nowrap',
+    'transition-[background-color,color,box-shadow] duration-150 ease-[var(--o-ease)]',
     'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]',
     active
-      ? 'border-[color-mix(in_oklab,var(--p-accent)_45%,transparent)] bg-accent-soft text-gink shadow-[var(--p-shadow-1)]'
-      : 'border-hair-strong bg-card text-gink-64 shadow-[var(--p-shadow-1)] hover:border-gink-28 hover:text-gink',
+      ? 'bg-[var(--p-accent)] text-onink'
+      : 'bg-[color-mix(in_oklab,var(--p-ink)_6%,transparent)] text-gink-64 hover:bg-[color-mix(in_oklab,var(--p-ink)_9%,transparent)] hover:text-gink',
   ].join(' ');
 }
 
@@ -745,7 +754,7 @@ export function Field({
  * A test in components/live-controls.test.tsx fails on the unmarked form.
  */
 const control =
-  'w-full rounded-[var(--p-r-control)] border border-hair-strong bg-card px-3.5 text-[13.5px] text-gink shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition-[border-color,box-shadow] duration-150 ease-[var(--o-ease)] placeholder:text-gink-28 hover:border-gink-28 focus:border-[var(--p-accent)] focus:ring-2 focus:ring-[color-mix(in_oklab,var(--p-accent)_16%,transparent)] focus:outline-none disabled:cursor-not-allowed disabled:bg-gink-07 disabled:text-gink-46';
+  'w-full rounded-[var(--p-r-control)] border border-hair-strong bg-card px-3.5 text-[13.5px] text-gink transition-[border-color,box-shadow] duration-150 ease-[var(--o-ease)] placeholder:text-gink-28 hover:border-gink-28 focus:border-[var(--p-accent)] focus:ring-[3px] focus:ring-[color-mix(in_oklab,var(--p-accent)_20%,transparent)] focus:outline-none disabled:cursor-not-allowed disabled:bg-gink-07 disabled:text-gink-46';
 
 export const inputClass = `${control} h-11`;
 export const textareaClass = `${control} resize-y py-3 leading-[1.55]`;
@@ -867,19 +876,32 @@ export function Tag({ tone = 'neutral', children }: { tone?: PillTone; children:
  * `aria-hidden`: the state is announced by the control around it.
  */
 export function SwitchTrack({ on, className = '' }: { on: boolean; className?: string }) {
+  /*
+   * The iOS switch, at its real size: a 51x31 track with a 27px knob.
+   *
+   * It used to be 38x22 with a 16px knob, which at arm's length on a tablet is
+   * a grey capsule with a dot in it -- the state is legible only if you look
+   * for the knob's position. The platform's own switch is 51x31 for the same
+   * reason: the travel is what makes the state readable at a glance, and a
+   * thumb sliding half its own width is not a movement you can see out of the
+   * corner of your eye.
+   *
+   * Off is a neutral grey track, on is the accent -- no border, no outline
+   * around it: the switch IS the control, and the label beside it names it.
+   */
   return (
     <span
       aria-hidden="true"
       className={[
-        'relative inline-flex h-[22px] w-[38px] shrink-0 items-center rounded-full transition-colors duration-200',
+        'relative inline-flex h-[31px] w-[51px] shrink-0 items-center rounded-full transition-colors duration-200 ease-[var(--o-ease)]',
         on ? 'bg-[var(--p-accent)]' : 'bg-[color-mix(in_oklab,var(--p-ink)_16%,transparent)]',
         className,
       ].join(' ')}
     >
       <span
         className={[
-          'absolute size-[16px] rounded-full bg-white shadow-[0_1px_2px_rgba(60,40,24,0.28)] transition-[left] duration-200 ease-out',
-          on ? 'left-[19px]' : 'left-[3px]',
+          'absolute size-[27px] rounded-full bg-white shadow-[0_2px_4px_rgba(29,29,31,0.18),0_1px_1px_rgba(29,29,31,0.1)] transition-[left] duration-200 ease-[var(--o-ease)]',
+          on ? 'left-[22px]' : 'left-[2px]',
         ].join(' ')}
       />
     </span>
