@@ -41,9 +41,17 @@ describe('the code form', () => {
     expect(html).toMatch(/<button[^>]*disabled[^>]*>Open the menu<\/button>/);
   });
 
-  it('says how often the code changes, in the restaurant staff’s own terms', () => {
+  it('says how often the code changes, and sends the guest to the counter first', () => {
     expect(html).toContain('changes every 10 minutes');
-    expect(html).toContain('ask a member of staff');
+    // Ordering is the whole point: the self-service screen is the instruction,
+    // a person on the floor is the fallback. The old copy led with "ask a
+    // member of staff", which made the waiter the default path to the menu --
+    // exactly what the ordering flow is meant to remove.
+    const counter = html.indexOf('screen at the counter');
+    const staff = html.indexOf('read the current digits to you');
+    expect(counter).toBeGreaterThan(-1);
+    expect(staff).toBeGreaterThan(counter);
+    expect(html).not.toContain('ask a member of staff');
   });
 
   it('says "minute" rather than "1 minutes" when a restaurant rotates faster', () => {
