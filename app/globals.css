@@ -916,6 +916,52 @@ p { margin: 0; }
   }
 }
 
+/* ---- the grain ---------------------------------------------------------
+   A 140px tile of fractal noise at 3.5%, painted over the whole surface.
+
+   This is the difference between "a stylesheet with a warm background" and
+   "paper". A flat colour at this size -- a 1440px monitor, 200 square
+   centimetres of one value -- reads as a screenshot of a colour. A texture an
+   order of magnitude below the eye's contrast threshold does two things at
+   once: it stops the large empty areas (the space beside a 620px form) from
+   looking like a rendering failure, and it makes the warm shadows sit on
+   something instead of floating over nothing.
+
+   Three rules kept it from being a performance problem:
+   - It is INLINE (a data URI), so it is one cached image and no request.
+   - It is `position: fixed` on a single pseudo-element, not a background on
+     forty cards: the browser rasterises 140x140 once and repeats it.
+   - It has NO `mix-blend-mode`. A blended full-screen layer makes the compositor
+     re-blend the whole page on every scroll frame, which is exactly the kind of
+     "premium" detail that makes a laptop fan spin up. Plain low-opacity paint
+     costs nothing.
+   It is `pointer-events: none` and `aria-hidden` by construction (pseudo-element),
+   so no target moves and nothing is announced. */
+[data-surface='owner']::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 140px 140px;
+}
+
+/* Paper grain is a SCREEN effect: on a printed bill it would be a grey haze
+   over the ink and a wasted toner cartridge. */
+@media print {
+  [data-surface='owner']::before {
+    display: none;
+  }
+}
+
+/* The grain is deliberately painted OVER the content, at 3.5%: that is what
+   paper grain does on a printed page, and at this opacity it reads as texture
+   rather than as a veil. It costs nothing to keep it there -- the alternative,
+   lifting every screen into its own stacking context, means one `position:
+   relative` per child and one chance per child to break the `sticky` header. */
+
 /* The focus ring has to survive a warm paper surface: the default outline is
    the same value as the page, and the accent is not. Keyboard users spend the
    whole shift on this surface. */

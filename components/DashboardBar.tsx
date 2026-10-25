@@ -87,6 +87,37 @@ export function DashboardBar({
      for why this is the surface that needs a timeline and the rest does not. */
   const railRef = useRailStagger<HTMLElement>(open);
 
+  /*
+   * THE BAR EARNS ITS EDGE.
+   *
+   * A sticky bar with a permanent hairline and a permanent shadow is drawn as if
+   * there is always something scrolling under it -- at the top of a page there
+   * is not, and the line then separates two surfaces that are the same surface.
+   * So the edge appears when the page has actually moved.
+   *
+   * The listener is passive, throttled to one rAF, and only calls setState when
+   * the boolean FLIPS: a scroll handler that re-renders on every frame is how a
+   * "premium" header turns a phone scroll into a slideshow.
+   */
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    let frame = 0;
+    const read = () => {
+      frame = 0;
+      setScrolled(window.scrollY > 4);
+    };
+    const onScroll = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(read);
+    };
+    read();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, []);
+
   const activeLink = DASHBOARD_LINKS.find((link) => link.key === active);
   const activeOutlet =
     outlet?.outlets.find((entry) => entry.id === outlet.activeId) ?? outlet?.outlets[0] ?? null;
@@ -275,7 +306,17 @@ export function DashboardBar({
       {/* Solid, not frosted. A translucent header over a scrolling table is
           glassmorphism, and it also lets a table row read through the
           venue name. The hairline is what separates the two. */}
-      <header className="sticky top-0 z-30 border-b border-hair bg-card lg:pl-[244px]">
+      <header
+        data-bar-scrolled={scrolled ? 'true' : 'false'}
+        className={[
+          'sticky top-0 z-30 border-b border-hair bg-card lg:pl-[244px]',
+          'transition-shadow duration-200 ease-[var(--o-ease)]',
+          /* One elevation token, not a hand-tuned shadow: the bar lifts to the
+             same contact shadow as a card, so the shell and the content agree
+             about where the light is coming from. */
+          scrolled ? 'shadow-[var(--p-shadow-1)]' : 'shadow-none',
+        ].join(' ')}
+      >
         <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
           <button
             type="button"
@@ -292,12 +333,20 @@ export function DashboardBar({
             Menu
           </button>
 
-          <div className="flex min-w-0 items-baseline gap-2">
+          {/* Where you are, then who you are. The screen name is ink and the
+              venue is meta: on a long shift the question is "which page", and
+              the venue is already answered by the rail's foot. */}
+          <div className="flex min-w-0 items-center gap-2.5">
             <span className="truncate text-[13px] font-semibold tracking-[-0.015em] text-gink">
               {activeLink?.label ?? 'Dashboard'}
             </span>
             {activeOutlet && (
-              <span className="hidden truncate text-[12.5px] text-gink-46 sm:block">· {activeOutlet.name}</span>
+              <>
+                <span aria-hidden="true" className="hidden h-3 w-px bg-hair-strong sm:block" />
+                <span className="hidden truncate text-[12.5px] text-gink-46 sm:block">
+                  {activeOutlet.name}
+                </span>
+              </>
             )}
           </div>
 

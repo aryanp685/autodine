@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { dashboardStats, recentOrders, restaurant, sparkline, topItems } from '@/lib/demo-data';
 import { Money, PaymentPill, PrepPill, Sparkline } from '@/components/ui';
 import { SignInPrompt } from '@/components/SignInPrompt';
+import { ChartMotion } from '@/components/owner/ChartMotion';
 import {
   BtnLink,
   Empty,
@@ -266,18 +267,23 @@ export function Dashboard({
         >
           {chartable && chartHasValue ? (
             <div className="text-gink" data-chart>
-              {/* Fluid, not a fixed 520px: the old width overflowed a phone and
-                  pushed the most recent hour off the edge of the card. */}
-              <Sparkline
-                data={hourly}
-                width={520}
-                height={120}
-                baseline="zero"
-                area
-                label="Revenue by hour of the day"
-                className="h-[112px] w-full"
-                markIndex={hasPeak ? peakIndex : undefined}
-              />
+              {/* The line draws itself once, on arrival: GSAP, lazily loaded,
+                  and it can only ever ADD motion -- the server sends the chart
+                  fully drawn, so a blocked bundle leaves a complete chart. */}
+              <ChartMotion>
+                {/* Fluid, not a fixed 520px: the old width overflowed a phone and
+                    pushed the most recent hour off the edge of the card. */}
+                <Sparkline
+                  data={hourly}
+                  width={520}
+                  height={120}
+                  baseline="zero"
+                  area
+                  label="Revenue by hour of the day"
+                  className="h-[112px] w-full"
+                  markIndex={hasPeak ? peakIndex : undefined}
+                />
+              </ChartMotion>
               {/* The axis and the reading are only for live data. The sample
                   series is a shape with no clock behind it, so labelling its
                   twelve buckets midnight-to-11am invented a trading day the
