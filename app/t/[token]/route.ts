@@ -5,6 +5,7 @@ import { isQrToken, TABLE_SESSION_COOKIE, TABLE_SESSION_COOKIE_OPTIONS } from '@
 import { loadTableAccess } from '@/lib/table-access';
 import { addressFromHeaders, hashAddress } from '@/lib/ip-hash';
 import { TABLE_CARD_COOKIE, TABLE_CARD_COOKIE_OPTIONS } from '@/lib/table-card';
+import { scanOutcome } from '@/lib/scan-outcome';
 
 /**
  * What a printed QR code points at: /t/<public token>.
@@ -140,7 +141,20 @@ async function openSessionOnScan(cardToken: string, request: NextRequest) {
   }
 
   const row = Array.isArray(data) ? data[0] : data;
-  if (!row || row.status !== 'opened' || !row.session_token) return null;
+
+  /*
+   * THE ANSWER IS READ, NOT GUESSED AT.
+   *
+   * This used to test `row.status !== 'opened'` and return null for everything
+   * else -- which collapsed five different answers into one silent outcome. It
+   * is still silent BY DESIGN for a guest (they always get their menu), but the
+   * meaning is now explicit: `code` is expected, `revoked` is a dead card, and
+   * `limited` is a throttle that the guest is currently told nothing about.
+   * See lib/scan-outcome.ts for why that distinction is a bug and not a
+   * nuance, and docs/scan-limit-l1.md for the proposed fix.
+   */
+  const outcome = scanOutcome(row?.status as string | undefined);
+  if (!outcome.keepSession || !row?.session_token) return null;
 
   return {
     token: row.session_token as string,

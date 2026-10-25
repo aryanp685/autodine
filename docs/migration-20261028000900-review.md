@@ -322,3 +322,38 @@ Applying §3 to a **branch** database and running §4. It would not cover
 production. Production needs a separate decision after §4.4 passes, and it would
 be: apply on prod during a quiet hour, then flip one pilot restaurant to
 `scan_confirm` — never to `scan` first.
+
+
+---
+
+## 8. Reversibility and destructive changes (direct answer)
+
+**Is the file reversible?** Yes, every part, but with one honest caveat: nothing
+here is destructive *while it exists*, and the destructive act would be the
+rollback, not the migration.
+
+| change | reversible? | method | data lost on rollback |
+| --- | --- | --- | --- |
+| `restaurants.guest_verification_mode` | yes | `drop column` | the chosen mode for every restaurant (a setting, not a record) |
+| `orders.hold_required / confirmed_at / confirmed_by / table_session_id` | yes | `drop column` | which sitting an order belonged to, and whether/when/by whom a human vouched for it |
+| 2 partial indexes on `orders` | yes | `drop index` | nothing — derived from rows |
+| `table_session_opens` (+2 indexes) | yes | `drop table` | the throttle's own history. This is the only table whose rows exist *only* for this feature |
+| 4 new functions | yes | `drop function` | nothing |
+| `place_public_order`, `get_public_order` (replaced) | yes | re-run `20261027000900` | nothing — but between the drop and the re-run, ordering is broken, so always restore first |
+
+**What is destructive in this file: nothing.** There is no `drop`, `delete`,
+`truncate`, `alter type`, or update of existing rows. Verified by grep over the
+whole file, not by reading it. Applying it cannot lose an order, a payment, a
+menu or a member.
+
+**What is destructive on rollback:** dropping `orders.table_session_id` and the
+`confirmed_at`/`confirmed_by` pair loses *provenance* — the answer to "did a
+human accept this table, and who". It does not lose orders, money or lines. And
+if L1 (`docs/scan-limit-l1.md`) has been applied on top, a
+`table_verification_sessions.hold_orders` column would also need dropping; the
+order matters (see the `pg_depend` query in §5).
+
+**Ordering rule that matters more than either:** restore the two replaced
+functions BEFORE dropping anything. If the columns are dropped while the new
+`place_public_order` still calls `stamp_guest_verification`, the guest order
+path fails on the next order placed.

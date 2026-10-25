@@ -56,8 +56,37 @@ jobs:
           echo "$listed"
           echo "$listed" | grep -q "Total: 9 tests"
 
+      # Two reporters: list for a human reading the log, json for the summary
+      # step below. The json file is the source of the per-test line.
       - name: Browser tests
-        run: npx playwright test --reporter=list
+        run: npx playwright test --reporter=list,json
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
+
+      # GitHub's log download is not always reachable from every client, but an
+      # annotation is: this turns each test into one API-readable line, so the
+      # result of every individual test can be quoted rather than summarised.
+      - name: Per-test results
+        if: always()
+        run: |
+          node -e '
+            const r = require("./playwright-report/results.json");
+            let pass = 0, fail = 0;
+            const walk = (suite) => {
+              for (const spec of suite.specs ?? []) {
+                for (const t of spec.tests ?? []) {
+                  const ok = t.results.every((x) => x.status === "passed" || x.status === "skipped");
+                  const state = ok ? "PASS" : "FAIL";
+                  if (ok) pass++; else fail++;
+                  console.log(`::notice title=e2e ${state}::${spec.title}`);
+                }
+              }
+              for (const child of suite.suites ?? []) walk(child);
+            };
+            for (const s of r.suites ?? []) walk(s);
+            console.log(`::notice title=e2e totals::${pass} passed, ${fail} failed`);
+            if (fail > 0) process.exit(1);
+          '
 
       - name: Upload the report when something failed
         if: failure()
