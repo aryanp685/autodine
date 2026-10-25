@@ -1,5 +1,5 @@
 import { OwnerLoading } from '@/components/owner/chrome';
 
 export default function Loading() {
-  return <OwnerLoading variant="dashboard" />;
+  return <OwnerLoading active="reports" variant="dashboard" />;
 }
