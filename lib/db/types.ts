@@ -35,6 +35,13 @@ export type Restaurant = {
   banner_path: string | null;
   /** Key into the curated palette in lib/branding/palette.ts. */
   accent: string;
+  /**
+   * Migration 20261028000900. How a guest proves they are at a table:
+   * 'code' (rotating digits, the default), 'scan_confirm' (scan, then one
+   * staff tap per sitting) or 'scan'. The last two cannot prove presence and
+   * must never be described as if they do.
+   */
+  guest_verification_mode?: 'code' | 'scan_confirm' | 'scan';
   updated_at: string;
   created_at: string;
   /**
@@ -173,6 +180,19 @@ export type Order = {
    * placed. A bill must show the rate it was charged, not today's.
    */
   tax_rate_bps_snapshot: number | null;
+  /**
+   * Migration 20261028000900. True when the order arrived under a scan-mode
+   * restaurant and no human had vouched for the table yet. Written once, at
+   * insert, and never recomputed -- a setting changed at 20:05 must not
+   * release a ticket that was held at 20:04.
+   */
+  hold_required?: boolean;
+  /** When staff accepted a held table. Null means nobody has. */
+  confirmed_at?: string | null;
+  /** Who tapped confirm. Null for anything not confirmed by a person. */
+  confirmed_by?: string | null;
+  /** The table sitting this order belongs to, for grouping and confirming. */
+  table_session_id?: string | null;
 };
 
 export type OrderItem = {

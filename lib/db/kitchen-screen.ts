@@ -101,6 +101,32 @@ export type CancelledTicket = {
   at: string;
 };
 
+/**
+ * One table sitting's worth of tickets that nobody has vouched for yet.
+ *
+ * Grouped by table session, not by order: a party that ordered in two rounds
+ * before anyone reached the board has two held orders and still needs exactly
+ * one tap, because the confirmation is about the TABLE, not about each ticket.
+ * See migration 20261028000900.
+ *
+ * `sessionId` is null only if an order was stamped `hold_required` without a
+ * session -- which should be impossible, and is therefore shown rather than
+ * hidden: the card explains itself and the button is disabled instead of
+ * pretending to work.
+ */
+export type HeldTable = {
+  sessionId: string | null;
+  table: string;
+  placedAt: string;
+  placedAtIso: string;
+  ageMin: number;
+  latest: string;
+  note?: string;
+  orders: { id: string; code: string; total: number }[];
+  itemCount: number;
+  items: KitchenTicket['items'];
+};
+
 export type KitchenScreenData = {
   restaurantName: string;
   /**
@@ -115,6 +141,11 @@ export type KitchenScreenData = {
    * a card quietly vanished.
    */
   cancelled: CancelledTicket[];
+  /**
+   * Waiting for a human to say the party is really at that table. Empty in a
+   * restaurant on the rotating code, because nothing is ever held there.
+   */
+  held?: HeldTable[];
   /**
    * Set when the database answered but this caller has no restaurant to show.
    * Distinct from a genuinely empty board: an empty board is good news, a
@@ -227,16 +258,55 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
     now - CANCELLED_WINDOW_MIN * 60_000
   ).toISOString();
 
+  /**
+   * The board must work BEFORE migration 20261028000900 is applied.
+   *
+   * The three new columns exist only after that migration runs. Asking for a
+   * column a database does not have is not a warning -- PostgREST answers 42703
+   * and the whole select fails, which would take the kitchen board down for a
+   * deployment that shipped ahead of its migration. So the first attempt asks
+   * for everything, and a missing-column answer falls back to the columns that
+   * have always existed. Held tickets simply do not exist until the migration
+   * is in: which is true, and is what the board shows.
+   */
+  const orderColumnsWithHolds =
+    'id, code, table_id, customer_note, prep_status, payment_status, total_paise, placed_at, hold_required, confirmed_at, table_session_id';
+  const orderColumnsLegacy =
+    'id, code, table_id, customer_note, prep_status, payment_status, total_paise, placed_at';
+
+  const firstOrdersAttempt = await supabase
+    .from('orders')
+    .select(orderColumnsWithHolds)
+    .eq('restaurant_id', restaurantId)
+    .neq('prep_status', 'cancelled')
+    .gte('placed_at', cutoff)
+    .order('placed_at', { ascending: true });
+
+  const ordersWithoutHolds =
+    firstOrdersAttempt.error?.code === '42703'
+      ? await supabase
+          .from('orders')
+          .select(orderColumnsLegacy)
+          .eq('restaurant_id', restaurantId)
+          .neq('prep_status', 'cancelled')
+          .gte('placed_at', cutoff)
+          .order('placed_at', { ascending: true })
+      : null;
+
   const [ordersResult, cancelledResult] = await Promise.all([
-    supabase
-      .from('orders')
-      .select(
-        'id, code, table_id, customer_note, prep_status, payment_status, total_paise, placed_at'
-      )
-      .eq('restaurant_id', restaurantId)
-      .neq('prep_status', 'cancelled')
-      .gte('placed_at', cutoff)
-      .order('placed_at', { ascending: true }),
+    Promise.resolve(
+      ordersWithoutHolds
+        ? {
+            data: (ordersWithoutHolds.data ?? []).map((row) => ({
+              ...row,
+              hold_required: false,
+              confirmed_at: null,
+              table_session_id: null,
+            })),
+            error: ordersWithoutHolds.error,
+          }
+        : { data: firstOrdersAttempt.data ?? [], error: firstOrdersAttempt.error },
+    ),
     supabase
       .from('orders')
       .select('id, table_id, updated_at, placed_at')
@@ -336,7 +406,65 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
     at: row.updated_at,
   }));
 
-  const tickets: KitchenTicket[] = rows.map((row) => {
+  /**
+   * Held rows are NOT tickets.
+   *
+   * The cook's columns must never contain a ticket the floor has not accepted;
+   * that is the whole point of the confirmation. They are pulled out here, in
+   * one place, so no screen can accidentally render them as work to start.
+   */
+  const heldRows = rows.filter((row) => row.hold_required && !row.confirmed_at);
+  const cookRows = rows.filter((row) => !(row.hold_required && !row.confirmed_at));
+
+  const heldBySession = new Map<string, typeof heldRows>();
+  for (const row of heldRows) {
+    const key = row.table_session_id ?? `order:${row.id}`;
+    const list = heldBySession.get(key) ?? [];
+    list.push(row);
+    heldBySession.set(key, list);
+  }
+
+  const held: HeldTable[] = [...heldBySession.entries()]
+    .map(([, group]) => {
+      const first = group[0]!;
+      const items = group.flatMap((row) =>
+        (itemsByOrder.get(row.id) ?? []).map((item) => {
+          const portion = item.variant_snapshot?.trim() || undefined;
+          const addons = (item.addons_snapshot ?? [])
+            .map((name) => name?.trim())
+            .filter((name): name is string => Boolean(name));
+          return {
+            qty: item.qty,
+            name: item.name_snapshot,
+            detail: [portion, ...addons].filter(Boolean).join(' · ') || undefined,
+            ...(portion ? { portion } : {}),
+            ...(addons.length ? { addons } : {}),
+            veg: item.is_veg,
+            spoken: undefined,
+          };
+        }),
+      );
+      const newest = group[group.length - 1]!;
+      return {
+        sessionId: first.table_session_id ?? null,
+        table: (first.table_id && labelByTable.get(first.table_id)) || NO_TABLE,
+        placedAt: clockTimeInZone(timezone, first.placed_at),
+        placedAtIso: first.placed_at,
+        ageMin: minutesSince(first.placed_at, now),
+        latest: clockTimeInZone(timezone, newest.placed_at),
+        note: group.map((row) => row.customer_note?.trim()).filter(Boolean).join(' · ') || undefined,
+        orders: group.map((row) => ({
+          id: row.id,
+          code: row.code,
+          total: paiseToRupees(row.total_paise),
+        })),
+        itemCount: items.reduce((total, item) => total + item.qty, 0),
+        items,
+      };
+    })
+    .sort((a, b) => a.placedAtIso.localeCompare(b.placedAtIso));
+
+  const tickets: KitchenTicket[] = cookRows.map((row) => {
     const items = (itemsByOrder.get(row.id) ?? []).map((item) => {
       const portion = item.variant_snapshot?.trim() || undefined;
       const addons = (item.addons_snapshot ?? [])
@@ -374,6 +502,7 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
     restaurantId,
     tickets,
     cancelled,
+    held,
     role,
     canAdvance,
     ...(cannotAdvance ? { cannotAdvance } : {}),

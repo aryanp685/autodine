@@ -1,7 +1,6 @@
 'use server';
 
-import { createHash } from 'node:crypto';
-import { headers } from 'next/headers';
+import { ipHash } from '@/lib/ip-hash';
 import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
@@ -35,31 +34,6 @@ import { safeNextPath } from '@/lib/verify-next';
  * lib/qr-problem.ts. Nothing the database says is ever rendered, and nothing
  * it says ever reaches a URL.
  */
-
-/**
- * A stable, non-reversible fingerprint of the caller's address.
- *
- * The database rate-limits verification attempts per code and per IP hash and
- * requires 64 hex characters. Salting with the QR token means a hash from one
- * table's code cannot be correlated with another's -- without it, the attempt
- * log would be a record of which addresses scanned which tables, which is
- * more than rate limiting needs to know.
- *
- * The address comes from the forwarded header because that is what carries it
- * behind Vercel. It is a header, so it can be forged. Rate limiting by IP is
- * a brake on casual probing, not a control an attacker cannot walk around,
- * and pretending otherwise would be worse than saying so.
- */
-async function ipHash(salt: string): Promise<string> {
-  const store = await headers();
-  const forwarded = store.get('x-forwarded-for');
-  const address =
-    (forwarded ? forwarded.split(',')[0]!.trim() : '') ||
-    store.get('x-real-ip')?.trim() ||
-    'unknown';
-
-  return createHash('sha256').update(`${address}|${salt}`).digest('hex');
-}
 
 function problemReason(reason: string): never {
   redirect(`/t/problem?r=${reason}`);

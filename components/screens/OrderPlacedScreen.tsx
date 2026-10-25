@@ -241,9 +241,30 @@ export function OrderPlacedScreen({
           {data.tableLabel ? `Table ${data.tableLabel}` : 'Counter order'}
         </h1>
         <p className="g-lede mt-1">
-          {data.restaurantName} · {prepLabel}
+          {data.restaurantName} ·{' '}
+          {data.awaitingConfirmation && data.prepStatus !== 'cancelled'
+            ? 'waiting for the table to be confirmed'
+            : prepLabel}
           {data.prepStatus === 'cancelled' ? ' · nothing is owed' : ''}
         </p>
+
+        {/* HELD, AND SAYING SO.
+            In a scan-mode restaurant the first order of a sitting waits for one
+            tap from staff. The guest is told exactly that: with the floor, not
+            in the kitchen. Calling it "confirmed" before a person has
+            confirmed it would be the one dishonest sentence this screen could
+            write. The tick above is about the ORDER being received, which is
+            true; this notice is about the food, which has not started. */}
+        {data.awaitingConfirmation && data.prepStatus !== 'cancelled' ? (
+          <p
+            role="status"
+            className="mt-3 rounded-[14px] border border-[color-mix(in_oklab,var(--p-accent)_28%,transparent)] bg-[color-mix(in_oklab,var(--p-accent)_8%,transparent)] px-3.5 py-2.5 text-[12.5px] leading-[1.5] text-gink-80"
+          >
+            <strong className="font-semibold text-gink">Waiting for the restaurant.</strong>{' '}
+            Somebody on the floor confirms each table once, then this order starts cooking. This
+            page updates by itself when they do.
+          </p>
+        ) : null}
 
         <p aria-label="Order reference" className="mt-3 flex items-center gap-2 text-[11.5px] text-gink-46">
           <span className="tracking-[0.08em] uppercase">Reference</span>

@@ -39,6 +39,14 @@ export type SettingsScreenData = {
   taxRateBps: number;
   /** Has the owner switched card/UPI payment on? */
   onlinePaymentsEnabled: boolean;
+  /**
+   * Migration 20261028000900. How a guest proves they are at a table.
+   *
+   * 'code' is the default and the only mode that requires an on-site secret.
+   * The other two remove it, which is a decision the owner makes with the
+   * trade-off written on the screen -- not something a deployment decides.
+   */
+  guestVerificationMode: 'code' | 'scan_confirm' | 'scan';
   /** Migration 20261026001300. The restaurant's own handle, or ''. */
   upiId: string;
   /**
@@ -76,6 +84,7 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
       details: { name: '', tagline: '', address: '', phone: '', gstin: '', slug: '' },
       taxRateBps: 0,
       onlinePaymentsEnabled: false,
+      guestVerificationMode: 'code' as const,
       upiId: '',
       upiPayeeName: '',
       timezone: 'Asia/Kolkata',
@@ -91,14 +100,35 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
 
   const { supabase, restaurantId, role, outlets } = staff.context;
 
-  const [restaurantResult, menusResult] = await Promise.all([
-    supabase
-      .from('restaurants')
-      .select(
-        'name, tagline, address, phone, gstin, slug, timezone, tax_rate_bps, online_payments_enabled, upi_id, upi_payee_name'
-      )
-      .eq('id', restaurantId)
-      .maybeSingle(),
+  /**
+   * guest_verification_mode exists only after migration 20261028000900, and a
+   * select naming a column the database does not have fails as a whole (42703).
+   * Settings is a screen an owner opens every day; it must not be taken down by
+   * a deployment that shipped ahead of its migration. So the column is asked
+   * for, and a missing-column answer retries without it -- with the mode
+   * defaulting to 'code', which is what an unmigrated database enforces anyway.
+   */
+  const restaurantColumns =
+    'name, tagline, address, phone, gstin, slug, timezone, tax_rate_bps, online_payments_enabled, upi_id, upi_payee_name, guest_verification_mode';
+  const restaurantColumnsLegacy =
+    'name, tagline, address, phone, gstin, slug, timezone, tax_rate_bps, online_payments_enabled, upi_id, upi_payee_name';
+
+  const firstRestaurantResult = await supabase
+    .from('restaurants')
+    .select(restaurantColumns)
+    .eq('id', restaurantId)
+    .maybeSingle();
+
+  const restaurantResult =
+    firstRestaurantResult.error?.code === '42703'
+      ? await supabase
+          .from('restaurants')
+          .select(restaurantColumnsLegacy)
+          .eq('id', restaurantId)
+          .maybeSingle()
+      : firstRestaurantResult;
+
+  const [menusResult] = await Promise.all([
     supabase.from('menus').select('id, is_published').eq('restaurant_id', restaurantId),
   ]);
 
@@ -119,6 +149,7 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
       details: { name: '', tagline: '', address: '', phone: '', gstin: '', slug: '' },
       taxRateBps: 0,
       onlinePaymentsEnabled: false,
+      guestVerificationMode: 'code' as const,
       upiId: '',
       upiPayeeName: '',
       timezone: 'Asia/Kolkata',
@@ -156,6 +187,12 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
     // inventing a tax nobody set.
     taxRateBps: Number(row.tax_rate_bps ?? 0),
     onlinePaymentsEnabled: row.online_payments_enabled === true,
+    // Read through a cast because the same query has a legacy shape without
+    // this column; see the retry above. Absent means 'code'.
+    guestVerificationMode: (() => {
+      const mode = (row as { guest_verification_mode?: string | null }).guest_verification_mode;
+      return mode === 'scan_confirm' || mode === 'scan' ? mode : 'code';
+    })(),
     upiId: String((row as { upi_id?: string | null }).upi_id ?? ''),
     upiPayeeName: String((row as { upi_payee_name?: string | null }).upi_payee_name ?? ''),
     timezone: String(row.timezone ?? 'Asia/Kolkata'),
