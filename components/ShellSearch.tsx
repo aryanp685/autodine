@@ -125,7 +125,12 @@ export function ShellSearch({ onLaunch }: { onLaunch?: () => void }) {
           tint, and focus turns it into the one white object in the bar with the
           accent ring. The `⌘K` legend sits inside it, because that is what it
           is: the shortcut for this control, not a separate affordance. */}
-      <div className="flex h-9 items-center gap-2 rounded-full border border-transparent bg-[color-mix(in_oklab,var(--p-ink)_6%,transparent)] pr-2 pl-3 transition-[background-color,border-color,box-shadow] duration-150 ease-[var(--o-ease)] hover:bg-[color-mix(in_oklab,var(--p-ink)_9%,transparent)] focus-within:border-[var(--p-accent)] focus-within:bg-card focus-within:shadow-[var(--p-shadow-1)]">
+      {/* A grey pill that becomes a white one. The focus state is the surface
+          lifting, not a border being drawn: two rings around a 36px control
+          (the wrapper's and the input's) is what it looked like before, and
+          one of them was the platform's black box. The input itself is
+          `.shell-field` -- see the reset in app/globals.css. */}
+      <div className="flex h-9 items-center gap-2 rounded-full bg-[color-mix(in_oklab,var(--p-ink)_6%,transparent)] pr-2 pl-3 transition-[background-color,box-shadow] duration-150 ease-[var(--o-ease)] hover:bg-[color-mix(in_oklab,var(--p-ink)_9%,transparent)] focus-within:bg-card focus-within:shadow-[var(--p-shadow-1)] focus-within:ring-[3px] focus-within:ring-[color-mix(in_oklab,var(--p-accent)_16%,transparent)]">
         <svg
           aria-hidden="true"
           viewBox="0 0 24 24"
@@ -167,18 +172,16 @@ export function ShellSearch({ onLaunch }: { onLaunch?: () => void }) {
               optionRefs.current[cursor]?.click();
             }
           }}
-          /* `appearance-none` is not cosmetic. A native `searchfield` paints its
-             own black focus rectangle on some engines and ignores
-             `outline: none`; the wrapper already draws the ring, in the accent,
-             when the field has focus. Two rings, one of them the platform's,
-             is what made this control look broken. */
-          className="w-[92px] appearance-none bg-transparent text-[12.5px] text-gink placeholder:text-gink-46 focus:w-[150px] focus:outline-none focus-visible:outline-none sm:w-[132px] sm:focus:w-[190px] transition-[width] duration-150"
+          /* `.shell-field` is the unlayered reset: no native searchfield
+             decoration, no border, no outline, no shadow. The wrapper owns the
+             whole visual state of this control. */
+          className="shell-field w-[92px] bg-transparent text-[12.5px] text-gink placeholder:text-gink-46 focus:w-[150px] sm:w-[132px] sm:focus:w-[190px] transition-[width] duration-150"
         />
         {/* The key shown has to be the key that works. This printed ⌘K on every
             platform, including Windows, where the shortcut is Ctrl+K and the
             legend named a key the keyboard does not have. The modifier is read
             after mount so the server-rendered mark stays stable. */}
-        <kbd className="hidden shrink-0 rounded-[6px] border border-hair bg-card px-1.5 py-px text-[10px] font-medium text-gink-46 shadow-[inset_0_-1px_0_rgba(29,29,31,0.06)] sm:block">
+        <kbd className="hidden shrink-0 rounded-[var(--p-r-chip)] border border-hair bg-card px-1.5 py-px text-[10px] font-medium text-gink-46 shadow-[inset_0_-1px_0_rgba(29,29,31,0.06)] sm:block">
           {isApple ? '⌘K' : 'Ctrl K'}
         </kbd>
       </div>

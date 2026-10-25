@@ -516,8 +516,8 @@ export function btn(tone: BtnTone = 'solid', size: BtnSize = 'md'): string {
    * So the geometry is 999px, the height is 36 (sm) or 44 (md), and the
    * difference between the tones is FILL and WEIGHT, not outline:
    *
-   *   solid    graphite fill, white label -- the default action
-   *   primary  accent fill, white label -- the one action the screen exists for
+   *   solid    accent fill, white label -- the default action
+   *   primary  the same fill, for the one action a screen exists for
    *   ghost    a pale grey fill, no border -- a secondary action
    *   quiet    no fill at all, accent label -- a text button
    *   danger   no fill, alert label, a red wash on hover
@@ -534,8 +534,14 @@ export function btn(tone: BtnTone = 'solid', size: BtnSize = 'md'): string {
     'inline-flex items-center justify-center gap-2 rounded-full font-medium whitespace-nowrap transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-[var(--o-ease)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0 disabled:active:scale-100 active:translate-y-px active:scale-[0.98]';
   const box = size === 'sm' ? 'h-9 px-4 text-[12.5px]' : 'h-11 px-5 text-[13px]';
   const tones: Record<BtnTone, string> = {
+    /* ONE FILLED COLOUR IN THE PRODUCT.
+       There used to be a second filled tone -- the ink -- and it was the thing
+       that made a page look assembled from two systems: "Enable" on a table
+       card was a black pill sitting in a row of blue text actions, so the row
+       had two hierarchies and neither was obvious. A filled action is the
+       accent, full stop; the ink is for type and for the rail's scrim. */
     solid:
-      'bg-gink text-onink hover:bg-[color-mix(in_oklab,var(--p-ink)_88%,white)] active:bg-[color-mix(in_oklab,var(--p-ink)_82%,white)]',
+      'bg-[var(--p-accent)] text-onink hover:bg-[var(--p-accent-strong)] active:bg-[var(--p-accent-strong)]',
     primary:
       'bg-[var(--p-accent)] text-onink hover:bg-[var(--p-accent-strong)] active:bg-[var(--p-accent-strong)]',
     ghost:
@@ -650,7 +656,7 @@ export function Segmented<T extends string>({
             onClick={() => onChange(option.value)}
             {...option.data}
             className={[
-              'rounded-[8px] font-medium whitespace-nowrap transition-[background-color,color,box-shadow] duration-150',
+              'rounded-[var(--p-r-chip)] font-medium whitespace-nowrap transition-[background-color,color,box-shadow] duration-150',
               'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]',
               fill ? 'flex flex-1 items-center justify-center gap-1.5' : '',
               item,
@@ -850,7 +856,7 @@ export function Tag({ tone = 'neutral', children }: { tone?: PillTone; children:
     due: 'bg-[var(--p-due-soft)] text-[var(--p-due)]',
     failed: 'bg-[var(--p-due-soft)] text-[var(--p-due)]',
     neutral: 'bg-paper-deep text-gink-64',
-    ink: 'bg-gink text-onink',
+    ink: 'bg-[var(--p-accent)] text-onink',
   };
   return (
     <span

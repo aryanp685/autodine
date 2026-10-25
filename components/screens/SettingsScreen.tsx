@@ -62,7 +62,7 @@ import {
  *   - Every callout is the kit's Notice, with a tone that means something:
  *     `due` for something that is costing money or blocking a scan, `accent`
  *     for a save that landed, `plain` for a fact.
- *   - One save button per form, all the solid ink button at the same size, so
+ *   - One save button per form, all the filled accent button at the same size, so
  *     "which control commits this card" is answered the same way five times.
  *   - The aside is two Panels, matching the five beside them.
  *
@@ -776,7 +776,7 @@ export function SettingsScreen({
                     href={data.publicMenuUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="min-w-0 flex-1 truncate rounded-[8px] border border-hair bg-paper-deep px-2.5 py-1.5 text-[11.5px] text-gink underline decoration-hair-strong underline-offset-2 hover:decoration-gink"
+                    className="min-w-0 flex-1 truncate rounded-[var(--p-r-chip)] border border-hair bg-paper-deep px-2.5 py-1.5 text-[11.5px] text-gink underline decoration-hair-strong underline-offset-2 hover:decoration-gink"
                   >
                     {data.publicMenuUrl}
                   </a>

@@ -304,10 +304,10 @@ describe('Settings, the redesign', () => {
   });
 
   it('gives every form the same commit button', () => {
-    // Five forms, five saves, one appearance: solid ink at the same size, so
-    // "which control commits this card" is answered the same way every time.
+    // Five forms, five saves, one appearance: the accent fill at the same size,
+    // so "which control commits this card" is answered the same way every time.
     const html = renderToStaticMarkup(<SettingsScreen data={data()} gatewayConfigured />);
-    expect(count(html, 'bg-gink text-onink')).toBe(5);
+    expect(count(html, 'bg-[var(--p-accent)] text-onink')).toBe(5);
   });
 
   it('draws no hand-made alert boxes any more', () => {
