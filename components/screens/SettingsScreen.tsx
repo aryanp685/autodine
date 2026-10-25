@@ -13,7 +13,7 @@ import {
   saveGuestVerificationAction,
   saveTaxAction,
   saveUpiAction,
-} from '@/app/dashboard/settings/actions';
+} from '@/app/(staff)/dashboard/settings/actions';
 import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
 import {

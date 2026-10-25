@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@/app/dashboard/settings/actions', () => ({
+vi.mock('@/app/(staff)/dashboard/settings/actions', () => ({
   saveDetailsAction: mocks.action('saveDetailsAction'),
   saveTaxAction: mocks.action('saveTaxAction'),
   saveOnlinePaymentsAction: mocks.action('saveOnlinePaymentsAction'),

@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@/app/dashboard/menus/actions', () => ({
+vi.mock('@/app/(staff)/dashboard/menus/actions', () => ({
   addAddonAction: mocks.action('addAddonAction'),
   addAddonGroupAction: mocks.action('addAddonGroupAction'),
   addCategoryAction: mocks.action('addCategoryAction'),

@@ -7,7 +7,7 @@ import type { TablesScreenData } from '@/lib/db/tables-screen';
 // marker), and the refresh helper is a client component that needs a Next
 // router. Neither is what this test is about: it is about what a member of
 // staff can SEE on the screen they have to read a code off.
-vi.mock('@/app/dashboard/tables/actions', () => ({
+vi.mock('@/app/(staff)/dashboard/tables/actions', () => ({
   addTableAction: async () => undefined,
   revokeQrAction: async () => undefined,
   rotateQrAction: async () => undefined,

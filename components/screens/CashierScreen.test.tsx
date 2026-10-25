@@ -8,7 +8,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => {}, push:
 
 /* The server actions reach lib/supabase/admin.ts through the action module.
    These tests render markup; they never call one. */
-vi.mock('@/app/cashier/actions', () => ({ recordPaymentAction: async () => ({ ok: true }) }));
+vi.mock('@/app/(staff)/cashier/actions', () => ({ recordPaymentAction: async () => ({ ok: true }) }));
 vi.mock('@/app/orders/actions', () => ({ cancelStaffOrderAction: async () => ({ ok: true }) }));
 
 /**

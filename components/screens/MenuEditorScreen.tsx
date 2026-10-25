@@ -47,7 +47,7 @@ import {
   selectMenuAction,
   setAllAvailabilityAction,
   setItemAvailabilityAction,
-} from '@/app/dashboard/menus/actions';
+} from '@/app/(staff)/dashboard/menus/actions';
 import { PRESET_CATEGORIES, normaliseCategoryName } from '@/lib/menu-presets';
 import { PronunciationField } from '@/components/PronunciationField';
 import { DishPhotoField } from '@/components/DishPhotoField';

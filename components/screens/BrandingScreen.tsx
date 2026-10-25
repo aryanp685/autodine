@@ -10,7 +10,7 @@ import {
   removeLogoAction,
   uploadBannerAction,
   uploadLogoAction,
-} from '@/app/dashboard/branding/actions';
+} from '@/app/(staff)/dashboard/branding/actions';
 import { inr } from '@/lib/demo-data';
 import {
   BtnLink,

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { VegMark } from '@/components/ui';
-import { createImportedMenuAction, previewMenuImportAction, type ImportPreview } from '@/app/dashboard/menus/import-actions';
+import { createImportedMenuAction, previewMenuImportAction, type ImportPreview } from '@/app/(staff)/dashboard/menus/import-actions';
 import { PhotoImportPanel } from '@/components/PhotoImportPanel';
 import { draftItemCount, MAX_IMPORT_TEXT } from '@/lib/menu-import';
 import { inr } from '@/lib/demo-data';

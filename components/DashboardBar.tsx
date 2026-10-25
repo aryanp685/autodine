@@ -9,7 +9,12 @@ import type { ReactNode } from 'react';
 import { OutletSwitcher } from '@/components/OutletSwitcher';
 import { ShellSearch } from '@/components/ShellSearch';
 import { BrandLockup } from '@/components/BrandMark';
-import { DASHBOARD_LINKS, SHELL_GROUPS, type DashboardSection } from '@/components/shell-links';
+import {
+  DASHBOARD_LINKS,
+  SHELL_GROUPS,
+  sectionForPathname,
+  type DashboardSection,
+} from '@/components/shell-links';
 import type { OutletBar } from '@/lib/outlets';
 import { signOutAction } from '@/app/auth/actions';
 
@@ -81,6 +86,19 @@ export function DashboardBar({
   signOut?: boolean;
 }) {
   const pathname = usePathname();
+
+  /*
+   * WHERE WE ARE COMES FROM THE URL.
+   *
+   * The prop is still accepted -- a skeleton that renders before its page is
+   * known can name the section itself, and standalone renders in tests pass one
+   * -- but when it is absent the rail works it out from the path. That is what
+   * lets the bar be rendered ONCE by the staff layout and still mark the right
+   * row on every navigation: a layout does not re-run when the page changes, so
+   * a prop threaded from the page would go stale.
+   */
+  const activeSection = active ?? sectionForPathname(pathname);
+
   const [open, setOpen] = useState(false);
   /* GSAP, lazily, for the drawer's rows only -- see components/owner/useRailStagger.ts
      for why this is the surface that needs a timeline and the rest does not. */
@@ -117,7 +135,7 @@ export function DashboardBar({
     };
   }, []);
 
-  const activeLink = DASHBOARD_LINKS.find((link) => link.key === active);
+  const activeLink = DASHBOARD_LINKS.find((link) => link.key === activeSection);
   const activeOutlet =
     outlet?.outlets.find((entry) => entry.id === outlet.activeId) ?? outlet?.outlets[0] ?? null;
 
@@ -222,7 +240,7 @@ export function DashboardBar({
                 {group.name}
               </div>
               {group.links.map((link) => {
-                const current = link.key === active;
+                const current = link.key === activeSection;
                 return (
                   <Link
                     key={link.key}

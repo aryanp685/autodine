@@ -16,7 +16,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
  * needs are there and that there is exactly one submit.
  */
 
-vi.mock('@/app/dashboard/menus/actions', () => ({
+vi.mock('@/app/(staff)/dashboard/menus/actions', () => ({
   uploadDishPhotoAction: () => {},
   removeDishPhotoAction: () => {},
 }));

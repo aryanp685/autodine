@@ -57,3 +57,48 @@ export const SHELL_GROUPS: ReadonlyArray<{ name: string; links: readonly ShellLi
   'Menu',
   'Business',
 ].map((name) => ({ name, links: DASHBOARD_LINKS.filter((link) => link.group === name) }));
+
+/**
+ * Which destination a URL is.
+ *
+ * WHY THIS EXISTS
+ *
+ * The shell used to be told its active section by a prop, passed by hand from
+ * each page. That works until one page forgets, and then the rail is on screen
+ * with nothing highlighted while the page loads -- which is exactly what
+ * happened to seven skeletons in this codebase.
+ *
+ * Now that the rail is rendered once by a layout, it cannot be handed a prop
+ * per page anyway: the layout does not re-run when the page changes. So the
+ * answer is derived from the URL, which is the only place it was ever true.
+ *
+ * Longest match wins, so `/dashboard/menus/import` is Import rather than Menus,
+ * and the comparison is segment-aware: `/kitchen` must not match
+ * `/kitchenette`.
+ */
+export function sectionForPathname(pathname: string | null | undefined): DashboardSection | undefined {
+  if (!pathname) return undefined;
+
+  let best: { key: DashboardSection; length: number } | null = null;
+
+  for (const link of DASHBOARD_LINKS) {
+    const isMatch = pathname === link.href || pathname.startsWith(`${link.href}/`);
+    if (!isMatch) continue;
+    if (!best || link.href.length > best.length) {
+      best = { key: link.key, length: link.href.length };
+    }
+  }
+
+  return best?.key;
+}
+
+/**
+ * The screens that want the wide column (a report table, a ticket grid).
+ *
+ * Derived from the same URL for the same reason: the width lives on the frame,
+ * the frame lives in the layout, and the layout does not see the page's props.
+ */
+export function isWideSection(pathname: string | null | undefined): boolean {
+  const key = sectionForPathname(pathname);
+  return key === 'kitchen' || key === 'menus' || key === 'orders' || key === 'reports' || key === 'counter';
+}

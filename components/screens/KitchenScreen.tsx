@@ -21,7 +21,7 @@ import type { OutletBar } from '@/lib/outlets';
 import type { KitchenScreenData, KitchenTicket } from '@/lib/db/kitchen-screen';
 import { clockTimeInZone } from '@/lib/db/time';
 import { LATE_AFTER_MIN, WARN_AFTER_MIN, nextPrepState, type PrepState } from '@/lib/db/prep';
-import { advanceOrderAction } from '@/app/kitchen/actions';
+import { advanceOrderAction } from '@/app/(staff)/kitchen/actions';
 import { HeldTableStrip } from '@/components/owner/HeldTableStrip';
 import { cancelStaffOrderAction } from '@/app/orders/actions';
 import { SignInPrompt } from '@/components/SignInPrompt';

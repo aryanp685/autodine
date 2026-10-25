@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { confirmTableAction, rejectTableAction } from '@/app/kitchen/actions';
+import { confirmTableAction, rejectTableAction } from '@/app/(staff)/kitchen/actions';
 import type { HeldTable } from '@/lib/db/kitchen-screen';
 import { btn } from '@/components/owner/chrome';
 

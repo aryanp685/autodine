@@ -20,16 +20,16 @@ import { DASHBOARD_LINKS } from '@/components/shell-links';
 
 /** The route each section lives at, and the file that must exist for it. */
 const ROUTES: Record<string, { dir: string; key: string }> = {
-  overview: { dir: 'app/dashboard', key: 'overview' },
-  orders: { dir: 'app/dashboard/orders', key: 'orders' },
-  menus: { dir: 'app/dashboard/menus', key: 'menus' },
-  import: { dir: 'app/dashboard/menus/import', key: 'import' },
-  branding: { dir: 'app/dashboard/branding', key: 'branding' },
-  tables: { dir: 'app/dashboard/tables', key: 'tables' },
-  reports: { dir: 'app/dashboard/reports', key: 'reports' },
-  settings: { dir: 'app/dashboard/settings', key: 'settings' },
-  kitchen: { dir: 'app/kitchen', key: 'kitchen' },
-  counter: { dir: 'app/cashier', key: 'counter' },
+  overview: { dir: 'app/(staff)/dashboard', key: 'overview' },
+  orders: { dir: 'app/(staff)/dashboard/orders', key: 'orders' },
+  menus: { dir: 'app/(staff)/dashboard/menus', key: 'menus' },
+  import: { dir: 'app/(staff)/dashboard/menus/import', key: 'import' },
+  branding: { dir: 'app/(staff)/dashboard/branding', key: 'branding' },
+  tables: { dir: 'app/(staff)/dashboard/tables', key: 'tables' },
+  reports: { dir: 'app/(staff)/dashboard/reports', key: 'reports' },
+  settings: { dir: 'app/(staff)/dashboard/settings', key: 'settings' },
+  kitchen: { dir: 'app/(staff)/kitchen', key: 'kitchen' },
+  counter: { dir: 'app/(staff)/cashier', key: 'counter' },
 };
 
 describe('the staff shell', () => {
@@ -82,7 +82,7 @@ describe('the staff shell', () => {
      * frame by hand -- which is exactly the kind of duplicate that drifts, so it
      * gets its own assertion: the bar must still be told where it is.
      */
-    const cashierPage = readFileSync('app/cashier/page.tsx', 'utf8');
+    const cashierPage = readFileSync('app/(staff)/cashier/page.tsx', 'utf8');
     expect(cashierPage).toMatch(/<DashboardBar[\s\S]*active="counter"/);
   });
 
@@ -95,5 +95,37 @@ describe('the staff shell', () => {
     // The drawer must close when the route changes, or a phone keeps a sheet
     // over the page it just navigated to.
     expect(shell).toMatch(/useEffect\(\(\) => \{\s*setOpen\(false\);\s*\}, \[pathname\]\)/);
+  });
+});
+
+describe('the shell is a layout, and stays one', () => {
+  it('renders the rail once, from the route group', () => {
+    const layout = readFileSync('app/(staff)/layout.tsx', 'utf8');
+    expect(layout).toContain('<StaffShell');
+    // The layout must not render a second bar or main of its own.
+    expect(layout).not.toContain('<DashboardBar');
+  });
+
+  it('keeps the guest-code kiosk outside the staff shell', () => {
+    // /dashboard/display is a full-screen board for a tablet at the counter.
+    // Wrapping it in a rail would put navigation on a screen nobody navigates.
+    expect(existsSync('app/(kiosk)/dashboard/display/page.tsx')).toBe(true);
+    expect(existsSync('app/(staff)/dashboard/display')).toBe(false);
+  });
+
+  it('catches a page crash below the shell, so navigation survives it', () => {
+    // An error boundary above the shell replaces the rail with it.
+    expect(existsSync('app/(staff)/error.tsx')).toBe(true);
+    const boundary = readFileSync('app/(staff)/error.tsx', 'utf8');
+    expect(boundary).toContain("'use client'");
+    expect(boundary).toContain('reset');
+  });
+
+  it('keeps every staff URL exactly as it was', () => {
+    // A route group contributes nothing to the path: if one of these files ever
+    // lands outside `(staff)`, the URL is the same but the shell is gone.
+    for (const { dir } of Object.values(ROUTES)) {
+      expect(dir.startsWith('app/(staff)/'), `${dir} left the staff group`).toBe(true);
+    }
   });
 });

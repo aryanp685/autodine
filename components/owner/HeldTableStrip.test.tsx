@@ -9,7 +9,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
  * refuses to offer -- not the round trip, which is the database's job and is
  * guarded by the UPDATE predicate `confirmed_at is null`.
  */
-vi.mock('@/app/kitchen/actions', () => ({
+vi.mock('@/app/(staff)/kitchen/actions', () => ({
   confirmTableAction: vi.fn(),
   rejectTableAction: vi.fn(),
 }));
