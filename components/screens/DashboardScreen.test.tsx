@@ -264,8 +264,17 @@ describe('Dashboard, the figures', () => {
 
   it('draws revenue larger and lets it have the width', () => {
     const html = renderToStaticMarkup(<Dashboard data={live()} />);
-    expect(html).toContain('lg:grid-cols-[1.6fr_1fr_1fr_1fr]');
-    expect(html).toContain('clamp(1.9rem,4.6vw,3.3rem)');
+
+    // It is no longer one of four equal cards with a bigger font: it is the
+    // hero, with the shape of the day inside it, and the other three sit beside
+    // it. What this asserts is the same intent as before -- revenue is drawn
+    // bigger than its siblings and it is given the width to do it in.
+    const hero = html.slice(html.indexOf('data-hero="revenue"'));
+    expect(hero.slice(0, 4000)).toContain('clamp(2.2rem,5.4vw,4rem)');
+    expect(html).toContain('lg:grid-cols-[1.62fr_1fr]');
+    // ...and no sibling may borrow the display size.
+    const siblings = html.slice(html.indexOf('Other figures for today'));
+    expect(siblings).not.toContain('clamp(2.2rem,5.4vw,4rem)');
   });
 
   it('still tints only open orders, and only when there are some', () => {
