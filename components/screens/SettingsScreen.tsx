@@ -319,7 +319,7 @@ export function SettingsScreen({
                   </Field>
 
                   {canEdit ? (
-                    <label className="flex items-start gap-2.5 rounded-[10px] border border-hair bg-paper-deep px-3 py-2.5">
+                    <label className="flex items-start gap-2.5 rounded-[var(--p-r-control)] border border-hair bg-paper-deep px-3 py-2.5">
                       <input
                         type="checkbox"
                         name="slugConfirm"
@@ -443,7 +443,7 @@ export function SettingsScreen({
                   ) : null}
 
                   <form action={saveOnlinePaymentsAction} className="mt-3.5 flex flex-col gap-3">
-                    <label className="flex items-start gap-2.5 rounded-[10px] border border-hair bg-paper-deep px-3 py-2.5">
+                    <label className="flex items-start gap-2.5 rounded-[var(--p-r-control)] border border-hair bg-paper-deep px-3 py-2.5">
                       <input
                         type="checkbox"
                         disabled={disabled || !gatewayConfigured}
@@ -660,7 +660,7 @@ export function SettingsScreen({
               bodyClassName="px-4 py-4"
             >
               {data?.publicMenuSvg ? (
-                <div className="flex justify-center rounded-[10px] border border-hair bg-white p-3">
+                <div className="flex justify-center rounded-[var(--p-r-control)] border border-hair bg-white p-3">
                   {/* Generated on the server by lib/qr.ts from a URL we build.
                       There is no path from anything a restaurant types to this
                       string, so it is injected rather than parsed. */}

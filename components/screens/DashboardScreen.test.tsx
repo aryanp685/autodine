@@ -265,7 +265,7 @@ describe('Dashboard, the figures', () => {
   it('draws revenue larger and lets it have the width', () => {
     const html = renderToStaticMarkup(<Dashboard data={live()} />);
     expect(html).toContain('lg:grid-cols-[1.6fr_1fr_1fr_1fr]');
-    expect(html).toContain('clamp(1.75rem,4.4vw,3.1rem)');
+    expect(html).toContain('clamp(1.9rem,4.6vw,3.3rem)');
   });
 
   it('still tints only open orders, and only when there are some', () => {
@@ -292,7 +292,7 @@ describe('Dashboard, the notices', () => {
   it('draws the plan line as the same strip as everything else', () => {
     const html = renderToStaticMarkup(<Dashboard data={EMPTY} />);
     const plan = strip(html);
-    expect(plan).toContain('rounded-[14px]');
+    expect(plan).toContain('rounded-[var(--p-r-block)]');
     expect(plan).toContain('Free trial');
   });
 

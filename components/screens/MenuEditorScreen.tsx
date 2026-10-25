@@ -329,7 +329,7 @@ export function MenuEditorScreen({
       {error && (
         <div
           role="alert"
-          className="mb-4 rounded-[12px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-4 py-3"
+          className="mb-4 rounded-[var(--p-r-block)] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-4 py-3"
         >
           <strong className="text-[12.5px] text-[var(--alert)]">Could not save.</strong>
           <p className="mt-1 text-[12.5px] leading-[1.5] text-gink-64">{error}</p>
@@ -343,7 +343,7 @@ export function MenuEditorScreen({
         <div
           data-banner="undo"
           role="status"
-          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-hair bg-card px-4 py-2.5"
+          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[var(--p-r-block)] border border-hair bg-card px-4 py-2.5"
         >
           <span className="text-[12.5px] text-gink-64">{notice ?? 'Item deleted.'}</span>
           <form action={restoreItemAction}>
@@ -358,7 +358,7 @@ export function MenuEditorScreen({
           <div
             data-banner="notice"
             role="status"
-            className="mb-4 rounded-[12px] border border-[var(--p-accent)]/25 bg-accent-soft px-4 py-2.5"
+            className="mb-4 rounded-[var(--p-r-block)] border border-[var(--p-accent)]/25 bg-accent-soft px-4 py-2.5"
           >
             <strong className="text-[12.5px] text-gink">Done.</strong>{' '}
             <span className="text-[12.5px] text-gink-64">{notice}</span>
@@ -367,7 +367,7 @@ export function MenuEditorScreen({
       )}
 
       {!blocked && (
-        <div className="grid gap-5 xl:grid-cols-[204px_minmax(0,1fr)_330px] xl:items-start">
+        <div className="grid gap-6 xl:grid-cols-[212px_minmax(0,1fr)_344px] xl:items-start">
           {/* ------------------------------------------------- categories rail */}
           <aside aria-labelledby="menu-categories">
             <SectionHead title={<span id="menu-categories">Categories</span>} />
@@ -433,7 +433,7 @@ export function MenuEditorScreen({
                           <button
                             type="submit"
                             aria-label={`Remove category ${name}`}
-                            className="inline-flex h-9 items-center rounded-[10px] border border-[color-mix(in_oklab,var(--p-accent)_42%,transparent)] bg-accent-soft px-3 text-[12.5px] font-medium text-[var(--p-accent)] transition-colors hover:border-[var(--p-accent)]"
+                            className="inline-flex h-9 items-center rounded-[var(--p-r-control)] border border-[color-mix(in_oklab,var(--p-accent)_42%,transparent)] bg-accent-soft px-3 text-[12.5px] font-medium text-[var(--p-accent)] transition-colors hover:border-[var(--p-accent)]"
                           >
                             {name} ✓
                           </button>
@@ -445,7 +445,7 @@ export function MenuEditorScreen({
                           <button
                             type="submit"
                             aria-label={`Add category ${name}`}
-                            className="inline-flex h-9 items-center rounded-[10px] border border-hair-strong bg-card px-3 text-[12.5px] font-medium text-gink-64 transition-colors hover:border-gink-28 hover:text-gink"
+                            className="inline-flex h-9 items-center rounded-[var(--p-r-control)] border border-hair-strong bg-card px-3 text-[12.5px] font-medium text-gink-64 transition-colors hover:border-gink-28 hover:text-gink"
                           >
                             + {name}
                           </button>
@@ -568,7 +568,7 @@ export function MenuEditorScreen({
               <form
                 action={addItemAction}
                 aria-label="Add a dish"
-                className="mb-3 grid grid-cols-2 items-end gap-2 rounded-[14px] border border-hair bg-card p-3 sm:grid-cols-[minmax(0,1.4fr)_92px_104px_minmax(0,1fr)_auto]"
+                className="mb-3 grid grid-cols-2 items-end gap-2 rounded-[var(--p-r-block)] border border-hair bg-card p-3 sm:grid-cols-[minmax(0,1.4fr)_92px_104px_minmax(0,1fr)_auto]"
               >
                 {/* Four inputs used to sit here unlabelled, each explaining
                     itself only in a placeholder that vanishes on the first
@@ -787,7 +787,7 @@ export function MenuEditorScreen({
                                 >
                                   <SwitchTrack
                                     on={i.available}
-                                    className="group-hover:bg-[rgba(25,20,17,0.22)]"
+                                    className="group-hover:bg-[color-mix(in_oklab,var(--p-ink)_22%,transparent)]"
                                   />
                                   <span className={i.available ? 'text-gink' : ''}>
                                     {i.available ? 'Available' : 'Sold out'}
@@ -1232,7 +1232,7 @@ export function MenuEditorScreen({
                 state is now said outright, and it can be reversed. */}
             <div className="mt-5">
               {data?.published ? (
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-[12px] border border-[var(--p-accent)]/25 bg-accent-soft px-3.5 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--p-r-block)] border border-[var(--p-accent)]/25 bg-accent-soft px-3.5 py-3">
                   <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-gink">
                     <span
                       aria-hidden="true"

@@ -154,7 +154,7 @@ export function MenuImportScreen({
       )}
 
       {!blocked && !visionEnabled && (
-        <div className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-[12px] border border-hair bg-card px-4 py-3">
+        <div className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-[var(--p-r-block)] border border-hair bg-card px-4 py-3">
           <Tag tone="neutral">Paste the text</Tag>
           <p className="m-0 flex-1 text-[12.5px] leading-[1.5] text-gink-64">
             Reading a photograph needs a vision model, and this deployment does not have one
@@ -171,7 +171,7 @@ export function MenuImportScreen({
       {error && (
         <div
           role="alert"
-          className="mt-3 rounded-[12px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-4 py-3"
+          className="mt-3 rounded-[var(--p-r-block)] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-4 py-3"
         >
           <strong className="text-[12.5px] text-[var(--alert)]">Nothing was imported.</strong>
           <p className="mt-1 text-[12.5px] leading-[1.5] text-gink-64">{error}</p>
@@ -260,7 +260,7 @@ export function MenuImportScreen({
                   key={`${category.name}-${index}`}
                   data-kept={kept ? 'true' : 'false'}
                   className={[
-                    'rounded-[12px] border px-3.5 py-3 transition-colors',
+                    'rounded-[var(--p-r-block)] border px-3.5 py-3 transition-colors',
                     kept ? 'border-hair bg-paper-deep/60' : 'border-hair bg-paper-deep opacity-55',
                   ].join(' ')}
                 >
@@ -303,7 +303,7 @@ export function MenuImportScreen({
             })}
 
             {draft.issues.length > 0 && (
-              <div className="rounded-[12px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-3">
+              <div className="rounded-[var(--p-r-block)] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-3">
                 <strong className="text-[12.5px] font-semibold text-gink">
                   {draft.issues.length} line(s) were not imported.
                 </strong>{' '}
@@ -330,7 +330,7 @@ export function MenuImportScreen({
               </p>
             )}
 
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-[12px] border border-hair bg-card px-3.5 py-3">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-[var(--p-r-block)] border border-hair bg-card px-3.5 py-3">
               <Tag tone="neutral">Guess</Tag>
               <p className="m-0 flex-1 text-[11.5px] leading-[1.5] text-gink-64">
                 <strong className="font-semibold text-gink">

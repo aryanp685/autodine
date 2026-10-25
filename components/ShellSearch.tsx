@@ -72,11 +72,6 @@ export function ShellSearch({ onLaunch }: { onLaunch?: () => void }) {
         setOpen(false);
         inputRef.current?.blur();
       }
-      // Cmd/Ctrl+K opens it from anywhere: the one shortcut people try.
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        inputRef.current?.focus();
-      }
     };
 
     document.addEventListener('mousedown', onPointerDown);
@@ -87,6 +82,31 @@ export function ShellSearch({ onLaunch }: { onLaunch?: () => void }) {
     };
   }, [open]);
 
+  /*
+   * CMD/CTRL+K, ALWAYS LISTENING.
+   *
+   * This handler used to live in the effect above, which only runs while the
+   * palette is ALREADY open -- so the legend printed "⌘K", the shortcut did
+   * nothing from a closed palette, and the one key everybody tries first
+   * appeared to be broken. Found by reading the effect's dependencies, not by
+   * looking at the screen: the palette looked perfect and did nothing.
+   *
+   * It is registered on the document for the life of the screen, not per open.
+   */
+  useEffect(() => {
+    const onShortcut = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'k') return;
+      event.preventDefault();
+      setOpen(true);
+      inputRef.current?.focus();
+      // The field is a real input: focusing it is enough, but a native
+      // `select()` makes the shortcut useful when there is already a query.
+      inputRef.current?.select();
+    };
+    document.addEventListener('keydown', onShortcut);
+    return () => document.removeEventListener('keydown', onShortcut);
+  }, []);
+
   function close() {
     setOpen(false);
     setQuery('');
@@ -95,7 +115,7 @@ export function ShellSearch({ onLaunch }: { onLaunch?: () => void }) {
 
   return (
     <div className="relative" ref={wrapperRef}>
-      <div className="flex items-center gap-2 rounded-[10px] border border-hair-strong bg-card px-3 py-2 transition-colors focus-within:border-[var(--p-accent)]">
+      <div className="flex h-9 items-center gap-2 rounded-[var(--p-r-control)] border border-hair-strong bg-card pr-2 pl-3 shadow-[var(--p-shadow-1)] transition-[border-color,box-shadow,background-color] duration-150 ease-[var(--o-ease)] hover:border-gink-28 focus-within:border-[var(--p-accent)] focus-within:shadow-[var(--p-shadow-2)]">
         <svg
           aria-hidden="true"
           viewBox="0 0 24 24"
@@ -143,7 +163,7 @@ export function ShellSearch({ onLaunch }: { onLaunch?: () => void }) {
             platform, including Windows, where the shortcut is Ctrl+K and the
             legend named a key the keyboard does not have. The modifier is read
             after mount so the server-rendered mark stays stable. */}
-        <kbd className="hidden shrink-0 rounded border border-hair-strong px-1 py-px text-[9.5px] font-medium text-gink-46 sm:block">
+        <kbd className="hidden shrink-0 rounded border border-hair-strong px-1 py-px text-[10px] font-medium text-gink-46 sm:block">
           {isApple ? '⌘K' : 'Ctrl K'}
         </kbd>
       </div>
@@ -153,10 +173,12 @@ export function ShellSearch({ onLaunch }: { onLaunch?: () => void }) {
           id="shell-search-results"
           role="listbox"
           aria-label="Screens"
-          className="absolute top-[calc(100%+6px)] right-0 z-50 w-[280px] overflow-hidden rounded-xl border border-hair bg-card py-1 shadow-g2"
+          className="absolute top-[calc(100%+8px)] right-0 z-50 max-h-[min(60dvh,420px)] w-[300px] overflow-y-auto overscroll-contain rounded-[var(--p-r-block)] border border-hair bg-card py-1.5 shadow-[var(--p-shadow-3)]"
         >
           {results.length === 0 ? (
-            <p className="px-3.5 py-3 text-[12.5px] text-gink-46">No screen matches “{query.trim()}”.</p>
+            <p className="px-3.5 py-3 text-[12.5px] text-gink-46">
+              No screen matches “{query.trim()}”.
+            </p>
           ) : (
             results.map((link, index) => (
               <Link
@@ -170,12 +192,22 @@ export function ShellSearch({ onLaunch }: { onLaunch?: () => void }) {
                 onMouseEnter={() => setCursor(index)}
                 onClick={close}
                 className={[
-                  'flex items-center justify-between gap-3 px-3.5 py-2 text-[13px] transition-colors',
-                  index === cursor ? 'bg-gink-07 text-gink' : 'text-gink-64',
+                  'relative mx-1 flex items-center justify-between gap-3 rounded-[var(--p-r-control)] px-2.5 py-2 text-[13px]',
+                  'transition-colors duration-100 ease-[var(--o-ease)]',
+                  index === cursor ? 'bg-[color-mix(in_oklab,var(--p-accent)_10%,transparent)] text-gink' : 'text-gink-64',
                 ].join(' ')}
               >
-                <span>{link.label}</span>
-                <span className="text-[10px] font-medium tracking-[0.08em] text-gink-46 uppercase">
+                {/* The cursor mark, in the same copper the rail uses for "you
+                    are here". One idea, two places. */}
+                <span
+                  aria-hidden="true"
+                  className={[
+                    'absolute top-1/2 left-0 h-4 w-[2px] -translate-y-1/2 rounded-r-full bg-[var(--p-accent)] transition-opacity duration-100',
+                    index === cursor ? 'opacity-100' : 'opacity-0',
+                  ].join(' ')}
+                />
+                <span className="pl-2">{link.label}</span>
+                <span className="pr-1 text-[10px] font-medium tracking-[0.1em] text-gink-46 uppercase">
                   {link.group}
                 </span>
               </Link>

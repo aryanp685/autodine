@@ -101,6 +101,18 @@ html, body { margin: 0; padding: 0; }
   --radius: 10px;
   --radius-lg: 16px;
 
+  /* THE EASING TOKEN, which was missing.
+   *
+   * Every `transition: … var(--p-ease)` in this file resolved to nothing,
+   * because the variable was never declared. An invalid var() in a shorthand
+   * invalidates the whole declaration at computed-value time, so `transition`
+   * fell back to its initial value and NOTHING on the surface was animated --
+   * not a hover state, not the file picker, not the guest's glass. It looked
+   * like a design decision, which is why it survived: the product simply felt
+   * abrupt. Declared once here; both surfaces read it, and the owner's own
+   * `--o-ease` is an alias so the two can never disagree. */
+  --p-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
   /* Overridden per direction */
   --page-bg: var(--warm-white);
   --surface: #ffffff;
@@ -262,26 +274,37 @@ p { margin: 0; }
 
 [data-app] [data-surface='owner'] {
   /* ---- surfaces -------------------------------------------------------
-     WARM PAPER. This surface used to be pure white, on the argument that an
-     owner sits under tube lights for six hours and cream reads as beige. The
-     result was a page where cards needed a hairline to exist at all: white on
-     white has no edge. A restaurant's stock is paper, so the page is paper and
-     the cards are the lighter thing sitting on it. */
-  --p-paper: #faf6ef;
-  --p-paper-deep: #f2eadd;
-  --p-surface: #fffdf8;
+     WARM PAPER, and a card that is a lighter sheet on it.
+
+     The page is one shade deeper than it used to be, because a premium
+     surface is made of CONTRAST between layers, not of one flat colour: on
+     the old page tone a card had to be nearly the same value, so the whole
+     page read as one wide beige field with hairlines drawn on it. Dropping it one
+     step and lifting the card one step gives every panel an edge without
+     buying it with a shadow. */
+  --p-paper: #f5efe4;
+  --p-paper-deep: #ece1cf;
+  --p-paper-veil: rgba(255, 253, 248, 0.55);
+  --p-surface: #fffefa;
+  --p-card: #fffdf8;
   --p-glass: rgba(255, 253, 248, 0.88);
 
   /* ---- ink ------------------------------------------------------------
      Espresso, not neutral black. It sits on warm paper the way printed ink
      does; pure black on ivory reads as a screenshot of a document. */
-  --p-ink: #191411;
-  --p-ink-80: rgba(25, 20, 17, 0.84);
-  --p-ink-64: rgba(25, 20, 17, 0.62);
-  --p-ink-46: rgba(25, 20, 17, 0.46);
-  --p-ink-28: rgba(25, 20, 17, 0.26);
-  --p-ink-12: rgba(25, 20, 17, 0.1);
-  --p-ink-07: rgba(25, 20, 17, 0.05);
+  --p-ink: #17110d;
+  --p-ink-80: rgba(23, 17, 13, 0.84);
+  --p-ink-64: rgba(23, 17, 13, 0.62);
+  /* The token keeps the name it has always had (237 call sites read it as
+     `text-gink-46`); the VALUE is the one that changed, and the reason is
+     measurable. At 0.46 the meta line -- a panel's "Restaurant time", a table
+     cell's "3:30 pm" -- measured 3.1:1 on warm paper, which is a grey that
+     reads as switched off. At 0.56 it measures 4.3:1 on a card: still clearly
+     secondary to the ink (18.4:1), now legible at 12.5px under tube lights. */
+  --p-ink-46: rgba(23, 17, 13, 0.56);
+  --p-ink-28: rgba(23, 17, 13, 0.26);
+  --p-ink-12: rgba(23, 17, 13, 0.1);
+  --p-ink-07: rgba(23, 17, 13, 0.05);
   --p-on-ink: #fffdf8;
   --p-on-ink-64: rgba(255, 253, 248, 0.66);
   --p-on-ink-40: rgba(255, 253, 248, 0.42);
@@ -291,11 +314,12 @@ p { margin: 0; }
      control. It is deliberately NOT the colour of a primary button -- that is
      ink -- and it is NOT the colour of "paid". One hue with one meaning.
 
-     The green it replaces was sampled from the logo and then used for the
-     active nav pill, every availability switch and the settled-payment pill.
-     Three meanings on one hue is the same as none. */
+     `--p-accent-strong` exists because copper at 12.5px on a soft wash was
+     fine but at 10.5px tracked-out uppercase it was not: small type needs one
+     more step of the same hue, not a new colour. */
   --p-accent: #9a5b2c;
-  --p-accent-soft: #f6ead9;
+  --p-accent-strong: #7c451e;
+  --p-accent-soft: #f7ecda;
   --p-live: #2f6b45;
   --p-due: #a3341f;
 
@@ -303,32 +327,102 @@ p { margin: 0; }
      The one dark surface in the product. It is the host stand: it frames every
      screen, gives the eye an edge to orient against, and takes the navigation
      out of the same value as the content so the page itself reads as one
-     object. */
-  --p-rail: #1b1512;
-  --p-rail-raised: #241c17;
-  --p-rail-ink: #f8f2e8;
-  --p-rail-ink-64: rgba(248, 242, 232, 0.62);
-  --p-rail-ink-40: rgba(248, 242, 232, 0.38);
-  --p-rail-line: rgba(248, 242, 232, 0.12);
-  --p-rail-active: rgba(154, 91, 44, 0.22);
+     object. Deeper than before, with a warm light along its inner edge so it
+     reads as a lit surface and not as a hole. */
+  --p-rail: #16110e;
+  --p-rail-raised: #211a15;
+  --p-rail-ink: #f9f3e9;
+  --p-rail-ink-64: rgba(249, 243, 233, 0.64);
+  /* 0.38 measured 3.4:1 on the rail for the 10px uppercase group labels
+     ("SERVICE", "BUSINESS") -- the smallest type in the product wearing the
+     faintest colour. 0.46 puts them at 4.35:1 without lifting them above the
+     link labels themselves. */
+  --p-rail-ink-40: rgba(249, 243, 233, 0.46);
+  --p-rail-line: rgba(249, 243, 233, 0.1);
+  --p-rail-active: rgba(154, 91, 44, 0.26);
 
   /* ---- lines -----------------------------------------------------------
      Warm, and a shade stronger than before: on paper a hairline has to do the
-     work a shadow does on white. */
-  --p-line: rgba(25, 20, 17, 0.09);
-  --p-line-strong: rgba(25, 20, 17, 0.17);
+     work a shadow does on white. `--p-line-soft` is for internal dividers
+     inside a card, which must be quieter than the card's own edge. */
+  --p-line: rgba(23, 17, 13, 0.1);
+  --p-line-soft: rgba(23, 17, 13, 0.06);
+  --p-line-strong: rgba(23, 17, 13, 0.18);
   --p-line-on-ink: rgba(255, 253, 248, 0.18);
 
+  /* ---- geometry --------------------------------------------------------
+     One radius per kind of object, so nothing is rounded by feel: a card is
+     20, an inner block is 14, a control is 10, a tag is a pill. */
+  --p-r-card: 20px;
+  --p-r-block: 14px;
+  --p-r-control: 10px;
+
   /* ---- elevation -------------------------------------------------------
-     Warm, low and wide. On paper a neutral shadow reads as grey dirt under the
-     card; a warm one reads as the card being lit from above. */
-  --p-shadow-1: 0 1px 2px rgba(60, 40, 24, 0.05), 0 10px 26px -20px rgba(60, 40, 24, 0.28);
-  --p-shadow-2: 0 2px 6px rgba(60, 40, 24, 0.06), 0 30px 60px -38px rgba(60, 40, 24, 0.4);
+     Warm, low and wide, and each step carries its own top highlight. On paper
+     a neutral shadow reads as grey dirt under the card; a warm one reads as
+     the card being lit from above, and the inset line is the lit edge.
+     `--p-shadow-3` is for something that genuinely floats over the page. */
+  --p-shadow-1: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 2px rgba(60, 40, 24, 0.05),
+    0 12px 28px -22px rgba(60, 40, 24, 0.32);
+  --p-shadow-2: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 2px 6px rgba(60, 40, 24, 0.07),
+    0 26px 54px -30px rgba(60, 40, 24, 0.42);
+  --p-shadow-3: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 8px 18px rgba(60, 40, 24, 0.08),
+    0 44px 80px -40px rgba(60, 40, 24, 0.5);
 
   /* The page paints its own surface with utilities; these two are the last
      resort for content that has not been wrapped yet. */
   background: var(--p-paper);
   color: var(--p-ink);
+}
+
+/* =========================================================================
+   THE OWNER MOTION CONTRACT
+
+   Three utilities and one rule. The rule: nothing on this surface may animate
+   anything that a click depends on, and nothing may START hidden -- the server
+   sends the final state, so a blocked bundle leaves a readable page. Every
+   animation below is transform/opacity only, so it composites and cannot move
+   a target out from under a finger.
+
+   `--o-ease` is the one curve the surface uses for arrivals, and `--o-spring`
+   is the one it uses for a control that follows the pointer. Two curves, not
+   nine.
+   ========================================================================= */
+[data-app] [data-surface='owner'] {
+  --o-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --o-spring: cubic-bezier(0.34, 1.28, 0.64, 1);
+}
+
+/* A card that opens something lifts, and lifts by one pixel: 1px is a surface
+   acknowledging the pointer; 6px is a toy. The shadow is the half of the cue
+   that works on a touch screen, where there is no hover at all. */
+[data-app] .o-lift {
+  transition:
+    transform 180ms var(--o-ease),
+    box-shadow 180ms var(--o-ease),
+    border-color 180ms var(--o-ease);
+}
+@media (hover: hover) {
+  [data-app] .o-lift:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--p-shadow-2);
+    border-color: var(--p-line-strong);
+  }
+}
+[data-app] .o-lift:active {
+  transform: translateY(0);
+}
+
+/* The press. Every button on the surface already has it; this is the one the
+   kit's own class string cannot express without repeating eight utilities. */
+[data-app] .o-press:active {
+  transform: translateY(1px) scale(0.995);
+}
+
+/* A hairline that fades out at both ends, used under section heads. */
+[data-app] .o-rule {
+  height: 1px;
+  background: linear-gradient(to right, var(--p-line), transparent);
 }
 
 /* =========================================================================
@@ -760,92 +854,117 @@ p { margin: 0; }
 }
 
 /* =========================================================================
-   THE OWNER SURFACE — glass over a cool wash
+   THE OWNER SURFACE — the rules that cannot live in a class string
 
-   The staff screens were flat white cards on flat white, and the complaint was
-   exact: nothing sat above anything. This is the same glass language the guest
-   flow wears, retuned for a person who reads it for six hours under tube
-   lights.
+   Everything about this surface's COLOUR and GEOMETRY is declared in the one
+   token block above (`[data-app] [data-surface='owner']`): paper, ink, copper,
+   the rail, three radii and three shadows. This section is only the handful of
+   rules that a Tailwind class list cannot express — a state that depends on a
+   real DOM condition (`:valid`), a card rule that has to apply to cards the
+   screens draw by hand, and an override that must beat a utility.
 
-   WHAT IS DELIBERATELY DIFFERENT FROM THE GUEST FLOW
+   WHAT WAS HERE BEFORE, AND WHY IT IS GONE
 
-   - Cool, not warm. The wash is a blue-grey bloom and one faint green, because
-     warm cream at dashboard size reads as beige -- and the previous note on
-     this surface (a restaurateur is not a diner) still holds.
-   - Almost opaque. Cards sit at 70% white where the guest's sit at 64%: this
-     surface carries long numbers in small type, and legibility outranks the
-     effect. The glass is in the edge, the lift and the blur behind the rail --
-     not in making the content hard to read.
-   - No backdrop-filter on the cards. There are forty of them on a reports page
-     and the wash behind them is smooth; blurring each one would buy nothing a
-     person can see and cost a laptop's battery.
+   The previous owner block declared a SECOND copy of --p-surface, --p-line,
+   --p-shadow-1/2 and --o-r -- with the old ink (rgba(25,20,17,…)) and the old
+   geometry (18px). It sat 500 lines below the first one, so it won: every
+   token this pass changed was quietly reverted except where a utility happened
+   to override it. That is why the surface could be restyled and still look
+   unchanged, and it is not a thing to leave in place a second time: one surface
+   now has ONE token block, and this section declares no colours of its own.
 
-   Scoping: this block is [data-surface='owner'] only. The guest flow has its
-   own section above, and the two must not leak into each other.
+   Two rules were also deleted rather than retuned:
+
+   - `backdrop-filter: blur(24px)` on the rail. The rail is opaque (`--p-rail`,
+     a deep espresso); a blur behind an opaque box is a full-screen GPU pass
+     that composites nothing. It cost battery on the tablets these run on.
+   - `table thead th { background: … }`. It was an unlayered rule, so it beat
+     the `bg-…` utility the kit's `TableHead` sets — the header band could not
+     be changed from the component. The kit owns it now.
    ========================================================================= */
-[data-surface='owner'] {
-  /* ---- the wash -------------------------------------------------------
-     One warm light from above and nothing else. The previous version mixed a
-     green and a slate-blue radial gradient under a third white one; on a white
-     page that produced a faint grey haze with no direction, and it is the
-     reason cards had to be 66% white to look like surfaces.
 
-     Here the paper is already a warm value and the cards are lighter than it,
-     so the wash only has to say which corner the light comes from. Fixed, so
-     scrolling a long table does not slide the light up the screen. */
+/* The wash: one warm light from above and nothing else.
+   The page is warm paper and the cards are LIGHTER than it, so the wash only
+   has to say which corner the light comes from. Fixed, so scrolling a long
+   table does not slide the light up the screen. */
+[data-surface='owner'] {
   background-image: radial-gradient(72% 48% at 18% -12%, rgba(154, 91, 44, 0.07), transparent 70%);
   background-attachment: fixed;
-
-  /* ---- surfaces -------------------------------------------------------
-     Near-opaque, and LIGHTER than the page. That inversion (page warm, card
-     paler) is what makes a panel read as a card lying on paper rather than as
-     a hole cut in it. */
-  --p-surface: #fffdf8;
-  --o-glass: rgba(255, 253, 248, 0.94);
-  --o-glass-raised: #ffffff;
-
-  /* One hairline for a resting edge, one for an edge that is doing something. */
-  --p-line: rgba(25, 20, 17, 0.09);
-  --p-line-strong: rgba(25, 20, 17, 0.17);
-
-  /* ---- elevation ------------------------------------------------------
-     Warm, low and wide: the card is lit from above, not floating in space. */
-  --p-shadow-1: 0 1px 2px rgba(60, 40, 24, 0.05), 0 10px 26px -20px rgba(60, 40, 24, 0.28);
-  --p-shadow-2: 0 2px 6px rgba(60, 40, 24, 0.06), 0 30px 60px -38px rgba(60, 40, 24, 0.4);
-
-  /* ---- geometry -------------------------------------------------------
-     18px, not 16: on a warm surface with a real shadow, 16 reads as a box with
-     soft corners and 18 reads as a card. */
-  --o-r: 18px;
-  --o-r-sm: 10px;
 }
 
-/* ---- the panel --------------------------------------------------------
-   One rule for every card on every staff screen. Applied to `bg-card` rather
-   than to a new class so the fifteen screens that already compose `Card` and
-   `Panel` pick it up without being touched -- and so a screen that writes a raw
-   card by hand cannot end up on a different surface from its neighbours. */
-[data-surface='owner'] .bg-card {
-  background: var(--o-glass);
-  border-color: var(--p-line);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1), var(--p-shadow-1);
+/* ---- the card ---------------------------------------------------------
+   Applied to `bg-card` rather than to a new class, so a screen that draws a
+   card by hand cannot end up on a different surface from its neighbours: one
+   edge, one elevation, one radius, tokens only.
+
+   IT LIVES IN `@layer components`, AND THAT IS THE POINT.
+
+   This rule used to be unlayered, and an unlayered rule beats every utility.
+   So `shadow-[var(--p-shadow-2)]` on a stat that lifts, and the tone washes on
+   the cards that carry a state (a due figure's red, an open order's copper),
+   were all silently replaced by this one white card with one flat shadow. The
+   markup said one thing and the screen said another, and no test could see it.
+
+   In the components layer the base card is a DEFAULT rather than an override:
+   a screen that adds a shadow or a wash gets it, and a screen that does not
+   still gets the card. */
+@layer components {
+  [data-surface='owner'] .bg-card {
+    background: var(--p-card);
+    border-color: var(--p-line);
+    box-shadow: var(--p-shadow-1);
+  }
 }
 
-/* The rail and the top bar are the two pieces of chrome that have content
-   scrolling underneath them, so they are the two that get a real blur. */
-[data-surface='owner'] #app-rail {
-  backdrop-filter: blur(24px) saturate(150%);
-  -webkit-backdrop-filter: blur(24px) saturate(150%);
+/* ---- the grain ---------------------------------------------------------
+   A 140px tile of fractal noise at 3.5%, painted over the whole surface.
+
+   This is the difference between "a stylesheet with a warm background" and
+   "paper". A flat colour at this size -- a 1440px monitor, 200 square
+   centimetres of one value -- reads as a screenshot of a colour. A texture an
+   order of magnitude below the eye's contrast threshold does two things at
+   once: it stops the large empty areas (the space beside a 620px form) from
+   looking like a rendering failure, and it makes the warm shadows sit on
+   something instead of floating over nothing.
+
+   Three rules kept it from being a performance problem:
+   - It is INLINE (a data URI), so it is one cached image and no request.
+   - It is `position: fixed` on a single pseudo-element, not a background on
+     forty cards: the browser rasterises 140x140 once and repeats it.
+   - It has NO `mix-blend-mode`. A blended full-screen layer makes the compositor
+     re-blend the whole page on every scroll frame, which is exactly the kind of
+     "premium" detail that makes a laptop fan spin up. Plain low-opacity paint
+     costs nothing.
+   It is `pointer-events: none` and `aria-hidden` by construction (pseudo-element),
+   so no target moves and nothing is announced. */
+[data-surface='owner']::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 140px 140px;
 }
 
-/* A table inside a card: the header row gets a hairline of its own and the
-   body gets nothing, so the numbers are the only thing with weight. */
-[data-surface='owner'] table thead th {
-  background: rgba(25, 20, 17, 0.022);
+/* Paper grain is a SCREEN effect: on a printed bill it would be a grey haze
+   over the ink and a wasted toner cartridge. */
+@media print {
+  [data-surface='owner']::before {
+    display: none;
+  }
 }
 
-/* The focus ring has to survive a translucent surface. The default ink outline
-   disappears on a card that is 70% white over a white page; the accent does not. */
+/* The grain is deliberately painted OVER the content, at 3.5%: that is what
+   paper grain does on a printed page, and at this opacity it reads as texture
+   rather than as a veil. It costs nothing to keep it there -- the alternative,
+   lifting every screen into its own stacking context, means one `position:
+   relative` per child and one chance per child to break the `sticky` header. */
+
+/* The focus ring has to survive a warm paper surface: the default outline is
+   the same value as the page, and the accent is not. Keyboard users spend the
+   whole shift on this surface. */
 [data-surface='owner'] :focus-visible {
   outline: 2px solid var(--p-accent);
   outline-offset: 2px;
@@ -856,48 +975,35 @@ p { margin: 0; }
    competing buttons. The upload control is in the DOM from the first paint (so
    it works with JavaScript blocked) and is only SHOWN once the browser itself
    considers the file input valid -- `:valid` on a required file input is true
-   the moment a file is chosen, with no script involved.
-
-   That is what stops "Choose another" and "Replace" from sitting side by side
-   as if they were two different commands. */
+   the moment a file is chosen, with no script involved. */
 [data-surface='owner'] .o-pick:not(:has(input[type='file']:valid)) .o-pick-go {
   display: none;
 }
 
 /* ---- a choice row -------------------------------------------------------
    A list of orders to pick from on the counter screen. It cannot be `.bg-card`:
-   the rule above sets the background of every card unconditionally, and being
+   the rule above sets the edge of every card unconditionally, and being
    unlayered it beats any `bg-…` utility a selected state could add. So the
-   selectable thing gets its own object with its own states. */
+   selectable thing gets its own object with its own three states, and they are
+   the same three the kit's controls use. */
 [data-surface='owner'] .o-choice {
-  background: var(--o-glass);
+  background: var(--p-card);
   border: 1px solid var(--p-line);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
-  transition: border-color 160ms var(--p-ease), background-color 160ms var(--p-ease);
+  box-shadow: var(--p-shadow-1);
+  transition:
+    border-color 160ms var(--o-ease),
+    background-color 160ms var(--o-ease),
+    box-shadow 160ms var(--o-ease);
 }
 [data-surface='owner'] .o-choice[aria-pressed='true'] {
   background: color-mix(in oklab, var(--p-accent-soft) 74%, white);
   border-color: color-mix(in oklab, var(--p-accent) 46%, transparent);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), var(--p-shadow-1);
+  box-shadow: var(--p-shadow-2);
 }
 @media (hover: hover) {
   [data-surface='owner'] .o-choice[aria-pressed='false']:hover {
-    background: var(--o-glass-raised);
+    background: var(--p-surface);
     border-color: var(--p-line-strong);
-  }
-}
-
-/* ---- hover, for the things that are actually clickable ------------------
-   A card that lifts is a card that says "you can open me". A card that only
-   changes border colour is a card that says nothing, which is what the old
-   `hover:border-hair-strong` on every stat did. */
-[data-surface='owner'] .o-lift {
-  transition: box-shadow 220ms var(--p-ease), transform 220ms var(--p-ease);
-}
-@media (hover: hover) {
-  [data-surface='owner'] .o-lift:hover {
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), var(--p-shadow-2);
-    transform: translateY(-1px);
   }
 }
 

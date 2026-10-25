@@ -244,7 +244,7 @@ describe('Counter, the redesign', () => {
     const at = doc.indexOf('data-claim');
     const from = doc.lastIndexOf('<div', at);
     const opening = doc.slice(from, doc.indexOf('>', from) + 1);
-    expect(opening).toContain('rounded-[14px]');
+    expect(opening).toContain('rounded-[var(--p-r-block)]');
     expect(opening).not.toContain('rounded-full');
   });
 });

@@ -108,7 +108,7 @@ export function ImagePick({
        */}
       <label
         className={[
-          'relative inline-flex h-9 cursor-pointer items-center rounded-[10px] border border-hair-strong bg-card px-3',
+          'relative inline-flex h-9 cursor-pointer items-center rounded-[var(--p-r-control)] border border-hair-strong bg-card px-3',
           'text-[12.5px] font-medium text-gink shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition-colors',
           'hover:border-gink-28 hover:bg-white',
           'focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--p-accent)]',

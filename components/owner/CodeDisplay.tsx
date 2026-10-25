@@ -101,7 +101,7 @@ export function CodeDisplay({
 
         <div
           aria-live="polite"
-          className="mt-6 rounded-[24px] border border-hair bg-card px-6 py-8 sm:px-14 sm:py-10"
+          className="mt-6 rounded-[var(--p-r-card)] border border-hair bg-card px-6 py-8 sm:px-14 sm:py-10"
         >
           <div className="tnum text-[clamp(4rem,15vw,10rem)] leading-none font-medium tracking-[0.14em] text-gink">
             {code}

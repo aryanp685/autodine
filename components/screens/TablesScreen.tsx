@@ -335,7 +335,7 @@ export function TablesScreen({
                             was really "there is no code". Absent means absent,
                             and it is said in words. */}
                         {t.qrSvg ? (
-                          <div className="shrink-0 rounded-[10px] border border-hair bg-white p-1.5">
+                          <div className="shrink-0 rounded-[var(--p-r-control)] border border-hair bg-white p-1.5">
                             <TableQr
                               svg={t.qrSvg}
                               fallbackValue={`${restaurantName}-${t.code}`}
@@ -343,7 +343,7 @@ export function TablesScreen({
                             />
                           </div>
                         ) : (
-                          <div className="grid h-[76px] w-[76px] shrink-0 place-items-center rounded-[10px] border border-dashed border-hair-strong bg-paper-deep px-1.5 text-center text-[10px] leading-[1.3] font-medium text-gink-46">
+                          <div className="grid h-[76px] w-[76px] shrink-0 place-items-center rounded-[var(--p-r-control)] border border-dashed border-hair-strong bg-paper-deep px-1.5 text-center text-[10px] leading-[1.3] font-medium text-gink-46">
                             {!live ? 'Sample' : t.token ? 'Code not drawn' : 'No code yet'}
                           </div>
                         )}
@@ -385,7 +385,7 @@ export function TablesScreen({
                          * beside it. A healthy card has no solid button at
                          * all: ink means "this one wants something from you".
                          */
-                        <form className="mt-auto flex flex-wrap items-center gap-1 border-t border-hair bg-[rgba(25,20,17,0.018)] px-2.5 py-2">
+                        <form className="mt-auto flex flex-wrap items-center gap-1 border-t border-hair bg-[color-mix(in_oklab,var(--p-ink)_2%,transparent)] px-2.5 py-2">
                           <input type="hidden" name="tableId" value={t.id} />
 
                           {t.qr === 'no-code' && (
@@ -589,7 +589,7 @@ export function TablesScreen({
               {page.map((t) => (
                 <div
                   key={t.code}
-                  className="flex flex-col items-center rounded-[10px] border border-hair px-3 py-4 text-center"
+                  className="flex flex-col items-center rounded-[var(--p-r-control)] border border-hair px-3 py-4 text-center"
                 >
                   {t.qrSvg ? (
                     <TableQr svg={t.qrSvg} fallbackValue={`print-${t.code}`} size={64} />

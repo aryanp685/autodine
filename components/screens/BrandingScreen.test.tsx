@@ -137,7 +137,9 @@ describe('Branding, the redesign', () => {
     // The label is the kit's diameter and radius; `h-8 rounded-full` was a chip
     // sitting beside a 36px rectangular button on the same line.
     expect(picker).toContain('h-9');
-    expect(picker).toContain('rounded-[10px]');
+    // The 10px step is the shared control token now: one radius scale for
+    // actions, fields and pickers instead of a literal per file.
+    expect(picker).toContain('rounded-[var(--p-r-control)]');
     expect(picker).not.toContain('rounded-full border border-hair-strong');
   });
 

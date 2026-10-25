@@ -27,7 +27,14 @@
  * description of a placeholder. The live region in the layout announces the
  * route change, which is the part that helps.
  */
-const bar = 'rounded-[3px] bg-paper-deep animate-[skelpulse_1.6s_ease-in-out_infinite] motion-reduce:animate-none motion-reduce:opacity-60';
+/* The bars are a warm tint of the surface rather than a grey: on paper, a
+   neutral grey skeleton reads as a screenshot that failed to load. */
+const bar =
+  'rounded-full bg-[color-mix(in_oklab,var(--p-ink)_9%,transparent)] animate-[skelpulse_1.6s_ease-in-out_infinite] motion-reduce:animate-none motion-reduce:opacity-60';
+/* A block that stands in for a card: same radius, same edge, same elevation as
+   the card that replaces it, so the swap does not shift anything by a pixel. */
+const block =
+  'rounded-[var(--p-r-card)] border border-hair bg-card shadow-[var(--p-shadow-1)] animate-[skelpulse_1.6s_ease-in-out_infinite] motion-reduce:animate-none motion-reduce:opacity-60';
 
 export function RouteSkeleton({
   variant = 'page',
@@ -35,10 +42,12 @@ export function RouteSkeleton({
   variant?: 'page' | 'rows' | 'board' | 'dashboard';
 }) {
   return (
-    <div
-      aria-hidden="true"
-      className="mx-auto grid w-full max-w-[1180px] content-start gap-3.5 px-5 pt-8 pb-24 sm:px-7 sm:pt-16"
-    >
+    /* NO FRAME OF ITS OWN. This used to carry `mx-auto max-w-[1180px] px-5
+       pt-8`, and it renders INSIDE OwnerPage's <main>, which already applies
+       the width and the padding -- so every loading state was indented twice
+       and drew a 1180px column inside a 1240px page. The skeleton now inherits
+       the frame, and can only ever line up with the screen it stands in for. */
+    <div aria-hidden="true" className="grid w-full content-start gap-3.5">
       <div className={`${bar} h-2 w-[92px]`} />
       <div className={`${bar} mt-2.5 h-[30px] w-[min(46%,420px)] max-sm:w-[74%] max-sm:h-6`} />
       <div className={`${bar} h-3 w-[min(62%,560px)] max-sm:w-full`} />
@@ -47,8 +56,8 @@ export function RouteSkeleton({
         <>
           <div className={`${bar} h-3 w-[min(38%,340px)]`} />
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            <div className="h-[132px] rounded-[14px] border border-hair bg-card animate-[skelpulse_1.6s_ease-in-out_infinite] motion-reduce:animate-none" />
-            <div className="h-[132px] rounded-[14px] border border-hair bg-card animate-[skelpulse_1.6s_ease-in-out_infinite] motion-reduce:animate-none" />
+            <div className={`h-[132px] ${block}`} />
+            <div className={`h-[132px] ${block}`} />
           </div>
         </>
       )}
@@ -69,7 +78,7 @@ export function RouteSkeleton({
           {[0, 1, 2].map((col) => (
             <div key={col} className="grid content-start gap-3.5">
               {[0, 1].map((card) => (
-                <div key={card} className="grid min-h-[120px] gap-2.5 rounded-[14px] border border-hair bg-card p-4">
+                <div key={card} className={`grid min-h-[120px] gap-2.5 p-4 ${block}`}>
                   <div className={`${bar} h-4 w-[52%]`} />
                   <div className={`${bar} h-3 w-[62%]`} />
                   <div className={`${bar} h-3 w-[38%]`} />
@@ -86,7 +95,7 @@ export function RouteSkeleton({
             {[0, 1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="h-24 rounded-[14px] border border-hair bg-card animate-[skelpulse_1.6s_ease-in-out_infinite] motion-reduce:animate-none"
+                className={`h-24 ${block}`}
               />
             ))}
           </div>

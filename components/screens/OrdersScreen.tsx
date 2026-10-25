@@ -251,7 +251,7 @@ export function OrdersScreen({
               <form
                 method="get"
                 action="/dashboard/orders"
-                className="mt-2 flex flex-wrap items-end gap-2 rounded-[12px] border border-hair bg-card p-2.5"
+                className="mt-2 flex flex-wrap items-end gap-2 rounded-[var(--p-r-block)] border border-hair bg-card p-2.5"
               >
                 <input type="hidden" name="range" value="custom" />
                 {filter !== 'all' && <input type="hidden" name="status" value={filter} />}

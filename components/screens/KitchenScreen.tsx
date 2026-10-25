@@ -1082,7 +1082,7 @@ export function Kitchen({
        * speed and voice to the speech engine, mute to this device -- and none
        * of them touches an order.
        */}
-      <section aria-label="Announcements" className="mb-3 overflow-hidden rounded-[18px] border border-hair bg-card">
+      <section aria-label="Announcements" className="mb-3 overflow-hidden rounded-[var(--p-r-card)] border border-hair bg-card">
         {/* THE SOUND DESK
             Everything about the voice lives in one card, because it is one job:
             is it on, which voice, how fast, and can I hear it. It used to be a
@@ -1119,7 +1119,7 @@ export function Kitchen({
             onClick={() => setAudio((value) => !value)}
             title={audio ? 'Turn the announcements off on this screen' : 'Turn the announcements on'}
             className={[
-              'inline-flex h-9 items-center gap-2 rounded-[10px] border px-2.5 text-[12.5px] font-medium transition-colors',
+              'inline-flex h-9 items-center gap-2 rounded-[var(--p-r-control)] border px-2.5 text-[12.5px] font-medium transition-colors',
               'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]',
               audio
                 ? 'border-[color-mix(in_oklab,var(--p-accent)_45%,transparent)] bg-accent-soft text-gink'
@@ -1161,7 +1161,7 @@ export function Kitchen({
                 speechRef.current?.setVoiceName(next || null);
                 setVoiceName(speechRef.current?.voiceName() ?? null);
               }}
-              className="h-9 max-w-[190px] rounded-[10px] border border-hair-strong bg-card px-2.5 pr-7 text-[12.5px] text-gink transition-colors hover:border-gink-28 focus:border-[var(--p-accent)] focus:ring-2 focus:ring-[color-mix(in_oklab,var(--p-accent)_16%,transparent)] focus:outline-none"
+              className="h-9 max-w-[190px] rounded-[var(--p-r-control)] border border-hair-strong bg-card px-2.5 pr-7 text-[12.5px] text-gink transition-colors hover:border-gink-28 focus:border-[var(--p-accent)] focus:ring-2 focus:ring-[color-mix(in_oklab,var(--p-accent)_16%,transparent)] focus:outline-none"
             >
               <option value="">सबसे अच्छी आवाज़ (auto)</option>
               {voiceList.map((voice) => (
@@ -1181,7 +1181,7 @@ export function Kitchen({
               onClick={() => setSpeaksHere((value) => !value)}
               title="Turn this off on a second screen in the same kitchen, so orders are not read out twice"
               className={[
-                'h-9 rounded-[10px] border px-3 text-[12.5px] font-medium transition-colors',
+                'h-9 rounded-[var(--p-r-control)] border px-3 text-[12.5px] font-medium transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]',
                 speaksHere
                   ? 'border-[color-mix(in_oklab,var(--p-accent)_45%,transparent)] bg-accent-soft text-gink'
@@ -1450,7 +1450,7 @@ export function Kitchen({
                   data-state={o.state}
                   data-arriving={arrivals.includes(o.key) ? 'true' : undefined}
                   className={[
-                    'relative overflow-hidden rounded-[14px] border bg-card p-3',
+                    'relative overflow-hidden rounded-[var(--p-r-block)] border bg-card p-3',
                     /* Served tickets stay on the board until the pass clears
                        them, so they fade rather than disappear: a card that
                        vanishes has no history. */

@@ -22,16 +22,27 @@ import { PageMotion } from '@/components/owner/PageMotion';
  *
  * THE SURFACE
  *
- * White paper, black ink, one green for "this is live" and "this is where you
- * are". Nothing warm: an owner sits in front of this for six hours under tube
- * lights, and warm cream at that size reads as beige. The tokens come from
- * `[data-surface='owner']` in styles/owner.css, so `bg-paper` is white here and
- * the guest's warm paper on the guest flow -- same utility, different surface.
+ * Warm paper, espresso ink, one copper. The paper is a real value
+ * (`--p-paper`) and every card is LIGHTER than it by one step, so a panel is
+ * a lit sheet lying on the page rather than a white rectangle drawn on beige.
+ * Copper means exactly two things -- "this is where you are" and "this control
+ * is on" -- and the action colour is ink, so a screen never has two objects
+ * competing for the same emphasis.
+ *
+ * The tokens come from `[data-surface='owner']` in app/globals.css, so
+ * `bg-paper` is warm here and a deeper cream on the guest flow: same utility,
+ * different surface, and the two palettes cannot leak into each other.
+ *
+ * A kit component expresses no colour, radius or shadow of its own. Every one
+ * of them reads a token, which is what lets the whole surface be retuned from
+ * one block -- and what stops the thirteenth screen from inventing its own
+ * card.
  *
  * WIDTH
  *
- * 1180px. Wide enough for six table columns without horizontal scroll on a
- * 1280 laptop, narrow enough that a line of text does not run 140 characters.
+ * 1240px for a form, 1380px for a report. Wide enough for six table columns
+ * without horizontal scroll on a 1280 laptop, narrow enough that a line of
+ * text does not run 140 characters.
  */
 
 /* --------------------------------------------------------------- the frame */
@@ -56,8 +67,8 @@ export function OwnerPage({
       <div className="lg:pl-[244px]">
         <main
           className={[
-            'mx-auto w-full px-5 pt-6 pb-20 sm:px-7 lg:pt-9',
-            wide ? 'max-w-[1320px]' : 'max-w-[1180px]',
+            'mx-auto w-full px-5 pt-7 pb-24 sm:px-8 lg:pt-10',
+            wide ? 'max-w-[1380px]' : 'max-w-[1240px]',
           ].join(' ')}
         >
           {/*
@@ -94,21 +105,31 @@ export function PageHead({
   actions?: ReactNode;
 }) {
   return (
-    <header className="mb-7 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-end sm:justify-between">
+    <header className="mb-8 flex flex-col gap-5 sm:mb-9 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
         {kicker ? (
-          <p className="text-[10.5px] font-semibold tracking-[0.18em] text-[var(--p-accent)] uppercase">
+          /* A rule, then the kicker. The 18px copper dash is what turns a
+             tracked-out label into a masthead: without it the eye reads the
+             kicker as the first line of the sentence below it. */
+          <p className="flex items-center gap-2 text-[10.5px] font-semibold tracking-[0.2em] text-[var(--p-accent-strong)] uppercase">
+            <span aria-hidden="true" className="h-px w-[18px] bg-[var(--p-accent)]" />
             {kicker}
           </p>
         ) : null}
         {/* The one display size on a staff screen. Tight tracking and a short
-            leading are what separate a masthead from a heading in a form. */}
-        <h1 className="mt-2.5 text-[clamp(1.75rem,2.6vw,2.5rem)] leading-[1.02] font-semibold tracking-[-0.045em] text-balance text-gink">
+            leading are what separate a masthead from a heading in a form; the
+            optical size steps up on a wide screen so the page opens with a
+            statement rather than a label. */}
+        <h1 className="mt-3 text-[clamp(1.9rem,2.9vw,2.7rem)] leading-[0.98] font-semibold tracking-[-0.05em] text-balance text-gink">
           {title}
         </h1>
-        {meta ? <p className="mt-2.5 max-w-[62ch] text-[13.5px] leading-[1.6] text-gink-64">{meta}</p> : null}
+        {meta ? (
+          <p className="mt-3 max-w-[64ch] text-[13.5px] leading-[1.6] text-gink-64">{meta}</p>
+        ) : null}
       </div>
-      {actions ? <div className="flex flex-wrap items-center gap-2 sm:shrink-0">{actions}</div> : null}
+      {actions ? (
+        <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:pb-1">{actions}</div>
+      ) : null}
     </header>
   );
 }
@@ -128,7 +149,7 @@ export function SectionHead({
   return (
     <div className={['mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1', className].join(' ')}>
       <div className="flex items-baseline gap-2.5">
-        <h2 className="text-[13px] font-semibold tracking-[-0.005em] text-gink">{title}</h2>
+        <h2 className="text-[13.5px] font-semibold tracking-[-0.012em] text-gink">{title}</h2>
         {meta ? <span className="text-[12.5px] text-gink-46">{meta}</span> : null}
       </div>
       {action}
@@ -163,9 +184,24 @@ export function Card({
   /** Set on a card that is itself a link target. */
   lift?: boolean;
 }) {
+  /*
+   * EVERY CARD CARRIES ITS OWN LIGHT.
+   *
+   * A hairline on paper says "there is an edge here"; it does not say the card
+   * is above the page. The surface now stacks: page (deep) -> card (light) ->
+   * inset block (deeper again), and each step gets a warm contact shadow plus a
+   * 1px lit top edge, both of which live in `--p-shadow-1`.
+   *
+   * It is one shadow token, not a hand-written one per card, so the guard still
+   * holds and every panel in the product is lit from the same angle.
+   */
   return (
     <div
-      className={['rounded-[18px] border border-hair bg-card', lift ? 'o-lift' : '', className]
+      className={[
+        'rounded-[var(--p-r-card)] border border-hair bg-card shadow-[var(--p-shadow-1)]',
+        lift ? 'o-lift' : '',
+        className,
+      ]
         .filter(Boolean)
         .join(' ')}
       style={style}
@@ -193,9 +229,13 @@ export function Panel({
 }) {
   return (
     <Card className={className}>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-t-[17px] border-b border-hair bg-[rgba(25,20,17,0.022)] px-4 py-3.5 sm:px-5">
+      {/* The header is a band, not a line of text: a warm tint one step off the
+          card, a hairline under it, and the title at 13.5 semibold. That is what
+          makes a panel read as a titled object rather than as a card with some
+          words at the top of it. */}
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-t-[calc(var(--p-r-card)-1px)] border-b border-hair bg-[rgba(23,17,13,0.026)] px-5 py-3.5">
         <div className="flex items-baseline gap-2.5">
-          <h2 className="text-[13px] font-semibold tracking-[-0.005em] text-gink">{title}</h2>
+          <h2 className="text-[13.5px] font-semibold tracking-[-0.012em] text-gink">{title}</h2>
           {meta ? <span className="text-[12.5px] text-gink-46">{meta}</span> : null}
         </div>
         {action}
@@ -244,18 +284,27 @@ export function Stat({
   return (
     <div
       className={[
-        'relative overflow-hidden rounded-[18px] border transition-shadow duration-200',
-        lead ? 'p-4 sm:p-5' : 'p-4 sm:p-[18px]',
+        'relative overflow-hidden rounded-[var(--p-r-card)] border shadow-[var(--p-shadow-1)] transition-shadow duration-200',
+        lead ? 'p-5' : 'p-4 sm:p-[18px]',
         'sm:hover:shadow-[var(--p-shadow-2)]',
         tone === 'live'
           ? 'border-[color-mix(in_oklab,var(--p-accent)_26%,transparent)] bg-[color-mix(in_oklab,var(--p-accent-soft)_62%,white)]'
           : tone === 'due'
             ? 'border-[color-mix(in_oklab,var(--alert)_22%,transparent)] bg-[color-mix(in_oklab,var(--alert)_5%,white)]'
             : lead
-              ? 'border-[color-mix(in_oklab,var(--p-accent)_18%,transparent)] bg-card'
+              ? 'border-[color-mix(in_oklab,var(--p-accent)_20%,transparent)] bg-card'
               : 'border-hair bg-card',
       ].join(' ')}
     >
+      {/* The lead card carries a copper hairline along its top edge. It is one
+          pixel and it does more than a larger number: it is the only warm line
+          on the row, so the eye lands on it before it has read a digit. */}
+      {lead ? (
+        <span
+          aria-hidden="true"
+          className="absolute inset-x-0 top-0 h-px bg-[color-mix(in_oklab,var(--p-accent)_55%,transparent)]"
+        />
+      ) : null}
       {/* A wash, not a gradient: one low-opacity copper shadow in the corner of
           the lead card, so it reads as the important one before a word is
           read. */}
@@ -269,7 +318,7 @@ export function Stat({
         className={[
           'relative',
           lead
-            ? 'text-[11.5px] font-semibold tracking-[0.1em] text-gink-46 uppercase'
+            ? 'text-[10.5px] font-semibold tracking-[0.16em] text-gink-46 uppercase'
             : 'text-[12.5px] font-medium tracking-[0.005em] text-gink-64',
         ].join(' ')}
       >
@@ -277,10 +326,10 @@ export function Stat({
       </div>
       <div
         className={[
-          'relative leading-[0.95] font-semibold tracking-[-0.05em] tabular-nums',
+          'relative leading-[0.92] font-semibold tracking-[-0.055em] tabular-nums',
           lead
-            ? 'mt-3 text-[clamp(1.75rem,4.4vw,3.1rem)]'
-            : 'mt-2.5 text-[clamp(1.75rem,2.8vw,2.35rem)]',
+            ? 'mt-3 text-[clamp(1.9rem,4.6vw,3.3rem)]'
+            : 'mt-2.5 text-[clamp(1.6rem,2.6vw,2.2rem)]',
           tone === 'due' ? 'text-[var(--alert)]' : 'text-gink',
         ].join(' ')}
       >
@@ -339,7 +388,7 @@ export function Notice({
     <div
       {...rest}
       className={[
-        'flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[14px] border bg-card px-4 py-3',
+        'flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--p-r-block)] border bg-card px-4 py-3 shadow-[var(--p-shadow-1)]',
         rules[tone],
         className,
       ]
@@ -372,7 +421,7 @@ export function Empty({ children, className = '' }: { children: ReactNode; class
   return (
     <p
       className={[
-        'grid min-h-[104px] place-items-center rounded-[12px] border border-hair bg-[rgba(25,20,17,0.018)] px-5 py-7 text-center text-[12.5px] leading-[1.6] text-gink-46',
+        'grid min-h-[112px] place-items-center rounded-[var(--p-r-block)] border border-hair bg-[rgba(23,17,13,0.014)] px-5 py-8 text-center text-[12.5px] leading-[1.6] text-gink-46',
         className,
       ].join(' ')}
     >
@@ -407,8 +456,16 @@ export function btn(tone: BtnTone = 'solid', size: BtnSize = 'md'): string {
    * and they are the only element on the surface with that radius. Pills come
    * back only for status, where the shape means "a state, not a control".
    */
+  /*
+   * The press is 1px down and a hair of scale, on the surface's own spring.
+   * It used to be `active:translate-y-px` alone, which is a fine press but a
+   * silent hover: on a pointer, a solid button did not change at all until it
+   * was pressed. Every tone now lifts its shadow on hover and settles on press,
+   * which is the same cue the cards give, so the surface has one idea of "this
+   * is interactive" instead of two.
+   */
   const base =
-    'inline-flex items-center justify-center gap-2 rounded-[10px] font-medium whitespace-nowrap transition-[background-color,border-color,color,box-shadow,transform] duration-150 active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0';
+    'inline-flex items-center justify-center gap-2 rounded-[var(--p-r-control)] font-medium whitespace-nowrap transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-[var(--o-ease)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0 disabled:active:scale-100 active:translate-y-px active:scale-[0.99]';
   const box = size === 'sm' ? 'h-9 px-3 text-[12.5px]' : 'h-11 px-4 text-[13px]';
   const tones: Record<BtnTone, string> = {
     /* Ink is the default action. It is the strongest thing on paper without
@@ -419,9 +476,9 @@ export function btn(tone: BtnTone = 'solid', size: BtnSize = 'md'): string {
        "Record payment", the menu's "Publish". Used twice on a page it stops
        meaning anything. */
     primary:
-      'bg-[var(--p-accent)] text-onink shadow-[var(--p-shadow-1)] hover:brightness-110 hover:shadow-[var(--p-shadow-2)]',
+      'bg-[var(--p-accent)] text-onink shadow-[var(--p-shadow-1)] hover:bg-[var(--p-accent-strong)] hover:shadow-[var(--p-shadow-2)]',
     ghost:
-      'border border-hair-strong bg-card text-gink shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] hover:border-gink-28 hover:bg-white',
+      'border border-hair-strong bg-card text-gink shadow-[var(--p-shadow-1)] hover:border-gink-28 hover:bg-white hover:shadow-[var(--p-shadow-2)]',
     quiet: 'text-gink-64 hover:bg-gink-07 hover:text-gink',
     danger: 'border border-[var(--alert)]/30 text-[var(--alert)] hover:bg-[var(--alert)]/8',
   };
@@ -566,11 +623,12 @@ export function chipClass(active: boolean): string {
    * picked and the row does not shiver.
    */
   return [
-    'inline-flex h-9 items-center rounded-[10px] border px-3.5 text-[12.5px] font-medium whitespace-nowrap transition-colors',
+    'inline-flex h-9 items-center rounded-[var(--p-r-control)] border px-3.5 text-[12.5px] font-medium whitespace-nowrap',
+    'transition-[background-color,border-color,color,box-shadow] duration-150 ease-[var(--o-ease)]',
     'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]',
     active
-      ? 'border-[color-mix(in_oklab,var(--p-accent)_45%,transparent)] bg-accent-soft text-gink'
-      : 'border-hair-strong bg-card text-gink-64 hover:border-gink-28 hover:text-gink',
+      ? 'border-[color-mix(in_oklab,var(--p-accent)_45%,transparent)] bg-accent-soft text-gink shadow-[var(--p-shadow-1)]'
+      : 'border-hair-strong bg-card text-gink-64 shadow-[var(--p-shadow-1)] hover:border-gink-28 hover:text-gink',
   ].join(' ');
 }
 
@@ -628,7 +686,7 @@ export function Field({
  * A test in components/live-controls.test.tsx fails on the unmarked form.
  */
 const control =
-  'w-full rounded-[10px] border border-hair-strong bg-card px-3.5 text-[13.5px] text-gink shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition-[border-color,box-shadow] duration-150 placeholder:text-gink-28 hover:border-gink-28 focus:border-[var(--p-accent)] focus:ring-2 focus:ring-[color-mix(in_oklab,var(--p-accent)_16%,transparent)] focus:outline-none disabled:cursor-not-allowed disabled:bg-gink-07 disabled:text-gink-46';
+  'w-full rounded-[var(--p-r-control)] border border-hair-strong bg-card px-3.5 text-[13.5px] text-gink shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition-[border-color,box-shadow] duration-150 ease-[var(--o-ease)] placeholder:text-gink-28 hover:border-gink-28 focus:border-[var(--p-accent)] focus:ring-2 focus:ring-[color-mix(in_oklab,var(--p-accent)_16%,transparent)] focus:outline-none disabled:cursor-not-allowed disabled:bg-gink-07 disabled:text-gink-46';
 
 export const inputClass = `${control} h-11`;
 export const textareaClass = `${control} resize-y py-3 leading-[1.55]`;
@@ -657,7 +715,7 @@ export function Th({
     <th
       scope="col"
       className={[
-        'border-b border-hair px-4 py-2.5 text-[10.5px] font-semibold tracking-[0.1em] whitespace-nowrap text-gink-46 uppercase',
+        'border-b border-hair-strong bg-[rgba(23,17,13,0.024)] px-4 py-2.5 text-[10.5px] font-semibold tracking-[0.11em] whitespace-nowrap text-gink-46 uppercase',
         align === 'right' ? 'text-right' : 'text-left',
         className,
       ].join(' ')}
@@ -677,7 +735,7 @@ export function Td({
   return (
     <td
       className={[
-        'border-b border-hair px-4 py-3.5 align-middle text-gink',
+        'border-b border-hair px-4 py-3.5 align-middle text-gink first:border-l-0',
         align === 'right' ? 'text-right tabular-nums' : 'text-left',
         className,
       ].join(' ')}
@@ -691,7 +749,7 @@ export function Td({
 /** A table row. The tint on hover is the whole interaction budget for a row. */
 export function Tr({ children, className = '', ...rest }: React.ComponentProps<'tr'>) {
   return (
-    <tr className={['transition-colors hover:bg-[rgba(25,20,17,0.025)]', className].join(' ')} {...rest}>
+    <tr className={['transition-colors hover:bg-[color-mix(in_oklab,var(--p-ink)_3%,transparent)]', className].join(' ')} {...rest}>
       {children}
     </tr>
   );
@@ -729,7 +787,7 @@ export function Tag({ tone = 'neutral', children }: { tone?: PillTone; children:
   return (
     <span
       className={[
-        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-[3px] text-[11.5px] font-semibold tracking-[0.01em] whitespace-nowrap',
+        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-[3px] text-[11.5px] font-semibold tracking-[0.01em] whitespace-nowrap ring-1 ring-inset ring-black/[0.04]',
         tones[tone],
       ].join(' ')}
     >
@@ -755,7 +813,7 @@ export function SwitchTrack({ on, className = '' }: { on: boolean; className?: s
       aria-hidden="true"
       className={[
         'relative inline-flex h-[22px] w-[38px] shrink-0 items-center rounded-full transition-colors duration-200',
-        on ? 'bg-[var(--p-accent)]' : 'bg-[rgba(25,20,17,0.16)]',
+        on ? 'bg-[var(--p-accent)]' : 'bg-[color-mix(in_oklab,var(--p-ink)_16%,transparent)]',
         className,
       ].join(' ')}
     >

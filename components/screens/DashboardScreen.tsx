@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { dashboardStats, recentOrders, restaurant, sparkline, topItems } from '@/lib/demo-data';
 import { Money, PaymentPill, PrepPill, Sparkline } from '@/components/ui';
 import { SignInPrompt } from '@/components/SignInPrompt';
+import { ChartMotion } from '@/components/owner/ChartMotion';
 import {
   BtnLink,
   Empty,
@@ -236,7 +237,7 @@ export function Dashboard({
           The only difference the copy had was a slightly smaller numeral. */}
       <section
         aria-label="Today at a glance"
-        className="grid grid-cols-2 gap-3 lg:grid-cols-[1.6fr_1fr_1fr_1fr]"
+        className="grid grid-cols-2 gap-3.5 lg:grid-cols-[1.6fr_1fr_1fr_1fr]"
       >
         {orderedCards.map((card) => (
           <Stat
@@ -253,7 +254,7 @@ export function Dashboard({
         ))}
       </section>
 
-      <div className="mt-4 grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
+      <div className="mt-5 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
         {/* The chart is deliberately quiet: one line, no gridlines, no axis
             labels. The number above it is the reading; this is the shape. */}
         <Panel
@@ -266,18 +267,23 @@ export function Dashboard({
         >
           {chartable && chartHasValue ? (
             <div className="text-gink" data-chart>
-              {/* Fluid, not a fixed 520px: the old width overflowed a phone and
-                  pushed the most recent hour off the edge of the card. */}
-              <Sparkline
-                data={hourly}
-                width={520}
-                height={120}
-                baseline="zero"
-                area
-                label="Revenue by hour of the day"
-                className="h-[112px] w-full"
-                markIndex={hasPeak ? peakIndex : undefined}
-              />
+              {/* The line draws itself once, on arrival: GSAP, lazily loaded,
+                  and it can only ever ADD motion -- the server sends the chart
+                  fully drawn, so a blocked bundle leaves a complete chart. */}
+              <ChartMotion>
+                {/* Fluid, not a fixed 520px: the old width overflowed a phone and
+                    pushed the most recent hour off the edge of the card. */}
+                <Sparkline
+                  data={hourly}
+                  width={520}
+                  height={120}
+                  baseline="zero"
+                  area
+                  label="Revenue by hour of the day"
+                  className="h-[112px] w-full"
+                  markIndex={hasPeak ? peakIndex : undefined}
+                />
+              </ChartMotion>
               {/* The axis and the reading are only for live data. The sample
                   series is a shape with no clock behind it, so labelling its
                   twelve buckets midnight-to-11am invented a trading day the
@@ -342,7 +348,7 @@ export function Dashboard({
                       disagree. */}
                   <div
                     aria-hidden="true"
-                    className="mt-1.5 ml-8 h-1 overflow-hidden rounded-full bg-[rgba(25,20,17,0.055)]"
+                    className="mt-1.5 ml-8 h-1 overflow-hidden rounded-full bg-[color-mix(in_oklab,var(--p-ink)_6%,transparent)]"
                   >
                     <div
                       className="h-full rounded-full bg-[var(--p-accent)]/55"
@@ -358,7 +364,7 @@ export function Dashboard({
         </Panel>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-5">
         <Panel
           /* "Orders today" is the label on the first-row card; this is the
              five most recent, so it says that. */

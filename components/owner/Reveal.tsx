@@ -52,12 +52,16 @@ export function Reveal({
     const controls = items.slice(0, 14).map((item, index) =>
       animate(
         item,
-        { opacity: [0, 1], y: [6, 0] },
+        // A card arrives at 10px with a hair of scale. The scale is what makes
+        // a grid of cards read as laid down one at a time rather than slid up as
+        // a block; 0.985 is small enough that nothing inside it can shift by a
+        // pixel a finger would aim at, and it is transform-only.
+        { opacity: [0, 1], y: [10, 0], scale: [0.985, 1] },
         {
-          duration: 0.24,
+          duration: 0.3,
           // Eight steps of stagger however many cards there are: past that the
           // last one arrives after the person has already looked at it.
-          delay: Math.min(index, 8) * 0.035,
+          delay: Math.min(index, 8) * 0.03,
           ease: [0.2, 0.7, 0.2, 1],
         },
       ),
