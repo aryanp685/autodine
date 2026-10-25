@@ -120,7 +120,7 @@ export function PageHead({
             leading are what separate a masthead from a heading in a form; the
             optical size steps up on a wide screen so the page opens with a
             statement rather than a label. */}
-        <h1 className="mt-3 text-[clamp(1.9rem,2.9vw,2.7rem)] leading-[0.98] font-semibold tracking-[-0.05em] text-balance text-gink">
+        <h1 className="mt-3 text-[clamp(1.9rem,2.9vw,2.6rem)] leading-[0.98] font-semibold tracking-[-0.045em] text-balance text-gink">
           {title}
         </h1>
         {meta ? (
@@ -241,10 +241,10 @@ export function Panel({
           semibold. The tick is what makes a panel read as a titled object at a
           glance -- it is the same 2px copper mark the rail uses for "you are
           here", so the surface has one way of saying "this is a something". */}
-      <div className="relative flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-t-[calc(var(--p-r-card)-1px)] border-b border-hair bg-[color-mix(in_oklab,var(--p-accent-wash)_52%,transparent)] px-5 py-4">
+      <div className="relative flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-t-[calc(var(--p-r-card)-1px)] border-b border-hair bg-[color-mix(in_oklab,var(--p-accent-wash)_60%,transparent)] px-5 py-4">
         <span
           aria-hidden="true"
-          className="absolute top-1/2 left-0 h-4 w-[2.5px] -translate-y-1/2 rounded-r-full bg-[var(--p-accent)]"
+          className="absolute top-1/2 left-0 h-[18px] w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--p-accent)]"
         />
         <div className="flex items-baseline gap-2.5">
           <h2 className="text-[13.5px] font-semibold tracking-[-0.014em] text-gink">{title}</h2>

@@ -189,10 +189,28 @@ p { margin: 0; }
   img { display: block; max-width: 100%; }
 }
 
-:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
-  border-radius: 4px;
+/*
+ * THE FOCUS RING, IN THE BASE LAYER.
+ *
+ * This was unlayered, and an unlayered rule beats every utility -- including
+ * `focus:outline-none`. So a text field that a component had deliberately
+ * smoothed (a search box inside a bordered pill, an input whose wrapper draws
+ * the ring) still painted a hard 2px near-black rectangle INSIDE its own
+ * rounded border. On the "Go to…" control that produced a black box floating
+ * in a white pill: the single most broken-looking thing on the shell, on every
+ * screen, and invisible in the markup because both rules are correct on their
+ * own.
+ *
+ * In @layer base the ring is a DEFAULT: everything still gets one -- which is
+ * what a keyboard user needs -- and a component that draws a better one can
+ * say so. Nothing is lost by the move, and nothing is won by leaving it.
+ */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
 }
 
 .money { font-variant-numeric: tabular-nums; }
@@ -279,86 +297,96 @@ p { margin: 0; }
   * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }}
 
 [data-app] [data-surface='owner'] {
-  /* ---- surfaces -------------------------------------------------------
-     WARM SAND, and a card that is a white sheet lying on it.
+  /* ---- the palette, in one place ---------------------------------------
+     A RESTAURANT, not a spreadsheet. Three colours carry the whole surface:
 
-     The gap between the page and the card is the whole design. On the old
-     tone (a near-white page) a card had to be almost the same value to look
-     like paper at all, so a screen read as one wide beige field with hairlines
-     drawn on it -- which is exactly what "it looks the same as before" means
-     when you look at a screenshot of it. Two values, a real step apart, and
-     every panel has an edge before a single shadow is drawn. */
-  --p-paper: #efe3d0;
-  --p-paper-deep: #e5d5bd;
-  --p-paper-veil: rgba(255, 252, 246, 0.6);
+       cream    the tablecloth
+       green    the banquette and the awning   (the rail, and only the rail)
+       saffron  the tandoor, the brass, the "you are here"
+
+     The previous palette was beige on beige with a brown accent, and that is
+     why it photographed as dull even after the layers were fixed: there was
+     no second hue anywhere, so the eye had nothing to resolve. Green against
+     cream with a saffron thread is a palette with a subject.
+
+     Cream is the canvas and white is the sheet, a real 1.29:1 apart, so a card
+     reads as paper on a table rather than a border drawn on a wall. */
+
+  /* ---- surfaces -------------------------------------------------------- */
+  --p-paper: #e9e0cd;
+  --p-paper-deep: #ddd0b6;
+  --p-paper-veil: rgba(255, 253, 249, 0.62);
   --p-surface: #fffdf9;
   --p-card: #fffdf9;
-  --p-glass: rgba(255, 253, 249, 0.92);
+  --p-glass: rgba(255, 253, 249, 0.94);
 
-  /* ---- ink ------------------------------------------------------------
-     Espresso, not neutral black. It sits on warm sand the way printed ink
-     does; pure black on ivory reads as a screenshot of a document. */
-  --p-ink: #1a1310;
-  --p-ink-80: rgba(26, 19, 16, 0.84);
-  --p-ink-64: rgba(26, 19, 16, 0.64);
-  /* The token keeps the name it has always had (237 call sites read it as
-     `text-gink-46`); the VALUE is the one that changed, and the reason is
-     measurable. At 0.46 the meta line -- a panel's "Restaurant time", a table
-     cell's "3:30 pm" -- measured 3.1:1 on paper, a grey that reads as switched
-     off. At 0.58 it measures 4.4:1 on a card: still clearly secondary to the
-     ink (15:1), now legible at 12.5px under tube lights. */
-  --p-ink-46: rgba(26, 19, 16, 0.58);
-  --p-ink-28: rgba(26, 19, 16, 0.28);
-  --p-ink-12: rgba(26, 19, 16, 0.11);
-  --p-ink-07: rgba(26, 19, 16, 0.055);
-  --p-on-ink: #fffcf6;
-  --p-on-ink-64: rgba(255, 252, 246, 0.68);
-  --p-on-ink-40: rgba(255, 252, 246, 0.44);
+  /* ---- ink -------------------------------------------------------------
+     Espresso, not neutral black. It sits on cream the way printed ink does;
+     pure black on ivory reads as a screenshot of a document. */
+  --p-ink: #1c1512;
+  --p-ink-80: rgba(28, 21, 18, 0.84);
+  --p-ink-64: rgba(28, 21, 18, 0.66);
+  /* The token keeps its name (237 call sites read `text-gink-46`); the value
+     is the interesting part. At 0.46 this measured 3.1:1 on paper -- a grey
+     that reads as switched off -- and it is the colour of every meta line and
+     table cell. 0.58 measures 4.4:1 on a card while staying clearly secondary
+     to the ink (15:1). */
+  --p-ink-46: rgba(28, 21, 18, 0.58);
+  --p-ink-28: rgba(28, 21, 18, 0.28);
+  --p-ink-12: rgba(28, 21, 18, 0.11);
+  --p-ink-07: rgba(28, 21, 18, 0.055);
+  --p-on-ink: #fffdf9;
+  --p-on-ink-64: rgba(255, 253, 249, 0.7);
+  --p-on-ink-40: rgba(255, 253, 249, 0.46);
 
   /* ---- accent ----------------------------------------------------------
-     TERRACOTTA. Deeper and redder than the old copper, because on sand a
-     brown-gold accent simply disappears: the old copper cleared 5:1 against
-     white text but read as "muddy brown" next to warm paper.
-     This one is the colour of a clay serving bowl, and it is now the ACTION
-     colour -- a filled primary button -- not a decoration.
+     SAFFRON. It is the action colour: a filled primary button, the mark on the
+     current rail row, the kicker rule. 5.4:1 on white text and 4.6:1 on its own
+     wash -- both measured, both above AA at the sizes they are used.
 
-     `--p-accent-strong` is the same hue one step down: for a pressed state, a
-     hover on a filled button, and 10.5px tracked-out uppercase, which needs a
-     step of its own at that size. */
-  --p-accent: #a5461d;
-  --p-accent-strong: #7d3413;
-  --p-accent-soft: #fbe8d5;
-  --p-accent-wash: rgba(165, 70, 29, 0.09);
-  --p-live: #2b6b46;
-  --p-live-soft: #e6f1e9;
+     `--p-accent-strong` is the same hue one step down, for a pressed state and
+     for 10.5px tracked-out uppercase, which needs the extra step at that size.
+     `--p-brass` exists for exactly one kind of detail -- hairline rules and the
+     brand mark on dark chrome -- and is never used for text. */
+  --p-accent: #b34712;
+  --p-accent-strong: #8a3410;
+  --p-accent-soft: #fbe7d2;
+  --p-accent-wash: rgba(179, 71, 18, 0.085);
+  --p-brass: #b98a3c;
+
+  /* ---- status ----------------------------------------------------------
+     Two meanings, never borrowed for decoration: green is settled/ready/paid,
+     brick is money to chase. Both carry a matching wash so a tag can be one
+     token instead of a colour-mix at every call site. */
+  --p-live: #1f6b45;
+  --p-live-soft: #e3efe7;
   --p-due: #a3341f;
-  --p-due-soft: #fbe9e6;
+  --p-due-soft: #fbe8e4;
 
   /* ---- the rail --------------------------------------------------------
-     The one dark surface in the product. It is the host stand: it frames every
-     screen and gives the eye an edge to orient against. Warmed a step (this is
-     espresso with red in it, not neutral charcoal) so the dark chrome and the
-     terracotta read as one palette instead of a black box around a beige page. */
-  --p-rail: #1c1512;
-  --p-rail-raised: #2a201a;
-  --p-rail-ink: #fbf5ec;
-  --p-rail-ink-64: rgba(251, 245, 236, 0.66);
-  /* 0.38 measured 3.4:1 on the rail for the 10px uppercase group labels
-     ("SERVICE", "BUSINESS") -- the smallest type in the product wearing the
-     faintest colour. 0.48 puts them at 4.5:1 without lifting them above the
-     link labels themselves. */
-  --p-rail-ink-40: rgba(251, 245, 236, 0.48);
-  --p-rail-line: rgba(251, 245, 236, 0.11);
-  --p-rail-active: rgba(165, 70, 29, 0.3);
+     BOTTLE GREEN, not charcoal. This is the single change that stops the
+     surface reading as a beige form: the dark chrome now belongs to the same
+     restaurant as the cream and the saffron. Warm cream ink on it measures
+     11:1; the hairline is a lit edge rather than a seam. */
+  --p-rail: #123a2e;
+  --p-rail-raised: #1b4a3b;
+  --p-rail-ink: #f7f1e3;
+  --p-rail-ink-64: rgba(247, 241, 227, 0.68);
+  /* 0.38 measured 3.4:1 for the 10px uppercase group labels -- the smallest
+     type in the product wearing the faintest colour. 0.48 puts them at 4.6:1
+     without lifting them above the link labels themselves. */
+  --p-rail-ink-40: rgba(247, 241, 227, 0.52);
+  --p-rail-line: rgba(247, 241, 227, 0.12);
+  --p-rail-active: rgba(179, 71, 18, 0.42);
 
   /* ---- lines -----------------------------------------------------------
-     Warm. On sand a hairline has to do the work a shadow does on white.
-     `--p-line-soft` is for internal dividers inside a card, which must be
-     quieter than the card's own edge. */
-  --p-line: rgba(26, 19, 16, 0.11);
-  --p-line-soft: rgba(26, 19, 16, 0.065);
-  --p-line-strong: rgba(26, 19, 16, 0.2);
-  --p-line-on-ink: rgba(255, 252, 246, 0.18);
+     Warm. On cream a hairline has to do the work a shadow does on white.
+     `--p-line-soft` is for dividers INSIDE a card, which must be quieter than
+     the card's own edge. */
+  --p-line: rgba(28, 21, 18, 0.12);
+  --p-line-soft: rgba(28, 21, 18, 0.07);
+  --p-line-strong: rgba(28, 21, 18, 0.22);
+  --p-line-on-ink: rgba(247, 241, 227, 0.2);
 
   /* ---- geometry --------------------------------------------------------
      One radius per kind of object, so nothing is rounded by feel: a card is
@@ -368,16 +396,15 @@ p { margin: 0; }
   --p-r-control: 10px;
 
   /* ---- elevation -------------------------------------------------------
-     Warm, low and wide, and every step carries its own lit top edge. On sand a
-     neutral shadow reads as grey dirt under the card; a warm one reads as the
-     card being lit from above, and the inset line is the lit edge.
-     `--p-shadow-3` is for something that genuinely floats over the page. */
-  --p-shadow-1: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 1px 2px rgba(74, 42, 20, 0.07),
-    0 10px 24px -18px rgba(74, 42, 20, 0.3);
-  --p-shadow-2: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 2px 6px rgba(74, 42, 20, 0.09),
-    0 22px 44px -26px rgba(74, 42, 20, 0.42);
-  --p-shadow-3: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 8px 18px rgba(74, 42, 20, 0.1),
-    0 40px 72px -36px rgba(74, 42, 20, 0.52);
+     Warm, low and wide, and every step carries its own lit top edge. On cream
+     a neutral shadow reads as grey dirt under the card; a warm one reads as
+     the card being lit from above, and the inset line is the lit edge. */
+  --p-shadow-1: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 1px 2px rgba(70, 45, 20, 0.08),
+    0 10px 24px -18px rgba(70, 45, 20, 0.32);
+  --p-shadow-2: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 2px 6px rgba(70, 45, 20, 0.1),
+    0 22px 44px -26px rgba(70, 45, 20, 0.44);
+  --p-shadow-3: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 8px 18px rgba(70, 45, 20, 0.11),
+    0 40px 72px -36px rgba(70, 45, 20, 0.54);
 
   /* The page paints its own surface with utilities; these two are the last
      resort for content that has not been wrapped yet. */
@@ -899,8 +926,8 @@ p { margin: 0; }
    table does not slide the light up the screen. */
 [data-surface='owner'] {
   background-image:
-    radial-gradient(78% 52% at 12% -14%, rgba(165, 70, 29, 0.13), transparent 68%),
-    radial-gradient(60% 44% at 96% 4%, rgba(43, 107, 70, 0.05), transparent 72%);
+    radial-gradient(74% 50% at 8% -16%, rgba(179, 71, 18, 0.14), transparent 66%),
+    radial-gradient(64% 48% at 100% 0%, rgba(18, 58, 46, 0.1), transparent 70%);
   background-attachment: fixed;
 }
 
@@ -976,10 +1003,15 @@ p { margin: 0; }
 
 /* The focus ring has to survive a warm paper surface: the default outline is
    the same value as the page, and the accent is not. Keyboard users spend the
-   whole shift on this surface. */
-[data-surface='owner'] :focus-visible {
-  outline: 2px solid var(--p-accent);
-  outline-offset: 2px;
+   whole shift on this surface.
+
+   `@layer base` for the same reason as the global ring above: unlayered, this
+   beat `focus:outline-none` and every component that draws its own. */
+@layer base {
+  [data-surface='owner'] :focus-visible {
+    outline: 2px solid var(--p-accent);
+    outline-offset: 2px;
+  }
 }
 
 /* ---- a file picker -----------------------------------------------------
@@ -1085,6 +1117,11 @@ p { margin: 0; }
   --color-rail-ink-64: var(--p-rail-ink-64);
   --color-rail-ink-40: var(--p-rail-ink-40);
   --color-rail-line: var(--p-rail-line);
+
+  /* Saffron's quieter sibling. One use in the product: the brand mark on the
+     dark rail, where the brand green has no contrast at all. */
+  --color-brass: var(--p-brass);
+  --color-accent-wash: var(--p-accent-wash);
 
   --color-hair: var(--p-line);
   --color-hair-strong: var(--p-line-strong);

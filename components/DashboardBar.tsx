@@ -9,7 +9,6 @@ import type { ReactNode } from 'react';
 import { OutletSwitcher } from '@/components/OutletSwitcher';
 import { ShellSearch } from '@/components/ShellSearch';
 import { BrandLockup } from '@/components/BrandMark';
-import { BRAND_GREEN } from '@/lib/brand';
 import { DASHBOARD_LINKS, SHELL_GROUPS, type DashboardSection } from '@/components/shell-links';
 import type { OutletBar } from '@/lib/outlets';
 import { signOutAction } from '@/app/auth/actions';
@@ -187,7 +186,11 @@ export function DashboardBar({
             as well would put the same words twice in a 244px column. */}
         <div className="flex items-center justify-between border-b border-rail-line px-4 py-3.5 lg:px-5 lg:py-4">
           <Link href="/" aria-label="AutoDine" className="group text-rail-ink">
-            <BrandLockup size={21} ink="currentColor" dot={BRAND_GREEN} />
+            {/* The mark's dot is BRASS on the rail, not the brand green: the
+                rail is bottle green now, and a green dot on a green ground is
+                not a brand mark, it is a smudge. Brass is the one token that
+                exists for a detail on dark chrome. */}
+            <BrandLockup size={21} ink="currentColor" dot="var(--p-brass)" />
           </Link>
 
           <button
