@@ -148,7 +148,7 @@ export function Dashboard({
             <BtnLink href="/cashier" tone="ghost">
               Open the counter
             </BtnLink>
-            <BtnLink href="/kitchen" tone="solid">
+            <BtnLink href="/kitchen" tone="primary">
               Open the kitchen board
             </BtnLink>
           </>

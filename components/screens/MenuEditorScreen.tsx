@@ -329,9 +329,9 @@ export function MenuEditorScreen({
       {error && (
         <div
           role="alert"
-          className="mb-4 rounded-[var(--p-r-block)] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-4 py-3"
+          className="mb-4 rounded-[var(--p-r-block)] border border-[var(--p-due)]/30 bg-[var(--p-due)]/8 px-4 py-3"
         >
-          <strong className="text-[12.5px] text-[var(--alert)]">Could not save.</strong>
+          <strong className="text-[12.5px] text-[var(--p-due)]">Could not save.</strong>
           <p className="mt-1 text-[12.5px] leading-[1.5] text-gink-64">{error}</p>
         </div>
       )}
@@ -471,9 +471,9 @@ export function MenuEditorScreen({
 
                   {uncategorised > 0 && (
                     <>
-                      <div className="mt-3 flex items-baseline justify-between gap-2 rounded-[9px] bg-[var(--alert)]/8 px-2.5 py-1.5">
+                      <div className="mt-3 flex items-baseline justify-between gap-2 rounded-[9px] bg-[var(--p-due)]/8 px-2.5 py-1.5">
                         <span className="text-[12.5px] font-medium text-gink">Uncategorised</span>
-                        <span className="text-[11.5px] text-[var(--alert)] tabular-nums">
+                        <span className="text-[11.5px] text-[var(--p-due)] tabular-nums">
                           {uncategorised}
                         </span>
                       </div>
@@ -856,7 +856,7 @@ export function MenuEditorScreen({
                                     data-row-delete
                                     aria-label={`Delete ${i.name}`}
                                     title={`Delete ${i.name}`}
-                                    className="grid size-6 place-items-center rounded-full text-[13.5px] leading-none text-gink-46 transition-colors hover:bg-[var(--alert)]/8 hover:text-[var(--alert)]"
+                                    className="grid size-6 place-items-center rounded-full text-[13.5px] leading-none text-gink-46 transition-colors hover:bg-[var(--p-due)]/8 hover:text-[var(--p-due)]"
                                   >
                                     ×
                                   </button>

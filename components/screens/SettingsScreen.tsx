@@ -210,7 +210,7 @@ export function SettingsScreen({
               <Panel
                 title="Restaurant details"
                 meta="Name, address and what the bill carries"
-                bodyClassName="px-4 py-4 sm:px-5"
+                bodyClassName="px-5 py-5"
               >
                 <p className="m-0 mb-4 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
                   The name and tagline are the first two things a guest reads on the menu.
@@ -352,7 +352,7 @@ export function SettingsScreen({
                 <Panel
                   title="Tax"
                   meta={taxBps === 0 ? '0% — nothing added' : `${formatTaxPercent(taxBps)}%`}
-                  bodyClassName="px-4 py-4 sm:px-5"
+                  bodyClassName="px-5 py-5"
                 >
                   <p className="m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
                     The rate the bill adds on top of the menu prices. Set what your accountant told
@@ -412,7 +412,7 @@ export function SettingsScreen({
                 <Panel
                   title="Online payment"
                   meta={gatewayConfigured ? 'Gateway keys present' : 'No gateway keys'}
-                  bodyClassName="px-4 py-4 sm:px-5"
+                  bodyClassName="px-5 py-5"
                 >
                   <p className="m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
                     Let guests pay by card or UPI from their own order page. Money goes to your
@@ -479,7 +479,7 @@ export function SettingsScreen({
                 <Panel
                   title="Your UPI QR"
                   meta={data?.upiId ? 'Shown to guests' : 'Not set'}
-                  bodyClassName="px-4 py-4 sm:px-5"
+                  bodyClassName="px-5 py-5"
                 >
                   <p className="m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
                     Your own UPI handle, on the guest&apos;s phone, with the amount already filled
@@ -560,7 +560,7 @@ export function SettingsScreen({
               <Panel
                 title="Outlets"
                 meta={live ? `${data?.outlets?.length ?? 0} on this account` : 'none'}
-                bodyClassName="px-4 py-4 sm:px-5"
+                bodyClassName="px-5 py-5"
               >
                 <p className="m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
                   Every outlet has its own menu, tables, QR codes, orders and bills. Whatever is open
@@ -736,7 +736,7 @@ export function SettingsScreen({
             </Panel>
 
             <Card className="bg-paper-deep px-4 py-4">
-              <h2 className="text-[13px] font-semibold tracking-[-0.005em] text-gink">
+              <h2 className="text-[13.5px] font-semibold tracking-[-0.014em] text-gink">
                 Where these appear
               </h2>
               <ul className="m-0 mt-2.5 flex list-none flex-col gap-1.5 p-0">

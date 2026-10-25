@@ -181,8 +181,12 @@ export function DashboardBar({
           'lg:inset-y-0 lg:left-0 lg:w-[244px] lg:max-h-none lg:translate-y-0 lg:rounded-none lg:border-t-0 lg:border-r lg:pb-0',
         ].join(' ')}
       >
-        <div className="flex items-center justify-between px-4 pt-4 pb-2 lg:px-5 lg:pt-5">
-          <Link href="/" aria-label="AutoDine" className="text-rail-ink">
+        {/* The brand block is a band with a hairline under it, so the rail has a
+            top edge instead of a wordmark floating in dark space. The venue is
+            named once, at the foot, where the account lives -- printing it here
+            as well would put the same words twice in a 244px column. */}
+        <div className="flex items-center justify-between border-b border-rail-line px-4 py-3.5 lg:px-5 lg:py-4">
+          <Link href="/" aria-label="AutoDine" className="group text-rail-ink">
             <BrandLockup size={21} ink="currentColor" dot={BRAND_GREEN} />
           </Link>
 
@@ -190,7 +194,7 @@ export function DashboardBar({
             type="button"
             aria-label="Close navigation"
             onClick={() => setOpen(false)}
-            className="grid size-8 place-items-center rounded-full text-[18px] text-rail-ink-64 hover:bg-white/10 hover:text-rail-ink lg:hidden"
+            className="grid size-8 place-items-center rounded-[8px] text-[18px] leading-none text-rail-ink-64 transition-colors duration-150 hover:bg-white/10 hover:text-rail-ink focus-visible:outline-[var(--p-rail-ink)] lg:hidden"
           >
             ×
           </button>
@@ -232,10 +236,10 @@ export function DashboardBar({
                        where the rail is always on screen. */
                     data-rail-row="true"
                     className={[
-                      'group relative mb-1 flex items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-[13px]',
-                      'transition-[background-color,color,box-shadow] duration-150 ease-[var(--o-ease)]',
+                      'group relative mb-0.5 flex items-center gap-2.5 rounded-[9px] px-3 py-[9px] text-[13px]',
+                      'transition-[background-color,color] duration-150 ease-[var(--o-ease)]',
                       current
-                        ? 'bg-[var(--p-rail-active)] font-medium text-rail-ink shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]'
+                        ? 'bg-[var(--p-rail-active)] font-medium text-rail-ink'
                         : 'text-rail-ink-64 hover:bg-white/[0.055] hover:text-rail-ink',
                     ].join(' ')}
                   >
@@ -246,7 +250,7 @@ export function DashboardBar({
                     <span
                       aria-hidden="true"
                       className={[
-                        'absolute top-1/2 left-0 h-4 w-[2.5px] -translate-y-1/2 rounded-r-full transition-opacity duration-150',
+                        'absolute top-1/2 left-0 h-[18px] w-[3px] -translate-y-1/2 rounded-r-full transition-opacity duration-150',
                         current ? 'bg-[var(--p-accent)] opacity-100' : 'opacity-0',
                       ].join(' ')}
                     />
@@ -267,31 +271,41 @@ export function DashboardBar({
           ))}
         </nav>
 
-        <div className="border-t border-rail-line px-3 py-3 lg:px-4 lg:py-4">
-          <div className="flex items-center gap-2.5 px-1">
-            <span
-              aria-hidden="true"
-              className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--p-accent)] text-[11.5px] font-semibold text-onink"
-            >
-              {initialsOf(activeOutlet?.name ?? 'AutoDine')}
-            </span>
-            <span className="min-w-0 leading-tight">
-              <span className="block truncate text-[12.5px] font-medium text-rail-ink">
-                {activeOutlet?.name ?? 'AutoDine'}
+        {/* The account is a RAISED CARD at the foot of the rail, not a row of
+            loose text. It is the one object on this dark column that is about a
+            person rather than a destination, so it gets its own surface -- one
+            step lighter than the rail, with a hairline and a lit top edge. */}
+        <div className="border-t border-rail-line p-2.5">
+          <div className="rounded-[var(--p-r-block)] border border-rail-line bg-[var(--p-rail-raised)] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+            <div className="flex items-center gap-2.5">
+              <span
+                aria-hidden="true"
+                className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-[var(--p-accent)] text-[11.5px] font-semibold text-onink shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]"
+              >
+                {initialsOf(activeOutlet?.name ?? 'AutoDine')}
               </span>
-              <span className="block truncate text-[11.5px] text-rail-ink-40 capitalize">
-                {activeOutlet?.role ?? 'Staff'}
+              <span className="min-w-0 leading-tight">
+                <span className="block truncate text-[12.5px] font-medium text-rail-ink">
+                  {activeOutlet?.name ?? 'AutoDine'}
+                </span>
+                <span className="block truncate text-[11.5px] text-rail-ink-40 capitalize">
+                  {activeOutlet?.role ?? 'Staff'}
+                </span>
               </span>
-            </span>
+            </div>
 
             {/* Sign out sits with the account, not at the bottom of the page.
                 It used to be a full-width outlined pill the same weight as a
-                destination, which is the wrong thing to put under a thumb. */}
+                destination, which is the wrong thing to put under a thumb.
+                It is a plain 28px row under the name now, with a real
+                `background` of its own -- a <button> with no background class
+                was inheriting the browser's light grey box, and on this rail it
+                rendered as a blank white rectangle. */}
             {signOut && (
-              <form action={signOutAction} className="ml-auto">
+              <form action={signOutAction} className="mt-2 border-t border-rail-line pt-2">
                 <button
                   type="submit"
-                  className="rounded-[8px] px-2 py-1.5 text-[11.5px] font-medium text-rail-ink-40 transition-colors hover:bg-white/[0.06] hover:text-rail-ink"
+                  className="w-auto rounded-[7px] px-1.5 py-1 text-[11.5px] font-medium text-rail-ink-40 transition-colors duration-150 hover:bg-white/[0.08] hover:text-rail-ink focus-visible:outline-[var(--p-rail-ink)]"
                 >
                   Sign out
                 </button>
@@ -335,8 +349,18 @@ export function DashboardBar({
 
           {/* Where you are, then who you are. The screen name is ink and the
               venue is meta: on a long shift the question is "which page", and
-              the venue is already answered by the rail's foot. */}
+              the venue is already answered by the rail's foot. The name is
+              prefixed with the same glyph the rail uses for that destination,
+              so the bar and the rail never disagree about what this page is. */}
           <div className="flex min-w-0 items-center gap-2.5">
+            {active ? (
+              <span
+                aria-hidden="true"
+                className="hidden shrink-0 text-[var(--p-accent)] sm:block [&_svg]:size-[15px]"
+              >
+                {ICONS[active]}
+              </span>
+            ) : null}
             <span className="truncate text-[13px] font-semibold tracking-[-0.015em] text-gink">
               {activeLink?.label ?? 'Dashboard'}
             </span>

@@ -612,7 +612,7 @@ export function Cashier({
                         <div
                           role="group"
                           aria-label="Confirm cancellation"
-                          className="mt-3 rounded-[var(--p-r-control)] border border-[var(--alert)]/30 bg-[var(--alert)]/6 px-3.5 py-3"
+                          className="mt-3 rounded-[var(--p-r-control)] border border-[var(--p-due)]/30 bg-[var(--p-due)]/6 px-3.5 py-3"
                         >
                           <strong className="text-[12.5px] text-gink">
                             Cancel {order.code} for {order.table}?
@@ -681,7 +681,7 @@ export function Cashier({
                     {error && (
                       <div
                         role="alert"
-                        className="mt-3 rounded-[var(--p-r-control)] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-3 text-[12.5px] text-[var(--alert)]"
+                        className="mt-3 rounded-[var(--p-r-control)] border border-[var(--p-due)]/30 bg-[var(--p-due)]/8 px-3.5 py-3 text-[12.5px] text-[var(--p-due)]"
                       >
                         {error}
                       </div>

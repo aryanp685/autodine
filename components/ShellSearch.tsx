@@ -115,7 +115,12 @@ export function ShellSearch({ onLaunch }: { onLaunch?: () => void }) {
 
   return (
     <div className="relative" ref={wrapperRef}>
-      <div className="flex h-9 items-center gap-2 rounded-[var(--p-r-control)] border border-hair-strong bg-card pr-2 pl-3 shadow-[var(--p-shadow-1)] transition-[border-color,box-shadow,background-color] duration-150 ease-[var(--o-ease)] hover:border-gink-28 focus-within:border-[var(--p-accent)] focus-within:shadow-[var(--p-shadow-2)]">
+      {/* A FIELD, NOT A BOX. 38px, control radius, a hairline that only lights
+          up on focus, and the magnifier at 14px so it reads as a mark rather
+          than as the biggest thing in the header. The legend inside is the
+          only chrome: on a bar this quiet, a filled pill behind "Go to…" would
+          be the loudest object on the screen. */}
+      <div className="flex h-9 items-center gap-2 rounded-[var(--p-r-control)] border border-hair-strong bg-card pr-2 pl-2.5 shadow-[var(--p-shadow-1)] transition-[border-color,box-shadow] duration-150 ease-[var(--o-ease)] hover:border-gink-28 focus-within:border-[var(--p-accent)] focus-within:shadow-[var(--p-shadow-2)]">
         <svg
           aria-hidden="true"
           viewBox="0 0 24 24"

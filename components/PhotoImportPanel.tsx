@@ -383,9 +383,9 @@ export function PhotoImportPanel({ canWrite }: { canWrite: boolean }) {
       {error && (
         <div
           role="alert"
-          className="rounded-[12px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-4 py-3"
+          className="rounded-[12px] border border-[var(--p-due)]/30 bg-[var(--p-due)]/8 px-4 py-3"
         >
-          <strong className="text-[12.5px] text-[var(--alert)]">That did not work.</strong>
+          <strong className="text-[12.5px] text-[var(--p-due)]">That did not work.</strong>
           <p className="mt-1 text-[12.5px] leading-[1.5] text-gink-64">{error}</p>
         </div>
       )}
@@ -474,7 +474,7 @@ export function PhotoImportPanel({ canWrite }: { canWrite: boolean }) {
                               {item.flags.map((flag) => (
                                 <span
                                   key={flag}
-                                  className="inline-flex items-center rounded-full bg-[var(--alert)]/8 px-2 py-0.5 text-[10.5px] font-medium text-[var(--alert)]"
+                                  className="inline-flex items-center rounded-full bg-[var(--p-due)]/8 px-2 py-0.5 text-[10.5px] font-medium text-[var(--p-due)]"
                                 >
                                   {FLAG_TEXT[flag] ?? flag}
                                 </span>

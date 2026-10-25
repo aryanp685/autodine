@@ -451,7 +451,7 @@ export function ReportsScreen({
                   ? `Peak ${inr(paiseToRupees(peak))} · ${peakBucket.label}`
                   : `Billed · ${range.label}`
               }
-              bodyClassName="px-4 py-4 sm:px-5"
+              bodyClassName="px-5 py-5"
             >
               {peak > 0 ? (
                 <div className="overflow-x-auto" data-chart>
@@ -618,7 +618,7 @@ export function ReportsScreen({
                             </Td>
                             <Td align="right">
                               {outstanding > 0 ? (
-                                <span className="text-[var(--alert)]">
+                                <span className="text-[var(--p-due)]">
                                   <Money value={outstanding} />
                                 </span>
                               ) : (
