@@ -72,7 +72,7 @@ export function BrandingPreview({
       <div className="mx-auto flex w-full max-w-[760px] justify-center px-5 py-7">
         {/* The phone. Same width as the editor preview, so switching between
             the two does not reflow the header. */}
-        <div className="w-full max-w-[360px] overflow-hidden rounded-[22px] border border-hair-strong bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_40px_-24px_rgba(0,0,0,0.28)]">
+        <div className="w-full max-w-[360px] overflow-hidden rounded-[var(--p-r-card)] border border-hair-strong bg-card shadow-[var(--p-shadow-3)]">
           <MenuIdentity
             name={name}
             tagline={restaurant?.tagline}

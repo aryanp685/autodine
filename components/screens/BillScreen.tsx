@@ -116,7 +116,7 @@ export function BillScreen({ bill }: { bill: BillData }) {
             whole document: no card, no shadow, no page furniture. */}
         <article
           data-bill-sheet
-          className="rounded-[14px] border border-hair bg-card px-6 py-7 sm:px-9 sm:py-9 print:rounded-none print:border-0 print:px-0 print:py-0"
+          className="rounded-[var(--p-r-block)] border border-hair bg-card px-6 py-7 sm:px-9 sm:py-9 print:rounded-none print:border-0 print:px-0 print:py-0"
         >
           <header className="flex flex-wrap items-start justify-between gap-5">
             <div className="min-w-0">
@@ -149,7 +149,7 @@ export function BillScreen({ bill }: { bill: BillData }) {
           </header>
 
           {order.cancelled ? (
-            <p className="mt-5 rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-2.5 text-[11.5px] font-semibold tracking-[0.04em] text-[var(--alert)] uppercase">
+            <p className="mt-5 rounded-[var(--p-r-control)] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-2.5 text-[11.5px] font-semibold tracking-[0.04em] text-[var(--alert)] uppercase">
               CANCELLED — nothing is chargeable on this bill
             </p>
           ) : null}
@@ -209,7 +209,7 @@ export function BillScreen({ bill }: { bill: BillData }) {
           </table>
 
           {order.customerNote ? (
-            <p className="mt-4 rounded-[10px] bg-paper-deep px-3.5 py-2.5 text-[12.5px] leading-[1.5] text-gink-64">
+            <p className="mt-4 rounded-[var(--p-r-control)] bg-paper-deep px-3.5 py-2.5 text-[12.5px] leading-[1.5] text-gink-64">
               <span className="font-medium text-gink">Note for the kitchen:</span>{' '}
               {order.customerNote}
             </p>
@@ -264,7 +264,7 @@ export function BillScreen({ bill }: { bill: BillData }) {
         <section
           data-print-chrome="whatsapp"
           aria-labelledby="bill-wa-title"
-          className="mt-5 rounded-[14px] border border-hair bg-card px-5 py-5 print:hidden"
+          className="mt-5 rounded-[var(--p-r-block)] border border-hair bg-card px-5 py-5 print:hidden"
         >
           <h2 id="bill-wa-title" className="text-[13px] font-semibold text-gink">
             Send this bill on WhatsApp
@@ -316,7 +316,7 @@ export function BillScreen({ bill }: { bill: BillData }) {
           ) : null}
 
           {missingDetails ? (
-            <p className="mt-2 rounded-[10px] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-2.5 text-[11.5px] leading-[1.5] text-gink-64">
+            <p className="mt-2 rounded-[var(--p-r-control)] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-2.5 text-[11.5px] leading-[1.5] text-gink-64">
               Address or GSTIN is empty, so printed bills go out without them.{' '}
               <Link
                 href="/dashboard/settings"
