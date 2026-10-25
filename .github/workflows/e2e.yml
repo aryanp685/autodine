@@ -48,8 +48,16 @@ jobs:
       - name: Build (demo mode, no database)
         run: npm run build
 
+      # The count is asserted, not assumed: a config that silently matched no
+      # tests would otherwise "pass" and prove nothing.
+      - name: Expect 9 tests
+        run: |
+          listed=$(npx playwright test --list | tail -1)
+          echo "$listed"
+          echo "$listed" | grep -q "Total: 9 tests"
+
       - name: Browser tests
-        run: npx playwright test
+        run: npx playwright test --reporter=list
 
       - name: Upload the report when something failed
         if: failure()
