@@ -230,7 +230,7 @@ export function BrandingScreen({
           meta={data?.bannerUrl ? 'Set' : 'Optional'}
           bodyClassName="flex flex-1 flex-col px-4 py-4 sm:px-5"
         >
-          <div className="relative aspect-[16/7] w-full overflow-hidden rounded-[10px] border border-hair bg-paper-deep">
+          <div className="relative aspect-[16/7] w-full overflow-hidden rounded-[var(--p-r-control)] border border-hair bg-paper-deep">
             {data?.bannerUrl ? (
               <Image
                 src={data.bannerUrl}
@@ -306,7 +306,7 @@ export function BrandingScreen({
         >
           {/* A phone, at phone width. Narrower and the header wraps differently
               from the real thing; wider and it stops being a preview. */}
-          <div className="mx-auto w-full max-w-[340px] overflow-hidden rounded-[18px] border border-hair-strong bg-card">
+          <div className="mx-auto w-full max-w-[340px] overflow-hidden rounded-[var(--p-r-card)] border border-hair-strong bg-card">
             <MenuIdentity
               name={name}
               tagline={data?.tagline}

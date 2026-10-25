@@ -406,7 +406,10 @@ describe('Kitchen board, the redesign', () => {
     const html = live();
     expect(html).not.toContain('🔊');
     const at = html.indexOf('aria-label="Replay order');
-    expect(html.slice(at, at + 600)).toContain('<svg');
+    // Slice to the end of the button rather than a fixed 600 characters: the
+    // shared button class list grows every time the kit changes, and an offset
+    // that has to be re-tuned is a test that fails for the wrong reason.
+    expect(html.slice(at, html.indexOf('</button>', at))).toContain('<svg');
   });
 
   it('marks each card with the colour of the stage it is in', () => {
@@ -438,7 +441,7 @@ describe('Kitchen board, the redesign', () => {
     const from = html.lastIndexOf('<div', at);
     const opening = html.slice(from, html.indexOf('>', from) + 1);
 
-    expect(opening).toContain('rounded-[14px]');
+    expect(opening).toContain('rounded-[var(--p-r-block)]');
     expect(opening).not.toContain('rounded-full');
   });
 

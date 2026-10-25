@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+
+import { useRailStagger } from './owner/useRailStagger';
 import type { ReactNode } from 'react';
 import { OutletSwitcher } from '@/components/OutletSwitcher';
 import { ShellSearch } from '@/components/ShellSearch';
@@ -81,6 +83,9 @@ export function DashboardBar({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  /* GSAP, lazily, for the drawer's rows only -- see components/owner/useRailStagger.ts
+     for why this is the surface that needs a timeline and the rest does not. */
+  const railRef = useRailStagger<HTMLElement>(open);
 
   const activeLink = DASHBOARD_LINKS.find((link) => link.key === active);
   const activeOutlet =
@@ -118,22 +123,29 @@ export function DashboardBar({
         tabIndex={open ? 0 : -1}
         onClick={() => setOpen(false)}
         className={[
-          'fixed inset-0 z-40 bg-gink/35 transition-opacity duration-200 lg:hidden',
+          'fixed inset-0 z-40 bg-gink/40 transition-opacity duration-200 ease-[var(--o-ease)] lg:hidden',
           open ? 'opacity-100' : 'pointer-events-none opacity-0',
         ].join(' ')}
       />
 
       <aside
         id="app-rail"
+        ref={railRef}
         aria-label="Restaurant"
         data-rail-open={open ? 'true' : 'false'}
         className={[
           /* Phone: a sheet from the bottom edge, because the thumb is there.
              Tablet: the same sheet. Laptop: a fixed rail that is part of the
              layout and never moves. One tree, three positions. */
-          'fixed z-50 flex flex-col bg-rail text-rail-ink shadow-[var(--p-shadow-2)]',
-          'inset-x-0 bottom-0 max-h-[80dvh] rounded-t-2xl border-t border-rail-line pb-[env(safe-area-inset-bottom)]',
-          'transition-transform duration-250 ease-out',
+          'fixed z-50 flex flex-col bg-rail text-rail-ink',
+          /* Two shadows, both doing a job: an outer one to lift the sheet off
+             the page, and an inner lit edge on the rail's right side so the
+             dark column has a boundary against the paper instead of ending in
+             a hard seam. On a phone the same edge reads as the top lip of the
+             sheet, which is where a bottom sheet catches light. */
+          'shadow-[var(--p-shadow-3)] lg:shadow-[inset_-1px_0_0_rgba(255,255,255,0.055)]',
+          'inset-x-0 bottom-0 max-h-[80dvh] rounded-t-[20px] border-t border-rail-line pb-[env(safe-area-inset-bottom)]',
+          'transition-transform duration-[280ms] ease-[var(--o-ease)] will-change-transform',
           open ? 'translate-y-0' : 'translate-y-full',
           'lg:inset-y-0 lg:left-0 lg:w-[244px] lg:max-h-none lg:translate-y-0 lg:rounded-none lg:border-t-0 lg:border-r lg:pb-0',
         ].join(' ')}
@@ -168,7 +180,7 @@ export function DashboardBar({
         <nav aria-label="Restaurant" className="flex-1 overflow-y-auto px-3 py-3">
           {SHELL_GROUPS.map((group) => (
             <div key={group.name} className="mb-4 last:mb-0">
-              <div className="px-3 pt-1 pb-2 text-[10px] font-semibold tracking-[0.18em] text-rail-ink-40 uppercase">
+              <div className="px-3 pt-1 pb-2 text-[10px] font-semibold tracking-[0.2em] text-rail-ink-40 uppercase">
                 {group.name}
               </div>
               {group.links.map((link) => {
@@ -184,18 +196,27 @@ export function DashboardBar({
                        bar and a lifted row, not by a coloured block. A filled
                        block here competed with the page's own primary action
                        across the whole width of the screen. */
+                    /* `data-rail-row` is the GSAP handle: the row is animated
+                       only while the drawer is opening, and never on a laptop
+                       where the rail is always on screen. */
+                    data-rail-row="true"
                     className={[
-                      'group relative mb-1 flex items-center gap-2.5 rounded-[9px] px-3 py-2.5 text-[13px] transition-colors duration-150',
+                      'group relative mb-1 flex items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-[13px]',
+                      'transition-[background-color,color,box-shadow] duration-150 ease-[var(--o-ease)]',
                       current
-                        ? 'bg-[var(--p-rail-active)] font-medium text-rail-ink'
-                        : 'text-rail-ink-64 hover:bg-white/[0.06] hover:text-rail-ink',
+                        ? 'bg-[var(--p-rail-active)] font-medium text-rail-ink shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]'
+                        : 'text-rail-ink-64 hover:bg-white/[0.055] hover:text-rail-ink',
                     ].join(' ')}
                   >
+                    {/* The copper bar is centred on the row's own edge rather
+                        than floating outside the rail: at -left-3 it sat in the
+                        rail's padding, where on a phone sheet it looked like a
+                        stray mark with nothing to belong to. */}
                     <span
                       aria-hidden="true"
                       className={[
-                        'absolute top-1/2 -left-3 h-5 w-[2px] -translate-y-1/2 rounded-full transition-colors',
-                        current ? 'bg-[var(--p-accent)]' : 'bg-transparent',
+                        'absolute top-1/2 left-0 h-4 w-[2.5px] -translate-y-1/2 rounded-r-full transition-opacity duration-150',
+                        current ? 'bg-[var(--p-accent)] opacity-100' : 'opacity-0',
                       ].join(' ')}
                     />
                     <span
@@ -254,14 +275,14 @@ export function DashboardBar({
       {/* Solid, not frosted. A translucent header over a scrolling table is
           glassmorphism, and it also lets a table row read through the
           venue name. The hairline is what separates the two. */}
-      <header className="sticky top-0 z-30 border-b border-hair bg-card/95 lg:pl-[244px]">
+      <header className="sticky top-0 z-30 border-b border-hair bg-card lg:pl-[244px]">
         <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
           <button
             type="button"
             aria-expanded={open}
             aria-controls="app-rail"
             onClick={() => setOpen(true)}
-            className="flex items-center gap-2 rounded-full border border-hair-strong py-1.5 pr-3 pl-2 text-[12.5px] font-medium text-gink lg:hidden"
+            className="flex items-center gap-2 rounded-[var(--p-r-control)] border border-hair-strong bg-card py-1.5 pr-3 pl-2 text-[12.5px] font-medium text-gink shadow-[var(--p-shadow-1)] transition-[border-color,box-shadow] duration-150 ease-[var(--o-ease)] hover:border-gink-28 hover:shadow-[var(--p-shadow-2)] lg:hidden"
           >
             <span aria-hidden="true" className="flex flex-col gap-[3px]">
               <i className="block h-px w-3.5 bg-current" />
@@ -272,7 +293,7 @@ export function DashboardBar({
           </button>
 
           <div className="flex min-w-0 items-baseline gap-2">
-            <span className="truncate text-[13px] font-semibold tracking-[-0.01em] text-gink">
+            <span className="truncate text-[13px] font-semibold tracking-[-0.015em] text-gink">
               {activeLink?.label ?? 'Dashboard'}
             </span>
             {activeOutlet && (

@@ -358,7 +358,7 @@ describe('OrdersScreen, the ledger as a page', () => {
     // pill inside a card is not the thing being tested.
     const opening = html.slice(from, html.indexOf('>', from) + 1);
 
-    expect(opening).toContain('rounded-[14px]');
+    expect(opening).toContain('rounded-[var(--p-r-block)]');
     expect(opening).not.toContain('rounded-full');
   });
 });

@@ -128,7 +128,7 @@ export function BrandingPreview({
             ))}
 
             {(!menu || menu.items.length === 0) && (
-              <div className="rounded-[12px] border border-dashed border-hair-strong px-4 py-8 text-center">
+              <div className="rounded-[var(--p-r-block)] border border-dashed border-hair-strong px-4 py-8 text-center">
                 <strong className="text-[12.5px] font-medium text-gink">No dishes yet.</strong>
                 <p className="mt-1 text-[11.5px] leading-[1.5] text-gink-46">
                   Add dishes in Menus and they will appear here, with your branding around them.

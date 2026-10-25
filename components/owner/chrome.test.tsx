@@ -96,7 +96,9 @@ describe('the owner kit, after the redesign', () => {
   it('makes actions rectangles, so a pill always means status', () => {
     for (const size of ['sm', 'md'] as const) {
       const cls = btn('solid', size);
-      expect(cls).toContain('rounded-[10px]');
+      // The 10px step is now the `--p-r-control` token (still 10px): one radius
+      // scale shared by actions, fields and chips instead of a literal per file.
+      expect(cls).toContain('rounded-[var(--p-r-control)]');
       expect(cls).not.toContain('rounded-full');
     }
   });
@@ -111,7 +113,7 @@ describe('the owner kit, after the redesign', () => {
 
   it('gives a field the same 44px geometry as a md action', () => {
     expect(inputClass).toContain('h-11');
-    expect(inputClass).toContain('rounded-[10px]');
+    expect(inputClass).toContain('rounded-[var(--p-r-control)]');
   });
 
   it('keeps the pill for status, and never paints status with the accent', () => {
