@@ -46,7 +46,7 @@ export function OutletSwitcher({
         name="outlet"
         defaultValue={active.id}
         onChange={(event) => event.currentTarget.form?.requestSubmit()}
-        className="h-9 w-full rounded-[8px] border border-rail-line bg-rail-raised px-2.5 pr-7 text-[12.5px] text-rail-ink focus:border-[var(--p-accent)] focus:outline-none"
+        className="h-9 w-full rounded-[var(--p-r-chip)] border border-rail-line bg-rail-raised px-2.5 pr-7 text-[12.5px] text-rail-ink focus:border-[var(--p-accent)] focus:outline-none"
       >
         {outlets.map((outlet) => (
           <option key={outlet.id} value={outlet.id}>

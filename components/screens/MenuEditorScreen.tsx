@@ -471,7 +471,7 @@ export function MenuEditorScreen({
 
                   {uncategorised > 0 && (
                     <>
-                      <div className="mt-3 flex items-baseline justify-between gap-2 rounded-[9px] bg-[var(--p-due)]/8 px-2.5 py-1.5">
+                      <div className="mt-3 flex items-baseline justify-between gap-2 rounded-[var(--p-r-control)] bg-[var(--p-due)]/8 px-2.5 py-1.5">
                         <span className="text-[12.5px] font-medium text-gink">Uncategorised</span>
                         <span className="text-[11.5px] text-[var(--p-due)] tabular-nums">
                           {uncategorised}
@@ -491,7 +491,7 @@ export function MenuEditorScreen({
                       key={c.id}
                       data-category-active={i === 2 ? 'true' : undefined}
                       className={[
-                        'flex items-baseline justify-between gap-2 rounded-[7px] px-2 py-1.5 text-[12.5px]',
+                        'flex items-baseline justify-between gap-2 rounded-[var(--p-r-chip)] px-2 py-1.5 text-[12.5px]',
                         i === 2 ? 'bg-gink-07 font-medium text-gink' : 'text-gink-64',
                       ].join(' ')}
                     >
@@ -778,7 +778,7 @@ export function MenuEditorScreen({
                                   data-availability={i.available ? 'on' : 'off'}
                                   aria-pressed={i.available}
                                   pendingLabel="Saving…"
-                                  className="group inline-flex h-9 items-center gap-2 rounded-[8px] pr-2 text-[12.5px] font-medium text-gink-64 transition-colors hover:text-gink disabled:opacity-60"
+                                  className="group inline-flex h-9 items-center gap-2 rounded-[var(--p-r-chip)] pr-2 text-[12.5px] font-medium text-gink-64 transition-colors hover:text-gink disabled:opacity-60"
                                   title={
                                     i.available
                                       ? `Mark ${i.name} sold out`

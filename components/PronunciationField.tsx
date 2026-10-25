@@ -62,7 +62,7 @@ export function PronunciationField({
       </Field>
 
       {/* The sentence the voice actually gets, not a promise about it. */}
-      <p className="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 rounded-[8px] bg-paper-deep px-2.5 py-1.5">
+      <p className="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 rounded-[var(--p-r-chip)] bg-paper-deep px-2.5 py-1.5">
         <span className="text-[10.5px] font-semibold tracking-[0.06em] text-gink-46 uppercase">
           Board says
         </span>

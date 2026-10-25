@@ -55,10 +55,10 @@ import {
  *     `aria-live` — when it rolls on its own, a screen reader hears the new
  *     one.
  *   - The floor comes second and carries the state in a tag, the seat count in
- *     words, and one row of actions. A healthy table offers no solid button:
- *     ink is reserved for the card that needs a decision ("Create code",
- *     "Enable"), so a page of twelve tables has a hierarchy instead of twelve
- *     equal black buttons.
+ *     words, and one row of actions. A healthy table offers no filled button:
+ *     the accent fill is reserved for the card that needs a decision ("Create
+ *     code", "Enable"), so a page of twelve tables has a hierarchy instead of
+ *     twelve equal blocks of colour.
  *   - A banner names the tables that cannot be scanned. Before, that fact was
  *     buried in the card's tag twelve times over.
  *   - Printing prints the whole floor, six cards to a page. It used to print
@@ -343,7 +343,7 @@ export function TablesScreen({
                             />
                           </div>
                         ) : (
-                          <div className="grid h-[76px] w-[76px] shrink-0 place-items-center rounded-[var(--p-r-control)] border border-dashed border-hair-strong bg-paper-deep px-1.5 text-center text-[10px] leading-[1.3] font-medium text-gink-46">
+                          <div className="grid h-[76px] w-[76px] shrink-0 place-items-center rounded-[var(--p-r-control)] border border-hair bg-paper-deep px-1.5 text-center text-[10px] leading-[1.3] font-medium text-gink-46">
                             {!live ? 'Sample' : t.token ? 'Code not drawn' : 'No code yet'}
                           </div>
                         )}
@@ -597,7 +597,7 @@ export function TablesScreen({
                     /* Printing a card for a table with no code puts an
                        unscannable square on a table and looks exactly like a
                        working one. The sheet says what is missing instead. */
-                    <div className="grid size-[64px] place-items-center rounded-[6px] border border-dashed border-hair-strong px-1 text-center text-[10px] leading-[1.2] font-medium text-gink-46">
+                    <div className="grid size-[64px] place-items-center rounded-[var(--p-r-chip)] border border-hair bg-paper-deep px-1 text-center text-[10px] leading-[1.2] font-medium text-gink-46">
                       No code
                     </div>
                   )}

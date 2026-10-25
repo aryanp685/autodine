@@ -263,15 +263,16 @@ describe('the redesign', () => {
     expect(plate.slice(0, 900)).toContain('Type it at checkout');
   });
 
-  it('reserves ink for the table that needs a decision', () => {
-    // Two solid controls are the page's own: "Add table" in the head and "Open
-    // guest display" beside the code. No card draws one while every table is
-    // healthy -- twelve black buttons under twelve healthy tables is how the
-    // screen told the owner nothing.
+  it('reserves the filled action for the table that needs a decision', () => {
+    // Two filled controls are the page's own: "Add table" in the head and
+    // "Open guest display" beside the code. No card draws one while every
+    // table is healthy -- twelve filled buttons under twelve healthy tables is
+    // how the screen told the owner nothing. The fill is the accent now, not
+    // the ink: one action colour in the product (btn() in the kit).
     const healthy = renderToStaticMarkup(
       <TablesScreen data={data({ tables: [table({}), table({ code: 'T2' })] })} />
     );
-    expect(count(healthy, 'bg-gink text-onink')).toBe(2);
+    expect(count(healthy, 'bg-[var(--p-accent)] text-onink')).toBe(2);
 
     // One table without a code: it, and only it, gains a solid button.
     const broken = renderToStaticMarkup(
@@ -281,7 +282,7 @@ describe('the redesign', () => {
         })}
       />
     );
-    expect(count(broken, 'bg-gink text-onink')).toBe(3);
+    expect(count(broken, 'bg-[var(--p-accent)] text-onink')).toBe(3);
     expect(broken).toContain('data-table-action="create"');
   });
 

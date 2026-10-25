@@ -197,7 +197,7 @@ export function DashboardBar({
             type="button"
             aria-label="Close navigation"
             onClick={() => setOpen(false)}
-            className="grid size-8 place-items-center rounded-[8px] text-[18px] leading-none text-rail-ink-64 transition-colors duration-150 hover:bg-gink-07 hover:text-rail-ink focus-visible:outline-[var(--p-rail-ink)] lg:hidden"
+            className="grid size-8 place-items-center rounded-[var(--p-r-chip)] text-[18px] leading-none text-rail-ink-64 transition-colors duration-150 hover:bg-gink-07 hover:text-rail-ink focus-visible:outline-[var(--p-rail-ink)] lg:hidden"
           >
             ×
           </button>
@@ -239,7 +239,7 @@ export function DashboardBar({
                        where the rail is always on screen. */
                     data-rail-row="true"
                     className={[
-                      'group relative mb-0.5 flex items-center gap-2.5 rounded-[9px] px-3 py-[9px] text-[13px]',
+                      'group relative mb-0.5 flex items-center gap-2.5 rounded-[var(--p-r-control)] px-3 py-[9px] text-[13px]',
                       'transition-[background-color,color] duration-150 ease-[var(--o-ease)]',
                       current
                         ? 'bg-[var(--p-rail-active)] font-medium text-rail-ink'

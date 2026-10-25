@@ -197,7 +197,7 @@ function Items({ order, compact }: { order: BoardTicket; compact?: boolean }) {
               <span
                 key={addon}
                 data-addon=""
-                className="ml-1.5 inline-block rounded-[6px] border border-hair bg-paper-deep px-1.5 py-[2px] text-[11.5px] font-medium whitespace-nowrap text-gink-64"
+                className="ml-1.5 inline-block rounded-[var(--p-r-chip)] border border-hair bg-paper-deep px-1.5 py-[2px] text-[11.5px] font-medium whitespace-nowrap text-gink-64"
               >
                 {addon}
               </span>
@@ -1492,7 +1492,7 @@ export function Kitchen({
                   />
                   <div className="flex items-center gap-2">
                     <span className="tnum text-[15px] font-semibold tracking-[-0.01em] text-gink">{o.code}</span>
-                    <span className="rounded-[6px] bg-paper-deep px-1.5 py-0.5 text-[11.5px] font-semibold tracking-[0.04em] text-gink-80">
+                    <span className="rounded-[var(--p-r-chip)] bg-paper-deep px-1.5 py-0.5 text-[11.5px] font-semibold tracking-[0.04em] text-gink-80">
                       {o.table}
                     </span>
                     {/* Age is the one number a cook acts on without reading
@@ -1513,7 +1513,7 @@ export function Kitchen({
                   </div>
 
                   {o.payment === 'pending' && (
-                    <div className="mt-2 flex items-center gap-1.5 rounded-[7px] bg-[color-mix(in_oklab,var(--p-due)_8%,var(--p-card))] px-2 py-1 text-[11.5px] font-medium text-[var(--p-due)]">
+                    <div className="mt-2 flex items-center gap-1.5 rounded-[var(--p-r-chip)] bg-[color-mix(in_oklab,var(--p-due)_8%,var(--p-card))] px-2 py-1 text-[11.5px] font-medium text-[var(--p-due)]">
                       <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--p-due)]" />
                       Unpaid · pay at counter
                     </div>

@@ -427,10 +427,16 @@ p { margin: 0; }
 
   /* ---- geometry --------------------------------------------------------
      One radius per kind of object, so nothing is rounded by feel: a card is
-     20, an inner block is 14, a control is 10, a tag is a pill. */
+     20, an inner block is 14, a control is 10, a small chip or a key cap is 8,
+     and anything that carries a STATE is a pill.
+
+     The 6/7/8/9px literals that used to be scattered across fourteen call
+     sites were four names for the same idea, which is how a surface ends up
+     looking hand-made: every one of them is this token now. */
   --p-r-card: 20px;
   --p-r-block: 14px;
   --p-r-control: 10px;
+  --p-r-chip: 8px;
 
   /* ---- elevation -------------------------------------------------------
      Wide, low and almost invisible -- Apple's cards are separated by a
@@ -1059,6 +1065,37 @@ p { margin: 0; }
     outline-offset: 2px;
   }
 }
+
+/* ---- the search field --------------------------------------------------
+   ONE CONTROL THAT HAS TO OPT OUT AT THE ROOT.
+
+   "Go to…" is an `<input type="search">` inside a pill. On some engines that
+   control still paints its own focus rectangle INSIDE the pill -- a hard black
+   box, two pixels, square corners -- and no `outline: none` utility clears it,
+   because the decoration comes from the native `searchfield` appearance rather
+   than from the outline property.
+
+   So the reset lives here, unlayered, on a class of its own: an unlayered rule
+   beats every layered utility, so no future change to a class string can bring
+   the box back. The wrapper draws the focus state (a tint and a soft ring), and
+   this element is only ever the text inside it. */
+.shell-field {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  outline: none;
+  outline-offset: 0;
+}
+.shell-field:focus,
+.shell-field:focus-visible,
+.shell-field::-webkit-search-decoration,
+.shell-field::-webkit-search-cancel-button {
+  outline: none;
+  box-shadow: none;
+}
+.shell-field::-webkit-search-decoration { display: none; }
 
 /* ---- a file picker -----------------------------------------------------
    Picking a file and sending it are two steps, but they must not look like two
