@@ -348,81 +348,82 @@ p { margin: 0; }
      comment on each group. */
 
   /* ---- surfaces --------------------------------------------------------
-     The field and the sheet are 1.09:1 apart -- that is Apple's own step, and
-     it is deliberately small: the sheet is separated by its hairline and its
-     shadow, not by being a loud rectangle. */
-  --p-paper: #f5f5f7;
-  --p-paper-deep: #ececef;
+     WARM PORCELAIN, not a grey room. The field is a soft cream with a hint of
+     depth, and the sheet stays pure white so a number on a card is still read
+     against white. The step between them is deliberately small: the sheet is
+     separated by its hairline and its shadow, not by being a loud rectangle. */
+  --p-paper: #fbf6ee;
+  --p-paper-deep: #f4ece1;
   /* A quiet wash for a well inside a card. Nothing paints over a wash. */
-  --p-paper-veil: rgba(29, 29, 31, 0.025);
+  --p-paper-veil: rgba(56, 38, 22, 0.028);
   --p-surface: #ffffff;
   --p-card: #ffffff;
-  --p-glass: rgba(251, 251, 253, 0.92);
+  --p-glass: rgba(253, 250, 245, 0.92);
 
   /* ---- ink -------------------------------------------------------------
-     Graphite, the value Apple uses for type: 15.5:1 on the field.
+     Espresso, not black -- warm, to sit on a warm field without going muddy.
      The ramp below it is the same ink at four opacities, so every quiet thing
      on the surface is the same colour, quieter. */
-  --p-ink: #1d1d1f;
-  --p-ink-80: rgba(29, 29, 31, 0.86);
-  --p-ink-64: rgba(29, 29, 31, 0.72);
-  /* Meta lines, table cells, notes: 4.9:1 on a sheet. Quieter than the ink,
+  --p-ink: #221a14;
+  --p-ink-80: rgba(34, 26, 20, 0.86);
+  --p-ink-64: rgba(34, 26, 20, 0.72);
+  /* Meta lines, table cells, notes: 4.8:1 on a sheet. Quieter than the ink,
      still readable -- at 0.44 this was 3.1:1 and read as switched off. */
-  --p-ink-46: rgba(29, 29, 31, 0.62);
+  --p-ink-46: rgba(34, 26, 20, 0.62);
   /* Placeholders and resting rules. 2.4:1: present, plainly not content. */
-  --p-ink-28: rgba(29, 29, 31, 0.38);
-  --p-ink-12: rgba(29, 29, 31, 0.14);
-  --p-ink-07: rgba(29, 29, 31, 0.07);
-  /* What sits ON a filled control. White on the filled ink and on the blue:
-     5.6:1, so a button label is readable at 12.5px without a heavier weight. */
+  --p-ink-28: rgba(34, 26, 20, 0.38);
+  --p-ink-12: rgba(34, 26, 20, 0.14);
+  --p-ink-07: rgba(34, 26, 20, 0.07);
+  /* What sits ON a filled control. White on the plum and on the ink fill:
+     8.6:1 on the plum, so a button label is readable at 12.5px without a
+     heavier weight. */
   --p-on-ink: #ffffff;
   --p-on-ink-64: rgba(255, 255, 255, 0.74);
   --p-on-ink-40: rgba(255, 255, 255, 0.52);
 
   /* ---- accent ----------------------------------------------------------
-     ONE BLUE, and it is the Apple link blue rather than a darker, "safer"
-     blue: 5.6:1 on a sheet and 5.1:1 on the field as text, and white on it is
-     the same 5.6:1. `--p-accent-strong` is one step down, for a pressed fill
-     and for 10.5px tracked-out uppercase, which needs the extra step.
-     `--p-brass` is not a colour of its own any more: it is the brand mark's
-     dot on the pale rail, and it carries the brand green so the mark stays
-     the mark. */
-  --p-accent: #0066cc;
-  --p-accent-strong: #0058b9;
-  --p-accent-soft: #e6f0fd;
-  --p-accent-wash: rgba(0, 102, 204, 0.05);
+     ONE PLUM, and it is a dining room colour rather than a dashboard blue:
+     aubergine on cream is what a menu, a table cloth and a wine list already
+     are. 8.6:1 as text on a sheet and 8.6:1 as a fill behind white, so the
+     same token can be a label and a button. `--p-accent-strong` is one step
+     down, for a pressed fill and for 10.5px tracked-out uppercase, which needs
+     the extra step. `--p-brass` is not a colour of its own: it is the brand
+     mark's dot on the pale rail, and it carries the brand green so the mark
+     stays the mark. */
+  --p-accent: #7d2b6b;
+  --p-accent-strong: #67225a;
+  --p-accent-soft: #f5e8f2;
+  --p-accent-wash: rgba(125, 43, 107, 0.05);
   --p-brass: #2f7d4f;
 
   /* ---- status ----------------------------------------------------------
-     Two meanings, never borrowed for decoration: mint is settled/ready/paid,
-     coral is money to chase. Both carry a matching wash so a tag can be one
-     token instead of a colour-mix at every call site. */
-  --p-live: #167b47;
-  --p-live-soft: #eaf6ef;
-  --p-due: #b3261e;
-  --p-due-soft: #fdecea;
+     Two meanings, never borrowed for decoration: a deep leaf for
+     settled/ready/paid, a brick for money to chase. Both carry a matching
+     wash so a tag can be one token instead of a colour-mix at every call
+     site. */
+  --p-live: #17754a;
+  --p-live-soft: #e8f5ed;
+  --p-due: #a82d21;
+  --p-due-soft: #fcebe8;
 
   /* ---- the rail --------------------------------------------------------
-     PALE, not dark. Apple's own sidebars are the lightest surface on screen,
-     which is the opposite of the dashboard convention -- and it is what stops
-     the product reading as a corporate console. The rail is a hair lighter
-     than the field (a white column on a grey room), the current row is a blue
-     tint, and the type on it is the same graphite.
-     16.3:1 for a label, 4.9:1 even for the 10px uppercase group headings. */
-  --p-rail: #fbfbfd;
+     PALE, not dark. A warm white column on a cream room: the lightest surface
+     on screen, which is what stops the product reading as a corporate console.
+     The current row is a plum tint, and the type on it is the same espresso. */
+  --p-rail: #fffdf8;
   --p-rail-raised: #ffffff;
-  --p-rail-ink: #1d1d1f;
-  --p-rail-ink-64: rgba(29, 29, 31, 0.72);
-  --p-rail-ink-40: rgba(29, 29, 31, 0.64);
-  --p-rail-line: rgba(29, 29, 31, 0.09);
-  --p-rail-active: rgba(0, 102, 204, 0.1);
+  --p-rail-ink: #221a14;
+  --p-rail-ink-64: rgba(34, 26, 20, 0.72);
+  --p-rail-ink-40: rgba(34, 26, 20, 0.64);
+  --p-rail-line: rgba(34, 26, 20, 0.09);
+  --p-rail-active: rgba(125, 43, 107, 0.1);
 
   /* ---- lines -----------------------------------------------------------
-     Graphite hairlines. On a white surface an edge is a drawn line, not a
-     shadow; `--p-line-soft` is the quieter one for dividers INSIDE a card. */
-  --p-line: rgba(29, 29, 31, 0.1);
-  --p-line-soft: rgba(29, 29, 31, 0.06);
-  --p-line-strong: rgba(29, 29, 31, 0.2);
+     Warm hairlines. On a white surface an edge is a drawn line, not a shadow;
+     `--p-line-soft` is the quieter one for dividers INSIDE a card. */
+  --p-line: rgba(34, 26, 20, 0.1);
+  --p-line-soft: rgba(34, 26, 20, 0.06);
+  --p-line-strong: rgba(34, 26, 20, 0.2);
   --p-line-on-ink: rgba(255, 255, 255, 0.24);
 
   /* ---- geometry --------------------------------------------------------
@@ -443,12 +444,12 @@ p { margin: 0; }
      hairline and a shadow you have to look for. Each step carries a lit top
      edge, which is what says the sheet is above the field rather than cut into
      it. */
-  --p-shadow-1: inset 0 1px 0 rgba(255, 255, 255, 1), 0 1px 2px rgba(29, 29, 31, 0.04),
-    0 8px 20px -16px rgba(29, 29, 31, 0.16);
-  --p-shadow-2: inset 0 1px 0 rgba(255, 255, 255, 1), 0 2px 6px rgba(29, 29, 31, 0.05),
-    0 20px 40px -24px rgba(29, 29, 31, 0.2);
-  --p-shadow-3: inset 0 1px 0 rgba(255, 255, 255, 1), 0 8px 18px rgba(29, 29, 31, 0.06),
-    0 40px 72px -36px rgba(29, 29, 31, 0.24);
+  --p-shadow-1: inset 0 1px 0 rgba(255, 255, 255, 1), 0 1px 2px rgba(58, 38, 20, 0.05),
+    0 8px 20px -16px rgba(58, 38, 20, 0.18);
+  --p-shadow-2: inset 0 1px 0 rgba(255, 255, 255, 1), 0 2px 6px rgba(58, 38, 20, 0.06),
+    0 20px 40px -24px rgba(58, 38, 20, 0.22);
+  --p-shadow-3: inset 0 1px 0 rgba(255, 255, 255, 1), 0 8px 18px rgba(58, 38, 20, 0.07),
+    0 40px 72px -36px rgba(58, 38, 20, 0.26);
 
   /* The page paints its own surface with utilities; these two are the last
      resort for content that has not been wrapped yet. */
@@ -965,16 +966,24 @@ p { margin: 0; }
    ========================================================================= */
 
 /* The wash: barely there, on purpose.
-   A white bloom at the top left and a hint of the accent at the top right, both
-   far below the contrast at which the eye reads a gradient. The point is not
-   decoration -- it is that a 1440px field of one flat grey reads as a
-   screenshot of a colour, and a 2% bloom gives it a top and a bottom without
-   ever becoming a band. Fixed, so scrolling a long table does not slide the
-   light up the screen. */
+   A white bloom at the top left, the product's own plum at the top right, and
+   a warm amber breath under it, all far below the contrast at which the eye
+   reads a gradient. The point is not decoration -- it is that a 1440px field of
+   one flat cream reads as a screenshot of a colour, and a 5% bloom gives it a
+   top and a bottom without ever becoming a band. Fixed, so scrolling a long
+   table does not slide the light up the screen.
+
+   THE THIRD LAYER USED TO BE BLUE. It was written against the previous accent
+   and left behind when the accent changed, so a careful eye could find a cold
+   corner in the top right of an otherwise warm room -- the exact kind of
+   leftover that makes a palette feel accidental. It is a colour-mix of the
+   accent token now, so the room follows the accent instead of remembering an
+   older one. */
 [data-surface='owner'] {
   background-image:
-    radial-gradient(70% 46% at 8% -18%, rgba(255, 255, 255, 0.9), transparent 68%),
-    radial-gradient(64% 46% at 100% -6%, rgba(0, 102, 204, 0.045), transparent 72%);
+    radial-gradient(70% 46% at 8% -18%, rgba(255, 255, 255, 0.85), transparent 68%),
+    radial-gradient(64% 46% at 100% -6%, color-mix(in oklab, var(--p-accent) 5%, transparent), transparent 72%),
+    radial-gradient(58% 40% at 100% 8%, rgba(180, 122, 62, 0.09), transparent 70%);
   background-attachment: fixed;
 }
 

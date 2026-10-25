@@ -120,7 +120,13 @@ export function VerifyCodeForm({
       <p className="mt-2.5 text-[11.5px] leading-[1.6] text-gink-46" id="code-hint">
         {complete && !sending
           ? 'Checking that code…'
-          : `The code changes every ${windowMinutes === 1 ? 'minute' : `${windowMinutes} minutes`}. If you cannot see it, ask a member of staff — they can read it out for you. Too many tries from one phone pause this for fifteen minutes, so please check the digits first.`}
+          /* The order of these two sentences is the product decision: a guest
+             reads the code off the screen at the counter, and a person is the
+             fallback rather than the instruction. The old line ("ask a member
+             of staff") made the human the first answer, which is the workflow
+             this product exists to remove -- and it contradicted the
+             WhereToFindCode list, which puts the screen first. */
+          : `The code is on the screen at the counter or till, and it changes every ${windowMinutes === 1 ? 'minute' : `${windowMinutes} minutes`}. If you cannot see that screen, anyone on the floor can read the current digits to you. Too many tries from one phone pause this for fifteen minutes, so please check the digits first.`}
       </p>
     </form>
   );

@@ -6,6 +6,7 @@ import { dashboardStats, recentOrders, restaurant, sparkline, topItems } from '@
 import { Money, PaymentPill, PrepPill, Sparkline } from '@/components/ui';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { ChartMotion } from '@/components/owner/ChartMotion';
+import { AutoRefresh } from '@/components/owner/AutoRefresh';
 import {
   BtnLink,
   Empty,
@@ -144,6 +145,10 @@ export function Dashboard({
 
   return (
     <OwnerPage active="overview" outlet={outlet} signOut={!blocked}>
+        {/* The overview is a read of the database, so it is only as true as the
+            last render. This re-renders it on a slow timer while the tab is
+            visible and nobody is typing -- see components/owner/AutoRefresh. */}
+        <AutoRefresh enabled={live && !blocked} />
       <PageHead
         kicker={live ? 'Overview · today, restaurant time' : 'Sample dashboard · fictional data'}
         title={venueName || 'Restaurant overview'}
