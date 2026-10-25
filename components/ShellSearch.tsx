@@ -120,7 +120,12 @@ export function ShellSearch({ onLaunch }: { onLaunch?: () => void }) {
           than as the biggest thing in the header. The legend inside is the
           only chrome: on a bar this quiet, a filled pill behind "Go to…" would
           be the loudest object on the screen. */}
-      <div className="flex h-9 items-center gap-2 rounded-[var(--p-r-control)] border border-hair-strong bg-card pr-2 pl-2.5 shadow-[var(--p-shadow-1)] transition-[border-color,box-shadow] duration-150 ease-[var(--o-ease)] hover:border-gink-28 focus-within:border-[var(--p-accent)] focus-within:shadow-[var(--p-shadow-2)]">
+      {/* A quiet chip that becomes a field. A permanently outlined box in a top
+          bar reads as an unfinished form control; the resting state is a soft
+          tint, and focus turns it into the one white object in the bar with the
+          accent ring. The `⌘K` legend sits inside it, because that is what it
+          is: the shortcut for this control, not a separate affordance. */}
+      <div className="flex h-9 items-center gap-2 rounded-[var(--p-r-control)] border border-transparent bg-[color-mix(in_oklab,var(--p-ink)_6%,transparent)] pr-2 pl-2.5 transition-[background-color,border-color,box-shadow] duration-150 ease-[var(--o-ease)] hover:border-hair-strong hover:bg-[color-mix(in_oklab,var(--p-ink)_3%,var(--p-card))] focus-within:border-[var(--p-accent)] focus-within:bg-card focus-within:shadow-[var(--p-shadow-1)]">
         <svg
           aria-hidden="true"
           viewBox="0 0 24 24"
@@ -162,13 +167,13 @@ export function ShellSearch({ onLaunch }: { onLaunch?: () => void }) {
               optionRefs.current[cursor]?.click();
             }
           }}
-          className="w-[92px] bg-transparent text-[12.5px] text-gink placeholder:text-gink-46 focus:w-[150px] focus:outline-none sm:w-[132px] sm:focus:w-[190px] transition-[width] duration-150"
+          className="w-[92px] bg-transparent text-[12.5px] text-gink placeholder:text-gink-46 focus:w-[150px] focus:outline-none focus-visible:outline-none sm:w-[132px] sm:focus:w-[190px] transition-[width] duration-150"
         />
         {/* The key shown has to be the key that works. This printed ⌘K on every
             platform, including Windows, where the shortcut is Ctrl+K and the
             legend named a key the keyboard does not have. The modifier is read
             after mount so the server-rendered mark stays stable. */}
-        <kbd className="hidden shrink-0 rounded border border-hair-strong px-1 py-px text-[10px] font-medium text-gink-46 sm:block">
+        <kbd className="hidden shrink-0 rounded-[6px] border border-hair bg-card px-1.5 py-px text-[10px] font-medium text-gink-46 shadow-[inset_0_-1px_0_rgba(255,255,255,0.05)] sm:block">
           {isApple ? '⌘K' : 'Ctrl K'}
         </kbd>
       </div>

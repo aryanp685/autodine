@@ -19,6 +19,7 @@ import {
   Th,
   TableWrap,
   Tr,
+  SectionHead,
   tableClass,
 } from '@/components/owner/chrome';
 import type { DashboardScreenData } from '@/lib/db/dashboard-screen';
@@ -100,13 +101,17 @@ export function Dashboard({
    *
    * These four cards were equal in every respect, so the eye had nowhere to
    * land: "Orders today" happened to be first because it was written first.
-   * Revenue is what an owner opens this screen for, so it goes first and it is
-   * drawn larger; the rest keep their weight and their order.
+   * Revenue is what an owner opens this screen for, so it is lifted out of the
+   * grid entirely and becomes the hero; the other three keep their weight and
+   * their order beside it.
+   *
+   * The fallback matters. `find` returns undefined if the source ever stops
+   * sending "Revenue today" -- and rendering `undefined.label` would take the
+   * whole screen down. The first card is a bad hero but a working one.
    */
   const LEAD = 'Revenue today';
-  const orderedCards = [...cards].sort(
-    (a, b) => Number(b.label === LEAD) - Number(a.label === LEAD)
-  );
+  const leadStat = cards.find((card) => card.label === LEAD) ?? cards[0];
+  const otherStats = cards.filter((card) => card !== leadStat);
 
   // One shape for both sources: the demo rows call the quantity 'sold' and the
   // live ones 'qty'. Normalising here keeps the union out of the markup.
@@ -228,141 +233,189 @@ export function Dashboard({
         </Notice>
       ) : null}
 
-      {/* Four figures, each with the sentence that says what it counts. On a
-          phone they are two by two, not one long column: a KPI you have to
-          scroll past is not a KPI.
+      {/*
+        THE DAY, AS ONE OBJECT.
 
-          These were hand-rolled copies of `Stat`, which is the kit's whole
-          point -- one figure size, one label size, one note size, one border.
-          The only difference the copy had was a slightly smaller numeral. */}
-      <section
-        aria-label="Today at a glance"
-        className="grid grid-cols-2 gap-3.5 lg:grid-cols-[1.6fr_1fr_1fr_1fr]"
-      >
-        {orderedCards.map((card) => (
-          <Stat
-            key={card.label}
-            label={card.label}
-            value={card.value}
-            meta={card.meta}
-            lead={card.label === LEAD}
-            /* Green means "somebody is working right now", so it belongs on
-               open orders and only when there are some. A permanently tinted
-               card is decoration. */
-            tone={card.label === 'Open orders' && openCount > 0 ? 'live' : 'plain'}
+        This screen used to open with four identical cards, then a chart panel,
+        then a ranked list, then a table: four boxes of equal weight stacked in
+        a column, which is a wireframe rather than a dashboard. Nothing on it
+        said "this is the number you came for" -- the takings happened to be in
+        the first box because somebody wrote it first.
+
+        So the composition is now: ONE hero (the takings, with the shape of the
+        day inside it), THREE secondary figures beside it, a ranked STRIP, and
+        the ledger. Fewer, larger objects, each doing one job. The hero is the
+        only card on the page with a warm fill and a lit top edge, which is how
+        the eye finds the number before it has read a word.
+
+        Nothing here is decoration: the chart is the same `Sparkline` over the
+        same buckets, the figures are the same `Stat`, and the plan line above
+        still comes from the database on every load.
+      */}
+      <section aria-label="Today at a glance" className="grid gap-4 lg:grid-cols-[1.62fr_1fr] lg:items-stretch">
+        {/* ------------------------------------------------------------ hero */}
+        <div
+          data-hero="revenue"
+          className="relative flex flex-col justify-between overflow-hidden rounded-[var(--p-r-card)] border border-[color-mix(in_oklab,var(--p-accent)_24%,transparent)] bg-card shadow-[var(--p-shadow-1)]"
+        >
+          {/* A 2px terracotta rule along the top, and a flat warm wash under
+              the whole card. Both are tokens: no gradient, no blur -- on a
+              20px-radius card a radial highlight read as a smudge. */}
+          <span
+            aria-hidden="true"
+            className="absolute inset-x-0 top-0 h-[2px] bg-[var(--p-accent)]"
           />
-        ))}
+          <span aria-hidden="true" className="absolute inset-0 bg-[var(--p-accent-wash)]" />
+
+          <div className="relative grid gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-center lg:gap-6">
+            {/* the figure */}
+            <div className="min-w-0">
+              <p className="text-[10.5px] font-semibold tracking-[0.16em] text-[var(--p-accent-strong)] uppercase">
+                {leadStat.label}
+              </p>
+              {/* The one display numeral on the surface. `tabular-nums` keeps
+                  the rupee digits from shivering as the day grows, and the
+                  clamp lets it be enormous on a laptop without wrapping on a
+                  phone. */}
+              <div className="mt-2.5 text-[clamp(2.2rem,5.4vw,4rem)] leading-[0.9] font-semibold tracking-[-0.055em] text-gink tabular-nums">
+                {leadStat.value}
+              </div>
+              <p className="mt-3 max-w-[32ch] text-[12.5px] leading-[1.5] text-gink-64">
+                {leadStat.meta}
+              </p>
+            </div>
+
+            {/* the shape of the day, inside the hero */}
+            <div className="min-w-0 border-t border-hair pt-4 lg:border-t-0 lg:border-l lg:border-hair lg:pt-0 lg:pl-6">
+              {chartable && chartHasValue ? (
+                <div className="text-gink" data-chart>
+                  {/* The line draws itself once, on arrival: GSAP, lazily
+                      loaded, and it can only ever ADD motion -- the server
+                      sends the chart fully drawn, so a blocked bundle leaves a
+                      complete chart. */}
+                  <ChartMotion>
+                    <Sparkline
+                      data={hourly}
+                      width={520}
+                      height={120}
+                      baseline="zero"
+                      area
+                      label="Revenue by hour of the day"
+                      className="h-[104px] w-full"
+                      markIndex={hasPeak ? peakIndex : undefined}
+                    />
+                  </ChartMotion>
+                  {live ? (
+                    <>
+                      {/* Two ticks and nothing between them: an hour is an
+                          hour, not a measurement, and a grid would be a claim
+                          about precision the buckets do not have. */}
+                      <div className="mt-1.5 flex items-baseline justify-between gap-3">
+                        <span className="text-[10.5px] text-gink-46 tabular-nums">{hourLabel(0)}</span>
+                        <span className="text-[10.5px] text-gink-46 tabular-nums">
+                          {hourLabel(hourly.length - 1)}
+                        </span>
+                      </div>
+                      {/* The line says the shape; this says the answer. */}
+                      <div className="mt-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-hair pt-2.5">
+                        <span className="text-[11.5px] font-medium text-gink">Busiest hour</span>
+                        <span className="text-[11.5px] text-gink-46">{hourRangeLabel(peakIndex)}</span>
+                        <span className="ml-auto text-[13px] font-semibold text-gink tabular-nums">
+                          <Money value={hourly[peakIndex]} />
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    /* The sample series is a shape with no clock behind it, so
+                       it is labelled as a sample and given no axis: printing
+                       midnight-to-11am under twelve invented buckets invented
+                       a trading day the demo never had. */
+                    <p className="mt-2 text-[11.5px] leading-[1.45] text-gink-46">
+                      Sample shape &middot; fictional
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <Empty>
+                  {chartable
+                    ? 'No settled payments yet today. The chart fills in as orders are paid for.'
+                    : 'Today has only just started. The chart needs an hour of trading before it can show a shape.'}
+                </Empty>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ------------------------------------------------- secondary figures
+            Three, not four: the fourth is the hero. They stack beside it on a
+            laptop and become a row under it on a tablet, so the page still
+            opens with figures rather than with a scroll. */}
+        <div
+          aria-label="Other figures for today"
+          className="grid gap-3.5 sm:grid-cols-3 lg:grid-cols-1"
+        >
+          {otherStats.map((card) => (
+            <Stat
+              key={card.label}
+              label={card.label}
+              value={card.value}
+              meta={card.meta}
+              /* Green means "somebody is working right now", so it belongs on
+                 open orders and only when there are some. A permanently tinted
+                 card is decoration. */
+              tone={card.label === 'Open orders' && openCount > 0 ? 'live' : 'plain'}
+            />
+          ))}
+        </div>
       </section>
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-        {/* The chart is deliberately quiet: one line, no gridlines, no axis
-            labels. The number above it is the reading; this is the shape. */}
-        <Panel
-          /* Not "Revenue today": the lead card above already says exactly
-             that, and two headings with one name on one screen is how a page
-             starts looking like it has a bug. This one is the hour-by-hour
-             detail, and says so. */
-          title="Revenue by hour"
-          meta={live ? 'Restaurant time' : 'Sample shape · fictional'}
-        >
-          {chartable && chartHasValue ? (
-            <div className="text-gink" data-chart>
-              {/* The line draws itself once, on arrival: GSAP, lazily loaded,
-                  and it can only ever ADD motion -- the server sends the chart
-                  fully drawn, so a blocked bundle leaves a complete chart. */}
-              <ChartMotion>
-                {/* Fluid, not a fixed 520px: the old width overflowed a phone and
-                    pushed the most recent hour off the edge of the card. */}
-                <Sparkline
-                  data={hourly}
-                  width={520}
-                  height={120}
-                  baseline="zero"
-                  area
-                  label="Revenue by hour of the day"
-                  className="h-[112px] w-full"
-                  markIndex={hasPeak ? peakIndex : undefined}
-                />
-              </ChartMotion>
-              {/* The axis and the reading are only for live data. The sample
-                  series is a shape with no clock behind it, so labelling its
-                  twelve buckets midnight-to-11am invented a trading day the
-                  demo never had. */}
-              {live ? (
-                <>
-                  {/* Two ticks and nothing between them. The chart is a shape,
-                      and a grid would be a claim about precision the buckets
-                      do not have -- an hour is an hour, not a measurement.
-                      They are the first and last hour of trading so far, so
-                      the line starts and ends on the axis it is drawn on. */}
-                  <div className="mt-1.5 flex items-baseline justify-between gap-3">
-                    <span className="text-[10.5px] text-gink-46 tabular-nums">{hourLabel(0)}</span>
-                    <span className="text-[10.5px] text-gink-46 tabular-nums">
-                      {hourLabel(hourly.length - 1)}
-                    </span>
-                  </div>
-                  {/* The line says the shape; this says the answer. A peak with
-                      no hour and no amount is a picture of a busy evening, not
-                      a fact an owner can staff against. */}
-                  <div className="mt-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-hair pt-2.5">
-                    <span className="text-[11.5px] font-medium text-gink">Busiest hour</span>
-                    <span className="text-[11.5px] text-gink-46">{hourRangeLabel(peakIndex)}</span>
-                    <span className="ml-auto text-[13px] font-semibold text-gink tabular-nums">
-                      <Money value={hourly[peakIndex]} />
-                    </span>
-                  </div>
-                </>
-              ) : null}
-            </div>
-          ) : (
-            <Empty>
-              {chartable
-                ? 'No settled payments yet today. The chart fills in as orders are paid for.'
-                : 'Today has only just started. The chart needs an hour of trading before it can show a shape.'}
-            </Empty>
-          )}
-        </Panel>
-
-        <Panel title="Top items" meta={live ? 'Today · by quantity' : 'Sample · fictional'}>
-          {itemRows.length > 0 ? (
-            <ul className="flex flex-col" data-top-items>
-              {itemRows.map((t, i) => (
-                <li
-                  key={t.name}
-                  className="border-b border-hair py-2.5 last:border-b-0 first:pt-0 last:pb-0"
+      {/* ------------------------------------------------------------- ranked
+          A leaderboard strip, not a list inside a panel. One card per dish, in
+          order, each with the same bar scaled against the best seller -- the
+          comparison the heading promises, and it is drawn from the figure
+          printed beside it, so the bar and the number cannot disagree. */}
+      <section aria-label="Top items" className="mt-6">
+        <SectionHead
+          title="Top items"
+          meta={live ? 'Today · by quantity' : 'Sample · fictional'}
+        />
+        {itemRows.length > 0 ? (
+          <ol data-top-items className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {itemRows.map((t, i) => (
+              <li
+                key={t.name}
+                className="relative overflow-hidden rounded-[var(--p-r-block)] border border-hair bg-card p-3.5 shadow-[var(--p-shadow-1)]"
+              >
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="tnum text-[10.5px] font-semibold tracking-[0.12em] text-[var(--p-accent-strong)]">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <span className="tnum text-[11.5px] text-gink-46">{t.qty} sold</span>
+                </div>
+                <p className="mt-2 truncate text-[13px] font-medium text-gink" title={t.name}>
+                  {t.name}
+                </p>
+                <p className="mt-0.5 text-[13px] font-semibold text-gink tabular-nums">
+                  <Money value={t.revenuePaise} />
+                </p>
+                <div
+                  aria-hidden="true"
+                  className="mt-2.5 h-1 overflow-hidden rounded-full bg-[color-mix(in_oklab,var(--p-ink)_7%,transparent)]"
                 >
-                  <div className="flex items-baseline gap-3">
-                    <span className="tnum w-5 shrink-0 text-[11.5px] font-semibold text-gink-46">
-                      {String(i + 1).padStart(2, '0')}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-[13.5px] text-gink">{t.name}</span>
-                    <span className="tnum shrink-0 text-[11.5px] text-gink-46">{t.qty} sold</span>
-                    <span className="w-20 shrink-0 text-right text-[13px] font-medium text-gink">
-                      <Money value={t.revenuePaise} />
-                    </span>
-                  </div>
-                  {/* A ranking of numbers with no scale is a list. The bar is
-                      each dish's quantity against the leader's, which is the
-                      comparison the heading promises -- and it is drawn from
-                      the same figure printed beside it, so the two cannot
-                      disagree. */}
                   <div
-                    aria-hidden="true"
-                    className="mt-1.5 ml-8 h-1 overflow-hidden rounded-full bg-[color-mix(in_oklab,var(--p-ink)_6%,transparent)]"
-                  >
-                    <div
-                      className="h-full rounded-full bg-[var(--p-accent)]/55"
-                      style={{ width: `${Math.max(4, Math.round((t.qty / topQty) * 100))}%` }}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <Empty>Nothing sold yet today. Items rank here once the first order of the day is placed.</Empty>
-          )}
-        </Panel>
-      </div>
+                    className="h-full rounded-full bg-[var(--p-accent)]"
+                    style={{ width: `${Math.max(6, Math.round((t.qty / topQty) * 100))}%` }}
+                  />
+                </div>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <Empty>
+            Nothing sold yet today. Items rank here once the first order of the day is placed.
+          </Empty>
+        )}
+      </section>
 
       <div className="mt-5">
         <Panel

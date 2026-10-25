@@ -3,6 +3,7 @@ import { SignInPrompt } from '@/components/SignInPrompt';
 import { CopyButton } from '@/components/CopyButton';
 import { PrintButton } from '@/components/PrintButton';
 import { SubmitButton } from '@/components/owner/SubmitButton';
+import type { ReactNode } from 'react';
 import type { OutletBar } from '@/lib/outlets';
 import type { SettingsScreenData } from '@/lib/db/settings-screen';
 import { formatTaxPercent, taxExamplePaise } from '@/lib/settings-input';
@@ -19,7 +20,6 @@ import {
   PageHead,
   Card,
   Panel,
-  SectionHead,
   Notice,
   btn,
   Field,
@@ -98,6 +98,76 @@ const SECTIONS = [
   { id: 'settings-outlets', label: 'Outlets' },
   { id: 'settings-qr', label: 'Menu QR' },
 ] as const;
+
+/**
+ * One numbered section of the page.
+ *
+ * The screen is three long runs of forms, and the old version separated them
+ * with a heading the same size as a panel's title -- so the eye saw seven equal
+ * headings in a column and no structure at all. A number, a heavier title and a
+ * hairline that runs to the meta line give the page a spine the reader can
+ * follow without reading a word of it.
+ *
+ * `scroll-mt` is what makes the anchor from the index land BELOW the sticky app
+ * bar instead of underneath it.
+ */
+function PageSection({
+  n,
+  id,
+  title,
+  meta,
+  children,
+}: {
+  n: string;
+  id: string;
+  title: string;
+  meta: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="scroll-mt-24">
+      <div className="mb-3.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="tnum text-[10.5px] font-semibold tracking-[0.14em] text-[var(--p-accent)]">
+          {n}
+        </span>
+        <h2 id={id} className="text-[15px] font-semibold tracking-[-0.025em] text-gink">
+          {title}
+        </h2>
+        <span aria-hidden="true" className="hidden h-px min-w-6 flex-1 bg-hair sm:block" />
+        <span className="text-[12.5px] text-gink-46">{meta}</span>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/**
+ * A named run of fields inside one panel.
+ *
+ * Eleven fields in one column is not a form, it is a list: "Restaurant name",
+ * "Tagline", "Address", "Phone", "GSTIN" and "Public web address" were all the
+ * same thing to the eye. Three groups -- what is printed on the menu, what is
+ * printed on the bill, and the link guests open -- turn the card into
+ * something that can be read, and each one is separated by the quietest line
+ * on the surface.
+ */
+function FieldGroup({
+  title,
+  hint,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="border-t border-[var(--p-line-soft)] pt-4 first:border-t-0 first:pt-0">
+      <h3 className="text-[12.5px] font-semibold tracking-[0.01em] text-gink">{title}</h3>
+      {hint ? <p className="mt-0.5 mb-3 text-[11.5px] leading-[1.5] text-gink-46">{hint}</p> : null}
+      <div className={hint ? 'flex flex-col gap-3.5' : 'mt-3 flex flex-col gap-3.5'}>{children}</div>
+    </div>
+  );
+}
 
 export function SettingsScreen({
   data,
@@ -201,22 +271,20 @@ export function SettingsScreen({
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_318px] lg:items-start">
           <div className="flex min-w-0 flex-col gap-4">
             {/* -------------------------------------------------- what guests see */}
-            <div>
-              <SectionHead
-                title={<span id="settings-details">What guests see</span>}
-                meta="Name, address and the link that opens your menu"
-              />
+            <PageSection
+              n="01"
+              id="settings-details"
+              title="What guests see"
+              meta="Name, address and the link that opens your menu"
+            >
 
               <Panel
                 title="Restaurant details"
                 meta="Name, address and what the bill carries"
                 bodyClassName="px-5 py-5"
               >
-                <p className="m-0 mb-4 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
-                  The name and tagline are the first two things a guest reads on the menu.
-                </p>
-
-                <form action={saveDetailsAction} className="flex flex-col gap-3.5">
+                <form action={saveDetailsAction} className="flex flex-col gap-5">
+                  <FieldGroup title="On the menu" hint="The first two things a guest reads when the code opens.">
                   <div className="grid gap-3.5 sm:grid-cols-2">
                     <Field label="Restaurant name" htmlFor="settings-name">
                       <input
@@ -249,7 +317,9 @@ export function SettingsScreen({
                       />
                     </Field>
                   </div>
+                  </FieldGroup>
 
+                  <FieldGroup title="On the bill" hint="Printed under the restaurant name, and on the menu card you can print from this page.">
                   <Field
                     label="Address"
                     htmlFor="settings-address"
@@ -300,7 +370,9 @@ export function SettingsScreen({
                       />
                     </Field>
                   </div>
+                  </FieldGroup>
 
+                  <FieldGroup title="The link guests open" hint="One address, one restaurant. It is what the QR below encodes.">
                   <Field
                     label="Public web address"
                     htmlFor="settings-slug"
@@ -331,22 +403,31 @@ export function SettingsScreen({
                       </span>
                     </label>
                   ) : null}
+                  </FieldGroup>
 
-                  <div>
+                  {/* One commit control, at the bottom, full stop. Everything
+                      above it is one write, so there is exactly one button that
+                      writes it -- and it sits at the end of the group it saves
+                      rather than floating beside a field. */}
+                  <div className="flex flex-wrap items-center gap-3 border-t border-[var(--p-line-soft)] pt-4">
                     <SubmitButton pendingLabel="Saving details…" disabled={disabled} tone="solid">
                       Save details
                     </SubmitButton>
+                    <span className="text-[11.5px] leading-[1.45] text-gink-46">
+                      Applies to the menu, the bill and the QR immediately.
+                    </span>
                   </div>
                 </form>
               </Panel>
-            </div>
+            </PageSection>
 
             {/* -------------------------------------------- what the bill charges */}
-            <div>
-              <SectionHead
-                title={<span id="settings-money">What the bill charges</span>}
-                meta="Tax, online payment and your own UPI code"
-              />
+            <PageSection
+              n="02"
+              id="settings-money"
+              title="What the bill charges"
+              meta="Tax, online payment and your own UPI code"
+            >
 
               <div className="flex flex-col gap-4">
                 <Panel
@@ -548,14 +629,15 @@ export function SettingsScreen({
                   </p>
                 </Panel>
               </div>
-            </div>
+            </PageSection>
 
             {/* ------------------------------------------------------------ account */}
-            <div>
-              <SectionHead
-                title={<span id="settings-outlets">Account</span>}
-                meta="Every outlet carries its own menu, tables and money"
-              />
+            <PageSection
+              n="03"
+              id="settings-outlets"
+              title="Account"
+              meta="Every outlet carries its own menu, tables and money"
+            >
 
               <Panel
                 title="Outlets"
@@ -626,25 +708,34 @@ export function SettingsScreen({
                   </p>
                 ) : null}
               </Panel>
-            </div>
+            </PageSection>
           </div>
 
           {/* ------------------------------------------------------------- aside */}
-          <aside className="flex min-w-0 flex-col gap-4">
+          {/* The index and the QR follow the reader down five forms' worth of
+              page. On a laptop they are sticky from just under the app bar; on
+              a phone they stack below, where sticky would only eat the screen. */}
+          <aside className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-[72px]">
             {/* The page is five forms tall. This is the only thing on it that
                 says where you are -- and it is four real anchors, not a menu
                 that scrolls for you, so it still works with no JavaScript. */}
             <Panel title="On this page" meta={`${SECTIONS.length} sections`} bodyClassName="px-2 py-2">
               <nav aria-label="Sections on this page">
                 <ul className="m-0 flex list-none flex-col p-0">
-                  {SECTIONS.map((section) => (
+                  {SECTIONS.map((section, i) => (
                     <li key={section.id}>
                       <a
                         href={`#${section.id}`}
-                        className="flex items-center justify-between gap-2 rounded-[8px] px-2.5 py-2 text-[12.5px] text-gink-64 transition-colors hover:bg-gink-07 hover:text-gink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]"
+                        className="group flex items-center gap-2.5 rounded-[var(--p-r-control)] px-2.5 py-2 text-[12.5px] text-gink-64 transition-colors duration-150 ease-[var(--o-ease)] hover:bg-[var(--p-accent-wash)] hover:text-gink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]"
                       >
-                        {section.label}
-                        <span aria-hidden="true" className="text-gink-28">
+                        <span className="tnum text-[10.5px] font-semibold tracking-[0.1em] text-gink-28 transition-colors group-hover:text-[var(--p-accent)]">
+                          {String(i + 1).padStart(2, '0')}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate">{section.label}</span>
+                        <span
+                          aria-hidden="true"
+                          className="text-[10.5px] text-gink-28 transition-colors group-hover:text-[var(--p-accent)]"
+                        >
                           ↓
                         </span>
                       </a>

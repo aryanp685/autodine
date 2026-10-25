@@ -189,10 +189,28 @@ p { margin: 0; }
   img { display: block; max-width: 100%; }
 }
 
-:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
-  border-radius: 4px;
+/*
+ * THE FOCUS RING, IN THE BASE LAYER.
+ *
+ * This was unlayered, and an unlayered rule beats every utility -- including
+ * `focus:outline-none`. So a text field that a component had deliberately
+ * smoothed (a search box inside a bordered pill, an input whose wrapper draws
+ * the ring) still painted a hard 2px near-black rectangle INSIDE its own
+ * rounded border. On the "Go to…" control that produced a black box floating
+ * in a white pill: the single most broken-looking thing on the shell, on every
+ * screen, and invisible in the markup because both rules are correct on their
+ * own.
+ *
+ * In @layer base the ring is a DEFAULT: everything still gets one -- which is
+ * what a keyboard user needs -- and a component that draws a better one can
+ * say so. Nothing is lost by the move, and nothing is won by leaving it.
+ */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
 }
 
 .money { font-variant-numeric: tabular-nums; }
@@ -279,86 +297,111 @@ p { margin: 0; }
   * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }}
 
 [data-app] [data-surface='owner'] {
-  /* ---- surfaces -------------------------------------------------------
-     WARM SAND, and a card that is a white sheet lying on it.
+  /* ---- the palette, in one place ---------------------------------------
+     MIDNIGHT MENU. The surface is a dining room after dark: the page is the
+     room, the cards are the tables, and the two colours that carry the whole
+     thing are marigold and wine.
 
-     The gap between the page and the card is the whole design. On the old
-     tone (a near-white page) a card had to be almost the same value to look
-     like paper at all, so a screen read as one wide beige field with hairlines
-     drawn on it -- which is exactly what "it looks the same as before" means
-     when you look at a screenshot of it. Two values, a real step apart, and
-     every panel has an edge before a single shadow is drawn. */
-  --p-paper: #efe3d0;
-  --p-paper-deep: #e5d5bd;
-  --p-paper-veil: rgba(255, 252, 246, 0.6);
-  --p-surface: #fffdf9;
-  --p-card: #fffdf9;
-  --p-glass: rgba(255, 253, 249, 0.92);
+       ink-black  the room           (the canvas)
+       wine       the banquette      (the rail, and the account card on it)
+       marigold   the candle, the "you are here", the action
 
-  /* ---- ink ------------------------------------------------------------
-     Espresso, not neutral black. It sits on warm sand the way printed ink
-     does; pure black on ivory reads as a screenshot of a document. */
-  --p-ink: #1a1310;
-  --p-ink-80: rgba(26, 19, 16, 0.84);
-  --p-ink-64: rgba(26, 19, 16, 0.64);
-  /* The token keeps the name it has always had (237 call sites read it as
-     `text-gink-46`); the VALUE is the one that changed, and the reason is
-     measurable. At 0.46 the meta line -- a panel's "Restaurant time", a table
-     cell's "3:30 pm" -- measured 3.1:1 on paper, a grey that reads as switched
-     off. At 0.58 it measures 4.4:1 on a card: still clearly secondary to the
-     ink (15:1), now legible at 12.5px under tube lights. */
-  --p-ink-46: rgba(26, 19, 16, 0.58);
-  --p-ink-28: rgba(26, 19, 16, 0.28);
-  --p-ink-12: rgba(26, 19, 16, 0.11);
-  --p-ink-07: rgba(26, 19, 16, 0.055);
-  --p-on-ink: #fffcf6;
-  --p-on-ink-64: rgba(255, 252, 246, 0.68);
-  --p-on-ink-40: rgba(255, 252, 246, 0.44);
+     Why DARK, and why this is a change and not a nudge: two previous passes
+     kept a light page and moved only the accent, and a light page with a warm
+     accent is exactly the thing that read as dull. Value is the variable the
+     eye resolves first -- a dark canvas flips every card, every table and every
+     form on fifteen screens at once, from one block, because every screen
+     reads these tokens and none of them writes a colour of its own.
+
+     The card is lighter than the room around it by one visible step, and it
+     carries a lit top edge, so a panel is a table under a lamp rather than a
+     rectangle drawn on a wall.
+
+     Every pair below was measured, not chosen by eye; the ratios are in the
+     comment on each group. */
+
+  /* ---- surfaces --------------------------------------------------------
+     Room, then table. The card is 1.20:1 against the canvas -- on a dark
+     surface separation is carried by the hairline and the lit top edge as much
+     as by value, but the step has to be there or a card is a hole. */
+  --p-paper: #171014;
+  --p-paper-deep: #100b0e;
+  --p-paper-veil: rgba(9, 6, 8, 0.45);
+  --p-surface: #2b2127;
+  --p-card: #2b2127;
+  --p-glass: rgba(27, 18, 22, 0.94);
+
+  /* ---- ink -------------------------------------------------------------
+     Ivory, not white: pure white on a near-black page glows, and this product
+     is candlelit. 12.7:1 on the room, 10.8:1 on a card. */
+  --p-ink: #f7eee2;
+  --p-ink-80: rgba(247, 238, 226, 0.88);
+  --p-ink-64: rgba(247, 238, 226, 0.72);
+  /* Meta lines and table cells: 6.1:1 on a card, still clearly below the ink.
+     At 0.46 this was 3.1:1 on the old paper -- a grey that read as switched
+     off -- and it is the colour of every note on the surface. */
+  --p-ink-46: rgba(247, 238, 226, 0.62);
+  /* Placeholders and quiet rules. 2.8:1: present, plainly not content. */
+  --p-ink-28: rgba(247, 238, 226, 0.4);
+  --p-ink-12: rgba(247, 238, 226, 0.16);
+  --p-ink-07: rgba(247, 238, 226, 0.09);
+  /* The ink that goes ON a light fill -- a marigold button, an ivory button.
+     The pair is inverted here for the same reason everything else is. */
+  --p-on-ink: #191013;
+  --p-on-ink-64: rgba(25, 16, 19, 0.72);
+  --p-on-ink-40: rgba(25, 16, 19, 0.5);
 
   /* ---- accent ----------------------------------------------------------
-     TERRACOTTA. Deeper and redder than the old copper, because on sand a
-     brown-gold accent simply disappears: the old copper cleared 5:1 against
-     white text but read as "muddy brown" next to warm paper.
-     This one is the colour of a clay serving bowl, and it is now the ACTION
-     colour -- a filled primary button -- not a decoration.
+     MARIGOLD. It is the candle on the table and the action on the screen:
+     a filled primary button, the mark on the current rail row, the kicker
+     rule. 9.0:1 on the room and 7.5:1 on a card, so it works as text as well
+     as fill; the label on a filled marigold button is the ink above (9.0:1).
 
-     `--p-accent-strong` is the same hue one step down: for a pressed state, a
-     hover on a filled button, and 10.5px tracked-out uppercase, which needs a
-     step of its own at that size. */
-  --p-accent: #a5461d;
-  --p-accent-strong: #7d3413;
-  --p-accent-soft: #fbe8d5;
-  --p-accent-wash: rgba(165, 70, 29, 0.09);
-  --p-live: #2b6b46;
-  --p-live-soft: #e6f1e9;
-  --p-due: #a3341f;
-  --p-due-soft: #fbe9e6;
+     `--p-accent-strong` is the same hue lifted, because on a dark surface the
+     "stronger" step is the brighter one: it is the hover fill and the colour
+     of 10.5px tracked-out uppercase, which needs the extra step at that size.
+     `--p-accent-soft` is the deep amber a selected chip sits on (12.1:1 for
+     the ivory on it); `--p-brass` is one kind of detail -- hairline rules and
+     the brand mark on the wine rail -- and is never body text. */
+  --p-accent: #f2a33c;
+  --p-accent-strong: #ffc074;
+  --p-accent-soft: #40270f;
+  --p-accent-wash: rgba(242, 163, 60, 0.12);
+  --p-brass: #d9a45a;
+
+  /* ---- status ----------------------------------------------------------
+     Two meanings, never borrowed for decoration: mint is settled/ready/paid,
+     coral is money to chase. Both carry a matching deep wash so a tag is one
+     token instead of a colour-mix at every call site, and both are readable
+     as text on that wash (6.9:1 and 6.6:1). */
+  --p-live: #4ec98e;
+  --p-live-soft: #12301f;
+  --p-due: #ff7d63;
+  --p-due-soft: #351613;
 
   /* ---- the rail --------------------------------------------------------
-     The one dark surface in the product. It is the host stand: it frames every
-     screen and gives the eye an edge to orient against. Warmed a step (this is
-     espresso with red in it, not neutral charcoal) so the dark chrome and the
-     terracotta read as one palette instead of a black box around a beige page. */
-  --p-rail: #1c1512;
-  --p-rail-raised: #2a201a;
-  --p-rail-ink: #fbf5ec;
-  --p-rail-ink-64: rgba(251, 245, 236, 0.66);
-  /* 0.38 measured 3.4:1 on the rail for the 10px uppercase group labels
-     ("SERVICE", "BUSINESS") -- the smallest type in the product wearing the
-     faintest colour. 0.48 puts them at 4.5:1 without lifting them above the
-     link labels themselves. */
-  --p-rail-ink-40: rgba(251, 245, 236, 0.48);
-  --p-rail-line: rgba(251, 245, 236, 0.11);
-  --p-rail-active: rgba(165, 70, 29, 0.3);
+     WINE. A column of bordeaux against a near-black room is the one large
+     block of colour on the screen -- it is what stops a dark dashboard from
+     reading as a spreadsheet with the lights off, and it is where the
+     restaurant lives. Ivory on it measures 15:1; the 0.55 step is 5.4:1, so
+     even the 10px group labels clear AA. */
+  --p-rail: #36111e;
+  --p-rail-raised: #48192a;
+  --p-rail-ink: #f9f1e6;
+  --p-rail-ink-64: rgba(249, 241, 230, 0.72);
+  --p-rail-ink-40: rgba(249, 241, 230, 0.55);
+  --p-rail-line: rgba(249, 241, 230, 0.16);
+  --p-rail-active: rgba(242, 163, 60, 0.18);
 
   /* ---- lines -----------------------------------------------------------
-     Warm. On sand a hairline has to do the work a shadow does on white.
-     `--p-line-soft` is for internal dividers inside a card, which must be
-     quieter than the card's own edge. */
-  --p-line: rgba(26, 19, 16, 0.11);
-  --p-line-soft: rgba(26, 19, 16, 0.065);
-  --p-line-strong: rgba(26, 19, 16, 0.2);
-  --p-line-on-ink: rgba(255, 252, 246, 0.18);
+     Ivory hairlines. On a dark surface a hairline is the edge of a lit object,
+     so it is drawn in the light's colour rather than in a darker ink -- a
+     darker line between two dark values is invisible. `--p-line-soft` is the
+     quieter one for dividers INSIDE a card. */
+  --p-line: rgba(247, 238, 226, 0.14);
+  --p-line-soft: rgba(247, 238, 226, 0.08);
+  --p-line-strong: rgba(247, 238, 226, 0.26);
+  --p-line-on-ink: rgba(25, 16, 19, 0.22);
 
   /* ---- geometry --------------------------------------------------------
      One radius per kind of object, so nothing is rounded by feel: a card is
@@ -368,16 +411,16 @@ p { margin: 0; }
   --p-r-control: 10px;
 
   /* ---- elevation -------------------------------------------------------
-     Warm, low and wide, and every step carries its own lit top edge. On sand a
-     neutral shadow reads as grey dirt under the card; a warm one reads as the
-     card being lit from above, and the inset line is the lit edge.
-     `--p-shadow-3` is for something that genuinely floats over the page. */
-  --p-shadow-1: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 1px 2px rgba(74, 42, 20, 0.07),
-    0 10px 24px -18px rgba(74, 42, 20, 0.3);
-  --p-shadow-2: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 2px 6px rgba(74, 42, 20, 0.09),
-    0 22px 44px -26px rgba(74, 42, 20, 0.42);
-  --p-shadow-3: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 8px 18px rgba(74, 42, 20, 0.1),
-    0 40px 72px -36px rgba(74, 42, 20, 0.52);
+     Black and low, with a faint lit top edge. On the old paper the shadows
+     were warm because a neutral one read as grey dirt; here the room is
+     already dark, so a shadow can only be deeper darkness, and the lit edge is
+     what says a card is above the table rather than cut into it. */
+  --p-shadow-1: inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 1px 2px rgba(0, 0, 0, 0.45),
+    0 10px 24px -18px rgba(0, 0, 0, 0.7);
+  --p-shadow-2: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 2px 6px rgba(0, 0, 0, 0.5),
+    0 22px 44px -26px rgba(0, 0, 0, 0.8);
+  --p-shadow-3: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 18px rgba(0, 0, 0, 0.5),
+    0 40px 72px -36px rgba(0, 0, 0, 0.85);
 
   /* The page paints its own surface with utilities; these two are the last
      resort for content that has not been wrapped yet. */
@@ -886,21 +929,24 @@ p { margin: 0; }
    Two rules were also deleted rather than retuned:
 
    - `backdrop-filter: blur(24px)` on the rail. The rail is opaque (`--p-rail`,
-     a deep espresso); a blur behind an opaque box is a full-screen GPU pass
+     a deep wine); a blur behind an opaque box is a full-screen GPU pass
      that composites nothing. It cost battery on the tablets these run on.
    - `table thead th { background: … }`. It was an unlayered rule, so it beat
      the `bg-…` utility the kit's `TableHead` sets — the header band could not
      be changed from the component. The kit owns it now.
    ========================================================================= */
 
-/* The wash: one warm light from above and nothing else.
-   The page is warm paper and the cards are LIGHTER than it, so the wash only
-   has to say which corner the light comes from. Fixed, so scrolling a long
-   table does not slide the light up the screen. */
+/* The wash: two lights in a dark room.
+   Marigold at the top left (the pass, the candle) and wine at the top right
+   (the rail's own hue bleeding onto the wall). Both are radial and both are
+   under a tenth of the value they would need to read as a gradient, which is
+   the point: on a near-black canvas a light has to be a bloom, not a band.
+   Flat, a dark page of one value reads as a screenshot of a colour. Fixed, so
+   scrolling a long table does not slide the light up the screen. */
 [data-surface='owner'] {
   background-image:
-    radial-gradient(78% 52% at 12% -14%, rgba(165, 70, 29, 0.13), transparent 68%),
-    radial-gradient(60% 44% at 96% 4%, rgba(43, 107, 70, 0.05), transparent 72%);
+    radial-gradient(72% 48% at 6% -14%, rgba(242, 163, 60, 0.1), transparent 66%),
+    radial-gradient(66% 50% at 100% -4%, rgba(120, 26, 52, 0.28), transparent 70%);
   background-attachment: fixed;
 }
 
@@ -966,6 +1012,62 @@ p { margin: 0; }
   [data-surface='owner']::before {
     display: none;
   }
+
+  /* A printed sheet is paper, not a dining room.
+     The surface is dark now, and a QR card or a bill printed from it would be
+     ivory type on white -- invisible. So print gets the palette inverted back:
+     dark ink on white, no shadows, and `--p-on-ink` dark as well, because
+     browsers drop background fills but keep the labels that sat on them. This
+     is a token override, not a second design: every rule on the surface already
+     reads these tokens. */
+  [data-surface='owner'] {
+    --p-paper: #ffffff;
+    --p-paper-deep: #ffffff;
+    --p-surface: #ffffff;
+    --p-card: #ffffff;
+    --p-glass: #ffffff;
+    --p-paper-veil: rgba(0, 0, 0, 0.04);
+
+    --p-ink: #12100e;
+    --p-ink-80: rgba(18, 16, 14, 0.88);
+    --p-ink-64: rgba(18, 16, 14, 0.72);
+    --p-ink-46: rgba(18, 16, 14, 0.62);
+    --p-ink-28: rgba(18, 16, 14, 0.4);
+    --p-ink-12: rgba(18, 16, 14, 0.16);
+    --p-ink-07: rgba(18, 16, 14, 0.09);
+    --p-on-ink: #12100e;
+    --p-on-ink-64: rgba(18, 16, 14, 0.72);
+    --p-on-ink-40: rgba(18, 16, 14, 0.5);
+
+    --p-accent: #8a4a12;
+    --p-accent-strong: #6f3a0d;
+    --p-accent-soft: #fdf1e0;
+    --p-accent-wash: rgba(138, 74, 18, 0.08);
+    --p-brass: #8a5a1e;
+
+    --p-live: #1d6b45;
+    --p-live-soft: #e8f3ec;
+    --p-due: #9e2f1c;
+    --p-due-soft: #fbeae6;
+
+    --p-rail: #ffffff;
+    --p-rail-raised: #ffffff;
+    --p-rail-ink: #12100e;
+    --p-rail-ink-64: rgba(18, 16, 14, 0.72);
+    --p-rail-ink-40: rgba(18, 16, 14, 0.55);
+    --p-rail-line: rgba(18, 16, 14, 0.2);
+
+    --p-line: rgba(18, 16, 14, 0.16);
+    --p-line-soft: rgba(18, 16, 14, 0.09);
+    --p-line-strong: rgba(18, 16, 14, 0.28);
+
+    --p-shadow-1: none;
+    --p-shadow-2: none;
+    --p-shadow-3: none;
+
+    background: var(--p-paper);
+    color: var(--p-ink);
+  }
 }
 
 /* The grain is deliberately painted OVER the content, at 3.5%: that is what
@@ -976,10 +1078,15 @@ p { margin: 0; }
 
 /* The focus ring has to survive a warm paper surface: the default outline is
    the same value as the page, and the accent is not. Keyboard users spend the
-   whole shift on this surface. */
-[data-surface='owner'] :focus-visible {
-  outline: 2px solid var(--p-accent);
-  outline-offset: 2px;
+   whole shift on this surface.
+
+   `@layer base` for the same reason as the global ring above: unlayered, this
+   beat `focus:outline-none` and every component that draws its own. */
+@layer base {
+  [data-surface='owner'] :focus-visible {
+    outline: 2px solid var(--p-accent);
+    outline-offset: 2px;
+  }
 }
 
 /* ---- a file picker -----------------------------------------------------
@@ -1085,6 +1192,11 @@ p { margin: 0; }
   --color-rail-ink-64: var(--p-rail-ink-64);
   --color-rail-ink-40: var(--p-rail-ink-40);
   --color-rail-line: var(--p-rail-line);
+
+  /* Saffron's quieter sibling. One use in the product: the brand mark on the
+     dark rail, where the brand green has no contrast at all. */
+  --color-brass: var(--p-brass);
+  --color-accent-wash: var(--p-accent-wash);
 
   --color-hair: var(--p-line);
   --color-hair-strong: var(--p-line-strong);
