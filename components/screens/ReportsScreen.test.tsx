@@ -195,7 +195,9 @@ describe('ReportsScreen, the chart axis and the outstanding card', () => {
     const card = html.slice(html.indexOf('Outstanding'));
 
     expect(card).toContain('Billed, not yet settled');
-    expect(card.slice(0, 1200)).toContain('var(--alert)');
+    // The owner surface has its own due colour now: --alert is the guest
+    // flow's coral, and a coral wash on warm sand reads pink.
+    expect(card.slice(0, 1200)).toContain('var(--p-due)');
   });
 });
 
@@ -248,7 +250,7 @@ describe('Reports, the redesign', () => {
 
     // A tag, not a fourth pill: "Custom" is the state of the two date fields,
     // not a destination someone can navigate to.
-    expect(html).toContain('bg-[color-mix(in_oklab,var(--p-accent)_12%,white)]');
+    expect(html).toContain('bg-[var(--p-accent-soft)]');
     expect(html).toContain('>Custom</span>');
   });
 
@@ -275,10 +277,12 @@ describe('Reports, the redesign', () => {
     const sales = html.slice(0, html.indexOf('Collected'));
 
     // The lead card is the only one on the row with the wash behind the figure.
-    expect(sales).toContain('bg-[radial-gradient');
+    // It is a flat token now, not a radial blur: at card size a 160px soft
+    // circle read as a smudge rather than as light.
+    expect(sales).toContain('bg-[var(--p-accent-wash)]');
     // And the other three keep the same weight as each other.
     const rest = html.slice(html.indexOf('Collected'));
-    expect(rest.slice(0, 4000)).not.toContain('bg-[radial-gradient');
+    expect(rest.slice(0, 4000)).not.toContain('bg-[var(--p-accent-wash)]');
   });
 
   it('says the range is empty once at the top, with a way out', () => {

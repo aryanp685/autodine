@@ -286,7 +286,10 @@ describe('Dashboard, the figures', () => {
 describe('Dashboard, the notices', () => {
   const strip = (html: string) => {
     const at = html.indexOf('data-plan-line');
-    return at < 0 ? '' : html.slice(at, at + 700);
+    // To the next structural boundary, not a magic 700 characters: the strip
+    // grew a status disc and the fixed window stopped reaching "Free trial".
+    const end = html.indexOf('aria-label="Today at a glance"', at);
+    return at < 0 ? '' : html.slice(at, end < 0 ? undefined : end);
   };
 
   it('draws the plan line as the same strip as everything else', () => {

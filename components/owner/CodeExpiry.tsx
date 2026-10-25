@@ -65,7 +65,7 @@ export function CodeExpiry({ expiresAt }: { expiresAt: string }) {
       aria-live="polite"
       className={[
         'tnum text-[10.5px] tracking-[0.06em] uppercase',
-        ending ? 'text-[var(--alert)]' : 'text-gink-46',
+        ending ? 'text-[var(--p-due)]' : 'text-gink-46',
       ].join(' ')}
     >
       {ending ? `new code in ${clock}` : `works for ${clock}`}

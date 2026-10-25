@@ -214,7 +214,7 @@ export function BrandingScreen({
                 <SubmitButton
                   tone="quiet"
                   pendingLabel="Removing…"
-                  className="hover:text-[var(--alert)]"
+                  className="hover:text-[var(--p-due)]"
                   disabled={disabled}
                 >
                   Remove logo
@@ -272,7 +272,7 @@ export function BrandingScreen({
                 <SubmitButton
                   tone="quiet"
                   pendingLabel="Removing…"
-                  className="hover:text-[var(--alert)]"
+                  className="hover:text-[var(--p-due)]"
                   disabled={disabled}
                 >
                   Remove banner

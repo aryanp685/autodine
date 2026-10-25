@@ -1090,7 +1090,7 @@ export function Kitchen({
             heights, so the one thing a cook adjusts at 9pm was also the least
             legible thing on the screen. */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-hair px-4 py-2.5">
-          <h2 className="text-[13px] font-semibold tracking-[-0.005em] text-gink">Sound</h2>
+          <h2 className="text-[13.5px] font-semibold tracking-[-0.014em] text-gink">Sound</h2>
           <span className="text-[11.5px] text-gink-46">
             Orders are read out in Hindi, one sentence at a time.
           </span>
@@ -1425,12 +1425,15 @@ export function Kitchen({
                 well as in words: copper is waiting to start, ink is in hand,
                 green is ready to leave. The count is a tag because it is the
                 one number the head carries. */}
-            <div className="mb-2 flex items-center justify-between gap-2 border-b border-hair pb-2">
-              <h2 className="flex items-center gap-2 text-[12.5px] font-semibold tracking-[-0.005em] text-gink">
+            <div className="mb-2.5 flex items-center justify-between gap-2 border-b border-hair pb-2.5">
+              <h2 className="flex items-center gap-2 text-[13.5px] font-semibold tracking-[-0.014em] text-gink">
+                {/* A 3px stage bar, not a 6px dot: at a metre and a half --
+                    which is how a board is actually read -- a dot is
+                    invisible and a bar is a column identity. */}
                 <span
                   aria-hidden="true"
                   className={[
-                    'size-1.5 rounded-full',
+                    'h-3.5 w-[3px] rounded-full',
                     c.key === 'new'
                       ? 'bg-[var(--p-accent)]'
                       : c.key === 'preparing'
@@ -1440,7 +1443,18 @@ export function Kitchen({
                 />
                 {c.title}
               </h2>
-              <Tag tone="neutral">{c.orders.length}</Tag>
+              <span
+                className={[
+                  'tnum inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[11.5px] font-semibold',
+                  c.key === 'new'
+                    ? 'bg-[var(--p-accent-soft)] text-[var(--p-accent-strong)]'
+                    : c.key === 'preparing'
+                      ? 'bg-paper-deep text-gink'
+                      : 'bg-[var(--p-live-soft)] text-[var(--p-live)]',
+                ].join(' ')}
+              >
+                {c.orders.length}
+              </span>
             </div>
 
             <div className="grid gap-2">

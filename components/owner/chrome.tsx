@@ -105,7 +105,7 @@ export function PageHead({
   actions?: ReactNode;
 }) {
   return (
-    <header className="mb-8 flex flex-col gap-5 sm:mb-9 sm:flex-row sm:items-end sm:justify-between">
+    <header className="mb-7 flex flex-col gap-5 sm:mb-8 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
         {kicker ? (
           /* A rule, then the kicker. The 18px copper dash is what turns a
@@ -130,6 +130,11 @@ export function PageHead({
       {actions ? (
         <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:pb-1">{actions}</div>
       ) : null}
+      {/* A rule under the masthead, fading out to the right. It is the cheapest
+          way to make a page feel composed: the header gets an edge, the content
+          begins below it, and the eye is told where one ends and the other
+          starts without a second box being drawn. */}
+      <div aria-hidden="true" className="o-rule mt-6" />
     </header>
   );
 }
@@ -198,6 +203,8 @@ export function Card({
   return (
     <div
       className={[
+        /* A slightly warm white, not pure white: on sand, #fff is a hole.
+           `--p-card` is the paper's own white and it carries the sheet. */
         'rounded-[var(--p-r-card)] border border-hair bg-card shadow-[var(--p-shadow-1)]',
         lift ? 'o-lift' : '',
         className,
@@ -218,7 +225,7 @@ export function Panel({
   action,
   children,
   className = '',
-  bodyClassName = 'px-4 py-4 sm:px-5',
+  bodyClassName = 'px-5 py-5',
 }: {
   title: ReactNode;
   meta?: ReactNode;
@@ -229,13 +236,18 @@ export function Panel({
 }) {
   return (
     <Card className={className}>
-      {/* The header is a band, not a line of text: a warm tint one step off the
-          card, a hairline under it, and the title at 13.5 semibold. That is what
-          makes a panel read as a titled object rather than as a card with some
-          words at the top of it. */}
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-t-[calc(var(--p-r-card)-1px)] border-b border-hair bg-[rgba(23,17,13,0.026)] px-5 py-3.5">
+      {/* The header is a BAND: a warm tint one step off the card, a hairline
+          under it, a copper tick at the left edge, and the title at 13.5
+          semibold. The tick is what makes a panel read as a titled object at a
+          glance -- it is the same 2px copper mark the rail uses for "you are
+          here", so the surface has one way of saying "this is a something". */}
+      <div className="relative flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-t-[calc(var(--p-r-card)-1px)] border-b border-hair bg-[color-mix(in_oklab,var(--p-accent-wash)_52%,transparent)] px-5 py-4">
+        <span
+          aria-hidden="true"
+          className="absolute top-1/2 left-0 h-4 w-[2.5px] -translate-y-1/2 rounded-r-full bg-[var(--p-accent)]"
+        />
         <div className="flex items-baseline gap-2.5">
-          <h2 className="text-[13.5px] font-semibold tracking-[-0.012em] text-gink">{title}</h2>
+          <h2 className="text-[13.5px] font-semibold tracking-[-0.014em] text-gink">{title}</h2>
           {meta ? <span className="text-[12.5px] text-gink-46">{meta}</span> : null}
         </div>
         {action}
@@ -285,33 +297,35 @@ export function Stat({
     <div
       className={[
         'relative overflow-hidden rounded-[var(--p-r-card)] border shadow-[var(--p-shadow-1)] transition-shadow duration-200',
-        lead ? 'p-5' : 'p-4 sm:p-[18px]',
+        lead ? 'p-5 sm:p-6' : 'p-4 sm:p-5',
         'sm:hover:shadow-[var(--p-shadow-2)]',
         tone === 'live'
           ? 'border-[color-mix(in_oklab,var(--p-accent)_26%,transparent)] bg-[color-mix(in_oklab,var(--p-accent-soft)_62%,white)]'
           : tone === 'due'
-            ? 'border-[color-mix(in_oklab,var(--alert)_22%,transparent)] bg-[color-mix(in_oklab,var(--alert)_5%,white)]'
+            ? 'border-[color-mix(in_oklab,var(--p-due)_22%,transparent)] bg-[color-mix(in_oklab,var(--p-due)_5%,white)]'
             : lead
               ? 'border-[color-mix(in_oklab,var(--p-accent)_20%,transparent)] bg-card'
               : 'border-hair bg-card',
       ].join(' ')}
     >
-      {/* The lead card carries a copper hairline along its top edge. It is one
-          pixel and it does more than a larger number: it is the only warm line
-          on the row, so the eye lands on it before it has read a digit. */}
+      {/* The lead card carries a terracotta hairline along its top edge. It is
+          one pixel and it does more than a larger number: it is the only warm
+          line on the row, so the eye lands on it before it has read a digit. */}
       {lead ? (
         <span
           aria-hidden="true"
-          className="absolute inset-x-0 top-0 h-px bg-[color-mix(in_oklab,var(--p-accent)_55%,transparent)]"
+          className="absolute inset-x-0 top-0 h-[2px] bg-[linear-gradient(to_right,var(--p-accent),color-mix(in_oklab,var(--p-accent)_18%,transparent))]"
         />
       ) : null}
-      {/* A wash, not a gradient: one low-opacity copper shadow in the corner of
-          the lead card, so it reads as the important one before a word is
-          read. */}
+      {/* The lead card is the only one on the row with a warm FILL, and it is
+          a real value rather than a radial blur. The old version painted a
+          160px soft circle into the corner of the card; on a card this size it
+          did not read as light, it read as a smudge on the screenshot, and it
+          is the single thing that made the row look unfinished. */}
       {lead ? (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute -top-16 -right-12 size-40 rounded-full bg-[radial-gradient(circle,color-mix(in_oklab,var(--p-accent)_13%,transparent),transparent_68%)]"
+          className="pointer-events-none absolute inset-0 bg-[var(--p-accent-wash)]"
         />
       ) : null}
       <div
@@ -330,7 +344,7 @@ export function Stat({
           lead
             ? 'mt-3 text-[clamp(1.9rem,4.6vw,3.3rem)]'
             : 'mt-2.5 text-[clamp(1.6rem,2.6vw,2.2rem)]',
-          tone === 'due' ? 'text-[var(--alert)]' : 'text-gink',
+          tone === 'due' ? 'text-[var(--p-due)]' : 'text-gink',
         ].join(' ')}
       >
         {value}
@@ -372,11 +386,22 @@ export function Notice({
   action?: ReactNode;
   className?: string;
 } & Omit<React.ComponentProps<'div'>, 'children' | 'className' | 'title'>) {
+  /* A 22px disc with a glyph, not a 6px dot. On a strip that carries the plan,
+     the sample-data warning and the "no orders yet" nudge, a dot is a bullet
+     point; a mark is a status. The glyph differs per tone so the strip can be
+     read without the sentence -- and it stays aria-hidden, because the words
+     already say it. */
   const marks = {
-    plain: 'bg-gink-28',
-    live: 'bg-[var(--p-live)]',
-    due: 'bg-[var(--p-due)]',
-    accent: 'bg-[var(--p-accent)]',
+    plain: 'bg-paper-deep text-gink-64',
+    live: 'bg-[var(--p-live-soft)] text-[var(--p-live)]',
+    due: 'bg-[var(--p-due-soft)] text-[var(--p-due)]',
+    accent: 'bg-[var(--p-accent-soft)] text-[var(--p-accent-strong)]',
+  } as const;
+  const glyphs = {
+    plain: <circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none" />,
+    live: <path d="m7.5 12.4 3 3 6-6.6" strokeLinecap="round" strokeLinejoin="round" />,
+    due: <path d="M12 7.5v5.5M12 16.4v.1" strokeLinecap="round" />,
+    accent: <path d="M12 7v10M7 12h10" strokeLinecap="round" />,
   } as const;
   const rules = {
     plain: 'border-hair',
@@ -388,14 +413,21 @@ export function Notice({
     <div
       {...rest}
       className={[
-        'flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--p-r-block)] border bg-card px-4 py-3 shadow-[var(--p-shadow-1)]',
+        'flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--p-r-block)] border bg-card px-4 py-3.5 shadow-[var(--p-shadow-1)]',
         rules[tone],
         className,
       ]
         .filter(Boolean)
         .join(' ')}
     >
-      <span aria-hidden="true" className={['size-1.5 shrink-0 rounded-full', marks[tone]].join(' ')} />
+      <span
+        aria-hidden="true"
+        className={['grid size-[22px] shrink-0 place-items-center rounded-full', marks[tone]].join(' ')}
+      >
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2">
+          {glyphs[tone]}
+        </svg>
+      </span>
       {label ? <span className="text-[12.5px] font-medium text-gink">{label}</span> : null}
       <span className="min-w-0 text-[12.5px] leading-[1.5] text-gink-64">{children}</span>
       {action ? <span className="ml-auto shrink-0">{action}</span> : null}
@@ -417,16 +449,39 @@ export function Notice({
  * in, a minimum height so a row of them lines up, and the message set at the
  * same size as the body text around it instead of a shade smaller.
  */
+/**
+ * A panel with nothing in it yet.
+ *
+ * This is the most-seen object on a new restaurant's dashboard: two of these
+ * are on the first screen until the first order lands, and a third on the
+ * counter. It used to be a 112px grey box with one line of text in the middle
+ * -- which on a warm surface read as a panel that had failed to load rather
+ * than a panel waiting for something.
+ *
+ * So it gets a MARK. A quiet line glyph in a soft terracotta disc, then the
+ * sentence, then nothing else: the empty state names what will appear here, it
+ * does not apologise for being empty and it does not invent a chart.
+ */
 export function Empty({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <p
+    <div
       className={[
-        'grid min-h-[112px] place-items-center rounded-[var(--p-r-block)] border border-hair bg-[rgba(23,17,13,0.014)] px-5 py-8 text-center text-[12.5px] leading-[1.6] text-gink-46',
+        'grid min-h-[132px] place-items-center rounded-[var(--p-r-block)] border border-hair bg-[var(--p-paper-veil)] px-5 py-8 text-center',
         className,
       ].join(' ')}
     >
-      <span className="max-w-[46ch]">{children}</span>
-    </p>
+      <div className="max-w-[46ch]">
+        <span
+          aria-hidden="true"
+          className="mx-auto mb-2.5 grid size-9 place-items-center rounded-full bg-paper-deep text-gink-46"
+        >
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6">
+            <path d="M4 19V9M9.5 19V5M15 19v-7M20.5 19v-4" strokeLinecap="round" />
+          </svg>
+        </span>
+        <p className="m-0 text-[12.5px] leading-[1.6] text-gink-46">{children}</p>
+      </div>
+    </div>
   );
 }
 
@@ -476,11 +531,11 @@ export function btn(tone: BtnTone = 'solid', size: BtnSize = 'md'): string {
        "Record payment", the menu's "Publish". Used twice on a page it stops
        meaning anything. */
     primary:
-      'bg-[var(--p-accent)] text-onink shadow-[var(--p-shadow-1)] hover:bg-[var(--p-accent-strong)] hover:shadow-[var(--p-shadow-2)]',
+      'bg-[var(--p-accent)] text-onink shadow-[var(--p-shadow-1)] hover:bg-[var(--p-accent-strong)] hover:shadow-[var(--p-shadow-2)] active:bg-[var(--p-accent-strong)]',
     ghost:
-      'border border-hair-strong bg-card text-gink shadow-[var(--p-shadow-1)] hover:border-gink-28 hover:bg-white hover:shadow-[var(--p-shadow-2)]',
+      'border border-hair-strong bg-card text-gink shadow-[var(--p-shadow-1)] hover:border-gink-28 hover:bg-[color-mix(in_oklab,var(--p-accent-wash)_45%,var(--p-card))] hover:shadow-[var(--p-shadow-2)]',
     quiet: 'text-gink-64 hover:bg-gink-07 hover:text-gink',
-    danger: 'border border-[var(--alert)]/30 text-[var(--alert)] hover:bg-[var(--alert)]/8',
+    danger: 'border border-[var(--p-due)]/30 text-[var(--p-due)] hover:bg-[var(--p-due)]/8',
   };
   return `${base} ${box} ${tones[tone]}`;
 }
@@ -657,7 +712,7 @@ export function Field({
       </label>
       {children}
       {error ? (
-        <p className="mt-1.5 text-[11.5px] leading-[1.45] text-[var(--alert)]">{error}</p>
+        <p className="mt-1.5 text-[11.5px] leading-[1.45] text-[var(--p-due)]">{error}</p>
       ) : hint ? (
         <p className="mt-1.5 text-[11.5px] leading-[1.5] text-gink-46">{hint}</p>
       ) : null}
@@ -777,17 +832,17 @@ export function Tag({ tone = 'neutral', children }: { tone?: PillTone; children:
    * accent and is reserved for position and on-states.
    */
   const tones: Record<PillTone, string> = {
-    live: 'bg-[color-mix(in_oklab,var(--p-live)_12%,white)] text-[var(--p-live)]',
-    work: 'bg-[color-mix(in_oklab,var(--p-accent)_12%,white)] text-[var(--p-accent)]',
-    due: 'bg-[color-mix(in_oklab,var(--p-due)_10%,white)] text-[var(--p-due)]',
-    failed: 'bg-[color-mix(in_oklab,var(--p-due)_10%,white)] text-[var(--p-due)]',
+    live: 'bg-[var(--p-live-soft)] text-[var(--p-live)]',
+    work: 'bg-[var(--p-accent-soft)] text-[var(--p-accent-strong)]',
+    due: 'bg-[var(--p-due-soft)] text-[var(--p-due)]',
+    failed: 'bg-[var(--p-due-soft)] text-[var(--p-due)]',
     neutral: 'bg-paper-deep text-gink-64',
     ink: 'bg-gink text-onink',
   };
   return (
     <span
       className={[
-        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-[3px] text-[11.5px] font-semibold tracking-[0.01em] whitespace-nowrap ring-1 ring-inset ring-black/[0.04]',
+        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-[3px] text-[11.5px] font-semibold tracking-[0.01em] whitespace-nowrap ring-1 ring-inset ring-black/[0.05]',
         tones[tone],
       ].join(' ')}
     >
@@ -832,7 +887,7 @@ export function Dot({ tone = 'live' }: { tone?: 'live' | 'idle' | 'alert' }) {
   const tones = {
     live: 'bg-[var(--p-accent)]',
     idle: 'bg-gink-28',
-    alert: 'bg-[var(--alert)]',
+    alert: 'bg-[var(--p-due)]',
   } as const;
   return <span aria-hidden="true" className={['size-1.5 shrink-0 rounded-full', tones[tone]].join(' ')} />;
 }

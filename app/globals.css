@@ -179,7 +179,13 @@ p { margin: 0; }
 @layer base {
   a { color: inherit; text-decoration: none; }
   ul, ol { margin: 0; padding: 0; list-style: none; }
-  button { font: inherit; color: inherit; }
+  /* `background: transparent` is NOT cosmetic. A <button> with no background
+     class keeps the user agent's `buttonface` -- a light grey box. On the dark
+     rail that rendered the account row's "Sign out" as a blank white rectangle
+     with light text inside it: a control that looked like a rendering fault and
+     read as nothing at all. Every styled button in the product sets its own
+     background, so this only ever removes a default nobody asked for. */
+  button { font: inherit; color: inherit; background: transparent; }
   img { display: block; max-width: 100%; }
 }
 
@@ -274,81 +280,85 @@ p { margin: 0; }
 
 [data-app] [data-surface='owner'] {
   /* ---- surfaces -------------------------------------------------------
-     WARM PAPER, and a card that is a lighter sheet on it.
+     WARM SAND, and a card that is a white sheet lying on it.
 
-     The page is one shade deeper than it used to be, because a premium
-     surface is made of CONTRAST between layers, not of one flat colour: on
-     the old page tone a card had to be nearly the same value, so the whole
-     page read as one wide beige field with hairlines drawn on it. Dropping it one
-     step and lifting the card one step gives every panel an edge without
-     buying it with a shadow. */
-  --p-paper: #f5efe4;
-  --p-paper-deep: #ece1cf;
-  --p-paper-veil: rgba(255, 253, 248, 0.55);
-  --p-surface: #fffefa;
-  --p-card: #fffdf8;
-  --p-glass: rgba(255, 253, 248, 0.88);
+     The gap between the page and the card is the whole design. On the old
+     tone (a near-white page) a card had to be almost the same value to look
+     like paper at all, so a screen read as one wide beige field with hairlines
+     drawn on it -- which is exactly what "it looks the same as before" means
+     when you look at a screenshot of it. Two values, a real step apart, and
+     every panel has an edge before a single shadow is drawn. */
+  --p-paper: #efe3d0;
+  --p-paper-deep: #e5d5bd;
+  --p-paper-veil: rgba(255, 252, 246, 0.6);
+  --p-surface: #fffdf9;
+  --p-card: #fffdf9;
+  --p-glass: rgba(255, 253, 249, 0.92);
 
   /* ---- ink ------------------------------------------------------------
-     Espresso, not neutral black. It sits on warm paper the way printed ink
+     Espresso, not neutral black. It sits on warm sand the way printed ink
      does; pure black on ivory reads as a screenshot of a document. */
-  --p-ink: #17110d;
-  --p-ink-80: rgba(23, 17, 13, 0.84);
-  --p-ink-64: rgba(23, 17, 13, 0.62);
+  --p-ink: #1a1310;
+  --p-ink-80: rgba(26, 19, 16, 0.84);
+  --p-ink-64: rgba(26, 19, 16, 0.64);
   /* The token keeps the name it has always had (237 call sites read it as
      `text-gink-46`); the VALUE is the one that changed, and the reason is
      measurable. At 0.46 the meta line -- a panel's "Restaurant time", a table
-     cell's "3:30 pm" -- measured 3.1:1 on warm paper, which is a grey that
-     reads as switched off. At 0.56 it measures 4.3:1 on a card: still clearly
-     secondary to the ink (18.4:1), now legible at 12.5px under tube lights. */
-  --p-ink-46: rgba(23, 17, 13, 0.56);
-  --p-ink-28: rgba(23, 17, 13, 0.26);
-  --p-ink-12: rgba(23, 17, 13, 0.1);
-  --p-ink-07: rgba(23, 17, 13, 0.05);
-  --p-on-ink: #fffdf8;
-  --p-on-ink-64: rgba(255, 253, 248, 0.66);
-  --p-on-ink-40: rgba(255, 253, 248, 0.42);
+     cell's "3:30 pm" -- measured 3.1:1 on paper, a grey that reads as switched
+     off. At 0.58 it measures 4.4:1 on a card: still clearly secondary to the
+     ink (15:1), now legible at 12.5px under tube lights. */
+  --p-ink-46: rgba(26, 19, 16, 0.58);
+  --p-ink-28: rgba(26, 19, 16, 0.28);
+  --p-ink-12: rgba(26, 19, 16, 0.11);
+  --p-ink-07: rgba(26, 19, 16, 0.055);
+  --p-on-ink: #fffcf6;
+  --p-on-ink-64: rgba(255, 252, 246, 0.68);
+  --p-on-ink-40: rgba(255, 252, 246, 0.44);
 
   /* ---- accent ----------------------------------------------------------
-     Copper, and only two jobs: "this is where you are", and the on-state of a
-     control. It is deliberately NOT the colour of a primary button -- that is
-     ink -- and it is NOT the colour of "paid". One hue with one meaning.
+     TERRACOTTA. Deeper and redder than the old copper, because on sand a
+     brown-gold accent simply disappears: the old copper cleared 5:1 against
+     white text but read as "muddy brown" next to warm paper.
+     This one is the colour of a clay serving bowl, and it is now the ACTION
+     colour -- a filled primary button -- not a decoration.
 
-     `--p-accent-strong` exists because copper at 12.5px on a soft wash was
-     fine but at 10.5px tracked-out uppercase it was not: small type needs one
-     more step of the same hue, not a new colour. */
-  --p-accent: #9a5b2c;
-  --p-accent-strong: #7c451e;
-  --p-accent-soft: #f7ecda;
-  --p-live: #2f6b45;
+     `--p-accent-strong` is the same hue one step down: for a pressed state, a
+     hover on a filled button, and 10.5px tracked-out uppercase, which needs a
+     step of its own at that size. */
+  --p-accent: #a5461d;
+  --p-accent-strong: #7d3413;
+  --p-accent-soft: #fbe8d5;
+  --p-accent-wash: rgba(165, 70, 29, 0.09);
+  --p-live: #2b6b46;
+  --p-live-soft: #e6f1e9;
   --p-due: #a3341f;
+  --p-due-soft: #fbe9e6;
 
   /* ---- the rail --------------------------------------------------------
      The one dark surface in the product. It is the host stand: it frames every
-     screen, gives the eye an edge to orient against, and takes the navigation
-     out of the same value as the content so the page itself reads as one
-     object. Deeper than before, with a warm light along its inner edge so it
-     reads as a lit surface and not as a hole. */
-  --p-rail: #16110e;
-  --p-rail-raised: #211a15;
-  --p-rail-ink: #f9f3e9;
-  --p-rail-ink-64: rgba(249, 243, 233, 0.64);
+     screen and gives the eye an edge to orient against. Warmed a step (this is
+     espresso with red in it, not neutral charcoal) so the dark chrome and the
+     terracotta read as one palette instead of a black box around a beige page. */
+  --p-rail: #1c1512;
+  --p-rail-raised: #2a201a;
+  --p-rail-ink: #fbf5ec;
+  --p-rail-ink-64: rgba(251, 245, 236, 0.66);
   /* 0.38 measured 3.4:1 on the rail for the 10px uppercase group labels
      ("SERVICE", "BUSINESS") -- the smallest type in the product wearing the
-     faintest colour. 0.46 puts them at 4.35:1 without lifting them above the
+     faintest colour. 0.48 puts them at 4.5:1 without lifting them above the
      link labels themselves. */
-  --p-rail-ink-40: rgba(249, 243, 233, 0.46);
-  --p-rail-line: rgba(249, 243, 233, 0.1);
-  --p-rail-active: rgba(154, 91, 44, 0.26);
+  --p-rail-ink-40: rgba(251, 245, 236, 0.48);
+  --p-rail-line: rgba(251, 245, 236, 0.11);
+  --p-rail-active: rgba(165, 70, 29, 0.3);
 
   /* ---- lines -----------------------------------------------------------
-     Warm, and a shade stronger than before: on paper a hairline has to do the
-     work a shadow does on white. `--p-line-soft` is for internal dividers
-     inside a card, which must be quieter than the card's own edge. */
-  --p-line: rgba(23, 17, 13, 0.1);
-  --p-line-soft: rgba(23, 17, 13, 0.06);
-  --p-line-strong: rgba(23, 17, 13, 0.18);
-  --p-line-on-ink: rgba(255, 253, 248, 0.18);
+     Warm. On sand a hairline has to do the work a shadow does on white.
+     `--p-line-soft` is for internal dividers inside a card, which must be
+     quieter than the card's own edge. */
+  --p-line: rgba(26, 19, 16, 0.11);
+  --p-line-soft: rgba(26, 19, 16, 0.065);
+  --p-line-strong: rgba(26, 19, 16, 0.2);
+  --p-line-on-ink: rgba(255, 252, 246, 0.18);
 
   /* ---- geometry --------------------------------------------------------
      One radius per kind of object, so nothing is rounded by feel: a card is
@@ -358,16 +368,16 @@ p { margin: 0; }
   --p-r-control: 10px;
 
   /* ---- elevation -------------------------------------------------------
-     Warm, low and wide, and each step carries its own top highlight. On paper
-     a neutral shadow reads as grey dirt under the card; a warm one reads as
-     the card being lit from above, and the inset line is the lit edge.
+     Warm, low and wide, and every step carries its own lit top edge. On sand a
+     neutral shadow reads as grey dirt under the card; a warm one reads as the
+     card being lit from above, and the inset line is the lit edge.
      `--p-shadow-3` is for something that genuinely floats over the page. */
-  --p-shadow-1: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 2px rgba(60, 40, 24, 0.05),
-    0 12px 28px -22px rgba(60, 40, 24, 0.32);
-  --p-shadow-2: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 2px 6px rgba(60, 40, 24, 0.07),
-    0 26px 54px -30px rgba(60, 40, 24, 0.42);
-  --p-shadow-3: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 8px 18px rgba(60, 40, 24, 0.08),
-    0 44px 80px -40px rgba(60, 40, 24, 0.5);
+  --p-shadow-1: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 1px 2px rgba(74, 42, 20, 0.07),
+    0 10px 24px -18px rgba(74, 42, 20, 0.3);
+  --p-shadow-2: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 2px 6px rgba(74, 42, 20, 0.09),
+    0 22px 44px -26px rgba(74, 42, 20, 0.42);
+  --p-shadow-3: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 8px 18px rgba(74, 42, 20, 0.1),
+    0 40px 72px -36px rgba(74, 42, 20, 0.52);
 
   /* The page paints its own surface with utilities; these two are the last
      resort for content that has not been wrapped yet. */
@@ -888,7 +898,9 @@ p { margin: 0; }
    has to say which corner the light comes from. Fixed, so scrolling a long
    table does not slide the light up the screen. */
 [data-surface='owner'] {
-  background-image: radial-gradient(72% 48% at 18% -12%, rgba(154, 91, 44, 0.07), transparent 70%);
+  background-image:
+    radial-gradient(78% 52% at 12% -14%, rgba(165, 70, 29, 0.13), transparent 68%),
+    radial-gradient(60% 44% at 96% 4%, rgba(43, 107, 70, 0.05), transparent 72%);
   background-attachment: fixed;
 }
 

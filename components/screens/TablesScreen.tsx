@@ -223,7 +223,7 @@ export function TablesScreen({
               <div className="px-5 py-5">
                 <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
                   <Dot tone="live" />
-                  <h2 className="text-[13px] font-semibold tracking-[-0.005em] text-gink">
+                  <h2 className="text-[13.5px] font-semibold tracking-[-0.014em] text-gink">
                     On-site code
                   </h2>
                   <Tag tone="neutral">Changes every {minutes}</Tag>
@@ -499,7 +499,7 @@ export function TablesScreen({
             second is the one a restaurant will only discover the hard way. */}
         <div className="mt-6 grid gap-3 lg:grid-cols-2">
           <Card className="px-5 py-4">
-            <h2 className="text-[13px] font-semibold tracking-[-0.005em] text-gink">
+            <h2 className="text-[13.5px] font-semibold tracking-[-0.014em] text-gink">
               How a scan works
             </h2>
             <p className="mt-1.5 text-[12.5px] leading-[1.55] text-gink-64">
@@ -510,8 +510,8 @@ export function TablesScreen({
               its own cards and its own code: one restaurant&apos;s card will not scan into another.
             </p>
           </Card>
-          <Card className="border-[color-mix(in_oklab,var(--alert)_22%,transparent)] px-5 py-4">
-            <h2 className="text-[13px] font-semibold tracking-[-0.005em] text-gink">
+          <Card className="border-[color-mix(in_oklab,var(--p-due)_22%,transparent)] px-5 py-4">
+            <h2 className="text-[13.5px] font-semibold tracking-[-0.014em] text-gink">
               Honest limitation
             </h2>
             <p className="mt-1.5 text-[12.5px] leading-[1.55] text-gink-64">

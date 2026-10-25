@@ -171,9 +171,9 @@ export function MenuImportScreen({
       {error && (
         <div
           role="alert"
-          className="mt-3 rounded-[var(--p-r-block)] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-4 py-3"
+          className="mt-3 rounded-[var(--p-r-block)] border border-[var(--p-due)]/30 bg-[var(--p-due)]/8 px-4 py-3"
         >
-          <strong className="text-[12.5px] text-[var(--alert)]">Nothing was imported.</strong>
+          <strong className="text-[12.5px] text-[var(--p-due)]">Nothing was imported.</strong>
           <p className="mt-1 text-[12.5px] leading-[1.5] text-gink-64">{error}</p>
         </div>
       )}
@@ -303,7 +303,7 @@ export function MenuImportScreen({
             })}
 
             {draft.issues.length > 0 && (
-              <div className="rounded-[var(--p-r-block)] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-3">
+              <div className="rounded-[var(--p-r-block)] border border-[var(--p-due)]/30 bg-[var(--p-due)]/8 px-3.5 py-3">
                 <strong className="text-[12.5px] font-semibold text-gink">
                   {draft.issues.length} line(s) were not imported.
                 </strong>{' '}

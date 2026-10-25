@@ -159,7 +159,7 @@ export function DishPhotoField({
               <button
                 type="submit"
                 data-remove-photo
-                className="h-9 rounded-[10px] px-2.5 text-[12.5px] font-medium text-gink-46 transition-colors hover:bg-[var(--alert)]/8 hover:text-[var(--alert)] disabled:opacity-45"
+                className="h-9 rounded-[10px] px-2.5 text-[12.5px] font-medium text-gink-46 transition-colors hover:bg-[var(--p-due)]/8 hover:text-[var(--p-due)] disabled:opacity-45"
                 disabled={disabled}
               >
                 Remove photo
@@ -170,7 +170,7 @@ export function DishPhotoField({
       </div>
 
       {localError && (
-        <p role="alert" className="mt-2 text-[11.5px] leading-[1.45] text-[var(--alert)]">
+        <p role="alert" className="mt-2 text-[11.5px] leading-[1.45] text-[var(--p-due)]">
           {localError}
         </p>
       )}
