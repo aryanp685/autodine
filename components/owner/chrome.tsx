@@ -832,8 +832,8 @@ export function Tag({ tone = 'neutral', children }: { tone?: PillTone; children:
    * pill still means something -- but loses the ring it used to carry, which
    * on a warm card read as a second border around a word.
    *
-   * `live` is bottle green because it means "settled / ready"; copper is the
-   * accent and is reserved for position and on-states.
+   * `live` is mint because it means "settled / ready"; blue is the accent and
+   * is reserved for position and on-states.
    */
   const tones: Record<PillTone, string> = {
     live: 'bg-[var(--p-live-soft)] text-[var(--p-live)]',

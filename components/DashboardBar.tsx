@@ -186,10 +186,10 @@ export function DashboardBar({
             as well would put the same words twice in a 244px column. */}
         <div className="flex items-center justify-between border-b border-rail-line px-4 py-3.5 lg:px-5 lg:py-4">
           <Link href="/" aria-label="AutoDine" className="group text-rail-ink">
-            {/* The mark's dot is BRASS on the rail, not the brand green: the
-                rail is bottle green now, and a green dot on a green ground is
-                not a brand mark, it is a smudge. Brass is the one token that
-                exists for a detail on dark chrome. */}
+            {/* BRASS is the token for the mark's dot, and on this surface it
+                carries the brand green: the rail is pale, so the dot has to be
+                the one saturated thing in the column rather than another grey
+                line. It stays a token, so the mark is one value in one place. */}
             <BrandLockup size={21} ink="currentColor" dot="var(--p-brass)" />
           </Link>
 
