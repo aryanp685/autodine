@@ -21,7 +21,8 @@ import type { OutletBar } from '@/lib/outlets';
 import type { KitchenScreenData, KitchenTicket } from '@/lib/db/kitchen-screen';
 import { clockTimeInZone } from '@/lib/db/time';
 import { LATE_AFTER_MIN, WARN_AFTER_MIN, nextPrepState, type PrepState } from '@/lib/db/prep';
-import { advanceOrderAction } from '@/app/kitchen/actions';
+import { advanceOrderAction } from '@/app/(staff)/kitchen/actions';
+import { HeldTableStrip } from '@/components/owner/HeldTableStrip';
 import { cancelStaffOrderAction } from '@/app/orders/actions';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { getSupabaseBrowser } from '@/lib/supabase/client';
@@ -1219,6 +1220,16 @@ export function Kitchen({
           </span>
         </div>
       </section>
+
+      {/*
+       * THE FLOOR'S QUESTION, ABOVE THE KITCHEN'S WORK.
+       *
+       * A restaurant that has turned the rotating code off holds the first
+       * order of each sitting until a person vouches for the table. It sits
+       * above the columns, never inside them: a cook must not start food for a
+       * ticket the floor has not accepted, and the columns are the cook's.
+       */}
+      <HeldTableStrip tables={data?.held ?? []} canConfirm={live && Boolean(data?.canAdvance)} />
 
         {/* ----------------------------------------------------- the one banner */}
 

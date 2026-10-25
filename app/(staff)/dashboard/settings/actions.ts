@@ -94,6 +94,15 @@ function writeFailure(context: string, error: { code?: string; message: string }
   if (error.code === '42501') {
     fail('The database refused this change for your account. Only the owner or a manager can make it.');
   }
+  if (error.code === '42703' || error.code === 'PGRST204') {
+    // The column this screen writes does not exist yet: migration
+    // 20261028000900 has not been applied to this database. Saying so is
+    // better than "we could not save that", which reads like a bug in their
+    // restaurant rather than a deployment step.
+    fail(
+      'This setting needs a database update that has not been applied to this deployment yet. Nothing was changed.',
+    );
+  }
   if (error.code === '23514') {
     fail('The database refused that value. Check the tax rate and try again.');
   }
@@ -204,6 +213,57 @@ export async function saveOnlinePaymentsAction(formData: FormData): Promise<void
     enabled
       ? 'Card and UPI payment is on. Guests will see a pay button on their order page once this deployment has gateway keys.'
       : 'Card and UPI payment is off. Guests pay at the counter, and no pay button is shown.',
+  );
+}
+
+/**
+ * Which proof a guest has to give before ordering.
+ *
+ * THREE VALUES, ONE OF WHICH IS HONEST
+ *
+ *   code          the rotating six digits. An on-site secret; the only mode
+ *                 where something about the physical room is actually checked.
+ *   scan_confirm  a scan mints the table session, and the first order of a
+ *                 sitting waits for one tap from staff. The tap is a human
+ *                 assertion, not a cryptographic proof.
+ *   scan          a scan mints the session and nothing is held. Fastest, and
+ *                 the weakest: a photographed card can order from anywhere.
+ *
+ * The value is validated against that closed set here, and the database's own
+ * CHECK constraint repeats the list, so a hand-crafted POST cannot store a
+ * fourth word and cannot store an empty string.
+ *
+ * This is a per-restaurant decision the owner makes with the trade-off written
+ * on the screen next to it. It is never inferred, and a deployment cannot flip
+ * it for them.
+ */
+export async function saveGuestVerificationAction(formData: FormData): Promise<void> {
+  const { supabase, restaurantId } = await requireEditor();
+
+  const raw = String(formData.get('guestVerificationMode') ?? '').trim();
+  if (raw !== 'code' && raw !== 'scan_confirm' && raw !== 'scan') {
+    fail('That is not a verification mode this product offers.');
+  }
+
+  const { data: saved, error } = await supabase
+    .from('restaurants')
+    .update({ guest_verification_mode: raw })
+    .eq('id', restaurantId)
+    .select('id');
+
+  if (error) writeFailure('switching guest verification', error);
+  if (!saved || saved.length === 0) {
+    fail('Nothing was saved. Your account can see this restaurant but is not allowed to change it.');
+  }
+
+  for (const path of AFFECTED_PATHS) revalidatePath(path);
+
+  done(
+    raw === 'code'
+      ? 'Guests will enter the six digits from the screen at the counter. Nothing else has changed.'
+      : raw === 'scan_confirm'
+        ? 'Guests can order straight from a scan. The first order at each table waits for one tap on the kitchen board.'
+        : 'Guests can order straight from a scan and nothing waits for staff. A photographed QR code can order at that table, and the screen says so.',
   );
 }
 

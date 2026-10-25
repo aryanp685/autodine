@@ -1,10 +1,9 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { DashboardBar } from '@/components/DashboardBar';
+import { OwnerFrame } from '@/components/owner/OwnerFrame';
 import type { DashboardSection } from '@/components/shell-links';
 import type { OutletBar } from '@/lib/outlets';
 import { RouteSkeleton } from '@/components/RouteSkeleton';
-import { PageMotion } from '@/components/owner/PageMotion';
 
 /**
  * The staff-side kit.
@@ -61,27 +60,20 @@ export function OwnerPage({
   /** Report tables need the full width; a settings form does not. */
   wide?: boolean;
 }) {
+  /*
+   * WHOSE JOB IS THE FRAME
+   *
+   * Since the staff layout renders `StaffShell` once, a page that renders the
+   * rail itself would draw two. `OwnerFrame` decides at render time whether
+   * this call is inside that shell (passthrough) or on its own (the whole
+   * frame, exactly as before), so a screen does not have to know where it is
+   * being mounted -- which is what keeps every screen in this product unchanged
+   * by the layout move.
+   */
   return (
-    <div data-surface="owner" className="min-h-dvh bg-paper text-gink antialiased">
-      <DashboardBar active={active} outlet={outlet} signOut={signOut} />
-      <div className="lg:pl-[244px]">
-        <main
-          className={[
-            'mx-auto w-full px-5 pt-7 pb-24 sm:px-8 lg:pt-10',
-            wide ? 'max-w-[1380px]' : 'max-w-[1240px]',
-          ].join(' ')}
-        >
-          {/*
-           * The arrival, not the layout. PageMotion sends its final state from
-           * the server and animates from keyframes only once the client is
-           * alive, so a blocked bundle leaves a visible page rather than an
-           * invisible one -- see the file for why that distinction is the
-           * whole point of using it instead of `initial={{ opacity: 0 }}`.
-           */}
-          <PageMotion>{children}</PageMotion>
-        </main>
-      </div>
-    </div>
+    <OwnerFrame active={active} outlet={outlet} signOut={signOut} wide={wide}>
+      {children}
+    </OwnerFrame>
   );
 }
 

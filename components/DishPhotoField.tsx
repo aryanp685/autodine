@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { DishPhoto } from '@/components/DishPhoto';
 import { MAX_BYTES, validateImage } from '@/lib/storage/assets';
-import { removeDishPhotoAction, uploadDishPhotoAction } from '@/app/dashboard/menus/actions';
+import { removeDishPhotoAction, uploadDishPhotoAction } from '@/app/(staff)/dashboard/menus/actions';
 import { btn } from '@/components/owner/chrome';
 
 /**

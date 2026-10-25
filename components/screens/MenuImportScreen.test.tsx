@@ -7,7 +7,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/dashboard/menus/import',
 }));
 
-vi.mock('@/app/dashboard/menus/import-actions', () => ({
+vi.mock('@/app/(staff)/dashboard/menus/import-actions', () => ({
   createImportedMenuAction: async () => ({ ok: false }),
   previewMenuImportAction: async () => ({ ok: false }),
 }));

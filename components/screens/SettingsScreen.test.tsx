@@ -18,11 +18,12 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@/app/dashboard/settings/actions', () => ({
+vi.mock('@/app/(staff)/dashboard/settings/actions', () => ({
   saveDetailsAction: mocks.action('saveDetailsAction'),
   saveTaxAction: mocks.action('saveTaxAction'),
   saveOnlinePaymentsAction: mocks.action('saveOnlinePaymentsAction'),
   saveUpiAction: mocks.action('saveUpiAction'),
+  saveGuestVerificationAction: mocks.action('saveGuestVerificationAction'),
 }));
 
 import { SettingsScreen } from './SettingsScreen';
@@ -42,6 +43,7 @@ function data(over: Partial<SettingsScreenData> = {}): SettingsScreenData {
     },
     taxRateBps: 1800,
     onlinePaymentsEnabled: false,
+    guestVerificationMode: 'code',
     upiId: '',
     upiPayeeName: '',
     timezone: 'Asia/Kolkata',
@@ -304,10 +306,11 @@ describe('Settings, the redesign', () => {
   });
 
   it('gives every form the same commit button', () => {
-    // Five forms, five saves, one appearance: the accent fill at the same size,
+    // Six forms, six saves, one appearance: the accent fill at the same size,
     // so "which control commits this card" is answered the same way every time.
+    // The sixth is the guest-verification choice (migration 20261028000900).
     const html = renderToStaticMarkup(<SettingsScreen data={data()} gatewayConfigured />);
-    expect(count(html, 'bg-[var(--p-accent)] text-onink')).toBe(5);
+    expect(count(html, 'bg-[var(--p-accent)] text-onink')).toBe(6);
   });
 
   it('draws no hand-made alert boxes any more', () => {
@@ -326,5 +329,33 @@ describe('Settings, the redesign', () => {
     // `.w-[180px]` before `.w-full`, so the field rendered full width while the
     // code said 180px.
     expect(html).toContain('w-[180px]!');
+  });
+});
+
+describe('SettingsScreen, how guests verify', () => {
+  it('offers the code as the default and names its risk honestly', () => {
+    const html = renderToStaticMarkup(<SettingsScreen data={data()} />);
+    expect(html).toContain('How guests verify they are at a table');
+    expect(html).toContain('Six-digit code on the screen at the counter');
+    expect(html).toContain('Safe default');
+    // The two scan modes must never be sold as proof of presence.
+    expect(html).toContain('This cannot claim the guest was in the room');
+  });
+
+  it('marks the scan-only mode as checked when the restaurant chose it', () => {
+    const html = renderToStaticMarkup(
+      <SettingsScreen data={data({ guestVerificationMode: 'scan' })} />,
+    );
+    expect(html).toContain('Scan only');
+    const radios = [...html.matchAll(/<input[^>]*name="guestVerificationMode"[^>]*>/g)].map((m) => m[0]);
+    const checked = radios.filter((tag) => tag.includes('checked'));
+    expect(checked).toHaveLength(1);
+    expect(checked[0]).toContain('value="scan"');
+  });
+
+  it('explains that one tap per table is not one tap per order', () => {
+    const html = renderToStaticMarkup(<SettingsScreen data={data()} />);
+    expect(html).toContain('One tap per table, not per order');
+    expect(html.toLowerCase()).toContain('a photographed card can reach your board');
   });
 });

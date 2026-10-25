@@ -9,9 +9,10 @@ import type { CashierScreenData, CounterOrder } from '@/lib/db/cashier-screen';
 // COUNTER_METHODS from lib/db/cashier-screen would pull lib/supabase/server
 // into the browser bundle -- type-only imports there are fine, this is not.
 import { COUNTER_METHODS, COUNTER_METHOD_LABEL, type CounterMethod } from '@/lib/payment-methods';
-import { recordPaymentAction } from '@/app/cashier/actions';
+import { recordPaymentAction } from '@/app/(staff)/cashier/actions';
 import { cancelStaffOrderAction } from '@/app/orders/actions';
 import { SignInPrompt } from '@/components/SignInPrompt';
+import { useInStaffShell } from '@/components/owner/StaffShell';
 import {
   PageHead,
   SectionHead,
@@ -329,18 +330,26 @@ export function Cashier({
   const outstandingNote =
     visible.length === 1 ? '1 ticket awaiting payment' : `${visible.length} tickets awaiting payment`;
 
-  return (
-    <div data-surface="owner" className="min-h-dvh bg-paper text-gink antialiased">
-      {nav}
+  // Is the rail already on screen, rendered by the staff layout?
+  const inShell = useInStaffShell();
 
-      {/* The rail is 244px wide, and this screen used to offset by 232 -- so
-          twelve pixels of the content column sat underneath it on every laptop.
-          The number lives in one place (`OwnerPage`), and this screen cannot
-          use `OwnerPage` because it is a Client Component whose nav is rendered
-          by the server; the offset is therefore written here and pinned by a
-          test. */}
-      <div className="lg:pl-[244px]">
-        <main className="mx-auto w-full max-w-[1180px] px-5 pt-6 pb-20 sm:px-7 lg:pt-9">
+  /*
+   * INSIDE THE SHELL OR ON ITS OWN.
+   *
+   * The counter is a Client Component that cannot import `DashboardBar` -- the
+   * bar carries a server action for sign-out -- so its page renders the bar and
+   * hands it down as `nav`. Since the staff layout now renders the shell once,
+   * THIS screen must not render a second one: when the shell is above it, the
+   * frame is already there, `nav` is already drawn, and this returns the
+   * content with the counter's own narrower column.
+   *
+   * The 244px offset used to live here as well as in `OwnerPage`, which is how
+   * the two drifted to 232 and 244 and put twelve pixels of the page underneath
+   * the rail. There is now one frame in the application, so there is one
+   * number.
+   */
+  const content = (
+    <div className="mx-auto w-full max-w-[1180px] px-5 pt-6 pb-20 sm:px-7 lg:pt-9">
           <PageHead
             kicker={
               <span className="inline-flex items-center gap-1.5">
@@ -704,8 +713,15 @@ export function Cashier({
               )}
             </div>
           )}
-        </main>
-      </div>
+    </div>
+  );
+
+  if (inShell) return content;
+
+  return (
+    <div data-surface="owner" className="min-h-dvh bg-paper text-gink antialiased">
+      {nav}
+      <div className="lg:pl-[244px]">{content}</div>
     </div>
   );
 }

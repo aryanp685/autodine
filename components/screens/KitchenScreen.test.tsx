@@ -20,7 +20,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/kitchen',
 }));
 
-vi.mock('@/app/kitchen/actions', () => ({
+vi.mock('@/app/(staff)/kitchen/actions', () => ({
   advanceOrderAction: async () => ({ ok: true, state: 'preparing' }),
 }));
 

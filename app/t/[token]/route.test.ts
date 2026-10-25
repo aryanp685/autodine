@@ -139,3 +139,62 @@ describe('GET /t/<card token>', () => {
     expect(response.headers.get('location')).toBe('http://localhost:3000/menu?s=maddi');
   });
 });
+
+describe('GET /t/<card token>, a restaurant on scan-only verification', () => {
+  /**
+   * Migration 20261028000900. The database decides: open_table_session answers
+   * 'code' for a restaurant still on the rotating digits, and 'opened' for one
+   * that chose a scan mode. This handler must act on that answer and nothing
+   * else -- it never reads the mode itself.
+   */
+  function scanModeRpc(status: string, withToken = true) {
+    mocks.rpc.mockImplementation(async (name: string) => {
+      if (name === 'public_qr_intro') {
+        return {
+          data: [
+            { restaurant_slug: 'maddi', restaurant_name: 'Maddi', table_label: 'T3', window_seconds: 600 },
+          ],
+          error: null,
+        };
+      }
+      return {
+        data: [
+          {
+            status,
+            session_token: withToken ? 'a'.repeat(64) : null,
+            restaurant_slug: 'maddi',
+            table_label: 'T3',
+            expires_at: '2026-10-25T16:00:00.000Z',
+          },
+        ],
+        error: null,
+      };
+    });
+  }
+
+  it('writes a table session when the database opens one', async () => {
+    scanModeRpc('opened');
+    const response = await scan(LIVE);
+    const session = response.cookies.get('autodine_table');
+
+    expect(response.status).toBe(307);
+    expect(session?.value).toContain('a'.repeat(64));
+    // The go-to-menu redirect is unchanged: a scan opens the menu, and the
+    // code form does not appear on the way in.
+    expect(response.headers.get('location')).toContain('/menu?s=maddi');
+  });
+
+  it('writes no session when the restaurant is still on the code', async () => {
+    scanModeRpc('code');
+    const response = await scan(LIVE);
+    expect(response.cookies.get('autodine_table')).toBeUndefined();
+    expect(response.cookies.get('autodine_table_card')).toBeDefined();
+  });
+
+  it('writes no session when the database refuses for any other reason', async () => {
+    scanModeRpc('limited');
+    const response = await scan(LIVE);
+    expect(response.cookies.get('autodine_table')).toBeUndefined();
+    expect(response.status).toBe(307);
+  });
+});

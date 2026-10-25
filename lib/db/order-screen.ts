@@ -61,6 +61,13 @@ export type OrderScreenData = {
   tableLabel: string | null;
   prepStatus: string;
   paymentStatus: string;
+  /**
+   * Migration 20261028000900. The order arrived in a scan-mode restaurant and
+   * no human has vouched for the table yet, so it is NOT in the kitchen queue.
+   * The screen must say that rather than letting "order placed" imply cooking
+   * has started.
+   */
+  awaitingConfirmation: boolean;
   subtotalPaise: number;
   taxPaise: number;
   totalPaise: number;
@@ -122,6 +129,8 @@ type PublicOrderPayload = {
   customer_note?: unknown;
   placed_at?: unknown;
   table_label?: unknown;
+  hold_required?: unknown;
+  confirmed_at?: unknown;
   lines?: unknown;
 };
 
@@ -222,6 +231,7 @@ export async function getOrderScreenData(
     tableLabel: text(order.table_label) || null,
     prepStatus,
     paymentStatus,
+    awaitingConfirmation: order.hold_required === true && !order.confirmed_at,
     subtotalPaise: num(order.subtotal_paise),
     taxPaise: num(order.tax_paise),
     totalPaise: num(order.total_paise),

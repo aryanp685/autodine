@@ -43,6 +43,7 @@ const order = (over: Partial<OrderScreenData> = {}): OrderScreenData => ({
   restaurantName: 'Maddi',
   tableLabel: 'T1',
   prepStatus: 'new',
+  awaitingConfirmation: false,
   paymentStatus: 'pending',
   subtotalPaise: 106000,
   taxPaise: 5300,
@@ -332,5 +333,25 @@ describe('OrderPlacedScreen — what happens next', () => {
 
     expect(html).toContain('Paid. Thank you.');
     expect(html).toMatch(/has been paid, so it cannot be changed/);
+  });
+});
+
+describe('OrderPlacedScreen, a held order', () => {
+  it('says the order is waiting for the table to be confirmed, not that it is cooking', () => {
+    const html = renderToStaticMarkup(<OrderPlacedScreen data={order({ awaitingConfirmation: true })} />);
+
+    // The honest sentence: with the floor, not in the kitchen.
+    expect(html).toContain('waiting for the table to be confirmed');
+    expect(html).toContain('Waiting for the restaurant.');
+
+    // The stepper still labels its first step "Sent to the kitchen" -- that is
+    // the route the order will take, not a claim about now -- so the assertion
+    // is about the status line, which is where a guest actually reads state.
+  });
+
+  it('drops the waiting notice the moment a person confirms', () => {
+    const html = renderToStaticMarkup(<OrderPlacedScreen data={order({ awaitingConfirmation: false })} />);
+    expect(html).not.toContain('Waiting for the restaurant.');
+    expect(html).toContain('Sent to the kitchen');
   });
 });

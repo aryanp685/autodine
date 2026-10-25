@@ -139,6 +139,50 @@ export type Database = {
     Views: Record<string, never>;
     Functions: {
       /**
+       * Migration 20261028000900. Mints a table session from a scanned card,
+       * for restaurants whose guest_verification_mode is 'scan_confirm' or
+       * 'scan'. Refuses in 'code' mode, which is the default -- so a client
+       * calling this unconditionally is harmless.
+       *
+       * Returns a status word rather than raising, for the same reason
+       * verify_table_qr_with_code does: a refused scan is a normal answer, not
+       * an error the guest should see a stack trace for.
+       *
+       * 'opened' is the only success. Everything else is a reason to fall
+       * through to the menu and let the order path decide.
+       */
+      open_table_session: {
+        Args: { p_public_token: string; p_ip_hash: string };
+        Returns: {
+          status: 'opened' | 'code' | 'revoked' | 'notserving' | 'nomenu' | 'limited' | 'unreadable';
+          session_token: string | null;
+          restaurant_slug: string | null;
+          table_label: string | null;
+          expires_at: string | null;
+        }[];
+      };
+      /**
+       * Migration 20261028000900. Accept every held ticket in one table
+       * sitting, in one statement, and report how many were actually changed.
+       *
+       * Idempotent by construction: the UPDATE matches only rows with
+       * confirmed_at is null, so a second tap from a second tablet changes
+       * zero rows and returns zero. Callers must treat 0 as "already
+       * confirmed", not as a failure.
+       */
+      confirm_table_orders: {
+        Args: { p_table_session_id: string };
+        Returns: number;
+      };
+      /**
+       * Migration 20261028000900. Cancel held tickets for a sitting that staff
+       * say is not theirs. Only unconfirmed, still-open rows are touched.
+       */
+      reject_table_orders: {
+        Args: { p_table_session_id: string; p_reason?: string | null };
+        Returns: number;
+      };
+      /**
        * Whether writes are allowed for this restaurant right now.
        *
        * False once a trial has ended with no active subscription. Every write

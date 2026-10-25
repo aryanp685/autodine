@@ -4,7 +4,7 @@ import { BrandingScreen } from './BrandingScreen';
 import type { BrandingScreenData } from '@/lib/db/branding-screen';
 
 // The upload actions are server-only modules; the markup is what is tested.
-vi.mock('@/app/dashboard/branding/actions', () => ({
+vi.mock('@/app/(staff)/dashboard/branding/actions', () => ({
   uploadLogoAction: async () => undefined,
   removeLogoAction: async () => undefined,
   uploadBannerAction: async () => undefined,

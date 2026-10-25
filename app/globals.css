@@ -327,72 +327,82 @@ p { margin: 0; }
 
 [data-app] [data-surface='owner'] {
   /* ---- the palette, in one place ---------------------------------------
-     QUIET LIGHT. A white room, near-black type, one blue.
+     QUIET LIGHT, WARM. A porcelain room, espresso type, one plum.
 
      Read the brief literally: "premium like Apple" is not a colour, it is a
      decision about how many colours there are. Apple's own surfaces are a
      near-white field, one graphite ink, one grey for the things that are not
-     the point, and exactly one blue that means "this is the action". Nothing
+     the point, and exactly one hue that means "this is the action". Nothing
      else is allowed to be a colour, so the one that is reads as deliberate.
 
      That is the whole system here:
 
-       field   the room the screens sit in
+       field   the room the screens sit in -- a warm porcelain, not a cream
        sheet   the cards: pure white, one step above the field
-       ink     graphite, not black -- black on white is a printout
-       blue    the action, the current row, the focus ring. One hue.
-       mint /  the only other two colours in the product, and they mean
-       coral   settled and outstanding, never decoration
+       ink     espresso, not black -- black on white is a printout
+       plum    the action: a filled plum control, the current row, the focus
+               ring, a 18px mark. One hue, spent only where something is
+               being pressed or where the eye should land.
+       live    the only two saturated colours in the product, and they mean
+       due     settled and outstanding, never decoration
 
      Every value below is a measured pair, not a taste: the ratio sits in the
-     comment on each group. */
+     comment on each group.
+
+     WHY PLUM AND NOT THE GREEN THE BRIEF ASKS FOR. This product already owns
+     two greens and both of them MEAN something: `--p-live` is settled and
+     `--p-brass` is the brand mark. A green Save button would spend the colour
+     the kitchen reads as "done" on a form submit, and green-as-brand was
+     rejected once already for exactly that reason. So green stays on state,
+     and the action colour is the only other hue in the room. If that call is
+     reversed, it is ONE token -- `--p-accent` -- and nothing else moves. */
 
   /* ---- surfaces --------------------------------------------------------
-     WARM PORCELAIN, not a grey room. The field is a soft cream with a hint of
-     depth, and the sheet stays pure white so a number on a card is still read
-     against white. The step between them is deliberately small: the sheet is
-     separated by its hairline and its shadow, not by being a loud rectangle. */
+     WARM PORCELAIN. The field is an off-white with warmth in it -- not a grey
+     room, and deliberately not the full cream the guest flow uses -- and the
+     sheet stays pure white so a number on a card is still read against white.
+     The step between them is small: the sheet is separated by its hairline and
+     its shadow, not by being a loud rectangle. */
   --p-paper: #fbf6ee;
-  --p-paper-deep: #f4ece1;
+  --p-paper-deep: #f4ecdf;
   /* A quiet wash for a well inside a card. Nothing paints over a wash. */
-  --p-paper-veil: rgba(56, 38, 22, 0.028);
+  --p-paper-veil: rgba(64, 44, 24, 0.022);
   --p-surface: #ffffff;
   --p-card: #ffffff;
-  --p-glass: rgba(253, 250, 245, 0.92);
+  --p-glass: rgba(253, 250, 244, 0.9);
 
   /* ---- ink -------------------------------------------------------------
-     Espresso, not black -- warm, to sit on a warm field without going muddy.
-     The ramp below it is the same ink at four opacities, so every quiet thing
-     on the surface is the same colour, quieter. */
-  --p-ink: #221a14;
-  --p-ink-80: rgba(34, 26, 20, 0.86);
-  --p-ink-64: rgba(34, 26, 20, 0.72);
+     Espresso, not black -- warm enough to sit on porcelain without going
+     muddy. The ramp below it is the same ink at four opacities, so every quiet
+     thing on the surface is the same colour, quieter. */
+  --p-ink: #211a15;
+  --p-ink-80: rgba(33, 26, 21, 0.86);
+  --p-ink-64: rgba(33, 26, 21, 0.72);
   /* Meta lines, table cells, notes: 4.8:1 on a sheet. Quieter than the ink,
      still readable -- at 0.44 this was 3.1:1 and read as switched off. */
-  --p-ink-46: rgba(34, 26, 20, 0.62);
+  --p-ink-46: rgba(33, 26, 21, 0.62);
   /* Placeholders and resting rules. 2.4:1: present, plainly not content. */
-  --p-ink-28: rgba(34, 26, 20, 0.38);
-  --p-ink-12: rgba(34, 26, 20, 0.14);
-  --p-ink-07: rgba(34, 26, 20, 0.07);
-  /* What sits ON a filled control. White on the plum and on the ink fill:
-     8.6:1 on the plum, so a button label is readable at 12.5px without a
-     heavier weight. */
+  --p-ink-28: rgba(33, 26, 21, 0.38);
+  --p-ink-12: rgba(33, 26, 21, 0.14);
+  --p-ink-07: rgba(33, 26, 21, 0.07);
+  /* What sits ON a filled control. White on the plum fill is 8.6:1, so a
+     button label is readable at 12.5px without a heavier weight. */
   --p-on-ink: #ffffff;
   --p-on-ink-64: rgba(255, 255, 255, 0.74);
   --p-on-ink-40: rgba(255, 255, 255, 0.52);
 
   /* ---- accent ----------------------------------------------------------
-     ONE PLUM, and it is a dining room colour rather than a dashboard blue:
-     aubergine on cream is what a menu, a table cloth and a wine list already
-     are. 8.6:1 as text on a sheet and 8.6:1 as a fill behind white, so the
-     same token can be a label and a button. `--p-accent-strong` is one step
-     down, for a pressed fill and for 10.5px tracked-out uppercase, which needs
-     the extra step. `--p-brass` is not a colour of its own: it is the brand
-     mark's dot on the pale rail, and it carries the brand green so the mark
-     stays the mark. */
+     ONE PLUM. A dining-room colour rather than a dashboard blue: aubergine on
+     porcelain is what a menu, a table cloth and a wine list already are.
+     8.6:1 as a fill behind white and 7.3:1 as a label on its own soft tint, so
+     the same token can be a button and a piece of type. `--p-accent-strong` is
+     the pressed state -- one step darker, because the surface is light -- and
+     the 10.5px tracked-out uppercase, which needs the extra weight.
+     `--p-brass` is not a colour of its own: it is the brand mark's dot on the
+     pale rail, and it carries the brand green so the mark stays the mark. */
   --p-accent: #7d2b6b;
-  --p-accent-strong: #67225a;
-  --p-accent-soft: #f5e8f2;
+  --p-accent-strong: #631f55;
+  --p-accent-soft: #f4e9f1;
   --p-accent-wash: rgba(125, 43, 107, 0.05);
   --p-brass: #2f7d4f;
 
@@ -401,41 +411,42 @@ p { margin: 0; }
      settled/ready/paid, a brick for money to chase. Both carry a matching
      wash so a tag can be one token instead of a colour-mix at every call
      site. */
-  --p-live: #17754a;
-  --p-live-soft: #e8f5ed;
+  --p-live: #1b7a45;
+  --p-live-soft: #e8f4ec;
   --p-due: #a82d21;
-  --p-due-soft: #fcebe8;
+  --p-due-soft: #fbeae7;
 
   /* ---- the rail --------------------------------------------------------
-     PALE, not dark. A warm white column on a cream room: the lightest surface
-     on screen, which is what stops the product reading as a corporate console.
-     The current row is a plum tint, and the type on it is the same espresso. */
-  --p-rail: #fffdf8;
+     PALE, not dark. A warm white column on a porcelain room: the lightest
+     surface on screen, which is what stops the product reading as a console.
+     The current row is a 10% plum tint, and the type on it is the same
+     espresso. */
+  --p-rail: #fffdf9;
   --p-rail-raised: #ffffff;
-  --p-rail-ink: #221a14;
-  --p-rail-ink-64: rgba(34, 26, 20, 0.72);
-  --p-rail-ink-40: rgba(34, 26, 20, 0.64);
-  --p-rail-line: rgba(34, 26, 20, 0.09);
+  --p-rail-ink: #211a15;
+  --p-rail-ink-64: rgba(33, 26, 21, 0.72);
+  --p-rail-ink-40: rgba(33, 26, 21, 0.64);
+  --p-rail-line: rgba(33, 26, 21, 0.09);
   --p-rail-active: rgba(125, 43, 107, 0.1);
 
   /* ---- lines -----------------------------------------------------------
      Warm hairlines. On a white surface an edge is a drawn line, not a shadow;
      `--p-line-soft` is the quieter one for dividers INSIDE a card. */
-  --p-line: rgba(34, 26, 20, 0.1);
-  --p-line-soft: rgba(34, 26, 20, 0.06);
-  --p-line-strong: rgba(34, 26, 20, 0.2);
+  --p-line: rgba(33, 26, 21, 0.1);
+  --p-line-soft: rgba(33, 26, 21, 0.06);
+  --p-line-strong: rgba(33, 26, 21, 0.18);
   --p-line-on-ink: rgba(255, 255, 255, 0.24);
 
   /* ---- geometry --------------------------------------------------------
      One radius per kind of object, so nothing is rounded by feel: a card is
-     20, an inner block is 14, a control is 10, a small chip or a key cap is 8,
+     16, an inner block is 12, a control is 10, a small chip or a key cap is 8,
      and anything that carries a STATE is a pill.
 
      The 6/7/8/9px literals that used to be scattered across fourteen call
      sites were four names for the same idea, which is how a surface ends up
      looking hand-made: every one of them is this token now. */
-  --p-r-card: 20px;
-  --p-r-block: 14px;
+  --p-r-card: 16px;
+  --p-r-block: 12px;
   --p-r-control: 10px;
   --p-r-chip: 8px;
 
@@ -445,11 +456,11 @@ p { margin: 0; }
      edge, which is what says the sheet is above the field rather than cut into
      it. */
   --p-shadow-1: inset 0 1px 0 rgba(255, 255, 255, 1), 0 1px 2px rgba(58, 38, 20, 0.05),
-    0 8px 20px -16px rgba(58, 38, 20, 0.18);
+    0 6px 16px -12px rgba(58, 38, 20, 0.16);
   --p-shadow-2: inset 0 1px 0 rgba(255, 255, 255, 1), 0 2px 6px rgba(58, 38, 20, 0.06),
-    0 20px 40px -24px rgba(58, 38, 20, 0.22);
+    0 18px 36px -22px rgba(58, 38, 20, 0.2);
   --p-shadow-3: inset 0 1px 0 rgba(255, 255, 255, 1), 0 8px 18px rgba(58, 38, 20, 0.07),
-    0 40px 72px -36px rgba(58, 38, 20, 0.26);
+    0 36px 64px -34px rgba(58, 38, 20, 0.24);
 
   /* The page paints its own surface with utilities; these two are the last
      resort for content that has not been wrapped yet. */
@@ -958,7 +969,7 @@ p { margin: 0; }
    Two rules were also deleted rather than retuned:
 
    - `backdrop-filter: blur(24px)` on the rail. The rail is opaque (`--p-rail`,
-     a deep wine); a blur behind an opaque box is a full-screen GPU pass
+     the palest surface on the page); a blur behind an opaque box is a full-screen GPU pass
      that composites nothing. It cost battery on the tablets these run on.
    - `table thead th { background: … }`. It was an unlayered rule, so it beat
      the `bg-…` utility the kit's `TableHead` sets — the header band could not
@@ -966,9 +977,10 @@ p { margin: 0; }
    ========================================================================= */
 
 /* The wash: barely there, on purpose.
-   A white bloom at the top left, the product's own plum at the top right, and
-   a warm amber breath under it, all far below the contrast at which the eye
-   reads a gradient. The point is not decoration -- it is that a 1440px field of
+   A white bloom at the top left, the accent at the top right, and a neutral
+   breath under it, all far below the contrast at which the eye reads a
+   gradient -- 5% at the strongest -- so the room has a top and a bottom
+   without gaining a second colour. The point is not decoration -- it is that a 1440px field of
    one flat cream reads as a screenshot of a colour, and a 5% bloom gives it a
    top and a bottom without ever becoming a band. Fixed, so scrolling a long
    table does not slide the light up the screen.
@@ -983,7 +995,7 @@ p { margin: 0; }
   background-image:
     radial-gradient(70% 46% at 8% -18%, rgba(255, 255, 255, 0.85), transparent 68%),
     radial-gradient(64% 46% at 100% -6%, color-mix(in oklab, var(--p-accent) 5%, transparent), transparent 72%),
-    radial-gradient(58% 40% at 100% 8%, rgba(180, 122, 62, 0.09), transparent 70%);
+    radial-gradient(58% 40% at 100% 8%, rgba(180, 122, 62, 0.055), transparent 70%);
   background-attachment: fixed;
 }
 

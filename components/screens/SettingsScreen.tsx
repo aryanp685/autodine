@@ -10,9 +10,10 @@ import { formatTaxPercent, taxExamplePaise } from '@/lib/settings-input';
 import {
   saveDetailsAction,
   saveOnlinePaymentsAction,
+  saveGuestVerificationAction,
   saveTaxAction,
   saveUpiAction,
-} from '@/app/dashboard/settings/actions';
+} from '@/app/(staff)/dashboard/settings/actions';
 import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
 import {
@@ -426,7 +427,7 @@ export function SettingsScreen({
               n="02"
               id="settings-money"
               title="What the bill charges"
-              meta="Tax, online payment and your own UPI code"
+              meta="Tax, online payment, guest verification and your own UPI"
             >
 
               <div className="flex flex-col gap-4">
@@ -553,6 +554,92 @@ export function SettingsScreen({
                     Turning this off does not touch orders already paid, and does not refund
                     anything. Counter payments — cash, card and UPI at the till — keep working
                     either way.
+                  </p>
+                </Panel>
+
+                {/* ------------------------------------------- how guests verify */}
+                <Panel
+                  title="How guests verify they are at a table"
+                  meta={
+                    data?.guestVerificationMode === 'scan'
+                      ? 'Scan only'
+                      : data?.guestVerificationMode === 'scan_confirm'
+                        ? 'Scan + one tap'
+                        : 'Six-digit code'
+                  }
+                  bodyClassName="px-5 py-5"
+                >
+                  <p className="m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
+                    A printed QR code can be photographed, so on its own it proves somebody saw the
+                    card, not that they are sitting at the table. Pick what has to happen before a
+                    guest&apos;s order reaches the kitchen.
+                  </p>
+
+                  <form action={saveGuestVerificationAction} className="mt-3.5 flex flex-col gap-2.5">
+                    {[
+                      {
+                        value: 'code' as const,
+                        title: 'Six-digit code on the screen at the counter',
+                        body: 'A guest enters the digits showing in the room, once per sitting. The only option where something about the physical room is checked. Nothing about your current setup changes.',
+                        risk: 'Safe default',
+                      },
+                      {
+                        value: 'scan_confirm' as const,
+                        title: 'Scan, then one tap from staff per table',
+                        body: 'The guest scans and orders. The first order at each table waits on the kitchen board for one tap; after that, orders from the same sitting go straight through. One tap per table, not per order.',
+                        risk: 'A photographed card can reach your board',
+                      },
+                      {
+                        value: 'scan' as const,
+                        title: 'Scan only, nothing waits',
+                        body: 'Fastest for the guest and the least checked. Anyone holding a photograph of one of your table cards can place an order at that table within the session window.',
+                        risk: 'No human check at all',
+                      },
+                    ].map((option) => (
+                      <label
+                        key={option.value}
+                        className="flex cursor-pointer items-start gap-2.5 rounded-[var(--p-r-control)] border border-hair bg-paper-deep px-3 py-2.5 has-[:checked]:border-[var(--p-accent)]"
+                      >
+                        <input
+                          type="radio"
+                          name="guestVerificationMode"
+                          value={option.value}
+                          disabled={disabled}
+                          defaultChecked={data?.guestVerificationMode === option.value}
+                          className="mt-[3px] size-4 shrink-0 accent-[var(--p-accent)]"
+                        />
+                        <span className="min-w-0">
+                          <span className="block text-[12.5px] font-semibold text-gink">
+                            {option.title}
+                          </span>
+                          <span className="mt-0.5 block text-[11.5px] leading-[1.5] text-gink-46">
+                            {option.body}
+                          </span>
+                          {option.value !== 'code' ? (
+                            <span className="mt-1 block text-[11.5px] font-medium text-[var(--p-due)]">
+                              {option.risk}. This cannot claim the guest was in the room.
+                            </span>
+                          ) : (
+                            <span className="mt-1 block text-[11.5px] font-medium text-[var(--p-live)]">
+                              {option.risk}
+                            </span>
+                          )}
+                        </span>
+                      </label>
+                    ))}
+
+                    <div>
+                      <SubmitButton tone="solid" pendingLabel="Saving setting…" disabled={disabled}>
+                        Save verification setting
+                      </SubmitButton>
+                    </div>
+                  </form>
+
+                  <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
+                    Changing this never releases an order that is already waiting, and never holds
+                    one that has already been accepted. Restaurants on the code keep the counter
+                    display at{' '}
+                    <span className="font-medium text-gink">Dashboard → Guest code display</span>.
                   </p>
                 </Panel>
 

@@ -9,7 +9,7 @@ import {
   extractMenuFromPhotoAction,
   type CropUpload,
   type PhotoPreview,
-} from '@/app/dashboard/menus/import-actions';
+} from '@/app/(staff)/dashboard/menus/import-actions';
 import { MAX_MENU_PHOTO_BYTES, type VisionCategory } from '@/lib/ai/menu-vision';
 import { cropFromImage } from '@/lib/import/crop';
 import { Card, btn, inputClass } from '@/components/owner/chrome';

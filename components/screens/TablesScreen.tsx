@@ -9,7 +9,7 @@ import {
   rotateQrAction,
   rotateVerificationCodeAction,
   setTableActiveAction,
-} from '@/app/dashboard/tables/actions';
+} from '@/app/(staff)/dashboard/tables/actions';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { CodeExpiry } from '@/components/owner/CodeExpiry';
 import { ConfirmSubmit } from '@/components/owner/ConfirmSubmit';
