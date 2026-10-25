@@ -1,0 +1,60 @@
+name: E2E (browser)
+
+# WHY A SEPARATE WORKFLOW
+#
+# These tests answer questions `npm test` cannot: does the sidebar survive a
+# click, does Back work, does a phone reach the rail. They need a browser, a
+# build and ~90 seconds, so they are their own job rather than a step in the
+# gate that every commit waits on.
+#
+# WHAT THIS DOES NOT DO
+#
+# It deploys nothing. There is no Vercel action here, no secret, and no step
+# that touches `main`'s deployment. Merging is what deploys this repository
+# (Vercel's git integration); this workflow cannot make that happen or stop it.
+#
+# It also needs no secrets: with no Supabase environment the app runs in demo
+# mode, which is a supported state and exercises the same shell, rail and links.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  staff-shell:
+    name: staff shell · kitchen · back/forward · 390px drawer
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build (demo mode, no database)
+        run: npm run build
+
+      - name: Browser tests
+        run: npx playwright test
+
+      - name: Upload the report when something failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

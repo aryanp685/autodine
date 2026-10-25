@@ -42,3 +42,9 @@ _shot.mjs
 _qrcheck.mjs
 _opt.mjs
 _h*.mjs
+
+# playwright
+/playwright-report
+/test-results
+/blob-report
+/.playwright

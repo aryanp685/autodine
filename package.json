@@ -2,7 +2,7 @@
   "name": "autodine",
   "version": "0.1.0",
   "private": true,
-  "description": "AutoDine — mobile-first QR ordering and restaurant-operations product preview.",
+  "description": "AutoDine \u2014 mobile-first QR ordering and restaurant-operations product preview.",
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3000",
     "build": "next build",
@@ -14,7 +14,9 @@
     "design:check": "node scripts/check-design-system.mjs",
     "sql:check": "node scripts/check-sql.mjs",
     "seed:sql": "tsx scripts/emit-seed.ts",
-    "env:check": "node scripts/check-env.mjs"
+    "env:check": "node scripts/check-env.mjs",
+    "e2e": "playwright test",
+    "e2e:install": "playwright install chromium"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",
@@ -28,6 +30,7 @@
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^22.10.0",
     "@types/qrcode": "^1.5.6",
