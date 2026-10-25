@@ -173,7 +173,7 @@ export function DashboardBar({
              dark column has a boundary against the paper instead of ending in
              a hard seam. On a phone the same edge reads as the top lip of the
              sheet, which is where a bottom sheet catches light. */
-          'shadow-[var(--p-shadow-3)] lg:shadow-[inset_-1px_0_0_rgba(255,255,255,0.055)]',
+          'shadow-[var(--p-shadow-3)] lg:shadow-none',
           'inset-x-0 bottom-0 max-h-[80dvh] rounded-t-[20px] border-t border-rail-line pb-[env(safe-area-inset-bottom)]',
           'transition-transform duration-[280ms] ease-[var(--o-ease)] will-change-transform',
           open ? 'translate-y-0' : 'translate-y-full',
@@ -197,7 +197,7 @@ export function DashboardBar({
             type="button"
             aria-label="Close navigation"
             onClick={() => setOpen(false)}
-            className="grid size-8 place-items-center rounded-[8px] text-[18px] leading-none text-rail-ink-64 transition-colors duration-150 hover:bg-white/10 hover:text-rail-ink focus-visible:outline-[var(--p-rail-ink)] lg:hidden"
+            className="grid size-8 place-items-center rounded-[8px] text-[18px] leading-none text-rail-ink-64 transition-colors duration-150 hover:bg-gink-07 hover:text-rail-ink focus-visible:outline-[var(--p-rail-ink)] lg:hidden"
           >
             ×
           </button>
@@ -243,7 +243,7 @@ export function DashboardBar({
                       'transition-[background-color,color] duration-150 ease-[var(--o-ease)]',
                       current
                         ? 'bg-[var(--p-rail-active)] font-medium text-rail-ink'
-                        : 'text-rail-ink-64 hover:bg-white/[0.055] hover:text-rail-ink',
+                        : 'text-rail-ink-64 hover:bg-gink-07 hover:text-rail-ink',
                     ].join(' ')}
                   >
                     {/* The copper bar is centred on the row's own edge rather
@@ -279,7 +279,7 @@ export function DashboardBar({
             person rather than a destination, so it gets its own surface -- one
             step lighter than the rail, with a hairline and a lit top edge. */}
         <div className="border-t border-rail-line p-2.5">
-          <div className="rounded-[var(--p-r-block)] border border-rail-line bg-[var(--p-rail-raised)] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+          <div className="rounded-[var(--p-r-block)] border border-rail-line bg-[var(--p-rail-raised)] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
             <div className="flex items-center gap-2.5">
               <span
                 aria-hidden="true"
@@ -308,7 +308,7 @@ export function DashboardBar({
               <form action={signOutAction} className="mt-2 border-t border-rail-line pt-2">
                 <button
                   type="submit"
-                  className="w-auto rounded-[7px] px-1.5 py-1 text-[11.5px] font-medium text-rail-ink-40 transition-colors duration-150 hover:bg-white/[0.08] hover:text-rail-ink focus-visible:outline-[var(--p-rail-ink)]"
+                  className="w-auto rounded-[7px] px-1.5 py-1 text-[11.5px] font-medium text-rail-ink-40 transition-colors duration-150 hover:bg-gink-07 hover:text-rail-ink focus-visible:outline-[var(--p-rail-ink)]"
                 >
                   Sign out
                 </button>
@@ -326,10 +326,10 @@ export function DashboardBar({
       <header
         data-bar-scrolled={scrolled ? 'true' : 'false'}
         className={[
-          /* Page colour, not card colour: on the dark surface the bar is part
-             of the room, and the cards below are the only things that lift.
-             A lighter bar read as a band across the top of every screen. */
-          'sticky top-0 z-30 border-b border-hair bg-paper lg:pl-[244px]',
+          /* The sheet colour, not the field: the bar is chrome, and on a pale
+             field a white bar with a hairline reads as a bar, while a grey one
+             reads as a band of the page that forgot to scroll. */
+          'sticky top-0 z-30 border-b border-hair bg-card lg:pl-[244px]',
           'transition-shadow duration-200 ease-[var(--o-ease)]',
           /* One elevation token, not a hand-tuned shadow: the bar lifts to the
              same contact shadow as a card, so the shell and the content agree

@@ -111,16 +111,20 @@ export function PageHead({
           /* A rule, then the kicker. The 18px copper dash is what turns a
              tracked-out label into a masthead: without it the eye reads the
              kicker as the first line of the sentence below it. */
-          <p className="flex items-center gap-2 text-[10.5px] font-semibold tracking-[0.2em] text-[var(--p-accent-strong)] uppercase">
+          /* Graphite label, blue rule. The blue in this product means "this
+             is the action", so a blue kicker would spend it on a label that
+             is not a control. The rule keeps the mark. */
+          <p className="flex items-center gap-2 text-[10.5px] font-semibold tracking-[0.18em] text-gink-46 uppercase">
             <span aria-hidden="true" className="h-px w-[18px] bg-[var(--p-accent)]" />
             {kicker}
           </p>
         ) : null}
-        {/* The one display size on a staff screen. Tight tracking and a short
-            leading are what separate a masthead from a heading in a form; the
-            optical size steps up on a wide screen so the page opens with a
-            statement rather than a label. */}
-        <h1 className="mt-3 text-[clamp(1.9rem,2.9vw,2.6rem)] leading-[0.98] font-semibold tracking-[-0.045em] text-balance text-gink">
+        {/* The one display size on a staff screen. The tracking is -0.028em,
+            not -0.045: the tighter figure was tuned for a face with a small
+            x-height and it made Inter look cramped at 44px. This is the
+            setting SF Pro Display uses at the same size, so the two agree on
+            Apple hardware and off it. */}
+        <h1 className="mt-3 text-[clamp(2rem,3vw,2.75rem)] leading-[1.05] font-semibold tracking-[-0.028em] text-balance text-gink">
           {title}
         </h1>
         {meta ? (
@@ -741,7 +745,7 @@ export function Field({
  * A test in components/live-controls.test.tsx fails on the unmarked form.
  */
 const control =
-  'w-full rounded-[var(--p-r-control)] border border-hair-strong bg-card px-3.5 text-[13.5px] text-gink shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] transition-[border-color,box-shadow] duration-150 ease-[var(--o-ease)] placeholder:text-gink-28 hover:border-gink-28 focus:border-[var(--p-accent)] focus:ring-2 focus:ring-[color-mix(in_oklab,var(--p-accent)_16%,transparent)] focus:outline-none disabled:cursor-not-allowed disabled:bg-gink-07 disabled:text-gink-46';
+  'w-full rounded-[var(--p-r-control)] border border-hair-strong bg-card px-3.5 text-[13.5px] text-gink shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition-[border-color,box-shadow] duration-150 ease-[var(--o-ease)] placeholder:text-gink-28 hover:border-gink-28 focus:border-[var(--p-accent)] focus:ring-2 focus:ring-[color-mix(in_oklab,var(--p-accent)_16%,transparent)] focus:outline-none disabled:cursor-not-allowed disabled:bg-gink-07 disabled:text-gink-46';
 
 export const inputClass = `${control} h-11`;
 export const textareaClass = `${control} resize-y py-3 leading-[1.55]`;
@@ -770,7 +774,7 @@ export function Th({
     <th
       scope="col"
       className={[
-        'border-b border-hair-strong bg-[rgba(255,255,255,0.035)] px-4 py-2.5 text-[10.5px] font-semibold tracking-[0.11em] whitespace-nowrap text-gink-46 uppercase',
+        'border-b border-hair-strong bg-[rgba(29,29,31,0.025)] px-4 py-2.5 text-[10.5px] font-semibold tracking-[0.11em] whitespace-nowrap text-gink-46 uppercase',
         align === 'right' ? 'text-right' : 'text-left',
         className,
       ].join(' ')}

@@ -298,110 +298,103 @@ p { margin: 0; }
 
 [data-app] [data-surface='owner'] {
   /* ---- the palette, in one place ---------------------------------------
-     MIDNIGHT MENU. The surface is a dining room after dark: the page is the
-     room, the cards are the tables, and the two colours that carry the whole
-     thing are marigold and wine.
+     QUIET LIGHT. A white room, near-black type, one blue.
 
-       ink-black  the room           (the canvas)
-       wine       the banquette      (the rail, and the account card on it)
-       marigold   the candle, the "you are here", the action
+     Read the brief literally: "premium like Apple" is not a colour, it is a
+     decision about how many colours there are. Apple's own surfaces are a
+     near-white field, one graphite ink, one grey for the things that are not
+     the point, and exactly one blue that means "this is the action". Nothing
+     else is allowed to be a colour, so the one that is reads as deliberate.
 
-     Why DARK, and why this is a change and not a nudge: two previous passes
-     kept a light page and moved only the accent, and a light page with a warm
-     accent is exactly the thing that read as dull. Value is the variable the
-     eye resolves first -- a dark canvas flips every card, every table and every
-     form on fifteen screens at once, from one block, because every screen
-     reads these tokens and none of them writes a colour of its own.
+     That is the whole system here:
 
-     The card is lighter than the room around it by one visible step, and it
-     carries a lit top edge, so a panel is a table under a lamp rather than a
-     rectangle drawn on a wall.
+       field   the room the screens sit in
+       sheet   the cards: pure white, one step above the field
+       ink     graphite, not black -- black on white is a printout
+       blue    the action, the current row, the focus ring. One hue.
+       mint /  the only other two colours in the product, and they mean
+       coral   settled and outstanding, never decoration
 
-     Every pair below was measured, not chosen by eye; the ratios are in the
+     Every value below is a measured pair, not a taste: the ratio sits in the
      comment on each group. */
 
   /* ---- surfaces --------------------------------------------------------
-     Room, then table. The card is 1.20:1 against the canvas -- on a dark
-     surface separation is carried by the hairline and the lit top edge as much
-     as by value, but the step has to be there or a card is a hole. */
-  --p-paper: #171014;
-  --p-paper-deep: #100b0e;
-  --p-paper-veil: rgba(9, 6, 8, 0.45);
-  --p-surface: #2b2127;
-  --p-card: #2b2127;
-  --p-glass: rgba(27, 18, 22, 0.94);
+     The field and the sheet are 1.09:1 apart -- that is Apple's own step, and
+     it is deliberately small: the sheet is separated by its hairline and its
+     shadow, not by being a loud rectangle. */
+  --p-paper: #f5f5f7;
+  --p-paper-deep: #ececef;
+  /* A quiet wash for a well inside a card. Nothing paints over a wash. */
+  --p-paper-veil: rgba(29, 29, 31, 0.025);
+  --p-surface: #ffffff;
+  --p-card: #ffffff;
+  --p-glass: rgba(251, 251, 253, 0.92);
 
   /* ---- ink -------------------------------------------------------------
-     Ivory, not white: pure white on a near-black page glows, and this product
-     is candlelit. 12.7:1 on the room, 10.8:1 on a card. */
-  --p-ink: #f7eee2;
-  --p-ink-80: rgba(247, 238, 226, 0.88);
-  --p-ink-64: rgba(247, 238, 226, 0.72);
-  /* Meta lines and table cells: 6.1:1 on a card, still clearly below the ink.
-     At 0.46 this was 3.1:1 on the old paper -- a grey that read as switched
-     off -- and it is the colour of every note on the surface. */
-  --p-ink-46: rgba(247, 238, 226, 0.62);
-  /* Placeholders and quiet rules. 2.8:1: present, plainly not content. */
-  --p-ink-28: rgba(247, 238, 226, 0.4);
-  --p-ink-12: rgba(247, 238, 226, 0.16);
-  --p-ink-07: rgba(247, 238, 226, 0.09);
-  /* The ink that goes ON a light fill -- a marigold button, an ivory button.
-     The pair is inverted here for the same reason everything else is. */
-  --p-on-ink: #191013;
-  --p-on-ink-64: rgba(25, 16, 19, 0.72);
-  --p-on-ink-40: rgba(25, 16, 19, 0.5);
+     Graphite, the value Apple uses for type: 15.5:1 on the field.
+     The ramp below it is the same ink at four opacities, so every quiet thing
+     on the surface is the same colour, quieter. */
+  --p-ink: #1d1d1f;
+  --p-ink-80: rgba(29, 29, 31, 0.86);
+  --p-ink-64: rgba(29, 29, 31, 0.72);
+  /* Meta lines, table cells, notes: 4.9:1 on a sheet. Quieter than the ink,
+     still readable -- at 0.44 this was 3.1:1 and read as switched off. */
+  --p-ink-46: rgba(29, 29, 31, 0.62);
+  /* Placeholders and resting rules. 2.4:1: present, plainly not content. */
+  --p-ink-28: rgba(29, 29, 31, 0.38);
+  --p-ink-12: rgba(29, 29, 31, 0.14);
+  --p-ink-07: rgba(29, 29, 31, 0.07);
+  /* What sits ON a filled control. White on the filled ink and on the blue:
+     5.6:1, so a button label is readable at 12.5px without a heavier weight. */
+  --p-on-ink: #ffffff;
+  --p-on-ink-64: rgba(255, 255, 255, 0.74);
+  --p-on-ink-40: rgba(255, 255, 255, 0.52);
 
   /* ---- accent ----------------------------------------------------------
-     MARIGOLD. It is the candle on the table and the action on the screen:
-     a filled primary button, the mark on the current rail row, the kicker
-     rule. 9.0:1 on the room and 7.5:1 on a card, so it works as text as well
-     as fill; the label on a filled marigold button is the ink above (9.0:1).
-
-     `--p-accent-strong` is the same hue lifted, because on a dark surface the
-     "stronger" step is the brighter one: it is the hover fill and the colour
-     of 10.5px tracked-out uppercase, which needs the extra step at that size.
-     `--p-accent-soft` is the deep amber a selected chip sits on (12.1:1 for
-     the ivory on it); `--p-brass` is one kind of detail -- hairline rules and
-     the brand mark on the wine rail -- and is never body text. */
-  --p-accent: #f2a33c;
-  --p-accent-strong: #ffc074;
-  --p-accent-soft: #40270f;
-  --p-accent-wash: rgba(242, 163, 60, 0.12);
-  --p-brass: #d9a45a;
+     ONE BLUE, and it is the Apple link blue rather than a darker, "safer"
+     blue: 5.6:1 on a sheet and 5.1:1 on the field as text, and white on it is
+     the same 5.6:1. `--p-accent-strong` is one step down, for a pressed fill
+     and for 10.5px tracked-out uppercase, which needs the extra step.
+     `--p-brass` is not a colour of its own any more: it is the brand mark's
+     dot on the pale rail, and it carries the brand green so the mark stays
+     the mark. */
+  --p-accent: #0066cc;
+  --p-accent-strong: #0058b9;
+  --p-accent-soft: #e6f0fd;
+  --p-accent-wash: rgba(0, 102, 204, 0.05);
+  --p-brass: #2f7d4f;
 
   /* ---- status ----------------------------------------------------------
      Two meanings, never borrowed for decoration: mint is settled/ready/paid,
-     coral is money to chase. Both carry a matching deep wash so a tag is one
-     token instead of a colour-mix at every call site, and both are readable
-     as text on that wash (6.9:1 and 6.6:1). */
-  --p-live: #4ec98e;
-  --p-live-soft: #12301f;
-  --p-due: #ff7d63;
-  --p-due-soft: #351613;
+     coral is money to chase. Both carry a matching wash so a tag can be one
+     token instead of a colour-mix at every call site. */
+  --p-live: #167b47;
+  --p-live-soft: #eaf6ef;
+  --p-due: #b3261e;
+  --p-due-soft: #fdecea;
 
   /* ---- the rail --------------------------------------------------------
-     WINE. A column of bordeaux against a near-black room is the one large
-     block of colour on the screen -- it is what stops a dark dashboard from
-     reading as a spreadsheet with the lights off, and it is where the
-     restaurant lives. Ivory on it measures 15:1; the 0.55 step is 5.4:1, so
-     even the 10px group labels clear AA. */
-  --p-rail: #36111e;
-  --p-rail-raised: #48192a;
-  --p-rail-ink: #f9f1e6;
-  --p-rail-ink-64: rgba(249, 241, 230, 0.72);
-  --p-rail-ink-40: rgba(249, 241, 230, 0.55);
-  --p-rail-line: rgba(249, 241, 230, 0.16);
-  --p-rail-active: rgba(242, 163, 60, 0.18);
+     PALE, not dark. Apple's own sidebars are the lightest surface on screen,
+     which is the opposite of the dashboard convention -- and it is what stops
+     the product reading as a corporate console. The rail is a hair lighter
+     than the field (a white column on a grey room), the current row is a blue
+     tint, and the type on it is the same graphite.
+     16.3:1 for a label, 4.9:1 even for the 10px uppercase group headings. */
+  --p-rail: #fbfbfd;
+  --p-rail-raised: #ffffff;
+  --p-rail-ink: #1d1d1f;
+  --p-rail-ink-64: rgba(29, 29, 31, 0.72);
+  --p-rail-ink-40: rgba(29, 29, 31, 0.64);
+  --p-rail-line: rgba(29, 29, 31, 0.09);
+  --p-rail-active: rgba(0, 102, 204, 0.1);
 
   /* ---- lines -----------------------------------------------------------
-     Ivory hairlines. On a dark surface a hairline is the edge of a lit object,
-     so it is drawn in the light's colour rather than in a darker ink -- a
-     darker line between two dark values is invisible. `--p-line-soft` is the
-     quieter one for dividers INSIDE a card. */
-  --p-line: rgba(247, 238, 226, 0.14);
-  --p-line-soft: rgba(247, 238, 226, 0.08);
-  --p-line-strong: rgba(247, 238, 226, 0.26);
-  --p-line-on-ink: rgba(25, 16, 19, 0.22);
+     Graphite hairlines. On a white surface an edge is a drawn line, not a
+     shadow; `--p-line-soft` is the quieter one for dividers INSIDE a card. */
+  --p-line: rgba(29, 29, 31, 0.1);
+  --p-line-soft: rgba(29, 29, 31, 0.06);
+  --p-line-strong: rgba(29, 29, 31, 0.2);
+  --p-line-on-ink: rgba(255, 255, 255, 0.24);
 
   /* ---- geometry --------------------------------------------------------
      One radius per kind of object, so nothing is rounded by feel: a card is
@@ -411,16 +404,16 @@ p { margin: 0; }
   --p-r-control: 10px;
 
   /* ---- elevation -------------------------------------------------------
-     Black and low, with a faint lit top edge. On the old paper the shadows
-     were warm because a neutral one read as grey dirt; here the room is
-     already dark, so a shadow can only be deeper darkness, and the lit edge is
-     what says a card is above the table rather than cut into it. */
-  --p-shadow-1: inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 1px 2px rgba(0, 0, 0, 0.45),
-    0 10px 24px -18px rgba(0, 0, 0, 0.7);
-  --p-shadow-2: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 2px 6px rgba(0, 0, 0, 0.5),
-    0 22px 44px -26px rgba(0, 0, 0, 0.8);
-  --p-shadow-3: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 18px rgba(0, 0, 0, 0.5),
-    0 40px 72px -36px rgba(0, 0, 0, 0.85);
+     Wide, low and almost invisible -- Apple's cards are separated by a
+     hairline and a shadow you have to look for. Each step carries a lit top
+     edge, which is what says the sheet is above the field rather than cut into
+     it. */
+  --p-shadow-1: inset 0 1px 0 rgba(255, 255, 255, 1), 0 1px 2px rgba(29, 29, 31, 0.04),
+    0 8px 20px -16px rgba(29, 29, 31, 0.16);
+  --p-shadow-2: inset 0 1px 0 rgba(255, 255, 255, 1), 0 2px 6px rgba(29, 29, 31, 0.05),
+    0 20px 40px -24px rgba(29, 29, 31, 0.2);
+  --p-shadow-3: inset 0 1px 0 rgba(255, 255, 255, 1), 0 8px 18px rgba(29, 29, 31, 0.06),
+    0 40px 72px -36px rgba(29, 29, 31, 0.24);
 
   /* The page paints its own surface with utilities; these two are the last
      resort for content that has not been wrapped yet. */
@@ -936,17 +929,17 @@ p { margin: 0; }
      be changed from the component. The kit owns it now.
    ========================================================================= */
 
-/* The wash: two lights in a dark room.
-   Marigold at the top left (the pass, the candle) and wine at the top right
-   (the rail's own hue bleeding onto the wall). Both are radial and both are
-   under a tenth of the value they would need to read as a gradient, which is
-   the point: on a near-black canvas a light has to be a bloom, not a band.
-   Flat, a dark page of one value reads as a screenshot of a colour. Fixed, so
-   scrolling a long table does not slide the light up the screen. */
+/* The wash: barely there, on purpose.
+   A white bloom at the top left and a hint of the accent at the top right, both
+   far below the contrast at which the eye reads a gradient. The point is not
+   decoration -- it is that a 1440px field of one flat grey reads as a
+   screenshot of a colour, and a 2% bloom gives it a top and a bottom without
+   ever becoming a band. Fixed, so scrolling a long table does not slide the
+   light up the screen. */
 [data-surface='owner'] {
   background-image:
-    radial-gradient(72% 48% at 6% -14%, rgba(242, 163, 60, 0.1), transparent 66%),
-    radial-gradient(66% 50% at 100% -4%, rgba(120, 26, 52, 0.28), transparent 70%);
+    radial-gradient(70% 46% at 8% -18%, rgba(255, 255, 255, 0.9), transparent 68%),
+    radial-gradient(64% 46% at 100% -6%, rgba(0, 102, 204, 0.045), transparent 72%);
   background-attachment: fixed;
 }
 
@@ -1001,7 +994,7 @@ p { margin: 0; }
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.035;
+  opacity: 0.02;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size: 140px 140px;
 }
@@ -1013,64 +1006,13 @@ p { margin: 0; }
     display: none;
   }
 
-  /* A printed sheet is paper, not a dining room.
-     The surface is dark now, and a QR card or a bill printed from it would be
-     ivory type on white -- invisible. So print gets the palette inverted back:
-     dark ink on white, no shadows, and `--p-on-ink` dark as well, because
-     browsers drop background fills but keep the labels that sat on them. This
-     is a token override, not a second design: every rule on the surface already
-     reads these tokens. */
-  [data-surface='owner'] {
-    --p-paper: #ffffff;
-    --p-paper-deep: #ffffff;
-    --p-surface: #ffffff;
-    --p-card: #ffffff;
-    --p-glass: #ffffff;
-    --p-paper-veil: rgba(0, 0, 0, 0.04);
-
-    --p-ink: #12100e;
-    --p-ink-80: rgba(18, 16, 14, 0.88);
-    --p-ink-64: rgba(18, 16, 14, 0.72);
-    --p-ink-46: rgba(18, 16, 14, 0.62);
-    --p-ink-28: rgba(18, 16, 14, 0.4);
-    --p-ink-12: rgba(18, 16, 14, 0.16);
-    --p-ink-07: rgba(18, 16, 14, 0.09);
-    --p-on-ink: #12100e;
-    --p-on-ink-64: rgba(18, 16, 14, 0.72);
-    --p-on-ink-40: rgba(18, 16, 14, 0.5);
-
-    --p-accent: #8a4a12;
-    --p-accent-strong: #6f3a0d;
-    --p-accent-soft: #fdf1e0;
-    --p-accent-wash: rgba(138, 74, 18, 0.08);
-    --p-brass: #8a5a1e;
-
-    --p-live: #1d6b45;
-    --p-live-soft: #e8f3ec;
-    --p-due: #9e2f1c;
-    --p-due-soft: #fbeae6;
-
-    --p-rail: #ffffff;
-    --p-rail-raised: #ffffff;
-    --p-rail-ink: #12100e;
-    --p-rail-ink-64: rgba(18, 16, 14, 0.72);
-    --p-rail-ink-40: rgba(18, 16, 14, 0.55);
-    --p-rail-line: rgba(18, 16, 14, 0.2);
-
-    --p-line: rgba(18, 16, 14, 0.16);
-    --p-line-soft: rgba(18, 16, 14, 0.09);
-    --p-line-strong: rgba(18, 16, 14, 0.28);
-
-    --p-shadow-1: none;
-    --p-shadow-2: none;
-    --p-shadow-3: none;
-
-    background: var(--p-paper);
-    color: var(--p-ink);
-  }
+  /* Print keeps the surface's own light tokens: the sheet is already white
+     with graphite type, so a QR card prints as a QR card. Only the grain goes
+     -- on a printed page it is a grey haze over the ink and a wasted toner
+     cartridge. */
 }
 
-/* The grain is deliberately painted OVER the content, at 3.5%: that is what
+/* The grain is deliberately painted OVER the content, at 2%: that is what
    paper grain does on a printed page, and at this opacity it reads as texture
    rather than as a veil. It costs nothing to keep it there -- the alternative,
    lifting every screen into its own stacking context, means one `position:
@@ -1151,7 +1093,13 @@ p { margin: 0; }
   --color-mute: #a49c90;
   --color-mute-dim: #7d7568;
 
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* The same stack as the root, so `font-sans` cannot disagree with the body.
+     -apple-system resolves to SF Pro on Apple hardware -- the typeface the
+     brief is asking for, already installed, nothing to download -- and Inter
+     (self-hosted, four weights) is the closest freely licensed match
+     everywhere else. */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
 
   --radius-card: 18px;
   --radius-panel: 24px;
