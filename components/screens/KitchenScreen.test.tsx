@@ -360,14 +360,21 @@ describe('Kitchen board, the redesign', () => {
   it('keeps the sound desk on the shared control geometry', () => {
     const desk = soundDesk(live());
 
-    // Controls, not the status tags beside them: a tag is a pill on purpose.
+    /* Actions are pills on this surface (see btn() in the kit), so the thing
+       worth holding is the height ladder and the absence of a border, not the
+       radius: every control here is 36px or 44px tall, and none of them draws
+       a platform outline. */
     const buttons = desk.match(/<button\b[^>]*>/g) ?? [];
     expect(buttons.length).toBeGreaterThan(2);
     for (const tag of buttons) {
-      expect(tag).not.toContain('rounded-full');
+      // Nothing on this desk draws a box around itself any more: the toggle
+      // rows are bare, and the segmented control is a filled track.
+      expect(tag).not.toMatch(/\bborder-hair-strong\b/);
       expect(tag).not.toMatch(/\bh-8\b/);
     }
-    expect(desk).toContain('rounded-[10px]');
+    // The audio toggle keeps the 36px action height and the pill radius.
+    expect(desk).toContain('h-9');
+    expect(desk).toContain('rounded-full');
   });
 
   it('makes the audio state one button instead of a pill with a link inside', () => {
@@ -385,7 +392,9 @@ describe('Kitchen board, the redesign', () => {
 
   it('draws the switch it toggles, at the same size as the menu switch', () => {
     const desk = soundDesk(live());
-    expect(desk).toContain('h-[22px] w-[38px]');
+    // The iOS switch: 51x31 track, 27px knob. One size, both screens.
+    expect(desk).toContain('h-[31px] w-[51px]');
+    expect(desk).toContain('size-[27px]');
     expect(desk).toContain('aria-hidden="true"');
   });
 
@@ -394,12 +403,10 @@ describe('Kitchen board, the redesign', () => {
 
     const advance = html.slice(html.indexOf('Start preparing') - 400, html.indexOf('Start preparing'));
     expect(advance).toContain('h-11');
-    expect(advance).not.toContain('rounded-full');
 
     const at = html.indexOf('aria-label="Replay order');
     const replay = html.slice(html.lastIndexOf('<button', at), html.indexOf('>', at) + 1);
     expect(replay).toContain('h-9');
-    expect(replay).not.toContain('rounded-full');
   });
 
   it('uses an icon for replay rather than an emoji the device gets to choose', () => {

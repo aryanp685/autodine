@@ -125,7 +125,7 @@ export function ShellSearch({ onLaunch }: { onLaunch?: () => void }) {
           tint, and focus turns it into the one white object in the bar with the
           accent ring. The `⌘K` legend sits inside it, because that is what it
           is: the shortcut for this control, not a separate affordance. */}
-      <div className="flex h-9 items-center gap-2 rounded-[var(--p-r-control)] border border-transparent bg-[color-mix(in_oklab,var(--p-ink)_6%,transparent)] pr-2 pl-2.5 transition-[background-color,border-color,box-shadow] duration-150 ease-[var(--o-ease)] hover:border-hair-strong hover:bg-[color-mix(in_oklab,var(--p-ink)_3%,var(--p-card))] focus-within:border-[var(--p-accent)] focus-within:bg-card focus-within:shadow-[var(--p-shadow-1)]">
+      <div className="flex h-9 items-center gap-2 rounded-full border border-transparent bg-[color-mix(in_oklab,var(--p-ink)_6%,transparent)] pr-2 pl-3 transition-[background-color,border-color,box-shadow] duration-150 ease-[var(--o-ease)] hover:bg-[color-mix(in_oklab,var(--p-ink)_9%,transparent)] focus-within:border-[var(--p-accent)] focus-within:bg-card focus-within:shadow-[var(--p-shadow-1)]">
         <svg
           aria-hidden="true"
           viewBox="0 0 24 24"
@@ -167,7 +167,12 @@ export function ShellSearch({ onLaunch }: { onLaunch?: () => void }) {
               optionRefs.current[cursor]?.click();
             }
           }}
-          className="w-[92px] bg-transparent text-[12.5px] text-gink placeholder:text-gink-46 focus:w-[150px] focus:outline-none focus-visible:outline-none sm:w-[132px] sm:focus:w-[190px] transition-[width] duration-150"
+          /* `appearance-none` is not cosmetic. A native `searchfield` paints its
+             own black focus rectangle on some engines and ignores
+             `outline: none`; the wrapper already draws the ring, in the accent,
+             when the field has focus. Two rings, one of them the platform's,
+             is what made this control look broken. */
+          className="w-[92px] appearance-none bg-transparent text-[12.5px] text-gink placeholder:text-gink-46 focus:w-[150px] focus:outline-none focus-visible:outline-none sm:w-[132px] sm:focus:w-[190px] transition-[width] duration-150"
         />
         {/* The key shown has to be the key that works. This printed ⌘K on every
             platform, including Windows, where the shortcut is Ctrl+K and the

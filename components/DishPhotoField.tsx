@@ -100,8 +100,8 @@ export function DishPhotoField({
                 with four button geometries in one column. */}
             <label
               className={[
-                'relative inline-flex h-9 cursor-pointer items-center rounded-[10px] border border-hair-strong bg-card px-3',
-                'text-[12.5px] font-medium text-gink shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition-colors hover:border-gink-28',
+                'relative inline-flex h-9 cursor-pointer items-center rounded-full bg-[color-mix(in_oklab,var(--p-ink)_7%,transparent)] px-4',
+                'text-[12.5px] font-medium text-gink transition-colors hover:bg-[color-mix(in_oklab,var(--p-ink)_11%,transparent)]',
                 'focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--p-accent)]',
                 disabled ? 'pointer-events-none opacity-45' : '',
               ].join(' ')}

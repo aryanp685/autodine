@@ -369,6 +369,6 @@ describe('Dashboard, what it does not repeat', () => {
     const html = renderToStaticMarkup(<Dashboard data={live()} />);
     const at = html.indexOf('All orders');
     const opening = html.slice(html.lastIndexOf('<a', at), at + 20);
-    expect(opening).toContain('h-9 px-3');
+    expect(opening).toContain('h-9 px-4');
   });
 });

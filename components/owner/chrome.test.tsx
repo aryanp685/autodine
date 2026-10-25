@@ -93,13 +93,22 @@ describe('Segmented', () => {
  * which is exactly why they are asserted here.
  */
 describe('the owner kit, after the redesign', () => {
-  it('makes actions rectangles, so a pill always means status', () => {
+  it('draws actions as pills, and never as an outlined box', () => {
+    /* The 2026-10-25 control pass. Actions used to be 10px rectangles on the
+       argument that a pill should mean status; on a white surface that made
+       every toolbar look like a form from 2010, and the platform's own 1px
+       button border survived under the class list anyway. Both are gone: an
+       action is a pill, and it is a FILL or a colour, never an outline. */
     for (const size of ['sm', 'md'] as const) {
-      const cls = btn('solid', size);
-      // The 10px step is now the `--p-r-control` token (still 10px): one radius
-      // scale shared by actions, fields and chips instead of a literal per file.
-      expect(cls).toContain('rounded-[var(--p-r-control)]');
-      expect(cls).not.toContain('rounded-full');
+      for (const tone of ['solid', 'primary', 'ghost', 'quiet', 'danger'] as const) {
+        const cls = btn(tone, size);
+        expect(cls).toContain('rounded-full');
+        expect(cls).not.toContain('rounded-[var(--p-r-control)]');
+        // No tone draws a border. The reset in globals.css removed the
+        // platform's; the kit must not put one back.
+        expect(cls).not.toMatch(/(^|\s)border(-[a-z-]+)?(\s|$)/);
+        expect(cls).not.toContain('border-hair-strong');
+      }
     }
   });
 
@@ -127,21 +136,24 @@ describe('the owner kit, after the redesign', () => {
     expect(work).toContain('--p-accent');
   });
 
-  it('paints a chosen chip with the accent, not with a block of ink', () => {
-    // A selected filter is an on-state -- "these rows" -- and copper is what
-    // this product uses for position. A solid ink chip was the heaviest thing
-    // on the ledger, heavier than the rows it was filtering.
+  it('paints a chosen chip as a filled accent pill, never an outlined box', () => {
     const on = chipClass(true);
-    expect(on).toContain('bg-accent-soft');
+    // A selected filter is an on-state, and the accent is what this surface
+    // uses for a state. Filled, not tinted-with-a-blue-border: on a row of
+    // three the fill is what the eye finds without reading.
+    expect(on).toContain('bg-[var(--p-accent)]');
+    expect(on).toContain('text-onink');
     expect(on).not.toContain('bg-gink');
 
-    // Both states carry a border and the same height, so picking a chip does
-    // not change the size of the row it sits in.
-    expect(chipClass(false)).toContain('border-hair-strong');
+    // Neither state has a border, and both keep the same height and radius, so
+    // picking a chip does not resize or reshape the row it sits in.
     for (const cls of [chipClass(true), chipClass(false)]) {
       expect(cls).toContain('h-9');
-      expect(cls).toContain('border ');
+      expect(cls).toContain('rounded-full');
+      expect(cls).not.toContain('border ');
+      expect(cls).not.toContain('border-hair-strong');
     }
+    expect(chipClass(false)).toContain('bg-[color-mix(in_oklab,var(--p-ink)_6%,transparent)]');
   });
 });
 
@@ -151,17 +163,18 @@ describe('SwitchTrack', () => {
     const off = renderToStaticMarkup(<SwitchTrack on={false} />);
 
     for (const html of [on, off]) {
-      // The one size. The menu editor and the kitchen both use this.
-      expect(html).toContain('h-[22px] w-[38px]');
-      expect(html).toContain('size-[16px]');
+      // The one size, and it is the platform's own: 51x31 track, 27px knob.
+      // The menu editor and the kitchen both use this.
+      expect(html).toContain('h-[31px] w-[51px]');
+      expect(html).toContain('size-[27px]');
       // The state is announced by the control around it, never by the shape.
       expect(html).toContain('aria-hidden="true"');
       expect(html).not.toContain('<button');
     }
 
     expect(on).toContain('--p-accent');
-    expect(off).toContain('left-[3px]');
-    expect(on).toContain('left-[19px]');
+    expect(off).toContain('left-[2px]');
+    expect(on).toContain('left-[22px]');
   });
 });
 

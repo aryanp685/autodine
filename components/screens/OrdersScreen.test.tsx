@@ -262,15 +262,17 @@ describe('OrdersScreen, the ledger as a page', () => {
     expect(chip('Cancelled')).toContain('>1<');
   });
 
-  it('marks the chosen window as current, in copper, not as a block of ink', () => {
+  it('marks the chosen window as current, in the accent, as a filled pill', () => {
     const html = renderToStaticMarkup(<OrdersScreen data={three()} />);
     // Scoped to the chip row: the rail has a group heading called "Today" too.
     const row = html.slice(html.indexOf('mb-3 flex flex-col gap-2'));
     const today = row.slice(0, row.indexOf('</a>'));
 
     expect(html).toContain('aria-current="true"');
-    expect(today).toContain('bg-accent-soft');
-    expect(today).not.toContain('bg-gink text-onink');
+    // Selected = the accent fill with the on-ink label; unselected = a tint.
+    expect(today).toContain('bg-[var(--p-accent)]');
+    expect(today).toContain('text-onink');
+    expect(today).toContain('rounded-full');
   });
 
   it('keeps the custom dates behind a summary that opens without JavaScript', () => {
@@ -345,8 +347,8 @@ describe('OrdersScreen, the ledger as a page', () => {
 
     expect(collects.length).toBeGreaterThan(1);
     for (const tag of collects) {
-      expect(tag).toContain('h-9 px-3');
-      expect(tag).not.toContain('rounded-full');
+      expect(tag).toContain('h-9 px-4');
+      expect(tag).toContain('rounded-full');
     }
   });
 

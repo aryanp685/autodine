@@ -445,7 +445,7 @@ export function MenuEditorScreen({
                           <button
                             type="submit"
                             aria-label={`Add category ${name}`}
-                            className="inline-flex h-9 items-center rounded-[var(--p-r-control)] border border-hair-strong bg-card px-3 text-[12.5px] font-medium text-gink-64 transition-colors hover:border-gink-28 hover:text-gink"
+                            className="inline-flex h-9 items-center rounded-full bg-[color-mix(in_oklab,var(--p-ink)_7%,transparent)] px-3.5 text-[12.5px] font-medium text-gink-64 transition-colors hover:bg-[color-mix(in_oklab,var(--p-ink)_11%,transparent)] hover:text-gink"
                           >
                             + {name}
                           </button>
