@@ -173,7 +173,7 @@ export function ShellSearch({ onLaunch }: { onLaunch?: () => void }) {
             platform, including Windows, where the shortcut is Ctrl+K and the
             legend named a key the keyboard does not have. The modifier is read
             after mount so the server-rendered mark stays stable. */}
-        <kbd className="hidden shrink-0 rounded-[6px] border border-hair bg-card px-1.5 py-px text-[10px] font-medium text-gink-46 shadow-[inset_0_-1px_0_rgba(255,255,255,0.05)] sm:block">
+        <kbd className="hidden shrink-0 rounded-[6px] border border-hair bg-card px-1.5 py-px text-[10px] font-medium text-gink-46 shadow-[inset_0_-1px_0_rgba(29,29,31,0.06)] sm:block">
           {isApple ? '⌘K' : 'Ctrl K'}
         </kbd>
       </div>
