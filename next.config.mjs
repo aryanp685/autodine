@@ -47,6 +47,12 @@ const nextConfig = {
    */
   experimental: {
     serverActions: { bodySizeLimit: '6mb' },
+    /*
+     * edge-tts-universal uses isomorphic-ws which wraps the `ws` package.
+     * These are Node.js packages that must not be bundled into the server
+     * bundle — Next.js should load them from node_modules at runtime.
+     */
+    serverComponentsExternalPackages: ['edge-tts-universal', 'isomorphic-ws', 'ws'],
   },
 
   /**
