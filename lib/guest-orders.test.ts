@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   forgetLastOrder,
+  lastCartKey,
   lastOrderKey,
   orderHref,
   parseRememberedOrder,
+  readLastCart,
   readLastOrder,
+  rememberLastCart,
   rememberLastOrder,
   type StorageLike,
 } from './guest-orders';
@@ -111,5 +114,101 @@ describe('the remembered order', () => {
     expect(params.get('s')).toBe('copper pot');
     expect(params.get('code')).toBe('MA-K3F9Q');
     expect(params.get('t')).toBe('tok-123');
+  });
+});
+
+/**
+ * The remembered cart — what "order these again" is built on.
+ *
+ * It is the same bargain as the remembered order: a browser fact, scoped to one
+ * restaurant, validated on the way back in, silent on every failure. What is
+ * different is that this one holds dish ids, so the validation matters more —
+ * a junk id would end up in an order.
+ */
+describe('the remembered cart', () => {
+  function fakeStorage(): StorageLike & { data: Map<string, string> } {
+    const data = new Map<string, string>();
+    return {
+      data,
+      getItem: (key) => data.get(key) ?? null,
+      setItem: (key, value) => void data.set(key, value),
+      removeItem: (key) => void data.delete(key),
+    };
+  }
+
+  const cart = [
+    { itemId: 'a1', qty: 2 },
+    { itemId: 'b2', qty: 1, variantId: 'v1', addonIds: ['x', 'y'] },
+  ];
+
+  it('round-trips portions and add-ons, which is why the cart is used as the memory', () => {
+    const storage = fakeStorage();
+    rememberLastCart(storage, 'kings-of-kings', cart);
+
+    expect(readLastCart(storage, 'kings-of-kings')).toEqual([
+      { itemId: 'a1', qty: 2 },
+      { itemId: 'b2', qty: 1, variantId: 'v1', addonIds: ['x', 'y'] },
+    ]);
+  });
+
+  it('is scoped per restaurant, so one cart cannot cross kitchens', () => {
+    const storage = fakeStorage();
+    rememberLastCart(storage, 'kings-of-kings', cart);
+
+    expect(readLastCart(storage, 'maddi')).toEqual([]);
+  });
+
+  it('normalises the slug, so a capitalised link still finds it', () => {
+    const storage = fakeStorage();
+    rememberLastCart(storage, 'Kings-Of-Kings', cart);
+
+    expect(readLastCart(storage, 'kings-of-kings')).toHaveLength(2);
+  });
+
+  it('drops junk rather than putting it in an order', () => {
+    const storage = fakeStorage();
+    storage.setItem(
+      lastCartKey('k'),
+      JSON.stringify([
+        { itemId: 'a1', qty: -4 },        // a negative quantity
+        { itemId: 42, qty: 1 },            // not an id
+        { qty: 3 },                        // no id at all
+        { itemId: 'ok', qty: 1 },
+      ]),
+    );
+
+    expect(readLastCart(storage, 'k')).toEqual([{ itemId: 'ok', qty: 1 }]);
+  });
+
+  it('treats an emptied list as a removal, not a stash', () => {
+    const storage = fakeStorage();
+    rememberLastCart(storage, 'k', cart);
+    rememberLastCart(storage, 'k', []);
+
+    expect(readLastCart(storage, 'k')).toEqual([]);
+  });
+
+  it('survives storage that throws on every call', () => {
+    const angry: StorageLike = {
+      getItem: () => {
+        throw new Error('denied');
+      },
+      setItem: () => {
+        throw new Error('denied');
+      },
+      removeItem: () => {
+        throw new Error('denied');
+      },
+    };
+
+    expect(() => rememberLastCart(angry, 'k', cart)).not.toThrow();
+    expect(readLastCart(angry, 'k')).toEqual([]);
+  });
+
+  it('is a no-op without a restaurant, rather than writing to a global key', () => {
+    const storage = fakeStorage();
+    rememberLastCart(storage, '   ', cart);
+
+    expect(storage.data.size).toBe(0);
   });
 });

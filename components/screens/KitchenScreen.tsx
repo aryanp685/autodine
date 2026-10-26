@@ -1,7 +1,7 @@
 'use client';
 
 import { rupeesToPaise } from '@/lib/money';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { kitchenOrders, restaurant, type KitchenOrder } from '@/lib/demo-data';
 import { Money, VegMark } from '@/components/ui';
@@ -186,9 +186,16 @@ function Items({ order, compact }: { order: BoardTicket; compact?: boolean }) {
             {it.qty}×
           </span>
           <span className="min-w-0 text-gink">
-            <span className="inline-flex items-center gap-1.5">
-              <VegMark veg={it.veg} size={11} />
-              <span className="font-medium">{it.name}</span>
+            {/* min-w-0 and shrink-0 are load-bearing, not cosmetic: a flex item
+                refuses to go narrower than its longest word by default, so a
+                long dish name used to run past the card and get clipped by the
+                card's own overflow-hidden. The mark keeps its size; the name
+                wraps. */}
+            <span className="inline-flex max-w-full min-w-0 items-center gap-1.5 align-middle">
+              <span className="shrink-0">
+                <VegMark veg={it.veg} size={11} />
+              </span>
+              <span className="min-w-0 font-medium">{it.name}</span>
             </span>
             {/* Portion first, then each add-on as its own tag. A ticket that
                 reads "Butter Naan · Half · Extra cheese · Jain" makes the cook
@@ -205,8 +212,12 @@ function Items({ order, compact }: { order: BoardTicket; compact?: boolean }) {
               <span
                 key={addon}
                 data-addon=""
-                className="ml-1.5 inline-block rounded-[var(--p-r-chip)] border border-hair bg-paper-deep px-1.5 py-[2px] text-[11.5px] font-medium whitespace-nowrap text-gink-64"
+                className="ml-1.5 inline-block max-w-full rounded-[var(--p-r-chip)] border border-hair bg-paper-deep px-1.5 py-[2px] text-[11.5px] leading-[1.4] font-medium whitespace-nowrap text-gink-64 max-lg:whitespace-normal"
               >
+                {/* nowrap keeps a two-word modifier on one line where there is
+                    room; below lg it wraps instead of being clipped, because a
+                    half-visible "Extra che…" is a modifier the cook cannot
+                    read, and this card clips. */}
                 {addon}
               </span>
             ))}
@@ -292,6 +303,22 @@ export function Kitchen({
   const [mobileCol, setMobileCol] = useState<'new' | 'preparing' | 'ready'>('new');
   /** Tickets that just appeared, so the card can announce itself. */
   const [arrivals, setArrivals] = useState<string[]>([]);
+  /**
+   * Where the ticket went, and where focus goes with it.
+   *
+   * Pressing "Start preparing" removes the card from the column the finger is
+   * in -- on a phone the whole card leaves the screen, because only the chosen
+   * column is drawn. A keyboard user was therefore left with focus on a node
+   * that no longer existed, which silently resets it to the top of the
+   * document: the next Tab press starts at the rail instead of at the queue.
+   *
+   * So the board says where the ticket went, in one line, and that line takes
+   * focus. It is above the columns on every width, so focusing it can never
+   * land on a hidden node, and Tab from it reaches the column pills and then
+   * the cards.
+   */
+  const movedRef = useRef<HTMLParagraphElement | null>(null);
+  const [moved, setMoved] = useState('');
   /** Which ticket is asking "are you sure", so a mis-tap cannot cancel. */
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
   const [cancelBusy, setCancelBusy] = useState<string | null>(null);
@@ -977,6 +1004,20 @@ export function Kitchen({
     return null;
   }, [audio, live, speaksHere, stalled, lostCount, voiceState, gestureDone, speakerState]);
 
+  /**
+   * Move focus to the note, after it exists.
+   *
+   * An effect rather than a call beside setMoved() because the paragraph is
+   * rendered conditionally: focusing the previous render's node would do
+   * nothing. `preventScroll` is deliberately not passed -- on a phone the note
+   * sits above the columns, and scrolling it into view is how the cook learns
+   * where the card went.
+   */
+  useEffect(() => {
+    if (!moved) return;
+    movedRef.current?.focus();
+  }, [moved]);
+
   /* ---------------------------------------------------------------- actions */
 
   /**
@@ -1014,6 +1055,7 @@ export function Kitchen({
     if (!ticket.orderId) {
       setError('');
       setDemoState((current) => ({ ...current, [ticket.key]: next }));
+      setMoved(movedLine(ticket, next));
       speak(`demo:${ticket.key}:${next}`, advanceText(ticket.table, next), ticket.table, 'info');
       return;
     }
@@ -1030,9 +1072,16 @@ export function Kitchen({
     });
 
     if (!result.ok) {
+      // The card does not move when the server refuses, so focus must not move
+      // either: the error banner is announced, and the button stays under the
+      // finger.
       setError(result.error);
       return;
     }
+    // The server's own answer, not the guess we drew optimistically. If they
+    // disagree the board is already corrected by the overlay above; the note
+    // only ever repeats what the database said.
+    setMoved(movedLine(ticket, result.state ?? next));
     if (result.state) {
       setPending((current) => ({ ...current, [ticket.orderId!]: result.state! }));
       setTimeout(() => {
@@ -1577,6 +1626,11 @@ export function Kitchen({
         }))}
       />
 
+      {/* Where the ticket went. Focusable, and focused, so a keyboard user is
+          never dropped back at the top of the document by a card leaving the
+          column they were working in. */}
+      {moved && <TicketMovedNote ref={movedRef} text={moved} />}
+
       <div className="mt-3 grid gap-3 lg:grid-cols-3">
         {cols.map((c) => (
           <section
@@ -1701,17 +1755,44 @@ export function Kitchen({
                     </span>
 
                     {interactive && o.state === 'new' && (
-                      <button type="button" className={kbBtn('solid')} onClick={() => advance(o)}>
+                      <button
+                        type="button"
+                        /* Full width below lg: this is the one tap the screen
+                           exists for, and on a 390px card it used to share the
+                           row with the total, the replay icon and the cancel
+                           pair -- which put it at the right edge, half under a
+                           thumb, on the narrowest screen in the product. */
+                        className={`${kbBtn('solid')} max-lg:w-full`}
+                        onClick={() => advance(o)}
+                      >
                         Start preparing
                       </button>
                     )}
                     {interactive && o.state === 'preparing' && (
-                      <button type="button" className={kbBtn('solid')} onClick={() => advance(o)}>
+                      <button
+                        type="button"
+                        /* Full width below lg: this is the one tap the screen
+                           exists for, and on a 390px card it used to share the
+                           row with the total, the replay icon and the cancel
+                           pair -- which put it at the right edge, half under a
+                           thumb, on the narrowest screen in the product. */
+                        className={`${kbBtn('solid')} max-lg:w-full`}
+                        onClick={() => advance(o)}
+                      >
                         Mark ready
                       </button>
                     )}
                     {interactive && o.state === 'ready' && (
-                      <button type="button" className={kbBtn('solid')} onClick={() => advance(o)}>
+                      <button
+                        type="button"
+                        /* Full width below lg: this is the one tap the screen
+                           exists for, and on a 390px card it used to share the
+                           row with the total, the replay icon and the cancel
+                           pair -- which put it at the right edge, half under a
+                           thumb, on the narrowest screen in the product. */
+                        className={`${kbBtn('solid')} max-lg:w-full`}
+                        onClick={() => advance(o)}
+                      >
                         Mark served
                       </button>
                     )}
@@ -1811,6 +1892,63 @@ function kbBtn(tone: 'solid' | 'quiet' | 'danger'): string {
   if (tone === 'solid') return btn('solid', 'md');
   if (tone === 'danger') return btn('danger', 'sm');
   return btn('quiet', 'sm');
+}
+
+/**
+ * Where a ticket went -- and where keyboard focus goes.
+ *
+ * THE ACCESSIBILITY CONTRACT, IN THREE PARTS
+ *
+ *   `tabIndex={-1}`     focusable by script and not by Tab. It is not an item
+ *                       in the tab order: a cook is working a board, and a line
+ *                       of text they did not open belongs behind Tab, not in it.
+ *
+ *   `ref` + the effect    pressing "Mark ready" removes that ticket's card from
+ *                         the column you were working in. On a phone the whole
+ *                         card leaves the screen, so focus was on a node that
+ *                         no longer existed and silently reset to the top of
+ *                         the document -- the next Tab starting at the rail.
+ *                         The note takes focus instead.
+ *
+ *   `focus-visible`        focus is invisible without a keyboard, which is the
+ *                          one case where an invisible focus is the whole
+ *                          point: a mouse user sees the note move, and never
+ *                          sees a focus ring drawn over it.
+ *
+ * `preventScroll` is deliberately NOT passed on the focus call: on a phone the
+ * note sits above the columns, and scrolling it into view is how the cook
+ * learns where the card went.
+ */
+export const TicketMovedNote = forwardRef<HTMLParagraphElement, { text: string }>(
+  function TicketMovedNote({ text }, forwardedRef) {
+    return (
+      <p
+        ref={forwardedRef}
+        tabIndex={-1}
+        className="mt-2 text-[12.5px] leading-[1.5] text-gink-64 focus-visible:rounded-[var(--p-r-chip)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]"
+      >
+        {text}
+      </p>
+    );
+  },
+);
+
+/**
+ * What the board says after a ticket moves.
+ *
+ * The destination is named the way the column is named ("Ready / Served"), not
+ * the way the database names it ("served"), because the person reading it is
+ * looking at a column heading.
+ */
+const MOVED_TO: Record<PrepState, string> = {
+  new: 'New',
+  preparing: 'Preparing',
+  ready: 'Ready / Served',
+  served: 'Ready / Served',
+};
+
+export function movedLine(ticket: Pick<BoardTicket, 'table' | 'code'>, next: PrepState): string {
+  return `${ticket.table} · ${ticket.code} moved to ${MOVED_TO[next]}.`;
 }
 
 /* ------------------------------------------------------------------ storage */

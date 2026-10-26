@@ -38,7 +38,7 @@ select current_database()                                        as database_nam
 select (select count(*) from public.orders)      as orders,
        (select count(*) from public.restaurants) as restaurants,
        (select count(*) from public.memberships) as memberships,
-       (select count(*) from public.menu_items)  as menu_items;
+       (select count(*) from public.items)       as menu_items;
 
 -- ---------------------------------------------------------------------------
 -- 2. Prerequisites must all be true. Any FALSE means the clone is incomplete

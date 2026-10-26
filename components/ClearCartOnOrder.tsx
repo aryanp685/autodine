@@ -27,8 +27,9 @@
 
 import { useEffect, useRef } from 'react';
 import { useCart } from '@/components/CartProvider';
+import { browserStorage, rememberLastCart } from '@/lib/guest-orders';
 
-export function ClearCartOnOrder({ clear }: { clear: boolean }) {
+export function ClearCartOnOrder({ clear, slug }: { clear: boolean; slug?: string }) {
   const cart = useCart();
   const done = useRef(false);
 
@@ -38,8 +39,24 @@ export function ClearCartOnOrder({ clear }: { clear: boolean }) {
     // the first render.
     if (!clear || done.current || !cart.ready) return;
     done.current = true;
-    if (cart.count > 0) cart.clear();
-  }, [clear, cart]);
+    if (cart.count === 0) return;
+
+    /*
+     * Keep the list before emptying it.
+     *
+     * The order is placed, so the cart has done its job — but the same dishes
+     * are the thing a table most often wants again. The copy happens here, at
+     * the one moment the cart and a real order are known to be the same list:
+     * a moment later the cart is empty, and reading the order back would only
+     * give names and prices, not the ids a cart is made of.
+     *
+     * Remembered AFTER the order exists (this component only mounts on the
+     * confirmation page) and before the clear, so a failed or cancelled order
+     * leaves the guest's cart exactly as it was.
+     */
+    rememberLastCart(browserStorage(), slug ?? '', cart.lines);
+    cart.clear();
+  }, [clear, cart, slug]);
 
   return null;
 }

@@ -120,6 +120,23 @@ export type Database = {
         ]
       >;
       order_items: Table<OrderItem>;
+      /**
+       * Migration 20261029000100. Staff invitations.
+       *
+       * `code_hash` is NOT in this type on purpose: the column is granted to
+       * nobody, so a client select that named it would fail. If you find
+       * yourself wanting it here, the answer is a new RPC, not a wider grant.
+       */
+      restaurant_invites: Table<{
+        id: string;
+        restaurant_id: string;
+        role: Exclude<MemberRole, 'owner'>;
+        created_by: string;
+        created_at: string;
+        expires_at: string;
+        redeemed_at: string | null;
+        revoked_at: string | null;
+      }>;
       payments: Table<{
         id: string;
         order_id: string;
@@ -194,6 +211,70 @@ export type Database = {
       restaurant_can_write: {
         Args: { p_restaurant_id: string };
         Returns: boolean;
+      };
+      /**
+       * Migration 20261029000100. Mint a staff invitation and return the code
+       * ONCE. The database keeps only its sha256; there is no way to read it
+       * back, so a screen that loses this value must mint a new one.
+       *
+       * Raises for an owner role, for a manager inviting a manager, and for a
+       * caller who is not owner/manager of that restaurant.
+       */
+      create_staff_invite: {
+        Args: { p_restaurant_id: string; p_role: Exclude<MemberRole, 'owner'>; p_days?: number };
+        Returns: string;
+      };
+      /**
+       * Migration 20261029000100. What a link is, without consuming it.
+       * Requires a signed-in caller, so an anonymous holder of a guessed link
+       * learns nothing -- not even whether it exists.
+       */
+      preview_staff_invite: {
+        Args: { p_code: string };
+        Returns: Array<{
+          status: 'ok' | 'already_member' | 'used' | 'expired' | 'revoked' | 'closed' | 'not_found';
+          restaurant_id: string | null;
+          restaurant_name: string | null;
+          role: MemberRole | null;
+          expires_at: string | null;
+        }>;
+      };
+      /** Migration 20261029000100. Single use, single transaction, race-safe. */
+      redeem_staff_invite: {
+        Args: { p_code: string };
+        Returns: Array<{
+          status: 'ok' | 'already_member' | 'used' | 'expired' | 'revoked' | 'closed' | 'not_found';
+          restaurant_id: string | null;
+          restaurant_name: string | null;
+          role: MemberRole | null;
+        }>;
+      };
+      /** Migration 20261029000100. Returns 'revoked' | 'used' | 'not_found'. */
+      revoke_staff_invite: {
+        Args: { p_invite_id: string };
+        Returns: string;
+      };
+      /** Migration 20261029000100. Owner only; refuses to remove the last owner. */
+      remove_staff_member: {
+        Args: { p_membership_id: string };
+        Returns: string;
+      };
+      /**
+       * Migration 20261029000100. The People screen's only read of the team.
+       * A definer function rather than a wider profiles policy, so a
+       * co-worker's phone number is never exposed to the team list.
+       */
+      list_staff_members: {
+        Args: { p_restaurant_id: string };
+        Returns: Array<{
+          membership_id: string;
+          user_id: string;
+          role: MemberRole;
+          full_name: string | null;
+          email: string | null;
+          joined_at: string;
+          is_self: boolean;
+        }>;
       };
       /**
        * Signature verified against the live database on 2026-10-20. It takes

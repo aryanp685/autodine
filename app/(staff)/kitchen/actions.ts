@@ -116,12 +116,25 @@ export async function advanceOrderAction(
    * refresh, while the kitchen believed it had been marked ready. Asking for
    * the updated row turns "nothing happened" into something this action can
    * see and report.
+   *
+   * THE THIRD `.eq` IS A COMPARE-AND-SET, and it is not housekeeping.
+   *
+   * Two screens work this board at once: a wall tablet and a phone on the
+   * pass. Both read `new`, so both compute `preparing` -- harmless, the same
+   * value twice. The dangerous interleaving is slower: tablet A reads `new`,
+   * the cook taps on B, B reads `preparing` and writes `ready`, and only then
+   * does A's write land. Without the predicate below that write is
+   * unconditional, so a ticket that is in the pass goes BACK to `preparing`:
+   * food already cooked, on a board that now says it is not. Matching the
+   * state we read makes the loser update zero rows, which the caller reports
+   * as "moved on another screen -- the board will catch up".
    */
   const { data: updated, error: updateError } = await supabase
     .from('orders')
     .update({ prep_status: next })
     .eq('id', orderId)
     .eq('restaurant_id', restaurantId)
+    .eq('prep_status', order.prep_status)
     .select('id, prep_status');
 
   if (updateError) {

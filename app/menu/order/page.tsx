@@ -27,9 +27,9 @@ export const metadata: Metadata = { title: 'Your order · AutoDine' };
 export default async function OrderPage({
   searchParams,
 }: {
-  searchParams: Promise<{ s?: string; code?: string; t?: string }>;
+  searchParams: Promise<{ s?: string; code?: string; t?: string; placed?: string }>;
 }) {
-  const { s, code, t } = await searchParams;
+  const { s, code, t, placed: justPlaced } = await searchParams;
   const data = await getOrderScreenData(s, code, t);
 
   /**
@@ -53,11 +53,19 @@ export default async function OrderPage({
   // become a real order, and the cart must not survive that. See
   // ClearCartOnOrder -- the cart used to stay full after ordering, so the next
   // visit to the menu offered to place the same meal again.
-  const placed = Boolean(data) && data?.prepStatus !== 'cancelled';
+  /*
+   * Clearing the cart is right on the redirect that follows an order and wrong
+   * on every other visit: a guest who has started a second order and then opens
+   * an old one from their history would lose the new cart to it.
+   *
+   * `placed=1` is written by the order action and by nothing else, so this is
+   * "the button sent me here", not "this order exists".
+   */
+  const placed = Boolean(data) && data?.prepStatus !== 'cancelled' && justPlaced === '1';
 
   return (
     <CartProvider slug={s}>
-      <ClearCartOnOrder clear={placed} />
+      <ClearCartOnOrder clear={placed} slug={s} />
       {/* Only a real, non-cancelled order is remembered: a cancelled one is not
           something to offer back from the Orders tab. */}
       <RememberOrder

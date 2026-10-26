@@ -6,7 +6,7 @@ preparation only.
 
 ## 0. Who runs what — measured, not assumed
 
-Arena's sandbox has outbound access to `github.com`, `codeload.github.com`,
+This sandbox has outbound access to `github.com`, `codeload.github.com`,
 `api.github.com`, `registry.npmjs.org`, `pypi.org`, `files.pythonhosted.org`, and
 nothing else. Measured just now: `curl https://github.com` → **200**,
 `curl https://supabase.com` → **000** (no route). There is no Postgres binary and
@@ -28,7 +28,7 @@ No credential is needed from you, and none should be pasted into this chat.
 | S7 | the browser throttle test | **you** | needs the app + a browser |
 | S8 | pause or delete the branch | **you** | dashboard access |
 
-What Arena has done, and can do, without a database:
+What the sandbox has done, and can do, without a database:
 
 | check | how | result |
 | --- | --- | --- |
@@ -38,6 +38,9 @@ What Arena has done, and can do, without a database:
 | the migration's statement inventory and line ranges | verified against the file (Appendix A) | matches |
 | nothing in this round changes application code | `git diff --stat` | docs + `scripts/branch-db/` only |
 | unit suite and hermetic E2E still pass | `vitest run`, CI, E2E workflow | 95 files / 1257 tests; E2E 9/9 (previous run, unchanged by this round) |
+| the migration actually executes | PostgreSQL 16.2 built from the repo's 27 migrations + a scaffold | **applied cleanly**; see `docs/validation-local-pg-2026-10-26.md` |
+| the ten `PASS` blocks actually pass | `06_scan_limits.sql` on that database | **PASS 1 … 10**, verbatim in the same file |
+| a database-backed throttle, through the real code | `app/menu/throttle-db.integration.test.tsx` | **3/3 passed** on that database |
 
 ## 1. Before any SQL: is this the right database?
 
@@ -217,7 +220,7 @@ npx playwright test --config playwright.integration.config.ts
 Use `.env.local` for the keys if you prefer; never commit it, never use
 production keys.
 
-**Discovery vs execution.** Arena has run discovery only:
+**Discovery vs execution.** The sandbox has run discovery only:
 
 ```
 npx playwright test --config playwright.integration.config.ts --list

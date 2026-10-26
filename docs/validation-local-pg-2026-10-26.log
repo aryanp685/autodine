@@ -1,0 +1,175 @@
+### S1: supabase shim + repository migrations up to 20261027000900
+psql:scripts/local-pg/000_supabase_shim.sql:18: WARNING:  wal_level is insufficient to publish logical changes
+HINT:  Set wal_level to "logical" before creating subscriptions.
+NOTICE:  policy "restaurants_public" for relation "public.restaurants" does not exist, skipping
+psql:scripts/local-pg/005_scaffold_missing_tables.sql:12: NOTICE:  relation "qr_tokens" already exists, skipping
+NOTICE:  trigger "trg_dining_tables_ensure_qr" for relation "public.dining_tables" does not exist, skipping
+NOTICE:  constraint "items_spoken_name_length" of relation "items" does not exist, skipping
+NOTICE:  trigger "order_items_reject_unpriced_addons" for relation "public.order_items" does not exist, skipping
+NOTICE:  function public.reject_unpriced_order_addons() does not exist, skipping
+NOTICE:  policy "table_qr_codes_staff_read" for relation "public.table_qr_codes" does not exist, skipping
+NOTICE:  constraint "restaurants_accent_check" of relation "restaurants" does not exist, skipping
+NOTICE:  constraint "restaurants_branding_path_check" of relation "restaurants" does not exist, skipping
+NOTICE:  policy "restaurant assets are publicly readable" for relation "storage.objects" does not exist, skipping
+NOTICE:  policy "managers upload their own restaurant assets" for relation "storage.objects" does not exist, skipping
+NOTICE:  policy "managers replace their own restaurant assets" for relation "storage.objects" does not exist, skipping
+NOTICE:  policy "managers delete their own restaurant assets" for relation "storage.objects" does not exist, skipping
+NOTICE:  constraint "restaurants_plan_check" of relation "restaurants" does not exist, skipping
+NOTICE:  constraint "restaurants_plan_status_check" of relation "restaurants" does not exist, skipping
+NOTICE:  trigger "restaurants_plan_guard" for relation "public.restaurants" does not exist, skipping
+NOTICE:  constraint "restaurants_upi_id_check" of relation "restaurants" does not exist, skipping
+applied: 26 files minus 20261028000900
+
+### S2: preflight
+ database_name | connected_as | server_address | pg_version | extensions 
+---------------+--------------+----------------+------------+------------
+ adine_capture | postgres     |                | 16.2       |          1
+(1 row)
+
+ orders | restaurants | memberships | menu_items 
+--------+-------------+-------------+------------
+      0 |           0 |           0 |          0
+(1 row)
+
+ has_table_qr_codes | has_table_verification_sessions | has_place_public_order_core | has_restaurant_can_write | has_memberships | orders_columns_ok | restaurants_columns_ok 
+--------------------+---------------------------------+-----------------------------+--------------------------+-----------------+-------------------+------------------------
+ t                  | t                               | t                           | t                        | t               | t                 | t
+(1 row)
+
+ table_name | column_name 
+------------+-------------
+(0 rows)
+
+ proname 
+---------
+(0 rows)
+
+ table_session_opens_exists 
+----------------------------
+                          0
+(1 row)
+
+
+### S3: verify-before
+ table_name | column_name 
+------------+-------------
+(0 rows)
+
+ proname 
+---------
+(0 rows)
+
+ table_name 
+------------
+(0 rows)
+
+ orders | restaurants 
+--------+-------------
+      0 |           0
+(1 row)
+
+
+### S3: capture rollback artefacts
+captured 2 function definitions, 31916 bytes
+
+### S4: apply 20261028000900 in one transaction
+applied
+
+### S5: verify-after
+                     section                     
+-------------------------------------------------
+ --- 1. the added columns and their defaults ---
+(1 row)
+
+ table_name  |       column_name       |        data_type         | is_nullable | column_default 
+-------------+-------------------------+--------------------------+-------------+----------------
+ orders      | confirmed_at            | timestamp with time zone | YES         | 
+ orders      | confirmed_by            | uuid                     | YES         | 
+ orders      | hold_required           | boolean                  | NO          | false
+ orders      | table_session_id        | uuid                     | YES         | 
+ restaurants | guest_verification_mode | text                     | NO          | 'code'::text
+(5 rows)
+
+                 section                 
+-----------------------------------------
+ --- 2. four indexes (expect 4 rows) ---
+(1 row)
+
+          indexname           
+------------------------------
+ orders_held_idx
+ orders_session_idx
+ table_session_opens_card_idx
+ table_session_opens_ip_idx
+(4 rows)
+
+                                 section                                 
+-------------------------------------------------------------------------
+ --- 3. the openers table is closed to clients (expect t, 0, 0 rows) ---
+(1 row)
+
+ rls_enabled 
+-------------
+ t
+(1 row)
+
+ policies_on_table_session_opens 
+---------------------------------
+                               0
+(1 row)
+
+ grantee | privilege_type 
+---------+----------------
+(0 rows)
+
+                                              section                                              
+---------------------------------------------------------------------------------------------------
+ --- 4. every function: definer, pinned path (expect security_definer = t, search_path=public) ---
+(1 row)
+
+         proname          |                                       args                                        | security_definer |           config            
+--------------------------+-----------------------------------------------------------------------------------+------------------+-----------------------------
+ confirm_table_orders     | p_table_session_id uuid                                                           | t                | search_path=public, pg_temp
+ get_public_order         | p_slug text, p_code text, p_token uuid                                            | t                | search_path=public, pg_temp
+ open_table_session       | p_public_token text, p_ip_hash text                                               | t                | search_path=public, pg_temp
+ place_public_order       | p_slug text, p_lines jsonb, p_note text, p_session_token text, p_guest_token uuid | t                | search_path=public, pg_temp
+ reject_table_orders      | p_table_session_id uuid, p_reason text                                            | t                | search_path=public, pg_temp
+ stamp_guest_verification | p_code text, p_restaurant_id uuid, p_session_token text                           | t                | search_path=public, pg_temp
+(6 rows)
+
+              section               
+------------------------------------
+ --- 5. grants (expect t, f, t) ---
+(1 row)
+
+ anon_can_open | anon_can_confirm | staff_can_confirm | anon_can_stamp 
+---------------+------------------+-------------------+----------------
+ t             | f                | t                 | f
+(1 row)
+
+                                       section                                        
+--------------------------------------------------------------------------------------
+ --- 6. nothing existing was rewritten (expect 0 held orders in this empty clone) ---
+(1 row)
+
+ orders_total | orders_held | orders_confirmed 
+--------------+-------------+------------------
+            0 |           0 |                0
+(1 row)
+
+
+### seed (local harness)
+psql:scripts/local-pg/900_local_seed.sql:29: NOTICE:  seed: restaurant=329bd9e5-1a59-4181-b495-8dd3d8f0b84c table=fc490c60-0992-4c2b-9555-00e02bc16ca2 card=20617629-5dbd-4357-9810-dce88dbbe55a
+
+### S6: 06_scan_limits.sql
+psql:supabase/checks/06_scan_limits.sql:75: NOTICE:  PASS 1: a code-mode restaurant refuses to mint from a scan
+psql:supabase/checks/06_scan_limits.sql:115: NOTICE:  PASS 2: 9 legitimate scans (opened=9, reused=0) — none refused
+psql:supabase/checks/06_scan_limits.sql:141: NOTICE:  PASS 3: the limit is enforced and reported (14 of 15 refused)
+psql:supabase/checks/06_scan_limits.sql:175: NOTICE:  PASS 4: a refusal writes nothing (status=limited)
+psql:supabase/checks/06_scan_limits.sql:224: NOTICE:  PASS 5: held order L-1001 is persisted and visible to the board
+psql:supabase/checks/06_scan_limits.sql:261: NOTICE:  PASS 6: second confirm is a no-op (first=1, second=0)
+psql:supabase/checks/06_scan_limits.sql:292: NOTICE:  PASS 7: guest_token uniqueness is backed by an index
+psql:supabase/checks/06_scan_limits.sql:307: NOTICE:  PASS 8: anonymous confirm refused (Sign in to confirm a table.)
+psql:supabase/checks/06_scan_limits.sql:356: NOTICE:  PASS 9: a refusal is status-only (15 refusals); retry column present=f (app currently says "a short while")
+psql:supabase/checks/06_scan_limits.sql:391: NOTICE:  PASS 10: place_public_order never reads the scan limit (2218 chars checked)
+ROLLBACK

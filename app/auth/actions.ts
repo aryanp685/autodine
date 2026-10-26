@@ -20,6 +20,8 @@ import { RECOVERY_COOKIE, passwordProblem, passwordsMatch } from '@/lib/password
 import { requestOrigin } from '@/lib/site-origin';
 import { slugify, uniqueSlug } from '@/lib/slug';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
+import { getStaffContextDetailed } from '@/lib/db/staff';
+import { homeForRole } from '@/lib/db/team';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 function fail(path: string, message: string): never {
@@ -151,7 +153,7 @@ export async function signInAction(formData: FormData): Promise<void> {
   // Only accept same-origin pathnames. Never turn the login form into an open redirect.
   const next = requestedNext.startsWith('/') && !requestedNext.startsWith('//') && !requestedNext.includes('\\')
     ? requestedNext
-    : '/dashboard';
+    : null;
 
   if (!email || !password) fail('/login', 'Please enter your email and password.');
 
@@ -165,7 +167,16 @@ export async function signInAction(formData: FormData): Promise<void> {
     fail('/login', 'Email or password is incorrect.');
   }
 
-  redirect(next);
+  if (next) redirect(next);
+
+  /* No destination was asked for, so land where this person actually works.
+     It used to be /dashboard for everybody, which was harmless while every
+     account was an owner. Now that a restaurant can hand a kitchen or counter
+     login to a second person, sending them to the owner's dashboard means
+     their first second in the product is a wall that says "not your role" --
+     and the screen they need is one they never saw. */
+  const staff = await getStaffContextDetailed();
+  redirect(staff.ok ? homeForRole(staff.context.role) : '/dashboard');
 }
 
 export async function signOutAction(): Promise<void> {

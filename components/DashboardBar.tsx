@@ -11,7 +11,7 @@ import { ShellSearch } from '@/components/ShellSearch';
 import { BrandLockup } from '@/components/BrandMark';
 import {
   DASHBOARD_LINKS,
-  SHELL_GROUPS,
+  groupsForRole,
   sectionForPathname,
   type DashboardSection,
 } from '@/components/shell-links';
@@ -135,6 +135,13 @@ export function DashboardBar({
     };
   }, []);
 
+  /* The rail shows what this person can actually open. The role travels with
+     the outlet because the same account can own one restaurant and cashier at
+     another -- see lib/outlets.ts. With no outlet (demo, signed out) every
+     link is drawn, which is the behaviour every screen had before this. */
+  const role = outlet?.outlets.find((entry) => entry.id === outlet.activeId)?.role ?? null;
+  const groups = groupsForRole(role);
+
   const activeLink = DASHBOARD_LINKS.find((link) => link.key === activeSection);
   const activeOutlet =
     outlet?.outlets.find((entry) => entry.id === outlet.activeId) ?? outlet?.outlets[0] ?? null;
@@ -234,7 +241,7 @@ export function DashboardBar({
         )}
 
         <nav aria-label="Restaurant" className="flex-1 overflow-y-auto px-3 py-3">
-          {SHELL_GROUPS.map((group) => (
+          {groups.map((group) => (
             <div key={group.name} className="mb-4 last:mb-0">
               <div className="px-3 pt-1 pb-2 text-[10px] font-semibold tracking-[0.2em] text-rail-ink-40 uppercase">
                 {group.name}

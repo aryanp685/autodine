@@ -2,9 +2,24 @@
 const nextConfig = {
   reactStrictMode: true,
 
-  // Allow the Arena live-preview host to talk to the Next dev server
-  // (Next 15.3+ blocks unknown cross-origin dev requests by default).
-  allowedDevOrigins: ['*.e2b.app', '*.arena.ai'],
+  /*
+   * Cross-origin dev requests are allowed from a hosted preview, feature by
+   * feature. Next 15.3+ blocks unknown origins by default, so a preview iframe
+   * gets a blank page and a "blocked cross-origin request" in the console.
+   *
+   * The list is configuration, not code: a preview provider that needs its own
+   * host adds it to DEV_PREVIEW_ORIGINS (comma separated) instead of editing
+   * this file. The default covers the sandbox host the app is developed in;
+   * production is unaffected either way, because this setting only applies to
+   * `next dev` and a deployed build never calls it.
+   */
+  allowedDevOrigins: [
+    '*.e2b.app',
+    ...(process.env.DEV_PREVIEW_ORIGINS ?? '')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+  ],
 
   /**
    * Dish photos can come from the database (menus.items.image_url) rather than

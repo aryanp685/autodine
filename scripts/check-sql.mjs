@@ -119,10 +119,13 @@ for (const file of files) {
   const removedReplicaIdentity = (sql.match(/replica\s+identity/gi) || []).length;
   const removedRenames = (sql.match(/^\s*alter\s+function/gim) || []).length;
 
-  // Comments are not statements. Strip them so a file that is nothing but
-  // functions, policies and grants reports "nothing checkable" instead of
-  // tripping the parser's "unexpected end of input" on empty input.
-  const checkable = stripped.replace(/--[^\n]*/g, '').trim();
+  // Comments are not statements, and the parser understands only one of the
+  // two ways of writing them. `--` was enough until migration 20261029000100,
+  // whose block comments survived the strip and made a valid file fail with a
+  // lexer error -- a false alarm that costs more trust than the check earns.
+  // Both forms go before parsing; neither is SQL.
+  const withoutBlockComments = stripped.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const checkable = withoutBlockComments.replace(/--[^\n]*/g, '').trim();
 
   if (!checkable) {
     console.log(
