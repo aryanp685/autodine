@@ -70,6 +70,42 @@ rebuilt from the migrations. (`place_public_order_core` and
   signature; there is one caller (`lib/db/...` → RPC by name), and the body is
   diffed against `20261027000900` except for one `perform`.
 
+### 2.4 Apply it atomically — the file has no `begin`/`commit`
+
+The file is a sequence of statements. The Supabase CLI wraps a migration file in
+a transaction; the **SQL editor does not** — it runs statement by statement and
+commits each one. So a failure halfway through leaves half a migration behind.
+
+Use one of these, in this order of preference:
+
+```bash
+# psql: -1 = one transaction, -v ON_ERROR_STOP=1 = stop at the first error
+psql "$BRANCH_DATABASE_URL" -v ON_ERROR_STOP=1 -1 \
+  -f supabase/migrations/20261028000900_guest_scan_confirm.sql
+```
+
+```sql
+-- SQL editor: paste this wrapping around the whole file, and watch for the
+-- final COMMIT — if the editor reports it did not commit, nothing was applied.
+begin;
+-- …the entire migration file…
+commit;
+```
+
+Recovery from a half-applied file is to run the **whole file again**: every
+statement is `add column if not exists` / `create index if not exists` /
+`create table if not exists` / `create or replace function`. There is no
+statement in it that is unsafe to repeat.
+
+### 2.5 Order of operations against a live deployment
+
+Apply the migration **before** deploying the code that uses it, not after:
+
+| order | result |
+| --- | --- |
+| migration → deploy | safe. New columns and functions exist; the running app ignores them until it is replaced |
+| deploy → migration | degraded, not broken: the kitchen board's Confirm/Reject call a function that does not exist yet, and the guest status page reads two keys that are missing (treated as "not held") |
+
 ## 3. Branch database — ₹0 paths
 
 **Do not test this on production.** Two free routes; A is the one I recommend.
@@ -311,6 +347,8 @@ select distinct dependent.relname
 | migration applied to a database that lacks `table_qr_codes` etc. | medium if anyone tries a fresh DB | migration aborts on FK/relation, no partial damage | §2.1; run §4.1 first |
 | deploy before migration, code asks for missing columns | high (this is the shipped order) | 42703 errors | already handled: kitchen + settings retry with legacy column lists and treat mode as `code` |
 | migration before deploy | low | no caller uses the new columns; nothing breaks | additive only |
+| `create index` on `orders` blocks writes while it builds (not CONCURRENTLY) | certain, briefly | order placement pauses for the duration | the table is small on this pilot (seconds). If it is not, create the two indexes first with `create index concurrently` by hand — the migration's `if not exists` then skips them |
+| the SQL editor applies half the file and stops | medium (no transaction wrapper) | new columns without new functions, or vice versa | §2.4; re-run the whole file — every statement is repeatable |
 | `place_public_order` replacement diverges from the previous body | low | order path regressions | body diffed against `20261027000900`; one `perform` added; re-diff before applying |
 | throttle bricks a table | **high today** | one table cannot order for an hour | L1 (docs/scan-limit-l1.md) — proposed, not applied |
 | per-address limit bypassable via forged `x-forwarded-for` | certain | rate limit is advisory | documented in `lib/ip-hash.ts`; do not describe it as a control |
@@ -358,6 +396,70 @@ functions BEFORE dropping anything. If the columns are dropped while the new
 `place_public_order` still calls `stamp_guest_verification`, the guest order
 path fails on the next order placed.
 
+
+---
+
+## 9. Do-it-yourself runbook
+
+Nothing here needs me, and none of it needs a credential sent to me. Each step
+prints something you can paste back if it fails.
+
+**Step 0 — a branch project (₹0).** Supabase dashboard → New project (free tier)
+→ note its connection string as `$BRANCH_DATABASE_URL`. Do **not** use the
+production project.
+
+**Step 1 — clone the live schema into it.** Schema only; no rows, no secrets:
+
+```bash
+pg_dump --schema-only --no-owner --no-privileges "$PRODUCTION_DATABASE_URL" \
+  | psql "$BRANCH_DATABASE_URL" -v ON_ERROR_STOP=1
+```
+
+Production's URL is yours to hold; a read-only role is enough for `pg_dump`.
+
+**Step 2 — prove the clone is faithful before changing anything.**
+
+```sql
+select count(*) from public.table_qr_codes;
+select count(*) from pg_proc where pronamespace = 'public'::regnamespace;
+```
+
+Compare with the same two counts on production. If `pg_proc` differs by more
+than a handful, the dump missed functions created outside migrations — stop and
+say so.
+
+**Step 3 — record the "before" state.** Run §4.1 and save the output. It should
+return zero rows for every check.
+
+**Step 4 — apply, atomically.** §2.4. Expect plain `ALTER TABLE` / `CREATE INDEX`
+/ `CREATE FUNCTION` output and no errors.
+
+**Step 5 — record the "after" state.** Run §4.2. Expected: one
+`guest_verification_mode` row (`text`, NOT NULL, default `'code'`), four `orders`
+columns, four indexes, `relrowsecurity = t` on `table_session_opens` with zero
+grants to `anon`/`authenticated`, and six functions all `security_definer = t`
+with `search_path=public`.
+
+**Step 6 — behaviour.** Run `supabase/checks/06_scan_limits.sql`. Ten `PASS`
+lines; `PASS 9` will report `retry column present=false`, which is the truth the
+screens are written against.
+
+**Step 7 — the browser, if you want the full proof.** §4.4, or the one-command
+version in `docs/scan-throttle-coverage.md`.
+
+**Step 8 — leave it or throw it away.** A branch project can be paused or deleted
+with no effect on production. If you keep it, do not point the live app at it:
+`.env.local` only, and never with production keys.
+
+### What could go wrong, and what it would mean
+
+| symptom | meaning |
+| --- | --- |
+| `relation "public.table_qr_codes" does not exist` at the FK in §1 | the branch was built from `supabase/migrations` instead of a schema dump — §2.1 |
+| `cannot ALTER TABLE ... because it has pending trigger events` | the file was run inside a wrapper that already had a failed statement; roll back and re-run once |
+| `function public.place_public_order_core(...) does not exist` | the clone predates `20261027001500`; re-dump |
+| `PASS 9` reports `retry column present=true` | a newer migration added a retry time — the screens can start quoting it, see §8 of `docs/scan-limit-l1.md` |
+| `FAIL 10` | `place_public_order` reads the scan limit — order submission has become throttled, which is the one thing it must never be |
 
 ---
 
