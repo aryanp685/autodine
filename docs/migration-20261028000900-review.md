@@ -387,15 +387,17 @@ git show 7e7173c:supabase/migrations/20261028000900_guest_scan_confirm.sql | sed
 | 92–97 | `create table if not exists public.table_session_opens (id uuid primary key default gen_random_uuid(), qr_code_id uuid not null references public.table_qr_codes(id) on delete cascade, ip_hash text not null, opened_at timestamptz not null default now());` |
 | 99–103 | `create index … table_session_opens_card_idx (qr_code_id, opened_at desc)` and `…_ip_idx (ip_hash, opened_at desc)` |
 | 105–108 | `alter table public.table_session_opens enable row level security;` + `revoke all … from anon;` + `… from authenticated;` |
-| 123–232 | `create or replace function public.open_table_session(p_public_token text, p_ip_hash text) returns table (status text, session_token text, restaurant_slug text, table_label text, expires_at timestamptz) language plpgsql security definer set search_path = public, pg_temp` |
-| 234–238 | `comment on function public.open_table_session(text, text)` |
-| 240–244 | `revoke all … from public/anon/authenticated;` + `grant execute … to anon;` + `… to authenticated;` |
-| 268–325 | `create or replace function public.stamp_guest_verification(p_code text, p_restaurant_id uuid, p_session_token text) returns void` + revokes |
-| 333–410 | `create or replace function public.place_public_order(p_slug text, p_lines jsonb, p_note text default null, p_session_token text default null, p_guest_token uuid default null) returns text` |
-| 421–466 | `create or replace function public.confirm_table_orders(p_table_session_id uuid) returns integer` |
-| 473–527 | `create or replace function public.reject_table_orders(p_table_session_id uuid, p_reason text default null) returns integer` |
-| 529–535 | the four grants for confirm/reject |
-| 547–598 | `create or replace function public.get_public_order(p_slug text, p_code text, p_token uuid) returns jsonb` |
+| 123–247 | `create or replace function public.open_table_session(p_public_token text, p_ip_hash text) returns table (status text, session_token text, restaurant_slug text, table_label text, expires_at timestamptz) language plpgsql security definer set search_path = public, pg_temp` |
+| 249–252 | `comment on function public.open_table_session(text, text)` |
+| 254–258 | three `revoke all … from public/anon/authenticated` + `grant execute … to anon` + `… to authenticated` |
+| 268–320 | `create or replace function public.stamp_guest_verification(p_code text, p_restaurant_id uuid, p_session_token text) returns void` |
+| 322–324 | three `revoke all …` (no grant: only `place_public_order` calls it) |
+| 333–414 | `create or replace function public.place_public_order(p_slug text, p_lines jsonb, p_note text default null, p_session_token text default null, p_guest_token uuid default null) returns text` |
+| 421–470 | `create or replace function public.confirm_table_orders(p_table_session_id uuid) returns integer` |
+| 473–529 | `create or replace function public.reject_table_orders(p_table_session_id uuid, p_reason text default null) returns integer` |
+| 531–539 | three `revoke all …` + `grant execute … to authenticated` for each of the two above |
+| 547–596 | `create or replace function public.get_public_order(p_slug text, p_code text, p_token uuid) returns jsonb` |
+| 598–602 | three `revoke all …` + `grant execute … to anon` + `… to authenticated` |
 
 Every function above is `security definer` with `set search_path = public, pg_temp`
 and an explicit `revoke`/`grant` pair. §4.2's query proves all three at once on a
