@@ -45,9 +45,12 @@ describe('Kitchen board', () => {
     expect(html).toMatch(/हिंदी · (आवाज़ खोज रहे हैं|तैयार|आवाज़ नहीं)/);
   });
 
-  it('offers the exact sentence it will speak as a test', () => {
+  it('offers a representative Hindi sample order for voice comparison', () => {
     const html = renderToStaticMarkup(<Kitchen />);
-    expect(html).toContain('Test announcement');
+    expect(html).toContain('Test sample order');
+    expect(html).toContain('aria-label="Test the selected voice with a representative Hindi sample order"');
+    expect(html).toContain('दो पनीर टिक्का');
+    expect(html).toContain('हाफ बटर नान, एक्स्ट्रा चीज़');
   });
 
   it('lets the operator slow the voice down from the board itself', () => {

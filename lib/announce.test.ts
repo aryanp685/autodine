@@ -70,10 +70,9 @@ describe('spokenTable', () => {
 });
 
 describe('spokenItem', () => {
-  it('says how many, how much, and what -- in that order', () => {
-    // "दो आधा बटर नान" attaches the portion to the dish. "दो बटर नान, आधा"
-    // makes the portion sound like a second item on the ticket.
-    expect(spokenItem({ qty: 2, name: 'Butter Naan', detail: 'Half' })).toBe('दो आधा बटर नान');
+  it('keeps quantity and portion attached to the dish in conversational kitchen Hindi', () => {
+    // Mumbai kitchens commonly say "हाफ" and "फुल" for these menu variants.
+    expect(spokenItem({ qty: 2, name: 'Butter Naan', detail: 'Half' })).toBe('दो हाफ बटर नान');
   });
 
   it('says a Bombay quarter the way a kitchen says it', () => {
@@ -88,12 +87,12 @@ describe('spokenItem', () => {
 
   it('keeps portion and add-on on their own sides of the dish name', () => {
     expect(spokenItem({ qty: 2, name: 'Butter Naan', detail: 'Half · Extra cheese' })).toBe(
-      'दो आधा बटर नान, एक्स्ट्रा चीज़',
+      'दो हाफ बटर नान, एक्स्ट्रा चीज़',
     );
   });
 
   it('keeps add-ons, translated and in order', () => {
-    expect(spokenDetail('Half · Extra cheese')).toBe('आधा, एक्स्ट्रा चीज़');
+    expect(spokenDetail('Half · Extra cheese')).toBe('हाफ, एक्स्ट्रा चीज़');
   });
 
   it('translates an add-on nobody has heard of instead of dropping it', () => {
@@ -101,7 +100,7 @@ describe('spokenItem', () => {
   });
 
   it('separates the portion from the add-ons, because they sit on opposite sides', () => {
-    expect(spokenPortion('Half · Extra cheese')).toBe('आधा');
+    expect(spokenPortion('Half · Extra cheese')).toBe('हाफ');
     expect(spokenAddons('Half · Extra cheese')).toBe('एक्स्ट्रा चीज़');
     // An unknown word is not a portion, so it trails the dish rather than
     // being pushed in front of its name.
@@ -157,7 +156,7 @@ describe('newOrderText', () => {
   it('says table first, dishes next, the guest note last', () => {
     const text = newOrderText('T1', [chicken], 'no onion');
 
-    expect(text).toBe('नया ऑर्डर, टेबल टी एक। एक आधा बटर चिकन, बटर नान। ध्यान दें, प्याज़ नहीं।');
+    expect(text).toBe('नया ऑर्डर आया है। टेबल टी एक। एक हाफ बटर चिकन, बटर नान। ध्यान देना, प्याज़ नहीं।');
   });
 
   it('never hands a Latin letter to the voice', () => {
@@ -180,7 +179,7 @@ describe('newOrderText', () => {
       { qty: 1, name: 'Butter Naan', detail: 'Half · Extra cheese · Jain' },
     ]);
 
-    expect(text).toBe('नया ऑर्डर, टेबल टी एक। एक आधा बटर नान, एक्स्ट्रा चीज़, जैन।');
+    expect(text).toBe('नया ऑर्डर आया है। टेबल टी एक। एक हाफ बटर नान, एक्स्ट्रा चीज़, जैन।');
   });
 
   it('says the restaurant\'s own add-ons, not just the ones we know', () => {
@@ -195,19 +194,22 @@ describe('newOrderText', () => {
   });
 
   it('marks the note as a warning, so it is not mistaken for another dish', () => {
-    // "नोट" is easy to lose under an extractor fan; "ध्यान दें" is what a
-    // person says when the next words are a constraint.
-    expect(newOrderText('T3', [naan], 'no onion')).toContain('ध्यान दें, ');
+    // A short conversational cue separates the guest's instruction from the dishes.
+    expect(newOrderText('T3', [naan], 'no onion')).toContain('ध्यान देना, ');
   });
 
   it('omits the note clause entirely when there is none', () => {
-    expect(newOrderText('T3', [naan])).not.toContain('ध्यान दें');
-    expect(newOrderText('T3', [naan], '   ')).not.toContain('ध्यान दें');
+    expect(newOrderText('T3', [naan])).not.toContain('ध्यान देना');
+    expect(newOrderText('T3', [naan], '   ')).not.toContain('ध्यान देना');
+  });
+
+  it('reads a room label and number in the order printed', () => {
+    expect(newOrderText('Room 204', [naan])).toContain('टेबल रूम दो शून्य चार।');
   });
 
   it('speaks a takeaway ticket without inventing a table', () => {
     const text = newOrderText('Takeaway', [naan]);
-    expect(text.startsWith('नया टेकअवे ऑर्डर।')).toBe(true);
+    expect(text.startsWith('नया टेकअवे ऑर्डर आया है।')).toBe(true);
     expect(text).not.toContain('टेबल');
   });
 
@@ -222,12 +224,21 @@ describe('newOrderText', () => {
     expect(text).not.toContain('और तीन आइटम');
   });
 
+  it('uses a conversational Mumbai-style order with grouped dishes and a real table label', () => {
+    expect(newOrderText('T5', [
+      { qty: 2, name: 'Paneer Tikka' },
+      { qty: 1, name: 'Butter Naan' },
+    ], 'less spicy')).toBe(
+      'नया ऑर्डर आया है। टेबल टी पाँच। दो पनीर टिक्का और एक बटर नान। ध्यान देना, तीखा थोड़ा कम रखना।',
+    );
+  });
+
   it('says a note the way Hindi says it, not word for word', () => {
     // "no onion" word for word is "नो प्याज़" -- understood, and not spoken by
     // anyone. Hindi negates at the end and quantifies at the front.
     expect(newOrderText('T2', [naan], 'no onion')).toContain('प्याज़ नहीं');
     expect(newOrderText('T2', [naan], 'without garlic')).toContain('लहसुन के बिना');
-    expect(newOrderText('T2', [naan], 'less spicy')).toContain('कम तीखा');
+    expect(newOrderText('T2', [naan], 'less spicy')).toContain('तीखा थोड़ा कम रखना');
     expect(newOrderText('T2', [naan], 'extra cheese')).toContain('ज़्यादा चीज़');
   });
 

@@ -167,7 +167,7 @@ describe('noteToDevanagari', () => {
   });
 
   it('puts the quantity before the thing it describes', () => {
-    expect(noteToDevanagari('less spicy')).toBe('कम तीखा');
+    expect(noteToDevanagari('less spicy')).toBe('तीखा थोड़ा कम रखना');
     expect(noteToDevanagari('extra cheese')).toBe('ज़्यादा चीज़');
   });
 
