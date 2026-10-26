@@ -46,6 +46,9 @@ import {
   createKitchenSpeech,
   type SpeechEngine,
 } from '@/lib/speech';
+import { createServerSpeech } from '@/lib/server-speech';
+import { browserServerSpeechEnv } from '@/lib/server-speech-browser';
+import { createDualSpeech } from '@/lib/dual-speech';
 
 /* The thresholds live next to the query that computes the age, so the badge
    and the board cannot disagree about what "late" means. */
@@ -481,7 +484,28 @@ export function Kitchen({
 
     const chime = createChime();
     chimeRef.current = chime;
-    const engine = createKitchenSpeech(browserSpeechEnv(chime));
+
+    /**
+     * Dual kitchen voice: server-backed Edge TTS first, browser Web Speech
+     * API as automatic fallback.
+     *
+     * The server engine (createServerSpeech) fetches MP3 audio from
+     * /api/tts and plays it through an Audio element. It gives a
+     * consistent, high-quality neural Hindi voice on every device —
+     * the same Madhur voice whether the tablet is a cheap Android or
+     * an iPad.
+     *
+     * The browser engine (createKitchenSpeech) is the existing Web
+     * Speech API engine. It is the fallback: if Edge TTS is unreachable
+     * (network issue, service change), the dual engine retries the same
+     * text through the browser engine and the kitchen hears it anyway.
+     *
+     * The KitchenScreen cannot tell which engine is speaking — both
+     * implement the same SpeechEngine interface.
+     */
+    const serverEngine = createServerSpeech(browserServerSpeechEnv(chime));
+    const browserEngine = createKitchenSpeech(browserSpeechEnv(chime));
+    const engine = createDualSpeech(serverEngine, browserEngine);
     speechRef.current = engine;
 
     /**
