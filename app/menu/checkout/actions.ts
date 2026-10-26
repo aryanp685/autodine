@@ -280,7 +280,17 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
     fail('The order did not come back with a number, so it is not confirmed. Please try again.', slug);
   }
 
+  /*
+   * `placed=1` is what tells the confirmation screen that this visit came from
+   * the button, not from the Orders tab.
+   *
+   * The screen empties the cart once the order exists, which is right on the
+   * redirect and wrong everywhere else: a guest who has started a second order
+   * and then opens an OLD order from their history would have the new cart
+   * silently emptied. The flag is in the address the action wrote, so an old
+   * link, a bookmark or a pasted code never carries it.
+   */
   redirect(
-    `/menu/order?s=${encodeURIComponent(slug)}&code=${encodeURIComponent(code)}&t=${guestToken}`
+    `/menu/order?s=${encodeURIComponent(slug)}&code=${encodeURIComponent(code)}&t=${guestToken}&placed=1`
   );
 }

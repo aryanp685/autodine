@@ -163,6 +163,20 @@ describe('placeOrderAction', () => {
     expect(parsed.searchParams.get('code')).toBe('KI-ABC12');
   });
 
+  it('marks the confirmation it redirects to as a fresh placement', async () => {
+    // The confirmation screen empties the cart on arrival. That is only correct
+    // for the address this action writes: the guest just tapped "place order".
+    // Browsing an old order from history must leave a half-filled new cart
+    // alone, so the flag rides on this redirect and on no other URL.
+    mocks.rpc.mockResolvedValue({ data: 'KI-FRESH1', error: null });
+
+    const url = await run(() => placeOrderAction(form()));
+    const parsed = new URL(url, 'https://example.test');
+
+    expect(parsed.pathname).toBe('/menu/order');
+    expect(parsed.searchParams.get('placed')).toBe('1');
+  });
+
   it('lands on the second retry when the schema cache was still reloading', async () => {
     // A free-tier database answers PGRST002 for a second or two after a restart.
     // One 400 ms wait is inside that window; the second wait is what makes the

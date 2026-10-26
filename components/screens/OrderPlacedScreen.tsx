@@ -5,6 +5,7 @@ import { GuestOrderEditor } from '@/components/screens/GuestOrderEditor';
 import { PayOnline } from '@/components/PayOnline';
 import { PayUpi } from '@/components/PayUpi';
 import { GuestFlow } from '@/components/GuestFlow';
+import { ReorderOffer } from '@/components/ReorderOffer';
 import { guestAccentStyle } from '@/lib/branding/palette';
 import { OrderStatusRefresh } from '@/components/OrderStatusRefresh';
 import { GUEST_CHANGE_WINDOW_MS, type OrderScreenData } from '@/lib/db/order-screen';
@@ -323,6 +324,19 @@ export function OrderPlacedScreen({
         <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
           Quote the reference above if staff ask — it is how the counter finds this bill.
         </p>
+
+        {/*
+          Another round, in one tap.
+
+          Rendered only when this browser still remembers the list that was
+          just ordered, so a guest on a new phone never sees a control with
+          nothing behind it. It puts the dishes back in the cart and goes no
+          further: prices are read again, and the order is placed only by the
+          cart's own button. A cancelled order is excluded — that round did not
+          happen, and offering it back would read as a re-order of something
+          the kitchen rejected.
+        */}
+        <ReorderOffer slug={slug} enabled={data.prepStatus !== 'cancelled'} />
 
         <section className="mt-4 rounded-2xl border border-hair-strong bg-card px-4 py-4">
           <h2 className="mb-1 text-[11px] font-semibold tracking-[0.1em] text-gink-46 uppercase">Bill</h2>

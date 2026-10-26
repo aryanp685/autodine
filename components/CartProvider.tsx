@@ -54,6 +54,16 @@ type CartApi = {
   removeItems: (itemIds: string[]) => void;
   setQty: (itemId: string, qty: number, variantId?: string, addonIds?: string[]) => void;
   clear: () => void;
+  /**
+   * Replace the cart with a known list, in one write.
+   *
+   * Added for "order these again": the remembered dishes have to become the
+   * cart exactly, not be merged into whatever was in it. Calling `add` per
+   * line would do the wrong thing twice over — it merges with an existing
+   * line's quantity, and each call would close over the same pre-restore
+   * `lines`, so all but the last would be lost.
+   */
+  restore: (lines: StoredLine[]) => void;
   count: number;
   /**
    * False until the stored cart has been read. The server renders an empty
@@ -123,12 +133,26 @@ export function CartProvider({
       setQty: (itemId, qty, variantId, addonIds) =>
         persist(setLineQty(lines, itemId, qty, variantId, addonIds)),
       clear: () => persist([]),
+      restore: (next) => persist(parseCart(serialiseCart(next))),
       count: totalQty(lines),
     }),
     [lines, ready, persist]
   );
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
+}
+
+/**
+ * The cart if there is one, otherwise null.
+ *
+ * For the few components whose job is an ENHANCEMENT — an offer to add the
+ * same dishes again, say — and which must render nothing rather than throw if
+ * they are mounted outside a provider (a screen rendered on its own, a test, a
+ * page that has not mounted one). A missing cart is a reason to stay quiet, not
+ * a reason to take the page down with it.
+ */
+export function useOptionalCart(): CartApi | null {
+  return useContext(Ctx);
 }
 
 export function useCart() {
