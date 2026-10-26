@@ -6,7 +6,7 @@ preparation only.
 
 ## 0. Who runs what — measured, not assumed
 
-Arena's sandbox has outbound access to `github.com`, `codeload.github.com`,
+This sandbox has outbound access to `github.com`, `codeload.github.com`,
 `api.github.com`, `registry.npmjs.org`, `pypi.org`, `files.pythonhosted.org`, and
 nothing else. Measured just now: `curl https://github.com` → **200**,
 `curl https://supabase.com` → **000** (no route). There is no Postgres binary and
@@ -28,7 +28,7 @@ No credential is needed from you, and none should be pasted into this chat.
 | S7 | the browser throttle test | **you** | needs the app + a browser |
 | S8 | pause or delete the branch | **you** | dashboard access |
 
-What Arena has done, and can do, without a database:
+What the sandbox has done, and can do, without a database:
 
 | check | how | result |
 | --- | --- | --- |
@@ -220,7 +220,7 @@ npx playwright test --config playwright.integration.config.ts
 Use `.env.local` for the keys if you prefer; never commit it, never use
 production keys.
 
-**Discovery vs execution.** Arena has run discovery only:
+**Discovery vs execution.** The sandbox has run discovery only:
 
 ```
 npx playwright test --config playwright.integration.config.ts --list

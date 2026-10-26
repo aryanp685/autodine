@@ -42,7 +42,7 @@ begin;
 -- ---------------------------------------------------------------- fixtures
 -- Replace these two with a live card and its restaurant before running.
 \set card '''618d77118ea89cbfb12c4a70d9267858cf06d34dc0f6db49'''
-\set slug '''arena-qr-flow-test-20261021'''
+\set slug '''qr-flow-test-20261021'''
 
 select set_config('t.slug', :slug, true);
 select set_config('t.card', :card, true);
