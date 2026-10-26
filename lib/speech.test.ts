@@ -10,6 +10,7 @@ import {
   splitSentences,
   voiceScore,
   type SpeechEnv,
+  type SpeechOutcome,
   type UtteranceLike,
   type VoiceLike,
 } from './speech';
@@ -37,6 +38,8 @@ function env(
     /** Never fire onstart or onend, as Chrome does when it wedges. */
     wedge?: boolean;
     throws?: boolean;
+    error?: string;
+    neverEnd?: boolean;
   } = {},
 ) {
   const spoken: FakeUtterance[] = [];
@@ -65,7 +68,8 @@ function env(
           // schedules for LATER (the gap between sentences, the watchdog) goes
           // through setTimer and is run by flush().
           shaped.onstart?.();
-          shaped.onend?.();
+          if (options.error) shaped.onerror?.({ error: options.error });
+          else if (!options.neverEnd) shaped.onend?.();
         }
       },
       cancel() {
@@ -245,18 +249,16 @@ describe('speaking', () => {
   it('says nothing at all when the device has no Hindi voice', () => {
     const fake = env({ voices: english });
     const engine = createKitchenSpeech(fake.env);
-    let ended = 0;
+    let result: SpeechOutcome | undefined;
 
-    engine.speak('नया ऑर्डर, टेबल टी वन।', () => {
-      ended += 1;
-    });
+    engine.speak('नया ऑर्डर, टेबल टी वन।', (outcome) => { result = outcome; });
 
     // Not one utterance, no chime: the board says why instead of playing a
     // voice that cannot read the sentence.
     expect(fake.spoken).toHaveLength(0);
     expect(fake.chimes).toBe(0);
-    // The queue must still move, or every later ticket is stuck behind this.
-    expect(ended).toBe(1);
+    expect(result?.status).toBe('failed');
+    if (result?.status === 'failed') expect(result.reason).toContain('Hindi voice');
     expect(engine.available()).toBe(false);
   });
 
@@ -323,6 +325,44 @@ describe('speaking', () => {
     fake.flush();
 
     expect(ended).toBe(1);
+  });
+
+  it('surfaces utterance onerror instead of treating it as successful playback', () => {
+    const fake = env({ voices: hindi, error: 'synthesis-failed' });
+    const engine = createKitchenSpeech(fake.env);
+    let result: SpeechOutcome | undefined;
+
+    engine.speak('नया ऑर्डर।', (outcome) => { result = outcome; });
+    fake.flush();
+
+    expect(result?.status).toBe('failed');
+    if (result?.status === 'failed') expect(result.reason).toContain('synthesis-failed');
+  });
+
+  it('fails a started utterance that never fires onend and releases the engine', () => {
+    const fake = env({ voices: hindi, neverEnd: true });
+    const engine = createKitchenSpeech(fake.env, { completionTimeoutMs: 25 });
+    let result: SpeechOutcome | undefined;
+
+    engine.speak('नया ऑर्डर।', (outcome) => { result = outcome; });
+    fake.flush();
+
+    expect(result?.status).toBe('failed');
+    if (result?.status === 'failed') expect(result.reason).toContain('finish before timeout');
+    expect(fake.cancels).toBe(1);
+  });
+
+  it('reports cancellation during teardown instead of success', () => {
+    const fake = env({ voices: hindi });
+    const engine = createKitchenSpeech(fake.env);
+    let result: SpeechOutcome | undefined;
+
+    engine.speak('नया ऑर्डर।', (outcome) => { result = outcome; });
+    engine.cancel();
+
+    expect(result?.status).toBe('cancelled');
+    expect(fake.cancels).toBe(1);
+    expect(fake.timers).toHaveLength(0);
   });
 
   it('does nothing for empty text', () => {
@@ -392,6 +432,15 @@ describe('voices the operator can choose between', () => {
     expect(engine.setVoiceName('Microsoft Swara')).toBe(false);
     expect(engine.available()).toBe(true);
     expect(engine.setVoiceName(null)).toBe(true);
+  });
+
+  it('drops a stored voice preference when that voice disappears', () => {
+    const fake = env({ voices: [...english, ...hindi] });
+    const engine = createKitchenSpeech(fake.env);
+    expect(engine.setVoiceName('Lekha')).toBe(true);
+    fake.setVoices([{ name: 'Google हिन्दी', lang: 'hi-IN' }]);
+    engine.refreshVoices();
+    expect(engine.voiceName()).toBe('Google हिन्दी');
   });
 
   it('slows down when asked, and never past the point of being intelligible', () => {

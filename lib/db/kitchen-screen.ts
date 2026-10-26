@@ -362,31 +362,10 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
     throw new Error(`Could not load tables: ${tablesResult.error.message}`);
   }
 
-  /**
-   * How each dish should be said.
-   *
-   * Read from the live item, not from the order snapshot: a pronunciation is
-   * a property of the dish, and correcting it should fix every ticket from the
-   * moment it is saved. A dish deleted since the order was placed simply has
-   * no entry, and the board falls back to the automated transliteration.
-   */
-  const itemIds = [
-    ...new Set((itemsResult.data ?? []).map((item) => item.item_id).filter(Boolean)),
-  ] as string[];
-
-  const { data: spokenRows, error: spokenError } = itemIds.length
-    ? await supabase.from('items').select('id, spoken_name').in('id', itemIds)
-    : { data: [] as { id: string; spoken_name: string | null }[], error: null };
-
-  if (spokenError) {
-    // Not fatal: the board still announces, using the generated pronunciation.
-    console.error(`[kitchen] could not load spoken names: ${spokenError.message}`);
-  }
-
-  const spokenById = new Map<string, string>();
-  for (const row of spokenRows ?? []) {
-    if (row.spoken_name && row.spoken_name.trim()) spokenById.set(row.id, row.spoken_name.trim());
-  }
+  // Announcements use the order-time name/variant/add-on snapshots above. The
+  // live menu pronunciation can change after an order is placed, so it is not
+  // substituted into historical tickets; a future schema proposal may snapshot
+  // that preference at order creation.
 
   const itemsByOrder = new Map<string, typeof itemsResult.data>();
   for (const item of itemsResult.data ?? []) {
@@ -478,7 +457,7 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
         ...(portion ? { portion } : {}),
         ...(addons.length ? { addons } : {}),
         veg: item.is_veg,
-        spoken: (item.item_id && spokenById.get(item.item_id)) || undefined,
+        spoken: undefined,
       };
     });
 

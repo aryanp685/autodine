@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PREP_TRANSITIONS,
   canAdvance,
+  confirmedPrepChange,
   nextPrepState,
 } from './prep';
 
@@ -43,6 +44,13 @@ describe('prep state machine', () => {
       'ready',
       'served',
     ]);
+  });
+
+  it('announces only a successful server-confirmed prep transition', () => {
+    expect(confirmedPrepChange('new', { ok: true, state: 'preparing' })).toBe('preparing');
+    expect(confirmedPrepChange('new', { ok: false, state: 'preparing' })).toBeNull();
+    expect(confirmedPrepChange('preparing', { ok: true, state: 'preparing' })).toBeNull();
+    expect(confirmedPrepChange('ready', { ok: true, state: null })).toBeNull();
   });
 
   it('returns null for junk rather than throwing', () => {

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   MAX_BACKLOG,
-  MAX_SPOKEN_ITEMS,
   advanceText,
   cancelText,
   announceLogLabel,
@@ -19,6 +18,7 @@ import {
   type SpeakableItem,
 } from './announce';
 import { isDevanagariOnly } from './hindi';
+import type { SpeechOutcome } from './speech';
 
 /**
  * What the kitchen hears.
@@ -37,24 +37,24 @@ const chicken: SpeakableItem = { qty: 1, name: 'Butter Chicken', detail: 'Half �
 describe('spokenTable', () => {
   it('reads a table label as a label, not as a quantity', () => {
     // "टेबल टी एक" is what a quantity table produces, and no one says it.
-    expect(spokenTable('T1')).toBe('टी वन');
-    expect(spokenTable('T2')).toBe('टी टू');
-    expect(spokenTable('T12')).toBe('टी ट्वेल्व');
+    expect(spokenTable('T1')).toBe('टी एक');
+    expect(spokenTable('T2')).toBe('टी दो');
+    expect(spokenTable('T12')).toBe('टी बारह');
   });
 
   it('reads a table number past twenty as one number', () => {
     // A hall with thirty tables is ordinary. "T21" said digit by digit is
     // "टी टू वन" -- a table two-one, which is not a table, and the pass walks
     // to the wrong one.
-    expect(spokenTable('T21')).toBe('टी ट्वेन्टी वन');
-    expect(spokenTable('T30')).toBe('टी थर्टी');
-    expect(spokenTable('T99')).toBe('टी नाइन्टी नाइन');
+    expect(spokenTable('T21')).toBe('टी इक्कीस');
+    expect(spokenTable('T30')).toBe('टी तीस');
+    expect(spokenTable('T99')).toBe('टी निन्यानवे');
   });
 
   it('says a room as a word and the number digit by digit', () => {
     // "Room 204" is a room, not four letters followed by three digits, and
     // a room number is spoken one digit at a time everywhere.
-    expect(spokenTable('Room 204')).toBe('रूम टू ज़ीरो फ़ोर');
+    expect(spokenTable('Room 204')).toBe('रूम दो शून्य चार');
   });
 
   it('has words for a takeaway ticket, which has no table', () => {
@@ -157,7 +157,7 @@ describe('newOrderText', () => {
   it('says table first, dishes next, the guest note last', () => {
     const text = newOrderText('T1', [chicken], 'no onion');
 
-    expect(text).toBe('नया ऑर्डर, टेबल टी वन। एक आधा बटर चिकन, बटर नान। ध्यान दें, प्याज़ नहीं।');
+    expect(text).toBe('नया ऑर्डर, टेबल टी एक। एक आधा बटर चिकन, बटर नान। ध्यान दें, प्याज़ नहीं।');
   });
 
   it('never hands a Latin letter to the voice', () => {
@@ -180,7 +180,7 @@ describe('newOrderText', () => {
       { qty: 1, name: 'Butter Naan', detail: 'Half · Extra cheese · Jain' },
     ]);
 
-    expect(text).toBe('नया ऑर्डर, टेबल टी वन। एक आधा बटर नान, एक्स्ट्रा चीज़, जैन।');
+    expect(text).toBe('नया ऑर्डर, टेबल टी एक। एक आधा बटर नान, एक्स्ट्रा चीज़, जैन।');
   });
 
   it('says the restaurant\'s own add-ons, not just the ones we know', () => {
@@ -211,16 +211,15 @@ describe('newOrderText', () => {
     expect(text).not.toContain('टेबल');
   });
 
-  it('counts what it does not read out instead of dropping it silently', () => {
+  it('announces every item instead of silently summarizing operational details', () => {
     const items: SpeakableItem[] = Array.from({ length: 7 }, (_, i) => ({
       qty: 1,
       name: `Dish ${i + 1}`,
     }));
 
     const text = newOrderText('T5', items);
-    // Four dishes, then "and three items" -- in words, in Devanagari.
-    expect(text).toContain('और तीन आइटम');
-    expect(text.split('।').filter((clause) => clause.includes('डिश')).length).toBeLessThanOrEqual(MAX_SPOKEN_ITEMS + 1);
+    for (let i = 1; i <= 7; i += 1) expect(text).toContain(`डिश ${['एक','दो','तीन','चार','पाँच','छह','सात'][i - 1]}`);
+    expect(text).not.toContain('और तीन आइटम');
   });
 
   it('says a note the way Hindi says it, not word for word', () => {
@@ -232,18 +231,19 @@ describe('newOrderText', () => {
     expect(newOrderText('T2', [naan], 'extra cheese')).toContain('ज़्यादा चीज़');
   });
 
-  it('cuts a note that would take longer to say than the ticket took to cook', () => {
-    const text = newOrderText('T5', [naan], 'a'.repeat(400));
-    expect(text.length).toBeLessThan(400);
-    expect(text).toContain('…');
+  it('preserves a long guest note rather than silently truncating it', () => {
+    const note = 'कृपया ध्यान दें '.repeat(30);
+    const text = newOrderText('T5', [naan], note);
+    expect(text.split('कृपया').length - 1).toBe(30);
+    expect(text).not.toContain('…');
   });
 });
 
 describe('advanceText', () => {
   it('says which table moved on', () => {
-    expect(advanceText('T2', 'preparing')).toBe('टेबल टी टू, बनना शुरू।');
-    expect(advanceText('T2', 'ready')).toBe('टेबल टी टू तैयार है।');
-    expect(advanceText('T2', 'served')).toBe('टेबल टी टू सर्व हो गया।');
+    expect(advanceText('T2', 'preparing')).toBe('टेबल टी दो, बनना शुरू।');
+    expect(advanceText('T2', 'ready')).toBe('टेबल टी दो तैयार है।');
+    expect(advanceText('T2', 'served')).toBe('टेबल टी दो सर्व हो गया।');
   });
 
   it('does not read out "table takeaway"', () => {
@@ -252,13 +252,13 @@ describe('advanceText', () => {
   });
 
   it('degrades to a real sentence for a state it does not know', () => {
-    expect(advanceText('T4', 'cancelled')).toBe('टेबल टी फ़ोर, कैंसल।');
+    expect(advanceText('T4', 'cancelled')).toBe('टेबल टी चार, कैंसल।');
   });
 });
 
 describe('cancelText', () => {
   it('names the table whose order was stopped', () => {
-    expect(cancelText('T2')).toBe('टेबल टी टू का ऑर्डर कैंसल हो गया।');
+    expect(cancelText('T2')).toBe('टेबल टी दो का ऑर्डर कैंसल हो गया।');
   });
 
   it('does not read out "table takeaway"', () => {
@@ -294,7 +294,7 @@ function recorder() {
   const queue = createAnnounceQueue({
     speak(text, onEnd) {
       heard.push(text);
-      onEnd();
+      onEnd({ status: 'completed', completedSegments: 1, totalSegments: 1 });
     },
   });
   return { queue, heard };
@@ -306,7 +306,7 @@ describe('announcement queue', () => {
     const queue = createAnnounceQueue({
       speak(text, onEnd) {
         heard.push(text);
-        onEnd();
+        onEnd({ status: 'completed', completedSegments: 1, totalSegments: 1 });
       },
     });
 
@@ -321,24 +321,25 @@ describe('announcement queue', () => {
   it('does not repeat a ticket it has already said', () => {
     const { queue, heard } = recorder();
 
-    expect(queue.push('o1', 'एक।')).toBe(true);
-    expect(queue.push('o1', 'एक।')).toBe(false);
+    expect(queue.push('o1', 'एक।')).toBe('queued');
+    expect(queue.push('o1', 'एक।')).toBe('duplicate');
     expect(heard).toEqual(['एक।']);
   });
 
-  it('does not queue the same sentence twice while it is still waiting', () => {
+  it('allows different order IDs with identical wording but rejects duplicate IDs', () => {
     const heard: string[] = [];
     const queue = createAnnounceQueue({
       speak(text, onEnd) {
         heard.push(text);
-        setTimeout(onEnd, 0);
+        setTimeout(() => onEnd({ status: 'completed', completedSegments: 1, totalSegments: 1 }), 0);
       },
     });
 
     queue.push('now', 'अभी।'); // speaking
-    expect(queue.push('a', 'नया ऑर्डर, टेबल टी वन।')).toBe(true);
-    expect(queue.push('b', 'नया ऑर्डर, टेबल टी वन।')).toBe(false);
-    expect(queue.pending()).toBe(1);
+    expect(queue.push('a', 'नया ऑर्डर, टेबल टी एक।')).toBe('queued');
+    expect(queue.push('b', 'नया ऑर्डर, टेबल टी एक।')).toBe('queued');
+    expect(queue.push('a', 'नया ऑर्डर, टेबल टी एक।')).toBe('duplicate');
+    expect(queue.pending()).toBe(2);
   });
 
   it('replays on request, even while the original is still waiting', () => {
@@ -346,7 +347,7 @@ describe('announcement queue', () => {
     const queue = createAnnounceQueue({
       speak(text, onEnd) {
         heard.push(text);
-        setTimeout(onEnd, 0);
+        setTimeout(() => onEnd({ status: 'completed', completedSegments: 1, totalSegments: 1 }), 0);
       },
     });
 
@@ -354,8 +355,8 @@ describe('announcement queue', () => {
     queue.push('o2', 'दो।'); // waiting
 
     // Replay of the waiting one must replace it, not be refused.
-    expect(queue.force('o2', 'दो।')).toBe(true);
-    expect(queue.pending()).toBe(1);
+    expect(queue.force('o2:replay', 'दो।')).toBe('queued');
+    expect(queue.pending()).toBe(2);
   });
 
   it('keeps the backlog bounded for state changes but never for orders', () => {
@@ -363,7 +364,7 @@ describe('announcement queue', () => {
     const queue = createAnnounceQueue({
       speak(text, onEnd) {
         heard.push(text);
-        setTimeout(onEnd, 0);
+        setTimeout(() => onEnd({ status: 'completed', completedSegments: 1, totalSegments: 1 }), 0);
       },
     });
 
@@ -374,27 +375,27 @@ describe('announcement queue', () => {
     }
 
     // Every order still gets in, because an unannounced ticket is a cold plate.
-    expect(queue.push('order', 'ऑर्डर।')).toBe(true);
+    expect(queue.push('order', 'ऑर्डर।')).toBe('queued');
     expect(queue.pending()).toBeLessThanOrEqual(MAX_BACKLOG + 1);
   });
 
   it('survives a speaker that calls back twice', () => {
-    let running = 0;
-    let overlap = false;
+    const started: string[] = [];
+    const callbacks: ((outcome: SpeechOutcome) => void)[] = [];
     const queue = createAnnounceQueue({
-      speak(_text, onEnd) {
-        running += 1;
-        if (running > 1) overlap = true;
-        onEnd();
-        onEnd(); // some engines fire both onend and onerror
-        running -= 1;
+      speak(text, onEnd) {
+        started.push(text);
+        callbacks.push(onEnd);
       },
     });
 
     queue.push('a', 'एक।');
     queue.push('b', 'दो।');
+    callbacks[0]!({ status: 'completed', completedSegments: 1, totalSegments: 1 });
+    callbacks[0]!({ status: 'failed', reason: 'duplicate callback', completedSegments: 0, totalSegments: 1 });
 
-    expect(overlap).toBe(false);
+    expect(started).toEqual(['एक।', 'दो।']);
+    expect(queue.pending()).toBe(0);
   });
 
   it('does not wedge when the speaker throws', () => {
@@ -403,7 +404,7 @@ describe('announcement queue', () => {
       speak(text, onEnd) {
         heard.push(text);
         if (text === 'बुरा।') throw new Error('engine died');
-        onEnd();
+        onEnd({ status: 'completed', completedSegments: 1, totalSegments: 1 });
       },
     });
 
@@ -413,9 +414,53 @@ describe('announcement queue', () => {
     expect(heard).toEqual(['बुरा।', 'ठीक।']);
   });
 
+  it('does not mark failed speech as complete and accepts an explicit retry', () => {
+    const outcomes: string[] = [];
+    let attempt = 0;
+    const queue = createAnnounceQueue(
+      { speak(_text, onEnd) {
+        attempt += 1;
+        onEnd(attempt === 1
+          ? { status: 'failed', reason: 'onerror', completedSegments: 0, totalSegments: 1 }
+          : { status: 'completed', completedSegments: 1, totalSegments: 1 });
+      } },
+      { onResult: (_entry, outcome) => outcomes.push(outcome.status) },
+    );
+
+    expect(queue.push('order-1', 'एक।')).toBe('queued');
+    expect(queue.has('order-1')).toBe(false);
+    expect(queue.contains('order-1')).toBe(true);
+    expect(queue.push('order-1', 'एक।')).toBe('duplicate');
+    expect(queue.force('order-1:retry-1', 'एक।')).toBe('queued');
+    expect(queue.has('order-1:retry-1')).toBe(true);
+    expect(outcomes).toEqual(['failed', 'completed']);
+  });
+
+  it('reports a full queue instead of silently dropping an order', () => {
+    const queue = createAnnounceQueue({ speak() { /* hold active item */ } });
+    expect(queue.push('active', 'एक।')).toBe('queued');
+    for (let i = 0; i < 19; i += 1) expect(queue.push(`order-${i}`, 'दो।')).toBe('queued');
+    expect(queue.push('overflow', 'तीन।')).toBe('full');
+    expect(queue.depth()).toBe(20);
+  });
+
+  it('ignores late speaker callbacks after queue teardown', () => {
+    let release: (outcome: SpeechOutcome) => void = () => {};
+    const outcomes: string[] = [];
+    const queue = createAnnounceQueue(
+      { speak(_text, onEnd) { release = onEnd; } },
+      { onResult: (_entry, outcome) => outcomes.push(outcome.status) },
+    );
+    queue.push('in-flight', 'एक।');
+    queue.dispose();
+    release({ status: 'completed', completedSegments: 1, totalSegments: 1 });
+    expect(outcomes).toEqual([]);
+    expect(queue.depth()).toBe(0);
+  });
+
   it('refuses empty text rather than speaking silence', () => {
     const { queue, heard } = recorder();
-    expect(queue.push('a', '   ')).toBe(false);
+    expect(queue.push('a', '   ')).toBe('empty');
     expect(heard).toEqual([]);
   });
 });
@@ -428,7 +473,7 @@ describe('what the board is told about the queue', () => {
    */
   it('names what is speaking, not what was queued last', () => {
     const begins: string[] = [];
-    let release = () => {};
+    let release: (outcome: SpeechOutcome) => void = () => {};
 
     const queue = createAnnounceQueue(
       {
@@ -436,7 +481,7 @@ describe('what the board is told about the queue', () => {
           release = onEnd; // hold the speaker open
         },
       },
-      { onBegin: (_key, text) => begins.push(text) },
+      { onBegin: (entry) => begins.push(entry.text) },
     );
 
     queue.push('o1', 'पहला।');
@@ -448,12 +493,12 @@ describe('what the board is told about the queue', () => {
     expect(begins).toEqual(['पहला।']);
     expect(queue.pending()).toBe(2);
 
-    release();
+    release({ status: 'completed', completedSegments: 1, totalSegments: 1 });
     expect(begins).toEqual(['पहला।', 'दूसरा।']);
     expect(queue.pending()).toBe(1);
 
-    release();
-    release(); // the last one, then idle
+    release({ status: 'completed', completedSegments: 1, totalSegments: 1 });
+    release({ status: 'completed', completedSegments: 1, totalSegments: 1 }); // the last one, then idle
     expect(begins).toEqual(['पहला।', 'दूसरा।', 'तीसरा।']);
     expect(queue.pending()).toBe(0);
   });
@@ -462,9 +507,9 @@ describe('what the board is told about the queue', () => {
     const events: string[] = [];
 
     createAnnounceQueue(
-      { speak(_text, onEnd) { onEnd(); } },
+      { speak(_text, onEnd) { onEnd({ status: 'completed', completedSegments: 1, totalSegments: 1 }); } },
       {
-        onBegin: (key) => events.push(`begin:${key}`),
+        onBegin: (entry) => events.push(`begin:${entry.key}`),
         onIdle: () => events.push('idle'),
       },
     ).push('o1', 'एक।');
@@ -474,24 +519,24 @@ describe('what the board is told about the queue', () => {
 
   it('goes idle only after the last announcement, never in the middle of a burst', () => {
     const events: string[] = [];
-    const releases: (() => void)[] = [];
+    const releases: ((outcome: SpeechOutcome) => void)[] = [];
 
     const queue = createAnnounceQueue(
       { speak(_text, onEnd) { releases.push(onEnd); } },
-      { onBegin: (key) => events.push(`begin:${key}`), onIdle: () => events.push('idle') },
+      { onBegin: (entry) => events.push(`begin:${entry.key}`), onIdle: () => events.push('idle') },
     );
 
     queue.push('o1', 'एक।');
     queue.push('o2', 'दो।');
-    releases[0]();
+    releases[0]({ status: 'completed', completedSegments: 1, totalSegments: 1 });
     expect(events).toEqual(['begin:o1', 'begin:o2']);
-    releases[1]();
+    releases[1]({ status: 'completed', completedSegments: 1, totalSegments: 1 });
     expect(events).toEqual(['begin:o1', 'begin:o2', 'idle']);
   });
 
   it('is not stopped by a listener that throws', () => {
     const queue = createAnnounceQueue(
-      { speak(_text, onEnd) { onEnd(); } },
+      { speak(_text, onEnd) { onEnd({ status: 'completed', completedSegments: 1, totalSegments: 1 }); } },
       {
         onBegin() {
           throw new Error('board bug');
@@ -502,7 +547,7 @@ describe('what the board is told about the queue', () => {
       },
     );
 
-    expect(queue.push('o1', 'एक।')).toBe(true);
+    expect(queue.push('o1', 'एक।')).toBe('queued');
     expect(queue.speaking()).toBe(false);
   });
 });

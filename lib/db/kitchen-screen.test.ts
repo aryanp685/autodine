@@ -196,7 +196,7 @@ describe('getKitchenScreenData', () => {
     expect((await getKitchenScreenData())?.tickets[0].ageMin).toBe(23);
   });
 
-  it('builds the item detail from variant and addons, in that order', async () => {
+  it('uses order-time item details instead of a mutable menu pronunciation', async () => {
     mocks.staff.result = signedIn(
       fakeSupabase({
         orders: [
@@ -214,6 +214,7 @@ describe('getKitchenScreenData', () => {
         order_items: [
           {
             order_id: 'o-1',
+            item_id: 'item-1',
             qty: 2,
             name_snapshot: 'Butter Naan',
             variant_snapshot: 'Regular',
@@ -222,6 +223,8 @@ describe('getKitchenScreenData', () => {
             sort_order: 0,
           },
         ],
+        // A later menu edit must not rewrite this persisted order's wording.
+        items: [{ id: 'item-1', spoken_name: 'changed menu pronunciation' }],
       })
     );
 
