@@ -5,7 +5,13 @@ import { isQrToken, TABLE_SESSION_COOKIE, TABLE_SESSION_COOKIE_OPTIONS } from '@
 import { loadTableAccess } from '@/lib/table-access';
 import { addressFromHeaders, hashAddress } from '@/lib/ip-hash';
 import { TABLE_CARD_COOKIE, TABLE_CARD_COOKIE_OPTIONS } from '@/lib/table-card';
-import { scanOutcome } from '@/lib/scan-outcome';
+import {
+  THROTTLE_COOKIE,
+  THROTTLE_COOKIE_OPTIONS,
+  THROTTLE_PARAM,
+  THROTTLE_VALUE,
+  scanOutcome,
+} from '@/lib/scan-outcome';
 
 /**
  * What a printed QR code points at: /t/<public token>.
@@ -94,6 +100,8 @@ export async function GET(
   if (access.status === 'verified') {
     const response = to(menuHref, request);
     response.cookies.set(TABLE_CARD_COOKIE, token, TABLE_CARD_COOKIE_OPTIONS);
+    // Already verified, so an earlier throttle no longer describes this guest.
+    response.cookies.set(THROTTLE_COOKIE, '', { ...THROTTLE_COOKIE_OPTIONS, maxAge: 0 });
     return response;
   }
 
@@ -101,9 +109,38 @@ export async function GET(
   // restaurant chose to accept, so a session is minted here -- the database
   // decides whether this card, this table and this restaurant qualify.
   const opened = await openSessionOnScan(token, request);
-  const response = to(menuHref, request);
+  const response = to(opened?.throttled ? `${menuHref}&${THROTTLE_PARAM}=${THROTTLE_VALUE}` : menuHref, request);
   response.cookies.set(TABLE_CARD_COOKIE, token, TABLE_CARD_COOKIE_OPTIONS);
-  if (opened) {
+
+  /*
+   * A THROTTLED SCAN IS SAID OUT LOUD, ONCE, WHERE IT HAPPENED.
+   *
+   * For a long time this answer was swallowed: the guest was sent to the menu
+   * and found out at checkout that ordering was impossible, with nothing to
+   * explain it — and in a restaurant that has switched the code off, no code to
+   * enter. The flag below is what lets the menu say it plainly, and the cookie
+   * is what carries it to the screens after the menu. It changes no permission:
+   * no session is minted for a throttled scan, and the order path still refuses
+   * one without.
+   */
+  if (opened?.throttled) {
+    response.cookies.set(THROTTLE_COOKIE, THROTTLE_VALUE, THROTTLE_COOKIE_OPTIONS);
+  } else if (opened) {
+    // The ordinary case: this browser just proved it can be given a session, so
+    // any stale "you were throttled" note is no longer true.
+    response.cookies.set(THROTTLE_COOKIE, '', { ...THROTTLE_COOKIE_OPTIONS, maxAge: 0 });
+  }
+  /*
+   * ONLY A REAL SESSION IS WRITTEN AS ONE.
+   *
+   * `opened` used to be either an object or null, so "is it truthy" was the
+   * same question as "did we get a session". It is no longer: a throttle answer
+   * is also an object, and writing `{ throttled: true }` into the table-session
+   * cookie would have told the rest of the app that this guest was verified —
+   * a silent bypass dressed as a JSON payload. The discriminator is explicit
+   * now, and the test that caught this is in route.test.ts.
+   */
+  if (opened && !opened.throttled) {
     // Written on the RESPONSE, like the card cookie above, rather than through
     // cookies().set(): this handler already owns a response, and one cookie
     // mechanism per handler is one place to look when a guest arrives without
@@ -154,9 +191,15 @@ async function openSessionOnScan(cardToken: string, request: NextRequest) {
    * nuance, and docs/scan-limit-l1.md for the proposed fix.
    */
   const outcome = scanOutcome(row?.status as string | undefined);
+
+  // Throttled: no session, and the guest is told. Everything else that is not
+  // a session stays silent, because the menu is always theirs to read.
+  if (outcome.reason === 'throttled') return { throttled: true as const };
+
   if (!outcome.keepSession || !row?.session_token) return null;
 
   return {
+    throttled: false as const,
     token: row.session_token as string,
     slug: row.restaurant_slug as string,
     tableLabel: row.table_label as string,

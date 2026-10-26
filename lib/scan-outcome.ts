@@ -133,3 +133,60 @@ export function formatRetry(seconds?: number | null): string | null {
   if (minutes >= 60) return 'about an hour';
   return `about ${minutes} minutes`;
 }
+
+/* ------------------------------------------------------------------ the flag */
+
+/**
+ * How a throttle survives the redirect.
+ *
+ * A scan answers with the menu URL, so there is nowhere else to put the answer.
+ * Two carriers, because they do two different jobs:
+ *
+ *   `?v=throttled`      the first screen after the scan. It is in the address,
+ *                       so it survives a hard refresh and can be shared.
+ *   `autodine_throttled` every screen after that — the item sheet, the cart,
+ *                       the checkout. Without it a guest who was throttled at
+ *                       the door would be told again at checkout that they need
+ *                       a code, in a restaurant that has none.
+ *
+ * THE COOKIE GRANTS NOTHING. It is read for copy and for nothing else, and it
+ * cannot become a session: `place_public_order` still refuses without one, and
+ * the only function that mints one is the one that just refused. A guest who
+ * edited it would change what a sentence says, not what they are allowed to do.
+ */
+export const THROTTLE_PARAM = 'v';
+export const THROTTLE_VALUE = 'throttled';
+export const THROTTLE_COOKIE = 'autodine_throttled';
+
+/**
+ * Fifteen minutes: long enough to cover a guest who takes a while over the
+ * menu, short enough that the guest who comes back after the queue has cleared
+ * is not still being told about a limit that may no longer apply.
+ */
+export const THROTTLE_COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: 'lax' as const,
+  secure: process.env.NODE_ENV === 'production',
+  path: '/',
+  maxAge: 60 * 15,
+};
+
+/** Is this request one that was throttled at the door? */
+export function isThrottled(value: string | null | undefined): boolean {
+  return value === THROTTLE_VALUE;
+}
+
+/**
+ * What a throttled guest is told when they have already built a cart.
+ *
+ * The menu banner can afford to be brief; this one cannot, because it arrives
+ * after the guest pressed Place order and the first thing they need to know is
+ * that NOTHING WAS SENT — not that something was saved and is waiting. Then
+ * what to do, then where their cart is. In that order, because that is the
+ * order a person reads it.
+ */
+export function notPlacedNotice(retryAfterSeconds?: number | null): string {
+  const retry = formatRetry(retryAfterSeconds);
+  const when = retry ? `in ${retry}` : 'in a few minutes';
+  return `Your order was not sent. This table was checked unusually often in the last hour, so ordering is paused — try again ${when}, or order with our staff. Your cart is safe and nothing has been charged.`;
+}

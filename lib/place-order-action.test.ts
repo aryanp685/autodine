@@ -22,6 +22,16 @@ const mocks = vi.hoisted(() => ({
   parseCart: vi.fn(),
   loadTableAccess: vi.fn(),
   redirect: vi.fn(),
+  /** The throttle flag the scan handler left behind, if any. */
+  throttle: null as string | null,
+}));
+
+/* Only one cookie is ever read on this path, and it is a note, not a key. */
+vi.mock('next/headers', () => ({
+  cookies: async () => ({
+    get: (name: string) =>
+      name === 'autodine_throttled' && mocks.throttle ? { name, value: mocks.throttle } : undefined,
+  }),
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -69,6 +79,7 @@ describe('placeOrderAction', () => {
     mocks.rpc.mockReset();
     mocks.parseCart.mockReset().mockReturnValue([{ itemId: 'i1', qty: 1 }]);
     mocks.redirect.mockReset();
+    mocks.throttle = null;
     mocks.loadTableAccess.mockReset().mockResolvedValue({
       status: 'verified',
       slug: 'kings-of-kings',
@@ -267,6 +278,57 @@ describe('placeOrderAction', () => {
     expect(parsed.searchParams.get('next')).toBe('/menu/checkout?s=kings-of-kings');
     // Nothing was written.
     expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+
+  it('does not send a throttled guest to a code form that cannot help them', async () => {
+    /*
+     * The bug this replaces: a guest whose scan was throttled has no session,
+     * so they arrive here as `browse` -- and in a restaurant that has switched
+     * the rotating code off, the code form has nothing to ask for. They were
+     * sent to it anyway, typed nothing, and came back to the same refusal.
+     *
+     * Nothing is loosened by this branch: the order is still refused, and the
+     * sentence says so first.
+     */
+    mocks.throttle = 'throttled';
+    mocks.loadTableAccess.mockResolvedValue({
+      status: 'browse',
+      qrToken: 'qr_abcdefghijklmnop',
+      slug: 'kings-of-kings',
+      tableLabel: 'T2',
+      windowSeconds: 600,
+    });
+
+    const url = await run(() => placeOrderAction(form()));
+    const parsed = new URL(url, 'https://example.test');
+
+    expect(parsed.pathname).toBe('/menu/cart');
+    expect(parsed.searchParams.get('s')).toBe('kings-of-kings');
+    const message = parsed.searchParams.get('error') ?? '';
+    expect(message).toContain('Your order was not sent');
+    expect(message).toContain('cart is safe');
+    expect(message).toContain('order with our staff');
+    // Never the code sentence: there is no code in this restaurant.
+    expect(message.toLowerCase()).not.toContain('enter the code');
+
+    // And nothing was written, which is the claim the sentence makes.
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it('still asks a normal scanning guest for the code', async () => {
+    // The throttle branch must not swallow the ordinary path.
+    mocks.throttle = null;
+    mocks.loadTableAccess.mockResolvedValue({
+      status: 'browse',
+      qrToken: 'qr_abcdefghijklmnop',
+      slug: 'kings-of-kings',
+      tableLabel: 'T2',
+      windowSeconds: 600,
+    });
+
+    const url = await run(() => placeOrderAction(form()));
+    expect(new URL(url, 'https://example.test').pathname).toBe('/t/qr_abcdefghijklmnop/code');
   });
 
   it('will not write an order for a guest the database did not verify', async () => {

@@ -299,3 +299,58 @@ dead end.
 - Whether `scan` mode should exist for a new restaurant at all. `scan_confirm`
   costs one tap per sitting; `scan` costs nothing and proves nothing. Nothing in
   the UI defaults to `scan`, and that should stay true.
+
+
+---
+
+## 8. What is implemented NOW vs what is proposed
+
+Read this before quoting anything above. A behaviour is only claimed when it is
+in the code and a test runs it.
+
+### Implemented, tested, on this branch (`c…`+)
+
+| behaviour | where | proven by |
+| --- | --- | --- |
+| the database's scan answer is read as a closed set, not one `if` | `lib/scan-outcome.ts` | `lib/scan-outcome.test.ts` (17) |
+| a **throttled** scan is explained to the guest, on the menu, above the food | `app/t/[token]/route.ts` → `?v=throttled`, `app/menu/page.tsx`, `CustomerMenu` | route tests (3) + screen tests (5) + live check on a production build |
+| the explanation survives the item sheet, the cart and the checkout (15 min cookie) | `THROTTLE_COOKIE` | route tests (2) |
+| a throttled guest pressing **Place order** is told nothing was sent, and is *not* sent to a code form that cannot help them | `app/menu/checkout/actions.ts` | `lib/place-order-action.test.ts` (2) |
+| a throttled scan writes no session — **even if the database returned a token** | route | route tests (2) |
+| a stale "paused" flag is cleared once the same browser gets a real session | route | route test (1) |
+| retry advice rounds up and never invents a number | `formatRetry()` | unit (4) |
+
+Live check on a production build (`next start`, port 3200, demo mode, no
+database): `GET /menu?v=throttled` renders `data-throttle-note` with
+"Table check paused" and the sentence; `GET /menu` renders none of it.
+
+### Proposed, NOT implemented — needs a migration and your approval
+
+| behaviour | why it needs SQL |
+| --- | --- |
+| `reused`: a live session is not re-minted, so reloads stop spending the budget | return shape of `open_table_session` |
+| `held`: a throttled sitting mints a session and its orders wait for one tap | `table_session_id`, `hold_required`, `hold_orders` on the session |
+| `retry_after`: a real wait time instead of "a short while" | extra column in the function's return table |
+| held-cap (Case C) before a hard pause | counting held mints per card |
+
+So today: **a throttled guest is told the truth and keeps their cart, but cannot
+order until the window passes or staff take the order.** Their order is not
+held, not saved and not queued — saying otherwise would be a lie, and the copy
+in `notPlacedNotice()` says exactly the opposite ("Your order was not sent").
+
+### The three questions, answered against the code
+
+| question | today |
+| --- | --- |
+| what is throttled? | **Verification only.** `open_table_session` — minting a table session from a scan. Order submission is never throttled; it is refused only for a real reason (no session, bad cart, closed restaurant). |
+| is a throttled order durably persisted? | **No order exists.** The guest never reaches `place_public_order` without a session, and the session is what was refused. Nothing to lose, and the copy says so. |
+| is a held order visible to staff, and how is it recovered? | Not applicable today (nothing is held). The machinery is already built and tested for `scan_confirm`'s first ticket: held rows appear in the board's "Waiting for the floor" strip, one tap confirms the sitting, two taps reject it. |
+
+### A defect this work found and fixed
+
+Writing the throttle marker into `opened` made it a truthy object, and the
+route's `if (opened)` then wrote `autodine_table={"throttled":true}` — i.e. it
+handed the guest a *table session* because their scan was refused. The
+discriminator is explicit now (`if (opened && !opened.throttled)`), and
+`route.test.ts` asserts the session cookie is absent for a throttled scan and
+present for an opened one.

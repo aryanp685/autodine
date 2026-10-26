@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { formatRetry, scanOutcome, throttleNotice, type ScanStatus } from './scan-outcome';
+import {
+  formatRetry,
+  isThrottled,
+  notPlacedNotice,
+  scanOutcome,
+  throttleNotice,
+  type ScanStatus,
+} from './scan-outcome';
 
 /**
  * The scan contract, as a table.
@@ -148,5 +155,40 @@ describe('retry advice', () => {
     }
     expect(withTime).toContain('about 10 minutes');
     expect(withoutTime).toContain('a short while');
+  });
+});
+
+describe('the checkout sentence', () => {
+  it('says nothing was sent before it says anything else', () => {
+    const message = notPlacedNotice(600);
+    expect(message.startsWith('Your order was not sent.')).toBe(true);
+    expect(message).toContain('try again in about 10 minutes');
+    expect(message).toContain('cart is safe');
+    expect(message).toContain('nothing has been charged');
+  });
+
+  it('does not invent a wait when the database gave no retry time', () => {
+    const message = notPlacedNotice();
+    expect(message).toContain('try again in a few minutes');
+    expect(message).not.toMatch(/\d+ minutes/);
+  });
+
+  it('never claims anything was saved or accepted', () => {
+    for (const message of [notPlacedNotice(), notPlacedNotice(120)]) {
+      const lower = message.toLowerCase();
+      for (const lie of ['saved', 'confirmed', 'accepted', 'placed']) {
+        expect(lower).not.toContain(lie);
+      }
+    }
+  });
+});
+
+describe('the throttle flag', () => {
+  it('is only ever the one exact value', () => {
+    // The flag arrives from a URL and a cookie, so it is guest-controlled input.
+    expect(isThrottled('throttled')).toBe(true);
+    for (const other of ['', 'Throttled', 'throttled ', '1', 'true', null, undefined]) {
+      expect(isThrottled(other as string), String(other)).toBe(false);
+    }
   });
 });

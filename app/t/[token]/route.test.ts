@@ -252,3 +252,64 @@ describe('a throttled scan', () => {
     expect(response.headers.get('location')).not.toContain('/t/problem');
   });
 });
+
+/*
+ * A THROTTLED GUEST IS TOLD, AND IS STILL GIVEN THE MENU.
+ *
+ * The answer used to be swallowed. These pin the two things that replaced the
+ * silence: a flag in the address for the screen right after the scan, and a
+ * short-lived cookie for the screens after that (the item sheet, the cart, the
+ * checkout). Neither carries a session.
+ */
+describe('a throttled scan is explained', () => {
+  beforeEach(() => {
+    mocks.loadTableAccess.mockResolvedValue({ status: 'browse', qrToken: LIVE });
+  });
+
+  it('says so in the address it redirects to', async () => {
+    mocks.rpc.mockResolvedValue({
+      data: [{ status: 'limited', restaurant_slug: 'kabir' }],
+      error: null,
+    });
+
+    const response = await scan(LIVE);
+    const location = response.headers.get('location') ?? '';
+
+    expect(location).toContain('/menu?s=kabir');
+    expect(location).toContain('v=throttled');
+  });
+
+  it('remembers it for the screens after the menu, without granting anything', async () => {
+    mocks.rpc.mockResolvedValue({
+      data: [{ status: 'limited', restaurant_slug: 'kabir' }],
+      error: null,
+    });
+
+    const cookies = (await scan(LIVE)).headers.get('set-cookie') ?? '';
+
+    expect(cookies).toContain('autodine_throttled=throttled');
+    expect(cookies).toContain('HttpOnly');
+    // The flag must not be mistaken for a table session.
+    expect(cookies).not.toContain('autodine_table=');
+  });
+
+  it('clears the flag when the same browser later gets a real session', async () => {
+    // Coming back after the queue cleared is the normal recovery, and a stale
+    // "ordering is paused" note on a guest who can now order is its own bug.
+    mocks.rpc.mockResolvedValue({
+      data: [
+        {
+          status: 'opened',
+          session_token: 'b'.repeat(64),
+          restaurant_slug: 'kabir',
+          table_label: '7',
+          expires_at: new Date(Date.now() + 59 * 60_000).toISOString(),
+        },
+      ],
+      error: null,
+    });
+
+    const cookies = (await scan(LIVE)).headers.get('set-cookie') ?? '';
+    expect(cookies).toContain('autodine_throttled=;');
+  });
+});
