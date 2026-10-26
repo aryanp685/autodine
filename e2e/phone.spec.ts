@@ -14,9 +14,18 @@ test('the rail is a closed drawer, and Menu opens it', async ({ page }) => {
   await expect(page.locator(RAIL)).toHaveCount(1);
   await expect(page.locator(RAIL)).toHaveAttribute('data-rail-open', 'false');
 
-  // Closed means off the bottom of the screen, not merely dimmed.
-  const closed = await page.locator(RAIL).boundingBox();
-  expect(closed!.y).toBeGreaterThanOrEqual(843);
+  /* Closed means off the bottom of the screen, not merely dimmed.
+   *
+   * Polled rather than measured once. A single `boundingBox()` right after
+   * `goto` can land in the frame between the first paint and the stylesheet
+   * that positions the sheet, which produced a red run every fourth or fifth
+   * time with nothing wrong in the product. The assertion is unchanged; only
+   * the eagerness is. */
+  await expect
+    .poll(async () => (await page.locator(RAIL).boundingBox())?.y ?? -1, {
+      message: 'the closed drawer never settled below the fold',
+    })
+    .toBeGreaterThanOrEqual(843);
 
   const menu = page.getByRole('button', { name: 'Menu' });
   await expect(menu).toBeVisible();
@@ -60,7 +69,17 @@ test('the content is not pushed off a 390px screen by a desktop offset', async (
   // The rail was once 232px here and 244px there; a leftover `pl-[244px]` below
   // `lg` would narrow the content on a phone.
   await page.goto('/dashboard');
-  const main = await page.locator('main').boundingBox();
-  expect(main!.x).toBeLessThan(40);
-  expect(main!.width).toBeGreaterThan(330);
+  const main = page.locator('main').first();
+  await expect(main).toBeVisible();
+
+  // Same reason as the drawer above: one measurement can catch the layout
+  // mid-hydration. Polling keeps the two assertions and stops the flake.
+  await expect
+    .poll(async () => Math.round((await main.boundingBox())?.x ?? -1), {
+      message: 'the content never settled at the left edge',
+    })
+    .toBeLessThan(40);
+
+  const box = await main.boundingBox();
+  expect(box!.width).toBeGreaterThan(330);
 });
