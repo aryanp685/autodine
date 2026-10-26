@@ -51,6 +51,26 @@ export default defineConfig({
       testMatch: 'phone.spec.ts',
       use: { ...devices['Desktop Chrome'], viewport: { width: 390, height: 844 } },
     },
+    {
+      /*
+       * Tests that need a real deployment and real accounts.
+       *
+       * They exist as a project rather than as loose files so that
+       * `npx playwright test --project=integration` runs them and nothing
+       * else. Every test in here skips itself when its environment is
+       * missing, which is the state CI is in: no secrets, so the run is green
+       * and the report says "skipped" rather than "verified". A file that no
+       * project matched would be a file that silently never ran, which is how
+       * a documented flow becomes a flow nobody ever clicked.
+       */
+      name: 'integration',
+      testMatch: 'integration/**/*.spec.ts',
+      // Serial by nature: one test mints an invitation the next one redeems,
+      // and each of them writes rows.
+      workers: 1,
+      fullyParallel: false,
+      use: { ...devices['Desktop Chrome'] },
+    },
   ],
   webServer: {
     command: 'npx next start -H 127.0.0.1 -p 3100',
