@@ -946,6 +946,22 @@ p { margin: 0; }
   animation: g-rise 260ms var(--p-ease) both;
 }
 
+/* The one looping mark on the guest surface: a dot that says "this is live".
+   A loop is right here and nowhere else on a menu -- it is attached to a fact
+   that is changing on the server, so movement carries meaning rather than
+   decorating. Opacity only: a scaling dot in the corner of the eye is a dot
+   that nags, and it costs a layout-free composite either way. */
+@keyframes g-live {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+[data-flow-root] .g-live-dot {
+  animation: g-live 2.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-flow-root] .g-live-dot { animation: none; }
+}
+
 /* =========================================================================
    THE OWNER SURFACE — the rules that cannot live in a class string
 

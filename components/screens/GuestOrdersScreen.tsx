@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { GuestFlow } from '@/components/GuestFlow';
 import { GuestTabs } from '@/components/GuestTabs';
+import { GuestLiveStatus } from '@/components/GuestLiveStatus';
 import { guestAccentStyle } from '@/lib/branding/palette';
 import {
   browserStorage,
@@ -72,7 +73,7 @@ export function GuestOrdersScreen({
         <h1 className="g-display mt-1.5">On this device</h1>
         <p className="g-lede mt-1.5">
           {state === 'found'
-            ? 'The last order placed from this phone. Open it to see how the kitchen is doing.'
+            ? 'The last order placed from this phone, with the kitchen’s live status.'
             : 'Orders are tied to the phone that placed them. This one has none yet.'}
         </p>
       </header>
@@ -120,6 +121,17 @@ export function GuestOrdersScreen({
                 <dd className="text-gink-64">{formatPlacedAt(order.placedAt)}</dd>
               </div>
             </dl>
+
+            {/* The kitchen's own answer, read from the order the token belongs
+                to. It starts as "checking" because the token lives on this
+                phone, not on the server: there is nothing truthful to server-
+                render here, and guessing "placed" would be a claim nobody made. */}
+            <GuestLiveStatus
+              slug={slug}
+              code={order.code}
+              token={order.token}
+              className="mt-3.5"
+            />
 
             <Link
               href={orderHref(order, slug)}
