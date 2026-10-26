@@ -9,8 +9,9 @@ import {
   THROTTLE_COOKIE,
   THROTTLE_COOKIE_OPTIONS,
   THROTTLE_PARAM,
-  THROTTLE_VALUE,
+  readRetryAfter,
   scanOutcome,
+  throttleFlag,
 } from '@/lib/scan-outcome';
 
 /**
@@ -109,7 +110,20 @@ export async function GET(
   // restaurant chose to accept, so a session is minted here -- the database
   // decides whether this card, this table and this restaurant qualify.
   const opened = await openSessionOnScan(token, request);
-  const response = to(opened?.throttled ? `${menuHref}&${THROTTLE_PARAM}=${THROTTLE_VALUE}` : menuHref, request);
+  /*
+   * The wait travels WITH the flag, when the database gave one.
+   *
+   * `open_table_session` has no retry column today, so this is `throttled` and
+   * the screens say "a short while". If a later migration adds one, the number
+   * reaches the guest without a second change here — and it is capped and
+   * rounded by `throttleFlag()` first, because it is about to be written into a
+   * sentence and a URL.
+   */
+  const flag = opened?.throttled ? throttleFlag(opened.retryAfterSeconds) : null;
+  const response = to(
+    flag ? `${menuHref}&${THROTTLE_PARAM}=${encodeURIComponent(flag)}` : menuHref,
+    request
+  );
   response.cookies.set(TABLE_CARD_COOKIE, token, TABLE_CARD_COOKIE_OPTIONS);
 
   /*
@@ -123,8 +137,8 @@ export async function GET(
    * no session is minted for a throttled scan, and the order path still refuses
    * one without.
    */
-  if (opened?.throttled) {
-    response.cookies.set(THROTTLE_COOKIE, THROTTLE_VALUE, THROTTLE_COOKIE_OPTIONS);
+  if (flag) {
+    response.cookies.set(THROTTLE_COOKIE, flag, THROTTLE_COOKIE_OPTIONS);
   } else if (opened) {
     // The ordinary case: this browser just proved it can be given a session, so
     // any stale "you were throttled" note is no longer true.
@@ -192,9 +206,15 @@ async function openSessionOnScan(cardToken: string, request: NextRequest) {
    */
   const outcome = scanOutcome(row?.status as string | undefined);
 
-  // Throttled: no session, and the guest is told. Everything else that is not
-  // a session stays silent, because the menu is always theirs to read.
-  if (outcome.reason === 'throttled') return { throttled: true as const };
+  // Throttled: no session, and the guest is told — including how long, if the
+  // database said. Everything else that is not a session stays silent, because
+  // the menu is always theirs to read.
+  if (outcome.reason === 'throttled') {
+    return {
+      throttled: true as const,
+      retryAfterSeconds: readRetryAfter(row as Record<string, unknown> | undefined),
+    };
+  }
 
   if (!outcome.keepSession || !row?.session_token) return null;
 

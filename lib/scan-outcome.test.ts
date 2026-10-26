@@ -3,7 +3,10 @@ import {
   formatRetry,
   isThrottled,
   notPlacedNotice,
+  readRetryAfter,
+  readThrottleFlag,
   scanOutcome,
+  throttleFlag,
   throttleNotice,
   type ScanStatus,
 } from './scan-outcome';
@@ -189,6 +192,66 @@ describe('the throttle flag', () => {
     expect(isThrottled('throttled')).toBe(true);
     for (const other of ['', 'Throttled', 'throttled ', '1', 'true', null, undefined]) {
       expect(isThrottled(other as string), String(other)).toBe(false);
+    }
+  });
+});
+
+describe('the wait the database reported', () => {
+  it('is read from either spelling an L1 return table might use', () => {
+    expect(readRetryAfter({ retry_after_seconds: 600 })).toBe(600);
+    expect(readRetryAfter({ retry_after: 90 })).toBe(90);
+    expect(readRetryAfter({ retry_after_seconds: '45' })).toBe(45);
+  });
+
+  it('is rounded up, so the guest is never sent back too early', () => {
+    expect(readRetryAfter({ retry_after_seconds: 30.2 })).toBe(31);
+  });
+
+  it('refuses what a sentence could not honestly say', () => {
+    for (const row of [
+      {},
+      null,
+      undefined,
+      { retry_after_seconds: 0 },
+      { retry_after_seconds: -60 },
+      { retry_after_seconds: 86_401 },
+      { retry_after_seconds: 'soon' },
+      { retry_after_seconds: Number.NaN },
+      { retry_after_seconds: Number.POSITIVE_INFINITY },
+    ]) {
+      expect(readRetryAfter(row as Record<string, unknown> | null), JSON.stringify(row)).toBe(null);
+    }
+  });
+});
+
+describe('the flag that carries it', () => {
+  it('is the bare word when there is no wait', () => {
+    expect(throttleFlag()).toBe('throttled');
+    expect(throttleFlag(null)).toBe('throttled');
+    expect(throttleFlag(0)).toBe('throttled');
+    expect(throttleFlag(-1)).toBe('throttled');
+  });
+
+  it('carries the wait in the same value, so the two cannot disagree', () => {
+    expect(throttleFlag(600)).toBe('throttled.600');
+  });
+
+  it('round-trips what it wrote', () => {
+    const flag = throttleFlag(600);
+    expect(readThrottleFlag(flag)).toEqual({ throttled: true, retryAfterSeconds: 600 });
+  });
+
+  it('keeps the note and drops an unusable number', () => {
+    // A guest can edit a cookie. The number must not become a sentence, and
+    // the explanation must not disappear because the number was rubbish.
+    expect(readThrottleFlag('throttled.-5')).toEqual({ throttled: true, retryAfterSeconds: null });
+    expect(readThrottleFlag('throttled.soon')).toEqual({ throttled: true, retryAfterSeconds: null });
+    expect(readThrottleFlag('throttled.999999')).toEqual({ throttled: true, retryAfterSeconds: null });
+  });
+
+  it('is false for anything that is not the flag', () => {
+    for (const value of ['', 'throttle', 'THROTTLED', 'throttled ', 'v', '1', null, undefined]) {
+      expect(readThrottleFlag(value as string).throttled, String(value)).toBe(false);
     }
   });
 });

@@ -5,7 +5,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { parseCart } from '@/lib/cart-storage';
 import { codePageHref, loadTableAccess } from '@/lib/table-access';
 import { cookies } from 'next/headers';
-import { THROTTLE_COOKIE, isThrottled, notPlacedNotice } from '@/lib/scan-outcome';
+import { THROTTLE_COOKIE, notPlacedNotice, readThrottleFlag } from '@/lib/scan-outcome';
 import {
   describePlaceFailure,
   isTransientPlaceCode,
@@ -129,8 +129,8 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
      * is still refused, exactly as it was before, and the guest is told why
      * instead of being sent in a circle.
      */
-    const throttled = isThrottled((await cookies()).get(THROTTLE_COOKIE)?.value);
-    if (throttled) fail(notPlacedNotice(), slug);
+    const throttle = readThrottleFlag((await cookies()).get(THROTTLE_COOKIE)?.value);
+    if (throttle.throttled) fail(notPlacedNotice(throttle.retryAfterSeconds), slug);
 
     const back = `/menu/checkout?s=${encodeURIComponent(slug)}`;
     redirect(`${codePageHref(access.qrToken)}?next=${encodeURIComponent(back)}`);

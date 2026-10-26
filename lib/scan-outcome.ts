@@ -171,9 +171,76 @@ export const THROTTLE_COOKIE_OPTIONS = {
   maxAge: 60 * 15,
 };
 
+/**
+ * The wait the DATABASE reported, if it reported one.
+ *
+ * `open_table_session` returns five columns and none of them is a wait time, so
+ * today this always returns null and every screen says "a short while". It is
+ * read anyway, under both spellings an L1 return table might use, because the
+ * alternative is that the day the database starts telling us the wait, the app
+ * ignores it — and a guest is told "a short while" when the server knew the
+ * number.
+ *
+ * Sanitised here rather than trusted: it is a number written into copy, and a
+ * negative, fractional or absurd value would produce either "in about -3
+ * minutes" or a wall of text. One day is the cap; a longer wait is a staff
+ * problem, not a retry hint.
+ */
+export function readRetryAfter(row: Record<string, unknown> | undefined | null): number | null {
+  if (!row) return null;
+  const raw = row['retry_after_seconds'] ?? row['retry_after'];
+  const seconds = typeof raw === 'string' ? Number(raw) : raw;
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds)) return null;
+  const rounded = Math.ceil(seconds);
+  if (rounded < 1 || rounded > 86_400) return null;
+  return rounded;
+}
+
+/**
+ * How the flag is written: `throttled`, or `throttled.600` when the server said
+ * how long.
+ *
+ * The wait travels in the SAME value rather than a second cookie, so the two
+ * can never disagree: there is no state where a guest is told they were
+ * throttled but the number is missing, or where a stale number outlives the
+ * flag it belongs to.
+ */
+export function throttleFlag(retryAfterSeconds?: number | null): string {
+  const seconds = readRetryAfter({ retry_after_seconds: retryAfterSeconds });
+  return seconds ? `${THROTTLE_VALUE}.${seconds}` : THROTTLE_VALUE;
+}
+
+export type ThrottleFlag = {
+  /** Was this request turned away at the door? */
+  throttled: boolean;
+  /** The wait the server reported, in seconds, when it reported one. */
+  retryAfterSeconds: number | null;
+};
+
+/**
+ * Read a flag that came from a URL or a cookie, so from the guest.
+ *
+ * Anything that is not exactly `throttled` or `throttled.<1..86400>` is not a
+ * throttle — including a longer suffix, a negative one, or `throttled.600.1`.
+ */
+export function readThrottleFlag(value: string | null | undefined): ThrottleFlag {
+  if (typeof value !== 'string') return { throttled: false, retryAfterSeconds: null };
+  if (value === THROTTLE_VALUE) return { throttled: true, retryAfterSeconds: null };
+  if (!value.startsWith(`${THROTTLE_VALUE}.`)) return { throttled: false, retryAfterSeconds: null };
+  // The word is the note; the suffix is only a number. An unusable number is
+  // dropped and the note kept, so a guest who edits the cookie loses the
+  // estimate and not the explanation — and a negative or absurd wait can never
+  // reach a sentence. Nothing is granted either way: the flag decides copy, and
+  // the order path still refuses without a session.
+  return {
+    throttled: true,
+    retryAfterSeconds: readRetryAfter({ retry_after_seconds: value.slice(THROTTLE_VALUE.length + 1) }),
+  };
+}
+
 /** Is this request one that was throttled at the door? */
 export function isThrottled(value: string | null | undefined): boolean {
-  return value === THROTTLE_VALUE;
+  return readThrottleFlag(value).throttled;
 }
 
 /**

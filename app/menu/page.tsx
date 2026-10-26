@@ -11,7 +11,7 @@ import { cookies } from 'next/headers';
 import {
   THROTTLE_COOKIE,
   THROTTLE_PARAM,
-  isThrottled,
+  readThrottleFlag,
   throttleNotice,
 } from '@/lib/scan-outcome';
 
@@ -94,16 +94,22 @@ export default async function CustomerMenuPage({
    *
    * `throttleNotice()` deliberately says "a short while" rather than a number
    * when the database did not give one. The current `open_table_session` does
-   * not return a retry time; inventing one would be worse than saying nothing.
+   * not return a retry time; inventing one would be worse than saying nothing,
+   * and quoting one when it IS returned is the whole point of carrying it.
+   *
+   * The address wins over the cookie: a guest who has just been throttled has
+   * both, and the address is the newer statement of the two.
    */
-  const throttled = isThrottled(v) || isThrottled((await cookies()).get(THROTTLE_COOKIE)?.value);
+  const fromAddress = readThrottleFlag(v);
+  const fromCookie = readThrottleFlag((await cookies()).get(THROTTLE_COOKIE)?.value);
+  const throttle = fromAddress.throttled ? fromAddress : fromCookie;
 
   // The cart is keyed by restaurant, so it is mounted where the slug is known.
   return (
     <CartProvider slug={s}>
       <CustomerMenu
         data={data ? { ...data, table } : undefined}
-        throttleNotice={throttled ? throttleNotice() : null}
+        throttleNotice={throttle.throttled ? throttleNotice(throttle.retryAfterSeconds) : null}
       />
     </CartProvider>
   );

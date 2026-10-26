@@ -306,4 +306,88 @@ begin
   end;
 end $$;
 
+-- ---------------------------------------------------------------------------
+-- 9. A refusal is a status-only row: no token, no expiry, no table label.
+--    The app reads `status` and treats null-everything as "no session". If a
+--    refusal ever carried a token, a throttled scan would mint one — the exact
+--    bypass the handler's discriminator exists to prevent.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  v_token text;
+  v_row record;
+  v_limited int := 0;
+  i int;
+  v_has_retry boolean;
+begin
+  select q.public_token into v_token
+    from public.table_qr_codes q where q.revoked_at is null limit 1;
+
+  -- Spend the budget, then look at the refusal itself.
+  for i in 1..15 loop
+    select * into v_row from public.open_table_session(v_token, encode(sha256(('contract' || i)::bytea), 'hex'));
+    if v_row.status = 'limited' then
+      if v_row.session_token is not null or v_row.expires_at is not null then
+        raise exception 'FAIL 9: a throttled answer carried a session (token=%, expires=%)',
+          v_row.session_token is not null, v_row.expires_at;
+      end if;
+      v_limited := v_limited + 1;
+    end if;
+  end loop;
+
+  if v_limited = 0 then
+    raise exception 'FAIL 9: never reached the refusal, so the contract was not checked';
+  end if;
+
+  -- Which contract is in force: today the return table has five columns and no
+  -- retry time, so the app must say "a short while" rather than a number.
+  -- Recorded, not asserted, because L1 is expected to add one — and when it
+  -- does, this line is how we notice that the screens can start quoting it.
+  select exists (
+    select 1 from unnest(coalesce(p.proargnames, '{}')) as arg(column_name)
+     where arg.column_name like '%retry%'
+  ) into v_has_retry
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'open_table_session';
+  v_has_retry := coalesce(v_has_retry, false);
+
+  raise notice 'PASS 9: a refusal is status-only (% refusals); retry column present=% (app currently says "a short while")',
+    v_limited, v_has_retry;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 10. Order submission is not throttled.
+--     The scan limit is a brake on VERIFICATION. A guest who already holds a
+--     session must never be refused an order because the card was scanned
+--     often — that would turn a queue on the door into a queue on the till.
+--     Checked against the function bodies, which is where the brake lives.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  v_open_src  text;
+  v_order_src text;
+begin
+  select p.prosrc into v_open_src
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'open_table_session';
+
+  select p.prosrc into v_order_src
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'place_public_order';
+
+  if v_open_src is null or v_order_src is null then
+    raise exception 'FAIL 10: one of the two functions is missing — is the migration applied?';
+  end if;
+
+  if v_open_src not like '%table_session_opens%' then
+    raise exception 'FAIL 10: open_table_session does not read the opens table — this check is looking at the wrong function';
+  end if;
+
+  if v_order_src like '%table_session_opens%' or v_order_src like '%limited%' then
+    raise exception 'FAIL 10: place_public_order consults the scan limit — order submission must never be throttled';
+  end if;
+
+  raise notice 'PASS 10: place_public_order never reads the scan limit (% chars checked)', length(v_order_src);
+end $$;
+
 rollback;  -- nothing above is kept

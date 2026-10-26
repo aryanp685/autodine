@@ -11,7 +11,14 @@ export default defineConfig({
     // route handlers: the table-card scan is a redirect plus a cookie, and the
     // difference between "browse pass" and "session" is invisible from a unit
     // test of anything else.
-    include: ['lib/**/*.test.ts', 'components/**/*.test.tsx', 'app/**/*.test.ts'],
+    // .test.tsx under app/ is for the flow tests that render a real page's
+    // output, which needs JSX (a .ts file cannot hold it).
+    include: [
+      'lib/**/*.test.ts',
+      'components/**/*.test.tsx',
+      'app/**/*.test.ts',
+      'app/**/*.test.tsx',
+    ],
   },
   resolve: {
     alias: {
