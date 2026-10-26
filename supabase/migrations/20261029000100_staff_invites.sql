@@ -635,43 +635,84 @@ grant execute on function public.list_staff_members(uuid) to authenticated;
 -- DROPPED AND RECREATED, because a policy cannot be edited. Every one below
 -- was `for all using (restaurant_id in (select current_restaurant_ids()))`,
 -- which says "any member", and any member included the kitchen.
+--
+-- Every write policy also checks public.restaurant_can_write(restaurant_id):
+-- a restaurant whose trial has expired can still read its menu but cannot
+-- change it. The trial gate is a licence check, not an access check, so it
+-- belongs in the policy alongside the role check, not only in the RPCs.
 -- ----------------------------------------------------------------------------
 
 -- Menus: every member reads (the board and the ledger join through menus),
 -- owner and manager write.
+--
+-- The remote project ships per-command policies (menus_staff_read,
+-- menus_staff_insert, menus_staff_update, menus_staff_delete) rather than a
+-- single `for all` policy. Both spellings are dropped so this migration
+-- produces the same result on a fresh database and on an existing one.
 drop policy if exists menus_staff on public.menus;
+drop policy if exists menus_staff_read on public.menus;
+drop policy if exists menus_staff_insert on public.menus;
+drop policy if exists menus_staff_update on public.menus;
+drop policy if exists menus_staff_delete on public.menus;
 drop policy if exists menus_member_read on public.menus;
 drop policy if exists menus_manage on public.menus;
 create policy menus_member_read on public.menus
   for select using (restaurant_id in (select public.current_restaurant_ids()));
 create policy menus_manage on public.menus
   for all
-  using (public.has_restaurant_role(restaurant_id, array['owner', 'manager']))
-  with check (public.has_restaurant_role(restaurant_id, array['owner', 'manager']));
+  using (public.has_restaurant_role(restaurant_id, array['owner', 'manager'])
+    AND public.restaurant_can_write(restaurant_id))
+  with check (public.has_restaurant_role(restaurant_id, array['owner', 'manager'])
+    AND public.restaurant_can_write(restaurant_id));
 
+-- Categories: every member reads, owner and manager write.
+--
+-- See the menus section above for why both the `for all` and per-command
+-- policy spellings are dropped.
 drop policy if exists categories_staff on public.categories;
+drop policy if exists categories_staff_read on public.categories;
+drop policy if exists categories_staff_insert on public.categories;
+drop policy if exists categories_staff_update on public.categories;
+drop policy if exists categories_staff_delete on public.categories;
 drop policy if exists categories_member_read on public.categories;
 drop policy if exists categories_manage on public.categories;
 create policy categories_member_read on public.categories
   for select using (restaurant_id in (select public.current_restaurant_ids()));
 create policy categories_manage on public.categories
   for all
-  using (public.has_restaurant_role(restaurant_id, array['owner', 'manager']))
-  with check (public.has_restaurant_role(restaurant_id, array['owner', 'manager']));
+  using (public.has_restaurant_role(restaurant_id, array['owner', 'manager'])
+    AND public.restaurant_can_write(restaurant_id))
+  with check (public.has_restaurant_role(restaurant_id, array['owner', 'manager'])
+    AND public.restaurant_can_write(restaurant_id));
 
+-- Items: every member reads, owner and manager write.
+--
+-- See the menus section above for why both spellings are dropped.
 drop policy if exists items_staff on public.items;
+drop policy if exists items_staff_read on public.items;
+drop policy if exists items_staff_insert on public.items;
+drop policy if exists items_staff_update on public.items;
+drop policy if exists items_staff_delete on public.items;
 drop policy if exists items_member_read on public.items;
 drop policy if exists items_manage on public.items;
 create policy items_member_read on public.items
   for select using (restaurant_id in (select public.current_restaurant_ids()));
 create policy items_manage on public.items
   for all
-  using (public.has_restaurant_role(restaurant_id, array['owner', 'manager']))
-  with check (public.has_restaurant_role(restaurant_id, array['owner', 'manager']));
+  using (public.has_restaurant_role(restaurant_id, array['owner', 'manager'])
+    AND public.restaurant_can_write(restaurant_id))
+  with check (public.has_restaurant_role(restaurant_id, array['owner', 'manager'])
+    AND public.restaurant_can_write(restaurant_id));
 
 -- Variants and add-ons carry their own restaurant_id through a policy that
 -- joins items; the write side mirrors items exactly.
+--
+-- See the menus section above for why both spellings are dropped.
 drop policy if exists variants_staff on public.item_variants;
+drop policy if exists variants_staff_read on public.item_variants;
+drop policy if exists variants_staff_insert on public.item_variants;
+drop policy if exists variants_staff_update on public.item_variants;
+drop policy if exists variants_staff_delete on public.item_variants;
 drop policy if exists variants_member_read on public.item_variants;
 drop policy if exists variants_manage on public.item_variants;
 create policy variants_member_read on public.item_variants
@@ -689,6 +730,7 @@ create policy variants_manage on public.item_variants
       select 1 from public.items i
       where i.id = item_variants.item_id
         and public.has_restaurant_role(i.restaurant_id, array['owner', 'manager'])
+        and public.restaurant_can_write(i.restaurant_id)
     )
   )
   with check (
@@ -696,9 +738,15 @@ create policy variants_manage on public.item_variants
       select 1 from public.items i
       where i.id = item_variants.item_id
         and public.has_restaurant_role(i.restaurant_id, array['owner', 'manager'])
+        and public.restaurant_can_write(i.restaurant_id)
     )
   );
 
+-- Add-on groups: same pattern as variants, joined through items.
+--
+-- These two tables had no old per-command policies, so the `for all` policy
+-- below is the only write policy -- which is why the trial gate must be in
+-- it rather than somewhere else.
 drop policy if exists addon_groups_staff on public.item_addon_groups;
 drop policy if exists addon_groups_member_read on public.item_addon_groups;
 drop policy if exists addon_groups_manage on public.item_addon_groups;
@@ -717,6 +765,7 @@ create policy addon_groups_manage on public.item_addon_groups
       select 1 from public.items i
       where i.id = item_addon_groups.item_id
         and public.has_restaurant_role(i.restaurant_id, array['owner', 'manager'])
+        and public.restaurant_can_write(i.restaurant_id)
     )
   )
   with check (
@@ -724,9 +773,13 @@ create policy addon_groups_manage on public.item_addon_groups
       select 1 from public.items i
       where i.id = item_addon_groups.item_id
         and public.has_restaurant_role(i.restaurant_id, array['owner', 'manager'])
+        and public.restaurant_can_write(i.restaurant_id)
     )
   );
 
+-- Add-ons: same pattern as add-on groups, joined through groups and items.
+--
+-- See the add-on groups section above for why the trial gate is in the policy.
 drop policy if exists addons_staff on public.item_addons;
 drop policy if exists addons_member_read on public.item_addons;
 drop policy if exists addons_manage on public.item_addons;
@@ -749,6 +802,7 @@ create policy addons_manage on public.item_addons
       join public.items i on i.id = g.item_id
       where g.id = item_addons.group_id
         and public.has_restaurant_role(i.restaurant_id, array['owner', 'manager'])
+        and public.restaurant_can_write(i.restaurant_id)
     )
   )
   with check (
@@ -758,34 +812,56 @@ create policy addons_manage on public.item_addons
       join public.items i on i.id = g.item_id
       where g.id = item_addons.group_id
         and public.has_restaurant_role(i.restaurant_id, array['owner', 'manager'])
+        and public.restaurant_can_write(i.restaurant_id)
     )
   );
 
 -- Tables and printed codes: every member may read (the board names tables),
 -- owner and manager may write. Code rotation itself stays in
 -- rotate_table_qr_code(), which checks the write gate.
+--
+-- See the menus section above for why both spellings are dropped.
 drop policy if exists tables_staff on public.dining_tables;
+drop policy if exists tables_staff_read on public.dining_tables;
+drop policy if exists tables_staff_insert on public.dining_tables;
+drop policy if exists tables_staff_update on public.dining_tables;
+drop policy if exists tables_staff_delete on public.dining_tables;
 drop policy if exists tables_member_read on public.dining_tables;
 drop policy if exists tables_manage on public.dining_tables;
 create policy tables_member_read on public.dining_tables
   for select using (restaurant_id in (select public.current_restaurant_ids()));
 create policy tables_manage on public.dining_tables
   for all
-  using (public.has_restaurant_role(restaurant_id, array['owner', 'manager']))
-  with check (public.has_restaurant_role(restaurant_id, array['owner', 'manager']));
+  using (public.has_restaurant_role(restaurant_id, array['owner', 'manager'])
+    AND public.restaurant_can_write(restaurant_id))
+  with check (public.has_restaurant_role(restaurant_id, array['owner', 'manager'])
+    AND public.restaurant_can_write(restaurant_id));
 
+-- QR tokens: every member may read, owner and manager may write.
+--
+-- See the menus section above for why both spellings are dropped.
 drop policy if exists qr_tokens_staff on public.qr_tokens;
+drop policy if exists qr_tokens_staff_read on public.qr_tokens;
+drop policy if exists qr_tokens_staff_insert on public.qr_tokens;
+drop policy if exists qr_tokens_staff_update on public.qr_tokens;
+drop policy if exists qr_tokens_staff_delete on public.qr_tokens;
 drop policy if exists qr_tokens_member_read on public.qr_tokens;
 drop policy if exists qr_tokens_manage on public.qr_tokens;
 create policy qr_tokens_member_read on public.qr_tokens
   for select using (restaurant_id in (select public.current_restaurant_ids()));
 create policy qr_tokens_manage on public.qr_tokens
   for all
-  using (public.has_restaurant_role(restaurant_id, array['owner', 'manager']))
-  with check (public.has_restaurant_role(restaurant_id, array['owner', 'manager']));
+  using (public.has_restaurant_role(restaurant_id, array['owner', 'manager'])
+    AND public.restaurant_can_write(restaurant_id))
+  with check (public.has_restaurant_role(restaurant_id, array['owner', 'manager'])
+    AND public.restaurant_can_write(restaurant_id));
 
 -- Payments are the bill. The kitchen needs the food, not the money.
+--
+-- The remote project has a legacy payments_staff_read policy in addition to
+-- payments_money_read; both are dropped so only the role-scoped read remains.
 drop policy if exists payments_staff on public.payments;
+drop policy if exists payments_staff_read on public.payments;
 drop policy if exists payments_money_read on public.payments;
 create policy payments_money_read on public.payments
   for select
