@@ -234,7 +234,7 @@ function Items({ order, compact }: { order: BoardTicket; compact?: boolean }) {
                 its dinner
      wording    lib/announce.ts builds the sentence; lib/hindi.ts makes every
                 word of it Devanagari, including the dish names
-     pacing     one sentence at a time, with a gap, at a human rate
+     pacing     short phrases and explicit pauses; voice character remains device-dependent
      honesty    when sound cannot happen at all -- no Hindi voice, no tap yet,
                 sound off, engine wedged -- the board says so in one banner,
                 in the words the operator needs, and says how to fix it
@@ -255,7 +255,7 @@ export function Kitchen({
   const [speaksHere, setSpeaksHere] = useState(true);
   const [voiceName, setVoiceName] = useState<string | null>(null);
   /** Every Hindi voice installed here, so a bad default can be swapped. */
-  const [voiceList, setVoiceList] = useState<{ name: string; lang: string }[]>([]);
+  const [voiceList, setVoiceList] = useState<{ name: string; lang: string; localService?: boolean; default?: boolean }[]>([]);
   const [voicePref, setVoicePref] = useState('');
   const [speed, setSpeed] = useState<Speed>('normal');
   /** 'starting' until the platform either names a Hindi voice or has none. */
@@ -469,8 +469,9 @@ export function Kitchen({
       engine.refreshVoices();
       engine.setRateScale(SPEEDS[speedRef.current]);
 
-      // A preference saved on another tablet may not exist here; the engine
-      // says so and we keep the best available rather than pretending.
+      // A saved preference may not exist on this browser. Clear it only after
+      // at least one Hindi candidate is discovered, then report the automatic
+      // selection rather than implying the stale preference is still active.
       let stored = '';
       try { stored = localStorage.getItem(VOICE_KEY) ?? ''; } catch { /* storage is optional */ }
       const hindiVoices = engine.hindiVoices();
@@ -484,7 +485,12 @@ export function Kitchen({
         engine.setVoiceName(stored);
       }
 
-      setVoiceList(hindiVoices.map((v) => ({ name: v.name, lang: v.lang })));
+      setVoiceList(hindiVoices.map((v) => ({
+        name: v.name,
+        lang: v.lang,
+        localService: v.localService,
+        default: v.default,
+      })));
 
       const name = engine.voiceName();
 
@@ -1119,20 +1125,19 @@ export function Kitchen({
   const latest = orders.find((order) => order.state !== 'served') ?? orders[0];
 
   /**
-   * The sentence "Test announcement" speaks.
-   *
-   * The same builder a real ticket uses, with one of each kind of clause in it
-   * -- a portion, a second dish, a note -- so pressing it once tells the
-   * operator what all three sound like at the speed they picked.
+   * Representative sample built with the same formatter as real tickets:
+   * table, grouped dishes, and a guest instruction. Its title is exposed on
+   * the test button so staff can see the exact phrase being auditioned.
    */
   const sampleText = newOrderText(
-    'T1',
+    'T5',
     [
-      { qty: 1, name: 'Butter Chicken', detail: 'Half' },
-      { qty: 2, name: 'Butter Naan' },
+      { qty: 2, name: 'Paneer Tikka' },
+      { qty: 1, name: 'Butter Naan', detail: 'Half · Extra cheese' },
     ],
-    'no onion',
+    'less spicy',
   );
+  const selectedVoiceInfo = voiceList.find((voice) => voice.name === voiceName);
 
   const readMissed = () => {
     for (const ticket of [...missedRef.current].reverse()) {
@@ -1276,9 +1281,9 @@ export function Kitchen({
             ]}
           />
 
-          {/* Which Hindi voice. A device can carry two, and they are not
-              equally good -- an embedded engine and a downloaded neural one
-              both answer to hi-IN. Only shown when there is a real choice. */}
+          {/* The exact runtime Hindi candidate is shown below, including its
+              language tag. Names and language tags identify the browser voice;
+              they do not guarantee human-sounding pronunciation. */}
           {voiceList.length > 1 && (
             <select
               aria-label="Hindi voice"
@@ -1291,10 +1296,10 @@ export function Kitchen({
               }}
               className="h-9 max-w-[190px] rounded-[var(--p-r-control)] border border-hair-strong bg-card px-2.5 pr-7 text-[12.5px] text-gink transition-colors hover:border-gink-28 focus:border-[var(--p-accent)] focus:ring-2 focus:ring-[color-mix(in_oklab,var(--p-accent)_16%,transparent)] focus:outline-none"
             >
-              <option value="">सबसे अच्छी आवाज़ (auto)</option>
+              <option value="">स्वचालित (पहले hi-IN)</option>
               {voiceList.map((voice) => (
                 <option key={voice.name} value={voice.name}>
-                  {voice.name}
+                  {voice.name} · {voice.lang}{voice.default ? ' · system default' : ''}
                 </option>
               ))}
             </select>
@@ -1323,10 +1328,12 @@ export function Kitchen({
           <span className="ml-auto flex items-center gap-1.5">
             <button
               type="button"
+              aria-label="Test the selected voice with a representative Hindi sample order"
+              title={sampleText}
               onClick={() => replay(`test:${Date.now()}`, sampleText, 'Test')}
               className={btn('ghost', 'sm')}
             >
-              Test announcement
+              Test sample order
             </button>
             <button
               type="button"
@@ -1344,6 +1351,23 @@ export function Kitchen({
               Replay latest
             </button>
           </span>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-hair px-4 py-2 text-[11.5px] text-gink-64">
+          <p aria-live="polite">
+            Selected Hindi voice:{' '}
+            <strong className="font-semibold text-gink">
+              {voiceName
+                ? `${voiceName}${selectedVoiceInfo ? ` (${selectedVoiceInfo.lang})` : ''}`
+                : voiceState === 'starting' ? 'searching…' : 'none available'}
+            </strong>
+            {selectedVoiceInfo?.default ? ' · browser default' : ''}
+            {' · '}
+            {voiceName && voicePref === voiceName
+              ? 'saved choice on this device'
+              : 'automatic Hindi-tag/name selection'}
+          </p>
+          <p>Voice quality depends on this device. Use the sample to compare installed voices.</p>
         </div>
       </section>
 

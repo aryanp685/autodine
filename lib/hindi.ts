@@ -562,6 +562,9 @@ export function spokenName(name: string, override?: string | null): string {
  * pattern is still translated word for word, which is the honest fallback.
  */
 const NOTE_REWRITES: [RegExp, string][] = [
+  // Common kitchen instruction: phrase it as something a cook can act on,
+  // rather than the clipped menu tag "कम तीखा".
+  [/\bless\s+spicy\b/gi, 'तीखा थोड़ा कम रखना'],
   [/\bwithout\s+([a-z]+)/gi, '$1 के बिना'],
   [/\bno\s+([a-z]+)/gi, '$1 नहीं'],
   [/\bnot\s+([a-z]+)/gi, '$1 नहीं'],

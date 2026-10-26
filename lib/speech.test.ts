@@ -199,6 +199,18 @@ describe('splitSentences', () => {
     expect(splitSentences('एक बटर चिकन')).toEqual(['एक बटर चिकन']);
     expect(splitSentences('   ')).toEqual([]);
   });
+
+  it('chunks a long special instruction at clause/word boundaries without losing text', () => {
+    const note = `ध्यान देना, ${'प्याज़ नहीं, लहसुन नहीं, तीखा थोड़ा कम रखना, अलग पैक करना, '.repeat(5)}आख़िरी निर्देश भी साथ रखना।`;
+    const pieces = splitSentences(note);
+    const restored = pieces.join(' ').replace(/\s+/g, ' ');
+
+    expect(pieces.length).toBeGreaterThan(1);
+    expect(pieces[0]).toMatch(/^ध्यान देना,/);
+    expect(restored).toBe(note);
+    const plan = planSpeech(note);
+    expect(new Set(plan.map((segment) => segment.rate)).size).toBe(1);
+  });
 });
 
 describe('speaking', () => {
@@ -398,6 +410,7 @@ describe('speaking', () => {
     expect(sentenceKind('नया ऑर्डर, टेबल टी वन।')).toBe('greeting');
     expect(sentenceKind('एक बटर चिकन, आधा।')).toBe('dish');
     expect(sentenceKind('ध्यान दें, प्याज़ नहीं।')).toBe('note');
+    expect(sentenceKind('ध्यान देना, प्याज़ नहीं।')).toBe('note');
     expect(sentenceKind('नोट, प्याज़ नहीं।')).toBe('note');
   });
 

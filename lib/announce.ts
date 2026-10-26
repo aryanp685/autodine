@@ -171,17 +171,21 @@ export function createAnnounceQueue(speaker: Speaker, hooks: QueueHooks = {}): A
 /**
  * Portion words, as a kitchen says them -- and they come BEFORE the dish.
  *
- * "एक आधा बटर चिकन" is how a person says it. "बटर चिकन, आधा" is how a list
- * says it: the comma makes the portion sound like a second dish, and on a
- * ticket with three dishes the cook has to remember which dish it belonged to.
- * Put in front, it is attached to the dish by the only word order Hindi has.
+ * Quantity and portion stay attached to the dish name. For the common menu
+ * variants "Half" and "Full", Mumbai kitchens naturally use "हाफ" and "फुल"
+ *; measured portions use proper Hindi ("आधी प्लेट", "आधा किलो"). This keeps
+ * the quantity, size and dish in one phrase without making a portion sound like
+ * a second item.
  *
  * "पाव" is Bombay for a quarter and is what the kitchen actually calls it; the
  * menu can say "Quarter".
  */
 const PORTION: Record<string, string> = {
-  half: 'आधा',
-  full: 'पूरा',
+  // Bombay kitchens commonly call menu portions "half" and "full"; these
+  // short Hinglish forms are clearer than the grammatically awkward "एक आधा
+  // बटर चिकन". Measured variants below remain proper Hindi (आधी प्लेट, आधा किलो).
+  half: 'हाफ',
+  full: 'फुल',
   quarter: 'पाव',
   regular: 'रेगुलर',
   small: 'छोटा',
@@ -405,13 +409,20 @@ export function spokenItem(item: SpeakableItem): string {
 export function newOrderText(table: string, items: SpeakableItem[], note?: string | null): string {
   const clauses: string[] = [];
 
-  clauses.push(isTakeaway(table) ? 'नया टेकअवे ऑर्डर।' : `नया ऑर्डर, टेबल ${spokenTable(table)}।`);
+  if (isTakeaway(table)) {
+    clauses.push('नया टेकअवे ऑर्डर आया है।');
+  } else {
+    clauses.push('नया ऑर्डर आया है।');
+    clauses.push(`टेबल ${spokenTable(table)}।`);
+  }
 
-  // Do not summarize or truncate item lines: the persisted quantities, names,
-  // portions and add-ons are all operational facts. Replay remains available
-  // from the announcement log if a long ticket is interrupted.
-  if (items.length > 0) {
-    clauses.push(`${items.map(spokenItem).join('। ')}।`);
+  // Pair dishes into conversational phrases. A long ticket becomes a few
+  // short utterances instead of a rushed item-by-item recital; every saved
+  // quantity, name, portion and add-on remains in its original item phrase.
+  // Replay remains available if any chunk is interrupted.
+  for (let index = 0; index < items.length; index += 2) {
+    const group = items.slice(index, index + 2).map(spokenItem);
+    clauses.push(`${group.join(' और ')}।`);
   }
 
   // A guest types "no onion." and the sentence already ends in a danda, so a
@@ -423,7 +434,7 @@ export function newOrderText(table: string, items: SpeakableItem[], note?: strin
   if (trimmedNote) {
     // "ध्यान दें" rather than "नोट": a kitchen acts on a warning, and the
     // word is unmistakable over extractor fans.
-    clauses.push(`ध्यान दें, ${noteToDevanagari(trimmedNote)}।`);
+    clauses.push(`ध्यान देना, ${noteToDevanagari(trimmedNote)}।`);
   }
 
   return clauses.join(' ');

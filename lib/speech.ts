@@ -27,9 +27,10 @@
  * board says why, loudly, in words. Quietly switching to English would be a
  * board the kitchen cannot follow while looking exactly like one that works.
  *
- * So every utterance has a watchdog, a chime before it, the best available
- * Hindi voice rather than whatever the platform defaults to, and a
- * sentence-at-a-time delivery so a long ticket is not read in one breath.
+ * Each utterance has watchdogs and outcome reporting. The browser supplies
+ * the available Hindi voices; the automatic choice is a metadata heuristic,
+ * and actual sound quality must be checked on the target device. Punctuation
+ * and sentence boundaries pace a ticket, but cannot make the model expressive.
  */
 
 /** The subset of SpeechSynthesisVoice this module needs. */
@@ -37,6 +38,8 @@ export type VoiceLike = {
   name: string;
   lang: string;
   localService?: boolean;
+  /** Browser-reported default flag; useful for diagnosis, not quality scoring. */
+  default?: boolean;
 };
 
 /**
@@ -51,18 +54,13 @@ function normaliseLang(lang: string): string {
 }
 
 /**
- * How pleasant a voice is likely to sound, from its name alone.
+ * A metadata-only tie-break within one Hindi language tier.
  *
- * The Web Speech API exposes no quality field, so this is a heuristic -- but a
- * useful one. Every platform ships several voices per language and the default
- * is frequently the oldest and most robotic: on Windows that is a legacy
- * Microsoft voice, on macOS the compact set, on Android the embedded one. The
- * neural voices are named after what they are, and the Hindi ones are named
- * after people (Lekha, Kalpana, Swara, Heera, Neerja).
- *
- * Higher is better. Ties fall back to local, then alphabetical, so the choice
- * is stable between announcements instead of flickering with enumeration
- * order.
+ * The Web Speech API exposes no pronunciation, gender, warmth or quality
+ * signal. Names such as "natural" or a vendor label are only weak hints, not
+ * evidence that a voice sounds better. This score makes automatic selection
+ * deterministic; it is not a substitute for comparing voices on the actual
+ * device. Operators can audition the installed candidates in the kitchen UI.
  */
 export function voiceScore(voice: VoiceLike): number {
   const name = `${voice.name} ${voice.lang}`.toLowerCase();
@@ -75,8 +73,8 @@ export function voiceScore(voice: VoiceLike): number {
   }
   if (voice.localService) score += 1; // no network round trip before it starts
 
-  // Legacy / embedded engines. Audibly worse than anything above, and some of
-  // them skip Devanagari-embedded Latin entirely.
+  // A weak label-based down-rank only. These names do not establish how a
+  // particular installed voice sounds on this device.
   if (/compact|espeak|festival|eloquence|pico|robot/.test(name)) score -= 5;
 
   return score;
@@ -164,16 +162,13 @@ export type SpeechEngine = {
   /** The name of the Hindi voice that will be used, or null. */
   voiceName(): string | null;
   /**
-   * Every Hindi voice this device has.
-   *
-   * A device can carry more than one, and they are not equally good: an
-   * embedded engine and a downloaded neural one both answer to hi-IN and
-   * sound nothing alike. The board lists them so an operator whose default
-   * sounds wrong can try the other one instead of living with it.
+   * Every Hindi-tagged voice this browser reports. Different engines may
+   * sound very different despite sharing a language tag; only listening on
+   * this device can establish which one is clearest.
    */
   hindiVoices(): VoiceLike[];
   /**
-   * Force a specific Hindi voice, or null to go back to the best available.
+   * Force a specific Hindi voice, or null to return to the automatic candidate.
    *
    * Returns false when the requested voice is not installed -- a preference
    * saved on another tablet, say -- so the caller can fall back rather than
@@ -183,8 +178,8 @@ export type SpeechEngine = {
   /**
    * Speed multiplier applied to every sentence. 1 is the tuned default.
    *
-   * A room with an echo, or an operator who finds the default hurried, needs
-   * this. Clamped so a stored value cannot make the board unintelligible.
+   * Allows the operator to compare slower, normal, and faster playback.
+   * Clamped so a stored value cannot make the board unintelligible.
    */
   setRateScale(scale: number): void;
   /** True when there is no Hindi voice at all. */
@@ -201,24 +196,18 @@ export const DEFAULT_START_TIMEOUT_MS = 4000;
 export const DEFAULT_COMPLETION_TIMEOUT_MS = 30_000;
 
 /**
- * Speed and pitch.
- *
- * Hindi voices ship fast and flat -- the same engine that reads a market price
- * will read a ticket like an automated phone menu. Pulling the rate down a
- * little and keeping the pitch neutral is the difference between a person
- * telling the pass what to cook and a device reciting a list.
- *
- * This is the BASE rate. Individual sentences are adjusted around it by
- * planSpeech() below, because a person does not read a ticket at one speed.
+ * Existing neutral Web Speech settings. These values are not calibrated to
+ * this user's target voice: this environment has no browser voice inventory or
+ * audio output to audition. Pitch stays neutral; changing it cannot add vocal
+ * texture or personality. The rate remains a base multiplier for the existing
+ * user speed control and sentence categories until a real-device listening
+ * comparison can justify a change.
  */
 export const VOICE_TUNING = { rate: 0.92, pitch: 1, volume: 1 } as const;
 
 /**
- * How long the board waits after the chime before the first word.
- *
- * A tone followed instantly by speech sounds like a machine. A person rings a
- * bell and then takes a breath; that breath is the difference between "an
- * alert" and "someone telling you something".
+ * Existing delay between the alert tone and first word. Kept unchanged in
+ * this iteration; it has not been validated by listening on the kitchen device.
  */
 export const LEAD_IN_MS = 280;
 
@@ -229,11 +218,9 @@ export const LEAD_IN_MS = 280;
  * between them -- that is the whole palette. So the three kinds of sentence a
  * ticket contains are paced differently, the way a person says them:
  *
- *   greeting   "नया ऑर्डर, टेबल टी वन।"  a little slower, then a real pause,
- *              because the next words are a list the pass has to write down
- *   dish       "एक बटर चिकन, आधा।"      steady, short pause between dishes
- *   note       "ध्यान दें, प्याज़ नहीं।" slower and warned by a longer pause,
- *              because a constraint said at speed is a constraint missed
+ *   greeting   "नया ऑर्डर आया है।"       alert, followed by the table phrase
+ *   dish       "दो पनीर टिक्का और एक बटर नान।" grouped in short batches
+ *   note       "ध्यान देना, प्याज़ नहीं।" a separate, slower instruction
  */
 export type SpeechSegment = {
   text: string;
@@ -253,7 +240,7 @@ const PACE = {
 
 /** The sentence kinds planSpeech recognises, by how they open. */
 export function sentenceKind(sentence: string): keyof typeof PACE {
-  if (/^(ध्यान दें|नोट)/.test(sentence)) return 'note';
+  if (/^(ध्यान दें|ध्यान देना|नोट)/.test(sentence)) return 'note';
   if (/^(नया|टेबल)/.test(sentence)) return 'greeting';
   return 'dish';
 }
@@ -261,17 +248,19 @@ export function sentenceKind(sentence: string): keyof typeof PACE {
 /**
  * Turn an announcement into paced sentences.
  *
- * This is where "human" actually lives. Speaking the same words at one rate
- * with one gap, no matter what they mean, is what makes a synthesiser sound
- * like a synthesiser: the voice has no idea that "टेबल टी वन" is a heading and
- * "प्याज़ नहीं" is a warning. Giving each kind its own rate and its own pause
- * costs nothing and is heard immediately in a kitchen.
+ * These boundaries give the browser explicit phrase and pause cues; they do
+ * not make a synthetic voice human. Web Speech does not expose word-level
+ * emphasis or expressive prosody. The existing timings are retained pending
+ * listening tests on the actual target devices, which are unavailable here.
  */
 export function planSpeech(text: string): SpeechSegment[] {
   const sentences = splitSentences(text);
 
+  let continuingNote = false;
   return sentences.map((sentence, index) => {
-    const pace = PACE[sentenceKind(sentence)];
+    if (NOTE_START.test(sentence)) continuingNote = true;
+    const kind = continuingNote ? 'note' : sentenceKind(sentence);
+    const pace = PACE[kind];
 
     return {
       text: sentence,
@@ -291,13 +280,54 @@ export function planSpeech(text: string): SpeechSegment[] {
  * clause with. Latin terminators are accepted too, so a message built
  * elsewhere is still paced rather than read in one breath.
  */
+const MAX_NOTE_SEGMENT_CHARS = 100;
+const NOTE_START = /^(?:ध्यान दें|ध्यान देना|नोट)[,،]?\s*/u;
+
+/** Split a long safety note at its written clauses, then at word boundaries. */
+function chunkNote(sentence: string): string[] {
+  const cue = sentence.match(NOTE_START)?.[0] ?? '';
+  const body = sentence.slice(cue.length).trim();
+  if (!cue || sentence.length <= MAX_NOTE_SEGMENT_CHARS) return [sentence];
+
+  const clauses = body.split(/(?<=[,;])\s+/u).filter(Boolean);
+  const chunks: string[] = [];
+  let current = cue;
+
+  for (const clause of clauses) {
+    const candidate = current ? `${current} ${clause}` : clause;
+    if (current && current !== cue && candidate.length > MAX_NOTE_SEGMENT_CHARS) {
+      chunks.push(current.trim());
+      current = '';
+    }
+
+    if (clause.length <= MAX_NOTE_SEGMENT_CHARS) {
+      current = current ? `${current} ${clause}` : clause;
+      continue;
+    }
+
+    // One unusually long clause may have no punctuation. Split only at spaces;
+    // no words are removed or rewritten, and the cue appears only on chunk one.
+    const words = clause.match(/\S+\s*/gu) ?? [];
+    for (const word of words) {
+      if (current && current.length + word.length > MAX_NOTE_SEGMENT_CHARS) {
+        chunks.push(current.trim());
+        current = '';
+      }
+      current += word;
+    }
+  }
+
+  if (current.trim()) chunks.push(current.trim());
+  return chunks.length ? chunks : [sentence];
+}
+
 export function splitSentences(text: string): string[] {
   const pieces = text
-    .split(/(?<=[।.!?])\s+/)
+    .split(/(?<=[।.!?])\s+/u)
     .map((piece) => piece.trim())
     .filter(Boolean);
 
-  return pieces.length > 0 ? pieces : [text.trim()].filter(Boolean);
+  return pieces.length > 0 ? pieces.flatMap(chunkNote) : [text.trim()].filter(Boolean);
 }
 
 export function createKitchenSpeech(
