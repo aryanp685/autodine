@@ -38,6 +38,9 @@ What Arena has done, and can do, without a database:
 | the migration's statement inventory and line ranges | verified against the file (Appendix A) | matches |
 | nothing in this round changes application code | `git diff --stat` | docs + `scripts/branch-db/` only |
 | unit suite and hermetic E2E still pass | `vitest run`, CI, E2E workflow | 95 files / 1257 tests; E2E 9/9 (previous run, unchanged by this round) |
+| the migration actually executes | PostgreSQL 16.2 built from the repo's 26 migrations + a scaffold | **applied cleanly**; see `docs/validation-local-pg-2026-10-26.md` |
+| the ten `PASS` blocks actually pass | `06_scan_limits.sql` on that database | **PASS 1 … 10**, verbatim in the same file |
+| a database-backed throttle, through the real code | `app/menu/throttle-db.integration.test.tsx` | **3/3 passed** on that database |
 
 ## 1. Before any SQL: is this the right database?
 

@@ -33,10 +33,16 @@ a sentence". This file is the honest map.
 | the same attempt key is re-sent, so a retry cannot duplicate an order | same file | yes | no |
 | an already-verified guest's order is untouched by a refused scan | same file | yes | no |
 | a genuine throttle in a browser, against a real DB | `e2e/integration/throttle.spec.ts` | **no** | **yes** |
+| a genuine throttle through the real route + page + action, real SQL | `app/menu/throttle-db.integration.test.tsx` | **no** (skips without `THROTTLE_DB_URL`) | **yes** — run locally, 3/3 passed |
 
 ## The gap, stated plainly
 
-**No test in this repository has ever run against a database-backed throttle.**
+**Update, 2026-10-26:** a database-backed throttle *has* now run — against a
+local PostgreSQL 16.2 built from this repository's migrations, not against
+Supabase and not against a production clone. Ten `PASS` blocks and three
+integration tests passed; see `docs/validation-local-pg-2026-10-26.md`. The
+paragraph below still describes the CI situation, which is unchanged, and the
+fidelity gap that only a branch database closes.
 CI has no Supabase environment, by design — the browser suite is hermetic so the
 pipeline needs no secrets. The consequence is exact and worth saying out loud:
 
