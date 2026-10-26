@@ -408,6 +408,11 @@ prints something you can paste back if it fails.
 → note its connection string as `$BRANCH_DATABASE_URL`. Do **not** use the
 production project.
 
+> The same sequence exists as runnable files and a who-runs-what table in
+> `docs/branch-db-validation.md`: `scripts/branch-db/00-preflight.sql` (identity
+> and the empty-clone guard), `01-verify-before.sql`, `02-capture-rollback.sql`
+> and `03-verify-after.sql`. Use those rather than retyping the queries here.
+
 **Step 1 — clone the live schema into it.** Schema only; no rows, no secrets:
 
 ```bash
