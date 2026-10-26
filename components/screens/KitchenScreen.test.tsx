@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { Kitchen } from './KitchenScreen';
+import { Kitchen, movedLine } from './KitchenScreen';
 
 /**
  * The kitchen board, rendered the way the server renders it.
@@ -457,5 +457,133 @@ describe('Kitchen board, the redesign', () => {
     // the only one.
     const html = live();
     expect(html).toContain('2 min');
+  });
+});
+
+/* ==========================================================================
+   A 390px phone, which is the screen this board is most often opened on
+   ========================================================================== */
+
+/** The opening tag of the button whose label is `label`. */
+function buttonFor(html: string, label: string): string {
+  const at = html.indexOf(`>${label}`);
+  expect(at, `no button labelled ${label}`).toBeGreaterThan(-1);
+  const open = html.lastIndexOf('<button', at);
+  return html.slice(open, html.indexOf('>', open) + 1);
+}
+
+describe('Kitchen board on a phone', () => {
+  it('gives the tap that moves a ticket the full width of the card', () => {
+    const html = renderToStaticMarkup(<Kitchen />);
+
+    // Below lg the action is full-bleed inside the card. It used to sit at the
+    // right end of a wrapping row, behind the total and next to the cancel
+    // pair, which on the narrowest screen puts the one control the board
+    // exists for at the edge -- and a five-character label does not fit there.
+    for (const label of ['Start preparing']) {
+      const tag = buttonFor(html, label);
+      expect(tag, label).toContain('max-lg:w-full');
+      // ...and it is still the 44px target the board promises.
+      expect(tag, label).toContain('h-11');
+    }
+  });
+
+  it('never leaves the move actions 36px tall on a phone', () => {
+    const html = renderToStaticMarkup(<Kitchen />);
+
+    // Every advance button carries the same pair of classes, so the row cannot
+    // drift one label at a time.
+    for (const label of ['Start preparing', 'Mark ready', 'Mark served']) {
+      const at = html.indexOf(`>${label}`);
+      if (at === -1) continue; // that stage has no ticket on the sample board
+      expect(buttonFor(html, label), label).toMatch(/max-lg:w-full/);
+    }
+  });
+
+  it('keeps the secondary controls in a row that wraps instead of clipping', () => {
+    const html = renderToStaticMarkup(<Kitchen />);
+    // Replay is an icon and Cancel is a word: on the narrowest card they share
+    // a line, and the row must wrap rather than push one out of the card.
+    expect(html).toMatch(/flex flex-wrap items-center gap-1\.5 border-t/);
+  });
+
+  it('says nothing about a move before one has happened', () => {
+    expect(renderToStaticMarkup(<Kitchen />)).not.toContain('moved to');
+  });
+
+  it('names the destination the way the column is named, not the database', () => {
+    expect(movedLine({ table: 'T4', code: 'KI-8F2A1' }, 'preparing')).toBe(
+      'T4 · KI-8F2A1 moved to Preparing.',
+    );
+    // 'served' is the third column's second half; the heading says Ready /
+    // Served, so a cook reading the note does not look for a column called
+    // "Served".
+    expect(movedLine({ table: 'T4', code: 'KI-8F2A1' }, 'served')).toBe(
+      'T4 · KI-8F2A1 moved to Ready / Served.',
+    );
+  });
+});
+
+describe('reading a ticket on a narrow card', () => {
+  const long = {
+    restaurantName: 'maddi',
+    restaurantId: 'r-1',
+    cancelled: [],
+    role: 'kitchen' as const,
+    canAdvance: true,
+    tickets: [
+      {
+        id: 'o-9',
+        code: 'MA-LONG1',
+        table: 'T12',
+        placedAt: '7:42 pm',
+        placedAtIso: new Date().toISOString(),
+        ageMin: 3,
+        payment: 'pending' as const,
+        state: 'new' as const,
+        items: [
+          {
+            qty: 2,
+            name: 'Hyderabadi Dum Chicken Biryani with Mirchi Ka Salan',
+            portion: 'Large',
+            addons: ['Extra caramelised onion and fried cashew', 'No coriander'],
+            veg: false,
+          },
+        ],
+        note: 'No onion in the gravy, and please ring the bell twice at the pass — the table is at the back.',
+        total: 980,
+      },
+    ],
+  };
+
+  it('lets a long dish name wrap instead of running out of the card', () => {
+    const html = renderToStaticMarkup(<Kitchen data={long} />);
+
+    // A flex item will not shrink below its longest word without min-w-0, and
+    // the card is overflow-hidden -- so the dish name used to be cut off
+    // rather than wrapped.
+    expect(html).toContain('inline-flex max-w-full min-w-0');
+    expect(html).toMatch(/class="min-w-0 font-medium">Hyderabadi Dum/);
+    // The veg mark never shrinks; only the words move.
+    expect(html).toMatch(/class="shrink-0"><span[^>]*data-veg|class="shrink-0">/);
+  });
+
+  it('wraps a long modifier on a phone instead of clipping it', () => {
+    const html = renderToStaticMarkup(<Kitchen data={long} />);
+    const at = html.indexOf('data-addon');
+    const tag = html.slice(html.lastIndexOf('<span', at), html.indexOf('>', at) + 1);
+
+    expect(tag).toContain('max-lg:whitespace-normal');
+    // ...and is still allowed to hold one line where there is room.
+    expect(tag).toContain('whitespace-nowrap');
+    expect(tag).toContain('max-w-full');
+  });
+
+  it('keeps the whole special instruction on the card', () => {
+    const html = renderToStaticMarkup(<Kitchen data={long} />);
+    // No truncation and no line clamp on the note: a cook who reads three
+    // quarters of "no onion" is a cook who puts onion in.
+    expect(html).toContain('ring the bell twice at the pass');
+    expect(html).not.toMatch(/line-clamp[^"]*"[^>]*>\s*“No onion/);
   });
 });
