@@ -514,6 +514,34 @@ end;
 $$;
 
 -- ----------------------------------------------------------------------------
+-- The email on a team row
+--
+-- auth.users is a Supabase object, not one of this repository's tables: a
+-- plain Postgres built from these migrations (the local harness, a CI scratch
+-- database) does not have it. A function that joined it directly would work on
+-- Supabase and fail everywhere else, which is the worst possible split.
+--
+-- to_regclass() is checked BEFORE the select, so the statement is never
+-- executed where the relation is absent -- and the column is simply null there.
+-- ----------------------------------------------------------------------------
+
+create or replace function public.staff_email(p_user_id uuid)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = public, auth
+as $$
+begin
+  if to_regclass('auth.users') is null then
+    return null;
+  end if;
+
+  return (select u.email::text from auth.users u where u.id = p_user_id);
+end;
+$$;
+
+-- ----------------------------------------------------------------------------
 -- The team list
 --
 -- A SECURITY DEFINER read instead of a wider policy on public.profiles.
@@ -556,12 +584,11 @@ begin
       m.user_id,
       m.role,
       nullif(trim(p.full_name), ''),
-      u.email::text,
+      public.staff_email(m.user_id),
       m.created_at,
       m.user_id = v_actor
     from public.memberships m
     left join public.profiles p on p.id = m.user_id
-    left join auth.users u on u.id = m.user_id
     where m.restaurant_id = p_restaurant_id
     order by
       /* Owners first, then managers, then the rest; oldest first inside a
@@ -587,6 +614,7 @@ $$;
 revoke all on function public.normalise_invite_code(text) from public;
 revoke all on function public.hash_invite_code(text) from public;
 revoke all on function public.new_invite_code() from public;
+revoke all on function public.staff_email(uuid) from public, anon, authenticated;
 revoke all on function public.create_staff_invite(uuid, public.member_role, integer) from public, anon;
 revoke all on function public.preview_staff_invite(text) from public, anon;
 revoke all on function public.redeem_staff_invite(text) from public, anon;
@@ -769,3 +797,12 @@ create policy payments_money_read on public.payments
    impossible rather than merely un-policied. */
 revoke insert, update, delete on public.payments from anon;
 revoke insert, update, delete on public.payments from authenticated;
+
+/* SELECT is granted explicitly, in keeping with this repository's rule that a
+   policy is not a permission (see 20261021000500). Without it the counter and
+   the bill read nothing at all -- the row-level policy above would never even
+   be consulted, because the statement fails on the privilege first. This is
+   also why the local harness matters: on Supabase the default privileges
+   happen to include SELECT, so a missing grant there is invisible until it is
+   run somewhere that does not have them. */
+grant select on public.payments to authenticated;

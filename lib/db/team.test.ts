@@ -21,7 +21,7 @@ vi.mock('@/lib/db/staff', () => ({
   getStaffContextDetailed: () => Promise.resolve(mocks.staff.result),
 }));
 
-import { getTeamScreenData } from './team';
+import { getTeamScreenData, homeForRole, roleLabel } from './team';
 
 type Row = Record<string, unknown>;
 
@@ -181,5 +181,28 @@ describe('team data', () => {
     expect(data?.members).toHaveLength(1);
     expect(data?.invites).toEqual([]);
     expect(data?.unavailable).toMatch(/invitations could not be read/i);
+  });
+});
+
+/**
+ * Where each role lands.
+ *
+ * This is the difference between a new kitchen login arriving on the board and
+ * arriving on a wall that says "not your role" -- so it is worth pinning in
+ * one line each.
+ */
+describe('where a role works', () => {
+  it('sends each role to its own screen', () => {
+    expect(homeForRole('owner')).toBe('/dashboard');
+    expect(homeForRole('manager')).toBe('/dashboard');
+    expect(homeForRole('cashier')).toBe('/cashier');
+    expect(homeForRole('kitchen')).toBe('/kitchen');
+  });
+
+  it('names the roles the way the product does', () => {
+    expect(roleLabel('owner')).toBe('Owner');
+    expect(roleLabel('manager')).toBe('Manager');
+    expect(roleLabel('cashier')).toBe('Cashier');
+    expect(roleLabel('kitchen')).toBe('Kitchen');
   });
 });

@@ -26,7 +26,7 @@ import { passwordProblem } from '@/lib/password';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requestOrigin } from '@/lib/site-origin';
-import { homeForRole, roleLabel } from '@/lib/db/team';
+import { homeForRole } from '@/lib/db/team';
 import { isWellFormedInviteCode, joinPath, normaliseInviteCode } from '@/lib/team-invite';
 import type { MemberRole } from '@/lib/db/database';
 
@@ -59,14 +59,10 @@ async function redeemAndLand(
   }
 
   if (row.status === 'ok' || row.status === 'already_member') {
-    const role = (row.role ?? 'cashier') as MemberRole;
-    const where = homeForRole(role);
-    const name = row.restaurant_name ?? 'the restaurant';
-    const message =
-      row.status === 'ok'
-        ? `You have joined ${name} as ${roleLabel(role)}.`
-        : `You are already on the team at ${name} as ${roleLabel(role)}.`;
-    redirect(`${where}?notice=${encodeURIComponent(message)}`);
+    /* Land on the screen this role works from. No ?notice= here: the kitchen
+       board and the counter do not read one, and a query parameter that nobody
+       displays is a message the product pretends to have sent. */
+    redirect(homeForRole((row.role ?? 'cashier') as MemberRole));
   }
 
   // Every other status is a real answer with its own sentence on the page.
