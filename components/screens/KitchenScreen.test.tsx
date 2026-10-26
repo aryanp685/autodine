@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { Kitchen, movedLine } from './KitchenScreen';
+import { Kitchen, movedLine, TicketMovedNote } from './KitchenScreen';
 
 /**
  * The kitchen board, rendered the way the server renders it.
@@ -585,5 +585,30 @@ describe('reading a ticket on a narrow card', () => {
     // quarters of "no onion" is a cook who puts onion in.
     expect(html).toContain('ring the bell twice at the pass');
     expect(html).not.toMatch(/line-clamp[^"]*"[^>]*>\s*“No onion/);
+  });
+});
+
+describe('the line that says where a ticket went', () => {
+  it('is focusable by script and not by Tab', () => {
+    const html = renderToStaticMarkup(<TicketMovedNote text="T4 · KI-8F2A1 moved to Preparing." />);
+
+    // tabIndex -1, not 0: this line is not something a cook opens, it is a
+    // report on something they just did. A 0 here would put one more stop in
+    // every card-advance, on a board people work with wet hands.
+    expect(html).toContain('tabindex="-1"');
+    // And focus must be visible to a keyboard but invisible to a mouse.
+    expect(html).toContain('focus-visible:outline-2');
+    expect(html).not.toContain('focus:outline');
+  });
+
+  it('draws the exact sentence and nothing else', () => {
+    const html = renderToStaticMarkup(<TicketMovedNote text="T4 · KI-8F2A1 moved to Preparing." />);
+
+    // No markup inside the line: it is a status report, and a cook reading it
+    // is not reaching for a button. Rendered to a static string so the whole
+    // element is compared, class list included.
+    expect(html).toBe(
+      '<p tabindex="-1" class="mt-2 text-[12.5px] leading-[1.5] text-gink-64 focus-visible:rounded-[var(--p-r-chip)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]">T4 · KI-8F2A1 moved to Preparing.</p>',
+    );
   });
 });

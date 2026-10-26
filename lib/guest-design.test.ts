@@ -115,3 +115,24 @@ describe('guest flow design system', () => {
     }
   });
 });
+
+describe('the live status dot', () => {
+  it('is looping, and is disabled under prefers-reduced-motion for that class only', () => {
+    const at = css.indexOf('@keyframes g-live {');
+    expect(at, 'the live dot keyframe exists').toBeGreaterThan(-1);
+
+    const guard = css.slice(at).match(/@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{([^}]*)\}/);
+    expect(guard, 'the dot is neutralised under reduced motion').not.toBeNull();
+    if (!guard) return;
+    expect(guard[1]).toContain('.g-live-dot');
+    expect(guard[1]).toContain('animation: none');
+
+    // One loop is only worth disabling if it is actually looping: the class
+    // rule, not the keyframe, says so.
+    const rule = css.slice(at).match(/\[data-flow-root\]\s+\.g-live-dot\s*\{([^}]*)\}/);
+    expect(rule, 'the dot is a real, scoped animation').not.toBeNull();
+    if (!rule) return;
+    expect(rule[1]).toMatch(/infinite/);
+    expect(rule[1]).toContain('g-live');
+  });
+});

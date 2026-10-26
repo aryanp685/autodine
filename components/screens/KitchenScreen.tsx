@@ -1,7 +1,7 @@
 'use client';
 
 import { rupeesToPaise } from '@/lib/money';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { kitchenOrders, restaurant, type KitchenOrder } from '@/lib/demo-data';
 import { Money, VegMark } from '@/components/ui';
@@ -1472,15 +1472,7 @@ export function Kitchen({
       {/* Where the ticket went. Focusable, and focused, so a keyboard user is
           never dropped back at the top of the document by a card leaving the
           column they were working in. */}
-      {moved && (
-        <p
-          ref={movedRef}
-          tabIndex={-1}
-          className="mt-2 text-[12.5px] leading-[1.5] text-gink-64 focus-visible:rounded-[var(--p-r-chip)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]"
-        >
-          {moved}
-        </p>
-      )}
+      {moved && <TicketMovedNote ref={movedRef} text={moved} />}
 
       <div className="mt-3 grid gap-3 lg:grid-cols-3">
         {cols.map((c) => (
@@ -1744,6 +1736,45 @@ function kbBtn(tone: 'solid' | 'quiet' | 'danger'): string {
   if (tone === 'danger') return btn('danger', 'sm');
   return btn('quiet', 'sm');
 }
+
+/**
+ * Where a ticket went -- and where keyboard focus goes.
+ *
+ * THE ACCESSIBILITY CONTRACT, IN THREE PARTS
+ *
+ *   `tabIndex={-1}`     focusable by script and not by Tab. It is not an item
+ *                       in the tab order: a cook is working a board, and a line
+ *                       of text they did not open belongs behind Tab, not in it.
+ *
+ *   `ref` + the effect    pressing "Mark ready" removes that ticket's card from
+ *                         the column you were working in. On a phone the whole
+ *                         card leaves the screen, so focus was on a node that
+ *                         no longer existed and silently reset to the top of
+ *                         the document -- the next Tab starting at the rail.
+ *                         The note takes focus instead.
+ *
+ *   `focus-visible`        focus is invisible without a keyboard, which is the
+ *                          one case where an invisible focus is the whole
+ *                          point: a mouse user sees the note move, and never
+ *                          sees a focus ring drawn over it.
+ *
+ * `preventScroll` is deliberately NOT passed on the focus call: on a phone the
+ * note sits above the columns, and scrolling it into view is how the cook
+ * learns where the card went.
+ */
+export const TicketMovedNote = forwardRef<HTMLParagraphElement, { text: string }>(
+  function TicketMovedNote({ text }, forwardedRef) {
+    return (
+      <p
+        ref={forwardedRef}
+        tabIndex={-1}
+        className="mt-2 text-[12.5px] leading-[1.5] text-gink-64 focus-visible:rounded-[var(--p-r-chip)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]"
+      >
+        {text}
+      </p>
+    );
+  },
+);
 
 /**
  * What the board says after a ticket moves.

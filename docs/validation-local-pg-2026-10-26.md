@@ -11,7 +11,7 @@ Supabase project was reachable from the environment these were run in, and no
 credential was used or requested. What was run is:
 
 > PostgreSQL **16.2**, started locally, built by applying **the repository's own
-> 26 migrations in order**, plus a shim for the Supabase objects those
+> 27 migrations in order**, plus a shim for the Supabase objects those
 > migrations expect (`auth.uid()`, the `anon`/`authenticated` roles, the
 > `supabase_realtime` publication, `storage.buckets`/`objects`), plus a
 > **scaffold** for the three tables that exist in the live database but were
@@ -28,7 +28,7 @@ The harness is reproducible: `scripts/local-pg/run.sh`.
 
 | step | what ran | result |
 | --- | --- | --- |
-| build | 26 migrations + shim + scaffold | **all applied** |
+| build | 27 migrations + shim + scaffold | **all applied** |
 | S2 preflight | `scripts/branch-db/00-preflight.sql` | identity row, `0/0/0/0` counts, 7 prerequisites **all `t`**, migration objects **absent** |
 | S3 before | `01-verify-before.sql` | three empty result sets, `orders = 0` |
 | S3 rollback | `02-capture-rollback.sql` | **2** `CREATE OR REPLACE FUNCTION` bodies captured, 31,916 bytes |
