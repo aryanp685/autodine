@@ -542,3 +542,60 @@ describe('leaving the dish sheet', () => {
     }
   });
 });
+
+/**
+ * A SCAN THAT WAS THROTTLED, SAID PLAINLY.
+ *
+ * The guest is at a real table with a real cart. Nothing they did was wrong and
+ * nothing has failed; the restaurant's own brake has paused verification for a
+ * while. The screen owes them three facts, in this order: the menu is still
+ * theirs, ordering is paused, and here is what to do next.
+ *
+ * What it must never say is anything that implies an order exists.
+ */
+describe('the throttle notice', () => {
+  const notice =
+    'This table has been scanned unusually often in the last hour. Ordering is paused for a short while — your cart is safe. You can also order with staff.';
+
+  it('shows the explanation above the menu, not at checkout', () => {
+    const html = renderToStaticMarkup(<CustomerMenu throttleNotice={notice} />);
+
+    expect(html).toContain('data-throttle-note');
+    expect(html).toContain('Table check paused');
+    expect(html).toContain('your cart is safe');
+    expect(html).toContain('order with staff');
+  });
+
+  it('keeps the menu readable, because browsing was never the problem', () => {
+    const html = renderToStaticMarkup(<CustomerMenu throttleNotice={notice} />);
+
+    // The same dishes the un-throttled menu shows.
+    const plain = renderToStaticMarkup(<CustomerMenu />);
+    const dishNames = ['Paneer', 'Biryani', 'Naan', 'Kebab', 'Dal'];
+    const shown = dishNames.filter((name) => html.includes(name));
+    const expected = dishNames.filter((name) => plain.includes(name));
+    expect(shown).toEqual(expected);
+  });
+
+  it('does not claim an order was placed', () => {
+    const html = renderToStaticMarkup(<CustomerMenu throttleNotice={notice} />);
+    const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').toLowerCase();
+
+    for (const lie of ['order placed', 'order confirmed', 'sent to the kitchen', 'we saved']) {
+      expect(text).not.toContain(lie);
+    }
+  });
+
+  it('says nothing at all on an ordinary visit', () => {
+    const html = renderToStaticMarkup(<CustomerMenu />);
+    expect(html).not.toContain('data-throttle-note');
+    expect(html).not.toContain('Table check paused');
+  });
+
+  it('is a status region, so a screen reader hears it without an interruption', () => {
+    const html = renderToStaticMarkup(<CustomerMenu throttleNotice={notice} />);
+    expect(html).toMatch(/role="status"[^>]*data-throttle-note|data-throttle-note[^>]*role="status"/);
+    // Not an alert: nothing has failed, the menu is still usable.
+    expect(html).not.toContain('role="alert"');
+  });
+});

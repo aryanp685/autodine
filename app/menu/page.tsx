@@ -7,6 +7,13 @@ import { TableGateScreen } from '@/components/screens/TableGateScreen';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { getMenuScreenData } from '@/lib/db/menu-screen';
 import { loadTableAccess, verifyAgainHref } from '@/lib/table-access';
+import { cookies } from 'next/headers';
+import {
+  THROTTLE_COOKIE,
+  THROTTLE_PARAM,
+  readThrottleFlag,
+  throttleNotice,
+} from '@/lib/scan-outcome';
 
 export const metadata: Metadata = { title: 'Order · AutoDine' };
 
@@ -40,9 +47,12 @@ export const metadata: Metadata = { title: 'Order · AutoDine' };
 export default async function CustomerMenuPage({
   searchParams,
 }: {
-  searchParams: Promise<{ s?: string; m?: string }>;
+  searchParams: Promise<{ s?: string; m?: string; v?: string }>;
 }) {
-  const { s, m } = await searchParams;
+  const params = await searchParams;
+  const { s, m } = params;
+  // The parameter name is single-sourced with the handler that writes it.
+  const v = params[THROTTLE_PARAM];
 
   // Asked for nothing, so show nothing -- not the sample menu, which would
   // read as this restaurant's dishes.
@@ -74,10 +84,33 @@ export default async function CustomerMenuPage({
         ? { label: access.tableLabel }
         : null;
 
+  /*
+   * WERE WE TURNED AWAY AT THE DOOR?
+   *
+   * The scan handler puts the answer in the address (`?v=throttled`) and in a
+   * short-lived cookie, because the guest needs it on this screen AND at
+   * checkout. Both are read here, and neither grants anything: the notice is
+   * copy, and the order path refuses a session-less order exactly as before.
+   *
+   * `throttleNotice()` deliberately says "a short while" rather than a number
+   * when the database did not give one. The current `open_table_session` does
+   * not return a retry time; inventing one would be worse than saying nothing,
+   * and quoting one when it IS returned is the whole point of carrying it.
+   *
+   * The address wins over the cookie: a guest who has just been throttled has
+   * both, and the address is the newer statement of the two.
+   */
+  const fromAddress = readThrottleFlag(v);
+  const fromCookie = readThrottleFlag((await cookies()).get(THROTTLE_COOKIE)?.value);
+  const throttle = fromAddress.throttled ? fromAddress : fromCookie;
+
   // The cart is keyed by restaurant, so it is mounted where the slug is known.
   return (
     <CartProvider slug={s}>
-      <CustomerMenu data={data ? { ...data, table } : undefined} />
+      <CustomerMenu
+        data={data ? { ...data, table } : undefined}
+        throttleNotice={throttle.throttled ? throttleNotice(throttle.retryAfterSeconds) : null}
+      />
     </CartProvider>
   );
 }

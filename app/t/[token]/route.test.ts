@@ -198,3 +198,118 @@ describe('GET /t/<card token>, a restaurant on scan-only verification', () => {
     expect(response.status).toBe(307);
   });
 });
+
+/*
+ * THE THROTTLE, AT THE ROUTE.
+ *
+ * `open_table_session` can answer `limited` when a card or an address has been
+ * opened too often this hour. The route's job is narrow and worth pinning:
+ * a throttled scan must not write a session (nothing is verified by it), and it
+ * must still leave the guest with a readable menu and their browse pass.
+ *
+ * What it does NOT prove, and cannot: that the guest is told anything useful.
+ * Today they are not — that is finding 5.2, and the sentence that fixes it
+ * lives in lib/scan-outcome.ts waiting for the L1 migration.
+ */
+describe('a throttled scan', () => {
+  beforeEach(() => {
+    mocks.loadTableAccess.mockResolvedValue({ status: 'browse', qrToken: LIVE });
+  });
+
+  it('writes no table session, because nothing was verified', async () => {
+    mocks.rpc.mockResolvedValue({
+      data: [{ status: 'limited', session_token: null, restaurant_slug: 'kabir', table_label: '7' }],
+      error: null,
+    });
+
+    const response = await scan(LIVE);
+    const cookies = response.headers.get('set-cookie') ?? '';
+
+    expect(cookies).toContain('autodine_table_card');
+    expect(cookies).not.toContain('autodine_table=');
+    expect(response.headers.get('location')).toContain('/menu?s=kabir');
+  });
+
+  it('does not mistake a throttle for an opened session', async () => {
+    // A database that returned a token alongside a non-opening status must not
+    // be trusted with it: the status is the authority, not the payload.
+    mocks.rpc.mockResolvedValue({
+      data: [{ status: 'limited', session_token: 'a'.repeat(64), restaurant_slug: 'kabir' }],
+      error: null,
+    });
+
+    const response = await scan(LIVE);
+    expect(response.headers.get('set-cookie') ?? '').not.toContain('autodine_table=');
+  });
+
+  it('still sends the guest to the menu rather than an error page', async () => {
+    mocks.rpc.mockResolvedValue({ data: [{ status: 'limited' }], error: null });
+
+    const response = await scan(LIVE);
+    expect(response.status).toBeGreaterThanOrEqual(300);
+    expect(response.status).toBeLessThan(400);
+    expect(response.headers.get('location')).toContain('/menu');
+    expect(response.headers.get('location')).not.toContain('/t/problem');
+  });
+});
+
+/*
+ * A THROTTLED GUEST IS TOLD, AND IS STILL GIVEN THE MENU.
+ *
+ * The answer used to be swallowed. These pin the two things that replaced the
+ * silence: a flag in the address for the screen right after the scan, and a
+ * short-lived cookie for the screens after that (the item sheet, the cart, the
+ * checkout). Neither carries a session.
+ */
+describe('a throttled scan is explained', () => {
+  beforeEach(() => {
+    mocks.loadTableAccess.mockResolvedValue({ status: 'browse', qrToken: LIVE });
+  });
+
+  it('says so in the address it redirects to', async () => {
+    mocks.rpc.mockResolvedValue({
+      data: [{ status: 'limited', restaurant_slug: 'kabir' }],
+      error: null,
+    });
+
+    const response = await scan(LIVE);
+    const location = response.headers.get('location') ?? '';
+
+    expect(location).toContain('/menu?s=kabir');
+    expect(location).toContain('v=throttled');
+  });
+
+  it('remembers it for the screens after the menu, without granting anything', async () => {
+    mocks.rpc.mockResolvedValue({
+      data: [{ status: 'limited', restaurant_slug: 'kabir' }],
+      error: null,
+    });
+
+    const cookies = (await scan(LIVE)).headers.get('set-cookie') ?? '';
+
+    expect(cookies).toContain('autodine_throttled=throttled');
+    expect(cookies).toContain('HttpOnly');
+    // The flag must not be mistaken for a table session.
+    expect(cookies).not.toContain('autodine_table=');
+  });
+
+  it('clears the flag when the same browser later gets a real session', async () => {
+    // Coming back after the queue cleared is the normal recovery, and a stale
+    // "ordering is paused" note on a guest who can now order is its own bug.
+    mocks.rpc.mockResolvedValue({
+      data: [
+        {
+          status: 'opened',
+          session_token: 'b'.repeat(64),
+          restaurant_slug: 'kabir',
+          table_label: '7',
+          expires_at: new Date(Date.now() + 59 * 60_000).toISOString(),
+        },
+      ],
+      error: null,
+    });
+
+    const cookies = (await scan(LIVE)).headers.get('set-cookie') ?? '';
+    expect(cookies).toContain('autodine_throttled=;');
+  });
+});

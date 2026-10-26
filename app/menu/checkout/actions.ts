@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { parseCart } from '@/lib/cart-storage';
 import { codePageHref, loadTableAccess } from '@/lib/table-access';
+import { cookies } from 'next/headers';
+import { THROTTLE_COOKIE, notPlacedNotice, readThrottleFlag } from '@/lib/scan-outcome';
 import {
   describePlaceFailure,
   isTransientPlaceCode,
@@ -113,6 +115,23 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
    * redirected to.
    */
   if (access.status === 'browse') {
+    /*
+     * THE ONE CASE WHERE THE CODE FORM IS THE WRONG ANSWER.
+     *
+     * `browse` normally means "you scanned, now type the six digits". But a
+     * guest whose scan was throttled has no session, and if the restaurant has
+     * switched the rotating code off there are no digits to type at all — so
+     * sending them to the code form is a dead end dressed as a step.
+     *
+     * The throttle cookie is set by `app/t/[token]/route.ts` and only ever for
+     * a restaurant that is NOT on the code, which is why it is safe to treat
+     * this as "there is nothing here to type". Nothing is bypassed: the order
+     * is still refused, exactly as it was before, and the guest is told why
+     * instead of being sent in a circle.
+     */
+    const throttle = readThrottleFlag((await cookies()).get(THROTTLE_COOKIE)?.value);
+    if (throttle.throttled) fail(notPlacedNotice(throttle.retryAfterSeconds), slug);
+
     const back = `/menu/checkout?s=${encodeURIComponent(slug)}`;
     redirect(`${codePageHref(access.qrToken)}?next=${encodeURIComponent(back)}`);
   }

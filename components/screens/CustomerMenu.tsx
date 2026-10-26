@@ -82,7 +82,21 @@ export type MenuScreenData = {
 /* ============================================================================
    Editorial Minimal — locked design system customer menu
    ========================================================================== */
-export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
+export function CustomerMenu({
+  data,
+  throttleNotice,
+}: {
+  data?: MenuScreenData;
+  /**
+   * Why ordering is paused, when a scan was turned away at the door.
+   *
+   * The sentence is built server-side (`lib/scan-outcome.ts`) because it is the
+   * same sentence the checkout refuses with, and two places writing "scanned
+   * too often, try again in a bit" would eventually disagree about what
+   * happened.
+   */
+  throttleNotice?: string | null;
+} = {}) {
   const table = data?.table ?? null;
   const cart = useCart();
   const [cat, setCat] = useState('all');
@@ -249,6 +263,31 @@ export function CustomerMenu({ data }: { data?: MenuScreenData } = {}) {
         bannerUrl={data?.restaurant.bannerUrl}
         tableLabel={table?.label ?? null}
       />
+
+      {/*
+        TURNED AWAY AT THE DOOR, SAID PLAINLY.
+
+        The banner sits directly under the venue, before a single dish, because
+        the guest needs to know before they build a cart that ordering is paused
+        — not after they have tapped twelve dishes and pressed Place order.
+
+        It is a `status` region, not an alert: the menu is still usable, nothing
+        has failed, and a screen reader should read it in passing rather than
+        interrupt. The wording comes from the server and never claims an order
+        exists, because none does.
+      */}
+      {throttleNotice ? (
+        <div
+          role="status"
+          data-throttle-note=""
+          className="mx-3 mt-3 rounded-[16px] border border-hair bg-card px-4 py-3"
+        >
+          <p className="text-[10.5px] font-semibold tracking-[0.12em] text-gink-46 uppercase">
+            Table check paused
+          </p>
+          <p className="mt-1 text-[13.5px] leading-[1.5] text-gink">{throttleNotice}</p>
+        </div>
+      ) : null}
 
       {/*
         Which menu this is. Hidden for the ordinary one-menu restaurant, so
