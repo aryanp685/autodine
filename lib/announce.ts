@@ -36,170 +36,131 @@ import { hindiNumber, noteToDevanagari, spokenName, toDevanagari } from './hindi
  * The speaker is handed the finished Devanagari sentence. It is responsible
  * for the voice, the pacing and the watchdog -- never for the wording.
  */
+import type { SpeechOutcome } from './speech';
+
 export type Speaker = {
-  /** Called for one announcement. Must call onEnd exactly once, even on error. */
-  speak(text: string, onEnd: () => void): void;
+  /** Calls back once, and distinguishes completed speech from an error. */
+  speak(text: string, onEnd: (outcome: SpeechOutcome) => void): void;
 };
 
-/**
- * 'order' is a ticket the kitchen has not seen before: never dropped.
- * 'info' is a state change the board already shows on screen: dropped when
- * the queue is backed up, because six queued tickets matter more than hearing
- * that table two is now preparing.
- */
 export type AnnouncePriority = 'order' | 'info';
+export type EnqueueResult = 'queued' | 'duplicate' | 'full' | 'empty';
+
+export type QueuedAnnouncement = {
+  key: string;
+  text: string;
+  priority: AnnouncePriority;
+};
 
 export type AnnounceQueue = {
-  /**
-   * Queue an announcement.
-   *
-   * Returns false when the key has already been announced, when the same text
-   * is already waiting, or when an 'info' announcement was dropped because
-   * the queue is backed up. In all three cases nothing will be spoken.
-   */
-  push(key: string, text: string, priority?: AnnouncePriority): boolean;
-  /**
-   * Queue an announcement whether or not the key has been used, replacing any
-   * copy still waiting. This is what a Replay button needs.
-   */
-  force(key: string, text: string, priority?: AnnouncePriority): boolean;
-  /** Whether this key was announced before. Does not queue anything. */
+  /** A stable event key may be queued at most once until an explicit retry. */
+  push(key: string, text: string, priority?: AnnouncePriority): EnqueueResult;
+  /** Explicit replay: caller supplies a fresh attempt key. */
+  force(key: string, text: string, priority?: AnnouncePriority): EnqueueResult;
+  /** Whether this key has completed successfully. */
   has(key: string): boolean;
-  /** Forget a key, so the same announcement can be made again on request. */
+  /** Whether this key is completed, waiting, speaking, or failed. */
+  contains(key: string): boolean;
+  /** Forget a failed/completed key, for a deliberate retry using that key. */
   forget(key: string): void;
-  /** Announcements waiting, not including the one speaking now. */
   pending(): number;
-  /** Waiting plus the one being spoken. What the UI shows as "3 queued". */
   depth(): number;
-  /** Whether something is being spoken right now. */
   speaking(): boolean;
-}
+  dispose(): void;
+};
 
-/**
- * How many announcements may be waiting before informational ones start being
- * dropped. Four orders in a burst is the case this feature exists for and must
- * never be trimmed; beyond that the queue is describing the past.
- */
 export const MAX_BACKLOG = 6;
-
-/**
- * A hard ceiling on everything waiting, orders included.
- *
- * Orders are never dropped for being low priority, but an unbounded queue is
- * its own failure: a wedged engine plus a busy evening leaves an hour of
- * tickets waiting to be read out one after another, long after the food went
- * cold. At this depth the queue refuses, the board leaves those tickets
- * unmarked, and they are announced when it drains -- or offered for replay,
- * which is the honest outcome either way.
- */
 export const MAX_PENDING = 20;
 
-/**
- * What the board wants to know about the queue itself.
- *
- * The board draws two things: what is being said right now, and how much is
- * still waiting. Both belong to the queue, not to the caller -- a caller that
- * guessed "the thing I just pushed is what is playing" is wrong the moment two
- * orders arrive together, and a counter that only ever goes up is a display
- * that lies.
- *
- * Notified synchronously from inside push() when the queue was idle, which is
- * what lets the first ticket start speaking without a render in between.
- */
 export type QueueHooks = {
-  /** An announcement has left the queue and gone to the speaker. */
-  onBegin?: (key: string, text: string) => void;
-  /** Nothing is speaking and nothing is waiting. */
+  onBegin?: (entry: QueuedAnnouncement) => void;
+  onResult?: (entry: QueuedAnnouncement, outcome: SpeechOutcome) => void;
   onIdle?: () => void;
 };
 
+/**
+ * FIFO speech queue. Deduplication is by event key, not by text: two genuine
+ * orders can have identical contents, while a refresh of one order must not
+ * create a second enqueue. A failed attempt remains known until explicitly
+ * replayed, but is not reported as completed.
+ */
 export function createAnnounceQueue(speaker: Speaker, hooks: QueueHooks = {}): AnnounceQueue {
-  const waiting: { key: string; text: string; priority: AnnouncePriority }[] = [];
-  const said = new Set<string>();
-  let busy = false;
+  const waiting: QueuedAnnouncement[] = [];
+  const completed = new Set<string>();
+  const failed = new Set<string>();
+  const queued = new Set<string>();
+  let active: QueuedAnnouncement | null = null;
+  let disposed = false;
 
   function notifyIdle(): void {
-    try {
-      hooks.onIdle?.();
-    } catch {
-      /* a broken listener must not stall the queue */
-    }
+    try { hooks.onIdle?.(); } catch { /* UI observers cannot wedge speech */ }
+  }
+
+  function finish(entry: QueuedAnnouncement, outcome: SpeechOutcome): void {
+    if (active?.key !== entry.key) return;
+    active = null;
+    queued.delete(entry.key);
+    if (outcome.status === 'completed') completed.add(entry.key);
+    else if (outcome.status === 'failed') failed.add(entry.key);
+
+    try { hooks.onResult?.(entry, outcome); } catch { /* keep draining */ }
+    drain();
+    if (!active && waiting.length === 0) notifyIdle();
   }
 
   function drain(): void {
-    if (busy) return;
-
+    if (disposed || active) return;
     const next = waiting.shift();
     if (!next) return;
+    active = next;
 
-    busy = true;
-    said.add(next.key);
-
+    try { hooks.onBegin?.(next); } catch { /* keep the speaker independent */ }
     try {
-      hooks.onBegin?.(next.key, next.text);
-    } catch {
-      /* same: the board's own bookkeeping never stops a ticket being read */
-    }
-
-    const finish = () => {
-      // Guard against a speaker that calls onEnd twice (an utterance can fire
-      // both onend and onerror on some engines). Without this the queue would
-      // run two announcements at once, which is the exact bug it exists for.
-      if (!busy) return;
-      busy = false;
-      drain();
-      // drain() sets busy again when it found something, so this is only true
-      // when the announcement that just ended was the last one.
-      if (!busy && waiting.length === 0) notifyIdle();
-    };
-
-    try {
-      speaker.speak(next.text, finish);
-    } catch {
-      // A speaker that throws must not wedge the queue for the rest of the
-      // service: every later ticket would sit behind it for ever.
-      finish();
+      speaker.speak(next.text, (outcome) => finish(next, outcome));
+    } catch (error) {
+      finish(next, {
+        status: 'failed',
+        reason: error instanceof Error ? error.message : 'Speech engine threw an error',
+        completedSegments: 0,
+        totalSegments: 1,
+      });
     }
   }
 
-  function enqueue(
-    key: string,
-    text: string,
-    priority: AnnouncePriority,
-    replaceWaiting: boolean,
-  ): boolean {
+  function enqueue(key: string, text: string, priority: AnnouncePriority, force: boolean): EnqueueResult {
     const body = text.trim();
-    if (body === '') return false;
-
-    if (said.has(key)) {
-      if (!replaceWaiting) return false;
-      said.delete(key);
+    if (!body) return 'empty';
+    if (queued.has(key) || (!force && (completed.has(key) || failed.has(key)))) return 'duplicate';
+    if (depth() >= MAX_PENDING || (priority === 'info' && waiting.length >= MAX_BACKLOG)) return 'full';
+    if (force) {
+      completed.delete(key);
+      failed.delete(key);
     }
 
-    const duplicate = waiting.findIndex((entry) => entry.text === body);
-    if (duplicate >= 0) {
-      if (!replaceWaiting) return false;
-      waiting.splice(duplicate, 1);
-    }
-
-    if (waiting.length >= MAX_PENDING) return false;
-    if (priority === 'info' && waiting.length >= MAX_BACKLOG) return false;
-
-    waiting.push({ key, text: body, priority });
+    const entry = { key, text: body, priority };
+    queued.add(key);
+    waiting.push(entry);
     drain();
-    return true;
+    return 'queued';
   }
+
+  function depth(): number { return waiting.length + (active ? 1 : 0); }
 
   return {
     push: (key, text, priority = 'order') => enqueue(key, text, priority, false),
     force: (key, text, priority = 'order') => enqueue(key, text, priority, true),
-    has: (key) => said.has(key),
-    forget: (key) => {
-      said.delete(key);
-    },
+    has: (key) => completed.has(key),
+    contains: (key) => queued.has(key) || completed.has(key) || failed.has(key),
+    forget: (key) => { completed.delete(key); failed.delete(key); },
     pending: () => waiting.length,
-    depth: () => waiting.length + (busy ? 1 : 0),
-    speaking: () => busy,
+    depth,
+    speaking: () => active !== null,
+    dispose() {
+      disposed = true;
+      waiting.length = 0;
+      queued.clear();
+      active = null;
+    },
   };
 }
 
@@ -302,15 +263,9 @@ const DETAIL: Record<string, string> = { ...PORTION, ...ADDON };
 /**
  * A table label as an Indian voice says it.
  *
- * 'T1' is printed on the table and must be spoken exactly. Devanagari
- * synthesisers disagree about Latin letters and digits -- some read them, some
- * spell them out, some skip them -- so every character is mapped to a
- * Devanagari syllable instead: 'T12' becomes 'टी ट्वेल्व' on every engine.
- *
- * Deliberately not the Hindi numerals used for quantities. A table labelled T1
- * is "टेबल टी वन"; nobody says "टेबल टी एक". The quantity on the ticket is a
- * different thing and does use Hindi numerals ("दो बटर चिकन"), so the two
- * lists cannot be shared.
+ * Table labels and ticket quantities share Hindi number pronunciation. The
+ * alphabetic prefix is read as a Hindi letter name; numeric parts use Hindi
+ * number words so the same table is never pronounced in two different ways.
  */
 const LETTERS: Record<string, string> = {
   a: 'ए', b: 'बी', c: 'सी', d: 'डी', e: 'ई', f: 'एफ़', g: 'जी', h: 'एच', i: 'आई',
@@ -318,39 +273,12 @@ const LETTERS: Record<string, string> = {
   s: 'एस', t: 'टी', u: 'यू', v: 'वी', w: 'डब्ल्यू', x: 'एक्स', y: 'वाय', z: 'ज़ेड',
 };
 
-const LABEL_UNITS = [
-  'ज़ीरो', 'वन', 'टू', 'थ्री', 'फ़ोर', 'फ़ाइव', 'सिक्स', 'सेवन', 'एट', 'नाइन',
-];
-const LABEL_TEENS = [
-  'टेन', 'इलेवन', 'ट्वेल्व', 'थर्टीन', 'फ़ोर्टीन', 'फ़िफ़्टीन', 'सिक्स्टीन',
-  'सेवन्टीन', 'एटीन', 'नाइन्टीन',
-];
-const LABEL_TENS = [
-  '', '', 'ट्वेन्टी', 'थर्टी', 'फ़ोर्टी', 'फ़िफ़्टी', 'सिक्स्टी', 'सेवन्टी', 'एटी', 'नाइन्टी',
-];
-
-/** A number said as a number, up to 99. */
-function labelNumber(value: number): string {
-  if (value < 10) return LABEL_UNITS[value];
-  if (value < 20) return LABEL_TEENS[value - 10];
-
-  const tens = Math.floor(value / 10);
-  const units = value % 10;
-  return units === 0 ? LABEL_TENS[tens] : `${LABEL_TENS[tens]} ${LABEL_UNITS[units]}`;
-}
-
 function labelDigits(chunk: string): string {
   const value = Number(chunk);
-
-  // A table is a number, so it is read as one: "T12" is "टी ट्वेल्व" and
-  // "T21" is "टी ट्वेन्टी वन". Said digit by digit -- "टी टू वन" -- a
-  // table twenty-one becomes a table two-one, and the pass walks to the wrong
-  // table. Larger places run well past twenty tables.
-  if (Number.isInteger(value) && value >= 0 && value <= 99) return labelNumber(value);
-
-  // Longer numbers -- a hotel's "Room 204" -- are said digit by digit, which
-  // is how a room number is spoken everywhere.
-  return [...chunk].map((digit) => LABEL_UNITS[Number(digit)] ?? digit).join(' ');
+  // Table labels use Hindi number words consistently: T1, T21 and Room 204
+  // never switch to English number words depending on label shape.
+  if (Number.isSafeInteger(value) && value >= 0 && value <= 99) return hindiNumber(value);
+  return [...chunk].map((digit) => hindiNumber(Number(digit))).join(' ');
 }
 
 /** Whether a table label means "no table" rather than naming one. */
@@ -388,9 +316,7 @@ export function spokenTable(table: string): string {
   return out.join(' ').replace(/\s+/g, ' ').trim();
 }
 
-/** How long a guest's note may be before it is cut. Spoken, not printed. */
-export const MAX_SPOKEN_NOTE = 120;
-
+/** The saved guest note, spoken in full after whitespace is normalized. */
 export type SpeakableItem = {
   qty: number;
   name: string;
@@ -452,37 +378,13 @@ export function spokenAddons(detail: string | undefined): string {
  * words, the name is Devanagari, and only the add-ons trail the dish.
  */
 export function spokenItem(item: SpeakableItem): string {
-  const name = spokenName(item.name.trim(), item.spoken);
+  const sourceName = item.name.trim();
+  const name = sourceName ? spokenName(sourceName, item.spoken) : 'आइटम';
   const portion = spokenPortion(item.detail);
   const addons = spokenAddons(item.detail);
 
   const base = [hindiNumber(item.qty), portion, name].filter(Boolean).join(' ');
   return addons ? `${base}, ${addons}` : base;
-}
-
-/**
- * Cap on how many dishes are read out.
- *
- * A twelve-item order read in full takes long enough that two more orders land
- * while it is being spoken, and the kitchen stops listening somewhere around
- * the fourth dish. Shortening it is a real loss of information, so the
- * remainder is counted rather than dropped.
- */
-export const MAX_SPOKEN_ITEMS = 4;
-
-export function summariseItems<T extends SpeakableItem>(items: T[]): T[] {
-  if (items.length <= MAX_SPOKEN_ITEMS) return items;
-
-  const head = items.slice(0, MAX_SPOKEN_ITEMS);
-  const rest = items.slice(MAX_SPOKEN_ITEMS);
-  const tail = { qty: 0, name: `और ${hindiNumber(rest.length)} आइटम` };
-
-  return [...head, tail as unknown as T];
-}
-
-/** The summary tail already carries its count, so it is not spoken with one. */
-function spokenTail(item: SpeakableItem): string {
-  return /^और /.test(item.name) ? item.name : spokenItem(item);
 }
 
 /**
@@ -505,9 +407,11 @@ export function newOrderText(table: string, items: SpeakableItem[], note?: strin
 
   clauses.push(isTakeaway(table) ? 'नया टेकअवे ऑर्डर।' : `नया ऑर्डर, टेबल ${spokenTable(table)}।`);
 
-  const spoken = summariseItems(items.filter((item) => item.name.trim() !== ''));
-  if (spoken.length > 0) {
-    clauses.push(`${spoken.map(spokenTail).join('। ')}।`);
+  // Do not summarize or truncate item lines: the persisted quantities, names,
+  // portions and add-ons are all operational facts. Replay remains available
+  // from the announcement log if a long ticket is interrupted.
+  if (items.length > 0) {
+    clauses.push(`${items.map(spokenItem).join('। ')}।`);
   }
 
   // A guest types "no onion." and the sentence already ends in a danda, so a
@@ -517,13 +421,9 @@ export function newOrderText(table: string, items: SpeakableItem[], note?: strin
     .replace(/\s+/g, ' ')
     .replace(/[.,;:!?।]+$/, '');
   if (trimmedNote) {
-    const cut =
-      trimmedNote.length > MAX_SPOKEN_NOTE
-        ? `${trimmedNote.slice(0, MAX_SPOKEN_NOTE).trimEnd()}…`
-        : trimmedNote;
     // "ध्यान दें" rather than "नोट": a kitchen acts on a warning, and the
     // word is unmistakable over extractor fans.
-    clauses.push(`ध्यान दें, ${noteToDevanagari(cut)}।`);
+    clauses.push(`ध्यान दें, ${noteToDevanagari(trimmedNote)}।`);
   }
 
   return clauses.join(' ');

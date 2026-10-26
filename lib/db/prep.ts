@@ -56,6 +56,19 @@ export function nextPrepState(
   return PREP_TRANSITIONS[current as PrepStatus] ?? null;
 }
 
+/**
+ * The only prep transition worth announcing: a server-confirmed state change.
+ * A failed action, null state, or stale click returning the same state must not
+ * be announced as if the ticket moved.
+ */
+export function confirmedPrepChange(
+  previous: PrepState,
+  result: { ok: boolean; state?: PrepState | null },
+): PrepState | null {
+  if (!result.ok || !result.state || result.state === previous) return null;
+  return result.state;
+}
+
 /** True when a ticket can still move forward. */
 export function canAdvance(current: PrepStatus | string | null | undefined): boolean {
   return nextPrepState(current) !== null;

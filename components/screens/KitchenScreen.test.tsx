@@ -167,6 +167,24 @@ describe('Kitchen board', () => {
     expect(html).toContain('· Half');
   });
 
+  it('retains recent cancellations with an explicit replay path', () => {
+    const html = renderToStaticMarkup(
+      <Kitchen
+        data={{
+          restaurantName: 'maddi',
+          restaurantId: 'r-1',
+          tickets: [],
+          cancelled: [{ id: 'cancel-1', table: 'T2', at: new Date().toISOString() }],
+          role: 'kitchen',
+          canAdvance: true,
+        }}
+      />,
+    );
+    expect(html).toContain('Recent cancellations');
+    expect(html).toContain('Replay cancellation');
+    expect(html).toContain('last 15 minutes');
+  });
+
   it('shows an empty live board as empty, not as a demo', () => {
     const html = renderToStaticMarkup(
       <Kitchen

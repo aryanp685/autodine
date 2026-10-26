@@ -128,7 +128,7 @@ export type UtteranceLike = {
   volume: number;
   onstart: (() => void) | null;
   onend: (() => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event?: { error?: string }) => void) | null;
 };
 
 export type SpeechEnv = {
@@ -149,9 +149,14 @@ export type SpeechEnv = {
   startTimeoutMs?: number;
 };
 
+export type SpeechOutcome =
+  | { status: 'completed'; completedSegments: number; totalSegments: number }
+  | { status: 'failed'; reason: string; completedSegments: number; totalSegments: number }
+  | { status: 'cancelled'; completedSegments: number; totalSegments: number };
+
 export type SpeechEngine = {
-  /** Speak one announcement. Calls onEnd exactly once. */
-  speak(text: string, onEnd: () => void): void;
+  /** Speak one announcement and report whether it was actually completed. */
+  speak(text: string, onEnd: (outcome: SpeechOutcome) => void): void;
   /** Re-read the installed voices. Cheap; safe to call on every render. */
   refreshVoices(): void;
   /** Whether this device has a Hindi voice. The only question that matters. */
@@ -193,6 +198,7 @@ export type SpeechEngine = {
 };
 
 export const DEFAULT_START_TIMEOUT_MS = 4000;
+export const DEFAULT_COMPLETION_TIMEOUT_MS = 30_000;
 
 /**
  * Speed and pitch.
@@ -296,36 +302,37 @@ export function splitSentences(text: string): string[] {
 
 export function createKitchenSpeech(
   env: SpeechEnv,
-  options: { startTimeoutMs?: number } = {},
+  options: { startTimeoutMs?: number; completionTimeoutMs?: number } = {},
 ): SpeechEngine {
   let voices: VoiceLike[] = [];
   let loaded = false;
   let didStall = false;
   let forced: string | null = null;
   let rateScale = 1;
+  let cancelCurrent: (() => void) | null = null;
 
   const startTimeoutMs = options.startTimeoutMs ?? env.startTimeoutMs ?? DEFAULT_START_TIMEOUT_MS;
+  const completionTimeoutMs = options.completionTimeoutMs ?? DEFAULT_COMPLETION_TIMEOUT_MS;
 
   function refreshVoices(): void {
     if (!env.synthesis) return;
     const next = env.synthesis.getVoices();
-    if (next.length === 0) return; // not enumerated yet; keep the empty list
+    if (next.length === 0) return;
     voices = next;
     loaded = true;
+    // A previously selected voice may disappear after an OS update or while
+    // the browser refreshes its voice catalogue. Never retain a stale choice.
+    if (forced && !voices.some((candidate) => candidate.name === forced)) forced = null;
   }
 
   refreshVoices();
 
   function voice(): VoiceLike | null {
-    // Voices load asynchronously on most platforms; the first announcement
-    // after a cold start is exactly when that matters.
     if (!loaded) refreshVoices();
-
     if (forced) {
       const chosen = voices.find((candidate) => candidate.name === forced);
       if (chosen) return chosen;
     }
-
     return pickHindiVoice(voices);
   }
 
@@ -334,73 +341,105 @@ export function createKitchenSpeech(
       const body = text.trim();
       const synthesis = env.synthesis;
       const voiceToUse = voice();
+      const sentences = splitSentences(body);
+      let completedSegments = 0;
+      let settled = false;
+      const timers = new Set<unknown>();
+      let activeUtterance = false;
 
-      if (!synthesis || !body || !voiceToUse) {
-        // No sound is possible. Nothing is spoken, and the queue still has to
-        // move: a stuck queue is a board that goes silent for the rest of the
-        // service. The caller surfaces why -- see unavailable().
-        onEnd();
+      const schedule = (fn: () => void, ms: number) => {
+        const timer = env.setTimer(() => {
+          timers.delete(timer);
+          fn();
+        }, ms);
+        timers.add(timer);
+        return timer;
+      };
+      const clearTimers = () => {
+        for (const timer of timers) env.clearTimer(timer);
+        timers.clear();
+      };
+      const finish = (outcome: SpeechOutcome) => {
+        if (settled) return;
+        settled = true;
+        clearTimers();
+        if (cancelCurrent === cancel) cancelCurrent = null;
+        try { onEnd(outcome); } catch { /* observer cannot wedge the synthesiser */ }
+      };
+      const cancel = () => {
+        if (settled) return;
+        settled = true;
+        clearTimers();
+        if (cancelCurrent === cancel) cancelCurrent = null;
+        try { synthesis?.cancel(); } catch { /* best effort */ }
+        try { onEnd({ status: 'cancelled', completedSegments, totalSegments: sentences.length }); } catch { /* observer cannot wedge the synthesiser */ }
+      };
+      cancelCurrent = cancel;
+
+      if (!synthesis || !body || !voiceToUse || sentences.length === 0) {
+        finish({
+          status: 'failed',
+          reason: !synthesis ? 'Speech synthesis is unavailable' : !voiceToUse ? 'No Hindi voice is available' : 'Announcement text is empty',
+          completedSegments: 0,
+          totalSegments: sentences.length,
+        });
         return;
       }
 
-      // The chime is played before the voice and outside the watchdog: it is
-      // the fallback for a device whose TTS is dead, and it tells the room to
-      // listen before the first word rather than after it.
-      try {
-        env.chime();
-      } catch {
-        /* audio locked or absent -- the screen still updates */
-      }
-
-      const sentences = splitSentences(body);
+      try { env.chime(); } catch { /* audio can be locked until a gesture */ }
       const plan = planSpeech(body);
 
-      let finished = false;
-      const finish = () => {
-        // An utterance can fire onstart, onend AND onerror on some engines.
-        // Calling back twice would run two announcements at once.
-        if (finished) return;
-        finished = true;
-        onEnd();
+      const fail = (reason: string, stalled = false) => {
+        if (settled) return;
+        if (stalled) didStall = true;
+        if (activeUtterance) {
+          try { synthesis.cancel(); } catch { /* nothing to cancel */ }
+          activeUtterance = false;
+        }
+        finish({ status: 'failed', reason, completedSegments, totalSegments: sentences.length });
       };
 
       const speakAt = (index: number) => {
-        if (finished) return;
-
-        const segment = plan[index];
+        if (settled) return;
         const raw = sentences[index];
-        if (!segment || !raw) {
-          finish();
+        const segment = plan[index];
+        if (!raw || !segment) {
+          finish({ status: 'completed', completedSegments, totalSegments: sentences.length });
           return;
         }
-
-        // The danda is our sentence separator, not a sound. Some engines
-        // vocalise or clip it, which is heard as a stutter at the end of every
-        // phrase -- exactly the "totla" impression. The pause is ours anyway.
         const sentence = raw.replace(/[।.!?\s]+$/u, '').trim();
         if (!sentence) {
-          if (index + 1 >= sentences.length) finish();
-          else env.setTimer(() => speakAt(index + 1), 0);
+          completedSegments += 1;
+          if (index + 1 >= sentences.length) finish({ status: 'completed', completedSegments, totalSegments: sentences.length });
+          else schedule(() => speakAt(index + 1), 0);
           return;
         }
 
-        let settled = false;
-        let watchdog: unknown = null;
-
+        let segmentSettled = false;
+        let startWatchdog: unknown = null;
+        let completionWatchdog: unknown = null;
+        const clearWatchdogs = () => {
+          if (startWatchdog !== null) { env.clearTimer(startWatchdog); timers.delete(startWatchdog); startWatchdog = null; }
+          if (completionWatchdog !== null) { env.clearTimer(completionWatchdog); timers.delete(completionWatchdog); completionWatchdog = null; }
+        };
+        const segmentFailure = (reason: string, stalled = false) => {
+          if (segmentSettled || settled) return;
+          segmentSettled = true;
+          clearWatchdogs();
+          fail(reason, stalled);
+        };
         const next = () => {
-          if (settled) return;
-          settled = true;
-          env.clearTimer(watchdog);
-
+          if (segmentSettled || settled) return;
+          segmentSettled = true;
+          activeUtterance = false;
+          clearWatchdogs();
+          completedSegments += 1;
           if (index + 1 >= sentences.length) {
-            finish();
+            finish({ status: 'completed', completedSegments, totalSegments: sentences.length });
             return;
           }
-
-          // The gap is what makes it sound like a person rather than a list:
-          // a beat between dishes, a longer one before the note.
           const nextSegment = plan[index + 1];
-          env.setTimer(() => speakAt(index + 1), segment.gapMs + (nextSegment?.leadMs ?? 0));
+          schedule(() => speakAt(index + 1), segment.gapMs + (nextSegment?.leadMs ?? 0));
         };
 
         try {
@@ -410,87 +449,56 @@ export function createKitchenSpeech(
           utterance.rate = Math.min(1.5, Math.max(0.5, VOICE_TUNING.rate * segment.rate * rateScale));
           utterance.pitch = VOICE_TUNING.pitch;
           utterance.volume = VOICE_TUNING.volume;
-
           utterance.onstart = () => {
             didStall = false;
-            env.clearTimer(watchdog);
+            if (startWatchdog !== null) { env.clearTimer(startWatchdog); timers.delete(startWatchdog); startWatchdog = null; }
+            completionWatchdog = schedule(() => segmentFailure('Speech did not finish before timeout'), completionTimeoutMs);
           };
           utterance.onend = next;
-          utterance.onerror = next;
-
-          watchdog = env.setTimer(() => {
-            didStall = true;
-            // A wedged utterance blocks the whole synthesiser queue. Clearing
-            // it is the only way the next ticket gets spoken at all -- and the
-            // rest of THIS announcement is abandoned, because the engine is no
-            // longer responding.
-            try {
-              synthesis.cancel();
-            } catch {
-              /* nothing to cancel */
+          utterance.onerror = (event) => {
+            const error = event?.error || 'Speech synthesis error';
+            if (error === 'interrupted' || error === 'canceled') {
+              segmentFailure('Speech was interrupted');
+            } else {
+              segmentFailure(`Speech failed: ${error}`);
             }
-            finish();
-          }, startTimeoutMs);
-
+          };
+          activeUtterance = true;
+          startWatchdog = schedule(() => segmentFailure('Speech did not start before timeout', true), startTimeoutMs);
           synthesis.speak(utterance);
-        } catch {
-          env.clearTimer(watchdog);
-          finish();
+        } catch (error) {
+          segmentFailure(error instanceof Error ? error.message : 'Speech synthesis threw an error');
         }
       };
 
-      // A breath between the chime and the first word.
-      env.setTimer(() => speakAt(0), LEAD_IN_MS);
+      schedule(() => speakAt(0), LEAD_IN_MS);
     },
 
     refreshVoices,
-
     available: () => voice() !== null,
-
     voiceName: () => voice()?.name ?? null,
-
     hindiVoices() {
       if (!loaded) refreshVoices();
       return voices.filter((candidate) => /^hi(-|$)/i.test(candidate.lang.replace('_', '-')));
     },
-
     setVoiceName(name) {
-      if (name === null) {
-        forced = null;
-        return true;
-      }
+      if (name === null) { forced = null; return true; }
       if (!loaded) refreshVoices();
-      if (!voices.some((candidate) => candidate.name === name)) return false;
+      if (!voices.some((candidate) => candidate.name === name && /^hi(-|$)/i.test(candidate.lang.replace('_', '-')))) return false;
       forced = name;
       return true;
     },
-
     setRateScale(scale) {
       if (!Number.isFinite(scale)) return;
       rateScale = Math.min(1.3, Math.max(0.6, scale));
     },
-
-    /**
-     * True only when this is definitely broken: no synthesiser at all, or a
-     * list of voices that contains no Hindi one.
-     *
-     * An EMPTY list is not proof of anything -- on most browsers getVoices()
-     * is empty for the first few hundred milliseconds while the engine
-     * enumerates. Claiming "broken" then would raise a false alarm on a
-     * perfectly good tablet, so an empty list reports "no voice yet" through
-     * voiceName() === null and the board waits before warning.
-     */
     unavailable: () => !env.synthesis || (loaded && pickHindiVoice(voices) === null),
-
     stalled: () => didStall,
-    clearStall: () => {
-      didStall = false;
-    },
+    clearStall: () => { didStall = false; },
     cancel() {
-      try {
-        env.synthesis?.cancel();
-      } catch {
-        /* nothing to cancel */
+      if (cancelCurrent) cancelCurrent();
+      else {
+        try { env.synthesis?.cancel(); } catch { /* nothing to cancel */ }
       }
     },
   };

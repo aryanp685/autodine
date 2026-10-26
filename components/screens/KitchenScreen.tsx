@@ -18,9 +18,11 @@ import {
   btn,
 } from '@/components/owner/chrome';
 import type { OutletBar } from '@/lib/outlets';
-import type { KitchenScreenData, KitchenTicket } from '@/lib/db/kitchen-screen';
+import type { CancelledTicket, KitchenScreenData, KitchenTicket } from '@/lib/db/kitchen-screen';
+import { claimKitchenSpeaker, type KitchenSpeakerState } from '@/lib/kitchen-speaker-lock';
+import { readMissedOrderIds, writeMissedOrderIds } from '@/lib/kitchen-missed';
 import { clockTimeInZone } from '@/lib/db/time';
-import { LATE_AFTER_MIN, WARN_AFTER_MIN, nextPrepState, type PrepState } from '@/lib/db/prep';
+import { confirmedPrepChange, LATE_AFTER_MIN, WARN_AFTER_MIN, nextPrepState, type PrepState } from '@/lib/db/prep';
 import { advanceOrderAction } from '@/app/(staff)/kitchen/actions';
 import { HeldTableStrip } from '@/components/owner/HeldTableStrip';
 import { cancelStaffOrderAction } from '@/app/orders/actions';
@@ -36,6 +38,7 @@ import {
   primeOnOpen,
   selectNewTickets,
   type AnnounceQueue,
+  type EnqueueResult,
 } from '@/lib/announce';
 import {
   browserSpeechEnv,
@@ -48,6 +51,7 @@ import {
    and the board cannot disagree about what "late" means. */
 /** How many past announcements the on-screen log keeps. */
 const LOG_LIMIT = 6;
+const MISSED_LIMIT = 100;
 
 /**
  * How long the board waits for the platform to enumerate its voices before it
@@ -77,6 +81,9 @@ const SPEEDS = { slow: 0.85, normal: 1, fast: 1.1 } as const;
 
 type Speed = keyof typeof SPEEDS;
 const seenKey = (restaurantId: string | null) => `autodine:kitchen:seen:${restaurantId ?? 'demo'}`;
+function kitchenStorage(): Storage | null {
+  try { return window.localStorage; } catch { return null; }
+}
 
 /**
  * One ticket on the board, in the shape the locked markup renders.
@@ -110,7 +117,7 @@ type BoardTicket = {
   total: number;
 };
 
-type LogEntry = { key: string; at: string; label: string; text: string };
+type LogEntry = { key: string; at: string; label: string; text: string; status: 'queued' | 'completed' | 'failed' | 'cancelled' };
 
 function fromDemo(order: KitchenOrder): BoardTicket {
   return {
@@ -300,6 +307,8 @@ export function Kitchen({
   const [speaking, setSpeaking] = useState(false);
   const [waiting, setWaiting] = useState(0);
   const [missed, setMissed] = useState<BoardTicket[]>([]);
+  const missedRef = useRef<BoardTicket[]>([]);
+  const [speakerState, setSpeakerState] = useState<KitchenSpeakerState>('claiming');
   /**
    * Why those tickets were not read out.
    *
@@ -308,7 +317,8 @@ export function Kitchen({
    * The first needs a fix and the second needs a decision, so the banner says
    * which one it is.
    */
-  const [missedReason, setMissedReason] = useState<'voice' | 'muted'>('voice');
+  const [missedReason, setMissedReason] = useState<'voice' | 'muted' | 'speaker' | 'queue'>('voice');
+  const [speechWarning, setSpeechWarning] = useState('');
   const [ready, setReady] = useState(false);
 
   const live = Boolean(data);
@@ -326,16 +336,52 @@ export function Kitchen({
   const chimeRef = useRef<(() => void) | null>(null);
   const speedRef = useRef<Speed>('normal');
   const queueRef = useRef<AnnounceQueue | null>(null);
+  const speakerAllowedRef = useRef(false);
+  const announcementTicketsRef = useRef(new Map<string, BoardTicket>());
+  const missedAttemptByOrderRef = useRef(new Map<string, string>());
   const seenRef = useRef<Set<string>>(new Set());
   const primedRef = useRef(false);
   /** Cancellations already announced, so a refresh cannot repeat one. */
   const cancelSeenRef = useRef<Set<string>>(new Set());
   const cancelPrimedRef = useRef(false);
+  const activeRestaurantRef = useRef<string | null | undefined>(undefined);
   /** True once the board knows whether a Hindi voice exists. */
   const settledRef = useRef(false);
   /** The same answer, readable from the announcement pass without a re-render. */
   const canAnnounceRef = useRef(false);
   const [settled, setSettled] = useState(false);
+
+  const changeMissed = useCallback((update: (current: BoardTicket[]) => BoardTicket[]) => {
+    setMissed((current) => {
+      const next = update(current);
+      missedRef.current = next;
+      writeMissedOrderIds(kitchenStorage(), restaurantId, next.flatMap((ticket) => ticket.orderId ? [ticket.orderId] : []));
+      return next;
+    });
+  }, [restaurantId]);
+
+  /* ------------------------------------------- same-browser speaker election */
+
+  useEffect(() => {
+    if (!live) {
+      speakerAllowedRef.current = true;
+      setSpeakerState('inactive');
+      return;
+    }
+    if (!restaurantId || !speaksHere) {
+      speakerAllowedRef.current = false;
+      setSpeakerState('inactive');
+      return;
+    }
+
+    const locks = typeof navigator !== 'undefined' && 'locks' in navigator
+      ? navigator.locks
+      : null;
+    return claimKitchenSpeaker(locks, restaurantId, (state) => {
+      speakerAllowedRef.current = state === 'leader' || state === 'local-only';
+      setSpeakerState(state);
+    });
+  }, [live, restaurantId, speaksHere]);
 
   /* ------------------------------------------------------------- preferences */
 
@@ -373,6 +419,39 @@ export function Kitchen({
   /* ------------------------------------------------------------------ speech */
 
   useEffect(() => {
+    if (activeRestaurantRef.current !== restaurantId) {
+      activeRestaurantRef.current = restaurantId;
+      seenRef.current = new Set();
+      primedRef.current = false;
+      cancelSeenRef.current.clear();
+      cancelPrimedRef.current = false;
+      missedRef.current = [];
+      missedAttemptByOrderRef.current.clear();
+      announcementTicketsRef.current.clear();
+      setMissed([]);
+      setLog([]);
+      setAnnouncement('');
+      setMissedReason('voice');
+      setSpeechWarning('');
+      setSpeaking(false);
+      setWaiting(0);
+      setVoiceName(null);
+      setVoiceList([]);
+      setLostCount(0);
+      setStalled(false);
+      setPending({});
+      setCancelled([]);
+      setConfirmCancel(null);
+      setCancelBusy(null);
+      setError('');
+      setArrivals([]);
+      setMobileCol('new');
+      canAnnounceRef.current = false;
+      settledRef.current = false;
+      setSettled(false);
+      setVoiceState('starting');
+    }
+
     const chime = createChime();
     chimeRef.current = chime;
     const engine = createKitchenSpeech(browserSpeechEnv(chime));
@@ -392,10 +471,20 @@ export function Kitchen({
 
       // A preference saved on another tablet may not exist here; the engine
       // says so and we keep the best available rather than pretending.
-      const stored = localStorage.getItem(VOICE_KEY);
-      if (stored) engine.setVoiceName(stored);
+      let stored = '';
+      try { stored = localStorage.getItem(VOICE_KEY) ?? ''; } catch { /* storage is optional */ }
+      const hindiVoices = engine.hindiVoices();
+      if (stored && hindiVoices.length > 0 && !engine.setVoiceName(stored)) {
+        // Only call a saved voice stale once the browser has discovered at
+        // least one Hindi voice; an initially empty list is still loading.
+        try { localStorage.removeItem(VOICE_KEY); } catch { /* storage is optional */ }
+        setVoicePref('');
+        engine.setVoiceName(null);
+      } else if (stored && hindiVoices.length > 0) {
+        engine.setVoiceName(stored);
+      }
 
-      setVoiceList(engine.hindiVoices().map((v) => ({ name: v.name, lang: v.lang })));
+      setVoiceList(hindiVoices.map((v) => ({ name: v.name, lang: v.lang })));
 
       const name = engine.voiceName();
 
@@ -440,34 +529,46 @@ export function Kitchen({
       {
         speak(text, onEnd) {
           const current = speechRef.current;
-
-          // Sound off, no Hindi voice, or this device is not the one that
-          // speaks: consume the announcement without sound. Consuming rather
-          // than skipping is deliberate -- otherwise a backlog would build
-          // while muted and play all at once when it was switched on.
-          if (!current || !audioRef.current || !speaksRef.current || !current.available()) {
-            onEnd();
+          if (!current || !audioRef.current || !speaksRef.current || !speakerAllowedRef.current) {
+            onEnd({ status: 'failed', reason: 'This screen is muted or another tab owns the speaker', completedSegments: 0, totalSegments: 1 });
             return;
           }
-
-          current.speak(text, () => {
-            if (current.stalled()) {
-              // The browser refused to start the utterance. The sentence stays
-              // in the log so the pass can replay it, but the board says so
-              // rather than looking like it announced something.
-              setStalled(true);
-              setLostCount((count) => count + 1);
-            }
-            onEnd();
-          });
+          if (!current.available()) {
+            onEnd({ status: 'failed', reason: 'No Hindi voice is available', completedSegments: 0, totalSegments: 1 });
+            return;
+          }
+          current.speak(text, onEnd);
         },
       },
       {
-        // Only what actually reached the speaker is called "speaking now".
-        onBegin(_key, text) {
-          setAnnouncement(text);
+        onBegin(entry) {
+          setAnnouncement(entry.text);
           setSpeaking(true);
           setWaiting(queueRef.current?.pending() ?? 0);
+        },
+        onResult(entry, outcome) {
+          const associatedTicket = announcementTicketsRef.current.get(entry.key);
+          if (associatedTicket?.orderId && missedAttemptByOrderRef.current.get(associatedTicket.orderId) === entry.key) {
+            missedAttemptByOrderRef.current.delete(associatedTicket.orderId);
+          }
+          setLog((current) => current.map((row) => row.key === entry.key
+            ? { ...row, status: outcome.status === 'completed' ? 'completed' : outcome.status === 'failed' ? 'failed' : 'cancelled' }
+            : row));
+          if (outcome.status === 'completed') {
+            const ticket = announcementTicketsRef.current.get(entry.key);
+            if (ticket?.orderId) changeMissed((current) => current.filter((item) => item.orderId !== ticket.orderId));
+          } else if (outcome.status === 'failed') {
+            setLostCount((count) => count + 1);
+            const ticket = announcementTicketsRef.current.get(entry.key);
+            if (ticket?.orderId && entry.key.startsWith('new:')) {
+              setMissedReason(outcome.reason.includes('speaker') ? 'speaker' : outcome.reason.includes('muted') ? 'muted' : 'voice');
+              changeMissed((current) => current.some((item) => item.orderId === ticket.orderId)
+                ? current
+                : [ticket, ...current].slice(0, MISSED_LIMIT));
+            }
+            if (speechRef.current?.stalled()) setStalled(true);
+          }
+          announcementTicketsRef.current.delete(entry.key);
         },
         onIdle() {
           setSpeaking(false);
@@ -479,23 +580,21 @@ export function Kitchen({
     return () => {
       clearTimeout(giveUp);
       synth?.removeEventListener?.('voiceschanged', refresh);
+      queueRef.current?.dispose();
       engine.cancel();
       speechRef.current = null;
       queueRef.current = null;
     };
-  }, []);
+  }, [restaurantId, changeMissed]);
 
   const speak = useCallback(
-    (key: string, text: string, label: string, priority: 'order' | 'info' = 'order'): boolean => {
-      const accepted = queueRef.current?.push(key, text, priority) ?? false;
-
-      // Only log what was actually queued. Logging a dropped announcement
-      // would show the pass a sentence the kitchen never heard.
-      if (!accepted) return false;
-
-      setLog((current) => [{ key, at: clockTimeInZone(null, new Date()), label, text }, ...current].slice(0, LOG_LIMIT));
+    (key: string, text: string, label: string, priority: 'order' | 'info' = 'order'): EnqueueResult => {
+      setLog((current) => [{ key, at: clockTimeInZone(null, new Date()), label, text, status: 'queued' as const }, ...current].slice(0, LOG_LIMIT));
+      const result = queueRef.current?.push(key, text, priority) ?? 'full';
+      if (result !== 'queued') setLog((current) => current.filter((row) => row.key !== key));
+      if (result === 'full') setSpeechWarning('Speech queue is full. Tickets remain visible; replay when the queue clears.');
       setWaiting(queueRef.current?.pending() ?? 0);
-      return true;
+      return result;
     },
     [],
   );
@@ -506,12 +605,13 @@ export function Kitchen({
    * force(), not push(): a replay pressed while the original is still waiting
    * would otherwise be refused as a duplicate and appear to do nothing.
    */
-  const replay = useCallback((key: string, text: string, label: string) => {
-    const accepted = queueRef.current?.force(key, text, 'order') ?? false;
-    if (!accepted) return;
-
-    setLog((current) => [{ key, at: clockTimeInZone(null, new Date()), label, text }, ...current].slice(0, LOG_LIMIT));
+  const replay = useCallback((key: string, text: string, label: string): EnqueueResult => {
+    setLog((current) => [{ key, at: clockTimeInZone(null, new Date()), label, text, status: 'queued' as const }, ...current].slice(0, LOG_LIMIT));
+    const result = queueRef.current?.force(key, text, 'order') ?? 'full';
+    if (result !== 'queued') setLog((current) => current.filter((row) => row.key !== key));
+    if (result === 'full') setSpeechWarning('Speech queue is full. Tickets remain visible; replay when the queue clears.');
     setWaiting(queueRef.current?.pending() ?? 0);
+    return result;
   }, []);
 
   /* ---------------------------------------------------------------- the board */
@@ -552,6 +652,12 @@ export function Kitchen({
    */
   const keySignature = orders.map((ticket) => ticket.key).join('\n');
   const seenKeysRef = useRef<Set<string> | null>(null);
+  const autoPickedRef = useRef(false);
+
+  useEffect(() => {
+    seenKeysRef.current = null;
+    autoPickedRef.current = false;
+  }, [restaurantId]);
 
   useEffect(() => {
     const keys = keySignature ? keySignature.split('\n') : [];
@@ -580,7 +686,6 @@ export function Kitchen({
    * empty and another one is not, follow the work rather than showing a blank
    * screen -- but only once, so a deliberate choice is never overridden.
    */
-  const autoPickedRef = useRef(false);
   useEffect(() => {
     if (autoPickedRef.current || orders.length === 0) return;
     autoPickedRef.current = true;
@@ -605,21 +710,24 @@ export function Kitchen({
 
       seenRef.current = new Set(seen);
       writeSeen(restaurantId, seen);
-      setMissed(offered);
+      const savedMissedIds = new Set(readMissedOrderIds(kitchenStorage(), restaurantId));
+      const restoredMissed = orders.filter((ticket) => ticket.orderId && savedMissedIds.has(ticket.orderId));
+      const combinedMissed = [...offered, ...restoredMissed.filter((ticket) => !offered.some((row) => row.orderId === ticket.orderId))];
+      missedRef.current = combinedMissed;
+      setMissed(combinedMissed);
+      writeMissedOrderIds(kitchenStorage(), restaurantId, combinedMissed.flatMap((ticket) => ticket.orderId ? [ticket.orderId] : []));
       return;
     }
 
     const fresh = selectNewTickets(orders, seenRef.current);
     if (fresh.length === 0) return;
 
-    // Nothing is spent until the board knows whether it can speak at all.
-    // Returning WITHOUT marking them seen is the point: the effect re-runs
-    // when the voice question is settled, and speaks them then.
-    if (!settled) return;
+    // Nothing is spent until both the Hindi voice and same-origin speaker
+    // election have settled. A newly opened tab must not race the active one.
+    if (!settled || (live && speakerState === 'claiming')) return;
 
     const readyToSpeak = canAnnounceRef.current;
-    const canSpeak = audioRef.current && speaksRef.current && readyToSpeak;
-    const announced = new Set<string>();
+    const canSpeak = audioRef.current && speaksRef.current && readyToSpeak && speakerAllowedRef.current;
 
     /**
      * No Hindi voice, but the sound is on: the room still has to hear that a
@@ -644,36 +752,38 @@ export function Kitchen({
       if (!ticket.orderId) continue;
 
       if (!canSpeak) {
-        // Unheard, and never pretended otherwise: the ticket joins the list
-        // the pass can read out by hand once the voice problem is fixed.
+        // Unheard, and never pretended otherwise. Persist the order ID so a
+        // refresh can restore its recovery entry while the server still returns it.
         seenRef.current.add(ticket.orderId);
-        setMissedReason(readyToSpeak ? 'muted' : 'voice');
-        setMissed((current) => [ticket, ...current].slice(0, LOG_LIMIT));
+        setMissedReason(!readyToSpeak ? 'voice' : !speakerAllowedRef.current ? 'speaker' : 'muted');
+        changeMissed((current) => current.some((item) => item.orderId === ticket.orderId)
+          ? current
+          : [ticket, ...current].slice(0, MISSED_LIMIT));
         continue;
       }
 
-      const accepted = speak(
-        `new:${ticket.orderId}`,
-        orderAnnouncement(ticket),
-        announceLogLabel(ticket.table, ticket.items),
-        'order',
-      );
-
-      // If the backlog is full the queue refuses; leaving the ticket unmarked
-      // means the next poll announces it instead of losing it for good.
-      if (!accepted) break;
+      const key = `new:${ticket.orderId}`;
+      announcementTicketsRef.current.set(key, ticket);
+      missedAttemptByOrderRef.current.set(ticket.orderId, key);
+      // Persist as needing confirmation before the asynchronous utterance can
+      // begin. A refresh/interruption then restores a replay path.
+      changeMissed((current) => current.some((item) => item.orderId === ticket.orderId)
+        ? current
+        : [ticket, ...current].slice(0, MISSED_LIMIT));
+      const result = speak(key, orderAnnouncement(ticket), announceLogLabel(ticket.table, ticket.items), 'order');
+      if (result === 'full') setMissedReason('queue');
+      if (result !== 'queued') {
+        missedAttemptByOrderRef.current.delete(ticket.orderId);
+        announcementTicketsRef.current.delete(key);
+      }
+      // Full/duplicate outcomes remain in the recoverable list; an actual
+      // successful onend is the only event that removes it.
       seenRef.current.add(ticket.orderId);
-      announced.add(ticket.orderId);
     }
 
     writeSeen(restaurantId, [...seenRef.current]);
 
-    // Anything just read out comes off the "not read out" list; anything the
-    // board could not read stays on it until it is read.
-    if (announced.size > 0) {
-      setMissed((current) => current.filter((t) => !t.orderId || !announced.has(t.orderId)));
-    }
-  }, [orders, live, restaurantId, speak, settled, voiceState]);
+  }, [orders, live, restaurantId, speak, settled, voiceState, speakerState, changeMissed]);
 
   /* ------------------------------------------------------- cancelled tickets */
 
@@ -808,16 +918,26 @@ export function Kitchen({
       return {
         tone: 'quiet',
         title: 'This screen is muted.',
-        body: 'Another screen in this kitchen is doing the announcing. Two screens speaking would read every order out twice.',
+        body: 'This device is muted. The browser can coordinate tabs in this profile only; mute other devices manually, because cross-device duplicate audio cannot be prevented here.',
         action: { label: 'Speak here too', run: () => setSpeaksHere(true) },
       };
     }
 
-    if (stalled && lostCount > 0) {
+    if (live && speakerState === 'busy') {
+      return { tone: 'quiet', title: 'Another tab owns this kitchen speaker.', body: 'This tab will not speak duplicate tickets. Orders remain visible here; the owner tab should be the one with sound enabled.' };
+    }
+
+    if (live && speakerState === 'local-only') {
+      return { tone: 'quiet', title: 'This browser cannot coordinate kitchen tabs.', body: 'Keep only one kitchen tab open on this browser. Speaker coordination is browser-local and does not guarantee exactly-once audio across devices.' };
+    }
+
+    if (lostCount > 0) {
       return {
         tone: 'alert',
-        title: `${lostCount} announcement${lostCount === 1 ? '' : 's'} could not be read out.`,
-        body: 'The browser blocked the voice. Tap the board once, press “Test announcement”, then replay anything from the list below.',
+        title: `${lostCount} announcement${lostCount === 1 ? '' : 's'} did not complete.`,
+        body: stalled
+          ? 'The browser timed out waiting for Hindi speech. Tap the board once, press “Test announcement”, then replay anything from the list below.'
+          : 'The browser reported an audio error or interruption. Check the voice and sound controls, then replay anything from the list below.',
         action: {
           label: 'Dismiss',
           run: () => {
@@ -855,7 +975,7 @@ export function Kitchen({
     }
 
     return null;
-  }, [audio, live, speaksHere, stalled, lostCount, voiceState, gestureDone]);
+  }, [audio, live, speaksHere, stalled, lostCount, voiceState, gestureDone, speakerState]);
 
   /* ---------------------------------------------------------------- actions */
 
@@ -898,7 +1018,6 @@ export function Kitchen({
       return;
     }
 
-    speak(`adv:${ticket.orderId}:${next}`, advanceText(ticket.table, next), ticket.table, 'info');
     setError('');
     setPending((current) => ({ ...current, [ticket.orderId!]: next }));
 
@@ -923,6 +1042,10 @@ export function Kitchen({
           return copy;
         });
       }, 0);
+    }
+    const announcedState = confirmedPrepChange(ticket.state, result);
+    if (announcedState) {
+      speak(`adv:${ticket.orderId}:${announcedState}`, advanceText(ticket.table, announcedState), ticket.table, 'info');
     }
   };
 
@@ -1012,14 +1135,17 @@ export function Kitchen({
   );
 
   const readMissed = () => {
-    for (const ticket of [...missed].reverse()) {
-      speak(
-        `missed:${ticket.orderId ?? ticket.key}:${Date.now()}`,
-        orderAnnouncement(ticket),
-        announceLogLabel(ticket.table, ticket.items),
-      );
+    for (const ticket of [...missedRef.current].reverse()) {
+      if (!ticket.orderId || missedAttemptByOrderRef.current.has(ticket.orderId)) continue;
+      const key = `missed:${ticket.orderId}:${Date.now()}:${Math.random().toString(36).slice(2, 7)}`;
+      announcementTicketsRef.current.set(key, ticket);
+      missedAttemptByOrderRef.current.set(ticket.orderId, key);
+      const result = replay(key, orderAnnouncement(ticket), announceLogLabel(ticket.table, ticket.items));
+      if (result !== 'queued') {
+        missedAttemptByOrderRef.current.delete(ticket.orderId);
+        announcementTicketsRef.current.delete(key);
+      }
     }
-    setMissed([]);
   };
 
   return (
@@ -1282,20 +1408,48 @@ export function Kitchen({
                 <button type="button" onClick={readMissed} className={btn('solid', 'sm')}>
                   Read them out
                 </button>
-                <button type="button" onClick={() => setMissed([])} className={btn('quiet', 'sm')}>
+                <button type="button" onClick={() => changeMissed(() => [])} className={btn('quiet', 'sm')}>
                   Dismiss
                 </button>
               </span>
             }
           >
             {/* Two honest reasons, and they are not the same thing. */}
-            {missedReason === 'muted'
-              ? 'They arrived while this screen was muted or the sound was off.'
-              : voiceState === 'ready'
-                ? 'They were placed before this board was opened. The pass may have seen them already.'
-                : 'They arrived while this device had no voice to read them with.'}{' '}
+            {missedReason === 'queue'
+              ? 'The speech queue was full. These orders remain on the board and can be replayed when it clears.'
+              : missedReason === 'speaker'
+                ? 'They arrived while another tab owned the speaker; replay them here if needed.'
+              : missedReason === 'muted'
+                ? 'They arrived while this screen was muted or the sound was off.'
+                : voiceState === 'ready'
+                  ? 'They were placed before this board was opened. The pass may have seen them already.'
+                  : 'They arrived while this device had no voice to read them with.'}{' '}
             They are on the board below.
           </Notice>
+        )}
+
+        {speechWarning && (
+          <Notice role="status" tone="accent" className="mb-0"
+            label={<strong className="text-[12.5px] font-semibold text-gink">Announcement not queued.</strong>}
+            action={<button type="button" onClick={() => setSpeechWarning('')} className={btn('quiet', 'sm')}>Dismiss</button>}
+          >{speechWarning}</Notice>
+        )}
+
+        {live && (data?.cancelled.length ?? 0) > 0 && (
+          <Panel title="Recent cancellations" meta="Kept for recovery · last 15 minutes" bodyClassName="">
+            <ul className="divide-y divide-hair">
+              {(data?.cancelled ?? []).map((row: CancelledTicket) => (
+                <li key={row.id} className="flex items-center gap-3 px-3.5 py-2 text-[12.5px]">
+                  <span className="min-w-0 flex-1 font-medium text-gink">{row.table} · cancelled</span>
+                  <button
+                    type="button"
+                    onClick={() => replay(`cancel-recovery:${row.id}:${Date.now()}`, cancelText(row.table), `${row.table} · cancelled`)}
+                    className="shrink-0 text-[11.5px] font-medium text-gink-64 underline underline-offset-2 hover:text-gink"
+                  >Replay cancellation</button>
+                </li>
+              ))}
+            </ul>
+          </Panel>
         )}
 
         {log.length > 0 && (
@@ -1321,6 +1475,9 @@ export function Kitchen({
                   <span className="tnum shrink-0 text-gink-46">{entry.at}</span>
                   <span className="shrink-0 font-medium text-gink-64">{entry.label}</span>
                   <span className="min-w-0 flex-1 truncate text-gink">{entry.text}</span>
+                  <span className="shrink-0 text-[10.5px] text-gink-46" aria-label={`Speech ${entry.status}`}>
+                    {entry.status === 'queued' ? 'Queued' : entry.status === 'completed' ? 'Completed' : entry.status === 'failed' ? 'Failed' : 'Cancelled'}
+                  </span>
                   <button
                     type="button"
                     aria-label={`Replay ${entry.label}`}
