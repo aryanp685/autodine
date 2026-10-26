@@ -149,8 +149,8 @@ declare
   v_code     text := '';
   i          integer;
 begin
-  /* Two hex characters per symbol, taken mod 32. 256 / 32 is exact, so the
-     modulo introduces no bias: every symbol is equally likely. */
+  -- Two hex characters per symbol, taken mod 32. 256 / 32 is exact, so the
+     -- modulo introduces no bias: every symbol is equally likely.
   for i in 1..16 loop
     v_code := v_code
       || substr(v_alphabet, (('x' || substr(v_hex, i * 2 - 1, 2))::bit(8)::integer % 32) + 1, 1);
@@ -219,10 +219,10 @@ begin
     raise exception 'Only the owner can invite a manager.' using errcode = '42501';
   end if;
 
-  /* A collision of 80 random bits means something is badly wrong, but the
-     unique index is the authority, so the insert is retried a few times
-     rather than trusted. Losing the race is not an error the caller can act
-     on, so after five attempts it becomes a plain "try again". */
+  -- A collision of 80 random bits means something is badly wrong, but the
+     -- unique index is the authority, so the insert is retried a few times
+     -- rather than trusted. Losing the race is not an error the caller can act
+     -- on, so after five attempts it becomes a plain "try again".
   for i in 1..5 loop
     v_code := public.new_invite_code();
     v_hash := public.hash_invite_code(v_code);
@@ -282,10 +282,10 @@ begin
   from public.restaurants r
   where r.id = v_invite.restaurant_id and r.is_active;
 
-  /* The status ladder is ordered deliberately. A link that was both revoked
-     and later expired is described as revoked: that is the fact the owner
-     acted on, and it is the one that explains why a code that looks valid
-     does not work. */
+  -- The status ladder is ordered deliberately. A link that was both revoked
+     -- and later expired is described as revoked: that is the fact the owner
+     -- acted on, and it is the one that explains why a code that looks valid
+     -- does not work.
   if not found then
     return query select 'closed'::text, v_invite.restaurant_id, null::text, v_invite.role, v_invite.expires_at;
   elsif v_invite.revoked_at is not null then
@@ -299,9 +299,9 @@ begin
     where m.restaurant_id = v_invite.restaurant_id
       and m.user_id = auth.uid()
   ) then
-    /* Said here rather than only at redemption, so the page can offer "open
-       your screen" instead of an Accept button that would answer "you are
-       already on this team". */
+    -- Said here rather than only at redemption, so the page can offer "open
+       -- your screen" instead of an Accept button that would answer "you are
+       -- already on this team".
     return query select 'already_member'::text, v_invite.restaurant_id, v_name, v_invite.role, v_invite.expires_at;
   else
     return query select 'ok'::text, v_invite.restaurant_id, v_name, v_invite.role, v_invite.expires_at;
@@ -367,9 +367,9 @@ begin
     return;
   end if;
 
-  /* Already a member: say so, and do NOT burn the code. The person holding a
-     link for a restaurant they already work in has not used anything up --
-     the link is still good for the colleague it was sent to. */
+  -- Already a member: say so, and do NOT burn the code. The person holding a
+     -- link for a restaurant they already work in has not used anything up --
+     -- the link is still good for the colleague it was sent to.
   if exists (
     select 1 from public.memberships m
     where m.restaurant_id = v_invite.restaurant_id
@@ -379,10 +379,10 @@ begin
     return;
   end if;
 
-  /* The membership's foreign key points at public.profiles. An account can
-     exist without one -- the normal signup writes it, an account created by
-     an invitation or by Supabase Auth alone does not. Creating it here is
-     what makes "accept the link, then sign up" work in either order. */
+  -- The membership's foreign key points at public.profiles. An account can
+     -- exist without one -- the normal signup writes it, an account created by
+     -- an invitation or by Supabase Auth alone does not. Creating it here is
+     -- what makes "accept the link, then sign up" work in either order.
   insert into public.profiles (id) values (v_actor)
   on conflict (id) do nothing;
 
@@ -425,9 +425,9 @@ begin
   end if;
 
   if not public.has_restaurant_role(v_invite.restaurant_id, array['owner', 'manager']) then
-    /* Deliberately the same message whether the invite is absent or belongs
-       to somebody else's restaurant: an id that is not yours must not be
-       distinguishable from one that does not exist. */
+    -- Deliberately the same message whether the invite is absent or belongs
+       -- to somebody else's restaurant: an id that is not yours must not be
+       -- distinguishable from one that does not exist.
     raise exception 'That invitation is not yours to revoke.' using errcode = '42501';
   end if;
 
@@ -489,8 +489,8 @@ begin
   end if;
 
   if v_membership.role <> 'owner' and v_membership.user_id = v_actor then
-    /* An owner removing their own non-owner membership in a restaurant they
-       own is nonsense; refuse rather than half-apply it. */
+    -- An owner removing their own non-owner membership in a restaurant they
+       -- own is nonsense; refuse rather than half-apply it.
     raise exception 'You cannot remove your own access to a restaurant you own.'
       using errcode = '42501';
   end if;
@@ -591,8 +591,8 @@ begin
     left join public.profiles p on p.id = m.user_id
     where m.restaurant_id = p_restaurant_id
     order by
-      /* Owners first, then managers, then the rest; oldest first inside a
-         role, so the list does not reshuffle when somebody joins. */
+      -- Owners first, then managers, then the rest; oldest first inside a
+         -- role, so the list does not reshuffle when somebody joins.
       case m.role
         when 'owner' then 0
         when 'manager' then 1
@@ -791,18 +791,18 @@ create policy payments_money_read on public.payments
   for select
   using (public.has_restaurant_role(restaurant_id, array['owner', 'manager', 'cashier']));
 
-/* And no write policy at all: money is recorded by record_counter_payment()
-   (which checks the role itself and writes under SECURITY DEFINER) or by the
-   online payment path. Revoking the table privileges makes a direct insert
-   impossible rather than merely un-policied. */
+-- And no write policy at all: money is recorded by record_counter_payment()
+   -- (which checks the role itself and writes under SECURITY DEFINER) or by the
+   -- online payment path. Revoking the table privileges makes a direct insert
+   -- impossible rather than merely un-policied.
 revoke insert, update, delete on public.payments from anon;
 revoke insert, update, delete on public.payments from authenticated;
 
-/* SELECT is granted explicitly, in keeping with this repository's rule that a
-   policy is not a permission (see 20261021000500). Without it the counter and
-   the bill read nothing at all -- the row-level policy above would never even
-   be consulted, because the statement fails on the privilege first. This is
-   also why the local harness matters: on Supabase the default privileges
-   happen to include SELECT, so a missing grant there is invisible until it is
-   run somewhere that does not have them. */
+-- SELECT is granted explicitly, in keeping with this repository's rule that a
+   -- policy is not a permission (see 20261021000500). Without it the counter and
+   -- the bill read nothing at all -- the row-level policy above would never even
+   -- be consulted, because the statement fails on the privilege first. This is
+   -- also why the local harness matters: on Supabase the default privileges
+   -- happen to include SELECT, so a missing grant there is invisible until it is
+   -- run somewhere that does not have them.
 grant select on public.payments to authenticated;
