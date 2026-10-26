@@ -354,3 +354,22 @@ handed the guest a *table session* because their scan was refused. The
 discriminator is explicit now (`if (opened && !opened.throttled)`), and
 `route.test.ts` asserts the session cookie is absent for a throttled scan and
 present for an opened one.
+
+
+---
+
+## 9. Where the round-9 evidence lives
+
+| claim | artefact |
+| --- | --- |
+| unit suite green | `npx vitest run` → 94 files, 1237 tests, 0 failed (after this round's +14) |
+| types / lint / design guard | `tsc --noEmit` clean; `eslint .` clean; design guard 5/5 |
+| the notice renders | `next build` then `next start -p 3200`; `curl '/menu?v=throttled'` → `data-throttle-note` + "Table check paused"; `curl '/menu'` → absent |
+| browser suite | E2E workflow run `40267168265` → annotations "e2e totals :: 9 passed, 0 failed", plus nine individual PASS titles |
+| the defect found here | `app/t/[token]/route.test.ts` → "writes no table session, because nothing was verified" |
+
+The browser suite does not cover the throttle banner, because the demo build has
+no database and therefore no way to be throttled by it. The unit tests drive the
+same components with the same props, and the live curl proves the route wiring;
+a Playwright case would need a seeded database in CI, which is a separate
+decision about a second Supabase project and is not taken here.
