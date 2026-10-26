@@ -6,6 +6,9 @@ import { SubmitButton } from '@/components/owner/SubmitButton';
 import type { ReactNode } from 'react';
 import type { OutletBar } from '@/lib/outlets';
 import type { SettingsScreenData } from '@/lib/db/settings-screen';
+import type { TeamScreenData } from '@/lib/db/team';
+import type { InviteFlash } from '@/lib/team-invite';
+import { PeoplePanel } from '@/components/owner/PeoplePanel';
 import { formatTaxPercent, taxExamplePaise } from '@/lib/settings-input';
 import {
   saveDetailsAction,
@@ -97,6 +100,7 @@ const SECTIONS = [
   { id: 'settings-details', label: 'Restaurant details' },
   { id: 'settings-money', label: 'Tax and money' },
   { id: 'settings-outlets', label: 'Outlets' },
+  { id: 'settings-people', label: 'People' },
   { id: 'settings-qr', label: 'Menu QR' },
 ] as const;
 
@@ -176,8 +180,17 @@ export function SettingsScreen({
   error,
   notice,
   gatewayConfigured = false,
+  team = null,
+  teamFlash = null,
+  origin = '',
 }: {
   data?: SettingsScreenData | null;
+  /** Who works here. Null when the database is not connected. */
+  team?: TeamScreenData | null;
+  /** A link minted in the last ten minutes, and only then. */
+  teamFlash?: InviteFlash | null;
+  /** Absolute origin, so a copied invitation link works pasted into a chat. */
+  origin?: string;
   /** Which outlet is open, for the switcher in the bar. */
   outlet?: OutletBar | null;
   error?: string;
@@ -795,6 +808,22 @@ export function SettingsScreen({
                   </p>
                 ) : null}
               </Panel>
+            </PageSection>
+
+            {/* -------------------------------------------------------------- people */}
+            <PageSection
+              n="04"
+              id="settings-people"
+              title="People"
+              meta="Who can sign in, and what their role can open"
+            >
+              <PeoplePanel
+                data={team}
+                flash={teamFlash}
+                origin={origin}
+                disabled={!live}
+                timeZone={data?.timezone ?? 'Asia/Kolkata'}
+              />
             </PageSection>
           </div>
 

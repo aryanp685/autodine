@@ -32,23 +32,63 @@ export type ShellLink = {
   href: string;
   /** Heading the link sits under in the rail. */
   group: string;
+  /**
+   * Who may open it. Omitted means everybody with a membership.
+   *
+   * This is the rail's copy of a rule the database already enforces: a kitchen
+   * login cannot write a price because the policy refuses it. Hiding the
+   * destination is the difference between "you have no business here" and a
+   * screen that opens, shows read-only fields, and answers Save with a
+   * Postgres error. The layouts under app/(staff) gate the URLs themselves, so
+   * a typed address behaves the same as a hidden link.
+   */
+  roles?: readonly string[];
 };
 
+/** Owner and manager: everything the business side owns. */
+const MANAGE = ['owner', 'manager'] as const;
+/** Money at the counter, and the bills it settles. */
+const COUNTER = ['owner', 'manager', 'cashier'] as const;
+/** The ticket rail. */
+const KITCHEN = ['owner', 'manager', 'kitchen'] as const;
+
 export const DASHBOARD_LINKS: ReadonlyArray<ShellLink> = [
-  { key: 'overview', label: 'Overview', href: '/dashboard', group: 'Today' },
+  { key: 'overview', label: 'Overview', href: '/dashboard', group: 'Today', roles: MANAGE },
 
-  { key: 'orders', label: 'Orders', href: '/dashboard/orders', group: 'Service' },
-  { key: 'kitchen', label: 'Kitchen', href: '/kitchen', group: 'Service' },
-  { key: 'counter', label: 'Counter', href: '/cashier', group: 'Service' },
+  { key: 'orders', label: 'Orders', href: '/dashboard/orders', group: 'Service', roles: COUNTER },
+  { key: 'kitchen', label: 'Kitchen', href: '/kitchen', group: 'Service', roles: KITCHEN },
+  { key: 'counter', label: 'Counter', href: '/cashier', group: 'Service', roles: COUNTER },
 
-  { key: 'menus', label: 'Menus', href: '/dashboard/menus', group: 'Menu' },
-  { key: 'branding', label: 'Branding', href: '/dashboard/branding', group: 'Menu' },
-  { key: 'import', label: 'Import menu', href: '/dashboard/menus/import', group: 'Menu' },
-  { key: 'tables', label: 'Tables & QR', href: '/dashboard/tables', group: 'Menu' },
+  { key: 'menus', label: 'Menus', href: '/dashboard/menus', group: 'Menu', roles: MANAGE },
+  { key: 'branding', label: 'Branding', href: '/dashboard/branding', group: 'Menu', roles: MANAGE },
+  { key: 'import', label: 'Import menu', href: '/dashboard/menus/import', group: 'Menu', roles: MANAGE },
+  { key: 'tables', label: 'Tables & QR', href: '/dashboard/tables', group: 'Menu', roles: MANAGE },
 
-  { key: 'reports', label: 'Reports', href: '/dashboard/reports', group: 'Business' },
-  { key: 'settings', label: 'Settings', href: '/dashboard/settings', group: 'Business' },
+  { key: 'reports', label: 'Reports', href: '/dashboard/reports', group: 'Business', roles: MANAGE },
+  { key: 'settings', label: 'Settings', href: '/dashboard/settings', group: 'Business', roles: MANAGE },
 ];
+
+/**
+ * The rail for one person's role.
+ *
+ * An unknown role (no session, a demo screen, a role added later) gets
+ * everything, which is what every screen did before this existed. A kitchen
+ * login gets two destinations and no Business group at all, rather than a
+ * heading with nothing under it.
+ */
+export function linksForRole(role: string | null | undefined): ReadonlyArray<ShellLink> {
+  if (!role) return DASHBOARD_LINKS;
+  return DASHBOARD_LINKS.filter((link) => !link.roles || link.roles.includes(role));
+}
+
+export function groupsForRole(
+  role: string | null | undefined,
+): ReadonlyArray<{ name: string; links: readonly ShellLink[] }> {
+  return SHELL_GROUPS.map((group) => ({
+    name: group.name,
+    links: group.links.filter((link) => !role || !link.roles || link.roles.includes(role)),
+  })).filter((group) => group.links.length > 0);
+}
 
 /** The rail's groups, in display order, each with its links. */
 export const SHELL_GROUPS: ReadonlyArray<{ name: string; links: readonly ShellLink[] }> = [

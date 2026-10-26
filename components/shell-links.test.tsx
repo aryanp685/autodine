@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DASHBOARD_LINKS, SHELL_GROUPS } from './shell-links';
+import { DASHBOARD_LINKS, SHELL_GROUPS, groupsForRole, linksForRole } from './shell-links';
 
 /**
  * The rail, the "Go to" search and the loading skeletons all read this list, so
@@ -44,5 +44,44 @@ describe('the staff shell map', () => {
   it('keeps the screens that live outside /dashboard reachable', () => {
     const hrefs = DASHBOARD_LINKS.map((link) => link.href);
     expect(hrefs).toEqual(expect.arrayContaining(['/kitchen', '/cashier']));
+  });
+});
+
+/**
+ * Roles are not decoration: the rail is the first place a person learns what
+ * their login is for. A kitchen login that shows Reports opens a screen whose
+ * numbers the database will not even return -- an error that reads as broken
+ * software rather than as a permission.
+ */
+describe('the rail for one role', () => {
+  it('gives an owner everything', () => {
+    expect(linksForRole('owner')).toHaveLength(DASHBOARD_LINKS.length);
+  });
+
+  it('keeps a kitchen login on the board', () => {
+    const hrefs = linksForRole('kitchen').map((link) => link.href);
+    expect(hrefs).toContain('/kitchen');
+    expect(hrefs).not.toContain('/dashboard/settings');
+    expect(hrefs).not.toContain('/dashboard/reports');
+    expect(hrefs).not.toContain('/dashboard/menus');
+    expect(hrefs).not.toContain('/cashier');
+  });
+
+  it('gives a cashier the counter and the bills, not the menu', () => {
+    const hrefs = linksForRole('cashier').map((link) => link.href);
+    expect(hrefs).toEqual(expect.arrayContaining(['/cashier', '/dashboard/orders']));
+    expect(hrefs).not.toContain('/dashboard/menus');
+    expect(hrefs).not.toContain('/dashboard/settings');
+  });
+
+  it('drops a whole group rather than leaving an empty heading', () => {
+    const groups = groupsForRole('kitchen');
+    expect(groups.map((group) => group.name)).not.toContain('Business');
+    expect(groups.every((group) => group.links.length > 0)).toBe(true);
+  });
+
+  it('draws everything when the role is unknown, as every screen did before', () => {
+    expect(linksForRole(null)).toHaveLength(DASHBOARD_LINKS.length);
+    expect(groupsForRole(undefined)).toHaveLength(SHELL_GROUPS.length);
   });
 });
