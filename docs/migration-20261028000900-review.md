@@ -357,3 +357,46 @@ order matters (see the `pg_depend` query in §5).
 functions BEFORE dropping anything. If the columns are dropped while the new
 `place_public_order` still calls `stamp_guest_verification`, the guest order
 path fails on the next order placed.
+
+
+---
+
+## Appendix A — the exact SQL, statement by statement
+
+The file is 602 lines and lives in the repository; reproducing it here would be a
+copy that could drift. This is the index, with the short statements verbatim and
+the long ones identified by their first and last line so any copy can be checked
+against the source:
+
+```bash
+# the whole file, at the commit this review describes
+git show 7e7173c:supabase/migrations/20261028000900_guest_scan_confirm.sql | less
+
+# just the function bodies
+git show 7e7173c:supabase/migrations/20261028000900_guest_scan_confirm.sql | sed -n '120,602p'
+```
+
+| lines | statement (verbatim where short) |
+| --- | --- |
+| 41–43 | `alter table public.restaurants add column if not exists guest_verification_mode text not null default 'code' check (guest_verification_mode in ('code', 'scan_confirm', 'scan'));` |
+| 47–50 | `comment on column public.restaurants.guest_verification_mode is …` |
+| 58–61 | `alter table public.orders add column if not exists hold_required boolean not null default false, add column if not exists confirmed_at timestamptz, add column if not exists confirmed_by uuid, add column if not exists table_session_id uuid;` |
+| 62–74 | four `comment on column public.orders.…` |
+| 76–78 | `create index if not exists orders_held_idx on public.orders (restaurant_id, placed_at) where hold_required and confirmed_at is null;` |
+| 80–82 | `create index if not exists orders_session_idx on public.orders (table_session_id) where table_session_id is not null;` |
+| 92–97 | `create table if not exists public.table_session_opens (id uuid primary key default gen_random_uuid(), qr_code_id uuid not null references public.table_qr_codes(id) on delete cascade, ip_hash text not null, opened_at timestamptz not null default now());` |
+| 99–103 | `create index … table_session_opens_card_idx (qr_code_id, opened_at desc)` and `…_ip_idx (ip_hash, opened_at desc)` |
+| 105–108 | `alter table public.table_session_opens enable row level security;` + `revoke all … from anon;` + `… from authenticated;` |
+| 123–232 | `create or replace function public.open_table_session(p_public_token text, p_ip_hash text) returns table (status text, session_token text, restaurant_slug text, table_label text, expires_at timestamptz) language plpgsql security definer set search_path = public, pg_temp` |
+| 234–238 | `comment on function public.open_table_session(text, text)` |
+| 240–244 | `revoke all … from public/anon/authenticated;` + `grant execute … to anon;` + `… to authenticated;` |
+| 268–325 | `create or replace function public.stamp_guest_verification(p_code text, p_restaurant_id uuid, p_session_token text) returns void` + revokes |
+| 333–410 | `create or replace function public.place_public_order(p_slug text, p_lines jsonb, p_note text default null, p_session_token text default null, p_guest_token uuid default null) returns text` |
+| 421–466 | `create or replace function public.confirm_table_orders(p_table_session_id uuid) returns integer` |
+| 473–527 | `create or replace function public.reject_table_orders(p_table_session_id uuid, p_reason text default null) returns integer` |
+| 529–535 | the four grants for confirm/reject |
+| 547–598 | `create or replace function public.get_public_order(p_slug text, p_code text, p_token uuid) returns jsonb` |
+
+Every function above is `security definer` with `set search_path = public, pg_temp`
+and an explicit `revoke`/`grant` pair. §4.2's query proves all three at once on a
+real database, which is better than trusting the table above.
