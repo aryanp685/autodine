@@ -142,6 +142,17 @@ describe('buildKitchenAnnouncement', () => {
     expect(text).toContain('प्याज़');
   });
 
+  it('keeps every joke out of safety announcements', () => {
+    resetVariationCounter();
+    const text = buildKitchenAnnouncement('5', SAMPLE_ITEMS, 'no onion, no garlic');
+    // The humour lives in the expressive framing ("hunger waits for no
+    // one", "show the magic of your hands"). A safety note is plain clear
+    // Hindi end to end — a joke must never ride along with an allergy.
+    for (const quip of ['जादू', 'फरमाइश', 'भूख', 'वाह', 'फरमान', 'हुक्म', 'पटकन', 'बापरे', 'कमाल']) {
+      expect(text).not.toContain(quip);
+    }
+  });
+
   it('uses expressive style for non-safety notes', () => {
     resetVariationCounter();
     const text = buildKitchenAnnouncement('5', SAMPLE_ITEMS, 'extra cheese');
