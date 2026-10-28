@@ -33,7 +33,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   const result = await renewTrialAction(restaurantName);
 
   if (!result.ok) {
-    return NextResponse.json({ error: result.error }, { status: 400 });
+    return NextResponse.json({ error: result.error ?? 'Unknown error' }, { status: 400 });
   }
 
   return NextResponse.json({
