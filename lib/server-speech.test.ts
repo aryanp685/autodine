@@ -3,7 +3,10 @@ import {
   DEFAULT_EDGE_VOICE,
   DEFAULT_PITCH,
   EDGE_HINDI_VOICES,
+  escapeSsml,
   findEdgeVoice,
+  normalizeProsodyHz,
+  normalizeProsodyPercent,
   rateToProsody,
   toVoiceLike,
 } from './tts-voices';
@@ -22,17 +25,76 @@ import { createDualSpeech } from './dual-speech';
  */
 
 describe('tts-voices', () => {
-  it('rateToProsody converts multipliers to Edge TTS percentage strings', () => {
-    expect(rateToProsody(1.0)).toBe('+0.00%');
-    expect(rateToProsody(0.92)).toBe('-8.00%');
-    expect(rateToProsody(1.1)).toBe('+10.00%');
-    expect(rateToProsody(0.5)).toBe('-50.00%');
-    expect(rateToProsody(1.5)).toBe('+50.00%');
+  it('rateToProsody converts multipliers to integer Edge TTS percentage strings', () => {
+    // Integers, no decimals — the /api/tts wire contract (SSML relative
+    // prosody). The old decimal format made EVERY synthesis request fail
+    // and the kitchen fall back to the device's (often female) Hindi voice.
+    expect(rateToProsody(1.0)).toBe('+0%');
+    expect(rateToProsody(0.92)).toBe('-8%');
+    expect(rateToProsody(1.1)).toBe('+10%');
+    expect(rateToProsody(0.5)).toBe('-50%');
+    expect(rateToProsody(1.5)).toBe('+50%');
   });
 
-  it('rateToProsody handles negative rates correctly', () => {
-    // 0.98 * 0.92 = 0.9016 → -9.84%
-    expect(rateToProsody(0.9016)).toBe('-9.84%');
+  it('rateToProsody rounds fractional percentages to integers', () => {
+    // 1 - 0.9016 = 9.84% slow → rounds to -10%
+    expect(rateToProsody(0.9016)).toBe('-10%');
+    expect(rateToProsody(1.004)).toBe('+0%');
+    expect(rateToProsody(1.006)).toBe('+1%');
+  });
+
+  it('rateToProsody output always matches the wire format', () => {
+    // /^[+-]\d+%$/ is what the TTS client and /api/tts exchange — this
+    // invariant is the regression guard for the '+0.00%' incident.
+    for (const rate of [0.5, 0.75, 0.92, 0.98, 1.0, 1.02, 1.1, 1.25, 1.5]) {
+      expect(rateToProsody(rate)).toMatch(/^[+-]\d+%$/);
+    }
+  });
+
+  it('prosody built from the shipped helpers matches the /api/tts wire contract', () => {
+    // The exact strings handed to the TTS client at runtime; the route
+    // tests assert the same shapes against the mocked client. This is the
+    // regression guard for the '+0.00%' incident — the format that made
+    // every synthesis request fail while unit tests stayed green.
+    expect(rateToProsody(1.0)).toMatch(/^[+-]\d+%$/);
+    expect(rateToProsody(0.92)).toMatch(/^[+-]\d+%$/);
+    expect(DEFAULT_PITCH).toMatch(/^[+-]\d+Hz$/);
+  });
+
+  it('escapeSsml escapes the SSML metacharacters in dish names', () => {
+    expect(escapeSsml('Fish & Chips')).toBe('Fish &amp; Chips');
+    expect(escapeSsml('Dal <special>')).toBe('Dal &lt;special&gt;');
+    expect(escapeSsml('5" pizza & "mom\'s"')).toBe('5&quot; pizza &amp; &quot;mom&apos;s&quot;');
+    // Ampersand first, so entities never double-escape.
+    expect(escapeSsml('&amp;')).toBe('&amp;amp;');
+  });
+
+  it('normalizeProsodyPercent coerces legacy and loose inputs to integer percents', () => {
+    expect(normalizeProsodyPercent('+0.00%', '+0%')).toBe('+0%');
+    expect(normalizeProsodyPercent('-8.00%', '+0%')).toBe('-8%');
+    expect(normalizeProsodyPercent('-9.84%', '+0%')).toBe('-10%');
+    expect(normalizeProsodyPercent('12%', '+0%')).toBe('+12%');
+    expect(normalizeProsodyPercent('+10', '+0%')).toBe('+10%');
+  });
+
+  it('normalizeProsodyPercent falls back on garbage instead of throwing', () => {
+    expect(normalizeProsodyPercent('fast', '+0%')).toBe('+0%');
+    expect(normalizeProsodyPercent(undefined, '+0%')).toBe('+0%');
+    expect(normalizeProsodyPercent(null, '-8%')).toBe('-8%');
+    expect(normalizeProsodyPercent('', '+0%')).toBe('+0%');
+  });
+
+  it('normalizeProsodyPercent clamps absurd values', () => {
+    expect(normalizeProsodyPercent('+500%', '+0%')).toBe('+100%');
+    expect(normalizeProsodyPercent('-500%', '+0%')).toBe('-100%');
+  });
+
+  it('normalizeProsodyHz coerces legacy and loose pitches to integer Hz', () => {
+    expect(normalizeProsodyHz('-20Hz', '+0Hz')).toBe('-20Hz');
+    expect(normalizeProsodyHz('-19.8Hz', '+0Hz')).toBe('-20Hz');
+    expect(normalizeProsodyHz('-20', '+0Hz')).toBe('-20Hz');
+    expect(normalizeProsodyHz('loud', '-20Hz')).toBe('-20Hz');
+    expect(normalizeProsodyHz('-500Hz', '+0Hz')).toBe('-100Hz');
   });
 
   it('findEdgeVoice returns the voice for a known name', () => {
@@ -217,7 +279,7 @@ describe('createServerSpeech', () => {
     expect(call.text).toBe('नमस्ते');
     expect(call.voice).toBe('hi-IN-MadhurNeural');
     expect(call.pitch).toBe('-20Hz');
-    expect(call.rate).toMatch(/^[+-]/);
+    expect(call.rate).toMatch(/^[+-]\d+%$/);
   });
 
   it('speak() with empty text reports failure', () => {
@@ -246,6 +308,30 @@ describe('createServerSpeech', () => {
     expect(onEnd).toHaveBeenCalledWith({
       status: 'failed',
       reason: 'Network error',
+      completedSegments: 0,
+      totalSegments: 1,
+    });
+  });
+
+  it('speak() fails the segment when fetchTTS never settles', async () => {
+    // Before the fetch watchdog existed, a hung /api/tts request left the
+    // segment without an outcome forever and wedged the announce queue.
+    const env = makeMockEnv({
+      fetchTTS: () => new Promise<ArrayBuffer>(() => { /* never settles */ }),
+    });
+    const engine = createServerSpeech(env, {
+      startTimeoutMs: 5000,
+      completionTimeoutMs: 5000,
+      fetchTimeoutMs: 50,
+    });
+    const onEnd = vi.fn();
+    engine.speak('नमस्ते।', onEnd);
+
+    await new Promise((resolve) => setTimeout(resolve, 600));
+
+    expect(onEnd).toHaveBeenCalledWith({
+      status: 'failed',
+      reason: 'TTS fetch timed out',
       completedSegments: 0,
       totalSegments: 1,
     });
@@ -420,5 +506,74 @@ describe('createDualSpeech', () => {
     const voices = dual.hindiVoices();
     expect(voices).toHaveLength(1);
     expect(voices[0].name).toBe('Google Hindi');
+  });
+
+  it('passes a cancelled outcome through without replaying through the browser', () => {
+    // Cancellation is deliberate (queue disposed, screen unmounted). The old
+    // code treated every non-completed outcome as failure: the browser
+    // RE-SPOKE the cancelled announcement and the browser engine was latched
+    // for the rest of the session.
+    const serverSpeak = vi.fn((text: string, onEnd: (outcome: import('./speech').SpeechOutcome) => void) => {
+      onEnd({ status: 'cancelled', completedSegments: 0, totalSegments: 1 });
+    });
+    const browserSpeak = vi.fn();
+    const server = makeMockEngine({ speak: serverSpeak });
+    const browser = makeMockEngine({ speak: browserSpeak });
+    const dual = createDualSpeech(server as never, browser as never);
+
+    const onEnd = vi.fn();
+    dual.speak('नमस्ते।', onEnd);
+
+    expect(browserSpeak).not.toHaveBeenCalled();
+    expect(onEnd).toHaveBeenCalledWith({ status: 'cancelled', completedSegments: 0, totalSegments: 1 });
+  });
+
+  it('a cancelled outcome does not latch the fallback — the server is tried again', () => {
+    const serverSpeak = vi.fn((text: string, onEnd: (outcome: import('./speech').SpeechOutcome) => void) => {
+      onEnd({ status: 'cancelled', completedSegments: 0, totalSegments: 1 });
+    });
+    const server = makeMockEngine({ speak: serverSpeak });
+    const browser = makeMockEngine();
+    const dual = createDualSpeech(server as never, browser as never);
+
+    dual.speak('एक।', () => {});
+    dual.speak('दो।', () => {});
+
+    expect(serverSpeak).toHaveBeenCalledTimes(2);
+  });
+
+  it('falls back to the server again after refreshVoices()', () => {
+    // A transient server failure latches the fallback so the kitchen keeps
+    // hearing announcements; refreshVoices (startup, voice change, toggle)
+    // is the deliberate action that gives the server another chance.
+    let serverHealthy = false;
+    const serverSpeak = vi.fn((text: string, onEnd: (outcome: import('./speech').SpeechOutcome) => void) => {
+      if (serverHealthy) {
+        onEnd({ status: 'completed', completedSegments: 1, totalSegments: 1 });
+      } else {
+        onEnd({ status: 'failed', reason: 'TTS relay returned 503', completedSegments: 0, totalSegments: 1 });
+      }
+    });
+    const browserSpeak = vi.fn((text: string, onEnd: (outcome: import('./speech').SpeechOutcome) => void) => {
+      onEnd({ status: 'completed', completedSegments: 1, totalSegments: 1 });
+    });
+    const server = makeMockEngine({ speak: serverSpeak });
+    const browser = makeMockEngine({ speak: browserSpeak });
+    const dual = createDualSpeech(server as never, browser as never);
+
+    dual.speak('एक।', () => {});
+    expect(serverSpeak).toHaveBeenCalledTimes(1);
+    expect(browserSpeak).toHaveBeenCalledTimes(1);
+
+    // Server is healthy again but the latch is still set — browser is used.
+    serverHealthy = true;
+    dual.speak('दो।', () => {});
+    expect(serverSpeak).toHaveBeenCalledTimes(1);
+    expect(browserSpeak).toHaveBeenCalledTimes(2);
+
+    dual.refreshVoices();
+    dual.speak('तीन।', () => {});
+    expect(serverSpeak).toHaveBeenCalledTimes(2);
+    expect(browserSpeak).toHaveBeenCalledTimes(2);
   });
 });

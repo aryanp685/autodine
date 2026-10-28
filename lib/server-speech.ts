@@ -88,6 +88,17 @@ export type ServerSpeechEnv = {
 };
 
 /**
+ * How long to wait for /api/tts to answer before giving up on the server
+ * engine for this segment.
+ *
+ * The start/completion watchdogs only arm once the audio has arrived — a
+ * fetch that never settles would wedge the announcement queue with no
+ * outcome at all. 12s covers a serverless cold start plus synthesis with
+ * room to spare, and still fails over to the browser engine promptly.
+ */
+export const DEFAULT_FETCH_TIMEOUT_MS = 12_000;
+
+/**
  * Create a server-backed SpeechEngine that speaks via Edge TTS.
  *
  * The engine fetches MP3 audio from /api/tts for each sentence and plays
@@ -96,7 +107,7 @@ export type ServerSpeechEnv = {
  */
 export function createServerSpeech(
   env: ServerSpeechEnv,
-  options: { startTimeoutMs?: number; completionTimeoutMs?: number } = {},
+  options: { startTimeoutMs?: number; completionTimeoutMs?: number; fetchTimeoutMs?: number } = {},
 ): SpeechEngine {
   let forcedVoice: string | null = null;
   let rateScale = 1;
@@ -107,6 +118,7 @@ export function createServerSpeech(
 
   const startTimeoutMs = options.startTimeoutMs ?? env.startTimeoutMs ?? DEFAULT_START_TIMEOUT_MS;
   const completionTimeoutMs = options.completionTimeoutMs ?? DEFAULT_COMPLETION_TIMEOUT_MS;
+  const fetchTimeoutMs = options.fetchTimeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS;
 
   function voiceName(): string {
     if (forcedVoice) return forcedVoice;
@@ -249,10 +261,12 @@ export function createServerSpeech(
       }
 
       let segmentSettled = false;
+      let fetchWatchdog: unknown = null;
       let startWatchdog: unknown = null;
       let completionWatchdog: unknown = null;
 
       const clearWatchdogs = () => {
+        if (fetchWatchdog !== null) { env.clearTimer(fetchWatchdog); timers.delete(fetchWatchdog); fetchWatchdog = null; }
         if (startWatchdog !== null) { env.clearTimer(startWatchdog); timers.delete(startWatchdog); startWatchdog = null; }
         if (completionWatchdog !== null) { env.clearTimer(completionWatchdog); timers.delete(completionWatchdog); completionWatchdog = null; }
       };
@@ -289,7 +303,10 @@ export function createServerSpeech(
       const prosodyRate = rateToProsody(effectiveRate);
 
       // Fetch audio from the /api/tts relay. This is async — the rest of
-      // the speak logic waits for the promise to resolve.
+      // the speak logic waits for the promise to resolve. The fetch watchdog
+      // covers the promise itself: without it a request that never settles
+      // would leave this segment (and the queue behind it) waiting forever.
+      fetchWatchdog = schedule(() => segmentFailure('TTS fetch timed out'), fetchTimeoutMs);
       let audioPromise: Promise<ArrayBuffer>;
       try {
         audioPromise = env.fetchTTS({
@@ -305,6 +322,7 @@ export function createServerSpeech(
 
       audioPromise.then((audioData) => {
         if (settled || segmentSettled) return;
+        clearWatchdogs();
 
         // Create a blob URL and an Audio element.
         const url = env.createObjectUrl(audioData);

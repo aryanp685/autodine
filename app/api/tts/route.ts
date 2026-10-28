@@ -26,14 +26,28 @@
  *
  * LICENCE
  *
- * Edge TTS is a community-reverse-engineered interface to Microsoft's
- * Read Aloud feature. It is free and requires no API key. Microsoft has
- * not published a support commitment for it. This route is the pragmatic
+ * The service is Microsoft's Read Aloud API — a community-reverse-
+ * engineered interface, free and key-less, with no published support
+ * commitment (its handshake has broken before: the Sec-MS-GEC token moved
+ * to a custom hash in 2026 and every stale client got 403). The client is
+ * msedge-tts (MIT), which carries the current token and propagates
+ * connection failures instead of hanging. This route is the pragmatic
  * choice at ₹0/month; the alternative (Azure Speech Studio) costs money
- * and was ruled out by the standing no-paid-services constraint.
+ * and was ruled out by the standing no-paid-services constraint. If
+ * Microsoft breaks the interface again, this route answers 503 honestly,
+ * the kitchen falls back to the browser voice, and scripts/tts-smoke.ts
+ * says which layer failed.
  */
 
-import { EdgeTTS } from 'edge-tts-universal';
+import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
+import {
+  DEFAULT_EDGE_VOICE,
+  DEFAULT_PITCH,
+  EDGE_HINDI_VOICES,
+  escapeSsml,
+  normalizeProsodyHz,
+  normalizeProsodyPercent,
+} from '@/lib/tts-voices';
 
 /** The runtime must be Node.js: the WebSocket client needs `ws`. */
 export const runtime = 'nodejs';
@@ -42,39 +56,39 @@ export const runtime = 'nodejs';
 export const maxDuration = 30;
 
 /**
- * Hindi male Edge TTS voices, in order of preference for the kitchen
- * character: deep, warm, mature, conversational.
- *
- * - Madhur: the standard male Hindi neural voice. Friendly, positive,
- *   mature. The best baseline for a warm, confident delivery.
- * - Aarav: newer male voice. More expressive, conversational.
- * - Kunal: newer male voice. Calm, measured, confident.
- * - Rehaan: newer male voice. Professional, clear, slightly formal.
- *
- * These are the voices Microsoft ships for hi-IN. The list is fixed
- * because it is the server's voice catalogue — the browser engine's
- * voice list varies by device, but the server engine's list is the
- * same everywhere.
+ * The kitchen's voice catalogue and default character live in
+ * lib/tts-voices.ts so the client engine and this route can never drift
+ * apart. Re-exported here because this route documents the catalogue as
+ * part of its contract.
  */
-export const EDGE_HINDI_VOICES = [
-  { name: 'hi-IN-MadhurNeural', lang: 'hi-IN', gender: 'Male' as const },
-  { name: 'hi-IN-AaravNeural', lang: 'hi-IN', gender: 'Male' as const },
-  { name: 'hi-IN-KunalNeural', lang: 'hi-IN', gender: 'Male' as const },
-  { name: 'hi-IN-RehaanNeural', lang: 'hi-IN', gender: 'Male' as const },
-];
+export { EDGE_HINDI_VOICES, DEFAULT_EDGE_VOICE };
 
-/** Default voice: Madhur is the deepest, warmest male Hindi voice. */
-export const DEFAULT_EDGE_VOICE = 'hi-IN-MadhurNeural';
-
-/** Prosody defaults for the kitchen character. */
+/**
+ * Prosody defaults for the kitchen character.
+ *
+ * The wire format is integer SSML prosody ("+0%", not "+0.00%") — kept
+ * strict after a decimal-format bug made every /api/tts call fail. The
+ * inputs from the body are run through the same normalizers, so a stale
+ * client bundle that still sends decimals gets coerced instead of failing.
+ */
 const DEFAULT_PROSODY = {
   /** Rate: converted from the browser engine's multiplier by the caller. */
-  rate: '+0.00%',
+  rate: '+0%',
   /** Pitch: -20Hz for a deep, warm, Jackie Shroff-style baritone. */
-  pitch: '-20Hz',
+  pitch: DEFAULT_PITCH,
   /** Volume: normal. */
-  volume: '+0.00%',
+  volume: '+0%',
 };
+
+/**
+ * How long synthesis may run before this route gives up and answers 503.
+ *
+ * The WebSocket connect plus synthesis normally finishes in a couple of
+ * seconds; without a ceiling a hung connection would hold the function open
+ * until maxDuration and leave the kitchen staring at silence. 20s sits
+ * under maxDuration and above any plausible cold start.
+ */
+const SYNTHESIS_TIMEOUT_MS = 20_000;
 
 /** Body schema: text is required, voice/rate/pitch are optional. */
 type TTSRequest = {
@@ -112,24 +126,41 @@ export async function POST(request: Request): Promise<Response> {
     : DEFAULT_EDGE_VOICE;
 
   const prosody = {
-    rate: body.rate ?? DEFAULT_PROSODY.rate,
-    pitch: body.pitch ?? DEFAULT_PROSODY.pitch,
+    rate: normalizeProsodyPercent(body.rate, DEFAULT_PROSODY.rate),
+    pitch: normalizeProsodyHz(body.pitch, DEFAULT_PROSODY.pitch),
     volume: DEFAULT_PROSODY.volume,
   };
 
   try {
-    const tts = new EdgeTTS(text, voice, prosody);
-    const result = await tts.synthesize();
-
-    // The audio field is a Blob containing MP3 data. Return it directly
-    // with the correct content type. Node 18+ Response accepts Blob.
-    return new Response(result.audio as unknown as Blob, {
-      headers: {
-        'Content-Type': 'audio/mpeg',
-        'Cache-Control': 'public, max-age=300',
-        'X-Content-Type-Options': 'nosniff',
-      },
+    const tts = new MsEdgeTTS({
+      connectionTimeoutMs: 12_000,
+      synthesisTimeoutMs: 15_000,
     });
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error(`TTS synthesis exceeded ${SYNTHESIS_TIMEOUT_MS}ms`)), SYNTHESIS_TIMEOUT_MS);
+    });
+    try {
+      const synthesize = async (): Promise<Buffer> => {
+        await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+        const { audioStream } = tts.toStream(escapeSsml(text), prosody);
+        const chunks: Buffer[] = [];
+        for await (const chunk of audioStream) chunks.push(Buffer.from(chunk as Buffer));
+        return Buffer.concat(chunks);
+      };
+      const audio = await Promise.race([synthesize(), timeout]);
+
+      return new Response(new Uint8Array(audio), {
+        headers: {
+          'Content-Type': 'audio/mpeg',
+          'Cache-Control': 'public, max-age=300',
+          'X-Content-Type-Options': 'nosniff',
+        },
+      });
+    } finally {
+      clearTimeout(timeoutId);
+      try { tts.close(); } catch { /* best effort */ }
+    }
   } catch (error) {
     // Edge TTS may be unreachable (network, service change, etc.). The
     // kitchen engine treats a 503 as "server speech failed" and falls

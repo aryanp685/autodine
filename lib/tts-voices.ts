@@ -59,16 +59,84 @@ export const DEFAULT_VOLUME = '+0.00%';
  * Convert a browser-style rate multiplier to an Edge TTS prosody string.
  *
  * The browser Web Speech API uses a multiplier where 1.0 is normal speed.
- * Edge TTS uses a percentage change from the voice's default rate, e.g.
- * "+10.00%" or "-20.00%".
+ * Edge TTS SSML uses a percentage change from the voice's default rate.
  *
- *   rate 1.0  → "+0.00%"
- *   rate 0.92 → "-8.00%"
- *   rate 1.1  → "+10.00%"
+ * THE FORMAT IS INTEGERS ONLY — a hard-won rule. The /api/tts wire format
+ * is `[+-]\d+%` (rate/volume) and `[+-]\d+Hz` (pitch), matching SSML
+ * relative prosody. An earlier version of this function returned
+ * "+0.00%"-style strings, which the then-library rejected with
+ * `Invalid rate '+0.00%'` before any network I/O: every /api/tts call
+ * failed, the kitchen fell back to the browser's (often female) Hindi
+ * voice, and the failure looked like "Edge TTS is blocked" instead of
+ * "the numbers were formatted wrong". Keep the integer shape; the tests
+ * enforce it.
+ *
+ *   rate 1.0   → "+0%"
+ *   rate 0.92  → "-8%"
+ *   rate 1.1   → "+10%"
+ *   rate 0.9016→ "-10%"  (rounded)
  */
 export function rateToProsody(rate: number): string {
-  const pct = (rate - 1) * 100;
-  return `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+  const pct = Math.round((rate - 1) * 100);
+  return `${pct >= 0 ? '+' : ''}${pct}%`;
+}
+
+/** How far a percent prosody (rate, volume) may stray from normal. */
+const PERCENT_CLAMP = 100;
+
+/** How far a pitch may stray from the voice's default, in Hz. */
+const PITCH_CLAMP = 100;
+
+/**
+ * Coerce a caller-supplied percent prosody (rate/volume) to the integer
+ * format the /api/tts wire contract accepts.
+ *
+ * Tolerant on input ("+0.00%", "-8%", "12%", 12) and strict on output
+ * (always `[+-]\d+%`). Anything unparseable falls back rather than throws —
+ * a stale preference from an older deployment must not silence the kitchen.
+ */
+export function normalizeProsodyPercent(value: unknown, fallback: string): string {
+  const match = typeof value === 'string'
+    ? /^([+-]?\d+(?:\.\d+)?)\s*%?$/.exec(value.trim())
+    : typeof value === 'number' && Number.isFinite(value)
+      ? /^([+-]?\d+(?:\.\d+)?)$/.exec(String(value))
+      : null;
+  if (!match) return fallback;
+  const pct = Math.round(Math.min(PERCENT_CLAMP, Math.max(-PERCENT_CLAMP, Number(match[1]))));
+  return `${pct >= 0 ? '+' : ''}${pct}%`;
+}
+
+/**
+ * Coerce a caller-supplied pitch to the integer-Hz format the /api/tts wire
+ * contract accepts (`[+-]\d+Hz`). Same tolerance rules as
+ * normalizeProsodyPercent.
+ */
+export function normalizeProsodyHz(value: unknown, fallback: string): string {
+  const match = typeof value === 'string'
+    ? /^([+-]?\d+(?:\.\d+)?)\s*(?:Hz)?$/i.exec(value.trim())
+    : typeof value === 'number' && Number.isFinite(value)
+      ? /^([+-]?\d+(?:\.\d+)?)$/.exec(String(value))
+      : null;
+  if (!match) return fallback;
+  const hz = Math.round(Math.min(PITCH_CLAMP, Math.max(-PITCH_CLAMP, Number(match[1]))));
+  return `${hz >= 0 ? '+' : ''}${hz}Hz`;
+}
+
+/**
+ * Escape text for inclusion inside an SSML document.
+ *
+ * Announcement text carries dish names ("Fish & Chips", "Dal <special>")
+ * and msedge-tts inserts input into its SSML template verbatim — an
+ * unescaped `&` or `<` is malformed XML and the synthesis request is
+ * rejected. Five entities, in the order that keeps `&` from double-escaping.
+ */
+export function escapeSsml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 }
 
 /** Find an Edge TTS voice by name, or null if not in the catalogue. */
