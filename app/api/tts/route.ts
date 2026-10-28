@@ -42,8 +42,8 @@
 import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
 import {
   DEFAULT_EDGE_VOICE,
-  DEFAULT_PITCH,
   EDGE_HINDI_VOICES,
+  defaultPitchFor,
   escapeSsml,
   normalizeProsodyHz,
   normalizeProsodyPercent,
@@ -70,12 +70,12 @@ export { EDGE_HINDI_VOICES, DEFAULT_EDGE_VOICE };
  * strict after a decimal-format bug made every /api/tts call fail. The
  * inputs from the body are run through the same normalizers, so a stale
  * client bundle that still sends decimals gets coerced instead of failing.
+ * Pitch has no single default: each voice carries its own natural pitch
+ * (defaultPitchFor), so Swara never inherits Madhur's warmth.
  */
 const DEFAULT_PROSODY = {
   /** Rate: converted from the browser engine's multiplier by the caller. */
   rate: '+0%',
-  /** Pitch: -20Hz for a deep, warm, Jackie Shroff-style baritone. */
-  pitch: DEFAULT_PITCH,
   /** Volume: normal. */
   volume: '+0%',
 };
@@ -127,7 +127,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const prosody = {
     rate: normalizeProsodyPercent(body.rate, DEFAULT_PROSODY.rate),
-    pitch: normalizeProsodyHz(body.pitch, DEFAULT_PROSODY.pitch),
+    pitch: normalizeProsodyHz(body.pitch, defaultPitchFor(voice)),
     volume: DEFAULT_PROSODY.volume,
   };
 

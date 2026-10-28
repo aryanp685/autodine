@@ -7,6 +7,9 @@
  * API route and the client engine always agree on which voices exist.
  */
 
+/** The gender of a voice character. */
+export type Gender = 'Male' | 'Female';
+
 /** An Edge TTS Hindi voice. */
 export type EdgeVoice = {
   /** Full Edge TTS voice name, e.g. "hi-IN-MadhurNeural". */
@@ -14,46 +17,105 @@ export type EdgeVoice = {
   /** BCP-47 locale, e.g. "hi-IN". */
   lang: string;
   /** Gender as reported by the Edge TTS voice list. */
-  gender: 'Male' | 'Female';
+  gender: Gender;
+  /** SSML pitch applied when the caller sends no explicit pitch. */
+  pitch: string;
+  /** Human label for the kitchen picker, Hindi name plus gender. */
+  label: string;
 };
 
 /**
- * Hindi male Edge TTS voices, in order of preference for the kitchen
- * character: deep, warm, mature, conversational.
+ * The kitchen voice catalogue: ONE male, ONE female.
  *
- * - Madhur: the standard male Hindi neural voice. Friendly, positive,
- *   mature. The best baseline for a warm, confident delivery.
- * - Aarav: newer male voice. More expressive, conversational.
- * - Kunal: newer male voice. Calm, measured, confident.
- * - Rehaan: newer male voice. Professional, clear, slightly formal.
+ * That is not a restriction invented here — it is the complete Hindi
+ * offering of the Microsoft Read Aloud service (verified against its live
+ * voice list): exactly two hi-IN voices, both GA, both tagged
+ * "Friendly, Positive" (conversational, not news-reader).
  *
- * These are the male voices Microsoft ships for hi-IN as of late 2024.
- * The list is fixed because it is the server's voice catalogue — the
- * browser engine's voice list varies by device, but the server engine's
- * list is the same everywhere.
+ * - Madhur (male): warm, mature, friendly. The kitchen's default character.
+ * - Swara (female): friendly, positive, clear.
+ *
+ * An earlier catalogue listed Aarav/Kunal/Rehaan from Azure's broader
+ * voice list; the Read Aloud endpoint does not serve them, so selecting one
+ * could never produce audio. Only voices this service actually serves may
+ * appear here.
+ *
+ * The Nagpuri/Mumbai slang lives in the words (lib/voice-personality.ts),
+ * not in these models — both characters speak the same desi text; their
+ * naturalness comes from neural delivery plus expressive punctuation.
  */
 export const EDGE_HINDI_VOICES: readonly EdgeVoice[] = [
-  { name: 'hi-IN-MadhurNeural', lang: 'hi-IN', gender: 'Male' },
-  { name: 'hi-IN-AaravNeural', lang: 'hi-IN', gender: 'Male' },
-  { name: 'hi-IN-KunalNeural', lang: 'hi-IN', gender: 'Male' },
-  { name: 'hi-IN-RehaanNeural', lang: 'hi-IN', gender: 'Male' },
+  {
+    name: 'hi-IN-MadhurNeural',
+    lang: 'hi-IN',
+    gender: 'Male',
+    // Barely-there warmth. The old -20Hz baritone was a style choice that
+    // pushed the model out of its natural range; "natural human tone" means
+    // staying close to the voice's own pitch.
+    pitch: '-4Hz',
+    label: 'माधुर (पुरुष)',
+  },
+  {
+    name: 'hi-IN-SwaraNeural',
+    lang: 'hi-IN',
+    gender: 'Female',
+    pitch: '+0Hz',
+    label: 'स्वरा (स्त्री)',
+  },
 ];
 
-/** Default voice: Madhur is the deepest, warmest male Hindi voice. */
+/** Default voice: Madhur, the warm male character. */
 export const DEFAULT_EDGE_VOICE = 'hi-IN-MadhurNeural';
 
 /**
- * Default pitch: -20Hz for a deeper, warmer, more mature male character.
- *
- * Changed from -10Hz to -20Hz to achieve a deeper, more Jackie Shroff-style
- * baritone delivery. The -10Hz value was too subtle — the voice still sounded
- * close to the default Madhur voice. -20Hz produces a noticeably deeper,
- * more authoritative tone while staying within Edge TTS's comfortable range.
+ * Default pitch: the default voice's natural pitch (see the catalogue).
  */
-export const DEFAULT_PITCH = '-20Hz';
+export const DEFAULT_PITCH = '-4Hz';
 
 /** Default volume: normal. */
-export const DEFAULT_VOLUME = '+0.00%';
+export const DEFAULT_VOLUME = '+0%';
+
+/**
+ * The SSML pitch for a catalogue voice, or the default when unknown.
+ * The route and the server engine use this so a voice never inherits
+ * another voice's character (Swara at -4Hz would sound artificially deep).
+ */
+export function defaultPitchFor(name: string): string {
+  return findEdgeVoice(name)?.pitch ?? DEFAULT_PITCH;
+}
+
+/**
+ * Voice-name gender inference.
+ *
+ * The Web Speech API does not expose gender, so the browser fallback engine
+ * infers it from names to match the character the operator picked (male
+ * Madhur or female Swara). Catalogue names resolve exactly; device names
+ * fall back to common Hindi voice-name hints. Unknown names return null —
+ * neither penalised nor preferred on gender alone.
+ */
+
+/** Voice-name substrings that indicate a female Hindi voice. */
+const FEMALE_VOICE_HINTS = /(swara|lekha|kalpana|heera|aditi|veena|neerja|priya|anjali|meera|sneha|kavita|sunita|radha|sita|durga|tara|gita|usha|vijaya|reetha|madhuri|sridevi|hema|rekha|sakshi|tanvi|irisha|female|woman)/i;
+
+/** Voice-name substrings that indicate a male Hindi voice. */
+const MALE_VOICE_HINTS = /(ravi|prabhat|madhur|suresh|aarav|kunal|rehaan|vikram|arjun|ramesh|mahesh|deepak|rajesh|kamal|nimesh|pradeep|manish|vivek|sanjay|rahul|hemant|male|man\b)/i;
+
+/** The gender of a voice by name — catalogue first, then name hints. */
+export function voiceGender(name: string): Gender | null {
+  const edge = findEdgeVoice(name);
+  if (edge) return edge.gender;
+  if (FEMALE_VOICE_HINTS.test(name)) return 'Female';
+  if (MALE_VOICE_HINTS.test(name)) return 'Male';
+  return null;
+}
+
+/**
+ * Human label for the kitchen picker: the catalogue's Hindi label for our
+ * two characters, or the raw name for a device voice.
+ */
+export function voiceLabel(name: string): string {
+  return findEdgeVoice(name)?.label ?? name;
+}
 
 /**
  * Convert a browser-style rate multiplier to an Edge TTS prosody string.

@@ -75,11 +75,12 @@ export function createDualSpeech(
 
   function setVoiceName(name: string | null): boolean {
     // Try the server engine first. If the name is not in its catalogue,
-    // try the browser engine.
-    if (!serverFailed && server.available()) {
-      if (server.setVoiceName(name)) return true;
-    }
-    return browser.setVoiceName(name);
+    // try the browser engine. Both are always informed: the browser engine
+    // tracks the chosen character's gender for the fallback even when the
+    // name is a server catalogue name the device does not have.
+    const serverOk = !serverFailed && server.available() ? server.setVoiceName(name) : false;
+    const browserOk = browser.setVoiceName(name);
+    return serverOk || browserOk;
   }
 
   function setRateScale(scale: number): void {

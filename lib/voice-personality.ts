@@ -22,10 +22,15 @@
  *
  * SLANG AND CLARITY
  *
- * Regional expressions ("re", "haan", "bhai", "mama") are used naturally,
+ * The slang is Nagpuri-Mumbai kitchen talk ("arey mama", "suno re bhai",
+ * "arey baapre", "patkan") -- the words a real kitchen in that belt uses,
+ * written in Devanagari so the TTS reads them as Hindi. Regional
+ * expressions ("re", "haan", "bhai", "mama", "patkan") are used naturally,
  * not forced into every sentence. When a note is a safety instruction -- an
  * allergy, a substitution -- it is stated plainly, with no slang that could
  * blur the instruction. Humour wraps the order; it never replaces it.
+ * Both the male (Madhur) and female (Swara) characters speak this same
+ * text -- the personality is in the words, not the voice model.
  *
  * WHAT THIS MODULE DOES NOT DO
  *
@@ -99,8 +104,9 @@ const VAR_AREY_MAMA: PersonalityVariation = {
  * Variation 2 -- Suno Re Bhai.
  *
  * More direct. "Suno re bhai!" grabs attention. Uses "zara" (a bit) and
- * "jaldi" (quickly) for energy. The note is introduced with "haan" -- a
- * conversational "and yes..." that precedes an important instruction.
+ * "patkan" (Nagpuri for "quickly") for energy. The note is introduced with
+ * "haan" -- a conversational "and yes..." that precedes an important
+ * instruction.
  */
 const VAR_SUNO_RE: PersonalityVariation = {
   id: 'suno-re',
@@ -111,7 +117,7 @@ const VAR_SUNO_RE: PersonalityVariation = {
   itemsIntro: () => 'देखो ज़रा!',
   itemsSeparator: () => ', ',
   noteLabel: () => 'और हैन्…',
-  closer: () => 'ऑर्डर सही है, जल्दी बनाओ!',
+  closer: () => 'ऑर्डर सही है, पटकन बनाओ भाई!',
 };
 
 /**
@@ -136,16 +142,16 @@ const VAR_DHYaan_DENA: PersonalityVariation = {
 /**
  * Variation 4 -- Arey Bhai.
  *
- * Casual and friendly. "Arey bhai!" is the Mumbai "hey man!". The note uses
- * "na" as a question tag ("no onions, right?") -- natural desi conversational
- * style. The closer uses "bhaiya" for variety.
+ * Casual and friendly. "Arey baapre!" is the Mumbai "oh man!". The note
+ * uses "na" as a question tag ("no onions, right?") -- natural desi
+ * conversational style. The closer uses "bhaiya" for variety.
  */
 const VAR_AREY_BHAI: PersonalityVariation = {
   id: 'arey-bhai',
   opener: (table) =>
     isTakeaway(table)
-      ? 'अरे भाई! नया टेकअवे ऑर्डर आ गया!'
-      : `अरे भाई! नया ऑर्डर आ गया! टेबल ${spokenTable(table)}!`,
+      ? 'अरे बापरे! नया टेकअवे ऑर्डर आ गया!'
+      : `अरे बापरे! नया ऑर्डर आ गया! टेबल ${spokenTable(table)}!`,
   itemsIntro: () => 'एक सुनों…',
   itemsSeparator: () => ', ',
   noteLabel: () => 'और हैन्…',

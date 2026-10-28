@@ -50,6 +50,7 @@ import { createServerSpeech } from '@/lib/server-speech';
 import { browserServerSpeechEnv } from '@/lib/server-speech-browser';
 import { createDualSpeech } from '@/lib/dual-speech';
 import { buildKitchenAnnouncement } from '@/lib/voice-personality';
+import { voiceLabel } from '@/lib/tts-voices';
 
 /* The thresholds live next to the query that computes the age, so the badge
    and the board cannot disagree about what "late" means. */
@@ -1417,7 +1418,7 @@ export function Kitchen({
               <option value="">स्वचालित (पहले hi-IN)</option>
               {voiceList.map((voice) => (
                 <option key={voice.name} value={voice.name}>
-                  {voice.name} · {voice.lang}{voice.default ? ' · system default' : ''}
+                  {voiceLabel(voice.name)} · {voice.lang}{voice.default ? ' · system default' : ''}
                 </option>
               ))}
             </select>
@@ -1476,7 +1477,7 @@ export function Kitchen({
             Selected Hindi voice:{' '}
             <strong className="font-semibold text-gink">
               {voiceName
-                ? `${voiceName}${selectedVoiceInfo ? ` (${selectedVoiceInfo.lang})` : ''}`
+                ? `${voiceLabel(voiceName)}${selectedVoiceInfo ? ` (${selectedVoiceInfo.lang})` : ''}`
                 : voiceState === 'starting' ? 'searching…' : 'none available'}
             </strong>
             {selectedVoiceInfo?.default ? ' · browser default' : ''}

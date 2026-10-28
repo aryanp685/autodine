@@ -3,12 +3,15 @@ import {
   DEFAULT_EDGE_VOICE,
   DEFAULT_PITCH,
   EDGE_HINDI_VOICES,
+  defaultPitchFor,
   escapeSsml,
   findEdgeVoice,
   normalizeProsodyHz,
   normalizeProsodyPercent,
   rateToProsody,
   toVoiceLike,
+  voiceGender,
+  voiceLabel,
 } from './tts-voices';
 import { createServerSpeech, type ServerSpeechEnv } from './server-speech';
 import { createDualSpeech } from './dual-speech';
@@ -121,15 +124,44 @@ describe('tts-voices', () => {
     expect(findEdgeVoice(DEFAULT_EDGE_VOICE)).not.toBeNull();
   });
 
-  it('DEFAULT_PITCH is -20Hz for a deep, Jackie Shroff-style baritone', () => {
-    expect(DEFAULT_PITCH).toBe('-20Hz');
+  it('DEFAULT_PITCH is the default voice\'s natural pitch', () => {
+    // -4Hz: barely-there warmth. The old -20Hz baritone was a style choice
+    // that pushed the model out of its natural range — "natural human tone"
+    // means staying close to the voice's own pitch.
+    expect(DEFAULT_PITCH).toBe('-4Hz');
+    expect(defaultPitchFor(DEFAULT_EDGE_VOICE)).toBe(DEFAULT_PITCH);
   });
 
-  it('EDGE_HINDI_VOICES contains only male Hindi voices', () => {
+  it('EDGE_HINDI_VOICES is exactly one male and one female Hindi voice', () => {
+    // The Read Aloud service serves exactly these two hi-IN voices; the
+    // kitchen offers both characters and nothing else.
+    expect(EDGE_HINDI_VOICES).toHaveLength(2);
     for (const v of EDGE_HINDI_VOICES) {
       expect(v.lang).toBe('hi-IN');
-      expect(v.gender).toBe('Male');
     }
+    expect(EDGE_HINDI_VOICES.filter((v) => v.gender === 'Male')).toHaveLength(1);
+    expect(EDGE_HINDI_VOICES.filter((v) => v.gender === 'Female')).toHaveLength(1);
+  });
+
+  it('each voice carries its own natural pitch', () => {
+    expect(defaultPitchFor('hi-IN-MadhurNeural')).toBe('-4Hz');
+    expect(defaultPitchFor('hi-IN-SwaraNeural')).toBe('+0Hz');
+    // Unknown names fall back to the default voice's pitch.
+    expect(defaultPitchFor('hi-IN-NonExistentNeural')).toBe(DEFAULT_PITCH);
+  });
+
+  it('voiceGender resolves catalogue names and common device names', () => {
+    expect(voiceGender('hi-IN-MadhurNeural')).toBe('Male');
+    expect(voiceGender('hi-IN-SwaraNeural')).toBe('Female');
+    expect(voiceGender('Microsoft Swara Online (Natural)')).toBe('Female');
+    expect(voiceGender('Ravi')).toBe('Male');
+    expect(voiceGender('Google हिन्दी')).toBeNull();
+  });
+
+  it('voiceLabel shows the Hindi character label for catalogue voices', () => {
+    expect(voiceLabel('hi-IN-MadhurNeural')).toBe('माधुर (पुरुष)');
+    expect(voiceLabel('hi-IN-SwaraNeural')).toBe('स्वरा (स्त्री)');
+    expect(voiceLabel('Google हिन्दी')).toBe('Google हिन्दी');
   });
 });
 
@@ -214,8 +246,8 @@ describe('createServerSpeech', () => {
   it('setVoiceName() accepts known Edge TTS voices', () => {
     const env = makeMockEnv();
     const engine = createServerSpeech(env);
-    expect(engine.setVoiceName('hi-IN-AaravNeural')).toBe(true);
-    expect(engine.voiceName()).toBe('hi-IN-AaravNeural');
+    expect(engine.setVoiceName('hi-IN-SwaraNeural')).toBe(true);
+    expect(engine.voiceName()).toBe('hi-IN-SwaraNeural');
   });
 
   it('setVoiceName() rejects unknown voices', () => {
@@ -228,7 +260,7 @@ describe('createServerSpeech', () => {
   it('setVoiceName(null) resets to default', () => {
     const env = makeMockEnv();
     const engine = createServerSpeech(env);
-    engine.setVoiceName('hi-IN-KunalNeural');
+    engine.setVoiceName('hi-IN-SwaraNeural');
     expect(engine.setVoiceName(null)).toBe(true);
     expect(engine.voiceName()).toBe('hi-IN-MadhurNeural');
   });
@@ -278,8 +310,23 @@ describe('createServerSpeech', () => {
     const call = env.fetchCalls[0];
     expect(call.text).toBe('नमस्ते');
     expect(call.voice).toBe('hi-IN-MadhurNeural');
-    expect(call.pitch).toBe('-20Hz');
+    expect(call.pitch).toBe('-4Hz'); // male voice's natural pitch
     expect(call.rate).toMatch(/^[+-]\d+%$/);
+  });
+
+  it('speak() uses the female voice\'s own pitch for the female character', async () => {
+    const env = makeMockEnv();
+    const engine = createServerSpeech(env, { startTimeoutMs: 5000, completionTimeoutMs: 5000 });
+
+    expect(engine.setVoiceName('hi-IN-SwaraNeural')).toBe(true);
+    engine.speak('नमस्ते।', vi.fn());
+    await new Promise((resolve) => setTimeout(resolve, 600));
+
+    expect(env.fetchCalls.length).toBeGreaterThan(0);
+    const call = env.fetchCalls[0];
+    expect(call.voice).toBe('hi-IN-SwaraNeural');
+    // Swara must never inherit Madhur's warmth.
+    expect(call.pitch).toBe('+0Hz');
   });
 
   it('speak() with empty text reports failure', () => {
@@ -433,7 +480,7 @@ describe('createDualSpeech', () => {
     expect(onEnd).toHaveBeenCalledWith({ status: 'completed', completedSegments: 1, totalSegments: 1 });
   });
 
-  it('setVoiceName tries server first, then browser', () => {
+  it('setVoiceName tries server first and informs the browser fallback', () => {
     const serverSetVoice = vi.fn(() => true);
     const browserSetVoice = vi.fn(() => true);
     const server = makeMockEngine({ voiceName: 'hi-IN-MadhurNeural' });
@@ -445,9 +492,12 @@ describe('createDualSpeech', () => {
       browser as never,
     );
 
-    dual.setVoiceName('hi-IN-AaravNeural');
-    expect(serverSetVoice).toHaveBeenCalledWith('hi-IN-AaravNeural');
-    expect(browserSetVoice).not.toHaveBeenCalled();
+    const accepted = dual.setVoiceName('hi-IN-SwaraNeural');
+    expect(accepted).toBe(true);
+    expect(serverSetVoice).toHaveBeenCalledWith('hi-IN-SwaraNeural');
+    // The browser engine is always informed: it tracks the character's
+    // gender so a fallback never answers a female voice with a male one.
+    expect(browserSetVoice).toHaveBeenCalledWith('hi-IN-SwaraNeural');
   });
 
   it('setRateScale applies to both engines', () => {
@@ -478,7 +528,7 @@ describe('createDualSpeech', () => {
 
   it('hindiVoices() shows server voices when server is available', () => {
     const server = makeMockEngine({
-      hindiVoices: [{ name: 'hi-IN-MadhurNeural', lang: 'hi-IN' }, { name: 'hi-IN-AaravNeural', lang: 'hi-IN' }],
+      hindiVoices: [{ name: 'hi-IN-MadhurNeural', lang: 'hi-IN' }, { name: 'hi-IN-SwaraNeural', lang: 'hi-IN' }],
     });
     const browser = makeMockEngine({
       hindiVoices: [{ name: 'Google Hindi', lang: 'hi-IN' }],
