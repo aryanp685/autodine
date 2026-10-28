@@ -127,7 +127,7 @@ describe('POST /api/tts', () => {
 
     const { prosody } = mocks.streamCalls[0] as { prosody: Record<string, string> };
     expect(prosody.rate).toBe('+0%');
-    expect(prosody.pitch).toBe('-20Hz');
+    expect(prosody.pitch).toBe('-4Hz'); // the default voice's natural pitch
   });
 
   it('falls back to the default voice for an unknown voice name', async () => {
@@ -137,9 +137,20 @@ describe('POST /api/tts', () => {
   });
 
   it('accepts a voice from the catalogue', async () => {
-    await POST(post({ text: 'नमस्ते', voice: 'hi-IN-AaravNeural' }));
+    await POST(post({ text: 'नमस्ते', voice: 'hi-IN-SwaraNeural' }));
 
-    expect(mocks.setMetadataCalls[0].voice).toBe('hi-IN-AaravNeural');
+    expect(mocks.setMetadataCalls[0].voice).toBe('hi-IN-SwaraNeural');
+  });
+
+  it('defaults each voice to its own natural pitch', async () => {
+    // The female voice must never inherit the male voice's warmth.
+    await POST(post({ text: 'नमस्ते', voice: 'hi-IN-SwaraNeural' }));
+    let { prosody } = mocks.streamCalls.at(-1) as { prosody: Record<string, string> };
+    expect(prosody.pitch).toBe('+0Hz');
+
+    await POST(post({ text: 'नमस्ते' }));
+    ({ prosody } = mocks.streamCalls.at(-1) as { prosody: Record<string, string> });
+    expect(prosody.pitch).toBe('-4Hz');
   });
 
   it('escapes SSML metacharacters in announcement text', async () => {

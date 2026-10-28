@@ -208,6 +208,26 @@ describe('voiceScore', () => {
     ];
     expect(pickHindiVoice(voices)?.name).toBe('Ravi');
   });
+
+  it('prefers a female voice when the target character is female', () => {
+    const voices: VoiceLike[] = [
+      { name: 'Lekha', lang: 'hi-IN', localService: true },
+      { name: 'Ravi', lang: 'hi-IN', localService: false },
+    ];
+    expect(pickHindiVoice(voices, 'Female')?.name).toBe('Lekha');
+    expect(voiceScore({ name: 'Lekha', lang: 'hi-IN' }, 'Female')).toBeGreaterThan(
+      voiceScore({ name: 'Ravi', lang: 'hi-IN' }, 'Female'),
+    );
+  });
+
+  it('treats gender as a preference, not a requirement', () => {
+    // A lone Hindi voice is used whatever its gender — silence would be
+    // worse than a mismatched voice on a kitchen device.
+    const onlyFemale: VoiceLike[] = [{ name: 'Lekha', lang: 'hi-IN' }];
+    expect(pickHindiVoice(onlyFemale, 'Male')?.name).toBe('Lekha');
+    const onlyMale: VoiceLike[] = [{ name: 'Ravi', lang: 'hi-IN' }];
+    expect(pickHindiVoice(onlyMale, 'Female')?.name).toBe('Ravi');
+  });
 });
 
 describe('splitSentences', () => {

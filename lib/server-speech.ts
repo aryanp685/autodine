@@ -50,7 +50,7 @@ import {
 } from './speech';
 import {
   DEFAULT_EDGE_VOICE,
-  DEFAULT_PITCH,
+  defaultPitchFor,
   EDGE_HINDI_VOICES,
   findEdgeVoice,
   rateToProsody,
@@ -313,7 +313,7 @@ export function createServerSpeech(
           text: sentence,
           voice: edgeVoiceName,
           rate: prosodyRate,
-          pitch: DEFAULT_PITCH,
+          pitch: defaultPitchFor(edgeVoiceName),
         });
       } catch (error) {
         segmentFailure(error instanceof Error ? error.message : 'TTS fetch threw an error');

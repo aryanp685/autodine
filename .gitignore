@@ -48,3 +48,6 @@ _h*.mjs
 /test-results
 /blob-report
 /.playwright
+
+# Local TTS smoke output (uploaded as CI artifacts, never committed)
+tts-smoke-artifacts/

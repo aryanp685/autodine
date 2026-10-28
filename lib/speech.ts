@@ -42,6 +42,8 @@ export type VoiceLike = {
   default?: boolean;
 };
 
+import { DEFAULT_EDGE_VOICE, type Gender, voiceGender } from './tts-voices';
+
 /**
  * Language tags that are Hindi. There is no third entry and no English entry:
  * a Devanagari sentence read by an English voice is silence, not accented
@@ -64,34 +66,30 @@ function normaliseLang(lang: string): string {
  *
  * GENDER PREFERENCE
  *
- * The kitchen voice must be male. The Web Speech API does not expose gender
- * as a field, so this function infers it from the voice name. Common female
- * Hindi voice names (Swara, Lekha, Kalpana, Heera, Aditi, Veena, Neerja) are
- * down-ranked. Common male names (Ravi, Prabhat, Madhur, Suresh, Aarav,
- * Kunal, Rehaan) are up-ranked. An unknown name gets no gender adjustment —
- * it is neither penalised nor preferred on gender alone.
+ * The kitchen offers two characters — male (Madhur) and female (Swara) — and
+ * the browser fallback should match the one the operator picked. The Web
+ * Speech API does not expose gender as a field, so this function infers it
+ * from the voice name (see voiceGender in lib/tts-voices.ts): a voice of the
+ * target gender is up-ranked, a voice of the other gender is down-ranked, an
+ * unknown name gets no gender adjustment. This is preference, not a
+ * requirement — if the device only has one Hindi voice, that voice is used
+ * whatever its gender, because silence is worse than a mismatch.
  */
-
-/** Voice-name substrings that indicate a female Hindi voice. */
-const FEMALE_VOICE_HINTS = /(swara|lekha|kalpana|heera|aditi|veena|neerja|priya|anjali|meera|sneha|kavita|sunita|radha|sita|durga|tara|gita|usha|vijaya|reetha|madhuri|sridevi|hema|rekha|sakshi|tanvi|irisha)/i;
-
-/** Voice-name substrings that indicate a male Hindi voice. */
-const MALE_VOICE_HINTS = /(ravi|prabhat|madhur|suresh|aarav|kunal|rehaan|vikram|arjun|ramesh|mahesh|suresh|deepak|rajesh|kamal|nimesh|pradeep|manish|vivek|sanjay|rahul)/i;
-
-export function voiceScore(voice: VoiceLike): number {
+export function voiceScore(voice: VoiceLike, target: Gender = 'Male'): number {
   const name = `${voice.name} ${voice.lang}`.toLowerCase();
   let score = 0;
 
   if (/natural|neural/.test(name)) score += 4;
   if (/google|microsoft|azure/.test(name)) score += 2;
-  if (/lekha|kalpana|swara|heera|aditi|ravi|veena|neerja|prabhat|madhur|suresh/.test(name)) {
+  if (/lekha|kalpana|swara|heera|aditi|ravi|veena|neerja|prabhat|madhur|suresh|hemant/.test(name)) {
     score += 2;
   }
   if (voice.localService) score += 1; // no network round trip before it starts
 
-  // Gender: prefer male voices, down-rank female voices.
-  if (FEMALE_VOICE_HINTS.test(name)) score -= 8;
-  if (MALE_VOICE_HINTS.test(name)) score += 3;
+  // Gender: match the chosen character where the device allows it.
+  const gender = voiceGender(voice.name);
+  if (gender === target) score += 3;
+  else if (gender !== null) score -= 8;
 
   // A weak label-based down-rank only. These names do not establish how a
   // particular installed voice sounds on this device.
@@ -100,9 +98,9 @@ export function voiceScore(voice: VoiceLike): number {
   return score;
 }
 
-function bestOf(voices: VoiceLike[]): VoiceLike {
+function bestOf(voices: VoiceLike[], target: Gender): VoiceLike {
   return [...voices].sort((a, b) => {
-    const byScore = voiceScore(b) - voiceScore(a);
+    const byScore = voiceScore(b, target) - voiceScore(a, target);
     if (byScore !== 0) return byScore;
     const byLocal = Number(Boolean(b.localService)) - Number(Boolean(a.localService));
     if (byLocal !== 0) return byLocal;
@@ -115,19 +113,21 @@ function bestOf(voices: VoiceLike[]): VoiceLike {
  *
  * Exact `hi-IN` first, then any other Hindi tag, then any `hi-*` region. The
  * passes are separate so a `hi-IN` voice is never passed over in favour of a
- * worse one that merely shares the language family.
+ * worse one that merely shares the language family. Within a tier the target
+ * gender wins when the device offers a choice; a lone Hindi voice is taken
+ * as it is.
  */
-export function pickHindiVoice(voices: VoiceLike[]): VoiceLike | null {
+export function pickHindiVoice(voices: VoiceLike[], target: Gender = 'Male'): VoiceLike | null {
   if (voices.length === 0) return null;
 
   for (const wanted of HINDI_LANGS) {
-    const target = normaliseLang(wanted);
-    const exact = voices.filter((voice) => normaliseLang(voice.lang) === target);
-    if (exact.length > 0) return bestOf(exact);
+    const targetLang = normaliseLang(wanted);
+    const exact = voices.filter((voice) => normaliseLang(voice.lang) === targetLang);
+    if (exact.length > 0) return bestOf(exact, target);
   }
 
   const family = voices.filter((voice) => normaliseLang(voice.lang).startsWith('hi-'));
-  return family.length > 0 ? bestOf(family) : null;
+  return family.length > 0 ? bestOf(family, target) : null;
 }
 
 /* ------------------------------------------------------------------- engine */
@@ -218,13 +218,22 @@ export const DEFAULT_COMPLETION_TIMEOUT_MS = 30_000;
 /**
  * Browser Web Speech API tuning.
  *
- * Pitch is lowered to 0.85 for a deeper, more masculine delivery. The browser
- * Web Speech API does not expose gender, so pitch is the only lever available
- * to bias the voice toward a male sound. 0.85 is a moderate reduction that
- * deepens the voice without making it unnatural. The rate stays at 0.92 —
- * slightly slower than neutral for clarity in a noisy kitchen.
+ * Rate stays at 0.92 — slightly slower than neutral for clarity in a noisy
+ * kitchen. Pitch follows the chosen character through browserPitchFor():
+ * the Web Speech API does not expose gender, so pitch is the only lever to
+ * keep a male fallback voice from sounding thin or a female one from
+ * sounding artificially deep. Both stay close to the voice's natural pitch —
+ * "natural human tone" means the model is not pushed out of its range.
  */
-export const VOICE_TUNING = { rate: 0.92, pitch: 0.85, volume: 1 } as const;
+export const VOICE_TUNING = { rate: 0.92, volume: 1 } as const;
+
+/**
+ * Web Speech pitch for a character: a touch of warmth for the male voice,
+ * the voice's own pitch for the female one.
+ */
+export function browserPitchFor(gender: Gender): number {
+  return gender === 'Female' ? 1.0 : 0.9;
+}
 
 /**
  * Existing delay between the alert tone and first word. Kept unchanged in
@@ -406,6 +415,9 @@ export function createKitchenSpeech(
   let loaded = false;
   let didStall = false;
   let forced: string | null = null;
+  // The character the operator picked (male Madhur or female Swara on the
+  // server engine). The fallback matches it where the device allows.
+  let targetGender: Gender = voiceGender(DEFAULT_EDGE_VOICE) ?? 'Male';
   let rateScale = 1;
   let cancelCurrent: (() => void) | null = null;
 
@@ -431,7 +443,7 @@ export function createKitchenSpeech(
       const chosen = voices.find((candidate) => candidate.name === forced);
       if (chosen) return chosen;
     }
-    return pickHindiVoice(voices);
+    return pickHindiVoice(voices, targetGender);
   }
 
   return {
@@ -545,7 +557,7 @@ export function createKitchenSpeech(
           utterance.voice = voiceToUse;
           utterance.lang = voiceToUse.lang || HINDI_LANGS[0];
           utterance.rate = Math.min(1.5, Math.max(0.5, VOICE_TUNING.rate * segment.rate * rateScale));
-          utterance.pitch = VOICE_TUNING.pitch;
+          utterance.pitch = browserPitchFor(targetGender);
           utterance.volume = VOICE_TUNING.volume;
           utterance.onstart = () => {
             didStall = false;
@@ -580,7 +592,17 @@ export function createKitchenSpeech(
       return voices.filter((candidate) => /^hi(-|$)/i.test(candidate.lang.replace('_', '-')));
     },
     setVoiceName(name) {
-      if (name === null) { forced = null; return true; }
+      if (name === null) {
+        forced = null;
+        targetGender = voiceGender(DEFAULT_EDGE_VOICE) ?? 'Male';
+        return true;
+      }
+      // Track the chosen character's gender even when the name is a server
+      // catalogue name this device does not have (hi-IN-MadhurNeural and
+      // hi-IN-SwaraNeural are Edge names) — the fallback must not answer a
+      // female character with a male device voice.
+      const gender = voiceGender(name);
+      if (gender) targetGender = gender;
       if (!loaded) refreshVoices();
       if (!voices.some((candidate) => candidate.name === name && /^hi(-|$)/i.test(candidate.lang.replace('_', '-')))) return false;
       forced = name;
