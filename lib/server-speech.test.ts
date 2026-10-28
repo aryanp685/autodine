@@ -59,8 +59,8 @@ describe('tts-voices', () => {
     expect(findEdgeVoice(DEFAULT_EDGE_VOICE)).not.toBeNull();
   });
 
-  it('DEFAULT_PITCH is -10Hz for a deeper character', () => {
-    expect(DEFAULT_PITCH).toBe('-10Hz');
+  it('DEFAULT_PITCH is -20Hz for a deep, Jackie Shroff-style baritone', () => {
+    expect(DEFAULT_PITCH).toBe('-20Hz');
   });
 
   it('EDGE_HINDI_VOICES contains only male Hindi voices', () => {
@@ -216,7 +216,7 @@ describe('createServerSpeech', () => {
     const call = env.fetchCalls[0];
     expect(call.text).toBe('नमस्ते');
     expect(call.voice).toBe('hi-IN-MadhurNeural');
-    expect(call.pitch).toBe('-10Hz');
+    expect(call.pitch).toBe('-20Hz');
     expect(call.rate).toMatch(/^[+-]/);
   });
 

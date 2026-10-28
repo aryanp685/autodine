@@ -70,8 +70,8 @@ export const DEFAULT_EDGE_VOICE = 'hi-IN-MadhurNeural';
 const DEFAULT_PROSODY = {
   /** Rate: converted from the browser engine's multiplier by the caller. */
   rate: '+0.00%',
-  /** Pitch: -10Hz for a deeper, warmer, more mature character. */
-  pitch: '-10Hz',
+  /** Pitch: -20Hz for a deep, warm, Jackie Shroff-style baritone. */
+  pitch: '-20Hz',
   /** Volume: normal. */
   volume: '+0.00%',
 };

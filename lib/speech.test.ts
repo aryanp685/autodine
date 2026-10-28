@@ -182,8 +182,31 @@ describe('voiceScore', () => {
 
   it('demotes the audibly robotic engines', () => {
     expect(voiceScore({ name: 'eSpeak Hindi', lang: 'hi-IN' })).toBeLessThan(
-      voiceScore({ name: 'Lekha', lang: 'hi-IN' }),
+      voiceScore({ name: 'Ravi', lang: 'hi-IN' }),
     );
+  });
+
+  it('down-ranks known female voice names', () => {
+    const female = voiceScore({ name: 'Lekha', lang: 'hi-IN' });
+    const male = voiceScore({ name: 'Ravi', lang: 'hi-IN' });
+    const neutral = voiceScore({ name: 'Google हिन्दी', lang: 'hi-IN' });
+    // A known female name scores below both a male name and a neutral name.
+    expect(female).toBeLessThan(male);
+    expect(female).toBeLessThan(neutral);
+  });
+
+  it('up-ranks known male voice names', () => {
+    const male = voiceScore({ name: 'Madhur', lang: 'hi-IN' });
+    const neutral = voiceScore({ name: 'Google हिन्दी', lang: 'hi-IN' });
+    expect(male).toBeGreaterThan(neutral);
+  });
+
+  it('prefers a male voice over a female voice when both are installed', () => {
+    const voices: VoiceLike[] = [
+      { name: 'Lekha', lang: 'hi-IN', localService: true },
+      { name: 'Ravi', lang: 'hi-IN', localService: false },
+    ];
+    expect(pickHindiVoice(voices)?.name).toBe('Ravi');
   });
 });
 
@@ -298,10 +321,10 @@ describe('speaking', () => {
     fake.setVoices(hindi);
     engine.refreshVoices();
     expect(engine.available()).toBe(true);
-    // Lekha is local and named; Google's is remote. Neither is wrong -- what
-    // matters is that one is chosen deterministically rather than whichever
-    // the platform happened to list first.
-    expect(engine.voiceName()).toBe('Lekha');
+    // Google हिन्दी is picked over Lekha: Lekha is a known female voice name
+    // and is down-ranked. Google हिन्दी has no gender hint, so it is neutral
+    // and wins on the google-vendor bonus alone.
+    expect(engine.voiceName()).toBe('Google हिन्दी');
   });
 
   it('recovers from a wedged engine instead of dying quietly', () => {
