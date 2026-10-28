@@ -26,18 +26,25 @@
  *
  * LICENCE
  *
- * Edge TTS is a community-reverse-engineered interface to Microsoft's
- * Read Aloud feature. It is free and requires no API key. Microsoft has
- * not published a support commitment for it. This route is the pragmatic
+ * The service is Microsoft's Read Aloud API — a community-reverse-
+ * engineered interface, free and key-less, with no published support
+ * commitment (its handshake has broken before: the Sec-MS-GEC token moved
+ * to a custom hash in 2026 and every stale client got 403). The client is
+ * msedge-tts (MIT), which carries the current token and propagates
+ * connection failures instead of hanging. This route is the pragmatic
  * choice at ₹0/month; the alternative (Azure Speech Studio) costs money
- * and was ruled out by the standing no-paid-services constraint.
+ * and was ruled out by the standing no-paid-services constraint. If
+ * Microsoft breaks the interface again, this route answers 503 honestly,
+ * the kitchen falls back to the browser voice, and scripts/tts-smoke.ts
+ * says which layer failed.
  */
 
-import { EdgeTTS } from 'edge-tts-universal';
+import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
 import {
   DEFAULT_EDGE_VOICE,
   DEFAULT_PITCH,
   EDGE_HINDI_VOICES,
+  escapeSsml,
   normalizeProsodyHz,
   normalizeProsodyPercent,
 } from '@/lib/tts-voices';
@@ -59,8 +66,8 @@ export { EDGE_HINDI_VOICES, DEFAULT_EDGE_VOICE };
 /**
  * Prosody defaults for the kitchen character.
  *
- * These MUST be integers ("+0%", not "+0.00%"): edge-tts-universal rejects
- * decimals with `Invalid rate '+0.00%'` before a single byte is sent. The
+ * The wire format is integer SSML prosody ("+0%", not "+0.00%") — kept
+ * strict after a decimal-format bug made every /api/tts call fail. The
  * inputs from the body are run through the same normalizers, so a stale
  * client bundle that still sends decimals gets coerced instead of failing.
  */
@@ -125,17 +132,25 @@ export async function POST(request: Request): Promise<Response> {
   };
 
   try {
-    const tts = new EdgeTTS(text, voice, prosody);
+    const tts = new MsEdgeTTS({
+      connectionTimeoutMs: 12_000,
+      synthesisTimeoutMs: 15_000,
+    });
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => reject(new Error(`TTS synthesis exceeded ${SYNTHESIS_TIMEOUT_MS}ms`)), SYNTHESIS_TIMEOUT_MS);
     });
     try {
-      const result = await Promise.race([tts.synthesize(), timeout]);
+      const synthesize = async (): Promise<Buffer> => {
+        await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+        const { audioStream } = tts.toStream(escapeSsml(text), prosody);
+        const chunks: Buffer[] = [];
+        for await (const chunk of audioStream) chunks.push(Buffer.from(chunk as Buffer));
+        return Buffer.concat(chunks);
+      };
+      const audio = await Promise.race([synthesize(), timeout]);
 
-      // The audio field is a Blob containing MP3 data. Return it directly
-      // with the correct content type. Node 18+ Response accepts Blob.
-      return new Response(result.audio as unknown as Blob, {
+      return new Response(new Uint8Array(audio), {
         headers: {
           'Content-Type': 'audio/mpeg',
           'Cache-Control': 'public, max-age=300',
@@ -144,6 +159,7 @@ export async function POST(request: Request): Promise<Response> {
       });
     } finally {
       clearTimeout(timeoutId);
+      try { tts.close(); } catch { /* best effort */ }
     }
   } catch (error) {
     // Edge TTS may be unreachable (network, service change, etc.). The

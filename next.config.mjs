@@ -50,7 +50,7 @@ const nextConfig = {
   },
 
   /*
-   * edge-tts-universal uses isomorphic-ws which wraps the `ws` package.
+   * msedge-tts uses isomorphic-ws which wraps the `ws` package.
    * These are Node.js packages that must not be bundled into the server
    * bundle — Next.js should load them from node_modules at runtime.
    *
@@ -59,7 +59,7 @@ const nextConfig = {
    * IGNORED on Next 16 (the build logs "Unrecognized key(s) in object"), so
    * the /api/tts route was silently bundling `ws` anyway.
    */
-  serverExternalPackages: ['edge-tts-universal', 'isomorphic-ws', 'ws'],
+  serverExternalPackages: ['msedge-tts', 'isomorphic-ws', 'ws'],
 
   /**
    * Security headers. These used to live in netlify.toml, which this project

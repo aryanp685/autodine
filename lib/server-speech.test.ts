@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { Communicate } from 'edge-tts-universal';
 import {
   DEFAULT_EDGE_VOICE,
   DEFAULT_PITCH,
   EDGE_HINDI_VOICES,
+  escapeSsml,
   findEdgeVoice,
   normalizeProsodyHz,
   normalizeProsodyPercent,
@@ -26,9 +26,9 @@ import { createDualSpeech } from './dual-speech';
 
 describe('tts-voices', () => {
   it('rateToProsody converts multipliers to integer Edge TTS percentage strings', () => {
-    // Integers, no decimals: edge-tts-universal rejects '+0.00%' outright.
-    // The old decimal format made EVERY /api/tts call fail validation and
-    // the kitchen fall back to the device's (often female) Hindi voice.
+    // Integers, no decimals — the /api/tts wire contract (SSML relative
+    // prosody). The old decimal format made EVERY synthesis request fail
+    // and the kitchen fall back to the device's (often female) Hindi voice.
     expect(rateToProsody(1.0)).toBe('+0%');
     expect(rateToProsody(0.92)).toBe('-8%');
     expect(rateToProsody(1.1)).toBe('+10%');
@@ -43,30 +43,30 @@ describe('tts-voices', () => {
     expect(rateToProsody(1.006)).toBe('+1%');
   });
 
-  it('rateToProsody output always matches the format edge-tts-universal accepts', () => {
-    // The library validates rate with /^[+-]\d+%$/ — this invariant is the
-    // regression guard for the '+0.00%' incident.
+  it('rateToProsody output always matches the wire format', () => {
+    // /^[+-]\d+%$/ is what the TTS client and /api/tts exchange — this
+    // invariant is the regression guard for the '+0.00%' incident.
     for (const rate of [0.5, 0.75, 0.92, 0.98, 1.0, 1.02, 1.1, 1.25, 1.5]) {
       expect(rateToProsody(rate)).toMatch(/^[+-]\d+%$/);
     }
   });
 
-  it('prosody built from the shipped helpers passes the real library validator', () => {
-    // Communicate's constructor validates prosody synchronously with the
-    // exact patterns edge-tts-universal uses in production, without any
-    // network. If this throws, /api/tts would throw the same way.
-    const build = (rate: string, pitch: string, volume: string) =>
-      new Communicate('नमस्ते', {
-        voice: DEFAULT_EDGE_VOICE,
-        rate,
-        pitch,
-        volume,
-      });
+  it('prosody built from the shipped helpers matches the /api/tts wire contract', () => {
+    // The exact strings handed to the TTS client at runtime; the route
+    // tests assert the same shapes against the mocked client. This is the
+    // regression guard for the '+0.00%' incident — the format that made
+    // every synthesis request fail while unit tests stayed green.
+    expect(rateToProsody(1.0)).toMatch(/^[+-]\d+%$/);
+    expect(rateToProsody(0.92)).toMatch(/^[+-]\d+%$/);
+    expect(DEFAULT_PITCH).toMatch(/^[+-]\d+Hz$/);
+  });
 
-    expect(() => build(rateToProsody(1.0), DEFAULT_PITCH, '+0%')).not.toThrow();
-    expect(() => build(rateToProsody(0.92), DEFAULT_PITCH, '+0%')).not.toThrow();
-    // The formats the previous code shipped — the library refuses them.
-    expect(() => build('+0.00%', DEFAULT_PITCH, '+0.00%')).toThrow(/Invalid (rate|volume)/);
+  it('escapeSsml escapes the SSML metacharacters in dish names', () => {
+    expect(escapeSsml('Fish & Chips')).toBe('Fish &amp; Chips');
+    expect(escapeSsml('Dal <special>')).toBe('Dal &lt;special&gt;');
+    expect(escapeSsml('5" pizza & "mom\'s"')).toBe('5&quot; pizza &amp; &quot;mom&apos;s&quot;');
+    // Ampersand first, so entities never double-escape.
+    expect(escapeSsml('&amp;')).toBe('&amp;amp;');
   });
 
   it('normalizeProsodyPercent coerces legacy and loose inputs to integer percents', () => {
