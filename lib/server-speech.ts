@@ -32,9 +32,9 @@
  * WHAT IT DOES NOT DO
  *
  * It does not clone any person's voice. Edge TTS voices are Microsoft's
- * own neural models. The pitch adjustment (-10Hz) and rate tuning make
- * the voice deeper and more measured, but the character comes from the
- * neural model itself, not from parameter tweaks on a generic voice.
+ * own neural models. Each character keeps its own natural pitch and the
+ * brisk kitchen pace comes from rate tuning, but the character comes from
+ * the neural model itself, not from parameter tweaks on a generic voice.
  */
 
 import {
@@ -78,7 +78,14 @@ export type ServerSpeechEnv = {
   revokeObjectUrl: (url: string) => void;
   /** Fetches TTS audio from the /api/tts endpoint. */
   fetchTTS: (params: {
-    text: string;
+    /** Plain text for a one-sentence announcement. */
+    text?: string;
+    /**
+     * Paced segments for a multi-sentence announcement: synthesized as one
+     * continuous clip, each sentence at its own rate, the planned pauses
+     * as SSML breaks.
+     */
+    segments?: { text: string; rate?: string; breakBeforeMs?: number }[];
     voice: string;
     rate: string;
     pitch: string;
@@ -89,21 +96,24 @@ export type ServerSpeechEnv = {
 
 /**
  * How long to wait for /api/tts to answer before giving up on the server
- * engine for this segment.
+ * engine for this announcement.
  *
  * The start/completion watchdogs only arm once the audio has arrived — a
  * fetch that never settles would wedge the announcement queue with no
- * outcome at all. 12s covers a serverless cold start plus synthesis with
- * room to spare, and still fails over to the browser engine promptly.
+ * outcome at all. 15s covers a serverless cold start plus synthesis of a
+ * full announcement (one continuous clip now, so synthesis runs a little
+ * longer than the old per-sentence calls) with room to spare, and still
+ * fails over to the browser engine promptly.
  */
-export const DEFAULT_FETCH_TIMEOUT_MS = 12_000;
+export const DEFAULT_FETCH_TIMEOUT_MS = 15_000;
 
 /**
  * Create a server-backed SpeechEngine that speaks via Edge TTS.
  *
- * The engine fetches MP3 audio from /api/tts for each sentence and plays
- * it through an HTMLAudioElement. It implements the same interface as
- * createKitchenSpeech so the KitchenScreen cannot tell the difference.
+ * The engine fetches one continuous MP3 clip from /api/tts for the whole
+ * announcement and plays it through an HTMLAudioElement. It implements the
+ * same interface as createKitchenSpeech so the KitchenScreen cannot tell
+ * the difference.
  */
 export function createServerSpeech(
   env: ServerSpeechEnv,
@@ -172,7 +182,9 @@ export function createServerSpeech(
   function speak(text: string, onEnd: (outcome: SpeechOutcome) => void): void {
     const body = text.trim();
     const sentences = splitSentences(body);
-    let completedSegments = 0;
+    // One clip, no partial progress: a cancel or failure reports 0
+    // completed rather than guessing how far the voice got.
+    const completedSegments = 0;
     let settled = false;
     const timers = new Set<unknown>();
 
@@ -244,84 +256,83 @@ export function createServerSpeech(
       finish({ status: 'failed', reason, completedSegments, totalSegments: sentences.length });
     };
 
-    const speakAt = (index: number) => {
+    // The whole announcement is synthesized as ONE continuous clip: the
+    // sentences follow each other the way a person says them, instead of
+    // separate audio files with dead air — and a fresh fetch latency —
+    // between every line. That continuity is what makes the voice sound
+    // human instead of robotic. Per-sentence pacing survives as SSML:
+    // each sentence keeps its own rate, and the planned pauses become
+    // SSML breaks (see segmentsToSsmlInput).
+    const segments = plan
+      .map((segment, index) => {
+        const previous = plan[index - 1];
+        return {
+          text: segment.text.replace(/[।.!?\s]+$/u, '').trim(),
+          rate: rateToProsody(Math.min(1.5, Math.max(0.5, VOICE_TUNING.rate * segment.rate * rateScale))),
+          breakBeforeMs: previous ? previous.gapMs + segment.leadMs : 0,
+        };
+      })
+      .filter((segment) => segment.text);
+
+    if (segments.length === 0) {
+      finish({ status: 'completed', completedSegments: 0, totalSegments: sentences.length });
+      return;
+    }
+
+    let clipSettled = false;
+    let fetchWatchdog: unknown = null;
+    let startWatchdog: unknown = null;
+    let completionWatchdog: unknown = null;
+
+    const clearWatchdogs = () => {
+      if (fetchWatchdog !== null) { env.clearTimer(fetchWatchdog); timers.delete(fetchWatchdog); fetchWatchdog = null; }
+      if (startWatchdog !== null) { env.clearTimer(startWatchdog); timers.delete(startWatchdog); startWatchdog = null; }
+      if (completionWatchdog !== null) { env.clearTimer(completionWatchdog); timers.delete(completionWatchdog); completionWatchdog = null; }
+    };
+
+    const clipFailure = (reason: string, stalled = false) => {
+      if (clipSettled || settled) return;
+      clipSettled = true;
+      clearWatchdogs();
+      fail(reason, stalled);
+    };
+
+    const completeClip = () => {
+      if (clipSettled || settled) return;
+      clipSettled = true;
+      clearWatchdogs();
+      activeAudio = null;
+      if (activeUrl) {
+        env.revokeObjectUrl(activeUrl);
+        activeUrl = null;
+      }
+      // One continuous clip carries every planned sentence; a partial
+      // count cannot be honest mid-clip, so completion reports them all.
+      finish({ status: 'completed', completedSegments: sentences.length, totalSegments: sentences.length });
+    };
+
+    // Fetch audio from the /api/tts relay — one request for the whole
+    // announcement, started after the chime's breath (the lead-in). The
+    // fetch watchdog covers the promise itself: without it a request that
+    // never settles would leave the announcement queue waiting forever.
+    const run = () => {
       if (settled) return;
-      const raw = sentences[index];
-      const segment = plan[index];
-      if (!raw || !segment) {
-        finish({ status: 'completed', completedSegments, totalSegments: sentences.length });
-        return;
-      }
-      const sentence = raw.replace(/[।.!?\s]+$/u, '').trim();
-      if (!sentence) {
-        completedSegments += 1;
-        if (index + 1 >= sentences.length) finish({ status: 'completed', completedSegments, totalSegments: sentences.length });
-        else schedule(() => speakAt(index + 1), 0);
-        return;
-      }
-
-      let segmentSettled = false;
-      let fetchWatchdog: unknown = null;
-      let startWatchdog: unknown = null;
-      let completionWatchdog: unknown = null;
-
-      const clearWatchdogs = () => {
-        if (fetchWatchdog !== null) { env.clearTimer(fetchWatchdog); timers.delete(fetchWatchdog); fetchWatchdog = null; }
-        if (startWatchdog !== null) { env.clearTimer(startWatchdog); timers.delete(startWatchdog); startWatchdog = null; }
-        if (completionWatchdog !== null) { env.clearTimer(completionWatchdog); timers.delete(completionWatchdog); completionWatchdog = null; }
-      };
-
-      const segmentFailure = (reason: string, stalled = false) => {
-        if (segmentSettled || settled) return;
-        segmentSettled = true;
-        clearWatchdogs();
-        fail(reason, stalled);
-      };
-
-      const next = () => {
-        if (segmentSettled || settled) return;
-        segmentSettled = true;
-        clearWatchdogs();
-        if (activeAudio) {
-          activeAudio = null;
-        }
-        if (activeUrl) {
-          env.revokeObjectUrl(activeUrl);
-          activeUrl = null;
-        }
-        completedSegments += 1;
-        if (index + 1 >= sentences.length) {
-          finish({ status: 'completed', completedSegments, totalSegments: sentences.length });
-          return;
-        }
-        const nextSegment = plan[index + 1];
-        schedule(() => speakAt(index + 1), segment.gapMs + (nextSegment?.leadMs ?? 0));
-      };
-
-      // Compute prosody from the segment rate and the global rate scale.
-      const effectiveRate = Math.min(1.5, Math.max(0.5, VOICE_TUNING.rate * segment.rate * rateScale));
-      const prosodyRate = rateToProsody(effectiveRate);
-
-      // Fetch audio from the /api/tts relay. This is async — the rest of
-      // the speak logic waits for the promise to resolve. The fetch watchdog
-      // covers the promise itself: without it a request that never settles
-      // would leave this segment (and the queue behind it) waiting forever.
-      fetchWatchdog = schedule(() => segmentFailure('TTS fetch timed out'), fetchTimeoutMs);
+      fetchWatchdog = schedule(() => clipFailure('TTS fetch timed out'), fetchTimeoutMs);
       let audioPromise: Promise<ArrayBuffer>;
       try {
-        audioPromise = env.fetchTTS({
-          text: sentence,
-          voice: edgeVoiceName,
-          rate: prosodyRate,
-          pitch: defaultPitchFor(edgeVoiceName),
-        });
+        const pitch = defaultPitchFor(edgeVoiceName);
+        // A one-sentence announcement keeps the plain text contract; only
+        // multi-sentence announcements need the segmented SSML shape.
+        audioPromise = segments.length === 1
+          ? env.fetchTTS({ text: segments[0].text, voice: edgeVoiceName, rate: segments[0].rate, pitch })
+          : env.fetchTTS({ segments, voice: edgeVoiceName, rate: '+0%', pitch });
       } catch (error) {
-        segmentFailure(error instanceof Error ? error.message : 'TTS fetch threw an error');
+        clipFailure(error instanceof Error ? error.message : 'TTS fetch threw an error');
         return;
       }
 
       audioPromise.then((audioData) => {
-        if (settled || segmentSettled) return;
+        if (settled || clipSettled) return;
         clearWatchdogs();
 
         // Create a blob URL and an Audio element.
@@ -331,19 +342,18 @@ export function createServerSpeech(
         activeAudio = audio;
 
         // Set up event handlers.
-        audio.onended = () => next();
+        audio.onended = () => completeClip();
         audio.onerror = () => {
-          const errorMsg = 'Audio playback error';
-          segmentFailure(errorMsg);
+          clipFailure('Audio playback error');
         };
 
         // Start watchdog: if play() does not resolve within startTimeoutMs,
         // the audio is treated as stuck.
-        startWatchdog = schedule(() => segmentFailure('Audio did not start before timeout', true), startTimeoutMs);
+        startWatchdog = schedule(() => clipFailure('Audio did not start before timeout', true), startTimeoutMs);
 
         // Completion watchdog: if the audio does not finish within
         // completionTimeoutMs, it is treated as wedged.
-        completionWatchdog = schedule(() => segmentFailure('Audio did not finish before timeout'), completionTimeoutMs);
+        completionWatchdog = schedule(() => clipFailure('Audio did not finish before timeout'), completionTimeoutMs);
 
         // Play the audio.
         audio.play().then(() => {
@@ -355,14 +365,14 @@ export function createServerSpeech(
           }
           didStall = false;
         }).catch((error: unknown) => {
-          segmentFailure(error instanceof Error ? error.message : 'Audio playback was blocked');
+          clipFailure(error instanceof Error ? error.message : 'Audio playback was blocked');
         });
       }).catch((error: unknown) => {
-        segmentFailure(error instanceof Error ? error.message : 'TTS fetch failed');
+        clipFailure(error instanceof Error ? error.message : 'TTS fetch failed');
       });
     };
 
-    schedule(() => speakAt(0), LEAD_IN_MS);
+    schedule(run, LEAD_IN_MS);
   };
 
   return {

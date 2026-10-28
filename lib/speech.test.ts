@@ -295,10 +295,11 @@ describe('speaking', () => {
     fake.flush();
 
     expect(fake.spoken[0].voice?.lang).toBe('hi-IN');
-    // The heading is read a shade slower than the base rate, never faster
-    // than a person would say it.
-    expect(fake.spoken[0].rate).toBeLessThan(VOICE_TUNING.rate);
-    expect(fake.spoken[0].rate).toBeGreaterThan(0.8);
+    // The heading is read at the kitchen's brisk natural pace — a person
+    // calling out an order, not a metronome reading aloud. Never below the
+    // base pace (that is what made even "fast" sound slow), never chipmunk.
+    expect(fake.spoken[0].rate).toBeGreaterThanOrEqual(VOICE_TUNING.rate);
+    expect(fake.spoken[0].rate).toBeLessThan(1.5);
   });
 
   it('says nothing at all when the device has no Hindi voice', () => {

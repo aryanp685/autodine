@@ -76,14 +76,14 @@ const SPEED_KEY = 'autodine:kitchen:speed';
 const EXPRESSIVE_KEY = 'autodine:kitchen:expressive';
 
 /**
- * How fast to read.
- *
- * Three steps, not a slider: an operator in a kitchen has one hand free and no
- * patience for a control that needs aiming. "धीमा" exists because a hurried
- * Hindi voice is what sounds slurred, and the right pace depends on the room --
- * a tiled hall with an echo needs slower than a small counter.
+ * How fast to read, as a multiple of the kitchen's natural pace
+ * (VOICE_TUNING.rate). "normal" is the brisk human default; "fast" is
+ * genuinely fast (+30% over neutral) — it used to barely clear neutral
+ * because the base rate sat below it. "धीमा" exists because a hurried
+ * Hindi voice is what sounds slurred, and the right pace depends on the
+ * room -- a tiled hall with an echo needs slower than a small counter.
  */
-const SPEEDS = { slow: 0.85, normal: 1, fast: 1.1 } as const;
+const SPEEDS = { slow: 0.8, normal: 1, fast: 1.2 } as const;
 
 type Speed = keyof typeof SPEEDS;
 const seenKey = (restaurantId: string | null) => `autodine:kitchen:seen:${restaurantId ?? 'demo'}`;
@@ -1365,8 +1365,9 @@ export function Kitchen({
             Kitchen audio {audio ? 'on' : 'off'}
           </button>
 
-          {/* Speed. A hurried Hindi voice is what sounds slurred, so the
-              operator gets the last word on pace instead of a constant. */}
+          {/* Speed. The base pace is already brisk; this is the operator's
+              trim around it, because a hurried Hindi voice is what sounds
+              slurred and every room is different. */}
           <Segmented
             label="आवाज़ की रफ़्तार — voice speed"
             size="sm"

@@ -218,14 +218,17 @@ export const DEFAULT_COMPLETION_TIMEOUT_MS = 30_000;
 /**
  * Browser Web Speech API tuning.
  *
- * Rate stays at 0.92 — slightly slower than neutral for clarity in a noisy
- * kitchen. Pitch follows the chosen character through browserPitchFor():
- * the Web Speech API does not expose gender, so pitch is the only lever to
- * keep a male fallback voice from sounding thin or a female one from
- * sounding artificially deep. Both stay close to the voice's natural pitch —
- * "natural human tone" means the model is not pushed out of its range.
+ * Rate is the kitchen's natural speaking pace: brisk, the speed a person
+ * actually calls an order out at. It used to sit below neutral (0.92),
+ * which made even the "fast" setting slower than a person speaks — the
+ * speed control cancelled itself out. Pitch follows the chosen character
+ * through browserPitchFor(): the Web Speech API does not expose gender, so
+ * pitch is the only lever to keep a male fallback voice from sounding thin
+ * or a female one from sounding artificially deep. Both stay close to the
+ * voice's natural pitch — "natural human tone" means the model is not
+ * pushed out of its range.
  */
-export const VOICE_TUNING = { rate: 0.92, volume: 1 } as const;
+export const VOICE_TUNING = { rate: 1.08, volume: 1 } as const;
 
 /**
  * Web Speech pitch for a character: a touch of warmth for the male voice,
@@ -236,10 +239,11 @@ export function browserPitchFor(gender: Gender): number {
 }
 
 /**
- * Existing delay between the alert tone and first word. Kept unchanged in
- * this iteration; it has not been validated by listening on the kitchen device.
+ * Delay between the alert tone and first word. Shortened from 280ms —
+ * long enough for the tone to land, short enough that the first word does
+ * not feel like it is waiting around.
  */
-export const LEAD_IN_MS = 280;
+export const LEAD_IN_MS = 200;
 
 /**
  * A sentence, with the pacing it is read at.
@@ -256,16 +260,20 @@ export type SpeechSegment = {
   text: string;
   /** Multiplier applied to VOICE_TUNING.rate. */
   rate: number;
-  /** Silence before this sentence starts. */
+  /**
+   * Pause before this sentence. The browser fallback waits it out as
+   * silence; the server engine folds it into the same continuous synthesis
+   * as an SSML break, so both paths breathe the same way.
+   */
   leadMs: number;
-  /** Silence after this sentence, before the next one. */
+  /** Pause after this sentence, before the next one. See leadMs. */
   gapMs: number;
 };
 
 const PACE = {
-  greeting: { rate: 0.98, leadMs: 0, gapMs: 480 },
-  dish: { rate: 1, leadMs: 0, gapMs: 300 },
-  note: { rate: 0.94, leadMs: 520, gapMs: 0 },
+  greeting: { rate: 1, leadMs: 0, gapMs: 160 },
+  dish: { rate: 1.03, leadMs: 0, gapMs: 140 },
+  note: { rate: 0.96, leadMs: 240, gapMs: 0 },
 } as const;
 
 /**

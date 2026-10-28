@@ -25,8 +25,10 @@ import {
   EDGE_HINDI_VOICES,
   defaultPitchFor,
   rateToProsody,
+  segmentsToSsmlInput,
   voiceGender,
 } from '../lib/tts-voices';
+import { planSpeech, VOICE_TUNING } from '../lib/speech';
 import { buildKitchenAnnouncement } from '../lib/voice-personality';
 
 /**
@@ -103,23 +105,32 @@ async function probeVoiceList(): Promise<void> {
 
 /**
  * Layer 2: the shipped synthesis path — the actual product behaviour, for
- * both kitchen characters, each with its own natural pitch.
+ * both kitchen characters, each with its own natural pitch. The
+ * announcement is paced exactly the way the kitchen engine paces it:
+ * sentences at their planned rates, the planned pauses as SSML breaks,
+ * one continuous clip per character.
  */
 async function probeSynthesis(voiceName: string, fileTag: string): Promise<void> {
+  // Mirror lib/server-speech.ts: same plan, same rate maths, same SSML.
+  const segments = planSpeech(ANNOUNCEMENT).map((segment, index, plan) => ({
+    text: segment.text.replace(/[।.!?\s]+$/u, '').trim(),
+    rate: rateToProsody(Math.min(1.5, Math.max(0.5, VOICE_TUNING.rate * segment.rate))),
+    breakBeforeMs: index === 0 ? 0 : plan[index - 1].gapMs + segment.leadMs,
+  }));
   const prosody = {
     voice: voiceName,
-    rate: rateToProsody(1.0),
+    rate: '+0%',
     volume: '+0%',
     pitch: defaultPitchFor(voiceName),
   };
-  console.log(`TTS smoke: shipped prosody ${JSON.stringify(prosody)}`);
+  console.log(`TTS smoke: shipped prosody ${JSON.stringify(prosody)} with segments ${JSON.stringify(segments)}`);
 
   const deadline = setTimeout(() => fail(`synthesis of ${voiceName} did not finish within 25s`), 25_000);
   try {
     const tts = new MsEdgeTTS({ connectionTimeoutMs: PROBE_TIMEOUT_MS, synthesisTimeoutMs: 15_000 });
     await tts.setMetadata(prosody.voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
     const started = Date.now();
-    const { audioStream } = tts.toStream(ANNOUNCEMENT, {
+    const { audioStream } = tts.toStream(segmentsToSsmlInput(segments, prosody.rate), {
       rate: prosody.rate,
       pitch: prosody.pitch,
       volume: prosody.volume,
