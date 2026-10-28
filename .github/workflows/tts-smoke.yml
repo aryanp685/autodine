@@ -31,4 +31,12 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Synthesize a Hindi sentence via Edge TTS
-        run: npx tsx scripts/tts-smoke.ts
+        # The script's own output says WHY it failed (validation, connect,
+        # hang, empty audio). Surface that line as a workflow annotation so
+        # it is readable from the API without downloading the job log.
+        run: |
+          set -o pipefail
+          if ! npx tsx scripts/tts-smoke.ts 2>&1 | tee tts-smoke.log; then
+            echo "::error title=TTS smoke failed::$(tr '\n' ' ' < tts-smoke.log | tail -c 400)"
+            exit 1
+          fi
