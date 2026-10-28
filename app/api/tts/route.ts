@@ -34,6 +34,13 @@
  */
 
 import { EdgeTTS } from 'edge-tts-universal';
+import {
+  DEFAULT_EDGE_VOICE,
+  DEFAULT_PITCH,
+  EDGE_HINDI_VOICES,
+  normalizeProsodyHz,
+  normalizeProsodyPercent,
+} from '@/lib/tts-voices';
 
 /** The runtime must be Node.js: the WebSocket client needs `ws`. */
 export const runtime = 'nodejs';
@@ -42,39 +49,39 @@ export const runtime = 'nodejs';
 export const maxDuration = 30;
 
 /**
- * Hindi male Edge TTS voices, in order of preference for the kitchen
- * character: deep, warm, mature, conversational.
- *
- * - Madhur: the standard male Hindi neural voice. Friendly, positive,
- *   mature. The best baseline for a warm, confident delivery.
- * - Aarav: newer male voice. More expressive, conversational.
- * - Kunal: newer male voice. Calm, measured, confident.
- * - Rehaan: newer male voice. Professional, clear, slightly formal.
- *
- * These are the voices Microsoft ships for hi-IN. The list is fixed
- * because it is the server's voice catalogue — the browser engine's
- * voice list varies by device, but the server engine's list is the
- * same everywhere.
+ * The kitchen's voice catalogue and default character live in
+ * lib/tts-voices.ts so the client engine and this route can never drift
+ * apart. Re-exported here because this route documents the catalogue as
+ * part of its contract.
  */
-export const EDGE_HINDI_VOICES = [
-  { name: 'hi-IN-MadhurNeural', lang: 'hi-IN', gender: 'Male' as const },
-  { name: 'hi-IN-AaravNeural', lang: 'hi-IN', gender: 'Male' as const },
-  { name: 'hi-IN-KunalNeural', lang: 'hi-IN', gender: 'Male' as const },
-  { name: 'hi-IN-RehaanNeural', lang: 'hi-IN', gender: 'Male' as const },
-];
+export { EDGE_HINDI_VOICES, DEFAULT_EDGE_VOICE };
 
-/** Default voice: Madhur is the deepest, warmest male Hindi voice. */
-export const DEFAULT_EDGE_VOICE = 'hi-IN-MadhurNeural';
-
-/** Prosody defaults for the kitchen character. */
+/**
+ * Prosody defaults for the kitchen character.
+ *
+ * These MUST be integers ("+0%", not "+0.00%"): edge-tts-universal rejects
+ * decimals with `Invalid rate '+0.00%'` before a single byte is sent. The
+ * inputs from the body are run through the same normalizers, so a stale
+ * client bundle that still sends decimals gets coerced instead of failing.
+ */
 const DEFAULT_PROSODY = {
   /** Rate: converted from the browser engine's multiplier by the caller. */
-  rate: '+0.00%',
+  rate: '+0%',
   /** Pitch: -20Hz for a deep, warm, Jackie Shroff-style baritone. */
-  pitch: '-20Hz',
+  pitch: DEFAULT_PITCH,
   /** Volume: normal. */
-  volume: '+0.00%',
+  volume: '+0%',
 };
+
+/**
+ * How long synthesis may run before this route gives up and answers 503.
+ *
+ * The WebSocket connect plus synthesis normally finishes in a couple of
+ * seconds; without a ceiling a hung connection would hold the function open
+ * until maxDuration and leave the kitchen staring at silence. 20s sits
+ * under maxDuration and above any plausible cold start.
+ */
+const SYNTHESIS_TIMEOUT_MS = 20_000;
 
 /** Body schema: text is required, voice/rate/pitch are optional. */
 type TTSRequest = {
@@ -112,24 +119,32 @@ export async function POST(request: Request): Promise<Response> {
     : DEFAULT_EDGE_VOICE;
 
   const prosody = {
-    rate: body.rate ?? DEFAULT_PROSODY.rate,
-    pitch: body.pitch ?? DEFAULT_PROSODY.pitch,
+    rate: normalizeProsodyPercent(body.rate, DEFAULT_PROSODY.rate),
+    pitch: normalizeProsodyHz(body.pitch, DEFAULT_PROSODY.pitch),
     volume: DEFAULT_PROSODY.volume,
   };
 
   try {
     const tts = new EdgeTTS(text, voice, prosody);
-    const result = await tts.synthesize();
-
-    // The audio field is a Blob containing MP3 data. Return it directly
-    // with the correct content type. Node 18+ Response accepts Blob.
-    return new Response(result.audio as unknown as Blob, {
-      headers: {
-        'Content-Type': 'audio/mpeg',
-        'Cache-Control': 'public, max-age=300',
-        'X-Content-Type-Options': 'nosniff',
-      },
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error(`TTS synthesis exceeded ${SYNTHESIS_TIMEOUT_MS}ms`)), SYNTHESIS_TIMEOUT_MS);
     });
+    try {
+      const result = await Promise.race([tts.synthesize(), timeout]);
+
+      // The audio field is a Blob containing MP3 data. Return it directly
+      // with the correct content type. Node 18+ Response accepts Blob.
+      return new Response(result.audio as unknown as Blob, {
+        headers: {
+          'Content-Type': 'audio/mpeg',
+          'Cache-Control': 'public, max-age=300',
+          'X-Content-Type-Options': 'nosniff',
+        },
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
   } catch (error) {
     // Edge TTS may be unreachable (network, service change, etc.). The
     // kitchen engine treats a 503 as "server speech failed" and falls

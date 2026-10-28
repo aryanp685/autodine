@@ -1,0 +1,34 @@
+name: TTS smoke
+
+# Does the kitchen voice synthesis path actually work from a real network?
+#
+# Unit tests can only prove the prosody strings are well-formed; whether
+# Microsoft's Edge TTS endpoint still answers is a network fact. The
+# production symptom of a silent break is a female fallback voice on the
+# kitchen tablet, which no test suite can see. This workflow runs the
+# shipped values through the real library on GitHub's open-egress runners.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'arena/**']
+    paths:
+      - 'app/api/tts/**'
+      - 'lib/tts-voices.ts'
+      - 'lib/server-speech.ts'
+      - 'scripts/tts-smoke.ts'
+      - '.github/workflows/tts-smoke.yml'
+
+jobs:
+  edge-tts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Synthesize a Hindi sentence via Edge TTS
+        run: npx tsx scripts/tts-smoke.ts

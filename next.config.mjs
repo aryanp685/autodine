@@ -47,13 +47,19 @@ const nextConfig = {
    */
   experimental: {
     serverActions: { bodySizeLimit: '6mb' },
-    /*
-     * edge-tts-universal uses isomorphic-ws which wraps the `ws` package.
-     * These are Node.js packages that must not be bundled into the server
-     * bundle — Next.js should load them from node_modules at runtime.
-     */
-    serverComponentsExternalPackages: ['edge-tts-universal', 'isomorphic-ws', 'ws'],
   },
+
+  /*
+   * edge-tts-universal uses isomorphic-ws which wraps the `ws` package.
+   * These are Node.js packages that must not be bundled into the server
+   * bundle — Next.js should load them from node_modules at runtime.
+   *
+   * Top-level `serverExternalPackages` since Next 15; the old
+   * `experimental.serverComponentsExternalPackages` spelling is rejected and
+   * IGNORED on Next 16 (the build logs "Unrecognized key(s) in object"), so
+   * the /api/tts route was silently bundling `ws` anyway.
+   */
+  serverExternalPackages: ['edge-tts-universal', 'isomorphic-ws', 'ws'],
 
   /**
    * Security headers. These used to live in netlify.toml, which this project

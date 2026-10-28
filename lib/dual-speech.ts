@@ -47,6 +47,9 @@ export function createDualSpeech(
   let serverFailed = false;
 
   function refreshVoices(): void {
+    // A refresh is a deliberate action (startup, voice change, the kitchen
+    // toggle) — give the server engine another chance before falling back.
+    serverFailed = false;
     server.refreshVoices();
     browser.refreshVoices();
   }
@@ -107,7 +110,11 @@ export function createDualSpeech(
   function speak(text: string, onEnd: (outcome: SpeechOutcome) => void): void {
     if (!serverFailed && server.available()) {
       server.speak(text, (outcome) => {
-        if (outcome.status === 'completed') {
+        // Only a genuine failure falls back. A 'cancelled' outcome means
+        // someone stopped the speech on purpose (the queue disposed, the
+        // screen unmounted): replaying it through the browser would announce
+        // a cancelled ticket and latch the browser engine for the session.
+        if (outcome.status !== 'failed') {
           onEnd(outcome);
           return;
         }
