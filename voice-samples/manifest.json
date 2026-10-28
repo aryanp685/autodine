@@ -1,0 +1,62 @@
+[
+  {
+    "name": "01_plain_devanagari",
+    "desc": "Plain Devanagari (existing Edge TTS style, Piper voice)",
+    "text": "नमस्ते। नया ऑर्डर आया है। टेबल ५। दो पनीर टिक्का, एक बटर नान, और एक दाल मखनी। ध्यान देना, प्याज़ नहीं है।",
+    "wav_size": 475180,
+    "mp3_size": 173453,
+    "duration": 10.77,
+    "wav_path": "/home/user/new/voice-samples/01_plain_devanagari.wav",
+    "mp3_path": "/home/user/new/voice-samples/01_plain_devanagari.mp3"
+  },
+  {
+    "name": "02_expressive_devanagari",
+    "desc": "Expressive Desi (Devanagari, default pacing)",
+    "text": "अरे मम्मा! एक नया ऑर्डर आया है रे! टेबल नंबर पाँच! दो पनीर टिक्का, एक बटर नान और एक दाल मखनी! और सुनों मम्मा… प्याज़ नहीं डालना है, हैन्! कस्टमर का ऑर्डर है भाई, ध्यान से बनाना!",
+    "wav_size": 703020,
+    "mp3_size": 256209,
+    "duration": 15.94,
+    "wav_path": "/home/user/new/voice-samples/02_expressive_devanagari.wav",
+    "mp3_path": "/home/user/new/voice-samples/02_expressive_devanagari.mp3"
+  },
+  {
+    "name": "03_expressive_latin",
+    "desc": "Expressive Desi (Latin/mixed, default pacing)",
+    "text": "Areyyy mama! Ek naya order aaya hai re! Table number paanch! Do paneer tikka, ek butter naan aur ek daal makhani! Aur suno mama… pyaaz nahi daalna hai, haan! Customer ka order hai bhai, dhyaan se banana!",
+    "wav_size": 759852,
+    "mp3_size": 276689,
+    "duration": 17.23,
+    "wav_path": "/home/user/new/voice-samples/03_expressive_latin.wav",
+    "mp3_path": "/home/user/new/voice-samples/03_expressive_latin.mp3"
+  },
+  {
+    "name": "04_expressive_latin_relaxed",
+    "desc": "Expressive Desi (Latin, relaxed pacing)",
+    "text": "Areyyy mama! Ek naya order aaya hai re! Table number paanch! Do paneer tikka, ek butter naan aur ek daal makhani! Aur suno mama… pyaaz nahi daalna hai, haan! Customer ka order hai bhai, dhyaan se banana!",
+    "wav_size": 840748,
+    "mp3_size": 305946,
+    "duration": 19.06,
+    "wav_path": "/home/user/new/voice-samples/04_expressive_latin_relaxed.wav",
+    "mp3_path": "/home/user/new/voice-samples/04_expressive_latin_relaxed.mp3"
+  },
+  {
+    "name": "05_variation2_devanagari",
+    "desc": "Expressive Desi Variation 2 (Devanagari, different phrasing)",
+    "text": "सुनो रे! एक नया ऑर्डर आ गया है! टेबल नंबर पाँच! दो पनीर टिक्का, एक बटर नान, एक दाल मखनी! और हैन्… प्याज़ नहीं डालना, ध्यान रखना! कस्टमर का ऑर्डर है, सही से बनाना!",
+    "wav_size": 665644,
+    "mp3_size": 242416,
+    "duration": 15.09,
+    "wav_path": "/home/user/new/voice-samples/05_variation2_devanagari.wav",
+    "mp3_path": "/home/user/new/voice-samples/05_variation2_devanagari.mp3"
+  },
+  {
+    "name": "06_short_expressive_latin",
+    "desc": "Short expressive (Latin, concise)",
+    "text": "Arey mama! Naya order aaya hai! Table paanch! Do paneer tikka, ek butter naan, ek daal makhani! Pyaaz nahi hai, dhyaan rakhna!",
+    "wav_size": 521260,
+    "mp3_size": 190171,
+    "duration": 11.82,
+    "wav_path": "/home/user/new/voice-samples/06_short_expressive_latin.wav",
+    "mp3_path": "/home/user/new/voice-samples/06_short_expressive_latin.mp3"
+  }
+]

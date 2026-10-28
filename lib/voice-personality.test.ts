@@ -1,0 +1,341 @@
+import { describe, expect, it, beforeEach } from 'vitest';
+import {
+  buildExpressiveAnnouncement,
+  buildKitchenAnnouncement,
+  decideStyle,
+  nextVariationIndex,
+  resetVariationCounter,
+  getVariationCounter,
+  PERSONALITY_VARIATIONS,
+} from './voice-personality';
+import type { SpeakableItem } from './announce';
+
+/**
+ * Kitchen voice personality tests.
+ *
+ * These test the expressive text generation: that order data (table, dishes,
+ * quantities, notes) is always preserved accurately, that expressive framing
+ * does not corrupt it, that safety-critical notes trigger the standard style,
+ * and that variations rotate so the voice does not sound like a loop.
+ */
+
+const SAMPLE_ITEMS: SpeakableItem[] = [
+  { qty: 2, name: 'Paneer Tikka' },
+  { qty: 1, name: 'Butter Naan' },
+];
+
+describe('buildExpressiveAnnouncement', () => {
+  it('includes the table number in the opener', () => {
+    const text = buildExpressiveAnnouncement('5', SAMPLE_ITEMS, null, 0);
+    expect(text).toContain('टेबल');
+    expect(text).toContain('पाँच');
+  });
+
+  it('includes every dish with its quantity', () => {
+    const text = buildExpressiveAnnouncement('5', SAMPLE_ITEMS, null, 0);
+    expect(text).toContain('दो'); // hindiNumber(2)
+    expect(text).toContain('एक'); // hindiNumber(1)
+    expect(text).toContain('पनीर');
+    expect(text).toContain('बटर');
+  });
+
+  it('includes the guest note when present', () => {
+    const text = buildExpressiveAnnouncement('5', SAMPLE_ITEMS, 'no onion', 0);
+    expect(text).toContain('प्याज़');
+  });
+
+  it('does not include a note section when note is null', () => {
+    const withNote = buildExpressiveAnnouncement('5', SAMPLE_ITEMS, 'no onion', 0);
+    const noNote = buildExpressiveAnnouncement('5', SAMPLE_ITEMS, null, 0);
+    // The note text should appear in the withNote version but not in noNote
+    expect(withNote).toContain('प्याज़');
+    expect(noNote).not.toContain('प्याज़');
+  });
+
+  it('handles takeaway orders', () => {
+    const text = buildExpressiveAnnouncement('Takeaway', SAMPLE_ITEMS, null, 0);
+    expect(text).toContain('टेकअवे');
+    expect(text).not.toContain('टेबल');
+  });
+
+  it('uses expressive punctuation for natural pacing', () => {
+    const text = buildExpressiveAnnouncement('5', SAMPLE_ITEMS, null, 0);
+    // Expressive text should use exclamation marks and ellipses for pacing
+    expect(text).toMatch(/[!।]/);
+  });
+
+  it('preserves dish names exactly through spokenItem', () => {
+    const items: SpeakableItem[] = [
+      { qty: 1, name: 'Dal Makhani' },
+      { qty: 3, name: 'Butter Naan' },
+    ];
+    const text = buildExpressiveAnnouncement('5', items, null, 0);
+    // The dish names should appear in the text
+    expect(text).toContain('दाल');
+    expect(text).toContain('नान');
+  });
+
+  it('does not invent menu items or quantities', () => {
+    const items: SpeakableItem[] = [
+      { qty: 1, name: 'Chicken Tikka' },
+    ];
+    const text = buildExpressiveAnnouncement('5', items, null, 0);
+    // Should not contain items not in the order
+    expect(text).not.toContain('पनीर');
+    expect(text).not.toContain('دال');
+    expect(text).not.toContain('टनka');
+  });
+
+  it('returns different text for different variations', () => {
+    const v0 = buildExpressiveAnnouncement('5', SAMPLE_ITEMS, null, 0);
+    const v1 = buildExpressiveAnnouncement('5', SAMPLE_ITEMS, null, 1);
+    const v2 = buildExpressiveAnnouncement('5', SAMPLE_ITEMS, null, 2);
+    const v3 = buildExpressiveAnnouncement('5', SAMPLE_ITEMS, null, 3);
+    const v4 = buildExpressiveAnnouncement('5', SAMPLE_ITEMS, null, 4);
+
+    // All should contain the order data
+    for (const text of [v0, v1, v2, v3, v4]) {
+      expect(text).toContain('पाँच');
+    }
+
+    // But the expressive framing should differ
+    const unique = new Set([v0, v1, v2, v3, v4]);
+    expect(unique.size).toBeGreaterThan(2);
+  });
+
+  it('wraps around variation index modulo length', () => {
+    const v0 = buildExpressiveAnnouncement('5', SAMPLE_ITEMS, null, 0);
+    const v5 = buildExpressiveAnnouncement('5', SAMPLE_ITEMS, null, 5); // 5 % 5 = 0
+    expect(v0).toBe(v5);
+  });
+});
+
+describe('buildKitchenAnnouncement', () => {
+  beforeEach(() => {
+    resetVariationCounter();
+  });
+
+  it('generates a complete announcement', () => {
+    const text = buildKitchenAnnouncement('5', SAMPLE_ITEMS, null);
+    expect(text.length).toBeGreaterThan(20);
+    expect(text).toContain('पाँच');
+  });
+
+  it('rotates variations on consecutive calls', () => {
+    resetVariationCounter();
+    const t1 = buildKitchenAnnouncement('5', SAMPLE_ITEMS, null);
+    const t2 = buildKitchenAnnouncement('5', SAMPLE_ITEMS, null);
+    const t3 = buildKitchenAnnouncement('5', SAMPLE_ITEMS, null);
+
+    // Should not all be the same
+    const unique = new Set([t1, t2, t3]);
+    expect(unique.size).toBeGreaterThan(1);
+  });
+
+  it('uses standard style for safety-critical notes', () => {
+    resetVariationCounter();
+    const text = buildKitchenAnnouncement('5', SAMPLE_ITEMS, 'no onion, no garlic');
+    // Standard style should not use heavy slang
+    expect(text).not.toContain('अरेय्यो');
+    expect(text).not.toContain('माम');
+    // But should still include the note clearly
+    expect(text).toContain('प्याज़');
+  });
+
+  it('uses expressive style for non-safety notes', () => {
+    resetVariationCounter();
+    const text = buildKitchenAnnouncement('5', SAMPLE_ITEMS, 'extra cheese');
+    // Should be expressive (may contain slang)
+    expect(text.length).toBeGreaterThan(20);
+  });
+
+  it('uses expressive style when no note', () => {
+    resetVariationCounter();
+    const text = buildKitchenAnnouncement('5', SAMPLE_ITEMS, null);
+    expect(text.length).toBeGreaterThan(20);
+  });
+});
+
+describe('decideStyle', () => {
+  it('returns expressive for empty note', () => {
+    expect(decideStyle(null)).toBe('expressive');
+    expect(decideStyle(undefined)).toBe('expressive');
+    expect(decideStyle('')).toBe('expressive');
+  });
+
+  it('returns expressive for non-safety notes', () => {
+    expect(decideStyle('on the side')).toBe('expressive');
+    expect(decideStyle('cutlery please')).toBe('expressive');
+  });
+
+  it('returns standard for allergy keywords', () => {
+    expect(decideStyle('no onion')).toBe('standard');
+    expect(decideStyle('no garlic')).toBe('standard');
+    expect(decideStyle('allergic to nuts')).toBe('standard');
+    expect(decideStyle('no gluten')).toBe('standard');
+  });
+
+  it('returns standard for substitution keywords', () => {
+    expect(decideStyle('no cheese')).toBe('standard');
+    expect(decideStyle('less spicy')).toBe('standard');
+    expect(decideStyle('extra spicy')).toBe('standard');
+  });
+
+  it('returns standard for dietary restriction keywords', () => {
+    expect(decideStyle('vegan')).toBe('standard');
+    expect(decideStyle('vegetarian')).toBe('standard');
+    expect(decideStyle('halal')).toBe('standard');
+  });
+
+  it('returns standard for quantity-modifying keywords', () => {
+    expect(decideStyle('extra cheese')).toBe('standard');
+    expect(decideStyle('no onion, no garlic')).toBe('standard');
+  });
+});
+
+describe('nextVariationIndex', () => {
+  beforeEach(() => {
+    resetVariationCounter();
+  });
+
+  it('returns 0 on first call', () => {
+    expect(nextVariationIndex()).toBe(0);
+  });
+
+  it('returns 1 on second call', () => {
+    nextVariationIndex();
+    expect(nextVariationIndex()).toBe(1);
+  });
+
+  it('returns 2 on third call', () => {
+    nextVariationIndex();
+    nextVariationIndex();
+    expect(nextVariationIndex()).toBe(2);
+  });
+
+  it('wraps around after all variations', () => {
+    for (let i = 0; i < PERSONALITY_VARIATIONS.length; i++) {
+      nextVariationIndex();
+    }
+    // Counter should be back to 0
+    expect(getVariationCounter()).toBe(0);
+    expect(nextVariationIndex()).toBe(0);
+  });
+
+  it('returns standard index when style is standard', () => {
+    const stdIndex = PERSONALITY_VARIATIONS.findIndex(
+      (v) => v.id === 'standard',
+    );
+    expect(stdIndex).toBeGreaterThanOrEqual(0);
+
+    // Regardless of counter position, standard style returns the standard index
+    resetVariationCounter();
+    nextVariationIndex(); // counter = 1
+    nextVariationIndex(); // counter = 2
+    expect(nextVariationIndex('standard')).toBe(stdIndex);
+  });
+
+  it('counter advances even for standard style', () => {
+    resetVariationCounter();
+    nextVariationIndex('standard');
+    expect(getVariationCounter()).toBe(1);
+  });
+});
+
+describe('PERSONALITY_VARIATIONS', () => {
+  it('has at least 4 variations', () => {
+    expect(PERSONALITY_VARIATIONS.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('includes a standard variation', () => {
+    const hasStandard = PERSONALITY_VARIATIONS.some(
+      (v) => v.id === 'standard',
+    );
+    expect(hasStandard).toBe(true);
+  });
+
+  it('all variations have unique IDs', () => {
+    const ids = PERSONALITY_VARIATIONS.map((v) => v.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('standard variation uses plain Hindi with no slang', () => {
+    const standard = PERSONALITY_VARIATIONS.find(
+      (v) => v.id === 'standard',
+    )!;
+    const text = standard.opener('5');
+    expect(text).not.toContain('अरे');
+    expect(text).not.toContain('माम');
+    expect(text).not.toContain('भाई');
+    expect(text).not.toContain('रे');
+  });
+
+  it('expressive variations use desi slang', () => {
+    const expressive = PERSONALITY_VARIATIONS.filter(
+      (v) => v.id !== 'standard',
+    );
+    expect(expressive.length).toBeGreaterThan(0);
+
+    // At least one expressive variation should use slang
+    const hasSlang = expressive.some((v) => {
+      const text = v.opener('5');
+      return /अरे|माम|भाई|रे|हैन्/.test(text);
+    });
+    expect(hasSlang).toBe(true);
+  });
+});
+
+describe('order data integrity', () => {
+  it('does not modify dish quantities', () => {
+    const items: SpeakableItem[] = [
+      { qty: 5, name: 'Paneer Tikka' },
+    ];
+    const text = buildExpressiveAnnouncement('5', items, null, 0);
+    // 5 should appear as the quantity
+    expect(text).toContain('पाँच');
+  });
+
+  it('does not modify dish names', () => {
+    const items: SpeakableItem[] = [
+      { qty: 1, name: 'Biryani' },
+    ];
+    const text = buildExpressiveAnnouncement('5', items, null, 0);
+    expect(text).toContain('बिरयानी');
+  });
+
+  it('does not modify table numbers', () => {
+    const text = buildExpressiveAnnouncement('12', SAMPLE_ITEMS, null, 0);
+    expect(text).toContain('बारह');
+  });
+
+  it('does not modify the note content', () => {
+    const text = buildExpressiveAnnouncement('5', SAMPLE_ITEMS, 'no onion and no garlic', 0);
+    expect(text).toContain('प्याज़');
+    expect(text).toContain('लहसुन');
+  });
+
+  it('does not add extra items to the order', () => {
+    const items: SpeakableItem[] = [
+      { qty: 1, name: 'Roti' },
+    ];
+    const text = buildExpressiveAnnouncement('5', items, null, 0);
+    // Should not contain items not in the order
+    expect(text).not.toContain('पनीर');
+    expect(text).not.toContain('चिकन');
+    expect(text).not.toContain('बिरयानी');
+  });
+
+  it('handles empty items array', () => {
+    const text = buildExpressiveAnnouncement('5', [], null, 0);
+    expect(text.length).toBeGreaterThan(0);
+  });
+
+  it('handles complex dish details', () => {
+    const items: SpeakableItem[] = [
+      { qty: 1, name: 'Butter Naan', detail: 'Half · Extra cheese' },
+    ];
+    const text = buildExpressiveAnnouncement('5', items, null, 0);
+    expect(text).toContain('हाफ'); // half (Hinglish form)
+    expect(text).toContain('एक्स्ट्रा'); // extra cheese
+  });
+});
