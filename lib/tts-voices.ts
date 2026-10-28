@@ -42,8 +42,15 @@ export const EDGE_HINDI_VOICES: readonly EdgeVoice[] = [
 /** Default voice: Madhur is the deepest, warmest male Hindi voice. */
 export const DEFAULT_EDGE_VOICE = 'hi-IN-MadhurNeural';
 
-/** Default pitch: -10Hz for a deeper, warmer, more mature character. */
-export const DEFAULT_PITCH = '-10Hz';
+/**
+ * Default pitch: -20Hz for a deeper, warmer, more mature male character.
+ *
+ * Changed from -10Hz to -20Hz to achieve a deeper, more Jackie Shroff-style
+ * baritone delivery. The -10Hz value was too subtle — the voice still sounded
+ * close to the default Madhur voice. -20Hz produces a noticeably deeper,
+ * more authoritative tone while staying within Edge TTS's comfortable range.
+ */
+export const DEFAULT_PITCH = '-20Hz';
 
 /** Default volume: normal. */
 export const DEFAULT_VOLUME = '+0.00%';

@@ -108,10 +108,10 @@ const VAR_SUNO_RE: PersonalityVariation = {
     isTakeaway(table)
       ? 'सुनो रे भाई! एक नया टेकअवे ऑर्डर आ गया है!'
       : `सुनो रे भाई! एक नया ऑर्डर आ गया है! टेबल ${spokenTable(table)}!`,
-  itemsIntro: () => 'देखो zara!',
+  itemsIntro: () => 'देखो ज़रा!',
   itemsSeparator: () => ', ',
   noteLabel: () => 'और हैन्…',
-  closer: () => 'ऑर्डर सही है, जldi बनाओ!',
+  closer: () => 'ऑर्डर सही है, जल्दी बनाओ!',
 };
 
 /**
@@ -130,7 +130,7 @@ const VAR_DHYaan_DENA: PersonalityVariation = {
   itemsIntro: () => '',
   itemsSeparator: () => ', ',
   noteLabel: () => 'और सुनों…',
-  closer: () => 'जldi देखो zara, ऑर्डर है!',
+  closer: () => 'जल्दी देखो ज़रा, ऑर्डर है!',
 };
 
 /**

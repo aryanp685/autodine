@@ -61,7 +61,23 @@ function normaliseLang(lang: string): string {
  * evidence that a voice sounds better. This score makes automatic selection
  * deterministic; it is not a substitute for comparing voices on the actual
  * device. Operators can audition the installed candidates in the kitchen UI.
+ *
+ * GENDER PREFERENCE
+ *
+ * The kitchen voice must be male. The Web Speech API does not expose gender
+ * as a field, so this function infers it from the voice name. Common female
+ * Hindi voice names (Swara, Lekha, Kalpana, Heera, Aditi, Veena, Neerja) are
+ * down-ranked. Common male names (Ravi, Prabhat, Madhur, Suresh, Aarav,
+ * Kunal, Rehaan) are up-ranked. An unknown name gets no gender adjustment —
+ * it is neither penalised nor preferred on gender alone.
  */
+
+/** Voice-name substrings that indicate a female Hindi voice. */
+const FEMALE_VOICE_HINTS = /(swara|lekha|kalpana|heera|aditi|veena|neerja|priya|anjali|meera|sneha|kavita|sunita|radha|sita|durga|tara|gita|usha|vijaya|reetha|madhuri|sridevi|hema|rekha|sakshi|tanvi|irisha)/i;
+
+/** Voice-name substrings that indicate a male Hindi voice. */
+const MALE_VOICE_HINTS = /(ravi|prabhat|madhur|suresh|aarav|kunal|rehaan|vikram|arjun|ramesh|mahesh|suresh|deepak|rajesh|kamal|nimesh|pradeep|manish|vivek|sanjay|rahul)/i;
+
 export function voiceScore(voice: VoiceLike): number {
   const name = `${voice.name} ${voice.lang}`.toLowerCase();
   let score = 0;
@@ -72,6 +88,10 @@ export function voiceScore(voice: VoiceLike): number {
     score += 2;
   }
   if (voice.localService) score += 1; // no network round trip before it starts
+
+  // Gender: prefer male voices, down-rank female voices.
+  if (FEMALE_VOICE_HINTS.test(name)) score -= 8;
+  if (MALE_VOICE_HINTS.test(name)) score += 3;
 
   // A weak label-based down-rank only. These names do not establish how a
   // particular installed voice sounds on this device.
@@ -196,14 +216,15 @@ export const DEFAULT_START_TIMEOUT_MS = 4000;
 export const DEFAULT_COMPLETION_TIMEOUT_MS = 30_000;
 
 /**
- * Existing neutral Web Speech settings. These values are not calibrated to
- * this user's target voice: this environment has no browser voice inventory or
- * audio output to audition. Pitch stays neutral; changing it cannot add vocal
- * texture or personality. The rate remains a base multiplier for the existing
- * user speed control and sentence categories until a real-device listening
- * comparison can justify a change.
+ * Browser Web Speech API tuning.
+ *
+ * Pitch is lowered to 0.85 for a deeper, more masculine delivery. The browser
+ * Web Speech API does not expose gender, so pitch is the only lever available
+ * to bias the voice toward a male sound. 0.85 is a moderate reduction that
+ * deepens the voice without making it unnatural. The rate stays at 0.92 —
+ * slightly slower than neutral for clarity in a noisy kitchen.
  */
-export const VOICE_TUNING = { rate: 0.92, pitch: 1, volume: 1 } as const;
+export const VOICE_TUNING = { rate: 0.92, pitch: 0.85, volume: 1 } as const;
 
 /**
  * Existing delay between the alert tone and first word. Kept unchanged in
@@ -238,11 +259,34 @@ const PACE = {
   note: { rate: 0.94, leadMs: 520, gapMs: 0 },
 } as const;
 
-/** The sentence kinds planSpeech recognises, by how they open. */
+/**
+ * The sentence kinds planSpeech recognises, by how they open.
+ *
+ * Recognises both the plain announcement patterns and the expressive
+ * personality openers/labels from lib/voice-personality.ts.
+ *
+ * NOTE: "ध्याn देना भाई!" (expressive greeting opener) must NOT match the
+ * note pattern. The note pattern requires a comma after "ध्याn देना" -- the
+ * greeting opener has "भाई" instead.
+ */
+/**
+ * The sentence kinds planSpeech recognises, by how they open.
+ *
+ * Recognises both the plain announcement patterns and the expressive
+ * personality openers/labels from lib/voice-personality.ts.
+ *
+ * NOTE: "ध्यान देना भाई!" (expressive greeting opener) must NOT match the
+ * note pattern. The note pattern requires a comma after "ध्यान देना" -- the
+ * greeting opener has "भाई" instead.
+ */
 export function sentenceKind(sentence: string): keyof typeof PACE {
-  if (/^(ध्यान दें|ध्यान देना|नोट)/.test(sentence)) return 'note';
-  if (/^(नया|टेबल)/.test(sentence)) return 'greeting';
-  return 'dish';
+  // Note: requires comma after "ध्यान दें"/"ध्यान देना" so the greeting
+  // opener "ध्यान देना भाई!" does not match. Also matches expressive
+  // note labels "और सुनons..." and "और हैन्...".
+  if (/^(ध्यान दें[,，]|ध्यान देना[,，]|नोट|और सुनons|और हैन्)/.test(sentence)) return "note";
+  // Greeting: plain patterns plus expressive openers and closers.
+  if (/^(नया|टेबल|अरेय्यो|सुनो रे|अरे भाई|एक नया|कस्टमर|ऑर्डर सही)/.test(sentence)) return "greeting";
+  return "dish";
 }
 
 /**
@@ -258,7 +302,17 @@ export function planSpeech(text: string): SpeechSegment[] {
 
   let continuingNote = false;
   return sentences.map((sentence, index) => {
-    if (NOTE_START.test(sentence)) continuingNote = true;
+    if (NOTE_START.test(sentence)) {
+      continuingNote = true;
+    } else if (continuingNote) {
+      // A new section (greeting opener or closer) ends the note run.
+      // Multi-clause notes have chunks without the NOTE_START cue, so we
+      // cannot simply reset on every non-note sentence. Only a sentence
+      // that starts a known section breaks the run.
+      if (/^(नया|टेबल|अरेय्यो|सुनो रे|अरे भाई|एक नया|कस्टमर|ऑर्डर सही)/.test(sentence)) {
+        continuingNote = false;
+      }
+    }
     const kind = continuingNote ? 'note' : sentenceKind(sentence);
     const pace = PACE[kind];
 
@@ -281,7 +335,21 @@ export function planSpeech(text: string): SpeechSegment[] {
  * elsewhere is still paced rather than read in one breath.
  */
 const MAX_NOTE_SEGMENT_CHARS = 100;
-const NOTE_START = /^(?:ध्यान दें|ध्यान देना|नोट)[,،]?\s*/u;
+/**
+ * Matches the cue at the start of a safety-note sentence.
+ *
+ * Requires a comma after "ध्याn दें" / "ध्याn देना" so the expressive
+ * greeting opener "ध्याn देना भाई!" does NOT match. Also matches the
+ * expressive note labels "और सुनons" and "और हैन्".
+ */
+/**
+ * Matches the cue at the start of a safety-note sentence.
+ *
+ * Requires a comma after "ध्यान दें" / "ध्याn देना" so the expressive
+ * greeting opener "ध्याn देना भाई!" does NOT match. Also matches the
+ * expressive note labels "और सुनons" and "और हैन्".
+ */
+const NOTE_START = /^(?:ध्यान दें[,，]|ध्यान देना[,，]|नोट[,，]?|और सुनons|और हैन्)\s*/u;
 
 /** Split a long safety note at its written clauses, then at word boundaries. */
 function chunkNote(sentence: string): string[] {
