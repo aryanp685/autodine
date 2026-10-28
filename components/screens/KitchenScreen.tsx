@@ -49,6 +49,7 @@ import {
 import { createServerSpeech } from '@/lib/server-speech';
 import { browserServerSpeechEnv } from '@/lib/server-speech-browser';
 import { createDualSpeech } from '@/lib/dual-speech';
+import { buildKitchenAnnouncement } from '@/lib/voice-personality';
 
 /* The thresholds live next to the query that computes the age, so the badge
    and the board cannot disagree about what "late" means. */
@@ -71,6 +72,7 @@ const AUDIO_KEY = 'autodine:kitchen:audio';
 const SPEAKS_KEY = 'autodine:kitchen:speaks';
 const VOICE_KEY = 'autodine:kitchen:voice';
 const SPEED_KEY = 'autodine:kitchen:speed';
+const EXPRESSIVE_KEY = 'autodine:kitchen:expressive';
 
 /**
  * How fast to read.
@@ -272,6 +274,8 @@ export function Kitchen({
   const [voiceList, setVoiceList] = useState<{ name: string; lang: string; localService?: boolean; default?: boolean }[]>([]);
   const [voicePref, setVoicePref] = useState('');
   const [speed, setSpeed] = useState<Speed>('normal');
+  /** Expressive desi personality on/off. Default on — the voice prototype. */
+  const [expressive, setExpressive] = useState(true);
   /** 'starting' until the platform either names a Hindi voice or has none. */
   const [voiceState, setVoiceState] = useState<'starting' | 'ready' | 'no-voice'>('starting');
   const [stalled, setStalled] = useState(false);
@@ -423,6 +427,8 @@ export function Kitchen({
       if (localStorage.getItem(SPEAKS_KEY) === 'off') setSpeaksHere(false);
       setVoicePref(localStorage.getItem(VOICE_KEY) ?? '');
 
+      if (localStorage.getItem(EXPRESSIVE_KEY) === 'off') setExpressive(false);
+
       const storedSpeed = localStorage.getItem(SPEED_KEY);
       if (storedSpeed === 'slow' || storedSpeed === 'normal' || storedSpeed === 'fast') {
         setSpeed(storedSpeed);
@@ -441,10 +447,11 @@ export function Kitchen({
       localStorage.setItem(SPEAKS_KEY, speaksHere ? 'on' : 'off');
       localStorage.setItem(VOICE_KEY, voicePref);
       localStorage.setItem(SPEED_KEY, speed);
+      localStorage.setItem(EXPRESSIVE_KEY, expressive ? 'on' : 'off');
     } catch {
       /* nothing to persist to */
     }
-  }, [audio, speaksHere, voicePref, speed, ready]);
+  }, [audio, speaksHere, voicePref, speed, expressive, ready]);
 
   /* ------------------------------------------------------------------ speech */
 
@@ -657,6 +664,25 @@ export function Kitchen({
   );
 
   /**
+   * The text to speak for a ticket.
+   *
+   * When expressive voice is on, the kitchen personality module generates
+   * a desi announcement with rotated variations and automatic standard-Hindi
+   * fallback for safety-critical notes. When off, the original plain
+   * Devanagari sentence is used. The browser Web Speech API fallback always
+   * uses plain text for maximum intelligibility across OS voices.
+   */
+  const getAnnouncementText = useCallback(
+    (ticket: { table: string; items: { qty: number; name: string; detail?: string; spoken?: string | null }[]; note?: string | null }): string => {
+      if (expressive) {
+        return buildKitchenAnnouncement(ticket.table, ticket.items, ticket.note);
+      }
+      return orderAnnouncement({ ...ticket, note: ticket.note ?? undefined });
+    },
+    [expressive],
+  );
+
+  /**
    * Replay one, on demand, whether or not it has been said before.
    *
    * force(), not push(): a replay pressed while the original is still waiting
@@ -827,7 +853,7 @@ export function Kitchen({
       changeMissed((current) => current.some((item) => item.orderId === ticket.orderId)
         ? current
         : [ticket, ...current].slice(0, MISSED_LIMIT));
-      const result = speak(key, orderAnnouncement(ticket), announceLogLabel(ticket.table, ticket.items), 'order');
+      const result = speak(key, getAnnouncementText(ticket), announceLogLabel(ticket.table, ticket.items), 'order');
       if (result === 'full') setMissedReason('queue');
       if (result !== 'queued') {
         missedAttemptByOrderRef.current.delete(ticket.orderId);
@@ -1202,14 +1228,16 @@ export function Kitchen({
    * table, grouped dishes, and a guest instruction. Its title is exposed on
    * the test button so staff can see the exact phrase being auditioned.
    */
-  const sampleText = newOrderText(
-    'T5',
-    [
+  const sampleText = useMemo(() => {
+    const items = [
       { qty: 2, name: 'Paneer Tikka' },
       { qty: 1, name: 'Butter Naan', detail: 'Half · Extra cheese' },
-    ],
-    'less spicy',
-  );
+    ];
+    if (expressive) {
+      return buildKitchenAnnouncement('T5', items, 'less spicy');
+    }
+    return newOrderText('T5', items, 'less spicy');
+  }, [expressive]);
   const selectedVoiceInfo = voiceList.find((voice) => voice.name === voiceName);
 
   const readMissed = () => {
@@ -1218,7 +1246,7 @@ export function Kitchen({
       const key = `missed:${ticket.orderId}:${Date.now()}:${Math.random().toString(36).slice(2, 7)}`;
       announcementTicketsRef.current.set(key, ticket);
       missedAttemptByOrderRef.current.set(ticket.orderId, key);
-      const result = replay(key, orderAnnouncement(ticket), announceLogLabel(ticket.table, ticket.items));
+      const result = replay(key, getAnnouncementText(ticket), announceLogLabel(ticket.table, ticket.items));
       if (result !== 'queued') {
         missedAttemptByOrderRef.current.delete(ticket.orderId);
         announcementTicketsRef.current.delete(key);
@@ -1354,6 +1382,23 @@ export function Kitchen({
             ]}
           />
 
+          {/* Expressive desi personality. When on, the kitchen voice uses
+              rotated Nagpuri-flavoured announcements with automatic
+              standard-Hindi fallback for safety-critical notes. When off,
+              the original plain Devanagari sentence is used. */}
+          <button
+            type="button"
+            aria-pressed={expressive}
+            title={expressive ? 'Turn off the expressive kitchen voice' : 'Turn on the expressive kitchen voice'}
+            onClick={() => setExpressive(!expressive)}
+            className={[
+              expressive ? 'text-gink' : 'text-gink-64 hover:text-gink',
+            ].join(' ')}
+          >
+            <SwitchTrack on={expressive} />
+            Desi voice {expressive ? 'on' : 'off'}
+          </button>
+
           {/* The exact runtime Hindi candidate is shown below, including its
               language tag. Names and language tags identify the browser voice;
               they do not guarantee human-sounding pronunciation. */}
@@ -1415,7 +1460,7 @@ export function Kitchen({
                 if (!latest) return;
                 replay(
                   `new:${latest.orderId ?? latest.key}`,
-                  orderAnnouncement(latest),
+                  getAnnouncementText(latest),
                   announceLogLabel(latest.table, latest.items),
                 );
               }}
@@ -1860,7 +1905,7 @@ export function Kitchen({
                       onClick={() =>
                         replay(
                           `new:${o.orderId ?? o.key}`,
-                          orderAnnouncement(o),
+                          getAnnouncementText(o),
                           announceLogLabel(o.table, o.items),
                         )
                       }
