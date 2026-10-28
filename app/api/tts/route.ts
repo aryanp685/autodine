@@ -101,9 +101,12 @@ type TTSRequest = {
 /**
  * POST /api/tts
  *
- * Synthesizes Hindi text to MP3 audio. The browser sends a sentence and
- * receives an audio/mpeg response. One sentence per call — the kitchen
- * engine paces sentences client-side and fetches each one separately.
+ * Synthesizes Hindi text to MP3 audio. The browser sends the announcement
+ * text — one continuous clip in, one continuous clip out — and receives an
+ * audio/mpeg response. The Read Aloud endpoint accepts a minimal SSML
+ * subset (nested <prosody> closes the stream — verified live in CI), so
+ * pacing inside the clip comes from the text's own punctuation, and this
+ * route passes exactly that: escaped text in one outer prosody frame.
  */
 export async function POST(request: Request): Promise<Response> {
   let body: TTSRequest;

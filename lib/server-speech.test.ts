@@ -166,12 +166,14 @@ describe('tts-voices', () => {
 });
 
 describe('createServerSpeech', () => {
+  type FetchCall = Parameters<ServerSpeechEnv['fetchTTS']>[0];
+
   function makeMockEnv(overrides: Partial<ServerSpeechEnv> = {}): ServerSpeechEnv & {
-    fetchCalls: { text: string; voice: string; rate: string; pitch: string }[];
+    fetchCalls: FetchCall[];
     audioElements: ReturnType<ServerSpeechEnv['createAudio']>[];
     chimeCalls: number;
   } {
-    const fetchCalls: { text: string; voice: string; rate: string; pitch: string }[] = [];
+    const fetchCalls: FetchCall[] = [];
     const audioElements: ReturnType<ServerSpeechEnv['createAudio']>[] = [];
     let chimeCalls = 0;
 
@@ -303,12 +305,14 @@ describe('createServerSpeech', () => {
     const onEnd = vi.fn();
     engine.speak('नमस्ते।', onEnd);
 
-    // Wait for the LEAD_IN_MS (280ms) + async fetch to complete
+    // Wait for the lead-in after the chime + async fetch to complete
     await new Promise((resolve) => setTimeout(resolve, 600));
 
     expect(env.fetchCalls.length).toBeGreaterThan(0);
     const call = env.fetchCalls[0];
-    expect(call.text).toBe('नमस्ते');
+    // The danda stays: it is a real Hindi full stop and the service
+    // pauses on it — punctuation is the pacing inside a continuous clip.
+    expect(call.text).toBe('नमस्ते।');
     expect(call.voice).toBe('hi-IN-MadhurNeural');
     expect(call.pitch).toBe('-4Hz'); // male voice's natural pitch
     expect(call.rate).toMatch(/^[+-]\d+%$/);
@@ -327,6 +331,49 @@ describe('createServerSpeech', () => {
     expect(call.voice).toBe('hi-IN-SwaraNeural');
     // Swara must never inherit Madhur's warmth.
     expect(call.pitch).toBe('+0Hz');
+  });
+
+  it('speak() synthesizes a multi-sentence announcement as one continuous clip', async () => {
+    const env = makeMockEnv();
+    const engine = createServerSpeech(env, { startTimeoutMs: 5000, completionTimeoutMs: 5000 });
+
+    const onEnd = vi.fn();
+    engine.speak('नया ऑर्डर, टेबल टी वन। दो बटर नान।', onEnd);
+    await new Promise((resolve) => setTimeout(resolve, 600));
+
+    // ONE request, not one per sentence — the sentences flow the way a
+    // person says them instead of separate clips with dead air between.
+    // Terminators stay: the danda is a real Hindi full stop and the
+    // service pauses on it (the SSML subset rejects <break>/<prosody>).
+    expect(env.fetchCalls).toHaveLength(1);
+    const call = env.fetchCalls[0];
+    expect(call.text).toBe('नया ऑर्डर, टेबल टी वन। दो बटर नान।');
+    // One rate for the clip: the brisk kitchen pace.
+    expect(call.rate).toBe('+8%');
+
+    // The clip finishing is what completes every planned sentence.
+    env.audioElements[0].onended?.(new Event('ended'));
+    expect(onEnd).toHaveBeenCalledWith({ status: 'completed', completedSegments: 2, totalSegments: 2 });
+  });
+
+  it('the fast speed setting is actually faster than normal', async () => {
+    const normal = makeMockEnv();
+    const normalEngine = createServerSpeech(normal, { startTimeoutMs: 5000, completionTimeoutMs: 5000 });
+    normalEngine.speak('दो बटर नान।', vi.fn());
+    await new Promise((resolve) => setTimeout(resolve, 600));
+
+    const fast = makeMockEnv();
+    const fastEngine = createServerSpeech(fast, { startTimeoutMs: 5000, completionTimeoutMs: 5000 });
+    fastEngine.setRateScale(1.2);
+    fastEngine.speak('दो बटर नान।', vi.fn());
+    await new Promise((resolve) => setTimeout(resolve, 600));
+
+    // The whole point of "fast": clearly faster than the already-brisk
+    // normal pace. It used to land at +1% — indistinguishable from slow.
+    const normalRate = normal.fetchCalls[0].rate;
+    const fastRate = fast.fetchCalls[0].rate;
+    expect(normalRate).toBe('+8%');
+    expect(fastRate).toBe('+30%');
   });
 
   it('speak() with empty text reports failure', () => {

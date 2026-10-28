@@ -153,6 +153,16 @@ describe('POST /api/tts', () => {
     expect(prosody.pitch).toBe('-4Hz');
   });
 
+  it('passes sentence terminators through as punctuation', async () => {
+    // The Read Aloud endpoint rejects SSML nesting (verified live in CI),
+    // so the danda is what pauses between sentences — it must reach the
+    // service as text, never stripped or escaped into noise.
+    await POST(post({ text: 'नया ऑर्डर, टेबल टी वन। दो बटर नान।' }));
+
+    const { input } = mocks.streamCalls.at(-1) as { input: string };
+    expect(input).toBe('नया ऑर्डर, टेबल टी वन। दो बटर नान।');
+  });
+
   it('escapes SSML metacharacters in announcement text', async () => {
     // Dish names like "Fish & Chips" or "Dal <special>" are malformed SSML
     // if passed through raw — the synthesis request would be rejected.
