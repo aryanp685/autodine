@@ -1,42 +1,64 @@
-name: TTS smoke
-
-# Does the kitchen voice synthesis path actually work from a real network?
+# CI probe for the Microsoft Read Aloud TTS service that the kitchen
+# announcement voice depends on.
 #
-# Unit tests can only prove the prosody strings are well-formed; whether
-# Microsoft's Edge TTS endpoint still answers is a network fact. The
-# production symptom of a silent break is a female fallback voice on the
-# kitchen tablet, which no test suite can see. This workflow runs the
-# shipped values through the real library on GitHub's open-egress runners.
+# Runs scripts/tts-smoke.ts on a plain ubuntu runner: (1) a plain HTTPS
+# fetch of the public Read Aloud voices list, which also asserts the
+# shipped hi-IN catalogue matches the live service, and (2) the shipped
+# msedge-tts synthesis path for BOTH kitchen characters -- Madhur (male)
+# and Swara (female) -- at their own natural pitches. The synthesized MP3s
+# are uploaded as workflow artifacts so a human can listen to exactly what
+# production would say.
+#
+# Why a real probe instead of a unit test: the failure mode this guards
+# against is a network or DRM change on Microsoft's side (previously seen
+# as a Sec-MS-GEC rejection at the WebSocket upgrade). No local mock can
+# detect that; only a live call can. The job is informational -- a failure
+# must not block unrelated development -- but it is the honest signal that
+# the kitchen voice can actually speak.
+#
+# Secrets required: none -- the trusted client token is a public constant
+# shared by every Read Aloud browser extension.
+
+name: TTS Smoke
 
 on:
-  workflow_dispatch:
   push:
-    branches: [main, 'arena/**']
-    paths:
-      - 'app/api/tts/**'
-      - 'lib/tts-voices.ts'
-      - 'lib/server-speech.ts'
-      - 'scripts/tts-smoke.ts'
-      - '.github/workflows/tts-smoke.yml'
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: tts-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  edge-tts:
+  smoke:
+    name: Edge TTS live probe
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
-      - run: npm ci
-      - name: Synthesize a Hindi sentence via Edge TTS
-        # The script's own output says WHY it failed (validation, connect,
-        # hang, empty audio). Surface that line as a workflow annotation so
-        # it is readable from the API without downloading the job log.
-        run: |
-          set -o pipefail
-          if ! npx tsx scripts/tts-smoke.ts 2>&1 | tee tts-smoke.log; then
-            echo "::error title=TTS smoke failed::$(tr '\n' ' ' < tts-smoke.log | tail -c 400)"
-            exit 1
-          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run TTS smoke
+        run: npx tsx scripts/tts-smoke.ts
+
+      - name: Upload synthesized announcements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tts-announcements
+          path: tts-smoke-artifacts/
+          if-no-files-found: ignore
+          retention-days: 14
