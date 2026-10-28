@@ -305,12 +305,14 @@ describe('createServerSpeech', () => {
     const onEnd = vi.fn();
     engine.speak('नमस्ते।', onEnd);
 
-    // Wait for the LEAD_IN_MS (280ms) + async fetch to complete
+    // Wait for the lead-in after the chime + async fetch to complete
     await new Promise((resolve) => setTimeout(resolve, 600));
 
     expect(env.fetchCalls.length).toBeGreaterThan(0);
     const call = env.fetchCalls[0];
-    expect(call.text).toBe('नमस्ते');
+    // The danda stays: it is a real Hindi full stop and the service
+    // pauses on it — punctuation is the pacing inside a continuous clip.
+    expect(call.text).toBe('नमस्ते।');
     expect(call.voice).toBe('hi-IN-MadhurNeural');
     expect(call.pitch).toBe('-4Hz'); // male voice's natural pitch
     expect(call.rate).toMatch(/^[+-]\d+%$/);
@@ -341,16 +343,13 @@ describe('createServerSpeech', () => {
 
     // ONE request, not one per sentence — the sentences flow the way a
     // person says them instead of separate clips with dead air between.
+    // Terminators stay: the danda is a real Hindi full stop and the
+    // service pauses on it (the SSML subset rejects <break>/<prosody>).
     expect(env.fetchCalls).toHaveLength(1);
     const call = env.fetchCalls[0];
-    expect(call.text).toBeUndefined();
-    expect(call.segments?.map((segment) => segment.text)).toEqual(['नया ऑर्डर, टेबल टी वन', 'दो बटर नान']);
-    // Per-sentence pacing survives inside the one request: greeting at the
-    // brisk base pace (+8%), dishes a touch faster (+11%), and the planned
-    // pause becomes an SSML break (greeting gap 160ms) instead of dead air.
-    expect(call.segments?.[0]?.rate).toBe('+8%');
-    expect(call.segments?.[1]?.rate).toBe('+11%');
-    expect(call.segments?.[1]?.breakBeforeMs).toBe(160);
+    expect(call.text).toBe('नया ऑर्डर, टेबल टी वन। दो बटर नान।');
+    // One rate for the clip: the brisk kitchen pace.
+    expect(call.rate).toBe('+8%');
 
     // The clip finishing is what completes every planned sentence.
     env.audioElements[0].onended?.(new Event('ended'));
@@ -373,8 +372,8 @@ describe('createServerSpeech', () => {
     // normal pace. It used to land at +1% — indistinguishable from slow.
     const normalRate = normal.fetchCalls[0].rate;
     const fastRate = fast.fetchCalls[0].rate;
-    expect(normalRate).toBe('+11%');
-    expect(fastRate).toBe('+33%');
+    expect(normalRate).toBe('+8%');
+    expect(fastRate).toBe('+30%');
   });
 
   it('speak() with empty text reports failure', () => {

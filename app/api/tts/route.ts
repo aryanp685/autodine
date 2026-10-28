@@ -47,7 +47,6 @@ import {
   escapeSsml,
   normalizeProsodyHz,
   normalizeProsodyPercent,
-  segmentsToSsmlInput,
 } from '@/lib/tts-voices';
 
 /** The runtime must be Node.js: the WebSocket client needs `ws`. */
@@ -91,32 +90,23 @@ const DEFAULT_PROSODY = {
  */
 const SYNTHESIS_TIMEOUT_MS = 20_000;
 
-/** Body schema: text or segments is required, voice/rate/pitch are optional. */
+/** Body schema: text is required, voice/rate/pitch are optional. */
 type TTSRequest = {
-  text?: string;
-  /**
-   * Paced segments for a whole announcement: synthesized as ONE continuous
-   * clip — each sentence at its own rate, the planned pauses as SSML
-   * breaks. This is what keeps the voice sounding human instead of a stack
-   * of separate audio files with dead air between them.
-   */
-  segments?: { text: string; rate?: string; breakBeforeMs?: number }[];
+  text: string;
   voice?: string;
   rate?: string;
   pitch?: string;
 };
 
-/** Segments sanity bounds — an announcement, not an audiobook. */
-const MAX_SEGMENTS = 24;
-const MAX_SEGMENT_CHARS = 600;
-
 /**
  * POST /api/tts
  *
- * Synthesizes Hindi text to MP3 audio. The browser sends an announcement —
- * either plain text or paced segments — and receives one audio/mpeg clip.
- * Segments are synthesized as a single continuous voice so the sentences
- * flow the way a person says them.
+ * Synthesizes Hindi text to MP3 audio. The browser sends the announcement
+ * text — one continuous clip in, one continuous clip out — and receives an
+ * audio/mpeg response. The Read Aloud endpoint accepts a minimal SSML
+ * subset (nested <prosody> closes the stream — verified live in CI), so
+ * pacing inside the clip comes from the text's own punctuation, and this
+ * route passes exactly that: escaped text in one outer prosody frame.
  */
 export async function POST(request: Request): Promise<Response> {
   let body: TTSRequest;
@@ -126,30 +116,8 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  // Segments (the paced announcement) take precedence over plain text.
-  let segments: { text: string; rate?: string; breakBeforeMs?: number }[] | null = null;
-  if (body.segments !== undefined) {
-    if (!Array.isArray(body.segments) || body.segments.length === 0 || body.segments.length > MAX_SEGMENTS) {
-      return Response.json({ error: 'Segments must be an array of 1 to 24 items' }, { status: 400 });
-    }
-    segments = [];
-    for (const segment of body.segments) {
-      const text = typeof segment?.text === 'string' ? segment.text.trim() : '';
-      if (!text || text.length > MAX_SEGMENT_CHARS) {
-        return Response.json({ error: 'Each segment needs non-empty text' }, { status: 400 });
-      }
-      segments.push({
-        text,
-        rate: typeof segment.rate === 'string' ? segment.rate : undefined,
-        breakBeforeMs: typeof segment.breakBeforeMs === 'number' && Number.isFinite(segment.breakBeforeMs)
-          ? segment.breakBeforeMs
-          : undefined,
-      });
-    }
-  }
-
   const text = body.text?.trim();
-  if (!segments && !text) {
+  if (!text) {
     return Response.json({ error: 'Missing text' }, { status: 400 });
   }
 
@@ -178,10 +146,7 @@ export async function POST(request: Request): Promise<Response> {
     try {
       const synthesize = async (): Promise<Buffer> => {
         await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
-        const ssmlInput = segments
-          ? segmentsToSsmlInput(segments, prosody.rate)
-          : escapeSsml(text ?? '');
-        const { audioStream } = tts.toStream(ssmlInput, prosody);
+        const { audioStream } = tts.toStream(escapeSsml(text), prosody);
         const chunks: Buffer[] = [];
         for await (const chunk of audioStream) chunks.push(Buffer.from(chunk as Buffer));
         return Buffer.concat(chunks);

@@ -153,58 +153,14 @@ describe('POST /api/tts', () => {
     expect(prosody.pitch).toBe('-4Hz');
   });
 
-  it('folds paced segments into one continuous SSML voice', async () => {
-    // The kitchen engine sends the whole announcement as segments — one
-    // synthesis, sentences at their own rates, planned pauses as breaks.
-    await POST(post({
-      segments: [
-        { text: 'नया ऑर्डर, टेबल टी वन', rate: '+8%' },
-        { text: 'दो बटर नान', rate: '+11%', breakBeforeMs: 160 },
-      ],
-    }));
+  it('passes sentence terminators through as punctuation', async () => {
+    // The Read Aloud endpoint rejects SSML nesting (verified live in CI),
+    // so the danda is what pauses between sentences — it must reach the
+    // service as text, never stripped or escaped into noise.
+    await POST(post({ text: 'नया ऑर्डर, टेबल टी वन। दो बटर नान।' }));
 
     const { input } = mocks.streamCalls.at(-1) as { input: string };
-    expect(input).toBe(
-      '<prosody rate="+8%">नया ऑर्डर, टेबल टी वन</prosody> <break time="160ms"/> <prosody rate="+11%">दो बटर नान</prosody>',
-    );
-  });
-
-  it('leaves a segment unwrapped when its rate is the default', async () => {
-    await POST(post({
-      segments: [
-        { text: 'नया ऑर्डर', rate: '+0%' },
-        { text: 'दो बटर नान' },
-      ],
-    }));
-
-    const { input } = mocks.streamCalls.at(-1) as { input: string };
-    expect(input).toBe('नया ऑर्डर दो बटर नान');
-  });
-
-  it('coerces garbage segment prosody instead of failing', async () => {
-    await POST(post({
-      segments: [
-        { text: 'नया ऑर्डर', rate: '+8.00%' },
-        { text: 'दो बटर नान', rate: 'ludicrous', breakBeforeMs: Number.NaN },
-      ],
-    }));
-
-    const { input } = mocks.streamCalls.at(-1) as { input: string };
-    expect(input).toBe('<prosody rate="+8%">नया ऑर्डर</prosody> दो बटर नान');
-  });
-
-  it('rejects malformed segments with 400', async () => {
-    const bad: unknown[] = [
-      { segments: [] },
-      { segments: [{ text: '   ' }] },
-      { segments: [{ text: 42 }] },
-      { segments: Array.from({ length: 25 }, () => ({ text: 'x' })) },
-    ];
-    for (const body of bad) {
-      const response = await POST(post(body));
-      expect(response.status).toBe(400);
-    }
-    expect(mocks.streamCalls).toHaveLength(0);
+    expect(input).toBe('नया ऑर्डर, टेबल टी वन। दो बटर नान।');
   });
 
   it('escapes SSML metacharacters in announcement text', async () => {

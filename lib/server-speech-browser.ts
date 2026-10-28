@@ -28,11 +28,11 @@ export function browserServerSpeechEnv(chime: () => void): ServerSpeechEnv {
     },
     createObjectUrl: (data) => URL.createObjectURL(new Blob([data], { type: 'audio/mpeg' })),
     revokeObjectUrl: (url) => URL.revokeObjectURL(url),
-    fetchTTS: async ({ text, segments, voice, rate, pitch }) => {
+    fetchTTS: async ({ text, voice, rate, pitch }) => {
       const response = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, segments, voice, rate, pitch }),
+        body: JSON.stringify({ text, voice, rate, pitch }),
       });
       if (!response.ok) {
         throw new Error(`TTS relay returned ${response.status}`);

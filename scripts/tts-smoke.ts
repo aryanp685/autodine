@@ -8,10 +8,10 @@
  *      if Microsoft ever removes or adds one, CI says so first.
  *
  *   2. SSML shape probes (layer 2a): the Read Aloud endpoint accepts a
- *      subset of SSML, and the subset has never been pinned down. Each
- *      shape the shipped pipeline depends on is synthesized separately so
- *      a failure names exactly which layer broke: plain text (control),
- *      nested per-sentence prosody, and explicit breaks.
+ *      minimal SSML subset — nested <prosody> closes the stream — so
+ *      every shape a future change might want is probed and the full
+ *      matrix reported. The shipped path is plain text with punctuation;
+ *      if that shape breaks, the probe fails loudly.
  *
  *   3. The shipped synthesis path (layer 2b): msedge-tts synthesizes the
  *      REAL kitchen announcement for BOTH characters — Madhur (male) and
@@ -36,10 +36,9 @@ import {
   defaultPitchFor,
   escapeSsml,
   rateToProsody,
-  segmentsToSsmlInput,
   voiceGender,
 } from '../lib/tts-voices';
-import { planSpeech, VOICE_TUNING } from '../lib/speech';
+import { splitSentences, VOICE_TUNING } from '../lib/speech';
 import { buildKitchenAnnouncement } from '../lib/voice-personality';
 
 /**
@@ -172,9 +171,11 @@ function save(audio: Buffer, fileTag: string): void {
 
 /**
  * Layer 2a: pin down which SSML shapes the Read Aloud endpoint accepts.
- * The shipped pipeline depends on nested prosody (per-sentence rates) and
- * breaks (planned pauses); the endpoint speaks an undocumented subset, so
- * each shape is verified separately before the full announcement runs.
+ * The endpoint speaks an undocumented minimal subset — nested <prosody>
+ * closes the stream — so every shape the pipeline might want is probed and
+ * the full matrix is reported. The shipped path only relies on plain text
+ * with punctuation; the other shapes are knowledge for the next person who
+ * is tempted to reach for SSML.
  */
 async function probeSsmlShapes(voiceName: string): Promise<void> {
   const pitch = defaultPitchFor(voiceName);
@@ -183,12 +184,10 @@ async function probeSsmlShapes(voiceName: string): Promise<void> {
     { label: 'plain-text', input: escapeSsml('नमस्ते दोस्तों, कैसे हो।') },
     { label: 'nested-prosody', input: `<prosody rate="+8%">${escapeSsml('नमस्ते दोस्तों')}</prosody>` },
     { label: 'break', input: `${escapeSsml('नमस्ते')} <break time="200ms"/> ${escapeSsml('दोस्तों')}` },
-    { label: 'segments', input: segmentsToSsmlInput([
-      { text: 'नमस्ते दोस्तों', rate: '+8%' },
-      { text: 'कैसे हो', rate: '+11%', breakBeforeMs: 200 },
-    ], prosody.rate) },
+    { label: 'sentence-terminators', input: `${escapeSsml('नमस्ते दोस्तों।')} ${escapeSsml('कैसे हो।')}` },
   ];
 
+  const rejected: string[] = [];
   for (const shape of shapes) {
     try {
       const audio = await withRetry(() => synthesize(voiceName, shape.input, prosody), `shape ${shape.label}`);
@@ -196,35 +195,42 @@ async function probeSsmlShapes(voiceName: string): Promise<void> {
       note(`shape ${shape.label} → OK, ${audio.length} bytes`);
     } catch (error) {
       const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-      // The exact answer decides the implementation: if a shipped shape is
-      // rejected here while plain-text works, the pipeline must change.
-      fail(`shape ${shape.label} rejected by the service — ${message} — input: ${shape.input.slice(0, 200)}`);
+      note(`shape ${shape.label} → REJECTED — ${message}`);
+      rejected.push(shape.label);
     }
+  }
+  // The shipped path is plain text; if that breaks, everything breaks.
+  if (rejected.includes('plain-text') || rejected.includes('sentence-terminators')) {
+    fail(`shipped SSML shape rejected by the service: ${rejected.join(', ')}`);
   }
 }
 
 /**
  * Layer 2b: the shipped synthesis path — the actual product behaviour, for
  * both kitchen characters, each with its own natural pitch. The
- * announcement is paced exactly the way the kitchen engine paces it:
- * sentences at their planned rates, the planned pauses as SSML breaks,
- * one continuous clip per character.
+ * announcement is paced exactly the way the kitchen engine paces it: one
+ * continuous clip, sentences merged with their terminators (punctuation is
+ * the only pacing the service's SSML subset allows), one rate.
  */
 async function probeSynthesis(voiceName: string, fileTag: string): Promise<void> {
-  // Mirror lib/server-speech.ts: same plan, same rate maths, same SSML.
-  const segments = planSpeech(ANNOUNCEMENT).map((segment, index, plan) => ({
-    text: segment.text.replace(/[।.!?\s]+$/u, '').trim(),
-    rate: rateToProsody(Math.min(1.5, Math.max(0.5, VOICE_TUNING.rate * segment.rate))),
-    breakBeforeMs: index === 0 ? 0 : plan[index - 1].gapMs + segment.leadMs,
-  }));
-  const prosody = { voice: voiceName, rate: '+0%', volume: '+0%', pitch: defaultPitchFor(voiceName) };
-  note(`shipped prosody ${JSON.stringify(prosody)} with ${segments.length} segments`);
+  // Mirror lib/server-speech.ts: same merge, same rate maths.
+  const mergedText = splitSentences(ANNOUNCEMENT)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean)
+    .join(' ');
+  const prosody = {
+    voice: voiceName,
+    rate: rateToProsody(VOICE_TUNING.rate),
+    volume: '+0%',
+    pitch: defaultPitchFor(voiceName),
+  };
+  note(`shipped prosody ${JSON.stringify(prosody)}`);
 
   const deadline = setTimeout(() => fail(`synthesis of ${voiceName} did not finish within 25s`), 25_000);
   try {
     const audio = await withRetry(() => synthesize(
       voiceName,
-      segmentsToSsmlInput(segments, prosody.rate),
+      escapeSsml(mergedText),
       { rate: prosody.rate, pitch: prosody.pitch, volume: prosody.volume },
     ), `synthesis of ${voiceName}`);
     clearTimeout(deadline);

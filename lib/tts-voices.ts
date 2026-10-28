@@ -201,33 +201,6 @@ export function escapeSsml(text: string): string {
     .replace(/'/g, '&apos;');
 }
 
-/**
- * Build the SSML body for a paced announcement as ONE continuous voice.
- *
- * The kitchen engine sends sentences as segments, each with its own rate,
- * and this folds them into a single synthesis request: the sentences follow
- * each other the way a person says them, instead of separate audio files
- * with dead air between them. Per-sentence pacing survives as SSML — a
- * nested <prosody> per rate change and an explicit <break> wherever the
- * plan asked for a pause (the beat before a safety note, a breath between
- * dishes). Nested prosody overrides the outer rate for its span only.
- */
-export function segmentsToSsmlInput(
-  segments: { text: string; rate?: string; breakBeforeMs?: number }[],
-  defaultRate: string,
-): string {
-  return segments
-    .map((segment, index) => {
-      const rate = normalizeProsodyPercent(segment.rate, defaultRate);
-      const body = escapeSsml(segment.text);
-      const inner = rate === defaultRate ? body : `<prosody rate="${rate}">${body}</prosody>`;
-      const breakMs = index === 0 ? 0 : Math.min(2000, Math.max(0, Math.round(segment.breakBeforeMs ?? 0)));
-      const brk = breakMs > 0 ? `<break time="${breakMs}ms"/> ` : '';
-      return brk + inner;
-    })
-    .join(' ');
-}
-
 /** Find an Edge TTS voice by name, or null if not in the catalogue. */
 export function findEdgeVoice(name: string): EdgeVoice | null {
   return EDGE_HINDI_VOICES.find((v) => v.name === name) ?? null;

@@ -42,7 +42,6 @@ import {
   DEFAULT_START_TIMEOUT_MS,
   LEAD_IN_MS,
   VOICE_TUNING,
-  planSpeech,
   splitSentences,
   type SpeechEngine,
   type SpeechOutcome,
@@ -78,14 +77,7 @@ export type ServerSpeechEnv = {
   revokeObjectUrl: (url: string) => void;
   /** Fetches TTS audio from the /api/tts endpoint. */
   fetchTTS: (params: {
-    /** Plain text for a one-sentence announcement. */
-    text?: string;
-    /**
-     * Paced segments for a multi-sentence announcement: synthesized as one
-     * continuous clip, each sentence at its own rate, the planned pauses
-     * as SSML breaks.
-     */
-    segments?: { text: string; rate?: string; breakBeforeMs?: number }[];
+    text: string;
     voice: string;
     rate: string;
     pitch: string;
@@ -239,7 +231,6 @@ export function createServerSpeech(
 
     try { env.chime(); } catch { /* audio can be locked until a gesture */ }
 
-    const plan = planSpeech(body);
     const edgeVoiceName = voiceName();
 
     const fail = (reason: string, stalled = false) => {
@@ -260,21 +251,18 @@ export function createServerSpeech(
     // sentences follow each other the way a person says them, instead of
     // separate audio files with dead air — and a fresh fetch latency —
     // between every line. That continuity is what makes the voice sound
-    // human instead of robotic. Per-sentence pacing survives as SSML:
-    // each sentence keeps its own rate, and the planned pauses become
-    // SSML breaks (see segmentsToSsmlInput).
-    const segments = plan
-      .map((segment, index) => {
-        const previous = plan[index - 1];
-        return {
-          text: segment.text.replace(/[।.!?\s]+$/u, '').trim(),
-          rate: rateToProsody(Math.min(1.5, Math.max(0.5, VOICE_TUNING.rate * segment.rate * rateScale))),
-          breakBeforeMs: previous ? previous.gapMs + segment.leadMs : 0,
-        };
-      })
-      .filter((segment) => segment.text);
+    // human instead of robotic. Sentences keep their terminators (the
+    // danda is a real Hindi full stop and the service pauses on it) — the
+    // Read Aloud endpoint rejects SSML nesting, so punctuation is the
+    // only pacing tool inside the clip (verified live: nested <prosody>
+    // closes the stream; plain text with dandas synthesizes fine).
+    const mergedText = sentences
+      .map((sentence) => sentence.trim())
+      .filter(Boolean)
+      .join(' ');
+    const prosodyRate = rateToProsody(Math.min(1.5, Math.max(0.5, VOICE_TUNING.rate * rateScale)));
 
-    if (segments.length === 0) {
+    if (!mergedText) {
       finish({ status: 'completed', completedSegments: 0, totalSegments: sentences.length });
       return;
     }
@@ -320,12 +308,12 @@ export function createServerSpeech(
       fetchWatchdog = schedule(() => clipFailure('TTS fetch timed out'), fetchTimeoutMs);
       let audioPromise: Promise<ArrayBuffer>;
       try {
-        const pitch = defaultPitchFor(edgeVoiceName);
-        // A one-sentence announcement keeps the plain text contract; only
-        // multi-sentence announcements need the segmented SSML shape.
-        audioPromise = segments.length === 1
-          ? env.fetchTTS({ text: segments[0].text, voice: edgeVoiceName, rate: segments[0].rate, pitch })
-          : env.fetchTTS({ segments, voice: edgeVoiceName, rate: '+0%', pitch });
+        audioPromise = env.fetchTTS({
+          text: mergedText,
+          voice: edgeVoiceName,
+          rate: prosodyRate,
+          pitch: defaultPitchFor(edgeVoiceName),
+        });
       } catch (error) {
         clipFailure(error instanceof Error ? error.message : 'TTS fetch threw an error');
         return;
