@@ -24,13 +24,16 @@
  *
  * The slang is Nagpuri-Mumbai kitchen talk ("arey mama", "suno re bhai",
  * "arey baapre", "patkan") -- the words a real kitchen in that belt uses,
- * written in Devanagari so the TTS reads them as Hindi. Regional
- * expressions ("re", "haan", "bhai", "mama", "patkan") are used naturally,
- * not forced into every sentence. When a note is a safety instruction -- an
- * allergy, a substitution -- it is stated plainly, with no slang that could
- * blur the instruction. Humour wraps the order; it never replaces it.
- * Both the male (Madhur) and female (Swara) characters speak this same
- * text -- the personality is in the words, not the voice model.
+ * written in Devanagari so the TTS reads them as Hindi. The jokes are the
+ * jokes a kitchen actually makes: the guests are already hungry, the order
+ * is a farmaan, hunger waits for no one, cook it so well the guest says
+ * "waah bhai waah". Regional expressions ("re", "haan", "bhai", "mama",
+ * "patkan") are used naturally, not forced into every sentence. When a
+ * note is a safety instruction -- an allergy, a substitution -- it is
+ * stated plainly, with no slang or joke that could blur the instruction.
+ * Humour wraps the order; it never replaces it. Both the male (Madhur)
+ * and female (Swara) characters speak this same text -- the personality
+ * is in the words, not the voice model.
  *
  * WHAT THIS MODULE DOES NOT DO
  *
@@ -84,86 +87,89 @@ export type AnnouncementStyle = 'expressive' | 'standard';
 /**
  * Variation 1 -- Arey Mama.
  *
- * The default: playful, energetic, "arey mama!" opener. Uses "re" and "haan"
- * naturally. The note is introduced with "suno mama" -- a real kitchen would
- * say this to get someone's attention before a safety instruction.
+ * The showman. "Arey mama!" plus the joke that the guests are already
+ * sitting hungry -- urgency with a smile. The dish list is the mehmaan's
+ * "farmaaish" (their royal request), and the closer hands the chef the
+ * one compliment a cook can never resist: show the magic of your hands.
  */
 const VAR_AREY_MAMA: PersonalityVariation = {
   id: 'arey-mama',
   opener: (table) =>
     isTakeaway(table)
-      ? 'अरेय्यो माम! एक नया टेकअवे ऑर्डर आया है रे!'
-      : `अरेय्यो माम! एक नया ऑर्डर आया है रे! टेबल नंबर ${spokenTable(table)}!`,
-  itemsIntro: () => 'सुनो रे!',
+      ? 'अरेय्यो माम! टेकअवे का नया ऑर्डर आया है रे! मेहमान भूखे बैठे हैं!'
+      : `अरेय्यो माम! नया ऑर्डर आया है रे! टेबल नंबर ${spokenTable(table)}, मेहमान भूखे बैठे हैं!`,
+  itemsIntro: () => 'ये रही फरमाइश!',
   itemsSeparator: () => ', ',
-  noteLabel: () => 'और सुनों माम…',
-  closer: () => 'कस्टमर का ऑर्डर है भाई, ध्यान से बनाना!',
+  noteLabel: () => 'और सुनों माम, एक ज़रूरी बात…',
+  closer: () => 'भाई, अपने हाथ का जादू दिखाओ!',
 };
 
 /**
  * Variation 2 -- Suno Re Bhai.
  *
- * More direct. "Suno re bhai!" grabs attention. Uses "zara" (a bit) and
- * "patkan" (Nagpuri for "quickly") for energy. The note is introduced with
- * "haan" -- a conversational "and yes..." that precedes an important
- * instruction.
+ * Nagpuri energy with a rhyme that sticks: "patkan banao aur kamaal
+ * dikhaao" -- make it quick and show the magic. The dish list is framed
+ * as "look what they asked for", and the note gets a plain, unmistakable
+ * "this is important".
  */
 const VAR_SUNO_RE: PersonalityVariation = {
   id: 'suno-re',
   opener: (table) =>
     isTakeaway(table)
-      ? 'सुनो रे भाई! एक नया टेकअवे ऑर्डर आ गया है!'
-      : `सुनो रे भाई! एक नया ऑर्डर आ गया है! टेबल ${spokenTable(table)}!`,
-  itemsIntro: () => 'देखो ज़रा!',
+      ? 'सुनो रे भाई! टेकअवे का नया ऑर्डर आ गया!'
+      : `सुनो रे भाई! टेबल ${spokenTable(table)} का नया ऑर्डर आ गया!`,
+  itemsIntro: () => 'देखो ज़रा, क्या माँगा है!',
   itemsSeparator: () => ', ',
-  noteLabel: () => 'और हैन्…',
-  closer: () => 'ऑर्डर सही है, पटकन बनाओ भाई!',
+  noteLabel: () => 'और हैन्, ये ज़रूरी है…',
+  closer: () => 'पटकन बनाओ और कमाल दिखाओ!',
 };
 
 /**
  * Variation 3 -- Dhyaan Dena.
  *
- * Confident and direct. "Dhyaan dena bhai!" is what a chef says when they
- * need the kitchen to listen. No extra slang in the opener -- the personality
- * comes from the tone, not the words. The note gets a plain "suno" (listen).
+ * The royal decree. The order is a "farmaan" from the table, the dish
+ * list is "the order is clear", and the closer delivers the line every
+ * kitchen lives by: hunger waits for no one. Confident, commanding, and
+ * funny because it is true.
  */
 const VAR_DHYaan_DENA: PersonalityVariation = {
   id: 'dhyaan-dena',
   opener: (table) =>
     isTakeaway(table)
-      ? 'ध्यान देना भाई! एक नया टेकअवे ऑर्डर आया है!'
-      : `ध्यान देना भाई! एक नया ऑर्डर आया है! टेबल नंबर ${spokenTable(table)}!`,
-  itemsIntro: () => '',
+      ? 'ध्यान देना भाई! टेकअवे से नया फरमान आया है!'
+      : `ध्यान देना भाई! टेबल नंबर ${spokenTable(table)} से नया फरमान आया है!`,
+  itemsIntro: () => 'हुक्म साफ़ है!',
   itemsSeparator: () => ', ',
   noteLabel: () => 'और सुनों…',
-  closer: () => 'जल्दी देखो ज़रा, ऑर्डर है!',
+  closer: () => 'भूख किसी का इंतज़ार नहीं करती, जल्दी चलो!',
 };
 
 /**
  * Variation 4 -- Arey Bhai.
  *
- * Casual and friendly. "Arey baapre!" is the Mumbai "oh man!". The note
- * uses "na" as a question tag ("no onions, right?") -- natural desi
- * conversational style. The closer uses "bhaiya" for variety.
+ * Mumbai cool. "Arey baapre!" for the arrival, "suno suno, ye chahiye
+ * inko" like a friend passing on gossip, and the closer is the dream:
+ * cook it so well the guest says "waah bhai waah". The note stays plain
+ * after the label -- the wish never touches the instruction.
  */
 const VAR_AREY_BHAI: PersonalityVariation = {
   id: 'arey-bhai',
   opener: (table) =>
     isTakeaway(table)
-      ? 'अरे बापरे! नया टेकअवे ऑर्डर आ गया!'
-      : `अरे बापरे! नया ऑर्डर आ गया! टेबल ${spokenTable(table)}!`,
-  itemsIntro: () => 'एक सुनों…',
+      ? 'अरे बापरे! टेकअवे ऑर्डर आ गया!'
+      : `अरे बापरे! टेबल ${spokenTable(table)} का ऑर्डर आ गया!`,
+  itemsIntro: () => 'सुनो सुनो, ये चाहिए इनको…',
   itemsSeparator: () => ', ',
   noteLabel: () => 'और हैन्…',
-  closer: () => 'कस्टमर का ऑर्डर है, ध्यान से बनाना!',
+  closer: () => 'ऐसा बनाओ कि मेहमान बोले, वाह भाई वाह!',
 };
 
 /**
  * Variation 5 -- Standard.
  *
- * No slang. Used when the previous announcement used heavy slang, or when
- * the note is complex and needs maximum clarity. This is the "clear Hindi"
- * mode: every instruction is plain and unambiguous.
+ * No slang. Used when the note is a safety instruction and needs maximum
+ * clarity. Plain clear Hindi -- but still warm: the closer asks nicely
+ * instead of announcing like a robot.
  */
 const VAR_STANDARD: PersonalityVariation = {
   id: 'standard',
@@ -174,7 +180,7 @@ const VAR_STANDARD: PersonalityVariation = {
   itemsIntro: () => '',
   itemsSeparator: () => ', ',
   noteLabel: () => 'ध्यान दें,',
-  closer: () => 'ऑर्डर सही है।',
+  closer: () => 'कृपया ध्यान से बनाइए।',
 };
 
 /** All variations, in rotation order. */

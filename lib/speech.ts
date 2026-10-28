@@ -277,20 +277,18 @@ const PACE = {
 } as const;
 
 /**
- * The sentence kinds planSpeech recognises, by how they open.
- *
- * Recognises both the plain announcement patterns and the expressive
- * personality openers/labels from lib/voice-personality.ts.
- *
- * NOTE: "ध्याn देना भाई!" (expressive greeting opener) must NOT match the
- * note pattern. The note pattern requires a comma after "ध्याn देना" -- the
- * greeting opener has "भाई" instead.
+ * Sentence starters that open or close an announcement: the plain patterns
+ * and the expressive openers/closers from lib/voice-personality.ts. Used
+ * both to pace greeting sentences and to end a note run (the closer that
+ * follows a safety note is a greeting, not more note).
  */
+const GREETING_START = /^(?:नया|टेबल|एक नया|अरेय्यो|सुनो रे|अरे भाई|अरे बापरे|ध्यान देना|कस्टमर|ऑर्डर सही|भाई|पटकन|भूख|ऐसा|कृपया)/;
+
 /**
  * The sentence kinds planSpeech recognises, by how they open.
  *
  * Recognises both the plain announcement patterns and the expressive
- * personality openers/labels from lib/voice-personality.ts.
+ * personality openers/closers from lib/voice-personality.ts.
  *
  * NOTE: "ध्यान देना भाई!" (expressive greeting opener) must NOT match the
  * note pattern. The note pattern requires a comma after "ध्यान देना" -- the
@@ -299,10 +297,10 @@ const PACE = {
 export function sentenceKind(sentence: string): keyof typeof PACE {
   // Note: requires comma after "ध्यान दें"/"ध्यान देना" so the greeting
   // opener "ध्यान देना भाई!" does not match. Also matches expressive
-  // note labels "और सुनons..." and "और हैन्...".
-  if (/^(ध्यान दें[,，]|ध्यान देना[,，]|नोट|और सुनons|और हैन्)/.test(sentence)) return "note";
+  // note labels "और सुनों..." and "और हैन्...".
+  if (/^(ध्यान दें[,，]|ध्यान देना[,，]|नोट|और सुनों|और हैन्)/.test(sentence)) return "note";
   // Greeting: plain patterns plus expressive openers and closers.
-  if (/^(नया|टेबल|अरेय्यो|सुनो रे|अरे भाई|एक नया|कस्टमर|ऑर्डर सही)/.test(sentence)) return "greeting";
+  if (GREETING_START.test(sentence)) return "greeting";
   return "dish";
 }
 
@@ -326,7 +324,7 @@ export function planSpeech(text: string): SpeechSegment[] {
       // Multi-clause notes have chunks without the NOTE_START cue, so we
       // cannot simply reset on every non-note sentence. Only a sentence
       // that starts a known section breaks the run.
-      if (/^(नया|टेबल|अरेय्यो|सुनो रे|अरे भाई|एक नया|कस्टमर|ऑर्डर सही)/.test(sentence)) {
+      if (GREETING_START.test(sentence)) {
         continuingNote = false;
       }
     }
@@ -355,18 +353,11 @@ const MAX_NOTE_SEGMENT_CHARS = 100;
 /**
  * Matches the cue at the start of a safety-note sentence.
  *
- * Requires a comma after "ध्याn दें" / "ध्याn देना" so the expressive
- * greeting opener "ध्याn देना भाई!" does NOT match. Also matches the
- * expressive note labels "और सुनons" and "और हैन्".
+ * Requires a comma after "ध्यान दें" / "ध्यान देना" so the expressive
+ * greeting opener "ध्यान देना भाई!" does NOT match. Also matches the
+ * expressive note labels "और सुनों" and "और हैन्".
  */
-/**
- * Matches the cue at the start of a safety-note sentence.
- *
- * Requires a comma after "ध्यान दें" / "ध्याn देना" so the expressive
- * greeting opener "ध्याn देना भाई!" does NOT match. Also matches the
- * expressive note labels "और सुनons" and "और हैन्".
- */
-const NOTE_START = /^(?:ध्यान दें[,，]|ध्यान देना[,，]|नोट[,，]?|और सुनons|और हैन्)\s*/u;
+const NOTE_START = /^(?:ध्यान दें[,，]|ध्यान देना[,，]|नोट[,，]?|और सुनों|और हैन्)\s*/u;
 
 /** Split a long safety note at its written clauses, then at word boundaries. */
 function chunkNote(sentence: string): string[] {
