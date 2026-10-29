@@ -43,7 +43,10 @@ vi.mock('msedge-tts', () => ({
       return mocks.close();
     }
   },
-  OUTPUT_FORMAT: { AUDIO_24KHZ_48KBITRATE_MONO_MP3: 'audio-24khz-48kbitrate-mono-mp3' },
+  OUTPUT_FORMAT: {
+    AUDIO_24KHZ_48KBITRATE_MONO_MP3: 'audio-24khz-48kbitrate-mono-mp3',
+    AUDIO_24KHZ_96KBITRATE_MONO_MP3: 'audio-24khz-96kbitrate-mono-mp3',
+  },
 }));
 
 import { POST } from './route';
@@ -92,6 +95,8 @@ describe('POST /api/tts', () => {
     expect(response.headers.get('Content-Type')).toBe('audio/mpeg');
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
     expect(mocks.setMetadataCalls[0].voice).toBe('hi-IN-MadhurNeural');
+    // Higher-fidelity audio: the natural-tone contract.
+    expect(mocks.setMetadataCalls[0].format).toBe('audio-24khz-96kbitrate-mono-mp3');
     expect(mocks.streamCalls).toHaveLength(1);
   });
 

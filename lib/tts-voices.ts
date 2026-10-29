@@ -40,9 +40,10 @@ export type EdgeVoice = {
  * could never produce audio. Only voices this service actually serves may
  * appear here.
  *
- * The Nagpuri/Mumbai slang lives in the words (lib/voice-personality.ts),
- * not in these models — both characters speak the same desi text; their
- * naturalness comes from neural delivery plus expressive punctuation.
+ * The Nagpuri slang lives in the words (lib/voice-personality.ts), not in
+ * these models — both characters speak the same desi text; their
+ * naturalness comes from neural delivery, expressive punctuation, and
+ * each voice staying close to its own natural pitch.
  */
 export const EDGE_HINDI_VOICES: readonly EdgeVoice[] = [
   {

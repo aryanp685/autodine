@@ -135,9 +135,9 @@ describe('buildKitchenAnnouncement', () => {
   it('uses standard style for safety-critical notes', () => {
     resetVariationCounter();
     const text = buildKitchenAnnouncement('5', SAMPLE_ITEMS, 'no onion, no garlic');
-    // Standard style should not use heavy slang
-    expect(text).not.toContain('अरेय्यो');
-    expect(text).not.toContain('माम');
+    // Standard style should not use Nagpuri slang
+    expect(text).not.toContain('गुरु');
+    expect(text).not.toContain('माय रे');
     // But should still include the note clearly
     expect(text).toContain('प्याज़');
   });
@@ -146,9 +146,12 @@ describe('buildKitchenAnnouncement', () => {
     resetVariationCounter();
     const text = buildKitchenAnnouncement('5', SAMPLE_ITEMS, 'no onion, no garlic');
     // The humour lives in the expressive framing ("hunger waits for no
-    // one", "show the magic of your hands"). A safety note is plain clear
-    // Hindi end to end — a joke must never ride along with an allergy.
-    for (const quip of ['जादू', 'फरमाइश', 'भूख', 'वाह', 'फरमान', 'हुक्म', 'पटकन', 'बापरे', 'कमाल']) {
+    // one", "bring the raunak"). A safety note is plain clear Hindi end to
+    // end — a joke must never ride along with an allergy.
+    for (const quip of [
+      'जादू', 'फरमाइश', 'भूख', 'वाह', 'फरमान', 'हुक्म', 'पटकन', 'बापरे', 'कमाल',
+      'गुरु', 'माय रे', 'झकास', 'रौनक', 'छा गया', 'दादा', 'फटाफट', 'का माँगा', 'सुन ले',
+    ]) {
       expect(text).not.toContain(quip);
     }
   });
@@ -281,18 +284,21 @@ describe('PERSONALITY_VARIATIONS', () => {
     expect(text).not.toContain('रे');
   });
 
-  it('expressive variations use desi slang', () => {
+  it('expressive variations use Nagpuri slang', () => {
     const expressive = PERSONALITY_VARIATIONS.filter(
       (v) => v.id !== 'standard',
     );
     expect(expressive.length).toBeGreaterThan(0);
 
-    // At least one expressive variation should use slang
-    const hasSlang = expressive.some((v) => {
-      const text = v.opener('5');
-      return /अरे|माम|भाई|रे|हैन्/.test(text);
-    });
-    expect(hasSlang).toBe(true);
+    // EVERY expressive variation speaks Nagpuri kitchen slang — "guru",
+    // "maan", "maay re", "kaa maanga hai", "patkan", "jhakaas", "raunak",
+    // "chhaa gaya" — so whichever character (Madhur or Swara) and
+    // whichever rotation comes up, the kitchen hears the desi dialect.
+    const nagpuri = /गुरु|माय रे|मान[,，]|झकास|रौनक|छा गया|का माँगा|पटकन|फटाफट|दादा/;
+    for (const variation of expressive) {
+      expect(nagpuri.test(variation.opener('5'))).toBe(true);
+      expect(nagpuri.test(variation.closer())).toBe(true);
+    }
   });
 });
 

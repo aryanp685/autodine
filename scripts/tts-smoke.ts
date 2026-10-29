@@ -39,7 +39,11 @@ import {
   voiceGender,
 } from '../lib/tts-voices';
 import { splitSentences, VOICE_TUNING } from '../lib/speech';
-import { buildKitchenAnnouncement } from '../lib/voice-personality';
+import {
+  buildExpressiveAnnouncement,
+  PERSONALITY_VARIATIONS,
+} from '../lib/voice-personality';
+import type { SpeakableItem } from '../lib/announce';
 
 /**
  * The public token Read Aloud clients use. It is a client identifier, not a
@@ -54,15 +58,27 @@ const PROBE_TIMEOUT_MS = 12_000;
 /** Where the listened-to MP3s land (uploaded by the workflow). */
 const ARTIFACT_DIR = join(process.cwd(), 'tts-smoke-artifacts');
 
-/** A real kitchen announcement -- the slang the kitchen actually hears. */
-const ANNOUNCEMENT = buildKitchenAnnouncement(
-  '5',
-  [
+/**
+ * A real kitchen ticket -- the order data the announcement wraps. Every
+ * personality variation frames the SAME data, so the artifact shows the
+ * full rotation of Nagpuri lines without inventing a second order.
+ */
+const SAMPLE_ORDER = {
+  table: '5',
+  items: [
     { qty: 2, name: 'Paneer Tikka' },
     { qty: 1, name: 'Butter Naan', detail: 'Half' },
-  ],
-  'on the side',
-);
+  ] as SpeakableItem[],
+  note: 'on the side',
+};
+
+/**
+ * Estimated seconds of speech for an MP3 of `bytes`, at the 96 kbps
+ * output format the route ships (= 12,000 bytes per second of audio).
+ * Used only to report pacing in the annotations; the clip itself is the
+ * real artefact.
+ */
+const BYTES_PER_SECOND = 12_000;
 
 /** Report a result where both humans and the annotations API can see it. */
 function note(message: string): void {
@@ -129,7 +145,7 @@ async function synthesize(
 ): Promise<Buffer> {
   const tts = new MsEdgeTTS({ connectionTimeoutMs: PROBE_TIMEOUT_MS, synthesisTimeoutMs: 15_000 });
   try {
-    await tts.setMetadata(voiceName, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+    await tts.setMetadata(voiceName, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
     const { audioStream } = tts.toStream(input, prosody);
     const chunks: Buffer[] = [];
     for await (const chunk of audioStream) chunks.push(Buffer.from(chunk));
@@ -162,11 +178,11 @@ async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
   }
 }
 
-function save(audio: Buffer, fileTag: string): void {
+function save(audio: Buffer, fileTag: string): string {
   mkdirSync(ARTIFACT_DIR, { recursive: true });
   const file = join(ARTIFACT_DIR, `${fileTag}.mp3`);
   writeFileSync(file, audio);
-  note(`saved ${audio.length} bytes → ${file}`);
+  return file;
 }
 
 /**
@@ -207,44 +223,63 @@ async function probeSsmlShapes(voiceName: string): Promise<void> {
 
 /**
  * Layer 2b: the shipped synthesis path — the actual product behaviour, for
- * both kitchen characters, each with its own natural pitch. The
- * announcement is paced exactly the way the kitchen engine paces it: one
- * continuous clip, sentences merged with their terminators (punctuation is
- * the only pacing the service's SSML subset allows), one rate.
+ * both kitchen characters and EVERY personality variation, each with its
+ * own natural pitch. Each clip is paced exactly the way the kitchen engine
+ * paces it: one continuous clip, sentences merged with their terminators
+ * (punctuation is the only pacing the service's SSML subset allows), one
+ * rate. All clips land in the artifact, so the whole Nagpuri rotation is
+ * audible, and each voice reports one compact pacing summary.
  */
 async function probeSynthesis(voiceName: string, fileTag: string): Promise<void> {
-  // Mirror lib/server-speech.ts: same merge, same rate maths.
-  const mergedText = splitSentences(ANNOUNCEMENT)
-    .map((sentence) => sentence.trim())
-    .filter(Boolean)
-    .join(' ');
-  const prosody = {
-    voice: voiceName,
-    rate: rateToProsody(VOICE_TUNING.rate),
-    volume: '+0%',
-    pitch: defaultPitchFor(voiceName),
-  };
-  note(`shipped prosody ${JSON.stringify(prosody)}`);
+  const pitch = defaultPitchFor(voiceName);
+  const rate = rateToProsody(VOICE_TUNING.rate);
+  const pace: string[] = [];
+  let failures = 0;
 
-  const deadline = setTimeout(() => fail(`synthesis of ${voiceName} did not finish within 25s`), 25_000);
-  try {
-    const audio = await withRetry(() => synthesize(
-      voiceName,
-      escapeSsml(mergedText),
-      { rate: prosody.rate, pitch: prosody.pitch, volume: prosody.volume },
-    ), `synthesis of ${voiceName}`);
-    clearTimeout(deadline);
-    assertMp3(audio, `synthesis of ${voiceName}`);
-    save(audio, `${fileTag}-${voiceName}`);
-    note(`announcement clip for ${voiceName} → ${audio.length} bytes`);
-  } catch (error) {
-    clearTimeout(deadline);
-    fail(error instanceof Error ? `${error.name}: ${error.message}` : String(error));
+  for (const variation of PERSONALITY_VARIATIONS) {
+    // Mirror lib/server-speech.ts: same merge, same rate maths.
+    const text = buildExpressiveAnnouncement(
+      SAMPLE_ORDER.table,
+      SAMPLE_ORDER.items,
+      SAMPLE_ORDER.note,
+      PERSONALITY_VARIATIONS.indexOf(variation),
+    );
+    const mergedText = splitSentences(text)
+      .map((sentence) => sentence.trim())
+      .filter(Boolean)
+      .join(' ');
+    const label = `synthesis of ${voiceName} / ${variation.id}`;
+
+    const deadline = setTimeout(() => fail(`${label} did not finish within 25s`), 25_000);
+    try {
+      const audio = await withRetry(() => synthesize(
+        voiceName,
+        escapeSsml(mergedText),
+        { rate, pitch, volume: '+0%' },
+      ), label);
+      clearTimeout(deadline);
+      assertMp3(audio, label);
+      save(audio, `${fileTag}-${variation.id}`);
+      const seconds = audio.length / BYTES_PER_SECOND;
+      pace.push(`${variation.id}≈${seconds.toFixed(1)}s/${(mergedText.length / seconds).toFixed(1)}cps`);
+    } catch (error) {
+      clearTimeout(deadline);
+      failures += 1;
+      const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+      note(`${label} failed — ${message}`);
+      // One variation failing alone is a wobble worth reporting; the whole
+      // voice failing (first clip already gone) is a broken voice — fail.
+      if (pace.length === 0) {
+        fail(`${voiceName}: no variation produced audio — ${message}`);
+        return;
+      }
+    }
   }
+
+  note(`${fileTag} ${rate} ${pitch} → ${pace.join(', ')} (${failures} failed)`);
 }
 
 async function main(): Promise<void> {
-  note(`announcement text ${ANNOUNCEMENT}`);
   await probeVoiceList();
   // SSML shape support first, so a shape rejection is named, not guessed.
   await probeSsmlShapes(EDGE_HINDI_VOICES[0].name);

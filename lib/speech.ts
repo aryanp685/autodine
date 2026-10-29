@@ -282,7 +282,7 @@ const PACE = {
  * both to pace greeting sentences and to end a note run (the closer that
  * follows a safety note is a greeting, not more note).
  */
-const GREETING_START = /^(?:नया|टेबल|एक नया|अरेय्यो|सुनो रे|अरे भाई|अरे बापरे|ध्यान देना|कस्टमर|ऑर्डर सही|भाई|पटकन|भूख|ऐसा|कृपया)/;
+const GREETING_START = /^(?:नया|टेबल|एक नया|टेकअवे|कस्टमर|ऑर्डर सही|अरे माय रे|सुन ना|ध्यान दे गुरु|ध्यान देना|अरे बाप रे|मान[,，]|मेहमान|पटकन|भूख|ऐसा|कृपया)/;
 
 /**
  * The sentence kinds planSpeech recognises, by how they open.
@@ -290,15 +290,15 @@ const GREETING_START = /^(?:नया|टेबल|एक नया|अरेय
  * Recognises both the plain announcement patterns and the expressive
  * personality openers/closers from lib/voice-personality.ts.
  *
- * NOTE: "ध्यान देना भाई!" (expressive greeting opener) must NOT match the
- * note pattern. The note pattern requires a comma after "ध्यान देना" -- the
- * greeting opener has "भाई" instead.
+ * NOTE: "ध्यान दे गुरु!" (expressive greeting opener) must NOT match the
+ * note pattern. The note pattern requires a comma after "ध्यान दें"/
+ * "ध्यान देना" -- the greeting opener is "ध्यान दे गुरु!" with no comma.
  */
 export function sentenceKind(sentence: string): keyof typeof PACE {
   // Note: requires comma after "ध्यान दें"/"ध्यान देना" so the greeting
-  // opener "ध्यान देना भाई!" does not match. Also matches expressive
-  // note labels "और सुनों..." and "और हैन्...".
-  if (/^(ध्यान दें[,，]|ध्यान देना[,，]|नोट|और सुनों|और हैन्)/.test(sentence)) return "note";
+  // opener "ध्यान दे गुरु!" does not match. Also matches expressive
+  // note labels "और सुनों...", "और हाँ..." and "और हैन्...".
+  if (/^(ध्यान दें[,，]|ध्यान देना[,，]|नोट|और सुनों|और हाँ|और हैन्)/.test(sentence)) return "note";
   // Greeting: plain patterns plus expressive openers and closers.
   if (GREETING_START.test(sentence)) return "greeting";
   return "dish";
@@ -357,7 +357,7 @@ const MAX_NOTE_SEGMENT_CHARS = 100;
  * greeting opener "ध्यान देना भाई!" does NOT match. Also matches the
  * expressive note labels "और सुनों" and "और हैन्".
  */
-const NOTE_START = /^(?:ध्यान दें[,，]|ध्यान देना[,，]|नोट[,，]?|और सुनों|और हैन्)\s*/u;
+const NOTE_START = /^(?:ध्यान दें[,，]|ध्यान देना[,，]|नोट[,，]?|और सुनों|और हाँ|और हैन्)\s*/u;
 
 /** Split a long safety note at its written clauses, then at word boundaries. */
 function chunkNote(sentence: string): string[] {

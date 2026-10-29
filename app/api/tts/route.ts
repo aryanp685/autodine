@@ -145,7 +145,10 @@ export async function POST(request: Request): Promise<Response> {
     });
     try {
       const synthesize = async (): Promise<Buffer> => {
-        await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+        // 96 kbps, not 48: twice the bitrate keeps the neural voice's
+        // natural timbre instead of a slightly warbly compressed one --
+        // "human-like tone" is partly just audio fidelity.
+        await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
         const { audioStream } = tts.toStream(escapeSsml(text), prosody);
         const chunks: Buffer[] = [];
         for await (const chunk of audioStream) chunks.push(Buffer.from(chunk as Buffer));
