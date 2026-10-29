@@ -461,15 +461,18 @@ describe('speaking', () => {
     expect(sentenceKind('सुन ना गुरु!')).toBe('greeting');
     expect(sentenceKind('ध्यान दे गुरु!')).toBe('greeting');
     expect(sentenceKind('अरे बाप रे गुरु!')).toBe('greeting');
-    expect(sentenceKind('मान, झकास बनाओ और रौनक ला दो!')).toBe('greeting');
-    expect(sentenceKind('और सुनों गुरु, एक ज़रूरी बात…')).toBe('note');
-    expect(sentenceKind('और हाँ गुरु, ये बात ध्यान में रखना…')).toBe('note');
+    expect(sentenceKind('मान, मेहमान भूखे बैठे हैं — अभी शुरू कर दे!')).toBe('greeting');
+    expect(sentenceKind('गुरु, मेहमान इंतज़ार कर रहे हैं — जल्दी शुरू करो!')).toBe('greeting');
+    expect(sentenceKind('ऐसा ही बनाना है।')).toBe('greeting');
+    expect(sentenceKind('और सुनों गुरु, ये ज़रूरी बात है —')).toBe('note');
+    expect(sentenceKind('और हाँ गुरु, ये बात ध्यान में रखना —')).toBe('note');
+    expect(sentenceKind('ये ज़रूरी निर्देश है — प्याज़ नहीं।')).toBe('note');
     expect(sentenceKind('और हाँ…')).toBe('note');
   });
 
   it('ends the note run at the closer, so a note never swallows the sign-off', () => {
     const plan = planSpeech(
-      'अरे माय रे गुरु! टेबल नंबर पाँच से नया ऑर्डर आया है। और सुनों गुरु, एक ज़रूरी बात… प्याज़ नहीं। मान, झकास बनाओ और रौनक ला दो!',
+      'अरे माय रे गुरु! टेबल नंबर पाँच से नया ऑर्डर आया है। ये ज़रूरी निर्देश है — प्याज़ नहीं। ऐसा ही बनाना है।',
     );
     const closer = plan[plan.length - 1];
     // The closer is a greeting, not more note: it gets the greeting pace.

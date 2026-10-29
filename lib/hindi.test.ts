@@ -175,6 +175,15 @@ describe('noteToDevanagari', () => {
     expect(noteToDevanagari('without butter')).toBe('बटर के बिना');
   });
 
+  it('renders whole phrases as instructions, not transliterated sounds', () => {
+    // "on the side" spoken as "ऑन थे साइड" is gibberish in Hindi — a note
+    // is an instruction a cook can act on, so it is phrased as one.
+    expect(noteToDevanagari('on the side')).toBe('अलग से देना है');
+    expect(noteToDevanagari('extra spicy')).toBe('तीखा ज़्यादा रखना');
+    expect(noteToDevanagari('pack separately')).toBe('अलग से पैक करना');
+    expect(noteToDevanagari('asap')).toBe('जल्दी करना है');
+  });
+
   it('translates a note it does not recognise rather than dropping it', () => {
     const out = noteToDevanagari('birthday cake');
     expect(isDevanagariOnly(out)).toBe(true);

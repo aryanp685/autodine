@@ -282,7 +282,7 @@ const PACE = {
  * both to pace greeting sentences and to end a note run (the closer that
  * follows a safety note is a greeting, not more note).
  */
-const GREETING_START = /^(?:नया|टेबल|एक नया|टेकअवे|कस्टमर|ऑर्डर सही|अरे माय रे|सुन ना|ध्यान दे गुरु|ध्यान देना|अरे बाप रे|मान[,，]|मेहमान|पटकन|भूख|ऐसा|कृपया)/;
+const GREETING_START = /^(?:नया|टेबल|एक नया|टेकअवे|कस्टमर|ऑर्डर सही|अरे माय रे|सुन ना|ध्यान दे गुरु|ध्यान देना|अरे बाप रे|गुरु[,，]|मान[,，]|मेहमान|पटकन|भूख|ऐसा|कृपया)/;
 
 /**
  * The sentence kinds planSpeech recognises, by how they open.
@@ -297,8 +297,9 @@ const GREETING_START = /^(?:नया|टेबल|एक नया|टेकअ
 export function sentenceKind(sentence: string): keyof typeof PACE {
   // Note: requires comma after "ध्यान दें"/"ध्यान देना" so the greeting
   // opener "ध्यान दे गुरु!" does not match. Also matches expressive
-  // note labels "और सुनों...", "और हाँ..." and "और हैन्...".
-  if (/^(ध्यान दें[,，]|ध्यान देना[,，]|नोट|और सुनों|और हाँ|और हैन्)/.test(sentence)) return "note";
+  // note labels "और सुनों...", "और हाँ...", "ये ज़रूरी निर्देश है —"
+  // and "और हैन्...".
+  if (/^(ध्यान दें[,，]|ध्यान देना[,，]|नोट|और सुनों|और हाँ|और हैन्|ये ज़रूरी)/.test(sentence)) return "note";
   // Greeting: plain patterns plus expressive openers and closers.
   if (GREETING_START.test(sentence)) return "greeting";
   return "dish";
@@ -357,7 +358,7 @@ const MAX_NOTE_SEGMENT_CHARS = 100;
  * greeting opener "ध्यान देना भाई!" does NOT match. Also matches the
  * expressive note labels "और सुनों" and "और हैन्".
  */
-const NOTE_START = /^(?:ध्यान दें[,，]|ध्यान देना[,，]|नोट[,，]?|और सुनों|और हाँ|और हैन्)\s*/u;
+const NOTE_START = /^(?:ध्यान दें[,，]|ध्यान देना[,，]|नोट[,，]?|और सुनों|और हाँ|और हैन्|ये ज़रूरी)\s*/u;
 
 /** Split a long safety note at its written clauses, then at word boundaries. */
 function chunkNote(sentence: string): string[] {

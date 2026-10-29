@@ -565,6 +565,13 @@ const NOTE_REWRITES: [RegExp, string][] = [
   // Common kitchen instruction: phrase it as something a cook can act on,
   // rather than the clipped menu tag "कम तीखा".
   [/\bless\s+spicy\b/gi, 'तीखा थोड़ा कम रखना'],
+  // Whole phrases first, so the word-level rules below cannot mangle them
+  // into transliterated gibberish ("on the side" must never reach the
+  // voice as "ऑन थे साइड" -- a note is an instruction, not sounds).
+  [/\bon the side\b/gi, 'अलग से देना है'],
+  [/\bextra spicy\b/gi, 'तीखा ज़्यादा रखना'],
+  [/\bpack (?:it )?separately\b/gi, 'अलग से पैक करना'],
+  [/\basap\b/gi, 'जल्दी करना है'],
   [/\bwithout\s+([a-z]+)/gi, '$1 के बिना'],
   [/\bno\s+([a-z]+)/gi, '$1 नहीं'],
   [/\bnot\s+([a-z]+)/gi, '$1 नहीं'],
