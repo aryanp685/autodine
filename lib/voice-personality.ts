@@ -20,26 +20,17 @@
  * Variations rotate so the voice feels like a person, not a loop. The caller
  * passes a variation index; the same order announced twice sounds different.
  *
- * SLANG AND CLARITY
+ * SAY THE ORDER. SAY THE NOTE. SAY NOTHING ELSE.
  *
- * SENSE COMES FIRST. Every sentence must carry real information (what
- * arrived, where, what to cook) or a real instruction (start now, keep
- * this in mind, make it exactly like the note says). Filler like
- * "please make it carefully" says nothing -- it is the kind of line that
- * makes a voice sound robotic however good the engine is. The warmth
- * lives in HOW things are said: Nagpuri vocatives ("गुरु", "मान"),
- * interjections ("अरे माय रे!"), and the natural shapes of real speech --
- * short clauses, an "और" before the last dish, a closing question --
- * which give the TTS engine rising-falling, conversational prosody.
- *
- * The slang is pure Nagpuri -- the kitchen talk of the Nagpur-Vidarbha
- * belt ("अरे माय रे गुरु!", "सुन ना गुरु!", "मान", "का माँगा है") --
- * written in Devanagari so the TTS reads them as Hindi. When a note is a
- * safety instruction -- an allergy, a substitution -- it is stated
- * plainly, with no slang or joke that could blur the instruction. Both
- * the male (Madhur) and female (Swara) characters speak this same text
- * -- the personality is in the words, not the voice model, so both
- * voices carry the same Nagpuri slang.
+ * The kitchen operator is working. The announcement exists to deliver
+ * two facts: what order arrived (where from, which dishes) and the
+ * guest's note if there is one. No openers, no closers, no jokes, no
+ * "start now" -- anything beyond the order and the note is chatter, and
+ * chatter is what makes a voice annoying. The five variations differ
+ * only in how they phrase the order's arrival, so consecutive
+ * announcements do not sound like the same recording on a loop. The
+ * "और" before the last dish stays because that is how a list of dishes
+ * is said -- it is part of saying the order, not decoration.
  *
  * WHAT THIS MODULE DOES NOT DO
  *
@@ -91,94 +82,69 @@ export type AnnouncementStyle = 'expressive' | 'standard';
 /* ========================================================================== */
 
 /**
- * Variation 1 -- Arey Maay Re Guru.
- *
- * The warm showman, in full Vidarbha exclamation. "अरे माय रे गुरु!" is
- * the Nagpuri "oh my god, buddy". Every line after it earns its place:
- * where the order is from, what to cook, the guest's constraint, and the
- * one fact that drives the kitchen -- the guests are already hungry, so
- * start now.
+ * Variation 1 -- "नया ऑर्डर आया है।" (order and note only).
  */
 const VAR_AREY_MAMA: PersonalityVariation = {
   id: 'arey-mama',
   opener: (table) =>
     isTakeaway(table)
-      ? 'अरे माय रे गुरु! टेकअवे का नया ऑर्डर आया है!'
-      : `अरे माय रे गुरु! टेबल नंबर ${spokenTable(table)} से नया ऑर्डर आया है!`,
-  itemsIntro: () => 'ये बनाना है —',
+      ? 'नया टेकअवे ऑर्डर आया है।'
+      : `नया ऑर्डर आया है। टेबल नंबर ${spokenTable(table)}।`,
+  itemsIntro: () => '',
   itemsSeparator: () => ', ',
-  noteLabel: () => 'और सुनों गुरु, ये ज़रूरी बात है —',
-  closer: () => 'मान, मेहमान भूखे बैठे हैं — अभी शुरू कर दे!',
+  noteLabel: () => 'नोट —',
+  closer: () => '',
 };
 
 /**
- * Variation 2 -- Sunn Na Guru.
- *
- * Quick and conversational. "का माँगा है" is the Nagpuri "kya maanga
- * hai" ("what did they ask for"), and the closer ends on a real
- * question -- "ठीक है?" -- because a question is what makes a voice
- * sound like a person talking to people, not a system reading a ticket.
+ * Variation 2 -- "टेबल X से नया ऑर्डर आ गया है।" (order and note only).
  */
 const VAR_SUNO_RE: PersonalityVariation = {
   id: 'suno-re',
   opener: (table) =>
     isTakeaway(table)
-      ? 'सुन ना गुरु! टेकअवे का नया ऑर्डर आ गया!'
-      : `सुन ना गुरु! टेबल ${spokenTable(table)} से नया ऑर्डर आ गया!`,
-  itemsIntro: () => 'देख ले, का माँगा है इन्होंने —',
+      ? 'टेकअवे से नया ऑर्डर आ गया है।'
+      : `टेबल ${spokenTable(table)} से नया ऑर्डर आ गया है।`,
+  itemsIntro: () => '',
   itemsSeparator: () => ', ',
-  noteLabel: () => 'और हाँ गुरु, ये बात ध्यान में रखना —',
-  closer: () => 'गुरु, मेहमान इंतज़ार कर रहे हैं — जल्दी शुरू करो, ठीक है?',
+  noteLabel: () => 'नोट —',
+  closer: () => '',
 };
 
 /**
- * Variation 3 -- Dhyaan De Guru.
- *
- * The clear commander. The order is a "farmaan", the instruction is
- * "hukm saaf", and the closer says the only thing that matters at that
- * moment -- hunger waits for no one, so move, fatafat. Direct and
- * sensible: nothing in it is decoration.
+ * Variation 3 -- "नया ऑर्डर, टेबल नंबर X।" (order and note only).
  */
 const VAR_DHYaan_DENA: PersonalityVariation = {
   id: 'dhyaan-dena',
   opener: (table) =>
     isTakeaway(table)
-      ? 'ध्यान दे गुरु! टेकअवे से नया फरमान आया है!'
-      : `ध्यान दे गुरु! टेबल नंबर ${spokenTable(table)} से नया फरमान आया है!`,
-  itemsIntro: () => 'हुक्म साफ़ है, ये बनाना है —',
+      ? 'नया ऑर्डर, टेकअवे।'
+      : `नया ऑर्डर, टेबल नंबर ${spokenTable(table)}।`,
+  itemsIntro: () => '',
   itemsSeparator: () => ', ',
-  noteLabel: () => 'और सुनों, ये ज़रूरी है —',
-  closer: () => 'भूख किसी का इंतज़ार नहीं करती — फटाफट चलो!',
+  noteLabel: () => 'नोट —',
+  closer: () => '',
 };
 
 /**
- * Variation 4 -- Arey Baap Re Guru.
- *
- * The friendly one. "अरे बाप रे गुरु!" for the arrival, "sunn sunn, ye
- * chahiye inko" like a friend passing on the order, and the closer is a
- * real goal the cook can act on: make it so good the guest comes back.
+ * Variation 4 -- "टेबल नंबर X का ऑर्डर आ गया है।" (order and note only).
  */
 const VAR_AREY_BHAI: PersonalityVariation = {
   id: 'arey-bhai',
   opener: (table) =>
     isTakeaway(table)
-      ? 'अरे बाप रे गुरु! टेकअवे का नया ऑर्डर आ गया!'
-      : `अरे बाप रे गुरु! टेबल ${spokenTable(table)} का नया ऑर्डर आ गया!`,
-  itemsIntro: () => 'सुन सुन, ये चाहिए इनको —',
+      ? 'टेकअवे का ऑर्डर आ गया है।'
+      : `टेबल नंबर ${spokenTable(table)} का ऑर्डर आ गया है।`,
+  itemsIntro: () => '',
   itemsSeparator: () => ', ',
-  noteLabel: () => 'और हाँ, ये वाली बात —',
-  closer: () => 'मान, ऐसा बनाना कि मेहमान दोबारा आए!',
+  noteLabel: () => 'नोट —',
+  closer: () => '',
 };
 
 /**
- * Variation 5 -- Standard.
- *
- * No slang. Used when the note is a safety instruction and needs maximum
- * clarity. Plain clear Hindi, every word functional: what arrived, where,
- * what to cook, the constraint, and the one instruction that follows from
- * it -- make it exactly like the note says. No filler pleasantry at the
- * end; "please make it carefully" is the kind of empty line that sounds
- * robotic and says nothing a cook can act on.
+ * Variation 5 -- Standard. "एक नया ऑर्डर आया है।" (order and note only).
+ * Same minimal shape as the rest; named "standard" because the safety
+ * path has always used it.
  */
 const VAR_STANDARD: PersonalityVariation = {
   id: 'standard',
@@ -188,8 +154,8 @@ const VAR_STANDARD: PersonalityVariation = {
       : `एक नया ऑर्डर आया है। टेबल नंबर ${spokenTable(table)}।`,
   itemsIntro: () => '',
   itemsSeparator: () => ', ',
-  noteLabel: () => 'ये ज़रूरी निर्देश है —',
-  closer: () => 'ऐसा ही बनाना है।',
+  noteLabel: () => 'नोट —',
+  closer: () => '',
 };
 
 /** All variations, in rotation order. */
@@ -282,18 +248,16 @@ export function buildExpressiveAnnouncement(
     parts.push(intro ? `${intro} ${itemsText}!` : `${itemsText}।`);
   }
 
-  // Guest note: last and labelled, because it is a constraint, not a dish.
+  // Guest note: stated plainly, labelled so it is not mistaken for a dish.
   const noteText = spokenNote(note);
   if (noteText) {
     const label = variation.noteLabel();
-    // For the standard variation, the label already ends with a comma.
-    parts.push(
-      label ? `${label} ${noteText}।` : `${noteText}।`,
-    );
+    parts.push(label ? `${label} ${noteText}।` : `${noteText}।`);
   }
 
-  // Closer: the human "get it done" line.
-  parts.push(variation.closer());
+  // No closer. The order and the note are the whole announcement.
+  const closer = variation.closer();
+  if (closer) parts.push(closer);
 
   return parts.join(' ');
 }

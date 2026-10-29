@@ -300,37 +300,40 @@ describe('PERSONALITY_VARIATIONS', () => {
     expect(text).not.toContain('रे');
   });
 
-  it('expressive variations use Nagpuri slang', () => {
-    const expressive = PERSONALITY_VARIATIONS.filter(
-      (v) => v.id !== 'standard',
-    );
-    expect(expressive.length).toBeGreaterThan(0);
-
-    // EVERY expressive variation speaks Nagpuri kitchen slang — "guru",
-    // "maan", "maay re", "kaa maanga hai", "fatafat" — so whichever
-    // character (Madhur or Swara) and whichever rotation comes up, the
-    // kitchen hears the desi dialect.
-    const nagpuri = /गुरु|माय रे|मान[,，]|का माँगा|फटाफट/;
-    for (const variation of expressive) {
-      expect(nagpuri.test(variation.opener('5'))).toBe(true);
-      expect(nagpuri.test(variation.closer())).toBe(true);
+  it('every variation says only the order — no slang, no chatter', () => {
+    for (const variation of PERSONALITY_VARIATIONS) {
+      const opener = variation.opener('5');
+      expect(opener).toContain('ऑर्डर');
+      // No personality, no jokes, no calls to action — the announcement
+      // is the order and the note, nothing else.
+      for (const chatter of [
+        'अरे', 'गुरु', 'मान,', 'भाई', 'शुरू कर', 'भूख', 'इंतज़ार', 'मेहमान',
+        'कृपया', 'फटाफट', 'रौनक', 'झकास', 'जादू', 'फरमाइश', 'फरमान', 'हुक्म',
+      ]) {
+        expect(opener).not.toContain(chatter);
+      }
     }
   });
 
-  it('every line says something a cook can act on', () => {
-    // No filler. The old "कृपया ध्यान से बनाइए" / "रौनक ला दो" style of
-    // empty pleasantry is exactly what makes a voice sound robotic.
-    const banned = ['कृपया ध्यान', 'रौनक', 'झकास', 'कमाल दिखा', 'जादू'];
+  it('says nothing beyond the order and the note', () => {
     for (const variation of PERSONALITY_VARIATIONS) {
-      const text = [
-        variation.opener('5'),
-        variation.itemsIntro(),
-        variation.noteLabel(),
-        variation.closer(),
-      ].join(' ');
-      for (const filler of banned) {
-        expect(text).not.toContain(filler);
+      const text = buildExpressiveAnnouncement(
+        '5',
+        SAMPLE_ITEMS,
+        'no onion, no garlic',
+        PERSONALITY_VARIATIONS.indexOf(variation),
+      );
+      for (const chatter of [
+        'अरे', 'गुरु', 'शुरू कर', 'भूख', 'इंतज़ार', 'मेहमान', 'कृपया',
+        'फटाफट', 'रौनक', 'झकास', 'ऐसा ही बनाना', 'जल्दी',
+      ]) {
+        expect(text).not.toContain(chatter);
       }
+      // Order, dishes, note — and nothing after the note.
+      expect(text).toContain('ऑर्डर');
+      expect(text).toContain('पनीर');
+      expect(text.indexOf('नोट')).toBeGreaterThan(text.indexOf('नान'));
+      expect(text.trimEnd().endsWith('।')).toBe(true);
     }
   });
 });
