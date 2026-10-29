@@ -456,6 +456,24 @@ describe('speaking', () => {
     expect(sentenceKind('ध्यान दें, प्याज़ नहीं।')).toBe('note');
     expect(sentenceKind('ध्यान देना, प्याज़ नहीं।')).toBe('note');
     expect(sentenceKind('नोट, प्याज़ नहीं।')).toBe('note');
+    // Nagpuri openers, note labels and closers from voice-personality.ts.
+    expect(sentenceKind('अरे माय रे गुरु!')).toBe('greeting');
+    expect(sentenceKind('सुन ना गुरु!')).toBe('greeting');
+    expect(sentenceKind('ध्यान दे गुरु!')).toBe('greeting');
+    expect(sentenceKind('अरे बाप रे गुरु!')).toBe('greeting');
+    expect(sentenceKind('मान, झकास बनाओ और रौनक ला दो!')).toBe('greeting');
+    expect(sentenceKind('और सुनों गुरु, एक ज़रूरी बात…')).toBe('note');
+    expect(sentenceKind('और हाँ गुरु, ये बात ध्यान में रखना…')).toBe('note');
+    expect(sentenceKind('और हाँ…')).toBe('note');
+  });
+
+  it('ends the note run at the closer, so a note never swallows the sign-off', () => {
+    const plan = planSpeech(
+      'अरे माय रे गुरु! टेबल नंबर पाँच से नया ऑर्डर आया है। और सुनों गुरु, एक ज़रूरी बात… प्याज़ नहीं। मान, झकास बनाओ और रौनक ला दो!',
+    );
+    const closer = plan[plan.length - 1];
+    // The closer is a greeting, not more note: it gets the greeting pace.
+    expect(sentenceKind(closer.text)).toBe('greeting');
   });
 
   it('takes a breath after the chime before speaking', () => {

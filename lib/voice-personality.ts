@@ -22,18 +22,21 @@
  *
  * SLANG AND CLARITY
  *
- * The slang is Nagpuri-Mumbai kitchen talk ("arey mama", "suno re bhai",
- * "arey baapre", "patkan") -- the words a real kitchen in that belt uses,
- * written in Devanagari so the TTS reads them as Hindi. The jokes are the
- * jokes a kitchen actually makes: the guests are already hungry, the order
- * is a farmaan, hunger waits for no one, cook it so well the guest says
- * "waah bhai waah". Regional expressions ("re", "haan", "bhai", "mama",
- * "patkan") are used naturally, not forced into every sentence. When a
- * note is a safety instruction -- an allergy, a substitution -- it is
- * stated plainly, with no slang or joke that could blur the instruction.
- * Humour wraps the order; it never replaces it. Both the male (Madhur)
- * and female (Swara) characters speak this same text -- the personality
- * is in the words, not the voice model.
+ * The slang is pure Nagpuri -- the kitchen talk of the Nagpur-Vidarbha
+ * belt ("अरे माय रे गुरु!", "सुन ना गुरु!", "मान", "का माँगा है",
+ * "झकास", "रौनक ला दो", "छा गया") -- the words a real kitchen in that
+ * belt uses, written in Devanagari so the TTS reads them as Hindi.
+ * Vocatives ("गुरु", "मान", "दादा") and interjections are what make
+ * neural TTS sound human: they hand the engine rising-falling,
+ * conversational prosody instead of a flat list. The jokes are the jokes
+ * a kitchen actually makes: the guests are already hungry, the order is a
+ * farmaan, hunger waits for no one, cook it so well the guest says "वाह
+ * दादा वाह, छा गया!". When a note is a safety instruction -- an allergy,
+ * a substitution -- it is stated plainly, with no slang or joke that could
+ * blur the instruction. Humour wraps the order; it never replaces it.
+ * Both the male (Madhur) and female (Swara) characters speak this same
+ * text -- the personality is in the words, not the voice model, so both
+ * voices carry the same Nagpuri slang.
  *
  * WHAT THIS MODULE DOES NOT DO
  *
@@ -85,83 +88,84 @@ export type AnnouncementStyle = 'expressive' | 'standard';
 /* ========================================================================== */
 
 /**
- * Variation 1 -- Arey Mama.
+ * Variation 1 -- Arey Maay Re Guru.
  *
- * The showman. "Arey mama!" plus the joke that the guests are already
+ * The showman, in full Vidarbha exclamation. "अरे माय रे गुरु!" is the
+ * Nagpuri "oh my god, buddy", plus the joke that the guests are already
  * sitting hungry -- urgency with a smile. The dish list is the mehmaan's
- * "farmaaish" (their royal request), and the closer hands the chef the
- * one compliment a cook can never resist: show the magic of your hands.
+ * "farmaaish", and the closer hands the chef the one compliment a cook
+ * can never resist: make it jhakaas and bring the raunak.
  */
 const VAR_AREY_MAMA: PersonalityVariation = {
   id: 'arey-mama',
   opener: (table) =>
     isTakeaway(table)
-      ? 'अरेय्यो माम! टेकअवे का नया ऑर्डर आया है रे! मेहमान भूखे बैठे हैं!'
-      : `अरेय्यो माम! नया ऑर्डर आया है रे! टेबल नंबर ${spokenTable(table)}, मेहमान भूखे बैठे हैं!`,
-  itemsIntro: () => 'ये रही फरमाइश!',
+      ? 'अरे माय रे गुरु! टेकअवे का नया ऑर्डर आया है, मेहमान भूखे बैठे हैं!'
+      : `अरे माय रे गुरु! टेबल नंबर ${spokenTable(table)} से नया ऑर्डर आया है, मेहमान भूखे बैठे हैं!`,
+  itemsIntro: () => 'ये रही फरमाइश, सुन ले!',
   itemsSeparator: () => ', ',
-  noteLabel: () => 'और सुनों माम, एक ज़रूरी बात…',
-  closer: () => 'भाई, अपने हाथ का जादू दिखाओ!',
+  noteLabel: () => 'और सुनों गुरु, एक ज़रूरी बात…',
+  closer: () => 'मान, झकास बनाओ और रौनक ला दो!',
 };
 
 /**
- * Variation 2 -- Suno Re Bhai.
+ * Variation 2 -- Sunn Na Guru.
  *
  * Nagpuri energy with a rhyme that sticks: "patkan banao aur kamaal
- * dikhaao" -- make it quick and show the magic. The dish list is framed
- * as "look what they asked for", and the note gets a plain, unmistakable
- * "this is important".
+ * dikhaao" -- make it quick and show the magic. "का माँगा है" is the
+ * Nagpuri "kya maanga hai" ("what did they ask for"), and the note gets a
+ * plain, unmistakable "keep this in mind".
  */
 const VAR_SUNO_RE: PersonalityVariation = {
   id: 'suno-re',
   opener: (table) =>
     isTakeaway(table)
-      ? 'सुनो रे भाई! टेकअवे का नया ऑर्डर आ गया!'
-      : `सुनो रे भाई! टेबल ${spokenTable(table)} का नया ऑर्डर आ गया!`,
-  itemsIntro: () => 'देखो ज़रा, क्या माँगा है!',
+      ? 'सुन ना गुरु! टेकअवे का नया ऑर्डर आ गया!'
+      : `सुन ना गुरु! टेबल ${spokenTable(table)} से नया ऑर्डर आ गया!`,
+  itemsIntro: () => 'ये देख, का माँगा है इन्होंने!',
   itemsSeparator: () => ', ',
-  noteLabel: () => 'और हैन्, ये ज़रूरी है…',
+  noteLabel: () => 'और हाँ गुरु, ये बात ध्यान में रखना…',
   closer: () => 'पटकन बनाओ और कमाल दिखाओ!',
 };
 
 /**
- * Variation 3 -- Dhyaan Dena.
+ * Variation 3 -- Dhyaan De Guru.
  *
  * The royal decree. The order is a "farmaan" from the table, the dish
  * list is "the order is clear", and the closer delivers the line every
- * kitchen lives by: hunger waits for no one. Confident, commanding, and
- * funny because it is true.
+ * kitchen lives by: hunger waits for no one -- fatafat. Confident,
+ * commanding, and funny because it is true.
  */
 const VAR_DHYaan_DENA: PersonalityVariation = {
   id: 'dhyaan-dena',
   opener: (table) =>
     isTakeaway(table)
-      ? 'ध्यान देना भाई! टेकअवे से नया फरमान आया है!'
-      : `ध्यान देना भाई! टेबल नंबर ${spokenTable(table)} से नया फरमान आया है!`,
+      ? 'ध्यान दे गुरु! टेकअवे से नया फरमान आया है!'
+      : `ध्यान दे गुरु! टेबल नंबर ${spokenTable(table)} से नया फरमान आया है!`,
   itemsIntro: () => 'हुक्म साफ़ है!',
   itemsSeparator: () => ', ',
   noteLabel: () => 'और सुनों…',
-  closer: () => 'भूख किसी का इंतज़ार नहीं करती, जल्दी चलो!',
+  closer: () => 'भूख किसी का इंतज़ार नहीं करती — फटाफट चलो!',
 };
 
 /**
- * Variation 4 -- Arey Bhai.
+ * Variation 4 -- Arey Baap Re Guru.
  *
- * Mumbai cool. "Arey baapre!" for the arrival, "suno suno, ye chahiye
+ * Desi cool. "अरे बाप रे गुरु!" for the arrival, "sunn sunn, ye chahiye
  * inko" like a friend passing on gossip, and the closer is the dream:
- * cook it so well the guest says "waah bhai waah". The note stays plain
- * after the label -- the wish never touches the instruction.
+ * cook it so well the guest says "waah daadaa waah, chhaa gaya". The note
+ * stays plain after the label -- the wish never touches the instruction.
  */
 const VAR_AREY_BHAI: PersonalityVariation = {
   id: 'arey-bhai',
   opener: (table) =>
     isTakeaway(table)
-      ? 'अरे बापरे! टेकअवे ऑर्डर आ गया!'
-      : `अरे बापरे! टेबल ${spokenTable(table)} का ऑर्डर आ गया!`,
-  itemsIntro: () => 'सुनो सुनो, ये चाहिए इनको…',
+      ? 'अरे बाप रे गुरु! टेकअवे ऑर्डर आ गया!'
+      : `अरे बाप रे गुरु! टेबल ${spokenTable(table)} का ऑर्डर आ गया!`,
+  itemsIntro: () => 'सुन सुन, ये चाहिए इनको…',
   itemsSeparator: () => ', ',
-  noteLabel: () => 'और हैन्…',
-  closer: () => 'ऐसा बनाओ कि मेहमान बोले, वाह भाई वाह!',
+  noteLabel: () => 'और हाँ…',
+  closer: () => 'ऐसा बना कि मेहमान बोले — वाह दादा वाह, छा गया!',
 };
 
 /**
