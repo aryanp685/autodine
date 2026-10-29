@@ -145,15 +145,31 @@ describe('buildKitchenAnnouncement', () => {
   it('keeps every joke out of safety announcements', () => {
     resetVariationCounter();
     const text = buildKitchenAnnouncement('5', SAMPLE_ITEMS, 'no onion, no garlic');
-    // The humour lives in the expressive framing ("hunger waits for no
-    // one", "bring the raunak"). A safety note is plain clear Hindi end to
-    // end — a joke must never ride along with an allergy.
+    // The personality lives in the expressive framing (vocatives, "hunger
+    // waits for no one"). A safety note is plain clear Hindi end to end —
+    // a joke or a slang word must never ride along with an allergy.
     for (const quip of [
       'जादू', 'फरमाइश', 'भूख', 'वाह', 'फरमान', 'हुक्म', 'पटकन', 'बापरे', 'कमाल',
-      'गुरु', 'माय रे', 'झकास', 'रौनक', 'छा गया', 'दादा', 'फटाफट', 'का माँगा', 'सुन ले',
+      'गुरु', 'माय रे', 'बाप रे', 'झकास', 'रौनक', 'छा गया', 'दादा', 'फटाफट', 'का माँगा', 'सुन ले',
     ]) {
       expect(text).not.toContain(quip);
     }
+  });
+
+  it('joins dishes the way a person reads a list — commas, then "and"', () => {
+    const text = buildExpressiveAnnouncement(
+      '5',
+      [
+        { qty: 2, name: 'Paneer Tikka' },
+        { qty: 1, name: 'Butter Naan' },
+        { qty: 3, name: 'Cold Drink' },
+      ],
+      null,
+      0,
+    );
+    // "दो पनीर टिक्का, एक बटर नान और तीन ठंडा ड्रिन्क" — the "और"
+    // before the last dish gives the voice a natural list contour.
+    expect(text).toContain('पनीर टिक्का, एक बटर नान और तीन ठंडा ड्रिन्क');
   });
 
   it('uses expressive style for non-safety notes', () => {
@@ -291,13 +307,30 @@ describe('PERSONALITY_VARIATIONS', () => {
     expect(expressive.length).toBeGreaterThan(0);
 
     // EVERY expressive variation speaks Nagpuri kitchen slang — "guru",
-    // "maan", "maay re", "kaa maanga hai", "patkan", "jhakaas", "raunak",
-    // "chhaa gaya" — so whichever character (Madhur or Swara) and
-    // whichever rotation comes up, the kitchen hears the desi dialect.
-    const nagpuri = /गुरु|माय रे|मान[,，]|झकास|रौनक|छा गया|का माँगा|पटकन|फटाफट|दादा/;
+    // "maan", "maay re", "kaa maanga hai", "fatafat" — so whichever
+    // character (Madhur or Swara) and whichever rotation comes up, the
+    // kitchen hears the desi dialect.
+    const nagpuri = /गुरु|माय रे|मान[,，]|का माँगा|फटाफट/;
     for (const variation of expressive) {
       expect(nagpuri.test(variation.opener('5'))).toBe(true);
       expect(nagpuri.test(variation.closer())).toBe(true);
+    }
+  });
+
+  it('every line says something a cook can act on', () => {
+    // No filler. The old "कृपया ध्यान से बनाइए" / "रौनक ला दो" style of
+    // empty pleasantry is exactly what makes a voice sound robotic.
+    const banned = ['कृपया ध्यान', 'रौनक', 'झकास', 'कमाल दिखा', 'जादू'];
+    for (const variation of PERSONALITY_VARIATIONS) {
+      const text = [
+        variation.opener('5'),
+        variation.itemsIntro(),
+        variation.noteLabel(),
+        variation.closer(),
+      ].join(' ');
+      for (const filler of banned) {
+        expect(text).not.toContain(filler);
+      }
     }
   });
 });
