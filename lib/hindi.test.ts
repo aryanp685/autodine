@@ -166,9 +166,38 @@ describe('noteToDevanagari', () => {
     expect(noteToDevanagari('no onions, no garlic')).toBe('प्याज़ नहीं, लहसुन नहीं');
   });
 
-  it('puts the quantity before the thing it describes', () => {
+  it('says a quantity as an instruction, not a label', () => {
+    // "ज़्यादा चीज़" said more of what; it did not say what to do with it.
+    // The guest's own example: "extra butter" is "बटर ज़्यादा डालना" -- add
+    // more butter -- and "more spicy" is "तीखा बनाना" -- make it spicy.
+    expect(noteToDevanagari('extra butter')).toBe('बटर ज़्यादा डालना');
+    expect(noteToDevanagari('more butter')).toBe('बटर ज़्यादा डालना');
+    expect(noteToDevanagari('extra cheese')).toBe('चीज़ ज़्यादा डालना');
+    expect(noteToDevanagari('less oil')).toBe('तेल थोड़ा कम डालना');
     expect(noteToDevanagari('less spicy')).toBe('तीखा थोड़ा कम रखना');
-    expect(noteToDevanagari('extra cheese')).toBe('ज़्यादा चीज़');
+  });
+
+  it('says a serving as giving more, not adding in', () => {
+    // Something that arrives on the plate is देना (give): "extra roti" is
+    // "रोटी ज़्यादा देना". Only what goes IN the dish is डालना.
+    expect(noteToDevanagari('extra roti')).toBe('रोटी ज़्यादा देना');
+    expect(noteToDevanagari('more water')).toBe('वाटर ज़्यादा देना');
+  });
+
+  it('keeps a dish name whole when the quantity sizes the serving', () => {
+    // "extra paneer tikka" is more of the dish the dictionary knows as
+    // पनीर टिक्का -- not paneer to add to a tikka.
+    expect(noteToDevanagari('extra paneer tikka')).toBe('ज़्यादा पनीर टिक्का');
+    expect(noteToDevanagari('extra butter naan')).toBe('ज़्यादा बटर नान');
+    expect(noteToDevanagari('no butter chicken')).toBe('बटर चिकन नहीं');
+  });
+
+  it('says a quality word as making it so', () => {
+    expect(noteToDevanagari('more crispy')).toBe('कुरकुरा बनाना');
+    expect(noteToDevanagari('make it crispy')).toBe('कुरकुरा बनाना');
+    expect(noteToDevanagari('more spicy please')).toBe('तीखा बनाना');
+    expect(noteToDevanagari("don't add onion")).toBe('प्याज़ मत डालना');
+    expect(noteToDevanagari('no more butter')).toBe('बटर और नहीं');
   });
 
   it('handles "without", which is a different word order again', () => {

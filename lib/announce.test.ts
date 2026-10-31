@@ -257,11 +257,13 @@ describe('newOrderText', () => {
 
   it('says a note the way Hindi says it, not word for word', () => {
     // "no onion" word for word is "नो प्याज़" -- understood, and not spoken by
-    // anyone. Hindi negates at the end and quantifies at the front.
+    // anyone. Hindi negates at the end and quantifies at the front. A
+    // quantity note is an instruction: "extra butter" is "बटर ज़्यादा डालना".
     expect(newOrderText('T2', [naan], 'no onion')).toContain('प्याज़ नहीं');
     expect(newOrderText('T2', [naan], 'without garlic')).toContain('लहसुन के बिना');
     expect(newOrderText('T2', [naan], 'less spicy')).toContain('तीखा थोड़ा कम रखना');
-    expect(newOrderText('T2', [naan], 'extra cheese')).toContain('ज़्यादा चीज़');
+    expect(newOrderText('T2', [naan], 'extra cheese')).toContain('चीज़ ज़्यादा डालना');
+    expect(newOrderText('T2', [naan], 'extra butter')).toContain('बटर ज़्यादा डालना');
   });
 
   it('preserves a long guest note rather than silently truncating it', () => {
