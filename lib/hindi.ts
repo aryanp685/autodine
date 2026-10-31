@@ -570,6 +570,12 @@ const NOTE_REWRITES: [RegExp, string][] = [
   // voice as "ऑन थे साइड" -- a note is an instruction, not sounds).
   [/\bon the side\b/gi, 'अलग से देना है'],
   [/\bextra spicy\b/gi, 'तीखा ज़्यादा रखना'],
+  // "more spicy" is the most common note there is, and the words themselves
+  // are the instruction: तीखा बनाना. Without this the word-level "more" rule
+  // below produced "ज़्यादा स्पाइसी" -- sounds, not a note.
+  [/\bmore\s+spicy\b/gi, 'तीखा बनाना'],
+  [/\bnot\s+spicy\b/gi, 'तीखा नहीं'],
+  [/\bspicy\b/gi, 'तीखा बनाना'],
   [/\bpack (?:it )?separately\b/gi, 'अलग से पैक करना'],
   [/\basap\b/gi, 'जल्दी करना है'],
   [/\bwithout\s+([a-z]+)/gi, '$1 के बिना'],
