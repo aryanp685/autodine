@@ -55,7 +55,7 @@ import { noteToDevanagari } from './hindi';
  * One personality variation.
  *
  * Each variation is a complete framing: how it opens, how it introduces the
- * dishes, how it labels the note, and how it closes. The dynamic data -- table,
+ * dishes, and how it closes. The dynamic data -- table,
  * items, note -- is injected by the variation's functions, so the variation
  * only controls the expressive wording around it.
  */
@@ -68,8 +68,6 @@ export type PersonalityVariation = {
   itemsIntro: () => string;
   /** Separator between dish phrases. */
   itemsSeparator: () => string;
-  /** Label that introduces the guest note. */
-  noteLabel: () => string;
   /** The closing line. */
   closer: () => string;
 };
@@ -153,7 +151,6 @@ function dialectVariation(id: string, slot: number): PersonalityVariation {
     },
     itemsIntro: () => '',
     itemsSeparator: () => ', ',
-    noteLabel: () => 'नोट —',
     closer: () => '',
   };
 }
@@ -176,7 +173,6 @@ const VAR_STANDARD: PersonalityVariation = {
       : `एक नया ऑर्डर आया है। टेबल नंबर ${spokenTable(table)}।`,
   itemsIntro: () => '',
   itemsSeparator: () => ', ',
-  noteLabel: () => 'नोट —',
   closer: () => '',
 };
 
@@ -271,11 +267,13 @@ export function buildExpressiveAnnouncement(
     parts.push(intro ? `${intro} ${itemsText}!` : `${itemsText}।`);
   }
 
-  // Guest note: stated plainly, labelled so it is not mistaken for a dish.
+  // Guest note: said directly, as the guest's own instruction -- "प्याज़ नहीं",
+  // "तीखा बनाना". Never labelled ("नोट —", "ध्यान देना"): the label was the one
+  // word that was neither the order nor the note, and the note is already
+  // phrased as something a cook acts on.
   const noteText = spokenNote(note);
   if (noteText) {
-    const label = variation.noteLabel();
-    parts.push(label ? `${label} ${noteText}।` : `${noteText}।`);
+    parts.push(`${noteText}।`);
   }
 
   // No closer. The order and the note are the whole announcement.

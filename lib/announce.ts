@@ -442,9 +442,11 @@ export function newOrderText(table: string, items: SpeakableItem[], note?: strin
     .replace(/\s+/g, ' ')
     .replace(/[.,;:!?।]+$/, '');
   if (trimmedNote) {
-    // "ध्यान दें" rather than "नोट": a kitchen acts on a warning, and the
-    // word is unmistakable over extractor fans.
-    clauses.push(`ध्यान देना, ${noteToDevanagari(trimmedNote)}।`);
+    // Said directly, as the guest's own instruction: "प्याज़ नहीं", "तीखा बनाना".
+    // No label -- "ध्यान देना", "नोट" -- because a label is a word that is
+    // neither the order nor the note, and the note is already phrased as
+    // something a cook acts on.
+    clauses.push(`${noteToDevanagari(trimmedNote)}।`);
   }
 
   return clauses.join(' ');
