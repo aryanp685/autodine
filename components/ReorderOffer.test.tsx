@@ -33,9 +33,12 @@ describe('the reorder offer', () => {
     expect(text).not.toContain('we will order');
   });
 
-  it('counts the dishes it will put back, singular included', () => {
-    expect(html(1).replace(/<[^>]+>/g, ' ')).toContain('Ordered one dish');
-    expect(html(3).replace(/<[^>]+>/g, ' ')).toContain('Ordered 3 dishes');
+  it('counts the items it will put back, singular included', () => {
+    // "Items", the same word the cart bar uses for the same number: the count
+    // is plates (2× paneer + 1× naan is 3), and calling that "3 dishes" read
+    // like three different dishes.
+    expect(html(1).replace(/<[^>]+>/g, ' ')).toContain('Ordered one item');
+    expect(html(3).replace(/<[^>]+>/g, ' ')).toContain('Ordered 3 items');
   });
 
   it('is a secondary action, not a second primary', () => {

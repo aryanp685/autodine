@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { CustomerMenu, ItemSheet } from './CustomerMenu';
+import { CustomerMenu, ItemSheet, initialPicks } from './CustomerMenu';
 import { QrProblemScreen } from './QrProblemScreen';
 
 /* The item sheet navigates back to the menu after adding a dish, which needs
@@ -296,6 +296,73 @@ describe('the add button price', () => {
  * what is offered comes from the restaurant, and the price on the button
  * already includes it.
  */
+/**
+ * What starts ticked, which is the difference between an add-on being OFFERED
+ * and an add-on being CHARGED. The rule lives in one exported function so it
+ * can be pinned without rendering the sheet.
+ */
+describe('initialPicks', () => {
+  const group = (over: {
+    id: string;
+    type: 'single' | 'multi';
+    required?: boolean;
+    options: { id: string; price: number }[];
+  }) => over;
+
+  it('preselects the free option of a required single choice', () => {
+    const picks = initialPicks([
+      group({
+        id: 'g-size',
+        type: 'single',
+        required: true,
+        options: [
+          { id: 'a-paid', price: 30 },
+          { id: 'a-free', price: 0 },
+        ],
+      }),
+    ]);
+    expect(picks).toEqual({ 'g-size': ['a-free'] });
+  });
+
+  it('never preselects anything for an optional group', () => {
+    // An optional single choice with a free option used to start on it, so the
+    // cart line carried an add-on the guest never picked ("+ Mild" on a dish
+    // nobody customised), and a radio cannot be cleared once it is on. Optional
+    // means opt-in.
+    const picks = initialPicks([
+      group({
+        id: 'g-spice',
+        type: 'single',
+        options: [
+          { id: 'a-mild', price: 0 },
+          { id: 'a-hot', price: 0 },
+        ],
+      }),
+      group({
+        id: 'g-extra',
+        type: 'multi',
+        options: [{ id: 'a-cheese', price: 40 }],
+      }),
+    ]);
+    expect(picks).toEqual({ 'g-spice': [], 'g-extra': [] });
+  });
+
+  it('waits on a required choice whose every option costs money', () => {
+    const picks = initialPicks([
+      group({
+        id: 'g-size',
+        type: 'single',
+        required: true,
+        options: [
+          { id: 'a-half', price: 20 },
+          { id: 'a-full', price: 40 },
+        ],
+      }),
+    ]);
+    expect(picks).toEqual({ 'g-size': [] });
+  });
+});
+
 describe('ItemSheet add-ons', () => {
   const button = (html: string) => {
     const match = html.match(/Add to order · [^<]*/);

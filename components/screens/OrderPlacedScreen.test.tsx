@@ -310,11 +310,37 @@ describe('OrderPlacedScreen — what happens next', () => {
     expect(ready).not.toMatch(/starting on it now/);
   });
 
-  it('asks for the bill at the counter once the food is served', () => {
+  it('asks for the bill at the counter once the food is served, and only once', () => {
     const served = renderToStaticMarkup(<OrderPlacedScreen data={order({ prepStatus: 'served' })} />);
     expect(served).toContain('This has been served');
     expect(served).toContain('settle the bill at the counter');
     expect(served).not.toMatch(/starting on it now/);
+
+    // The status sentence used to settle the bill at the counter AND the pay
+    // line next to it sent the guest to the counter again: two "at the
+    // counter" sentences in one breath, reading like two different things to
+    // do. It is one instruction, said once.
+    expect((served.match(/at the counter/g) ?? []).length).toBe(1);
+  });
+
+  it('never tells a held order the kitchen is starting', () => {
+    // The waiting notice says nothing is cooking; the pay paragraph next to it
+    // used to say "the kitchen is starting on it now" -- the exact lie the
+    // notice exists to prevent.
+    const held = renderToStaticMarkup(
+      <OrderPlacedScreen data={order({ awaitingConfirmation: true })} />,
+    );
+    expect(held).not.toMatch(/starting on it now/);
+    expect(held).toContain('The kitchen starts once the table is confirmed.');
+  });
+
+  it('sends a takeaway to pickup, not to the counter twice', () => {
+    const ready = renderToStaticMarkup(
+      <OrderPlacedScreen data={order({ prepStatus: 'ready', tableLabel: null })} />,
+    );
+    expect(ready).toContain('ready for pickup');
+    expect(ready).not.toContain('collect it at the counter');
+    expect((ready.match(/at the counter/g) ?? []).length).toBe(1);
   });
 
   it('explains why a paid order cannot be changed', () => {

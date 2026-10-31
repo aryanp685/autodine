@@ -37,14 +37,14 @@ export function ReorderButton({
   count,
   onRestore,
 }: {
-  /** How many dishes the remembered order will put back. */
+  /** How many items the remembered order will put back -- plates, same count the cart bar shows. */
   count: number;
   onRestore: () => void;
 }) {
   return (
     <div className="mt-3 rounded-[16px] border border-hair bg-card px-4 py-3.5" data-reorder-offer="">
       <p className="m-0 text-[12.5px] leading-[1.5] text-gink-46">
-        Ordered {count === 1 ? 'one dish' : `${count} dishes`} on this phone before? Put the same ones
+        Ordered {count === 1 ? 'one item' : `${count} items`} on this phone before? Put the same ones
         back in your cart — you see the prices again before anything is sent.
       </p>
       <button
