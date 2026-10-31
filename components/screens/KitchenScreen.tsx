@@ -49,7 +49,12 @@ import {
 import { createServerSpeech } from '@/lib/server-speech';
 import { browserServerSpeechEnv } from '@/lib/server-speech-browser';
 import { createDualSpeech } from '@/lib/dual-speech';
-import { buildKitchenAnnouncement } from '@/lib/voice-personality';
+import {
+  buildKitchenAnnouncement,
+  DEFAULT_DIALECT,
+  DIALECT_LABELS,
+  type AnnouncementDialect,
+} from '@/lib/voice-personality';
 import { voiceLabel } from '@/lib/tts-voices';
 
 /* The thresholds live next to the query that computes the age, so the badge
@@ -74,6 +79,7 @@ const SPEAKS_KEY = 'autodine:kitchen:speaks';
 const VOICE_KEY = 'autodine:kitchen:voice';
 const SPEED_KEY = 'autodine:kitchen:speed';
 const EXPRESSIVE_KEY = 'autodine:kitchen:expressive';
+const DIALECT_KEY = 'autodine:kitchen:dialect';
 
 /**
  * How fast to read, as a multiple of the kitchen's natural pace
@@ -277,6 +283,8 @@ export function Kitchen({
   const [speed, setSpeed] = useState<Speed>('normal');
   /** Expressive desi personality on/off. Default on — the voice prototype. */
   const [expressive, setExpressive] = useState(true);
+  /** Which desi dialect the voice speaks: Nagpuri (default) or Mumbai. */
+  const [dialect, setDialect] = useState<AnnouncementDialect>(DEFAULT_DIALECT);
   /** 'starting' until the platform either names a Hindi voice or has none. */
   const [voiceState, setVoiceState] = useState<'starting' | 'ready' | 'no-voice'>('starting');
   const [stalled, setStalled] = useState(false);
@@ -430,6 +438,11 @@ export function Kitchen({
 
       if (localStorage.getItem(EXPRESSIVE_KEY) === 'off') setExpressive(false);
 
+      const storedDialect = localStorage.getItem(DIALECT_KEY);
+      if (storedDialect === 'nagpuri' || storedDialect === 'mumbai') {
+        setDialect(storedDialect);
+      }
+
       const storedSpeed = localStorage.getItem(SPEED_KEY);
       if (storedSpeed === 'slow' || storedSpeed === 'normal' || storedSpeed === 'fast') {
         setSpeed(storedSpeed);
@@ -449,10 +462,11 @@ export function Kitchen({
       localStorage.setItem(VOICE_KEY, voicePref);
       localStorage.setItem(SPEED_KEY, speed);
       localStorage.setItem(EXPRESSIVE_KEY, expressive ? 'on' : 'off');
+      localStorage.setItem(DIALECT_KEY, dialect);
     } catch {
       /* nothing to persist to */
     }
-  }, [audio, speaksHere, voicePref, speed, expressive, ready]);
+  }, [audio, speaksHere, voicePref, speed, expressive, dialect, ready]);
 
   /* ------------------------------------------------------------------ speech */
 
@@ -676,11 +690,11 @@ export function Kitchen({
   const getAnnouncementText = useCallback(
     (ticket: { table: string; items: { qty: number; name: string; detail?: string; spoken?: string | null }[]; note?: string | null }): string => {
       if (expressive) {
-        return buildKitchenAnnouncement(ticket.table, ticket.items, ticket.note);
+        return buildKitchenAnnouncement(ticket.table, ticket.items, ticket.note, dialect);
       }
       return orderAnnouncement({ ...ticket, note: ticket.note ?? undefined });
     },
-    [expressive],
+    [expressive, dialect],
   );
 
   /**
@@ -1235,10 +1249,10 @@ export function Kitchen({
       { qty: 1, name: 'Butter Naan', detail: 'Half · Extra cheese' },
     ];
     if (expressive) {
-      return buildKitchenAnnouncement('T5', items, 'less spicy');
+      return buildKitchenAnnouncement('T5', items, 'less spicy', dialect);
     }
     return newOrderText('T5', items, 'less spicy');
-  }, [expressive]);
+  }, [expressive, dialect]);
   const selectedVoiceInfo = voiceList.find((voice) => voice.name === voiceName);
 
   const readMissed = () => {
@@ -1384,10 +1398,24 @@ export function Kitchen({
             ]}
           />
 
+          {/* Which desi dialect the voice speaks. Same facts either way --
+              which table, what arrived -- said the way this room talks. */}
+          <Segmented
+            label="बोली — announcement style"
+            size="sm"
+            value={dialect}
+            onChange={(next) => setDialect(next)}
+            options={[
+              { value: 'nagpuri', label: DIALECT_LABELS.nagpuri },
+              { value: 'mumbai', label: DIALECT_LABELS.mumbai },
+            ]}
+          />
+
           {/* Expressive desi personality. When on, the kitchen voice uses
-              rotated Nagpuri-flavoured announcements with automatic
-              standard-Hindi fallback for safety-critical notes. When off,
-              the original plain Devanagari sentence is used. */}
+              rotated announcements in the chosen dialect (Nagpuri or Mumbai)
+              with automatic standard-Hindi fallback for safety-critical
+              notes. When off, the original plain Devanagari sentence is
+              used. */}
           <button
             type="button"
             aria-pressed={expressive}

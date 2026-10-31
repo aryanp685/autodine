@@ -35,20 +35,29 @@ const naan: SpeakableItem = { qty: 2, name: 'Butter Naan', detail: 'Full' };
 const chicken: SpeakableItem = { qty: 1, name: 'Butter Chicken', detail: 'Half · Butter naan' };
 
 describe('spokenTable', () => {
-  it('reads a table label as a label, not as a quantity', () => {
-    // "टेबल टी एक" is what a quantity table produces, and no one says it.
-    expect(spokenTable('T1')).toBe('टी एक');
-    expect(spokenTable('T2')).toBe('टी दो');
-    expect(spokenTable('T12')).toBe('टी बारह');
+  it('says the number of a printed card label — "T2" is table two, not "t2"', () => {
+    // The card prints "T2"; the T is the word "Table" and the sentence around
+    // this already says "टेबल नंबर". Spelling it gave "टेबल नंबर टी दो", which a
+    // kitchen hears as "t2". The number is the fact, said as a Hindi word.
+    expect(spokenTable('T1')).toBe('एक');
+    expect(spokenTable('T2')).toBe('दो');
+    expect(spokenTable('T12')).toBe('बारह');
+    expect(spokenTable('t-2')).toBe('दो');
+    expect(spokenTable('Table 3')).toBe('तीन');
+  });
+
+  it('keeps a letter that is NOT the word "table" — a section mark is information', () => {
+    expect(spokenTable('A2')).toBe('ए दो');
+    expect(spokenTable('2')).toBe('दो');
   });
 
   it('reads a table number past twenty as one number', () => {
     // A hall with thirty tables is ordinary. "T21" said digit by digit is
-    // "टी टू वन" -- a table two-one, which is not a table, and the pass walks
+    // "टू वन" -- a table two-one, which is not a table, and the pass walks
     // to the wrong one.
-    expect(spokenTable('T21')).toBe('टी इक्कीस');
-    expect(spokenTable('T30')).toBe('टी तीस');
-    expect(spokenTable('T99')).toBe('टी निन्यानवे');
+    expect(spokenTable('T21')).toBe('इक्कीस');
+    expect(spokenTable('T30')).toBe('तीस');
+    expect(spokenTable('T99')).toBe('निन्यानवे');
   });
 
   it('says a room as a word and the number digit by digit', () => {
@@ -156,7 +165,7 @@ describe('newOrderText', () => {
   it('says table first, dishes next, the guest note last', () => {
     const text = newOrderText('T1', [chicken], 'no onion');
 
-    expect(text).toBe('नया ऑर्डर आया है। टेबल टी एक। एक हाफ बटर चिकन, बटर नान। ध्यान देना, प्याज़ नहीं।');
+    expect(text).toBe('नया ऑर्डर आया है। टेबल एक। एक हाफ बटर चिकन, बटर नान। ध्यान देना, प्याज़ नहीं।');
   });
 
   it('never hands a Latin letter to the voice', () => {
@@ -179,7 +188,7 @@ describe('newOrderText', () => {
       { qty: 1, name: 'Butter Naan', detail: 'Half · Extra cheese · Jain' },
     ]);
 
-    expect(text).toBe('नया ऑर्डर आया है। टेबल टी एक। एक हाफ बटर नान, एक्स्ट्रा चीज़, जैन।');
+    expect(text).toBe('नया ऑर्डर आया है। टेबल एक। एक हाफ बटर नान, एक्स्ट्रा चीज़, जैन।');
   });
 
   it('says the restaurant\'s own add-ons, not just the ones we know', () => {
@@ -229,8 +238,13 @@ describe('newOrderText', () => {
       { qty: 2, name: 'Paneer Tikka' },
       { qty: 1, name: 'Butter Naan' },
     ], 'less spicy')).toBe(
-      'नया ऑर्डर आया है। टेबल टी पाँच। दो पनीर टिक्का और एक बटर नान। ध्यान देना, तीखा थोड़ा कम रखना।',
+      'नया ऑर्डर आया है। टेबल पाँच। दो पनीर टिक्का और एक बटर नान। ध्यान देना, तीखा थोड़ा कम रखना।',
     );
+  });
+
+  it('says "टेबल दो" for the card label T2 — the number, not the letters', () => {
+    expect(newOrderText('T2', [naan])).toContain('टेबल दो।');
+    expect(newOrderText('T2', [naan])).not.toContain('टी');
   });
 
   it('says a note the way Hindi says it, not word for word', () => {
@@ -252,9 +266,9 @@ describe('newOrderText', () => {
 
 describe('advanceText', () => {
   it('says which table moved on', () => {
-    expect(advanceText('T2', 'preparing')).toBe('टेबल टी दो, बनना शुरू।');
-    expect(advanceText('T2', 'ready')).toBe('टेबल टी दो तैयार है।');
-    expect(advanceText('T2', 'served')).toBe('टेबल टी दो सर्व हो गया।');
+    expect(advanceText('T2', 'preparing')).toBe('टेबल दो, बनना शुरू।');
+    expect(advanceText('T2', 'ready')).toBe('टेबल दो तैयार है।');
+    expect(advanceText('T2', 'served')).toBe('टेबल दो सर्व हो गया।');
   });
 
   it('does not read out "table takeaway"', () => {
@@ -263,13 +277,13 @@ describe('advanceText', () => {
   });
 
   it('degrades to a real sentence for a state it does not know', () => {
-    expect(advanceText('T4', 'cancelled')).toBe('टेबल टी चार, कैंसल।');
+    expect(advanceText('T4', 'cancelled')).toBe('टेबल चार, कैंसल।');
   });
 });
 
 describe('cancelText', () => {
   it('names the table whose order was stopped', () => {
-    expect(cancelText('T2')).toBe('टेबल टी दो का ऑर्डर कैंसल हो गया।');
+    expect(cancelText('T2')).toBe('टेबल दो का ऑर्डर कैंसल हो गया।');
   });
 
   it('does not read out "table takeaway"', () => {

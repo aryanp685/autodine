@@ -296,6 +296,16 @@ export function spokenTable(table: string): string {
   const trimmed = table.trim();
   if (isTakeaway(table)) return 'टेकअवे';
 
+  // "T2" is how the card is PRINTED -- the T is the word "Table", not part of
+  // the name. The sentence around this already says "टेबल" / "टेबल नंबर", so
+  // spelling the T gives "टेबल नंबर टी दो", which a kitchen hears as "t2"
+  // instead of "table number two". The number is what matters, and it is said
+  // as the Hindi word: T2 -> दो, T12 -> बारह. A letter that is NOT this
+  // abbreviation -- a section mark like "A2" -- is kept and spelled, because
+  // that one is information.
+  const printed = trimmed.match(/^(?:table|t)[\s.\-–—]*([0-9]+)$/i);
+  if (printed) return labelDigits(printed[1]);
+
   const out: string[] = [];
 
   // One pass so 'T12' is T + the number twelve, not T + 1 + 2.

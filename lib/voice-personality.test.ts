@@ -392,3 +392,98 @@ describe('order data integrity', () => {
     expect(text).toContain('एक्स्ट्रा'); // extra cheese
   });
 });
+
+/**
+ * The desi dialects: Nagpuri (default) and Mumbai.
+ *
+ * Same facts either way -- which table, that a new order arrived -- said the
+ * way the room actually talks. What a dialect may NOT do is add words: the
+ * banned list below runs against both.
+ */
+describe('desi dialects', () => {
+  const CHATTER = [
+    'अरे', 'गुरु', 'मान,', 'भाई', 'माम', 'रे', 'शुरू कर', 'भूख', 'इंतज़ार', 'मेहमान',
+    'कृपया', 'फटाफट', 'रौनक', 'झकास', 'जादू', 'फरमाइश', 'फरमान', 'हुक्म', 'यार',
+  ];
+
+  it('says "टेबल नंबर दो" for the printed card label T2', () => {
+    // The kitchen said the old spelling sounded like "t2". The T on the card
+    // is the word "table"; the sentence already says टेबल नंबर, so only the
+    // number is spoken -- as the Hindi word.
+    const text = buildExpressiveAnnouncement('T2', SAMPLE_ITEMS, null, 0);
+    expect(text).toContain('टेबल नंबर दो');
+    expect(text).not.toContain('टी दो');
+    expect(buildKitchenAnnouncement('T2', SAMPLE_ITEMS, null, 'mumbai')).toContain(
+      'टेबल नंबर दो',
+    );
+  });
+
+  it('offers Nagpuri and Mumbai, and they say the same facts differently', () => {
+    const nagpuri = buildExpressiveAnnouncement('5', SAMPLE_ITEMS, null, 0, 'nagpuri');
+    const mumbai = buildExpressiveAnnouncement('5', SAMPLE_ITEMS, null, 0, 'mumbai');
+
+    expect(nagpuri).not.toBe(mumbai);
+    for (const text of [nagpuri, mumbai]) {
+      expect(text).toContain('पाँच');
+      expect(text).toContain('ऑर्डर');
+      expect(text).toContain('पनीर');
+    }
+    expect(nagpuri).toContain('नवा');
+    expect(nagpuri).toContain('आय');
+    expect(mumbai).toContain('आ गया');
+  });
+
+  it('defaults to Nagpuri when no dialect is given', () => {
+    expect(buildExpressiveAnnouncement('5', SAMPLE_ITEMS, null, 0)).toBe(
+      buildExpressiveAnnouncement('5', SAMPLE_ITEMS, null, 0, 'nagpuri'),
+    );
+  });
+
+  it('every dialect variation says only the order — no slang, no chatter', () => {
+    for (const dialect of ['nagpuri', 'mumbai'] as const) {
+      for (const variation of PERSONALITY_VARIATIONS) {
+        const opener = variation.opener('5', dialect);
+        expect(opener).toContain('ऑर्डर');
+        for (const chatter of CHATTER) {
+          expect(opener).not.toContain(chatter);
+        }
+      }
+    }
+  });
+
+  it('says nothing beyond the order and the note, in either dialect', () => {
+    for (const dialect of ['nagpuri', 'mumbai'] as const) {
+      for (const variation of PERSONALITY_VARIATIONS) {
+        const text = buildExpressiveAnnouncement(
+          '5',
+          SAMPLE_ITEMS,
+          'no onion, no garlic',
+          PERSONALITY_VARIATIONS.indexOf(variation),
+          dialect,
+        );
+        for (const chatter of CHATTER) {
+          expect(text).not.toContain(chatter);
+        }
+        expect(text.indexOf('नोट')).toBeGreaterThan(text.indexOf('नान'));
+        expect(text.trimEnd().endsWith('।')).toBe(true);
+      }
+    }
+  });
+
+  it('reads a safety note in plain Hindi whatever the dialect', () => {
+    // The safety voice is the one place flavour gives way to clarity: an
+    // allergy note is framed identically in every room.
+    const nagpuri = buildExpressiveAnnouncement('5', SAMPLE_ITEMS, 'no onion', 4, 'nagpuri');
+    const mumbai = buildExpressiveAnnouncement('5', SAMPLE_ITEMS, 'no onion', 4, 'mumbai');
+    expect(nagpuri).toBe(mumbai);
+  });
+
+  it('rotates to a different phrase each ticket, in each dialect', () => {
+    for (const dialect of ['nagpuri', 'mumbai'] as const) {
+      const texts = [0, 1, 2, 3].map((index) =>
+        buildExpressiveAnnouncement('T2', SAMPLE_ITEMS, null, index, dialect),
+      );
+      expect(new Set(texts).size).toBe(4);
+    }
+  });
+});
