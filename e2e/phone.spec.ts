@@ -36,9 +36,17 @@ test('the rail is a closed drawer, and Menu opens it', async ({ page }) => {
   await expect(page.locator(RAIL)).toHaveAttribute('data-rail-open', 'true');
   await expect(menu).toHaveAttribute('aria-expanded', 'true');
 
-  // The rail is now on screen, and it is the same one.
-  const open = await page.locator(RAIL).boundingBox();
-  expect(open!.y).toBeLessThan(844);
+  // The rail is now on screen, and it is the same one. Polled, like every
+  // position check in this file: the sheet slides up over 280ms with
+  // `will-change-transform`, which puts the transition on the compositor --
+  // and a single boundingBox() right after the click reads the last
+  // main-thread geometry (still parked below the fold) until the first frame
+  // commits. The assertion is unchanged; only the eagerness is.
+  await expect
+    .poll(async () => (await page.locator(RAIL).boundingBox())?.y ?? 9999, {
+      message: 'the opened drawer never came above the fold',
+    })
+    .toBeLessThan(844);
 });
 
 test('choosing Kitchen from the drawer navigates and closes the drawer', async ({ page }) => {
