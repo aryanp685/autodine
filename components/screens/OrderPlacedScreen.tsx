@@ -113,7 +113,10 @@ function OrderTrack({ prepStatus }: { prepStatus: string }) {
 }
 
 /**
- * The sentence under the bill while it is still unpaid.
+ * The sentence under the bill while it is still unpaid: what the kitchen is
+ * doing, and nothing about money. How the bill gets paid is the job of the
+ * sentences around it (see counterPayment), because saying both here and there
+ * is how a served guest ended up reading "at the counter" twice in one breath.
  *
  * "The kitchen has your order already and is starting on it now" was printed in
  * every unpaid state -- including once the food had arrived. A guest reading
@@ -121,19 +124,46 @@ function OrderTrack({ prepStatus }: { prepStatus: string }) {
  * begun. The sentence now follows the same prep status the tracker above it
  * draws, so the two cannot contradict each other.
  */
-function unpaidNextStep(prepStatus: string, tableLabel: string | null): string {
+function unpaidNextStep(
+  prepStatus: string,
+  tableLabel: string | null,
+  awaitingConfirmation: boolean,
+): string {
   switch (prepStatus) {
     case 'preparing':
       return 'The kitchen is cooking this now.';
     case 'ready':
       return tableLabel
         ? 'This is ready — it is on its way to your table.'
-        : 'This is ready — please collect it at the counter.';
+        : 'This is ready for pickup.';
     case 'served':
-      return 'This has been served. Please settle the bill at the counter before you leave.';
+      return 'This has been served.';
     default:
-      return 'The kitchen has your order and is starting on it now.';
+      // A held order is not cooking and must not say it is: the notice above
+      // already says the table is waiting to be confirmed, and "starting on it
+      // now" next to it would be the exact lie that notice exists to prevent.
+      return awaitingConfirmation
+        ? 'The kitchen starts once the table is confirmed.'
+        : 'The kitchen has your order and is starting on it now.';
   }
+}
+
+/**
+ * How an unpaid bill gets paid, phrased once per screen.
+ *
+ * A served guest is asked to settle; everyone else is asked to pay. `orForm`
+ * is for the paragraphs that sit under a pay button (UPI or card), where "Or"
+ * is what ties the sentence to the alternative above it.
+ */
+function counterPayment(prepStatus: string, orForm: boolean): string {
+  if (prepStatus === 'served') {
+    return orForm
+      ? 'Or settle the bill at the counter before you leave.'
+      : 'Please settle the bill at the counter before you leave.';
+  }
+  return orForm
+    ? 'Or pay at the counter before you leave.'
+    : 'Pay at the counter before you leave.';
 }
 
 /**
@@ -374,8 +404,8 @@ export function OrderPlacedScreen({
 
               {data.upi ? (
                 <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
-                  {unpaidNextStep(data.prepStatus, data.tableLabel)} Or pay at the counter before
-                  you leave.
+                  {unpaidNextStep(data.prepStatus, data.tableLabel, data.awaitingConfirmation)}{' '}
+                  {counterPayment(data.prepStatus, true)}
                 </p>
               ) : onlinePay?.available && slug && token ? (
                 <>
@@ -386,7 +416,8 @@ export function OrderPlacedScreen({
                     duePaise={data.totalPaise}
                   />
                   <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
-                    Or pay at the counter before you leave. {unpaidNextStep(data.prepStatus, data.tableLabel)}
+                    {unpaidNextStep(data.prepStatus, data.tableLabel, data.awaitingConfirmation)}{' '}
+                    {counterPayment(data.prepStatus, true)}
                   </p>
                 </>
               ) : (
@@ -395,8 +426,10 @@ export function OrderPlacedScreen({
                     <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">{onlinePay.note}</p>
                   ) : null}
                   <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
-                    <strong className="font-semibold text-gink">Pay at the counter before you leave.</strong>{' '}
-                    {unpaidNextStep(data.prepStatus, data.tableLabel)}
+                    <strong className="font-semibold text-gink">
+                      {counterPayment(data.prepStatus, false)}
+                    </strong>{' '}
+                    {unpaidNextStep(data.prepStatus, data.tableLabel, data.awaitingConfirmation)}
                   </p>
                 </>
               )}

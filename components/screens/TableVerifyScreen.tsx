@@ -77,7 +77,7 @@ export function TableVerifyScreen({
       <GuestNoteText>
         Type the six-digit code showing inside {restaurantName} to order at table {tableLabel}. It
         is not printed on the table and nobody will ask you for it — it is on a screen in the
-        restaurant, so it can change every few minutes.
+        restaurant, so it changes every {windowMinutes === 1 ? 'minute' : `${windowMinutes} minutes`}.
       </GuestNoteText>
 
       {error ? <GuestNoteAlert title="That did not work.">{error}</GuestNoteAlert> : null}
