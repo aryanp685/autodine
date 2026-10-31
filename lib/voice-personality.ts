@@ -63,7 +63,7 @@ export type PersonalityVariation = {
   /** Stable identifier, used for testing and debugging. */
   id: string;
   /** The opening line, including the table if there is one. */
-  opener: (table: string) => string;
+  opener: (table: string, dialect?: AnnouncementDialect) => string;
   /** A short transition before the dish list. */
   itemsIntro: () => string;
   /** Separator between dish phrases. */
@@ -82,69 +82,91 @@ export type AnnouncementStyle = 'expressive' | 'standard';
 /* ========================================================================== */
 
 /**
- * Variation 1 -- "नया ऑर्डर आया है।" (order and note only).
+ * DESI DIALECTS -- how a local says the same facts.
+ *
+ * The kitchen asked for a voice that sounds like the room it works in:
+ * Nagpuri or Mumbai Hindi, not textbook Hindi. So the arrival line is
+ * written twice, once per dialect, and the operator picks. Both say exactly
+ * the same facts -- which table, that a new order arrived -- in the words
+ * each dialect actually uses: "वर / नवा / आय" in Nagpuri, "पे / आ गया" in
+ * Mumbai. No slang words: a dialect is grammar and word choice, not
+ * interjections. The banned-words tests below run against BOTH.
+ *
+ * The safety voice ('standard') does NOT vary by dialect. A note about
+ * allergies is read in plain Hindi whatever the setting -- clarity for a
+ * constraint beats flavour every time.
  */
-const VAR_AREY_MAMA: PersonalityVariation = {
-  id: 'arey-mama',
-  opener: (table) =>
-    isTakeaway(table)
-      ? 'नया टेकअवे ऑर्डर आया है।'
-      : `नया ऑर्डर आया है। टेबल नंबर ${spokenTable(table)}।`,
-  itemsIntro: () => '',
-  itemsSeparator: () => ', ',
-  noteLabel: () => 'नोट —',
-  closer: () => '',
+export type AnnouncementDialect = 'nagpuri' | 'mumbai';
+
+export const DEFAULT_DIALECT: AnnouncementDialect = 'nagpuri';
+
+export const DIALECT_LABELS: Record<AnnouncementDialect, string> = {
+  nagpuri: 'नागपुरी',
+  mumbai: 'बमइया',
 };
 
-/**
- * Variation 2 -- "टेबल X से नया ऑर्डर आ गया है।" (order and note only).
- */
-const VAR_SUNO_RE: PersonalityVariation = {
-  id: 'suno-re',
-  opener: (table) =>
-    isTakeaway(table)
-      ? 'टेकअवे से नया ऑर्डर आ गया है।'
-      : `टेबल ${spokenTable(table)} से नया ऑर्डर आ गया है।`,
-  itemsIntro: () => '',
-  itemsSeparator: () => ', ',
-  noteLabel: () => 'नोट —',
-  closer: () => '',
+type DialectOpeners = {
+  /** Four arrival phrases per dialect, one per expressive variation. */
+  table: ReadonlyArray<(t: string) => string>;
+  takeaway: ReadonlyArray<() => string>;
 };
 
-/**
- * Variation 3 -- "नया ऑर्डर, टेबल नंबर X।" (order and note only).
- */
-const VAR_DHYaan_DENA: PersonalityVariation = {
-  id: 'dhyaan-dena',
-  opener: (table) =>
-    isTakeaway(table)
-      ? 'नया ऑर्डर, टेकअवे।'
-      : `नया ऑर्डर, टेबल नंबर ${spokenTable(table)}।`,
-  itemsIntro: () => '',
-  itemsSeparator: () => ', ',
-  noteLabel: () => 'नोट —',
-  closer: () => '',
+const DIALECT_OPENERS: Record<AnnouncementDialect, DialectOpeners> = {
+  nagpuri: {
+    table: [
+      (t) => `टेबल नंबर ${t} वर नवा ऑर्डर आय।`,
+      (t) => `नवा ऑर्डर आय, टेबल नंबर ${t}।`,
+      (t) => `टेबल ${t} से ऑर्डर आय।`,
+      (t) => `टेबल नंबर ${t} के ऑर्डर आय।`,
+    ],
+    takeaway: [
+      () => 'टेकअवे वर नवा ऑर्डर आय।',
+      () => 'नवा ऑर्डर आय, टेकअवे।',
+      () => 'टेकअवे से ऑर्डर आय।',
+      () => 'टेकअवे के ऑर्डर आय।',
+    ],
+  },
+  mumbai: {
+    table: [
+      (t) => `टेबल नंबर ${t} पे नया ऑर्डर आ गया।`,
+      (t) => `नया ऑर्डर आया, टेबल नंबर ${t}।`,
+      (t) => `टेबल ${t} से ऑर्डर आ गया।`,
+      (t) => `टेबल नंबर ${t} का ऑर्डर आ गया।`,
+    ],
+    takeaway: [
+      () => 'टेकअवे पे नया ऑर्डर आ गया।',
+      () => 'नया ऑर्डर आया, टेकअवे।',
+      () => 'टेकअवे से ऑर्डर आ गया।',
+      () => 'टेकअवे का ऑर्डर आ गया।',
+    ],
+  },
 };
 
-/**
- * Variation 4 -- "टेबल नंबर X का ऑर्डर आ गया है।" (order and note only).
- */
-const VAR_AREY_BHAI: PersonalityVariation = {
-  id: 'arey-bhai',
-  opener: (table) =>
-    isTakeaway(table)
-      ? 'टेकअवे का ऑर्डर आ गया है।'
-      : `टेबल नंबर ${spokenTable(table)} का ऑर्डर आ गया है।`,
-  itemsIntro: () => '',
-  itemsSeparator: () => ', ',
-  noteLabel: () => 'नोट —',
-  closer: () => '',
-};
+/** The four expressive variations: same facts, four ways a person says them. */
+function dialectVariation(id: string, slot: number): PersonalityVariation {
+  return {
+    id,
+    opener: (table, dialect) => {
+      const openers = DIALECT_OPENERS[dialect ?? DEFAULT_DIALECT];
+      if (isTakeaway(table)) return openers.takeaway[slot]();
+      return openers.table[slot](spokenTable(table));
+    },
+    itemsIntro: () => '',
+    itemsSeparator: () => ', ',
+    noteLabel: () => 'नोट —',
+    closer: () => '',
+  };
+}
+
+const VAR_ARRIVAL_1 = dialectVariation('arrival-1', 0);
+const VAR_ARRIVAL_2 = dialectVariation('arrival-2', 1);
+const VAR_ARRIVAL_3 = dialectVariation('arrival-3', 2);
+const VAR_ARRIVAL_4 = dialectVariation('arrival-4', 3);
 
 /**
  * Variation 5 -- Standard. "एक नया ऑर्डर आया है।" (order and note only).
- * Same minimal shape as the rest; named "standard" because the safety
- * path has always used it.
+ * The safety path has always used it: plain Hindi, no dialect, so an
+ * allergy note is never framed in anything a stressed cook could mishear.
  */
 const VAR_STANDARD: PersonalityVariation = {
   id: 'standard',
@@ -160,10 +182,10 @@ const VAR_STANDARD: PersonalityVariation = {
 
 /** All variations, in rotation order. */
 export const PERSONALITY_VARIATIONS: PersonalityVariation[] = [
-  VAR_AREY_MAMA,
-  VAR_SUNO_RE,
-  VAR_DHYaan_DENA,
-  VAR_AREY_BHAI,
+  VAR_ARRIVAL_1,
+  VAR_ARRIVAL_2,
+  VAR_ARRIVAL_3,
+  VAR_ARRIVAL_4,
   VAR_STANDARD,
 ];
 
@@ -232,6 +254,7 @@ export function buildExpressiveAnnouncement(
   items: SpeakableItem[],
   note: string | null | undefined,
   variationIndex: number = 0,
+  dialect?: AnnouncementDialect,
 ): string {
   const variation =
     PERSONALITY_VARIATIONS[variationIndex % PERSONALITY_VARIATIONS.length];
@@ -239,7 +262,7 @@ export function buildExpressiveAnnouncement(
   const parts: string[] = [];
 
   // Opener: names the table and the new order.
-  parts.push(variation.opener(table));
+  parts.push(variation.opener(table, dialect));
 
   // Dish list: every item, in order, with its quantity and detail.
   const itemsText = spokenItems(items, variation);
@@ -353,8 +376,9 @@ export function buildKitchenAnnouncement(
   table: string,
   items: SpeakableItem[],
   note: string | null | undefined,
+  dialect?: AnnouncementDialect,
 ): string {
   const style = decideStyle(note);
   const index = nextVariationIndex(style);
-  return buildExpressiveAnnouncement(table, items, note, index);
+  return buildExpressiveAnnouncement(table, items, note, index, dialect);
 }
