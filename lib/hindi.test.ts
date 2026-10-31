@@ -184,6 +184,15 @@ describe('noteToDevanagari', () => {
     expect(noteToDevanagari('asap')).toBe('जल्दी करना है');
   });
 
+  it('says "more spicy" the way the kitchen says it — तीखा बनाना', () => {
+    // The most common note there is. Without the whole-phrase rule the word
+    // level produced "ज़्यादा स्पाइसी" — sounds, not an instruction.
+    expect(noteToDevanagari('more spicy')).toBe('तीखा बनाना');
+    expect(noteToDevanagari('MORE SPICY')).toBe('तीखा बनाना');
+    expect(noteToDevanagari('spicy')).toBe('तीखा बनाना');
+    expect(noteToDevanagari('not spicy')).toBe('तीखा नहीं');
+  });
+
   it('translates a note it does not recognise rather than dropping it', () => {
     const out = noteToDevanagari('birthday cake');
     expect(isDevanagariOnly(out)).toBe(true);

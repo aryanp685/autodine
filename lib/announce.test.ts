@@ -165,7 +165,7 @@ describe('newOrderText', () => {
   it('says table first, dishes next, the guest note last', () => {
     const text = newOrderText('T1', [chicken], 'no onion');
 
-    expect(text).toBe('नया ऑर्डर आया है। टेबल एक। एक हाफ बटर चिकन, बटर नान। ध्यान देना, प्याज़ नहीं।');
+    expect(text).toBe('नया ऑर्डर आया है। टेबल एक। एक हाफ बटर चिकन, बटर नान। प्याज़ नहीं।');
   });
 
   it('never hands a Latin letter to the voice', () => {
@@ -202,14 +202,22 @@ describe('newOrderText', () => {
     expect(text).toContain('प्याज़ सलाद');
   });
 
-  it('marks the note as a warning, so it is not mistaken for another dish', () => {
-    // A short conversational cue separates the guest's instruction from the dishes.
-    expect(newOrderText('T3', [naan], 'no onion')).toContain('ध्यान देना, ');
+  it('says the note directly, as the guest\'s instruction — no label word', () => {
+    // "ध्यान देना" / "नोट" were words that were neither the order nor the
+    // note. The note is already phrased as something a cook acts on, so it
+    // is said as written: "प्याज़ नहीं", "तीखा बनाना".
+    const text = newOrderText('T3', [naan], 'no onion');
+    expect(text).toContain('प्याज़ नहीं');
+    expect(text).not.toContain('ध्यान देना');
+    expect(text).not.toContain('नोट');
+    expect(text.indexOf('प्याज़')).toBeGreaterThan(text.indexOf('नान'));
+    expect(text.trimEnd().endsWith('प्याज़ नहीं।')).toBe(true);
   });
 
-  it('omits the note clause entirely when there is none', () => {
-    expect(newOrderText('T3', [naan])).not.toContain('ध्यान देना');
-    expect(newOrderText('T3', [naan], '   ')).not.toContain('ध्यान देना');
+  it('omits the note entirely when there is none', () => {
+    expect(newOrderText('T3', [naan])).not.toContain('प्याज़');
+    expect(newOrderText('T3', [naan], '   ')).not.toContain('प्याज़');
+    expect(newOrderText('T3', [naan], '   ').trimEnd().endsWith('नान।')).toBe(true);
   });
 
   it('reads a room label and number in the order printed', () => {
@@ -238,7 +246,7 @@ describe('newOrderText', () => {
       { qty: 2, name: 'Paneer Tikka' },
       { qty: 1, name: 'Butter Naan' },
     ], 'less spicy')).toBe(
-      'नया ऑर्डर आया है। टेबल पाँच। दो पनीर टिक्का और एक बटर नान। ध्यान देना, तीखा थोड़ा कम रखना।',
+      'नया ऑर्डर आया है। टेबल पाँच। दो पनीर टिक्का और एक बटर नान। तीखा थोड़ा कम रखना।',
     );
   });
 

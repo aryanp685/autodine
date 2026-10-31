@@ -329,10 +329,14 @@ describe('PERSONALITY_VARIATIONS', () => {
       ]) {
         expect(text).not.toContain(chatter);
       }
-      // Order, dishes, note — and nothing after the note.
+      // Order, dishes, note — and nothing after the note. The note is spoken
+      // directly: no "नोट", no "ध्यान देना" — those were words that were
+      // neither the order nor the note.
       expect(text).toContain('ऑर्डर');
       expect(text).toContain('पनीर');
-      expect(text.indexOf('नोट')).toBeGreaterThan(text.indexOf('नान'));
+      expect(text).not.toContain('नोट');
+      expect(text).not.toContain('ध्यान देना');
+      expect(text.indexOf('प्याज़')).toBeGreaterThan(text.indexOf('नान'));
       expect(text.trimEnd().endsWith('।')).toBe(true);
     }
   });
@@ -464,7 +468,9 @@ describe('desi dialects', () => {
         for (const chatter of CHATTER) {
           expect(text).not.toContain(chatter);
         }
-        expect(text.indexOf('नोट')).toBeGreaterThan(text.indexOf('नान'));
+        expect(text).not.toContain('नोट');
+        expect(text).not.toContain('ध्यान देना');
+        expect(text.indexOf('प्याज़')).toBeGreaterThan(text.indexOf('नान'));
         expect(text.trimEnd().endsWith('।')).toBe(true);
       }
     }
