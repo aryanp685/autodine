@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { DishPhoto } from '@/components/DishPhoto';
 import { GuestFlow } from '@/components/GuestFlow';
 import { GuestTabs } from '@/components/GuestTabs';
@@ -102,6 +103,8 @@ export function Cart({
   placedErrorCode?: string;
 }) {
   const cart = useCart();
+  const reduce = useReducedMotion();
+  const motionOn = !reduce;
 
   const withSlug = (path: string) => (slug ? `${path}?s=${encodeURIComponent(slug)}` : path);
   const priced = priceCart(cart.lines, items, taxRateBps);
@@ -146,21 +149,36 @@ export function Cart({
              below 900px because two black buttons 40px apart is a choice
              nobody asked for. Now there is one, and it is where the thumb is
              at every width. */
-          <div data-cart-dock="" className="flex items-center gap-3">
+          <motion.div
+            key="cart-dock"
+            data-cart-dock=""
+            className="flex items-center gap-3"
+            initial={motionOn ? { y: 22, opacity: 0 } : false}
+            animate={motionOn ? { y: 0, opacity: 1 } : undefined}
+            transition={{ type: 'spring', stiffness: 360, damping: 30 }}
+          >
             <span className="flex flex-col leading-tight">
               <span className="text-[10.5px] font-semibold tracking-[0.09em] text-gink-46 uppercase">Total</span>
-              <strong className="tnum text-[17px] font-semibold text-gink">{inr(paiseToRupees(totalPaise))}</strong>
+              <motion.strong
+                key={totalPaise}
+                className="tnum inline-block text-[17px] font-semibold text-gink"
+                initial={motionOn ? { scale: 1.12, y: -2 } : false}
+                animate={motionOn ? { scale: 1, y: 0 } : undefined}
+                transition={{ type: 'spring', stiffness: 520, damping: 20 }}
+              >
+                {inr(paiseToRupees(totalPaise))}
+              </motion.strong>
             </span>
             <Link
               href={withSlug('/menu/checkout')}
-              className="g-primary ml-auto flex items-center gap-2 rounded-full px-5 py-3 text-[13.5px] font-semibold"
+              className="g-primary ml-auto flex items-center gap-2 rounded-full px-5 py-3 text-[13.5px] font-semibold transition-transform duration-150 active:scale-[0.97]"
             >
               Continue to checkout
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <path d="M9 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </Link>
-          </div>
+          </motion.div>
         ) : null
       }
       /* The cart is a place, not a step: the tabs stay, so leaving it is one
@@ -168,13 +186,32 @@ export function Cart({
       tabs={<GuestTabs slug={slug} active="cart" />}
     >
       <header className="px-4 pt-6 pb-4">
-        <p className="g-eyebrow">Your order</p>
-        <h1 className="g-display mt-1.5">{headerMeta}</h1>
-        <p className="g-lede mt-1.5">
+        <motion.p
+          className="g-eyebrow"
+          initial={motionOn ? { opacity: 0, y: 12 } : false}
+          animate={motionOn ? { opacity: 1, y: 0 } : undefined}
+          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+        >
+          Your order
+        </motion.p>
+        <motion.h1
+          className="g-display mt-1.5"
+          initial={motionOn ? { opacity: 0, y: 16 } : false}
+          animate={motionOn ? { opacity: 1, y: 0 } : undefined}
+          transition={{ duration: 0.5, delay: 0.07, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {headerMeta}
+        </motion.h1>
+        <motion.p
+          className="g-lede mt-1.5"
+          initial={motionOn ? { opacity: 0, y: 14 } : false}
+          animate={motionOn ? { opacity: 1, y: 0 } : undefined}
+          transition={{ duration: 0.5, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+        >
           {priced.lines.length > 0
             ? 'Check the bill, then pay. Prices are read from the kitchen’s menu when you order.'
             : 'Nothing has been added from the menu yet.'}
-        </p>
+        </motion.p>
         {needsCode && priced.lines.length > 0 ? (
           <p className="mt-2 flex items-start gap-2 text-[12px] leading-[1.55] text-gink-46">
             <span
@@ -246,14 +283,33 @@ export function Cart({
             </div>
           ) : (
             <>
-              {priced.lines.map((l) => (
-                // Keyed by portion too. Keying by item alone collapsed a
-                // half and a full plate of the same dish onto one React
-                // element, so changing one quantity re-rendered the other.
-                <div
-                  key={`${l.itemId}|${l.variantId ?? ''}|${(l.addonIds ?? []).join(',')}`}
-                  className="g-card flex gap-3 p-3"
-                >
+              {/* Lines settle in and leave honestly: removing a dish slides it
+                  away and the rest close the gap, instead of the whole list
+                  snapping to a new shape under the guest's thumb. */}
+              <AnimatePresence initial={false}>
+                {priced.lines.map((l, index) => (
+                  // Keyed by portion too. Keying by item alone collapsed a
+                  // half and a full plate of the same dish onto one React
+                  // element, so changing one quantity re-rendered the other.
+                  <motion.div
+                    key={`${l.itemId}|${l.variantId ?? ''}|${(l.addonIds ?? []).join(',')}`}
+                    layout={motionOn ? 'position' : undefined}
+                    initial={motionOn ? { opacity: 0, y: 16 } : false}
+                    animate={motionOn ? { opacity: 1, y: 0 } : undefined}
+                    exit={motionOn ? { opacity: 0, x: -22, transition: { duration: 0.22 } } : undefined}
+                    transition={{
+                      default: {
+                        type: 'spring',
+                        stiffness: 340,
+                        damping: 32,
+                        delay: motionOn ? Math.min(index * 0.06, 0.3) : 0,
+                      },
+                      // Closing the gap when a line leaves must not inherit the
+                      // entrance stagger -- the rows above are already home.
+                      layout: { type: 'spring', stiffness: 380, damping: 34 },
+                    }}
+                    className="g-card flex gap-3 p-3"
+                  >
                   {/* The same photograph the guest tapped on the menu. A
                       bill of names only is hard to check against a table of
                       people deciding who ordered what. */}
@@ -289,16 +345,24 @@ export function Cart({
                           type="button"
                           onClick={() => cart.setQty(l.itemId, l.qty - 1, l.variantId, l.addonIds)}
                           aria-label={`Decrease ${l.name}`}
-                          className="grid size-7 place-items-center rounded-full text-[14px] text-gink-80 transition hover:bg-gink-07"
+                          className="grid size-7 place-items-center rounded-full text-[14px] text-gink-80 transition hover:bg-gink-07 active:scale-[0.92]"
                         >
                           −
                         </button>
-                        <span className="tnum min-w-5 text-center text-[12.5px] font-semibold text-gink">{l.qty}</span>
+                        <motion.span
+                          key={l.qty}
+                          className="tnum inline-block min-w-5 text-center text-[12.5px] font-semibold text-gink"
+                          initial={motionOn ? { scale: 1.3, y: -2 } : false}
+                          animate={motionOn ? { scale: 1, y: 0 } : undefined}
+                          transition={{ type: 'spring', stiffness: 520, damping: 20 }}
+                        >
+                          {l.qty}
+                        </motion.span>
                         <button
                           type="button"
                           onClick={() => cart.setQty(l.itemId, l.qty + 1, l.variantId, l.addonIds)}
                           aria-label={`Increase ${l.name}`}
-                          className="grid size-7 place-items-center rounded-full text-[14px] text-gink-80 transition hover:bg-gink-07"
+                          className="grid size-7 place-items-center rounded-full text-[14px] text-gink-80 transition hover:bg-gink-07 active:scale-[0.92]"
                         >
                           +
                         </button>
@@ -321,8 +385,9 @@ export function Cart({
                       </button>
                     </div>
                   </div>
-                </div>
-              ))}
+                  </motion.div>
+                ))}
+              </AnimatePresence>
 
               {cart.lines.length === 0 && (
                 <div className="g-card px-5 py-9 text-center">
@@ -396,12 +461,20 @@ export function Cart({
             a card under the lines on a phone, which meant two layouts to keep
             agreeing; one card that reads the same at every width is the version
             a guest can actually check. */}
-        {/* A bill of zeroes is not a bill. When every line has dropped out --
-            sold out, or off the menu -- the notice above already says why, and
-            a card reading Subtotal Rs 0 next to a disabled "Cart is empty"
-            button only adds a second, worse explanation. */}
-        {priced.lines.length > 0 || !cart.ready ? (
-        <section className="g-panel mt-4 px-4 py-4">
+        {/* A bill of zeroes is not a bill -- and the `|| !cart.ready` that used
+            to gate this section drew exactly that under "Loading your order":
+            every guest's first paint of the cart was Subtotal Rs 0 / Total Rs 0
+            for a cart the browser had not read yet. It renders now only when
+            there is a real, priced bill to show: the empty state and the
+            loading state each explain themselves above. */}
+        {cart.ready && priced.lines.length > 0 ? (
+        <motion.section
+          className="g-panel mt-4 px-4 py-4"
+          initial={motionOn ? { opacity: 0, y: 18 } : false}
+          whileInView={motionOn ? { opacity: 1, y: 0 } : undefined}
+          viewport={{ once: true, margin: '-32px 0px' }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        >
           <h2 className="g-eyebrow mb-1">Bill summary</h2>
           <Totals
             subtotalPaise={subtotalPaise}
@@ -409,13 +482,11 @@ export function Cart({
             totalPaise={totalPaise}
             taxRateBps={taxRateBps}
           />
-          {priced.lines.length > 0 ? (
-            <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
-              Prices are read from the kitchen&rsquo;s menu when you order, so the total you are
-              charged is the one the restaurant set. Nothing is charged from this phone.
-            </p>
-          ) : null}
-        </section>
+          <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
+            Prices are read from the kitchen&rsquo;s menu when you order, so the total you are
+            charged is the one the restaurant set. Nothing is charged from this phone.
+          </p>
+        </motion.section>
         ) : null}
       </div>
     </GuestFlow>
