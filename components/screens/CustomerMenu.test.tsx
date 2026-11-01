@@ -288,6 +288,61 @@ describe('the add button price', () => {
 });
 
 /**
+ * The price on the dish row, before anything is opened.
+ *
+ * The row says "from ₹X" for a dish that has portions -- and X used to be the
+ * dish's base price. A Butter Chicken listed at 469 whose Half plate costs 250
+ * said "from ₹469" on the row while the sheet below it offered the same dish
+ * at ₹250: the one number on the menu meant to be the cheapest way in was the
+ * most expensive one. The row now prints what the cheapest plate actually
+ * costs, and only says "from" when there is a choice to be the cheapest of.
+ */
+describe('the price on a dish row', () => {
+  const portions = [
+    { id: 'v-half', name: 'Half', price: 250 },
+    { id: 'v-full', name: 'Full', price: 469 },
+  ];
+
+  const row = (variants?: { id: string; name: string; price: number }[]) =>
+    renderToStaticMarkup(
+      <CustomerMenu
+        data={
+          {
+            restaurant,
+            categories: [{ id: 'c1', name: 'Main Course', count: 1 }],
+            items: [
+              {
+                id: 'i1',
+                name: 'Butter Chicken',
+                desc: 'Slow-cooked',
+                price: 469,
+                category: 'c1',
+                veg: false,
+                available: true,
+                ...(variants ? { variants } : {}),
+              },
+            ],
+            table: null,
+          } as never
+        }
+      />,
+    );
+
+  it('says from, then the cheapest plate the guest can actually order', () => {
+    const html = row(portions);
+    // The Half plate is the way in, so it is what "from" points at -- and it
+    // must be the price right next to the word, not one found elsewhere.
+    expect(html).toMatch(/from(?:\s|<[^>]*>){0,4}₹250/);
+  });
+
+  it('prints the plain price with no "from" for a dish with one price', () => {
+    const html = row();
+    expect(html).not.toContain('from');
+    expect(html).toContain('₹469');
+  });
+});
+
+/**
  * Add-ons on the dish sheet.
  *
  * They used to be presets printed on every dish -- "Spice level", "Pair it

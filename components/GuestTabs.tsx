@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useCart } from '@/components/CartProvider';
 
 /**
@@ -35,6 +36,8 @@ export function GuestTabs({ slug, active }: { slug?: string | null; active: Gues
   const cart = useCart();
   const withSlug = (path: string) => (slug ? `${path}?s=${encodeURIComponent(slug)}` : path);
   const count = cart.ready ? cart.count : 0;
+  const reduce = useReducedMotion();
+  const motionOn = !reduce;
 
   const tabs: ReadonlyArray<{ key: GuestTab; label: string; href: string; icon: ReactNode }> = [
     {
@@ -93,7 +96,7 @@ export function GuestTabs({ slug, active }: { slug?: string | null; active: Gues
               data-gtab-active={current ? 'true' : undefined}
               aria-current={current ? 'page' : undefined}
               className={[
-                'group relative flex flex-col items-center gap-1 rounded-[14px] py-1.5 text-[10.5px] font-medium tracking-[0.01em] transition-colors',
+                'group relative flex flex-col items-center gap-1 rounded-[14px] py-1.5 text-[10.5px] font-medium tracking-[0.01em] transition-colors active:scale-[0.94]',
                 current
                   ? 'text-[var(--p-accent)]'
                   : 'text-gink-46 hover:text-gink-80',
@@ -101,25 +104,34 @@ export function GuestTabs({ slug, active }: { slug?: string | null; active: Gues
             >
               {/* The active state is a soft accent lozenge behind the glyph --
                   shape first, colour second, so the selected tab reads at a
-                  glance without relying on hue. */}
-              <span
-                className={[
-                  'relative grid place-items-center rounded-full transition-colors',
-                  current ? 'size-8 bg-[var(--p-accent)]/12' : 'size-8',
-                ].join(' ')}
-              >
+                  glance without relying on hue. It settles in with the screen
+                  (each screen owns its own bar, so there is no bar to slide
+                  within -- a pop is the honest move here). */}
+              <span className="relative grid size-8 place-items-center rounded-full transition-colors">
+                <motion.span
+                  className="absolute inset-0 rounded-full"
+                  style={current ? { backgroundColor: 'var(--p-accent)', opacity: 0.12 } : undefined}
+                  initial={motionOn && current ? { scale: 0.5, opacity: 0 } : false}
+                  animate={motionOn && current ? { scale: 1, opacity: 0.12 } : undefined}
+                  transition={{ type: 'spring', stiffness: 420, damping: 26 }}
+                  aria-hidden="true"
+                />
                 {tab.icon}
                 {/* The number is not decoration: it is the answer to "did my
                     last tap work", and it is the only cart count on the screen
                     once the floating bar has been dismissed by adding nothing. */}
                 {tab.key === 'cart' && count > 0 && (
-                  <span
+                  <motion.span
+                    key={count}
                     data-gtab-badge=""
                     aria-label={`${count} in the cart`}
                     className="tabular-nums absolute -top-1.5 -right-2 grid min-w-[17px] place-items-center rounded-full bg-[var(--p-accent)] px-1 text-[10px] leading-[17px] font-semibold text-onink"
+                    initial={motionOn ? { scale: 1.45 } : false}
+                    animate={motionOn ? { scale: 1 } : undefined}
+                    transition={{ type: 'spring', stiffness: 520, damping: 18 }}
                   >
                     {count}
-                  </span>
+                  </motion.span>
                 )}
               </span>
               <span>{tab.label}</span>
