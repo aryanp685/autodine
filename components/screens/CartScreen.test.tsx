@@ -143,6 +143,23 @@ describe('the cart actions', () => {
     expect(html).not.toContain('Your cart is empty');
   });
 
+  it('draws no zero bill while the cart is still being read', () => {
+    // The bill section used to render while localStorage was loading, so the
+    // first paint of every cart said "Subtotal Rs 0 / Total Rs 0" underneath
+    // "Loading your order" -- a bill of zeroes is not a bill, and the loading
+    // card already says where things stand.
+    mocks.cart.ready = false;
+    setLines([{ itemId: 'i1', qty: 1 }]);
+    mocks.cart.ready = false;
+
+    const html = renderToStaticMarkup(
+      <Cart slug="maddi" restaurantName="Maddi" taxRateBps={500} items={items} />,
+    );
+
+    expect(html).toContain('Loading your order');
+    expect(html).not.toContain('Bill summary');
+  });
+
   it('offers one checkout button, not two', () => {
     setLines([{ itemId: 'i1', qty: 1 }]);
     const html = renderToStaticMarkup(<Cart slug="maddi" items={items} taxRateBps={500} />);
