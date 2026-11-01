@@ -182,8 +182,8 @@ const WORDS: Record<string, string> = {
   'onion': 'प्याज़', 'tomato': 'टमाटर', 'garlic': 'लहसुन', 'ginger': 'अदरक',
   'coriander': 'धनिया', 'coconut': 'नारियल', 'cashew': 'काजू', 'almond': 'बादाम',
   'saffron': 'केसर', 'cardamom': 'इलायची', 'sugar': 'शुगर', 'salt': 'नमक',
-  'bread': 'ब्रेड', 'toast': 'टोस्ट', 'butter': 'बटर', 'ghee': 'घी', 'curd': 'दही',
-  'ice cream': 'आइस क्रीम', 'cream': 'क्रीम', 'dessert': 'डेज़र्ट', 'sweet': 'स्वीट',
+  'bread': 'ब्रेड', 'toast': 'टोस्ट', 'butter': 'बटर', 'ghee': 'घी', 'oil': 'तेल', 'curd': 'दही',
+  'ice cream': 'आइस क्रीम', 'ice': 'बर्फ़', 'cream': 'क्रीम', 'dessert': 'डेज़र्ट', 'sweet': 'स्वीट',
   'lassi': 'लस्सी', 'chai': 'चाय', 'tea': 'चाय', 'coffee': 'कॉफ़ी', 'water': 'वाटर',
   'coke': 'कोक', 'pepsi': 'पेप्सी', 'sprite': 'स्प्राइट', 'lemonade': 'लेमनाड',
   'lemon': 'लेमन', 'lime': 'लाइम', 'soda': 'सोडा', 'juice': 'जूस', 'shake': 'शेक',
@@ -555,41 +555,120 @@ export function spokenName(name: string, override?: string | null): string {
 /**
  * A guest's note, said the way a person would say it.
  *
- * "no onion" transliterated word for word is "नो प्याज़" -- understandable,
- * and not how anyone speaks. Hindi puts the negation last ("प्याज़ नहीं") and
- * the quantifier first ("कम तीखा"), so the common English note patterns are
- * reordered before the words are converted. Anything that does not match a
- * pattern is still translated word for word, which is the honest fallback.
+ * A note is an INSTRUCTION, not a label. "extra butter" is what the cook
+ * should do -- "बटर ज़्यादा डालना" (add more butter) -- and "more spicy" is
+ * "तीखा बनाना" (make it spicy). A bare quantity ("ज़्यादा butter") said more
+ * of what, not what to do with it, so every quantity gets a verb:
+ *
+ *   · things that go IN the dish  → "…ज़्यादा डालना" / "…थोड़ा कम डालना"
+ *   · things served on the plate  → "…ज़्यादा देना" / "…थोड़ा कम देना"
+ *   · qualities (spicy, crispy)   → "…बनाना" / "…ज़्यादा रखना" / "…थोड़ा कम रखना"
+ *
+ * Hindi puts the negation last ("प्याज़ नहीं"), and anything that does not
+ * match a pattern is still translated word for word -- the honest fallback.
  */
+
+/** How the dish should come OUT -- बनाना / रखना, never डालना. */
+const QUALITY: Record<string, string> = {
+  spicy: 'तीखा', crispy: 'कुरकुरा', crunchy: 'कुरकुरा', hot: 'गरम', warm: 'गरम',
+  sweet: 'मीठा', salty: 'नमकीन', soft: 'नरम', fresh: 'ताज़ा',
+};
+
+/**
+ * Things that arrive on the plate -- "…देना" (give), never "…डालना" (put IN):
+ * "extra roti" is "रोटी ज़्यादा देना", "extra butter" is "बटर ज़्यादा डालना".
+ */
+const SERVE: ReadonlySet<string> = new Set([
+  'roti', 'naan', 'rice', 'biryani', 'pulao', 'paratha', 'kulcha', 'puri', 'dosa',
+  'idli', 'thali', 'dal', 'daal', 'sabzi', 'soup', 'salad', 'raita', 'papad',
+  'water', 'lassi', 'chai', 'tea', 'coffee', 'juice', 'plate', 'glass', 'napkin',
+  'tissue', 'spoon', 'fork', 'curd', 'cake', 'dessert',
+]);
+
+/** The dish names WORDS knows whole ("butter naan") — longest first. */
+const DISHES: string = PHRASES.filter((phrase) => phrase.includes(' ')).join('|');
+
+/**
+ * True when the word after a governed one continues a dish name: a quantity
+ * in front of one sizes the serving ("extra paneer tikka" is more of the
+ * dish), so those words are left to the fallback rules below.
+ */
+function continuesDish(next: string | undefined): boolean {
+  return Boolean(next && Object.prototype.hasOwnProperty.call(WORDS, next.toLowerCase()));
+}
+
+/**
+ * The instruction frames. Each fires only when the word it governs is not
+ * followed by another dish word -- see continuesDish.
+ */
+function toInstruction(text: string): string {
+  const quality = (word: string) => QUALITY[word.toLowerCase()];
+  /** The Latin word after the match, if any -- a dish word means "sizes the serving". */
+  const nextWord = (whole: string, offset: number, str: string): string | undefined =>
+    /^\s+([a-z]+)/i.exec(str.slice(offset + whole.length))?.[1];
+  return (
+    text
+      // Courtesies and framing verbs are not part of the instruction.
+      .replace(/\b(?:please|pls|plz|kindly|thank you|thanks|thx)\b/gi, '')
+      .replace(/\bmake(?:\s+it)?\b/gi, '')
+      // "don't add onion" → "onion मत डालना".
+      .replace(/\bdon'?t\s+(?:add|put|use|include)\s+([a-z]+)/gi, '$1 मत डालना')
+      // "no more butter" → "बटर और नहीं" -- a quantity inside a negation.
+      .replace(new RegExp(`\\b(?:no|not|without)\\s+(?:more|extra)\\s+(${DISHES})\\b`, 'gi'), '$1 और नहीं')
+      .replace(/\b(?:no|not|without)\s+(?:more|extra)\s+([a-z]+)/gi, '$1 और नहीं')
+      // Negation, Hindi style -- last. A dish name negates whole:
+      // "no butter chicken" → "बटर चिकन नहीं".
+      .replace(new RegExp(`\\b(?:no|not)\\s+(${DISHES})\\b`, 'gi'), '$1 नहीं')
+      .replace(new RegExp(`\\bwithout\\s+(${DISHES})\\b`, 'gi'), '$1 के बिना')
+      .replace(/\b(?:no|not)\s+([a-z]+)/gi, (_m, w: string) => `${quality(w) ?? w} नहीं`)
+      .replace(/\bwithout\s+([a-z]+)/gi, (_m, w: string) => `${quality(w) ?? w} के बिना`)
+      // Quantities: "extra butter" → "बटर ज़्यादा डालना", "more spicy" →
+      // "तीखा बनाना", "extra roti" → "रोटी ज़्यादा देना".
+      .replace(
+        /\b(more|extra|less)\s+([a-z]+)/gi,
+        (whole, qty: string, word: string, offset: number, str: string) => {
+          if (continuesDish(nextWord(whole, offset, str))) return whole;
+          const state = quality(word);
+          const verb = SERVE.has(word.toLowerCase()) ? 'देना' : 'डालना';
+          if (qty.toLowerCase() === 'more') return state ? `${state} बनाना` : `${word} ज़्यादा ${verb}`;
+          if (qty.toLowerCase() === 'extra') return state ? `${state} ज़्यादा रखना` : `${word} ज़्यादा ${verb}`;
+          return state ? `${state} थोड़ा कम रखना` : `${word} थोड़ा कम ${verb}`;
+        },
+      )
+      // A quality word alone IS the instruction: "spicy" → "तीखा बनाना".
+      .replace(
+        new RegExp(`\\b(${Object.keys(QUALITY).join('|')})\\b`, 'gi'),
+        (whole, word: string, offset: number, str: string) =>
+          (continuesDish(nextWord(whole, offset, str)) ? whole : `${QUALITY[word.toLowerCase()]} बनाना`),
+      )
+  );
+}
+
 const NOTE_REWRITES: [RegExp, string][] = [
-  // Common kitchen instruction: phrase it as something a cook can act on,
-  // rather than the clipped menu tag "कम तीखा".
-  [/\bless\s+spicy\b/gi, 'तीखा थोड़ा कम रखना'],
-  // Whole phrases first, so the word-level rules below cannot mangle them
-  // into transliterated gibberish ("on the side" must never reach the
-  // voice as "ऑन थे साइड" -- a note is an instruction, not sounds).
+  // Whole phrases, so the word-level rules below cannot mangle them into
+  // transliterated gibberish ("on the side" must never reach the voice as
+  // "ऑन थे साइड" -- a note is an instruction, not sounds).
   [/\bon the side\b/gi, 'अलग से देना है'],
-  [/\bextra spicy\b/gi, 'तीखा ज़्यादा रखना'],
-  // "more spicy" is the most common note there is, and the words themselves
-  // are the instruction: तीखा बनाना. Without this the word-level "more" rule
-  // below produced "ज़्यादा स्पाइसी" -- sounds, not a note.
-  [/\bmore\s+spicy\b/gi, 'तीखा बनाना'],
-  [/\bnot\s+spicy\b/gi, 'तीखा नहीं'],
-  [/\bspicy\b/gi, 'तीखा बनाना'],
   [/\bpack (?:it )?separately\b/gi, 'अलग से पैक करना'],
   [/\basap\b/gi, 'जल्दी करना है'],
-  [/\bwithout\s+([a-z]+)/gi, '$1 के बिना'],
-  [/\bno\s+([a-z]+)/gi, '$1 नहीं'],
-  [/\bnot\s+([a-z]+)/gi, '$1 नहीं'],
+  // Clause words.
+  [/\band\b/gi, 'और'],
+  [/\bor\b/gi, 'या'],
+  [/\bbut\b/gi, 'लेकिन'],
+  [/\bin\b/gi, 'में'],
+  [/\bwith\b/gi, 'के साथ'],
+  [/\bfor\b/gi, 'के लिए'],
+  // Fallback: a quantity in front of a dish name sizes the serving, and the
+  // name must survive whole -- "extra paneer tikka" → "ज़्यादा पनीर टिक्का".
   [/\bless\s+([a-z]+)/gi, 'कम $1'],
   [/\bextra\s+([a-z]+)/gi, 'ज़्यादा $1'],
   [/\bmore\s+([a-z]+)/gi, 'ज़्यादा $1'],
 ];
 
 export function noteToDevanagari(text: string): string {
-  let out = text;
+  let out = toInstruction(text).replace(/\s+/g, ' ').trim();
   for (const [pattern, replacement] of NOTE_REWRITES) out = out.replace(pattern, replacement);
-  return toDevanagari(out);
+  return toDevanagari(out.replace(/\s+/g, ' ').trim());
 }
 
 /** True when every letter of the text is Devanagari or punctuation. */
