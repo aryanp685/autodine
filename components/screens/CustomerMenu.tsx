@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import {
   categories as demoCategories,
@@ -38,6 +39,33 @@ import { VegMark } from '@/components/ui';
  */
 const needsChoice = (i: Item) =>
   Boolean((i.variants && i.variants.length) || (i.modifiers && i.modifiers.length));
+
+/**
+ * The cheapest way this dish can be had, in rupees.
+ *
+ * The row used to print the dish's base price after the word "from" -- but a
+ * dish with a Half/Full pair is really "from ₹250" when its base says 469 and
+ * the Half plate costs 250. "from" is printed whenever the dish has portions
+ * to choose between, pointing at the smallest of them.
+ */
+export const fromPrice = (i: { price: number; variants?: ReadonlyArray<{ price: number }> }) => {
+  const choices = (i.variants ?? []).map((v) => v.price);
+  return choices.length ? Math.min(i.price, ...choices) : i.price;
+};
+
+/** A dish row settles onto the page: fade up, first rows first. */
+const rowIn = (index: number) => ({
+  initial: { opacity: 0, y: 18 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, margin: '-32px 0px' },
+  transition: {
+    duration: 0.5,
+    // Rows below the fold have already stopped moving by the time the thumb
+    // gets there; the stagger is capped so a long menu doesn't queue up.
+    delay: Math.min(index * 0.055, 0.35),
+    ease: [0.22, 1, 0.36, 1] as const,
+  },
+});
 
 /**
  * Everything a menu screen shows, already in display units (rupees).
@@ -102,12 +130,12 @@ export function CustomerMenu({
   const [cat, setCat] = useState('all');
   /** What the guest typed. Empty means no search is running. */
   const [query, setQuery] = useState('');
-  /** Bumped on every add, so the bar re-runs its entry animation. */
-  const [barPulse, setBarPulse] = useState(0);
+  /** Motion, off for anyone who asked their system to calm down. */
+  const reduce = useReducedMotion();
+  const motionOn = !reduce;
 
   const addToCart = (itemId: string) => {
     cart.add(itemId);
-    setBarPulse((n) => n + 1);
   };
 
   // Deliberately named to shadow the demo imports, so that not one line of
@@ -225,13 +253,31 @@ export function CustomerMenu({
            on this screen -- look, or go and pay -- and the number is the reason
            to go. */
         barCount > 0 ? (
-          <div key={barPulse} className="animate-[gbar_260ms_cubic-bezier(0.22,1,0.36,1)]">
+          /* The bar rises into place the first time an item lands in it, and
+             settles gently when the count changes underneath -- no keyframe
+             re-runs, no key remount. `once` keeps the reflow quiet: a bar that
+             jumps every time a dish is added fights the number it is showing. */
+          <motion.div
+            key="cart-bar"
+            initial={motionOn ? { y: 22, opacity: 0 } : false}
+            animate={motionOn ? { y: 0, opacity: 1 } : undefined}
+            transition={{ type: 'spring', stiffness: 360, damping: 30 }}
+          >
             <Link
               href={cartHref}
               className="g-primary flex items-center gap-3 rounded-[16px] px-4 py-3"
             >
               <span aria-live="polite" role="status" className="text-[13px] font-medium">
-                <strong className="tnum font-semibold">{barCount}</strong> item
+                <motion.strong
+                  key={barCount}
+                  className="tnum inline-block font-semibold"
+                  initial={motionOn ? { scale: 1.28 } : false}
+                  animate={motionOn ? { scale: 1 } : undefined}
+                  transition={{ type: 'spring', stiffness: 500, damping: 18 }}
+                >
+                  {barCount}
+                </motion.strong>{' '}
+                item
                 {barCount === 1 ? '' : 's'} · <span className="tnum">{inr(paiseToRupees(barSubtotal))}</span> before
                 taxes
               </span>
@@ -242,7 +288,7 @@ export function CustomerMenu({
                 </svg>
               </span>
             </Link>
-          </div>
+          </motion.div>
         ) : null
       }
       tabs={<GuestTabs slug={slug} active="menu" />}
@@ -262,6 +308,9 @@ export function CustomerMenu({
         logoUrl={data?.restaurant.logoUrl}
         bannerUrl={data?.restaurant.bannerUrl}
         tableLabel={table?.label ?? null}
+        /* The live menu gets the motion; the owner's branding preview keeps
+           this still so it can be judged as a still. */
+        animate
       />
 
       {/*
@@ -436,7 +485,7 @@ export function CustomerMenu({
           ))}
 
         <div className="flex flex-col gap-2.5">
-          {list.map((i) => (
+          {list.map((i, index) => (
             /* THE APP ROW
              *
              * Words on the left, picture on the right, and the one decision --
@@ -449,10 +498,11 @@ export function CustomerMenu({
              * put it half a card away from the picture, under a description of
              * varying length -- so no two cards were the same height and the
              * Add row wandered down the page. */
-            <article
+            <motion.article
               key={i.id}
+              {...(motionOn ? rowIn(index) : {})}
               className={[
-                'g-card g-card--tappable flex gap-3 p-3',
+                'group g-card g-card--tappable flex gap-3 p-3',
                 i.available ? '' : 'opacity-60',
               ].join(' ')}
             >
@@ -473,12 +523,12 @@ export function CustomerMenu({
                 </div>
 
                 <div className="mt-1 flex items-baseline gap-1.5">
-                  {i.variants && (
+                  {(i.variants ?? []).length > 0 && (
                     <span className="text-[10.5px] font-medium tracking-[0.05em] text-gink-46 uppercase">
                       from
                     </span>
                   )}
-                  <span className="tnum text-[15px] font-semibold text-gink">{inr(i.price)}</span>
+                  <span className="tnum text-[15px] font-semibold text-gink">{inr(fromPrice(i))}</span>
                 </div>
 
                 <p className="mt-1 line-clamp-2 text-[13px] leading-[1.45] text-gink-64">{i.desc}</p>
@@ -486,15 +536,24 @@ export function CustomerMenu({
 
               {/* The picture column owns the action. Equal width on every row,
                   so a long description cannot push one card's button below its
-                  neighbour's. */}
+                  neighbour's. The crop is rounded at the window, not the
+                  image, so the hover zoom breathes inside its frame the way a
+                  food site's does. */}
               <div className="flex w-[92px] shrink-0 flex-col items-stretch gap-1.5">
-                <DishPhoto src={i.img} name={i.name} size={92} className="w-full" />
+                <div className="overflow-hidden rounded-[14px]">
+                  <DishPhoto
+                    src={i.img}
+                    name={i.name}
+                    size={92}
+                    className="w-full transition-transform duration-500 ease-out group-hover:scale-[1.08]"
+                  />
+                </div>
 
                 {i.available ? (
                   needsChoice(i) ? (
                     <Link
                       href={itemHref(i.id)}
-                      className="g-primary inline-flex items-center justify-center rounded-full px-3 py-1.5 text-[12px] font-semibold"
+                      className="g-primary inline-flex items-center justify-center rounded-full px-3 py-1.5 text-[12px] font-semibold transition-transform duration-150 active:scale-[0.94]"
                     >
                       Choose
                     </Link>
@@ -504,7 +563,7 @@ export function CustomerMenu({
                         type="button"
                         onClick={() => cart.setQty(i.id, plainQty(i.id) - 1)}
                         aria-label={`One fewer ${i.name}`}
-                        className="grid size-7 place-items-center rounded-full text-[15px] text-gink-80 transition hover:bg-gink-07"
+                        className="grid size-7 place-items-center rounded-full text-[15px] text-gink-80 transition hover:bg-gink-07 active:scale-[0.92]"
                       >
                         −
                       </button>
@@ -518,7 +577,7 @@ export function CustomerMenu({
                         type="button"
                         onClick={() => addToCart(i.id)}
                         aria-label={`One more ${i.name}`}
-                        className="grid size-7 place-items-center rounded-full text-[15px] text-gink-80 transition hover:bg-gink-07"
+                        className="grid size-7 place-items-center rounded-full text-[15px] text-gink-80 transition hover:bg-gink-07 active:scale-[0.92]"
                       >
                         +
                       </button>
@@ -528,7 +587,7 @@ export function CustomerMenu({
                       type="button"
                       onClick={() => addToCart(i.id)}
                       aria-label={`Add ${i.name}`}
-                      className="g-primary inline-flex items-center justify-center rounded-full px-3 py-1.5 text-[12px] font-semibold"
+                      className="g-primary inline-flex items-center justify-center rounded-full px-3 py-1.5 text-[12px] font-semibold transition-transform duration-150 active:scale-[0.94]"
                     >
                       Add
                     </button>
@@ -539,7 +598,7 @@ export function CustomerMenu({
                   </span>
                 )}
               </div>
-            </article>
+            </motion.article>
           ))}
         </div>
       </div>
@@ -619,6 +678,8 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
   const [added, setAdded] = useState(false);
   const cart = useCart();
   const router = useRouter();
+  const reduce = useReducedMotion();
+  const motionOn = !reduce;
 
   /**
    * The timer that takes the guest back to the menu after adding.
@@ -818,11 +879,28 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
 
       {/* Two ways out that are not the small ×: the scrim, and Escape. The
           scrim is a link, not a div with a handler, so it works before any
-          JavaScript has run and reads to a keyboard as what it is. */}
-      <Link href={backHref} data-sheet-scrim="" aria-label="Close" tabIndex={-1} className="fixed inset-0 z-30" />
+          JavaScript has run and reads to a keyboard as what it is. It fades in
+          behind the rising sheet -- the dimming is the transition, not a jump. */}
+      <motion.div
+        className="fixed inset-0 z-30"
+        initial={motionOn ? { opacity: 0 } : false}
+        animate={motionOn ? { opacity: 1 } : undefined}
+        transition={{ duration: 0.28 }}
+      >
+        <Link
+          href={backHref}
+          data-sheet-scrim=""
+          aria-label="Close"
+          tabIndex={-1}
+          className="block h-full w-full"
+        />
+      </motion.div>
 
       <div className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-[560px]">
-        <div
+        <motion.div
+          initial={motionOn ? { y: '100%' } : false}
+          animate={motionOn ? { y: 0 } : undefined}
+          transition={{ type: 'spring', stiffness: 320, damping: 34 }}
           className="max-h-[86dvh] overflow-y-auto rounded-t-[26px] border border-white/70 shadow-g2" style={{ backgroundColor: 'var(--g-panel-solid)', paddingBottom: 'calc(14px + env(safe-area-inset-bottom))' }}
           role="dialog"
           aria-modal="true"
@@ -882,7 +960,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
                             on ? 'border-[var(--p-accent)]' : 'border-gink-28',
                           ].join(' ')}
                         >
-                          {on && <span className="size-2 rounded-full bg-[var(--p-accent)]" />}
+                          <ChoiceDot on={on} motionOn={motionOn} />
                         </span>
                         <span className="flex-1 text-[14px] font-medium">{v.name}</span>
                         <span className="tnum text-[14px] font-semibold">{inr(v.price)}</span>
@@ -933,7 +1011,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
                                 on ? 'border-[var(--p-accent)]' : 'border-gink-28',
                               ].join(' ')}
                             >
-                              {on && <span className="size-2 rounded-full bg-[var(--p-accent)]" />}
+                              <ChoiceDot on={on} motionOn={motionOn} />
                             </span>
                             <span className="flex-1 text-[14px] font-medium">{option.name}</span>
                             <span className="tnum text-[13.5px] text-gink-64">
@@ -954,7 +1032,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
                             aria-pressed={on}
                             disabled={!on && atMax}
                             onClick={() => toggle(group, option.id)}
-                            className="g-chip disabled:cursor-not-allowed disabled:opacity-40"
+                            className="g-chip transition-transform duration-150 active:scale-[0.94] disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             {option.name}
                             {option.price ? ` + ${inr(option.price)}` : ''}
@@ -987,7 +1065,15 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
                     deciding. It used to print max(1, addQty), so at the 99
                     ceiling -- where nothing can be added -- the sheet still
                     read "1", next to a price for one plate and a dead button. */}
-                <span className="tnum min-w-6 text-center text-[14px] font-semibold">{addQty}</span>
+                <motion.span
+                  key={addQty}
+                  className="tnum inline-block min-w-6 text-center text-[14px] font-semibold"
+                  initial={motionOn ? { scale: 1.3, y: -3 } : false}
+                  animate={motionOn ? { scale: 1, y: 0 } : undefined}
+                  transition={{ type: 'spring', stiffness: 520, damping: 20 }}
+                >
+                  {addQty}
+                </motion.span>
                 <button
                   type="button"
                   onClick={() => setQty(Math.min(room, qty + 1))}
@@ -1024,7 +1110,16 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
                 ].join(' ')}
               >
                 {added ? (
-                  'Added to your order ✓'
+                  /* The one word that has to land: the tap is confirmed before
+                     the sheet leaves, with a small settle rather than a bounce. */
+                  <motion.span
+                    className="inline-block"
+                    initial={motionOn ? { scale: 0.86, opacity: 0 } : false}
+                    animate={motionOn ? { scale: 1, opacity: 1 } : undefined}
+                    transition={{ type: 'spring', stiffness: 480, damping: 22 }}
+                  >
+                    Added to your order ✓
+                  </motion.span>
                 ) : unmet.length > 0 ? (
                   `Choose ${unmet[0].name.toLowerCase()}`
                 ) : atCeiling ? (
@@ -1042,8 +1137,27 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
               </button>
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
     </div>
+  );
+}
+
+/**
+ * The filled centre of a chosen radio.
+ *
+ * Pops when the choice lands: the one moment in the sheet where the guest has
+ * made a decision, and it should feel like one. Mount animation only -- the
+ * dot disappears by unmounting, which is instant and unremarkable.
+ */
+function ChoiceDot({ on, motionOn }: { on: boolean; motionOn: boolean }) {
+  if (!on) return null;
+  return (
+    <motion.span
+      className="size-2 rounded-full bg-[var(--p-accent)]"
+      initial={motionOn ? { scale: 0.35, opacity: 0 } : false}
+      animate={motionOn ? { scale: 1, opacity: 1 } : undefined}
+      transition={{ type: 'spring', stiffness: 620, damping: 22 }}
+    />
   );
 }
