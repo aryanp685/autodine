@@ -14,10 +14,11 @@
  *
  * WHO MAY CALL IT
  *
- * Nobody from the browser. This is a server-only action that must be
- * called from a server component, a script, or an admin route — never
- * from client-side code. The admin Supabase client bypasses RLS, which
- * is exactly why it must never reach the browser bundle.
+ * Only a caller holding the server's admin secret (see lib/admin-auth.ts):
+ * the admin page's form, or POST /api/admin/renew-trial. The check lives
+ * inside this action on purpose — protecting one entry point protects
+ * nothing if another can reach the same write. Every caller, however it
+ * arrives, passes the same gate before any database work happens.
  *
  * WHAT IT DOES
  *
@@ -37,6 +38,7 @@
 import { revalidatePath } from 'next/cache';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { isSupabaseAdminConfigured } from '@/lib/supabase/env';
+import { isValidAdminSecret, UNAUTHORIZED_MESSAGE } from '@/lib/admin-auth';
 
 export type RenewTrialResult = {
   ok: boolean;
@@ -46,12 +48,37 @@ export type RenewTrialResult = {
 };
 
 /**
+ * Escape the LIKE pattern metacharacters in a caller-supplied name.
+ *
+ * Without this, a name of "%" is not a name — it is "every restaurant",
+ * and the renewal would move some arbitrary restaurant's trial clock.
+ * The name is a name; the pattern language is not part of the input.
+ */
+function escapeLikePattern(name: string): string {
+  return name.replace(/[\\%_]/g, (char) => `\\${char}`);
+}
+
+/**
  * Renew the 7-day trial for a restaurant by name.
  *
  * @param restaurantName The exact restaurant name to match.
+ * @param adminSecret The server's admin secret, verified here and not
+ *   merely upstream: this action is a privileged write, and every route
+ *   into it must carry the same credential.
  * @returns Success with the new trial end date, or an error message.
  */
-export async function renewTrialAction(restaurantName: string): Promise<RenewTrialResult> {
+export async function renewTrialAction(restaurantName: string, adminSecret: string): Promise<RenewTrialResult> {
+  // The gate. Before configuration checks, before any database work: an
+  // unauthorized caller learns nothing about this server's state.
+  if (!isValidAdminSecret(adminSecret)) {
+    return { ok: false, error: UNAUTHORIZED_MESSAGE };
+  }
+
+  const name = restaurantName.trim();
+  if (!name) {
+    return { ok: false, error: 'Missing restaurantName' };
+  }
+
   if (!isSupabaseAdminConfigured) {
     return { ok: false, error: 'Database is not configured. Set SUPABASE_URL and SUPABASE_SECRET_KEY.' };
   }
@@ -61,23 +88,25 @@ export async function renewTrialAction(restaurantName: string): Promise<RenewTri
     return { ok: false, error: 'Database is not configured. Set SUPABASE_URL and SUPABASE_SECRET_KEY.' };
   }
 
-  // Find the restaurant by exact name match.
+  // Find the restaurant by exact name match (case-insensitive). The
+  // pattern is escaped so the name can only ever mean itself.
   const { data: restaurants, error: findError } = await supabase
     .from('restaurants')
     .select('id, name, trial_started_at')
-    .ilike('name', restaurantName.trim());
+    .ilike('name', escapeLikePattern(name));
 
   if (findError) {
     return { ok: false, error: `Could not find restaurant: ${findError.message}` };
   }
 
   if (!restaurants || restaurants.length === 0) {
-    return { ok: false, error: `No restaurant found with name "${restaurantName}".` };
+    return { ok: false, error: `No restaurant found with name "${name}".` };
   }
 
-  // If multiple restaurants match, use the first one and warn.
+  // Ambiguity is refused, not guessed. Renewing "the first" match would
+  // move some restaurant's trial clock that nobody named.
   if (restaurants.length > 1) {
-    console.warn(`[renew-trial] Multiple restaurants match "${restaurantName}". Using the first: ${restaurants[0].name}`);
+    return { ok: false, error: `Multiple restaurants match "${name}". Use the exact name.` };
   }
 
   const restaurant = restaurants[0];

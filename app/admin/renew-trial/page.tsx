@@ -12,6 +12,14 @@
  * This page is NOT linked from the main navigation. It is an
  * operational tool for specific situations (e.g. a restaurant whose
  * trial expired and needs a fresh 7 days).
+ *
+ * THE ADMIN SECRET
+ *
+ * The renewal is a privileged write, so the operator types the server's
+ * admin secret into this form with each use. It is verified server-side
+ * (inside the action, not here), travels only in the request body over
+ * TLS, and is kept in component state alone — never localStorage,
+ * sessionStorage, a query parameter, or the page's HTML.
  */
 
 import { useState } from 'react';
@@ -19,14 +27,15 @@ import { renewTrialAction } from './actions';
 
 export default function RenewTrialPage() {
   const [restaurantName, setRestaurantName] = useState('');
+  const [adminSecret, setAdminSecret] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<null | { ok: boolean; message: string }>(null);
 
   async function handleRenew() {
-    if (!restaurantName.trim()) return;
+    if (!restaurantName.trim() || !adminSecret) return;
     setLoading(true);
     setResult(null);
-    const res = await renewTrialAction(restaurantName.trim());
+    const res = await renewTrialAction(restaurantName.trim(), adminSecret);
     if (res.ok && res.restaurantName && res.trialEndsAt) {
       setResult({
         ok: true,
@@ -63,9 +72,21 @@ export default function RenewTrialPage() {
           className="w-full rounded-[var(--p-r-card)] border border-hair bg-card px-4 py-3 text-[15px] text-gink outline-none focus:border-gink-40"
         />
 
+        <label className="text-[12.5px] font-semibold tracking-[0.16em] text-gink uppercase">
+          Admin secret
+        </label>
+        <input
+          type="password"
+          value={adminSecret}
+          onChange={(e) => setAdminSecret(e.target.value)}
+          placeholder="Server ADMIN_SECRET"
+          autoComplete="off"
+          className="w-full rounded-[var(--p-r-card)] border border-hair bg-card px-4 py-3 text-[15px] text-gink outline-none focus:border-gink-40"
+        />
+
         <button
           onClick={handleRenew}
-          disabled={loading || !restaurantName.trim()}
+          disabled={loading || !restaurantName.trim() || !adminSecret}
           className="mt-2 inline-flex h-11 items-center justify-center rounded-full px-5 text-[13px] font-semibold transition active:scale-[0.99] g-primary disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {loading ? 'Renewing…' : 'Renew trial'}
