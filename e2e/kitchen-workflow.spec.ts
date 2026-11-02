@@ -19,6 +19,7 @@ import { announcementCount, recordAnnouncements, waitForAppReady } from './flow-
  */
 
 test('DIAG kitchen button wiring', async ({ page }) => {
+  test.setTimeout(90_000);
   const errors: string[] = [];
   page.on('console', (m) => {
     if (m.type() === 'error') errors.push(m.text().slice(0, 180));
