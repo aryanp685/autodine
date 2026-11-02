@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
+import { FadeUp, FadeUpItem, PopIn, SpringUp } from '@/components/MotionBits';
 import { GuestOrderEditor } from '@/components/screens/GuestOrderEditor';
 import { PayOnline } from '@/components/PayOnline';
 import { PayUpi } from '@/components/PayUpi';
@@ -81,12 +82,21 @@ function OrderTrack({ prepStatus }: { prepStatus: string }) {
                 track rather than four statements. It is drawn by the row, and
                 stops at the last one, so the line never runs past "Served". */}
             <span aria-hidden="true" className="flex flex-col items-center self-stretch">
-              <span
-                className={[
-                  'mt-1 grid size-3 shrink-0 place-items-center rounded-full ring-2',
-                  state === 'todo' ? 'bg-paper ring-gink-12' : 'bg-[var(--p-accent)] ring-accent-soft',
-                ].join(' ')}
-              />
+              {state === 'now' ? (
+                /* Where the order is NOW is the one mark on the track the
+                   guest is actually reading; it pops in when the screen
+                   settles. The done/todo marks are context and stay still. */
+                <PopIn delay={0.32}>
+                  <span className="mt-1 grid size-3 shrink-0 place-items-center rounded-full bg-[var(--p-accent)] ring-2 ring-accent-soft" />
+                </PopIn>
+              ) : (
+                <span
+                  className={[
+                    'mt-1 grid size-3 shrink-0 place-items-center rounded-full ring-2',
+                    state === 'todo' ? 'bg-paper ring-gink-12' : 'bg-[var(--p-accent)] ring-accent-soft',
+                  ].join(' ')}
+                />
+              )}
               {index < PREP_STEPS.length - 1 && (
                 <span
                   className={[
@@ -96,15 +106,17 @@ function OrderTrack({ prepStatus }: { prepStatus: string }) {
                 />
               )}
             </span>
-            <span
-              className={[
-                'pb-3 text-[13px] leading-tight',
-                state === 'now' ? 'font-semibold text-gink' : state === 'done' ? 'text-gink-64' : 'text-gink-64',
-              ].join(' ')}
-            >
-              {step.label}
-              {index === currentIndex ? <span className="sr-only"> — where it is now</span> : null}
-            </span>
+            <FadeUpItem delay={0.1 + index * 0.07} className="min-w-0 flex-1">
+              <span
+                className={[
+                  'pb-3 text-[13px] leading-tight',
+                  state === 'now' ? 'font-semibold text-gink' : state === 'done' ? 'text-gink-64' : 'text-gink-64',
+                ].join(' ')}
+              >
+                {step.label}
+                {index === currentIndex ? <span className="sr-only"> — where it is now</span> : null}
+              </span>
+            </FadeUpItem>
           </li>
         );
       })}
@@ -232,52 +244,63 @@ export function OrderPlacedScreen({
       dock={
         /* The flow does not end here: a table usually orders again, and the
            screen used to offer no way back to the menu at all. */
-        <Link
-          href={menuHref}
-          className="g-primary flex h-12 w-full items-center justify-center rounded-full text-[14px] font-semibold"
-        >
-          Order something else
-        </Link>
+        <SpringUp className="w-full">
+          <Link
+            href={menuHref}
+            className="g-primary flex h-12 w-full items-center justify-center rounded-full text-[14px] font-semibold transition-transform duration-150 active:scale-[0.97]"
+          >
+            Order something else
+          </Link>
+        </SpringUp>
       }
     >
       <header className="px-4 pt-7 pb-5">
         {/* The one moment in the flow that deserves a mark. Drawn rather than
             typed: a tick in a circle reads at a glance from across a table,
-            and it is the only decoration on the screen. */}
-        <span
-          data-placed-mark={data.prepStatus === 'cancelled' ? 'void' : 'ok'}
-          aria-hidden="true"
-          className={[
-            'grid size-11 place-items-center rounded-full ring-1',
-            data.prepStatus === 'cancelled'
-              ? 'bg-[var(--alert)]/10 text-[var(--alert)] ring-[var(--alert)]/25'
-              : 'bg-accent-soft text-[var(--p-accent)] ring-[var(--p-accent)]/25',
-          ].join(' ')}
-        >
-          {data.prepStatus === 'cancelled' ? (
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
-            </svg>
-          ) : (
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M4 12.5l5 5L20 6.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          )}
-        </span>
+            and it is the only decoration on the screen. It lands with a small
+            spring -- the one place a little bounce is honest. */}
+        <PopIn>
+          <span
+            data-placed-mark={data.prepStatus === 'cancelled' ? 'void' : 'ok'}
+            aria-hidden="true"
+            className={[
+              'grid size-11 place-items-center rounded-full ring-1',
+              data.prepStatus === 'cancelled'
+                ? 'bg-[var(--alert)]/10 text-[var(--alert)] ring-[var(--alert)]/25'
+                : 'bg-accent-soft text-[var(--p-accent)] ring-[var(--p-accent)]/25',
+            ].join(' ')}
+          >
+            {data.prepStatus === 'cancelled' ? (
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M4 12.5l5 5L20 6.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </span>
+        </PopIn>
 
-        <p className="g-eyebrow mt-3.5">
-          {data.prepStatus === 'cancelled' ? 'Order cancelled' : 'Order placed'}
-        </p>
-        <h1 className="g-display mt-1">
-          {data.tableLabel ? `Table ${data.tableLabel}` : 'Counter order'}
-        </h1>
-        <p className="g-lede mt-1">
-          {data.restaurantName} ·{' '}
-          {data.awaitingConfirmation && data.prepStatus !== 'cancelled'
-            ? 'waiting for the table to be confirmed'
-            : prepLabel}
-          {data.prepStatus === 'cancelled' ? ' · nothing is owed' : ''}
-        </p>
+        <FadeUp delay={0.1} className="mt-3.5">
+          <p className="g-eyebrow">
+            {data.prepStatus === 'cancelled' ? 'Order cancelled' : 'Order placed'}
+          </p>
+        </FadeUp>
+        <FadeUp delay={0.18}>
+          <h1 className="g-display mt-1">
+            {data.tableLabel ? `Table ${data.tableLabel}` : 'Counter order'}
+          </h1>
+        </FadeUp>
+        <FadeUp delay={0.26}>
+          <p className="g-lede mt-1">
+            {data.restaurantName} ·{' '}
+            {data.awaitingConfirmation && data.prepStatus !== 'cancelled'
+              ? 'waiting for the table to be confirmed'
+              : prepLabel}
+            {data.prepStatus === 'cancelled' ? ' · nothing is owed' : ''}
+          </p>
+        </FadeUp>
 
         {/* HELD, AND SAYING SO.
             In a scan-mode restaurant the first order of a sitting waits for one
@@ -297,12 +320,14 @@ export function OrderPlacedScreen({
           </p>
         ) : null}
 
-        <p aria-label="Order reference" className="mt-3 flex items-center gap-2 text-[11.5px] text-gink-46">
-          <span className="tracking-[0.08em] uppercase">Reference</span>
-          <strong className="tnum rounded-md bg-gink-07 px-2 py-1 text-[13px] tracking-[0.12em] text-gink">
-            {data.code}
-          </strong>
-        </p>
+        <FadeUp delay={0.34}>
+          <p aria-label="Order reference" className="mt-3 flex items-center gap-2 text-[11.5px] text-gink-46">
+            <span className="tracking-[0.08em] uppercase">Reference</span>
+            <strong className="tnum rounded-md bg-gink-07 px-2 py-1 text-[13px] tracking-[0.12em] text-gink">
+              {data.code}
+            </strong>
+          </p>
+        </FadeUp>
 
         {/* What happens next, from the state the kitchen last wrote. A
             cancelled order has no track: there is nothing left to move
@@ -368,8 +393,9 @@ export function OrderPlacedScreen({
         */}
         <ReorderOffer slug={slug} enabled={data.prepStatus !== 'cancelled'} />
 
-        <section className="mt-4 rounded-2xl border border-hair-strong bg-card px-4 py-4">
-          <h2 className="mb-1 text-[11px] font-semibold tracking-[0.1em] text-gink-46 uppercase">Bill</h2>
+        <FadeUp inView>
+          <section className="mt-4 rounded-2xl border border-hair-strong bg-card px-4 py-4">
+            <h2 className="mb-1 text-[11px] font-semibold tracking-[0.1em] text-gink-46 uppercase">Bill</h2>
           <dl className="text-[13.5px]">
             <div className="flex items-baseline justify-between py-1 text-gink-64">
               <dt>Subtotal</dt>
@@ -437,7 +463,8 @@ export function OrderPlacedScreen({
           ) : (
             <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">Paid. Thank you.</p>
           )}
-        </section>
+          </section>
+        </FadeUp>
       </div>
     </GuestFlow>
   );
