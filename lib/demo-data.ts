@@ -8,6 +8,9 @@
  * No live payment service is invoked anywhere in these prototypes.
  */
 
+import { rupeesToPaise } from '@/lib/money';
+import type { MenuItemPrice } from '@/lib/cart-pricing';
+
 export const inr = (n: number) =>
   '₹' + n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
@@ -296,6 +299,41 @@ export type KitchenOrder = {
   items: { qty: number; name: string; detail?: string; veg: boolean }[];
   total: number;
 };
+
+/**
+ * The demo menu in the shape the cart and the bill price against.
+ *
+ * The menu screen falls back to `items` when there is no database; the cart
+ * and checkout screens price against MenuItemPrice[] and were handed an empty
+ * list in demo mode instead. A demo guest who added a demo dish therefore
+ * watched the cart call it "no longer available", and the Place order button
+ * never rendered at all -- the sample could not order the sample.
+ *
+ * This is the same join the menu's running-total bar does over these items
+ * (CustomerMenu's menuPrices), kept here so the demo has one source for it.
+ */
+export const menuPriceItems: MenuItemPrice[] = items.map((i) => ({
+  id: i.id,
+  name: i.name,
+  ...(i.img ? { img: i.img } : {}),
+  pricePaise: rupeesToPaise(i.price),
+  isVeg: i.veg,
+  isAvailable: i.available,
+  addons: (i.modifiers ?? []).flatMap((group) =>
+    group.options.map((option) => ({
+      id: option.id,
+      name: option.name,
+      pricePaise: rupeesToPaise(option.price),
+      groupId: group.id,
+      maxSelect: group.max ?? group.options.length,
+    })),
+  ),
+  variants: (i.variants ?? []).map((variant) => ({
+    id: variant.id,
+    name: variant.name,
+    pricePaise: rupeesToPaise(variant.price),
+  })),
+}));
 
 export const kitchenOrders: KitchenOrder[] = [
   {
