@@ -83,12 +83,14 @@ jobs:
               const entries = [];
               const clean = (s) =>
                 String(s ?? "")
+                  .replace(/[^\x20-\x7e\u00a0-\u024f\u2010-\u2027\u20b9\u00b7\u00d7\u2192]/g, " ")
                   .split("\n")
                   .map((line) => line.trim())
                   .filter(Boolean)
                   .slice(0, 8)
                   .join(" | ")
-                  .slice(0, 800);
+                  .replaceAll("::", ":")
+                  .slice(0, 700);
               const walk = (suite) => {
                 for (const spec of suite.specs ?? []) {
                   for (const t of spec.tests ?? []) {
@@ -121,10 +123,10 @@ jobs:
                 .sort((a, b) => b.msg.length - a.msg.length)
                 .slice(0, 9)
                 .forEach((e) => console.log(`::${e.level} title=${e.title}::${e.msg}`));
-              if (fail > 0) process.exit(1);
+              if (fail > 0) process.exitCode = 1;
             } catch (err) {
               console.log(`::error title=e2e walker crashed::${String(err && err.stack ? err.stack : err).split("\n").slice(0, 6).join(" | ").slice(0, 800)}`);
-              process.exit(1);
+              process.exitCode = 1;
             }
           '
 
