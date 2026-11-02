@@ -51,15 +51,17 @@ jobs:
       # The count is asserted, not assumed: a config that silently matched no
       # tests would otherwise "pass" and prove nothing.
       #
-      # 16 = 4 desktop + 5 phone + 7 integration. The integration ones need a
-      # real deployment and real accounts, so without secrets they report as
+      # 77 = 5 desktop + 5 phone + 13 guest-ordering + 7 security + 8 kitchen
+      # + 8 cashier + 31 integration. The integration ones need a real
+      # deployment and real accounts, so without secrets they report as
       # SKIPPED -- they are in the list so that they cannot quietly stop being
-      # discoverable, not because this job verifies them.
-      - name: Expect 16 tests
+      # discoverable, not because this job verifies them. The 46 hermetic ones
+      # (desktop/phone/guest/staff) run here against demo mode.
+      - name: Expect 77 tests
         run: |
           listed=$(npx playwright test --list | tail -1)
           echo "$listed"
-          echo "$listed" | grep -q "Total: 16 tests"
+          echo "$listed" | grep -q "Total: 77 tests"
 
       # Two reporters: list for a human reading the log, json for the summary
       # step below. The json file is the source of the per-test line.

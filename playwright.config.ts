@@ -53,6 +53,29 @@ export default defineConfig({
     },
     {
       /*
+       * The guest ordering flow at phone width: QR verification, the menu,
+       * variants and the cart, server-priced totals, the double-tap guard on
+       * Place order, and the tamper/failure cases — the screens a diner on a
+       * phone actually touches. Its own file per area, its own project, so a
+       * failure names the width and the workflow it came from.
+       */
+      name: 'guest',
+      testMatch: /(?:guest-ordering|security)\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'], viewport: { width: 390, height: 844 } },
+    },
+    {
+      /*
+       * The staff workflows at desk width — the kitchen pass (all four
+       * columns on one screen) and the counter (queue + till panel side by
+       * side). Both boards are read at a glance and tapped with wet hands;
+       * 1280×800 is the wall-tablet/laptop shape they are designed for.
+       */
+      name: 'staff',
+      testMatch: /(?:kitchen-workflow|cashier-workflow)\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } },
+    },
+    {
+      /*
        * Tests that need a real deployment and real accounts.
        *
        * They exist as a project rather than as loose files so that
