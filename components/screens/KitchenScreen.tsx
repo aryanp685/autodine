@@ -34,7 +34,9 @@ import {
   cancelText,
   createAnnounceQueue,
   newOrderText,
+  newOrderTextEn,
   orderAnnouncement,
+  orderAnnouncementEn,
   primeOnOpen,
   selectNewTickets,
   type AnnounceQueue,
@@ -80,6 +82,15 @@ const VOICE_KEY = 'autodine:kitchen:voice';
 const SPEED_KEY = 'autodine:kitchen:speed';
 const EXPRESSIVE_KEY = 'autodine:kitchen:expressive';
 const DIALECT_KEY = 'autodine:kitchen:dialect';
+const LANG_KEY = 'autodine:kitchen:lang';
+
+/**
+ * Which language the pass speaks. Hindi is the board's mother tongue -- the
+ * expressive pass, the dialects and the desi voices all live there. English
+ * is the plain twin: the same announcement, said the way an English kitchen
+ * hears it.
+ */
+type AnnounceLang = 'hi' | 'en';
 
 /**
  * How fast to read, as a multiple of the kitchen's natural pace
@@ -281,6 +292,8 @@ export function Kitchen({
   const [voiceList, setVoiceList] = useState<{ name: string; lang: string; localService?: boolean; default?: boolean }[]>([]);
   const [voicePref, setVoicePref] = useState('');
   const [speed, setSpeed] = useState<Speed>('normal');
+  /** Which language the pass announces in: Hindi (default) or English. */
+  const [announceLang, setAnnounceLang] = useState<AnnounceLang>('hi');
   /** Expressive desi personality on/off. Default on — the voice prototype. */
   const [expressive, setExpressive] = useState(true);
   /** Which desi dialect the voice speaks: Nagpuri (default) or Mumbai. */
@@ -378,6 +391,9 @@ export function Kitchen({
   /** The same chime the voice uses, reachable from the order pass. */
   const chimeRef = useRef<(() => void) | null>(null);
   const speedRef = useRef<Speed>('normal');
+  const langRef = useRef<AnnounceLang>('hi');
+  /** The voice resolver, so a language change can re-run it without re-mounting. */
+  const refreshRef = useRef<(() => void) | null>(null);
   const queueRef = useRef<AnnounceQueue | null>(null);
   const speakerAllowedRef = useRef(false);
   const announcementTicketsRef = useRef(new Map<string, BoardTicket>());
@@ -448,6 +464,12 @@ export function Kitchen({
         setSpeed(storedSpeed);
         speedRef.current = storedSpeed;
       }
+
+      const storedLang = localStorage.getItem(LANG_KEY);
+      if (storedLang === 'hi' || storedLang === 'en') {
+        setAnnounceLang(storedLang);
+        langRef.current = storedLang;
+      }
     } catch {
       /* private mode: defaults are fine */
     }
@@ -463,10 +485,11 @@ export function Kitchen({
       localStorage.setItem(SPEED_KEY, speed);
       localStorage.setItem(EXPRESSIVE_KEY, expressive ? 'on' : 'off');
       localStorage.setItem(DIALECT_KEY, dialect);
+      localStorage.setItem(LANG_KEY, announceLang);
     } catch {
       /* nothing to persist to */
     }
-  }, [audio, speaksHere, voicePref, speed, expressive, dialect, ready]);
+  }, [audio, speaksHere, voicePref, speed, expressive, dialect, announceLang, ready]);
 
   /* ------------------------------------------------------------------ speech */
 
@@ -541,24 +564,26 @@ export function Kitchen({
     const refresh = () => {
       engine.refreshVoices();
       engine.setRateScale(SPEEDS[speedRef.current]);
+      engine.setTargetFamily(langRef.current);
+      refreshRef.current = refresh;
 
       // A saved preference may not exist on this browser. Clear it only after
-      // at least one Hindi candidate is discovered, then report the automatic
+      // at least one candidate is discovered, then report the automatic
       // selection rather than implying the stale preference is still active.
       let stored = '';
       try { stored = localStorage.getItem(VOICE_KEY) ?? ''; } catch { /* storage is optional */ }
-      const hindiVoices = engine.hindiVoices();
-      if (stored && hindiVoices.length > 0 && !engine.setVoiceName(stored)) {
+      const familyVoices = langRef.current === 'en' ? engine.englishVoices() : engine.hindiVoices();
+      if (stored && familyVoices.length > 0 && !engine.setVoiceName(stored)) {
         // Only call a saved voice stale once the browser has discovered at
-        // least one Hindi voice; an initially empty list is still loading.
+        // least one candidate; an initially empty list is still loading.
         try { localStorage.removeItem(VOICE_KEY); } catch { /* storage is optional */ }
         setVoicePref('');
         engine.setVoiceName(null);
-      } else if (stored && hindiVoices.length > 0) {
+      } else if (stored && familyVoices.length > 0) {
         engine.setVoiceName(stored);
       }
 
-      setVoiceList(hindiVoices.map((v) => ({
+      setVoiceList(familyVoices.map((v) => ({
         name: v.name,
         lang: v.lang,
         localService: v.localService,
@@ -663,8 +688,22 @@ export function Kitchen({
       engine.cancel();
       speechRef.current = null;
       queueRef.current = null;
+      refreshRef.current = null;
     };
   }, [restaurantId, changeMissed]);
+
+  /**
+   * The announcement language follows the board's control.
+   *
+   * Re-resolving the voice is the whole job: the family decides which voices
+   * can carry the text at all (Devanagari in an English voice is silence),
+   * so the candidate, the picker list and the saved preference all move with
+   * it. The queue does not re-mount -- tickets keep their place.
+   */
+  useEffect(() => {
+    langRef.current = announceLang;
+    refreshRef.current?.();
+  }, [announceLang]);
 
   const speak = useCallback(
     (key: string, text: string, label: string, priority: 'order' | 'info' = 'order'): EnqueueResult => {
@@ -689,12 +728,17 @@ export function Kitchen({
    */
   const getAnnouncementText = useCallback(
     (ticket: { table: string; items: { qty: number; name: string; detail?: string; spoken?: string | null }[]; note?: string | null }): string => {
+      if (announceLang === 'en') {
+        // English says the plain pass. The expressive personality is Hindi,
+        // dialect and all -- mixing the two would speak neither well.
+        return orderAnnouncementEn({ ...ticket, note: ticket.note ?? undefined });
+      }
       if (expressive) {
         return buildKitchenAnnouncement(ticket.table, ticket.items, ticket.note, dialect);
       }
       return orderAnnouncement({ ...ticket, note: ticket.note ?? undefined });
     },
-    [expressive, dialect],
+    [announceLang, expressive, dialect],
   );
 
   /**
@@ -1048,7 +1092,20 @@ export function Kitchen({
     }
 
     if (voiceState === 'no-voice') {
-      return {
+      return announceLang === 'en'
+        ? {
+            tone: 'alert' as const,
+            title: 'No English voice on this device — nothing will be read out.',
+            body: 'Install an English text-to-speech voice — Android: Settings → System → Languages → Text-to-speech → install English; iPad: Settings → Accessibility → Spoken Content → Voices → English. A Hindi voice will also say these English sentences, with an accent. Then reload this page.',
+            action: {
+              label: 'Check again',
+              run: () => {
+                speechRef.current?.refreshVoices();
+                window.location.reload();
+              },
+            },
+          }
+        : {
         tone: 'alert',
         title: 'No Hindi voice on this device — nothing will be read out.',
         body: 'The board does not switch to English: Devanagari read by an English voice is silence, not Hindi. Install a Hindi text-to-speech voice — Android: Settings → System → Languages → Text-to-speech → install हिन्दी; iPad: Settings → Accessibility → Spoken Content → Voices → Hindi. Then reload this page.',
@@ -1248,11 +1305,14 @@ export function Kitchen({
       { qty: 2, name: 'Paneer Tikka' },
       { qty: 1, name: 'Butter Naan', detail: 'Half · Extra cheese' },
     ];
+    if (announceLang === 'en') {
+      return newOrderTextEn('T5', items, 'less spicy');
+    }
     if (expressive) {
       return buildKitchenAnnouncement('T5', items, 'less spicy', dialect);
     }
     return newOrderText('T5', items, 'less spicy');
-  }, [expressive, dialect]);
+  }, [announceLang, expressive, dialect]);
   const selectedVoiceInfo = voiceList.find((voice) => voice.name === voiceName);
 
   const readMissed = () => {
@@ -1340,15 +1400,23 @@ export function Kitchen({
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-hair px-4 py-2.5">
           <h2 className="text-[13.5px] font-semibold tracking-[-0.014em] text-gink">Sound</h2>
           <span className="text-[11.5px] text-gink-46">
-            Orders are read out in Hindi, one sentence at a time.
+            {announceLang === 'en'
+              ? 'Orders are read out in English, one sentence at a time.'
+              : 'Orders are read out in Hindi, one sentence at a time.'}
           </span>
           <span className="ml-auto flex flex-wrap items-center gap-1.5">
             <Tag tone={voiceState === 'ready' ? 'live' : 'due'}>
-              {voiceState === 'starting'
-                ? 'हिंदी · आवाज़ खोज रहे हैं'
-                : voiceState === 'ready'
-                  ? 'हिंदी · तैयार'
-                  : 'हिंदी · आवाज़ नहीं'}
+              {announceLang === 'en'
+                ? voiceState === 'starting'
+                  ? 'English · आवाज़ खोज रहे हैं'
+                  : voiceState === 'ready'
+                    ? 'English · तैयार'
+                    : 'English · आवाज़ नहीं'
+                : voiceState === 'starting'
+                  ? 'हिंदी · आवाज़ खोज रहे हैं'
+                  : voiceState === 'ready'
+                    ? 'हिंदी · तैयार'
+                    : 'हिंदी · आवाज़ नहीं'}
             </Tag>
             {live && (
               <Tag tone={speaksHere ? 'neutral' : 'due'}>
@@ -1379,6 +1447,21 @@ export function Kitchen({
             Kitchen audio {audio ? 'on' : 'off'}
           </button>
 
+          {/* Which language the pass speaks. The user's own words: "Hindi me
+              announce kare ya English me" -- as plain a control as the speed
+              or the voice. Hindi keeps the expressive voice and the dialects;
+              English says the same facts in the plain pass. */}
+          <Segmented
+            label="Announcement language"
+            size="sm"
+            value={announceLang}
+            onChange={(next) => setAnnounceLang(next)}
+            options={[
+              { value: 'hi', label: 'हिन्दी' },
+              { value: 'en', label: 'English' },
+            ]}
+          />
+
           {/* Speed. The base pace is already brisk; this is the operator's
               trim around it, because a hurried Hindi voice is what sounds
               slurred and every room is different. */}
@@ -1399,42 +1482,47 @@ export function Kitchen({
           />
 
           {/* Which desi dialect the voice speaks. Same facts either way --
-              which table, what arrived -- said the way this room talks. */}
-          <Segmented
-            label="बोली — announcement style"
-            size="sm"
-            value={dialect}
-            onChange={(next) => setDialect(next)}
-            options={[
-              { value: 'nagpuri', label: DIALECT_LABELS.nagpuri },
-              { value: 'mumbai', label: DIALECT_LABELS.mumbai },
-            ]}
-          />
+              which table, what arrived -- said the way this room talks.
+              Hindi only: an English announcement has no dialect to choose. */}
+          {announceLang === 'hi' && (
+            <Segmented
+              label="बोली — announcement style"
+              size="sm"
+              value={dialect}
+              onChange={(next) => setDialect(next)}
+              options={[
+                { value: 'nagpuri', label: DIALECT_LABELS.nagpuri },
+                { value: 'mumbai', label: DIALECT_LABELS.mumbai },
+              ]}
+            />
+          )}
 
           {/* Expressive desi personality. When on, the kitchen voice uses
               rotated announcements in the chosen dialect (Nagpuri or Mumbai)
               with automatic standard-Hindi fallback for safety-critical
               notes. When off, the original plain Devanagari sentence is
-              used. */}
-          <button
-            type="button"
-            aria-pressed={expressive}
-            title={expressive ? 'Turn off the expressive kitchen voice' : 'Turn on the expressive kitchen voice'}
-            onClick={() => setExpressive(!expressive)}
-            className={[
-              expressive ? 'text-gink' : 'text-gink-64 hover:text-gink',
-            ].join(' ')}
-          >
-            <SwitchTrack on={expressive} />
-            Desi voice {expressive ? 'on' : 'off'}
-          </button>
+              used. Hindi only -- the personality does not translate. */}
+          {announceLang === 'hi' && (
+            <button
+              type="button"
+              aria-pressed={expressive}
+              title={expressive ? 'Turn off the expressive kitchen voice' : 'Turn on the expressive kitchen voice'}
+              onClick={() => setExpressive(!expressive)}
+              className={[
+                expressive ? 'text-gink' : 'text-gink-64 hover:text-gink',
+              ].join(' ')}
+            >
+              <SwitchTrack on={expressive} />
+              Desi voice {expressive ? 'on' : 'off'}
+            </button>
+          )}
 
-          {/* The exact runtime Hindi candidate is shown below, including its
+          {/* The exact runtime candidate is shown below, including its
               language tag. Names and language tags identify the browser voice;
               they do not guarantee human-sounding pronunciation. */}
           {voiceList.length > 1 && (
             <select
-              aria-label="Hindi voice"
+              aria-label={announceLang === 'en' ? 'Voice' : 'Hindi voice'}
               value={voicePref}
               onChange={(event) => {
                 const next = event.target.value;
@@ -1444,7 +1532,7 @@ export function Kitchen({
               }}
               className="h-9 max-w-[190px] rounded-[var(--p-r-control)] border border-hair-strong bg-card px-2.5 pr-7 text-[12.5px] text-gink transition-colors hover:border-gink-28 focus:border-[var(--p-accent)] focus:ring-2 focus:ring-[color-mix(in_oklab,var(--p-accent)_16%,transparent)] focus:outline-none"
             >
-              <option value="">स्वचालित (पहले hi-IN)</option>
+              <option value="">{announceLang === 'en' ? 'Auto (en first)' : 'स्वचालित (पहले hi-IN)'}</option>
               {voiceList.map((voice) => (
                 <option key={voice.name} value={voice.name}>
                   {voiceLabel(voice.name)} · {voice.lang}{voice.default ? ' · system default' : ''}
@@ -1476,7 +1564,9 @@ export function Kitchen({
           <span className="ml-auto flex items-center gap-1.5">
             <button
               type="button"
-              aria-label="Test the selected voice with a representative Hindi sample order"
+              aria-label={announceLang === 'en'
+                ? 'Test the selected voice with a representative English sample order'
+                : 'Test the selected voice with a representative Hindi sample order'}
               title={sampleText}
               onClick={() => replay(`test:${Date.now()}`, sampleText, 'Test')}
               className={btn('ghost', 'sm')}

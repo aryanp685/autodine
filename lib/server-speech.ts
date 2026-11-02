@@ -368,6 +368,13 @@ export function createServerSpeech(
     available,
     voiceName,
     hindiVoices,
+    // The Edge catalogue is two Hindi neural voices, and neural Hindi voices
+    // read English with an Indian accent -- audible and clear, unlike Latin
+    // script in a voice that skips it. For English announcements these are
+    // the voices the board has; the picker shows their language tag so the
+    // operator knows exactly what speaks.
+    englishVoices: hindiVoices,
+    setTargetFamily: () => { /* the catalogue speaks both; nothing to switch */ },
     setVoiceName,
     setRateScale,
     unavailable,

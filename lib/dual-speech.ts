@@ -73,6 +73,19 @@ export function createDualSpeech(
     return browser.hindiVoices();
   }
 
+  function englishVoices(): VoiceLike[] {
+    if (!serverFailed && server.available()) return server.englishVoices();
+    return browser.englishVoices();
+  }
+
+  function setTargetFamily(family: 'hi' | 'en'): void {
+    // Both engines are always informed: the server catalogue speaks both
+    // languages, and the browser engine picks its automatic candidate for
+    // whichever family the board announces in.
+    server.setTargetFamily(family);
+    browser.setTargetFamily(family);
+  }
+
   function setVoiceName(name: string | null): boolean {
     // Try the server engine first. If the name is not in its catalogue,
     // try the browser engine. Both are always informed: the browser engine
@@ -137,6 +150,8 @@ export function createDualSpeech(
     available,
     voiceName,
     hindiVoices,
+    englishVoices,
+    setTargetFamily,
     setVoiceName,
     setRateScale,
     unavailable,

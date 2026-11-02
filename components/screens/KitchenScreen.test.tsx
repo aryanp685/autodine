@@ -29,12 +29,14 @@ vi.mock('@/lib/supabase/client', () => ({
 }));
 
 describe('Kitchen board', () => {
-  it('offers one language, not a picker that implies a second one exists', () => {
+  it('offers the announcement language the user asked for: Hindi or English', () => {
     const html = renderToStaticMarkup(<Kitchen />);
 
-    expect(html).toContain('हिंदी');
-    expect(html).not.toContain('aria-label="Announcement language"');
-    expect(html).not.toContain('>English<');
+    // "Kitchen me option: Hindi me announce kare ya English me" -- as plain a
+    // picker as the voice or the speed, with Hindi the board's default.
+    expect(html).toContain('aria-label="Announcement language"');
+    expect(html).toContain('>हिन्दी<');
+    expect(html).toContain('>English<');
   });
 
   it('names the voice it will use rather than promising Hindi blindly', () => {
@@ -50,7 +52,9 @@ describe('Kitchen board', () => {
     expect(html).toContain('Test sample order');
     expect(html).toContain('aria-label="Test the selected voice with a representative Hindi sample order"');
     expect(html).toContain('दो पनीर टिक्का');
-    expect(html).toContain('हाफ बटर नान, एक्स्ट्रा चीज़');
+    // The add-on joins the dish in the with-phrase a kitchen says:
+    // "बटर नान एक्स्ट्रा चीज़ के साथ", not a bare comma list.
+    expect(html).toContain('हाफ बटर नान एक्स्ट्रा चीज़ के साथ');
   });
 
   it('lets the operator slow the voice down from the board itself', () => {
