@@ -51,6 +51,22 @@ test('DIAG kitchen button wiring', async ({ page }) => {
       els.map((el) => el.getAttribute('data-state')),
     );
 
+  // What is actually sitting on the button's centre, and its top-left corner?
+  const hit = await btn.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const describe = (x: number, y: number) => {
+      const found = document.elementFromPoint(x, y);
+      return found
+        ? `${found.tagName}.${String(found.className).slice(0, 60)} ==el? ${found === el}`
+        : 'nothing';
+    };
+    return {
+      rect: r.toJSON(),
+      centre: describe(r.left + r.width / 2, r.top + r.height / 2),
+      corner: describe(r.left + 3, r.top + 3),
+    };
+  });
+
   let pwStates = 'not-run';
   try {
     await btn.click();
@@ -58,6 +74,18 @@ test('DIAG kitchen button wiring', async ({ page }) => {
     pwStates = JSON.stringify(await statesOf());
   } catch (e) {
     pwStates = `CLICK-ERR ${String(e).slice(0, 140)}`;
+  }
+
+  let cornerStates = 'not-run';
+  try {
+    await page
+      .getByRole('button', { name: 'Start preparing' })
+      .first()
+      .click({ position: { x: 3, y: 3 } });
+    await page.waitForTimeout(400);
+    cornerStates = JSON.stringify(await statesOf());
+  } catch (e) {
+    cornerStates = `CLICK-ERR ${String(e).slice(0, 140)}`;
   }
 
   let domStates = 'not-run';
@@ -73,7 +101,7 @@ test('DIAG kitchen button wiring', async ({ page }) => {
   }
 
   throw new Error(
-    `DIAG info=${JSON.stringify(info)} pw=${pwStates} dom=${domStates} console=${JSON.stringify(errors.slice(0, 6))}`,
+    `DIAG hit=${JSON.stringify(hit)} pw=${pwStates} corner=${cornerStates} dom=${domStates} console=${JSON.stringify(errors.slice(0, 6))}`,
   );
 });
 
