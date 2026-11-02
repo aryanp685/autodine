@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import { FadeUp } from '@/components/MotionBits';
 
 /* ============================================================================
    The shell for every screen a guest can reach without a session: the bare
@@ -115,28 +116,38 @@ export function GuestNote({
       </header>
 
       <main data-gnote-body="" className="mx-auto w-full max-w-[620px] flex-1 px-5 py-12">
+        {/* The body settles in as one thought: eyebrow, title, words, foot.
+            Every entry screen inherits this from the shell -- the gate, the
+            code form, the dead-card page, the 404 -- so the first screen after
+            a scan carries the same polish as the menu it opens. */}
         {eyebrow ? (
-          <p
-            data-gnote-eyebrow=""
-            className="g-eyebrow"
-          >
-            {eyebrow}
-          </p>
+          <FadeUp delay={0}>
+            <p
+              data-gnote-eyebrow=""
+              className="g-eyebrow"
+            >
+              {eyebrow}
+            </p>
+          </FadeUp>
         ) : null}
 
-        <h1 className="g-display mt-2.5 text-[30px]">
-          {title}
-        </h1>
+        <FadeUp delay={0.08}>
+          <h1 className="g-display mt-2.5 text-[30px]">
+            {title}
+          </h1>
+        </FadeUp>
 
-        <div className="mt-4 text-[14.5px] leading-[1.6] text-gink-64">{children}</div>
+        <FadeUp delay={0.16}>
+          <div className="mt-4 text-[14.5px] leading-[1.6] text-gink-64">{children}</div>
+        </FadeUp>
 
         {foot ? (
-          <>
+          <FadeUp delay={0.24}>
             <hr className="mt-8 mb-3 border-hair" />
             <p className="text-[12px] leading-[1.6] text-gink-46 [&_a]:font-medium [&_a]:text-gink-64 [&_a]:underline [&_a]:underline-offset-2">
               {foot}
             </p>
-          </>
+          </FadeUp>
         ) : null}
       </main>
     </div>
