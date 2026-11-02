@@ -1,6 +1,30 @@
 import { type Page } from '@playwright/test';
 
 /**
+ * WAIT FOR THE PAGE TO BE A REACT PAGE BEFORE CLICKING ANYTHING ON IT.
+ *
+ * The shell suite learned this the hard way (see waitForHydration in
+ * shell.ts): Next.js serves real HTML first and attaches the behaviour
+ * seconds later. A click that lands in between goes to a button that does
+ * nothing yet -- it is not flaky, it is early. Every spec that clicks or
+ * reads state React derives from localStorage waits here first.
+ */
+export async function waitForAppReady(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () => {
+      for (const el of document.querySelectorAll('a, button, input, textarea, label')) {
+        for (const key of Object.keys(el)) {
+          if (key.startsWith('__reactProps') || key.startsWith('__reactFiber')) return true;
+        }
+      }
+      return false;
+    },
+    undefined,
+    { timeout: 20_000 },
+  );
+}
+
+/**
  * Shared helpers for the browser-level restaurant-workflow tests.
  *
  * DEMO MODE (the default for `playwright.config.ts`)

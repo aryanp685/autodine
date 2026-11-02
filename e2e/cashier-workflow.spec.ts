@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { waitForAppReady } from './flow-helpers';
 
 /**
  * THE COUNTER (CASHIER), IN A BROWSER.
@@ -20,6 +21,7 @@ import { expect, test } from '@playwright/test';
 test.describe('the queue and the bill', () => {
   test('every waiting ticket is listed with its table and money owed', async ({ page }) => {
     await page.goto('/cashier');
+    await waitForAppReady(page);
 
     for (const [code, table, amount] of [
       ['A-1041', 'T3', '₹1,247'],
@@ -37,6 +39,7 @@ test.describe('the queue and the bill', () => {
     page,
   }) => {
     await page.goto('/cashier');
+    await waitForAppReady(page);
 
     await page.getByRole('button', { name: 'Select A-1038 at T9, ₹737 outstanding' }).click();
 
@@ -49,6 +52,7 @@ test.describe('the queue and the bill', () => {
 
   test('a Collect link from the ledger opens that exact ticket', async ({ page }) => {
     await page.goto('/cashier?order=A-1036');
+    await waitForAppReady(page);
 
     const panel = page.locator('[aria-labelledby="cashier-order-title"]');
     await expect(panel).toContainText('A-1036');
@@ -60,6 +64,7 @@ test.describe('the queue and the bill', () => {
 test.describe('counter payments', () => {
   test('the settle button names the method and the exact amount', async ({ page }) => {
     await page.goto('/cashier');
+    await waitForAppReady(page);
     await page.getByRole('button', { name: 'Select A-1041 at T3, ₹1,247 outstanding' }).click();
 
     const method = page.getByRole('group', { name: 'Payment method' });
@@ -79,6 +84,7 @@ test.describe('counter payments', () => {
     page,
   }) => {
     await page.goto('/cashier');
+    await waitForAppReady(page);
 
     await page.getByRole('button', { name: 'Select A-1041 at T3, ₹1,247 outstanding' }).click();
     await page.locator('[data-counter-cta]').click();
@@ -100,6 +106,7 @@ test.describe('counter payments', () => {
     page,
   }) => {
     await page.goto('/cashier');
+    await waitForAppReady(page);
 
     await page.getByRole('button', { name: 'Select A-1041 at T3, ₹1,247 outstanding' }).click();
     await page.locator('[data-counter-cta]').click();
@@ -118,6 +125,7 @@ test.describe('counter payments', () => {
 
   test('the sample queue resets, and the reset says nothing was real', async ({ page }) => {
     await page.goto('/cashier');
+    await waitForAppReady(page);
 
     await page.locator('[data-counter-cta]').click(); // settles A-1041
     await expect(page.getByRole('button', { name: /Select A-1041/ })).toHaveCount(0);
@@ -136,6 +144,7 @@ test.describe('cancellation at the counter', () => {
     page,
   }) => {
     await page.goto('/cashier');
+    await waitForAppReady(page);
     await page.getByRole('button', { name: 'Select A-1041 at T3, ₹1,247 outstanding' }).click();
 
     await page.getByRole('button', { name: 'Cancel this order' }).click();

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { announcementCount, recordAnnouncements } from './flow-helpers';
+import { announcementCount, recordAnnouncements, waitForAppReady } from './flow-helpers';
 
 /**
  * THE KITCHEN BOARD, IN A BROWSER.
@@ -23,6 +23,7 @@ test.describe('incoming orders are readable at a glance', () => {
     page,
   }) => {
     await page.goto('/kitchen');
+    await waitForAppReady(page);
 
     const ticket = page.locator('article[data-state="new"]', { hasText: 'T7' });
     await expect(ticket).toHaveCount(1);
@@ -44,21 +45,27 @@ test.describe('incoming orders are readable at a glance', () => {
     await expect(ticket).toContainText('Ring the bell — no onion in the gravy.');
   });
 
-  test('payment state is on the ticket: paid online vs pay at counter', async ({ page }) => {
+  test('payment state is on the ticket: a pending bill is named, a paid one is not', async ({
+    page,
+  }) => {
     await page.goto('/kitchen');
+    await waitForAppReady(page);
 
+    // Paid online leaves no doubt to state: no chip at all. The pending one
+    // names exactly what is owed.
     await expect(
       page.locator('article[data-state="new"]', { hasText: 'T7' }),
-    ).toContainText('UPI · paid online');
+    ).not.toContainText('Unpaid');
     await expect(
       page.locator('article[data-state="preparing"]', { hasText: 'T3' }),
-    ).toContainText('Pay at counter');
+    ).toContainText('Unpaid · pay at counter');
   });
 });
 
 test.describe('Preparing → Ready → Served', () => {
   test('one tap moves a ticket forward, and only forward', async ({ page }) => {
     await page.goto('/kitchen');
+    await waitForAppReady(page);
 
     // New → Preparing.
     const start = page
@@ -91,6 +98,7 @@ test.describe('Preparing → Ready → Served', () => {
 
   test('a moved ticket leaves its column behind empty and honest', async ({ page }) => {
     await page.goto('/kitchen');
+    await waitForAppReady(page);
 
     await page
       .locator('article[data-state="new"]', { hasText: 'T7' })
@@ -107,6 +115,7 @@ test.describe('Preparing → Ready → Served', () => {
 test.describe('cancellation', () => {
   test('cancel asks first, and "No" changes nothing', async ({ page }) => {
     await page.goto('/kitchen');
+    await waitForAppReady(page);
 
     await page.getByRole('button', { name: 'Cancel order for T7' }).click();
 
@@ -122,6 +131,7 @@ test.describe('cancellation', () => {
 
   test('a confirmed cancel removes the ticket from the board', async ({ page }) => {
     await page.goto('/kitchen');
+    await waitForAppReady(page);
 
     await page.getByRole('button', { name: 'Cancel order for T7' }).click();
     await page.getByRole('button', { name: 'Yes, cancel' }).click();
@@ -137,6 +147,7 @@ test.describe('voice announcements are never repeated', () => {
   }) => {
     await recordAnnouncements(page);
     await page.goto('/kitchen');
+    await waitForAppReady(page);
     await expect(page.locator('article[data-state="new"]', { hasText: 'T7' })).toBeVisible();
 
     // Every ticket already on the board is primed as seen: a board that
@@ -173,6 +184,7 @@ test.describe('voice announcements are never repeated', () => {
     // seen stays seen (localStorage), so the kitchen is not shouted at twice
     // for orders it already heard.
     await page.reload();
+    await waitForAppReady(page);
     await expect(page.locator('article[data-state="new"]', { hasText: 'T7' })).toBeVisible();
     await page.waitForTimeout(1500);
     expect(await announcementCount(page), 'a refresh re-announced the board').toBe(0);
@@ -184,6 +196,7 @@ test.describe('refresh and reconnect', () => {
     page,
   }) => {
     await page.goto('/kitchen');
+    await waitForAppReady(page);
     await page
       .locator('article[data-state="new"]', { hasText: 'T7' })
       .getByRole('button', { name: 'Start preparing' })
@@ -191,6 +204,7 @@ test.describe('refresh and reconnect', () => {
     await expect(page.locator('article[data-state="preparing"]', { hasText: 'T7' })).toBeVisible();
 
     await page.reload();
+    await waitForAppReady(page);
 
     // The sample board keeps its state only in this browser; a reload is a
     // fresh read. What must never happen is a dead shell or missing controls:

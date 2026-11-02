@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { seedCart } from './flow-helpers';
+import { seedCart, waitForAppReady } from './flow-helpers';
 
 /**
  * FAILURE AND TAMPERING, IN A BROWSER.
@@ -34,6 +34,7 @@ test.describe('tampered client prices', () => {
       },
     ]);
     await page.goto('/menu/cart');
+    await waitForAppReady(page);
 
     // ₹299 × 2, from the menu. Not ₹2, not ₹0.02.
     await expect(page.locator('dl').getByText('₹598')).toBeVisible();
@@ -43,8 +44,14 @@ test.describe('tampered client prices', () => {
   test('the order form posts ids and quantities — never a price', async ({ page }) => {
     await seedCart(page, [{ itemId: 'it-hara-bhara', qty: 2 }]);
     await page.goto('/menu/checkout');
+    await waitForAppReady(page);
 
-    const raw = await page.locator('form#co-place-order input[name="lines"]').inputValue();
+    // The hidden input is rendered empty on the server and filled from the
+    // browser's cart after hydration; wait for the real line to land before
+    // reading it.
+    const input = page.locator('form#co-place-order input[name="lines"]');
+    await expect(input).toHaveValue(/it-hara-bhara/);
+    const raw = await input.inputValue();
     const lines = JSON.parse(raw) as Array<Record<string, unknown>>;
 
     expect(lines).toHaveLength(1);
@@ -70,6 +77,7 @@ test.describe('invalid items and quantities', () => {
       { itemId: 'it-ghost-dish-9999', qty: 2 },
     ]);
     await page.goto('/menu/cart');
+    await waitForAppReady(page);
 
     // The ghost id can neither be priced nor hidden: the screen says a dish
     // is no longer available and offers to remove it.
@@ -79,7 +87,7 @@ test.describe('invalid items and quantities', () => {
     await page.getByRole('button', { name: 'Remove it from my cart' }).click();
     await expect(notice).toHaveCount(0);
     // The real dish is untouched; the ghost left with its button.
-    await expect(page.getByText('Hara Bhara Kebab')).toBeVisible();
+    await expect(page.getByText('Hara Bhara Kebab').first()).toBeVisible();
     await expect(page.getByText('it-ghost-dish-9999')).toHaveCount(0);
   });
 
@@ -90,6 +98,7 @@ test.describe('invalid items and quantities', () => {
       { itemId: 'it-seekh', qty: -3 },
     ]);
     await page.goto('/menu/cart');
+    await waitForAppReady(page);
 
     // All three are refused at parse time: no line, no total, no crash — and
     // above all no ₹1 phantom row for a dish that was never really chosen.
@@ -103,6 +112,7 @@ test.describe('invalid items and quantities', () => {
   test('the ceiling itself is honoured: 99 plates are 99 plates', async ({ page }) => {
     await seedCart(page, [{ itemId: 'it-hara-bhara', qty: 99 }]);
     await page.goto('/menu/cart');
+    await waitForAppReady(page);
 
     // 299 × 99 = 29,601 — the clamp is a boundary, not a suggestion.
     await expect(page.locator('dl').getByText('₹29,601')).toBeVisible();
@@ -128,6 +138,7 @@ test.describe('routes that must fail honestly', () => {
     await page.goto('/t/problem?r=made-up-reason');
 
     await expect(page.getByRole('heading', { name: 'This card is not in use' })).toBeVisible();
+    await expect(page.getByText('Table access')).toBeVisible();
     await expect(page.getByRole('link', { name: 'AutoDine home' })).toBeVisible();
   });
 });
