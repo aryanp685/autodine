@@ -79,6 +79,7 @@ jobs:
           node -e '
             const r = require("./playwright-report/results.json");
             let pass = 0, fail = 0, skip = 0;
+            const clean = (s) => String(s ?? "").split("\n").slice(0, 3).join(" | ").slice(0, 400);
             const walk = (suite) => {
               for (const spec of suite.specs ?? []) {
                 for (const t of spec.tests ?? []) {
@@ -93,9 +94,10 @@ jobs:
                   const results = t.results ?? [];
                   const skipped = results.length === 0 || results.every((x) => x.status === "skipped");
                   const ok = results.every((x) => x.status === "passed" || x.status === "skipped");
+                  const bad = results.find((x) => x.status !== "passed" && x.status !== "skipped");
                   if (skipped) { skip++; console.log(`::notice title=e2e SKIP::${spec.title}`); }
                   else if (ok) { pass++; console.log(`::notice title=e2e PASS::${spec.title}`); }
-                  else { fail++; console.log(`::error title=e2e FAIL::${spec.title}`); }
+                  else { fail++; console.log(`::error title=e2e FAIL::${spec.title} :: ${clean(bad?.error?.message)}`); }
                 }
               }
               for (const child of suite.suites ?? []) walk(child);
