@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useOptionalCart } from '@/components/CartProvider';
 import { browserStorage, readLastCart } from '@/lib/guest-orders';
 import type { StoredLine } from '@/lib/cart-storage';
@@ -41,8 +42,18 @@ export function ReorderButton({
   count: number;
   onRestore: () => void;
 }) {
+  const reduce = useReducedMotion();
+  const motionOn = !reduce;
   return (
-    <div className="mt-3 rounded-[16px] border border-hair bg-card px-4 py-3.5" data-reorder-offer="">
+    /* The offer appears only after mount -- so when it arrives, it should
+       arrive: a short settle instead of a card popping into existence. */
+    <motion.div
+      className="mt-3 rounded-[16px] border border-hair bg-card px-4 py-3.5"
+      data-reorder-offer=""
+      initial={motionOn ? { opacity: 0, y: 14 } : false}
+      animate={motionOn ? { opacity: 1, y: 0 } : undefined}
+      transition={{ type: 'spring', stiffness: 340, damping: 30 }}
+    >
       <p className="m-0 text-[12.5px] leading-[1.5] text-gink-46">
         Ordered {count === 1 ? 'one item' : `${count} items`} on this phone before? Put the same ones
         back in your cart — you see the prices again before anything is sent.
@@ -51,11 +62,11 @@ export function ReorderButton({
         type="button"
         onClick={onRestore}
         data-reorder-button=""
-        className="g-quiet mt-3 inline-flex h-10 items-center justify-center rounded-full px-4 text-[13px] font-semibold"
+        className="g-quiet mt-3 inline-flex h-10 items-center justify-center rounded-full px-4 text-[13px] font-semibold transition-transform duration-150 active:scale-[0.96]"
       >
         Order these again
       </button>
-    </div>
+    </motion.div>
   );
 }
 
