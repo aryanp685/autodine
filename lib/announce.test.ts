@@ -7,12 +7,14 @@ import {
   createAnnounceQueue,
   isTakeaway,
   newOrderText,
+  newOrderTextEn,
   orderAnnouncement,
   primeOnOpen,
   selectNewTickets,
   spokenAddons,
   spokenDetail,
   spokenItem,
+  spokenItemEn,
   spokenPortion,
   spokenTable,
   type SpeakableItem,
@@ -88,15 +90,36 @@ describe('spokenItem', () => {
     expect(spokenItem({ qty: 1, name: 'Veg Biryani', detail: 'Quarter' })).toBe('एक पाव वेज बिरयानी');
   });
 
-  it('puts an add-on after the dish, because it is an instruction about it', () => {
+  it('puts an add-on after the dish, in the with-phrase a kitchen says', () => {
     expect(spokenItem({ qty: 1, name: 'Butter Naan', detail: 'Extra cheese' })).toBe(
-      'एक बटर नान, एक्स्ट्रा चीज़',
+      'एक बटर नान एक्स्ट्रा चीज़ के साथ',
+    );
+  });
+
+  it('says the add-on in its oblique form before "के साथ"', () => {
+    // The order the user asked for: "Hyderabadi chicken biryani with raita" --
+    // रायता is served रायते के साथ, not रायता के साथ.
+    expect(spokenItem({ qty: 1, name: 'Hyderabadi Chicken Biryani', detail: 'Raita' })).toBe(
+      'एक हैदराबादी चिकन बिरयानी रायते के साथ',
+    );
+  });
+
+  it('keeps a quality add-on trailing the dish, because it is about how to cook it', () => {
+    // "ज़्यादा तीखा के साथ" would serve a mood with the plate. A quality
+    // trails the dish the way the request does; only things get "के साथ".
+    expect(spokenItem({ qty: 1, name: 'Masala Dosa', detail: 'Extra spicy' })).toBe(
+      'एक मसाला डोसा, ज़्यादा तीखा',
+    );
+    // And both shapes in one clause: the thing joined to the dish, the
+    // quality trailing.
+    expect(spokenItem({ qty: 1, name: 'Masala Dosa', detail: 'Extra spicy · Mint chutney' })).toBe(
+      'एक मसाला डोसा मिंट चटनी के साथ, ज़्यादा तीखा',
     );
   });
 
   it('keeps portion and add-on on their own sides of the dish name', () => {
     expect(spokenItem({ qty: 2, name: 'Butter Naan', detail: 'Half · Extra cheese' })).toBe(
-      'दो हाफ बटर नान, एक्स्ट्रा चीज़',
+      'दो हाफ बटर नान एक्स्ट्रा चीज़ के साथ',
     );
   });
 
@@ -125,7 +148,7 @@ describe('spokenItem', () => {
     );
     // Feminine, because प्लेट is. "आधा प्लेट" is an accent.
     expect(spokenItem({ qty: 2, name: 'Butter Naan', detail: 'Full Plate · Extra cheese' })).toBe(
-      'दो पूरी प्लेट बटर नान, एक्स्ट्रा चीज़',
+      'दो पूरी प्लेट बटर नान एक्स्ट्रा चीज़ के साथ',
     );
   });
 
@@ -165,7 +188,7 @@ describe('newOrderText', () => {
   it('says table first, dishes next, the guest note last', () => {
     const text = newOrderText('T1', [chicken], 'no onion');
 
-    expect(text).toBe('नया ऑर्डर आया है। टेबल एक। एक हाफ बटर चिकन, बटर नान। प्याज़ नहीं।');
+    expect(text).toBe('नया ऑर्डर आया है। टेबल एक। एक हाफ बटर चिकन बटर नान के साथ। प्याज़ नहीं।');
   });
 
   it('never hands a Latin letter to the voice', () => {
@@ -188,7 +211,7 @@ describe('newOrderText', () => {
       { qty: 1, name: 'Butter Naan', detail: 'Half · Extra cheese · Jain' },
     ]);
 
-    expect(text).toBe('नया ऑर्डर आया है। टेबल एक। एक हाफ बटर नान, एक्स्ट्रा चीज़, जैन।');
+    expect(text).toBe('नया ऑर्डर आया है। टेबल एक। एक हाफ बटर नान एक्स्ट्रा चीज़ और जैन के साथ।');
   });
 
   it('says the restaurant\'s own add-ons, not just the ones we know', () => {
@@ -271,6 +294,62 @@ describe('newOrderText', () => {
     const text = newOrderText('T5', [naan], note);
     expect(text.split('कृपया').length - 1).toBe(30);
     expect(text).not.toContain('…');
+  });
+});
+
+/**
+ * The English pass.
+ *
+ * The board can announce in Hindi or English. English is the twin of the
+ * Hindi pass, not a translation of it: same clause shape -- table, dishes,
+ * the guest's note last -- said the way an English kitchen hears it. The
+ * user's own pins: a dish comes "with raita", a note says "make extra
+ * spicy" and "less spicy".
+ */
+describe('newOrderTextEn', () => {
+  it('says the dish with its add-on in a with-phrase, and the note as an instruction', () => {
+    const text = newOrderTextEn(
+      'T2',
+      [{ qty: 1, name: 'Hyderabadi Chicken Biryani', detail: 'Raita' }],
+      'extra spicy',
+    );
+
+    expect(text).toBe(
+      'New order. Table 2. 1 Hyderabadi Chicken Biryani with Raita. Make extra spicy.',
+    );
+  });
+
+  it('says a reduction note exactly as the guest meant it', () => {
+    expect(newOrderTextEn('T2', [{ qty: 1, name: 'Masala Dosa' }], 'less spicy')).toBe(
+      'New order. Table 2. 1 Masala Dosa. Less spicy.',
+    );
+  });
+
+  it('keeps a quality add-on trailing the dish and the things in a with-phrase', () => {
+    expect(
+      spokenItemEn({ qty: 1, name: 'Masala Dosa', detail: 'Extra spicy · Mint chutney' }),
+    ).toBe('1 Masala Dosa with Mint chutney, Extra spicy');
+  });
+
+  it('says a printed card label as the number, not the letters', () => {
+    expect(newOrderTextEn('T2', [naan])).toContain('Table 2.');
+    expect(newOrderTextEn('T2', [naan])).not.toContain('T2');
+    expect(newOrderTextEn('Takeaway', [naan])).toContain('New takeaway order.');
+    expect(newOrderTextEn('Takeaway', [naan])).not.toContain('Table');
+  });
+
+  it('pairs dishes the way the Hindi pass does, and never drops one', () => {
+    const items: SpeakableItem[] = Array.from({ length: 7 }, (_, i) => ({
+      qty: 1,
+      name: `Dish ${i + 1}`,
+    }));
+    const text = newOrderTextEn('T5', items);
+    for (let i = 1; i <= 7; i += 1) expect(text).toContain(`Dish ${i}`);
+  });
+
+  it('says no note at all when there is none', () => {
+    const text = newOrderTextEn('T2', [naan]);
+    expect(text.endsWith('2 Full Butter Naan.')).toBe(true);
   });
 });
 

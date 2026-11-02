@@ -50,6 +50,7 @@ import { DEFAULT_EDGE_VOICE, type Gender, voiceGender } from './tts-voices';
  * Hindi, so an unmatched device is a device that cannot announce.
  */
 export const HINDI_LANGS: readonly string[] = ['hi-IN', 'hi'];
+export const ENGLISH_LANGS: readonly string[] = ['en-IN', 'en-GB', 'en-US', 'en'];
 
 function normaliseLang(lang: string): string {
   return lang.replace('_', '-').toLowerCase();
@@ -130,6 +131,25 @@ export function pickHindiVoice(voices: VoiceLike[], target: Gender = 'Male'): Vo
   return family.length > 0 ? bestOf(family, target) : null;
 }
 
+/**
+ * The English voice this device will use, or null.
+ *
+ * Same tiering as the Hindi pick: the Indian voice first (the board's rooms
+ * are here), then the other English regions, then any `en-*` tag.
+ */
+export function pickEnglishVoice(voices: VoiceLike[], target: Gender = 'Male'): VoiceLike | null {
+  if (voices.length === 0) return null;
+
+  for (const wanted of ENGLISH_LANGS) {
+    const targetLang = normaliseLang(wanted);
+    const exact = voices.filter((voice) => normaliseLang(voice.lang) === targetLang);
+    if (exact.length > 0) return bestOf(exact, target);
+  }
+
+  const family = voices.filter((voice) => normaliseLang(voice.lang).startsWith('en-'));
+  return family.length > 0 ? bestOf(family, target) : null;
+}
+
 /* ------------------------------------------------------------------- engine */
 
 /**
@@ -187,6 +207,18 @@ export type SpeechEngine = {
    * this device can establish which one is clearest.
    */
   hindiVoices(): VoiceLike[];
+  /**
+   * Every English-tagged voice this browser reports, for the board's English
+   * announcements. English text is readable by almost any voice, so this is
+   * about clarity, not capability.
+   */
+  englishVoices(): VoiceLike[];
+  /**
+   * Which language the board is announcing in. A Hindi announcement needs a
+   * Hindi voice -- Devanagari read by an English voice is silence -- so the
+   * automatic candidate, the voice list and setVoiceName all follow this.
+   */
+  setTargetFamily(family: 'hi' | 'en'): void;
   /**
    * Force a specific Hindi voice, or null to return to the automatic candidate.
    *
@@ -420,6 +452,8 @@ export function createKitchenSpeech(
   let targetGender: Gender = voiceGender(DEFAULT_EDGE_VOICE) ?? 'Male';
   let rateScale = 1;
   let cancelCurrent: (() => void) | null = null;
+  /** Which language the board announces in. Follows the board's control. */
+  let family: 'hi' | 'en' = 'hi';
 
   const startTimeoutMs = options.startTimeoutMs ?? env.startTimeoutMs ?? DEFAULT_START_TIMEOUT_MS;
   const completionTimeoutMs = options.completionTimeoutMs ?? DEFAULT_COMPLETION_TIMEOUT_MS;
@@ -437,13 +471,20 @@ export function createKitchenSpeech(
 
   refreshVoices();
 
+  function familyVoices(list: VoiceLike[]): VoiceLike[] {
+    const tag = family === 'en' ? /^en(-|$)/i : /^hi(-|$)/i;
+    return list.filter((candidate) => tag.test(candidate.lang.replace('_', '-')));
+  }
+
   function voice(): VoiceLike | null {
     if (!loaded) refreshVoices();
     if (forced) {
       const chosen = voices.find((candidate) => candidate.name === forced);
       if (chosen) return chosen;
     }
-    return pickHindiVoice(voices, targetGender);
+    return family === 'en'
+      ? pickEnglishVoice(voices, targetGender)
+      : pickHindiVoice(voices, targetGender);
   }
 
   return {
@@ -591,6 +632,22 @@ export function createKitchenSpeech(
       if (!loaded) refreshVoices();
       return voices.filter((candidate) => /^hi(-|$)/i.test(candidate.lang.replace('_', '-')));
     },
+    englishVoices() {
+      if (!loaded) refreshVoices();
+      return familyVoices(voices).filter((candidate) => /^en(-|$)/i.test(candidate.lang.replace('_', '-')));
+    },
+    setTargetFamily(next) {
+      family = next;
+      // A voice chosen for the other language cannot carry this text; go
+      // back to the automatic candidate for the new family.
+      if (forced) {
+        const tag = next === 'en' ? /^en(-|$)/i : /^hi(-|$)/i;
+        const stillValid = voices.some(
+          (candidate) => candidate.name === forced && tag.test(candidate.lang.replace('_', '-')),
+        );
+        if (!stillValid) forced = null;
+      }
+    },
     setVoiceName(name) {
       if (name === null) {
         forced = null;
@@ -604,7 +661,10 @@ export function createKitchenSpeech(
       const gender = voiceGender(name);
       if (gender) targetGender = gender;
       if (!loaded) refreshVoices();
-      if (!voices.some((candidate) => candidate.name === name && /^hi(-|$)/i.test(candidate.lang.replace('_', '-')))) return false;
+      // The chosen voice must belong to the family being announced: Hindi
+      // text in an English voice is silence.
+      const tag = family === 'en' ? /^en(-|$)/i : /^hi(-|$)/i;
+      if (!voices.some((candidate) => candidate.name === name && tag.test(candidate.lang.replace('_', '-')))) return false;
       forced = name;
       return true;
     },
@@ -612,7 +672,7 @@ export function createKitchenSpeech(
       if (!Number.isFinite(scale)) return;
       rateScale = Math.min(1.3, Math.max(0.6, scale));
     },
-    unavailable: () => !env.synthesis || (loaded && pickHindiVoice(voices) === null),
+    unavailable: () => !env.synthesis || (loaded && voice() === null),
     stalled: () => didStall,
     clearStall: () => { didStall = false; },
     cancel() {

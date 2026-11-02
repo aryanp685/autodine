@@ -29,6 +29,7 @@
  */
 
 import { hindiNumber, noteToDevanagari, spokenName, toDevanagari } from './hindi';
+import { noteToEnglish, QUALITY_WORDS } from './english';
 
 /**
  * How the queue talks. Injected so the queue can be tested without a browser.
@@ -363,6 +364,31 @@ function spokenPart(part: string): string {
   return DETAIL[part.toLowerCase()] ?? toDevanagari(part);
 }
 
+/**
+ * Which add-ons are instructions about the dish rather than things with it.
+ *
+ * "Extra spicy" is HOW the dish is made; "Raita" is WHAT comes with it. The
+ * with-phrase ("…के साथ") carries the things; a quality keeps trailing the
+ * dish the way a request does -- "मसाला डोसा नारियल चटनी के साथ, ज़्यादा तीखा".
+ */
+function isQualityPart(part: string): boolean {
+  const words = part.toLowerCase().split(/\s+/).filter(Boolean);
+  const last = words[words.length - 1];
+  return Boolean(last && QUALITY_WORDS.has(last));
+}
+
+/**
+ * The form a dish-part takes before "के साथ".
+ *
+ * Hindi puts the noun in the oblique before a postposition: "रायता" is served
+ * "रायते के साथ". Only the last word changes, and only the masculine -ा
+ * ending declines this way -- everything else (चीज़, नान, चटनी, जैन) is
+ * already its own oblique form.
+ */
+function withOblique(rendered: string): string {
+  return rendered.replace(/ा(?=\s*$)/, 'े');
+}
+
 /** The whole detail line, in the order it was written. */
 export function spokenDetail(detail: string | undefined): string {
   return detailParts(detail).map(spokenPart).join(', ');
@@ -385,20 +411,28 @@ export function spokenAddons(detail: string | undefined): string {
 }
 
 /**
- * One dish, as a clause: "एक आधा बटर चिकन, एक्स्ट्रा चीज़".
+ * One dish, as a clause: "एक आधा बटर चिकन बटर नान के साथ".
  *
  * The order is the order a person says it in -- how many, how much of it, what
  * it is, and then anything extra asked for on top. Quantity and portion are
- * words, the name is Devanagari, and only the add-ons trail the dish.
+ * words, the name is Devanagari, and the add-ons join the dish the way a
+ * kitchen says them: the things served with it in a "के साथ" phrase ("रायते
+ * के साथ"), a quality about the dish trailing it (", ज़्यादा तीखा").
  */
 export function spokenItem(item: SpeakableItem): string {
   const sourceName = item.name.trim();
   const name = sourceName ? spokenName(sourceName, item.spoken) : 'आइटम';
   const portion = spokenPortion(item.detail);
-  const addons = spokenAddons(item.detail);
+  const parts = detailParts(item.detail).filter((part) => PORTION[part.toLowerCase()] === undefined);
+  const things = parts.filter((part) => !isQualityPart(part));
+  const qualities = parts.filter(isQualityPart);
 
   const base = [hindiNumber(item.qty), portion, name].filter(Boolean).join(' ');
-  return addons ? `${base}, ${addons}` : base;
+  const withPhrase = things.length
+    ? ` ${things.map((part) => withOblique(spokenPart(part))).join(' और ')} के साथ`
+    : '';
+  const qualityPhrase = qualities.length ? `, ${qualities.map(spokenPart).join(', ')}` : '';
+  return `${base}${withPhrase}${qualityPhrase}`;
 }
 
 /**
@@ -447,6 +481,78 @@ export function newOrderText(table: string, items: SpeakableItem[], note?: strin
     // neither the order nor the note, and the note is already phrased as
     // something a cook acts on.
     clauses.push(`${noteToDevanagari(trimmedNote)}।`);
+  }
+
+  return clauses.join(' ');
+}
+
+/* ========================================================================== */
+/*  The same pass, in English                                                 */
+/* ========================================================================== */
+
+/**
+ * A table label in English.
+ *
+ * "T2" is a printed card: the T is the word "Table", so saying it too gives
+ * "Table T two" for a table the kitchen knows as table 2. Anything else --
+ * "Room 204", "A2" -- is said as written; English voices read digits natively.
+ */
+export function spokenTableEn(table: string): string {
+  const trimmed = table.trim();
+  if (isTakeaway(table)) return 'Takeaway';
+  const printed = trimmed.match(/^(?:table|t)[\s.\-–—]*([0-9]+)$/i);
+  return (printed ? printed[1] : trimmed) || trimmed;
+}
+
+/**
+ * One dish, in English: "2 Half Butter Naan with Extra Cheese, extra spicy".
+ *
+ * Same clause shape as the Hindi side -- quantity, portion, name, the things
+ * served with it in a "with" phrase, and a quality about the dish trailing
+ * it. The words are the ones the menu wrote; English needs no transliteration.
+ */
+export function spokenItemEn(item: SpeakableItem): string {
+  const name = item.name.trim() || 'item';
+  const parts = detailParts(item.detail);
+  const portion = parts.filter((part) => PORTION[part.toLowerCase()] !== undefined);
+  const addons = parts.filter((part) => PORTION[part.toLowerCase()] === undefined);
+  const things = addons.filter((part) => !isQualityPart(part));
+  const qualities = addons.filter(isQualityPart);
+
+  const base = [item.qty, ...portion, name].filter(Boolean).join(' ');
+  const withPhrase = things.length ? ` with ${things.join(' and ')}` : '';
+  const qualityPhrase = qualities.length ? `, ${qualities.join(', ')}` : '';
+  return `${base}${withPhrase}${qualityPhrase}`;
+}
+
+/**
+ * What the pass says when an order arrives, in English.
+ *
+ * The English twin of newOrderText: table first, dishes next, the guest's
+ * note last and unlabelled -- "Make extra spicy." is the guest's instruction,
+ * said as one.
+ */
+export function newOrderTextEn(table: string, items: SpeakableItem[], note?: string | null): string {
+  const clauses: string[] = [];
+
+  if (isTakeaway(table)) {
+    clauses.push('New takeaway order.');
+  } else {
+    clauses.push('New order.');
+    clauses.push(`Table ${spokenTableEn(table)}.`);
+  }
+
+  for (let index = 0; index < items.length; index += 2) {
+    const group = items.slice(index, index + 2).map(spokenItemEn);
+    clauses.push(`${group.join(' and ')}.`);
+  }
+
+  const trimmedNote = (note ?? '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/[.,;:!?]+$/, '');
+  if (trimmedNote) {
+    clauses.push(`${noteToEnglish(trimmedNote)}.`);
   }
 
   return clauses.join(' ');
@@ -521,6 +627,16 @@ export type AnnounceableTicket = {
 /** The full spoken sentence for one ticket. */
 export function orderAnnouncement(ticket: AnnounceableTicket): string {
   return newOrderText(ticket.table, ticket.items, ticket.note);
+}
+
+/**
+ * The same ticket, for the board's English mode.
+ *
+ * Never used together with the expressive pass -- that personality is Hindi,
+ * dialect and all. English says the plain pass or nothing at all.
+ */
+export function orderAnnouncementEn(ticket: AnnounceableTicket): string {
+  return newOrderTextEn(ticket.table, ticket.items, ticket.note);
 }
 
 /**
