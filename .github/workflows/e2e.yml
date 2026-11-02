@@ -125,8 +125,11 @@ jobs:
                * error text for. */
               entries
                 .filter((e) => e.level === "error")
-                .sort((a, b) => b.msg.length - a.msg.length)
-                .slice(0, 5)
+                .sort((a, b) => {
+                  const d = (x) => (x.msg.startsWith("DIAG") ? 1 : 0);
+                  return d(b) - d(a) || b.msg.length - a.msg.length;
+                })
+                .slice(0, 7)
                 .forEach((e) => console.log(`::error title=e2e FAIL::${e.msg}`));
               if (fail > 0) process.exitCode = 1;
             } catch (err) {
