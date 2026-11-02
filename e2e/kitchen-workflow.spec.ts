@@ -20,91 +20,41 @@ import { announcementCount, recordAnnouncements, waitForAppReady } from './flow-
 
 test('DIAG kitchen button wiring', async ({ page }) => {
   test.setTimeout(90_000);
-  const errors: string[] = [];
-  page.on('console', (m) => {
-    if (m.type() === 'error') errors.push(m.text().slice(0, 180));
-  });
-  page.on('pageerror', (e) => errors.push(`PAGEERROR ${String(e).slice(0, 260)}`));
-
   await page.goto('/kitchen');
   await waitForAppReady(page);
 
   const btn = page.getByRole('button', { name: 'Start preparing' }).first();
   const info = await btn.evaluate((el) => {
-    const keys = Object.keys(el);
-    const fiberKey = keys.find(
-      (k) => k.startsWith('__reactFiber') || k.startsWith('__reactInternalInstance'),
-    );
+    const keys = Object.keys(el).filter((k) => k.startsWith('__'));
     const propsKey = keys.find((k) => k.startsWith('__reactProps'));
     const props = propsKey ? (el as unknown as Record<string, unknown>)[propsKey] : null;
+    const r = (el as HTMLElement).getBoundingClientRect();
+    const hitEl = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
     return {
-      marked: keys.filter((k) => k.startsWith('__')).slice(0, 6),
-      fiber: Boolean(fiberKey),
-      props: Boolean(propsKey),
+      marks: keys.slice(0, 4),
       onClick: props ? typeof (props as { onClick?: unknown }).onClick : 'none',
-      disabled: (el as HTMLButtonElement).disabled,
-      rect: (el as HTMLElement).getBoundingClientRect().toJSON(),
+      rect: { x: r.x, y: r.y, w: r.width, h: r.height },
+      viewportH: window.innerHeight,
+      hit: hitEl ? `${hitEl.tagName} ==button? ${hitEl === el}` : 'nothing',
     };
   });
 
-  const statesOf = () =>
-    page.locator('article[data-state]').evaluateAll((els) =>
-      els.map((el) => el.getAttribute('data-state')),
-    );
-
-  // What is actually sitting on the button's centre, and its top-left corner?
-  const hit = await btn.evaluate((el) => {
-    const r = el.getBoundingClientRect();
-    const describe = (x: number, y: number) => {
-      const found = document.elementFromPoint(x, y);
-      return found
-        ? `${found.tagName}.${String(found.className).slice(0, 60)} ==el? ${found === el}`
-        : 'nothing';
-    };
-    return {
-      rect: r.toJSON(),
-      centre: describe(r.left + r.width / 2, r.top + r.height / 2),
-      corner: describe(r.left + 3, r.top + 3),
-    };
-  });
-
-  let pwStates = 'not-run';
+  const steps: string[] = [];
   try {
-    await btn.click();
-    await page.waitForTimeout(400);
-    pwStates = JSON.stringify(await statesOf());
+    await btn.click({ timeout: 5_000 });
+    steps.push('click-ok');
   } catch (e) {
-    pwStates = `CLICK-ERR ${String(e).slice(0, 140)}`;
+    steps.push(`click-ERR ${String(e).split('\n').slice(0, 5).join(' | ').slice(0, 400)}`);
   }
-
-  let cornerStates = 'not-run';
-  try {
-    await page
-      .getByRole('button', { name: 'Start preparing' })
-      .first()
-      .click({ position: { x: 3, y: 3 } });
-    await page.waitForTimeout(400);
-    cornerStates = JSON.stringify(await statesOf());
-  } catch (e) {
-    cornerStates = `CLICK-ERR ${String(e).slice(0, 140)}`;
+  const states: (string | null)[] = [];
+  for (const a of await page.locator('article[data-state]').all()) {
+    states.push(await a.getAttribute('data-state'));
   }
+  steps.push(`states=${JSON.stringify(states)}`);
 
-  let domStates = 'not-run';
-  try {
-    await page
-      .getByRole('button', { name: 'Start preparing' })
-      .first()
-      .evaluate((el) => (el as HTMLButtonElement).click());
-    await page.waitForTimeout(400);
-    domStates = JSON.stringify(await statesOf());
-  } catch (e) {
-    domStates = `DOM-ERR ${String(e).slice(0, 140)}`;
-  }
-
-  throw new Error(
-    `DIAG hit=${JSON.stringify(hit)} pw=${pwStates} corner=${cornerStates} dom=${domStates} console=${JSON.stringify(errors.slice(0, 6))}`,
-  );
+  throw new Error(`DIAG info=${JSON.stringify(info)} steps=${JSON.stringify(steps)}`);
 });
+
 
 test.describe('incoming orders are readable at a glance', () => {
   test('a ticket shows the table, every item with its quantity, and the note in full', async ({
