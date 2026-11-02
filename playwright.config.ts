@@ -36,6 +36,13 @@ export default defineConfig({
     baseURL: 'http://127.0.0.1:3100',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
+    /* The app draws its entrance and layout animations as springs, and a
+     * spring is still moving when Playwright presses the button: the click
+     * lands where the button was, not where it is, and the state change the
+     * test waits for never comes. The app has a first-class static path
+     * (useReducedMotion throughout) -- these tests exercise behaviour, not
+     * motion, so they run on it. */
+    reducedMotion: 'reduce',
   },
   projects: [
     {

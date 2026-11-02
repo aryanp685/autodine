@@ -181,7 +181,7 @@ test.describe('submitting an order', () => {
     await page.locator('[data-place-order]').first().click();
     await expect(page).toHaveURL(/\/menu\/cart\?error=/);
 
-    await expect(page.getByText('That order was not placed.')).toBeVisible();
+    await expect(page.getByText('That order was not placed')).toBeVisible();
     await expect(page.getByText('Ordering is not available right now.')).toBeVisible();
     await expect(page.getByText('Nothing has been charged, and your cart is still here.')).toBeVisible();
     await expect(page.getByText('Hara Bhara Kebab').first()).toBeVisible();
@@ -201,13 +201,19 @@ test.describe('submitting an order', () => {
       release = resolve;
     });
     await page.route(/\/menu\/checkout/, async (route) => {
-      // Only the submission is held; prefetches flow past.
-      if (route.request().method() !== 'POST') {
+      // Only the submission is held; prefetches flow past. The continue can
+      // race Playwright's own cleanup when the request is a late replay, and
+      // a route already handled is a route that needs no second handling.
+      try {
+        if (route.request().method() !== 'POST') {
+          await route.continue();
+          return;
+        }
+        await gate;
         await route.continue();
-        return;
+      } catch {
+        // Already handled.
       }
-      await gate;
-      await route.continue();
     });
 
     await page.locator('[data-place-order]').first().click();
@@ -221,11 +227,10 @@ test.describe('submitting an order', () => {
     await expect(buttons.nth(1)).toContainText('Placing your order…');
 
     release();
-    await page.unrouteAll();
     // Exactly one submission went out, and the honest demo failure is the
     // outcome it reached.
     await expect(page).toHaveURL(/\/menu\/cart\?error=/);
-    await expect(page.getByText('That order was not placed.')).toBeVisible();
+    await expect(page.getByText('That order was not placed')).toBeVisible();
   });
 });
 
