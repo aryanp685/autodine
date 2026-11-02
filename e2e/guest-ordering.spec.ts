@@ -37,7 +37,7 @@ test.describe('QR verification and honest problem pages', () => {
 
     await expect(page).toHaveURL(/\/t\/problem\?r=offline/);
     await expect(page.getByRole('heading', { name: 'Ordering is not switched on' })).toBeVisible();
-    await expect(page.getByText('You can still ask at the counter')).toBeVisible();
+    await expect(page.getByText('Please order with staff.')).toBeVisible();
     await expect(page.getByRole('link', { name: 'AutoDine home' })).toBeVisible();
   });
 });
