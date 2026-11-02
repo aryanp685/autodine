@@ -79,7 +79,14 @@ jobs:
           node -e '
             const r = require("./playwright-report/results.json");
             let pass = 0, fail = 0, skip = 0;
-            const clean = (s) => String(s ?? "").split("\n").slice(0, 3).join(" | ").slice(0, 400);
+            const clean = (s) =>
+              String(s ?? "")
+                .split("\n")
+                .map((line) => line.trim())
+                .filter(Boolean)
+                .slice(0, 8)
+                .join(" | ")
+                .slice(0, 800);
             const walk = (suite) => {
               for (const spec of suite.specs ?? []) {
                 for (const t of spec.tests ?? []) {

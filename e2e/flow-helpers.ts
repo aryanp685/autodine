@@ -12,11 +12,17 @@ import { type Page } from '@playwright/test';
  * and the screen it carries comes later, so a "somebody is hydrated" check
  * returns while the board's own buttons are still inert. Every button in
  * the DOM must carry React's mark before any of them is safe to press.
+ *
+ * Hidden inputs are excluded: Next.js drops its $ACTION_* bookkeeping
+ * inputs into forms after hydration, and those never carry React's mark.
+ * They are hidden, and nothing presses them.
  */
 export async function waitForAppReady(page: Page): Promise<void> {
   await page.waitForFunction(
     () => {
-      const interactive = document.querySelectorAll('a, button, input, textarea, label');
+      const interactive = document.querySelectorAll(
+        'a, button, input:not([type="hidden"]), textarea, label',
+      );
       if (interactive.length === 0) return false;
       for (const el of interactive) {
         let hydrated = false;
