@@ -146,7 +146,7 @@ test.describe('totals recomputed from the menu', () => {
     const summary = page.locator('dl');
     await expect(summary.getByText('Subtotal')).toBeVisible();
     await expect(summary.getByText('₹598')).toBeVisible();
-    await expect(summary.getByText(/Taxes \(5%\)/)).toBeVisible();
+    await expect(summary.getByText(/Taxes \(GST 5% · sample\)/)).toBeVisible();
     await expect(summary.getByText('₹30')).toBeVisible();
     // Exact: "Subtotal" also contains "Total", and two matches is a strict-
     // mode failure waiting to happen.
@@ -178,7 +178,7 @@ test.describe('submitting an order', () => {
     await page.goto('/menu/checkout');
     await waitForAppReady(page);
 
-    await page.locator('[data-place-order]').click();
+    await page.locator('[data-place-order]').first().click();
     await expect(page).toHaveURL(/\/menu\/cart\?error=/);
 
     await expect(page.getByText('That order was not placed.')).toBeVisible();
@@ -210,7 +210,7 @@ test.describe('submitting an order', () => {
       await route.continue();
     });
 
-    await page.locator('[data-place-order]').click();
+    await page.locator('[data-place-order]').first().click();
 
     // BOTH buttons, not just the one that was tapped. A guest who sees one
     // live button taps it again; a guest who sees none does not.
