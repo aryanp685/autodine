@@ -77,41 +77,55 @@ jobs:
         if: always()
         run: |
           node -e '
-            const r = require("./playwright-report/results.json");
-            let pass = 0, fail = 0, skip = 0;
-            const clean = (s) =>
-              String(s ?? "")
-                .split("\n")
-                .map((line) => line.trim())
-                .filter(Boolean)
-                .slice(0, 8)
-                .join(" | ")
-                .slice(0, 800);
-            const walk = (suite) => {
-              for (const spec of suite.specs ?? []) {
-                for (const t of spec.tests ?? []) {
-                  /* SKIPPED IS NOT PASSED.
-                   *
-                   * The integration project lives in this run so it stays
-                   * discoverable, and without secrets every one of its tests
-                   * skips itself. Counting those as PASS would put "the invite
-                   * flow was verified" in a green check for a flow that never
-                   * opened a page. They are counted separately and named as
-                   * skipped. */
-                  const results = t.results ?? [];
-                  const skipped = results.length === 0 || results.every((x) => x.status === "skipped");
-                  const ok = results.every((x) => x.status === "passed" || x.status === "skipped");
-                  const bad = results.find((x) => x.status !== "passed" && x.status !== "skipped");
-                  if (skipped) { skip++; console.log(`::notice title=e2e SKIP::${spec.title}`); }
-                  else if (ok) { pass++; console.log(`::notice title=e2e PASS::${spec.title}`); }
-                  else { fail++; console.log(`::error title=e2e FAIL::${spec.title} :: ${clean(bad?.error?.message)}`); }
+            try {
+              const r = require("./playwright-report/results.json");
+              let pass = 0, fail = 0, skip = 0;
+              const entries = [];
+              const clean = (s) =>
+                String(s ?? "")
+                  .split("\n")
+                  .map((line) => line.trim())
+                  .filter(Boolean)
+                  .slice(0, 8)
+                  .join(" | ")
+                  .slice(0, 800);
+              const walk = (suite) => {
+                for (const spec of suite.specs ?? []) {
+                  for (const t of spec.tests ?? []) {
+                    /* SKIPPED IS NOT PASSED.
+                     *
+                     * The integration project lives in this run so it stays
+                     * discoverable, and without secrets every one of its tests
+                     * skips itself. Counting those as PASS would put "the invite
+                     * flow was verified" in a green check for a flow that never
+                     * opened a page. They are counted separately and named as
+                     * skipped. */
+                    const results = t.results ?? [];
+                    const skipped = results.length === 0 || results.every((x) => x.status === "skipped");
+                    const ok = results.every((x) => x.status === "passed" || x.status === "skipped");
+                    const bad = results.find((x) => x.status !== "passed" && x.status !== "skipped");
+                    if (skipped) { skip++; entries.push({ level: "notice", title: "e2e SKIP", msg: spec.title }); }
+                    else if (ok) { pass++; entries.push({ level: "notice", title: "e2e PASS", msg: spec.title }); }
+                    else { fail++; entries.push({ level: "error", title: "e2e FAIL", msg: `${spec.title} :: ${clean(bad?.error?.message)}` }); }
+                  }
                 }
-              }
-              for (const child of suite.suites ?? []) walk(child);
-            };
-            for (const s of r.suites ?? []) walk(s);
-            console.log(`::notice title=e2e totals::${pass} passed, ${skip} skipped, ${fail} failed`);
-            if (fail > 0) process.exit(1);
+                for (const child of suite.suites ?? []) walk(child);
+              };
+              for (const s of r.suites ?? []) walk(s);
+              /* Totals first: GitHub keeps about ten annotations per level per
+               * step, and the number must never be the thing that scrolls off.
+               * The rest go out longest-message-first, so the errors that carry
+               * detail outlive the ones that only carry a name. */
+              console.log(`::notice title=e2e totals::${pass} passed, ${skip} skipped, ${fail} failed`);
+              entries
+                .sort((a, b) => b.msg.length - a.msg.length)
+                .slice(0, 9)
+                .forEach((e) => console.log(`::${e.level} title=${e.title}::${e.msg}`));
+              if (fail > 0) process.exit(1);
+            } catch (err) {
+              console.log(`::error title=e2e walker crashed::${String(err && err.stack ? err.stack : err).split("\n").slice(0, 6).join(" | ").slice(0, 800)}`);
+              process.exit(1);
+            }
           '
 
       - name: Upload the report when something failed

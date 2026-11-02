@@ -46,14 +46,34 @@ test('DIAG kitchen button wiring', async ({ page }) => {
     };
   });
 
-  await btn.evaluate((el) => (el as HTMLButtonElement).click());
-  await page.waitForTimeout(500);
-  const states = await page.locator('article[data-state]').evaluateAll((els) =>
-    els.map((el) => el.getAttribute('data-state')),
-  );
+  const statesOf = () =>
+    page.locator('article[data-state]').evaluateAll((els) =>
+      els.map((el) => el.getAttribute('data-state')),
+    );
+
+  let pwStates = 'not-run';
+  try {
+    await btn.click();
+    await page.waitForTimeout(400);
+    pwStates = JSON.stringify(await statesOf());
+  } catch (e) {
+    pwStates = `CLICK-ERR ${String(e).slice(0, 140)}`;
+  }
+
+  let domStates = 'not-run';
+  try {
+    await page
+      .getByRole('button', { name: 'Start preparing' })
+      .first()
+      .evaluate((el) => (el as HTMLButtonElement).click());
+    await page.waitForTimeout(400);
+    domStates = JSON.stringify(await statesOf());
+  } catch (e) {
+    domStates = `DOM-ERR ${String(e).slice(0, 140)}`;
+  }
 
   throw new Error(
-    `DIAG info=${JSON.stringify(info)} domClickStates=${JSON.stringify(states)} console=${JSON.stringify(errors.slice(0, 6))}`,
+    `DIAG info=${JSON.stringify(info)} pw=${pwStates} dom=${domStates} console=${JSON.stringify(errors.slice(0, 6))}`,
   );
 });
 
