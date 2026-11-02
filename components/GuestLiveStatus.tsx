@@ -29,6 +29,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import {
   checkedAgo,
   guestStatus,
@@ -89,6 +90,8 @@ export function GuestLiveStatus({
   const [phase, setPhase] = useState<PollerPhase>('idle');
   const [missing, setMissing] = useState(false);
   const [failures, setFailures] = useState(0);
+  const reduce = useReducedMotion();
+  const motionOn = !reduce;
 
   /** The newest status actually drawn. A ref so the stale guard sees it at once. */
   const shownRef = useRef<GuestStatusKey>('unknown');
@@ -148,7 +151,12 @@ export function GuestLiveStatus({
 
   if (missing) {
     return (
-      <div className={`rounded-[var(--p-r-card)] border border-hair bg-card px-4 py-3.5 ${className}`}>
+      <motion.div
+        initial={motionOn ? { opacity: 0, y: 12 } : false}
+        animate={motionOn ? { opacity: 1, y: 0 } : undefined}
+        transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+        className={`rounded-[var(--p-r-card)] border border-hair bg-card px-4 py-3.5 ${className}`}
+      >
         <p className="text-[13px] leading-[1.5] font-medium text-gink">
           This order could not be found
         </p>
@@ -157,14 +165,17 @@ export function GuestLiveStatus({
           reference <strong className="tnum tracking-[0.08em] text-gink">{code}</strong> is still
           enough for the staff to find it at the counter.
         </p>
-      </div>
+      </motion.div>
     );
   }
 
   if (!snapshot) {
     return (
-      <div
+      <motion.div
         data-live-status="checking"
+        initial={motionOn ? { opacity: 0, y: 12 } : false}
+        animate={motionOn ? { opacity: 1, y: 0 } : undefined}
+        transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
         className={`rounded-[var(--p-r-card)] border border-hair bg-card px-4 py-3.5 ${className}`}
         aria-live="polite"
       >
@@ -181,7 +192,7 @@ export function GuestLiveStatus({
         <p className="mt-2 text-[11.5px] text-gink-46">
           Reference <strong className="tnum tracking-[0.08em] text-gink">{code}</strong>
         </p>
-      </div>
+      </motion.div>
     );
   }
 
@@ -193,15 +204,27 @@ export function GuestLiveStatus({
   const freshness = checkedAgo(snapshot.checkedAt, Date.now());
 
   return (
-    <div
+    <motion.div
       data-live-status={status.key}
       data-live-phase={phase}
+      initial={motionOn ? { opacity: 0, y: 12 } : false}
+      animate={motionOn ? { opacity: 1, y: 0 } : undefined}
+      transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
       className={`rounded-[var(--p-r-card)] border border-hair bg-card px-4 py-3.5 ${className}`}
     >
       <div className="flex flex-wrap items-center gap-2">
-        <span className={`g-badge ${TONE_CLASS[status.tone] ?? TONE_CLASS.unknown}`}>
+        {/* The status word is the answer to the only question on this card;
+            when it changes, it says so with a small pop rather than swapping
+            under the guest's eye. */}
+        <motion.span
+          key={status.key}
+          className={`g-badge ${TONE_CLASS[status.tone] ?? TONE_CLASS.unknown}`}
+          initial={motionOn ? { scale: 1.18, opacity: 0.6 } : false}
+          animate={motionOn ? { scale: 1, opacity: 1 } : undefined}
+          transition={{ type: 'spring', stiffness: 480, damping: 20 }}
+        >
           {status.label}
-        </span>
+        </motion.span>
         {!status.terminal ? (
           <span className="inline-flex items-center gap-1.5 text-[11px] text-gink-46">
             <span
@@ -238,6 +261,6 @@ export function GuestLiveStatus({
           </>
         ) : null}
       </p>
-    </div>
+    </motion.div>
   );
 }

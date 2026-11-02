@@ -18,6 +18,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 
 import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
@@ -52,6 +53,8 @@ export function GuestOrderEditor({
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [confirming, setConfirming] = useState(false);
+  const reduce = useReducedMotion();
+  const motionOn = !reduce;
 
   const dirty = lines.some((l) => (qty[l.id] ?? l.qty) !== l.qty);
   const nextSubtotal = lines.reduce(
@@ -110,13 +113,20 @@ export function GuestOrderEditor({
   return (
     <>
       <div className="flex flex-col gap-2.5">
-        {lines.map((l) => {
+        {lines.map((l, index) => {
           const now = qty[l.id] ?? l.qty;
           const removed = canEdit && now === 0;
 
           return (
-            <div
+            <motion.div
               key={l.id}
+              initial={motionOn ? { opacity: 0, y: 14 } : false}
+              animate={motionOn ? { opacity: 1, y: 0 } : undefined}
+              transition={{
+                duration: 0.45,
+                delay: Math.min(index * 0.06, 0.3),
+                ease: [0.22, 1, 0.36, 1],
+              }}
               className={[
                 'g-card flex items-center gap-3 p-3',
                 removed ? 'g-void' : '',
@@ -170,10 +180,16 @@ export function GuestOrderEditor({
                 <span className="tnum shrink-0 text-[13px] font-semibold text-gink-64">{l.qty}</span>
               )}
 
-              <span className="tnum w-16 shrink-0 text-right text-[13.5px] font-semibold text-gink">
+              <motion.span
+                key={now}
+                className="tnum w-16 shrink-0 text-right text-[13.5px] font-semibold text-gink"
+                initial={motionOn ? { scale: 1.12 } : false}
+                animate={motionOn ? { scale: 1 } : undefined}
+                transition={{ type: 'spring', stiffness: 520, damping: 20 }}
+              >
                 {removed ? '—' : inr(paiseToRupees(l.unitPricePaise * now))}
-              </span>
-            </div>
+              </motion.span>
+            </motion.div>
           );
         })}
       </div>
