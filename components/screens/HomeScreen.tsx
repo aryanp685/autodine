@@ -35,33 +35,18 @@ import { BRAND_GREEN } from '@/lib/brand';
 const STEPS = [
   {
     n: '01',
-    title: 'Set up once',
-    body: 'Menu, prices, photos, tables. Print a card per table.',
+    title: 'Set up the menu',
+    body: 'Dishes, prices, photos, tables. Print a card per table.',
   },
   {
     n: '02',
-    title: 'Scan the card',
-    body: 'The card opens that table\'s menu. A room code proves the guest is seated.',
+    title: 'Guests scan and order',
+    body: 'The card opens the menu. Order and notes reach the kitchen instantly.',
   },
   {
     n: '03',
-    title: 'Order from the phone',
-    body: 'Portion, add-on, a note for the kitchen. Totals update as you order.',
-  },
-  {
-    n: '04',
-    title: 'Saved, then sent',
-    body: 'Priced by the database, never the browser. The guest gets a reference.',
-  },
-  {
-    n: '05',
-    title: 'The kitchen sees it',
-    body: 'A live ticket with the table, the note and its age — read aloud in Hindi.',
-  },
-  {
-    n: '06',
-    title: 'Settle at the counter',
-    body: 'Cash or card at the till, or the restaurant\'s own UPI QR. Staff confirm.',
+    title: 'Cook, serve, bill',
+    body: 'The board shows every ticket. Settle cash, card or UPI at the counter.',
   },
 ];
 
@@ -88,37 +73,6 @@ const FEATURES = [
   },
 ];
 
-const FAQ = [
-  {
-    q: 'Do customers need to install an app?',
-    a: 'No. The card opens the menu in the browser — nothing to download.',
-  },
-  {
-    q: 'How does the QR ordering work?',
-    a: 'The card opens that table\'s menu. A six-digit room code proves the guest is seated there.',
-  },
-  {
-    q: 'Can I customise my restaurant menu?',
-    a: 'Yes — dishes, sections, prices, portions, add-ons and photos. You publish when ready.',
-  },
-  {
-    q: 'Is my restaurant data secure?',
-    a: 'Every screen is behind a sign-in, and a restaurant only ever sees its own rows.',
-  },
-  {
-    q: 'What happens after the free trial?',
-    a: 'Seven days on the whole product, then read-only until a plan is added. Nothing is deleted. Plans are extended by hand for now.',
-  },
-  {
-    q: 'How does the kitchen hear about an order?',
-    a: 'A ticket appears instantly with the table and the note. The board can read it aloud in Hindi on the device itself — no extra service. No voice? The ticket stays on screen and a chime plays.',
-  },
-  {
-    q: 'How do guests pay?',
-    a: 'At the counter — cash or card, recorded by staff. With a UPI ID set, guests pay from the order page, and staff confirm before the bill is marked paid.',
-  },
-];
-
 export function Home() {
   return (
     <div className="min-h-screen bg-ink text-cream antialiased">
@@ -131,7 +85,6 @@ export function Home() {
       <Features />
       <Honest />
       <Pricing />
-      <Faq />
       <Close />
     </div>
   );
@@ -184,7 +137,7 @@ function Hero() {
           <div className="mt-9 flex flex-wrap items-center gap-3" data-hero-step>
             <Link
               href="/signup"
-              className="inline-flex h-12 items-center gap-2 rounded-full bg-plum px-6 text-[14px] font-medium text-white transition-colors hover:bg-plum-strong"
+              className="inline-flex h-12 items-center gap-2 rounded-full bg-grass px-6 text-[14px] font-medium text-cream transition-colors hover:bg-grass-strong"
             >
               Start the 7-day trial
               <span aria-hidden="true">→</span>
@@ -202,23 +155,19 @@ function Hero() {
         <PhoneMockup />
       </div>
 
-      <div className="relative border-t border-cream/[0.12]">
-        <ul className="mx-auto grid max-w-[1180px] grid-cols-2 gap-px px-5 sm:px-8 lg:grid-cols-4">
+      <div className="relative border-t border-white/15">
+        <ul className="mx-auto flex max-w-[1180px] flex-wrap gap-x-10 gap-y-4 px-5 py-6 sm:px-8">
           {[
             ['Digital menu', 'For your customers'],
             ['Live kitchen orders', 'For your staff'],
             ['Simple setup', 'Minutes, not weeks'],
             ['Works for all', 'Cafés, casual & fine dining'],
           ].map(([title, sub]) => (
-            <li key={title} className="flex items-start gap-3 py-6">
-              <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white text-plum" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6">
-                  <path d="m5 12 4.5 4.5L19 7" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </span>
+            <li key={title} className="flex items-center gap-2.5">
+              <span aria-hidden="true" className="text-[13px] leading-none text-white/70">✓</span>
               <span>
-                <span className="block text-[13px] font-medium text-cream">{title}</span>
-                <span className="block text-[12px] text-mute-dim">{sub}</span>
+                <span className="block text-[13px] font-medium text-white">{title}</span>
+                <span className="block text-[11.5px] text-white/65">{sub}</span>
               </span>
             </li>
           ))}
@@ -242,7 +191,7 @@ function PhoneMockup() {
 
   return (
     <div className="relative mx-auto w-full max-w-[330px] lg:mx-0 lg:ml-auto" data-hero-step>
-      <div className="absolute -inset-8 -z-10 rounded-[48px] bg-[radial-gradient(60%_50%_at_50%_40%,rgba(224,168,106,0.22),transparent_70%)] blur-2xl" aria-hidden="true" />
+      <div className="absolute -inset-8 -z-10 rounded-[48px] bg-[radial-gradient(60%_50%_at_50%_40%,rgba(255,214,170,0.16),transparent_70%)] blur-2xl" aria-hidden="true" />
 
       <div className="rounded-[34px] border border-cream/15 bg-ink-soft p-2.5 shadow-[0_40px_80px_-40px_rgba(0,0,0,0.9)]">
         <div className="overflow-hidden rounded-[26px] bg-ink">
@@ -267,7 +216,7 @@ function PhoneMockup() {
                 key={tab}
                 className={
                   i === 0
-                    ? 'rounded-full bg-plum px-3 py-1 font-medium text-white'
+                    ? 'rounded-full bg-grass px-3 py-1 font-medium text-cream'
                     : 'rounded-full bg-white px-3 py-1 text-mute'
                 }
               >
@@ -289,7 +238,7 @@ function PhoneMockup() {
                   </p>
                   <div className="mt-1.5 flex items-center justify-between">
                     <span className="text-[12px] text-plum">₹{dish.price}</span>
-                    <span className="grid h-6 w-6 place-items-center rounded-full bg-plum text-[13px] font-medium text-white">+</span>
+                    <span className="grid h-6 w-6 place-items-center rounded-full bg-grass text-[13px] font-medium text-cream">+</span>
                   </div>
                 </div>
               </li>
@@ -385,10 +334,10 @@ function Steps() {
           From scan to serving.
         </h2>
         <p className="mt-4 max-w-[52ch] text-[15px] leading-relaxed text-mute" data-reveal>
-          Six steps, from setting the room up to settling the bill. None of it needs an install.
+          Three steps. No app, no install.
         </p>
 
-        <ol className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4" data-stagger>
+        <ol className="mt-12 grid gap-5 sm:grid-cols-3" data-stagger>
           {STEPS.map((step) => (
             <li
               key={step.n}
@@ -552,7 +501,7 @@ function Honest() {
             <ul className="mt-5 space-y-3">
               {NOT_CONNECTED.map((item) => (
                 <li key={item.id} className="flex gap-3 text-[13.5px] leading-relaxed text-mute">
-                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-plum" aria-hidden="true" />
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-grass" aria-hidden="true" />
                   <span><span className="text-cream">{item.label}</span> — {item.detail}</span>
                 </li>
               ))}
@@ -589,7 +538,7 @@ function Pricing() {
               }`}
             >
               {plan.recommended && (
-                <span className="absolute -top-3 left-7 rounded-full bg-plum px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
+                <span className="absolute -top-3 left-7 rounded-full bg-grass px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-cream">
                   Most popular
                 </span>
               )}
@@ -607,7 +556,7 @@ function Pricing() {
               <ul className="mt-6 space-y-2.5 text-[13px] text-mute">
                 {capabilitiesFor(plan.id).map((capability) => (
                   <li key={capability.id} className="flex items-start gap-2.5">
-                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-plum" aria-hidden="true" />
+                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-grass" aria-hidden="true" />
                     {capability.label}
                   </li>
                 ))}
@@ -617,7 +566,7 @@ function Pricing() {
                 href={`/pricing#plan-${plan.id}`}
                 className={`mt-7 inline-flex h-11 items-center justify-center rounded-full text-[13px] font-medium transition-colors ${
                   plan.recommended
-                    ? 'bg-plum text-white hover:bg-plum-strong'
+                    ? 'bg-grass text-cream hover:bg-grass-strong'
                     : 'border border-cream/15 text-cream hover:bg-cream/[0.05]'
                 }`}
               >
@@ -632,40 +581,6 @@ function Pricing() {
           trial is a real seven days, enforced on the server — after it ends the workspace is
           read-only until access is extended, and nothing is deleted.
         </p>
-      </div>
-    </section>
-  );
-}
-
-/* ------------------------------------------------------------------ faq */
-
-function Faq() {
-  return (
-    <section id="faq" className="border-t border-cream/[0.12] py-24">
-      <div className="mx-auto grid max-w-[1180px] gap-14 px-5 sm:px-8 lg:grid-cols-[0.8fr_1.2fr]">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-plum">FAQ</p>
-          <h2 className="mt-5 text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.05] tracking-[-0.04em]" data-reveal>
-            Frequently asked questions.
-          </h2>
-          <p className="mt-4 max-w-[38ch] text-[15px] leading-relaxed text-mute">
-            Still have questions? Write to us and a person answers.
-          </p>
-        </div>
-
-        <div className="divide-y divide-cream/[0.12] border-y border-cream/[0.12]">
-          {FAQ.map((item) => (
-            <details key={item.q} className="group py-5">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-6 text-[15px] text-cream marker:hidden">
-                {item.q}
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-cream/15 text-mute transition-transform group-open:rotate-45">
-                  +
-                </span>
-              </summary>
-              <p className="mt-3 max-w-[62ch] text-[13.5px] leading-relaxed text-mute">{item.a}</p>
-            </details>
-          ))}
-        </div>
       </div>
     </section>
   );
@@ -696,7 +611,7 @@ function Close() {
           <div className="mt-9 flex flex-wrap justify-center gap-3">
             <Link
               href="/signup"
-              className="inline-flex h-12 items-center gap-2 rounded-full bg-plum px-7 text-[14px] font-medium text-white transition-colors hover:bg-plum-strong"
+              className="inline-flex h-12 items-center gap-2 rounded-full bg-grass px-7 text-[14px] font-medium text-cream transition-colors hover:bg-grass-strong"
             >
               Create your restaurant <span aria-hidden="true">→</span>
             </Link>

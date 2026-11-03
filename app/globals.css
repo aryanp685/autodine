@@ -1196,6 +1196,11 @@ p { margin: 0; }
   --color-plum-strong: #631f55;
   --color-plum-soft: #f4e9f1;
 
+  /* The action colour the owner chose: a light grass green on the buttons.
+     Espresso sits on it (10:1); white does not. */
+  --color-grass: #1fd655;
+  --color-grass-strong: #17b84a;
+
   --color-brand: #207030;
   --color-brand-soft: #2c8a3f;
 

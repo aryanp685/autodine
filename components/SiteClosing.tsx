@@ -39,7 +39,7 @@ export function SiteClosing({
         <div className="flex flex-wrap items-center gap-3">
           <Link
             href={primary.href}
-            className="inline-flex h-12 items-center rounded-full bg-plum px-6 text-[14px] font-medium text-white transition-colors hover:bg-plum-strong"
+            className="inline-flex h-12 items-center rounded-full bg-grass px-6 text-[14px] font-medium text-cream transition-colors hover:bg-grass-strong"
           >
             {primary.label}
           </Link>

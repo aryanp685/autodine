@@ -115,7 +115,7 @@ export function PricingScreen() {
                 }))}
               />
               <span className="inline-flex items-center gap-2 text-[11.5px] font-medium tracking-[0.03em] text-mute">
-                <span aria-hidden="true" className="size-1.5 rounded-full bg-plum" />
+                <span aria-hidden="true" className="size-1.5 rounded-full bg-grass" />
                 {BILLING.connected ? 'Billing connected' : 'Preview · billing not connected'}
               </span>
             </div>
@@ -144,7 +144,7 @@ export function PricingScreen() {
                     ].join(' ')}
                   >
                     {plan.recommended && (
-                      <div className="absolute -top-3 left-6 rounded-full bg-plum px-2.5 py-1 text-[10px] font-semibold tracking-[0.08em] text-white uppercase">
+                      <div className="absolute -top-3 left-6 rounded-full bg-grass px-2.5 py-1 text-[10px] font-semibold tracking-[0.08em] text-cream uppercase">
                         Recommended
                       </div>
                     )}
@@ -184,7 +184,7 @@ export function PricingScreen() {
                             })
                             .map((c) => (
                               <li key={c.id} className="flex gap-2">
-                                <span aria-hidden="true" className="mt-1.5 size-1 shrink-0 rounded-full bg-plum" />
+                                <span aria-hidden="true" className="mt-1.5 size-1 shrink-0 rounded-full bg-grass" />
                                 {c.label}
                               </li>
                             ))}
@@ -206,7 +206,7 @@ export function PricingScreen() {
             <div data-reveal className="mt-10 flex flex-col items-start gap-2">
               <Link
                 href="/signup"
-                className="inline-flex h-12 items-center rounded-full bg-plum px-6 text-[14px] font-medium text-white transition-colors hover:bg-plum-strong"
+                className="inline-flex h-12 items-center rounded-full bg-grass px-6 text-[14px] font-medium text-cream transition-colors hover:bg-grass-strong"
               >
                 Create an account
               </Link>

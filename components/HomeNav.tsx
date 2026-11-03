@@ -26,7 +26,6 @@ export function HomeNav() {
             <li><Link href="#how" className="transition-colors hover:text-cream">How it works</Link></li>
             <li><Link href="#screens" className="transition-colors hover:text-cream">Screens</Link></li>
             <li><Link href="/pricing" className="transition-colors hover:text-cream">Pricing</Link></li>
-            <li><Link href="#faq" className="transition-colors hover:text-cream">FAQ</Link></li>
           </ul>
         </nav>
 
@@ -63,7 +62,6 @@ export function HomeNav() {
               ['How it works', '#how'],
               ['Screens', '#screens'],
               ['Pricing', '/pricing'],
-              ['FAQ', '#faq'],
             ].map(([label, href]) => (
               <li key={href}>
                 <a
