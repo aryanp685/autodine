@@ -563,7 +563,7 @@ export function CustomerMenu({
                         type="button"
                         onClick={() => cart.setQty(i.id, plainQty(i.id) - 1)}
                         aria-label={`One fewer ${i.name}`}
-                        className="grid size-7 place-items-center rounded-full text-[15px] text-gink-80 transition hover:bg-gink-07 active:scale-[0.92]"
+                        className="relative grid size-7 place-items-center rounded-full before:absolute before:-inset-2 before:rounded-full before:content-[''] text-[15px] text-gink-80 transition hover:bg-gink-07 active:scale-[0.92]"
                       >
                         −
                       </button>
@@ -577,7 +577,7 @@ export function CustomerMenu({
                         type="button"
                         onClick={() => addToCart(i.id)}
                         aria-label={`One more ${i.name}`}
-                        className="grid size-7 place-items-center rounded-full text-[15px] text-gink-80 transition hover:bg-gink-07 active:scale-[0.92]"
+                        className="relative grid size-7 place-items-center rounded-full before:absolute before:-inset-2 before:rounded-full before:content-[''] text-[15px] text-gink-80 transition hover:bg-gink-07 active:scale-[0.92]"
                       >
                         +
                       </button>

@@ -46,6 +46,7 @@ _h*.mjs
 # playwright
 /playwright-report
 /test-results
+/responsive-artifacts
 /blob-report
 /.playwright
 

@@ -261,7 +261,7 @@ export function Cart({
               <Link
                 href={withSlug('/menu/cart')}
                 aria-label="Dismiss this message"
-                className="ml-auto -mr-1 grid size-7 shrink-0 place-items-center rounded-full text-gink-46 transition hover:bg-gink-07 hover:text-gink"
+                className="relative ml-auto -mr-1 grid size-7 shrink-0 place-items-center rounded-full before:absolute before:-inset-2 before:rounded-full before:content-[''] text-gink-46 transition hover:bg-gink-07 hover:text-gink"
               >
                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                   <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
@@ -345,7 +345,7 @@ export function Cart({
                           type="button"
                           onClick={() => cart.setQty(l.itemId, l.qty - 1, l.variantId, l.addonIds)}
                           aria-label={`Decrease ${l.name}`}
-                          className="grid size-7 place-items-center rounded-full text-[14px] text-gink-80 transition hover:bg-gink-07 active:scale-[0.92]"
+                          className="relative grid size-7 place-items-center rounded-full before:absolute before:-inset-2 before:rounded-full before:content-[''] text-[14px] text-gink-80 transition hover:bg-gink-07 active:scale-[0.92]"
                         >
                           −
                         </button>
@@ -362,7 +362,7 @@ export function Cart({
                           type="button"
                           onClick={() => cart.setQty(l.itemId, l.qty + 1, l.variantId, l.addonIds)}
                           aria-label={`Increase ${l.name}`}
-                          className="grid size-7 place-items-center rounded-full text-[14px] text-gink-80 transition hover:bg-gink-07 active:scale-[0.92]"
+                          className="relative grid size-7 place-items-center rounded-full before:absolute before:-inset-2 before:rounded-full before:content-[''] text-[14px] text-gink-80 transition hover:bg-gink-07 active:scale-[0.92]"
                         >
                           +
                         </button>

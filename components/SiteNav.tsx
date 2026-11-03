@@ -23,7 +23,7 @@
 import Link from 'next/link';
 import { BrandLockup } from '@/components/BrandMark';
 import { BRAND_GREEN } from '@/lib/brand';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export type SiteNavLink = { label: string; href: string; active?: boolean };
 
@@ -45,6 +45,11 @@ export function SiteNav({
    */
   onImage?: boolean;
 }) {
+  /* Phone navigation. The desktop bar is untouched: the links simply gain a
+     phone-only disclosure, so nothing important is unreachable on a small
+     screen (a strict requirement of the responsive pass). */
+  const [open, setOpen] = useState(false);
+
   useEffect(() => {
     const nav = document.querySelector<HTMLElement>('[data-site-nav]');
     if (!nav) return;
@@ -142,8 +147,56 @@ export function SiteNav({
           >
             Create account
           </Link>
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-controls="site-nav-menu"
+            aria-label={open ? 'Close menu' : 'Open menu'}
+            onClick={() => setOpen((v) => !v)}
+            className="grid size-11 place-items-center rounded-full border border-cream/15 text-cream transition-colors hover:bg-cream/[0.06] md:hidden"
+          >
+            <span aria-hidden="true" className="text-[15px] leading-none">
+              {open ? '✕' : '☰'}
+            </span>
+          </button>
         </div>
       </div>
+
+      {/* The phone menu: the same links, one column, under the bar. */}
+      {open ? (
+        <nav
+          id="site-nav-menu"
+          aria-label="Primary (mobile)"
+          className="border-t border-cream/12 bg-ink px-5 pb-4 pt-2 md:hidden"
+        >
+          <ul className="flex flex-col gap-1">
+            {links.map((link) => (
+              <li key={link.href}>
+                <Link
+                  href={link.href}
+                  aria-current={link.active ? 'page' : undefined}
+                  onClick={() => setOpen(false)}
+                  className={[
+                    'block rounded-[10px] px-3 py-2.5 text-[14px] transition-colors',
+                    link.active ? 'bg-cream/[0.06] text-cream' : 'text-cream/75 hover:bg-cream/[0.05]',
+                  ].join(' ')}
+                >
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+            <li>
+              <Link
+                href="/login"
+                onClick={() => setOpen(false)}
+                className="block rounded-[10px] px-3 py-2.5 text-[14px] text-cream/75 transition-colors hover:bg-cream/[0.05] sm:hidden"
+              >
+                Sign in
+              </Link>
+            </li>
+          </ul>
+        </nav>
+      ) : null}
     </header>
   );
 }

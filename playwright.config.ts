@@ -101,6 +101,13 @@ export default defineConfig({
       fullyParallel: false,
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      // The responsive audit: every route × every common viewport, sideways-
+      // scroll and landmark assertions, and a screenshot per combination.
+      name: 'responsive',
+      testMatch: 'responsive.spec.ts',
+      use: { ...devices['Desktop Chrome'] },
+    },
   ],
   webServer: {
     command: 'npx next start -H 127.0.0.1 -p 3100',
