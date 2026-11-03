@@ -737,7 +737,7 @@ p { margin: 0; }
 }
 [data-flow-root][data-brand] .g-card {
   border-width: var(--brand-border, 1px);
-  box-shadow: var(--brand-elevation, var(--p-shadow-1)), inset 0 1px 0 var(--g-line-light);
+  box-shadow: var(--brand-elevation), inset 0 1px 0 var(--g-line-light);
 }
 [data-flow-root][data-brand] .g-panel {
   border-width: var(--brand-border, 1px);

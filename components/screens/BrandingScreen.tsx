@@ -11,6 +11,7 @@ import {
   uploadBannerAction,
   uploadLogoAction,
 } from '@/app/(staff)/dashboard/branding/actions';
+import { rollbackPublishFormAction } from '@/app/(staff)/dashboard/menus/brand-actions';
 import { inr } from '@/lib/demo-data';
 import {
   BtnLink,
@@ -372,6 +373,24 @@ export function BrandingScreen({
         ) : null}
       </section>
 
+      {/* ------------------------------------------------------------- versions
+          Publish history for the Brand Studio pair. Only shown when something
+          has actually been published through it — a "restore" button over an
+          empty history is a button that always fails. */}
+      {data?.hasPublishHistory ? (
+        <section aria-labelledby="branding-versions" className="mt-6">
+          <SectionHead
+            title={<span id="branding-versions">Versions</span>}
+            meta="The last publish is live; the one before it can come back"
+          />
+          <form action={rollbackPublishFormAction} className="mt-3">
+            <button type="submit" className={btn('quiet', 'sm')}>
+              Restore previous menu and brand
+            </button>
+          </form>
+        </section>
+      ) : null}
+
       {/* ------------------------------------------------------------- the notes
           One short list, because the questions this screen raises are always the
           same three: what changes, and does the name live here? */}
@@ -387,9 +406,10 @@ export function BrandingScreen({
           </Link>
           .
         </Notice>
-        <Notice tone="plain" label="Shared on purpose">
-          Every restaurant&apos;s menu looks the same: same layout, same colours, same type. That is
-          what lets a guest order at any table in any restaurant without learning a new screen.
+        <Notice tone="plain" label="One design, or your own">
+          Every guest menu starts from the same layout and colours, so ordering works the same
+          everywhere. A restaurant that wants its own colour and type can opt in through the Brand
+          Studio — until then, nothing here changes what guests see.
         </Notice>
       </div>
     </OwnerPage>

@@ -12,6 +12,19 @@ vi.mock('@/app/(staff)/dashboard/menus/import-actions', () => ({
   previewMenuImportAction: async () => ({ ok: false }),
 }));
 
+vi.mock('@/app/(staff)/dashboard/menus/brand-actions', () => ({
+  createImportPairAction: async () => ({ ok: false }),
+  extractBrandFromPhotoAction: async () => ({ ok: false }),
+  uploadBrandAssetAction: async () => ({ ok: false }),
+}));
+
+vi.mock('@/components/screens/BrandReview', () => ({
+  BrandReview: (props: { enabled: boolean }) => (
+    <div data-brand-review={props.enabled ? 'enabled' : 'manual'}>brand review</div>
+  ),
+  brandStateToDraft: () => null,
+}));
+
 vi.mock('@/components/PhotoImportPanel', () => ({
   PhotoImportPanel: () => <div data-photo-panel>photo reader</div>,
 }));

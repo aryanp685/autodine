@@ -37,6 +37,8 @@ export type BrandingScreenData = {
    * owner sees here is what the guest sees.
    */
   brand?: { brandThemeEnabled?: boolean | null; brandTheme?: unknown | null } | null;
+  /** A publish/rollback pair exists to restore (migration 20261103000100). */
+  hasPublishHistory?: boolean;
   blocked?: 'signed-out' | 'no-membership';
 };
 
@@ -63,7 +65,7 @@ export async function getBrandingScreenData(): Promise<BrandingScreenData | null
 
   const { supabase, restaurantId, role, slug, restaurantName, tagline } = staff.context;
 
-  const [restaurant, menus, dishes] = await Promise.all([
+  const [restaurant, menus, dishes, history] = await Promise.all([
     supabase
       .from('restaurants')
       .select('logo_path, banner_path, brand_theme_enabled, brand_theme')
@@ -76,6 +78,10 @@ export async function getBrandingScreenData(): Promise<BrandingScreenData | null
       .eq('restaurant_id', restaurantId)
       .order('sort_order', { ascending: true })
       .limit(4),
+    supabase
+      .from('restaurant_publish_history')
+      .select('id', { count: 'exact', head: true })
+      .eq('restaurant_id', restaurantId),
   ]);
 
   const row = (restaurant.data ?? {}) as {
@@ -102,6 +108,7 @@ export async function getBrandingScreenData(): Promise<BrandingScreenData | null
       img: publicAssetUrl((d.image_url as string | null) ?? null),
     })),
     hasPublishedMenu: (menus.data ?? []).some((m) => m.is_published === true),
+    hasPublishHistory: (history.count ?? 0) > 0,
     brand: {
       brandThemeEnabled: row.brand_theme_enabled === true,
       brandTheme: row.brand_theme ?? null,

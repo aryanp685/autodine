@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { VegMark } from '@/components/ui';
-import { createImportedMenuAction, previewMenuImportAction, type ImportPreview } from '@/app/(staff)/dashboard/menus/import-actions';
+import { previewMenuImportAction, type ImportPreview } from '@/app/(staff)/dashboard/menus/import-actions';
+import { createImportPairAction } from '@/app/(staff)/dashboard/menus/brand-actions';
+import { BrandReview, brandStateToDraft, type BrandReviewState } from '@/components/screens/BrandReview';
 import { PhotoImportPanel } from '@/components/PhotoImportPanel';
 import { draftItemCount, MAX_IMPORT_TEXT } from '@/lib/menu-import';
 import { inr } from '@/lib/demo-data';
@@ -81,6 +83,12 @@ export function MenuImportScreen({
    */
   const [mode, setMode] = useState<'photo' | 'text'>(visionEnabled ? 'photo' : 'text');
 
+  /* The stable import identifier: the menu draft and the brand draft share
+     it, and a repeated Create finds the same pair instead of doubling it. */
+  const [importId] = useState(() => crypto.randomUUID());
+  const [menuFile, setMenuFile] = useState<File | null>(null);
+  const [brandState, setBrandState] = useState<BrandReviewState | null>(null);
+
   function readMenu() {
     setError(null);
     startReading(async () => {
@@ -97,10 +105,14 @@ export function MenuImportScreen({
 
     const kept = {
       categories: preview.draft.categories.filter((_, index) => !dropped.has(index)),
+      importId,
     };
 
     startWriting(async () => {
-      const result = await createImportedMenuAction(kept);
+      // The pair: menu draft AND brand draft, one import id. A failure in the
+      // brand half rolls the menu half back (createImportPairAction).
+      const brand = brandState ? brandStateToDraft(brandState, importId) : null;
+      const result = await createImportPairAction({ menu: kept, brand: brand ?? { importId } });
       if (!result.ok) {
         setError(result.error);
         return;
@@ -164,7 +176,7 @@ export function MenuImportScreen({
         </div>
       )}
 
-      {mode === 'photo' && visionEnabled && !blocked && <PhotoImportPanel canWrite={canWrite} />}
+      {mode === 'photo' && visionEnabled && !blocked && <PhotoImportPanel canWrite={canWrite} onFileChange={setMenuFile} />}
 
       {blocked && <SignInPrompt reason={blocked} screen="menu import" />}
 
@@ -380,6 +392,16 @@ export function MenuImportScreen({
           </div>
         </Card>
       )}
+
+      {/* The brand half of the import. Independent extraction, independent
+          review — one Create writes both drafts. */}
+      <BrandReview
+        enabled={visionEnabled}
+        canWrite={canWrite}
+        existingName={outlet?.outlets.find((o) => o.id === outlet.activeId)?.name ?? ''}
+        file={menuFile}
+        onStateChange={(state) => setBrandState((current) => (current === state ? current : state))}
+      />
     </OwnerPage>
   );
 }

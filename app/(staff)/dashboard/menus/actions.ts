@@ -23,6 +23,7 @@ import { getStaffContextDetailed } from '@/lib/db/staff';
 import { rupeesToPaise } from '@/lib/money';
 import { PRESET_CATEGORIES, normaliseCategoryName } from '@/lib/menu-presets';
 import { EDITOR_MENU_COOKIE } from '@/lib/db/menu-editor';
+import { getDraftForMenu, publishPair } from '@/lib/branding/brand-data';
 import { readUndoItem } from '@/lib/menu-undo';
 import type { UndoItem } from '@/lib/menu-undo';
 import {
@@ -514,6 +515,36 @@ export async function publishMenuAction(formData: FormData): Promise<void> {
   // disabled button labelled "Published" and no way to take it down, which
   // read as broken. One flag, both directions.
   const published = String(formData.get('published') ?? 'true').trim() !== 'false';
+
+  if (published) {
+    /*
+     * A menu that carries a brand draft from the Brand Studio publishes the
+     * PAIR, in one transaction (publish_menu_brand_pair, migration
+     * 20261103000100): a new menu with the wrong branding around it is
+     * exactly what must never go live. The critical validations run here
+     * first — an unconfirmed name or an unresolved brand question refuses
+     * the publish with a sentence, and the live pair stays as it was.
+     *
+     * A menu with no brand draft — every menu created outside the Studio —
+     * publishes through the plain flag update below, unchanged.
+     */
+    const draftResult = await getDraftForMenu(menuId);
+    const linked = draftResult.ok ? draftResult.value : null;
+    if (linked) {
+      const draft = linked.draft;
+      if (draft && draft.name !== null && !draft.nameConfirmed) {
+        fail('Confirm the restaurant name in the brand review before publishing.');
+      }
+      if (draft && draft.conflicts.length > 0) {
+        fail('Some brand questions are still open. Answer them in the brand review, then publish.');
+      }
+      const result = await publishPair(menuId, linked.id);
+      if (!result.ok) fail(result.error);
+      revalidatePath('/menu');
+      ok('Menu and brand published. Diners can see them now.');
+      return;
+    }
+  }
 
   const { error } = await ctx.supabase
     .from('menus')

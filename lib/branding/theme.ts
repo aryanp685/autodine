@@ -231,7 +231,7 @@ const BORDER_CSS: Record<CardBorder, string> = {
 };
 const SPACING_EM: Record<Spacing, string> = { compact: '0.75rem', regular: '1rem', airy: '1.35rem' };
 const ELEVATION_CSS: Record<CardElevation, string> = {
-  flat: 'none',
+  flat: '0 1px 2px rgba(46, 33, 20, 0.05)',
   lifted: '0 10px 26px rgba(40, 24, 12, 0.14)',
 };
 
