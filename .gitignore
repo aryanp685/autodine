@@ -52,3 +52,4 @@ _h*.mjs
 
 # Local TTS smoke output (uploaded as CI artifacts, never committed)
 tts-smoke-artifacts/
+/images
