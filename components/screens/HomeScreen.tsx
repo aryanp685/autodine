@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { LIVE, NOT_CONNECTED, NumberWord, PLANS, capabilitiesFor } from '@/lib/plans';
 import { inr } from '@/lib/demo-data';
 import { SiteMotion } from '@/components/SiteMotion';
+import { HomeNav } from '@/components/HomeNav';
 import { BrandLockup } from '@/components/BrandMark';
 import { BRAND_GREEN } from '@/lib/brand';
 
@@ -122,7 +123,7 @@ export function Home() {
   return (
     <div className="min-h-screen bg-ink text-cream antialiased">
       <SiteMotion />
-      <Nav />
+      <HomeNav />
       <Hero />
       <Problem />
       <Steps />
@@ -138,40 +139,6 @@ export function Home() {
 
 /* ------------------------------------------------------------------ nav */
 
-function Nav() {
-  return (
-    <header className="sticky top-0 z-50 border-b border-cream/[0.12] bg-ink/80 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-[1180px] items-center gap-8 px-5 sm:px-8">
-        <Link href="/" aria-label="AutoDine home" className="shrink-0">
-          <BrandLockup size={21} ink="#f7f3ea" dot={BRAND_GREEN} />
-        </Link>
-
-        <nav aria-label="Primary" className="hidden flex-1 md:block">
-          <ul className="flex items-center gap-7 text-[13px] text-mute">
-            <li><Link href="#product" className="transition-colors hover:text-cream">Product</Link></li>
-            <li><Link href="#how" className="transition-colors hover:text-cream">How it works</Link></li>
-            <li><Link href="#screens" className="transition-colors hover:text-cream">Screens</Link></li>
-            <li><Link href="/pricing" className="transition-colors hover:text-cream">Pricing</Link></li>
-            <li><Link href="#faq" className="transition-colors hover:text-cream">FAQ</Link></li>
-          </ul>
-        </nav>
-
-        <div className="ml-auto flex items-center gap-3">
-          <Link href="/login" className="hidden text-[13px] text-mute transition-colors hover:text-cream sm:block">
-            Sign in
-          </Link>
-          <Link
-            href="/signup"
-            className="inline-flex h-10 items-center rounded-full bg-plum px-5 text-[13px] font-medium text-white transition-colors hover:bg-plum-strong"
-          >
-            Create account
-          </Link>
-        </div>
-      </div>
-    </header>
-  );
-}
-
 /* ----------------------------------------------------------------- hero */
 
 function Hero() {
@@ -184,33 +151,33 @@ function Hero() {
           fill
           priority
           sizes="100vw"
-          className="object-cover object-center opacity-55"
+          className="object-cover object-center"
         />
       </div>
       {/* Two gradients, not one: a vertical wash that makes the copy legible,
           and a warm glow from the right so the photograph does not read as a
           grey rectangle behind white text. */}
-      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-ink/70 via-ink/55 to-ink" aria-hidden="true" />
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(80%_60%_at_85%_35%,rgba(224,168,106,0.18),transparent_65%)]" aria-hidden="true" />
+      <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_bottom,rgb(12_11_9/0.82),rgb(12_11_9/0.42)_55%,rgb(12_11_9/0.62))]" aria-hidden="true" />
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(80%_60%_at_85%_35%,rgba(255,214,170,0.14),transparent_65%)]" aria-hidden="true" />
 
       <div className="mx-auto grid max-w-[1180px] gap-14 px-5 pb-24 pt-20 sm:px-8 sm:pt-28 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:pb-32">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-plum" data-hero-step>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/70" data-hero-step>
             Restaurant technology
           </p>
 
           <h1
-            className="mt-6 text-[clamp(2.6rem,6.4vw,4.6rem)] font-medium leading-[0.98] tracking-[-0.045em]"
+            className="mt-6 text-[clamp(2.6rem,6.4vw,4.6rem)] font-medium leading-[0.98] tracking-[-0.045em] text-white"
             data-line
           >
             Every table,
             <br />
-            <span className="text-plum">one seamless</span>
+            <span className="text-white/70">one seamless</span>
             <br />
             experience.
           </h1>
 
-          <p className="mt-7 max-w-[48ch] text-[15px] leading-relaxed text-mute" data-hero-step>
+          <p className="mt-7 max-w-[48ch] text-[15px] leading-relaxed text-white/80" data-hero-step>
             A guest scans the card on the table, orders from their own phone, and the kitchen sees
             the ticket in the same second — table number and notes attached. No app to install, no
             account to create, nothing to learn behind the counter.
@@ -230,7 +197,7 @@ function Hero() {
             >
               See how it works
             </Link>
-            <span className="text-[12px] text-mute-dim">No card. Nothing charged during preview.</span>
+            <span className="text-[12px] text-white/65">No card. Nothing charged during preview.</span>
           </div>
         </div>
 
