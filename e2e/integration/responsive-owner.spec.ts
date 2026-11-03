@@ -40,10 +40,32 @@ const ROUTES: Array<{ slug: string; path: string }> = [
 ];
 
 async function assertNoSidewaysScroll(page: Page, where: string) {
-  const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-  );
-  expect(overflow, `${where}: page scrolls sideways by ${overflow}px`).toBeLessThanOrEqual(1);
+  // When a page is too wide, the useful fact is WHICH element did it — the
+  // failure message names the offenders instead of leaving a number to guess
+  // from.
+  const report = await page.evaluate(() => {
+    const doc = document.documentElement;
+    const overflow = doc.scrollWidth - doc.clientWidth;
+    const offenders: string[] = [];
+    if (overflow > 1) {
+      for (const el of Array.from(document.querySelectorAll('*'))) {
+        const r = el.getBoundingClientRect();
+        if (r.right > doc.clientWidth + 1 && r.width > 0 && r.height > 0) {
+          const cls =
+            typeof el.className === 'string' && el.className.trim()
+              ? `.${el.className.trim().split(/\s+/).slice(0, 4).join('.')}`
+              : '';
+          offenders.push(`${el.tagName.toLowerCase()}${cls} right=${Math.round(r.right)}`);
+        }
+        if (offenders.length >= 4) break;
+      }
+    }
+    return { overflow, offenders };
+  });
+  expect(
+    report.overflow,
+    `${where}: page scrolls sideways by ${report.overflow}px — ${report.offenders.join(' | ')}`,
+  ).toBeLessThanOrEqual(1);
 }
 
 for (const route of ROUTES) {
