@@ -5,7 +5,7 @@ import { GuestFlow } from '@/components/GuestFlow';
 import { WhereToFindCode } from '@/components/WhereToFindCode';
 import { VerifyCodeForm } from '@/components/VerifyCodeForm';
 import { useCart } from '@/components/CartProvider';
-import { guestAccentStyle } from '@/lib/branding/palette';
+import { guestBrandStyle, type GuestBrandState } from '@/lib/branding/guest-theme';
 import { priceCart, type MenuItemPrice } from '@/lib/cart-pricing';
 import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
@@ -37,6 +37,7 @@ import { paiseToRupees } from '@/lib/money';
  * page, which renders only after the database returns a code.
  */
 export function VerifyToOrderScreen({
+  brandState,
   slug,
   token,
   restaurantName,
@@ -47,6 +48,7 @@ export function VerifyToOrderScreen({
   cartCount,
   cartTotalPaise,
 }: {
+  brandState?: GuestBrandState | null;
   slug: string;
   /** The card that was scanned, so the form needs no second scan. */
   token: string;
@@ -63,6 +65,7 @@ export function VerifyToOrderScreen({
   cartCount?: number;
   cartTotalPaise?: number;
 }) {
+  const paint = guestBrandStyle(brandState);
   const cart = useCart();
   const priced = priceCart(cart.lines, items, taxRateBps);
   const { totalPaise } = priced.totals;
@@ -77,7 +80,7 @@ export function VerifyToOrderScreen({
 
   return (
     <GuestFlow
-      style={guestAccentStyle()}
+      style={paint.style} brandAttrs={paint.attrs}
       step="pay"
       venue={restaurantName}
       table={tableLabel}

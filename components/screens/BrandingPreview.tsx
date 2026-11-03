@@ -4,7 +4,8 @@ import { DishPhoto } from '@/components/DishPhoto';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import type { BrandingScreenData } from '@/lib/db/branding-screen';
 import type { MenuScreenData } from '@/lib/db/menu-screen';
-import { guestAccentStyle } from '@/lib/branding/palette';
+import { guestBrandStyle } from '@/lib/branding/guest-theme';
+import { parseTheme, themeDataAttrs, themeGuestStyle } from '@/lib/branding/theme';
 import { inr } from '@/lib/demo-data';
 import { btn } from '@/components/owner/chrome';
 
@@ -25,10 +26,25 @@ export function BrandingPreview({
   data,
   menu,
   backHref,
+  themeOverride,
+  nameOverride,
+  logoUrlOverride,
+  bannerUrlOverride,
+  view = 'mobile',
 }: {
   data: BrandingScreenData | null;
   menu: MenuScreenData | null;
   backHref: string;
+  /**
+   * A draft theme (raw JSON) to preview instead of the published one. This
+   * is how the import review shows "the actual branded customer preview"
+   * before anything is published — the same renderer, painted from the draft.
+   */
+  themeOverride?: unknown | null;
+  nameOverride?: string | null;
+  logoUrlOverride?: string | null;
+  bannerUrlOverride?: string | null;
+  view?: 'mobile' | 'desktop';
 }) {
   if (data?.blocked) {
     return (
@@ -44,15 +60,21 @@ export function BrandingPreview({
   }
 
   const restaurant = menu?.restaurant;
-  const name = restaurant?.name ?? data?.name ?? 'Your restaurant';
+  const name = nameOverride ?? restaurant?.name ?? data?.name ?? 'Your restaurant';
+
+  /* The same decider the guest flow uses. A draft theme paints the preview
+     ahead of publish; otherwise the published brand state decides, and a
+     restaurant with none gets the product's own style — exactly the promise
+     the preview is making. */
+  const draftTheme = parseTheme(themeOverride ?? null);
+  const paint = draftTheme
+    ? { style: themeGuestStyle(draftTheme), attrs: themeDataAttrs(draftTheme) }
+    : guestBrandStyle(data?.brand ?? null);
 
   return (
     <div
-      /* The guest flow's own colours, not the restaurant's row. The preview is
-         a promise about what a guest will see, and every guest now sees one
-         design -- so a preview painted with a stored accent would be promising
-         something the menu no longer does. */
-      style={guestAccentStyle() as React.CSSProperties}
+      style={paint.style as React.CSSProperties}
+      {...paint.attrs}
       className="min-h-dvh bg-paper-deep text-gink antialiased"
     >
       <header className="sticky top-0 z-10 border-b border-hair bg-paper/92 backdrop-blur-xl">
@@ -66,19 +88,37 @@ export function BrandingPreview({
           <span className="text-[11.5px] text-gink-46">
             Guests see this after scanning. The table badge is a sample.
           </span>
+          <span className="ml-auto flex items-center gap-1.5">
+            <Link
+              href={`${backHref.replace(/\?view=\w+$/, '')}/preview?view=mobile`}
+              className={`rounded-full px-2.5 py-1 text-[11.5px] font-semibold ${view === 'mobile' ? 'bg-gink text-onink' : 'border border-hair-strong text-gink-64'}`}
+            >
+              Mobile
+            </Link>
+            <Link
+              href={`${backHref.replace(/\?view=\w+$/, '')}/preview?view=desktop`}
+              className={`rounded-full px-2.5 py-1 text-[11.5px] font-semibold ${view === 'desktop' ? 'bg-gink text-onink' : 'border border-hair-strong text-gink-64'}`}
+            >
+              Desktop
+            </Link>
+          </span>
         </div>
       </header>
 
       <div className="mx-auto flex w-full max-w-[760px] justify-center px-5 py-7">
-        {/* The phone. Same width as the editor preview, so switching between
-            the two does not reflow the header. */}
-        <div className="w-full max-w-[360px] overflow-hidden rounded-[var(--p-r-card)] border border-hair-strong bg-card shadow-[var(--p-shadow-3)]">
+        {/* The phone (or the desktop column). Mobile is the same width as the
+            editor preview, so switching between the two does not reflow the
+            header; desktop is the wide guest column at its max width. */}
+        <div
+          className={`overflow-hidden border border-hair-strong bg-card shadow-[var(--p-shadow-3)] ${view === 'desktop' ? 'w-full max-w-[720px] rounded-[var(--p-r-card)]' : 'w-full max-w-[360px] rounded-[var(--p-r-card)]'}`}
+        >
           <MenuIdentity
             name={name}
             tagline={restaurant?.tagline}
             address={restaurant?.address}
-            logoUrl={restaurant?.logoUrl ?? data?.logoUrl}
-            bannerUrl={restaurant?.bannerUrl ?? data?.bannerUrl}
+            logoUrl={logoUrlOverride ?? restaurant?.logoUrl ?? data?.logoUrl}
+            bannerUrl={bannerUrlOverride ?? restaurant?.bannerUrl ?? data?.bannerUrl}
+            headerStyle={draftTheme?.layout.header}
             tableLabel="Table 7"
           />
 

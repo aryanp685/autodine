@@ -57,6 +57,7 @@ export default async function CheckoutPage({
     return (
       <CartProvider slug={s}>
         <VerifyToOrderScreen
+          brandState={data?.brandState}
           slug={access.slug}
           token={access.qrToken}
           restaurantName={data?.restaurantName}
@@ -72,6 +73,7 @@ export default async function CheckoutPage({
   return (
     <CartProvider slug={s}>
       <Checkout
+        brandState={data?.brandState}
         slug={s}
         restaurantName={data?.restaurantName ?? (isSupabaseConfigured ? undefined : demoRestaurant.name)}
         tableLabel={access.status === 'verified' ? access.tableLabel : null}

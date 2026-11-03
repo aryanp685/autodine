@@ -75,7 +75,7 @@ export default async function OrderPage({
         placedAt={data?.placedAt}
         enabled={placed}
       />
-      <OrderPlacedScreen data={data} token={t} slug={s} onlinePay={onlinePay} />
+      <OrderPlacedScreen data={data} token={t} slug={s} onlinePay={onlinePay} brandState={data?.brandState} />
     </CartProvider>
   );
 }

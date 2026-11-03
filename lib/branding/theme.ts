@@ -274,6 +274,59 @@ export function themeAccentOverrides(theme: BrandTheme): Record<string, string> 
   };
 }
 
+/**
+ * The full guest-surface override: accent + page/surface colours + the
+ * geometry tokens the flow already rounds with (--g-r*) + the brand-*
+ * properties the scoped CSS block in app/globals.css consumes behind
+ * [data-brand].
+ *
+ * Everything is an override of EXISTING custom properties or a new property
+ * with a CSS fallback, so a restaurant with no theme renders byte-identical:
+ * the function that decides is `guestBrandStyle` in lib/branding/guest-theme.ts
+ * and it returns the current constant style when the theme is absent.
+ */
+export function themeGuestStyle(theme: BrandTheme): Record<string, string> {
+  const radius = RADIUS_PX[theme.layout.card.radius];
+  const scale = theme.layout.card.radius === 'round' ? 1.45 : theme.layout.card.radius === 'none' ? 0.3 : 1;
+  const r = (base: number) => `${Math.round(base * scale)}px`;
+  return {
+    ...themeAccentOverrides(theme),
+    '--p-paper': theme.colors.background ?? '#f7f2e9',
+    '--p-paper-deep': shade(theme.colors.background ?? '#f7f2e9', -0.05),
+    '--p-surface': hexToRgba(theme.colors.surface ?? '#ffffff', 0.72),
+    '--g-panel': hexToRgba(theme.colors.surface ?? '#ffffff', 0.88),
+    '--g-panel-solid': theme.colors.surface ?? '#fffdf9',
+    '--g-r-sm': r(12),
+    '--g-r': r(16),
+    '--g-r-lg': r(22),
+    '--g-r-xl': r(28),
+    '--brand-primary': theme.colors.primary,
+    '--brand-primary-ink': labelOn(theme.colors.primary),
+    '--brand-secondary': theme.colors.secondary ?? theme.colors.primary,
+    '--brand-surface': theme.colors.surface ?? '#ffffff',
+    '--brand-font': FONT_MATCHES[theme.typography.character].stack,
+    '--brand-radius': radius,
+    '--brand-border': BORDER_CSS[theme.layout.card.border],
+    '--brand-elevation': ELEVATION_CSS[theme.layout.card.elevation],
+    '--brand-space': SPACING_EM[theme.layout.spacing],
+    '--brand-motif': theme.layout.motifs[0] ?? 'none',
+    '--brand-header': theme.layout.header,
+  };
+}
+
+/**
+ * The data attributes a themed flow root carries. `data-brand` switches the
+ * scoped CSS rules on; `data-motif` and `data-header` select decorative
+ * variants. Absent attributes mean "no theme", and no rule matches.
+ */
+export function themeDataAttrs(theme: BrandTheme): Record<string, string> {
+  return {
+    'data-brand': '',
+    'data-motif': theme.layout.motifs[0] ?? 'none',
+    'data-header': theme.layout.header,
+  };
+}
+
 /** A paper-tinted wash of an accent: mixed 12% into white. */
 export function softWash(hex: string): string {
   return mix(hex, '#ffffff', 0.12);

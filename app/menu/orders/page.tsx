@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { CartProvider } from '@/components/CartProvider';
 import { GuestOrdersScreen } from '@/components/screens/GuestOrdersScreen';
 import { getRestaurantName } from '@/lib/db/cart-screen';
+import { getGuestBrandState } from '@/lib/branding/guest-brand-server';
 import { loadTableAccess } from '@/lib/table-access';
 
 export const metadata: Metadata = { title: 'Your order · AutoDine', robots: { index: false } };
@@ -30,11 +31,16 @@ export default async function GuestOrdersPage({
 
   // The venue's name, and nothing else: this screen only prints it. The full
   // menu read that used to sit here was six queries for four words.
-  const [access, restaurantName] = await Promise.all([loadTableAccess(s), getRestaurantName(s)]);
+  const [access, restaurantName, brandState] = await Promise.all([
+    loadTableAccess(s),
+    getRestaurantName(s),
+    getGuestBrandState(s),
+  ]);
 
   return (
     <CartProvider slug={s}>
       <GuestOrdersScreen
+        brandState={brandState}
         slug={s}
         restaurantName={restaurantName}
         /* Only a verified session names a table; a stale one names nothing

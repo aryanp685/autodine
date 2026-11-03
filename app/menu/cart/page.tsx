@@ -45,15 +45,16 @@ export default async function CartPage({
     return <TableGateScreen reason="stale" verifyHref={verifyAgainHref(access)} />;
   }
 
-  // One query, not two. The branding read existed for the accent, and the
-  // guest flow no longer varies by restaurant -- every customer sees the same
-  // colours (lib/branding/palette.ts, guestAccentStyle).
+  // One query, not two: the restaurants row carries the brand state too.
+  // A restaurant with no published brand paints the product's own style
+  // (lib/branding/guest-theme.ts) exactly as before.
   const data = await getCartScreenData(s);
 
   return (
     <CartProvider slug={s}>
       <Cart
         slug={s}
+        brandState={data?.brandState}
         restaurantName={data?.restaurantName ?? (isSupabaseConfigured ? undefined : demoRestaurant.name)}
         // Only a verified session names a table. Demo mode can carry one from
         // the sample cookie; a real database read decides it above.

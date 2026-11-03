@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { GuestFlow } from '@/components/GuestFlow';
 import { GuestTabs } from '@/components/GuestTabs';
 import { GuestLiveStatus } from '@/components/GuestLiveStatus';
-import { guestAccentStyle } from '@/lib/branding/palette';
+import { guestBrandStyle, type GuestBrandState } from '@/lib/branding/guest-theme';
 import {
   browserStorage,
   forgetLastOrder,
@@ -36,14 +36,17 @@ import {
  * to it.
  */
 export function GuestOrdersScreen({
+  brandState,
   slug,
   restaurantName,
   tableLabel,
 }: {
+  brandState?: GuestBrandState | null;
   slug?: string | null;
   restaurantName?: string | null;
   tableLabel?: string | null;
 }) {
+  const paint = guestBrandStyle(brandState);
   const [state, setState] = useState<'checking' | 'none' | 'found'>('checking');
   const [order, setOrder] = useState<RememberedOrder | null>(null);
 
@@ -64,7 +67,7 @@ export function GuestOrdersScreen({
       /* Not a step in the flow: this is somewhere the tabs can take you. */
       venue={restaurantName}
       table={tableLabel}
-      style={guestAccentStyle()}
+      style={paint.style} brandAttrs={paint.attrs}
       back={{ href: menuHref, label: 'Back to the menu' }}
       tabs={<GuestTabs slug={slug} active="orders" />}
     >

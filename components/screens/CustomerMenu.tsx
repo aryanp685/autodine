@@ -20,7 +20,7 @@ import { DishPhoto } from '@/components/DishPhoto';
 import { GuestTabs } from '@/components/GuestTabs';
 import { GuestFlow } from '@/components/GuestFlow';
 import { MenuIdentity } from '@/components/MenuIdentity';
-import { guestAccentStyle } from '@/lib/branding/palette';
+import { guestBrandStyle } from '@/lib/branding/guest-theme';
 import { useCart } from '@/components/CartProvider';
 import { priceCart } from '@/lib/cart-pricing';
 import { filterDishes } from '@/lib/guest-search';
@@ -239,11 +239,16 @@ export function CustomerMenu({
     return `/menu/item?${params.toString()}`;
   };
 
+  /* One decision for the whole flow: the restaurant's published brand theme,
+     or the product's own style when it has none (lib/branding/guest-theme.ts). */
+  const brand = guestBrandStyle(data?.restaurant);
+
   return (
     <GuestFlow
       step="menu"
       /* The accent paints the whole flow, so it is applied once at the root. */
-      style={guestAccentStyle()}
+      style={brand.style}
+      brandAttrs={brand.attrs}
       venue={restaurant.name}
       table={table?.label ?? null}
       dock={
@@ -307,6 +312,7 @@ export function CustomerMenu({
            show until a real restaurant has uploaded something. */
         logoUrl={data?.restaurant.logoUrl}
         bannerUrl={data?.restaurant.bannerUrl}
+        headerStyle={brand.theme?.layout.header}
         tableLabel={table?.label ?? null}
         /* The live menu gets the motion; the owner's branding preview keeps
            this still so it can be judged as a still. */
@@ -634,6 +640,7 @@ export function initialPicks(
 
 /* Option A — item customization: centred sheet, hairlines, no chrome */
 export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?: string }; itemId?: string } = {}) {
+  const brand = guestBrandStyle(data?.restaurant);
   const table = data?.table ?? null;
   const allItems = data?.items ?? demoItems;
   const restaurant = data?.restaurant ?? demoRestaurant;
@@ -821,7 +828,8 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
     return (
       <div
         data-flow-root=""
-        style={guestAccentStyle()}
+        style={brand.style}
+        {...brand.attrs}
         className="mx-auto min-h-dvh w-full max-w-[560px] px-5 py-16 text-gink"
       >
         <p className="text-[11px] font-semibold tracking-[0.12em] text-gink-46 uppercase">Not on the menu</p>
@@ -843,7 +851,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
   }
 
   return (
-    <div data-flow-root="" style={guestAccentStyle()} className="min-h-dvh text-gink">
+    <div data-flow-root="" style={brand.style} {...brand.attrs} className="min-h-dvh text-gink">
       {/* The menu itself, still there behind the sheet. It is dimmed and made
           inert rather than removed: a guest who closes the sheet lands back on
           the dish they were reading, at the scroll position they left. */}

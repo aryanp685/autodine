@@ -5,7 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { DishPhoto } from '@/components/DishPhoto';
 import { GuestFlow } from '@/components/GuestFlow';
 import { GuestTabs } from '@/components/GuestTabs';
-import { guestAccentStyle } from '@/lib/branding/palette';
+import { guestBrandStyle, type GuestBrandState } from '@/lib/branding/guest-theme';
 import { useCart } from '@/components/CartProvider';
 import { inr } from '@/lib/demo-data';
 import { VegMark } from '@/components/ui';
@@ -60,6 +60,7 @@ function Totals({ subtotalPaise, taxPaise, totalPaise, taxRateBps, compact }: {
  * the bill without a word looks like a mistake.
  */
 export function Cart({
+  brandState,
   slug,
   restaurantName,
   tableLabel,
@@ -69,6 +70,7 @@ export function Cart({
   placedErrorCode,
   needsCode = false,
 }: {
+  brandState?: GuestBrandState | null;
   slug?: string;
   restaurantName?: string;
   /** The table a live session confirmed, when there is one. */
@@ -102,6 +104,7 @@ export function Cart({
    */
   placedErrorCode?: string;
 }) {
+  const paint = guestBrandStyle(brandState);
   const cart = useCart();
   const reduce = useReducedMotion();
   const motionOn = !reduce;
@@ -138,7 +141,7 @@ export function Cart({
   return (
     <GuestFlow
       step="cart"
-      style={guestAccentStyle()}
+      style={paint.style} brandAttrs={paint.attrs}
       venue={restaurantName}
       table={tableLabel}
       back={{ href: withSlug('/menu'), label: 'Back to the menu' }}

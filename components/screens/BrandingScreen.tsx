@@ -4,7 +4,7 @@ import { SignInPrompt } from '@/components/SignInPrompt';
 import { MenuIdentity } from '@/components/MenuIdentity';
 import type { OutletBar } from '@/lib/outlets';
 import type { BrandingScreenData } from '@/lib/db/branding-screen';
-import { guestAccentStyle } from '@/lib/branding/palette';
+import { guestBrandStyle } from '@/lib/branding/guest-theme';
 import {
   removeBannerAction,
   removeLogoAction,
@@ -299,10 +299,11 @@ export function BrandingScreen({
 
         <Card
           className="bg-paper-deep px-4 py-6"
-          /* The flow's own colours, not this restaurant's row: the preview has
-             to show what a guest will actually see, and that is the same for
-             every restaurant. */
-          style={guestAccentStyle() as React.CSSProperties}
+          /* Exactly what a guest sees: the same decider (lib/branding/
+             guest-theme.ts), so the preview cannot promise something the
+             menu does not do. */
+          style={guestBrandStyle(data?.brand ?? null).style as React.CSSProperties}
+          {...guestBrandStyle(data?.brand ?? null).attrs}
         >
           {/* A phone, at phone width. Narrower and the header wraps differently
               from the real thing; wider and it stops being a preview. */}

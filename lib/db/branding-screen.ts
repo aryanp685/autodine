@@ -31,6 +31,12 @@ export type BrandingScreenData = {
   sampleDishes: { id: string; name: string; price: number; img: string | null }[];
   /** False when nothing is published: the preview then says so. */
   hasPublishedMenu: boolean;
+  /**
+   * The published brand state (migration 20261103000100). The preview paints
+   * through lib/branding/guest-theme.ts with exactly these facts, so what the
+   * owner sees here is what the guest sees.
+   */
+  brand?: { brandThemeEnabled?: boolean | null; brandTheme?: unknown | null } | null;
   blocked?: 'signed-out' | 'no-membership';
 };
 
@@ -60,7 +66,7 @@ export async function getBrandingScreenData(): Promise<BrandingScreenData | null
   const [restaurant, menus, dishes] = await Promise.all([
     supabase
       .from('restaurants')
-      .select('logo_path, banner_path')
+      .select('logo_path, banner_path, brand_theme_enabled, brand_theme')
       .eq('id', restaurantId)
       .maybeSingle(),
     supabase.from('menus').select('id, is_published').eq('restaurant_id', restaurantId),
@@ -75,6 +81,8 @@ export async function getBrandingScreenData(): Promise<BrandingScreenData | null
   const row = (restaurant.data ?? {}) as {
     logo_path?: string | null;
     banner_path?: string | null;
+    brand_theme_enabled?: boolean | null;
+    brand_theme?: unknown | null;
   };
 
   return {
@@ -94,5 +102,9 @@ export async function getBrandingScreenData(): Promise<BrandingScreenData | null
       img: publicAssetUrl((d.image_url as string | null) ?? null),
     })),
     hasPublishedMenu: (menus.data ?? []).some((m) => m.is_published === true),
+    brand: {
+      brandThemeEnabled: row.brand_theme_enabled === true,
+      brandTheme: row.brand_theme ?? null,
+    },
   };
 }
