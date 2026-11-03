@@ -175,7 +175,7 @@ describe('Counter, the redesign', () => {
     const at = doc.indexOf('data-counter-cta');
     const tag = doc.slice(doc.lastIndexOf('<button', at), doc.indexOf('>', at) + 1);
 
-    expect(tag).toContain('bg-[var(--p-accent)]');
+    expect(tag).toContain('bg-grass');
     expect(tag).not.toContain('bg-gink');
   });
 

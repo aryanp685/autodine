@@ -125,7 +125,7 @@ export function GuestTabs({ slug, active }: { slug?: string | null; active: Gues
                     key={count}
                     data-gtab-badge=""
                     aria-label={`${count} in the cart`}
-                    className="tabular-nums absolute -top-1.5 -right-2 grid min-w-[17px] place-items-center rounded-full bg-[var(--p-accent)] px-1 text-[10px] leading-[17px] font-semibold text-onink"
+                    className="tabular-nums absolute -top-1.5 -right-2 grid min-w-[17px] place-items-center rounded-full bg-grass px-1 text-[10px] leading-[17px] font-semibold text-cream"
                     initial={motionOn ? { scale: 1.45 } : false}
                     animate={motionOn ? { scale: 1 } : undefined}
                     transition={{ type: 'spring', stiffness: 520, damping: 18 }}

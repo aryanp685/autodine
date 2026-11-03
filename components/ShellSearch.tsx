@@ -220,7 +220,7 @@ export function ShellSearch({ onLaunch }: { onLaunch?: () => void }) {
                 <span
                   aria-hidden="true"
                   className={[
-                    'absolute top-1/2 left-0 h-4 w-[2px] -translate-y-1/2 rounded-r-full bg-[var(--p-accent)] transition-opacity duration-100',
+                    'absolute top-1/2 left-0 h-4 w-[2px] -translate-y-1/2 rounded-r-full bg-grass transition-opacity duration-100',
                     index === cursor ? 'opacity-100' : 'opacity-0',
                   ].join(' ')}
                 />

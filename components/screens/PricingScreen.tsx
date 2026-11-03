@@ -91,7 +91,7 @@ export function PricingScreen() {
         {/* ---------------------------------------------------------- header */}
         <header className="border-b border-cream/[0.12] px-5 pt-20 pb-14 sm:px-8">
           <div className="mx-auto w-full max-w-[1180px]">
-            <p className="text-[10.5px] font-semibold tracking-[0.14em] text-plum uppercase">01 · Plans</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-plum uppercase">01 · Plans</p>
 
             <div className="mt-6 grid gap-8 md:grid-cols-[1.15fr_0.85fr] md:items-end">
               <h1 className="max-w-[15ch] text-[clamp(34px,5.6vw,62px)] leading-[0.98] font-semibold tracking-[-0.04em] text-balance">
@@ -222,14 +222,14 @@ export function PricingScreen() {
           <div className="mx-auto w-full max-w-[1180px]">
             <div data-reveal className="grid gap-6 md:grid-cols-[1fr_0.9fr] md:items-end">
               <div>
-                <p className="text-[10.5px] font-semibold tracking-[0.14em] text-plum uppercase">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-plum uppercase">
                   02 · In the product today
                 </p>
                 <h2 className="mt-4 max-w-[16ch] text-[clamp(28px,4vw,44px)] leading-[1.03] font-semibold tracking-[-0.035em]">
                   Built, and switched on.
                 </h2>
               </div>
-              <p className="max-w-[44ch] text-[14.5px] leading-[1.65] text-mute">
+              <p className="max-w-[44ch] text-[15px] leading-[1.6] text-mute">
                 Not a roadmap. Every one of these is running in this build, on every account,
                 whatever the plans end up costing.
               </p>
@@ -263,7 +263,7 @@ export function PricingScreen() {
             >
               A restaurant that cannot take an order is not a smaller customer.
             </h2>
-            <p data-reveal className="mt-5 max-w-[52ch] text-[14.5px] leading-[1.65] text-mute">
+            <p data-reveal className="mt-5 max-w-[52ch] text-[15px] leading-[1.6] text-mute">
               The parts that run service are in every plan, and today they are not metered at
               all. Billing, when it arrives, will not take away the kitchen board.
             </p>
@@ -275,14 +275,14 @@ export function PricingScreen() {
           <div className="mx-auto w-full max-w-[1180px]">
             <div data-reveal className="grid gap-6 md:grid-cols-[1fr_0.9fr] md:items-end">
               <div>
-                <p className="text-[10.5px] font-semibold tracking-[0.14em] text-plum uppercase">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-plum uppercase">
                   03 · What the tiers change
                 </p>
                 <h2 className="mt-4 max-w-[18ch] text-[clamp(28px,4vw,44px)] leading-[1.03] font-semibold tracking-[-0.035em]">
                   {`${NumberWord(DIFFERENCES.length)} differences, not fifty.`}
                 </h2>
               </div>
-              <p className="max-w-[44ch] text-[14.5px] leading-[1.65] text-mute">
+              <p className="max-w-[44ch] text-[15px] leading-[1.6] text-mute">
                 What each step up will add when billing opens. Nothing here exists yet, which is
                 why every row is marked planned.
               </p>
@@ -309,7 +309,7 @@ export function PricingScreen() {
         <section id="billing" className="border-t border-cream/[0.12] px-5 py-16 sm:px-8">
           <div className="mx-auto grid w-full max-w-[1180px] gap-10 md:grid-cols-[0.85fr_1.15fr]">
             <div data-reveal>
-              <p className="text-[10.5px] font-semibold tracking-[0.14em] text-plum uppercase">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-plum uppercase">
                 04 · The money side
               </p>
               <h2 className="mt-4 max-w-[14ch] text-[clamp(26px,3.6vw,40px)] leading-[1.04] font-semibold tracking-[-0.035em]">
@@ -355,7 +355,7 @@ export function PricingScreen() {
         <section id="questions" className="border-t border-cream/[0.12] px-5 py-16 sm:px-8">
           <div className="mx-auto w-full max-w-[1180px]">
             <div data-reveal>
-              <p className="text-[10.5px] font-semibold tracking-[0.14em] text-plum uppercase">05 · Questions</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-plum uppercase">05 · Questions</p>
               <h2 className="mt-4 max-w-[20ch] text-[clamp(26px,3.6vw,40px)] leading-[1.04] font-semibold tracking-[-0.035em]">
                 The ones worth asking first.
               </h2>

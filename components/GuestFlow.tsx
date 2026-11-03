@@ -208,8 +208,8 @@ export function GuestFlow({
                        at a glance the shape says "two thirds of the way". */
                     className={[
                       'h-1 rounded-full transition-all',
-                      state === 'now' ? 'w-6 bg-[var(--p-accent)]' : 'w-4',
-                      state === 'done' ? 'bg-[var(--p-accent)]/40' : '',
+                      state === 'now' ? 'w-6 bg-grass' : 'w-4',
+                      state === 'done' ? 'bg-grass/40' : '',
                       state === 'todo' ? 'bg-gink-12' : '',
                     ]
                       .filter(Boolean)

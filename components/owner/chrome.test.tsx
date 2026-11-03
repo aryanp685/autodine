@@ -141,8 +141,8 @@ describe('the owner kit, after the redesign', () => {
     // A selected filter is an on-state, and the accent is what this surface
     // uses for a state. Filled, not tinted-with-a-blue-border: on a row of
     // three the fill is what the eye finds without reading.
-    expect(on).toContain('bg-[var(--p-accent)]');
-    expect(on).toContain('text-onink');
+    expect(on).toContain('bg-grass');
+    expect(on).toContain('text-cream');
     expect(on).not.toContain('bg-gink');
 
     // Neither state has a border, and both keep the same height and radius, so
@@ -172,7 +172,7 @@ describe('SwitchTrack', () => {
       expect(html).not.toContain('<button');
     }
 
-    expect(on).toContain('--p-accent');
+    expect(on).toContain('bg-grass');
     expect(off).toContain('left-[2px]');
     expect(on).toContain('left-[22px]');
   });

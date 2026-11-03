@@ -216,7 +216,7 @@ export function Cart({
           <p className="mt-2 flex items-start gap-2 text-[12px] leading-[1.55] text-gink-46">
             <span
               aria-hidden="true"
-              className="mt-[6px] size-1.5 shrink-0 rounded-full bg-[var(--p-accent)]"
+              className="mt-[6px] size-1.5 shrink-0 rounded-full bg-grass"
             />
             <span>
               One step left at checkout: the six-digit code showing inside the restaurant. Your

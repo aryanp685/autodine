@@ -803,7 +803,7 @@ export function MenuEditorScreen({
                                   aria-hidden="true"
                                   className={[
                                     'size-1.5 rounded-full',
-                                    i.available ? 'bg-[var(--p-accent)]' : 'bg-gink-28',
+                                    i.available ? 'bg-grass' : 'bg-gink-28',
                                   ].join(' ')}
                                 />
                                 {i.available ? 'Available' : 'Sold out'}

@@ -121,7 +121,7 @@ export function Checkout({
               {/* A drawn mark, not a tick: a tick would say "paid", and nothing
                   has been paid on this screen. */}
               <span aria-hidden="true" className="grid size-8 place-items-center rounded-full bg-[var(--p-accent-soft)] ring-1 ring-[var(--p-accent)]/20">
-                <span className="size-2 rounded-full bg-[var(--p-accent)]" />
+                <span className="size-2 rounded-full bg-grass" />
               </span>
               <div className="flex flex-col leading-tight">
                 <strong className="text-[14.5px] font-semibold text-gink">At the counter</strong>

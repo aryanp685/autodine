@@ -115,7 +115,7 @@ function Hero() {
 
       <div className="mx-auto grid max-w-[1180px] gap-14 px-5 pb-24 pt-20 sm:px-8 sm:pt-28 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:pb-32">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/70" data-hero-step>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70" data-hero-step>
             Restaurant technology
           </p>
 
@@ -130,7 +130,7 @@ function Hero() {
             experience.
           </h1>
 
-          <p className="mt-7 max-w-[48ch] text-[15px] leading-relaxed text-white/80" data-hero-step>
+          <p className="mt-7 max-w-[48ch] text-[15px] leading-[1.6] text-white/80" data-hero-step>
             Scan the table card. Order on the phone. The kitchen sees it instantly.
           </p>
 
@@ -293,11 +293,11 @@ function Problem() {
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
         <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-plum">Why it exists</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-plum">Why it exists</p>
             <h2 className="mt-5 max-w-[18ch] text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.05] tracking-[-0.04em]" data-reveal>
               Service is not slow. The hand-offs are.
             </h2>
-            <p className="mt-4 max-w-[46ch] text-[15px] leading-relaxed text-mute" data-reveal>
+            <p className="mt-4 max-w-[46ch] text-[15px] leading-[1.6] text-mute" data-reveal>
               AutoDine removes the walk between the table and the kitchen. Staff still run the room.
             </p>
           </div>
@@ -329,11 +329,11 @@ function Steps() {
   return (
     <section id="how" className="border-t border-cream/[0.12] py-24">
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-plum">Simple process</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-plum">Simple process</p>
         <h2 className="mt-5 max-w-[20ch] text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.05] tracking-[-0.04em]" data-reveal>
           From scan to serving.
         </h2>
-        <p className="mt-4 max-w-[52ch] text-[15px] leading-relaxed text-mute" data-reveal>
+        <p className="mt-4 max-w-[52ch] text-[15px] leading-[1.6] text-mute" data-reveal>
           Three steps. No app, no install.
         </p>
 
@@ -384,7 +384,7 @@ function Screens() {
   return (
     <section id="screens" className="border-t border-cream/[0.12] py-24">
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-plum">The product</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-plum">The product</p>
         <h2 className="mt-5 text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.05] tracking-[-0.04em]" data-reveal>
           Three screens, in service order.
         </h2>
@@ -430,11 +430,11 @@ function Features() {
     <section id="product" className="border-t border-cream/[0.12] py-24">
       <div className="mx-auto grid max-w-[1180px] gap-14 px-5 sm:px-8 lg:grid-cols-[0.85fr_1.15fr]">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-plum">Built for real restaurants</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-plum">Built for real restaurants</p>
           <h2 className="mt-5 text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.05] tracking-[-0.04em]" data-reveal>
             Why restaurants choose AutoDine.
           </h2>
-          <p className="mt-4 max-w-[42ch] text-[15px] leading-relaxed text-mute" data-reveal>
+          <p className="mt-4 max-w-[42ch] text-[15px] leading-[1.6] text-mute" data-reveal>
             For the room, not a dashboard with a menu bolted on.
           </p>
 
@@ -479,7 +479,7 @@ function Honest() {
               is the first thing to go stale. */}
           {`${NumberWord(LIVE.length)} things work. ${NumberWord(NOT_CONNECTED.length)} do not.`}
         </h2>
-        <p className="mt-4 max-w-[56ch] text-[15px] leading-relaxed text-mute" data-reveal>
+        <p className="mt-4 max-w-[56ch] text-[15px] leading-[1.6] text-mute" data-reveal>
           A working product in preview. Its real state, not a launch badge.
         </p>
 
@@ -519,11 +519,11 @@ function Pricing() {
   return (
     <section id="pricing" className="border-t border-cream/[0.12] py-24">
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-plum">Simple pricing</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-plum">Simple pricing</p>
         <h2 className="mt-5 text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.05] tracking-[-0.04em]" data-reveal>
           Start with what you need.
         </h2>
-        <p className="mt-4 max-w-[52ch] text-[15px] leading-relaxed text-mute" data-reveal>
+        <p className="mt-4 max-w-[52ch] text-[15px] leading-[1.6] text-mute" data-reveal>
           Three sizes. Seven free days. No card to begin.
         </p>
 

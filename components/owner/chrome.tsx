@@ -107,7 +107,7 @@ export function PageHead({
              is the action", so a blue kicker would spend it on a label that
              is not a control. The rule keeps the mark. */
           <p className="flex items-center gap-2 text-[10.5px] font-semibold tracking-[0.18em] text-gink-46 uppercase">
-            <span aria-hidden="true" className="h-px w-[18px] bg-[var(--p-accent)]" />
+            <span aria-hidden="true" className="h-px w-[18px] bg-grass" />
             {kicker}
           </p>
         ) : null}
@@ -240,7 +240,7 @@ export function Panel({
       <div className="relative flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-t-[calc(var(--p-r-card)-1px)] border-b border-hair bg-[color-mix(in_oklab,var(--p-accent-wash)_60%,transparent)] px-5 py-4">
         <span
           aria-hidden="true"
-          className="absolute top-1/2 left-0 h-[18px] w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--p-accent)]"
+          className="absolute top-1/2 left-0 h-[18px] w-[3px] -translate-y-1/2 rounded-r-full bg-grass"
         />
         <div className="flex items-baseline gap-2.5">
           <h2 className="text-[13.5px] font-semibold tracking-[-0.014em] text-gink">{title}</h2>
@@ -523,7 +523,7 @@ export function btn(tone: BtnTone = 'solid', size: BtnSize = 'md'): string {
    * control that does nothing when a finger lands on it reads as disabled.
    */
   const base =
-    'inline-flex items-center justify-center gap-2 rounded-full font-medium whitespace-nowrap transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-[var(--o-ease)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0 disabled:active:scale-100 active:translate-y-px active:scale-[0.98]';
+    'relative inline-flex items-center justify-center gap-2 rounded-full font-medium whitespace-nowrap transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-[var(--o-ease)] before:absolute before:-inset-1 before:rounded-full before:content-[\'\'] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0 disabled:active:scale-100 active:translate-y-px active:scale-[0.98]';
   const box = size === 'sm' ? 'h-9 px-4 text-[12.5px]' : 'h-11 px-5 text-[13px]';
   const tones: Record<BtnTone, string> = {
     /* ONE FILLED COLOUR IN THE PRODUCT.
@@ -533,9 +533,9 @@ export function btn(tone: BtnTone = 'solid', size: BtnSize = 'md'): string {
        had two hierarchies and neither was obvious. A filled action is the
        accent, full stop; the ink is for type and for the rail's scrim. */
     solid:
-      'bg-[var(--p-accent)] text-onink hover:bg-[var(--p-accent-strong)] active:bg-[var(--p-accent-strong)]',
+      'bg-grass text-cream hover:bg-grass-strong active:bg-grass-strong',
     primary:
-      'bg-[var(--p-accent)] text-onink hover:bg-[var(--p-accent-strong)] active:bg-[var(--p-accent-strong)]',
+      'bg-grass text-cream hover:bg-grass-strong active:bg-grass-strong',
     ghost:
       'bg-[color-mix(in_oklab,var(--p-ink)_7%,transparent)] text-gink hover:bg-[color-mix(in_oklab,var(--p-ink)_11%,transparent)]',
     quiet:
@@ -693,7 +693,7 @@ export function chipClass(active: boolean): string {
     'transition-[background-color,color,box-shadow] duration-150 ease-[var(--o-ease)]',
     'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]',
     active
-      ? 'bg-[var(--p-accent)] text-onink'
+      ? 'bg-grass text-cream'
       : 'bg-[color-mix(in_oklab,var(--p-ink)_6%,transparent)] text-gink-64 hover:bg-[color-mix(in_oklab,var(--p-ink)_9%,transparent)] hover:text-gink',
   ].join(' ');
 }
@@ -848,7 +848,7 @@ export function Tag({ tone = 'neutral', children }: { tone?: PillTone; children:
     due: 'bg-[var(--p-due-soft)] text-[var(--p-due)]',
     failed: 'bg-[var(--p-due-soft)] text-[var(--p-due)]',
     neutral: 'bg-paper-deep text-gink-64',
-    ink: 'bg-[var(--p-accent)] text-onink',
+    ink: 'bg-grass text-cream',
   };
   return (
     <span
@@ -892,7 +892,7 @@ export function SwitchTrack({ on, className = '' }: { on: boolean; className?: s
       aria-hidden="true"
       className={[
         'relative inline-flex h-[31px] w-[51px] shrink-0 items-center rounded-full transition-colors duration-200 ease-[var(--o-ease)]',
-        on ? 'bg-[var(--p-accent)]' : 'bg-[color-mix(in_oklab,var(--p-ink)_16%,transparent)]',
+        on ? 'bg-grass' : 'bg-[color-mix(in_oklab,var(--p-ink)_16%,transparent)]',
         className,
       ].join(' ')}
     >
@@ -909,7 +909,7 @@ export function SwitchTrack({ on, className = '' }: { on: boolean; className?: s
 /** A dot, for a status that is stated in words next to it. */
 export function Dot({ tone = 'live' }: { tone?: 'live' | 'idle' | 'alert' }) {
   const tones = {
-    live: 'bg-[var(--p-accent)]',
+    live: 'bg-grass',
     idle: 'bg-gink-28',
     alert: 'bg-[var(--p-due)]',
   } as const;

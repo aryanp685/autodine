@@ -229,7 +229,7 @@ export function GuestLiveStatus({
           <span className="inline-flex items-center gap-1.5 text-[11px] text-gink-46">
             <span
               aria-hidden="true"
-              className="g-live-dot size-1.5 rounded-full bg-[var(--p-accent)]"
+              className="g-live-dot size-1.5 rounded-full bg-grass"
             />
             Live
           </span>

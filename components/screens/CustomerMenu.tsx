@@ -854,7 +854,7 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
           <div className="mt-0.5 truncate text-[12px] text-gink-46">{restaurant.tagline}</div>
           {table ? (
             <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-1 text-[10.5px] font-semibold tracking-[0.07em] text-[var(--p-accent)] uppercase">
-              <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--p-accent)]" />
+              <span aria-hidden="true" className="size-1.5 rounded-full bg-grass" />
               {table.label}
             </div>
           ) : null}
@@ -1154,7 +1154,7 @@ function ChoiceDot({ on, motionOn }: { on: boolean; motionOn: boolean }) {
   if (!on) return null;
   return (
     <motion.span
-      className="size-2 rounded-full bg-[var(--p-accent)]"
+      className="size-2 rounded-full bg-grass"
       initial={motionOn ? { scale: 0.35, opacity: 0 } : false}
       animate={motionOn ? { scale: 1, opacity: 1 } : undefined}
       transition={{ type: 'spring', stiffness: 620, damping: 22 }}

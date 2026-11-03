@@ -1871,7 +1871,7 @@ export function Kitchen({
                   className={[
                     'h-3.5 w-[3px] rounded-full',
                     c.key === 'new'
-                      ? 'bg-[var(--p-accent)]'
+                      ? 'bg-grass'
                       : c.key === 'preparing'
                         ? 'bg-gink'
                         : 'bg-[var(--p-live)]',
@@ -1917,7 +1917,7 @@ export function Kitchen({
                     className={[
                       'absolute inset-y-0 left-0 w-[3px]',
                       o.state === 'new'
-                        ? 'bg-[var(--p-accent)]'
+                        ? 'bg-grass'
                         : o.state === 'preparing'
                           ? 'bg-gink'
                           : o.state === 'ready'

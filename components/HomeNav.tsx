@@ -35,7 +35,7 @@ export function HomeNav() {
           </Link>
           <Link
             href="/signup"
-            className="inline-flex h-10 items-center rounded-full bg-plum px-5 text-[13px] font-medium text-white transition-colors hover:bg-plum-strong"
+            className="inline-flex h-10 items-center rounded-full bg-grass px-5 text-[13px] font-medium text-cream transition-colors hover:bg-grass-strong"
           >
             Create account
           </Link>
