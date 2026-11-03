@@ -18,44 +18,6 @@ import { announcementCount, recordAnnouncements, waitForAppReady } from './flow-
  * skip themselves without one.
  */
 
-test('DIAG kitchen button wiring', async ({ page }) => {
-  test.setTimeout(90_000);
-  await page.goto('/kitchen');
-  await waitForAppReady(page);
-
-  const btn = page.getByRole('button', { name: 'Start preparing' }).first();
-  const info = await btn.evaluate((el) => {
-    const keys = Object.keys(el).filter((k) => k.startsWith('__'));
-    const propsKey = keys.find((k) => k.startsWith('__reactProps'));
-    const props = propsKey ? (el as unknown as Record<string, unknown>)[propsKey] : null;
-    const r = (el as HTMLElement).getBoundingClientRect();
-    const hitEl = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-    return {
-      marks: keys.slice(0, 4),
-      onClick: props ? typeof (props as { onClick?: unknown }).onClick : 'none',
-      rect: { x: r.x, y: r.y, w: r.width, h: r.height },
-      viewportH: window.innerHeight,
-      hit: hitEl ? `${hitEl.tagName} ==button? ${hitEl === el}` : 'nothing',
-    };
-  });
-
-  const steps: string[] = [];
-  try {
-    await btn.click({ timeout: 5_000 });
-    steps.push('click-ok');
-  } catch (e) {
-    steps.push(`click-ERR ${String(e).split('\n').slice(0, 5).join(' | ').slice(0, 400)}`);
-  }
-  const states: (string | null)[] = [];
-  for (const a of await page.locator('article[data-state]').all()) {
-    states.push(await a.getAttribute('data-state'));
-  }
-  steps.push(`states=${JSON.stringify(states)}`);
-
-  throw new Error(`DIAG info=${JSON.stringify(info)} steps=${JSON.stringify(steps)}`);
-});
-
-
 test.describe('incoming orders are readable at a glance', () => {
   test('a ticket shows the table, every item with its quantity, and the note in full', async ({
     page,
