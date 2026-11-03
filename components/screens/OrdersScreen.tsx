@@ -267,7 +267,7 @@ export function OrdersScreen({
                     name="from"
                     defaultValue={customFrom}
                     required
-                    className={fieldSm('w-[150px]')}
+                    className={fieldSm('w-[150px] max-w-full')}
                   />
                 </label>
                 <label className="block">
@@ -277,7 +277,7 @@ export function OrdersScreen({
                     name="to"
                     defaultValue={customTo}
                     required
-                    className={fieldSm('w-[150px]')}
+                    className={fieldSm('w-[150px] max-w-full')}
                   />
                 </label>
                 <button type="submit" className={btn('ghost', 'sm')}>
@@ -326,7 +326,7 @@ export function OrdersScreen({
                 defaultValue={query}
                 placeholder="Table or reference"
                 aria-label="Find an order by table or reference"
-                className={fieldSm('w-[180px]')}
+                className={fieldSm('w-[180px] max-w-full')}
               />
               <button type="submit" className={btn('ghost', 'sm')}>
                 Search

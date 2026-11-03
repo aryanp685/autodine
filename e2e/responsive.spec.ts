@@ -21,6 +21,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { seedCart, waitForAppReady } from './flow-helpers';
 
 const VIEWPORTS = [
+  { width: 320, height: 720, label: 'phone-narrow' },
   { width: 360, height: 800, label: 'phone-small' },
   { width: 390, height: 844, label: 'phone' },
   { width: 768, height: 1024, label: 'tablet-portrait' },
@@ -56,7 +57,7 @@ async function assertNoSidewaysScroll(page: Page, where: string) {
 }
 
 for (const route of ROUTES) {
-  test(`responsive: ${route.slug} holds from 360px to 1440px`, async ({ page }) => {
+  test(`responsive: ${route.slug} holds from 320px to 1440px`, async ({ page }) => {
     for (const vp of VIEWPORTS) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
 

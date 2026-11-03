@@ -21,6 +21,7 @@ const READY = Boolean(BASE && OWNER_EMAIL && OWNER_PASSWORD);
 const NEEDS = 'E2E_BASE_URL, E2E_OWNER_EMAIL, E2E_OWNER_PASSWORD';
 
 const VIEWPORTS = [
+  { width: 320, height: 720, label: 'phone-narrow' },
   { width: 360, height: 800, label: 'phone-small' },
   { width: 390, height: 844, label: 'phone' },
   { width: 768, height: 1024, label: 'tablet-portrait' },
@@ -46,7 +47,7 @@ async function assertNoSidewaysScroll(page: Page, where: string) {
 }
 
 for (const route of ROUTES) {
-  test(`owner responsive: ${route.slug} holds from 360px to 1280px`, async ({ browser }) => {
+  test(`owner responsive: ${route.slug} holds from 320px to 1280px`, async ({ browser }) => {
     test.skip(!READY, skipUnless(READY, NEEDS));
 
     const context = await browser.newContext({ baseURL: BASE });
