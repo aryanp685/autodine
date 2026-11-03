@@ -336,6 +336,19 @@ begin
     return jsonb_build_object('ok', false, 'reason', 'Only an owner or manager can publish.');
   end if;
 
+  -- The menu half is a write to public.menus, and every menus write is
+  -- trial-gated by RLS (menus_manage = role AND restaurant_can_write,
+  -- migration 20261029000100). This function runs as SECURITY DEFINER and
+  -- would otherwise bypass that gate, so the same condition is enforced
+  -- here. The pair is atomic: if the menu half cannot be written, neither
+  -- half goes live.
+  if not public.restaurant_can_write(v_restaurant) then
+    return jsonb_build_object(
+      'ok', false,
+      'reason', 'Only an owner or manager can change the menu, and the trial must still be running. Nothing was published.'
+    );
+  end if;
+
   -- The pair must belong to the same restaurant, and the menu must exist.
   select * into v_menu from public.menus where id = p_menu_id;
   if not found or v_menu.restaurant_id <> v_restaurant then
@@ -446,6 +459,16 @@ begin
 
   if not public.has_restaurant_role(p_restaurant_id, array['owner', 'manager']) then
     return jsonb_build_object('ok', false, 'reason', 'Only an owner or manager can roll back.');
+  end if;
+
+  -- Rollback also writes menus.is_published, so it carries the same trial
+  -- gate as publish (see the note there): SECURITY DEFINER must not become a
+  -- way around menus_manage.
+  if not public.restaurant_can_write(p_restaurant_id) then
+    return jsonb_build_object(
+      'ok', false,
+      'reason', 'Only an owner or manager can change the menu, and the trial must still be running. Nothing was rolled back.'
+    );
   end if;
 
   select * into v_last
