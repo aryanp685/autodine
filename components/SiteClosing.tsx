@@ -26,7 +26,7 @@ export function SiteClosing({
   secondary,
 }: Props) {
   return (
-    <section className="border-t border-white/[0.07] bg-ink text-cream">
+    <section className="border-t border-cream/[0.07] bg-ink text-cream">
       <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-10 px-5 py-20 sm:px-8 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-[10.5px] font-semibold tracking-[0.14em] text-gold-dim uppercase">{eyebrow}</p>
@@ -39,14 +39,14 @@ export function SiteClosing({
         <div className="flex flex-wrap items-center gap-3">
           <Link
             href={primary.href}
-            className="inline-flex h-12 items-center rounded-full bg-gold px-6 text-[14px] font-medium text-ink transition-colors hover:bg-gold-bright"
+            className="inline-flex h-12 items-center rounded-full bg-gold px-6 text-[14px] font-medium text-cream transition-colors hover:bg-gold-bright"
           >
             {primary.label}
           </Link>
           {secondary && (
             <Link
               href={secondary.href}
-              className="inline-flex h-12 items-center rounded-full border border-white/20 px-6 text-[14px] font-medium text-cream transition-colors hover:border-white/40 hover:bg-white/[0.06]"
+              className="inline-flex h-12 items-center rounded-full border border-cream/20 px-6 text-[14px] font-medium text-cream transition-colors hover:border-cream/40 hover:bg-white/70"
             >
               {secondary.label}
             </Link>

@@ -140,7 +140,7 @@ export function Home() {
 
 function Nav() {
   return (
-    <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-ink/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-cream/[0.06] bg-ink/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-[1180px] items-center gap-8 px-5 sm:px-8">
         <Link href="/" aria-label="AutoDine home" className="shrink-0">
           <BrandLockup size={21} ink="#f7f3ea" dot={BRAND_GREEN} />
@@ -162,7 +162,7 @@ function Nav() {
           </Link>
           <Link
             href="/signup"
-            className="inline-flex h-10 items-center rounded-full bg-gold px-5 text-[13px] font-medium text-ink transition-colors hover:bg-gold-bright"
+            className="inline-flex h-10 items-center rounded-full bg-gold px-5 text-[13px] font-medium text-cream transition-colors hover:bg-gold-bright"
           >
             Create account
           </Link>
@@ -195,7 +195,7 @@ function Hero() {
 
       <div className="mx-auto grid max-w-[1180px] gap-14 px-5 pb-24 pt-20 sm:px-8 sm:pt-28 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:pb-32">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-gold" data-hero-step>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-gold-dim" data-hero-step>
             Restaurant technology
           </p>
 
@@ -205,7 +205,7 @@ function Hero() {
           >
             Every table,
             <br />
-            <span className="text-gold">one seamless</span>
+            <span className="text-gold-dim">one seamless</span>
             <br />
             experience.
           </h1>
@@ -219,14 +219,14 @@ function Hero() {
           <div className="mt-9 flex flex-wrap items-center gap-3" data-hero-step>
             <Link
               href="/signup"
-              className="inline-flex h-12 items-center gap-2 rounded-full bg-gold px-6 text-[14px] font-medium text-ink transition-colors hover:bg-gold-bright"
+              className="inline-flex h-12 items-center gap-2 rounded-full bg-gold px-6 text-[14px] font-medium text-cream transition-colors hover:bg-gold-bright"
             >
               Start the 7-day trial
               <span aria-hidden="true">→</span>
             </Link>
             <Link
               href="#how"
-              className="inline-flex h-12 items-center gap-2 rounded-full border border-white/15 px-6 text-[14px] text-cream transition-colors hover:border-white/30 hover:bg-white/[0.04]"
+              className="inline-flex h-12 items-center gap-2 rounded-full border border-cream/15 px-6 text-[14px] text-cream transition-colors hover:border-cream/30 hover:bg-cream/[0.05]"
             >
               See how it works
             </Link>
@@ -237,7 +237,7 @@ function Hero() {
         <PhoneMockup />
       </div>
 
-      <div className="relative border-t border-white/[0.07]">
+      <div className="relative border-t border-cream/[0.07]">
         <ul className="mx-auto grid max-w-[1180px] grid-cols-2 gap-px px-5 sm:px-8 lg:grid-cols-4">
           {[
             ['Digital menu', 'For your customers'],
@@ -246,7 +246,7 @@ function Hero() {
             ['Works for all', 'Cafés, casual & fine dining'],
           ].map(([title, sub]) => (
             <li key={title} className="flex items-start gap-3 py-6">
-              <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/[0.05] text-gold" aria-hidden="true">
+              <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/70 text-gold-dim" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6">
                   <path d="m5 12 4.5 4.5L19 7" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -279,21 +279,21 @@ function PhoneMockup() {
     <div className="relative mx-auto w-full max-w-[330px] lg:mx-0 lg:ml-auto" data-hero-step>
       <div className="absolute -inset-8 -z-10 rounded-[48px] bg-[radial-gradient(60%_50%_at_50%_40%,rgba(224,168,106,0.22),transparent_70%)] blur-2xl" aria-hidden="true" />
 
-      <div className="rounded-[34px] border border-white/10 bg-ink-soft p-2.5 shadow-[0_40px_80px_-40px_rgba(0,0,0,0.9)]">
+      <div className="rounded-[34px] border border-cream/10 bg-ink-soft p-2.5 shadow-[0_40px_80px_-40px_rgba(0,0,0,0.9)]">
         <div className="overflow-hidden rounded-[26px] bg-ink">
           <div className="flex items-center justify-between px-4 pt-3 text-[10px] text-mute-dim">
             <span>9:41</span>
-            <span className="h-1.5 w-16 rounded-full bg-white/10" />
+            <span className="h-1.5 w-16 rounded-full bg-cream/15" />
             <span>5G</span>
           </div>
 
           <div className="flex items-center justify-between px-4 pb-3 pt-4">
             <div>
-              <p className="text-[9px] uppercase tracking-[0.18em] text-gold">Table 05</p>
+              <p className="text-[9px] uppercase tracking-[0.18em] text-gold-dim">Table 05</p>
               <p className="mt-1 text-[15px] font-medium tracking-tight">The Urban Table</p>
               <p className="text-[10px] text-mute-dim">North Indian · dine-in</p>
             </div>
-            <span className="grid h-8 w-8 place-items-center rounded-full bg-white/[0.06] text-mute">✕</span>
+            <span className="grid h-8 w-8 place-items-center rounded-full bg-white/70 text-mute">✕</span>
           </div>
 
           <div className="flex gap-1.5 px-4 pb-4 text-[10px]">
@@ -302,8 +302,8 @@ function PhoneMockup() {
                 key={tab}
                 className={
                   i === 0
-                    ? 'rounded-full bg-gold px-3 py-1 font-medium text-ink'
-                    : 'rounded-full bg-white/[0.05] px-3 py-1 text-mute'
+                    ? 'rounded-full bg-gold px-3 py-1 font-medium text-cream'
+                    : 'rounded-full bg-white/70 px-3 py-1 text-mute'
                 }
               >
                 {tab}
@@ -313,7 +313,7 @@ function PhoneMockup() {
 
           <ul className="space-y-2 px-3 pb-4">
             {dishes.map((dish) => (
-              <li key={dish.name} className="flex gap-3 rounded-2xl bg-white/[0.03] p-2.5">
+              <li key={dish.name} className="flex gap-3 rounded-2xl bg-white/70 p-2.5">
                 <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl">
                   <Image src={dish.img} alt="" fill sizes="80px" className="object-cover" />
                 </div>
@@ -323,8 +323,8 @@ function PhoneMockup() {
                     Cooked in rich tomato gravy with butter
                   </p>
                   <div className="mt-1.5 flex items-center justify-between">
-                    <span className="text-[12px] text-gold">₹{dish.price}</span>
-                    <span className="grid h-6 w-6 place-items-center rounded-full bg-gold text-[13px] font-medium text-ink">+</span>
+                    <span className="text-[12px] text-gold-dim">₹{dish.price}</span>
+                    <span className="grid h-6 w-6 place-items-center rounded-full bg-gold text-[13px] font-medium text-cream">+</span>
                   </div>
                 </div>
               </li>
@@ -334,11 +334,11 @@ function PhoneMockup() {
       </div>
 
       {/* The table card, because the whole product starts with one. */}
-      <div className="absolute -bottom-6 -left-4 hidden rounded-2xl border border-white/10 bg-ink-card p-3 sm:block">
-        <div className="grid h-16 w-16 place-items-center rounded-lg bg-cream">
+      <div className="absolute -bottom-6 -left-4 hidden rounded-2xl border border-cream/10 bg-ink-card p-3 sm:block">
+        <div className="grid h-16 w-16 place-items-center rounded-lg bg-ink">
           <div className="grid grid-cols-5 gap-0.5" aria-hidden="true">
             {Array.from({ length: 25 }).map((_, i) => (
-              <span key={i} className={`h-1.5 w-1.5 ${i % 3 === 0 || i % 7 === 0 ? 'bg-ink' : 'bg-transparent'}`} />
+              <span key={i} className={`h-1.5 w-1.5 ${i % 3 === 0 || i % 7 === 0 ? 'bg-cream' : 'bg-transparent'}`} />
             ))}
           </div>
         </div>
@@ -375,11 +375,11 @@ function Problem() {
   ];
 
   return (
-    <section className="border-t border-white/[0.06] py-24">
+    <section className="border-t border-cream/[0.06] py-24">
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
         <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-gold">Why it exists</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-gold-dim">Why it exists</p>
             <h2 className="mt-5 max-w-[18ch] text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.05] tracking-[-0.04em]" data-reveal>
               Service is not slow. The hand-offs are.
             </h2>
@@ -389,7 +389,7 @@ function Problem() {
             </p>
           </div>
 
-          <ol className="divide-y divide-white/[0.07] border-y border-white/[0.07]" data-stagger>
+          <ol className="divide-y divide-cream/[0.07] border-y border-cream/[0.07]" data-stagger>
             {items.map((item, index) => (
               <li key={item.title} className="flex gap-5 py-6">
                 <span className="mt-0.5 text-[11px] font-semibold tracking-[0.16em] text-mute-dim">
@@ -414,9 +414,9 @@ function Problem() {
 
 function Steps() {
   return (
-    <section id="how" className="border-t border-white/[0.06] py-24">
+    <section id="how" className="border-t border-cream/[0.06] py-24">
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-gold">Simple process</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-gold-dim">Simple process</p>
         <h2 className="mt-5 max-w-[20ch] text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.05] tracking-[-0.04em]" data-reveal>
           From scan to serving.
         </h2>
@@ -428,11 +428,11 @@ function Steps() {
           {STEPS.map((step) => (
             <li
               key={step.n}
-              className="group rounded-2xl border border-white/[0.07] bg-ink-card/60 p-6 transition-colors hover:border-white/15 hover:bg-ink-card"
+              className="group rounded-2xl border border-cream/[0.07] bg-ink-card/60 p-6 transition-colors hover:border-cream/15 hover:bg-ink-card"
             >
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-semibold tracking-[0.16em] text-mute-dim">{step.n}</span>
-                <span className="h-px flex-1 bg-white/[0.07]" aria-hidden="true" />
+                <span className="h-px flex-1 bg-cream/[0.07]" aria-hidden="true" />
               </div>
               <h3 className="mt-6 text-[17px] font-medium tracking-tight">{step.title}</h3>
               <p className="mt-2.5 text-[13px] leading-relaxed text-mute">{step.body}</p>
@@ -469,9 +469,9 @@ function Screens() {
   ];
 
   return (
-    <section id="screens" className="border-t border-white/[0.06] py-24">
+    <section id="screens" className="border-t border-cream/[0.06] py-24">
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-gold">The product</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-gold-dim">The product</p>
         <h2 className="mt-5 text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.05] tracking-[-0.04em]" data-reveal>
           Three screens, in service order.
         </h2>
@@ -481,7 +481,7 @@ function Screens() {
             <article
               key={panel.title}
               data-tour-panel
-              className="overflow-hidden rounded-2xl border border-white/[0.07] bg-ink-card"
+              className="overflow-hidden rounded-2xl border border-cream/[0.07] bg-ink-card"
             >
               <div className="relative aspect-[4/3] overflow-hidden">
                 <Image
@@ -492,7 +492,7 @@ function Screens() {
                   className="object-cover transition-transform duration-700 group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-ink-card via-ink-card/20 to-transparent" />
-                <span className="absolute left-4 top-4 rounded-full bg-ink/70 px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-gold backdrop-blur">
+                <span className="absolute left-4 top-4 rounded-full bg-ink/70 px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-gold-dim backdrop-blur">
                   {panel.kicker}
                 </span>
               </div>
@@ -514,10 +514,10 @@ function Screens() {
 
 function Features() {
   return (
-    <section id="product" className="border-t border-white/[0.06] py-24">
+    <section id="product" className="border-t border-cream/[0.06] py-24">
       <div className="mx-auto grid max-w-[1180px] gap-14 px-5 sm:px-8 lg:grid-cols-[0.85fr_1.15fr]">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-gold">Built for real restaurants</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-gold-dim">Built for real restaurants</p>
           <h2 className="mt-5 text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.05] tracking-[-0.04em]" data-reveal>
             Why restaurants choose AutoDine.
           </h2>
@@ -526,7 +526,7 @@ function Features() {
             bolted on.
           </p>
 
-          <blockquote className="mt-10 rounded-2xl border border-white/[0.07] bg-ink-card p-6">
+          <blockquote className="mt-10 rounded-2xl border border-cream/[0.07] bg-ink-card p-6">
             <p className="text-[17px] leading-snug tracking-tight text-cream">
               “Technology that fits your restaurant, not the other way around.”
             </p>
@@ -537,9 +537,9 @@ function Features() {
           {FEATURES.map((feature) => (
             <li
               key={feature.title}
-              className="rounded-2xl border border-white/[0.07] bg-ink-card/60 p-6 transition-colors hover:border-white/15"
+              className="rounded-2xl border border-cream/[0.07] bg-ink-card/60 p-6 transition-colors hover:border-cream/15"
             >
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-gold/10 text-gold" aria-hidden="true">
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-gold/10 text-gold-dim" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <path d={feature.icon} strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -564,7 +564,7 @@ function Features() {
  */
 function Honest() {
   return (
-    <section id="status" className="border-t border-white/[0.06] py-24">
+    <section id="status" className="border-t border-cream/[0.06] py-24">
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
         <h2 className="text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.05] tracking-[-0.04em]" data-reveal>
           {/* Spelled out from the lists, never typed: a number in a headline
@@ -610,9 +610,9 @@ function Honest() {
 
 function Pricing() {
   return (
-    <section id="pricing" className="border-t border-white/[0.06] py-24">
+    <section id="pricing" className="border-t border-cream/[0.06] py-24">
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-gold">Simple pricing</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-gold-dim">Simple pricing</p>
         <h2 className="mt-5 text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.05] tracking-[-0.04em]" data-reveal>
           Start with what you need.
         </h2>
@@ -628,11 +628,11 @@ function Pricing() {
               className={`relative flex flex-col rounded-2xl border p-7 ${
                 plan.recommended
                   ? 'border-gold/40 bg-gold/[0.06]'
-                  : 'border-white/[0.07] bg-ink-card/60'
+                  : 'border-cream/[0.07] bg-ink-card/60'
               }`}
             >
               {plan.recommended && (
-                <span className="absolute -top-3 left-7 rounded-full bg-gold px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink">
+                <span className="absolute -top-3 left-7 rounded-full bg-gold px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-cream">
                   Most popular
                 </span>
               )}
@@ -660,8 +660,8 @@ function Pricing() {
                 href={`/pricing#plan-${plan.id}`}
                 className={`mt-7 inline-flex h-11 items-center justify-center rounded-full text-[13px] font-medium transition-colors ${
                   plan.recommended
-                    ? 'bg-gold text-ink hover:bg-gold-bright'
-                    : 'border border-white/15 text-cream hover:bg-white/[0.05]'
+                    ? 'bg-gold text-cream hover:bg-gold-bright'
+                    : 'border border-cream/15 text-cream hover:bg-cream/[0.05]'
                 }`}
               >
                 See {plan.name}
@@ -684,10 +684,10 @@ function Pricing() {
 
 function Faq() {
   return (
-    <section id="faq" className="border-t border-white/[0.06] py-24">
+    <section id="faq" className="border-t border-cream/[0.06] py-24">
       <div className="mx-auto grid max-w-[1180px] gap-14 px-5 sm:px-8 lg:grid-cols-[0.8fr_1.2fr]">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-gold">FAQ</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-gold-dim">FAQ</p>
           <h2 className="mt-5 text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.05] tracking-[-0.04em]" data-reveal>
             Frequently asked questions.
           </h2>
@@ -696,12 +696,12 @@ function Faq() {
           </p>
         </div>
 
-        <div className="divide-y divide-white/[0.07] border-y border-white/[0.07]">
+        <div className="divide-y divide-cream/[0.07] border-y border-cream/[0.07]">
           {FAQ.map((item) => (
             <details key={item.q} className="group py-5">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-6 text-[15px] text-cream marker:hidden">
                 {item.q}
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-white/15 text-mute transition-transform group-open:rotate-45">
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-cream/15 text-mute transition-transform group-open:rotate-45">
                   +
                 </span>
               </summary>
@@ -718,7 +718,7 @@ function Faq() {
 
 function Close() {
   return (
-    <footer className="border-t border-white/[0.06]">
+    <footer className="border-t border-cream/[0.06]">
       <div className="relative isolate overflow-hidden">
         <Image
           src="/img/restaurant-interior.jpg"
@@ -739,13 +739,13 @@ function Close() {
           <div className="mt-9 flex flex-wrap justify-center gap-3">
             <Link
               href="/signup"
-              className="inline-flex h-12 items-center gap-2 rounded-full bg-gold px-7 text-[14px] font-medium text-ink transition-colors hover:bg-gold-bright"
+              className="inline-flex h-12 items-center gap-2 rounded-full bg-gold px-7 text-[14px] font-medium text-cream transition-colors hover:bg-gold-bright"
             >
               Create your restaurant <span aria-hidden="true">→</span>
             </Link>
             <Link
               href="/pricing"
-              className="inline-flex h-12 items-center rounded-full border border-white/15 px-7 text-[14px] transition-colors hover:bg-white/[0.05]"
+              className="inline-flex h-12 items-center rounded-full border border-cream/15 px-7 text-[14px] transition-colors hover:bg-cream/[0.05]"
             >
               See pricing
             </Link>
@@ -753,7 +753,7 @@ function Close() {
         </div>
       </div>
 
-      <div className="border-t border-white/[0.07]">
+      <div className="border-t border-cream/[0.07]">
         <div className="mx-auto flex max-w-[1180px] flex-col gap-6 px-5 py-10 sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <div>
             <BrandLockup size={20} ink="#f7f3ea" dot={BRAND_GREEN} />

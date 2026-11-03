@@ -81,8 +81,8 @@ export function SiteNav({
   }, []);
 
   const surface = onImage
-    ? 'data-[scrolled=true]:border-white/[0.07] data-[scrolled=true]:bg-ink/80 data-[scrolled=true]:backdrop-blur-xl'
-    : 'border-b border-ink/10 bg-cream/85 backdrop-blur-xl';
+    ? 'data-[scrolled=true]:border-cream/[0.07] data-[scrolled=true]:bg-ink/80 data-[scrolled=true]:backdrop-blur-xl'
+    : 'border-b border-cream/10 bg-ink/85 backdrop-blur-xl';
 
   return (
     <header
@@ -96,7 +96,7 @@ export function SiteNav({
         <Link
           href="/"
           aria-label="AutoDine home"
-          className={onImage ? 'shrink-0 text-cream' : 'shrink-0 text-ink'}
+          className={onImage ? 'shrink-0 text-cream' : 'shrink-0 text-cream'}
         >
           <BrandLockup size={21} ink="currentColor" dot={BRAND_GREEN} />
         </Link>
@@ -105,7 +105,7 @@ export function SiteNav({
           <ul
             className={[
               'flex items-center gap-7 text-[13px]',
-              onImage ? 'text-mute' : 'text-ink/60',
+              onImage ? 'text-mute' : 'text-cream/60',
             ].join(' ')}
           >
             {links.map((link) => (
@@ -115,8 +115,8 @@ export function SiteNav({
                   aria-current={link.active ? 'page' : undefined}
                   className={[
                     'transition-colors',
-                    onImage ? 'hover:text-cream' : 'hover:text-ink',
-                    link.active ? (onImage ? 'text-cream' : 'text-ink') : '',
+                    onImage ? 'hover:text-cream' : 'hover:text-cream',
+                    link.active ? 'text-cream' : '',
                   ].join(' ')}
                 >
                   {link.label}
@@ -131,14 +131,14 @@ export function SiteNav({
             href="/login"
             className={[
               'hidden text-[13px] transition-colors sm:block',
-              onImage ? 'text-mute hover:text-cream' : 'text-ink/60 hover:text-ink',
+              onImage ? 'text-mute hover:text-cream' : 'text-cream/60 hover:text-cream',
             ].join(' ')}
           >
             Sign in
           </Link>
           <Link
             href="/signup"
-            className="inline-flex h-10 items-center rounded-full bg-gold px-5 text-[13px] font-medium text-ink transition-colors hover:bg-gold-bright"
+            className="inline-flex h-10 items-center rounded-full bg-gold px-5 text-[13px] font-medium text-cream transition-colors hover:bg-gold-bright"
           >
             Create account
           </Link>

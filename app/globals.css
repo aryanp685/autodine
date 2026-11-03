@@ -1180,21 +1180,25 @@ p { margin: 0; }
    rgba() can never drift apart.
    ========================================================================= */
 @theme {
-  --color-ink: #0b0a08;
-  --color-ink-soft: #14120f;
-  --color-ink-card: #1a1714;
-  --color-ink-line: #2a2521;
+  /* LIGHT WARM PORCELAIN (flipped 2026-11-03 — the dark premium surface was
+     retired at the owner's request; same system, same geometry, daylight).
+     `ink` is now the room, `cream` is now the type: the class names kept
+     their meaning ("the surface", "the text on it") and swapped their hues. */
+  --color-ink: #f7f2e9;
+  --color-ink-soft: #efe8dc;
+  --color-ink-card: #ffffff;
+  --color-ink-line: #e6dccb;
 
   --color-gold: #e0a86a;
-  --color-gold-bright: #f2c188;
-  --color-gold-dim: #b9854e;
+  --color-gold-bright: #cf9557;
+  --color-gold-dim: #96662f;
 
   --color-brand: #207030;
   --color-brand-soft: #2c8a3f;
 
-  --color-cream: #f7f3ea;
-  --color-mute: #a49c90;
-  --color-mute-dim: #7d7568;
+  --color-cream: #211a15;
+  --color-mute: #6f675c;
+  --color-mute-dim: #8a8175;
 
   /* The same stack as the root, so `font-sans` cannot disagree with the body.
      -apple-system resolves to SF Pro on Apple hardware -- the typeface the

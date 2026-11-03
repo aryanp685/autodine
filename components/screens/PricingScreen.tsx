@@ -64,7 +64,7 @@ function TierTags({ tiers }: { tiers: string[] }) {
       {tiers.map((tier) => (
         <span
           key={tier}
-          className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] font-medium tracking-[0.06em] text-mute uppercase"
+          className="rounded-full border border-cream/15 px-2 py-0.5 text-[10px] font-medium tracking-[0.06em] text-mute uppercase"
         >
           {tier}
         </span>
@@ -89,7 +89,7 @@ export function PricingScreen() {
 
       <main className="bg-ink text-cream antialiased">
         {/* ---------------------------------------------------------- header */}
-        <header className="border-b border-white/[0.07] px-5 pt-20 pb-14 sm:px-8">
+        <header className="border-b border-cream/[0.07] px-5 pt-20 pb-14 sm:px-8">
           <div className="mx-auto w-full max-w-[1180px]">
             <p className="text-[10.5px] font-semibold tracking-[0.14em] text-gold-dim uppercase">01 · Plans</p>
 
@@ -106,7 +106,7 @@ export function PricingScreen() {
 
             <div
               data-reveal
-              className="mt-10 flex flex-col gap-3 rounded-2xl border border-white/[0.08] bg-ink-soft px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"
+              className="mt-10 flex flex-col gap-3 rounded-2xl border border-cream/[0.08] bg-ink-soft px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"
             >
               <PlanMatcher
                 options={PLANS.map((plan) => ({
@@ -141,11 +141,11 @@ export function PricingScreen() {
                          badge shouting over the other two. */
                       plan.recommended
                         ? 'border-gold/35 bg-ink-card shadow-[0_40px_80px_-50px_rgba(224,168,106,0.55)]'
-                        : 'border-white/[0.09] bg-ink-soft',
+                        : 'border-cream/[0.09] bg-ink-soft',
                     ].join(' ')}
                   >
                     {plan.recommended && (
-                      <div className="absolute -top-3 left-6 rounded-full bg-gold px-2.5 py-1 text-[10px] font-semibold tracking-[0.08em] text-ink uppercase">
+                      <div className="absolute -top-3 left-6 rounded-full bg-gold px-2.5 py-1 text-[10px] font-semibold tracking-[0.08em] text-cream uppercase">
                         Recommended
                       </div>
                     )}
@@ -162,7 +162,7 @@ export function PricingScreen() {
                       <span className="text-[12px] text-mute-dim">/month · planned</span>
                     </div>
 
-                    <hr className="my-5 border-white/[0.08]" />
+                    <hr className="my-5 border-cream/[0.08]" />
 
                     <ul className="flex flex-1 flex-col gap-2.5 text-[13.5px] leading-[1.45] text-cream/80">
                       {plan.id === 'starter' ? (
@@ -193,7 +193,7 @@ export function PricingScreen() {
                       )}
                     </ul>
 
-                    <p className="mt-5 border-t border-white/[0.08] pt-3 text-[10.5px] font-medium tracking-[0.09em] text-mute-dim uppercase">
+                    <p className="mt-5 border-t border-cream/[0.08] pt-3 text-[10.5px] font-medium tracking-[0.09em] text-mute-dim uppercase">
                       Planned · not on sale
                     </p>
                   </article>
@@ -207,7 +207,7 @@ export function PricingScreen() {
             <div data-reveal className="mt-10 flex flex-col items-start gap-2">
               <Link
                 href="/signup"
-                className="inline-flex h-12 items-center rounded-full bg-gold px-6 text-[14px] font-medium text-ink transition-colors hover:bg-gold-bright"
+                className="inline-flex h-12 items-center rounded-full bg-gold px-6 text-[14px] font-medium text-cream transition-colors hover:bg-gold-bright"
               >
                 Create an account
               </Link>
@@ -219,7 +219,7 @@ export function PricingScreen() {
         </section>
 
         {/* ------------------------------------------------------ live today */}
-        <section id="live" className="border-t border-white/[0.07] px-5 py-16 sm:px-8">
+        <section id="live" className="border-t border-cream/[0.07] px-5 py-16 sm:px-8">
           <div className="mx-auto w-full max-w-[1180px]">
             <div data-reveal className="grid gap-6 md:grid-cols-[1fr_0.9fr] md:items-end">
               <div>
@@ -238,7 +238,7 @@ export function PricingScreen() {
 
             <div data-stagger className="mt-12 grid gap-x-8 gap-y-9 sm:grid-cols-2 lg:grid-cols-3">
               {LIVE.map((capability, index) => (
-                <article key={capability.id} className="border-t border-white/[0.12] pt-4">
+                <article key={capability.id} className="border-t border-cream/[0.12] pt-4">
                   <p className="tnum text-[10.5px] font-semibold tracking-[0.1em] text-mute-dim">
                     {String(index + 1).padStart(2, '0')}
                   </p>
@@ -253,7 +253,7 @@ export function PricingScreen() {
         </section>
 
         {/* ------------------------------------------------------- statement */}
-        <section className="border-y border-white/[0.07] bg-ink-soft px-5 py-20 sm:px-8">
+        <section className="border-y border-cream/[0.07] bg-ink-soft px-5 py-20 sm:px-8">
           <div className="mx-auto w-full max-w-[1180px]">
             <p data-reveal className="text-[10.5px] font-semibold tracking-[0.14em] text-mute-dim uppercase">
               Why nothing is gated
@@ -289,7 +289,7 @@ export function PricingScreen() {
               </p>
             </div>
 
-            <div data-stagger className="mt-10 divide-y divide-white/[0.08] border-y border-white/[0.08]">
+            <div data-stagger className="mt-10 divide-y divide-cream/[0.08] border-y border-cream/[0.08]">
               {DIFFERENCES.map((difference) => {
                 const tiers = difference.tiers === 'all' ? [] : difference.tiers;
                 return (
@@ -307,7 +307,7 @@ export function PricingScreen() {
         </section>
 
         {/* --------------------------------------------------------- billing */}
-        <section id="billing" className="border-t border-white/[0.07] px-5 py-16 sm:px-8">
+        <section id="billing" className="border-t border-cream/[0.07] px-5 py-16 sm:px-8">
           <div className="mx-auto grid w-full max-w-[1180px] gap-10 md:grid-cols-[0.85fr_1.15fr]">
             <div data-reveal>
               <p className="text-[10.5px] font-semibold tracking-[0.14em] text-gold-dim uppercase">
@@ -340,7 +340,7 @@ export function PricingScreen() {
                   body: 'The account becomes read-only: menus, orders, receipts and reports stay visible and are never deleted. New orders stop until a plan is active.',
                 },
               ].map((step) => (
-                <div key={step.n} className="grid grid-cols-[auto_1fr] gap-4 border-t border-white/[0.1] pt-4">
+                <div key={step.n} className="grid grid-cols-[auto_1fr] gap-4 border-t border-cream/[0.1] pt-4">
                   <p className="tnum text-[11px] font-semibold tracking-[0.08em] text-gold-dim">{step.n}</p>
                   <div>
                     <h3 className="text-[15.5px] font-semibold tracking-[-0.01em] text-cream">{step.title}</h3>
@@ -353,7 +353,7 @@ export function PricingScreen() {
         </section>
 
         {/* ------------------------------------------------------------- FAQ */}
-        <section id="questions" className="border-t border-white/[0.07] px-5 py-16 sm:px-8">
+        <section id="questions" className="border-t border-cream/[0.07] px-5 py-16 sm:px-8">
           <div className="mx-auto w-full max-w-[1180px]">
             <div data-reveal>
               <p className="text-[10.5px] font-semibold tracking-[0.14em] text-gold-dim uppercase">05 · Questions</p>
@@ -362,7 +362,7 @@ export function PricingScreen() {
               </h2>
             </div>
 
-            <div data-stagger className="mt-8 max-w-[820px] divide-y divide-white/[0.08] border-y border-white/[0.08]">
+            <div data-stagger className="mt-8 max-w-[820px] divide-y divide-cream/[0.08] border-y border-cream/[0.08]">
               {FAQS.map((item) => (
                 <details key={item.q} className="group py-4">
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[14.5px] font-medium text-cream marker:hidden">
