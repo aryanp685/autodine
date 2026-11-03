@@ -392,7 +392,7 @@ export async function extractMenuFromImage(
  * would produce a box outside the frame; clamping keeps a crop inside the
  * picture instead of throwing on a negative slice later.
  */
-function readBox(value: unknown): PhotoBox | null {
+export function readBox(value: unknown): PhotoBox | null {
   if (!value || typeof value !== 'object') return null;
 
   // Models sometimes answer in fractions despite the instruction. Detect that
