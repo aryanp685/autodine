@@ -45,6 +45,7 @@ const ROUTES: Route[] = [
   { slug: 'guest-menu', path: '/menu', landmark: 'h1', app: true },
   { slug: 'guest-cart', path: '/menu/cart', landmark: 'h1', app: true, seed: true },
   { slug: 'guest-checkout', path: '/menu/checkout', landmark: 'h1', app: true, seed: true },
+  { slug: 'brand-import', path: '/dashboard/menus/import', landmark: 'h1' },
   { slug: 'kitchen', path: '/kitchen', landmark: 'h1', app: true },
   { slug: 'cashier', path: '/cashier', landmark: 'h1', app: true },
 ];

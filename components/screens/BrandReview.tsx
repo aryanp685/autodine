@@ -156,7 +156,6 @@ export function BrandReview({
   // with a functional update keyed on this object.
   useEffect(() => {
     onStateChange(state);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     state.name,
     state.nameConfirmed,
@@ -356,7 +355,6 @@ export function BrandReview({
           <div className="mt-2 flex items-center gap-3">
             <div className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-full border border-hair bg-paper-deep">
               {logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
                 <img src={logoUrl} alt="Your logo" className="size-14 object-cover" />
               ) : (
                 <span className="text-[13px] font-semibold text-gink-46">
@@ -410,7 +408,6 @@ export function BrandReview({
           <div className="mt-2 flex items-center gap-3">
             <div className="h-14 w-24 shrink-0 overflow-hidden rounded-[var(--p-r-block)] border border-hair bg-paper-deep">
               {bannerUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
                 <img src={bannerUrl} alt="Your banner" className="h-14 w-24 object-cover" />
               ) : null}
             </div>

@@ -73,8 +73,6 @@ export function BrandingPreview({
 
   return (
     <div
-      style={paint.style as React.CSSProperties}
-      {...paint.attrs}
       className="min-h-dvh bg-paper-deep text-gink antialiased"
     >
       <header className="sticky top-0 z-10 border-b border-hair bg-paper/92 backdrop-blur-xl">
@@ -110,7 +108,10 @@ export function BrandingPreview({
             editor preview, so switching between the two does not reflow the
             header; desktop is the wide guest column at its max width. */}
         <div
-          className={`overflow-hidden border border-hair-strong bg-card shadow-[var(--p-shadow-3)] ${view === 'desktop' ? 'w-full max-w-[720px] rounded-[var(--p-r-card)]' : 'w-full max-w-[360px] rounded-[var(--p-r-card)]'}`}
+          data-flow-root=""
+          style={paint.style as React.CSSProperties}
+          {...paint.attrs}
+          className={`overflow-hidden border border-hair-strong shadow-[var(--p-shadow-3)] ${view === 'desktop' ? 'w-full max-w-[720px] rounded-[var(--p-r-card)]' : 'w-full max-w-[360px] rounded-[var(--p-r-card)]'}`}
         >
           <MenuIdentity
             name={name}

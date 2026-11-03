@@ -102,6 +102,13 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
     {
+      // The Brand Studio demo contract: import screen honesty, name
+      // confirmation, the real-renderer preview, and the opt-in default.
+      name: 'brand',
+      testMatch: 'brand-studio.spec.ts',
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } },
+    },
+    {
       // The responsive audit: every route × every common viewport, sideways-
       // scroll and landmark assertions, and a screenshot per combination.
       name: 'responsive',

@@ -40,9 +40,8 @@ import {
   recordBrandAsset,
   rollbackLastPublish,
   upsertBrandDraft,
-  type BrandAssetRecord,
 } from '@/lib/branding/brand-data';
-import { sanitiseBrandDraft, type BrandDraft } from '@/lib/branding/draft';
+import { sanitiseBrandDraft } from '@/lib/branding/draft';
 import { prepareAsset, assetObjectPath } from '@/lib/branding/uploads';
 import { publicAssetUrl } from '@/lib/storage/assets';
 
