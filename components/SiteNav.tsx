@@ -81,8 +81,8 @@ export function SiteNav({
   }, []);
 
   const surface = onImage
-    ? 'data-[scrolled=true]:border-cream/[0.07] data-[scrolled=true]:bg-ink/80 data-[scrolled=true]:backdrop-blur-xl'
-    : 'border-b border-cream/10 bg-ink/85 backdrop-blur-xl';
+    ? 'data-[scrolled=true]:border-cream/[0.12] data-[scrolled=true]:bg-ink/80 data-[scrolled=true]:backdrop-blur-xl'
+    : 'border-b border-cream/15 bg-ink/85 backdrop-blur-xl';
 
   return (
     <header
@@ -138,7 +138,7 @@ export function SiteNav({
           </Link>
           <Link
             href="/signup"
-            className="inline-flex h-10 items-center rounded-full bg-gold px-5 text-[13px] font-medium text-cream transition-colors hover:bg-gold-bright"
+            className="inline-flex h-10 items-center rounded-full bg-plum px-5 text-[13px] font-medium text-white transition-colors hover:bg-plum-strong"
           >
             Create account
           </Link>

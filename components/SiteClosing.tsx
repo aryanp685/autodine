@@ -26,10 +26,10 @@ export function SiteClosing({
   secondary,
 }: Props) {
   return (
-    <section className="border-t border-cream/[0.07] bg-ink text-cream">
+    <section className="border-t border-cream/[0.12] bg-ink text-cream">
       <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-10 px-5 py-20 sm:px-8 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-[10.5px] font-semibold tracking-[0.14em] text-gold-dim uppercase">{eyebrow}</p>
+          <p className="text-[10.5px] font-semibold tracking-[0.14em] text-plum uppercase">{eyebrow}</p>
           <h2 className="mt-5 max-w-[14ch] text-[clamp(30px,4.6vw,50px)] leading-[1.02] font-semibold tracking-[-0.035em] text-balance">
             {title}
           </h2>
@@ -39,14 +39,14 @@ export function SiteClosing({
         <div className="flex flex-wrap items-center gap-3">
           <Link
             href={primary.href}
-            className="inline-flex h-12 items-center rounded-full bg-gold px-6 text-[14px] font-medium text-cream transition-colors hover:bg-gold-bright"
+            className="inline-flex h-12 items-center rounded-full bg-plum px-6 text-[14px] font-medium text-white transition-colors hover:bg-plum-strong"
           >
             {primary.label}
           </Link>
           {secondary && (
             <Link
               href={secondary.href}
-              className="inline-flex h-12 items-center rounded-full border border-cream/20 px-6 text-[14px] font-medium text-cream transition-colors hover:border-cream/40 hover:bg-white/70"
+              className="inline-flex h-12 items-center rounded-full border border-cream/20 px-6 text-[14px] font-medium text-cream transition-colors hover:border-cream/40 hover:bg-white"
             >
               {secondary.label}
             </Link>

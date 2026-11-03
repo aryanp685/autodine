@@ -1189,16 +1189,19 @@ p { margin: 0; }
   --color-ink-card: #ffffff;
   --color-ink-line: #e6dccb;
 
-  --color-gold: #e0a86a;
-  --color-gold-bright: #cf9557;
-  --color-gold-dim: #96662f;
+  /* ONE PLUM, per the finalized brief: the action hue of the product
+     (the same aubergine as --p-accent) carried onto the marketing surface.
+     Green stays state, never decoration. */
+  --color-plum: #7d2b6b;
+  --color-plum-strong: #631f55;
+  --color-plum-soft: #f4e9f1;
 
   --color-brand: #207030;
   --color-brand-soft: #2c8a3f;
 
   --color-cream: #211a15;
-  --color-mute: #6f675c;
-  --color-mute-dim: #8a8175;
+  --color-mute: #5f584e;
+  --color-mute-dim: #7a7266;
 
   /* The same stack as the root, so `font-sans` cannot disagree with the body.
      -apple-system resolves to SF Pro on Apple hardware -- the typeface the

@@ -91,7 +91,7 @@ export function SiteFooter({
           </div>
         </div>
 
-        <div className="mt-14 flex flex-wrap items-center justify-between gap-2 border-t border-cream/[0.08] pt-5 text-[11px] tracking-[0.02em] text-mute-dim">
+        <div className="mt-14 flex flex-wrap items-center justify-between gap-2 border-t border-cream/[0.12] pt-5 text-[11px] tracking-[0.02em] text-mute-dim">
           <span>{fineLeft}</span>
           <span>{fineRight}</span>
         </div>

@@ -89,9 +89,9 @@ export function PricingScreen() {
 
       <main className="bg-ink text-cream antialiased">
         {/* ---------------------------------------------------------- header */}
-        <header className="border-b border-cream/[0.07] px-5 pt-20 pb-14 sm:px-8">
+        <header className="border-b border-cream/[0.12] px-5 pt-20 pb-14 sm:px-8">
           <div className="mx-auto w-full max-w-[1180px]">
-            <p className="text-[10.5px] font-semibold tracking-[0.14em] text-gold-dim uppercase">01 · Plans</p>
+            <p className="text-[10.5px] font-semibold tracking-[0.14em] text-plum uppercase">01 · Plans</p>
 
             <div className="mt-6 grid gap-8 md:grid-cols-[1.15fr_0.85fr] md:items-end">
               <h1 className="max-w-[15ch] text-[clamp(34px,5.6vw,62px)] leading-[0.98] font-semibold tracking-[-0.04em] text-balance">
@@ -106,7 +106,7 @@ export function PricingScreen() {
 
             <div
               data-reveal
-              className="mt-10 flex flex-col gap-3 rounded-2xl border border-cream/[0.08] bg-ink-soft px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"
+              className="mt-10 flex flex-col gap-3 rounded-2xl border border-cream/[0.12] bg-ink-soft px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"
             >
               <PlanMatcher
                 options={PLANS.map((plan) => ({
@@ -116,7 +116,7 @@ export function PricingScreen() {
                 }))}
               />
               <span className="inline-flex items-center gap-2 text-[11.5px] font-medium tracking-[0.03em] text-mute">
-                <span aria-hidden="true" className="size-1.5 rounded-full bg-gold" />
+                <span aria-hidden="true" className="size-1.5 rounded-full bg-plum" />
                 {BILLING.connected ? 'Billing connected' : 'Preview · billing not connected'}
               </span>
             </div>
@@ -137,15 +137,15 @@ export function PricingScreen() {
                     className={[
                       'relative flex flex-col rounded-[22px] border p-6',
                       /* The middle tier is lifted rather than decorated: a
-                         warmer ground and a gold rule say "this one" without a
+                         warmer ground and a plum rule say "this one" without a
                          badge shouting over the other two. */
                       plan.recommended
-                        ? 'border-gold/35 bg-ink-card shadow-[0_40px_80px_-50px_rgba(224,168,106,0.55)]'
+                        ? 'border-plum/35 bg-ink-card shadow-[0_40px_80px_-50px_rgba(125,43,107,0.35)]'
                         : 'border-cream/[0.09] bg-ink-soft',
                     ].join(' ')}
                   >
                     {plan.recommended && (
-                      <div className="absolute -top-3 left-6 rounded-full bg-gold px-2.5 py-1 text-[10px] font-semibold tracking-[0.08em] text-cream uppercase">
+                      <div className="absolute -top-3 left-6 rounded-full bg-plum px-2.5 py-1 text-[10px] font-semibold tracking-[0.08em] text-white uppercase">
                         Recommended
                       </div>
                     )}
@@ -162,7 +162,7 @@ export function PricingScreen() {
                       <span className="text-[12px] text-mute-dim">/month · planned</span>
                     </div>
 
-                    <hr className="my-5 border-cream/[0.08]" />
+                    <hr className="my-5 border-cream/[0.12]" />
 
                     <ul className="flex flex-1 flex-col gap-2.5 text-[13.5px] leading-[1.45] text-cream/80">
                       {plan.id === 'starter' ? (
@@ -185,7 +185,7 @@ export function PricingScreen() {
                             })
                             .map((c) => (
                               <li key={c.id} className="flex gap-2">
-                                <span aria-hidden="true" className="mt-1.5 size-1 shrink-0 rounded-full bg-gold-dim" />
+                                <span aria-hidden="true" className="mt-1.5 size-1 shrink-0 rounded-full bg-plum" />
                                 {c.label}
                               </li>
                             ))}
@@ -193,7 +193,7 @@ export function PricingScreen() {
                       )}
                     </ul>
 
-                    <p className="mt-5 border-t border-cream/[0.08] pt-3 text-[10.5px] font-medium tracking-[0.09em] text-mute-dim uppercase">
+                    <p className="mt-5 border-t border-cream/[0.12] pt-3 text-[10.5px] font-medium tracking-[0.09em] text-mute-dim uppercase">
                       Planned · not on sale
                     </p>
                   </article>
@@ -207,7 +207,7 @@ export function PricingScreen() {
             <div data-reveal className="mt-10 flex flex-col items-start gap-2">
               <Link
                 href="/signup"
-                className="inline-flex h-12 items-center rounded-full bg-gold px-6 text-[14px] font-medium text-cream transition-colors hover:bg-gold-bright"
+                className="inline-flex h-12 items-center rounded-full bg-plum px-6 text-[14px] font-medium text-white transition-colors hover:bg-plum-strong"
               >
                 Create an account
               </Link>
@@ -219,11 +219,11 @@ export function PricingScreen() {
         </section>
 
         {/* ------------------------------------------------------ live today */}
-        <section id="live" className="border-t border-cream/[0.07] px-5 py-16 sm:px-8">
+        <section id="live" className="border-t border-cream/[0.12] px-5 py-16 sm:px-8">
           <div className="mx-auto w-full max-w-[1180px]">
             <div data-reveal className="grid gap-6 md:grid-cols-[1fr_0.9fr] md:items-end">
               <div>
-                <p className="text-[10.5px] font-semibold tracking-[0.14em] text-gold-dim uppercase">
+                <p className="text-[10.5px] font-semibold tracking-[0.14em] text-plum uppercase">
                   02 · In the product today
                 </p>
                 <h2 className="mt-4 max-w-[16ch] text-[clamp(28px,4vw,44px)] leading-[1.03] font-semibold tracking-[-0.035em]">
@@ -253,7 +253,7 @@ export function PricingScreen() {
         </section>
 
         {/* ------------------------------------------------------- statement */}
-        <section className="border-y border-cream/[0.07] bg-ink-soft px-5 py-20 sm:px-8">
+        <section className="border-y border-cream/[0.12] bg-ink-soft px-5 py-20 sm:px-8">
           <div className="mx-auto w-full max-w-[1180px]">
             <p data-reveal className="text-[10.5px] font-semibold tracking-[0.14em] text-mute-dim uppercase">
               Why nothing is gated
@@ -276,7 +276,7 @@ export function PricingScreen() {
           <div className="mx-auto w-full max-w-[1180px]">
             <div data-reveal className="grid gap-6 md:grid-cols-[1fr_0.9fr] md:items-end">
               <div>
-                <p className="text-[10.5px] font-semibold tracking-[0.14em] text-gold-dim uppercase">
+                <p className="text-[10.5px] font-semibold tracking-[0.14em] text-plum uppercase">
                   03 · What the tiers change
                 </p>
                 <h2 className="mt-4 max-w-[18ch] text-[clamp(28px,4vw,44px)] leading-[1.03] font-semibold tracking-[-0.035em]">
@@ -289,7 +289,7 @@ export function PricingScreen() {
               </p>
             </div>
 
-            <div data-stagger className="mt-10 divide-y divide-cream/[0.08] border-y border-cream/[0.08]">
+            <div data-stagger className="mt-10 divide-y divide-cream/[0.12] border-y border-cream/[0.12]">
               {DIFFERENCES.map((difference) => {
                 const tiers = difference.tiers === 'all' ? [] : difference.tiers;
                 return (
@@ -307,10 +307,10 @@ export function PricingScreen() {
         </section>
 
         {/* --------------------------------------------------------- billing */}
-        <section id="billing" className="border-t border-cream/[0.07] px-5 py-16 sm:px-8">
+        <section id="billing" className="border-t border-cream/[0.12] px-5 py-16 sm:px-8">
           <div className="mx-auto grid w-full max-w-[1180px] gap-10 md:grid-cols-[0.85fr_1.15fr]">
             <div data-reveal>
-              <p className="text-[10.5px] font-semibold tracking-[0.14em] text-gold-dim uppercase">
+              <p className="text-[10.5px] font-semibold tracking-[0.14em] text-plum uppercase">
                 04 · The money side
               </p>
               <h2 className="mt-4 max-w-[14ch] text-[clamp(26px,3.6vw,40px)] leading-[1.04] font-semibold tracking-[-0.035em]">
@@ -341,7 +341,7 @@ export function PricingScreen() {
                 },
               ].map((step) => (
                 <div key={step.n} className="grid grid-cols-[auto_1fr] gap-4 border-t border-cream/[0.1] pt-4">
-                  <p className="tnum text-[11px] font-semibold tracking-[0.08em] text-gold-dim">{step.n}</p>
+                  <p className="tnum text-[11px] font-semibold tracking-[0.08em] text-plum">{step.n}</p>
                   <div>
                     <h3 className="text-[15.5px] font-semibold tracking-[-0.01em] text-cream">{step.title}</h3>
                     <p className="mt-1.5 text-[13.5px] leading-[1.6] text-mute">{step.body}</p>
@@ -353,16 +353,16 @@ export function PricingScreen() {
         </section>
 
         {/* ------------------------------------------------------------- FAQ */}
-        <section id="questions" className="border-t border-cream/[0.07] px-5 py-16 sm:px-8">
+        <section id="questions" className="border-t border-cream/[0.12] px-5 py-16 sm:px-8">
           <div className="mx-auto w-full max-w-[1180px]">
             <div data-reveal>
-              <p className="text-[10.5px] font-semibold tracking-[0.14em] text-gold-dim uppercase">05 · Questions</p>
+              <p className="text-[10.5px] font-semibold tracking-[0.14em] text-plum uppercase">05 · Questions</p>
               <h2 className="mt-4 max-w-[20ch] text-[clamp(26px,3.6vw,40px)] leading-[1.04] font-semibold tracking-[-0.035em]">
                 The ones worth asking first.
               </h2>
             </div>
 
-            <div data-stagger className="mt-8 max-w-[820px] divide-y divide-cream/[0.08] border-y border-cream/[0.08]">
+            <div data-stagger className="mt-8 max-w-[820px] divide-y divide-cream/[0.12] border-y border-cream/[0.12]">
               {FAQS.map((item) => (
                 <details key={item.q} className="group py-4">
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[14.5px] font-medium text-cream marker:hidden">
