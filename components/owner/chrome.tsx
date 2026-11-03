@@ -622,7 +622,16 @@ export function Segmented<T extends string>({
   className?: string;
 }) {
   const box = size === 'sm' ? 'h-9' : 'h-11';
-  const item = size === 'sm' ? 'h-7 px-2.5 text-[11.5px]' : 'h-9 px-3.5 text-[12.5px]';
+  /* Filled mode stretches across the screen, so its buttons must fit inside
+     it: tighter padding and a tighter label gap, or a three-tab switcher with
+     a long label ("Ready / Served") pushes the page sideways on a 320px
+     phone. The compact geometry applies to filled tracks only — the inline
+     segments keep their air. */
+  const item = fill
+    ? `min-w-0 flex-1 px-2 gap-1 ${size === 'sm' ? 'h-7 text-[11.5px]' : 'h-9 text-[12.5px]'}`
+    : size === 'sm'
+      ? 'h-7 px-2.5 text-[11.5px]'
+      : 'h-9 px-3.5 text-[12.5px]';
   return (
     <div
       role="group"
@@ -650,7 +659,7 @@ export function Segmented<T extends string>({
             className={[
               'rounded-[var(--p-r-chip)] font-medium whitespace-nowrap transition-[background-color,color,box-shadow] duration-150',
               'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]',
-              fill ? 'flex flex-1 items-center justify-center gap-1.5' : '',
+              fill ? 'flex items-center justify-center' : '',
               item,
               on
                 ? 'bg-card text-gink shadow-[0_1px_3px_rgba(29,29,31,0.12),0_1px_1px_rgba(29,29,31,0.04)]'
