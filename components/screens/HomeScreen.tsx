@@ -36,54 +36,54 @@ const STEPS = [
   {
     n: '01',
     title: 'Set up once',
-    body: 'Dishes, prices, photographs and the tables in the room. Publish when it is right, and print a card per table.',
+    body: 'Menu, prices, photos, tables. Print a card per table.',
   },
   {
     n: '02',
     title: 'Scan the card',
-    body: 'The card resolves to that table in that restaurant. A six-digit code shown in the room proves the guest is sitting there.',
+    body: 'The card opens that table\'s menu. A room code proves the guest is seated.',
   },
   {
     n: '03',
     title: 'Order from the phone',
-    body: 'A portion, an add-on, a note for the kitchen. The total updates as the cart does, and sold-out dishes say so.',
+    body: 'Portion, add-on, a note for the kitchen. Totals update as you order.',
   },
   {
     n: '04',
     title: 'Saved, then sent',
-    body: 'The order is priced and written by the database — never by the browser — and the guest gets a reference they can quote.',
+    body: 'Priced by the database, never the browser. The guest gets a reference.',
   },
   {
     n: '05',
     title: 'The kitchen sees it',
-    body: 'A ticket on the board with its table, its notes and its age, read aloud in Hindi when a new one arrives.',
+    body: 'A live ticket with the table, the note and its age — read aloud in Hindi.',
   },
   {
     n: '06',
     title: 'Settle at the counter',
-    body: 'Cash or card at the till, or the restaurant\'s own UPI QR on the guest\'s phone. Staff record what actually arrived.',
+    body: 'Cash or card at the till, or the restaurant\'s own UPI QR. Staff confirm.',
   },
 ];
 
 const FEATURES = [
   {
     title: 'Better dining experience',
-    body: 'Guests order from their own phone, at their own pace, with a menu that has pictures.',
+    body: 'Guests order from their own phone, at their own pace.',
     icon: 'M4 7h16M4 12h16M4 17h10',
   },
   {
     title: 'Smoother operations',
-    body: 'Orders reach the kitchen in the same second, with the notes attached, in the order they matter.',
+    body: 'Orders reach the kitchen in the same second, notes attached.',
     icon: 'M12 3v18M5 10l7-7 7 7',
   },
   {
     title: 'Easy menu management',
-    body: 'Prices, photographs and availability, edited once and live everywhere the menu is.',
+    body: 'Edit once — live everywhere the menu is.',
     icon: 'M4 6h16M4 12h10M4 18h7',
   },
   {
     title: 'Works for every room',
-    body: 'Cafés, casual dining and family restaurants. One product, no per-restaurant code.',
+    body: 'Cafés to family restaurants. One product.',
     icon: 'M4 20V8l8-4 8 4v12M9 20v-6h6v6',
   },
 ];
@@ -91,31 +91,31 @@ const FEATURES = [
 const FAQ = [
   {
     q: 'Do customers need to install an app?',
-    a: 'No. They scan the card on the table and the menu opens in the browser. Nothing to download, no account to create.',
+    a: 'No. The card opens the menu in the browser — nothing to download.',
   },
   {
     q: 'How does the QR ordering work?',
-    a: 'The card resolves to a table and a restaurant. A six-digit code shown in the room proves the guest is actually seated there, and the order is tied to that table.',
+    a: 'The card opens that table\'s menu. A six-digit room code proves the guest is seated there.',
   },
   {
     q: 'Can I customise my restaurant menu?',
-    a: 'Yes — dishes, sections, prices, portions, add-ons and photographs are yours to edit, and you publish when you are ready.',
+    a: 'Yes — dishes, sections, prices, portions, add-ons and photos. You publish when ready.',
   },
   {
     q: 'Is my restaurant data secure?',
-    a: 'Every screen is behind a signed-in account, and a restaurant can only ever read and write its own rows. Guests see a menu, never a dashboard.',
+    a: 'Every screen is behind a sign-in, and a restaurant only ever sees its own rows.',
   },
   {
     q: 'What happens after the free trial?',
-    a: 'A new restaurant gets seven days on the whole product. After that the workspace becomes read-only until a plan is added: menus, past orders and reports stay visible, and nothing is deleted. Plans cannot be bought on this site yet — access is extended by hand.',
+    a: 'Seven days on the whole product, then read-only until a plan is added. Nothing is deleted. Plans are extended by hand for now.',
   },
   {
     q: 'How does the kitchen hear about an order?',
-    a: 'A ticket appears on the kitchen board as soon as it is saved, with the table number and the guest\'s notes. The board can read new tickets aloud in Hindi using the voice already on the device — no extra service, no monthly fee. If the device has no Hindi voice or audio is blocked, the ticket is still on screen and a chime plays instead.',
+    a: 'A ticket appears instantly with the table and the note. The board can read it aloud in Hindi on the device itself — no extra service. No voice? The ticket stays on screen and a chime plays.',
   },
   {
     q: 'How do guests pay?',
-    a: 'At the counter, by cash or card, where staff record what they collected. If the restaurant sets its own UPI ID, guests can also scan the restaurant\'s QR from the order page with the amount filled in — that is the restaurant\'s own account, and staff still confirm the transfer before marking the bill paid.',
+    a: 'At the counter — cash or card, recorded by staff. With a UPI ID set, guests pay from the order page, and staff confirm before the bill is marked paid.',
   },
 ];
 
@@ -178,9 +178,7 @@ function Hero() {
           </h1>
 
           <p className="mt-7 max-w-[48ch] text-[15px] leading-relaxed text-white/80" data-hero-step>
-            A guest scans the card on the table, orders from their own phone, and the kitchen sees
-            the ticket in the same second — table number and notes attached. No app to install, no
-            account to create, nothing to learn behind the counter.
+            Scan the table card. Order on the phone. The kitchen sees it instantly.
           </p>
 
           <div className="mt-9 flex flex-wrap items-center gap-3" data-hero-step>
@@ -329,15 +327,15 @@ function Problem() {
   const items = [
     {
       title: 'The menu is on paper',
-      body: 'A price changes, a dish runs out, a section is added — and the menu in the guest\'s hand is out of date until somebody reprints it.',
+      body: 'A price changes or a dish runs out — the printed menu is already wrong.',
     },
     {
       title: 'Orders are carried, not sent',
-      body: 'A request goes from the table to a server\'s pad to the kitchen pass. Every hand-off is a chance for a table number or a note to be lost.',
+      body: 'Table, pad, pass. Every hand-off can lose a number or a note.',
     },
     {
       title: 'The bill comes last',
-      body: 'The guest waits to catch an eye, the server walks to the till, and the table sits finished for ten minutes it did not need to.',
+      body: 'The guest waits, the server walks, the table sits finished.',
     },
   ];
 
@@ -351,8 +349,7 @@ function Problem() {
               Service is not slow. The hand-offs are.
             </h2>
             <p className="mt-4 max-w-[46ch] text-[15px] leading-relaxed text-mute" data-reveal>
-              AutoDine removes the walk between the table and the kitchen — not the people who do it
-              well. Staff still run the room; they just stop being the messaging layer.
+              AutoDine removes the walk between the table and the kitchen. Staff still run the room.
             </p>
           </div>
 
@@ -424,13 +421,13 @@ function Screens() {
     {
       kicker: 'Guest',
       title: 'Customise the order',
-      body: 'A portion, an add-on, a note for the kitchen. Priced as it is chosen.',
+      body: 'A portion, an add-on, a note — priced as chosen.',
       img: '/img/dishes/paneer-tikka.jpg',
     },
     {
       kicker: 'Kitchen',
       title: 'Watch it cook',
-      body: 'The ticket arrives with its table, its note and its place in the queue.',
+      body: 'The ticket lands with its table and its note.',
       img: '/img/dishes/butter-naan.jpg',
     },
   ];
@@ -489,15 +486,10 @@ function Features() {
             Why restaurants choose AutoDine.
           </h2>
           <p className="mt-4 max-w-[42ch] text-[15px] leading-relaxed text-mute" data-reveal>
-            A practical solution designed for modern dining spaces — not a dashboard with a menu
-            bolted on.
+            For the room, not a dashboard with a menu bolted on.
           </p>
 
-          <blockquote className="mt-10 rounded-2xl border border-cream/[0.12] bg-ink-card p-6">
-            <p className="text-[17px] leading-snug tracking-tight text-cream">
-              “Technology that fits your restaurant, not the other way around.”
-            </p>
-          </blockquote>
+
         </div>
 
         <ul className="grid gap-4 sm:grid-cols-2" data-stagger>
@@ -539,8 +531,7 @@ function Honest() {
           {`${NumberWord(LIVE.length)} things work. ${NumberWord(NOT_CONNECTED.length)} do not.`}
         </h2>
         <p className="mt-4 max-w-[56ch] text-[15px] leading-relaxed text-mute" data-reveal>
-          This is a working product in preview, not a finished one. The honest version of its state
-          is more useful than a launch badge.
+          A working product in preview. Its real state, not a launch badge.
         </p>
 
         <div className="mt-12 grid gap-10 md:grid-cols-2">
@@ -584,8 +575,7 @@ function Pricing() {
           Start with what you need.
         </h2>
         <p className="mt-4 max-w-[52ch] text-[15px] leading-relaxed text-mute" data-reveal>
-          Three sizes of operation, one product. A new restaurant starts on all of it for seven
-          days, and no card is taken to begin.
+          Three sizes. Seven free days. No card to begin.
         </p>
 
         <div className="mt-12 grid gap-5 lg:grid-cols-3" data-stagger>
@@ -701,7 +691,7 @@ function Close() {
             Bring a better ordering experience to your restaurant.
           </h2>
           <p className="mx-auto mt-5 max-w-[46ch] text-[14.5px] leading-relaxed text-mute">
-            Simple setup. Modern experience. Built for real restaurants.
+
           </p>
           <div className="mt-9 flex flex-wrap justify-center gap-3">
             <Link
@@ -725,7 +715,7 @@ function Close() {
           <div>
             <BrandLockup size={20} ink="#f7f3ea" dot={BRAND_GREEN} />
             <p className="mt-3 max-w-[42ch] text-[12.5px] leading-relaxed text-mute-dim">
-              A modern ordering system for modern restaurants. QR menu, kitchen board, counter.
+              QR menu, kitchen board, counter — one system.
             </p>
           </div>
 

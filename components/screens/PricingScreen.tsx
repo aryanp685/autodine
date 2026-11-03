@@ -34,27 +34,27 @@ import {
 const FAQS = [
   {
     q: 'Can I buy a plan today?',
-    a: 'No. Billing is not connected in this build: there is no gateway, no subscription record and no card is ever asked for. Accounts created now are free and stay free while the product is in preview.',
+    a: 'No. Billing is not connected — no gateway, and no card is ever asked for. Accounts created now stay free while the product is in preview.',
   },
   {
     q: 'What do I get if I create an account now?',
-    a: 'Everything in the product: menus, table cards, guest ordering, the kitchen board, the counter and reports. Nothing is gated, metered or limited, and that will not change without telling you first.',
+    a: 'Everything: menus, table cards, guest ordering, the kitchen board, the counter and reports. Nothing is metered, and that will not change without telling you first.',
   },
   {
     q: 'Are these prices final?',
-    a: 'They are planning figures. The monthly amounts are our intent, but final pricing and the tax treatment on it are not settled, so nothing here is a quote.',
+    a: 'Planning figures. The amounts are our intent; final pricing and tax are not settled. Nothing here is a quote.',
   },
   {
     q: 'How will a subscription work when it opens?',
-    a: `Monthly, per restaurant, with a ${BILLING.trialDays}-day trial before the first charge. If a subscription lapses the account becomes read-only: menus, orders and reports stay visible and are never deleted. We will give notice before any of that is switched on.`,
+    a: `Monthly, per restaurant, with a ${BILLING.trialDays}-day trial before the first charge. A lapsed account goes read-only — never deleted. We will give notice before any of that switches on.`,
   },
   {
     q: 'Do I need any hardware?',
-    a: 'No. Print the table cards on ordinary paper, run the kitchen board on any laptop or tablet, and print receipts from the same browser the counter already uses.',
+    a: 'No. Print table cards on ordinary paper, run the kitchen board on any laptop or tablet, print receipts from the browser.',
   },
   {
     q: 'Can guests pay online?',
-    a: 'Not in this build. Both paths are written — online and at the counter — but the payment gateway is not connected, so guests are asked to pay at the counter and the order shows as payment pending until it is recorded.',
+    a: 'Not in this build. Both paths are written, but the gateway is not connected — guests pay at the counter and the order shows as payment pending until recorded.',
   },
 ];
 
@@ -98,9 +98,8 @@ export function PricingScreen() {
                 Priced for one restaurant, not a chain.
               </h1>
               <p className="max-w-[46ch] text-[15px] leading-[1.65] text-mute">
-                Three sizes of operation, one product. The prices are planning figures: no plan can
-                be bought yet. Every new account runs on the whole product for seven days, then goes
-                read-only until access is extended — nothing is deleted.
+                Three sizes, one product. Prices are planning figures — nothing is for sale yet.
+                Seven free days, then read-only until access is extended. Nothing is deleted.
               </p>
             </div>
 
