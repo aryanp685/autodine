@@ -42,7 +42,7 @@ export type DisplayItem = {
   /** Rupees, for display only. The cart converts back to paise. */
   price: number;
   category: string;
-  veg: boolean;
+  veg: boolean | null;
   available: boolean;
   img?: string;
   badge?: string;

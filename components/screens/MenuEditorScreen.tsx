@@ -607,6 +607,7 @@ export function MenuEditorScreen({
                   >
                     <option value="veg">Veg</option>
                     <option value="non">Non-veg</option>
+                    <option value="not">Not marked</option>
                   </select>
                 </label>
                 <label className="col-span-2 block sm:col-span-1">
@@ -970,7 +971,7 @@ export function MenuEditorScreen({
                     <select
                       className={selectClass}
                       name="veg"
-                      defaultValue={selected.veg ? 'veg' : 'non'}
+                      defaultValue={selected.veg === null ? 'not' : selected.veg ? 'veg' : 'non'}
                     >
                       <option value="veg">Vegetarian</option>
                       <option value="non">Non-vegetarian</option>

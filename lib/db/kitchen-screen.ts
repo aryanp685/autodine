@@ -78,7 +78,7 @@ export type KitchenTicket = {
      * as one long dish name.
      */
     addons?: string[];
-    veg: boolean;
+    veg: boolean | null;
     /** The owner's written pronunciation, when there is one. */
     spoken?: string | null;
   }[];

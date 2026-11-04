@@ -406,7 +406,8 @@ export async function saveItemAction(formData: FormData): Promise<void> {
   const itemId = String(formData.get('itemId') ?? '').trim();
   const name = String(formData.get('name') ?? '').trim();
   const desc = String(formData.get('description') ?? '').trim();
-  const veg = formData.get('veg') === 'veg';
+  const vegRaw = String(formData.get('veg') ?? '').trim();
+  const veg = vegRaw === 'veg' ? true : vegRaw === 'non' ? false : null;
   const spokenName = String(formData.get('spokenName') ?? '').trim();
   const rawPrice = String(formData.get('price') ?? '').trim();
   const categoryId = await resolveCategoryId(ctx, formData.get('categoryId'));
@@ -455,7 +456,8 @@ export async function addItemAction(formData: FormData): Promise<void> {
   const rupees = Number(String(formData.get('price') ?? '0').trim());
   const safePrice = Number.isFinite(rupees) && rupees >= 0 ? rupees : 0;
 
-  const isVeg = String(formData.get('veg') ?? 'veg').trim() !== 'non';
+  const vegRaw = String(formData.get('veg') ?? '').trim();
+  const isVeg = vegRaw === 'veg' ? true : vegRaw === 'non' ? false : null;
 
   // Required, not optional. categories_id is the join that makes an item
   // visible to diners: the items_public RLS policy reaches an item only

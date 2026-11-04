@@ -40,7 +40,7 @@ export type OrderLine = {
   qty: number;
   unitPricePaise: number;
   lineTotalPaise: number;
-  isVeg: boolean;
+  isVeg: boolean | null;
   /** Which portion, as it was when the order was placed. */
   variantName: string | null;
   /** Add-ons as they were charged, e.g. ["Extra cheese"]. */
@@ -160,7 +160,7 @@ function line(value: unknown): OrderLine | null {
     qty,
     unitPricePaise: unit,
     lineTotalPaise: unit * qty,
-    isVeg: row.is_veg === true,
+    isVeg: row.is_veg === true ? true : row.is_veg === false ? false : null,
     variantName: text(row.variant) || null,
     addons: Array.isArray(row.addons) ? row.addons.filter((a): a is string => typeof a === 'string') : [],
   };

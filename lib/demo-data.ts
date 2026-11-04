@@ -42,7 +42,7 @@ export type Item = {
   desc: string;
   price: number;
   category: string;
-  veg: boolean;
+  veg: boolean | null;
   spice?: 0 | 1 | 2;
   badge?: string;
   available: boolean;

@@ -170,7 +170,13 @@ export function PhotoImportPanel({
           : {
               ...category,
               items: category.items.map((item, i) =>
-                i !== ii ? item : { ...item, isVeg: item.isVeg === false ? true : false }
+                i !== ii
+                  ? item
+                  : {
+                      ...item,
+                      // Three states cycle: veg -> non-veg -> unmarked -> veg.
+                      isVeg: item.isVeg === true ? false : item.isVeg === false ? null : true,
+                    }
               ),
             }
       )
@@ -225,7 +231,9 @@ export function PhotoImportPanel({
               // of the product does it.
               pricePaise: Math.round(Number(item.price.replace(/[^\d.]/g, '')) * 100),
               description: null as string | null,
-              isVeg: item.isVeg !== false,
+              // Unmarked stays unmarked. The old coercion quietly turned
+              // "the menu never said" into a green mark.
+              isVeg: item.isVeg,
             })),
           })),
       };
@@ -477,7 +485,7 @@ export function PhotoImportPanel({
                               }
                               aria-hidden="true"
                             >
-                              <VegMark veg={item.isVeg !== false} />
+                              <VegMark veg={item.isVeg} />
                             </span>
                             <span className="truncate">{item.name}</span>
                           </div>
@@ -530,14 +538,23 @@ export function PhotoImportPanel({
                             disabled={isDropped || working}
                             aria-pressed={item.isVeg === true}
                             title={
-                              item.isVeg === null ? 'Mark vegetarian' : 'Change veg / non-veg'
+                              item.isVeg === null
+                                ? 'Mark vegetarian'
+                                : item.isVeg === true
+                                  ? 'Change to non-veg'
+                                  : 'Clear the mark'
                             }
                           >
-                            <span data-veg={item.isVeg === false ? 'non' : 'veg'} aria-hidden="true">
-                              <VegMark veg={item.isVeg !== false} />
+                            <span
+                              data-veg={
+                                item.isVeg === false ? 'non' : item.isVeg === true ? 'veg' : 'unknown'
+                              }
+                              aria-hidden="true"
+                            >
+                              <VegMark veg={item.isVeg} />
                             </span>
                             <span className="text-[11.5px]">
-                              {item.isVeg === null ? 'Set' : item.isVeg ? 'Veg' : 'Non-veg'}
+                              {item.isVeg === null ? 'Unmarked' : item.isVeg ? 'Veg' : 'Non-veg'}
                             </span>
                           </button>
 

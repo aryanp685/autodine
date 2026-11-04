@@ -69,9 +69,11 @@ describe('readUndoItem', () => {
     expect(readUndoItem({ ...valid, categoryId: null })?.categoryId).toBeNull();
   });
 
-  it('defaults the food type and availability to true when missing', () => {
+  it('leaves the food type unmarked and defaults availability to true when missing', () => {
     const out = readUndoItem({ id: ID, name: 'Paneer', pricePaise: 100 });
-    expect(out?.isVeg).toBe(true);
+    // Unmarked is not vegetarian -- a restored item must not grow a mark
+    // the menu never printed.
+    expect(out?.isVeg).toBeNull();
     expect(out?.isAvailable).toBe(true);
     expect(out?.description).toBeNull();
   });

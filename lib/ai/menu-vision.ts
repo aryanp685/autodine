@@ -25,6 +25,7 @@
  */
 
 import { MAX_IMPORT_CATEGORIES, MAX_IMPORT_ITEMS } from '../menu-import';
+import { callGeminiJson, geminiConfigured } from './gemini';
 
 /** Where a dish's own photo sits on the page, as fractions of the image. */
 export type PhotoBox = {
@@ -90,15 +91,7 @@ const ACCEPTED: Record<string, string> = {
 };
 
 export function visionConfigured(): boolean {
-  return apiKey() !== '';
-}
-
-function apiKey(): string {
-  return (process.env.GEMINI_API_KEY ?? process.env.MENU_VISION_API_KEY ?? '').trim();
-}
-
-function model(): string {
-  return (process.env.GEMINI_MODEL ?? 'gemini-2.5-flash').trim();
+  return geminiConfigured();
 }
 
 /** Check a file before it is sent to a paid API. */
@@ -283,106 +276,44 @@ export async function extractMenuFromImage(
   bytes: ArrayBuffer,
   mimeType: string
 ): Promise<VisionResult> {
-  const key = apiKey();
-  if (!key) {
-    return {
-      ok: false,
-      code: 'not-configured',
-      reason: 'Reading photos is not switched on for this deployment. You can still add dishes by hand.',
-    };
+  const result = await callGeminiJson({
+    prompt: PROMPT,
+    bytes,
+    mimeType,
+    maxOutputTokens: 8192,
+    busyReason: 'The reader is busy right now. Wait a minute and try again, or add dishes by hand.',
+    unreachableReason: 'The reader could not be reached. You can still add dishes by hand.',
+    timeoutReason: 'That took too long. Try a smaller or clearer photo, or add dishes by hand.',
+    modelMissingReason:
+      'The reader is not available on this deployment right now. You can still add dishes by hand.',
+  });
+  if (!result.ok) return { ok: false, code: result.code, reason: result.reason };
+
+  const text = result.text;
+  if (!text.trim()) {
+    return { ok: false, code: 'unreadable', reason: 'Nothing readable came back from that photo.' };
   }
 
-  const base64 = Buffer.from(bytes).toString('base64');
-  const controller = new AbortController();
-  // A vision call on a phone photo is slow. Forty-five seconds is long enough
-  // to succeed and short enough that an owner is not left staring at a
-  // spinner while a lunch service runs.
-  const timeout = setTimeout(() => controller.abort(), 45_000);
-
+  let parsed: unknown;
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model())}:generateContent`,
-      {
-        method: 'POST',
-        signal: controller.signal,
-        headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: PROMPT }, { inline_data: { mime_type: mimeType, data: base64 } }],
-            },
-          ],
-          generationConfig: {
-            temperature: 0,
-            responseMimeType: 'application/json',
-            maxOutputTokens: 8192,
-          },
-        }),
-      }
-    );
+    parsed = JSON.parse(unfence(text));
+  } catch {
+    console.error('[autodine] menu vision returned non-JSON:', text.slice(0, 200));
+    return { ok: false, code: 'unreadable', reason: 'That photo could not be read as a menu.' };
+  }
 
-    if (response.status === 429) {
-      return {
-        ok: false,
-        code: 'rate-limited',
-        reason: 'The reader is busy right now. Wait a minute and try again, or add dishes by hand.',
-      };
-    }
+  const draft = buildVisionDraft(parsed, result.model);
 
-    if (!response.ok) {
-      const detail = await response.text().catch(() => '');
-      console.error('[autodine] menu vision failed:', response.status, detail.slice(0, 300));
-      return {
-        ok: false,
-        code: 'upstream',
-        reason: 'The reader could not be reached. You can still add dishes by hand.',
-      };
-    }
-
-    const payload = (await response.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-      promptFeedback?: { blockReason?: string };
-    };
-
-    const text = payload.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
-    if (!text.trim()) {
-      return { ok: false, code: 'unreadable', reason: 'Nothing readable came back from that photo.' };
-    }
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(unfence(text));
-    } catch {
-      console.error('[autodine] menu vision returned non-JSON:', text.slice(0, 200));
-      return { ok: false, code: 'unreadable', reason: 'That photo could not be read as a menu.' };
-    }
-
-    const draft = buildVisionDraft(parsed, model());
-
-    if (draft.categories.length === 0) {
-      return {
-        ok: false,
-        code: 'unreadable',
-        reason:
-          'No dishes were found in that photo. Check that the whole menu is in frame and the text is sharp, then try again.',
-      };
-    }
-
-    return { ok: true, draft };
-  } catch (error) {
-    const aborted = error instanceof Error && error.name === 'AbortError';
-    console.error('[autodine] menu vision threw:', error);
+  if (draft.categories.length === 0) {
     return {
       ok: false,
-      code: aborted ? 'timeout' : 'upstream',
-      reason: aborted
-        ? 'That took too long. Try a smaller or clearer photo, or add dishes by hand.'
-        : 'The reader could not be reached. You can still add dishes by hand.',
+      code: 'unreadable',
+      reason:
+        'No dishes were found in that photo. Check that the whole menu is in frame and the text is sharp, then try again.',
     };
-  } finally {
-    clearTimeout(timeout);
   }
+
+  return { ok: true, draft };
 }
 
 /**

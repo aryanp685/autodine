@@ -40,7 +40,7 @@ export type MenuItemPrice = {
   img?: string;
   /** Paise, as stored. Never a float. */
   pricePaise: Paise;
-  isVeg: boolean;
+  isVeg: boolean | null;
   isAvailable: boolean;
   /** What can be added to this dish, and what each costs. */
   addons?: MenuAddon[];
@@ -61,7 +61,7 @@ export type PricedLine = {
   img?: string;
   unitPricePaise: Paise;
   qty: number;
-  isVeg: boolean;
+  isVeg: boolean | null;
   lineTotalPaise: Paise;
   /** Which portion, when the dish has portions and one was chosen. */
   variantId?: string;

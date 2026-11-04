@@ -125,14 +125,15 @@ describe('parseMenuText', () => {
   });
 
   describe('veg marking', () => {
-    it('marks named meat as non-veg and everything else as veg', () => {
+    it('marks named meat as non-veg and leaves everything else unmarked', () => {
       const draft = parseMenuText(['Chicken 65 360', 'Paneer Tikka 320', 'Egg Curry 240', 'Fish Fry 400'].join('\n'));
       const byName = Object.fromEntries(
         draft.categories[0].items.map((item) => [item.name, item.isVeg]),
       );
 
       expect(byName['Chicken 65']).toBe(false);
-      expect(byName['Paneer Tikka']).toBe(true);
+      // The menu never marked it, so AutoDine does not either.
+      expect(byName['Paneer Tikka']).toBeNull();
       expect(byName['Egg Curry']).toBe(false);
       expect(byName['Fish Fry']).toBe(false);
     });
@@ -256,9 +257,27 @@ describe('sanitiseDraft', () => {
     }
   });
 
-  it('assumes veg when the flag is missing, matching the editor default', () => {
+  it('keeps an unmarked dish unmarked when the flag is missing', () => {
     const draft = sanitiseDraft({ categories: [{ name: 'S', items: [{ name: 'Dal', pricePaise: 20000 }] }] });
-    expect(draft.categories[0].items[0].isVeg).toBe(true);
+    expect(draft.categories[0].items[0].isVeg).toBeNull();
+  });
+
+  it('round-trips all three veg states without coercing any of them', () => {
+    const draft = sanitiseDraft({
+      categories: [
+        {
+          name: 'S',
+          items: [
+            { name: 'A', pricePaise: 100, isVeg: true },
+            { name: 'B', pricePaise: 100, isVeg: false },
+            { name: 'C', pricePaise: 100, isVeg: null },
+            { name: 'D', pricePaise: 100, isVeg: 'nonsense' },
+          ],
+        },
+      ],
+    });
+    const states = draft.categories[0].items.map((item) => item.isVeg);
+    expect(states).toEqual([true, false, null, null]);
   });
 });
 

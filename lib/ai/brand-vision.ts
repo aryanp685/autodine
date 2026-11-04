@@ -22,6 +22,7 @@
  */
 
 import { readBox, validateMenuCapture, type PhotoBox, type VisionErrorCode } from './menu-vision';
+import { callGeminiJson, geminiConfigured } from './gemini';
 import {
   parseHex,
   parseTheme,
@@ -75,16 +76,8 @@ export type BrandResult =
 /** Same acceptance and ceilings as the menu reader — one upload, one policy. */
 export const validateBrandCapture = validateMenuCapture;
 
-function apiKey(): string {
-  return (process.env.GEMINI_API_KEY ?? process.env.MENU_VISION_API_KEY ?? '').trim();
-}
-
-function model(): string {
-  return (process.env.GEMINI_MODEL ?? 'gemini-2.5-flash').trim();
-}
-
 export function brandVisionConfigured(): boolean {
-  return apiKey() !== '';
+  return geminiConfigured();
 }
 
 const PROMPT = [
@@ -245,89 +238,31 @@ export function buildBrandExtraction(answer: unknown, modelName: string): BrandE
  * Server-only: the API key never leaves this process.
  */
 export async function extractBrandFromImage(bytes: ArrayBuffer, mimeType: string): Promise<BrandResult> {
-  const key = apiKey();
-  if (!key) {
-    return {
-      ok: false,
-      code: 'not-configured',
-      reason: 'Reading brand style is not switched on for this deployment. You can still upload your logo and pick a colour by hand.',
-    };
+  const result = await callGeminiJson({
+    prompt: PROMPT,
+    bytes,
+    mimeType,
+    maxOutputTokens: 4096,
+    busyReason: 'The reader is busy right now. Wait a minute and try again, or set your logo and colour by hand.',
+    unreachableReason: 'The reader could not be reached. You can still set your logo and colour by hand.',
+    timeoutReason: 'That took too long. Try a smaller or clearer image, or set things up by hand.',
+    modelMissingReason:
+      'The reader is not available on this deployment right now. You can still set your logo and colour by hand.',
+  });
+  if (!result.ok) return { ok: false, code: result.code, reason: result.reason };
+
+  const text = result.text;
+  if (!text.trim()) {
+    return { ok: false, code: 'unreadable', reason: 'Nothing readable came back from that image.' };
   }
 
-  const base64 = Buffer.from(bytes).toString('base64');
-  const controller = new AbortController();
-  // Same patience as the menu reader: a phone photo is slow, a lunch service
-  // is not waiting for us.
-  const timeout = setTimeout(() => controller.abort(), 45_000);
-
+  let parsed: unknown;
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model())}:generateContent`,
-      {
-        method: 'POST',
-        signal: controller.signal,
-        headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: PROMPT }, { inline_data: { mime_type: mimeType, data: base64 } }],
-            },
-          ],
-          generationConfig: {
-            temperature: 0,
-            responseMimeType: 'application/json',
-            maxOutputTokens: 4096,
-          },
-        }),
-      },
-    );
-
-    if (response.status === 429) {
-      return {
-        ok: false,
-        code: 'rate-limited',
-        reason: 'The reader is busy right now. Wait a minute and try again, or set your logo and colour by hand.',
-      };
-    }
-    if (!response.ok) {
-      const detail = await response.text().catch(() => '');
-      console.error('[autodine] brand vision failed:', response.status, detail.slice(0, 300));
-      return {
-        ok: false,
-        code: 'upstream',
-        reason: 'The reader could not be reached. You can still set your logo and colour by hand.',
-      };
-    }
-
-    const payload = (await response.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-    };
-    const text = payload.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
-    if (!text.trim()) {
-      return { ok: false, code: 'unreadable', reason: 'Nothing readable came back from that image.' };
-    }
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(unfence(text));
-    } catch {
-      console.error('[autodine] brand vision returned non-JSON:', text.slice(0, 200));
-      return { ok: false, code: 'unreadable', reason: 'That image could not be read as brand material.' };
-    }
-
-    return { ok: true, extraction: buildBrandExtraction(parsed, model()) };
-  } catch (error) {
-    const aborted = error instanceof Error && error.name === 'AbortError';
-    console.error('[autodine] brand vision threw:', error);
-    return {
-      ok: false,
-      code: aborted ? 'timeout' : 'upstream',
-      reason: aborted
-        ? 'That took too long. Try a smaller or clearer image, or set things up by hand.'
-        : 'The reader could not be reached. You can still set your logo and colour by hand.',
-    };
-  } finally {
-    clearTimeout(timeout);
+    parsed = JSON.parse(unfence(text));
+  } catch {
+    console.error('[autodine] brand vision returned non-JSON:', text.slice(0, 200));
+    return { ok: false, code: 'unreadable', reason: 'That image could not be read as brand material.' };
   }
+
+  return { ok: true, extraction: buildBrandExtraction(parsed, result.model) };
 }

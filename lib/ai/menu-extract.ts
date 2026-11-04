@@ -55,7 +55,7 @@ const SYSTEM_PROMPT = [
   'Rules: price is a number in rupees, never a string and never with a currency symbol.',
   'Keep dish names as written; do not translate, rename, or invent dishes.',
   'Never invent a price. If a line has no price, leave that dish out.',
-  'isVeg is false only for dishes that contain meat, fish, prawn or egg.',
+  'isVeg is true or false only when the menu makes it clear: false for dishes that contain meat, fish, prawn or egg, true when marked vegetarian. Use null when the menu does not say. Never guess.',
   'If the text is not a menu, return {"categories":[]}.',
 ].join('\n');
 
