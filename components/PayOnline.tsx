@@ -187,7 +187,7 @@ export function PayOnline({
         data-pay-online-button
         onClick={pay}
         disabled={busy || status.kind === 'paid'}
-        className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[var(--p-accent)] px-5 text-[13.5px] font-semibold text-white transition-[opacity,transform] duration-150 active:translate-y-px disabled:opacity-55"
+        className="inline-flex h-11 w-full items-center justify-center rounded-full bg-grass px-5 text-[13.5px] font-semibold text-cream transition-[opacity,transform] duration-150 active:translate-y-px disabled:opacity-55"
       >
         {status.kind === 'starting'
           ? 'Opening the payment window…'

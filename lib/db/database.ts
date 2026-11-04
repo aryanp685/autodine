@@ -137,6 +137,61 @@ export type Database = {
         redeemed_at: string | null;
         revoked_at: string | null;
       }>;
+      /**
+       * Migration 20261103000100 (brand studio). Ownership + metadata for
+       * every brand asset. Bytes live in Storage; the path CHECK and the
+       * unique (id, restaurant_id) pair exist so no row and no composite FK
+       * can point at another tenant's folder or asset.
+       */
+      restaurant_brand_assets: Table<{
+        id: string;
+        restaurant_id: string;
+        kind: 'logo' | 'banner' | 'reference' | 'menu-photo' | 'crop';
+        bucket: 'restaurant-assets' | 'restaurant-brand-source';
+        path: string;
+        mime_type: string;
+        byte_size: number;
+        width: number | null;
+        height: number | null;
+        checksum: string;
+        source: 'upload' | 'extract';
+        created_by: string | null;
+        created_at: string;
+      }>;
+      /**
+       * Migration 20261103000100. Brand drafts and published versions.
+       * Guests never read this table: publish_menu_brand_pair copies the
+       * approved values onto restaurants.
+       */
+      restaurant_brand_profiles: Table<{
+        id: string;
+        restaurant_id: string;
+        import_id: string;
+        status: 'draft' | 'published' | 'archived';
+        version: number;
+        name: string | null;
+        logo_asset_id: string | null;
+        banner_asset_id: string | null;
+        theme: unknown;
+        source: unknown;
+        menu_id: string | null;
+        created_by: string | null;
+        created_at: string;
+        updated_at: string;
+        published_at: string | null;
+        published_by: string | null;
+      }>;
+      /** Migration 20261103000100. Append-only publish/rollback log. */
+      restaurant_publish_history: Table<{
+        id: string;
+        restaurant_id: string;
+        action: 'publish' | 'rollback';
+        menu_id: string | null;
+        brand_profile_id: string | null;
+        snapshot: unknown;
+        actor: string | null;
+        created_at: string;
+      }>;
       payments: Table<{
         id: string;
         order_id: string;
@@ -155,6 +210,27 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      /**
+       * Migration 20261103000100. Publish the menu + brand pair in ONE
+       * transaction: the restaurants row is only ever rewritten from here, so
+       * a half-published version is not representable. Idempotent — a repeat
+       * call on the same pair returns { ok, already: true } with no second
+       * history row. Returns a status object instead of raising for guest
+       * causes, the same convention as verify_table_qr_with_code.
+       */
+      publish_menu_brand_pair: {
+        Args: { p_menu_id: string; p_brand_profile_id: string };
+        Returns: { ok: boolean; already: boolean; reason?: string };
+      };
+      /**
+       * Migration 20261103000100. Restore the previous live menu+brand pair
+       * from the snapshot in restaurant_publish_history. Idempotent: a second
+       * call with nothing newer to undo returns { ok, already: true }.
+       */
+      rollback_last_publish: {
+        Args: { p_restaurant_id: string };
+        Returns: { ok: boolean; already: boolean; reason?: string };
+      };
       /**
        * Migration 20261028000900. Mints a table session from a scanned card,
        * for restaurants whose guest_verification_mode is 'scan_confirm' or

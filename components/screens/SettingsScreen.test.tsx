@@ -313,7 +313,7 @@ describe('Settings, the redesign', () => {
     // so "which control commits this card" is answered the same way every time.
     // The sixth is the guest-verification choice (migration 20261028000900).
     const html = renderToStaticMarkup(<SettingsScreen data={data()} gatewayConfigured />);
-    expect(count(html, 'bg-[var(--p-accent)] text-onink')).toBe(6);
+    expect(count(html, 'bg-grass text-cream')).toBe(6);
   });
 
   it('draws no hand-made alert boxes any more', () => {

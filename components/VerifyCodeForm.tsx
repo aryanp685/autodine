@@ -112,7 +112,7 @@ export function VerifyCodeForm({
       <button
         type="submit"
         disabled={sending || !complete}
-        className="mt-3 h-11 w-full rounded-full bg-[var(--p-accent)] text-[13.5px] font-semibold text-white transition active:scale-[0.99] disabled:opacity-40"
+        className="mt-3 h-11 w-full rounded-full bg-grass text-[13.5px] font-semibold text-cream transition active:scale-[0.99] disabled:opacity-40"
       >
         {sending ? 'Checking…' : (cta ?? 'Open the menu')}
       </button>

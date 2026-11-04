@@ -64,7 +64,7 @@ export function WhereToFindCode({
           <li key={place.where} className="flex gap-2.5">
             <span
               aria-hidden="true"
-              className="mt-[6px] size-1.5 shrink-0 rounded-full bg-[var(--p-accent)]"
+              className="mt-[6px] size-1.5 shrink-0 rounded-full bg-grass"
             />
             <span className="min-w-0 text-[12.5px] leading-[1.55] text-gink-64">
               <strong className="font-semibold text-gink">{place.where}.</strong> {place.detail}

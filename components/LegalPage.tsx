@@ -26,7 +26,7 @@ export function LegalPage({
 }) {
   return (
     <div className="min-h-screen bg-ink text-cream antialiased">
-      <header className="border-b border-white/[0.06]">
+      <header className="border-b border-cream/[0.12]">
         <div className="mx-auto flex h-16 max-w-[820px] items-center justify-between px-5 sm:px-8">
           <Link href="/" aria-label="AutoDine home">
             <BrandLockup size={21} ink="#f7f3ea" dot={BRAND_GREEN} />
@@ -38,13 +38,13 @@ export function LegalPage({
       </header>
 
       <main className="mx-auto max-w-[820px] px-5 py-20 sm:px-8">
-        <p className="text-[11px] font-semibold tracking-[0.24em] text-gold uppercase">{kicker}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-plum uppercase">{kicker}</p>
         <h1 className="mt-5 text-[clamp(2rem,4.4vw,3rem)] leading-[1.05] font-medium tracking-[-0.04em]">
           {title}
         </h1>
-        <p className="mt-5 max-w-[62ch] text-[15px] leading-relaxed text-mute">{lede}</p>
+        <p className="mt-5 max-w-[62ch] text-[15px] leading-[1.6] text-mute">{lede}</p>
 
-        <p className="mt-8 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-[12.5px] leading-relaxed text-mute-dim">
+        <p className="mt-8 rounded-xl border border-cream/15 bg-white px-4 py-3 text-[12.5px] leading-relaxed text-mute-dim">
           Product preview. This page describes what the software does today, in plain language. It is
           not a lawyer&apos;s document, and it will be replaced by one before any restaurant is charged
           money.

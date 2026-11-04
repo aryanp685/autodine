@@ -32,6 +32,24 @@ export const MIN_PASSWORD = 10;
 export const MAX_PASSWORD_BYTES = 72;
 
 /**
+ * The shape every password must have: one uppercase letter, one lowercase
+ * letter, one number, one special character. The same four rules a person
+ * meets on any account they create anywhere, so nobody is surprised here.
+ *
+ * "Special" means a punctuation or symbol character — not a space (a space
+ * must not quietly satisfy the rule) and not a letter in another script
+ * (Devanagari is a letter, not a special character).
+ */
+const HAS_LOWERCASE = /[a-z]/;
+const HAS_UPPERCASE = /[A-Z]/;
+const HAS_NUMBER = /[0-9]/;
+const HAS_SPECIAL = /[^\p{L}\p{N}\s]/u;
+
+/** One message listing every requirement, so the banner says all of it at once. */
+const NEEDS_THESE =
+  'Password must have at least 10 characters, with an uppercase letter, a lowercase letter, a number, and a special character (like ! ? #).';
+
+/**
  * What is wrong with this password, or null when nothing is.
  *
  * Deliberately not a strength meter: a meter tells an owner their password is
@@ -53,6 +71,15 @@ export function passwordProblem(password: string): string | null {
 
   if (new TextEncoder().encode(password).length > MAX_PASSWORD_BYTES) {
     return `Password is too long. Keep it under ${MAX_PASSWORD_BYTES} bytes — roughly ${MAX_PASSWORD_BYTES} English characters, fewer if you use emoji.`;
+  }
+
+  if (
+    !HAS_LOWERCASE.test(password) ||
+    !HAS_UPPERCASE.test(password) ||
+    !HAS_NUMBER.test(password) ||
+    !HAS_SPECIAL.test(password)
+  ) {
+    return NEEDS_THESE;
   }
 
   return null;

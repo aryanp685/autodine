@@ -479,7 +479,7 @@ export function SettingsScreen({
                           override. See the kit note in owner/chrome.tsx. */}
                       <input
                         id="settings-tax"
-                        className={`${inputClass} w-[180px]! tabular-nums`}
+                        className={`${inputClass} w-[180px]! max-w-full tabular-nums`}
                         name="taxRate"
                         type="text"
                         inputMode="decimal"

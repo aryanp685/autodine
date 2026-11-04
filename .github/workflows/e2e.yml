@@ -51,15 +51,17 @@ jobs:
       # The count is asserted, not assumed: a config that silently matched no
       # tests would otherwise "pass" and prove nothing.
       #
-      # 16 = 4 desktop + 5 phone + 7 integration. The integration ones need a
-      # real deployment and real accounts, so without secrets they report as
+      # 78 = 5 desktop + 5 phone + 14 guest-ordering + 7 security + 8 kitchen
+      # + 8 cashier + 31 integration. The integration ones need a real
+      # deployment and real accounts, so without secrets they report as
       # SKIPPED -- they are in the list so that they cannot quietly stop being
-      # discoverable, not because this job verifies them.
-      - name: Expect 16 tests
+      # discoverable, not because this job verifies them. The 47 hermetic ones
+      # (desktop/phone/guest/staff) run here against demo mode.
+      - name: Expect 111 tests
         run: |
           listed=$(npx playwright test --list | tail -1)
           echo "$listed"
-          echo "$listed" | grep -q "Total: 16 tests"
+          echo "$listed" | grep -q "Total: 111 tests"
 
       # Two reporters: list for a human reading the log, json for the summary
       # step below. The json file is the source of the per-test line.
@@ -75,33 +77,74 @@ jobs:
         if: always()
         run: |
           node -e '
-            const r = require("./playwright-report/results.json");
-            let pass = 0, fail = 0, skip = 0;
-            const walk = (suite) => {
-              for (const spec of suite.specs ?? []) {
-                for (const t of spec.tests ?? []) {
-                  /* SKIPPED IS NOT PASSED.
-                   *
-                   * The integration project lives in this run so it stays
-                   * discoverable, and without secrets every one of its tests
-                   * skips itself. Counting those as PASS would put "the invite
-                   * flow was verified" in a green check for a flow that never
-                   * opened a page. They are counted separately and named as
-                   * skipped. */
-                  const results = t.results ?? [];
-                  const skipped = results.length === 0 || results.every((x) => x.status === "skipped");
-                  const ok = results.every((x) => x.status === "passed" || x.status === "skipped");
-                  if (skipped) { skip++; console.log(`::notice title=e2e SKIP::${spec.title}`); }
-                  else if (ok) { pass++; console.log(`::notice title=e2e PASS::${spec.title}`); }
-                  else { fail++; console.log(`::error title=e2e FAIL::${spec.title}`); }
+            try {
+              const r = require("./playwright-report/results.json");
+              let pass = 0, fail = 0, skip = 0;
+              const entries = [];
+              const clean = (s) =>
+                String(s ?? "")
+                  .replace(/[^\x20-\x7e\u00a0-\u024f\u2010-\u2027\u20b9\u00b7\u00d7\u2192]/g, " ")
+                  .split("\n")
+                  .map((line) => line.trim())
+                  .filter(Boolean)
+                  .slice(0, 8)
+                  .join(" | ")
+                  .replaceAll("::", ":")
+                  .slice(0, 700);
+              const walk = (suite) => {
+                for (const spec of suite.specs ?? []) {
+                  for (const t of spec.tests ?? []) {
+                    /* SKIPPED IS NOT PASSED.
+                     *
+                     * The integration project lives in this run so it stays
+                     * discoverable, and without secrets every one of its tests
+                     * skips itself. Counting those as PASS would put "the invite
+                     * flow was verified" in a green check for a flow that never
+                     * opened a page. They are counted separately and named as
+                     * skipped. */
+                    const results = t.results ?? [];
+                    const skipped = results.length === 0 || results.every((x) => x.status === "skipped");
+                    const ok = results.every((x) => x.status === "passed" || x.status === "skipped");
+                    const bad = results.find((x) => x.status !== "passed" && x.status !== "skipped");
+                    if (skipped) { skip++; entries.push({ level: "notice", title: "e2e SKIP", msg: spec.title }); }
+                    else if (ok) { pass++; entries.push({ level: "notice", title: "e2e PASS", msg: spec.title }); }
+                    else { fail++; entries.push({ level: "error", title: "e2e FAIL", msg: `${spec.title} :: ${clean(bad?.error?.message)}` }); }
+                  }
                 }
-              }
-              for (const child of suite.suites ?? []) walk(child);
-            };
-            for (const s of r.suites ?? []) walk(s);
-            console.log(`::notice title=e2e totals::${pass} passed, ${skip} skipped, ${fail} failed`);
-            if (fail > 0) process.exit(1);
+                for (const child of suite.suites ?? []) walk(child);
+              };
+              for (const s of r.suites ?? []) walk(s);
+              /* Totals first: GitHub keeps about ten annotations per level per
+               * step, and the number must never be the thing that scrolls off.
+               * The rest go out longest-message-first, so the errors that carry
+               * detail outlive the ones that only carry a name. */
+              console.log(`::notice title=e2e totals::${pass} passed, ${skip} skipped, ${fail} failed`);
+              /* Only the failures are annotated (five, longest first):
+               * the runner puts its own annotations in the same ten slots, and can crowd
+               * a short list out, and nothing here is worth losing the
+               * error text for. */
+              entries
+                .filter((e) => e.level === "error")
+                .sort((a, b) => {
+                  const d = (x) => (x.msg.startsWith("DIAG") ? 1 : 0);
+                  return d(b) - d(a) || b.msg.length - a.msg.length;
+                })
+                .slice(0, 7)
+                .forEach((e) => console.log(`::error title=e2e FAIL::${e.msg}`));
+              if (fail > 0) process.exitCode = 1;
+            } catch (err) {
+              console.log(`::error title=e2e walker crashed::${String(err && err.stack ? err.stack : err).split("\n").slice(0, 6).join(" | ").slice(0, 800)}`);
+              process.exitCode = 1;
+            }
           '
+
+      - name: Upload the responsive screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: responsive-artifacts
+          path: responsive-artifacts/
+          retention-days: 7
 
       - name: Upload the report when something failed
         if: failure()

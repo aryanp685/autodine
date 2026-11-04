@@ -713,6 +713,54 @@ p { margin: 0; }
 [data-flow-root] .g-primary:active { transform: scale(0.985); }
 [data-flow-root] .g-primary:disabled { filter: grayscale(0.4); opacity: 0.5; }
 
+/* ---- brand theme (opt-in, migration 20261103000100) ----------------------
+   A restaurant that published a brand profile carries data-brand on its flow
+   root (lib/branding/guest-theme.ts). Everything below FALLS BACK to the
+   current value, and the [data-brand]-scoped rules do not match at all
+   without the attribute — so the hundreds of restaurants that never opt in
+   render exactly as they did before this block existed. The fill on
+   .g-primary is the only rule that applies always, and it is identical
+   without a theme: var(--brand-primary, var(--p-accent)) resolves to the
+   same accent it always did. */
+[data-flow-root] .g-primary {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0)),
+    var(--brand-primary, var(--p-accent));
+  color: var(--brand-primary-ink, var(--p-on-ink));
+}
+[data-flow-root][data-brand] {
+  font-family: var(--brand-font, inherit);
+}
+[data-flow-root][data-brand] .g-card,
+[data-flow-root][data-brand] .g-panel {
+  padding: var(--brand-space, 1rem);
+}
+[data-flow-root][data-brand] .g-card {
+  border-width: var(--brand-border, 1px);
+  box-shadow: var(--brand-elevation), inset 0 1px 0 var(--g-line-light);
+}
+[data-flow-root][data-brand] .g-panel {
+  border-width: var(--brand-border, 1px);
+}
+/* ---- motifs: small printed-menu decorations, chosen per brand ---------- */
+[data-flow-root][data-motif='rule-double'] .g-eyebrow {
+  border-bottom: 3px double var(--p-line-strong);
+  padding-bottom: 4px;
+}
+[data-flow-root][data-motif='divider-swirl'] .g-eyebrow::after {
+  content: ' ❧';
+  opacity: 0.55;
+}
+[data-flow-root][data-motif='dot-separator'] .g-eyebrow::after {
+  content: ' ···';
+  letter-spacing: 0.18em;
+  opacity: 0.55;
+}
+[data-flow-root][data-motif='corner-ornament'] .g-card {
+  outline: 1px solid var(--p-line);
+  outline-offset: -5px;
+}
+
 /* Secondary: glass, not ink. A second dark button next to the primary is two
    primary actions, and the guest has to guess which one is the way forward. */
 [data-flow-root] .g-quiet {
@@ -1180,21 +1228,33 @@ p { margin: 0; }
    rgba() can never drift apart.
    ========================================================================= */
 @theme {
-  --color-ink: #0b0a08;
-  --color-ink-soft: #14120f;
-  --color-ink-card: #1a1714;
-  --color-ink-line: #2a2521;
+  /* LIGHT WARM PORCELAIN (flipped 2026-11-03 — the dark premium surface was
+     retired at the owner's request; same system, same geometry, daylight).
+     `ink` is now the room, `cream` is now the type: the class names kept
+     their meaning ("the surface", "the text on it") and swapped their hues. */
+  --color-ink: #f7f2e9;
+  --color-ink-soft: #efe8dc;
+  --color-ink-card: #ffffff;
+  --color-ink-line: #e6dccb;
 
-  --color-gold: #e0a86a;
-  --color-gold-bright: #f2c188;
-  --color-gold-dim: #b9854e;
+  /* ONE PLUM, per the finalized brief: the action hue of the product
+     (the same aubergine as --p-accent) carried onto the marketing surface.
+     Green stays state, never decoration. */
+  --color-plum: #7d2b6b;
+  --color-plum-strong: #631f55;
+  --color-plum-soft: #f4e9f1;
+
+  /* The action colour the owner chose: a light grass green on the buttons.
+     Espresso sits on it (10:1); white does not. */
+  --color-grass: #1fd655;
+  --color-grass-strong: #17b84a;
 
   --color-brand: #207030;
   --color-brand-soft: #2c8a3f;
 
-  --color-cream: #f7f3ea;
-  --color-mute: #a49c90;
-  --color-mute-dim: #7d7568;
+  --color-cream: #211a15;
+  --color-mute: #5f584e;
+  --color-mute-dim: #7a7266;
 
   /* The same stack as the root, so `font-sans` cannot disagree with the body.
      -apple-system resolves to SF Pro on Apple hardware -- the typeface the

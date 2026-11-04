@@ -161,7 +161,7 @@ export function GuestOrderEditor({
                     onClick={() => step(l, -1)}
                     disabled={pending || now === 0}
                     aria-label={`One fewer ${l.name}`}
-                    className="grid size-7 place-items-center rounded-full text-[14px] text-gink-80 transition hover:bg-gink-07 disabled:opacity-30"
+                    className="relative grid size-7 place-items-center rounded-full before:absolute before:-inset-2 before:rounded-full before:content-[''] text-[14px] text-gink-80 transition hover:bg-gink-07 disabled:opacity-30"
                   >
                     −
                   </button>
@@ -171,7 +171,7 @@ export function GuestOrderEditor({
                     onClick={() => step(l, +1)}
                     disabled={pending || now >= 99}
                     aria-label={`One more ${l.name}`}
-                    className="grid size-7 place-items-center rounded-full text-[14px] text-gink-80 transition hover:bg-gink-07 disabled:opacity-30"
+                    className="relative grid size-7 place-items-center rounded-full before:absolute before:-inset-2 before:rounded-full before:content-[''] text-[14px] text-gink-80 transition hover:bg-gink-07 disabled:opacity-30"
                   >
                     +
                   </button>

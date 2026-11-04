@@ -104,7 +104,11 @@ export async function previewMenuImportAction(text: string): Promise<ImportPrevi
   return { ok: true, draft, source: 'rules', note };
 }
 
-export type ImportResult = { ok: true; menuId: string; items: number } | { ok: false; error: string };
+export type ImportResult =
+  | { ok: true; menuId: string; items: number; existing?: boolean }
+  | { ok: false; error: string };
+
+const IMPORT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Write the draft as a new draft menu.
@@ -112,12 +116,28 @@ export type ImportResult = { ok: true; menuId: string; items: number } | { ok: f
  * Cleanup on failure is deliberate: categories and dishes inserted under a
  * menu that then failed to save would be orphaned rows the owner can neither
  * see nor delete.
+ *
+ * When the payload carries a valid `importId` (the Brand Studio's stable
+ * import identifier), the write is IDEMPOTENT: a menu already created for
+ * that import is returned as-is (`existing: true`) instead of a second draft
+ * appearing. Without an importId the behaviour is exactly as before — a new
+ * menu every time. The id is stored on menus.import_id (migration
+ * 20261103000100) and never influences anything else.
  */
 export async function createImportedMenuAction(payload: unknown): Promise<ImportResult> {
   const draft = sanitiseDraft(payload);
   if (draft.categories.length === 0) {
     return { ok: false, error: 'There is nothing to import. Go back and read the menu again.' };
   }
+
+  const rawImportId =
+    payload && typeof payload === 'object'
+      ? (payload as { importId?: unknown }).importId
+      : undefined;
+  const importId =
+    typeof rawImportId === 'string' && IMPORT_ID_RE.test(rawImportId.trim())
+      ? rawImportId.trim().toLowerCase()
+      : null;
 
   const staff = await getStaffContextDetailed();
   if (!staff.ok) {
@@ -126,6 +146,28 @@ export async function createImportedMenuAction(payload: unknown): Promise<Import
   }
 
   const { supabase, restaurantId } = staff.context;
+
+  if (importId) {
+    const { data: already, error: alreadyError } = await supabase
+      .from('menus')
+      .select('id')
+      .eq('restaurant_id', restaurantId)
+      .eq('import_id', importId)
+      .maybeSingle();
+    if (alreadyError) return { ok: false, error: `Could not read your menus: ${alreadyError.message}` };
+    if (already) {
+      const { count } = await supabase
+        .from('items')
+        .select('id', { count: 'exact', head: true })
+        .in(
+          'category_id',
+          (
+            await supabase.from('categories').select('id').eq('menu_id', String(already.id))
+          ).data?.map((c) => String(c.id)) ?? [],
+        );
+      return { ok: true, menuId: String(already.id), items: count ?? 0, existing: true };
+    }
+  }
 
   const { data: existing, error: listError } = await supabase
     .from('menus')
@@ -144,7 +186,7 @@ export async function createImportedMenuAction(payload: unknown): Promise<Import
 
   const { data: menu, error: menuError } = await supabase
     .from('menus')
-    .insert({ restaurant_id: restaurantId, name, is_published: false, sort_order: nextOrder })
+    .insert({ restaurant_id: restaurantId, name, is_published: false, sort_order: nextOrder, import_id: importId })
     .select('id')
     .maybeSingle();
 

@@ -36,6 +36,16 @@ export type Restaurant = {
   /** Key into the curated palette in lib/branding/palette.ts. */
   accent: string;
   /**
+   * Migration 20261103000100 (brand studio). Opt-in per-restaurant guest
+   * theming. False for every restaurant that has never published a brand
+   * profile — the existing appearance is the default. `brand_theme` is the
+   * validated theme JSON written only by publish_menu_brand_pair, and
+   * `brand_profile_id` points at the approved profile row.
+   */
+  brand_theme_enabled?: boolean;
+  brand_theme?: unknown | null;
+  brand_profile_id?: string | null;
+  /**
    * Migration 20261028000900. How a guest proves they are at a table:
    * 'code' (rotating digits, the default), 'scan_confirm' (scan, then one
    * staff tap per sitting) or 'scan'. The last two cannot prove presence and
@@ -140,6 +150,11 @@ export type Menu = {
   name: string;
   is_published: boolean;
   sort_order: number;
+  /**
+   * Migration 20261103000100. The stable import identifier linking this menu
+   * draft to its brand draft. Null for menus created by hand.
+   */
+  import_id?: string | null;
 };
 
 export type DiningTable = {

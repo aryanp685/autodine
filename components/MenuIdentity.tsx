@@ -43,6 +43,13 @@ export type MenuIdentityProps = {
    * what a screenshot looks like. Off by default; the guest menu passes true.
    */
   animate?: boolean;
+  /**
+   * Brand theme header character (lib/branding/theme.ts): banner-overlay
+   * (name ON the photograph — the current design), banner-stack (photograph
+   * first, name card below), plain (the paper card even with a banner).
+   * Absent = banner-overlay, the current behaviour, unchanged.
+   */
+  headerStyle?: 'banner-overlay' | 'banner-stack' | 'plain';
 };
 
 /** The motion of one line arriving: fade up, settle, never bounce. */
@@ -100,11 +107,14 @@ export function MenuIdentity({
   bannerUrl,
   tableLabel,
   animate = false,
+  headerStyle,
 }: MenuIdentityProps) {
   const line = placeLine(tagline, address);
   const monogram = initialsOf(name);
   const reduce = useReducedMotion();
   const motionOn = animate && !reduce;
+  const showBanner = Boolean(bannerUrl) && headerStyle !== 'plain';
+  const overlay = headerStyle !== 'banner-stack';
   const headerRef = useRef<HTMLElement | null>(null);
 
   /**
@@ -116,7 +126,7 @@ export function MenuIdentity({
    * trigger left behind would pin itself to the next screen's scroll.
    */
   useEffect(() => {
-    if (!motionOn || !bannerUrl) return;
+    if (!motionOn || !showBanner) return;
     const header = headerRef.current;
     if (!header) return;
     gsap.registerPlugin(ScrollTrigger);
@@ -134,9 +144,62 @@ export function MenuIdentity({
       );
     }, header);
     return () => ctx.revert();
-  }, [motionOn, bannerUrl]);
+  }, [motionOn, showBanner]);
 
-  if (bannerUrl) {
+  /* The paper card: a ringed monogram, the name, one line of place. It is a
+     finished design, not the absence of one. Shared by the plain header and
+     by banner-stack (name card below the picture). */
+  const paperCard = (
+        <motion.div
+          data-venue-card=""
+          className="g-card mx-auto w-full max-w-[720px] p-3.5"
+          initial={motionOn ? { opacity: 0, y: 16 } : false}
+          animate={motionOn ? { opacity: 1, y: 0 } : undefined}
+          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <div className="flex items-center gap-3.5">
+            <motion.div
+              className="grid size-12 shrink-0 place-items-center rounded-full bg-white/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] ring-1 ring-[var(--p-accent)]/25"
+              initial={motionOn ? { opacity: 0, scale: 0.8 } : false}
+              animate={motionOn ? { opacity: 1, scale: 1 } : undefined}
+              transition={{ duration: 0.5, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+            >
+              {logoUrl ? (
+                <Image src={logoUrl} alt="" width={48} height={48} className="size-12 rounded-full object-cover" />
+              ) : (
+                <span aria-hidden="true" className="text-[15px] font-semibold tracking-[0.02em] text-[var(--p-accent)]">
+                  {monogram}
+                </span>
+              )}
+            </motion.div>
+
+            <div className="min-w-0 flex-1">
+              <motion.h1
+                className="truncate text-[22px] leading-tight font-semibold tracking-[-0.025em] text-gink"
+                initial={motionOn ? lineIn(0.16).initial : false}
+                animate={motionOn ? lineIn(0.16).animate : undefined}
+                transition={lineIn(0.16).transition}
+              >
+                {name}
+              </motion.h1>
+              {line && (
+                <motion.div
+                  className="mt-1 truncate text-[10.5px] font-medium tracking-[0.11em] text-gink-46 uppercase"
+                  initial={motionOn ? lineIn(0.26).initial : false}
+                  animate={motionOn ? lineIn(0.26).animate : undefined}
+                  transition={lineIn(0.26).transition}
+                >
+                  {line}
+                </motion.div>
+              )}
+            </div>
+
+            {tableLabel && <TableChip label={tableLabel} motionOn={motionOn} />}
+          </div>
+        </motion.div>
+  );
+
+  if (bannerUrl && headerStyle !== 'plain') {
     return (
       <header className="relative" ref={headerRef}>
         <div className="relative h-[188px] w-full overflow-hidden rounded-b-[22px] bg-gink-12">
@@ -170,9 +233,10 @@ export function MenuIdentity({
           />
         </div>
 
-        {/* The name sits ON the photograph, over the dark end of the scrim.
-            Putting it under the banner instead would have meant white type on
-            paper -- the one place in this flow where that is unreadable. */}
+        {/* The name sits ON the photograph for banner-overlay. For
+            banner-stack it becomes a paper card below the picture — the
+            printed-menu shape some brands use. */}
+        {overlay ? (
         <div className="absolute inset-x-0 bottom-0 mx-auto flex w-full max-w-[720px] items-end gap-3 px-4 pb-4">
           <motion.span
             className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-paper shadow-g1 ring-1 ring-white/50"
@@ -212,6 +276,9 @@ export function MenuIdentity({
 
           {tableLabel && <TableChip label={tableLabel} onPhoto motionOn={motionOn} />}
         </div>
+        ) : (
+          <div className="px-4 pt-4 pb-1">{paperCard}</div>
+        )}
       </header>
     );
   }
@@ -223,57 +290,8 @@ export function MenuIdentity({
   return (
     /* The restaurant, as a card. It is the first thing on the screen and the
        only place the guest is told where they are -- so it gets the flow's
-       panel treatment rather than floating loose on the wash, which made the
-       name look like a heading that had lost its page. */
-    <header className="px-4 pt-4 pb-1">
-      <motion.div
-        data-venue-card=""
-        className="g-card mx-auto w-full max-w-[720px] p-3.5"
-        initial={motionOn ? { opacity: 0, y: 16 } : false}
-        animate={motionOn ? { opacity: 1, y: 0 } : undefined}
-        transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-      >
-        <div className="flex items-center gap-3.5">
-          <motion.div
-            className="grid size-12 shrink-0 place-items-center rounded-full bg-white/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] ring-1 ring-[var(--p-accent)]/25"
-            initial={motionOn ? { opacity: 0, scale: 0.8 } : false}
-            animate={motionOn ? { opacity: 1, scale: 1 } : undefined}
-            transition={{ duration: 0.5, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
-          >
-            {logoUrl ? (
-              <Image src={logoUrl} alt="" width={48} height={48} className="size-12 rounded-full object-cover" />
-            ) : (
-              <span aria-hidden="true" className="text-[15px] font-semibold tracking-[0.02em] text-[var(--p-accent)]">
-                {monogram}
-              </span>
-            )}
-          </motion.div>
-
-          <div className="min-w-0 flex-1">
-            <motion.h1
-              className="truncate text-[22px] leading-tight font-semibold tracking-[-0.025em] text-gink"
-              initial={motionOn ? lineIn(0.16).initial : false}
-              animate={motionOn ? lineIn(0.16).animate : undefined}
-              transition={lineIn(0.16).transition}
-            >
-              {name}
-            </motion.h1>
-            {line && (
-              <motion.div
-                className="mt-1 truncate text-[10.5px] font-medium tracking-[0.11em] text-gink-46 uppercase"
-                initial={motionOn ? lineIn(0.26).initial : false}
-                animate={motionOn ? lineIn(0.26).animate : undefined}
-                transition={lineIn(0.26).transition}
-              >
-                {line}
-              </motion.div>
-            )}
-          </div>
-
-          {tableLabel && <TableChip label={tableLabel} motionOn={motionOn} />}
-        </div>
-      </motion.div>
-    </header>
+       panel treatment rather than floating loose on the wash. */
+    <header className="px-4 pt-4 pb-1">{paperCard}</header>
   );
 }
 

@@ -4,13 +4,14 @@ import { SignInPrompt } from '@/components/SignInPrompt';
 import { MenuIdentity } from '@/components/MenuIdentity';
 import type { OutletBar } from '@/lib/outlets';
 import type { BrandingScreenData } from '@/lib/db/branding-screen';
-import { guestAccentStyle } from '@/lib/branding/palette';
+import { guestBrandStyle } from '@/lib/branding/guest-theme';
 import {
   removeBannerAction,
   removeLogoAction,
   uploadBannerAction,
   uploadLogoAction,
 } from '@/app/(staff)/dashboard/branding/actions';
+import { rollbackPublishFormAction } from '@/app/(staff)/dashboard/menus/brand-actions';
 import { inr } from '@/lib/demo-data';
 import {
   BtnLink,
@@ -299,10 +300,11 @@ export function BrandingScreen({
 
         <Card
           className="bg-paper-deep px-4 py-6"
-          /* The flow's own colours, not this restaurant's row: the preview has
-             to show what a guest will actually see, and that is the same for
-             every restaurant. */
-          style={guestAccentStyle() as React.CSSProperties}
+          /* Exactly what a guest sees: the same decider (lib/branding/
+             guest-theme.ts), so the preview cannot promise something the
+             menu does not do. */
+          style={guestBrandStyle(data?.brand ?? null).style as React.CSSProperties}
+          {...guestBrandStyle(data?.brand ?? null).attrs}
         >
           {/* A phone, at phone width. Narrower and the header wraps differently
               from the real thing; wider and it stops being a preview. */}
@@ -334,7 +336,7 @@ export function BrandingScreen({
                     <div className="truncate text-[12.5px] font-medium text-gink">{dish.name}</div>
                     <div className="text-[11.5px] text-gink-46 tabular-nums">{inr(dish.price)}</div>
                   </div>
-                  <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[var(--p-accent)] text-[15px] leading-none text-onink">
+                  <span className="grid size-6 shrink-0 place-items-center rounded-full bg-grass text-[15px] leading-none text-cream">
                     +
                   </span>
                 </div>
@@ -371,6 +373,24 @@ export function BrandingScreen({
         ) : null}
       </section>
 
+      {/* ------------------------------------------------------------- versions
+          Publish history for the Brand Studio pair. Only shown when something
+          has actually been published through it — a "restore" button over an
+          empty history is a button that always fails. */}
+      {data?.hasPublishHistory ? (
+        <section aria-labelledby="branding-versions" className="mt-6">
+          <SectionHead
+            title={<span id="branding-versions">Versions</span>}
+            meta="The last publish is live; the one before it can come back"
+          />
+          <form action={rollbackPublishFormAction} className="mt-3">
+            <button type="submit" className={btn('quiet', 'sm')}>
+              Restore previous menu and brand
+            </button>
+          </form>
+        </section>
+      ) : null}
+
       {/* ------------------------------------------------------------- the notes
           One short list, because the questions this screen raises are always the
           same three: what changes, and does the name live here? */}
@@ -386,9 +406,10 @@ export function BrandingScreen({
           </Link>
           .
         </Notice>
-        <Notice tone="plain" label="Shared on purpose">
-          Every restaurant&apos;s menu looks the same: same layout, same colours, same type. That is
-          what lets a guest order at any table in any restaurant without learning a new screen.
+        <Notice tone="plain" label="One design, or your own">
+          Every guest menu starts from the same layout and colours, so ordering works the same
+          everywhere. A restaurant that wants its own colour and type can opt in through the Brand
+          Studio — until then, nothing here changes what guests see.
         </Notice>
       </div>
     </OwnerPage>

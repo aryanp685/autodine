@@ -4,7 +4,9 @@ import { Checkout } from '@/components/screens/CheckoutScreen';
 import { TableGateScreen } from '@/components/screens/TableGateScreen';
 import { VerifyToOrderScreen } from '@/components/screens/VerifyToOrderScreen';
 import { getCartScreenData } from '@/lib/db/cart-screen';
+import { menuPriceItems, restaurant as demoRestaurant } from '@/lib/demo-data';
 import { onlinePaymentsConfigured } from '@/lib/payments/razorpay';
+import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { loadTableAccess, verifyAgainHref } from '@/lib/table-access';
 
 export const metadata: Metadata = { title: 'Checkout · AutoDine' };
@@ -55,6 +57,7 @@ export default async function CheckoutPage({
     return (
       <CartProvider slug={s}>
         <VerifyToOrderScreen
+          brandState={data?.brandState}
           slug={access.slug}
           token={access.qrToken}
           restaurantName={data?.restaurantName}
@@ -70,11 +73,15 @@ export default async function CheckoutPage({
   return (
     <CartProvider slug={s}>
       <Checkout
+        brandState={data?.brandState}
         slug={s}
-        restaurantName={data?.restaurantName}
+        restaurantName={data?.restaurantName ?? (isSupabaseConfigured ? undefined : demoRestaurant.name)}
         tableLabel={access.status === 'verified' ? access.tableLabel : null}
         taxRateBps={data?.taxRateBps}
-        items={data?.items ?? []}
+        // With no database at all, the demo menu is the menu. On a configured
+        // deployment an unresolved restaurant still gets no prices at all --
+        // prices that came from nowhere are worse than none.
+        items={!isSupabaseConfigured ? menuPriceItems : (data?.items ?? [])}
         // Both are needed before the screen may promise card payment later:
         // the owner's switch, and a gateway this deployment can verify with.
         onlinePaymentAvailable={Boolean(data?.onlinePaymentsEnabled) && onlinePaymentsConfigured()}

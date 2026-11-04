@@ -383,7 +383,7 @@ export function ReportsScreen({
                     required
                     aria-label="From"
                     defaultValue={fromDate}
-                    className={`${inputClass} h-9! w-[142px]! text-[12.5px]!`}
+                    className={`${inputClass} h-9! w-[142px]! max-w-full text-[12.5px]!`}
                   />
                 </label>
                 <label className="flex items-center gap-1.5 text-[11.5px] text-gink-46">
@@ -394,7 +394,7 @@ export function ReportsScreen({
                     required
                     aria-label="To"
                     defaultValue={toDate}
-                    className={`${inputClass} h-9! w-[142px]! text-[12.5px]!`}
+                    className={`${inputClass} h-9! w-[142px]! max-w-full text-[12.5px]!`}
                   />
                 </label>
                 <button type="submit" className={btn('ghost', 'sm')}>

@@ -79,11 +79,14 @@ describe('guest flow design system', () => {
     expect(css).not.toMatch(unlayeredLinkReset);
   });
 
-  it('gives every customer the same UI, whichever restaurant they are in', () => {
-    // The flow used to be painted with the restaurant's stored accent, so two
-    // restaurants rendered two different products. Nothing in the guest flow
-    // may read that column again: the colour comes from guestAccentStyle(),
-    // which takes no input.
+  it('themes only opted-in restaurants, and never from a raw accent column', () => {
+    // The history: the flow used to be painted with restaurants.accent, so
+    // two restaurants rendered two different products. That was replaced by
+    // one constant style for everyone — and the Brand Studio (migration
+    // 20261103000100) then reintroduced per-restaurant colour STRICTLY behind
+    // an opt-in: restaurants.brand_theme_enabled, applied only through
+    // lib/branding/guest-theme.ts, whose default is the same constant as
+    // before. The rules below pin all three halves of that contract.
     const screens = readdirSync(new URL('../components/screens/', import.meta.url))
       .filter((f) => f.endsWith('.tsx') && !f.endsWith('.test.tsx'))
       .map((f) => [
@@ -93,17 +96,27 @@ describe('guest flow design system', () => {
 
     expect(screens.length).toBeGreaterThan(5);
     for (const [file, source] of screens) {
+      // No screen reads the stored accent or the palette picker directly.
       expect(source, `${file} reads a per-restaurant accent`).not.toMatch(
         /restaurant\.accent|accentFrom\(|\.accent\)/,
       );
       expect(source, `${file} imports the old accentStyle`).not.toContain('accentStyle(');
+      // Any screen that paints the flow at all goes through the one decider.
+      if (source.includes('data-flow-root') || source.includes('GuestFlow')) {
+        expect(source, `${file} paints without guestBrandStyle`).not.toContain('guestAccentStyle(');
+      }
     }
 
-    // And the shared header/branding components, same rule.
+    // The shared header/branding components, same rule.
     for (const file of ['MenuIdentity.tsx', 'GuestFlow.tsx', 'GuestTabs.tsx']) {
       const source = readFileSync(new URL(`../components/${file}`, import.meta.url), 'utf8');
       expect(source, `${file} reads a per-restaurant accent`).not.toMatch(/restaurant\.accent/);
     }
+
+    // The decider itself: no theme means the product's own constant style.
+    const decider = readFileSync(new URL('../lib/branding/guest-theme.ts', import.meta.url), 'utf8');
+    expect(decider).toContain('guestAccentStyle()');
+    expect(decider).toContain("brandThemeEnabled === true");
   });
 
   it('scopes every guest rule, so owner screens keep their white surface', () => {

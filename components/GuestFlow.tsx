@@ -59,6 +59,7 @@ export function GuestFlow({
   tabs,
   docked,
   style,
+  brandAttrs,
 }: {
   /**
    * Which step of the ordering flow this is.
@@ -105,6 +106,12 @@ export function GuestFlow({
    * what keeps the content clear of the pinned bar.
    */
   docked?: boolean;
+  /**
+   * Brand theme attributes (data-brand / data-motif / data-header) from
+   * lib/branding/guest-theme.ts. Absent = no theme, and no scoped brand rule
+   * matches. Spread onto the flow root next to the existing data attrs.
+   */
+  brandAttrs?: Record<string, string>;
 }) {
   const currentIndex = step ? GUEST_STEPS.findIndex((entry) => entry.key === step) : -1;
   const position = currentIndex + 1;
@@ -130,6 +137,7 @@ export function GuestFlow({
     <div
       data-flow-root=""
       data-flow-docked={hasDock ? 'true' : undefined}
+      {...brandAttrs}
       className="min-h-dvh text-gink antialiased"
       /* Room for the floating bars. Both are fixed, so the page reserves the
          space itself -- otherwise the last dish sits under the cart bar and
@@ -208,8 +216,8 @@ export function GuestFlow({
                        at a glance the shape says "two thirds of the way". */
                     className={[
                       'h-1 rounded-full transition-all',
-                      state === 'now' ? 'w-6 bg-[var(--p-accent)]' : 'w-4',
-                      state === 'done' ? 'bg-[var(--p-accent)]/40' : '',
+                      state === 'now' ? 'w-6 bg-grass' : 'w-4',
+                      state === 'done' ? 'bg-grass/40' : '',
                       state === 'todo' ? 'bg-gink-12' : '',
                     ]
                       .filter(Boolean)

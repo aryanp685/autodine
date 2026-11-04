@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { DishPhoto } from '@/components/DishPhoto';
 import { GuestFlow } from '@/components/GuestFlow';
-import { guestAccentStyle } from '@/lib/branding/palette';
+import { guestBrandStyle, type GuestBrandState } from '@/lib/branding/guest-theme';
 import { PlaceOrderButton } from '@/components/PlaceOrderButton';
 import { AttemptToken } from '@/components/AttemptToken';
 import { useCart } from '@/components/CartProvider';
@@ -31,6 +31,7 @@ import { gstLabel } from '@/lib/pricing';
  * promise a card sheet this screen cannot open.
  */
 export function Checkout({
+  brandState,
   slug,
   restaurantName,
   tableLabel,
@@ -38,6 +39,7 @@ export function Checkout({
   items,
   onlinePaymentAvailable = false,
 }: {
+  brandState?: GuestBrandState | null;
   slug?: string;
   restaurantName?: string;
   /** The table a live session confirmed, when there is one. */
@@ -52,6 +54,7 @@ export function Checkout({
    */
   onlinePaymentAvailable?: boolean;
 }) {
+  const paint = guestBrandStyle(brandState);
   const cart = useCart();
   const priced = priceCart(cart.lines, items, taxRateBps);
   const { subtotalPaise, taxPaise, totalPaise } = priced.totals;
@@ -67,7 +70,7 @@ export function Checkout({
 
   return (
     <GuestFlow
-      style={guestAccentStyle()}
+      style={paint.style} brandAttrs={paint.attrs}
       step="pay"
       venue={restaurantName}
       table={tableLabel}
@@ -121,7 +124,7 @@ export function Checkout({
               {/* A drawn mark, not a tick: a tick would say "paid", and nothing
                   has been paid on this screen. */}
               <span aria-hidden="true" className="grid size-8 place-items-center rounded-full bg-[var(--p-accent-soft)] ring-1 ring-[var(--p-accent)]/20">
-                <span className="size-2 rounded-full bg-[var(--p-accent)]" />
+                <span className="size-2 rounded-full bg-grass" />
               </span>
               <div className="flex flex-col leading-tight">
                 <strong className="text-[14.5px] font-semibold text-gink">At the counter</strong>

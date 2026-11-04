@@ -92,6 +92,14 @@ export type DisplayRestaurant = {
   logoUrl?: string;
   bannerUrl?: string;
   accent?: string;
+  /**
+   * Migration 20261103000100 (brand studio). The published brand theme and
+   * its opt-in flag. Absent/false = the product's own guest style, exactly as
+   * before. Consumers must go through lib/branding/guest-theme.ts — no
+   * component reads these directly (enforced by lib/guest-design.test.ts).
+   */
+  brandThemeEnabled?: boolean;
+  brandTheme?: unknown | null;
 };
 
 export function toDisplayItem(item: MenuItem): DisplayItem {
@@ -191,6 +199,7 @@ export function toDisplayRestaurant(r: Restaurant): DisplayRestaurant {
     ...(publicAssetUrl(r.logo_path) ? { logoUrl: publicAssetUrl(r.logo_path)! } : {}),
     ...(publicAssetUrl(r.banner_path) ? { bannerUrl: publicAssetUrl(r.banner_path)! } : {}),
     accent: r.accent || undefined,
+    ...(r.brand_theme_enabled ? { brandThemeEnabled: true, brandTheme: r.brand_theme ?? null } : {}),
   };
 }
 

@@ -279,7 +279,7 @@ export function DashboardBar({
                       aria-hidden="true"
                       className={[
                         'absolute top-1/2 left-0 h-[18px] w-[3px] -translate-y-1/2 rounded-r-full transition-opacity duration-150',
-                        current ? 'bg-[var(--p-accent)] opacity-100' : 'opacity-0',
+                        current ? 'bg-grass opacity-100' : 'opacity-0',
                       ].join(' ')}
                     />
                     <span
@@ -308,7 +308,7 @@ export function DashboardBar({
             <div className="flex items-center gap-2.5">
               <span
                 aria-hidden="true"
-                className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-[var(--p-accent)] text-[11.5px] font-semibold text-onink shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]"
+                className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-grass text-[11.5px] font-semibold text-cream shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]"
               >
                 {initialsOf(activeOutlet?.name ?? 'AutoDine')}
               </span>

@@ -46,8 +46,10 @@ _h*.mjs
 # playwright
 /playwright-report
 /test-results
+/responsive-artifacts
 /blob-report
 /.playwright
 
 # Local TTS smoke output (uploaded as CI artifacts, never committed)
 tts-smoke-artifacts/
+/images

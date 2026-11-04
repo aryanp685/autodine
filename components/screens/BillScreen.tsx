@@ -154,7 +154,8 @@ export function BillScreen({ bill }: { bill: BillData }) {
             </p>
           ) : null}
 
-          <table className="mt-6 w-full border-collapse text-[12.5px]">
+          <div className="mt-6 overflow-x-auto">
+          <table className="w-full border-collapse text-[12.5px]">
             <thead>
               <tr>
                 <th
@@ -207,6 +208,7 @@ export function BillScreen({ bill }: { bill: BillData }) {
               ))}
             </tbody>
           </table>
+          </div>
 
           {order.customerNote ? (
             <p className="mt-4 rounded-[var(--p-r-control)] bg-paper-deep px-3.5 py-2.5 text-[12.5px] leading-[1.5] text-gink-64">

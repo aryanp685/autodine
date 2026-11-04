@@ -29,6 +29,12 @@ export type CartScreenData = {
    */
   taxRateBps: number;
   /**
+   * The published brand state (migration 20261103000100). Absent when the
+   * restaurant has no brand profile — the screens then paint the product's
+   * own style through lib/branding/guest-theme.ts.
+   */
+  brandState?: { brandThemeEnabled?: boolean | null; brandTheme?: unknown | null } | null;
+  /**
    * Has the owner switched card/UPI payment on for this outlet?
    *
    * The checkout screen uses it to describe what happens after placing the
@@ -49,7 +55,7 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
 
   const { data: restaurant, error: restaurantError } = await supabase
     .from('restaurants')
-    .select('id, name, slug, tax_rate_bps, online_payments_enabled')
+    .select('id, name, slug, tax_rate_bps, online_payments_enabled, brand_theme_enabled, brand_theme')
     .eq('slug', slug.trim())
     .eq('is_active', true)
     .maybeSingle();
@@ -200,6 +206,10 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
     slug: restaurant.slug as string,
     restaurantName: (restaurant.name as string) ?? 'Your table',
     taxRateBps: Number(restaurant.tax_rate_bps ?? 500),
+    brandState: {
+      brandThemeEnabled: restaurant.brand_theme_enabled === true,
+      brandTheme: (restaurant as Record<string, unknown>).brand_theme ?? null,
+    },
     onlinePaymentsEnabled: restaurant.online_payments_enabled === true,
     items: (rows ?? []).map((r) => {
       const variants = variantsOf((r as Record<string, unknown>).item_variants);

@@ -48,7 +48,18 @@ const FLAG_TEXT: Record<string, string> = {
   'veg-unclear': 'No veg mark',
 };
 
-export function PhotoImportPanel({ canWrite }: { canWrite: boolean }) {
+export function PhotoImportPanel({
+  canWrite,
+  onFileChange,
+}: {
+  canWrite: boolean;
+  /**
+   * The chosen file, lifted to the parent so the Brand Review can read the
+   * same menu photo for its own extraction ("the same menu image may be used
+   * for both"). Purely informational — this panel keeps owning the import.
+   */
+  onFileChange?: (file: File | null) => void;
+}) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -66,6 +77,7 @@ export function PhotoImportPanel({ canWrite }: { canWrite: boolean }) {
 
   function reset() {
     setFile(null);
+    onFileChange?.(null);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     setStatus('idle');
@@ -88,6 +100,7 @@ export function PhotoImportPanel({ canWrite }: { canWrite: boolean }) {
     }
 
     setFile(picked);
+    onFileChange?.(picked);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     // A PDF has no thumbnail; the <img> would show a broken icon, so only an
     // image gets a preview.

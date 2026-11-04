@@ -5,7 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { DishPhoto } from '@/components/DishPhoto';
 import { GuestFlow } from '@/components/GuestFlow';
 import { GuestTabs } from '@/components/GuestTabs';
-import { guestAccentStyle } from '@/lib/branding/palette';
+import { guestBrandStyle, type GuestBrandState } from '@/lib/branding/guest-theme';
 import { useCart } from '@/components/CartProvider';
 import { inr } from '@/lib/demo-data';
 import { VegMark } from '@/components/ui';
@@ -60,6 +60,7 @@ function Totals({ subtotalPaise, taxPaise, totalPaise, taxRateBps, compact }: {
  * the bill without a word looks like a mistake.
  */
 export function Cart({
+  brandState,
   slug,
   restaurantName,
   tableLabel,
@@ -69,6 +70,7 @@ export function Cart({
   placedErrorCode,
   needsCode = false,
 }: {
+  brandState?: GuestBrandState | null;
   slug?: string;
   restaurantName?: string;
   /** The table a live session confirmed, when there is one. */
@@ -102,6 +104,7 @@ export function Cart({
    */
   placedErrorCode?: string;
 }) {
+  const paint = guestBrandStyle(brandState);
   const cart = useCart();
   const reduce = useReducedMotion();
   const motionOn = !reduce;
@@ -138,7 +141,7 @@ export function Cart({
   return (
     <GuestFlow
       step="cart"
-      style={guestAccentStyle()}
+      style={paint.style} brandAttrs={paint.attrs}
       venue={restaurantName}
       table={tableLabel}
       back={{ href: withSlug('/menu'), label: 'Back to the menu' }}
@@ -216,7 +219,7 @@ export function Cart({
           <p className="mt-2 flex items-start gap-2 text-[12px] leading-[1.55] text-gink-46">
             <span
               aria-hidden="true"
-              className="mt-[6px] size-1.5 shrink-0 rounded-full bg-[var(--p-accent)]"
+              className="mt-[6px] size-1.5 shrink-0 rounded-full bg-grass"
             />
             <span>
               One step left at checkout: the six-digit code showing inside the restaurant. Your
@@ -261,7 +264,7 @@ export function Cart({
               <Link
                 href={withSlug('/menu/cart')}
                 aria-label="Dismiss this message"
-                className="ml-auto -mr-1 grid size-7 shrink-0 place-items-center rounded-full text-gink-46 transition hover:bg-gink-07 hover:text-gink"
+                className="relative ml-auto -mr-1 grid size-7 shrink-0 place-items-center rounded-full before:absolute before:-inset-2 before:rounded-full before:content-[''] text-gink-46 transition hover:bg-gink-07 hover:text-gink"
               >
                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                   <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
@@ -345,7 +348,7 @@ export function Cart({
                           type="button"
                           onClick={() => cart.setQty(l.itemId, l.qty - 1, l.variantId, l.addonIds)}
                           aria-label={`Decrease ${l.name}`}
-                          className="grid size-7 place-items-center rounded-full text-[14px] text-gink-80 transition hover:bg-gink-07 active:scale-[0.92]"
+                          className="relative grid size-7 place-items-center rounded-full before:absolute before:-inset-2 before:rounded-full before:content-[''] text-[14px] text-gink-80 transition hover:bg-gink-07 active:scale-[0.92]"
                         >
                           −
                         </button>
@@ -362,7 +365,7 @@ export function Cart({
                           type="button"
                           onClick={() => cart.setQty(l.itemId, l.qty + 1, l.variantId, l.addonIds)}
                           aria-label={`Increase ${l.name}`}
-                          className="grid size-7 place-items-center rounded-full text-[14px] text-gink-80 transition hover:bg-gink-07 active:scale-[0.92]"
+                          className="relative grid size-7 place-items-center rounded-full before:absolute before:-inset-2 before:rounded-full before:content-[''] text-[14px] text-gink-80 transition hover:bg-gink-07 active:scale-[0.92]"
                         >
                           +
                         </button>

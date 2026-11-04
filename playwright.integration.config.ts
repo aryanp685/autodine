@@ -47,6 +47,8 @@ export default defineConfig({
     baseURL,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
+    /* See playwright.config.ts: behaviour, not motion. */
+    reducedMotion: 'reduce',
   },
   projects: [
     {

@@ -3,6 +3,8 @@ import { CartProvider } from '@/components/CartProvider';
 import { Cart } from '@/components/screens/CartScreen';
 import { TableGateScreen } from '@/components/screens/TableGateScreen';
 import { getCartScreenData } from '@/lib/db/cart-screen';
+import { menuPriceItems, restaurant as demoRestaurant } from '@/lib/demo-data';
+import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { loadTableAccess, verifyAgainHref } from '@/lib/table-access';
 
 export const metadata: Metadata = { title: 'Your order · AutoDine' };
@@ -43,25 +45,29 @@ export default async function CartPage({
     return <TableGateScreen reason="stale" verifyHref={verifyAgainHref(access)} />;
   }
 
-  // One query, not two. The branding read existed for the accent, and the
-  // guest flow no longer varies by restaurant -- every customer sees the same
-  // colours (lib/branding/palette.ts, guestAccentStyle).
+  // One query, not two: the restaurants row carries the brand state too.
+  // A restaurant with no published brand paints the product's own style
+  // (lib/branding/guest-theme.ts) exactly as before.
   const data = await getCartScreenData(s);
 
   return (
     <CartProvider slug={s}>
       <Cart
         slug={s}
-        restaurantName={data?.restaurantName}
+        brandState={data?.brandState}
+        restaurantName={data?.restaurantName ?? (isSupabaseConfigured ? undefined : demoRestaurant.name)}
         // Only a verified session names a table. Demo mode can carry one from
         // the sample cookie; a real database read decides it above.
         tableLabel={
           access.status === 'verified' || access.status === 'browse' ? access.tableLabel : null
         }
         taxRateBps={data?.taxRateBps}
-        // No restaurant resolved: show the empty state rather than a menu of
-        // prices that came from nowhere.
-        items={data?.items ?? []}
+        // With no restaurant resolved on a CONFIGURED deployment: show the
+        // empty state rather than a menu of prices that came from nowhere.
+        // With no database at all, the demo menu is the only menu there is --
+        // pricing against an empty list called every dish in the guest's own
+        // cart "no longer available" and never rendered the order button.
+        items={!isSupabaseConfigured ? menuPriceItems : (data?.items ?? [])}
         // The action redirects back here with ?error=…, so this is where the
         // guest learns why. It renders inside the screen, under the order it
         // is about, rather than as a banner over the guest's own header.

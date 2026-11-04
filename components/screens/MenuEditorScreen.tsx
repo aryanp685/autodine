@@ -302,7 +302,7 @@ export function MenuEditorScreen({
               <input
                 type="text"
                 name="name"
-                className={inputSm('w-[132px] text-[12.5px]')}
+                className={inputSm('w-[132px] max-w-full text-[12.5px]')}
                 placeholder="New menu"
                 aria-label="Name for a new menu"
                 maxLength={40}
@@ -644,7 +644,7 @@ export function MenuEditorScreen({
                 className="mb-2.5 flex flex-wrap items-end gap-2"
               >
                 {selectedId && <input type="hidden" name="item" value={selectedId} />}
-                <label className="block min-w-[180px] flex-1">
+                <label className="block min-w-[180px] max-w-full flex-1">
                   <span className="mb-1 block text-[11.5px] font-medium text-gink-46">
                     Find a dish
                   </span>
@@ -803,7 +803,7 @@ export function MenuEditorScreen({
                                   aria-hidden="true"
                                   className={[
                                     'size-1.5 rounded-full',
-                                    i.available ? 'bg-[var(--p-accent)]' : 'bg-gink-28',
+                                    i.available ? 'bg-grass' : 'bg-gink-28',
                                   ].join(' ')}
                                 />
                                 {i.available ? 'Available' : 'Sold out'}

@@ -51,6 +51,8 @@ export type OrderScreenData = {
   id: string;
   code: string;
   restaurantName: string;
+  /** Published brand state; absent = the product's own guest style. */
+  brandState?: { brandThemeEnabled?: boolean | null; brandTheme?: unknown | null } | null;
   /**
    * Which table the order is going to, or null for a counter order.
    *
@@ -178,7 +180,7 @@ export async function getOrderScreenData(
   const [restaurantResult, orderResult] = await Promise.all([
     supabase
       .from('restaurants')
-      .select('name, online_payments_enabled, upi_id, upi_payee_name')
+      .select('name, online_payments_enabled, upi_id, upi_payee_name, brand_theme_enabled, brand_theme')
       .eq('slug', slug.trim())
       .eq('is_active', true)
       .maybeSingle(),
@@ -228,6 +230,10 @@ export async function getOrderScreenData(
     upi,
     code: text(order.code),
     restaurantName: text(restaurantResult.data?.name as unknown) || 'Your table',
+    brandState: {
+      brandThemeEnabled: (restaurantResult.data as Record<string, unknown> | null)?.brand_theme_enabled === true,
+      brandTheme: (restaurantResult.data as Record<string, unknown> | null)?.brand_theme ?? null,
+    },
     tableLabel: text(order.table_label) || null,
     prepStatus,
     paymentStatus,

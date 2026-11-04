@@ -290,6 +290,22 @@ export function Cashier({
   const cancelOrder = async () => {
     if (!order) return;
 
+    /* Two taps for EVERY ticket, sample rows included.
+     *
+     * The confirmation below is the slip guard ("Cancel" next to "Record
+     * cash" is one mistake away from throwing away a guest's order), and it
+     * used to be skipped entirely for demo rows: they have no database id,
+     * and the id-keyed guard came after the demo branch — so one stray tap
+     * cancelled a sample ticket with nothing named and nothing asked. The
+     * kitchen board has always confirmed before cancelling its sample
+     * tickets; the counter now matches, keyed on the id where there is one
+     * and the row's own key where there is not. */
+    const cancelTarget = order.orderId ?? order.key;
+    if (confirmCancel !== cancelTarget) {
+      setConfirmCancel(cancelTarget);
+      return;
+    }
+
     if (!order.orderId) {
       if (!live) {
         setDemoDone((current) => [...current, order.key]);
@@ -297,16 +313,12 @@ export function Cashier({
         setMessage(`${order.code} cancelled in this preview. Nothing was recorded.`);
         return;
       }
+      setConfirmCancel(null);
       setError('This ticket has no database id, so it cannot be cancelled here.');
       return;
     }
 
     const id = order.orderId;
-
-    if (confirmCancel !== id) {
-      setConfirmCancel(id);
-      return;
-    }
 
     setError('');
     setMessage('');
@@ -617,7 +629,7 @@ export function Cashier({
                         </p>
                       )}
 
-                      {confirmCancel === order.orderId && order.orderId ? (
+                      {confirmCancel === (order.orderId ?? order.key) ? (
                         <div
                           role="group"
                           aria-label="Confirm cancellation"

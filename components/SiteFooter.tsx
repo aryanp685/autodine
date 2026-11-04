@@ -91,7 +91,7 @@ export function SiteFooter({
           </div>
         </div>
 
-        <div className="mt-14 flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.08] pt-5 text-[11px] tracking-[0.02em] text-mute-dim">
+        <div className="mt-14 flex flex-wrap items-center justify-between gap-2 border-t border-cream/[0.12] pt-5 text-[11px] tracking-[0.02em] text-mute-dim">
           <span>{fineLeft}</span>
           <span>{fineRight}</span>
         </div>
@@ -100,7 +100,7 @@ export function SiteFooter({
             heading: it is the last mark on the page, not another title. */}
         <div
           aria-hidden="true"
-          className="mt-8 text-[clamp(46px,11vw,132px)] leading-[0.8] font-semibold tracking-[-0.045em] text-white/[0.055] select-none"
+          className="mt-8 text-[clamp(46px,11vw,132px)] leading-[0.8] font-semibold tracking-[-0.045em] text-cream/[0.055] select-none"
         >
           AutoDine
         </div>

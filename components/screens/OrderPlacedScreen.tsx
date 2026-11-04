@@ -7,7 +7,7 @@ import { PayOnline } from '@/components/PayOnline';
 import { PayUpi } from '@/components/PayUpi';
 import { GuestFlow } from '@/components/GuestFlow';
 import { ReorderOffer } from '@/components/ReorderOffer';
-import { guestAccentStyle } from '@/lib/branding/palette';
+import { guestBrandStyle, type GuestBrandState } from '@/lib/branding/guest-theme';
 import { OrderStatusRefresh } from '@/components/OrderStatusRefresh';
 import { GUEST_CHANGE_WINDOW_MS, type OrderScreenData } from '@/lib/db/order-screen';
 import type { OnlineOffer } from '@/lib/payments/online-availability';
@@ -187,11 +187,13 @@ function counterPayment(prepStatus: string, orForm: boolean): string {
  * quiet would leave someone waiting for a card prompt that is never coming.
  */
 export function OrderPlacedScreen({
+  brandState,
   data,
   token,
   slug,
   onlinePay,
 }: {
+  brandState?: GuestBrandState | null;
   data: OrderScreenData | null;
   /** The guest's credential from the URL. Absent on a stale or hand-typed link. */
   token?: string;
@@ -204,11 +206,12 @@ export function OrderPlacedScreen({
    */
   onlinePay?: OnlineOffer | null;
 }) {
+  const paint = guestBrandStyle(brandState);
   if (!data) {
     return (
       <div
         data-flow-root=""
-        style={guestAccentStyle()}
+        style={paint.style} {...paint.attrs}
         className="mx-auto min-h-dvh w-full max-w-[560px] px-5 py-16 text-gink"
       >
         <p className="g-eyebrow">Order</p>
@@ -238,7 +241,7 @@ export function OrderPlacedScreen({
   return (
     <GuestFlow
       step="placed"
-      style={guestAccentStyle()}
+      style={paint.style} brandAttrs={paint.attrs}
       venue={data.restaurantName}
       table={data.tableLabel}
       dock={

@@ -23,7 +23,7 @@
 import Link from 'next/link';
 import { BrandLockup } from '@/components/BrandMark';
 import { BRAND_GREEN } from '@/lib/brand';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export type SiteNavLink = { label: string; href: string; active?: boolean };
 
@@ -45,6 +45,11 @@ export function SiteNav({
    */
   onImage?: boolean;
 }) {
+  /* Phone navigation. The desktop bar is untouched: the links simply gain a
+     phone-only disclosure, so nothing important is unreachable on a small
+     screen (a strict requirement of the responsive pass). */
+  const [open, setOpen] = useState(false);
+
   useEffect(() => {
     const nav = document.querySelector<HTMLElement>('[data-site-nav]');
     if (!nav) return;
@@ -81,8 +86,8 @@ export function SiteNav({
   }, []);
 
   const surface = onImage
-    ? 'data-[scrolled=true]:border-white/[0.07] data-[scrolled=true]:bg-ink/80 data-[scrolled=true]:backdrop-blur-xl'
-    : 'border-b border-ink/10 bg-cream/85 backdrop-blur-xl';
+    ? 'data-[scrolled=true]:border-cream/[0.12] data-[scrolled=true]:bg-ink/80 data-[scrolled=true]:backdrop-blur-xl'
+    : 'border-b border-cream/15 bg-ink/85 backdrop-blur-xl';
 
   return (
     <header
@@ -96,7 +101,7 @@ export function SiteNav({
         <Link
           href="/"
           aria-label="AutoDine home"
-          className={onImage ? 'shrink-0 text-cream' : 'shrink-0 text-ink'}
+          className={onImage ? 'shrink-0 text-cream' : 'shrink-0 text-cream'}
         >
           <BrandLockup size={21} ink="currentColor" dot={BRAND_GREEN} />
         </Link>
@@ -105,7 +110,7 @@ export function SiteNav({
           <ul
             className={[
               'flex items-center gap-7 text-[13px]',
-              onImage ? 'text-mute' : 'text-ink/60',
+              onImage ? 'text-mute' : 'text-cream/60',
             ].join(' ')}
           >
             {links.map((link) => (
@@ -115,8 +120,8 @@ export function SiteNav({
                   aria-current={link.active ? 'page' : undefined}
                   className={[
                     'transition-colors',
-                    onImage ? 'hover:text-cream' : 'hover:text-ink',
-                    link.active ? (onImage ? 'text-cream' : 'text-ink') : '',
+                    onImage ? 'hover:text-cream' : 'hover:text-cream',
+                    link.active ? 'text-cream' : '',
                   ].join(' ')}
                 >
                   {link.label}
@@ -131,19 +136,67 @@ export function SiteNav({
             href="/login"
             className={[
               'hidden text-[13px] transition-colors sm:block',
-              onImage ? 'text-mute hover:text-cream' : 'text-ink/60 hover:text-ink',
+              onImage ? 'text-mute hover:text-cream' : 'text-cream/60 hover:text-cream',
             ].join(' ')}
           >
             Sign in
           </Link>
           <Link
             href="/signup"
-            className="inline-flex h-10 items-center rounded-full bg-gold px-5 text-[13px] font-medium text-ink transition-colors hover:bg-gold-bright"
+            className="inline-flex h-10 items-center rounded-full bg-grass px-5 text-[13px] font-medium text-cream transition-colors hover:bg-grass-strong"
           >
             Create account
           </Link>
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-controls="site-nav-menu"
+            aria-label={open ? 'Close menu' : 'Open menu'}
+            onClick={() => setOpen((v) => !v)}
+            className="grid size-11 place-items-center rounded-full border border-cream/15 text-cream transition-colors hover:bg-cream/[0.06] md:hidden"
+          >
+            <span aria-hidden="true" className="text-[15px] leading-none">
+              {open ? '✕' : '☰'}
+            </span>
+          </button>
         </div>
       </div>
+
+      {/* The phone menu: the same links, one column, under the bar. */}
+      {open ? (
+        <nav
+          id="site-nav-menu"
+          aria-label="Primary (mobile)"
+          className="border-t border-cream/12 bg-ink px-5 pb-4 pt-2 md:hidden"
+        >
+          <ul className="flex flex-col gap-1">
+            {links.map((link) => (
+              <li key={link.href}>
+                <Link
+                  href={link.href}
+                  aria-current={link.active ? 'page' : undefined}
+                  onClick={() => setOpen(false)}
+                  className={[
+                    'block rounded-[10px] px-3 py-2.5 text-[14px] transition-colors',
+                    link.active ? 'bg-cream/[0.06] text-cream' : 'text-cream/75 hover:bg-cream/[0.05]',
+                  ].join(' ')}
+                >
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+            <li>
+              <Link
+                href="/login"
+                onClick={() => setOpen(false)}
+                className="block rounded-[10px] px-3 py-2.5 text-[14px] text-cream/75 transition-colors hover:bg-cream/[0.05] sm:hidden"
+              >
+                Sign in
+              </Link>
+            </li>
+          </ul>
+        </nav>
+      ) : null}
     </header>
   );
 }
