@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { MenuEditorScreen } from '@/components/screens/MenuEditorScreen';
 import { getMenuEditorData } from '@/lib/db/menu-editor';
+import { describeConfigured } from '@/lib/ai/describe';
 import { getOutletBar } from '@/lib/db/outlet-bar';
 
 export const metadata: Metadata = { title: 'Menu · AutoDine', robots: { index: false, follow: false } };
@@ -40,6 +41,7 @@ export default async function MenusPage({
       show={show}
       sort={sort}
       bulkMode={bulk === '1'}
+      enhanceConfigured={describeConfigured()}
     />
   );
 }
