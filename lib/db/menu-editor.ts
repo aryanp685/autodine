@@ -109,6 +109,8 @@ export type EditorCategory = {
    * so they can be fixed, so the count has to match what the list shows.
    */
   itemCount: number;
+  /** Position in the menu — the order the rail and the guest menu use. */
+  sortOrder: number;
 };
 
 /** One menu, as the editor's tab bar needs it. */
@@ -224,7 +226,10 @@ export async function getMenuEditorData(): Promise<MenuEditorData | null> {
         'id, category_id, name, description, price_paise, is_veg, is_available, image_url, sort_order, spoken_name'
       )
       .eq('restaurant_id', restaurantId)
-      .order('sort_order', { ascending: true }),
+      .order('sort_order', { ascending: true })
+      // The tie-break menu.ts uses: rows sharing a sort_order (every
+      // hand-added dish starts at 0) must not shuffle between loads.
+      .order('created_at', { ascending: true }),
     // Every category in the restaurant, only to count them per menu for the
     // tab bar. Cheap: two columns, and a menu list is small.
     supabase.from('categories').select('id, menu_id').eq('restaurant_id', restaurantId),
@@ -394,6 +399,7 @@ export async function getMenuEditorData(): Promise<MenuEditorData | null> {
       id: row.id as string,
       name: row.name as string,
       itemCount: countByCategory.get(row.id as string) ?? 0,
+      sortOrder: Number(row.sort_order ?? 0),
     })),
     items: items.map((row) => ({
       id: row.id as string,
