@@ -32,6 +32,13 @@ import {
 } from '@/lib/menus/bulk-parse';
 import type { ImportedItem, MenuImportDraft } from '@/lib/menu-import';
 import { generateDescriptions, type DescribeResult, type DescribeTarget } from '@/lib/ai/describe';
+import { translateBatch, type TranslateResult, type TranslateTarget } from '@/lib/ai/translate';
+import {
+  sourceHash,
+  type LanguageCode,
+  type TranslationEntry,
+  type TranslationMap,
+} from '@/lib/i18n/translations';
 import { EDITOR_MENU_COOKIE } from '@/lib/db/menu-editor';
 import { getDraftForMenu, publishPair } from '@/lib/branding/brand-data';
 import { readUndoItem } from '@/lib/menu-undo';
@@ -1242,6 +1249,188 @@ export async function saveDescriptionsAction(formData: FormData): Promise<void> 
   ok(
     `Saved ${saved} ${saved === 1 ? 'description' : 'descriptions'}.` +
       (skipped > 0 ? ` ${skipped} left untouched — they already had one.` : '')
+  );
+}
+
+/* ============================================================================
+   The translator
+   ========================================================================== */
+
+/**
+ * Translate rows into हिन्दी or मराठी — writes NOTHING to the database.
+ *
+ * Called from the translator's review panel. The server re-reads each row
+ * itself (name + description) so the model translates the real source text
+ * and only this restaurant's rows; the owner reviews, edits and saves in a
+ * separate step. Generation is never a save — same rule as the description
+ * writer.
+ */
+export async function generateTranslationsAction(payload: {
+  language: LanguageCode;
+  targets: { id: string; kind: 'item' | 'category' }[];
+}): Promise<TranslateResult[]> {
+  const ctx = await currentRestaurant();
+  const language: LanguageCode = payload?.language === 'mr' ? 'mr' : 'hi';
+  const wanted = (payload?.targets ?? [])
+    .map((entry) => ({
+      id: String(entry?.id ?? '').trim(),
+      kind: entry?.kind === 'category' ? ('category' as const) : ('item' as const),
+    }))
+    .filter((entry) => entry.id !== '')
+    .slice(0, 50);
+  if (!ctx) {
+    return wanted.map((entry) => ({
+      id: entry.id,
+      ok: false as const,
+      reason: 'You need to be signed in to edit the menu.',
+    }));
+  }
+  if (wanted.length === 0) return [];
+
+  const itemIds = wanted.filter((entry) => entry.kind === 'item').map((entry) => entry.id);
+  const categoryIds = wanted.filter((entry) => entry.kind === 'category').map((entry) => entry.id);
+
+  const [itemsResult, categoriesResult] = await Promise.all([
+    itemIds.length > 0
+      ? ctx.supabase
+          .from('items')
+          .select('id, name, description')
+          .eq('restaurant_id', ctx.restaurantId)
+          .in('id', itemIds)
+      : Promise.resolve({ data: [], error: null }),
+    categoryIds.length > 0
+      ? ctx.supabase
+          .from('categories')
+          .select('id, name')
+          .eq('restaurant_id', ctx.restaurantId)
+          .in('id', categoryIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (itemsResult.error || categoriesResult.error) {
+    const reason = `Could not read your menu: ${(itemsResult.error ?? categoriesResult.error)?.message ?? ''}`;
+    return wanted.map((entry) => ({ id: entry.id, ok: false as const, reason }));
+  }
+
+  const itemById = new Map((itemsResult.data ?? []).map((row) => [row.id as string, row]));
+  const categoryById = new Map((categoriesResult.data ?? []).map((row) => [row.id as string, row]));
+
+  const targets: TranslateTarget[] = [];
+  const results: TranslateResult[] = [];
+
+  for (const entry of wanted) {
+    if (entry.kind === 'item') {
+      const row = itemById.get(entry.id);
+      if (!row) {
+        results.push({ id: entry.id, ok: false, reason: 'That dish is not on your account.' });
+        continue;
+      }
+      targets.push({
+        id: entry.id,
+        name: row.name as string,
+        description: (row.description as string | null) ?? '',
+      });
+    } else {
+      const row = categoryById.get(entry.id);
+      if (!row) {
+        results.push({ id: entry.id, ok: false, reason: 'That category is not on your account.' });
+        continue;
+      }
+      targets.push({ id: entry.id, name: row.name as string, description: '' });
+    }
+  }
+
+  results.push(...(await translateBatch(targets, language)));
+  return results;
+}
+
+/**
+ * Save accepted translations — the only way a translation becomes visible
+ * to guests. The source hash is computed HERE from the current name and
+ * description, so a translation saved today stops showing the moment the
+ * dish changes, without any other code path remembering to mark it.
+ */
+export async function saveTranslationsAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const language: LanguageCode = String(formData.get('language') ?? '') === 'mr' ? 'mr' : 'hi';
+
+  let rows: { id: string; kind: 'item' | 'category'; name: string; description: string }[] = [];
+  try {
+    const parsed = JSON.parse(String(formData.get('rows') ?? '[]'));
+    if (!Array.isArray(parsed)) throw new Error('not a list');
+    rows = parsed
+      .map((row: { id?: unknown; kind?: unknown; name?: unknown; description?: unknown }) => ({
+        id: String(row?.id ?? '').trim(),
+        kind: row?.kind === 'category' ? ('category' as const) : ('item' as const),
+        name: String(row?.name ?? '').replace(/\s+/g, ' ').trim().slice(0, 120),
+        description: String(row?.description ?? '').replace(/\s+/g, ' ').trim().slice(0, 300),
+      }))
+      .filter((row) => row.id !== '' && row.name !== '')
+      .slice(0, 50);
+  } catch {
+    fail('That batch of translations could not be read. Try again.');
+  }
+
+  if (rows.length === 0) fail('No translations to save.');
+
+  // The hash must come from the CURRENT source text — re-read, never trusted
+  // from the browser, or a stale page could approve a translation against a
+  // description that has since changed.
+  const itemIds = rows.filter((row) => row.kind === 'item').map((row) => row.id);
+  const categoryIds = rows.filter((row) => row.kind === 'category').map((row) => row.id);
+  const [itemsResult, categoriesResult] = await Promise.all([
+    itemIds.length > 0
+      ? ctx.supabase
+          .from('items')
+          .select('id, name, description, translations')
+          .eq('restaurant_id', ctx.restaurantId)
+          .in('id', itemIds)
+      : Promise.resolve({ data: [], error: null }),
+    categoryIds.length > 0
+      ? ctx.supabase
+          .from('categories')
+          .select('id, name, translations')
+          .eq('restaurant_id', ctx.restaurantId)
+          .in('id', categoryIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (itemsResult.error || categoriesResult.error) {
+    fail(`Could not read your menu: ${(itemsResult.error ?? categoriesResult.error)?.message ?? ''}`);
+  }
+
+  const itemById = new Map((itemsResult.data ?? []).map((row) => [row.id as string, row]));
+  const categoryById = new Map((categoriesResult.data ?? []).map((row) => [row.id as string, row]));
+
+  let saved = 0;
+  let skipped = 0;
+  for (const row of rows) {
+    const source =
+      row.kind === 'item' ? itemById.get(row.id) : categoryById.get(row.id);
+    if (!source) {
+      skipped += 1;
+      continue;
+    }
+    const entry: TranslationEntry = {
+      name: row.name,
+      description: row.description,
+      approved: true,
+      sourceHash: sourceHash(source.name as string, (source as { description?: string | null }).description ?? ''),
+    };
+    const existing = ((source.translations as TranslationMap | null) ?? {});
+    const { error } = await ctx.supabase
+      .from(row.kind === 'item' ? 'items' : 'categories')
+      .update({ translations: { ...existing, [language]: entry } })
+      .eq('id', row.id)
+      .eq('restaurant_id', ctx.restaurantId);
+    if (error) fail(`Could not save the translations: ${error.message}`);
+    saved += 1;
+  }
+
+  ok(
+    `Saved ${saved} ${saved === 1 ? 'translation' : 'translations'} in ${language === 'mr' ? 'Marathi' : 'Hindi'}.` +
+      (skipped > 0 ? ` ${skipped} skipped — not on your menu any more.` : '')
   );
 }
 

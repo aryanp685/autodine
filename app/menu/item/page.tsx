@@ -27,9 +27,9 @@ export const metadata: Metadata = { title: 'Customise · AutoDine' };
 export default async function ItemPage({
   searchParams,
 }: {
-  searchParams: Promise<{ s?: string; item?: string; m?: string }>;
+  searchParams: Promise<{ s?: string; item?: string; m?: string; lang?: string }>;
 }) {
-  const { s, item, m } = await searchParams;
+  const { s, item, m, lang } = await searchParams;
 
   const access = await loadTableAccess(s);
 
@@ -54,6 +54,7 @@ export default async function ItemPage({
       <ItemSheet
         data={data ? { ...data, itemId: item, table } : undefined}
         itemId={item}
+        lang={lang}
       />
     </CartProvider>
   );
