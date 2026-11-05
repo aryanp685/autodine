@@ -24,6 +24,7 @@ vi.mock('@/app/(staff)/dashboard/menus/actions', () => ({
   addAddonGroupAction: mocks.action('addAddonGroupAction'),
   addCategoryAction: mocks.action('addCategoryAction'),
   addItemAction: mocks.action('addItemAction'),
+  bulkAddItemsAction: mocks.action('bulkAddItemsAction'),
   addPresetCategoriesAction: mocks.action('addPresetCategoriesAction'),
   addVariantAction: mocks.action('addVariantAction'),
   createMenuAction: mocks.action('createMenuAction'),
@@ -81,7 +82,7 @@ const item = (id: string, name: string, over: ItemOverride = {}): EditorItem => 
 const render = (
   d: MenuEditorData | null,
   undo?: string,
-  filters: { query?: string; show?: string; sort?: string } = {}
+  filters: { query?: string; show?: string; sort?: string; bulkMode?: boolean } = {}
 ) => renderToStaticMarkup(<MenuEditorScreen data={d} undo={undo} {...filters} />);
 
 /** Nine dishes, enough that the find bar is worth showing. */
@@ -717,5 +718,40 @@ describe('MenuEditorScreen, ordering', () => {
   it('shows no arrows for a single category or in the demo', () => {
     expect(render(crowded())).not.toContain('data-move-category');
     expect(render(null)).not.toContain('data-move-item');
+  });
+});
+
+describe('MenuEditorScreen, bulk add', () => {
+  it('swaps in the bulk panel on request — a paste area and a file, both', () => {
+    const html = render(crowded(), undefined, { bulkMode: true });
+
+    expect(html).toContain('Add many dishes at once');
+    expect(html).toContain('aria-label="Add dishes in bulk"');
+    expect(html).toContain('name="text"');
+    expect(html).toContain('accept=".csv');
+    // The chosen category is the destination, and the panel says so.
+    expect(html).toContain('name="categoryId"');
+    expect(html).toContain('Every dish goes into the category you pick.');
+  });
+
+  it('keeps the single-dish form as the default, with the bulk link beside it', () => {
+    const html = render(crowded());
+
+    expect(html).toContain('aria-label="Add a dish"');
+    expect(html).toContain('Add many at once');
+    expect(html).not.toContain('name="text"');
+    expect(html).not.toContain('accept=".csv');
+  });
+
+  it('shows neither form in the demo', () => {
+    expect(render(null, undefined, { bulkMode: true })).not.toContain('Add many dishes at once');
+    expect(render(null)).not.toContain('Add many at once');
+  });
+
+  it('offers no bulk panel before there is a category to hold the dishes', () => {
+    const html = render(data({ items: [item('it-1', 'Paneer Tikka')] }), undefined, { bulkMode: true });
+
+    expect(html).not.toContain('Add many dishes at once');
+    expect(html).toContain('Add a category on the left');
   });
 });

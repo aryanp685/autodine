@@ -33,6 +33,7 @@ import {
   addAddonGroupAction,
   addCategoryAction,
   addItemAction,
+  bulkAddItemsAction,
   addPresetCategoriesAction,
   createMenuAction,
   addVariantAction,
@@ -51,6 +52,7 @@ import {
   moveItemAction,
 } from '@/app/(staff)/dashboard/menus/actions';
 import { PRESET_CATEGORIES, normaliseCategoryName } from '@/lib/menu-presets';
+import { MAX_IMPORT_TEXT } from '@/lib/menus/bulk-parse';
 import { PronunciationField } from '@/components/PronunciationField';
 import { DishPhotoField } from '@/components/DishPhotoField';
 
@@ -72,6 +74,7 @@ export function MenuEditorScreen({
   query,
   show,
   sort,
+  bulkMode,
 }: {
   data?: MenuEditorData | null;
   /** Which outlet is open, for the switcher in the bar. */
@@ -87,6 +90,8 @@ export function MenuEditorScreen({
   show?: string;
   /** `menu` | `name` | `price-asc` | `price-desc` from `?sort=`. */
   sort?: string;
+  /** `?bulk=1` — show the bulk add panel instead of the single-dish form. */
+  bulkMode?: boolean;
 }) {
   const live = Boolean(data);
   // A blocked caller has a database and no restaurant. The editor below is
@@ -635,8 +640,74 @@ export function MenuEditorScreen({
 
             {/* Adding an item used to create a blank "New item" row at zero
                 rupees that then had to be reopened and retyped. Every field
-                the item needs sits here instead. */}
-            {live && liveCategories.length > 0 && (
+                the item needs sits here instead. A whole list of dishes has
+                the bulk panel below: `?bulk=1` swaps the two forms, no
+                JavaScript needed. */}
+            {live && liveCategories.length > 0 && bulkMode ? (
+              <form
+                action={bulkAddItemsAction}
+                aria-label="Add dishes in bulk"
+                className="mb-3 rounded-[var(--p-r-block)] border border-hair bg-card p-3"
+              >
+                <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+                  <span className="block">
+                    <span className="block text-[13px] font-semibold text-gink">Add many dishes at once</span>
+                    <span className="mt-0.5 block text-[11.5px] text-gink-46">
+                      One dish per line: name, then price. Every dish goes into the category you pick.
+                    </span>
+                  </span>
+                  <Link
+                    href="/dashboard/menus"
+                    className="text-[12.5px] text-gink-46 underline-offset-2 hover:underline"
+                  >
+                    Add one at a time
+                  </Link>
+                </div>
+                <div className="grid items-end gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,220px)]">
+                  <label className="block">
+                    <span className="mb-1 block text-[11.5px] font-medium text-gink-46">Dish list</span>
+                    <textarea
+                      name="text"
+                      rows={5}
+                      maxLength={MAX_IMPORT_TEXT}
+                      placeholder={'Paneer Tikka 240\nDal Makhani 180\nButter Chicken Half 240 / Full 420'}
+                      className={`${textareaClass} min-h-[112px]`}
+                    />
+                  </label>
+                  <div className="flex flex-col gap-2">
+                    <label className="block">
+                      <span className="mb-1 block text-[11.5px] font-medium text-gink-46">Category</span>
+                      <select
+                        className={selectClass.replace('h-11', 'h-9')}
+                        name="categoryId"
+                        defaultValue={defaultCategoryId}
+                      >
+                        {liveCategories.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-[11.5px] font-medium text-gink-46">
+                        Or a CSV / Excel file
+                      </span>
+                      <input
+                        type="file"
+                        name="file"
+                        accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        className="block w-full text-[12.5px] text-gink file:mr-2 file:rounded-[var(--p-r-chip)] file:border file:border-hair file:bg-card file:px-2.5 file:py-1.5 file:text-[12.5px] file:text-gink"
+                      />
+                    </label>
+                    <SubmitButton pendingLabel="Adding…" className="w-full">
+                      Add dishes
+                    </SubmitButton>
+                  </div>
+                </div>
+              </form>
+            ) : live && liveCategories.length > 0 ? (
+              <>
               <form
                 action={addItemAction}
                 aria-label="Add a dish"
@@ -700,7 +771,13 @@ export function MenuEditorScreen({
                   Add dish
                 </SubmitButton>
               </form>
-            )}
+                <p className="m-0 mt-1.5 text-[12.5px] text-gink-46">
+                  <Link href="/dashboard/menus?bulk=1" className="underline-offset-2 hover:underline">
+                    Add many at once
+                  </Link>
+                </p>
+              </>
+            ) : null}
 
             {live && liveCategories.length === 0 && (
               <Empty className="mb-3">
