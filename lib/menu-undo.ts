@@ -15,7 +15,7 @@ export type UndoItem = {
   name: string;
   description: string | null;
   pricePaise: number;
-  isVeg: boolean;
+  isVeg: boolean | null;
   isAvailable: boolean;
   categoryId: string | null;
   sortOrder: number;
@@ -57,7 +57,7 @@ export function readUndoItem(value: unknown): UndoItem | null {
     // A negative price is nonsense and a float is a rounding bug waiting to
     // happen; money is stored in paise and stays an integer.
     pricePaise: Number.isFinite(price) && price >= 0 ? Math.round(price) : 0,
-    isVeg: v.isVeg !== false,
+    isVeg: v.isVeg === true ? true : v.isVeg === false ? false : null,
     isAvailable: v.isAvailable !== false,
     categoryId,
     sortOrder: Number.isFinite(sort) ? Math.round(sort) : 0,

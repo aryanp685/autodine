@@ -89,7 +89,7 @@ export type Item = {
   description: string | null;
   /** Paise. Always paise. */
   price_paise: number;
-  is_veg: boolean;
+  is_veg: boolean | null;
   is_available: boolean;
   image_url: string | null;
   sort_order: number;
@@ -219,7 +219,7 @@ export type OrderItem = {
   qty: number;
   variant_snapshot: string | null;
   addons_snapshot: string[];
-  is_veg: boolean;
+  is_veg: boolean | null;
   sort_order: number;
 };
 

@@ -16,9 +16,11 @@
  * a dish that cannot be ordered, and a menu import that quietly loses four
  * dishes is worse than one that refuses.
  *
- * Vegetable / non-vegetable is guessed from the dish name, because most
- * menus paste cleanly but rarely say "veg" on every line. It is a guess and
- * the review screen says so -- in India the marker is not decoration.
+ * Vegetable / non-vegetable is a three-state fact: marked veg, marked
+ * non-veg, or unmarked. Only the menu's own markers set the first two; a
+ * dish named for meat is non-veg because the name is printed evidence;
+ * everything else arrives unmarked and stays unmarked until the owner
+ * decides. In India the marker is not decoration.
  */
 
 /** One parsed dish. */
@@ -27,7 +29,8 @@ export type ImportedItem = {
   /** Paise. */
   pricePaise: number;
   description: string | null;
-  isVeg: boolean;
+  /** true/false = the source marked it. null = the source never said. */
+  isVeg: boolean | null;
 };
 
 export type ImportedCategory = {
@@ -195,14 +198,16 @@ function nameFromLine(line: string): string {
 }
 
 /**
- * Named meat is non-veg, everything else is assumed veg.
+ * What the dish's own NAME says about meat: named meat is non-veg, anything
+ * else is UNMARKED -- not vegetarian.
  *
- * Assumed, and said out loud on the review screen. Most pasted menus do not
- * mark every dish, the editor's own default is veg, and a wrong "non-veg" on a
- * paneer dish is a worse mistake than an owner un-ticking dal makhani.
+ * The old rule guessed veg for everything without meat in the name, and a
+ * guess wearing a green mark is indistinguishable from the kitchen's promise.
+ * Only the menu's own markers decide vegetarian; a name decides non-veg
+ * because "Chicken 65" is printed evidence, not inference.
  */
-function isVegGuess(name: string): boolean {
-  return !EXPLICIT_NON_VEG.test(name);
+function nonVegFromName(name: string): boolean | null {
+  return EXPLICIT_NON_VEG.test(name) ? false : null;
 }
 
 /**
@@ -333,8 +338,8 @@ export function parseMenuText(raw: string): MenuImportDraft {
       name,
       pricePaise: price,
       description: null,
-      // A written marker beats the name guess, which is the weaker signal.
-      isVeg: markedVeg ?? isVegGuess(name),
+      // A written marker beats the name signal, which is the weaker one.
+      isVeg: markedVeg ?? nonVegFromName(name),
     });
     itemCount += 1;
   }
@@ -383,7 +388,9 @@ export function sanitiseDraft(input: unknown): MenuImportDraft {
         name: itemName,
         pricePaise: price,
         description: typeof item.description === 'string' ? item.description.trim().slice(0, 300) || null : null,
-        isVeg: item.isVeg !== false,
+        // Three states survive the round trip. Anything that is not an
+        // explicit true/false is unmarked -- never a silent veg default.
+        isVeg: item.isVeg === true ? true : item.isVeg === false ? false : null,
       });
       items += 1;
     }
@@ -428,7 +435,7 @@ export function draftFromAiAnswer(answer: unknown): MenuImportDraft {
           name: typeof item.name === 'string' ? item.name : '',
           pricePaise: price,
           description: typeof item.description === 'string' ? item.description : null,
-          isVeg: item.isVeg !== false,
+          isVeg: item.isVeg === true ? true : item.isVeg === false ? false : null,
         };
       }),
     };

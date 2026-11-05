@@ -27,7 +27,7 @@ export type BillLine = {
   qty: number;
   ratePaise: number;
   amountPaise: number;
-  isVeg: boolean;
+  isVeg: boolean | null;
 };
 
 export type BillPayment = {

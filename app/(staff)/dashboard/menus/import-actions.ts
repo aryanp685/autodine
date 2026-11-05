@@ -336,7 +336,7 @@ export type CropUpload = {
 export async function attachImportPhotosAction(
   menuId: string,
   crops: CropUpload[],
-): Promise<{ ok: true; attached: number; skipped: number } | { ok: false; error: string }> {
+): Promise<{ ok: true; attached: number; skipped: number; skippedNames: string[] } | { ok: false; error: string }> {
   const staff = await getStaffContextDetailed();
   if (!staff.ok) return { ok: false, error: 'You need to be signed in to add photos.' };
   if (staff.context.role !== 'owner' && staff.context.role !== 'manager') {
@@ -384,18 +384,26 @@ export async function attachImportPhotosAction(
 
   let attached = 0;
   let skipped = 0;
+  // Dish names that lost their photo, capped: enough to act on, short enough
+  // for one notice line. An unnameable failure (a lost index) counts but
+  // cannot be named.
+  const skippedNames: string[] = [];
+  const noteSkipped = (name?: string) => {
+    skipped += 1;
+    if (name && skippedNames.length < 3) skippedNames.push(name);
+  };
 
   for (const crop of crops.slice(0, 60)) {
     const category = categories[crop.categoryIndex];
     if (!category) {
-      skipped += 1;
+      noteSkipped();
       continue;
     }
 
     const bucketItems = (byCategory.get(String(category.id)) ?? []).slice().sort((a, b) => a.sortOrder - b.sortOrder);
     const item = bucketItems[crop.itemIndex];
     if (!item) {
-      skipped += 1;
+      noteSkipped();
       continue;
     }
 
@@ -403,7 +411,7 @@ export async function attachImportPhotosAction(
     // 600 KB per crop, 2 MB is impossible after client-side scaling, and this
     // is the guard for a hand-crafted request.
     if (!decoded || decoded.bytes.byteLength === 0 || decoded.bytes.byteLength > 600_000) {
-      skipped += 1;
+      noteSkipped(item.name);
       continue;
     }
 
@@ -414,7 +422,7 @@ export async function attachImportPhotosAction(
 
     if (uploadError) {
       console.error('[autodine] crop upload failed', uploadError);
-      skipped += 1;
+      noteSkipped(item.name);
       continue;
     }
 
@@ -426,14 +434,14 @@ export async function attachImportPhotosAction(
 
     if (updateError) {
       console.error('[autodine] crop not saved to item', updateError);
-      skipped += 1;
+      noteSkipped(item.name);
       continue;
     }
 
     attached += 1;
   }
 
-  return { ok: true, attached, skipped };
+  return { ok: true, attached, skipped, skippedNames };
 }
 
 /** `data:image/jpeg;base64,...` -> bytes. Returns null for anything else. */

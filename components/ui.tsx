@@ -66,11 +66,13 @@ export function QrChip({ value, size = 96 }: { value: string; size?: number }) {
   );
 }
 
-export function VegMark({ veg, size = 14 }: { veg: boolean; size?: number }) {
+export function VegMark({ veg, size = 14 }: { veg: boolean | null; size?: number }) {
   /* The square-and-dot mark, drawn rather than typed. It is a legal marker in
      India, not a decoration, so the colours are the two conventional ones and
      they are hard-coded on purpose: a restaurant's accent must never repaint a
-     dietary mark. */
+     dietary mark. An UNMARKED dish (null) gets no mark at all -- a green dot
+     AutoDine invented is worse than no dot. */
+  if (veg === null) return null;
   return (
     <span
       data-veg={veg ? 'veg' : 'non'}

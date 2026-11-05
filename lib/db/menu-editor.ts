@@ -72,7 +72,7 @@ export type EditorItem = {
   desc: string;
   /** Paise. The editor renders rupees and converts back on save. */
   pricePaise: number;
-  veg: boolean;
+  veg: boolean | null;
   available: boolean;
   /**
    * Public URL of the dish photo, or null when none has been uploaded.
@@ -401,7 +401,7 @@ export async function getMenuEditorData(): Promise<MenuEditorData | null> {
       name: row.name as string,
       desc: (row.description as string | null) ?? '',
       pricePaise: Number(row.price_paise ?? 0),
-      veg: Boolean(row.is_veg),
+      veg: row.is_veg,
       available: Boolean(row.is_available),
       // Stored as a URL (not a path) because items.image_url predates this
       // feature and three existing readers expect a URL. See

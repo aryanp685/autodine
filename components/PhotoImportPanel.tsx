@@ -10,6 +10,7 @@ import {
   type CropUpload,
   type PhotoPreview,
 } from '@/app/(staff)/dashboard/menus/import-actions';
+import { uploadBrandAssetAction } from '@/app/(staff)/dashboard/menus/brand-actions';
 import { MAX_MENU_PHOTO_BYTES, type VisionCategory } from '@/lib/ai/menu-vision';
 import { cropFromImage } from '@/lib/import/crop';
 import { Card, btn, inputClass } from '@/components/owner/chrome';
@@ -107,6 +108,19 @@ export function PhotoImportPanel({
     setPreviewUrl(picked.type === 'application/pdf' ? null : URL.createObjectURL(picked));
     setStatus('idle');
     setCategories([]);
+
+    // Keep the original from the moment it is chosen: later corrections read
+    // from this file, and a read that fails must not lose the owner's only
+    // copy. The backup never blocks the import -- it is stored in the private
+    // source bucket, and a failure is announced rather than silent.
+    const source = new FormData();
+    source.set('kind', 'menu-photo');
+    source.set('file', picked);
+    void uploadBrandAssetAction(source).then((result) => {
+      if (!result.ok) {
+        setNotice('The original photo could not be saved for later review. The import still works.');
+      }
+    });
   }
 
   function read() {
@@ -170,7 +184,13 @@ export function PhotoImportPanel({
           : {
               ...category,
               items: category.items.map((item, i) =>
-                i !== ii ? item : { ...item, isVeg: item.isVeg === false ? true : false }
+                i !== ii
+                  ? item
+                  : {
+                      ...item,
+                      // Three states cycle: veg -> non-veg -> unmarked -> veg.
+                      isVeg: item.isVeg === true ? false : item.isVeg === false ? null : true,
+                    }
               ),
             }
       )
@@ -225,7 +245,9 @@ export function PhotoImportPanel({
               // of the product does it.
               pricePaise: Math.round(Number(item.price.replace(/[^\d.]/g, '')) * 100),
               description: null as string | null,
-              isVeg: item.isVeg !== false,
+              // Unmarked stays unmarked. The old coercion quietly turned
+              // "the menu never said" into a green mark.
+              isVeg: item.isVeg,
             })),
           })),
       };
@@ -241,6 +263,7 @@ export function PhotoImportPanel({
       // text with no thumbnails is a good import, a rolled-back import is not.
       let attached = 0;
       let skipped = 0;
+      let skippedNames: string[] = [];
 
       if (file) {
         const crops: CropUpload[] = [];
@@ -263,6 +286,7 @@ export function PhotoImportPanel({
           if (result.ok) {
             attached = result.attached;
             skipped = result.skipped;
+            skippedNames = result.skippedNames;
           }
         }
       }
@@ -271,7 +295,11 @@ export function PhotoImportPanel({
       setNotice(
         `Saved as a draft menu with ${created.items} dish${created.items === 1 ? '' : 'es'}.` +
           (attached > 0 ? ` ${attached} photo${attached === 1 ? '' : 's'} copied from your menu.` : '') +
-          (skipped > 0 ? ` ${skipped} photo${skipped === 1 ? '' : 's'} could not be copied.` : '')
+          (skipped > 0
+            ? ` ${skipped} photo${skipped === 1 ? '' : 's'} could not be copied` +
+              (skippedNames.length > 0 ? ` (${skippedNames.join(', ')})` : '') +
+              ' — add them by hand in the editor.'
+            : '')
       );
 
       // The editor is where the next decision lives: publish, or keep editing.
@@ -477,7 +505,7 @@ export function PhotoImportPanel({
                               }
                               aria-hidden="true"
                             >
-                              <VegMark veg={item.isVeg !== false} />
+                              <VegMark veg={item.isVeg} />
                             </span>
                             <span className="truncate">{item.name}</span>
                           </div>
@@ -530,14 +558,23 @@ export function PhotoImportPanel({
                             disabled={isDropped || working}
                             aria-pressed={item.isVeg === true}
                             title={
-                              item.isVeg === null ? 'Mark vegetarian' : 'Change veg / non-veg'
+                              item.isVeg === null
+                                ? 'Mark vegetarian'
+                                : item.isVeg === true
+                                  ? 'Change to non-veg'
+                                  : 'Clear the mark'
                             }
                           >
-                            <span data-veg={item.isVeg === false ? 'non' : 'veg'} aria-hidden="true">
-                              <VegMark veg={item.isVeg !== false} />
+                            <span
+                              data-veg={
+                                item.isVeg === false ? 'non' : item.isVeg === true ? 'veg' : 'unknown'
+                              }
+                              aria-hidden="true"
+                            >
+                              <VegMark veg={item.isVeg} />
                             </span>
                             <span className="text-[11.5px]">
-                              {item.isVeg === null ? 'Set' : item.isVeg ? 'Veg' : 'Non-veg'}
+                              {item.isVeg === null ? 'Unmarked' : item.isVeg ? 'Veg' : 'Non-veg'}
                             </span>
                           </button>
 

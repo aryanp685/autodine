@@ -134,7 +134,7 @@ type BoardTicket = {
     portion?: string;
     /** Add-ons alone, shown as tags on the ticket. */
     addons?: string[];
-    veg: boolean;
+    veg: boolean | null;
     spoken?: string | null;
   }[];
   total: number;
