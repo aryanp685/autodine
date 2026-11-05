@@ -770,6 +770,8 @@ describe('MenuEditorScreen, the description writer', () => {
 
     expect(html).toContain('Write with AI');
     expect(html).toContain('name="description"');
+    // The owner can hand the AI details — the honest fix for a thin name.
+    expect(html).toContain('aria-label="Details for the AI"');
   });
 
   it('keeps the field plain when the writer is not switched on', () => {

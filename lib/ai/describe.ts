@@ -30,6 +30,14 @@ export type DescribeTarget = {
   name: string;
   /** The dish's section, as light context — never a source of claims. */
   category: string;
+  /**
+   * The description to IMPROVE, when one is already there. The model keeps
+   * its facts and tightens the wording; it does not start over and invent
+   * around them. Absent = write a fresh description from the name.
+   */
+  existing?: string;
+  /** The owner's own details — the source of truth for specifics. */
+  detail?: string;
 };
 
 export type DescribeResult =
@@ -55,18 +63,23 @@ function unfence(text: string): string {
 const RULES = [
   'You write one short sentence of description for each dish on a restaurant menu.',
   'Rules for every description:',
-  '- Use ONLY what the dish name and its section say. Never invent ingredients, preparation, origin, or style the name does not state.',
+  '- Use ONLY what the dish name, its section, and any owner details say. Never invent ingredients, preparation, origin, or style the name does not state.',
+  '- When a current description is given for a dish, IMPROVE it: keep every fact it states, tighten the wording, add nothing new.',
+  '- When the name alone is too little to describe the dish specifically, write a short GENERIC description that makes no specific claims (for example: "A house special from our kitchen."). Never guess ingredients or cooking methods to sound specific.',
+  '- Use null only when the line is not a dish name at all.',
   '- No prices, no superlatives, no marketing words like "delicious" or "best". Plain, honest, specific.',
   '- At most 150 characters, one sentence.',
   '- Write in the same language and script as the dish name (Hindi name -> Hindi description, English name -> English description).',
-  '- If a name is too unclear or too little to describe honestly, use null for that dish instead of guessing.',
 ].join('\n');
 
 function buildPrompt(targets: readonly DescribeTarget[]): string {
-  const lines = targets.map(
-    (target, index) =>
-      `${index + 1}. ${target.name}${target.category ? ` (section: ${target.category})` : ''}`
-  );
+  const lines = targets.map((target, index) => {
+    const parts = [`${index + 1}. ${target.name}`];
+    if (target.category) parts.push(`(section: ${target.category})`);
+    if (target.detail) parts.push(`— owner's details: ${JSON.stringify(target.detail)}`);
+    if (target.existing) parts.push(`— current description to improve: ${JSON.stringify(target.existing)}`);
+    return parts.join(' ');
+  });
   return `${RULES}\n\nDishes:\n${lines.join('\n')}\n\nReply with JSON only, in this exact shape:\n{"items": ["description one", null, "description three"]}\nThe "items" array must have exactly ${targets.length} entries, in the same order as the dishes. Use a string or null per dish.`;
 }
 
@@ -132,7 +145,7 @@ export async function generateDescriptions(
         results.push({
           id: target.id,
           ok: false,
-          reason: 'The writer had nothing honest to say for this one. Write it by hand.',
+          reason: 'The writer had nothing to say for this one — it may not be a dish name. Write it by hand.',
         });
         return;
       }

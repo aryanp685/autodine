@@ -1135,40 +1135,59 @@ export async function bulkAddItemsAction(formData: FormData): Promise<void> {
  * needs the results in hand, not a redirect.
  */
 export async function generateDescriptionsAction(
-  payload: { id: string }[]
+  payload: { id: string; existing?: string; detail?: string }[]
 ): Promise<DescribeResult[]> {
   const ctx = await currentRestaurant();
-  const ids = (payload ?? [])
-    .map((entry) => String(entry?.id ?? '').trim())
-    .filter((id) => id !== '')
+  const clean = (value: unknown): string => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, 300);
+  const entries = (payload ?? [])
+    .map((entry) => ({
+      id: String(entry?.id ?? '').trim(),
+      existing: clean(entry?.existing),
+      detail: clean(entry?.detail),
+    }))
+    .filter((entry) => entry.id !== '')
     .slice(0, 50);
   if (!ctx) {
-    return ids.map((id) => ({ id, ok: false as const, reason: 'You need to be signed in to edit the menu.' }));
+    return entries.map((entry) => ({
+      id: entry.id,
+      ok: false as const,
+      reason: 'You need to be signed in to edit the menu.',
+    }));
   }
-  if (ids.length === 0) return [];
+  if (entries.length === 0) return [];
 
   const { data, error } = await ctx.supabase
     .from('items')
     .select('id, name, category_id, categories ( name )')
     .eq('restaurant_id', ctx.restaurantId)
-    .in('id', ids);
+    .in('id', entries.map((entry) => entry.id));
 
   if (error) {
-    return ids.map((id) => ({ id, ok: false as const, reason: `Could not read your dishes: ${error.message}` }));
+    return entries.map((entry) => ({
+      id: entry.id,
+      ok: false as const,
+      reason: `Could not read your dishes: ${error.message}`,
+    }));
   }
 
   const byId = new Map((data ?? []).map((row) => [row.id as string, row]));
   const targets: DescribeTarget[] = [];
   const results: DescribeResult[] = [];
 
-  for (const id of ids) {
-    const row = byId.get(id);
+  for (const entry of entries) {
+    const row = byId.get(entry.id);
     if (!row) {
-      results.push({ id, ok: false, reason: 'That dish is not on your account.' });
+      results.push({ id: entry.id, ok: false, reason: 'That dish is not on your account.' });
       continue;
     }
     const category = row.categories as { name?: string } | null;
-    targets.push({ id, name: row.name as string, category: category?.name ?? '' });
+    targets.push({
+      id: entry.id,
+      name: row.name as string,
+      category: category?.name ?? '',
+      ...(entry.existing !== '' ? { existing: entry.existing } : {}),
+      ...(entry.detail !== '' ? { detail: entry.detail } : {}),
+    });
   }
 
   results.push(...(await generateDescriptions(targets)));

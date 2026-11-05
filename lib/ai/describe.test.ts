@@ -60,8 +60,40 @@ describe('generateDescriptions', () => {
     expect(results[1]).toEqual({
       id: 'i-2',
       ok: false,
-      reason: 'The writer had nothing honest to say for this one. Write it by hand.',
+      reason: 'The writer had nothing to say for this one — it may not be a dish name. Write it by hand.',
     });
+  });
+
+  it('tells the model to improve an existing description without adding claims', async () => {
+    call.mockImplementationOnce(() => answer(JSON.stringify({ items: ['Cottage cheese, grilled.', 'Fine.'] })));
+
+    await generateDescriptions([
+      { ...targets[0], existing: 'Cottage cheese grilled on skewers with spices.' },
+      targets[1],
+    ]);
+
+    const prompt = call.mock.calls[0][0].prompt;
+    expect(prompt).toContain('current description to improve: "Cottage cheese grilled on skewers with spices."');
+    expect(prompt).toContain('IMPROVE it: keep every fact it states');
+  });
+
+  it('carries the owner\'s own details as the source of truth', async () => {
+    call.mockImplementationOnce(() => answer(JSON.stringify({ items: ['Fine.', 'Fine.'] })));
+
+    await generateDescriptions([{ ...targets[0], detail: 'paneer, capsicum, tandoor-grilled' }, targets[1]]);
+
+    const prompt = call.mock.calls[0][0].prompt;
+    expect(prompt).toContain("owner's details: \"paneer, capsicum, tandoor-grilled\"");
+  });
+
+  it('asks for a generic non-claiming line when the name is too little — not a guess', async () => {
+    call.mockImplementationOnce(() => answer(JSON.stringify({ items: ['A house special from our kitchen.', 'Fine.'] })));
+
+    await generateDescriptions(targets);
+
+    const prompt = call.mock.calls[0][0].prompt;
+    expect(prompt).toContain('GENERIC description that makes no specific claims');
+    expect(prompt).toContain('Never guess ingredients or cooking methods');
   });
 
   it('treats a missing or non-string entry as a failure for that dish alone', async () => {
