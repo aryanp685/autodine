@@ -28,7 +28,8 @@
     "next": "^16.4.2",
     "qrcode": "^1.5.4",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "read-excel-file": "^9.3.14"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

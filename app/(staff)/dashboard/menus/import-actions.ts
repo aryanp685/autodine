@@ -41,6 +41,7 @@ import {
   sanitiseDraft,
   type MenuImportDraft,
 } from '@/lib/menu-import';
+import { parseMenuCsv, parseMenuXlsx, MAX_MENU_FILE_BYTES } from '@/lib/menu-import-file';
 
 const MENUS_PATH = '/dashboard/menus';
 
@@ -312,6 +313,64 @@ export async function extractMenuFromPhotoAction(formData: FormData): Promise<Ph
 export type PhotoPreview =
   | { ok: true; draft: VisionDraft }
   | { ok: false; error: string; code: string };
+
+/**
+ * Read a structured file (CSV or Excel) into the same draft shape the text
+ * and photo paths produce. Writes nothing: the review decides, and the one
+ * Create is the same action every other source uses.
+ */
+export async function parseMenuFileAction(formData: FormData): Promise<ImportPreview> {
+  const staff = await getStaffContextDetailed();
+  if (!staff.ok) {
+    return {
+      ok: false,
+      error:
+        staff.reason === 'unconfigured'
+          ? 'The database is not connected, so there is nowhere to save an import.'
+          : 'You need to be signed in to import a menu.',
+    };
+  }
+
+  const file = formData.get('file');
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: 'Choose a CSV or Excel file first.' };
+  }
+  if (file.size > MAX_MENU_FILE_BYTES) {
+    return {
+      ok: false,
+      error: `That file is ${(file.size / (1024 * 1024)).toFixed(1)} MB. The limit is 5 MB.`,
+    };
+  }
+
+  const fileName = (file.name ?? '').toLowerCase();
+  const isCsv = fileName.endsWith('.csv') || file.type === 'text/csv';
+  const isXlsx =
+    fileName.endsWith('.xlsx') ||
+    file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  if (!isCsv && !isXlsx) {
+    return { ok: false, error: 'That file is not a CSV or Excel (.xlsx) file.' };
+  }
+
+  try {
+    const draft = isCsv
+      ? parseMenuCsv(await file.text())
+      : await parseMenuXlsx(Buffer.from(await file.arrayBuffer()));
+    // The sanitiser is the same gate every other source passes through. Its
+    // issues list is empty by design, so the parser's own issues -- the rows
+    // it refused -- ride along for the review screen to show.
+    const cleaned = sanitiseDraft(draft);
+    return {
+      ok: true,
+      source: 'rules',
+      draft: { ...cleaned, issues: draft.issues.slice(0, 12), duplicates: draft.duplicates },
+    };
+  } catch {
+    return {
+      ok: false,
+      error: 'That file could not be read. Check that it opens in Excel or a text editor, and try again.',
+    };
+  }
+}
 
 /** One cropped dish photo, as the browser produced it. */
 export type CropUpload = {

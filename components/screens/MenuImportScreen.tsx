@@ -5,7 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { VegMark } from '@/components/ui';
-import { previewMenuImportAction, type ImportPreview } from '@/app/(staff)/dashboard/menus/import-actions';
+import {
+  parseMenuFileAction,
+  previewMenuImportAction,
+  type ImportPreview,
+} from '@/app/(staff)/dashboard/menus/import-actions';
 import { createImportPairAction } from '@/app/(staff)/dashboard/menus/brand-actions';
 import { BrandReview, brandStateToDraft, type BrandReviewState } from '@/components/screens/BrandReview';
 import { PhotoImportPanel } from '@/components/PhotoImportPanel';
@@ -81,7 +85,7 @@ export function MenuImportScreen({
    * round. With no vision key the photo path is not a slower option, it is an
    * impossible one, so the screen starts on text and does not offer the tab.
    */
-  const [mode, setMode] = useState<'photo' | 'text'>(visionEnabled ? 'photo' : 'text');
+  const [mode, setMode] = useState<'photo' | 'file' | 'text'>(visionEnabled ? 'photo' : 'text');
 
   /* The stable import identifier: the menu draft and the brand draft share
      it, and a repeated Create finds the same pair instead of doubling it. */
@@ -100,6 +104,23 @@ export function MenuImportScreen({
       } catch {
         // A rejected server action must not leave the Read button stuck.
         setError('Something went wrong reading the text. Try again.');
+      }
+    });
+  }
+
+  function readSpreadsheet(picked: File | null) {
+    if (!picked) return;
+    setError(null);
+    startReading(async () => {
+      try {
+        const data = new FormData();
+        data.set('file', picked);
+        const result = await parseMenuFileAction(data);
+        setPreview(result);
+        setDropped(new Set());
+        if (!result.ok) setError(result.error);
+      } catch {
+        setError('Something went wrong reading that file. Try again.');
       }
     });
   }
@@ -147,8 +168,8 @@ export function MenuImportScreen({
         title="Bring in a menu you already have"
         meta={
           visionEnabled
-            ? 'Photograph your printed menu and we read the dishes, prices and pictures for you to check. Or paste the text. Nothing is saved until you approve it.'
-            : 'Paste your menu’s text and we read the dishes and prices for you to check. Nothing is saved until you approve it.'
+            ? 'Photograph your printed menu and we read the dishes, prices and pictures for you to check. Or upload a spreadsheet, or paste the text. Nothing is saved until you approve it.'
+            : 'Upload a spreadsheet or paste your menu’s text and we read the dishes and prices for you to check. Nothing is saved until you approve it.'
         }
         actions={
           <Link href="/dashboard/menus" className={btn('ghost', 'sm')}>
@@ -157,23 +178,63 @@ export function MenuImportScreen({
         }
       />
 
-      {/* Two inputs, one result. A segmented control rather than two screens,
-          so the owner never has to guess which page to be on.
-
-          It only appears when there really are two. A one-option control is
-          furniture, and "Photo of your menu" on a deployment with no vision
-          key is a tab that can only disappoint. */}
-      {!blocked && visionEnabled && (
+      {/* Three inputs, one result. A segmented control rather than separate
+          screens, so the owner never has to guess which page to be on. The
+          photo tab appears only when there is a vision key: "Photo of your
+          menu" on a deployment that cannot read one is a tab that can only
+          disappoint. */}
+      {!blocked && (
         <div className="mb-4">
           <Segmented
             label="How to import"
             value={mode}
-            onChange={setMode}
+            onChange={(next) => setMode(next as 'photo' | 'file' | 'text')}
             options={[
-              { value: 'photo', label: 'Photo of your menu', data: { 'data-import-tab': mode === 'photo' ? 'on' : 'off' } },
+              ...(visionEnabled
+                ? [
+                    {
+                      value: 'photo',
+                      label: 'Photo of your menu',
+                      data: { 'data-import-tab': mode === 'photo' ? 'on' : 'off' },
+                    },
+                  ]
+                : []),
+              {
+                value: 'file',
+                label: 'Spreadsheet file',
+                data: { 'data-import-tab': mode === 'file' ? 'on' : 'off' },
+              },
               { value: 'text', label: 'Paste the text', data: { 'data-import-tab': mode === 'text' ? 'on' : 'off' } },
             ]}
           />
+        </div>
+      )}
+
+      {/* The progress strip: where the owner is, in one line. Derived from
+          real state only — the save step lights up while the save runs, and
+          nothing claims a step that has not happened. */}
+      {!blocked && (
+        <div className="mb-4 flex flex-wrap items-center gap-1.5" data-import-steps>
+          {['Add your menu', 'Check dishes & brand', 'Save the draft'].map((label, index) => {
+            const position = writing ? 2 : preview?.ok || menuFile ? 1 : 0;
+            const state = index < position ? 'done' : index === position ? 'active' : 'todo';
+            return (
+              <span
+                key={label}
+                data-step={state}
+                className={[
+                  'rounded-full border px-2.5 py-1 text-[11.5px]',
+                  state === 'active'
+                    ? 'border-gink font-semibold text-gink'
+                    : state === 'done'
+                      ? 'border-gink bg-gink text-onink'
+                      : 'border-hair text-gink-46',
+                ].join(' ')}
+              >
+                {index + 1} · {label}
+              </span>
+            );
+          })}
         </div>
       )}
 
@@ -212,6 +273,36 @@ export function MenuImportScreen({
           <strong className="text-[12.5px] text-[var(--p-due)]">Nothing was imported.</strong>
           <p className="mt-1 text-[12.5px] leading-[1.5] text-gink-64">{error}</p>
         </div>
+      )}
+
+      {mode === 'file' && !preview?.ok && !blocked && (
+        <Card>
+          <div className="border-b border-hair px-4 py-3 sm:px-5">
+            <h2 className="text-[13px] font-semibold text-gink">Upload a spreadsheet</h2>
+            <p className="mt-1 text-[12.5px] leading-[1.5] text-gink-46">
+              A CSV or Excel file with one dish per row. A name column and a price column are
+              required; category, description and veg are used when the file has them. Nothing is
+              saved until you check the result.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2.5 px-4 py-4 sm:px-5">
+            <label className={`${btn('solid', 'sm')} relative cursor-pointer overflow-hidden`}>
+              {reading ? 'Reading the file…' : 'Choose a CSV or Excel file'}
+              <input
+                type="file"
+                accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                className="hidden"
+                disabled={reading}
+                onChange={(e) => {
+                  const picked = e.target.files?.[0] ?? null;
+                  e.target.value = '';
+                  readSpreadsheet(picked);
+                }}
+              />
+            </label>
+            <span className="text-[11.5px] text-gink-46">CSV or .xlsx, up to 5 MB.</span>
+          </div>
+        </Card>
       )}
 
       {mode === 'text' && !preview?.ok && !blocked && (
