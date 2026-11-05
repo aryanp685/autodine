@@ -47,7 +47,7 @@ export const metadata: Metadata = { title: 'Order · AutoDine' };
 export default async function CustomerMenuPage({
   searchParams,
 }: {
-  searchParams: Promise<{ s?: string; m?: string; v?: string }>;
+  searchParams: Promise<{ s?: string; m?: string; v?: string; lang?: string }>;
 }) {
   const params = await searchParams;
   const { s, m } = params;
@@ -110,6 +110,7 @@ export default async function CustomerMenuPage({
       <CustomerMenu
         data={data ? { ...data, table } : undefined}
         throttleNotice={throttle.throttled ? throttleNotice(throttle.retryAfterSeconds) : null}
+        lang={params.lang}
       />
     </CartProvider>
   );

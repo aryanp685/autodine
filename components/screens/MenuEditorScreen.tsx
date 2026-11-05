@@ -780,6 +780,13 @@ export function MenuEditorScreen({
                   <Link href="/dashboard/menus?bulk=1" className="underline-offset-2 hover:underline">
                     Add many at once
                   </Link>
+                  {' · '}
+                  <Link
+                    href="/dashboard/menus/translate"
+                    className="underline-offset-2 hover:underline"
+                  >
+                    Translate menu
+                  </Link>
                 </p>
               </>
             ) : null}

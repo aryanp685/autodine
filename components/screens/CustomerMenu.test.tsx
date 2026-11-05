@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CustomerMenu, ItemSheet, initialPicks } from './CustomerMenu';
 import { QrProblemScreen } from './QrProblemScreen';
+import { sourceHash } from '@/lib/i18n/translations';
 
 /* The item sheet navigates back to the menu after adding a dish, which needs
    the App Router. These tests render components in isolation, so the router is
@@ -719,5 +720,82 @@ describe('the throttle notice', () => {
     expect(html).toMatch(/role="status"[^>]*data-throttle-note|data-throttle-note[^>]*role="status"/);
     // Not an alert: nothing has failed, the menu is still usable.
     expect(html).not.toContain('role="alert"');
+  });
+});
+
+describe('the language switcher', () => {
+  const hash = sourceHash('Butter Chicken', 'Slow-cooked in a tomato gravy');
+
+  const translated = () => ({
+    ...data(null),
+    items: [
+      {
+        id: 'i1',
+        name: 'Butter Chicken',
+        desc: 'Slow-cooked in a tomato gravy',
+        price: 469,
+        category: 'c1',
+        veg: false,
+        available: true,
+        translations: {
+          hi: { name: 'बटर चिकन', description: 'टमेटो ग्रेवी में धीमी आंच पर पका।', approved: true, sourceHash: hash },
+        },
+      },
+    ],
+    categories: [
+      {
+        id: 'c1',
+        name: 'Main Course',
+        count: 1,
+        translations: {
+          hi: { name: 'मुख्य भोजन', description: '', approved: true, sourceHash: sourceHash('Main Course', '') },
+        },
+      },
+    ],
+  });
+
+  it('offers no switcher when nothing is translated — a switch that does nothing is noise', () => {
+    const html = renderToStaticMarkup(<CustomerMenu data={data(null)} />);
+    expect(html).not.toContain('aria-label="Language"');
+  });
+
+  it('shows the menu as written for EN, with the switcher beside it', () => {
+    const html = renderToStaticMarkup(<CustomerMenu data={translated()} />);
+    expect(html).toContain('aria-label="Language"');
+    expect(html).toContain('Butter Chicken');
+    expect(html).toContain('Slow-cooked in a tomato gravy');
+    expect(html).not.toContain('बटर चिकन');
+  });
+
+  it('swaps names, descriptions and categories for हिन्दी — and nothing else', () => {
+    const html = renderToStaticMarkup(<CustomerMenu data={translated()} lang="hi" />);
+    expect(html).toContain('बटर चिकन');
+    expect(html).toContain('टमेटो ग्रेवी में धीमी आंच पर पका।');
+    expect(html).toContain('मुख्य भोजन');
+    expect(html).not.toContain('Slow-cooked in a tomato gravy');
+    // The price never moves.
+    expect(html).toContain('469');
+  });
+
+  it('falls back to the original when the dish has changed since it was translated', () => {
+    const stale = translated();
+    stale.items[0].desc = 'A NEW description';
+    const html = renderToStaticMarkup(<CustomerMenu data={stale} lang="hi" />);
+    expect(html).toContain('Butter Chicken');
+    expect(html).toContain('A NEW description');
+    expect(html).not.toContain('बटर चिकन');
+  });
+
+  it('falls back to the original for a language that was never translated', () => {
+    const html = renderToStaticMarkup(<CustomerMenu data={translated()} lang="mr" />);
+    expect(html).toContain('Butter Chicken');
+    expect(html).not.toContain('बटर चिकन');
+    // The switcher still offers मराठी — it is a menu-wide choice.
+    expect(html).toContain('मराठी');
+  });
+
+  it('carries the language into the dish link', () => {
+    const html = renderToStaticMarkup(<CustomerMenu data={translated()} lang="hi" />);
+    expect(html).toContain('lang=hi');
   });
 });

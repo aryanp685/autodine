@@ -9,6 +9,8 @@
  *   npx supabase gen types typescript --local > lib/db/types.ts
  */
 
+import type { TranslationMap } from '@/lib/i18n/translations';
+
 export type Restaurant = {
   id: string;
   slug: string;
@@ -79,6 +81,8 @@ export type Category = {
   menu_id: string | null;
   name: string;
   sort_order: number;
+  /** Saved translations. Optional: not selected everywhere a category is read. */
+  translations?: TranslationMap;
 };
 
 export type Item = {
@@ -101,6 +105,8 @@ export type Item = {
    * customer-facing menu has no use for it.
    */
   spoken_name?: string | null;
+  /** Saved translations. Optional: not selected everywhere an item is read. */
+  translations?: TranslationMap;
 };
 
 export type ItemVariant = {

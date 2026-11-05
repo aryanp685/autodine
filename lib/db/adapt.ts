@@ -17,6 +17,7 @@
 
 import { paiseToRupees } from '@/lib/money';
 import { publicAssetUrl } from '@/lib/storage/assets';
+import type { TranslationMap } from '@/lib/i18n/translations';
 import type { Category, ItemVariant, MenuItem, Restaurant, RestaurantMenu } from './types';
 
 export type DisplayModifierOption = {
@@ -46,8 +47,7 @@ export type DisplayItem = {
   available: boolean;
   img?: string;
   badge?: string;
-  variants?: { id: string; name: string; price: number }[];
-  /**
+  variants?: { id: string; name: string; price: number }[];  /**
    * Add-on groups, from item_addon_groups and item_addons.
    *
    * Undefined when the dish has none -- not an empty array -- so the sheet can
@@ -55,12 +55,20 @@ export type DisplayItem = {
    * offering a customisation step that would lead nowhere.
    */
   modifiers?: DisplayModifierGroup[];
+  /**
+   * Saved translations, language code -> entry. See lib/i18n/translations:
+   * a guest sees one only while it is approved and its source hash matches;
+   * otherwise the original name and description are shown.
+   */
+  translations?: TranslationMap;
 };
 
 export type DisplayCategory = {
   id: string;
   name: string;
   count: number;
+  /** Same rules as DisplayItem.translations; name-only entries. */
+  translations?: TranslationMap;
 };
 
 /**
@@ -124,6 +132,7 @@ export function toDisplayItem(item: MenuItem): DisplayItem {
     veg: item.is_veg,
     available: item.is_available,
     ...(item.image_url ? { img: item.image_url } : {}),
+    ...(item.translations ? { translations: item.translations } : {}),
     ...(variants.length ? { variants } : {}),
     ...(modifiers.length ? { modifiers } : {}),
   };
@@ -176,6 +185,7 @@ export function toDisplayCategories(
     id: c.id,
     name: c.name,
     count: counts.get(c.id) ?? 0,
+    ...(c.translations ? { translations: c.translations } : {}),
   }));
 }
 

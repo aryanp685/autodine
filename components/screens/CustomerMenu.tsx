@@ -17,6 +17,14 @@ import type {
   DisplayRestaurant,
 } from '@/lib/db/adapt';
 import { DishPhoto } from '@/components/DishPhoto';
+import {
+  LANGUAGE_LABELS,
+  hasFreshTranslation,
+  translatedDescription,
+  translatedName,
+  type GuestLanguage,
+  type TranslationMap,
+} from '@/lib/i18n/translations';
 import { GuestTabs } from '@/components/GuestTabs';
 import { GuestFlow } from '@/components/GuestFlow';
 import { MenuIdentity } from '@/components/MenuIdentity';
@@ -113,6 +121,7 @@ export type MenuScreenData = {
 export function CustomerMenu({
   data,
   throttleNotice,
+  lang: langParam,
 }: {
   data?: MenuScreenData;
   /**
@@ -124,6 +133,13 @@ export function CustomerMenu({
    * happened.
    */
   throttleNotice?: string | null;
+  /**
+   * The guest's language pick (`?lang=`). 'en' or absent = the menu as the
+   * owner wrote it; `hi`/`mr` swap in approved translations per field, with
+   * the original as the standing fallback. Prices, portions, add-ons and the
+   * cart never move.
+   */
+  lang?: string;
 } = {}) {
   const table = data?.table ?? null;
   const cart = useCart();
@@ -141,15 +157,59 @@ export function CustomerMenu({
   // Deliberately named to shadow the demo imports, so that not one line of
   // the locked JSX below had to change to accept real data.
   const restaurant = data?.restaurant ?? demoRestaurant;
-  const categories = data?.categories ?? demoCategories;
-  const items = data?.items ?? demoItems;
+
+  /*
+   * THE LANGUAGE VIEW.
+   *
+   * The guest's pick remaps names and descriptions only — a fresh, approved
+   * translation is shown per field, the original stands in wherever one is
+   * missing or outdated. The arrays below are what the locked JSX renders,
+   * so every existing line shows the right language without knowing about
+   * translations at all. Priced data (the bar, the cart) reads the ORIGINAL
+   * arrays: switching language never changes what is ordered or charged.
+   */
+  const language: GuestLanguage = langParam === 'hi' || langParam === 'mr' ? langParam : 'en';
+  const originalCategories = data?.categories ?? demoCategories;
+  const originalItems = data?.items ?? demoItems;
+  const translationsOf = (row: unknown): TranslationMap | undefined =>
+    (row as { translations?: TranslationMap }).translations;
+  const categories = originalCategories.map((c) => ({
+    ...c,
+    name: translatedName(translationsOf(c), language, c.name, ''),
+  }));
+  const items = originalItems.map((i) => ({
+    ...i,
+    name: translatedName(translationsOf(i), language, i.name, i.desc),
+    desc: translatedDescription(translationsOf(i), language, i.name, i.desc),
+  }));
+  /** The switcher is offered only when a translation exists to switch to. */
+  const hasTranslations =
+    language !== 'en' ||
+    originalItems.some(
+      (i) =>
+        hasFreshTranslation(translationsOf(i), 'hi', i.name, i.desc) ||
+        hasFreshTranslation(translationsOf(i), 'mr', i.name, i.desc)
+    ) ||
+    originalCategories.some(
+      (c) =>
+        hasFreshTranslation(translationsOf(c), 'hi', c.name, '') ||
+        hasFreshTranslation(translationsOf(c), 'mr', c.name, '')
+    );
+  const langHref = (code: GuestLanguage) => {
+    const params = new URLSearchParams();
+    if (slug) params.set('s', slug);
+    if (menuId) params.set('m', menuId);
+    if (code !== 'en') params.set('lang', code);
+    const query = params.toString();
+    return query ? `/menu?${query}` : '/menu';
+  };
 
   // Priced against this menu for the bar only. It is a running hint, not the
   // amount charged: the order is priced from the database when it is placed.
   const slug = data?.restaurant.slug;
   const menus = data?.menus ?? [];
   const menuId = data?.menuId;
-  const menuPrices = items.map((i) => ({
+  const menuPrices = originalItems.map((i) => ({
     id: i.id,
     name: i.name,
     pricePaise: rupeesToPaise(i.price),
@@ -232,6 +292,7 @@ export function CustomerMenu({
   const itemHref = (itemId: string) => {
     const params = new URLSearchParams({ item: itemId });
     if (data?.restaurant.slug) params.set('s', data.restaurant.slug);
+    if (language !== 'en') params.set('lang', language);
     // Carried through: the sheet loads its dishes from one menu, and this is
     // that menu. Without it the sheet opens on the default menu and cannot
     // find the dish.
@@ -318,6 +379,28 @@ export function CustomerMenu({
            this still so it can be judged as a still. */
         animate
       />
+
+      {/* The language switcher — offered only when there is a translation to
+          switch to. It remaps names and descriptions in the guest's browser;
+          the menu data, the prices and the cart never change. */}
+      {data && hasTranslations && (
+        <nav aria-label="Language" className="mt-3 flex items-center gap-1.5">
+          {(['en', 'hi', 'mr'] as GuestLanguage[]).map((code) => (
+            <Link
+              key={code}
+              href={langHref(code)}
+              aria-current={language === code ? 'true' : undefined}
+              className={`rounded-full border px-2.5 py-1 text-[12.5px] transition-colors duration-150 ${
+                language === code
+                  ? 'border-[var(--p-accent)] font-medium text-gink'
+                  : 'border-hair text-gink-46 hover:text-gink'
+              }`}
+            >
+              {LANGUAGE_LABELS[code]}
+            </Link>
+          ))}
+        </nav>
+      )}
 
       {/*
         TURNED AWAY AT THE DOOR, SAID PLAINLY.
@@ -639,7 +722,16 @@ export function initialPicks(
 }
 
 /* Option A — item customization: centred sheet, hairlines, no chrome */
-export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?: string }; itemId?: string } = {}) {
+export function ItemSheet({
+  data,
+  itemId,
+  lang: langParam,
+}: {
+  data?: MenuScreenData & { itemId?: string };
+  itemId?: string;
+  /** The guest's language pick (`?lang=`). Same fallback rules as the menu. */
+  lang?: string;
+} = {}) {
   const brand = guestBrandStyle(data?.restaurant);
   const table = data?.table ?? null;
   const allItems = data?.items ?? demoItems;
@@ -671,11 +763,20 @@ export function ItemSheet({ data, itemId }: { data?: MenuScreenData & { itemId?:
    */
   const missing = Boolean(requestedItemId) && !requestedItem;
 
-  const item =
+  const baseItem =
     requestedItem ??
     // Real menu, no id requested: show the menu's own first customisable dish.
     (data ? allItems.find((i) => i.variants && i.variants.length > 0) ?? allItems[0] : undefined) ??
     demoItems.find((i) => i.id === 'it-butter-chicken')!;
+
+  /** The language view: name and description may swap, nothing else does. */
+  const language: GuestLanguage = langParam === 'hi' || langParam === 'mr' ? langParam : 'en';
+  const baseTranslations = (baseItem as { translations?: TranslationMap }).translations;
+  const item = {
+    ...baseItem,
+    name: translatedName(baseTranslations, language, baseItem.name, baseItem.desc),
+    desc: translatedDescription(baseTranslations, language, baseItem.name, baseItem.desc),
+  };
 
   const variants = item.variants ?? [];
   const groups: DisplayModifierGroup[] = item.modifiers ?? [];
