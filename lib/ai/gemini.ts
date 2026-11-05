@@ -90,8 +90,9 @@ const GENERATE_URL = (model: string) =>
 export async function callGeminiJson(
   args: {
     prompt: string;
-    bytes: ArrayBuffer;
-    mimeType: string;
+    /** Absent = text-only: no photo is attached to the prompt. */
+    bytes?: ArrayBuffer;
+    mimeType?: string;
     maxOutputTokens: number;
     /** Overall patience, retries included. Default 45s. */
     timeoutMs?: number;
@@ -113,7 +114,7 @@ export async function callGeminiJson(
   const sleep = args.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const retryDelaysMs = args.retryDelaysMs ?? [1500, 3000];
 
-  const base64 = Buffer.from(args.bytes).toString('base64');
+  const base64 = args.bytes ? Buffer.from(args.bytes).toString('base64') : null;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), args.timeoutMs ?? 45_000);
 
@@ -135,7 +136,10 @@ export async function callGeminiJson(
             contents: [
               {
                 role: 'user',
-                parts: [{ text: args.prompt }, { inline_data: { mime_type: args.mimeType, data: base64 } }],
+                parts:
+                  base64 && args.mimeType
+                    ? [{ text: args.prompt }, { inline_data: { mime_type: args.mimeType, data: base64 } }]
+                    : [{ text: args.prompt }],
               },
             ],
             generationConfig: {
@@ -222,6 +226,33 @@ export async function callVisionJson(
   // Gemini's phase is capped at 75s so a thrashing provider cannot eat the
   // whole budget before the fallback gets a chance.
   const gemini = await callGeminiJson({ ...args, timeoutMs: Math.min(budgetMs, 75_000) });
+  if (gemini.ok) return gemini;
+
+  const remaining = deadline - Date.now();
+  if (remaining < 5_000 || !groqConfigured()) return gemini;
+
+  return callGroqJson({ ...args, timeoutMs: remaining });
+}
+
+/**
+ * The same provider split for a prompt with no photo attached: the
+ * description writer talks to the dish by name alone. Gemini first, Groq
+ * when Gemini is busy or gone -- identical budgeting to callVisionJson so
+ * both doors of the AI Menu Studio behave the same under load.
+ */
+export async function callTextJson(
+  args: {
+    prompt: string;
+    maxOutputTokens: number;
+    timeoutMs?: number;
+    retryDelaysMs?: number[];
+    sleep?: (ms: number) => Promise<void>;
+  } & GeminiFailureCopy
+): Promise<GeminiJsonResult> {
+  const budgetMs = args.timeoutMs ?? 60_000;
+  const deadline = Date.now() + budgetMs;
+
+  const gemini = await callGeminiJson({ ...args, timeoutMs: Math.min(budgetMs, 40_000) });
   if (gemini.ok) return gemini;
 
   const remaining = deadline - Date.now();

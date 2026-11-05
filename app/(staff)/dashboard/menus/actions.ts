@@ -31,6 +31,7 @@ import {
   parseMenuXlsx,
 } from '@/lib/menus/bulk-parse';
 import type { ImportedItem, MenuImportDraft } from '@/lib/menu-import';
+import { generateDescriptions, type DescribeResult, type DescribeTarget } from '@/lib/ai/describe';
 import { EDITOR_MENU_COOKIE } from '@/lib/db/menu-editor';
 import { getDraftForMenu, publishPair } from '@/lib/branding/brand-data';
 import { readUndoItem } from '@/lib/menu-undo';
@@ -1114,6 +1115,115 @@ export async function bulkAddItemsAction(formData: FormData): Promise<void> {
     parts.push(`${draft.issues.length} line${draft.issues.length === 1 ? '' : 's'} skipped — ${draft.issues[0].reason.toLowerCase()}`);
   }
   ok(parts.join(' '));
+}
+
+/* ============================================================================
+   The description writer
+   ========================================================================== */
+
+/**
+ * Generate descriptions for dishes — writes NOTHING to the database.
+ *
+ * Called from the editor's client panels (the per-dish "Write with AI"
+ * button and the bulk "Enhance menu" review). Generation is deliberately
+ * separate from saving: the owner sees the text, edits it if they want, and
+ * only a Save writes it. The server re-reads each dish itself so the model
+ * is told the real name and section, and only this restaurant's dishes are
+ * ever described.
+ *
+ * A data-returning action (like extractMenuFromPhotoAction): the panel
+ * needs the results in hand, not a redirect.
+ */
+export async function generateDescriptionsAction(
+  payload: { id: string }[]
+): Promise<DescribeResult[]> {
+  const ctx = await currentRestaurant();
+  const ids = (payload ?? [])
+    .map((entry) => String(entry?.id ?? '').trim())
+    .filter((id) => id !== '')
+    .slice(0, 50);
+  if (!ctx) {
+    return ids.map((id) => ({ id, ok: false as const, reason: 'You need to be signed in to edit the menu.' }));
+  }
+  if (ids.length === 0) return [];
+
+  const { data, error } = await ctx.supabase
+    .from('items')
+    .select('id, name, category_id, categories ( name )')
+    .eq('restaurant_id', ctx.restaurantId)
+    .in('id', ids);
+
+  if (error) {
+    return ids.map((id) => ({ id, ok: false as const, reason: `Could not read your dishes: ${error.message}` }));
+  }
+
+  const byId = new Map((data ?? []).map((row) => [row.id as string, row]));
+  const targets: DescribeTarget[] = [];
+  const results: DescribeResult[] = [];
+
+  for (const id of ids) {
+    const row = byId.get(id);
+    if (!row) {
+      results.push({ id, ok: false, reason: 'That dish is not on your account.' });
+      continue;
+    }
+    const category = row.categories as { name?: string } | null;
+    targets.push({ id, name: row.name as string, category: category?.name ?? '' });
+  }
+
+  results.push(...(await generateDescriptions(targets)));
+  return results;
+}
+
+/**
+ * Save accepted descriptions in one press.
+ *
+ * The bulk review writes only what the owner accepted, and only over rows
+ * that still have no description: a dish filled in the meantime (another
+ * tab, a co-owner) is left alone and counted in the outcome. "Existing
+ * descriptions stay untouched" is enforced by the write itself, not by
+ * good manners in the UI.
+ */
+export async function saveDescriptionsAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  let rows: { id: string; description: string }[] = [];
+  try {
+    const parsed = JSON.parse(String(formData.get('rows') ?? '[]'));
+    if (!Array.isArray(parsed)) throw new Error('not a list');
+    rows = parsed
+      .map((row: { id?: unknown; description?: unknown }) => ({
+        id: String(row?.id ?? '').trim(),
+        description: String(row?.description ?? '').trim(),
+      }))
+      .filter((row) => row.id !== '' && row.description !== '')
+      .slice(0, 50);
+  } catch {
+    fail('That batch of descriptions could not be read. Try again.');
+  }
+
+  if (rows.length === 0) fail('No descriptions to save.');
+
+  let saved = 0;
+  let skipped = 0;
+  for (const row of rows) {
+    const { data, error } = await ctx.supabase
+      .from('items')
+      .update({ description: row.description.slice(0, 300) })
+      .eq('id', row.id)
+      .eq('restaurant_id', ctx.restaurantId)
+      .is('description', null)
+      .select('id');
+    if (error) fail(`Could not save the descriptions: ${error.message}`);
+    if (data && data.length > 0) saved += 1;
+    else skipped += 1;
+  }
+
+  ok(
+    `Saved ${saved} ${saved === 1 ? 'description' : 'descriptions'}.` +
+      (skipped > 0 ? ` ${skipped} left untouched — they already had one.` : '')
+  );
 }
 
 /* ============================================================================

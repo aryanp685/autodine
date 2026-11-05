@@ -34,6 +34,8 @@ vi.mock('@/app/(staff)/dashboard/menus/actions', () => ({
   deleteCategoryAction: mocks.action('deleteCategoryAction'),
   deleteItemAction: mocks.action('deleteItemAction'),
   deleteVariantAction: mocks.action('deleteVariantAction'),
+  generateDescriptionsAction: mocks.action('generateDescriptionsAction'),
+  saveDescriptionsAction: mocks.action('saveDescriptionsAction'),
   moveCategoryAction: mocks.action('moveCategoryAction'),
   moveItemAction: mocks.action('moveItemAction'),
   publishMenuAction: mocks.action('publishMenuAction'),
@@ -82,7 +84,7 @@ const item = (id: string, name: string, over: ItemOverride = {}): EditorItem => 
 const render = (
   d: MenuEditorData | null,
   undo?: string,
-  filters: { query?: string; show?: string; sort?: string; bulkMode?: boolean } = {}
+  filters: { query?: string; show?: string; sort?: string; bulkMode?: boolean; enhanceConfigured?: boolean } = {}
 ) => renderToStaticMarkup(<MenuEditorScreen data={d} undo={undo} {...filters} />);
 
 /** Nine dishes, enough that the find bar is worth showing. */
@@ -753,5 +755,48 @@ describe('MenuEditorScreen, bulk add', () => {
 
     expect(html).not.toContain('Add many dishes at once');
     expect(html).toContain('Add a category on the left');
+  });
+});
+
+describe('MenuEditorScreen, the description writer', () => {
+  const withBlank = () =>
+    data({
+      categories: [{ id: 'c-1', name: 'Starters', itemCount: 1, sortOrder: 0 }],
+      items: [item('it-1', 'Paneer Tikka', { desc: '' })],
+    });
+
+  it('puts the writer button on the description field when it is switched on', () => {
+    const html = render(withBlank(), undefined, { enhanceConfigured: true });
+
+    expect(html).toContain('Write with AI');
+    expect(html).toContain('name="description"');
+  });
+
+  it('keeps the field plain when the writer is not switched on', () => {
+    const html = render(withBlank());
+
+    expect(html).toContain('name="description"');
+    expect(html).not.toContain('Write with AI');
+    expect(html).not.toContain('Enhance menu with AI');
+  });
+
+  it('offers the bulk review when dishes are missing descriptions', () => {
+    const html = render(withBlank(), undefined, { enhanceConfigured: true });
+
+    expect(html).toContain('Enhance menu with AI');
+    expect(html).toContain('1 dish is missing a description.');
+  });
+
+  it('offers nothing to enhance when every dish has a description', () => {
+    const html = render(crowded(), undefined, { enhanceConfigured: true });
+
+    expect(html).not.toContain('Enhance menu with AI');
+  });
+
+  it('shows no writer in the demo', () => {
+    const html = render(null, undefined, { enhanceConfigured: true });
+
+    expect(html).not.toContain('Write with AI');
+    expect(html).not.toContain('Enhance menu with AI');
   });
 });

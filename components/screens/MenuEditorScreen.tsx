@@ -53,6 +53,8 @@ import {
 } from '@/app/(staff)/dashboard/menus/actions';
 import { PRESET_CATEGORIES, normaliseCategoryName } from '@/lib/menu-presets';
 import { MAX_IMPORT_TEXT } from '@/lib/menus/bulk-parse';
+import { AiDescriptionField } from '@/components/AiDescriptionField';
+import { EnhancePanel } from '@/components/EnhancePanel';
 import { PronunciationField } from '@/components/PronunciationField';
 import { DishPhotoField } from '@/components/DishPhotoField';
 
@@ -75,6 +77,7 @@ export function MenuEditorScreen({
   show,
   sort,
   bulkMode,
+  enhanceConfigured,
 }: {
   data?: MenuEditorData | null;
   /** Which outlet is open, for the switcher in the bar. */
@@ -92,6 +95,8 @@ export function MenuEditorScreen({
   sort?: string;
   /** `?bulk=1` — show the bulk add panel instead of the single-dish form. */
   bulkMode?: boolean;
+  /** The description writer is switched on for this deployment. */
+  enhanceConfigured?: boolean;
 }) {
   const live = Boolean(data);
   // A blocked caller has a database and no restaurant. The editor below is
@@ -779,6 +784,20 @@ export function MenuEditorScreen({
               </>
             ) : null}
 
+            {/* The bulk door of the description writer. Only offered when
+                dishes are actually missing descriptions and the writer is
+                switched on — an action that would do nothing is noise. */}
+            {live && enhanceConfigured && data && (
+              <>
+                {(() => {
+                  const blank = data.items
+                    .filter((i) => !i.desc)
+                    .map((i) => ({ id: i.id, name: i.name }));
+                  return blank.length > 0 ? <EnhancePanel items={blank} /> : null;
+                })()}
+              </>
+            )}
+
             {live && liveCategories.length === 0 && (
               <Empty className="mb-3">
                 Add a category on the left and you can start adding items here.
@@ -1115,11 +1134,10 @@ export function MenuEditorScreen({
                 />
 
                 <Field label="Description">
-                  <textarea
-                    className={textareaClass}
-                    name="description"
-                    rows={3}
+                  <AiDescriptionField
+                    itemId={selected.id}
                     defaultValue={selectedDesc}
+                    configured={Boolean(live && enhanceConfigured)}
                   />
                 </Field>
 

@@ -54,8 +54,9 @@ export function groqModel(): string {
 export async function callGroqJson(
   args: {
     prompt: string;
-    bytes: ArrayBuffer;
-    mimeType: string;
+    /** Absent = text-only: no photo is attached to the prompt. */
+    bytes?: ArrayBuffer;
+    mimeType?: string;
     maxOutputTokens: number;
     timeoutMs?: number;
     retryDelaysMs?: number[];
@@ -70,7 +71,7 @@ export async function callGroqJson(
   const sleep = args.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const retryDelaysMs = args.retryDelaysMs ?? [1500, 3000];
 
-  const base64 = Buffer.from(args.bytes).toString('base64');
+  const base64 = args.bytes ? Buffer.from(args.bytes).toString('base64') : null;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), args.timeoutMs ?? 45_000);
 
@@ -90,10 +91,13 @@ export async function callGroqJson(
           messages: [
             {
               role: 'user',
-              content: [
-                { type: 'text', text: args.prompt },
-                { type: 'image_url', image_url: { url: `data:${args.mimeType};base64,${base64}` } },
-              ],
+              content:
+                base64 && args.mimeType
+                  ? [
+                      { type: 'text', text: args.prompt },
+                      { type: 'image_url', image_url: { url: `data:${args.mimeType};base64,${base64}` } },
+                    ]
+                  : args.prompt,
             },
           ],
         }),
