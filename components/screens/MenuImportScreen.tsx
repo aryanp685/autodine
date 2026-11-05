@@ -4,50 +4,26 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { SignInPrompt } from '@/components/SignInPrompt';
-import { VegMark } from '@/components/ui';
-import {
-  attachImportPhotosAction,
-  parseMenuFileAction,
-  previewMenuImportAction,
-  type CropUpload,
-  type ImportPreview,
-} from '@/app/(staff)/dashboard/menus/import-actions';
-import { cropFromImage } from '@/lib/import/crop';
+import { attachImportPhotosAction, type CropUpload } from '@/app/(staff)/dashboard/menus/import-actions';
 import { createImportPairAction } from '@/app/(staff)/dashboard/menus/brand-actions';
 import { BrandReview, brandStateToDraft, type BrandReviewState } from '@/components/screens/BrandReview';
 import { PhotoImportPanel, type PhotoDraft } from '@/components/PhotoImportPanel';
-import { draftItemCount, MAX_IMPORT_TEXT } from '@/lib/menu-import';
-import { inr } from '@/lib/demo-data';
-import { paiseToRupees } from '@/lib/money';
+import { cropFromImage } from '@/lib/import/crop';
 import type { OutletBar } from '@/lib/outlets';
-import {
-  Card,
-  OwnerPage,
-  PageHead,
-  Segmented,
-  Tag,
-  btn,
-  textareaClass,
-} from '@/components/owner/chrome';
-
-const SAMPLE = `STARTERS
-Paneer Tikka 320
-Chicken 65 360
-Veg Manchurian 260
-
-MAIN COURSE
-Dal Makhani 280
-Butter Chicken 420
-Jeera Rice 180`;
+import { Card, OwnerPage, PageHead, btn } from '@/components/owner/chrome';
 
 /**
- * Import a menu that already exists elsewhere.
+ * Bring in a menu that already exists elsewhere.
  *
- * Two steps, and the first one writes nothing. The review is not decoration:
- * it is where the owner sees that "Paneer Tikka 320" became a ₹320 dish, that
- * four lines were skipped, and that two dishes were guessed non-veg from
- * their names. Undo after an import is a delete menu; undo before one is a
- * glance.
+ * One way in: photograph the menu. The owner's own printed card is the
+ * source every restaurant already has, and one path kept honest beats three
+ * kept busy. The review is not decoration: it is where the owner sees that
+ * "Paneer Tikka 320" became a ₹320 dish and that four dishes need a price
+ * before anything is written.
+ *
+ * The save is one action at the bottom of the page — dishes and brand style
+ * go in together, as one draft. Nothing goes live until the owner publishes
+ * from the editor.
  */
 export function MenuImportScreen({
   outlet,
@@ -62,33 +38,17 @@ export function MenuImportScreen({
   /**
    * Does this deployment have a vision key?
    *
-   * Passed from the server because it is an environment fact. When it is false
-   * the photo path cannot work at all: there is no model to read the picture.
-   * The screen used to offer it anyway, as the DEFAULT tab, so the first thing
-   * an owner tried on this page was the one thing guaranteed to fail. A path
-   * that cannot succeed is not an option.
+   * Passed from the server because it is an environment fact. When it is
+   * false there is nothing this screen can do — a photo is the only way in —
+   * and it says so instead of offering a path that cannot succeed.
    */
   visionEnabled?: boolean;
 }) {
   const router = useRouter();
-  const [text, setText] = useState('');
-  const [preview, setPreview] = useState<ImportPreview | null>(null);
-  const [dropped, setDropped] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
-  const [reading, startReading] = useTransition();
   const [writing, startWriting] = useTransition();
 
   const canWrite = !blocked && (role === 'owner' || role === 'manager');
-
-  /*
-   * Which input the owner is using.
-   *
-   * Photo first when there is a model to read it: a restaurant with a printed
-   * card already has the thing this needs, and typing it out is the long way
-   * round. With no vision key the photo path is not a slower option, it is an
-   * impossible one, so the screen starts on text and does not offer the tab.
-   */
-  const [mode, setMode] = useState<'photo' | 'file' | 'text'>(visionEnabled ? 'photo' : 'text');
 
   /* The stable import identifier: the menu draft and the brand draft share
      it, and a repeated Create finds the same pair instead of doubling it. */
@@ -97,54 +57,20 @@ export function MenuImportScreen({
   const [brandState, setBrandState] = useState<BrandReviewState | null>(null);
   const [photoDraft, setPhotoDraft] = useState<PhotoDraft | null>(null);
 
-  function readMenu() {
-    setError(null);
-    startReading(async () => {
-      try {
-        const result = await previewMenuImportAction(text);
-        setPreview(result);
-        setDropped(new Set());
-        if (!result.ok) setError(result.error);
-      } catch {
-        // A rejected server action must not leave the Read button stuck.
-        setError('Something went wrong reading the text. Try again.');
-      }
-    });
-  }
-
-  function readSpreadsheet(picked: File | null) {
-    if (!picked) return;
-    setError(null);
-    startReading(async () => {
-      try {
-        const data = new FormData();
-        data.set('file', picked);
-        const result = await parseMenuFileAction(data);
-        setPreview(result);
-        setDropped(new Set());
-        if (!result.ok) setError(result.error);
-      } catch {
-        setError('Something went wrong reading that file. Try again.');
-      }
-    });
-  }
+  const saveCount = photoDraft
+    ? photoDraft.payload.categories.reduce((sum, category) => sum + category.items.length, 0)
+    : 0;
 
   /*
    * The one save, below the brand review on purpose: whatever the owner
-   * checked — dishes from photo, spreadsheet or text, and the brand style —
-   * goes in together, as one draft. Dish photos are cropped after the menu
-   * exists and may fail without losing the import.
+   * checked — dishes and brand style — goes in together, as one draft. Dish
+   * photos are cropped after the menu exists and may fail without losing the
+   * import.
    */
   function saveImport() {
     setError(null);
-
-    const menu = photoDraft
-      ? { ...photoDraft.payload, importId }
-      : preview?.ok
-        ? { categories: preview.draft.categories.filter((_, index) => !dropped.has(index)), importId }
-        : null;
-    if (!menu) return;
-    if (photoDraft?.missingPrice) {
+    if (!photoDraft) return;
+    if (photoDraft.missingPrice) {
       setError('Some dishes have no price. Type one, or remove the dish.');
       return;
     }
@@ -154,15 +80,18 @@ export function MenuImportScreen({
         // The pair: menu draft AND brand draft, one import id. A failure in the
         // brand half rolls the menu half back (createImportPairAction).
         const brand = brandState ? brandStateToDraft(brandState, importId) : null;
-        const result = await createImportPairAction({ menu, brand: brand ?? { importId } });
+        const result = await createImportPairAction({
+          menu: { ...photoDraft.payload, importId },
+          brand: brand ?? { importId },
+        });
         if (!result.ok) {
           setError(result.error);
           return;
         }
 
         let photoNote = '';
-        const crops = photoDraft?.crops ?? [];
-        if (photoDraft && crops.length > 0 && photoDraft.file) {
+        const crops = photoDraft.crops;
+        if (crops.length > 0 && photoDraft.file) {
           if (photoDraft.file.type === 'application/pdf') {
             // Honest limit, said out loud: a PDF is read for dishes and
             // prices, but dish photos are cropped from images only.
@@ -208,27 +137,12 @@ export function MenuImportScreen({
     });
   }
 
-  const draft = preview?.ok ? preview.draft : null;
-  const keptCount = draft
-    ? draft.categories
-        .filter((_, index) => !dropped.has(index))
-        .reduce((sum, category) => sum + category.items.length, 0)
-    : 0;
-  const photoDishCount = photoDraft
-    ? photoDraft.payload.categories.reduce((sum, category) => sum + category.items.length, 0)
-    : 0;
-  const saveCount = photoDraft ? photoDishCount : keptCount;
-
   return (
     <OwnerPage active="import" outlet={outlet}>
       <PageHead
         kicker="Menu · import"
         title="Bring in a menu you already have"
-        meta={
-          visionEnabled
-            ? 'Photograph your printed menu and we read the dishes, prices and pictures for you to check. Or upload a spreadsheet, or paste the text. Nothing is saved until you approve it.'
-            : 'Upload a spreadsheet or paste your menu’s text and we read the dishes and prices for you to check. Nothing is saved until you approve it.'
-        }
+        meta="Photograph your printed menu and we read the dishes, prices and pictures for you to check. Nothing is saved until you approve it."
         actions={
           <Link href="/dashboard/menus" className={btn('ghost', 'sm')}>
             Back to the menu editor
@@ -236,45 +150,13 @@ export function MenuImportScreen({
         }
       />
 
-      {/* Three inputs, one result. A segmented control rather than separate
-          screens, so the owner never has to guess which page to be on. The
-          photo tab appears only when there is a vision key: "Photo of your
-          menu" on a deployment that cannot read one is a tab that can only
-          disappoint. */}
-      {!blocked && (
-        <div className="mb-4">
-          <Segmented
-            label="How to import"
-            value={mode}
-            onChange={(next) => setMode(next as 'photo' | 'file' | 'text')}
-            options={[
-              ...(visionEnabled
-                ? [
-                    {
-                      value: 'photo',
-                      label: 'Photo of your menu',
-                      data: { 'data-import-tab': mode === 'photo' ? 'on' : 'off' },
-                    },
-                  ]
-                : []),
-              {
-                value: 'file',
-                label: 'Spreadsheet file',
-                data: { 'data-import-tab': mode === 'file' ? 'on' : 'off' },
-              },
-              { value: 'text', label: 'Paste the text', data: { 'data-import-tab': mode === 'text' ? 'on' : 'off' } },
-            ]}
-          />
-        </div>
-      )}
-
       {/* The progress strip: where the owner is, in one line. Derived from
           real state only — the save step lights up while the save runs, and
           nothing claims a step that has not happened. */}
       {!blocked && (
         <div className="mb-4 flex flex-wrap items-center gap-1.5" data-import-steps>
           {['Add your menu', 'Check dishes & brand', 'Save the draft'].map((label, index) => {
-            const position = writing ? 2 : preview?.ok || menuFile ? 1 : 0;
+            const position = writing ? 2 : photoDraft || menuFile ? 1 : 0;
             const state = index < position ? 'done' : index === position ? 'active' : 'todo';
             return (
               <span
@@ -296,248 +178,27 @@ export function MenuImportScreen({
         </div>
       )}
 
-      {!blocked && !visionEnabled && (
-        <div className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-[var(--p-r-block)] border border-hair bg-card px-4 py-3">
-          <Tag tone="neutral">Paste the text</Tag>
-          <p className="m-0 flex-1 text-[12.5px] leading-[1.5] text-gink-64">
-            Reading a photograph needs a vision model, and this deployment does not have one
-            configured. Paste the menu&rsquo;s text instead &mdash; it is parsed by rules, and you check
-            every line before anything is saved.
-          </p>
-        </div>
-      )}
-
-      {mode === 'photo' && visionEnabled && !blocked && (
-        <PhotoImportPanel canWrite={canWrite} onFileChange={setMenuFile} onDraftChange={setPhotoDraft} />
-      )}
-
       {blocked && <SignInPrompt reason={blocked} screen="menu import" />}
 
+      {!blocked && visionEnabled && (
+        <PhotoImportPanel canWrite={canWrite} onFileChange={setMenuFile} onDraftChange={setPhotoDraft} />
+      )}
+      {!blocked && !visionEnabled && (
+        <Card>
+          <p className="m-0 px-4 py-4 text-[12.5px] leading-[1.55] text-gink-64 sm:px-5">
+            Reading a photograph needs a vision service on this deployment, and this one does not
+            have it configured. Add dishes by hand in the menu editor instead.
+          </p>
+        </Card>
+      )}
+
       {error && (
-        <div
+        <p
           role="alert"
-          className="mt-3 rounded-[var(--p-r-block)] border border-[var(--p-due)]/30 bg-[var(--p-due)]/8 px-4 py-3"
+          className="mt-4 rounded-[12px] border border-[var(--p-due)]/30 bg-[var(--p-due)]/8 px-4 py-3 text-[12.5px] text-[var(--p-due)]"
         >
-          <strong className="text-[12.5px] text-[var(--p-due)]">Nothing was imported.</strong>
-          <p className="mt-1 text-[12.5px] leading-[1.5] text-gink-64">{error}</p>
-        </div>
-      )}
-
-      {mode === 'file' && !preview?.ok && !blocked && (
-        <Card>
-          <div className="border-b border-hair px-4 py-3 sm:px-5">
-            <h2 className="text-[13px] font-semibold text-gink">Upload a spreadsheet</h2>
-            <p className="mt-1 text-[12.5px] leading-[1.5] text-gink-46">
-              A CSV or Excel file with one dish per row. A name column and a price column are
-              required; category, description and veg are used when the file has them. Nothing is
-              saved until you check the result.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2.5 px-4 py-4 sm:px-5">
-            <label className={`${btn('solid', 'sm')} relative cursor-pointer overflow-hidden`}>
-              {reading ? 'Reading the file…' : 'Choose a CSV or Excel file'}
-              <input
-                type="file"
-                accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                className="hidden"
-                disabled={reading}
-                onChange={(e) => {
-                  const picked = e.target.files?.[0] ?? null;
-                  e.target.value = '';
-                  readSpreadsheet(picked);
-                }}
-              />
-            </label>
-            <span className="text-[11.5px] text-gink-46">CSV or .xlsx, up to 5 MB.</span>
-          </div>
-        </Card>
-      )}
-
-      {mode === 'text' && !preview?.ok && !blocked && (
-        <Card>
-          <div className="border-b border-hair px-4 py-3 sm:px-5">
-            <h2 className="text-[13px] font-semibold text-gink">The menu text</h2>
-            <p className="mt-1 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
-              Section headings on their own line, then the dishes. Prices can be written as 320, ₹320,
-              320/- or 1,200.
-            </p>
-          </div>
-
-          <div className="px-4 py-4 sm:px-5">
-            <label htmlFor="menu-import-text" className="mb-1.5 block text-[11.5px] font-medium text-gink-64">
-              Paste here
-            </label>
-            <textarea
-              id="menu-import-text"
-              className={`${textareaClass} min-h-[280px] font-mono text-[12.5px]!`}
-              name="menuText"
-              rows={14}
-              maxLength={MAX_IMPORT_TEXT}
-              placeholder={SAMPLE}
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-            />
-            <p className="mt-1.5 text-[11.5px] leading-[1.45] text-gink-46">
-              {text.length.toLocaleString('en-IN')} of {MAX_IMPORT_TEXT.toLocaleString('en-IN')}{' '}
-              characters. A photograph of a menu cannot be pasted — type or copy the text.
-            </p>
-
-            <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-              <button
-                type="button"
-                className={btn('ghost', 'sm')}
-                onClick={() => setText(SAMPLE)}
-                disabled={reading || writing}
-              >
-                Use the example
-              </button>
-              <button
-                type="button"
-                className={btn('solid', 'sm')}
-                onClick={readMenu}
-                disabled={reading || writing}
-              >
-                {reading ? 'Reading…' : 'Read the menu'}
-              </button>
-            </div>
-
-            <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
-              Reading a menu with a language model is optional and off unless this deployment has a key
-              configured. When it is off, the text is read by rules: a line with a price is a dish, a
-              short line without one is a section. Either way you see the result before anything is
-              written.
-            </p>
-          </div>
-        </Card>
-      )}
-
-      {draft && (
-        <Card className="mt-4">
-          <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-hair px-4 py-3 sm:px-5">
-            <div>
-              <h2 className="text-[13px] font-semibold text-gink">Check before importing</h2>
-              <p className="mt-1 text-[12.5px] leading-[1.5] text-gink-46">
-                {draft.categories.length} section{draft.categories.length === 1 ? '' : 's'} ·{' '}
-                {draftItemCount(draft)} dish{draftItemCount(draft) === 1 ? '' : 'es'}. Untick a section
-                to leave it out.
-              </p>
-            </div>
-            {preview?.ok && preview.note && (
-              <span className="text-[11.5px] text-gink-46">{preview.note}</span>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-2.5 px-4 py-4 sm:px-5">
-            {draft.categories.map((category, index) => {
-              const kept = !dropped.has(index);
-              return (
-                <div
-                  key={`${category.name}-${index}`}
-                  data-kept={kept ? 'true' : 'false'}
-                  className={[
-                    'rounded-[var(--p-r-block)] border px-3.5 py-3 transition-colors',
-                    kept ? 'border-hair bg-paper-deep/60' : 'border-hair bg-paper-deep opacity-55',
-                  ].join(' ')}
-                >
-                  <label className="flex cursor-pointer items-center gap-2.5">
-                    <input
-                      type="checkbox"
-                      checked={kept}
-                      className="size-4 shrink-0 accent-[var(--p-accent)]"
-                      onChange={(event) => {
-                        const next = new Set(dropped);
-                        if (event.target.checked) next.delete(index);
-                        else next.add(index);
-                        setDropped(next);
-                      }}
-                    />
-                    <strong className="text-[12.5px] font-semibold text-gink">{category.name}</strong>
-                    <span className="text-[11.5px] text-gink-46">
-                      {category.items.length} dish{category.items.length === 1 ? '' : 'es'}
-                    </span>
-                  </label>
-
-                  <ul className="m-0 mt-2 grid list-none gap-1 p-0 sm:grid-cols-2">
-                    {category.items.map((item, itemIndex) => (
-                      <li
-                        key={`${item.name}-${itemIndex}`}
-                        className="flex items-baseline justify-between gap-2 text-[12.5px] text-gink-64"
-                      >
-                        <span className="flex min-w-0 items-baseline gap-1.5">
-                          <VegMark veg={item.isVeg} />
-                          <span className="truncate">{item.name}</span>
-                        </span>
-                        <span className="shrink-0 tabular-nums text-gink">
-                          {inr(paiseToRupees(item.pricePaise))}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })}
-
-            {draft.issues.length > 0 && (
-              <div className="rounded-[var(--p-r-block)] border border-[var(--p-due)]/30 bg-[var(--p-due)]/8 px-3.5 py-3">
-                <strong className="text-[12.5px] font-semibold text-gink">
-                  {draft.issues.length} line(s) were not imported.
-                </strong>{' '}
-                <span className="text-[11.5px] leading-[1.5] text-gink-64">
-                  Fix these in your own document and paste again, or add them by hand afterwards.
-                </span>
-                <ul className="m-0 mt-2 flex list-none flex-col gap-1 p-0">
-                  {draft.issues.slice(0, 12).map((issue, index) => (
-                    <li key={index} className="text-[11.5px] leading-[1.45] text-gink-64">
-                      <code className="rounded bg-card px-1 py-0.5 text-[11.5px] text-gink">
-                        {issue.line}
-                      </code>{' '}
-                      — {issue.reason}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {draft.duplicates > 0 && (
-              <p className="m-0 text-[11.5px] leading-[1.5] text-gink-46">
-                {draft.duplicates} duplicate line{draft.duplicates === 1 ? ' was' : 's were'} dropped
-                because the same dish with the same price appeared twice.
-              </p>
-            )}
-
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-[var(--p-r-block)] border border-hair bg-card px-3.5 py-3">
-              <Tag tone="neutral">Guess</Tag>
-              <p className="m-0 flex-1 text-[11.5px] leading-[1.5] text-gink-64">
-                <strong className="font-semibold text-gink">
-                  Only what the menu marks is marked.
-                </strong>{' '}
-                Anything named chicken, mutton, fish, prawn or egg is marked non-veg from its name;
-                everything else arrives unmarked until you set it above. A wrong mark is a real
-                problem for a guest, not a detail.
-              </p>
-            </div>
-
-            {!canWrite ? (
-              <p className="m-0 text-[11.5px] leading-[1.5] text-gink-46">
-                Only an owner or manager can add a menu. You are signed in as {role ?? 'staff'}.
-              </p>
-            ) : (
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <button
-                  type="button"
-                  className={btn('ghost', 'sm')}
-                  onClick={() => {
-                    setPreview(null);
-                    setError(null);
-                  }}
-                  disabled={writing}
-                >
-                  Start over
-                </button>
-              </div>
-            )}
-          </div>
-        </Card>
+          {error}
+        </p>
       )}
 
       {/* The brand half of the import. Independent extraction, independent
@@ -551,8 +212,8 @@ export function MenuImportScreen({
       />
 
       {/* The one save. Below the brand review on purpose: dishes and brand
-          style go in together, whatever source they came from. */}
-      {!blocked && canWrite && (photoDraft || preview?.ok) && (
+          style go in together. */}
+      {!blocked && canWrite && photoDraft && (
         <Card className="mt-4">
           <div className="border-b border-hair px-4 py-3 sm:px-5">
             <h2 className="text-[13px] font-semibold text-gink">Save the draft</h2>
@@ -562,15 +223,8 @@ export function MenuImportScreen({
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2 px-4 py-4 sm:px-5">
-            <button
-              type="button"
-              className={btn('solid')}
-              onClick={saveImport}
-              disabled={writing || reading}
-            >
-              {writing
-                ? 'Saving…'
-                : `Save ${saveCount} dish${saveCount === 1 ? '' : 'es'} as a draft`}
+            <button type="button" className={btn('solid')} onClick={saveImport} disabled={writing}>
+              {writing ? 'Saving…' : `Save ${saveCount} dish${saveCount === 1 ? '' : 'es'} as a draft`}
             </button>
           </div>
         </Card>

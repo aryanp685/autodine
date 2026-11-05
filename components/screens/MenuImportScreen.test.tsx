@@ -8,8 +8,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/app/(staff)/dashboard/menus/import-actions', () => ({
-  createImportedMenuAction: async () => ({ ok: false }),
-  previewMenuImportAction: async () => ({ ok: false }),
+  attachImportPhotosAction: async () => ({ ok: true, attached: 0, skipped: 0, skippedNames: [] }),
 }));
 
 vi.mock('@/app/(staff)/dashboard/menus/brand-actions', () => ({
@@ -30,36 +29,42 @@ vi.mock('@/components/PhotoImportPanel', () => ({
 }));
 
 /**
- * A path that cannot succeed is not an option.
+ * One way in: photograph the menu.
  *
- * The import screen used to open on "Photo of your menu" whether or not the
- * deployment could read a photograph. On a server with no vision key that tab
- * could only ever fail, and it was the first thing an owner was shown. The tab
- * is now gated on the key, and the text pasting path -- which always works --
- * is what the screen offers.
+ * The screen used to offer text pasting and a spreadsheet upload alongside
+ * the photo path; the owner asked for just the photo. What these pin is the
+ * shape of the one-path screen: the photo reader when the deployment can
+ * read a photo, an honest sentence when it cannot, and no path that can only
+ * disappoint.
  */
 describe('Menu import with no vision key', () => {
   it('does not offer the photo path', () => {
     const html = renderToStaticMarkup(<MenuImportScreen visionEnabled={false} />);
 
-    expect(html).not.toContain('Photo of your menu');
     expect(html).not.toContain('data-photo-panel');
   });
 
   it('says why, and points at the path that works', () => {
     const html = renderToStaticMarkup(<MenuImportScreen visionEnabled={false} />);
 
-    expect(html).toContain('Paste the text');
-    expect(html).toContain('does not have one');
+    expect(html).toContain('does not have it configured');
+    expect(html).toContain('Add dishes by hand');
   });
 });
 
 describe('Menu import with a vision key', () => {
-  it('offers both inputs', () => {
+  it('offers the photo reader and nothing else', () => {
     const html = renderToStaticMarkup(<MenuImportScreen visionEnabled />);
 
-    expect(html).toContain('Photo of your menu');
-    expect(html).toContain('Paste the text');
     expect(html).toContain('data-photo-panel');
+    expect(html).not.toContain('Paste the text');
+    expect(html).not.toContain('Spreadsheet');
+  });
+
+  it('keeps the brand review and the progress strip on the same journey', () => {
+    const html = renderToStaticMarkup(<MenuImportScreen visionEnabled />);
+
+    expect(html).toContain('data-brand-review');
+    expect(html).toContain('data-import-steps');
   });
 });
