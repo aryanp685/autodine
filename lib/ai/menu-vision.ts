@@ -25,7 +25,8 @@
  */
 
 import { MAX_IMPORT_CATEGORIES, MAX_IMPORT_ITEMS } from '../menu-import';
-import { callGeminiJson, geminiConfigured } from './gemini';
+import { callVisionJson, geminiConfigured } from './gemini';
+import { groqConfigured } from './groq';
 
 /** Where a dish's own photo sits on the page, as fractions of the image. */
 export type PhotoBox = {
@@ -91,7 +92,8 @@ const ACCEPTED: Record<string, string> = {
 };
 
 export function visionConfigured(): boolean {
-  return geminiConfigured();
+  // Either provider can serve a read; one is enough.
+  return geminiConfigured() || groqConfigured();
 }
 
 /** Check a file before it is sent to a paid API. */
@@ -276,7 +278,7 @@ export async function extractMenuFromImage(
   bytes: ArrayBuffer,
   mimeType: string
 ): Promise<VisionResult> {
-  const result = await callGeminiJson({
+  const result = await callVisionJson({
     prompt: PROMPT,
     bytes,
     mimeType,

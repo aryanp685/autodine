@@ -453,7 +453,8 @@ export function PhotoImportPanel({
 
             {status === 'reading' && (
               <p role="status" className="mt-2 text-[11.5px] leading-[1.5] text-gink-46">
-                This usually takes about twenty seconds. Keep this tab open.
+                This usually takes about twenty seconds — longer when the reader is busy. Keep this
+                tab open.
               </p>
             )}
           </div>

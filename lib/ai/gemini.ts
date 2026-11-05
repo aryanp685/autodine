@@ -27,6 +27,8 @@
  * Server-only: the key never leaves this process.
  */
 
+import { callGroqJson, groqConfigured } from './groq';
+
 /** The failure codes shared by both readers. */
 export type GeminiFailureCode = 'not-configured' | 'rate-limited' | 'timeout' | 'upstream';
 
@@ -187,4 +189,43 @@ export async function callGeminiJson(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/**
+ * The reader both screens actually use: Gemini first, Groq when Gemini is
+ * busy or gone.
+ *
+ * The free Gemini tier answers 503 "high demand" for hours at a stretch, and
+ * an owner staring at "the reader is busy" cannot import a menu. The budget
+ * is split deliberately: Gemini gets the first stretch (retries included) but
+ * cannot starve the fallback, and any failure -- busy, gone model, even a
+ * missing Gemini key -- hands the same prompt and photo to Llama 4 Scout
+ * before the owner is told anything. Only a budget that has run out ends the
+ * attempt: the owner waited already, and a second provider is cheaper than a
+ * retry-the-page instruction.
+ */
+export async function callVisionJson(
+  args: {
+    prompt: string;
+    bytes: ArrayBuffer;
+    mimeType: string;
+    maxOutputTokens: number;
+    /** Overall patience, both providers and all retries. Default 120s. */
+    timeoutMs?: number;
+    retryDelaysMs?: number[];
+    sleep?: (ms: number) => Promise<void>;
+  } & GeminiFailureCopy
+): Promise<GeminiJsonResult> {
+  const budgetMs = args.timeoutMs ?? 120_000;
+  const deadline = Date.now() + budgetMs;
+
+  // Gemini's phase is capped at 75s so a thrashing provider cannot eat the
+  // whole budget before the fallback gets a chance.
+  const gemini = await callGeminiJson({ ...args, timeoutMs: Math.min(budgetMs, 75_000) });
+  if (gemini.ok) return gemini;
+
+  const remaining = deadline - Date.now();
+  if (remaining < 5_000 || !groqConfigured()) return gemini;
+
+  return callGroqJson({ ...args, timeoutMs: remaining });
 }
