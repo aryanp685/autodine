@@ -17,7 +17,12 @@ describe('BrandReview', () => {
     );
     expect(html).toContain('not switched on');
     expect(html).toContain('Upload logo');
-    expect(html).toContain('Primary colour');
+    // The colour and design-style review blocks were removed on the owner's
+    // call — the theme still resolves for the draft, the import review just
+    // no longer shows swatches, style tags or extraction notes.
+    expect(html).not.toContain('Primary colour');
+    expect(html).not.toContain('Design style');
+    expect(html).not.toContain('would not be readable');
   });
 
   it('never pre-confirms the name', () => {

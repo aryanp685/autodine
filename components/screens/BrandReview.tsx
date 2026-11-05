@@ -36,15 +36,7 @@ import {
   resolveName,
   resolvePrimary,
 } from '@/lib/branding/resolve';
-import { ACCENTS } from '@/lib/branding/palette';
-import {
-  FONT_MATCHES,
-  parseHex,
-  parseTheme,
-  themeContrastWarnings,
-  themeFontLimitation,
-  type BrandTheme,
-} from '@/lib/branding/theme';
+import { parseHex, parseTheme, type BrandTheme } from '@/lib/branding/theme';
 import type { BrandConflict, BrandDraft, FieldSource } from '@/lib/branding/draft';
 import type { BrandExtraction } from '@/lib/ai/brand-vision';
 import { Card, Tag, btn, inputClass } from '@/components/owner/chrome';
@@ -131,8 +123,6 @@ export function BrandReview({
   ];
   const conflictKey = (c: BrandConflict) => `${c.field}:${c.message}`;
   const openConflicts = conflicts.filter((c) => !resolvedKeys.has(conflictKey(c)));
-  const warnings = theme ? themeContrastWarnings(theme) : [];
-  const fontNote = theme ? themeFontLimitation(theme) : null;
 
   /* Push the state up whenever anything changes. The parent derives the
      Create payload from this; nothing here writes. */
@@ -177,20 +167,26 @@ export function BrandReview({
       return;
     }
     startReading(async () => {
-      const data = new FormData();
-      data.set('photo', chosen);
-      const result: BrandPreview = await extractBrandFromPhotoAction(data);
-      if (!result.ok) {
-        setError(result.error);
-        return;
+      try {
+        const data = new FormData();
+        data.set('photo', chosen);
+        const result: BrandPreview = await extractBrandFromPhotoAction(data);
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        setExtraction(result.extraction);
+        setNameConfirmed(false);
+        setNotice(
+          result.extraction.name
+            ? 'Read the visual style. Check the name below before creating.'
+            : 'Read the style, but no name was printed on this image. Type the name yourself.',
+        );
+      } catch {
+        // A rejected server action must never leave the read buttons stuck
+        // behind a reading state — the owner has to be able to try again.
+        setError('Something went wrong reading that image. Try again.');
       }
-      setExtraction(result.extraction);
-      setNameConfirmed(false);
-      setNotice(
-        result.extraction.name
-          ? 'Read the visual style. Check the name and colour below before creating.'
-          : 'Read the style, but no name was printed on this image. Type the name yourself.',
-      );
     });
   }
 
@@ -200,22 +196,26 @@ export function BrandReview({
     if (!picked) return;
     setError(null);
     startUpload(async () => {
-      const data = new FormData();
-      data.set('kind', kind);
-      data.set('file', picked);
-      const result: UploadResult = await uploadBrandAssetAction(data);
-      if (!result.ok) {
-        setError(result.error);
-        return;
+      try {
+        const data = new FormData();
+        data.set('kind', kind);
+        data.set('file', picked);
+        const result: UploadResult = await uploadBrandAssetAction(data);
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        if (kind === 'logo') {
+          setLogoAssetId(result.asset.id);
+          setLogoUrl(result.asset.url);
+        } else {
+          setBannerAssetId(result.asset.id);
+          setBannerUrl(result.asset.url);
+        }
+        setNotice(kind === 'logo' ? 'Logo ready. Your upload always wins.' : 'Banner ready.');
+      } catch {
+        setError('That upload failed. Try again — nothing was changed.');
       }
-      if (kind === 'logo') {
-        setLogoAssetId(result.asset.id);
-        setLogoUrl(result.asset.url);
-      } else {
-        setBannerAssetId(result.asset.id);
-        setBannerUrl(result.asset.url);
-      }
-      setNotice(kind === 'logo' ? 'Logo ready. Your upload always wins.' : 'Banner ready.');
     });
   }
 
@@ -297,6 +297,16 @@ export function BrandReview({
             <button type="button" className={btn('ghost', 'sm')} disabled={reading} onClick={() => readBrand(null)}>
               Read again
             </button>
+          )}
+          {theme && (
+            <a
+              className={btn('quiet', 'sm')}
+              href={`/dashboard/branding/preview?theme=${encodeURIComponent(JSON.stringify(theme))}&name=${encodeURIComponent(name || existingName)}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Preview the guest menu
+            </a>
           )}
         </div>
       )}
@@ -444,93 +454,6 @@ export function BrandReview({
           <p className="mt-2 text-[11.5px] leading-[1.5] text-gink-46">Optional — without one the menu uses its paper header.</p>
         </div>
       </div>
-
-      {/* ---------------------------------------------------------- colour */}
-      <div className="border-b border-hair px-4 py-4 sm:px-5">
-        <div className="flex items-baseline justify-between gap-2">
-          <h3 className="text-[12.5px] font-semibold text-gink">Primary colour</h3>
-          {sourceTag(primaryResolution.resolved.source)}
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          {ACCENTS.map((a) => (
-            <button
-              key={a.key}
-              type="button"
-              aria-label={a.label}
-              disabled={!canWrite}
-              onClick={() => {
-                // The curated palette entry — a checked hex, not the stored
-                // restaurant accent. See lib/branding/palette.ts.
-                const hex = a.accent;
-                setOwnerPrimary(hex);
-              }}
-              className={`size-8 rounded-full border-2 ${primaryResolution.resolved.value === a.accent ? 'border-gink' : 'border-transparent'}`}
-              style={{ background: a.accent }}
-            />
-          ))}
-          {extraction?.colors.primary && (
-            <button
-              type="button"
-              aria-label={`Printed colour ${extraction.colors.primary}`}
-              disabled={!canWrite}
-              onClick={() => {
-                const hex = parseHex(extraction.colors.primary);
-                if (hex) setOwnerPrimary(hex);
-              }}
-              className={`size-8 rounded-full border-2 ${primaryResolution.resolved.value === extraction.colors.primary ? 'border-gink' : 'border-dashed border-hair-strong'}`}
-              style={{ background: extraction.colors.primary }}
-            />
-          )}
-          <label className="ml-1 flex items-center gap-2 text-[11.5px] text-gink-64">
-            Custom
-            <input
-              type="color"
-              disabled={!canWrite}
-              value={primaryResolution.resolved.value}
-              onChange={(e) => setOwnerPrimary(e.target.value.toLowerCase())}
-              className="size-8 cursor-pointer rounded border border-hair"
-            />
-          </label>
-          <code className="rounded bg-paper-deep px-1.5 py-0.5 text-[11.5px] text-gink">{primaryResolution.resolved.value}</code>
-        </div>
-        {warnings.map((w) => (
-          <p key={w} className="mt-2 text-[11.5px] leading-[1.5] text-[var(--p-due)]">
-            {w}
-          </p>
-        ))}
-      </div>
-
-      {/* --------------------------------------------------- style summary */}
-      {theme && (
-        <div className="border-b border-hair px-4 py-4 sm:px-5">
-          <h3 className="text-[12.5px] font-semibold text-gink">Design style {sourceTag('printed-menu')}</h3>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            <Tag tone="neutral">{FONT_MATCHES[theme.typography.character].label}</Tag>
-            <Tag tone="neutral">Cards {theme.layout.card.radius}</Tag>
-            <Tag tone="neutral">Border {theme.layout.card.border}</Tag>
-            <Tag tone="neutral">Spacing {theme.layout.spacing}</Tag>
-            {theme.layout.motifs.map((m) => (
-              <Tag key={m} tone="neutral">
-                {m.replace('-', ' ')}
-              </Tag>
-            ))}
-          </div>
-          {fontNote && <p className="mt-2 text-[11.5px] leading-[1.5] text-gink-46">{fontNote}</p>}
-          {extraction?.notes.map((n) => (
-            <p key={n} className="mt-1 text-[11.5px] leading-[1.5] text-gink-46">
-              {n}
-            </p>
-          ))}
-          <a
-            className={`${btn('quiet', 'sm')} mt-3`}
-            href={`/dashboard/branding/preview?theme=${encodeURIComponent(JSON.stringify(theme))}&name=${encodeURIComponent(name || existingName)}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Preview the guest menu
-          </a>
-        </div>
-      )}
 
       {/* ------------------------------------------------------- conflicts */}
       {openConflicts.map((c) => (
