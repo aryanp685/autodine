@@ -43,6 +43,31 @@ const DEFAULT_PRIMARY = '#6b2338';
  * character, header treatment, card geometry, spacing and motif — the fields
  * that say "design" rather than "palette".
  */
+/**
+ * Which design the live theme is, if it is one of the two.
+ *
+ * Compared on the fields that SAY design — type character, header, card
+ * geometry, spacing, motifs — and never on colour: the colours belong to the
+ * restaurant and are byte-copied into both candidates. A theme that matches
+ * neither candidate is the owner's own ('null' = custom), which is a real
+ * answer, not a failure.
+ */
+export function currentDesignIdOf(theme: BrandTheme | null | undefined): DesignId | null {
+  if (!theme) return null;
+  const same = (a: BrandTheme, b: BrandTheme) =>
+    a.typography.character === b.typography.character &&
+    a.layout.header === b.layout.header &&
+    a.layout.card.radius === b.layout.card.radius &&
+    a.layout.card.border === b.layout.card.border &&
+    a.layout.card.elevation === b.layout.card.elevation &&
+    a.layout.spacing === b.layout.spacing &&
+    JSON.stringify(a.layout.motifs ?? []) === JSON.stringify(b.layout.motifs ?? []);
+  for (const candidate of designCandidates(null)) {
+    if (same(theme, candidate.theme)) return candidate.id;
+  }
+  return null;
+}
+
 export function designCandidates(base: BrandTheme | null): DesignCandidate[] {
   const colors: BrandTheme['colors'] = base
     ? {

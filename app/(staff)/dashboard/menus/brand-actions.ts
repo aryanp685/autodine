@@ -42,6 +42,8 @@ import {
   upsertBrandDraft,
 } from '@/lib/branding/brand-data';
 import { sanitiseBrandDraft } from '@/lib/branding/draft';
+import { designCandidates } from '@/lib/branding/designs';
+import { parseTheme } from '@/lib/branding/theme';
 import { prepareAsset, assetObjectPath } from '@/lib/branding/uploads';
 import { publicAssetUrl } from '@/lib/storage/assets';
 
@@ -327,4 +329,145 @@ export async function rollbackPublishFormAction(): Promise<void> {
 /** A stable import id for the client to hold across retries. */
 export async function newImportIdAction(): Promise<string> {
   return randomUUID();
+}
+
+/* -------------------------------------------------- the design, after publish */
+
+/**
+ * Switch the storefront design — Warm Classic, Fresh Modern, or keep the
+ * owner's own.
+ *
+ * The design choice used to be a one-time door at the end of the import. This
+ * is the same choice, open for the life of the storefront: the candidates are
+ * rebuilt from the restaurant's own colours (never a new hue), the theme lands
+ * on a brand draft, and when a menu is already live the switch goes through
+ * publish_menu_brand_pair — the same transaction as the first publish, so the
+ * previous design is snapshotted and the existing rollback brings it back.
+ *
+ * Nothing here writes the menu or the dishes; the design is the only thing
+ * that changes.
+ */
+export async function applyDesignAction(formData: FormData): Promise<void> {
+  const ctx = await manageContext();
+  if (!ctx) {
+    redirect(
+      `/dashboard/branding?error=${encodeURIComponent('You need to be an owner or manager to change the design.')}`,
+    );
+  }
+
+  const designId = String(formData.get('designId') ?? '').trim();
+  if (designId !== 'warm-classic' && designId !== 'fresh-modern') {
+    redirect(`/dashboard/branding?error=${encodeURIComponent('Pick one of the two designs first.')}`);
+  }
+
+  const { data: restaurant, error: restaurantError } = await ctx.supabase
+    .from('restaurants')
+    .select('brand_theme, brand_theme_enabled')
+    .eq('id', ctx.restaurantId)
+    .maybeSingle();
+
+  if (restaurantError || !restaurant) {
+    redirect(`/dashboard/branding?error=${encodeURIComponent('Could not read your restaurant. Try again.')}`);
+  }
+
+  // The candidates keep the restaurant's own colours: the design is the
+  // shape, never a new hue.
+  const base = restaurant.brand_theme_enabled === true ? parseTheme(restaurant.brand_theme) : null;
+  const chosen = designCandidates(base).find((design) => design.id === designId)?.theme;
+  if (!chosen) {
+    redirect(`/dashboard/branding?error=${encodeURIComponent('That design is not available.')}`);
+  }
+
+  // The target is always a DRAFT profile: update the current draft if one
+  // exists, otherwise start one from the live identity (name and assets are
+  // copied, so switching design switches the design only).
+  const { data: draft } = await ctx.supabase
+    .from('restaurant_brand_profiles')
+    .select('id')
+    .eq('restaurant_id', ctx.restaurantId)
+    .eq('status', 'draft')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let profileId = draft?.id as string | undefined;
+
+  if (!profileId) {
+    const { data: previous } = await ctx.supabase
+      .from('restaurant_brand_profiles')
+      .select('name, logo_asset_id, banner_asset_id')
+      .eq('restaurant_id', ctx.restaurantId)
+      .eq('status', 'published')
+      .maybeSingle();
+
+    const { data: created, error: insertError } = await ctx.supabase
+      .from('restaurant_brand_profiles')
+      .insert({
+        restaurant_id: ctx.restaurantId,
+        // A fresh import id: this profile is a new draft of its own, not a
+        // repeat of the import that made the last one.
+        import_id: randomUUID(),
+        status: 'draft',
+        name: previous?.name ?? null,
+        logo_asset_id: previous?.logo_asset_id ?? null,
+        banner_asset_id: previous?.banner_asset_id ?? null,
+        theme: chosen,
+      })
+      .select('id')
+      .single();
+
+    if (insertError || !created) {
+      redirect(
+        `/dashboard/branding?error=${encodeURIComponent(
+          `Could not save the design: ${insertError?.message ?? 'the write did not come back.'}`,
+        )}`,
+      );
+    }
+    profileId = created.id as string;
+  } else {
+    const { error: updateError } = await ctx.supabase
+      .from('restaurant_brand_profiles')
+      .update({ theme: chosen })
+      .eq('id', profileId)
+      .eq('restaurant_id', ctx.restaurantId);
+    if (updateError) {
+      redirect(
+        `/dashboard/branding?error=${encodeURIComponent(`Could not save the design: ${updateError.message}`)}`,
+      );
+    }
+  }
+
+  const { data: menus } = await ctx.supabase
+    .from('menus')
+    .select('id, is_published')
+    .eq('restaurant_id', ctx.restaurantId)
+    .order('sort_order', { ascending: true });
+  const liveMenu = (menus ?? []).find((menu) => menu.is_published === true);
+
+  if (!liveMenu) {
+    revalidatePath('/dashboard/branding');
+    redirect(
+      `/dashboard/branding?notice=${encodeURIComponent(
+        'The design is saved to your draft. It goes live with your first publish.',
+      )}`,
+    );
+  }
+
+  // A live menu: switch the pair through the publish transaction, so the
+  // previous design is snapshotted and rollback covers this switch too.
+  const result = await publishPair(liveMenu.id as string, profileId);
+  if (!result.ok) {
+    redirect(`/dashboard/branding?error=${encodeURIComponent(result.error)}`);
+  }
+
+  revalidatePath('/menu');
+  revalidatePath('/dashboard/menus');
+  revalidatePath('/dashboard/branding');
+  redirect(
+    `/dashboard/branding?notice=${encodeURIComponent(
+      result.value.already
+        ? 'That design is already live.'
+        : 'The new design is live. The previous one can come back from Publish history.',
+    )}`,
+  );
 }

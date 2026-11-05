@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { BrandingScreen } from './BrandingScreen';
 import type { BrandingScreenData } from '@/lib/db/branding-screen';
+import { designCandidates } from '@/lib/branding/designs';
 
 // The upload actions are server-only modules; the markup is what is tested.
 vi.mock('@/app/(staff)/dashboard/branding/actions', () => ({
@@ -30,6 +31,8 @@ function data(over: Partial<BrandingScreenData> = {}): BrandingScreenData {
     canEdit: true,
     hasPublishedMenu: true,
     sampleDishes: [],
+    designs: [],
+    currentDesignId: null,
     ...over,
   } as BrandingScreenData;
 }
@@ -146,7 +149,9 @@ describe('Branding, the redesign', () => {
   it('marks the sample dish row as inert, because it is not tappable', () => {
     const html = render(
       data({
-        sampleDishes: [{ id: 'd1', name: 'Butter Chicken', price: 42_000, img: null }],
+        sampleDishes: [
+          { id: 'd1', name: 'Butter Chicken', price: 42_000, pricePaise: 42_000, img: null, category: 'Starters' },
+        ],
       } as Partial<BrandingScreenData>),
     );
     const at = html.indexOf('pointer-events-none select-none');
@@ -176,5 +181,57 @@ describe('Branding, the redesign', () => {
     const html = render(data({ hasPublishedMenu: false } as Partial<BrandingScreenData>));
     expect(html).toContain('Nothing is published yet.');
     expect(html).toContain('href="/dashboard/menus"');
+  });
+});
+
+describe('BrandingScreen, the storefront design section', () => {
+  // Real candidates from the design factory — the picker calls themeGuestStyle
+  // on each preview's theme, so hand-rolled shapes cannot stand in for them.
+  const designs = designCandidates(null);
+
+  it('hides the picker entirely when there are no designs to pick', () => {
+    const html = render(data());
+    expect(html).not.toContain('branding-design');
+    expect(html).not.toContain('Apply design');
+  });
+
+  it('shows the designs with an apply form that carries the chosen design id', () => {
+    const html = render(
+      data({
+        designs,
+        currentDesignId: 'warm-classic',
+        sampleDishes: [
+          { id: 'd1', name: 'Butter Chicken', price: 420, pricePaise: 42_000, img: null, category: 'Starters' },
+        ],
+      } as Partial<BrandingScreenData>),
+    );
+    expect(html).toContain('Storefront design');
+    expect(html).toContain('Warm Classic');
+    expect(html).toContain('Fresh Modern');
+    // The apply form exists and posts the pick through a hidden designId input
+    // (server-action forms carry no static action URL in server markup).
+    expect(html).toContain('name="designId"');
+    expect(html).toContain('value="warm-classic"');
+    // The live design is labelled as live, so the owner knows what guests see.
+    expect(html).toContain('This design is live');
+    expect(html).toContain('Switching is instant. The previous design can come back from Publish history.');
+  });
+
+  it('offers the apply as soon as a different design is on the page to pick', () => {
+    // No live design id (a custom theme, or nothing chosen yet): the chooser
+    // opens unselected and the apply reads "Apply design" until someone picks.
+    const html = render(data({ designs, currentDesignId: null } as Partial<BrandingScreenData>));
+    expect(html).toContain('Apply design');
+    expect(html).toContain('Choose');
+  });
+
+  it('keeps the apply blocked for staff who cannot edit and off the page when nothing is live', () => {
+    const readOnly = render(data({ designs, currentDesignId: 'warm-classic', canEdit: false } as Partial<BrandingScreenData>));
+    // Designs stay browsable, but the apply is disabled and says who can press it.
+    expect(readOnly).toContain('disabled=""');
+    expect(readOnly).toContain('Only an owner or manager can change the design.');
+    const unpublished = render(data({ designs, hasPublishedMenu: false } as Partial<BrandingScreenData>));
+    expect(unpublished).not.toContain('Storefront design');
+    expect(unpublished).not.toContain('Apply design');
   });
 });
