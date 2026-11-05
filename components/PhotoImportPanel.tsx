@@ -92,6 +92,8 @@ export function PhotoImportPanel({
   const [model, setModel] = useState<string>('');
   const [categories, setCategories] = useState<EditableCategory[]>([]);
   const [dropped, setDropped] = useState<Set<string>>(new Set());
+  /** The drop zone says "let go here" while a file is dragged over it. */
+  const [dragOver, setDragOver] = useState(false);
 
   const [working, startWork] = useTransition();
 
@@ -306,57 +308,85 @@ export function PhotoImportPanel({
     );
   }
 
-  const stepBadge = (n: number) => (
-    <span
-      aria-hidden="true"
-      className="grid size-6 shrink-0 place-items-center rounded-full bg-gink text-[11.5px] font-semibold text-onink tabular-nums"
-    >
-      {n}
-    </span>
-  );
-
   return (
     <div data-photo-import className="flex flex-col gap-4">
       {/* --------------------------------------------------------------- pick */}
       <Card>
-        <div className="border-b border-hair px-4 py-3 sm:px-5">
-          <div className="flex items-center gap-2.5">
-            {stepBadge(1)}
-            <h2 className="text-[13px] font-semibold text-gink">Photo of your menu</h2>
-          </div>
-          <p className="mt-1.5 text-[12.5px] leading-[1.5] text-gink-46">
-            Point at a printed menu — the whole card in frame, flat, in good light. JPG, PNG, WebP or
-            PDF, up to 8 MB and 3 pages.
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:px-5">
-          {/* A plain <img>, not next/image: this is a blob: URL for a file that
-              only exists in this tab, which the optimiser cannot fetch. */}
-          <div className="flex size-[104px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] border border-hair bg-paper-deep">
-            {previewUrl ? (
-              <img
-                src={previewUrl}
-                alt="The menu you are about to read"
-                className="size-full object-cover"
-              />
-            ) : file ? (
-              <div className="px-2 text-center text-[10.5px] leading-[1.4] text-gink-46">
-                PDF selected
-                <br />
-                <span className="break-all">{file.name.slice(0, 26)}</span>
-              </div>
-            ) : (
-              <div className="px-2 text-center text-[10.5px] leading-[1.4] text-gink-46">
-                No photo yet
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <label
-              className={`${btn('ghost', 'sm')} relative cursor-pointer overflow-hidden`}
+        <div
+          className="px-4 py-4 sm:px-5"
+          onDragOver={(event) => {
+            event.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(event) => {
+            event.preventDefault();
+            setDragOver(false);
+            pick(event.dataTransfer.files?.[0] ?? null);
+          }}
+        >
+          <div
+            className={[
+              'flex flex-col items-center gap-3 rounded-[14px] border-2 border-dashed px-4 py-8 text-center transition-colors duration-150',
+              dragOver ? 'border-plum bg-plum-soft' : 'border-hair',
+            ].join(' ')}
+          >
+            <span
+              aria-hidden="true"
+              className="grid size-12 place-items-center rounded-full bg-plum-soft text-plum"
             >
+              <svg viewBox="0 0 24 24" fill="none" className="size-5">
+                <path
+                  d="M12 16V5m0 0L7.5 9.5M12 5l4.5 4.5M5 15v2.5A2.5 2.5 0 007.5 20h9a2.5 2.5 0 002.5-2.5V15"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </span>
+            <div>
+              <h2 className="m-0 text-[17px] font-semibold text-gink">Drop your menu here</h2>
+              <p className="mt-1 mb-0 text-[12.5px] text-gink-46">or choose how you want to add it</p>
+            </div>
+
+            {/* One way in, by the owner's call: a photo of the printed menu.
+                The card reads selected because it is the only method. */}
+            <div className="flex w-full max-w-[280px] items-center gap-2.5 rounded-[12px] border border-plum bg-plum-soft px-3.5 py-2.5 text-left">
+              <span aria-hidden="true" className="shrink-0 text-plum">
+                <svg viewBox="0 0 20 20" fill="none" className="size-[18px]">
+                  <rect x="2.5" y="3.5" width="15" height="13" rx="2" stroke="currentColor" strokeWidth="1.5" />
+                  <circle cx="7.5" cy="8" r="1.4" stroke="currentColor" strokeWidth="1.3" />
+                  <path
+                    d="M2.5 13.5L7 10l3.5 2.5 3-2 4 3"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="m-0 text-[13px] font-semibold text-gink">Photo / PDF</p>
+                <p className="m-0 text-[11.5px] text-gink-64">Scan or upload your printed menu</p>
+              </div>
+              <span
+                aria-hidden="true"
+                className="grid size-5 shrink-0 place-items-center rounded-full bg-plum text-onink"
+              >
+                <svg viewBox="0 0 16 16" fill="none" className="size-3">
+                  <path
+                    d="M3 8.5L6.5 12L13 4.5"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
+            </div>
+
+            <label className={`${btn('primary')} relative cursor-pointer overflow-hidden`}>
               <input
                 ref={inputRef}
                 type="file"
@@ -368,14 +398,43 @@ export function PhotoImportPanel({
                 onChange={(event) => pick(event.target.files?.[0] ?? null)}
                 className="absolute inset-0 size-full cursor-pointer opacity-0"
               />
-              <span>{file ? 'Choose another' : 'Take or choose a photo'}</span>
+              <span>{file ? 'Choose another' : 'Choose File'}</span>
             </label>
-            {file && (
-              <button type="button" className={btn('quiet', 'sm')} onClick={reset}>
-                Clear
-              </button>
-            )}
           </div>
+
+          {/* What was chosen, when one is: exactly what will be read. */}
+          {file && (
+            <div className="mt-3 flex items-center gap-3">
+              {/* A plain <img>, not next/image: this is a blob: URL for a file
+                  that only exists in this tab, which the optimiser cannot
+                  fetch. */}
+              <div className="flex size-[72px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] border border-hair bg-paper-deep">
+                {previewUrl ? (
+                  <img
+                    src={previewUrl}
+                    alt="The menu you are about to read"
+                    className="size-full object-cover"
+                  />
+                ) : (
+                  <div className="px-2 text-center text-[10.5px] leading-[1.4] text-gink-46">
+                    PDF
+                    <br />
+                    <span className="break-all">{file.name.slice(0, 18)}</span>
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="m-0 truncate text-[12.5px] font-medium text-gink">{file.name}</p>
+                <button type="button" className={`${btn('quiet', 'sm')} mt-1`} onClick={reset}>
+                  Clear
+                </button>
+              </div>
+            </div>
+          )}
+
+          <p className="mt-3 mb-0 text-center text-[10.5px] text-gink-46">
+            JPG, PNG, WebP or PDF · Up to 8 MB · PDF max 3 pages
+          </p>
         </div>
       </Card>
 
@@ -383,10 +442,7 @@ export function PhotoImportPanel({
       {file && status !== 'review' && (
         <Card>
           <div className="border-b border-hair px-4 py-3 sm:px-5">
-            <div className="flex items-center gap-2.5">
-              {stepBadge(2)}
-              <h2 className="text-[13px] font-semibold text-gink">Read it</h2>
-            </div>
+            <h2 className="text-[13px] font-semibold text-gink">Read it</h2>
             <p className="mt-1.5 text-[12.5px] leading-[1.5] text-gink-46">
               We read the dishes, prices and photos, and mark anything we are not sure about. Nothing
               is saved until you check it.
