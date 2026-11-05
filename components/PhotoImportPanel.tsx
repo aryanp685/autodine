@@ -1,18 +1,13 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { VegMark } from '@/components/ui';
 import {
-  attachImportPhotosAction,
-  createImportedMenuAction,
   extractMenuFromPhotoAction,
-  type CropUpload,
   type PhotoPreview,
 } from '@/app/(staff)/dashboard/menus/import-actions';
 import { uploadBrandAssetAction } from '@/app/(staff)/dashboard/menus/brand-actions';
 import { MAX_MENU_PHOTO_BYTES, type VisionCategory } from '@/lib/ai/menu-vision';
-import { cropFromImage } from '@/lib/import/crop';
 import { Card, btn, inputClass } from '@/components/owner/chrome';
 
 /**
@@ -43,7 +38,7 @@ type Editable = {
 type EditableCategory = { name: string; items: Editable[] };
 
 /** The menu half of the one Create — same shape the text path sends. */
-type MenuDraftPayload = {
+export type MenuDraftPayload = {
   categories: {
     name: string;
     items: { name: string; pricePaise: number; description: string | null; isVeg: boolean | null }[];
@@ -51,7 +46,18 @@ type MenuDraftPayload = {
   importId?: string;
 };
 
-type DraftSaveResult = { ok: true; menuId: string; items: number } | { ok: false; error: string };
+/**
+ * What the parent's one save needs from the photo path: the draft, the
+ * dish-photo boxes to crop after the menu exists, and the file to crop from.
+ */
+export type PhotoDraft = {
+  payload: MenuDraftPayload;
+  /** A dish still has no price — the save must refuse and say so. */
+  missingPrice: boolean;
+  /** Printed dish photos, positioned in the draft's own category/item grid. */
+  crops: { categoryIndex: number; itemIndex: number; box: { page: number; x: number; y: number; w: number; h: number } }[];
+  file: File | null;
+};
 
 const FLAG_TEXT: Record<string, string> = {
   'price-unclear': 'Price unclear — check the photo',
@@ -63,8 +69,7 @@ const FLAG_TEXT: Record<string, string> = {
 export function PhotoImportPanel({
   canWrite,
   onFileChange,
-  importId,
-  createDraft,
+  onDraftChange,
 }: {
   canWrite: boolean;
   /**
@@ -73,16 +78,9 @@ export function PhotoImportPanel({
    * for both"). Purely informational — this panel keeps owning the import.
    */
   onFileChange?: (file: File | null) => void;
-  /** Shared with the brand draft so one Create writes both halves. */
-  importId?: string;
-  /**
-   * The one Create. The parent passes the pair writer (menu draft AND brand
-   * draft in one action, one import id). Without it the panel falls back to a
-   * menu-only draft.
-   */
-  createDraft?: (menu: MenuDraftPayload) => Promise<DraftSaveResult>;
+  /** Lifts the checked draft to the parent's one save. */
+  onDraftChange?: (draft: PhotoDraft | null) => void;
 }) {
-  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [file, setFile] = useState<File | null>(null);
@@ -242,109 +240,62 @@ export function PhotoImportPanel({
 
   const keptCount = kept.reduce((n, c) => n + c.items.length, 0);
 
-  // A dish with no price cannot be saved: it would either be free or invent a
-  // number, and both are worse than asking.
-  const missingPrice = kept.some((c) => c.items.some((item) => item.price.trim() === ''));
+  /* ---------------------------------------------------------------- lift */
 
-  function save() {
-    setError(null);
-    setNotice(null);
-
-    if (keptCount === 0) {
-      setError('Nothing is selected. Keep at least one dish, or start again.');
+  /*
+   * The panel owns reading and checking; the SAVING lives in the parent,
+   * below the brand review, so the menu and the brand go in with one
+   * button. What crosses is exactly what the save needs and nothing else:
+   * the draft, the dish-photo boxes to crop afterwards, and the file to
+   * crop from.
+   */
+  useEffect(() => {
+    if (!onDraftChange) return;
+    if (status !== 'review' || categories.length === 0) {
+      onDraftChange(null);
       return;
     }
-    if (missingPrice) {
-      setError('Some dishes have no price. Type one, or remove the dish.');
-      return;
-    }
 
-    setStatus('saving');
+    const keptNonEmpty = categories
+      .map((category, categoryIndex) => ({
+        name: category.name,
+        items: category.items
+          .map((item, itemIndex) => ({ item, isDropped: dropped.has(`${categoryIndex}:${itemIndex}`) }))
+          .filter((entry) => !entry.isDropped)
+          .map((entry) => entry.item),
+      }))
+      .filter((category) => category.items.length > 0);
 
-    startWork(async () => {
-      try {
-        const payload: MenuDraftPayload = {
-          importId,
-          categories: kept
-            .filter((c) => c.items.length > 0)
-            .map((c) => ({
-              name: c.name,
-              items: c.items.map((item) => ({
-                name: item.name,
-                // Rupees -> paise at the boundary, rounded the same way the rest
-                // of the product does it.
-                pricePaise: Math.round(Number(item.price.replace(/[^\d.]/g, '')) * 100),
-                description: null as string | null,
-                // Unmarked stays unmarked. The old coercion quietly turned
-                // "the menu never said" into a green mark.
-                isVeg: item.isVeg,
-              })),
-            })),
-        };
+    const payload: MenuDraftPayload = {
+      categories: keptNonEmpty.map((category) => ({
+        name: category.name,
+        items: category.items.map((item) => ({
+          name: item.name,
+          // Rupees -> paise at the boundary, rounded the same way the rest
+          // of the product does it.
+          pricePaise: Math.round(Number(item.price.replace(/[^\d.]/g, '')) * 100),
+          description: null as string | null,
+          isVeg: item.isVeg,
+        })),
+      })),
+    };
 
-        // One Create: the parent supplies the pair writer so the brand half
-        // rides along with the menu draft. Without it, a menu-only draft.
-        const created = await (createDraft ? createDraft(payload) : createImportedMenuAction(payload));
-        if (!created.ok) {
-          setError(created.error);
-          setStatus('review');
-          return;
-        }
-
-        // Photos next, and they are allowed to fail without losing the menu:
-        // text with no thumbnails is a good import, a rolled-back import is not.
-        let attached = 0;
-        let skipped = 0;
-        let skippedNames: string[] = [];
-
-        if (file) {
-          const crops: CropUpload[] = [];
-          const isPdf = file.type === 'application/pdf';
-
-          if (!isPdf) {
-            for (let ci = 0; ci < kept.length; ci += 1) {
-              for (let ii = 0; ii < kept[ci].items.length; ii += 1) {
-                const box = kept[ci].items[ii].photo;
-                if (!box) continue;
-                const crop = await cropFromImage(file, box);
-                if (!crop) continue;
-                crops.push({ categoryIndex: ci, itemIndex: ii, dataUrl: crop.dataUrl });
-              }
-            }
-          }
-
-          if (crops.length > 0) {
-            const result = await attachImportPhotosAction(created.menuId, crops);
-            if (result.ok) {
-              attached = result.attached;
-              skipped = result.skipped;
-              skippedNames = result.skippedNames;
-            }
-          }
-        }
-
-        setStatus('review');
-        setNotice(
-          `Saved as a draft menu with ${created.items} dish${created.items === 1 ? '' : 'es'}.` +
-            (attached > 0 ? ` ${attached} photo${attached === 1 ? '' : 's'} copied from your menu.` : '') +
-            (skipped > 0
-              ? ` ${skipped} photo${skipped === 1 ? '' : 's'} could not be copied` +
-                (skippedNames.length > 0 ? ` (${skippedNames.join(', ')})` : '') +
-                ' — add them by hand in the editor.'
-              : '')
-        );
-
-        // The editor is where the next decision lives: publish, or keep editing.
-        router.push(`/dashboard/menus?menu=${created.menuId}&notice=${encodeURIComponent('Draft imported. Check it, then publish when you are ready.')}`);
-      } catch {
-        // A thrown server action must not leave the panel stuck in 'saving':
-        // blocked buttons and a draft that never arrived are exactly what this
-        // catch exists to prevent.
-        setError('Something went wrong saving the menu. Try again — nothing was changed.');
-        setStatus('review');
-      }
+    const crops: PhotoDraft['crops'] = [];
+    keptNonEmpty.forEach((category, categoryIndex) => {
+      category.items.forEach((item, itemIndex) => {
+        if (item.photo) crops.push({ categoryIndex, itemIndex, box: item.photo });
+      });
     });
-  }
+
+    onDraftChange({
+      payload,
+      missingPrice: keptNonEmpty.some((category) =>
+        category.items.some((item) => item.price.trim() === ''),
+      ),
+      crops,
+      file,
+    });
+  }, [status, categories, dropped, file, onDraftChange]);
 
   if (!canWrite) {
     return (
@@ -635,20 +586,11 @@ export function PhotoImportPanel({
             ))}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hair px-4 py-3 sm:px-5">
+          <div className="border-t border-hair px-4 py-3 sm:px-5">
             <p className="m-0 text-[11.5px] leading-[1.45] text-gink-46">
-              Saves as a draft. Publish from Menus when it looks right.
+              {keptCount} dish{keptCount === 1 ? '' : 'es'} ready. The save is at the bottom of the
+              page — dishes and brand style go in together as one draft.
             </p>
-            <button
-              type="button"
-              className={btn('solid')}
-              onClick={save}
-              disabled={working || keptCount === 0}
-            >
-              {working
-                ? 'Saving…'
-                : `Save ${keptCount} dish${keptCount === 1 ? '' : 'es'} as a draft`}
-            </button>
           </div>
         </Card>
       )}

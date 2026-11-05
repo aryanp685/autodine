@@ -26,7 +26,6 @@ import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { getStaffContextDetailed } from '@/lib/db/staff';
 import { EDITOR_MENU_COOKIE } from '@/lib/db/menu-editor';
-import { extractMenuWithAi, menuAiConfigured } from '@/lib/ai/menu-extract';
 import {
   extractMenuFromImage,
   validateMenuCapture,
@@ -34,76 +33,9 @@ import {
   type VisionDraft,
 } from '@/lib/ai/menu-vision';
 import { ASSET_BUCKET, dishAssetPath, publicAssetUrl } from '@/lib/storage/assets';
-import {
-  MAX_IMPORT_TEXT,
-  draftItemCount,
-  parseMenuText,
-  sanitiseDraft,
-  type MenuImportDraft,
-} from '@/lib/menu-import';
-import { parseMenuCsv, parseMenuXlsx, MAX_MENU_FILE_BYTES } from '@/lib/menu-import-file';
+import { sanitiseDraft, type MenuImportDraft } from '@/lib/menu-import';
 
 const MENUS_PATH = '/dashboard/menus';
-
-export type ImportPreview =
-  | { ok: true; draft: MenuImportDraft; source: 'ai' | 'rules'; note?: string }
-  | { ok: false; error: string };
-
-/**
- * Read the pasted text. Writes nothing.
- *
- * The model is tried first when it is configured, because it handles the
- * messy pastes (two prices on a line, a photo caption, a table pasted out of
- * a PDF) that rules get wrong. If it is not configured, or it fails, the rule
- * parser runs and `source` says which one produced the draft.
- */
-export async function previewMenuImportAction(text: string): Promise<ImportPreview> {
-  const raw = String(text ?? '').trim();
-  if (raw.length < 10) return { ok: false, error: 'Paste the menu text first.' };
-  if (raw.length > MAX_IMPORT_TEXT) {
-    return { ok: false, error: `That is longer than one paste can hold. Split it into parts under ${MAX_IMPORT_TEXT} characters.` };
-  }
-
-  let note: string | undefined;
-
-  if (menuAiConfigured()) {
-    const ai = await extractMenuWithAi(raw);
-
-    if (ai.ok) {
-      /**
-       * The model is told to leave out a dish it cannot price, which means it
-       * can silently read fewer dishes than the paste contains. The rules are
-       * run as a second opinion: when they find MORE priced lines than the
-       * model returned, the owner is told to check, because a paste that lost
-       * four dishes on the way in is the failure this screen exists to stop.
-       */
-      const lineCount = draftItemCount(parseMenuText(raw));
-      const aiCount = draftItemCount(ai.draft);
-      const missing = lineCount - aiCount;
-
-      const coverage =
-        missing > 0
-          ? ` The line parser found ${lineCount} priced lines and the model returned ${aiCount} — check the list below against your menu before importing.`
-          : '';
-
-      return { ok: true, draft: ai.draft, source: 'ai', note: `Read with ${ai.model}.${coverage}` };
-    }
-
-    note = `${ai.reason} Read with the rule parser instead.`;
-  }
-
-  const draft = parseMenuText(raw);
-  if (draftItemCount(draft) === 0) {
-    return {
-      ok: false,
-      error:
-        draft.issues[0]?.reason ??
-        'No dish with a price was found. Put one dish per line, with its price at the end — for example "Paneer Tikka 320".',
-    };
-  }
-
-  return { ok: true, draft, source: 'rules', note };
-}
 
 export type ImportResult =
   | { ok: true; menuId: string; items: number; existing?: boolean }
@@ -217,21 +149,45 @@ export async function createImportedMenuAction(payload: unknown): Promise<Import
       const categoryId = String(createdCategory.id);
       createdCategoryIds.push(categoryId);
 
-      const { error: itemsError } = await supabase.from('items').insert(
-        category.items.map((item, order) => ({
-          restaurant_id: restaurantId,
-          category_id: categoryId,
-          name: item.name,
-          description: item.description,
-          price_paise: item.pricePaise,
-          is_veg: item.isVeg,
-          is_available: true,
-          sort_order: order,
+      const { data: createdItems, error: itemsError } = await supabase
+        .from('items')
+        .insert(
+          category.items.map((item, order) => ({
+            restaurant_id: restaurantId,
+            category_id: categoryId,
+            name: item.name,
+            description: item.description,
+            price_paise: item.pricePaise,
+            is_veg: item.isVeg,
+            is_available: true,
+            sort_order: order,
+          })),
+        )
+        .select('id');
+
+      if (itemsError || !createdItems || createdItems.length !== category.items.length) {
+        throw new Error(describeWriteError(itemsError?.message, `add the dishes in "${category.name}"`));
+      }
+      itemCount += category.items.length;
+
+      // Portions ("Half 240 / Full 420") become real rows, not a note the
+      // owner has to re-type in the editor. The parent item holds the entry
+      // price; each variant replaces it when chosen, exactly like portions
+      // created by hand.
+      const variantRows = category.items.flatMap((item, itemIndex) =>
+        (item.variants ?? []).map((variant, variantOrder) => ({
+          item_id: String(createdItems[itemIndex].id),
+          name: variant.name,
+          price_paise: variant.pricePaise,
+          sort_order: variantOrder,
         })),
       );
-
-      if (itemsError) throw new Error(describeWriteError(itemsError.message, `add the dishes in "${category.name}"`));
-      itemCount += category.items.length;
+      if (variantRows.length > 0) {
+        const { error: variantsError } = await supabase.from('item_variants').insert(variantRows);
+        if (variantsError) {
+          throw new Error(describeWriteError(variantsError.message, 'add the portions'));
+        }
+      }
     }
   } catch (error) {
     // Undo what this import created. Deleted in dependency order: dishes need
@@ -313,64 +269,6 @@ export async function extractMenuFromPhotoAction(formData: FormData): Promise<Ph
 export type PhotoPreview =
   | { ok: true; draft: VisionDraft }
   | { ok: false; error: string; code: string };
-
-/**
- * Read a structured file (CSV or Excel) into the same draft shape the text
- * and photo paths produce. Writes nothing: the review decides, and the one
- * Create is the same action every other source uses.
- */
-export async function parseMenuFileAction(formData: FormData): Promise<ImportPreview> {
-  const staff = await getStaffContextDetailed();
-  if (!staff.ok) {
-    return {
-      ok: false,
-      error:
-        staff.reason === 'unconfigured'
-          ? 'The database is not connected, so there is nowhere to save an import.'
-          : 'You need to be signed in to import a menu.',
-    };
-  }
-
-  const file = formData.get('file');
-  if (!(file instanceof File) || file.size === 0) {
-    return { ok: false, error: 'Choose a CSV or Excel file first.' };
-  }
-  if (file.size > MAX_MENU_FILE_BYTES) {
-    return {
-      ok: false,
-      error: `That file is ${(file.size / (1024 * 1024)).toFixed(1)} MB. The limit is 5 MB.`,
-    };
-  }
-
-  const fileName = (file.name ?? '').toLowerCase();
-  const isCsv = fileName.endsWith('.csv') || file.type === 'text/csv';
-  const isXlsx =
-    fileName.endsWith('.xlsx') ||
-    file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-  if (!isCsv && !isXlsx) {
-    return { ok: false, error: 'That file is not a CSV or Excel (.xlsx) file.' };
-  }
-
-  try {
-    const draft = isCsv
-      ? parseMenuCsv(await file.text())
-      : await parseMenuXlsx(Buffer.from(await file.arrayBuffer()));
-    // The sanitiser is the same gate every other source passes through. Its
-    // issues list is empty by design, so the parser's own issues -- the rows
-    // it refused -- ride along for the review screen to show.
-    const cleaned = sanitiseDraft(draft);
-    return {
-      ok: true,
-      source: 'rules',
-      draft: { ...cleaned, issues: draft.issues.slice(0, 12), duplicates: draft.duplicates },
-    };
-  } catch {
-    return {
-      ok: false,
-      error: 'That file could not be read. Check that it opens in Excel or a text editor, and try again.',
-    };
-  }
-}
 
 /** One cropped dish photo, as the browser produced it. */
 export type CropUpload = {
