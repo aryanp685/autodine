@@ -47,6 +47,8 @@ import {
   selectMenuAction,
   setAllAvailabilityAction,
   setItemAvailabilityAction,
+  moveCategoryAction,
+  moveItemAction,
 } from '@/app/(staff)/dashboard/menus/actions';
 import { PRESET_CATEGORIES, normaliseCategoryName } from '@/lib/menu-presets';
 import { PronunciationField } from '@/components/PronunciationField';
@@ -116,8 +118,19 @@ export function MenuEditorScreen({
           price: paiseToRupees(v.pricePaise),
         })),
         category: i.categoryId ?? '',
+        sortOrder: i.sortOrder,
       }))
-    : demoItems;
+    : demoItems.map((d, index) => ({
+        id: d.id,
+        name: d.name,
+        desc: d.desc,
+        price: d.price,
+        veg: d.veg,
+        available: d.available,
+        variants: d.variants ?? [],
+        category: d.category,
+        sortOrder: index,
+      }));
 
   const liveCategories = data?.categories ?? [];
   const uncategorised = (data?.items ?? []).filter((i) => !i.categoryId).length;
@@ -220,9 +233,35 @@ export function MenuEditorScreen({
   const sortOrder =
     sort === 'name' || sort === 'price-asc' || sort === 'price-desc' ? sort : 'menu';
   const filtered = tableRows.length > 5;
+  /*
+   * THE MENU ORDER IS CATEGORY ORDER, THEN DISH ORDER.
+   *
+   * The guest menu reads a category's dishes in sort_order; the editor table
+   * shows every dish on one list. Grouping by category first is what lets the
+   * move arrows on a row mean exactly what they say — "up" moves the dish
+   * over the dish above it in ITS category, which is the order guests see.
+   * Dishes with no category belong to no menu and sit last.
+   */
+  const categoryRank = new Map(liveCategories.map((c, index) => [c.id, index]));
+  const rankOf = (row: { category: string }) =>
+    row.category ? (categoryRank.get(row.category) ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER;
+  const inMenuOrder = <T extends { category: string; sortOrder: number }>(list: T[]): T[] =>
+    [...list].sort((a, b) => rankOf(a) - rankOf(b) || a.sortOrder - b.sortOrder);
+
+  /* The move-arrow edges, from the WHOLE menu rather than the filtered rows:
+     searching must not turn a move into a surprise jump past a hidden dish. */
+  const firstInCategory = new Set<string>();
+  const lastInCategory = new Set<string>();
+  inMenuOrder(tableRows).forEach((row, index, all) => {
+    const prev = all[index - 1];
+    const next = all[index + 1];
+    if (!prev || prev.category !== row.category) firstInCategory.add(row.id);
+    if (!next || next.category !== row.category) lastInCategory.add(row.id);
+  });
+
   const rows = (() => {
     const base = tableRows.filter((i) => (live ? true : i.category === 'curries'));
-    if (!live || !filtered) return base;
+    if (!live || !filtered) return inMenuOrder(base);
     const needle = q.toLowerCase();
     const narrowed = base.filter((i) => {
       if (needle && !i.name.toLowerCase().includes(needle)) return false;
@@ -230,7 +269,7 @@ export function MenuEditorScreen({
       if (showFilter === 'soldout') return !i.available;
       return true;
     });
-    if (sortOrder === 'menu') return narrowed;
+    if (sortOrder === 'menu') return inMenuOrder(narrowed);
     const byName = [...narrowed].sort((a, b) => a.name.localeCompare(b.name));
     if (sortOrder === 'name') return byName;
     const byPrice = [...narrowed].sort((a, b) => a.price - b.price);
@@ -392,13 +431,46 @@ export function MenuEditorScreen({
                     </>
                   ) : (
                     <ul className="m-0 flex list-none flex-col p-0">
-                      {liveCategories.map((c) => (
+                      {liveCategories.map((c, index) => (
                         <li
                           key={c.id}
                           className="flex items-baseline justify-between gap-2 border-b border-hair py-1.5 last:border-b-0"
                         >
                           <span className="text-[12.5px] text-gink">{c.name}</span>
                           <span className="flex items-center gap-1 text-[11.5px] text-gink-46 tabular-nums">
+                            {/* Where the category sits in the menu. The
+                                arrows are plain submits: the same no-JS form
+                                pattern every other control here uses. */}
+                            {liveCategories.length > 1 && (
+                              <span className="mr-0.5 flex items-center">
+                                <form action={moveCategoryAction}>
+                                  <input type="hidden" name="categoryId" value={c.id} />
+                                  <input type="hidden" name="direction" value="up" />
+                                  <button
+                                    type="submit"
+                                    data-move-category="up"
+                                    aria-label={`Move category ${c.name} up`}
+                                    disabled={index === 0}
+                                    className="grid size-5 place-items-center rounded-full text-[11.5px] leading-none text-gink-46 hover:bg-gink-07 hover:text-gink disabled:opacity-30 disabled:hover:bg-transparent"
+                                  >
+                                    ↑
+                                  </button>
+                                </form>
+                                <form action={moveCategoryAction}>
+                                  <input type="hidden" name="categoryId" value={c.id} />
+                                  <input type="hidden" name="direction" value="down" />
+                                  <button
+                                    type="submit"
+                                    data-move-category="down"
+                                    aria-label={`Move category ${c.name} down`}
+                                    disabled={index === liveCategories.length - 1}
+                                    className="grid size-5 place-items-center rounded-full text-[11.5px] leading-none text-gink-46 hover:bg-gink-07 hover:text-gink disabled:opacity-30 disabled:hover:bg-transparent"
+                                  >
+                                    ↓
+                                  </button>
+                                </form>
+                              </span>
+                            )}
                             {c.itemCount}
                             {c.itemCount === 0 && (
                               <form action={deleteCategoryAction}>
@@ -731,6 +803,40 @@ export function MenuEditorScreen({
                         >
                           <Td>
                             <div className="flex items-start gap-2">
+                              {/* Where the dish sits in its category — the
+                                  order guests read it in. Only in the manual
+                                  view: a name-ordered table is not the order
+                                  being moved. */}
+                              {live && sortOrder === 'menu' && (
+                                <span className="mt-0.5 flex flex-col items-center">
+                                  <form action={moveItemAction}>
+                                    <input type="hidden" name="itemId" value={i.id} />
+                                    <input type="hidden" name="direction" value="up" />
+                                    <button
+                                      type="submit"
+                                      data-move-item="up"
+                                      aria-label={`Move ${i.name} up in its category`}
+                                      disabled={firstInCategory.has(i.id)}
+                                      className="grid size-5 place-items-center rounded-full text-[11.5px] leading-none text-gink-46 hover:bg-gink-07 hover:text-gink disabled:opacity-30 disabled:hover:bg-transparent"
+                                    >
+                                      ↑
+                                    </button>
+                                  </form>
+                                  <form action={moveItemAction}>
+                                    <input type="hidden" name="itemId" value={i.id} />
+                                    <input type="hidden" name="direction" value="down" />
+                                    <button
+                                      type="submit"
+                                      data-move-item="down"
+                                      aria-label={`Move ${i.name} down in its category`}
+                                      disabled={lastInCategory.has(i.id)}
+                                      className="grid size-5 place-items-center rounded-full text-[11.5px] leading-none text-gink-46 hover:bg-gink-07 hover:text-gink disabled:opacity-30 disabled:hover:bg-transparent"
+                                    >
+                                      ↓
+                                    </button>
+                                  </form>
+                                </span>
+                              )}
                               <span className="mt-[3px]">
                                 <VegMark veg={i.veg} />
                               </span>

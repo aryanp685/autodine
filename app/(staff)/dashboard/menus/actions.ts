@@ -22,6 +22,7 @@ import { redirect } from 'next/navigation';
 import { getStaffContextDetailed } from '@/lib/db/staff';
 import { rupeesToPaise } from '@/lib/money';
 import { PRESET_CATEGORIES, normaliseCategoryName } from '@/lib/menu-presets';
+import { movedOrder, renumber } from '@/lib/menus/reorder';
 import { EDITOR_MENU_COOKIE } from '@/lib/db/menu-editor';
 import { getDraftForMenu, publishPair } from '@/lib/branding/brand-data';
 import { readUndoItem } from '@/lib/menu-undo';
@@ -863,6 +864,122 @@ export async function deleteAddonAction(formData: FormData): Promise<void> {
   if (error) fail(`Could not remove the add-on: ${error.message}`);
 
   ok(`"${addon.name as string}" removed. Past orders keep their own record of it.`);
+}
+
+/* ============================================================================
+   Ordering: where a dish sits in its category, where a category sits in its menu
+   ========================================================================== */
+
+/**
+ * Move a category one place in its menu's order.
+ *
+ * The whole group is renumbered after the move. That is what keeps the order
+ * stable when categories share a sort_order of 0 — every category added by
+ * hand starts there — and it repairs any older ties on the first press.
+ */
+export async function moveCategoryAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const categoryId = String(formData.get('categoryId') ?? '').trim();
+  const direction = String(formData.get('direction') ?? '').trim();
+  if (!categoryId) fail('No category selected.');
+  if (direction !== 'up' && direction !== 'down') fail('That move is not one I can make.');
+
+  const { data: category, error: categoryError } = await ctx.supabase
+    .from('categories')
+    .select('id, menu_id')
+    .eq('id', categoryId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .maybeSingle();
+
+  if (categoryError || !category) fail('That category is not on your account.');
+
+  const { data: siblings, error: siblingsError } = await ctx.supabase
+    .from('categories')
+    .select('id, sort_order')
+    .eq('restaurant_id', ctx.restaurantId)
+    .eq('menu_id', category.menu_id as string)
+    .order('sort_order', { ascending: true })
+    .order('id', { ascending: true });
+
+  if (siblingsError) fail(`Could not read the categories: ${siblingsError.message}`);
+
+  const moved = movedOrder(siblings ?? [], categoryId, direction);
+  if (!moved) {
+    fail(direction === 'up' ? 'That category is already first.' : 'That category is already last.');
+  }
+
+  for (const change of renumber(moved, (row) => Number(row.sort_order ?? 0))) {
+    const { error } = await ctx.supabase
+      .from('categories')
+      .update({ sort_order: change.sortOrder })
+      .eq('id', change.id)
+      .eq('restaurant_id', ctx.restaurantId);
+    if (error) fail(`Could not reorder the categories: ${error.message}`);
+  }
+
+  ok('Category order saved.');
+}
+
+/**
+ * Move a dish one place within its category.
+ *
+ * Within its category — the order guests see inside a section of the menu —
+ * not in the editor's flat table, where the neighbouring row can belong to a
+ * different category and a swap would change nothing a guest can see. As with
+ * categories, the group is renumbered after the move so hand-added dishes
+ * (all at sort_order 0) become a stable sequence on the first press.
+ */
+export async function moveItemAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const itemId = String(formData.get('itemId') ?? '').trim();
+  const direction = String(formData.get('direction') ?? '').trim();
+  if (!itemId) fail('No dish selected.');
+  if (direction !== 'up' && direction !== 'down') fail('That move is not one I can make.');
+
+  const { data: item, error: itemError } = await ctx.supabase
+    .from('items')
+    .select('id, category_id')
+    .eq('id', itemId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .maybeSingle();
+
+  if (itemError || !item) fail('That dish is not on your account.');
+
+  const categoryId = (item.category_id as string | null) ?? null;
+
+  // The group is the dish's own category (or the uncategorised shelf). The
+  // query mirrors lib/db/menu.ts so the move happens in the order guests see.
+  const groupQuery = ctx.supabase
+    .from('items')
+    .select('id, sort_order')
+    .eq('restaurant_id', ctx.restaurantId)
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true });
+  const { data: siblings, error: siblingsError } = categoryId
+    ? await groupQuery.eq('category_id', categoryId)
+    : await groupQuery.is('category_id', null);
+
+  if (siblingsError) fail(`Could not read the dishes: ${siblingsError.message}`);
+
+  const moved = movedOrder(siblings ?? [], itemId, direction);
+  if (!moved) {
+    fail(direction === 'up' ? 'That dish is already first in its category.' : 'That dish is already last in its category.');
+  }
+
+  for (const change of renumber(moved, (row) => Number(row.sort_order ?? 0))) {
+    const { error } = await ctx.supabase
+      .from('items')
+      .update({ sort_order: change.sortOrder })
+      .eq('id', change.id)
+      .eq('restaurant_id', ctx.restaurantId);
+    if (error) fail(`Could not reorder the dishes: ${error.message}`);
+  }
+
+  ok('Dish order saved.');
 }
 
 /* ============================================================================

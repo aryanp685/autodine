@@ -122,8 +122,8 @@ describe('getMenuEditorData', () => {
 
     const data = await getMenuEditorData();
     expect(data?.categories).toEqual([
-      { id: 'c-1', name: 'Starters', itemCount: 2 },
-      { id: 'c-2', name: 'Mains', itemCount: 3 },
+      { id: 'c-1', name: 'Starters', itemCount: 2, sortOrder: 0 },
+      { id: 'c-2', name: 'Mains', itemCount: 3, sortOrder: 1 },
     ]);
   });
 
@@ -140,6 +140,7 @@ describe('getMenuEditorData', () => {
       id: 'c-1',
       name: 'Empty',
       itemCount: 0,
+      sortOrder: 0,
     });
   });
 

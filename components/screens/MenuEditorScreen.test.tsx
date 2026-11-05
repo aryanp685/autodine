@@ -33,6 +33,8 @@ vi.mock('@/app/(staff)/dashboard/menus/actions', () => ({
   deleteCategoryAction: mocks.action('deleteCategoryAction'),
   deleteItemAction: mocks.action('deleteItemAction'),
   deleteVariantAction: mocks.action('deleteVariantAction'),
+  moveCategoryAction: mocks.action('moveCategoryAction'),
+  moveItemAction: mocks.action('moveItemAction'),
   publishMenuAction: mocks.action('publishMenuAction'),
   restoreItemAction: mocks.action('restoreItemAction'),
   saveItemAction: mocks.action('saveItemAction'),
@@ -85,7 +87,7 @@ const render = (
 /** Nine dishes, enough that the find bar is worth showing. */
 const crowded = (over: Partial<MenuEditorData> = {}) =>
   data({
-    categories: [{ id: 'c-1', name: 'Starters', itemCount: 9 }],
+    categories: [{ id: 'c-1', name: 'Starters', itemCount: 9, sortOrder: 0 }],
     items: [
       item('it-1', 'Paneer Tikka', { pricePaise: 32000 }),
       item('it-2', 'Chicken Tikka', { pricePaise: 38000, veg: false }),
@@ -136,7 +138,7 @@ describe('MenuEditorScreen, live', () => {
   });
 
   it('shows a preset as on, and offers to remove it, once it exists', () => {
-    const html = render(data({ categories: [{ id: 'c-1', name: 'Starters', itemCount: 0 }] }));
+    const html = render(data({ categories: [{ id: 'c-1', name: 'Starters', itemCount: 0, sortOrder: 0 }] }));
 
     expect(html).toContain('Starters ✓');
     expect(html).toContain('Remove category Starters');
@@ -147,14 +149,14 @@ describe('MenuEditorScreen, live', () => {
   it('matches a preset against a hand-typed name instead of duplicating it', () => {
     // Live data had a category saved as lower-case "starter". Case-folding is
     // what stops the chip list offering a near-duplicate beside it.
-    const html = render(data({ categories: [{ id: 'c-1', name: 'starters', itemCount: 0 }] }));
+    const html = render(data({ categories: [{ id: 'c-1', name: 'starters', itemCount: 0, sortOrder: 0 }] }));
 
     expect(html).toContain('Starters ✓');
     expect(html).not.toContain('+ Starters');
   });
 
   it('puts every field for a new item on the add row', () => {
-    const html = render(data({ categories: [{ id: 'c-1', name: 'Starters', itemCount: 0 }] }));
+    const html = render(data({ categories: [{ id: 'c-1', name: 'Starters', itemCount: 0, sortOrder: 0 }] }));
 
     expect(html).toContain('name="name"');
     expect(html).toContain('name="price"');
@@ -224,7 +226,7 @@ describe('MenuEditorScreen, live', () => {
   it('counts items that no category owns, which diners cannot see', () => {
     const html = render(
       data({
-        categories: [{ id: 'c-1', name: 'Starters', itemCount: 1 }],
+        categories: [{ id: 'c-1', name: 'Starters', itemCount: 1, sortOrder: 0 }],
         items: [item('i-1', 'Filed'), item('i-2', 'Orphan', { categoryId: null })],
       })
     );
@@ -236,7 +238,7 @@ describe('MenuEditorScreen, live', () => {
   it('puts a delete control on every live row', () => {
     const html = render(
       data({
-        categories: [{ id: 'c-1', name: 'Starters', itemCount: 2 }],
+        categories: [{ id: 'c-1', name: 'Starters', itemCount: 2, sortOrder: 0 }],
         items: [item('i-1', 'Paneer Tikka'), item('i-2', 'Chicken 65')],
       })
     );
@@ -515,7 +517,7 @@ describe('the item table', () => {
   it('marks the row being edited instead of repeating the menu badge', () => {
     const html = render(
       data({
-        categories: [{ id: 'c-1', name: 'Starters', itemCount: 1 }],
+        categories: [{ id: 'c-1', name: 'Starters', itemCount: 1, sortOrder: 0 }],
         items: [item('it-1', 'Paneer Tikka')],
       }),
     );
@@ -529,7 +531,7 @@ describe('the item table', () => {
   it('keeps the delete control in the row it belongs to', () => {
     const html = render(
       data({
-        categories: [{ id: 'c-1', name: 'Starters', itemCount: 1 }],
+        categories: [{ id: 'c-1', name: 'Starters', itemCount: 1, sortOrder: 0 }],
         items: [item('it-1', 'Paneer Tikka')],
       }),
     );
@@ -543,7 +545,7 @@ describe('MenuEditorScreen, finding a dish in a menu that grows', () => {
     // Four rows need no filter, and a search box over four rows is furniture.
     const html = render(
       data({
-        categories: [{ id: 'c-1', name: 'Starters', itemCount: 2 }],
+        categories: [{ id: 'c-1', name: 'Starters', itemCount: 2, sortOrder: 0 }],
         items: [item('a', 'Paneer Tikka'), item('b', 'Dal Bukhara')],
       })
     );
@@ -651,5 +653,69 @@ describe('MenuEditorScreen, the bulk writes', () => {
     const start = html.indexOf('Mark all available');
     const from = html.lastIndexOf('<button', start);
     expect(html.slice(from, start)).toContain('type="submit"');
+  });
+});
+
+describe('MenuEditorScreen, ordering', () => {
+  /** Two categories with the dishes interleaved in the array, as a re-shuffle
+      would leave them — the table must cluster by category. */
+  const twoCategories = () =>
+    data({
+      categories: [
+        { id: 'c-1', name: 'Starters', itemCount: 2, sortOrder: 0 },
+        { id: 'c-2', name: 'Mains', itemCount: 2, sortOrder: 1 },
+      ],
+      items: [
+        item('it-1', 'Paneer Tikka', { sortOrder: 0 }),
+        item('it-2', 'Butter Chicken', { categoryId: 'c-2', veg: false, sortOrder: 0 }),
+        item('it-3', 'Chicken Tikka', { veg: false, sortOrder: 1 }),
+        item('it-4', 'Dal Makhani', { categoryId: 'c-2', sortOrder: 1 }),
+      ],
+    });
+
+  it('groups the table by category in menu order — the order guests read', () => {
+    const html = render(twoCategories());
+
+    expect(orderOf(html, ['Paneer Tikka', 'Chicken Tikka', 'Butter Chicken', 'Dal Makhani'])).toEqual([
+      'Paneer Tikka',
+      'Chicken Tikka',
+      'Butter Chicken',
+      'Dal Makhani',
+    ]);
+  });
+
+  it('offers move arrows on rows, disabled at the category edges', () => {
+    const html = render(twoCategories());
+    const paneerRow = rowOf(html, 'Paneer Tikka');
+    const chickenRow = rowOf(html, 'Chicken Tikka');
+
+    const up = (row: string) => row.match(/<button[^>]*data-move-item="up"[^>]*>/)?.[0] ?? '';
+    const down = (row: string) => row.match(/<button[^>]*data-move-item="down"[^>]*>/)?.[0] ?? '';
+
+    // First in Starters: up is refused, down is open. The check is for the
+    // disabled ATTRIBUTE — the button classes contain 'disabled:' variants.
+    expect(up(paneerRow)).toContain('disabled=""');
+    expect(down(paneerRow)).not.toContain('disabled=""');
+    // Last in Starters: the other way round.
+    expect(up(chickenRow)).not.toContain('disabled=""');
+    expect(down(chickenRow)).toContain('disabled=""');
+  });
+
+  it('hides the move arrows in a name-ordered table — that view is not the menu order', () => {
+    const html = render(twoCategories(), undefined, { sort: 'name' });
+
+    expect(html).not.toContain('data-move-item');
+  });
+
+  it('offers category move arrows, disabled at the ends of the menu', () => {
+    const html = render(twoCategories());
+
+    expect(html).toMatch(/aria-label="Move category Starters up"[^>]*disabled/);
+    expect(html).toMatch(/aria-label="Move category Mains down"[^>]*disabled/);
+  });
+
+  it('shows no arrows for a single category or in the demo', () => {
+    expect(render(crowded())).not.toContain('data-move-category');
+    expect(render(null)).not.toContain('data-move-item');
   });
 });

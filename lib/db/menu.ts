@@ -100,6 +100,8 @@ export async function getRestaurantMenu(
         .in('category_id', categoryIds)
         .eq('is_available', true)
         .order('sort_order', { ascending: true })
+        // Dishes sharing a sort_order keep the order they were added in.
+        .order('created_at', { ascending: true })
     : { data: [], error: null };
 
   if (itemsError) throw new Error(`Could not load items: ${itemsError.message}`);
