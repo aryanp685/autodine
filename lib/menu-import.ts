@@ -31,6 +31,20 @@ export type ImportedItem = {
   description: string | null;
   /** true/false = the source marked it. null = the source never said. */
   isVeg: boolean | null;
+  /**
+   * Portions the menu printed beside one dish ("Half 240 / Full 420").
+   * Absent for dishes sold one way — a dish is never assumed to have
+   * portions, and the base price is the smallest printed portion.
+   */
+  variants?: ImportedVariant[];
+};
+
+/** One printed portion of a dish. */
+export type ImportedVariant = {
+  /** The portion word as printed: "Half", "Full", "Small"... */
+  name: string;
+  /** Paise. */
+  pricePaise: number;
 };
 
 export type ImportedCategory = {
@@ -85,6 +99,34 @@ const TRAILING_PRICE = /(?:(?:₹|rs\.?|inr)\s*)?([0-9][0-9,]*(?:\.[0-9]{1,2})?)
 
 /** Every price-shaped run in a line, for detecting "Half 180 / Full 320". */
 const ANY_PRICE = /(?:(?:₹|rs\.?|inr)\s*)?([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s*(?:\/-|\/--|only)?/gi;
+
+/**
+ * "Half 240" — a portion word and its price. The shape menus use when one
+ * dish is sold in more than one size. Only real portion words count:
+ * "Chicken 65 360" is a dish, not a portion, and a false variant on an
+ * ordinary line is a warning people learn to ignore.
+ */
+const VARIANT_PAIR =
+  /\b(half|full|small|large|regular|mini|single|double|quarter|qtr)\b\s*(?:[:\-–—/]\s*)?(?:(?:₹|rs\.?|inr)\s*)?([0-9][0-9,]*(?:\.[0-9]{1,2})?)/gi;
+
+/**
+ * "Butter Chicken Half 240 / Full 420" -> two real portions, or null when the
+ * line does not price one dish in portions. Names keep the printed word; the
+ * dish's own price is the smallest portion, so the menu shows an honest entry
+ * price instead of the last number the parser happened to reach.
+ */
+export function parseVariantPairs(line: string): ImportedVariant[] | null {
+  const pairs: ImportedVariant[] = [];
+  for (const match of line.matchAll(VARIANT_PAIR)) {
+    const price = parsePriceToPaise(match[2]);
+    if (price === null) continue;
+    const word = match[1].toLowerCase();
+    const name = word.charAt(0).toUpperCase() + word.slice(1);
+    if (pairs.some((p) => p.name === name)) continue;
+    pairs.push({ name, pricePaise: price });
+  }
+  return pairs.length >= 2 ? pairs : null;
+}
 
 const SIZE_TAIL = /[\s\-–—:/]*\b(half|full|small|large|regular|mini|single|double|quarter|qtr|plate|piece|pcs?)\s*$/i;
 
@@ -256,16 +298,22 @@ export function parseMenuText(raw: string): MenuImportDraft {
     const priceMatch = TRAILING_PRICE.exec(body);
 
     /**
-     * "Butter Chicken Half 240 Full 420" is one dish, priced twice. The name
-     * is everything before the FIRST price; the last price is the one that
-     * gets imported, so the dish is never free.
+     * "Butter Chicken Half 240 Full 420" is one dish sold in portions. Real
+     * portion pairs become variants; a double price this parser cannot split
+     * is still called out, because guessing which number is which portion is
+     * exactly the invention this file refuses.
      */
+    const variantPairs = parseVariantPairs(body);
     const variant = hasVariantPricing(body);
     const variantHead = variant
       ? dropSizeTail(cleanName(body.slice(0, Math.max(firstPriceIndex(body), 0))))
       : '';
 
-    const name = priceMatch ? variantHead || nameFromLine(body) : '';
+    const name = priceMatch
+      ? variantPairs
+        ? cleanName(body.replace(VARIANT_PAIR, ' ').replace(ANY_PRICE, ' ').replace(/[/|·,]+/g, ' '))
+        : variantHead || nameFromLine(body)
+      : '';
 
     if (!priceMatch || name === '') {
       if (BOILERPLATE.test(line)) {
@@ -296,15 +344,19 @@ export function parseMenuText(raw: string): MenuImportDraft {
       continue;
     }
 
-    const price = parsePriceToPaise(priceMatch[1]);
-    if (price === null) {
+    const listed = parsePriceToPaise(priceMatch[1]);
+    if (listed === null) {
       issues.push({ line, reason: 'That price could not be read as an amount.' });
       continue;
     }
 
-    if (variant) {
-      // "Half 180 / Full 320": the last price is used so the dish is not free,
-      // but the second rate is called out — it has to become a variant.
+    // Portions carry their own prices; the dish's price is the smallest
+    // portion, so the entry price shown on the menu is honest.
+    const price = variantPairs ? Math.min(...variantPairs.map((v) => v.pricePaise)) : listed;
+
+    if (!variantPairs && variant) {
+      // Double pricing this parser could not split: the last price was used
+      // so the dish is not free, and the other rate is called out.
       issues.push({
         line,
         reason: 'More than one price on this line. The last was used — add the other as a variant in the editor.',
@@ -340,6 +392,7 @@ export function parseMenuText(raw: string): MenuImportDraft {
       description: null,
       // A written marker beats the name signal, which is the weaker one.
       isVeg: markedVeg ?? nonVegFromName(name),
+      ...(variantPairs ? { variants: variantPairs } : {}),
     });
     itemCount += 1;
   }
@@ -379,10 +432,33 @@ export function sanitiseDraft(input: unknown): MenuImportDraft {
     for (const line of category.items) {
       if (items >= MAX_IMPORT_ITEMS) break;
       if (!line || typeof line !== 'object') continue;
-      const item = line as { name?: unknown; pricePaise?: unknown; description?: unknown; isVeg?: unknown };
+      const item = line as {
+        name?: unknown;
+        pricePaise?: unknown;
+        description?: unknown;
+        isVeg?: unknown;
+        variants?: unknown;
+      };
       const itemName = typeof item.name === 'string' ? item.name.trim().slice(0, 120) : '';
       const price = typeof item.pricePaise === 'number' ? Math.round(item.pricePaise) : 0;
       if (itemName === '' || !Number.isSafeInteger(price) || price <= 0) continue;
+
+      // Portions survive the round trip the same way: six at most, each with a
+      // printed name and a real price, anything malformed dropped.
+      const variants: ImportedVariant[] = Array.isArray(item.variants)
+        ? item.variants
+            .slice(0, 6)
+            .map((entry) => {
+              const variant = (entry ?? {}) as { name?: unknown; pricePaise?: unknown };
+              const name = typeof variant.name === 'string' ? variant.name.trim().slice(0, 40) : '';
+              const variantPrice =
+                typeof variant.pricePaise === 'number' ? Math.round(variant.pricePaise) : 0;
+              return name !== '' && Number.isSafeInteger(variantPrice) && variantPrice > 0
+                ? { name, pricePaise: variantPrice }
+                : null;
+            })
+            .filter((entry): entry is ImportedVariant => entry !== null)
+        : [];
 
       kept.push({
         name: itemName,
@@ -391,6 +467,7 @@ export function sanitiseDraft(input: unknown): MenuImportDraft {
         // Three states survive the round trip. Anything that is not an
         // explicit true/false is unmarked -- never a silent veg default.
         isVeg: item.isVeg === true ? true : item.isVeg === false ? false : null,
+        ...(variants.length > 0 ? { variants } : {}),
       });
       items += 1;
     }

@@ -217,21 +217,45 @@ export async function createImportedMenuAction(payload: unknown): Promise<Import
       const categoryId = String(createdCategory.id);
       createdCategoryIds.push(categoryId);
 
-      const { error: itemsError } = await supabase.from('items').insert(
-        category.items.map((item, order) => ({
-          restaurant_id: restaurantId,
-          category_id: categoryId,
-          name: item.name,
-          description: item.description,
-          price_paise: item.pricePaise,
-          is_veg: item.isVeg,
-          is_available: true,
-          sort_order: order,
+      const { data: createdItems, error: itemsError } = await supabase
+        .from('items')
+        .insert(
+          category.items.map((item, order) => ({
+            restaurant_id: restaurantId,
+            category_id: categoryId,
+            name: item.name,
+            description: item.description,
+            price_paise: item.pricePaise,
+            is_veg: item.isVeg,
+            is_available: true,
+            sort_order: order,
+          })),
+        )
+        .select('id');
+
+      if (itemsError || !createdItems || createdItems.length !== category.items.length) {
+        throw new Error(describeWriteError(itemsError?.message, `add the dishes in "${category.name}"`));
+      }
+      itemCount += category.items.length;
+
+      // Portions ("Half 240 / Full 420") become real rows, not a note the
+      // owner has to re-type in the editor. The parent item holds the entry
+      // price; each variant replaces it when chosen, exactly like portions
+      // created by hand.
+      const variantRows = category.items.flatMap((item, itemIndex) =>
+        (item.variants ?? []).map((variant, variantOrder) => ({
+          item_id: String(createdItems[itemIndex].id),
+          name: variant.name,
+          price_paise: variant.pricePaise,
+          sort_order: variantOrder,
         })),
       );
-
-      if (itemsError) throw new Error(describeWriteError(itemsError.message, `add the dishes in "${category.name}"`));
-      itemCount += category.items.length;
+      if (variantRows.length > 0) {
+        const { error: variantsError } = await supabase.from('item_variants').insert(variantRows);
+        if (variantsError) {
+          throw new Error(describeWriteError(variantsError.message, 'add the portions'));
+        }
+      }
     }
   } catch (error) {
     // Undo what this import created. Deleted in dependency order: dishes need

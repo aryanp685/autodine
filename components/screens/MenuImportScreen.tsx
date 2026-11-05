@@ -6,13 +6,16 @@ import { useState, useTransition } from 'react';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { VegMark } from '@/components/ui';
 import {
+  attachImportPhotosAction,
   parseMenuFileAction,
   previewMenuImportAction,
+  type CropUpload,
   type ImportPreview,
 } from '@/app/(staff)/dashboard/menus/import-actions';
+import { cropFromImage } from '@/lib/import/crop';
 import { createImportPairAction } from '@/app/(staff)/dashboard/menus/brand-actions';
 import { BrandReview, brandStateToDraft, type BrandReviewState } from '@/components/screens/BrandReview';
-import { PhotoImportPanel } from '@/components/PhotoImportPanel';
+import { PhotoImportPanel, type PhotoDraft } from '@/components/PhotoImportPanel';
 import { draftItemCount, MAX_IMPORT_TEXT } from '@/lib/menu-import';
 import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
@@ -92,6 +95,7 @@ export function MenuImportScreen({
   const [importId] = useState(() => crypto.randomUUID());
   const [menuFile, setMenuFile] = useState<File | null>(null);
   const [brandState, setBrandState] = useState<BrandReviewState | null>(null);
+  const [photoDraft, setPhotoDraft] = useState<PhotoDraft | null>(null);
 
   function readMenu() {
     setError(null);
@@ -125,28 +129,78 @@ export function MenuImportScreen({
     });
   }
 
-  function createMenu() {
-    if (!preview?.ok) return;
+  /*
+   * The one save, below the brand review on purpose: whatever the owner
+   * checked — dishes from photo, spreadsheet or text, and the brand style —
+   * goes in together, as one draft. Dish photos are cropped after the menu
+   * exists and may fail without losing the import.
+   */
+  function saveImport() {
     setError(null);
 
-    const kept = {
-      categories: preview.draft.categories.filter((_, index) => !dropped.has(index)),
-      importId,
-    };
+    const menu = photoDraft
+      ? { ...photoDraft.payload, importId }
+      : preview?.ok
+        ? { categories: preview.draft.categories.filter((_, index) => !dropped.has(index)), importId }
+        : null;
+    if (!menu) return;
+    if (photoDraft?.missingPrice) {
+      setError('Some dishes have no price. Type one, or remove the dish.');
+      return;
+    }
 
     startWriting(async () => {
       try {
         // The pair: menu draft AND brand draft, one import id. A failure in the
         // brand half rolls the menu half back (createImportPairAction).
         const brand = brandState ? brandStateToDraft(brandState, importId) : null;
-        const result = await createImportPairAction({ menu: kept, brand: brand ?? { importId } });
+        const result = await createImportPairAction({ menu, brand: brand ?? { importId } });
         if (!result.ok) {
           setError(result.error);
           return;
         }
-        router.push('/dashboard/menus');
+
+        let photoNote = '';
+        const crops = photoDraft?.crops ?? [];
+        if (photoDraft && crops.length > 0 && photoDraft.file) {
+          if (photoDraft.file.type === 'application/pdf') {
+            // Honest limit, said out loud: a PDF is read for dishes and
+            // prices, but dish photos are cropped from images only.
+            photoNote = ' Dish photos were not copied from the PDF — add them by hand in the editor.';
+          } else {
+            const ready: CropUpload[] = [];
+            for (const crop of crops) {
+              const cut = await cropFromImage(photoDraft.file, crop.box);
+              if (cut) {
+                ready.push({
+                  categoryIndex: crop.categoryIndex,
+                  itemIndex: crop.itemIndex,
+                  dataUrl: cut.dataUrl,
+                });
+              }
+            }
+            const failed = crops.length - ready.length;
+            if (ready.length > 0) {
+              const attached = await attachImportPhotosAction(result.menuId, ready);
+              if (attached.ok && attached.skipped > 0) {
+                const names =
+                  attached.skippedNames.length > 0 ? ` (${attached.skippedNames.join(', ')})` : '';
+                photoNote = ` ${attached.skipped} photo${attached.skipped === 1 ? '' : 's'} could not be copied${names} — add them by hand in the editor.`;
+              }
+            }
+            if (failed > 0 && photoNote === '') {
+              photoNote = ` ${failed} photo${failed === 1 ? '' : 's'} could not be copied — add them by hand in the editor.`;
+            }
+          }
+        }
+
+        router.push(
+          `/dashboard/menus?menu=${result.menuId}&notice=${encodeURIComponent(
+            `Draft imported with ${result.items} dish${result.items === 1 ? '' : 'es'}.${photoNote} Check it, then publish when you are ready.`,
+          )}`,
+        );
       } catch {
-        // A thrown server action must not leave the Import button stuck —
+        // A thrown server action must not leave the Save button stuck —
         // blocked buttons with a draft that never arrived is the bug class
         // this catch prevents.
         setError('Something went wrong saving the menu. Try again — nothing was changed.');
@@ -160,6 +214,10 @@ export function MenuImportScreen({
         .filter((_, index) => !dropped.has(index))
         .reduce((sum, category) => sum + category.items.length, 0)
     : 0;
+  const photoDishCount = photoDraft
+    ? photoDraft.payload.categories.reduce((sum, category) => sum + category.items.length, 0)
+    : 0;
+  const saveCount = photoDraft ? photoDishCount : keptCount;
 
   return (
     <OwnerPage active="import" outlet={outlet}>
@@ -250,17 +308,7 @@ export function MenuImportScreen({
       )}
 
       {mode === 'photo' && visionEnabled && !blocked && (
-        <PhotoImportPanel
-          canWrite={canWrite}
-          onFileChange={setMenuFile}
-          importId={importId}
-          createDraft={(menu) =>
-            createImportPairAction({
-              menu,
-              brand: brandState ? brandStateToDraft(brandState, importId) : { importId },
-            })
-          }
-        />
+        <PhotoImportPanel canWrite={canWrite} onFileChange={setMenuFile} onDraftChange={setPhotoDraft} />
       )}
 
       {blocked && <SignInPrompt reason={blocked} screen="menu import" />}
@@ -486,24 +534,8 @@ export function MenuImportScreen({
                 >
                   Start over
                 </button>
-                <button
-                  type="button"
-                  className={btn('solid', 'sm')}
-                  onClick={createMenu}
-                  disabled={writing || reading || keptCount === 0}
-                >
-                  {writing
-                    ? 'Importing…'
-                    : `Import ${keptCount} dish${keptCount === 1 ? '' : 'es'} as a draft menu`}
-                </button>
               </div>
             )}
-
-            <p className="m-0 text-[11.5px] leading-[1.5] text-gink-46">
-              The import becomes a new <strong className="text-gink">draft</strong> menu called
-              &quot;Imported menu&quot;, so your live menu is not touched. Review it in the editor, then
-              publish when it is right.
-            </p>
           </div>
         </Card>
       )}
@@ -517,6 +549,32 @@ export function MenuImportScreen({
         file={menuFile}
         onStateChange={(state) => setBrandState((current) => (current === state ? current : state))}
       />
+
+      {/* The one save. Below the brand review on purpose: dishes and brand
+          style go in together, whatever source they came from. */}
+      {!blocked && canWrite && (photoDraft || preview?.ok) && (
+        <Card className="mt-4">
+          <div className="border-b border-hair px-4 py-3 sm:px-5">
+            <h2 className="text-[13px] font-semibold text-gink">Save the draft</h2>
+            <p className="mt-1 text-[12.5px] leading-[1.5] text-gink-46">
+              Dishes and brand style go in together as a new draft menu. Your live menu is not
+              touched — publish from the editor when it looks right.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2 px-4 py-4 sm:px-5">
+            <button
+              type="button"
+              className={btn('solid')}
+              onClick={saveImport}
+              disabled={writing || reading}
+            >
+              {writing
+                ? 'Saving…'
+                : `Save ${saveCount} dish${saveCount === 1 ? '' : 'es'} as a draft`}
+            </button>
+          </div>
+        </Card>
+      )}
     </OwnerPage>
   );
 }

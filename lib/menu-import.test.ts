@@ -114,12 +114,33 @@ describe('parseMenuText', () => {
   });
 
   describe('half / full pricing', () => {
-    it('uses the last price so the dish is not free, and says so', () => {
+    it('turns printed portions into real variants with an honest entry price', () => {
       const draft = parseMenuText('Butter Chicken Half 240 Full 420');
       const item = draft.categories[0].items[0];
 
       expect(item.name).toBe('Butter Chicken');
+      // The dish's own price is the smallest portion — the entry price.
+      expect(item.pricePaise).toBe(24000);
+      expect(item.variants).toEqual([
+        { name: 'Half', pricePaise: 24000 },
+        { name: 'Full', pricePaise: 42000 },
+      ]);
+      // The line was understood: nothing for the owner to fix.
+      expect(draft.issues).toEqual([]);
+    });
+
+    it('keeps separators out of the dish name when the line prints slashes', () => {
+      const draft = parseMenuText('Butter Chicken Half 240 / Full 420');
+      expect(draft.categories[0].items[0].name).toBe('Butter Chicken');
+    });
+
+    it('reports a double price it cannot split instead of guessing the portions', () => {
+      const draft = parseMenuText('Paneer Half 240 / 420');
+      const item = draft.categories[0].items[0];
+
+      expect(item.name).toBe('Paneer');
       expect(item.pricePaise).toBe(42000);
+      expect(item.variants).toBeUndefined();
       expect(draft.issues[0].reason).toMatch(/variant/i);
     });
   });
