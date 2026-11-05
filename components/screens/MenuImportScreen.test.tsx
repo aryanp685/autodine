@@ -83,4 +83,10 @@ describe('the journey frame', () => {
     expect(html).toContain('Sample preview');
     expect(html).toContain('Get 2 Design Options');
   });
+
+  it('shows no design chooser before there is a draft to preview', () => {
+    const html = renderToStaticMarkup(<MenuImportScreen visionEnabled />);
+
+    expect(html).not.toContain('data-design-chooser');
+  });
 });
