@@ -92,10 +92,15 @@ export function MenuImportScreen({
   function readMenu() {
     setError(null);
     startReading(async () => {
-      const result = await previewMenuImportAction(text);
-      setPreview(result);
-      setDropped(new Set());
-      if (!result.ok) setError(result.error);
+      try {
+        const result = await previewMenuImportAction(text);
+        setPreview(result);
+        setDropped(new Set());
+        if (!result.ok) setError(result.error);
+      } catch {
+        // A rejected server action must not leave the Read button stuck.
+        setError('Something went wrong reading the text. Try again.');
+      }
     });
   }
 
@@ -109,15 +114,22 @@ export function MenuImportScreen({
     };
 
     startWriting(async () => {
-      // The pair: menu draft AND brand draft, one import id. A failure in the
-      // brand half rolls the menu half back (createImportPairAction).
-      const brand = brandState ? brandStateToDraft(brandState, importId) : null;
-      const result = await createImportPairAction({ menu: kept, brand: brand ?? { importId } });
-      if (!result.ok) {
-        setError(result.error);
-        return;
+      try {
+        // The pair: menu draft AND brand draft, one import id. A failure in the
+        // brand half rolls the menu half back (createImportPairAction).
+        const brand = brandState ? brandStateToDraft(brandState, importId) : null;
+        const result = await createImportPairAction({ menu: kept, brand: brand ?? { importId } });
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        router.push('/dashboard/menus');
+      } catch {
+        // A thrown server action must not leave the Import button stuck —
+        // blocked buttons with a draft that never arrived is the bug class
+        // this catch prevents.
+        setError('Something went wrong saving the menu. Try again — nothing was changed.');
       }
-      router.push('/dashboard/menus');
     });
   }
 
@@ -176,7 +188,19 @@ export function MenuImportScreen({
         </div>
       )}
 
-      {mode === 'photo' && visionEnabled && !blocked && <PhotoImportPanel canWrite={canWrite} onFileChange={setMenuFile} />}
+      {mode === 'photo' && visionEnabled && !blocked && (
+        <PhotoImportPanel
+          canWrite={canWrite}
+          onFileChange={setMenuFile}
+          importId={importId}
+          createDraft={(menu) =>
+            createImportPairAction({
+              menu,
+              brand: brandState ? brandStateToDraft(brandState, importId) : { importId },
+            })
+          }
+        />
+      )}
 
       {blocked && <SignInPrompt reason={blocked} screen="menu import" />}
 
@@ -346,11 +370,11 @@ export function MenuImportScreen({
               <Tag tone="neutral">Guess</Tag>
               <p className="m-0 flex-1 text-[11.5px] leading-[1.5] text-gink-64">
                 <strong className="font-semibold text-gink">
-                  Veg and non-veg are guessed from the dish names.
+                  Only what the menu marks is marked.
                 </strong>{' '}
-                Anything with chicken, mutton, fish, prawn or egg is marked non-veg; everything else is
-                marked veg. Check the markers above — a wrong one is a real problem for a guest, not a
-                detail.
+                Anything named chicken, mutton, fish, prawn or egg is marked non-veg from its name;
+                everything else arrives unmarked until you set it above. A wrong mark is a real
+                problem for a guest, not a detail.
               </p>
             </div>
 

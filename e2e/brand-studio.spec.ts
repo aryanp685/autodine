@@ -32,9 +32,12 @@ test('the import screen offers the brand half and admits when photo reading is o
 
   await expect(page.getByRole('heading', { name: 'Brand — how guests see you' })).toBeVisible();
   await expect(page.getByText(/not switched on/i)).toBeVisible();
-  // The manual path always exists: uploads and the colour control.
+  // The manual path always exists: the name and the uploads. The colour and
+  // design-style review blocks were removed on the owner's call — the theme
+  // still resolves into the draft, the import review just no longer shows it.
   await expect(page.getByRole('button', { name: /upload logo/i })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Primary colour' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Restaurant name' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Primary colour' })).toHaveCount(0);
 });
 
 test('the restaurant name is only applied after the owner confirms it', async ({ page }) => {

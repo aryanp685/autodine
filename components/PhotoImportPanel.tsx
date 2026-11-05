@@ -42,6 +42,17 @@ type Editable = {
 
 type EditableCategory = { name: string; items: Editable[] };
 
+/** The menu half of the one Create — same shape the text path sends. */
+type MenuDraftPayload = {
+  categories: {
+    name: string;
+    items: { name: string; pricePaise: number; description: string | null; isVeg: boolean | null }[];
+  }[];
+  importId?: string;
+};
+
+type DraftSaveResult = { ok: true; menuId: string; items: number } | { ok: false; error: string };
+
 const FLAG_TEXT: Record<string, string> = {
   'price-unclear': 'Price unclear — check the photo',
   'no-price-printed': 'No price in the photo',
@@ -52,6 +63,8 @@ const FLAG_TEXT: Record<string, string> = {
 export function PhotoImportPanel({
   canWrite,
   onFileChange,
+  importId,
+  createDraft,
 }: {
   canWrite: boolean;
   /**
@@ -60,6 +73,14 @@ export function PhotoImportPanel({
    * for both"). Purely informational — this panel keeps owning the import.
    */
   onFileChange?: (file: File | null) => void;
+  /** Shared with the brand draft so one Create writes both halves. */
+  importId?: string;
+  /**
+   * The one Create. The parent passes the pair writer (menu draft AND brand
+   * draft in one action, one import id). Without it the panel falls back to a
+   * menu-only draft.
+   */
+  createDraft?: (menu: MenuDraftPayload) => Promise<DraftSaveResult>;
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -133,33 +154,40 @@ export function PhotoImportPanel({
     setStatus('reading');
 
     startWork(async () => {
-      const data = new FormData();
-      data.set('photo', file);
-      const result: PhotoPreview = await extractMenuFromPhotoAction(data);
+      try {
+        const data = new FormData();
+        data.set('photo', file);
+        const result: PhotoPreview = await extractMenuFromPhotoAction(data);
 
-      if (!result.ok) {
-        setError(result.error);
+        if (!result.ok) {
+          setError(result.error);
+          setStatus('idle');
+          return;
+        }
+
+        setNotes(result.draft.notes);
+        setModel(result.draft.model);
+        setCategories(
+          result.draft.categories.map((category: VisionCategory) => ({
+            name: category.name,
+            items: category.items.map((item) => ({
+              name: item.name,
+              // Empty, not zero: a zero would be saved as ₹0 and the dish would
+              // appear free on the menu.
+              price: item.pricePaise === null ? '' : String(Math.round(item.pricePaise / 100)),
+              isVeg: item.isVeg,
+              flags: item.flags,
+              photo: item.photo,
+            })),
+          }))
+        );
+        setStatus('review');
+      } catch {
+        // A rejected server action must not leave the panel stuck in
+        // 'reading' — the Read button has to come back so the owner can retry.
+        setError('Something went wrong reading that photo. Try again.');
         setStatus('idle');
-        return;
       }
-
-      setNotes(result.draft.notes);
-      setModel(result.draft.model);
-      setCategories(
-        result.draft.categories.map((category: VisionCategory) => ({
-          name: category.name,
-          items: category.items.map((item) => ({
-            name: item.name,
-            // Empty, not zero: a zero would be saved as ₹0 and the dish would
-            // appear free on the menu.
-            price: item.pricePaise === null ? '' : String(Math.round(item.pricePaise / 100)),
-            isVeg: item.isVeg,
-            flags: item.flags,
-            photo: item.photo,
-          })),
-        }))
-      );
-      setStatus('review');
     });
   }
 
@@ -234,76 +262,87 @@ export function PhotoImportPanel({
     setStatus('saving');
 
     startWork(async () => {
-      const payload = {
-        categories: kept
-          .filter((c) => c.items.length > 0)
-          .map((c) => ({
-            name: c.name,
-            items: c.items.map((item) => ({
-              name: item.name,
-              // Rupees -> paise at the boundary, rounded the same way the rest
-              // of the product does it.
-              pricePaise: Math.round(Number(item.price.replace(/[^\d.]/g, '')) * 100),
-              description: null as string | null,
-              // Unmarked stays unmarked. The old coercion quietly turned
-              // "the menu never said" into a green mark.
-              isVeg: item.isVeg,
+      try {
+        const payload: MenuDraftPayload = {
+          importId,
+          categories: kept
+            .filter((c) => c.items.length > 0)
+            .map((c) => ({
+              name: c.name,
+              items: c.items.map((item) => ({
+                name: item.name,
+                // Rupees -> paise at the boundary, rounded the same way the rest
+                // of the product does it.
+                pricePaise: Math.round(Number(item.price.replace(/[^\d.]/g, '')) * 100),
+                description: null as string | null,
+                // Unmarked stays unmarked. The old coercion quietly turned
+                // "the menu never said" into a green mark.
+                isVeg: item.isVeg,
+              })),
             })),
-          })),
-      };
+        };
 
-      const created = await createImportedMenuAction(payload);
-      if (!created.ok) {
-        setError(created.error);
-        setStatus('review');
-        return;
-      }
+        // One Create: the parent supplies the pair writer so the brand half
+        // rides along with the menu draft. Without it, a menu-only draft.
+        const created = await (createDraft ? createDraft(payload) : createImportedMenuAction(payload));
+        if (!created.ok) {
+          setError(created.error);
+          setStatus('review');
+          return;
+        }
 
-      // Photos next, and they are allowed to fail without losing the menu:
-      // text with no thumbnails is a good import, a rolled-back import is not.
-      let attached = 0;
-      let skipped = 0;
-      let skippedNames: string[] = [];
+        // Photos next, and they are allowed to fail without losing the menu:
+        // text with no thumbnails is a good import, a rolled-back import is not.
+        let attached = 0;
+        let skipped = 0;
+        let skippedNames: string[] = [];
 
-      if (file) {
-        const crops: CropUpload[] = [];
-        const isPdf = file.type === 'application/pdf';
+        if (file) {
+          const crops: CropUpload[] = [];
+          const isPdf = file.type === 'application/pdf';
 
-        if (!isPdf) {
-          for (let ci = 0; ci < kept.length; ci += 1) {
-            for (let ii = 0; ii < kept[ci].items.length; ii += 1) {
-              const box = kept[ci].items[ii].photo;
-              if (!box) continue;
-              const crop = await cropFromImage(file, box);
-              if (!crop) continue;
-              crops.push({ categoryIndex: ci, itemIndex: ii, dataUrl: crop.dataUrl });
+          if (!isPdf) {
+            for (let ci = 0; ci < kept.length; ci += 1) {
+              for (let ii = 0; ii < kept[ci].items.length; ii += 1) {
+                const box = kept[ci].items[ii].photo;
+                if (!box) continue;
+                const crop = await cropFromImage(file, box);
+                if (!crop) continue;
+                crops.push({ categoryIndex: ci, itemIndex: ii, dataUrl: crop.dataUrl });
+              }
+            }
+          }
+
+          if (crops.length > 0) {
+            const result = await attachImportPhotosAction(created.menuId, crops);
+            if (result.ok) {
+              attached = result.attached;
+              skipped = result.skipped;
+              skippedNames = result.skippedNames;
             }
           }
         }
 
-        if (crops.length > 0) {
-          const result = await attachImportPhotosAction(created.menuId, crops);
-          if (result.ok) {
-            attached = result.attached;
-            skipped = result.skipped;
-            skippedNames = result.skippedNames;
-          }
-        }
+        setStatus('review');
+        setNotice(
+          `Saved as a draft menu with ${created.items} dish${created.items === 1 ? '' : 'es'}.` +
+            (attached > 0 ? ` ${attached} photo${attached === 1 ? '' : 's'} copied from your menu.` : '') +
+            (skipped > 0
+              ? ` ${skipped} photo${skipped === 1 ? '' : 's'} could not be copied` +
+                (skippedNames.length > 0 ? ` (${skippedNames.join(', ')})` : '') +
+                ' — add them by hand in the editor.'
+              : '')
+        );
+
+        // The editor is where the next decision lives: publish, or keep editing.
+        router.push(`/dashboard/menus?menu=${created.menuId}&notice=${encodeURIComponent('Draft imported. Check it, then publish when you are ready.')}`);
+      } catch {
+        // A thrown server action must not leave the panel stuck in 'saving':
+        // blocked buttons and a draft that never arrived are exactly what this
+        // catch exists to prevent.
+        setError('Something went wrong saving the menu. Try again — nothing was changed.');
+        setStatus('review');
       }
-
-      setStatus('review');
-      setNotice(
-        `Saved as a draft menu with ${created.items} dish${created.items === 1 ? '' : 'es'}.` +
-          (attached > 0 ? ` ${attached} photo${attached === 1 ? '' : 's'} copied from your menu.` : '') +
-          (skipped > 0
-            ? ` ${skipped} photo${skipped === 1 ? '' : 's'} could not be copied` +
-              (skippedNames.length > 0 ? ` (${skippedNames.join(', ')})` : '') +
-              ' — add them by hand in the editor.'
-            : '')
-      );
-
-      // The editor is where the next decision lives: publish, or keep editing.
-      router.push(`/dashboard/menus?menu=${created.menuId}&notice=${encodeURIComponent('Draft imported. Check it, then publish when you are ready.')}`);
     });
   }
 
