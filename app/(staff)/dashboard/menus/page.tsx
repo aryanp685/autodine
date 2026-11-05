@@ -16,11 +16,13 @@ export default async function MenusPage({
     q?: string;
     show?: string;
     sort?: string;
+    bulk?: string;
   }>;
 }) {
   // `q`, `show` and `sort` narrow the dish table. They are read here so the
   // screen stays a server component and the filter survives a reload.
-  const { error, notice, item, undo, q, show, sort } = await searchParams;
+  // `bulk` swaps the single-dish form for the bulk add panel, the same way.
+  const { error, notice, item, undo, q, show, sort, bulk } = await searchParams;
 
   // Null means Supabase is not configured: the screen renders its demo rows
   // and keeps every control inert rather than pretending to save.
@@ -37,6 +39,7 @@ export default async function MenusPage({
       query={q}
       show={show}
       sort={sort}
+      bulkMode={bulk === '1'}
     />
   );
 }

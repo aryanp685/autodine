@@ -23,6 +23,14 @@ import { getStaffContextDetailed } from '@/lib/db/staff';
 import { rupeesToPaise } from '@/lib/money';
 import { PRESET_CATEGORIES, normaliseCategoryName } from '@/lib/menu-presets';
 import { movedOrder, renumber } from '@/lib/menus/reorder';
+import {
+  MAX_IMPORT_TEXT,
+  MAX_MENU_FILE_BYTES,
+  parseMenuCsv,
+  parseMenuText,
+  parseMenuXlsx,
+} from '@/lib/menus/bulk-parse';
+import type { ImportedItem, MenuImportDraft } from '@/lib/menu-import';
 import { EDITOR_MENU_COOKIE } from '@/lib/db/menu-editor';
 import { getDraftForMenu, publishPair } from '@/lib/branding/brand-data';
 import { readUndoItem } from '@/lib/menu-undo';
@@ -980,6 +988,132 @@ export async function moveItemAction(formData: FormData): Promise<void> {
   }
 
   ok('Dish order saved.');
+}
+
+/* ============================================================================
+   Adding many dishes at once
+   ========================================================================== */
+
+/**
+ * Bulk add: a pasted list, a CSV, or an Excel file, into one chosen category.
+ *
+ * The editor's single-dish form is right for one correction and wrong for
+ * twenty dishes. This action takes a list through the same deterministic
+ * parsers the import screen used to use -- never a guessed price, never an
+ * invented veg mark -- and files every dish under the category the owner
+ * picked, at the end of it. Lines that cannot become a dish are reported in
+ * the outcome, never silently dropped.
+ */
+export async function bulkAddItemsAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const categoryId = await resolveCategoryId(ctx, formData.get('categoryId'));
+  if (!categoryId) fail('Add a category first. Diners see dishes through their category.');
+
+  const file = formData.get('file');
+  const text = String(formData.get('text') ?? '');
+
+  let draft: MenuImportDraft;
+  if (file instanceof File && file.size > 0) {
+    if (file.size > MAX_MENU_FILE_BYTES) {
+      fail('That file is over 5 MB. Export a smaller one and try again.');
+    }
+    const lower = file.name.toLowerCase();
+    if (lower.endsWith('.csv')) {
+      draft = parseMenuCsv(await file.text());
+    } else if (lower.endsWith('.xlsx')) {
+      draft = await parseMenuXlsx(Buffer.from(await file.arrayBuffer()));
+    } else {
+      fail('Save the file as .csv or .xlsx — those are the two I can read.');
+    }
+  } else if (text.trim() !== '') {
+    if (text.length > MAX_IMPORT_TEXT) {
+      fail('That paste is over 20,000 characters. Split it into smaller parts.');
+    }
+    draft = parseMenuText(text);
+  } else {
+    fail('Paste your dish list or attach a CSV or Excel file.');
+  }
+
+  // One category was chosen, so the parsers' own sections (a heading in the
+  // text, a category column in the file) do not survive as categories -- the
+  // dishes do. Two sections naming the same dish would land twice without
+  // this second pass over the flattened list.
+  const flattened = draft.categories.flatMap((category) => category.items);
+  const seen = new Set<string>();
+  const items: ImportedItem[] = [];
+  let duplicates = draft.duplicates;
+  for (const item of flattened) {
+    const key = `${item.name.toLowerCase()}::${item.pricePaise}`;
+    if (seen.has(key)) {
+      duplicates += 1;
+      continue;
+    }
+    seen.add(key);
+    items.push(item);
+  }
+
+  if (items.length === 0) {
+    const first = draft.issues[0];
+    fail(first ? `Nothing was added — ${first.reason.toLowerCase()}` : 'No dishes were found in that list.');
+  }
+
+  // New dishes go at the end of the category: the place the move arrows
+  // would drag them to anyway.
+  const { data: lastRows } = await ctx.supabase
+    .from('items')
+    .select('sort_order')
+    .eq('restaurant_id', ctx.restaurantId)
+    .eq('category_id', categoryId)
+    .order('sort_order', { ascending: false })
+    .limit(1);
+  const startOrder = Number(lastRows?.[0]?.sort_order ?? -1) + 1;
+
+  const { data: created, error } = await ctx.supabase
+    .from('items')
+    .insert(
+      items.map((item, index) => ({
+        restaurant_id: ctx.restaurantId,
+        category_id: categoryId,
+        name: item.name,
+        description: item.description ?? null,
+        price_paise: item.pricePaise,
+        is_veg: item.isVeg,
+        is_available: true,
+        sort_order: startOrder + index,
+      })),
+    )
+    .select('id');
+
+  if (error || !created || created.length !== items.length) {
+    fail(`Could not add the dishes: ${error?.message ?? 'the write did not come back whole.'}`);
+  }
+
+  // Portions ("Half 240 / Full 420") become real rows, exactly like portions
+  // created by hand. The parent dish holds the entry price (the smallest
+  // portion) and each variant replaces it when chosen.
+  const variantRows = items.flatMap((item, itemIndex) =>
+    (item.variants ?? []).map((variant, variantOrder) => ({
+      item_id: String(created[itemIndex].id),
+      name: variant.name,
+      price_paise: variant.pricePaise,
+      sort_order: variantOrder,
+    })),
+  );
+  if (variantRows.length > 0) {
+    const { error: variantsError } = await ctx.supabase.from('item_variants').insert(variantRows);
+    if (variantsError) {
+      fail(`The dishes were added, but their portions were not: ${variantsError.message}`);
+    }
+  }
+
+  const parts = [`Added ${items.length} ${items.length === 1 ? 'dish' : 'dishes'}.`];
+  if (duplicates > 0) parts.push(`${duplicates} duplicate${duplicates === 1 ? '' : 's'} skipped.`);
+  if (draft.issues.length > 0) {
+    parts.push(`${draft.issues.length} line${draft.issues.length === 1 ? '' : 's'} skipped — ${draft.issues[0].reason.toLowerCase()}`);
+  }
+  ok(parts.join(' '));
 }
 
 /* ============================================================================
