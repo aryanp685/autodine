@@ -7,24 +7,82 @@ import { SignInPrompt } from '@/components/SignInPrompt';
 import { attachImportPhotosAction, type CropUpload } from '@/app/(staff)/dashboard/menus/import-actions';
 import { createImportPairAction } from '@/app/(staff)/dashboard/menus/brand-actions';
 import { BrandReview, brandStateToDraft, type BrandReviewState } from '@/components/screens/BrandReview';
+import { ImportShowcase } from '@/components/screens/ImportShowcase';
 import { PhotoImportPanel, type PhotoDraft } from '@/components/PhotoImportPanel';
 import { cropFromImage } from '@/lib/import/crop';
 import type { OutletBar } from '@/lib/outlets';
 import { Card, OwnerPage, PageHead, btn } from '@/components/owner/chrome';
 
 /**
- * Bring in a menu that already exists elsewhere.
- *
- * One way in: photograph the menu. The owner's own printed card is the
- * source every restaurant already has, and one path kept honest beats three
- * kept busy. The review is not decoration: it is where the owner sees that
- * "Paneer Tikka 320" became a ₹320 dish and that four dishes need a price
- * before anything is written.
- *
- * The save is one action at the bottom of the page — dishes and brand style
- * go in together, as one draft. Nothing goes live until the owner publishes
- * from the editor.
+ * The AI Menu Studio journey, in four words the owner can follow: add the
+ * menu, check it, choose a design, publish. Only the first two steps exist
+ * on this screen today — the design step is next on the build — so the last
+ * two render dashed and quiet instead of pretending to be buttons.
  */
+const STEPS = [
+  { label: 'Add Menu', sub: 'Upload or import' },
+  { label: 'Review', sub: 'Check items & brand' },
+  { label: 'Choose Design', sub: 'Pick your style' },
+  { label: 'Publish', sub: 'Go live in minutes' },
+];
+
+const BENEFITS = [
+  {
+    title: 'Auto Extract Menu',
+    sub: 'Dishes, prices & categories',
+    icon: (
+      <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="size-4">
+        <path
+          d="M11 2L4 11h4l-1 7 7-10h-4l1-6z"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+  },
+  {
+    title: 'Detect Your Brand',
+    sub: 'Logo, colours & style',
+    icon: (
+      <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="size-4">
+        <path
+          d="M10 2l7 3.5-7 3.5-7-3.5L10 2zM3 9.5l7 3.5 7-3.5M3 13l7 3.5 7-3.5"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+  },
+  {
+    title: 'Get 2 Design Options',
+    sub: 'Branded storefront styles',
+    icon: (
+      <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="size-4">
+        <rect x="2.5" y="4" width="9" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
+        <rect x="8.5" y="6.5" width="9" height="9.5" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Publish in Minutes',
+    sub: 'Go live with your brand',
+    icon: (
+      <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="size-4">
+        <path
+          d="M2.5 9.5L17 3l-4.5 14.5-3-6-7-2z"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+  },
+];
+
 export function MenuImportScreen({
   outlet,
   role,
@@ -139,44 +197,83 @@ export function MenuImportScreen({
 
   return (
     <OwnerPage active="import" outlet={outlet}>
-      <PageHead
-        kicker="Menu · import"
-        title="Bring in a menu you already have"
-        meta="Photograph your printed menu and we read the dishes, prices and pictures for you to check. Nothing is saved until you approve it."
-        actions={
-          <Link href="/dashboard/menus" className={btn('ghost', 'sm')}>
-            Back to the menu editor
-          </Link>
-        }
-      />
+      {/* The hero band: the masthead and journey steps on the left, the
+          menu-to-storefront showcase on the right. The showcase is a
+          demonstration on design-system tokens — flat paper, no gradients. */}
+      <div className="grid gap-x-8 gap-y-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.85fr)] lg:items-center">
+        <div className="min-w-0">
+          <PageHead
+            kicker="AI Menu Studio"
+            title={
+              <>
+                Turn Your Menu into a <span className="text-plum">Branded Storefront</span>
+              </>
+            }
+            meta="Upload your existing menu and let AI extract items, prices, photos and your brand style — then get two ready-to-publish designs."
+            actions={
+              <Link href="/dashboard/menus" className={btn('ghost', 'sm')}>
+                Back to the menu editor
+              </Link>
+            }
+          />
 
-      {/* The progress strip: where the owner is, in one line. Derived from
-          real state only — the save step lights up while the save runs, and
-          nothing claims a step that has not happened. */}
-      {!blocked && (
-        <div className="mb-4 flex flex-wrap items-center gap-1.5" data-import-steps>
-          {['Add your menu', 'Check dishes & brand', 'Save the draft'].map((label, index) => {
-            const position = writing ? 2 : photoDraft || menuFile ? 1 : 0;
-            const state = index < position ? 'done' : index === position ? 'active' : 'todo';
-            return (
-              <span
-                key={label}
-                data-step={state}
-                className={[
-                  'rounded-full border px-2.5 py-1 text-[11.5px]',
-                  state === 'active'
-                    ? 'border-gink font-semibold text-gink'
-                    : state === 'done'
-                      ? 'border-gink bg-gink text-onink'
-                      : 'border-hair text-gink-46',
-                ].join(' ')}
-              >
-                {index + 1} · {label}
-              </span>
-            );
-          })}
+          {/* The journey so far, from real state only: the design step is
+              next on the build and stays dashed rather than clickable. */}
+          {!blocked && (
+            <ol className="m-0 flex list-none flex-wrap gap-1.5 p-0" data-import-steps>
+              {STEPS.map((step, index) => {
+                const position = photoDraft || menuFile ? 1 : 0;
+                const state =
+                  index > 1
+                    ? 'upcoming'
+                    : index < position
+                      ? 'done'
+                      : index === position
+                        ? 'active'
+                        : 'todo';
+                return (
+                  <li
+                    key={step.label}
+                    data-step={state}
+                    className={[
+                      'flex min-w-0 items-center gap-2 rounded-full border px-2.5 py-1.5',
+                      state === 'active'
+                        ? 'border-plum bg-plum-soft font-semibold text-plum'
+                        : state === 'done'
+                          ? 'border-gink bg-gink text-onink'
+                          : state === 'todo'
+                            ? 'border-hair text-gink'
+                            : 'border-dashed border-hair text-gink-28',
+                    ].join(' ')}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={[
+                        'grid size-5 shrink-0 place-items-center rounded-full text-[10px] font-semibold',
+                        state === 'active'
+                          ? 'bg-plum text-onink'
+                          : state === 'done'
+                            ? 'bg-onink text-gink'
+                            : 'bg-gink-07 text-gink-46',
+                      ].join(' ')}
+                    >
+                      {index + 1}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-[11.5px] leading-tight">{step.label}</span>
+                      <span className="block truncate text-[10px] leading-tight text-gink-46">
+                        {step.sub}
+                      </span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
         </div>
-      )}
+
+        <ImportShowcase />
+      </div>
 
       {blocked && <SignInPrompt reason={blocked} screen="menu import" />}
 
@@ -200,6 +297,28 @@ export function MenuImportScreen({
           {error}
         </p>
       )}
+
+      {/* What this journey does, in four lines. A slim band between the menu
+          half and the brand half — not a second dashboard. */}
+      <section
+        aria-label="What the import does"
+        className="mt-6 grid gap-x-6 gap-y-4 border-y border-hair py-4 sm:grid-cols-2 lg:grid-cols-4"
+      >
+        {BENEFITS.map((benefit) => (
+          <div key={benefit.title} className="flex min-w-0 items-start gap-2.5">
+            <span
+              aria-hidden="true"
+              className="grid size-8 shrink-0 place-items-center rounded-[10px] bg-plum-soft text-plum"
+            >
+              {benefit.icon}
+            </span>
+            <div className="min-w-0">
+              <p className="m-0 truncate text-[13px] font-semibold text-gink">{benefit.title}</p>
+              <p className="m-0 truncate text-[11.5px] text-gink-46">{benefit.sub}</p>
+            </div>
+          </div>
+        ))}
+      </section>
 
       {/* The brand half of the import. Independent extraction, independent
           review — one Create writes both drafts. */}

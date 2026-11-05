@@ -68,3 +68,19 @@ describe('Menu import with a vision key', () => {
     expect(html).toContain('data-import-steps');
   });
 });
+
+describe('the journey frame', () => {
+  it('shows the hero, four steps, and labels the storefront mock-up as a sample', () => {
+    const html = renderToStaticMarkup(<MenuImportScreen visionEnabled />);
+
+    expect(html).toContain('Branded Storefront');
+    expect(html).toContain('Add Menu');
+    expect(html).toContain('Choose Design');
+    expect(html).toContain('Publish');
+    // The design step is next on the build: it renders dashed and quiet,
+    // never as a step the owner can be sent down.
+    expect(html).toContain('data-step="upcoming"');
+    expect(html).toContain('Sample preview');
+    expect(html).toContain('Get 2 Design Options');
+  });
+});

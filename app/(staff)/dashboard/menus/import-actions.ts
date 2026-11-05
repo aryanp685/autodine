@@ -33,7 +33,7 @@ import {
   type VisionDraft,
 } from '@/lib/ai/menu-vision';
 import { ASSET_BUCKET, dishAssetPath, publicAssetUrl } from '@/lib/storage/assets';
-import { sanitiseDraft, type MenuImportDraft } from '@/lib/menu-import';
+import { sanitiseDraft } from '@/lib/menu-import';
 
 const MENUS_PATH = '/dashboard/menus';
 
