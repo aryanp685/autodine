@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { callGeminiJson, geminiConfigured } from './gemini';
+import { callGeminiJson, callVisionJson, geminiConfigured } from './gemini';
 
 /**
  * These pin the behaviour the two readers now share: busy is retried before
@@ -179,5 +179,98 @@ describe('callGeminiJson', () => {
     vi.stubEnv('GEMINI_API_KEY', '');
     vi.stubEnv('MENU_VISION_API_KEY', '');
     expect(geminiConfigured()).toBe(false);
+  });
+});
+
+describe('callVisionJson (Gemini first, Groq fallback)', () => {
+  /** Routes the mock by host so the dispatcher's two providers are distinct. */
+  function stubRoutedFetch(onGemini: () => Promise<Response>, onGroq: () => Promise<Response>) {
+    const fetchMock = vi.fn(async (input: unknown) => {
+      const url = String(input);
+      return url.includes('groq.com') ? onGroq() : onGemini();
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  function geminiOk(text: string): Response {
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] }), { status: 200 });
+  }
+
+  function groqOk(text: string): Response {
+    return new Response(JSON.stringify({ choices: [{ message: { content: text } }] }), { status: 200 });
+  }
+
+  it('never touches the fallback when the primary answers', async () => {
+    stubKey();
+    vi.stubEnv('GROQ_API_KEY', 'gsk-test');
+    const fetchMock = stubRoutedFetch(
+      async () => geminiOk('{"ok":true}'),
+      async () => groqOk('never'),
+    );
+
+    const result = await callVisionJson(args());
+
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.model).toBe('gemini-3.8-flash');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to Groq when the primary stays busy after every retry', async () => {
+    stubKey();
+    vi.stubEnv('GROQ_API_KEY', 'gsk-test');
+    const fetchMock = stubRoutedFetch(
+      async () => new Response('busy', { status: 503 }),
+      async () => groqOk('{"ok":true}'),
+    );
+
+    const result = await callVisionJson(args());
+
+    expect(result).toEqual({ ok: true, model: 'meta-llama/llama-4-scout-17b-16e-instruct', text: '{"ok":true}' });
+    // Three Gemini attempts (one + two retries), then one Groq call.
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it('serves from Groq alone when there is no Gemini key at all', async () => {
+    vi.stubEnv('GEMINI_API_KEY', '');
+    vi.stubEnv('MENU_VISION_API_KEY', '');
+    vi.stubEnv('GROQ_API_KEY', 'gsk-test');
+    const fetchMock = stubRoutedFetch(
+      async () => geminiOk('never'),
+      async () => groqOk('{"ok":true}'),
+    );
+
+    const result = await callVisionJson(args());
+
+    expect(result.ok).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0][0])).toContain('groq.com');
+  });
+
+  it('reports the caller busy sentence when both providers stay busy', async () => {
+    stubKey();
+    vi.stubEnv('GROQ_API_KEY', 'gsk-test');
+    stubRoutedFetch(
+      async () => new Response('busy', { status: 503 }),
+      async () => new Response('busy', { status: 429 }),
+    );
+
+    const result = await callVisionJson(args());
+
+    expect(result).toEqual({ ok: false, code: 'rate-limited', reason: 'busy-sentence' });
+  });
+
+  it('keeps the primary failure when no fallback key exists', async () => {
+    stubKey();
+    vi.stubEnv('GROQ_API_KEY', '');
+    const fetchMock = stubRoutedFetch(
+      async () => new Response('busy', { status: 503 }),
+      async () => groqOk('never'),
+    );
+
+    const result = await callVisionJson(args());
+
+    expect(result).toEqual({ ok: false, code: 'rate-limited', reason: 'busy-sentence' });
+    expect(String(fetchMock.mock.calls[0][0])).not.toContain('groq.com');
   });
 });

@@ -22,7 +22,8 @@
  */
 
 import { readBox, validateMenuCapture, type PhotoBox, type VisionErrorCode } from './menu-vision';
-import { callGeminiJson, geminiConfigured } from './gemini';
+import { callVisionJson, geminiConfigured } from './gemini';
+import { groqConfigured } from './groq';
 import {
   parseHex,
   parseTheme,
@@ -77,7 +78,8 @@ export type BrandResult =
 export const validateBrandCapture = validateMenuCapture;
 
 export function brandVisionConfigured(): boolean {
-  return geminiConfigured();
+  // Either provider can serve a read; one is enough.
+  return geminiConfigured() || groqConfigured();
 }
 
 const PROMPT = [
@@ -238,7 +240,7 @@ export function buildBrandExtraction(answer: unknown, modelName: string): BrandE
  * Server-only: the API key never leaves this process.
  */
 export async function extractBrandFromImage(bytes: ArrayBuffer, mimeType: string): Promise<BrandResult> {
-  const result = await callGeminiJson({
+  const result = await callVisionJson({
     prompt: PROMPT,
     bytes,
     mimeType,
