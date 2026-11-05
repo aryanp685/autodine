@@ -47,6 +47,9 @@ export type BrandReviewState = {
   theme: BrandTheme | null;
   logoAssetId: string | null;
   bannerAssetId: string | null;
+  /** Resolved asset URLs, so the parent's design previews can show them. */
+  logoUrl: string | null;
+  bannerUrl: string | null;
   conflicts: BrandConflict[];
   provenance: Partial<Record<'name' | 'primary' | 'logo' | 'banner' | 'theme', FieldSource>>;
   notes: string[];
@@ -132,6 +135,8 @@ export function BrandReview({
     theme,
     logoAssetId: logoResolution.value,
     bannerAssetId: bannerResolution.value,
+    logoUrl,
+    bannerUrl,
     conflicts: openConflicts,
     provenance: {
       name: nameResolution.resolved.source,
@@ -152,6 +157,8 @@ export function BrandReview({
     state.theme,
     state.logoAssetId,
     state.bannerAssetId,
+    state.logoUrl,
+    state.bannerUrl,
     state.conflicts.length,
     state.notes.length,
   ]);

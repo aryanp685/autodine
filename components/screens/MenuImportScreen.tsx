@@ -7,6 +7,8 @@ import { SignInPrompt } from '@/components/SignInPrompt';
 import { attachImportPhotosAction, type CropUpload } from '@/app/(staff)/dashboard/menus/import-actions';
 import { createImportPairAction } from '@/app/(staff)/dashboard/menus/brand-actions';
 import { BrandReview, brandStateToDraft, type BrandReviewState } from '@/components/screens/BrandReview';
+import { DesignChooser } from '@/components/screens/DesignChooser';
+import { designCandidates, type DesignId } from '@/lib/branding/designs';
 import { ImportShowcase } from '@/components/screens/ImportShowcase';
 import { PhotoImportPanel, type PhotoDraft } from '@/components/PhotoImportPanel';
 import { cropFromImage } from '@/lib/import/crop';
@@ -114,6 +116,26 @@ export function MenuImportScreen({
   const [menuFile, setMenuFile] = useState<File | null>(null);
   const [brandState, setBrandState] = useState<BrandReviewState | null>(null);
   const [photoDraft, setPhotoDraft] = useState<PhotoDraft | null>(null);
+  /**
+   * The chosen storefront design — step 3. Optional on purpose: with no pick
+   * the save keeps the extracted style exactly as it always has.
+   */
+  const [designPick, setDesignPick] = useState<DesignId | null>(null);
+
+  const designs = designCandidates(brandState?.theme ?? null);
+  const chosenDesign = designs.find((design) => design.id === designPick) ?? null;
+
+  /* The real extracted rows, for the design previews: the same names and
+     prices the save will write. */
+  const previewDishes = photoDraft
+    ? photoDraft.payload.categories.flatMap((category) =>
+        category.items.map((item) => ({
+          category: category.name,
+          name: item.name,
+          pricePaise: item.pricePaise,
+        }))
+      )
+    : [];
 
   const saveCount = photoDraft
     ? photoDraft.payload.categories.reduce((sum, category) => sum + category.items.length, 0)
@@ -136,11 +158,15 @@ export function MenuImportScreen({
     startWriting(async () => {
       try {
         // The pair: menu draft AND brand draft, one import id. A failure in the
-        // brand half rolls the menu half back (createImportPairAction).
+        // brand half rolls the menu half back (createImportPairAction). A
+        // chosen design replaces the auto-resolved style in that same draft.
         const brand = brandState ? brandStateToDraft(brandState, importId) : null;
+        const brandDraft = chosenDesign
+          ? { ...(brand ?? { importId }), theme: chosenDesign.theme }
+          : (brand ?? { importId });
         const result = await createImportPairAction({
           menu: { ...photoDraft.payload, importId },
-          brand: brand ?? { importId },
+          brand: brandDraft,
         });
         if (!result.ok) {
           setError(result.error);
@@ -217,14 +243,14 @@ export function MenuImportScreen({
             }
           />
 
-          {/* The journey so far, from real state only: the design step is
-              next on the build and stays dashed rather than clickable. */}
+          {/* The journey so far, from real state only: publish stays dashed
+              because it happens on the menu draft, in the editor. */}
           {!blocked && (
             <ol className="m-0 flex list-none flex-wrap gap-1.5 p-0" data-import-steps>
               {STEPS.map((step, index) => {
-                const position = photoDraft || menuFile ? 1 : 0;
+                const position = photoDraft ? (designPick ? 2 : 1) : 0;
                 const state =
-                  index > 1
+                  index === 3
                     ? 'upcoming'
                     : index < position
                       ? 'done'
@@ -330,6 +356,25 @@ export function MenuImportScreen({
         onStateChange={(state) => setBrandState((current) => (current === state ? current : state))}
       />
 
+      {/* Step 3: the storefront design — real previews of the real draft,
+          painted by the same pipeline the guest menu uses. Optional: with no
+          pick, the save keeps the extracted style. */}
+      {!blocked && canWrite && photoDraft && (
+        <DesignChooser
+          designs={designs}
+          selectedId={designPick}
+          onSelect={setDesignPick}
+          name={
+            brandState?.name ??
+            outlet?.outlets.find((o) => o.id === outlet.activeId)?.name ??
+            'Your restaurant'
+          }
+          logoUrl={brandState?.logoUrl ?? null}
+          bannerUrl={brandState?.bannerUrl ?? null}
+          dishes={previewDishes}
+        />
+      )}
+
       {/* The one save. Below the brand review on purpose: dishes and brand
           style go in together. */}
       {!blocked && canWrite && photoDraft && (
@@ -337,7 +382,8 @@ export function MenuImportScreen({
           <div className="border-b border-hair px-4 py-3 sm:px-5">
             <h2 className="text-[13px] font-semibold text-gink">Save the draft</h2>
             <p className="mt-1 text-[12.5px] leading-[1.5] text-gink-46">
-              Dishes and brand style go in together as a new draft menu. Your live menu is not
+              Dishes and brand style go in together as a new draft menu
+              {chosenDesign ? ` in the ${chosenDesign.name} style` : ''}. Your live menu is not
               touched — publish from the editor when it looks right.
             </p>
           </div>

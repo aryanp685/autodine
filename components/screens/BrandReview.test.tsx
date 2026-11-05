@@ -57,6 +57,8 @@ describe('brandStateToDraft', () => {
     theme: parseTheme({ colors: { primary: '#7a1f2b' } }),
     logoAssetId: null,
     bannerAssetId: null,
+    logoUrl: null,
+    bannerUrl: null,
     conflicts: [],
     provenance: { name: 'owner-confirmed' },
     notes: [],
