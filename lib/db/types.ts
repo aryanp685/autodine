@@ -26,12 +26,6 @@ export type Restaurant = {
   announcement_text: string | null;
   announcement_on: boolean;
   /**
-   * Migration 20261022000800. Whether this outlet takes card/UPI online.
-   * Off until the owner switches it on: taking card money is their decision,
-   * not something a deployment key should turn on for them.
-   */
-  online_payments_enabled: boolean;
-  /**
    * Migration 20261025001000. Storage object paths, not URLs -- see
    * lib/storage/assets.ts for why. Null means "never uploaded", which is the
    * normal case and is drawn as a designed state, never as a broken image.

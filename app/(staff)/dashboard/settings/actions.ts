@@ -43,7 +43,6 @@ import {
   formatTaxPercent,
   parseTaxPercent,
   validateDetails,
-  validateUpi,
 } from '@/lib/settings-input';
 
 const SETTINGS_PATH = '/dashboard/settings';
@@ -192,46 +191,6 @@ export async function saveDetailsAction(formData: FormData): Promise<void> {
 }
 
 /**
- * Switch card/UPI payment on or off for this outlet.
- *
- * A checkbox, so "absent from the form" means OFF and is not an error -- the
- * browser omits an unticked box entirely. Reading it as `=== 'on'` makes the
- * off state expressible; reading it with String(formData.get(...)) would make
- * the absence the string "null" and quietly switch it on.
- *
- * No environment check here. An owner may switch this on before the deployment
- * has a gateway key; the guest screen is what refuses to draw a pay button in
- * that case, and says so. Refusing the save would leave the owner with nothing
- * to do but guess.
- */
-export async function saveOnlinePaymentsAction(formData: FormData): Promise<void> {
-  const { supabase, restaurantId } = await requireEditor();
-
-  const enabled = formData.get('onlinePayments') === 'on';
-
-  const { data: saved, error } = await supabase
-    .from('restaurants')
-    .update({ online_payments_enabled: enabled })
-    .eq('id', restaurantId)
-    .select('id');
-
-  if (error) writeFailure('switching online payments', error);
-  if (!saved || saved.length === 0) {
-    fail('Nothing was saved. Your account can see this restaurant but is not allowed to change it.');
-  }
-
-  for (const path of AFFECTED_PATHS) revalidatePath(path);
-  // The guest's order screen is not in AFFECTED_PATHS: it is per-order and
-  // force-dynamic, so it re-reads this switch on the next request anyway.
-
-  done(
-    enabled
-      ? 'Card and UPI payment is on. Guests will see a pay button on their order page once this deployment has gateway keys.'
-      : 'Card and UPI payment is off. Guests pay at the counter, and no pay button is shown.',
-  );
-}
-
-/**
  * Which proof a guest has to give before ordering.
  *
  * THREE VALUES, ONE OF WHICH IS HONEST
@@ -308,46 +267,3 @@ export async function saveTaxAction(formData: FormData): Promise<void> {
   );
 }
 
-
-/**
- * Save the restaurant's own UPI handle.
- *
- * This is the shop's existing standee, not a gateway: no money moves through
- * AutoDine, and nothing here is a payment integration. What it buys is a guest
- * who can pay without walking to the counter, and a counter that still records
- * the money itself.
- *
- * Clearing the field is a legitimate save: it removes the QR from every guest's
- * order page and leaves "pay at the counter" in its place. That is the honest
- * way to turn the feature off.
- */
-export async function saveUpiAction(formData: FormData): Promise<void> {
-  const { supabase, restaurantId } = await requireEditor();
-
-  const parsed = validateUpi({
-    upiId: formData.get('upiId'),
-    payeeName: formData.get('upiPayeeName'),
-  });
-
-  if (!parsed.ok) fail(parsed.message);
-
-  const { data: saved, error } = await supabase
-    .from('restaurants')
-    .update({ upi_id: parsed.value.upiId, upi_payee_name: parsed.value.payeeName })
-    .eq('id', restaurantId)
-    .select('id');
-
-  if (error) writeFailure('saving the UPI handle', error);
-  if (!saved || saved.length === 0) {
-    fail('Nothing was saved. Your account can see this restaurant but is not allowed to change it.');
-  }
-
-  for (const path of AFFECTED_PATHS) revalidatePath(path);
-  revalidatePath('/menu/order');
-
-  done(
-    parsed.value.upiId
-      ? 'Saved. Guests now see your own UPI QR on their order page, with the amount filled in. It does not mark anything paid — the counter does that.'
-      : 'Cleared. Guests no longer see a UPI QR and pay at the counter.'
-  );
-}

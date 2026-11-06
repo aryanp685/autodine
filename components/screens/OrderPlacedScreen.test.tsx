@@ -13,27 +13,21 @@ vi.mock('next/navigation', () => ({
 }));
 
 /*
- * The pay button is a client component that imports a 'use server' action,
- * which pulls in the admin Supabase client (server-only). In a static render
- * that module must not be executed, so it is replaced with a stub — these
- * tests are about which sentence appears, not about payment.
+ * Guest actions (cancel, quantity changes) are server actions; in a static
+ * render their module must not be executed. These tests are about which
+ * sentence appears, not about the actions themselves.
  */
-vi.mock('@/app/menu/order/pay-actions', () => ({
-  startOnlinePaymentAction: async () => ({ ok: false, error: 'not in this test' }),
-}));
-
 vi.mock('@/app/menu/order/actions', () => ({
   cancelGuestOrderAction: async () => ({ ok: true, message: 'Cancelled.' }),
   setGuestOrderLinesAction: async () => ({ ok: true, message: 'Saved.' }),
 }));
 
 /**
- * The screen a diner lands on after pressing "Place order".
+ * The screen a diner lands on after pressing "Place order & pay at counter".
  *
- * What matters most here is the payment line. Online payment is not connected,
- * so the order is placed with payment pending and settled at the counter. A
- * confirmation that stayed quiet about that would leave someone waiting for a
- * card prompt that is never coming.
+ * What matters most here is the payment line. The order is placed with payment
+ * pending and settled at the counter — online payment is gone from customer
+ * ordering, and the confirmation says the one thing that will happen.
  */
 
 const order = (over: Partial<OrderScreenData> = {}): OrderScreenData => ({
@@ -50,8 +44,6 @@ const order = (over: Partial<OrderScreenData> = {}): OrderScreenData => ({
   totalPaise: 111300,
   customerNote: null,
   placedAt: '2026-10-21T12:00:00Z',
-  onlineEnabled: false,
-  upi: null,
   lines: [
     {
       id: 'l-1',
@@ -115,48 +107,27 @@ describe('OrderPlacedScreen', () => {
     expect(html).not.toContain('Paid. Thank you.');
   });
 
-  describe('paying online', () => {
-    it('offers the pay button when the server says it may', () => {
+  describe('paying', () => {
+    it('never draws an online pay button — the counter is the only way', () => {
       const html = renderToStaticMarkup(
         <OrderPlacedScreen
-          data={order({ onlineEnabled: true })}
+          data={order()}
           slug="maddi"
           token="11111111-1111-1111-1111-111111111111"
-          onlinePay={{ available: true, note: null }}
         />,
       );
 
-      expect(html).toContain('Pay ₹1,113 online');
-      // The counter is still offered, because a guest may prefer it.
-      expect(html).toContain('pay at the counter');
-    });
-
-    it('never draws the button when the server withheld it, and says why', () => {
-      const html = renderToStaticMarkup(
-        <OrderPlacedScreen
-          data={order({ onlineEnabled: true })}
-          slug="maddi"
-          token="11111111-1111-1111-1111-111111111111"
-          onlinePay={{
-            available: false,
-            note: 'Card payment is not connected on this deployment yet — pay at the counter.',
-          }}
-        />,
-      );
-
+      expect(html).not.toContain('data-pay-online');
       expect(html).not.toContain('Pay ₹');
-      expect(html).toContain('Card payment is not connected');
       expect(html).toContain('Pay at the counter');
     });
 
     it('does not offer payment on an order that is already paid', () => {
-      // Even if a caller passes a permissive offer, the paid branch wins.
       const html = renderToStaticMarkup(
         <OrderPlacedScreen
           data={order({ paymentStatus: 'paid' })}
           slug="maddi"
           token="11111111-1111-1111-1111-111111111111"
-          onlinePay={{ available: true, note: null }}
         />,
       );
 

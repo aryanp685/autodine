@@ -4,7 +4,6 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { probeHealth, type ProbeClient } from '@/lib/health';
 import { BILLING } from '@/lib/plans';
-import { onlinePaymentsConfigured } from '@/lib/payments/razorpay';
 
 /**
  * GET /api/health
@@ -33,7 +32,6 @@ export async function GET() {
   const health = await probeHealth({
     configured: isSupabaseConfigured,
     serverKey: isSupabaseAdminConfigured,
-    gatewayKeys: onlinePaymentsConfigured(),
     trialDays: BILLING.trialDays,
     primary: (server as unknown as ProbeClient | null) ?? null,
     publicClient: (await createSupabaseServerClient()) as unknown as ProbeClient | null,
