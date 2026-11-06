@@ -77,6 +77,29 @@ export function isTransientPlaceCode(code?: string | null): boolean {
   return Boolean(code && TRANSIENT_PLACE_CODES.has(code));
 }
 
+/**
+ * The wait a budget refusal carries, parsed out of the database's sentence.
+ *
+ * The sentence is ours (see the rate-limit guard in place_public_order), so
+ * this pattern is not guessing at foreign text. Null when it is not there:
+ * the caller falls back to a sentence without a number rather than inventing
+ * one.
+ */
+export function rateLimitWaitSeconds(message?: string | null): number | null {
+  const match = /wait (\d+) seconds/i.exec(message ?? '');
+  if (!match) return null;
+  const seconds = Number(match[1]);
+  return Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds) : null;
+}
+
+/** What a guest under a budget is told. The wait is actionable; the cause is not their fault. */
+export function describeRateLimited(retrySeconds?: number | null): string {
+  const hasWait = retrySeconds !== null && retrySeconds !== undefined && Number.isFinite(Number(retrySeconds));
+  const rounded = hasWait ? Math.round(Number(retrySeconds)) : 60;
+  const seconds = Math.min(Math.max(rounded, 2), 3600);
+  return `Too many orders right now. Please wait about ${seconds} seconds and try again — nothing was charged.`;
+}
+
 export function describePlaceFailure(code?: string): string {
   if (!code) {
     return 'The kitchen’s system did not answer. Your cart is safe — please try again in a moment.';

@@ -6,9 +6,12 @@ import { parseCart } from '@/lib/cart-storage';
 import { codePageHref, loadTableAccess } from '@/lib/table-access';
 import { cookies } from 'next/headers';
 import { THROTTLE_COOKIE, notPlacedNotice, readThrottleFlag } from '@/lib/scan-outcome';
+import { ipHash } from '@/lib/ip-hash';
 import {
   describePlaceFailure,
+  describeRateLimited,
   isTransientPlaceCode,
+  rateLimitWaitSeconds,
 } from '@/lib/place-order-failure';
 
 const CART_PATH = '/menu/cart';
@@ -185,6 +188,7 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
     p_note: note,
     p_session_token: liveSession,
     p_guest_token: guestToken,
+    p_ip_hash: await ipHash(slug),
   });
 
   /**
@@ -214,12 +218,19 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
       p_note: note,
       p_session_token: liveSession,
       p_guest_token: guestToken,
+      p_ip_hash: await ipHash(slug),
     });
     code = retry.data;
     error = retry.error;
   }
 
   if (error) {
+    // A budget refusal is not an outage: it carries hint 'rate-limited' and a
+    // wait the guest can act on. It never falls into the generic mapper,
+    // which would describe it as a failure and invite a tap that cannot win.
+    if (error.hint === 'rate-limited') {
+      fail(describeRateLimited(rateLimitWaitSeconds(error.message)), slug, 'rate');
+    }
     // Every branch that reaches a guest is logged with its code. Without this
     // an "unexpected failure" was untraceable from the server: the guest saw
     // one fixed sentence and the log carried nothing to search for.

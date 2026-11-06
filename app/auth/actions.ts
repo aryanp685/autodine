@@ -18,6 +18,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { RECOVERY_COOKIE, passwordProblem, passwordsMatch } from '@/lib/password';
 import { requestOrigin } from '@/lib/site-origin';
+import { safeLocalPath } from '@/lib/safe-next-path';
 import { slugify, uniqueSlug } from '@/lib/slug';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { getStaffContextDetailed } from '@/lib/db/staff';
@@ -150,10 +151,11 @@ export async function signInAction(formData: FormData): Promise<void> {
     .toLowerCase();
   const password = String(formData.get('password') ?? '');
   const requestedNext = String(formData.get('next') ?? '');
-  // Only accept same-origin pathnames. Never turn the login form into an open redirect.
-  const next = requestedNext.startsWith('/') && !requestedNext.startsWith('//') && !requestedNext.includes('\\')
-    ? requestedNext
-    : null;
+  // Only accept same-origin pathnames. Never turn the login form into an open
+  // redirect: one shared, hardened check (lib/safe-next-path.ts) that also
+  // rejects encoded and double-encoded forms. Anything else falls through to
+  // the role's own home below.
+  const next = safeLocalPath(requestedNext, '') || null;
 
   if (!email || !password) fail('/login', 'Please enter your email and password.');
 

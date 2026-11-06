@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { headers } from 'next/headers';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -47,7 +48,10 @@ export const viewport: Viewport = {
   themeColor: '#fbf6ee',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // The per-request CSP nonce (proxy.ts). Empty outside the proxy — the
+  // script still runs, the policy simply is not being enforced on that path.
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
   return (
     <html lang="en">
       <head>
@@ -67,6 +71,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           which is a visible flash.
         */}
         <script
+          nonce={nonce}
           dangerouslySetInnerHTML={{
             __html:
               "(function(){var d=document.documentElement;" +

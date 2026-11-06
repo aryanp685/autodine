@@ -14,9 +14,31 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL, isSupabaseConfigured } from '@/lib/supabase/env';
+import { buildCsp } from '@/lib/csp';
 
 export async function proxy(request: NextRequest) {
-  if (!isSupabaseConfigured) return NextResponse.next();
+  // ---- Content Security Policy, on every document this app serves.
+  //
+  // The nonce rides on the request (x-nonce) so the root layout can tag the
+  // motion script, and inside the CSP request header so Next.js nonces its
+  // own inline runtime. The same policy is set on the response, which is
+  // where the browser reads it. Staff-route session work below is untouched:
+  // it still only runs where it ran before.
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
+  const csp = buildCsp({ nonce, supabaseUrl: SUPABASE_URL });
+  request.headers.set('x-nonce', nonce);
+  request.headers.set('Content-Security-Policy', csp);
+
+  const staffPath = /^\/(dashboard|kitchen|cashier|bill)(\/|$)/.test(request.nextUrl.pathname);
+
+  const finish = (response: NextResponse): NextResponse => {
+    response.headers.set('Content-Security-Policy', csp);
+    return response;
+  };
+
+  if (!isSupabaseConfigured || !staffPath) {
+    return finish(NextResponse.next({ request: { headers: request.headers } }));
+  }
 
   let response = NextResponse.next({ request: { headers: request.headers } });
 
@@ -43,12 +65,16 @@ export async function proxy(request: NextRequest) {
     // /dashboard/orders?range=7d&status=open back to today's bills after
     // signing in, so the link they clicked appeared not to work.
     url.searchParams.set('next', `${request.nextUrl.pathname}${request.nextUrl.search}`);
-    return NextResponse.redirect(url);
+    return finish(NextResponse.redirect(url));
   }
 
-  return response;
+  return finish(response);
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/kitchen/:path*', '/cashier/:path*', '/bill/:path*'],
+  // Everything that renders HTML carries the CSP. /api is left out on
+  // purpose: payment webhooks and JSON answers have no document to protect
+  // and the proxy's session work must never sit in their path. Static
+  // chunks and optimized images are documents to nobody.
+  matcher: ['/((?!api|_next/static|_next/image).*)'],
 };

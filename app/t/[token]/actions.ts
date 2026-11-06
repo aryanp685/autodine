@@ -92,7 +92,10 @@ export async function verifyTableCodeAction(formData: FormData): Promise<void> {
   }
 
   if (row.status === 'limited') {
-    redirect(codeHref('e=limited'));
+    // The wait travels with the refusal: the form's sentence can say how
+    // long instead of guessing "a couple of minutes".
+    const wait = Number(row.retry_after_seconds);
+    redirect(codeHref(`e=limited${Number.isFinite(wait) && wait > 0 ? `&s=${Math.round(wait)}` : ''}`));
   }
 
   if (row.status !== 'ok') {

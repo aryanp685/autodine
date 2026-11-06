@@ -37,10 +37,10 @@ export default async function TableVerifyCodePage({
   searchParams,
 }: {
   params: Promise<{ token: string }>;
-  searchParams: Promise<{ e?: string; next?: string }>;
+  searchParams: Promise<{ e?: string; next?: string; s?: string }>;
 }) {
   const { token } = await params;
-  const { e, next } = await searchParams;
+  const { e, next, s } = await searchParams;
 
   if (!isSupabaseConfigured) redirect('/t/problem?r=offline');
 
@@ -78,7 +78,9 @@ export default async function TableVerifyCodePage({
       windowMinutes={Math.max(1, Math.round(row.window_seconds / 60))}
       // Only a path this file already knows survives; see lib/verify-next.ts.
       next={destination}
-      {...(isVerifyErrorReason(e) ? { error: verifyErrorText(e) } : {})}
+      {...(isVerifyErrorReason(e)
+        ? { error: verifyErrorText(e, s ? Number(s) : null) }
+        : {})}
     />
   );
 }

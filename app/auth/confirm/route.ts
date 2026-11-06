@@ -23,13 +23,13 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import type { EmailOtpType } from '@supabase/supabase-js';
 import { RECOVERY_COOKIE } from '@/lib/password';
+import { safeLocalPath } from '@/lib/safe-next-path';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
-/** Only same-origin paths, so a crafted link cannot bounce someone off-site. */
+/** Only same-origin paths, so a crafted link cannot bounce someone off-site.
+ *  Shared floor: lib/safe-next-path.ts (rejects encoded and backslash forms). */
 function safeNext(value: string | null, fallback: string): string {
-  if (!value) return fallback;
-  if (!value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return fallback;
-  return value;
+  return safeLocalPath(value, fallback);
 }
 
 /**
