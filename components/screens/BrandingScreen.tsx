@@ -122,7 +122,7 @@ export function BrandingScreen({
       <PageHead
         kicker="Menu branding"
         title={name}
-        meta="Your mark and a banner, on the guest menu. The layout and the colours are shared, so every guest at every table reads the same menu."
+        meta="Everything guests see — your mark, banner, design and storefront."
         actions={
           live ? (
             <div className="flex flex-wrap items-center gap-1.5">
@@ -199,9 +199,8 @@ export function BrandingScreen({
               )}
             </div>
             <p className="m-0 max-w-[34ch] text-[12.5px] leading-[1.55] text-gink-46">
-              Shown in a circle next to your name at the top of the guest menu. A square image works
-              best; nothing is cropped away.
-              {!data?.logoUrl ? ' Until one is uploaded, the circle carries your initials.' : ''}
+              In a circle beside your name on the guest menu. Square works best.
+              {!data?.logoUrl ? ' Until one is uploaded, your initials show.' : ''}
             </p>
           </div>
 
@@ -259,8 +258,7 @@ export function BrandingScreen({
           </div>
 
           <p className="mt-2.5 max-w-[46ch] text-[12.5px] leading-[1.55] text-gink-46">
-            A wide photo of the room or a signature dish. Skip it and the header uses paper instead —
-            both are finished designs, and neither leaves a hole.
+            A wide photo across the top. Optional — skip it and the header uses paper.
           </p>
 
           <div className="mt-auto flex flex-wrap items-start gap-2 pt-4">
@@ -360,8 +358,7 @@ export function BrandingScreen({
         </Card>
 
         <p className="mt-2 text-[11.5px] leading-[1.55] text-gink-46">
-          The header above is the real component, so it cannot drift from the menu. The dishes under
-          it are a sample and are not tappable here — open the guest menu to try a real row.
+          The real guest header. The dishes below are not tappable here — a sample.
         </p>
 
         {live && !data?.hasPublishedMenu ? (
@@ -391,7 +388,7 @@ export function BrandingScreen({
         <section aria-labelledby="branding-design" className="mt-6">
           <SectionHead
             title={<span id="branding-design">Storefront design</span>}
-            meta="Two looks built from your own colours — switch whenever you like"
+            meta="Two looks, your own colours"
           />
           <div className="mt-3">
             <StorefrontDesignPicker
@@ -433,7 +430,7 @@ export function BrandingScreen({
                 <Field
                   label="What guests should know"
                   htmlFor="branding-announcement-text"
-                  hint="One line at the top of the guest menu — an early close, a festival special, a new outlet."
+                  hint="One line at the top of the guest menu."
                 >
                   <textarea
                     id="branding-announcement-text"
@@ -499,8 +496,8 @@ export function BrandingScreen({
                   </div>
                 </fieldset>
                 <p className="m-0 text-[11.5px] leading-[1.5] text-gink-64">
-                  Closed, the storefront shows a closed note and no new orders can be placed. Orders
-                  already placed and the kitchen keep running until they are done.
+                  Closed, guests see a closed note and cannot order. Orders already placed and the
+                  kitchen keep running.
                 </p>
                 <div>
                   <SubmitButton pendingLabel="Saving…" disabled={!canEdit} tone="solid">
@@ -513,14 +510,14 @@ export function BrandingScreen({
 
           <Notice tone="plain" label="Storefront address" className="mt-3">
             <span className="font-mono text-[12.5px]">{`/menu?s=${data?.slug || 'your-address'}`}</span>
-            {' — the address guests open and the QR encodes. It changes in '}
+            {' — the guest address. Change it in '}
             <Link
               href="/dashboard/settings"
               className="font-medium text-gink underline decoration-hair-strong underline-offset-2"
             >
               Settings
             </Link>
-            , where the warning about old links and printed standees lives.
+            .
           </Notice>
         </section>
       ) : null}
@@ -597,7 +594,7 @@ export function BrandingScreen({
             })}
           </div>
           <Notice tone="plain" label="The rest lives in Settings" className="mt-3">
-            Print or download a code, add an outlet, or switch which one this dashboard edits — in{' '}
+            Print or download a code — or add and switch outlets — in{' '}
             <Link
               href="/dashboard/settings"
               className="font-medium text-gink underline decoration-hair-strong underline-offset-2"
@@ -627,28 +624,19 @@ export function BrandingScreen({
         </section>
       ) : null}
 
-      {/* ------------------------------------------------------------- the notes
-          One short list, because the questions this screen raises are always the
-          same three: what changes, and does the name live here? */}
-      <div className="mt-4 grid gap-2.5 lg:grid-cols-2">
-        <Notice tone="plain" label="Where these appear">
-          The logo and the banner are the top of the guest menu, and nothing else — not the bill, not
-          the kitchen board. Name and tagline live in{' '}
-          <Link
-            href="/dashboard/settings"
-            className="font-medium text-gink underline decoration-hair-strong underline-offset-2"
-          >
-            Settings
-          </Link>
-          .
-        </Notice>
-        <Notice tone="plain" label="One design, or your own">
-          Every guest menu starts from the same layout and colours, so ordering works the same
-          everywhere. A restaurant that wants its own colour and type can opt in through the Brand
-          Studio — the storefront design above is that opt-in, and applying one is what turns it
-          on for guests.
-        </Notice>
-      </div>
+      {/* ------------------------------------------------------------- the note
+          One line, not a lecture: where the name lives. Everything else on
+          this page is already an action. */}
+      <Notice tone="plain" className="mt-4">
+        Logo and banner are the top of the guest menu. Name and tagline live in{' '}
+        <Link
+          href="/dashboard/settings"
+          className="font-medium text-gink underline decoration-hair-strong underline-offset-2"
+        >
+          Settings
+        </Link>
+        .
+      </Notice>
     </OwnerPage>
   );
 }

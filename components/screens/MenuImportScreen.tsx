@@ -246,7 +246,7 @@ export function MenuImportScreen({
           {/* The journey so far, from real state only: publish stays dashed
               because it happens on the menu draft, in the editor. */}
           {!blocked && (
-            <ol className="m-0 flex list-none flex-wrap gap-1.5 p-0" data-import-steps>
+            <ol className="m-0 flex list-none flex-wrap items-center gap-1.5 p-0" data-import-steps>
               {STEPS.map((step, index) => {
                 const position = photoDraft ? (designPick ? 2 : 1) : 0;
                 const state =
@@ -258,39 +258,61 @@ export function MenuImportScreen({
                         ? 'active'
                         : 'todo';
                 return (
-                  <li
-                    key={step.label}
-                    data-step={state}
-                    className={[
-                      'flex min-w-0 items-center gap-2 rounded-full border px-2.5 py-1.5',
-                      state === 'active'
-                        ? 'border-plum bg-plum-soft font-semibold text-plum'
-                        : state === 'done'
-                          ? 'border-gink bg-gink text-onink'
-                          : state === 'todo'
-                            ? 'border-hair text-gink'
-                            : 'border-dashed border-hair text-gink-28',
-                    ].join(' ')}
-                  >
+                  <li key={step.label} className="flex min-w-0 items-center gap-1.5">
                     <span
-                      aria-hidden="true"
+                      data-step={state}
                       className={[
-                        'grid size-5 shrink-0 place-items-center rounded-full text-[10px] font-semibold',
+                        'flex min-w-0 items-center gap-2 rounded-[10px] border px-2.5 py-1.5',
                         state === 'active'
-                          ? 'bg-plum text-onink'
+                          ? 'border-plum bg-plum font-semibold text-onink'
                           : state === 'done'
-                            ? 'bg-onink text-gink'
-                            : 'bg-gink-07 text-gink-46',
+                            ? 'border-gink bg-gink text-onink'
+                            : state === 'todo'
+                              ? 'border-hair bg-card text-gink'
+                              : 'border-dashed border-hair text-gink-28',
                       ].join(' ')}
                     >
-                      {index + 1}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-[11.5px] leading-tight">{step.label}</span>
-                      <span className="block truncate text-[10px] leading-tight text-gink-46">
-                        {step.sub}
+                      <span
+                        aria-hidden="true"
+                        className={[
+                          'grid size-5 shrink-0 place-items-center rounded-full text-[10px] font-semibold',
+                          state === 'active'
+                            ? 'bg-onink text-plum'
+                            : state === 'done'
+                              ? 'bg-onink text-gink'
+                              : 'bg-gink-07 text-gink-46',
+                        ].join(' ')}
+                      >
+                        {index + 1}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-[11.5px] leading-tight">{step.label}</span>
+                        <span
+                          className={[
+                            'block truncate text-[10px] leading-tight',
+                            state === 'active' ? 'text-onink/70' : 'text-gink-46',
+                          ].join(' ')}
+                        >
+                          {step.sub}
+                        </span>
                       </span>
                     </span>
+                    {index < STEPS.length - 1 ? (
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                        className="hidden size-3 shrink-0 text-gink-28 sm:block"
+                      >
+                        <path
+                          d="M4 2.5L7.5 6L4 9.5"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    ) : null}
                   </li>
                 );
               })}
@@ -323,28 +345,6 @@ export function MenuImportScreen({
           {error}
         </p>
       )}
-
-      {/* What this journey does, in four lines. A slim band between the menu
-          half and the brand half — not a second dashboard. */}
-      <section
-        aria-label="What the import does"
-        className="mt-6 grid gap-x-6 gap-y-4 border-y border-hair py-4 sm:grid-cols-2 lg:grid-cols-4"
-      >
-        {BENEFITS.map((benefit) => (
-          <div key={benefit.title} className="flex min-w-0 items-start gap-2.5">
-            <span
-              aria-hidden="true"
-              className="grid size-8 shrink-0 place-items-center rounded-[10px] bg-plum-soft text-plum"
-            >
-              {benefit.icon}
-            </span>
-            <div className="min-w-0">
-              <p className="m-0 truncate text-[13px] font-semibold text-gink">{benefit.title}</p>
-              <p className="m-0 truncate text-[11.5px] text-gink-46">{benefit.sub}</p>
-            </div>
-          </div>
-        ))}
-      </section>
 
       {/* The brand half of the import. Independent extraction, independent
           review — one Create writes both drafts. */}
@@ -382,9 +382,8 @@ export function MenuImportScreen({
           <div className="border-b border-hair px-4 py-3 sm:px-5">
             <h2 className="text-[13px] font-semibold text-gink">Save the draft</h2>
             <p className="mt-1 text-[12.5px] leading-[1.5] text-gink-46">
-              Dishes and brand style go in together as a new draft menu
-              {chosenDesign ? ` in the ${chosenDesign.name} style` : ''}. Your live menu is not
-              touched — publish from the editor when it looks right.
+              Dishes and brand style save together as one draft
+              {chosenDesign ? ` (${chosenDesign.name})` : ''}. Your live menu is untouched.
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2 px-4 py-4 sm:px-5">
@@ -394,6 +393,28 @@ export function MenuImportScreen({
           </div>
         </Card>
       )}
+
+      {/* What this journey does, in four lines — the page-end summary, after
+          the actions instead of in their way. */}
+      <section
+        aria-label="What the import does"
+        className="mt-6 grid gap-x-6 gap-y-4 border-t border-hair pt-4 sm:grid-cols-2 lg:grid-cols-4"
+      >
+        {BENEFITS.map((benefit) => (
+          <div key={benefit.title} className="flex min-w-0 items-start gap-2.5">
+            <span
+              aria-hidden="true"
+              className="grid size-8 shrink-0 place-items-center rounded-[10px] bg-plum-soft text-plum"
+            >
+              {benefit.icon}
+            </span>
+            <div className="min-w-0">
+              <p className="m-0 truncate text-[13px] font-semibold text-gink">{benefit.title}</p>
+              <p className="m-0 truncate text-[11.5px] text-gink-46">{benefit.sub}</p>
+            </div>
+          </div>
+        ))}
+      </section>
     </OwnerPage>
   );
 }
