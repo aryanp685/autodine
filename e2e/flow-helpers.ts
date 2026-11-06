@@ -67,6 +67,13 @@ export const DEMO_CART_KEY = 'autodine.cart.demo';
 export async function seedCart(page: Page, lines: unknown[]): Promise<void> {
   await page.addInitScript(
     ([key, value]) => {
+      // Seed once per tab. This script re-runs on every navigation, and a
+      // refresh is exactly when the cart must SURVIVE, not be re-imposed:
+      // without the marker, reloading would overwrite whatever the guest (or
+      // the test) has changed since with the original seed.
+      const marker = `seeded.${key}`;
+      if (window.sessionStorage.getItem(marker)) return;
+      window.sessionStorage.setItem(marker, '1');
       window.localStorage.setItem(key, value as string);
     },
     [DEMO_CART_KEY, JSON.stringify(lines)] as const,
@@ -140,9 +147,24 @@ export async function recordAnnouncements(page: Page): Promise<void> {
       removeEventListener() {},
     };
 
-    (window as unknown as { SpeechSynthesisUtterance: unknown }).SpeechSynthesisUtterance =
-      FakeUtterance;
-    (window as unknown as { speechSynthesis: unknown }).speechSynthesis = synthesis;
+    // Install by DEFINING the properties. A plain assignment silently does
+    // nothing: `window.speechSynthesis` is a read-only accessor in Chromium,
+    // so `window.speechSynthesis = synthesis` throws in strict mode and is
+    // dropped in sloppy mode -- the stub would exist here and be invisible to
+    // the page, which is exactly the bug this guard keeps from coming back.
+    Object.defineProperty(window, 'SpeechSynthesisUtterance', {
+      value: FakeUtterance,
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(window, 'speechSynthesis', {
+      value: synthesis,
+      configurable: true,
+      writable: true,
+    });
+    if ((window as unknown as { speechSynthesis: unknown }).speechSynthesis !== (synthesis as unknown)) {
+      throw new Error('speechSynthesis stub did not install');
+    }
   });
 
   // Deterministic fallback: the server engine must fail so the stub is used.
