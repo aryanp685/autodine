@@ -470,6 +470,24 @@ export function Cashier({
                       : 'No demo orders are waiting for payment.'}
                   </Empty>
                 )}
+                {/* The rehearsal reset belongs to the QUEUE, not to the empty
+                    state: a sample settle is undoable while tickets remain,
+                    not only after the last one. Rendered only while the queue
+                    still has rows, so it never competes with the copy in the
+                    "Queue clear" panel (same action, one at a time). */}
+                {!live && visible.length > 0 && demoDone.length > 0 && (
+                  <button
+                    type="button"
+                    className={`${btn('ghost')} mt-4`}
+                    onClick={() => {
+                      setDemoDone([]);
+                      setSettling([]);
+                      setMessage('Demo queue reset. No real payments were recorded.');
+                    }}
+                  >
+                    Reset demo queue
+                  </button>
+                )}
               </section>
 
               {/* ------------------------------------------------------- detail */}

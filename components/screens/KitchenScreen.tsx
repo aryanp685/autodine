@@ -1018,6 +1018,13 @@ export function Kitchen({
    *
    * The board therefore asks for one tap -- and it takes the tap from anywhere
    * on the page, so it is not a button someone has to find.
+   *
+   * The trigger is `click`, not `pointerdown`, and that is load-bearing: this
+   * banner sits above the columns, and removing it reflows the board. Done at
+   * pointerdown, every first press lost its own release -- the button slid out
+   * from under the pointer mid-press and the tap it was supposed to unlock
+   * with died instead. Done at click, the tap has already landed: the action
+   * runs, and the banner goes with it.
    */
   useEffect(() => {
     if (!ready || gestureDone) return;
@@ -1028,11 +1035,11 @@ export function Kitchen({
       setVoiceName(speechRef.current?.voiceName() ?? null);
     };
 
-    window.addEventListener('pointerdown', unlock, { once: true });
+    window.addEventListener('click', unlock, { once: true });
     window.addEventListener('keydown', unlock, { once: true });
 
     return () => {
-      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('click', unlock);
       window.removeEventListener('keydown', unlock);
     };
   }, [ready, gestureDone]);
