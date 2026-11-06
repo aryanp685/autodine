@@ -96,67 +96,64 @@ export function Home() {
 
 function Hero() {
   return (
-    <section className="relative isolate overflow-hidden" data-hero>
-      <div className="absolute inset-0 -z-10" data-hero-image>
-        <Image
-          src="/img/restaurant-interior.jpg"
-          alt=""
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover object-center"
-        />
-      </div>
-      {/* Two gradients, not one: a vertical wash that makes the copy legible,
-          and a warm glow from the right so the photograph does not read as a
-          grey rectangle behind white text. */}
-      <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_bottom,rgb(12_11_9/0.82),rgb(12_11_9/0.42)_55%,rgb(12_11_9/0.62))]" aria-hidden="true" />
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(80%_60%_at_85%_35%,rgba(255,214,170,0.14),transparent_65%)]" aria-hidden="true" />
+    <section className="relative isolate overflow-hidden bg-ink" data-hero>
+      {/* A warm light wash instead of the old dark photograph. The product
+          shot is the hero; the background stays quiet so the type and the
+          phone carry the page. */}
+      <div
+        className="absolute inset-0 -z-10 bg-[radial-gradient(70%_60%_at_82%_18%,rgba(31,77,58,0.10),transparent_68%)]"
+        aria-hidden="true"
+      />
+      <div
+        className="absolute inset-0 -z-10 bg-[radial-gradient(50%_40%_at_10%_90%,rgba(185,138,75,0.08),transparent_70%)]"
+        aria-hidden="true"
+      />
 
       <div className="mx-auto grid max-w-[1180px] gap-14 px-5 pb-24 pt-20 sm:px-8 sm:pt-28 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:pb-32">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70" data-hero-step>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-forest" data-hero-step>
             Restaurant technology
           </p>
 
-          <h1
-            className="mt-6 text-[clamp(2.6rem,6.4vw,4.6rem)] font-medium leading-[0.98] tracking-[-0.045em] text-white"
-            data-line
-          >
-            Every table,
-            <br />
-            <span className="text-white/70">one seamless</span>
-            <br />
-            experience.
+          <h1 className="mt-6 text-[clamp(2.35rem,6.2vw,4.6rem)] font-medium leading-[0.98] tracking-[-0.045em] text-cream">
+            <span className="block overflow-hidden">
+              <span className="block" data-line>Every table,</span>
+            </span>
+            <span className="block overflow-hidden">
+              <span className="block text-mute" data-line>one seamless</span>
+            </span>
+            <span className="block overflow-hidden">
+              <span className="block" data-line>experience.</span>
+            </span>
           </h1>
 
-          <p className="mt-7 max-w-[48ch] text-[15px] leading-[1.6] text-white/80" data-hero-step>
+          <p className="mt-7 max-w-[48ch] text-[15px] leading-[1.6] text-mute" data-hero-step>
             Scan the table card. Order on the phone. The kitchen sees it instantly.
           </p>
 
           <div className="mt-9 flex flex-wrap items-center gap-3" data-hero-step>
             <Link
               href="/signup"
-              className="inline-flex h-12 items-center gap-2 rounded-full bg-grass px-6 text-[14px] font-medium text-cream transition-colors hover:bg-grass-strong"
+              className="inline-flex h-12 items-center gap-2 rounded-full bg-forest px-6 text-[14px] font-medium text-white transition-colors hover:bg-forest-strong"
             >
               Start the 7-day trial
               <span aria-hidden="true">→</span>
             </Link>
             <Link
               href="#how"
-              className="inline-flex h-12 items-center gap-2 rounded-full border border-cream/15 px-6 text-[14px] text-cream transition-colors hover:border-cream/30 hover:bg-cream/[0.05]"
+              className="inline-flex h-12 items-center gap-2 rounded-full border border-cream/15 px-6 text-[14px] text-cream transition-colors hover:border-cream/30 hover:bg-ink-soft"
             >
               See how it works
             </Link>
-            <span className="text-[12px] text-white/65">No card. Nothing charged during preview.</span>
+            <span className="text-[12px] text-mute-dim">No card. Nothing charged during preview.</span>
           </div>
         </div>
 
         <PhoneMockup />
       </div>
 
-      <div className="relative border-t border-white/15">
-        <ul className="mx-auto flex max-w-[1180px] flex-wrap gap-x-10 gap-y-4 px-5 py-6 sm:px-8">
+      <div className="relative border-t border-cream/10">
+        <ul className="mx-auto flex max-w-[1180px] flex-wrap gap-x-10 gap-y-4 px-5 py-6 sm:px-8" data-hero-step>
           {[
             ['Digital menu', 'For your customers'],
             ['Live kitchen orders', 'For your staff'],
@@ -164,10 +161,10 @@ function Hero() {
             ['Works for all', 'Cafés, casual & fine dining'],
           ].map(([title, sub]) => (
             <li key={title} className="flex items-center gap-2.5">
-              <span aria-hidden="true" className="text-[13px] leading-none text-white/70">✓</span>
+              <span aria-hidden="true" className="text-[13px] leading-none text-forest">✓</span>
               <span>
-                <span className="block text-[13px] font-medium text-white">{title}</span>
-                <span className="block text-[11.5px] text-white/65">{sub}</span>
+                <span className="block text-[13px] font-medium text-cream">{title}</span>
+                <span className="block text-[11.5px] text-mute-dim">{sub}</span>
               </span>
             </li>
           ))}
@@ -191,9 +188,9 @@ function PhoneMockup() {
 
   return (
     <div className="relative mx-auto w-full max-w-[330px] lg:mx-0 lg:ml-auto" data-hero-step>
-      <div className="absolute -inset-8 -z-10 rounded-[48px] bg-[radial-gradient(60%_50%_at_50%_40%,rgba(255,214,170,0.16),transparent_70%)] blur-2xl" aria-hidden="true" />
+      <div className="absolute -inset-8 -z-10 rounded-[48px] bg-[radial-gradient(60%_50%_at_50%_40%,rgba(31,77,58,0.10),transparent_70%)] blur-2xl" aria-hidden="true" />
 
-      <div className="rounded-[34px] border border-cream/15 bg-ink-soft p-2.5 shadow-[0_40px_80px_-40px_rgba(0,0,0,0.9)]">
+      <div className="rounded-[34px] border border-cream/15 bg-ink-soft p-2.5 shadow-[0_40px_80px_-40px_rgba(28,27,24,0.22)]">
         <div className="overflow-hidden rounded-[26px] bg-ink">
           <div className="flex items-center justify-between px-4 pt-3 text-[10px] text-mute-dim">
             <span>9:41</span>
@@ -203,11 +200,11 @@ function PhoneMockup() {
 
           <div className="flex items-center justify-between px-4 pb-3 pt-4">
             <div>
-              <p className="text-[9px] uppercase tracking-[0.18em] text-plum">Table 05</p>
+              <p className="text-[9px] uppercase tracking-[0.18em] text-forest">Table 05</p>
               <p className="mt-1 text-[15px] font-medium tracking-tight">The Urban Table</p>
               <p className="text-[10px] text-mute-dim">North Indian · dine-in</p>
             </div>
-            <span className="grid h-8 w-8 place-items-center rounded-full bg-white text-mute">✕</span>
+            <span className="grid h-8 w-8 place-items-center rounded-full bg-ink-soft text-mute">✕</span>
           </div>
 
           <div className="flex gap-1.5 px-4 pb-4 text-[10px]">
@@ -216,8 +213,8 @@ function PhoneMockup() {
                 key={tab}
                 className={
                   i === 0
-                    ? 'rounded-full bg-grass px-3 py-1 font-medium text-cream'
-                    : 'rounded-full bg-white px-3 py-1 text-mute'
+                    ? 'rounded-full bg-forest px-3 py-1 font-medium text-white'
+                    : 'rounded-full bg-ink-soft px-3 py-1 text-mute'
                 }
               >
                 {tab}
@@ -227,7 +224,7 @@ function PhoneMockup() {
 
           <ul className="space-y-2 px-3 pb-4">
             {dishes.map((dish) => (
-              <li key={dish.name} className="flex gap-3 rounded-2xl bg-white p-2.5">
+              <li key={dish.name} className="flex gap-3 rounded-2xl border border-hair bg-white p-2.5">
                 <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl">
                   <Image src={dish.img} alt="" fill sizes="80px" className="object-cover" />
                 </div>
@@ -237,8 +234,8 @@ function PhoneMockup() {
                     Cooked in rich tomato gravy with butter
                   </p>
                   <div className="mt-1.5 flex items-center justify-between">
-                    <span className="text-[12px] text-plum">₹{dish.price}</span>
-                    <span className="grid h-6 w-6 place-items-center rounded-full bg-grass text-[13px] font-medium text-cream">+</span>
+                    <span className="text-[12px] text-forest">₹{dish.price}</span>
+                    <span className="grid h-6 w-6 place-items-center rounded-full bg-forest text-[13px] font-medium text-white">+</span>
                   </div>
                 </div>
               </li>

@@ -39,8 +39,8 @@
 
 [data-app] {
   /* ---- surfaces ------------------------------------------------------- */
-  --p-paper: #f8f5ef;
-  --p-paper-deep: #efeae0;
+  --p-paper: #fbfaf7;
+  --p-paper-deep: #f3f0e9;
   --p-surface: #ffffff;
   --p-glass: rgba(248, 245, 239, 0.72);
 
