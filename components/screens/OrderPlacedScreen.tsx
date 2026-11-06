@@ -3,7 +3,6 @@ import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
 import { FadeUp, FadeUpItem, PopIn, SpringUp } from '@/components/MotionBits';
 import { GuestOrderEditor } from '@/components/screens/GuestOrderEditor';
-import { PayUpi } from '@/components/PayUpi';
 import { GuestFlow } from '@/components/GuestFlow';
 import { ReorderOffer } from '@/components/ReorderOffer';
 import { guestBrandStyle, type GuestBrandState } from '@/lib/branding/guest-theme';
@@ -161,19 +160,13 @@ function unpaidNextStep(
 /**
  * How an unpaid bill gets paid, phrased once per screen.
  *
- * A served guest is asked to settle; everyone else is asked to pay. `orForm`
- * is for the paragraphs that sit under a pay button (UPI or card), where "Or"
- * is what ties the sentence to the alternative above it.
+ * A served guest is asked to settle; everyone else is asked to pay.
  */
-function counterPayment(prepStatus: string, orForm: boolean): string {
+function counterPayment(prepStatus: string): string {
   if (prepStatus === 'served') {
-    return orForm
-      ? 'Or settle the bill at the counter before you leave.'
-      : 'Please settle the bill at the counter before you leave.';
+    return 'Please settle the bill at the counter before you leave.';
   }
-  return orForm
-    ? 'Or pay at the counter before you leave.'
-    : 'Pay at the counter before you leave.';
+  return 'Pay at the counter before you leave.';
 }
 
 /**
@@ -412,28 +405,16 @@ export function OrderPlacedScreen({
           ) : data.paymentStatus === 'pending' ? (
             <>
               {/*
-                The restaurant's own UPI QR comes first when it has one: it is
-                the way most guests will actually pay, and it needs no gateway.
-                It is offered alongside the counter, never instead of it -- a
-                phone with a dead battery still has to be able to leave.
+                Pay at the counter, in the same words everywhere. Online
+                payment and the restaurant's own UPI QR are both gone from
+                this screen: one sentence, one way to settle.
               */}
-              {data.upi && slug && token ? (
-                <PayUpi upi={data.upi} slug={slug} code={data.code} token={token} />
-              ) : null}
-
-              {data.upi ? (
-                <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
-                  {unpaidNextStep(data.prepStatus, data.tableLabel, data.awaitingConfirmation)}{' '}
-                  {counterPayment(data.prepStatus, true)}
-                </p>
-              ) : (
-                <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
-                  <strong className="font-semibold text-gink">
-                    {counterPayment(data.prepStatus, false)}
-                  </strong>{' '}
-                  {unpaidNextStep(data.prepStatus, data.tableLabel, data.awaitingConfirmation)}
-                </p>
-              )}
+              <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
+                <strong className="font-semibold text-gink">
+                  {counterPayment(data.prepStatus)}
+                </strong>{' '}
+                {unpaidNextStep(data.prepStatus, data.tableLabel, data.awaitingConfirmation)}
+              </p>
             </>
           ) : (
             <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">Paid. Thank you.</p>

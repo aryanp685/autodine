@@ -819,39 +819,6 @@ export type Database = {
         Args: { p_restaurant_id: string; p_feature: string };
         Returns: boolean;
       };
-      /**
-       * Migration 20261026001300. The restaurant's own UPI details for ONE
-       * order, to a caller holding that order's guest token. Never a
-       * platform-wide payee.
-       */
-      public_upi_details: {
-        Args: { p_slug: string; p_code: string; p_token: string };
-        Returns: {
-          upi_id: string | null;
-          payee_name: string;
-          restaurant_name: string;
-          code: string;
-          payment_status: string;
-          due_paise: number;
-          claimed_at: string | null;
-        } | null;
-      };
-      /** "I have paid" -> a PENDING row. Never marks an order paid. */
-      claim_upi_payment: {
-        Args: { p_slug: string; p_code: string; p_token: string };
-        Returns: {
-          ok: boolean;
-          already_paid?: boolean;
-          already_claimed?: boolean;
-          claim_recorded?: boolean;
-          due_paise?: number;
-        };
-      };
-      /** Orders where the guest says they paid by UPI. Cashier-facing. */
-      counter_claims: {
-        Args: { p_restaurant_id: string };
-        Returns: Array<{ order_id: string; claimed_at: string }>;
-      };
     };
     Enums: {
       member_role: MemberRole;

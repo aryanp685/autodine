@@ -15,7 +15,6 @@ import {
   saveDetailsAction,
   saveGuestVerificationAction,
   saveTaxAction,
-  saveUpiAction,
 } from '@/app/(staff)/dashboard/settings/actions';
 import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
@@ -430,7 +429,7 @@ export function SettingsScreen({
               n="02"
               id="settings-money"
               title="What the bill charges"
-              meta="Tax, guest verification and your own UPI"
+              meta="Tax and guest verification"
             >
 
               <div className="flex flex-col gap-4">
@@ -579,78 +578,7 @@ export function SettingsScreen({
                   </p>
                 </Panel>
 
-                {/* ------------------------------------------------- your own UPI */}
-                <Panel
-                  title="Your UPI QR"
-                  meta={data?.upiId ? 'Shown to guests' : 'Not set'}
-                  bodyClassName="px-5 py-5"
-                >
-                  <p className="m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
-                    Your own UPI handle, on the guest&apos;s phone, with the amount already filled
-                    in. The money goes to your account — AutoDine never holds it and takes no cut.
-                  </p>
-
-                  <Notice
-                    tone="accent"
-                    label="This is not a payment gateway."
-                    className="mt-3 mb-0"
-                  >
-                    When a guest scans it, nothing is marked paid here. They say they have paid, and
-                    you or your cashier confirm the transfer in your own UPI app before recording it
-                    at the counter. That keeps the record honest — and it is why this works today,
-                    with no gateway and no KYC.
-                  </Notice>
-
-                  <form action={saveUpiAction} className="mt-3.5 grid gap-3">
-                    <div className="grid gap-3.5 sm:grid-cols-2">
-                      <Field
-                        label="UPI ID"
-                        htmlFor="upiId"
-                        hint="The handle printed on your counter standee. Leave it empty to show no QR."
-                      >
-                        <input
-                          id="upiId"
-                          name="upiId"
-                          type="text"
-                          inputMode="email"
-                          autoComplete="off"
-                          spellCheck={false}
-                          placeholder="thegulmohar@okhdfcbank"
-                          defaultValue={data?.upiId ?? ''}
-                          disabled={disabled}
-                          className={inputClass}
-                        />
-                      </Field>
-
-                      <Field
-                        label="Name shown in the guest's UPI app"
-                        htmlFor="upiPayeeName"
-                        hint="Optional. Defaults to your restaurant name above."
-                      >
-                        <input
-                          id="upiPayeeName"
-                          name="upiPayeeName"
-                          type="text"
-                          defaultValue={data?.upiPayeeName ?? ''}
-                          disabled={disabled}
-                          className={inputClass}
-                        />
-                      </Field>
-                    </div>
-
-                    <div>
-                      <SubmitButton tone="solid" pendingLabel="Saving UPI…" disabled={disabled}>
-                        Save UPI details
-                      </SubmitButton>
-                    </div>
-                  </form>
-
-                  <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
-                    Test it before a service: open your guest menu on a phone, place an order, and
-                    scan the code with your own UPI app. If the payee name is wrong, guests will not
-                    trust it.
-                  </p>
-                </Panel>
+                
               </div>
             </PageSection>
 

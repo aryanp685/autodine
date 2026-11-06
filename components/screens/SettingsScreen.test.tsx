@@ -43,8 +43,6 @@ function data(over: Partial<SettingsScreenData> = {}): SettingsScreenData {
     },
     taxRateBps: 1800,
     guestVerificationMode: 'code',
-    upiId: '',
-    upiPayeeName: '',
     timezone: 'Asia/Kolkata',
     publicMenuUrl: 'https://autodine.example/menu?s=maddi',
     publicMenuSvg: '<svg role="img" aria-label="QR"></svg>',
@@ -206,14 +204,14 @@ describe('SettingsScreen', () => {
  */
 describe('Settings, where the save result lands', () => {
   it('pins the notice under the app bar instead of leaving it off-screen', () => {
-    const html = renderToStaticMarkup(<SettingsScreen data={data()} notice="Saved the UPI details." />);
+    const html = renderToStaticMarkup(<SettingsScreen data={data()} notice="Saved the tax rate." />);
 
     expect(html).toContain('sticky top-14');
-    expect(html).toContain('Saved the UPI details.');
+    expect(html).toContain('Saved the tax rate.');
   });
 
   it('pins an error the same way, because a failed save is the one you must see', () => {
-    const html = renderToStaticMarkup(<SettingsScreen data={data()} error="That UPI ID is not valid." />);
+    const html = renderToStaticMarkup(<SettingsScreen data={data()} error="That tax rate is not valid." />);
 
     expect(html).toContain('sticky top-14');
     expect(html).toContain('Nothing was saved.');
@@ -262,11 +260,11 @@ describe('Settings, the redesign', () => {
   });
 
   it('gives every form the same commit button', () => {
-    // Five forms, five saves, one appearance: the accent fill at the same size,
+    // Four forms, four saves, one appearance: the accent fill at the same size,
     // so "which control commits this card" is answered the same way every time.
     // The last is the guest-verification choice (migration 20261028000900).
     const html = renderToStaticMarkup(<SettingsScreen data={data()} />);
-    expect(count(html, 'bg-grass text-cream')).toBe(5);
+    expect(count(html, 'bg-grass text-cream')).toBe(4);
   });
 
   it('draws no hand-made alert boxes any more', () => {

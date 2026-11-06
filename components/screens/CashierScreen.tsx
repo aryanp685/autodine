@@ -40,12 +40,6 @@ type QueueRow = {
   outstanding: number;
   paid: number;
   items: string;
-  /**
-   * The guest pressed "I have paid" against the restaurant's UPI QR. A claim,
-   * not money: the transfer happened in an app we cannot see. Shown so the
-   * cashier checks the shop's own bank app before taking cash twice.
-   */
-  claimed: boolean;
 };
 
 function fromDemo(order: (typeof counterQueue)[number]): QueueRow {
@@ -60,7 +54,6 @@ function fromDemo(order: (typeof counterQueue)[number]): QueueRow {
     outstanding: order.total,
     paid: 0,
     items: order.items,
-    claimed: false,
   };
 }
 
@@ -76,7 +69,6 @@ function fromLive(order: CounterOrder): QueueRow {
     outstanding: order.outstanding,
     paid: order.paid,
     items: order.items,
-    claimed: order.claimed === true,
   };
 }
 
@@ -438,9 +430,6 @@ export function Cashier({
 
                             <span className="mt-2.5 flex items-center justify-between gap-3">
                               <span className="flex flex-wrap items-center gap-1.5">
-                                {item.claimed ? (
-                                  <Tag tone="due">Says paid by UPI</Tag>
-                                ) : null}
                                 {/* The kitchen's own word for where the food is,
                                     as a status tag: the string was bare 11.5px
                                     grey text sitting beside two real tags. */}
@@ -542,35 +531,10 @@ export function Cashier({
                       </div>
                       <div className="flex flex-col items-end gap-1.5">
                         <Tag tone="due">Payment due</Tag>
-                        {order.claimed ? <Tag tone="work">Guest says paid by UPI</Tag> : null}
                       </div>
                     </div>
 
                     <div className="px-5 py-4">
-                      {/**
-                       * The claim is on the queue row, which is easy to miss once
-                       * the ticket is selected -- and this panel is where the
-                       * money gets recorded. Recording cash on a bill the guest
-                       * has already paid by UPI collects it twice, so the panel
-                       * repeats the claim and names the check to make.
-                       */}
-                      {order.claimed ? (
-                        <Notice
-                          data-claim
-                          role="note"
-                          tone="accent"
-                          className="mb-3"
-                          label={
-                            <strong className="text-[12.5px] font-semibold text-gink">
-                              The guest has marked this bill paid by UPI.
-                            </strong>
-                          }
-                        >
-                          Check the restaurant&rsquo;s own UPI app before recording it as cash
-                          &mdash; nothing in this app can see that transfer.
-                        </Notice>
-                      ) : null}
-
                       {order.paid > 0 && (
                         <p className="mb-3 text-[12.5px] leading-[1.5] text-gink-64">
                           {inr(order.paid)} already recorded on this order, against a bill of{' '}

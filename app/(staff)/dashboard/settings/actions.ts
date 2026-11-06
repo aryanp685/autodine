@@ -43,7 +43,6 @@ import {
   formatTaxPercent,
   parseTaxPercent,
   validateDetails,
-  validateUpi,
 } from '@/lib/settings-input';
 
 const SETTINGS_PATH = '/dashboard/settings';
@@ -268,46 +267,3 @@ export async function saveTaxAction(formData: FormData): Promise<void> {
   );
 }
 
-
-/**
- * Save the restaurant's own UPI handle.
- *
- * This is the shop's existing standee, not a gateway: no money moves through
- * AutoDine, and nothing here is a payment integration. What it buys is a guest
- * who can pay without walking to the counter, and a counter that still records
- * the money itself.
- *
- * Clearing the field is a legitimate save: it removes the QR from every guest's
- * order page and leaves "pay at the counter" in its place. That is the honest
- * way to turn the feature off.
- */
-export async function saveUpiAction(formData: FormData): Promise<void> {
-  const { supabase, restaurantId } = await requireEditor();
-
-  const parsed = validateUpi({
-    upiId: formData.get('upiId'),
-    payeeName: formData.get('upiPayeeName'),
-  });
-
-  if (!parsed.ok) fail(parsed.message);
-
-  const { data: saved, error } = await supabase
-    .from('restaurants')
-    .update({ upi_id: parsed.value.upiId, upi_payee_name: parsed.value.payeeName })
-    .eq('id', restaurantId)
-    .select('id');
-
-  if (error) writeFailure('saving the UPI handle', error);
-  if (!saved || saved.length === 0) {
-    fail('Nothing was saved. Your account can see this restaurant but is not allowed to change it.');
-  }
-
-  for (const path of AFFECTED_PATHS) revalidatePath(path);
-  revalidatePath('/menu/order');
-
-  done(
-    parsed.value.upiId
-      ? 'Saved. Guests now see your own UPI QR on their order page, with the amount filled in. It does not mark anything paid — the counter does that.'
-      : 'Cleared. Guests no longer see a UPI QR and pay at the counter.'
-  );
-}
