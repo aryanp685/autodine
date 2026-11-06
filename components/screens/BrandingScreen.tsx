@@ -33,6 +33,7 @@ import {
 } from '@/components/owner/chrome';
 import { SubmitButton } from '@/components/owner/SubmitButton';
 import { ImagePick } from '@/components/owner/ImagePick';
+import { CopyButton } from '@/components/CopyButton';
 
 /**
  * Menu branding.
@@ -520,6 +521,90 @@ export function BrandingScreen({
               Settings
             </Link>
             , where the warning about old links and printed standees lives.
+          </Notice>
+        </section>
+      ) : null}
+
+      {/* ------------------------------------------------------ your storefronts
+          The chain view. One card per outlet: the guest link, the code and
+          whether guests can actually use it right now. Only when the account
+          really has several outlets — for the one shop, the sections above
+          already are its storefront. Adding and switching outlets stays in
+          Settings, where it lives; this is the read-across. */}
+      {live && data && data.storefronts.length > 1 ? (
+        <section aria-labelledby="branding-storefronts" className="mt-6">
+          <SectionHead
+            title={<span id="branding-storefronts">Your storefronts</span>}
+            meta="Every outlet's guest link, code and status"
+          />
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            {data.storefronts.map((s) => {
+              const status = !s.open
+                ? ({ tone: 'due', label: 'Closed' } as const)
+                : !s.published
+                  ? ({ tone: 'neutral', label: 'No menu published' } as const)
+                  : ({ tone: 'live', label: 'Live' } as const);
+              return (
+                <Card key={s.id} className="px-4 py-4">
+                  <div className="flex items-start gap-3.5">
+                    {s.qr ? (
+                      <span
+                        className="block shrink-0 rounded-[8px] border border-hair bg-white p-1.5 [&>svg]:block [&>svg]:size-full"
+                        style={{ width: 88, height: 88 }}
+                        // Generated server-side by lib/qr.ts from a URL we
+                        // build. Nothing a restaurant types reaches this
+                        // string, so it is injected rather than parsed.
+                        dangerouslySetInnerHTML={{ __html: s.qr }}
+                      />
+                    ) : (
+                      <span
+                        className="grid shrink-0 place-items-center rounded-[8px] border border-hair bg-paper-deep text-center text-[10.5px] leading-[1.4] text-gink-46"
+                        style={{ width: 88, height: 88 }}
+                      >
+                        No code
+                      </span>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        <p className="m-0 min-w-0 truncate text-[13.5px] font-semibold text-gink">
+                          {s.name}
+                        </p>
+                        <span className="flex shrink-0 items-center gap-1.5">
+                          <Tag tone={status.tone}>{status.label}</Tag>
+                          {s.isCurrent ? <Tag tone="work">Editing</Tag> : null}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 flex items-center gap-1.5">
+                        <a
+                          id={`storefront-url-${s.id}`}
+                          href={s.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="min-w-0 flex-1 truncate rounded-[var(--p-r-chip)] border border-hair bg-paper-deep px-2.5 py-1.5 font-mono text-[11.5px] text-gink underline decoration-hair-strong underline-offset-2 hover:decoration-gink"
+                        >
+                          {`/menu?s=${s.slug}`}
+                        </a>
+                        <CopyButton
+                          value={s.url}
+                          selectId={`storefront-url-${s.id}`}
+                          className={btn('ghost', 'sm')}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+          <Notice tone="plain" label="The rest lives in Settings" className="mt-3">
+            Print or download a code, add an outlet, or switch which one this dashboard edits — in{' '}
+            <Link
+              href="/dashboard/settings"
+              className="font-medium text-gink underline decoration-hair-strong underline-offset-2"
+            >
+              Settings
+            </Link>
+            .
           </Notice>
         </section>
       ) : null}

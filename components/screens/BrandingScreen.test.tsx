@@ -37,6 +37,7 @@ function data(over: Partial<BrandingScreenData> = {}): BrandingScreenData {
     hasDraft: false,
     announcement: { on: false, text: '' },
     orderingOpen: true,
+    storefronts: [],
     ...over,
   } as BrandingScreenData;
 }
@@ -296,5 +297,74 @@ describe('BrandingScreen, the storefront settings section', () => {
   it('keeps the storefront controls read-only for staff who cannot edit', () => {
     const html = render(data({ canEdit: false } as Partial<BrandingScreenData>));
     expect(html).toContain('disabled=""');
+  });
+});
+
+describe('BrandingScreen, your storefronts', () => {
+  const twoOutlets = [
+    {
+      id: 'o1',
+      name: 'Maddi — Baner',
+      slug: 'maddi-baner',
+      isCurrent: true,
+      open: true,
+      published: true,
+      url: 'https://example.test/menu?s=maddi-baner',
+      qr: '<svg data-qr="o1"></svg>',
+    },
+    {
+      id: 'o2',
+      name: 'Maddi — Kothrud',
+      slug: 'maddi-kothrud',
+      isCurrent: false,
+      open: false,
+      published: true,
+      url: 'https://example.test/menu?s=maddi-kothrud',
+      qr: '<svg data-qr="o2"></svg>',
+    },
+  ];
+
+  it('shows nothing for the one-shop account — the sections above are its storefront', () => {
+    const solo = render(data({ storefronts: [twoOutlets[0]!] } as Partial<BrandingScreenData>));
+    expect(solo).not.toContain('Your storefronts');
+    const none = render(data());
+    expect(none).not.toContain('Your storefronts');
+  });
+
+  it('lists every outlet with its link, its code and its status', () => {
+    const html = render(data({ storefronts: twoOutlets } as Partial<BrandingScreenData>));
+    expect(html).toContain('Your storefronts');
+    // Both outlets, with the guest link each one answers to.
+    expect(html).toContain('Maddi — Baner');
+    expect(html).toContain('Maddi — Kothrud');
+    expect(html).toContain('/menu?s=maddi-baner');
+    expect(html).toContain('/menu?s=maddi-kothrud');
+    // The real codes, one per row.
+    expect(html).toContain('data-qr="o1"');
+    expect(html).toContain('data-qr="o2"');
+    // Status in words: the closed one says closed, the open one says live,
+    // and the row being edited is marked so the sections above have a home.
+    expect(html).toContain('Live');
+    expect(html).toContain('Closed');
+    expect(html).toContain('Editing');
+  });
+
+  it('says when a link has no menu behind it yet', () => {
+    const html = render(
+      data({
+        storefronts: [
+          { ...twoOutlets[0]!, published: false, qr: null },
+          twoOutlets[1]!,
+        ],
+      } as Partial<BrandingScreenData>),
+    );
+    expect(html).toContain('No menu published');
+    expect(html).toContain('No code');
+  });
+
+  it('points at Settings for what it does not duplicate', () => {
+    const html = render(data({ storefronts: twoOutlets } as Partial<BrandingScreenData>));
+    expect(html).toContain('href="/dashboard/settings"');
+    expect(html).toContain('Print or download a code');
   });
 });

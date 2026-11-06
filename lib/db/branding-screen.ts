@@ -15,6 +15,23 @@ import { getStaffContextDetailed } from '@/lib/db/staff';
 import { publicAssetUrl } from '@/lib/storage/assets';
 import { designCandidates, currentDesignIdOf, type DesignCandidate, type DesignId } from '@/lib/branding/designs';
 import { parseTheme } from '@/lib/branding/theme';
+import { qrSvg, siteOrigin } from '@/lib/qr';
+
+/** One outlet as a storefront: link, code, and whether guests can use it. */
+export type StorefrontRow = {
+  id: string;
+  name: string;
+  slug: string;
+  /** The outlet this dashboard is editing right now. */
+  isCurrent: boolean;
+  /** restaurants.is_active — the ordering status. */
+  open: boolean;
+  /** At least one menu is published, so the link shows dishes. */
+  published: boolean;
+  url: string;
+  /** A real scannable code for `url`, or null if it could not be drawn. */
+  qr: string | null;
+};
 
 export type BrandingScreenData = {
   role: string;
@@ -63,6 +80,12 @@ export type BrandingScreenData = {
   announcement: { on: boolean; text: string };
   /** False when the storefront is closed (restaurants.is_active). */
   orderingOpen: boolean;
+  /**
+   * Every outlet on this account, as storefronts: the guest link, the code
+   * and the live status. More than one row only when the account really has
+   * several outlets — the section is about chains, not about the one shop.
+   */
+  storefronts: StorefrontRow[];
   blocked?: 'signed-out' | 'no-membership';
 };
 
@@ -88,6 +111,7 @@ export async function getBrandingScreenData(): Promise<BrandingScreenData | null
       hasDraft: false,
       announcement: { on: false, text: '' },
       orderingOpen: true,
+      storefronts: [],
       blocked: staff.reason,
     };
   }
@@ -148,6 +172,43 @@ export async function getBrandingScreenData(): Promise<BrandingScreenData | null
   // base, because that is what the first publish would show.
   const draftRow = (draft.data ?? null) as { id: string; theme?: unknown } | null;
   const hasPublishedMenu = (menus.data ?? []).some((m) => m.is_published === true);
+
+  // Every outlet this account belongs to, as a storefront. Two small reads
+  // and one code per outlet: the fields are the same ones the active-outlet
+  // sections above already read, gathered across the account instead of one.
+  const outletIds = staff.context.outlets.map((o) => o.id);
+  const [outletRows, outletMenus] = await Promise.all([
+    supabase
+      .from('restaurants')
+      .select('id, name, slug, is_active')
+      .in('id', outletIds)
+      .order('name', { ascending: true }),
+    supabase.from('menus').select('restaurant_id, is_published').in('restaurant_id', outletIds),
+  ]);
+  const publishedOutletIds = new Set(
+    ((outletMenus.data ?? []) as { restaurant_id: string; is_published: boolean | null }[])
+      .filter((m) => m.is_published === true)
+      .map((m) => m.restaurant_id)
+  );
+  const origin = await siteOrigin();
+  const storefronts: StorefrontRow[] = await Promise.all(
+    ((outletRows.data ?? []) as { id: string; name: string | null; slug: string | null; is_active: boolean | null }[]).map(
+      async (row) => {
+        const slug = String(row.slug ?? '');
+        const url = `${origin.replace(/\/+$/, '')}/menu?s=${encodeURIComponent(slug)}`;
+        return {
+          id: String(row.id),
+          name: String(row.name ?? ''),
+          slug,
+          isCurrent: row.id === restaurantId,
+          open: row.is_active !== false,
+          published: publishedOutletIds.has(String(row.id)),
+          url,
+          qr: slug ? await qrSvg(url) : null,
+        };
+      }
+    )
+  );
   const liveBase = row.brand_theme_enabled === true ? parseTheme(row.brand_theme) : null;
   const draftBase = !hasPublishedMenu && draftRow ? parseTheme(draftRow.theme ?? null) : null;
   const baseTheme = liveBase ?? draftBase;
@@ -180,6 +241,7 @@ export async function getBrandingScreenData(): Promise<BrandingScreenData | null
       text: row.announcement_text ?? '',
     },
     orderingOpen: row.is_active !== false,
+    storefronts,
     hasPublishHistory: (history.count ?? 0) > 0,
     brand: {
       brandThemeEnabled: row.brand_theme_enabled === true,
