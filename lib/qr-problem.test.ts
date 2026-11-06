@@ -57,4 +57,17 @@ describe('verifyErrorText', () => {
     expect(isVerifyErrorReason('ok')).toBe(false);
     expect(isVerifyErrorReason(undefined)).toBe(false);
   });
+
+  it('lets the database wait replace the guesswork on a limited refusal', () => {
+    expect(verifyErrorText('limited', 42)).toContain('42 seconds');
+    expect(verifyErrorText('limited', 130)).toContain('130 seconds');
+    // Without a real number the honest old sentence stands.
+    expect(verifyErrorText('limited')).toBe(verifyErrorText('limited', null));
+    expect(verifyErrorText('limited', Number.NaN)).toBe(verifyErrorText('limited', null));
+    // Clamped: 1 second is noise, a day is a bug.
+    expect(verifyErrorText('limited', 1)).not.toContain('1 seconds');
+    expect(verifyErrorText('limited', 99999)).not.toContain('99999');
+    // The wait only shapes the 'limited' sentence.
+    expect(verifyErrorText('wrong', 42)).toBe(verifyErrorText('wrong'));
+  });
 });

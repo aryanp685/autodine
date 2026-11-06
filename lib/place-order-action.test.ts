@@ -32,6 +32,9 @@ vi.mock('next/headers', () => ({
     get: (name: string) =>
       name === 'autodine_throttled' && mocks.throttle ? { name, value: mocks.throttle } : undefined,
   }),
+  // ipHash() reads the forwarded address through headers(); the action now
+  // passes a per-restaurant ip hash to place_public_order's rate budget.
+  headers: async () => new Map([['x-forwarded-for', '203.0.113.9']]),
 }));
 
 vi.mock('@/lib/supabase/server', () => ({

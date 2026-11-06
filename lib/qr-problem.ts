@@ -70,7 +70,16 @@ export function isVerifyErrorReason(value: string | undefined): value is VerifyE
   );
 }
 
-export function verifyErrorText(reason: VerifyErrorReason): string {
+export function verifyErrorText(reason: VerifyErrorReason, waitSeconds?: number | null): string {
+  if (reason === 'limited') {
+    // The database knows how long the window has left; when the number
+    // travelled this far it replaces the guesswork sentence. Clamped: this
+    // goes into a sentence a guest reads on a phone.
+    const seconds = Number(waitSeconds);
+    if (Number.isFinite(seconds) && seconds >= 2 && seconds <= 3600) {
+      return `Too many attempts. Please wait about ${Math.round(seconds)} seconds and try again.`;
+    }
+  }
   return VERIFY_ERRORS[reason];
 }
 

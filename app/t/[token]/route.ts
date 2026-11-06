@@ -124,6 +124,13 @@ export async function GET(
     flag ? `${menuHref}&${THROTTLE_PARAM}=${encodeURIComponent(flag)}` : menuHref,
     request
   );
+  // Retry-After on the redirect itself: the refusal says how long, at the
+  // HTTP level as well as in the sentence the menu shows. Only when the
+  // database gave a real number — a header carrying a made-up wait is worse
+  // than no header.
+  if (opened?.throttled && typeof opened.retryAfterSeconds === 'number' && opened.retryAfterSeconds > 0) {
+    response.headers.set('Retry-After', String(Math.round(Math.min(opened.retryAfterSeconds, 3600))));
+  }
   response.cookies.set(TABLE_CARD_COOKIE, token, TABLE_CARD_COOKIE_OPTIONS);
 
   /*

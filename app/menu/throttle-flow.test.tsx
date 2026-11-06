@@ -55,6 +55,9 @@ vi.mock('next/headers', () => ({
     set: (name: string, value: string) => void mocks.jar.set(name, value),
     delete: (name: string) => void mocks.jar.delete(name),
   }),
+  // ipHash() reads the forwarded address through headers(); the order action
+  // now passes a per-restaurant ip hash to place_public_order's rate budget.
+  headers: async () => new Map([['x-forwarded-for', '203.0.113.9']]),
 }));
 
 vi.mock('@/lib/supabase/env', () => ({
