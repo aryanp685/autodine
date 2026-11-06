@@ -483,7 +483,7 @@ export function Empty({ children, className = '' }: { children: ReactNode; class
 
 /* ------------------------------------------------------------------ buttons */
 
-export type BtnTone = 'solid' | 'primary' | 'ghost' | 'quiet' | 'danger';
+export type BtnTone = 'solid' | 'primary' | 'ghost' | 'quiet' | 'danger' | 'forest';
 export type BtnSize = 'sm' | 'md';
 
 /**
@@ -536,6 +536,11 @@ export function btn(tone: BtnTone = 'solid', size: BtnSize = 'md'): string {
       'bg-grass text-cream hover:bg-grass-strong active:bg-grass-strong',
     primary:
       'bg-grass text-cream hover:bg-grass-strong active:bg-grass-strong',
+    /* The public-site action: deep forest with a white label. The product's
+       owner screens keep the grass tone; the marketing and auth surfaces use
+       this one so the premium white palette has a single, calm action colour. */
+    forest:
+      'bg-forest text-white hover:bg-forest-strong active:bg-forest-strong',
     ghost:
       'bg-[color-mix(in_oklab,var(--p-ink)_7%,transparent)] text-gink hover:bg-[color-mix(in_oklab,var(--p-ink)_11%,transparent)]',
     quiet:

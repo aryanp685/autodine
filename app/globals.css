@@ -1232,10 +1232,18 @@ p { margin: 0; }
      retired at the owner's request; same system, same geometry, daylight).
      `ink` is now the room, `cream` is now the type: the class names kept
      their meaning ("the surface", "the text on it") and swapped their hues. */
-  --color-ink: #f7f2e9;
-  --color-ink-soft: #efe8dc;
+  --color-ink: #fbfaf7;
+  --color-ink-soft: #f3f0e9;
   --color-ink-card: #ffffff;
-  --color-ink-line: #e6dccb;
+  --color-ink-line: #e8e3da;
+
+  /* The public-site accent: deep forest, with a soft wash and a brass
+     highlight. The product's own owner/guest screens keep their olive
+     accent; these tokens are for the marketing and auth surfaces only. */
+  --color-forest: #1f4d3a;
+  --color-forest-strong: #163a2b;
+  --color-forest-soft: #e9f0ea;
+  --color-brass: #b98a4b;
 
   /* ONE PLUM, per the finalized brief: the action hue of the product
      (the same aubergine as --p-accent) carried onto the marketing surface.
