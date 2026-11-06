@@ -380,7 +380,7 @@ export function BrandingScreen({
           previewed with the guest's own paint functions over this restaurant's
           dishes. The apply is a draft save before the first publish and an
           instant, rollbackable switch after it. */}
-      {live && data && data.hasPublishedMenu && data.designs.length > 0 ? (
+      {live && data && data.designs.length > 0 && (data.hasPublishedMenu || data.hasDraft) ? (
         <section aria-labelledby="branding-design" className="mt-6">
           <SectionHead
             title={<span id="branding-design">Storefront design</span>}

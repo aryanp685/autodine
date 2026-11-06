@@ -33,6 +33,7 @@ function data(over: Partial<BrandingScreenData> = {}): BrandingScreenData {
     sampleDishes: [],
     designs: [],
     currentDesignId: null,
+    hasDraft: false,
     ...over,
   } as BrandingScreenData;
 }
@@ -225,13 +226,38 @@ describe('BrandingScreen, the storefront design section', () => {
     expect(html).toContain('Choose');
   });
 
-  it('keeps the apply blocked for staff who cannot edit and off the page when nothing is live', () => {
+  it('keeps the apply blocked for staff who cannot edit and off the page when nothing is real', () => {
     const readOnly = render(data({ designs, currentDesignId: 'warm-classic', canEdit: false } as Partial<BrandingScreenData>));
     // Designs stay browsable, but the apply is disabled and says who can press it.
     expect(readOnly).toContain('disabled=""');
     expect(readOnly).toContain('Only an owner or manager can change the design.');
-    const unpublished = render(data({ designs, hasPublishedMenu: false } as Partial<BrandingScreenData>));
-    expect(unpublished).not.toContain('Storefront design');
-    expect(unpublished).not.toContain('Apply design');
+    const empty = render(data({ designs, hasPublishedMenu: false } as Partial<BrandingScreenData>));
+    expect(empty).not.toContain('Storefront design');
+    expect(empty).not.toContain('Apply design');
+  });
+
+  it('saves to the draft when nothing is live yet, and says so', () => {
+    // Imported but not published: the choice is a draft save, and the label
+    // must say draft — "Apply design" would promise a live switch that the
+    // button does not make.
+    const html = render(
+      data({ designs, hasPublishedMenu: false, hasDraft: true } as Partial<BrandingScreenData>),
+    );
+    expect(html).toContain('Storefront design');
+    expect(html).toContain('Save to draft');
+    expect(html).toContain('Saved to your draft — it goes live with your first publish.');
+    expect(html).not.toContain('Apply design');
+  });
+
+  it('shows the draft pick as saved while nothing is live', () => {
+    const html = render(
+      data({
+        designs,
+        hasPublishedMenu: false,
+        hasDraft: true,
+        currentDesignId: 'fresh-modern',
+      } as Partial<BrandingScreenData>),
+    );
+    expect(html).toContain('Saved to your draft');
   });
 });

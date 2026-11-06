@@ -373,36 +373,56 @@ export async function applyDesignAction(formData: FormData): Promise<void> {
   // The candidates keep the restaurant's own colours: the design is the
   // shape, never a new hue.
   const base = restaurant.brand_theme_enabled === true ? parseTheme(restaurant.brand_theme) : null;
-  const chosen = designCandidates(base).find((design) => design.id === designId)?.theme;
-  if (!chosen) {
-    redirect(`/dashboard/branding?error=${encodeURIComponent('That design is not available.')}`);
-  }
 
-  // The target is always a DRAFT profile: update the current draft if one
-  // exists, otherwise start one from the live identity (name and assets are
-  // copied, so switching design switches the design only).
-  const { data: draft } = await ctx.supabase
-    .from('restaurant_brand_profiles')
-    .select('id')
+  // Nothing is live yet. The design is saved onto the pending import's brand
+  // draft — the same draft the review's Publish carries live — keeping that
+  // draft's own imported colours and swapping only the shape. If no draft
+  // exists yet, one is started from the published identity if any.
+  const { data: menus } = await ctx.supabase
+    .from('menus')
+    .select('id, is_published')
     .eq('restaurant_id', ctx.restaurantId)
-    .eq('status', 'draft')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order('sort_order', { ascending: true });
+  const liveMenu = (menus ?? []).find((menu) => menu.is_published === true);
 
-  let profileId = draft?.id as string | undefined;
-
-  if (!profileId) {
-    const { data: previous } = await ctx.supabase
+  if (!liveMenu) {
+    const { data: draft } = await ctx.supabase
       .from('restaurant_brand_profiles')
-      .select('name, logo_asset_id, banner_asset_id')
+      .select('id, theme')
       .eq('restaurant_id', ctx.restaurantId)
-      .eq('status', 'published')
+      .eq('status', 'draft')
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
-    const { data: created, error: insertError } = await ctx.supabase
-      .from('restaurant_brand_profiles')
-      .insert({
+    // The draft's own colours are the base: the design is the shape, never a
+    // new hue — even before the first publish.
+    const draftBase = draft ? parseTheme(draft.theme) ?? base : null;
+    const chosen = designCandidates(draftBase).find((design) => design.id === designId)?.theme;
+    if (!chosen) {
+      redirect(`/dashboard/branding?error=${encodeURIComponent('That design is not available.')}`);
+    }
+
+    if (draft) {
+      const { error: updateError } = await ctx.supabase
+        .from('restaurant_brand_profiles')
+        .update({ theme: chosen })
+        .eq('id', draft.id as string)
+        .eq('restaurant_id', ctx.restaurantId);
+      if (updateError) {
+        redirect(
+          `/dashboard/branding?error=${encodeURIComponent(`Could not save the design: ${updateError.message}`)}`,
+        );
+      }
+    } else {
+      const { data: previous } = await ctx.supabase
+        .from('restaurant_brand_profiles')
+        .select('name, logo_asset_id, banner_asset_id')
+        .eq('restaurant_id', ctx.restaurantId)
+        .eq('status', 'published')
+        .maybeSingle();
+
+      const { error: insertError } = await ctx.supabase.from('restaurant_brand_profiles').insert({
         restaurant_id: ctx.restaurantId,
         // A fresh import id: this profile is a new draft of its own, not a
         // repeat of the import that made the last one.
@@ -412,39 +432,14 @@ export async function applyDesignAction(formData: FormData): Promise<void> {
         logo_asset_id: previous?.logo_asset_id ?? null,
         banner_asset_id: previous?.banner_asset_id ?? null,
         theme: chosen,
-      })
-      .select('id')
-      .single();
-
-    if (insertError || !created) {
-      redirect(
-        `/dashboard/branding?error=${encodeURIComponent(
-          `Could not save the design: ${insertError?.message ?? 'the write did not come back.'}`,
-        )}`,
-      );
+      });
+      if (insertError) {
+        redirect(
+          `/dashboard/branding?error=${encodeURIComponent(`Could not save the design: ${insertError.message}`)}`,
+        );
+      }
     }
-    profileId = created.id as string;
-  } else {
-    const { error: updateError } = await ctx.supabase
-      .from('restaurant_brand_profiles')
-      .update({ theme: chosen })
-      .eq('id', profileId)
-      .eq('restaurant_id', ctx.restaurantId);
-    if (updateError) {
-      redirect(
-        `/dashboard/branding?error=${encodeURIComponent(`Could not save the design: ${updateError.message}`)}`,
-      );
-    }
-  }
 
-  const { data: menus } = await ctx.supabase
-    .from('menus')
-    .select('id, is_published')
-    .eq('restaurant_id', ctx.restaurantId)
-    .order('sort_order', { ascending: true });
-  const liveMenu = (menus ?? []).find((menu) => menu.is_published === true);
-
-  if (!liveMenu) {
     revalidatePath('/dashboard/branding');
     redirect(
       `/dashboard/branding?notice=${encodeURIComponent(
@@ -453,9 +448,46 @@ export async function applyDesignAction(formData: FormData): Promise<void> {
     );
   }
 
-  // A live menu: switch the pair through the publish transaction, so the
-  // previous design is snapshotted and rollback covers this switch too.
-  const result = await publishPair(liveMenu.id as string, profileId);
+  // A live menu: the switch is design-only. The target is a fresh profile
+  // carrying the currently published identity with only the theme swapped —
+  // a pending import's draft keeps its own unreviewed name and artwork and is
+  // never published by this button. One transaction, a Publish history
+  // snapshot, rollback covers the switch too.
+  const chosen = designCandidates(base).find((design) => design.id === designId)?.theme;
+  if (!chosen) {
+    redirect(`/dashboard/branding?error=${encodeURIComponent('That design is not available.')}`);
+  }
+
+  const { data: previous } = await ctx.supabase
+    .from('restaurant_brand_profiles')
+    .select('name, logo_asset_id, banner_asset_id')
+    .eq('restaurant_id', ctx.restaurantId)
+    .eq('status', 'published')
+    .maybeSingle();
+
+  const { data: created, error: insertError } = await ctx.supabase
+    .from('restaurant_brand_profiles')
+    .insert({
+      restaurant_id: ctx.restaurantId,
+      import_id: randomUUID(),
+      status: 'draft',
+      name: previous?.name ?? null,
+      logo_asset_id: previous?.logo_asset_id ?? null,
+      banner_asset_id: previous?.banner_asset_id ?? null,
+      theme: chosen,
+    })
+    .select('id')
+    .single();
+
+  if (insertError || !created) {
+    redirect(
+      `/dashboard/branding?error=${encodeURIComponent(
+        `Could not save the design: ${insertError?.message ?? 'the write did not come back.'}`,
+      )}`,
+    );
+  }
+
+  const result = await publishPair(liveMenu.id as string, created.id as string);
   if (!result.ok) {
     redirect(`/dashboard/branding?error=${encodeURIComponent(result.error)}`);
   }

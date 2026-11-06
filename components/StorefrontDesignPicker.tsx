@@ -57,8 +57,14 @@ export function StorefrontDesignPicker({
         dishes={dishes}
       />
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <SubmitButton pendingLabel="Applying…" disabled={disabled}>
-          {alreadyLive ? 'This design is live' : 'Apply design'}
+        <SubmitButton pendingLabel={published ? 'Applying…' : 'Saving…'} disabled={disabled}>
+          {alreadyLive
+            ? published
+              ? 'This design is live'
+              : 'Saved to your draft'
+            : published
+              ? 'Apply design'
+              : 'Save to draft'}
         </SubmitButton>
         <span className="text-[11.5px] text-gink-46">
           {published

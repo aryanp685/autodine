@@ -57,6 +57,8 @@ export type BrandingScreenData = {
   brand?: { brandThemeEnabled?: boolean | null; brandTheme?: unknown | null } | null;
   /** A publish/rollback pair exists to restore (migration 20261103000100). */
   hasPublishHistory?: boolean;
+  /** A brand draft is waiting — imported but not published yet. */
+  hasDraft?: boolean;
   blocked?: 'signed-out' | 'no-membership';
 };
 
@@ -79,13 +81,14 @@ export async function getBrandingScreenData(): Promise<BrandingScreenData | null
       designs: [],
       currentDesignId: null,
       hasPublishedMenu: false,
+      hasDraft: false,
       blocked: staff.reason,
     };
   }
 
   const { supabase, restaurantId, role, slug, restaurantName, tagline } = staff.context;
 
-  const [restaurant, menus, dishes, history, dishCategories] = await Promise.all([
+  const [restaurant, menus, dishes, history, dishCategories, draft] = await Promise.all([
     supabase
       .from('restaurants')
       .select('logo_path, banner_path, brand_theme_enabled, brand_theme')
@@ -105,6 +108,17 @@ export async function getBrandingScreenData(): Promise<BrandingScreenData | null
     // Category names for the sample dishes, so the design previews label
     // rows the way the guest menu does.
     supabase.from('categories').select('id, name').eq('restaurant_id', restaurantId),
+    // The pending brand draft, if any: while nothing is live it is the theme
+    // the first publish would carry, so it colours the previews and marks the
+    // current pick.
+    supabase
+      .from('restaurant_brand_profiles')
+      .select('id, theme')
+      .eq('restaurant_id', restaurantId)
+      .eq('status', 'draft')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const row = (restaurant.data ?? {}) as {
@@ -119,9 +133,15 @@ export async function getBrandingScreenData(): Promise<BrandingScreenData | null
   );
 
   // The base for the design candidates: the live theme when one is painted,
-  // else nothing (the product default colours). A draft theme never colours
-  // the candidates — the previews must show what guests would see.
-  const baseTheme = row.brand_theme_enabled === true ? parseTheme(row.brand_theme) : null;
+  // else nothing (the product default colours). While a menu is live a draft
+  // theme never colours the candidates — the previews must show what guests
+  // see now. With nothing live yet the pending draft's own colours are the
+  // base, because that is what the first publish would show.
+  const draftRow = (draft.data ?? null) as { id: string; theme?: unknown } | null;
+  const hasPublishedMenu = (menus.data ?? []).some((m) => m.is_published === true);
+  const liveBase = row.brand_theme_enabled === true ? parseTheme(row.brand_theme) : null;
+  const draftBase = !hasPublishedMenu && draftRow ? parseTheme(draftRow.theme ?? null) : null;
+  const baseTheme = liveBase ?? draftBase;
   const designs = designCandidates(baseTheme);
 
   return {
@@ -144,7 +164,8 @@ export async function getBrandingScreenData(): Promise<BrandingScreenData | null
     })),
     designs,
     currentDesignId: currentDesignIdOf(baseTheme),
-    hasPublishedMenu: (menus.data ?? []).some((m) => m.is_published === true),
+    hasPublishedMenu,
+    hasDraft: draftRow !== null,
     hasPublishHistory: (history.count ?? 0) > 0,
     brand: {
       brandThemeEnabled: row.brand_theme_enabled === true,
