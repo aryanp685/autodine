@@ -59,6 +59,10 @@ export type BrandingScreenData = {
   hasPublishHistory?: boolean;
   /** A brand draft is waiting — imported but not published yet. */
   hasDraft?: boolean;
+  /** The announcement banner: one line, shown on the guest menu while on. */
+  announcement: { on: boolean; text: string };
+  /** False when the storefront is closed (restaurants.is_active). */
+  orderingOpen: boolean;
   blocked?: 'signed-out' | 'no-membership';
 };
 
@@ -82,6 +86,8 @@ export async function getBrandingScreenData(): Promise<BrandingScreenData | null
       currentDesignId: null,
       hasPublishedMenu: false,
       hasDraft: false,
+      announcement: { on: false, text: '' },
+      orderingOpen: true,
       blocked: staff.reason,
     };
   }
@@ -91,7 +97,7 @@ export async function getBrandingScreenData(): Promise<BrandingScreenData | null
   const [restaurant, menus, dishes, history, dishCategories, draft] = await Promise.all([
     supabase
       .from('restaurants')
-      .select('logo_path, banner_path, brand_theme_enabled, brand_theme')
+      .select('logo_path, banner_path, brand_theme_enabled, brand_theme, is_active, announcement_text, announcement_on')
       .eq('id', restaurantId)
       .maybeSingle(),
     supabase.from('menus').select('id, is_published').eq('restaurant_id', restaurantId),
@@ -126,6 +132,9 @@ export async function getBrandingScreenData(): Promise<BrandingScreenData | null
     banner_path?: string | null;
     brand_theme_enabled?: boolean | null;
     brand_theme?: unknown | null;
+    is_active?: boolean | null;
+    announcement_text?: string | null;
+    announcement_on?: boolean | null;
   };
 
   const categoryNameById = new Map(
@@ -166,6 +175,11 @@ export async function getBrandingScreenData(): Promise<BrandingScreenData | null
     currentDesignId: currentDesignIdOf(baseTheme),
     hasPublishedMenu,
     hasDraft: draftRow !== null,
+    announcement: {
+      on: row.announcement_on === true && Boolean(row.announcement_text?.trim()),
+      text: row.announcement_text ?? '',
+    },
+    orderingOpen: row.is_active !== false,
     hasPublishHistory: (history.count ?? 0) > 0,
     brand: {
       brandThemeEnabled: row.brand_theme_enabled === true,

@@ -3,9 +3,11 @@ import { notFound } from 'next/navigation';
 import { CartProvider } from '@/components/CartProvider';
 import { CustomerMenu } from '@/components/screens/CustomerMenu';
 import { MenuSlugNeeded } from '@/components/screens/MenuSlugNeeded';
+import { StorefrontClosedScreen } from '@/components/screens/StorefrontClosedScreen';
 import { TableGateScreen } from '@/components/screens/TableGateScreen';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { getMenuScreenData } from '@/lib/db/menu-screen';
+import { getStorefrontStatusBySlug } from '@/lib/db/storefront-status';
 import { loadTableAccess, verifyAgainHref } from '@/lib/table-access';
 import { cookies } from 'next/headers';
 import {
@@ -57,6 +59,19 @@ export default async function CustomerMenuPage({
   // Asked for nothing, so show nothing -- not the sample menu, which would
   // read as this restaurant's dishes.
   if (isSupabaseConfigured && !s?.trim()) return <MenuSlugNeeded />;
+
+  // A closed storefront answers before the table gate does: "scan the table"
+  // or a 404 would both read as a broken link rather than a closed shop. The
+  // order gate and the scan gate refuse this state too -- this is where the
+  // guest is told, in the same words.
+  let announcement: string | null = null;
+  if (isSupabaseConfigured && s?.trim()) {
+    const status = await getStorefrontStatusBySlug(s);
+    if (status && !status.open) {
+      return <StorefrontClosedScreen name={status.name} announcement={status.announcement} />;
+    }
+    announcement = status?.announcement ?? null;
+  }
 
   const access = await loadTableAccess(s);
 
@@ -110,6 +125,7 @@ export default async function CustomerMenuPage({
       <CustomerMenu
         data={data ? { ...data, table } : undefined}
         throttleNotice={throttle.throttled ? throttleNotice(throttle.retryAfterSeconds) : null}
+        announcement={announcement}
         lang={params.lang}
       />
     </CartProvider>

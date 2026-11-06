@@ -100,6 +100,12 @@ vi.mock('@/components/CartProvider', () => ({
   }),
 }));
 
+vi.mock('@/lib/db/storefront-status', () => ({
+  // The closed check sits before the gate flow this file drives; an open
+  // storefront with no announcement keeps the paths under test unchanged.
+  getStorefrontStatusBySlug: async () => ({ name: 'Maddi', open: true, announcement: null }),
+}));
+
 vi.mock('@/lib/db/menu-screen', () => ({
   getMenuScreenData: async () => ({
     restaurant: {

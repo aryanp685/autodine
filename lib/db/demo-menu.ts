@@ -75,6 +75,8 @@ export function demoMenu(slug: string): RestaurantMenu {
     timezone: 'Asia/Kolkata',
     tax_rate_bps: 500,
     is_active: true,
+    announcement_text: null,
+    announcement_on: false,
     // The demo says "pay at the counter", which is what an unconnected
     // deployment shows a guest. See lib/payments/online-availability.ts.
     online_payments_enabled: false,

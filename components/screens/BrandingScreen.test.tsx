@@ -25,6 +25,7 @@ vi.mock('@/app/(staff)/dashboard/branding/actions', () => ({
 function data(over: Partial<BrandingScreenData> = {}): BrandingScreenData {
   return {
     name: 'Maddi',
+    slug: 'maddi',
     tagline: 'North Indian, since 1998',
     logoUrl: null,
     bannerUrl: null,
@@ -34,6 +35,8 @@ function data(over: Partial<BrandingScreenData> = {}): BrandingScreenData {
     designs: [],
     currentDesignId: null,
     hasDraft: false,
+    announcement: { on: false, text: '' },
+    orderingOpen: true,
     ...over,
   } as BrandingScreenData;
 }
@@ -259,5 +262,39 @@ describe('BrandingScreen, the storefront design section', () => {
       } as Partial<BrandingScreenData>),
     );
     expect(html).toContain('Saved to your draft');
+  });
+});
+
+describe('BrandingScreen, the storefront settings section', () => {
+  it('offers the announcement and the ordering status, and points at Settings for the address', () => {
+    const html = render(data());
+    expect(html).toContain('Storefront settings');
+    expect(html).toContain('name="text"');
+    expect(html).toContain('name="on"');
+    expect(html).toContain('name="open"');
+    expect(html).toContain('value="open"');
+    expect(html).toContain('value="closed"');
+    // The rule the close carries, said before anyone presses it.
+    expect(html).toContain('Orders already placed and the kitchen keep running');
+    // The address is pointed at, not rebuilt here.
+    expect(html).toContain('/menu?s=maddi');
+    expect(html).toContain('href="/dashboard/settings"');
+  });
+
+  it('says which ordering status is live and which announcement is showing', () => {
+    const closed = render(
+      data({
+        orderingOpen: false,
+        announcement: { on: true, text: 'Closed early today — back at 6.' },
+      } as Partial<BrandingScreenData>),
+    );
+    expect(closed).toContain('Closed — new orders are blocked');
+    expect(closed).toContain('Closed early today — back at 6.');
+    expect(closed).toContain('checked=""');
+  });
+
+  it('keeps the storefront controls read-only for staff who cannot edit', () => {
+    const html = render(data({ canEdit: false } as Partial<BrandingScreenData>));
+    expect(html).toContain('disabled=""');
   });
 });

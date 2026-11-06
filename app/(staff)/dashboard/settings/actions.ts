@@ -144,6 +144,21 @@ export async function saveDetailsAction(formData: FormData): Promise<void> {
     );
   }
 
+  // The address is only as useful as it is unique. The database enforces it
+  // too, but a constraint error is not an answer an owner can act on -- this
+  // is the same refusal create_outlet gives, said in words. The unique index
+  // remains the backstop for the race between this check and the write.
+  if (slugChanged) {
+    const { data: taken, error: takenError } = await supabase
+      .from('restaurants')
+      .select('id')
+      .eq('slug', parsed.value.slug)
+      .neq('id', restaurantId)
+      .maybeSingle();
+    if (takenError) writeFailure('checking the address', takenError);
+    if (taken) fail('That address is already in use. Please pick another.');
+  }
+
   const patch = {
     name: parsed.value.name,
     tagline: parsed.value.tagline,

@@ -121,9 +121,16 @@ export type MenuScreenData = {
 export function CustomerMenu({
   data,
   throttleNotice,
+  announcement,
   lang: langParam,
 }: {
   data?: MenuScreenData;
+  /**
+   * The owner's announcement — one line, shown above the dishes while the
+   * owner has it on. Often the reason for something: an early close, a
+   * festival special, a new outlet.
+   */
+  announcement?: string | null;
   /**
    * Why ordering is paused, when a scan was turned away at the door.
    *
@@ -401,6 +408,27 @@ export function CustomerMenu({
           ))}
         </nav>
       )}
+
+      {/*
+        THE OWNER'S ANNOUNCEMENT.
+
+        One line, above the dishes and before any operational notice, because
+        it is the owner talking about the day — an early close, a festival
+        special. `status` for the same reason as the throttle note: the menu is
+        fine, this is news, not an alert.
+      */}
+      {announcement ? (
+        <div
+          role="status"
+          data-announcement=""
+          className="mx-3 mt-3 rounded-[16px] border border-hair bg-card px-4 py-3"
+        >
+          <p className="text-[10.5px] font-semibold tracking-[0.12em] text-gink-46 uppercase">
+            Announcement
+          </p>
+          <p className="mt-1 text-[13.5px] leading-[1.5] text-gink">{announcement}</p>
+        </div>
+      ) : null}
 
       {/*
         TURNED AWAY AT THE DOOR, SAID PLAINLY.

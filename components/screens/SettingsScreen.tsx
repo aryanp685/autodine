@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { CopyButton } from '@/components/CopyButton';
+import { MenuQrActions } from '@/components/MenuQrActions';
 import { PrintButton } from '@/components/PrintButton';
 import { SubmitButton } from '@/components/owner/SubmitButton';
 import type { ReactNode } from 'react';
@@ -936,8 +937,13 @@ export function SettingsScreen({
               ) : null}
 
               {live && data?.publicMenuSvg ? (
-                <div className="mt-3">
+                <div className="mt-3 flex flex-wrap items-center gap-2">
                   <PrintButton className={btn('ghost', 'sm')}>Print menu card</PrintButton>
+                  <MenuQrActions
+                    svg={data.publicMenuSvg}
+                    url={data.publicMenuUrl ?? ''}
+                    className={btn('ghost', 'sm')}
+                  />
                 </div>
               ) : null}
             </Panel>

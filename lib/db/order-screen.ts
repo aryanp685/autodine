@@ -178,11 +178,14 @@ export async function getOrderScreenData(
   if (!supabase) return null;
 
   const [restaurantResult, orderResult] = await Promise.all([
+    // Deliberately no is_active filter: this page is how a guest sees an order
+    // already placed. A closed storefront blocks NEW orders at
+    // place_public_order; hiding a placed order's status and payment behind
+    // the owner's close would punish the guest for it.
     supabase
       .from('restaurants')
       .select('name, online_payments_enabled, upi_id, upi_payee_name, brand_theme_enabled, brand_theme')
       .eq('slug', slug.trim())
-      .eq('is_active', true)
       .maybeSingle(),
     supabase.rpc('get_public_order', {
       p_slug: slug.trim(),

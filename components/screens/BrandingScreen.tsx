@@ -12,11 +12,16 @@ import {
   uploadBannerAction,
   uploadLogoAction,
 } from '@/app/(staff)/dashboard/branding/actions';
-import { rollbackPublishFormAction } from '@/app/(staff)/dashboard/menus/brand-actions';
+import {
+  updateAnnouncementAction,
+  updateOrderingStatusAction,
+  rollbackPublishFormAction,
+} from '@/app/(staff)/dashboard/menus/brand-actions';
 import { inr } from '@/lib/demo-data';
 import {
   BtnLink,
   Card,
+  Field,
   Notice,
   OwnerPage,
   PageHead,
@@ -24,6 +29,7 @@ import {
   SectionHead,
   Tag,
   btn,
+  inputClass,
 } from '@/components/owner/chrome';
 import { SubmitButton } from '@/components/owner/SubmitButton';
 import { ImagePick } from '@/components/owner/ImagePick';
@@ -402,6 +408,119 @@ export function BrandingScreen({
               canEdit={canEdit}
             />
           </div>
+        </section>
+      ) : null}
+
+      {/* -------------------------------------------------- storefront settings
+          The announcement banner and the ordering status. Both are things the
+          owner flips mid-service, so they sit here with the storefront, not in
+          Settings among the tax rows. The address is only pointed at: it is
+          edited in Settings, where its old-link warning already lives. */}
+      {live ? (
+        <section aria-labelledby="branding-storefront" className="mt-6">
+          <SectionHead
+            title={<span id="branding-storefront">Storefront settings</span>}
+            meta="What guests read before they order"
+          />
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            <Panel
+              title="Announcement banner"
+              meta={data?.announcement.on ? 'On the guest menu' : 'Off'}
+              bodyClassName="px-4 py-4"
+            >
+              <form action={updateAnnouncementAction} className="grid gap-3">
+                <Field
+                  label="What guests should know"
+                  htmlFor="branding-announcement-text"
+                  hint="One line at the top of the guest menu — an early close, a festival special, a new outlet."
+                >
+                  <textarea
+                    id="branding-announcement-text"
+                    name="text"
+                    rows={2}
+                    maxLength={200}
+                    defaultValue={data?.announcement.text ?? ''}
+                    disabled={!canEdit}
+                    className={`${inputClass} min-h-[72px] resize-none`}
+                  />
+                </Field>
+                <label className="flex items-start gap-2.5">
+                  <input
+                    type="checkbox"
+                    name="on"
+                    defaultChecked={data?.announcement.on ?? false}
+                    disabled={!canEdit}
+                    className="mt-[2px] size-4 shrink-0 accent-[var(--p-accent)]"
+                  />
+                  <span className="text-[12.5px] leading-[1.5] text-gink-64">
+                    Show it on the guest menu. Off, the text is kept but guests see nothing.
+                  </span>
+                </label>
+                <div>
+                  <SubmitButton pendingLabel="Saving…" disabled={!canEdit} tone="solid">
+                    Save banner
+                  </SubmitButton>
+                </div>
+              </form>
+            </Panel>
+
+            <Panel
+              title="Ordering status"
+              meta={data?.orderingOpen ? 'Open — guests can order' : 'Closed — new orders are blocked'}
+              bodyClassName="px-4 py-4"
+            >
+              <form action={updateOrderingStatusAction} className="grid gap-3">
+                <fieldset className="m-0 border-0 p-0">
+                  <legend className="text-[12.5px] font-medium text-gink">Is the storefront taking orders?</legend>
+                  <div className="mt-2 grid gap-2">
+                    <label className="flex items-start gap-2.5">
+                      <input
+                        type="radio"
+                        name="open"
+                        value="open"
+                        defaultChecked={data?.orderingOpen ?? true}
+                        disabled={!canEdit}
+                        className="mt-[3px] size-4 shrink-0 accent-[var(--p-accent)]"
+                      />
+                      <span className="text-[12.5px] leading-[1.5] text-gink">Open — guests can order</span>
+                    </label>
+                    <label className="flex items-start gap-2.5">
+                      <input
+                        type="radio"
+                        name="open"
+                        value="closed"
+                        defaultChecked={data ? !data.orderingOpen : false}
+                        disabled={!canEdit}
+                        className="mt-[3px] size-4 shrink-0 accent-[var(--p-accent)]"
+                      />
+                      <span className="text-[12.5px] leading-[1.5] text-gink">Closed — block new orders</span>
+                    </label>
+                  </div>
+                </fieldset>
+                <p className="m-0 text-[11.5px] leading-[1.5] text-gink-64">
+                  Closed, the storefront shows a closed note and no new orders can be placed. Orders
+                  already placed and the kitchen keep running until they are done.
+                </p>
+                <div>
+                  <SubmitButton pendingLabel="Saving…" disabled={!canEdit} tone="solid">
+                    Save status
+                  </SubmitButton>
+                </div>
+              </form>
+            </Panel>
+          </div>
+
+          <Notice tone="plain" label="Storefront address" className="mt-3">
+            <span className="font-mono text-[12.5px]">{`/menu?s=${data?.slug || 'your-address'}`}</span>
+            {' — the address guests open and the QR encodes. It changes in '}
+            <Link
+              href="/dashboard/settings"
+              className="font-medium text-gink underline decoration-hair-strong underline-offset-2"
+            >
+              Settings
+            </Link>
+            , where the warning about old links and printed standees lives.
+          </Notice>
         </section>
       ) : null}
 
