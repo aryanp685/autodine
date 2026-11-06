@@ -2,6 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { MenuIdentity } from '@/components/MenuIdentity';
+import { StorefrontDesignPicker } from '@/components/StorefrontDesignPicker';
 import type { OutletBar } from '@/lib/outlets';
 import type { BrandingScreenData } from '@/lib/db/branding-screen';
 import { guestBrandStyle } from '@/lib/branding/guest-theme';
@@ -373,6 +374,37 @@ export function BrandingScreen({
         ) : null}
       </section>
 
+      {/* ------------------------------------------------------------- design
+          The storefront design, open for the life of the storefront — the same
+          two candidates the import offered at the end of its journey, each one
+          previewed with the guest's own paint functions over this restaurant's
+          dishes. The apply is a draft save before the first publish and an
+          instant, rollbackable switch after it. */}
+      {live && data && data.designs.length > 0 && (data.hasPublishedMenu || data.hasDraft) ? (
+        <section aria-labelledby="branding-design" className="mt-6">
+          <SectionHead
+            title={<span id="branding-design">Storefront design</span>}
+            meta="Two looks built from your own colours — switch whenever you like"
+          />
+          <div className="mt-3">
+            <StorefrontDesignPicker
+              designs={data.designs}
+              currentDesignId={data.currentDesignId}
+              name={name}
+              logoUrl={data.logoUrl}
+              bannerUrl={data.bannerUrl}
+              dishes={data.sampleDishes.map((d) => ({
+                category: d.category,
+                name: d.name,
+                pricePaise: d.pricePaise,
+              }))}
+              published={Boolean(data.hasPublishedMenu)}
+              canEdit={canEdit}
+            />
+          </div>
+        </section>
+      ) : null}
+
       {/* ------------------------------------------------------------- versions
           Publish history for the Brand Studio pair. Only shown when something
           has actually been published through it — a "restore" button over an
@@ -409,7 +441,8 @@ export function BrandingScreen({
         <Notice tone="plain" label="One design, or your own">
           Every guest menu starts from the same layout and colours, so ordering works the same
           everywhere. A restaurant that wants its own colour and type can opt in through the Brand
-          Studio — until then, nothing here changes what guests see.
+          Studio — the storefront design above is that opt-in, and applying one is what turns it
+          on for guests.
         </Notice>
       </div>
     </OwnerPage>

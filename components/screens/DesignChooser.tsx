@@ -26,6 +26,7 @@ export function DesignChooser({
   logoUrl,
   bannerUrl,
   dishes,
+  disabled = false,
 }: {
   designs: DesignCandidate[];
   selectedId: DesignId | null;
@@ -35,6 +36,8 @@ export function DesignChooser({
   bannerUrl?: string | null;
   /** The real extracted rows: name and price as the draft will save them. */
   dishes: { category: string; name: string; pricePaise: number }[];
+  /** Read-only viewing: the cards stay, the choose buttons do not respond. */
+  disabled?: boolean;
 }) {
   return (
     <section
@@ -115,6 +118,7 @@ export function DesignChooser({
                   type="button"
                   className={btn(selected ? 'quiet' : 'ghost', 'sm')}
                   aria-pressed={selected}
+                  disabled={disabled}
                   onClick={() => onSelect(design.id)}
                 >
                   {selected ? 'Selected' : 'Choose'}
