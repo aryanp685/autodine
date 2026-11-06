@@ -55,15 +55,6 @@ export type Health = {
     /** restaurants.upi_id. Migration 01300. */
     restaurantUpi: Probe;
   };
-  payments: {
-    /** A gateway key pair exists on this deployment. */
-    gatewayKeys: boolean;
-    /**
-     * Can a guest ever see a pay-online button? Both the deployment key and the
-     * restaurant's own switch are required; this is the deployment half.
-     */
-    onlinePossible: boolean;
-  };
   trialDays: number;
 };
 
@@ -150,7 +141,6 @@ async function functionExists(
 export async function probeHealth(input: {
   configured: boolean;
   serverKey: boolean;
-  gatewayKeys: boolean;
   trialDays: number;
   primary: ProbeClient | null;
   publicClient: ProbeClient | null;
@@ -164,10 +154,6 @@ export async function probeHealth(input: {
       trialAndWriteGate: 'unknown',
       planEntitlements: 'unknown',
       restaurantUpi: 'unknown',
-    },
-    payments: {
-      gatewayKeys: input.gatewayKeys,
-      onlinePossible: input.gatewayKeys,
     },
     trialDays: input.trialDays,
   };

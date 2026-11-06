@@ -21,7 +21,6 @@ const restaurant: Restaurant = {
   is_active: true,
   announcement_text: null,
   announcement_on: false,
-  online_payments_enabled: false,
   logo_path: null,
   banner_path: null,
   accent: 'forest',

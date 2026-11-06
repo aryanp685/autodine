@@ -13,7 +13,6 @@ import { PeoplePanel } from '@/components/owner/PeoplePanel';
 import { formatTaxPercent, taxExamplePaise } from '@/lib/settings-input';
 import {
   saveDetailsAction,
-  saveOnlinePaymentsAction,
   saveGuestVerificationAction,
   saveTaxAction,
   saveUpiAction,
@@ -180,7 +179,6 @@ export function SettingsScreen({
   outlet,
   error,
   notice,
-  gatewayConfigured = false,
   team = null,
   teamFlash = null,
   origin = '',
@@ -196,15 +194,6 @@ export function SettingsScreen({
   outlet?: OutletBar | null;
   error?: string;
   notice?: string;
-  /**
-   * Does this DEPLOYMENT have a payment gateway key pair?
-   *
-   * Passed in rather than read here, because it is an environment fact and
-   * this component is also rendered in tests. The switch and the key are two
-   * different things and the card below says which one is missing -- an owner
-   * who "turned it on" and saw no button needs to know why.
-   */
-  gatewayConfigured?: boolean;
 }) {
   // Blocked callers get the prompt only. See the note above.
   if (data?.blocked) {
@@ -441,7 +430,7 @@ export function SettingsScreen({
               n="02"
               id="settings-money"
               title="What the bill charges"
-              meta="Tax, online payment, guest verification and your own UPI"
+              meta="Tax, guest verification and your own UPI"
             >
 
               <div className="flex flex-col gap-4">
@@ -501,73 +490,6 @@ export function SettingsScreen({
                     Orders already placed keep the tax they were charged — a bill is a record of the
                     rate at that moment, not a live calculation. New orders use the new rate
                     immediately.
-                  </p>
-                </Panel>
-
-                {/* --------------------------------------------- online payment */}
-                <Panel
-                  title="Online payment"
-                  meta={gatewayConfigured ? 'Gateway keys present' : 'No gateway keys'}
-                  bodyClassName="px-5 py-5"
-                >
-                  <p className="m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
-                    Let guests pay by card or UPI from their own order page. Money goes to your
-                    payment-gateway account, and the order is marked paid as soon as the gateway
-                    confirms it.
-                  </p>
-
-                  {/* Shown whenever the keys are missing, not only when the box is
-                      already ticked. The switch is a database flag; the keys are
-                      an environment fact. */}
-                  {!gatewayConfigured ? (
-                    <Notice
-                      tone="due"
-                      label="No gateway keys on this deployment."
-                      className="mt-3 mb-0"
-                    >
-                      This switch is disabled because there is nothing behind it: the server has no
-                      payment-gateway key pair, so no pay button can appear for a guest. Ask
-                      whoever deploys AutoDine to add the keys, then come back.
-                    </Notice>
-                  ) : null}
-
-                  {!data?.onlinePaymentsEnabled && gatewayConfigured ? (
-                    <Notice tone="plain" label="Off." className="mt-3 mb-0">
-                      This server has gateway keys, but guests still see &quot;pay at the
-                      counter&quot;. Tick the box and save to change that.
-                    </Notice>
-                  ) : null}
-
-                  <form action={saveOnlinePaymentsAction} className="mt-3.5 flex flex-col gap-3">
-                    <label className="flex items-start gap-2.5 rounded-[var(--p-r-control)] border border-hair bg-paper-deep px-3 py-2.5">
-                      <input
-                        type="checkbox"
-                        disabled={disabled || !gatewayConfigured}
-                        name="onlinePayments"
-                        defaultChecked={Boolean(data?.onlinePaymentsEnabled)}
-                        className="mt-[2px] size-4 shrink-0 accent-[var(--p-accent)]"
-                      />
-                      <span className="text-[11.5px] leading-[1.5] text-gink-64">
-                        Take card and UPI payment online. Orders stay unpaid until the gateway
-                        confirms the money, so nothing is ever marked paid on the guest&apos;s word.
-                      </span>
-                    </label>
-
-                    <div>
-                      <SubmitButton
-                        tone="solid"
-                        pendingLabel="Saving setting…"
-                        disabled={disabled || !gatewayConfigured}
-                      >
-                        Save payment setting
-                      </SubmitButton>
-                    </div>
-                  </form>
-
-                  <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
-                    Turning this off does not touch orders already paid, and does not refund
-                    anything. Counter payments — cash, card and UPI at the till — keep working
-                    either way.
                   </p>
                 </Panel>
 

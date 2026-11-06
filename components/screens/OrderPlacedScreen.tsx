@@ -3,14 +3,12 @@ import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
 import { FadeUp, FadeUpItem, PopIn, SpringUp } from '@/components/MotionBits';
 import { GuestOrderEditor } from '@/components/screens/GuestOrderEditor';
-import { PayOnline } from '@/components/PayOnline';
 import { PayUpi } from '@/components/PayUpi';
 import { GuestFlow } from '@/components/GuestFlow';
 import { ReorderOffer } from '@/components/ReorderOffer';
 import { guestBrandStyle, type GuestBrandState } from '@/lib/branding/guest-theme';
 import { OrderStatusRefresh } from '@/components/OrderStatusRefresh';
 import { GUEST_CHANGE_WINDOW_MS, type OrderScreenData } from '@/lib/db/order-screen';
-import type { OnlineOffer } from '@/lib/payments/online-availability';
 
 /**
  * Why the guest cannot change this order any more, in their own words.
@@ -181,30 +179,22 @@ function counterPayment(prepStatus: string, orForm: boolean): string {
 /**
  * Confirmation, and the only screen that tells the diner what happens next.
  *
- * It says plainly how the bill gets paid. When the restaurant takes card
- * online the button is here; when it does not, or this deployment has no
- * gateway key, the screen says "pay at the counter" in as many words. Staying
- * quiet would leave someone waiting for a card prompt that is never coming.
+ * It says plainly how the bill gets paid: at the counter, in as many words.
+ * Online payment is gone from customer ordering, so there is no card button
+ * to wait for and nothing here pretends otherwise.
  */
 export function OrderPlacedScreen({
   brandState,
   data,
   token,
   slug,
-  onlinePay,
 }: {
   brandState?: GuestBrandState | null;
   data: OrderScreenData | null;
   /** The guest's credential from the URL. Absent on a stale or hand-typed link. */
   token?: string;
-  /** Which restaurant, for the pay button's server call. */
+  /** Which restaurant, for the UPI panel's server call. */
   slug?: string;
-  /**
-   * Whether card payment may be offered on this order, decided on the server
-   * (lib/payments/online-availability.ts). Null means the order could not be
-   * read at all.
-   */
-  onlinePay?: OnlineOffer | null;
 }) {
   const paint = guestBrandStyle(brandState);
   if (!data) {
@@ -436,31 +426,13 @@ export function OrderPlacedScreen({
                   {unpaidNextStep(data.prepStatus, data.tableLabel, data.awaitingConfirmation)}{' '}
                   {counterPayment(data.prepStatus, true)}
                 </p>
-              ) : onlinePay?.available && slug && token ? (
-                <>
-                  <PayOnline
-                    slug={slug}
-                    code={data.code}
-                    token={token}
-                    duePaise={data.totalPaise}
-                  />
-                  <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
-                    {unpaidNextStep(data.prepStatus, data.tableLabel, data.awaitingConfirmation)}{' '}
-                    {counterPayment(data.prepStatus, true)}
-                  </p>
-                </>
               ) : (
-                <>
-                  {onlinePay?.note ? (
-                    <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">{onlinePay.note}</p>
-                  ) : null}
-                  <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
-                    <strong className="font-semibold text-gink">
-                      {counterPayment(data.prepStatus, false)}
-                    </strong>{' '}
-                    {unpaidNextStep(data.prepStatus, data.tableLabel, data.awaitingConfirmation)}
-                  </p>
-                </>
+                <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
+                  <strong className="font-semibold text-gink">
+                    {counterPayment(data.prepStatus, false)}
+                  </strong>{' '}
+                  {unpaidNextStep(data.prepStatus, data.tableLabel, data.awaitingConfirmation)}
+                </p>
               )}
             </>
           ) : (

@@ -5,7 +5,6 @@ import { TableGateScreen } from '@/components/screens/TableGateScreen';
 import { VerifyToOrderScreen } from '@/components/screens/VerifyToOrderScreen';
 import { getCartScreenData } from '@/lib/db/cart-screen';
 import { menuPriceItems, restaurant as demoRestaurant } from '@/lib/demo-data';
-import { onlinePaymentsConfigured } from '@/lib/payments/razorpay';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { loadTableAccess, verifyAgainHref } from '@/lib/table-access';
 
@@ -82,9 +81,6 @@ export default async function CheckoutPage({
         // deployment an unresolved restaurant still gets no prices at all --
         // prices that came from nowhere are worse than none.
         items={!isSupabaseConfigured ? menuPriceItems : (data?.items ?? [])}
-        // Both are needed before the screen may promise card payment later:
-        // the owner's switch, and a gateway this deployment can verify with.
-        onlinePaymentAvailable={Boolean(data?.onlinePaymentsEnabled) && onlinePaymentsConfigured()}
       />
     </CartProvider>
   );

@@ -42,7 +42,6 @@ function data(over: Partial<SettingsScreenData> = {}): SettingsScreenData {
       slug: 'maddi',
     },
     taxRateBps: 1800,
-    onlinePaymentsEnabled: false,
     guestVerificationMode: 'code',
     upiId: '',
     upiPayeeName: '',
@@ -114,58 +113,12 @@ describe('SettingsScreen', () => {
   });
 
   describe('online payment', () => {
-    it('says the deployment has no keys when the switch is on but the server is not configured', () => {
-      // The exact confusion this card exists to stop: an owner ticks the box,
-      // sees no pay button on the guest side, and concludes the feature is
-      // broken rather than unconfigured.
-      const html = renderToStaticMarkup(
-        <SettingsScreen data={data({ onlinePaymentsEnabled: true })} gatewayConfigured={false} />,
-      );
+    it('is gone from settings: the gateway was removed from customer ordering', () => {
+      const html = renderToStaticMarkup(<SettingsScreen data={data()} />);
 
-      expect(html).toContain('Online payment');
-      expect(html).toContain('No gateway keys');
-    });
-
-    it('shows the missing-keys warning before the box is ticked, not after', () => {
-      // The old card only warned once the switch was already on, which meant
-      // the first thing an owner did -- tick it, save, see nothing -- was the
-      // thing that produced the warning. Now the control is disabled up front.
-      const html = renderToStaticMarkup(
-        <SettingsScreen data={data({ onlinePaymentsEnabled: false })} gatewayConfigured={false} />,
-      );
-
-      expect(html).toContain('No gateway keys on this deployment');
-      expect(html).toContain('name="onlinePayments"');
-      // Disabled, because there is no key pair for the switch to reach.
-      expect(html).toMatch(/disabled=""[^>]*name="onlinePayments"/);
-      expect(html).toMatch(/disabled=""[^>]*>\s*Save payment setting/);
-    });
-
-    it('leaves the switch usable when the deployment does have keys', () => {
-      const html = renderToStaticMarkup(
-        <SettingsScreen data={data({ onlinePaymentsEnabled: true })} gatewayConfigured />,
-      );
-
-      expect(html).not.toContain('No gateway keys on this deployment');
-      // `disabled:` also appears as a Tailwind variant in the class list, so
-      // the assertion is on the attribute that actually disables the control.
-      expect(html).not.toMatch(/<button[^>]*\sdisabled=""[^>]*>\s*Save payment setting/);
-    });
-
-    it('says nothing is missing when the switch is on and the server has keys', () => {
-      const html = renderToStaticMarkup(
-        <SettingsScreen data={data({ onlinePaymentsEnabled: true })} gatewayConfigured />,
-      );
-
+      expect(html).not.toContain('Online payment');
+      expect(html).not.toContain('name="onlinePayments"');
       expect(html).not.toContain('No gateway keys');
-    });
-
-    it('explains that a configured server still shows the counter until the box is ticked', () => {
-      const html = renderToStaticMarkup(
-        <SettingsScreen data={data({ onlinePaymentsEnabled: false })} gatewayConfigured />,
-      );
-
-      expect(html).toContain('pay at the counter');
     });
   });
 
@@ -309,11 +262,11 @@ describe('Settings, the redesign', () => {
   });
 
   it('gives every form the same commit button', () => {
-    // Six forms, six saves, one appearance: the accent fill at the same size,
+    // Five forms, five saves, one appearance: the accent fill at the same size,
     // so "which control commits this card" is answered the same way every time.
-    // The sixth is the guest-verification choice (migration 20261028000900).
-    const html = renderToStaticMarkup(<SettingsScreen data={data()} gatewayConfigured />);
-    expect(count(html, 'bg-grass text-cream')).toBe(6);
+    // The last is the guest-verification choice (migration 20261028000900).
+    const html = renderToStaticMarkup(<SettingsScreen data={data()} />);
+    expect(count(html, 'bg-grass text-cream')).toBe(5);
   });
 
   it('draws no hand-made alert boxes any more', () => {

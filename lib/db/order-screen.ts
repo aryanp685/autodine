@@ -83,15 +83,6 @@ export type OrderScreenData = {
    */
   canGuestChange: boolean;
   /**
-   * Has the owner switched online (card/UPI) payment on for this outlet?
-   *
-   * Only the restaurant's own switch. Whether this DEPLOYMENT has a gateway
-   * key is decided on the page, because that is an environment question and
-   * this module's job is to read the restaurant. See
-   * lib/payments/online-availability.ts for how the two combine.
-   */
-  onlineEnabled: boolean;
-  /**
    * The restaurant's OWN UPI handle, when it has configured one.
    *
    * This is not a gateway. It is the shop's existing standee, on the guest's
@@ -184,7 +175,7 @@ export async function getOrderScreenData(
     // the owner's close would punish the guest for it.
     supabase
       .from('restaurants')
-      .select('name, online_payments_enabled, upi_id, upi_payee_name, brand_theme_enabled, brand_theme')
+      .select('name, upi_id, upi_payee_name, brand_theme_enabled, brand_theme')
       .eq('slug', slug.trim())
       .maybeSingle(),
     supabase.rpc('get_public_order', {
@@ -248,7 +239,6 @@ export async function getOrderScreenData(
     placedAt,
     canGuestChange:
       prepStatus === 'new' && paymentStatus === 'pending' && insideWindow,
-    onlineEnabled: restaurantResult.data?.online_payments_enabled === true,
     lines: (Array.isArray(order.lines) ? order.lines : [])
       .map(line)
       .filter((row): row is OrderLine => row !== null),

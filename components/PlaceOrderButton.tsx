@@ -45,8 +45,8 @@ export function PlaceOrderButton({
     : pending
       ? 'Placing your order…'
       : variant === 'dock'
-        ? 'Place order'
-        : `Place order · ${inr(paiseToRupees(totalPaise))}`;
+        ? 'Place order & pay at counter'
+        : `Place order & pay at counter · ${inr(paiseToRupees(totalPaise))}`;
 
   return (
     <button
@@ -56,7 +56,7 @@ export function PlaceOrderButton({
       className={[
         'inline-flex items-center justify-center gap-2 font-semibold transition active:scale-[0.99] disabled:opacity-50',
         variant === 'dock'
-          ? 'g-primary h-12 flex-1 rounded-full px-5 text-[14px]'
+          ? 'g-primary h-12 flex-1 rounded-full px-5 text-[13px]'
           : 'g-primary mt-4 h-12 w-full rounded-full px-5 text-[13.5px]',
       ].join(' ')}
       disabled={!canOrder || pending}
