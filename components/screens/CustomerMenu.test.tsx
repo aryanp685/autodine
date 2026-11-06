@@ -723,6 +723,37 @@ describe('the throttle notice', () => {
   });
 });
 
+/**
+ * THE OWNER'S ANNOUNCEMENT.
+ *
+ * One line of news over the menu: an early close, a festival special. It is
+ * the owner speaking, so it shows only when they wrote one and turned it on --
+ * silence is the default state, not an empty banner.
+ */
+describe('the announcement banner', () => {
+  it('shows the owner line above the dishes', () => {
+    const html = renderToStaticMarkup(
+      <CustomerMenu announcement="Closed early today — back at 6." />,
+    );
+    expect(html).toContain('data-announcement');
+    expect(html).toContain('Announcement');
+    expect(html).toContain('Closed early today — back at 6.');
+  });
+
+  it('says nothing when there is nothing to announce', () => {
+    for (const empty of [null, undefined, '']) {
+      const html = renderToStaticMarkup(<CustomerMenu announcement={empty} />);
+      expect(html).not.toContain('data-announcement');
+    }
+  });
+
+  it('is a status region, not an alert: news, not a failure', () => {
+    const html = renderToStaticMarkup(<CustomerMenu announcement="Back at 6." />);
+    expect(html).toMatch(/role="status"[^>]*data-announcement|data-announcement[^>]*role="status"/);
+    expect(html).not.toContain('role="alert"');
+  });
+});
+
 describe('the language switcher', () => {
   const hash = sourceHash('Butter Chicken', 'Slow-cooked in a tomato gravy');
 

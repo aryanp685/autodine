@@ -503,3 +503,91 @@ export async function applyDesignAction(formData: FormData): Promise<void> {
     )}`,
   );
 }
+
+/* ------------------------------------------------------- storefront settings */
+
+/**
+ * The announcement banner: one line the owner writes, shown at the top of the
+ * guest menu while it is on. Nothing else changes -- not the menu, not the
+ * orders.
+ */
+export async function updateAnnouncementAction(formData: FormData): Promise<void> {
+  const ctx = await manageContext();
+  if (!ctx) {
+    redirect(
+      `/dashboard/branding?error=${encodeURIComponent('You need to be an owner or manager to change the announcement.')}`,
+    );
+  }
+
+  const text = String(formData.get('text') ?? '').trim().replace(/\s+/g, ' ');
+  const on = formData.get('on') === 'on';
+  if (on && text.length === 0) {
+    redirect(
+      `/dashboard/branding?error=${encodeURIComponent('Write the announcement first, or turn it off.')}`,
+    );
+  }
+  if (text.length > 200) {
+    redirect(
+      `/dashboard/branding?error=${encodeURIComponent('The announcement must be 200 characters or fewer.')}`,
+    );
+  }
+
+  const { error } = await ctx.supabase
+    .from('restaurants')
+    .update({ announcement_text: text.length > 0 ? text : null, announcement_on: on && text.length > 0 })
+    .eq('id', ctx.restaurantId);
+
+  revalidatePath('/menu');
+  revalidatePath('/dashboard/branding');
+  redirect(
+    `/dashboard/branding?${error ? 'error' : 'notice'}=${encodeURIComponent(
+      error
+        ? `Could not save the announcement: ${error.message}`
+        : on
+          ? 'The announcement is on the guest menu now.'
+          : 'The announcement is off.',
+    )}`,
+  );
+}
+
+/**
+ * The ordering status. This writes `restaurants.is_active`, the column that
+ * has always answered "is this restaurant taking orders" for the guest reads,
+ * for place_public_order and for the table scan -- there is no second flag.
+ *
+ * Closing blocks new orders and shows the closed note on the storefront.
+ * Orders already placed, the kitchen and the counter are untouched: none of
+ * them read this column.
+ */
+export async function updateOrderingStatusAction(formData: FormData): Promise<void> {
+  const ctx = await manageContext();
+  if (!ctx) {
+    redirect(
+      `/dashboard/branding?error=${encodeURIComponent('You need to be an owner or manager to change the ordering status.')}`,
+    );
+  }
+
+  const open = String(formData.get('open') ?? '').trim();
+  if (open !== 'open' && open !== 'closed') {
+    redirect(
+      `/dashboard/branding?error=${encodeURIComponent('Pick Open or Closed first.')}`,
+    );
+  }
+
+  const { error } = await ctx.supabase
+    .from('restaurants')
+    .update({ is_active: open === 'open' })
+    .eq('id', ctx.restaurantId);
+
+  revalidatePath('/menu');
+  revalidatePath('/dashboard/branding');
+  redirect(
+    `/dashboard/branding?${error ? 'error' : 'notice'}=${encodeURIComponent(
+      error
+        ? `Could not save the ordering status: ${error.message}`
+        : open === 'open'
+          ? 'Your storefront is open. Guests can order again.'
+          : 'Your storefront is closed. Guests see the closed note and new orders are blocked — orders already placed and the kitchen keep running.',
+    )}`,
+  );
+}

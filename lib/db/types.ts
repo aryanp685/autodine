@@ -22,6 +22,9 @@ export type Restaurant = {
   timezone: string;
   tax_rate_bps: number;
   is_active: boolean;
+  /** Migration 20261107000000. The announcement banner: one line, off by default. */
+  announcement_text: string | null;
+  announcement_on: boolean;
   /**
    * Migration 20261022000800. Whether this outlet takes card/UPI online.
    * Off until the owner switches it on: taking card money is their decision,
