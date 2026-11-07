@@ -28,7 +28,7 @@ function Totals({ subtotalPaise, taxPaise, totalPaise, taxRateBps, compact }: {
         <dd className="tnum">{inr(paiseToRupees(subtotalPaise))}</dd>
       </div>
       <div className="flex items-baseline justify-between py-1.5 text-gink-64">
-        <dt>Taxes ({gstLabel(taxRateBps)})</dt>
+        <dt>{taxRateBps == null ? 'Taxes' : `Taxes (${gstLabel(taxRateBps)})`}</dt>
         <dd className="tnum">{inr(paiseToRupees(taxPaise))}</dd>
       </div>
       <div className="mt-1.5 flex items-baseline justify-between border-t border-hair pt-2.5 text-[16px] font-semibold text-gink">

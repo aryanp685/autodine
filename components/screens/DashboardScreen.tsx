@@ -25,6 +25,7 @@ import {
 } from '@/components/owner/chrome';
 import type { DashboardScreenData } from '@/lib/db/dashboard-screen';
 import { MarkSessionPaidButton } from '@/components/owner/MarkSessionPaidButton';
+import { CloseSessionButton } from '@/components/owner/CloseSessionButton';
 import { accessSummary, planSentence } from '@/lib/access';
 import { clockTimeInZone, hourLabel, hourRangeLabel } from '@/lib/db/time';
 
@@ -421,8 +422,15 @@ export function Dashboard({
                           </p>
                         ) : null}
                       </div>
-                      {unpaid && data.canMarkPaid ? (
-                        <MarkSessionPaidButton sessionId={session.id} table={session.table} />
+                      {data.canMarkPaid ? (
+                        <div className="flex flex-col items-end gap-2">
+                          {unpaid ? <MarkSessionPaidButton sessionId={session.id} table={session.table} /> : null}
+                          <CloseSessionButton
+                            sessionId={session.id}
+                            table={session.table}
+                            outstandingPaise={session.outstandingPaise}
+                          />
+                        </div>
                       ) : null}
                     </div>
                   </li>

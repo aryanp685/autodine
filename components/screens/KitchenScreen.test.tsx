@@ -128,6 +128,35 @@ describe('Kitchen board', () => {
     expect(html).not.toContain('Demo board · local only');
   });
 
+  it('offers browser KOT printing only for real live tickets', () => {
+    const html = renderToStaticMarkup(
+      <Kitchen
+        data={{
+          restaurantName: 'Maddi',
+          restaurantId: 'r-1',
+          cancelled: [],
+          role: 'kitchen',
+          canAdvance: false,
+          tickets: [{
+            id: 'order-1',
+            code: 'MA-ABC12',
+            table: 'T1',
+            placedAt: '7:42 pm',
+            placedAtIso: new Date().toISOString(),
+            ageMin: 1,
+            payment: 'pending',
+            state: 'new',
+            items: [{ qty: 1, name: 'Tea', veg: true }],
+            total: 30,
+          }],
+        }}
+      />,
+    );
+    expect(html).toContain('data-print-kot="order-1"');
+    expect(html).toContain('Print KOT');
+    expect(renderToStaticMarkup(<Kitchen />)).not.toContain('data-print-kot');
+  });
+
   it('attaches an add-on to the dish it was ordered with, as a tag', () => {
     // The cook reads the dish first and its instructions second. Run together
     // as "Butter Naan · Half · Extra cheese" the add-on reads as part of the

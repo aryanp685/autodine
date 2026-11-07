@@ -77,12 +77,14 @@ describe('the cart bill', () => {
     expect(html).not.toContain('sample values for layout review');
   });
 
-  it('says the tax is a sample when the menu has no rate configured', () => {
+  it('uses a generic tax label when the demo menu has no restaurant rate', () => {
     setLines([{ itemId: 'i1', qty: 1 }]);
 
     const html = renderToStaticMarkup(<Cart slug="maddi" restaurantName="Maddi" items={items} />);
 
+    expect(html).toContain('<dt>Taxes</dt>');
     expect(html).toContain('no tax rate configured');
+    expect(html).not.toContain('GST 5% · sample');
   });
 
   it('names a dish that is gone instead of quietly shrinking the bill', () => {

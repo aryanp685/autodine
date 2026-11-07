@@ -144,6 +144,7 @@ export function Cashier({
   const router = useRouter();
   const [method, setMethod] = useState<CounterMethod>('cash');
   const [message, setMessage] = useState('');
+  const [paymentReceiptUrl, setPaymentReceiptUrl] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [settling, setSettling] = useState<string[]>([]);
   /** Orders settled or cancelled locally, in demo mode only. */
@@ -220,6 +221,7 @@ export function Cashier({
     const release = () => paying.current.delete(order.key);
     setError('');
     setMessage('');
+    setPaymentReceiptUrl(null);
 
     // No database row means nothing can be written. In a preview that is
     // expected, so the row is settled in this browser only and the screen
@@ -265,6 +267,7 @@ export function Cashier({
       delete keys.current[paidId];
       setSettling((current) => current.filter((id) => id !== paidId));
       setMessage(result.message);
+      setPaymentReceiptUrl(result.paymentReceiptUrl ?? null);
     });
   };
 
@@ -656,6 +659,11 @@ export function Cashier({
                       {message && (
                         <Notice role="status" tone="live" className="mt-3 mb-0" label={<span className="text-[11.5px] font-semibold text-[var(--p-live)]">Recorded</span>}>
                           {message}
+                          {paymentReceiptUrl ? (
+                            <Link href={paymentReceiptUrl} className="ml-2 font-medium underline decoration-hair-strong underline-offset-2">
+                              View payment receipt
+                            </Link>
+                          ) : null}
                         </Notice>
                       )}
                       {/* One footnote, not two saying the same thing: the

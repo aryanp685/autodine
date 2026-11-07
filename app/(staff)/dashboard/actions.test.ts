@@ -12,7 +12,7 @@ vi.mock('@/lib/db/staff', () => ({
   getStaffContext: () => Promise.resolve(mocks.staff.result),
 }));
 
-import { markSessionPaidAction } from './actions';
+import { checkoutSessionAction, markSessionPaidAction } from './actions';
 
 const SESSION_ID = 'd220f1e4-f155-49b3-a56b-96b59ced7f50';
 
@@ -20,6 +20,47 @@ beforeEach(() => {
   mocks.rpc.mockReset();
   mocks.revalidatePath.mockReset();
   mocks.staff.result = null;
+});
+
+describe('checkoutSessionAction', () => {
+  it('rejects malformed ids before reaching the database', async () => {
+    expect(await checkoutSessionAction('T3')).toEqual({
+      ok: false,
+      error: 'This table session is invalid. Refresh the dashboard.',
+    });
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it('calls the transactional checkout RPC and returns the invoice route', async () => {
+    const invoiceId = 'ee1bdc77-e632-40a2-b5f7-4c17139d6d85';
+    mocks.staff.result = { supabase: { rpc: mocks.rpc }, role: 'cashier' };
+    mocks.rpc.mockResolvedValue({ data: invoiceId, error: null });
+
+    expect(await checkoutSessionAction(SESSION_ID)).toEqual({
+      ok: true,
+      invoiceId,
+      invoiceUrl: `/invoice/${invoiceId}`,
+    });
+    expect(mocks.rpc).toHaveBeenCalledWith('close_order_session_and_issue_receipt', {
+      p_order_session_id: SESSION_ID,
+    });
+    expect(mocks.revalidatePath.mock.calls).toEqual([
+      ['/dashboard'],
+      ['/dashboard/orders'],
+      ['/cashier'],
+      [`/invoice/${invoiceId}`],
+    ]);
+  });
+
+  it('does not claim checkout completed when the database refuses', async () => {
+    mocks.staff.result = { supabase: { rpc: mocks.rpc }, role: 'manager' };
+    mocks.rpc.mockResolvedValue({ data: null, error: { message: 'Add the restaurant address first.' } });
+    expect(await checkoutSessionAction(SESSION_ID)).toEqual({
+      ok: false,
+      error: 'Add the restaurant address first.',
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
 });
 
 describe('markSessionPaidAction', () => {
