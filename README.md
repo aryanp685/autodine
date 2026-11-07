@@ -35,6 +35,11 @@ Before that, `npm run env:check` reads `.env.local` and names what is missing, c
 
 ## Quality checks
 
+Project-wide locked decisions and agent instructions are authoritative in
+[`AGENTS.md`](AGENTS.md). For the database-backed QR throttle browser tests, use
+only the isolated local setup documented in [`docs/e2e-local.md`](docs/e2e-local.md);
+never point integration tests at production.
+
 ```bash
 npm run typecheck
 npm run lint

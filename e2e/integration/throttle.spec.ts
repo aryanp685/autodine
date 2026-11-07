@@ -17,19 +17,17 @@ import { expect, test } from '@playwright/test';
  * address), so within a couple of dozen attempts the database must start
  * answering `limited`. The test then checks what the guest actually sees.
  *
- * IT WRITES ROWS. `table_session_opens` gains up to two dozen. That is fine on a
- * branch database and unacceptable on production, which is why this never runs
- * automatically.
+ * IT WRITES ROWS. `table_session_opens` gains up to two dozen. The supported
+ * runner provisions a disposable local database; never point this at a branch
+ * or production database.
  *
  * REQUIRES
  *
- *   E2E_BASE_URL   an environment with 20261028000900 applied
- *   E2E_QR_TOKEN   a live card whose restaurant is in 'scan' or 'scan_confirm'
- *                  mode (dashboard → Settings → verification)
+ *   E2E_BASE_URL   the local Next.js process started by scripts/e2e/run-throttle.sh
+ *   E2E_QR_TOKEN   the synthetic card seeded into the disposable local database
  *
- * If a card's hour is already spent, the limit is simply reached sooner — that
- * only makes the test pass faster. If the card is on a code-mode restaurant,
- * the scan never mints and the test fails with that explanation.
+ * The runner rebuilds the DB for each invocation, so card usage starts fresh.
+ * It refuses non-loopback database hosts and never reads production credentials.
  */
 
 const TOKEN = process.env.E2E_QR_TOKEN ?? '';
