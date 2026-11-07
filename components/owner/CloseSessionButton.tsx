@@ -47,7 +47,7 @@ export function CloseSessionButton({
     <div className="flex flex-col items-end gap-1.5">
       {confirm ? (
         <div role="group" aria-label={`Confirm checkout for ${table}`} className="max-w-[260px] rounded-[var(--p-r-control)] border border-hair bg-paper-deep px-3 py-2 text-right">
-          <p className="text-[11px] leading-[1.45] text-gink-64">
+          <p className="text-[11.5px] leading-[1.45] text-gink-64">
             Close {table} and issue the final receipt?
             {outstandingPaise > 0
               ? ` It will show ${formatBillMoney(outstandingPaise)} due; later payment will get a separate receipt.`

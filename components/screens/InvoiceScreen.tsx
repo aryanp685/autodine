@@ -35,18 +35,18 @@ export function InvoiceScreen({ invoice }: { invoice: ReceiptData }) {
     ? 'max-w-[760px] p-6'
     : layout === '58mm'
       ? 'max-w-[58mm] p-3 text-[10px]'
-      : 'max-w-[80mm] p-3 text-[11px]';
+      : 'max-w-[80mm] p-3 text-[11.5px]';
 
   return (
     <div className="min-h-dvh bg-paper-deep text-gink antialiased">
       <style>{`@media print { @page { size: ${page.size}; margin: ${page.margin}; } }`}</style>
-      <div className="sticky top-0 z-10 border-b border-hair bg-paper/95 px-4 py-3 backdrop-blur print:hidden">
+      <div className="sticky top-0 z-10 border-b border-hair bg-paper px-4 py-3 print:hidden">
         <div className="mx-auto flex max-w-[820px] flex-wrap items-center justify-between gap-3">
           <Link href="/dashboard" className={`${btn('quiet', 'sm')} -ml-2`}>
             ← Dashboard
           </Link>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-2 text-[11px] text-gink-64">
+            <label className="flex items-center gap-2 text-[11.5px] text-gink-64">
               Layout
               <select
                 aria-label="Receipt print layout"
@@ -84,32 +84,32 @@ export function InvoiceScreen({ invoice }: { invoice: ReceiptData }) {
               {invoice.seller.logoUrl ? (
                 <img src={invoice.seller.logoUrl} alt={`${invoice.seller.name} logo`} className="mb-3 max-h-14 max-w-28 object-contain print:max-h-12" />
               ) : null}
-              <h1 className="text-[21px] leading-tight font-semibold tracking-[-0.02em] print:text-[18px]">
+              <h1 className="text-[20px] leading-tight font-semibold tracking-[-0.02em] print:text-[18px]">
                 {invoice.seller.name}
               </h1>
-              <p className="mt-1 max-w-[38ch] whitespace-pre-line text-[12px] leading-[1.45] text-gink-64 print:text-[10px]">
+              <p className="mt-1 max-w-[38ch] whitespace-pre-line text-[12.5px] leading-[1.45] text-gink-64 print:text-[10px]">
                 {invoice.seller.address}
               </p>
               {invoice.seller.phone ? (
-                <p className="mt-1 text-[11px] text-gink-64">Phone {invoice.seller.phone}</p>
+                <p className="mt-1 text-[11.5px] text-gink-64">Phone {invoice.seller.phone}</p>
               ) : null}
               <p className="mt-2 text-[10px] font-semibold tracking-[0.08em] uppercase">
                 Receipt · Not a GST tax invoice
               </p>
             </div>
             <div className="shrink-0 text-right">
-              <p className="text-[9px] font-semibold tracking-[0.12em] text-gink-46 uppercase">Receipt no.</p>
-              <p className="mt-1 font-mono text-[14px] font-semibold tabular-nums">{invoice.number}</p>
-              <p className="mt-2 text-[11px] text-gink-64">{invoice.issuedAt}</p>
-              <p className="mt-1 text-[11px] text-gink-64">{invoice.tableLabel ? `Table ${invoice.tableLabel}` : 'Table'}</p>
-              <p className="mt-1 text-[9px] text-gink-46">Session {invoice.sessionReference.slice(0, 8).toUpperCase()}</p>
+              <p className="text-[10px] font-semibold tracking-[0.12em] text-gink-46 uppercase">Receipt no.</p>
+              <p className="mt-1 font-mono text-[13.5px] font-semibold tabular-nums">{invoice.number}</p>
+              <p className="mt-2 text-[11.5px] text-gink-64">{invoice.issuedAt}</p>
+              <p className="mt-1 text-[11.5px] text-gink-64">{invoice.tableLabel ? `Table ${invoice.tableLabel}` : 'Table'}</p>
+              <p className="mt-1 text-[10px] text-gink-46">Session {invoice.sessionReference.slice(0, 8).toUpperCase()}</p>
             </div>
           </header>
 
           <div className="mt-5 overflow-hidden border-y border-hair">
             <table className="w-full border-collapse text-[11.5px] print:text-[10px]">
               <thead>
-                <tr className="text-[9px] font-semibold tracking-[0.08em] text-gink-46 uppercase">
+                <tr className="text-[10px] font-semibold tracking-[0.08em] text-gink-46 uppercase">
                   <th className="py-2 text-left">Qty</th>
                   <th className="py-2 text-left">Item / ticket</th>
                   <th className="py-2 text-right">Rate</th>
@@ -127,7 +127,7 @@ export function InvoiceScreen({ invoice }: { invoice: ReceiptData }) {
                           {[line.variant, ...line.addons].filter(Boolean).join(' · ')}
                         </div>
                       ) : null}
-                      <div className="mt-0.5 text-[9px] text-gink-46">Ticket {line.ticketCode}</div>
+                      <div className="mt-0.5 text-[10px] text-gink-46">Ticket {line.ticketCode}</div>
                     </td>
                     <td className="py-2 text-right tabular-nums">{formatBillMoney(line.unitPricePaise)}</td>
                     <td className="py-2 text-right tabular-nums">{formatBillMoney(line.amountPaise)}</td>
@@ -184,12 +184,12 @@ export function InvoiceScreen({ invoice }: { invoice: ReceiptData }) {
         {invoice.paymentReceipts.length ? (
           <section data-supplemental-payment-receipts className="mx-auto mt-4 max-w-[760px] rounded-[14px] border border-hair bg-card p-5 print:hidden">
             <h2 className="text-[13px] font-semibold">Later payment receipts</h2>
-            <p className="mt-1 text-[11px] leading-[1.45] text-gink-64">
+            <p className="mt-1 text-[11.5px] leading-[1.45] text-gink-64">
               These are separate acknowledgements for payments received after this invoice was issued. They do not change the printed invoice above.
             </p>
             <ul className="mt-3 divide-y divide-hair">
               {invoice.paymentReceipts.map((receipt) => (
-                <li key={receipt.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-[11px]">
+                <li key={receipt.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-[11.5px]">
                   <span>
                     <span className="font-mono font-medium">{receipt.reference}</span>
                     <span className="ml-2 text-gink-64">{receipt.receivedAt}</span>

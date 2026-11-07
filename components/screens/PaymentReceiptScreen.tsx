@@ -44,18 +44,18 @@ export function PaymentReceiptScreen({ receipt }: { receipt: PaymentReceiptData 
     ? 'max-w-[760px] p-6'
     : layout === '58mm'
       ? 'max-w-[58mm] p-3 text-[10px]'
-      : 'max-w-[80mm] p-3 text-[11px]';
+      : 'max-w-[80mm] p-3 text-[11.5px]';
 
   return (
     <div className="min-h-dvh bg-paper-deep text-gink antialiased">
       <style>{`@media print { @page { size: ${page.size}; margin: ${page.margin}; } }`}</style>
-      <div className="sticky top-0 z-10 border-b border-hair bg-paper/95 px-4 py-3 backdrop-blur print:hidden">
+      <div className="sticky top-0 z-10 border-b border-hair bg-paper px-4 py-3 print:hidden">
         <div className="mx-auto flex max-w-[820px] flex-wrap items-center justify-between gap-3">
           <Link href={`/invoice/${receipt.invoiceId}`} className={`${btn('quiet', 'sm')} -ml-2`}>
             ← Invoice
           </Link>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-2 text-[11px] text-gink-64">
+            <label className="flex items-center gap-2 text-[11.5px] text-gink-64">
               Layout
               <select aria-label="Payment receipt print layout" value={layout} onChange={(e) => setLayout(e.target.value as Layout)} className="rounded border border-hair bg-card px-2 py-1.5 text-gink">
                 <option value="a4">A4</option>
@@ -73,13 +73,13 @@ export function PaymentReceiptScreen({ receipt }: { receipt: PaymentReceiptData 
         <article data-payment-receipt className={`mx-auto rounded-[14px] border border-hair bg-card shadow-[0_10px_36px_rgba(30,31,24,.06)] print:rounded-none print:border-0 print:p-0 print:shadow-none ${layoutClass}`}>
           <header className="border-b border-hair pb-4 text-center">
             <h1 className="text-[20px] font-semibold tracking-[-0.02em]">{receipt.seller.name}</h1>
-            <p className="mt-1 text-[12px] text-gink-64">{receipt.seller.address}</p>
-            {receipt.seller.phone ? <p className="mt-0.5 text-[11px] text-gink-64">Phone {receipt.seller.phone}</p> : null}
-            <p className="mt-4 text-[12px] font-semibold tracking-[0.1em] uppercase">Payment receipt</p>
+            <p className="mt-1 text-[12.5px] text-gink-64">{receipt.seller.address}</p>
+            {receipt.seller.phone ? <p className="mt-0.5 text-[11.5px] text-gink-64">Phone {receipt.seller.phone}</p> : null}
+            <p className="mt-4 text-[12.5px] font-semibold tracking-[0.1em] uppercase">Payment receipt</p>
             <p className="mt-1 font-mono text-[13px] font-semibold">{receipt.reference}</p>
           </header>
 
-          <div className="mt-4 space-y-2 text-[12px]">
+          <div className="mt-4 space-y-2 text-[12.5px]">
             <Line label="For invoice" value={receipt.invoiceNumber} />
             {receipt.tableLabel ? <Line label="Table" value={receipt.tableLabel} /> : null}
             <Line label="Payment method" value={paymentMethodLabel(receipt.method)} />
