@@ -7,6 +7,7 @@ import { GuestFlow } from '@/components/GuestFlow';
 import { ReorderOffer } from '@/components/ReorderOffer';
 import { guestBrandStyle, type GuestBrandState } from '@/lib/branding/guest-theme';
 import { OrderStatusRefresh } from '@/components/OrderStatusRefresh';
+import { CallWaiterButton } from '@/components/CallWaiterButton';
 import { GUEST_CHANGE_WINDOW_MS, type OrderScreenData } from '@/lib/db/order-screen';
 
 /**
@@ -181,6 +182,7 @@ export function OrderPlacedScreen({
   data,
   token,
   slug,
+  canCallWaiter = false,
 }: {
   brandState?: GuestBrandState | null;
   data: OrderScreenData | null;
@@ -188,6 +190,8 @@ export function OrderPlacedScreen({
   token?: string;
   /** Which restaurant, for the UPI panel's server call. */
   slug?: string;
+  /** Only a current verified table session may request a waiter. */
+  canCallWaiter?: boolean;
 }) {
   const paint = guestBrandStyle(brandState);
   if (!data) {
@@ -231,12 +235,15 @@ export function OrderPlacedScreen({
         /* The flow does not end here: a table usually orders again, and the
            screen used to offer no way back to the menu at all. */
         <SpringUp className="w-full">
-          <Link
-            href={menuHref}
-            className="g-primary flex h-12 w-full items-center justify-center rounded-full text-[14px] font-semibold transition-transform duration-150 active:scale-[0.97]"
-          >
-            Order something else
-          </Link>
+          <div className="grid gap-1.5">
+            {canCallWaiter && data.tableLabel ? <CallWaiterButton /> : null}
+            <Link
+              href={menuHref}
+              className="g-primary flex h-12 w-full items-center justify-center rounded-full text-[14px] font-semibold transition-transform duration-150 active:scale-[0.97]"
+            >
+              Order something else
+            </Link>
+          </div>
         </SpringUp>
       }
     >

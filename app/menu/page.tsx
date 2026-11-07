@@ -126,6 +126,7 @@ export default async function CustomerMenuPage({
         data={data ? { ...data, table } : undefined}
         throttleNotice={throttle.throttled ? throttleNotice(throttle.retryAfterSeconds) : null}
         announcement={announcement}
+        canCallWaiter={access.status === 'verified'}
         lang={params.lang}
       />
     </CartProvider>

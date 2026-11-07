@@ -275,6 +275,28 @@ export type Order = {
   table_session_id?: string | null;
   /** Durable table sitting used to group incremental tickets into one bill. */
   order_session_id?: string | null;
+  /** Last persistent kitchen announcement outcome, written by a guarded RPC. */
+  kitchen_announcement_status?: 'announced' | 'failed' | null;
+  kitchen_announcement_at?: string | null;
+  kitchen_announcement_error?: string | null;
+};
+
+/** A guest's open request for a staff member to visit their table. */
+export type TableWaiterCall = {
+  id: string;
+  restaurant_id: string;
+  table_id: string;
+  table_session_hash: string | null;
+  table_label_snapshot: string;
+  request_key: string;
+  status: 'open' | 'resolved';
+  created_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  announcement_status: 'pending' | 'claimed' | 'announced' | 'failed';
+  announcement_claimed_at: string | null;
+  announcement_at: string | null;
+  announcement_error: string | null;
 };
 
 export type OrderItem = {

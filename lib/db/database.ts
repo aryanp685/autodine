@@ -30,6 +30,7 @@ import type {
   RestaurantInvoice,
   RestaurantInvoiceLine,
   RestaurantPaymentReceipt,
+  TableWaiterCall,
   PaymentStatus,
   PrepStatus,
   Restaurant,
@@ -92,6 +93,8 @@ export type Database = {
       restaurant_invoice_lines: Table<RestaurantInvoiceLine>;
       /** Immutable supplemental receipts for payments received after invoicing. */
       restaurant_payment_receipts: Table<RestaurantPaymentReceipt>;
+      /** Live guest requests for staff to visit a verified table. */
+      table_waiter_calls: Table<TableWaiterCall>;
       /** Private row-locked receipt counters; no client grants. */
       restaurant_invoice_series: Table<{
         restaurant_id: string;
@@ -233,6 +236,26 @@ export type Database = {
       /** One cross-device winner for a kitchen announcement; staff role is checked in SQL. */
       claim_kitchen_order_announcement: {
         Args: { p_order_id: string };
+        Returns: boolean;
+      };
+      record_kitchen_announcement_result: {
+        Args: { p_order_id: string; p_status: 'announced' | 'failed'; p_failure_reason?: string | null };
+        Returns: boolean;
+      };
+      call_waiter: {
+        Args: { p_session_token: string; p_request_key: string };
+        Returns: string;
+      };
+      claim_table_waiter_call_announcement: {
+        Args: { p_call_id: string };
+        Returns: boolean;
+      };
+      record_table_waiter_call_announcement: {
+        Args: { p_call_id: string; p_status: 'announced' | 'failed'; p_failure_reason?: string | null };
+        Returns: boolean;
+      };
+      resolve_table_waiter_call: {
+        Args: { p_call_id: string };
         Returns: boolean;
       };
       /**
