@@ -1,6 +1,14 @@
 -- LOCAL HARNESS ONLY. Deterministic guest-facing data for the throttle browser
 -- E2E. The database is disposable and this file must never target production.
 
+-- Supabase grants SQL table privileges separately from RLS. This local-only
+-- grant supplies the public-schema SELECT privilege the guest menu needs;
+-- checked-in policies still control which rows are visible. Keep this confined
+-- to the disposable E2E seed and do not treat it as production DDL.
+grant select on public.restaurants, public.menus, public.categories,
+  public.items, public.item_variants, public.item_addon_groups, public.item_addons
+  to anon, authenticated;
+
 do $$
 declare
   v_restaurant_id uuid;

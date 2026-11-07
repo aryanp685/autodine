@@ -111,8 +111,10 @@ no mounted data volume. If these loopback ports are already occupied, override
 - The database name is fixed to `autodine_e2e`; it is dropped before creation
   and dropped again by the exit trap. Do not change this to a production DB.
 - PostgREST connects as a dedicated local `authenticator` role and switches to
-  `anon` after JWT verification. The JWT secret and authenticator password are
-  generated per run and never written to the repository.
+  `anon` after JWT verification. The E2E-only seed grants SQL `SELECT` on the
+  menu-facing tables, while the checked-in RLS policies still filter rows. The
+  JWT secret and authenticator password are generated per run and never written
+  to the repository.
 - The QR token, restaurant, and menu entry are deterministic synthetic test
   fixtures. The E2E tests do not place orders and do not select or exercise GST
   treatment.
