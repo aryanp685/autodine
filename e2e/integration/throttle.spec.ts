@@ -59,17 +59,21 @@ test.describe('a card scanned too often', () => {
         break;
       }
 
+      // Let the server-rendered menu finish before closing this fresh guest's
+      // context; otherwise many abandoned streamed renders can queue behind the
+      // real database and make the throttle observation nondeterministic.
+      await page.getByText('Local E2E dish', { exact: true }).first().waitFor({ state: 'visible', timeout: 30_000 });
       await context.close();
     }
 
     // Ten opens per card, twenty per address, so 25 attempts cannot all pass.
     expect(refused, `no refusal in 25 scans; last address ${lastUrl}`).toBe(true);
 
+    const notice = page!.getByRole('status').filter({ hasText: 'Table check paused' });
+    await expect(notice).toBeVisible({ timeout: 30_000 });
     const bodyText = await page!.locator('body').innerText();
     const bodyHtml = (await page!.locator('body').innerHTML()).slice(0, 1200);
     expect(bodyText, `throttle notice absent at ${page!.url()}; response=${lastResponseInfo}; cookies=${lastCookieInfo}; body=${bodyText}; bodyHtml=${bodyHtml}; clientErrors=${clientErrors.join(' || ')}`).toContain('Table check paused');
-    const notice = page!.getByRole('status').filter({ hasText: 'Table check paused' });
-    await expect(notice).toBeVisible();
 
     // What the guest is owed: why, and what to do next.
     const text = (await notice.innerText()).toLowerCase();
@@ -119,17 +123,19 @@ test.describe('a card scanned too often', () => {
       if (page.url().includes('v=throttled')) break;
 
       // Same browser, cleared cookies: the guest, not the card budget, is what
-      // the loop varies; the opens table keeps counting either way.
+      // the loop varies; the opens table keeps counting either way. Wait for
+      // this render to finish before starting the next scan.
+      await page.getByText('Local E2E dish', { exact: true }).first().waitFor({ state: 'visible', timeout: 30_000 });
       await context.clearCookies();
     }
 
     const flag = new URL(page.url(), baseURL).searchParams.get('v') ?? '';
+    const notice = page.getByRole('status').filter({ hasText: 'Table check paused' });
+    await expect(notice).toBeVisible({ timeout: 30_000 });
     const bodyText = await page.locator('body').innerText();
     const bodyHtml = (await page.locator('body').innerHTML()).slice(0, 1200);
     const cookieInfo = JSON.stringify((await context.cookies()).map(({ name, domain, secure, sameSite }) => ({ name, domain, secure, sameSite })));
     expect(bodyText, `throttle notice absent at ${page.url()}; flag=${flag}; response=${lastResponseInfo}; cookies=${cookieInfo}; body=${bodyText}; bodyHtml=${bodyHtml}; clientErrors=${clientErrors.join(' || ')}`).toContain('Table check paused');
-    const notice = page.getByRole('status').filter({ hasText: 'Table check paused' });
-    await expect(notice).toBeVisible();
     const text = await notice.innerText();
 
     const seconds = flag.startsWith('throttled.') ? Number(flag.slice('throttled.'.length)) : null;
