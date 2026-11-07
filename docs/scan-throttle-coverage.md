@@ -33,7 +33,7 @@ a sentence". This file is the honest map.
 | the same attempt key is re-sent, so a retry cannot duplicate an order | same file | yes | no |
 | an already-verified guest's order is untouched by a refused scan | same file | yes | no |
 | a genuine throttle in a browser, against a real DB | `e2e/integration/throttle.spec.ts` | **no** | **yes** |
-| a genuine throttle through the real route + page + action, real SQL | `app/menu/throttle-db.integration.test.tsx` | **no** (skips without `THROTTLE_DB_URL`) | **yes** — run locally, 3/3 passed |
+| a genuine throttle through the real route + page + action, real SQL | `app/menu/throttle-db.integration.test.tsx` | **no** (skips without `THROTTLE_DB_URL`) | **yes** — the original 3 cases passed on local PostgreSQL; a C4 concurrent idempotency case was added 2026-11-07 and remains unrun |
 
 ## The gap, stated plainly
 
