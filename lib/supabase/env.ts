@@ -25,6 +25,8 @@
  * fictional restaurant data to a guest.
  */
 
+import { assertSupabaseRuntimeConfig } from './env-guard';
+
 export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 
 /**
@@ -111,24 +113,21 @@ export const isSupabaseAdminConfigured = Boolean(SUPABASE_URL && SUPABASE_SECRET
  * other production build with missing public Supabase configuration fails at
  * build/import time instead of serving fictional restaurant data.
  */
-const allowHermeticDemoBuild =
-  process.env.GITHUB_ACTIONS === 'true' &&
-  process.env.CI === 'true' &&
-  process.env.AUTODINE_TEST_DEMO_BUILD === 'true' &&
-  process.env.VERCEL_ENV === 'test';
-const allowExplicitLocalDemo =
-  process.env.NODE_ENV === 'development' && process.env.AUTODINE_DEMO_MODE === 'true';
+/**
+ * This module is shared with browser Supabase clients. Enforce deployment
+ * configuration only in the server/build runtime; private CI variables are
+ * intentionally unavailable in the browser bundle.
+ */
+const isServerRuntime = typeof window === 'undefined';
 
 /** Local-only demo state; it never becomes true in a production build. */
-export const isDemoMode = !isSupabaseConfigured && allowExplicitLocalDemo;
-
-if (
-  !isSupabaseConfigured &&
-  ((process.env.NODE_ENV === 'production' && !allowHermeticDemoBuild) ||
-    (process.env.NODE_ENV === 'development' && !allowExplicitLocalDemo))
-) {
-  throw new Error(
-    'AutoDine requires NEXT_PUBLIC_SUPABASE_URL and a public Supabase key. ' +
-      'Demo data is never an automatic fallback: configure Supabase, or set AUTODINE_DEMO_MODE=true for local development only.'
-  );
-}
+export const isDemoMode = isServerRuntime
+  ? assertSupabaseRuntimeConfig(isSupabaseConfigured, {
+      nodeEnv: process.env.NODE_ENV,
+      githubActions: process.env.GITHUB_ACTIONS,
+      ci: process.env.CI,
+      testDemoBuild: process.env.AUTODINE_TEST_DEMO_BUILD,
+      vercelEnv: process.env.VERCEL_ENV,
+      localDemoMode: process.env.AUTODINE_DEMO_MODE,
+    })
+  : false;
