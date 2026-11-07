@@ -1,5 +1,5 @@
 -- ============================================================================
--- AutoDine — migration 20261108000500: one table, one active order session
+-- AutoDine — migration 20261107074545: one table, one active order session
 --
 -- WHY THIS EXISTS
 --
@@ -90,7 +90,6 @@ revoke all on public.order_sessions from anon;
 revoke all on public.order_sessions from authenticated;
 revoke all on public.order_sessions from service_role;
 
-drop policy if exists order_sessions_staff on public.order_sessions;
 create policy order_sessions_staff on public.order_sessions
   for select to authenticated
   using (exists (
@@ -99,9 +98,6 @@ create policy order_sessions_staff on public.order_sessions
        and m.user_id = auth.uid()
   ));
 
--- Policies filter rows; they do not grant table privileges. Staff screens use
--- the user's authenticated client, so give it SELECT only (never write access).
-grant select on public.order_sessions to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 2. Which sitting a ticket joined.

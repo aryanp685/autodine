@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const sql = readFileSync(
-  new URL('../../supabase/migrations/20261108000500_order_sessions.sql', import.meta.url),
+  new URL('../../supabase/migrations/20261107074545_order_sessions.sql', import.meta.url),
+  'utf8',
+);
+const accessSql = readFileSync(
+  new URL('../../supabase/migrations/20261108000500_order_session_staff_read.sql', import.meta.url),
   'utf8',
 );
 
@@ -39,8 +43,8 @@ describe('order sessions migration guards', () => {
     expect(sql).toContain('alter table public.order_sessions enable row level security');
     expect(sql).toContain('where m.restaurant_id = order_sessions.restaurant_id');
     expect(sql).toContain('and m.user_id = auth.uid()');
-    expect(sql).toContain('grant select on public.order_sessions to authenticated');
-    expect(sql).not.toMatch(/grant\s+(?:all|insert|update|delete)\s+on\s+public\.order_sessions/i);
+    expect(accessSql).toContain('grant select on public.order_sessions to authenticated');
+    expect(accessSql).not.toMatch(/grant\s+(?:all|insert|update|delete)\s+on\s+public\.order_sessions/i);
     expect(sql).toContain('revoke all on public.order_sessions from anon');
   });
 
