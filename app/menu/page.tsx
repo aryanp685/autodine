@@ -116,8 +116,12 @@ export default async function CustomerMenuPage({
    * both, and the address is the newer statement of the two.
    */
   const fromAddress = readThrottleFlag(v);
-  const fromCookie = readThrottleFlag((await cookies()).get(THROTTLE_COOKIE)?.value);
+  const rawThrottleCookie = (await cookies()).get(THROTTLE_COOKIE)?.value;
+  const fromCookie = readThrottleFlag(rawThrottleCookie);
   const throttle = fromAddress.throttled ? fromAddress : fromCookie;
+  if (process.env.AUTODINE_E2E_DEBUG === '1') {
+    console.error('[throttle-e2e-debug]', JSON.stringify({ v, fromAddress, cookiePresent: Boolean(rawThrottleCookie), fromCookie, throttle }));
+  }
 
   // The cart is keyed by restaurant, so it is mounted where the slug is known.
   return (
