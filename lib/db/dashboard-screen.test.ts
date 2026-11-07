@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/db/staff', () => ({
+  CASHIER_ROLES: ['owner', 'manager', 'cashier'],
   getStaffContextDetailed: () => Promise.resolve(mocks.staff.result),
 }));
 
@@ -62,6 +63,8 @@ function signedIn(supabase: unknown, timezone: string = RESTAURANT_TIME_ZONE) {
       restaurantName: 'Kings of Kings',
       timezone,
       tagline: null,
+      role: 'owner',
+      access: { canWrite: true },
     },
   };
 }
@@ -282,5 +285,77 @@ describe('business-day boundary', () => {
     const at = new Date('2026-06-30T20:30:00Z');
     expect(hourInZone('Asia/Kolkata', at)).toBe(2);
     expect(hourInZone('UTC', at)).toBe(20);
+  });
+});
+
+describe('active table sessions', () => {
+  it('groups tickets by the durable session and computes only the outstanding balance', async () => {
+    mocks.staff.result = signedIn(
+      fakeSupabase({
+        orders: [
+          order('1', { order_session_id: 'session-1', table_id: 'table-1', total_paise: 10000 }),
+          order('2', { order_session_id: 'session-1', table_id: 'table-1', total_paise: 20000 }),
+        ],
+        order_sessions: [
+          { id: 'session-1', table_id: 'table-1', opened_at: earlierToday(0.2), paid_at: null },
+        ],
+        dining_tables: [{ id: 'table-1', label: 'T6' }],
+        payments: [
+          { order_id: '1', amount_paise: 4000, status: 'recorded', created_at: earlierToday(0.3) },
+          { order_id: '2', amount_paise: 15000, status: 'recorded', created_at: earlierToday(0.4) },
+          { order_id: '2', amount_paise: 2000, status: 'pending', created_at: earlierToday(0.5) },
+        ],
+      }),
+    );
+
+    const data = await getDashboardScreenData();
+    expect(data?.activeSessions).toEqual([
+      expect.objectContaining({
+        id: 'session-1',
+        table: 'T6',
+        orderCount: 2,
+        orderCodes: ['A-1', 'A-2'],
+        totalPaise: 30000,
+        paidPaise: 19000,
+        outstandingPaise: 11000,
+        paidAt: null,
+      }),
+    ]);
+    expect(data?.canMarkPaid).toBe(true);
+  });
+
+  it('clears an old paid timestamp from the card when a new ticket adds a balance', async () => {
+    mocks.staff.result = signedIn(
+      fakeSupabase({
+        orders: [order('1', { order_session_id: 'session-1', table_id: 'table-1', total_paise: 10000 })],
+        order_sessions: [
+          { id: 'session-1', table_id: 'table-1', opened_at: earlierToday(), paid_at: earlierToday(0.2) },
+        ],
+        dining_tables: [{ id: 'table-1', label: 'T1' }],
+        payments: [],
+      }),
+    );
+
+    const session = (await getDashboardScreenData())?.activeSessions[0];
+    expect(session?.outstandingPaise).toBe(10000);
+    expect(session?.paidAt).toBeNull();
+  });
+
+  it('shows an open active session as settled when all ledger payments are recorded', async () => {
+    const lastPayment = earlierToday(0.7);
+    mocks.staff.result = signedIn(
+      fakeSupabase({
+        orders: [order('1', { order_session_id: 'session-1', table_id: 'table-1', total_paise: 10000 })],
+        order_sessions: [
+          { id: 'session-1', table_id: 'table-1', opened_at: earlierToday(), paid_at: null },
+        ],
+        dining_tables: [{ id: 'table-1', label: 'T1' }],
+        payments: [{ order_id: '1', amount_paise: 10000, status: 'recorded', created_at: lastPayment }],
+      }),
+    );
+
+    const session = (await getDashboardScreenData())?.activeSessions[0];
+    expect(session?.outstandingPaise).toBe(0);
+    expect(session?.paidAt).toBe(lastPayment);
   });
 });
