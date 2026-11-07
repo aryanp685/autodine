@@ -38,6 +38,7 @@ done
 
 mkdir -p "$ARTIFACTS"
 POSTGREST_PID=''
+POSTGREST_PROXY_PID=''
 APP_PID=''
 POSTGREST_TMP="$(mktemp -d "${TMPDIR:-/tmp}/autodine-postgrest.XXXXXX")"
 cleanup() {
@@ -46,6 +47,10 @@ cleanup() {
   if [[ -n "$APP_PID" ]]; then
     kill "$APP_PID" 2>/dev/null || true
     wait "$APP_PID" 2>/dev/null || true
+  fi
+  if [[ -n "$POSTGREST_PROXY_PID" ]]; then
+    kill "$POSTGREST_PROXY_PID" 2>/dev/null || true
+    wait "$POSTGREST_PROXY_PID" 2>/dev/null || true
   fi
   if [[ -n "$POSTGREST_PID" ]]; then
     kill "$POSTGREST_PID" 2>/dev/null || true
@@ -104,19 +109,32 @@ export PGRST_DB_SCHEMAS=public
 export PGRST_DB_ANON_ROLE=anon
 export PGRST_DB_EXTRA_SEARCH_PATH=public
 export PGRST_JWT_SECRET="$LOCAL_E2E_JWT_SECRET"
+PGRST_UPSTREAM_PORT="${PGRST_UPSTREAM_PORT:-3002}"
 export PGRST_SERVER_HOST=127.0.0.1
-export PGRST_SERVER_PORT="$PGRST_PORT"
-# Supabase JS prefixes REST calls with /rest/v1; mount PostgREST there so no
-# external Supabase gateway or production endpoint is involved.
-export PGRST_SERVER_ROOT=/rest/v1
+export PGRST_SERVER_PORT="$PGRST_UPSTREAM_PORT"
 export PGRST_LOG_LEVEL=info
 "$POSTGREST_BIN" >"$ARTIFACTS/postgrest.log" 2>&1 &
 POSTGREST_PID=$!
 
+# PostgREST serves its API at /. Supabase JS expects /rest/v1, so this tiny
+# loopback-only proxy strips that prefix without changing database behavior.
+export LOCAL_POSTGREST_PROXY_HOST=127.0.0.1
+export LOCAL_POSTGREST_PROXY_PORT="$PGRST_PORT"
+export LOCAL_POSTGREST_UPSTREAM_HOST=127.0.0.1
+export LOCAL_POSTGREST_UPSTREAM_PORT="$PGRST_UPSTREAM_PORT"
+export LOCAL_POSTGREST_APP_ORIGIN="http://127.0.0.1:${APP_PORT}"
+node scripts/e2e/postgrest-path-proxy.mjs >"$ARTIFACTS/postgrest-proxy.log" 2>&1 &
+POSTGREST_PROXY_PID=$!
+
 wait_http() {
-  local url="$1" description="$2"
+  local url="$1" description="$2" accept_header="${3:-}"
   for _ in $(seq 1 60); do
-    if curl --fail --silent --show-error "$url" -o /dev/null 2>/dev/null; then
+    if [[ -n "$accept_header" ]]; then
+      curl --fail --silent --show-error -H "$accept_header" "$url" -o /dev/null 2>/dev/null && {
+        echo "$description is ready: $url" | tee -a "$ARTIFACTS/run.log"
+        return 0
+      }
+    elif curl --fail --silent --show-error "$url" -o /dev/null 2>/dev/null; then
       echo "$description is ready: $url" | tee -a "$ARTIFACTS/run.log"
       return 0
     fi
@@ -127,7 +145,7 @@ wait_http() {
   return 1
 }
 
-wait_http "http://127.0.0.1:${PGRST_PORT}/rest/v1/" 'local PostgREST API'
+wait_http "http://127.0.0.1:${PGRST_PORT}/rest/v1/" 'local PostgREST API' 'Accept: application/openapi+json'
 # Read-only preflight: verify the synthetic card and RPC metadata before the
 # browser test spends its card budget. This does not call open_table_session.
 curl --fail --silent --show-error \
