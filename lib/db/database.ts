@@ -26,6 +26,7 @@ import type {
   Menu,
   Order,
   OrderItem,
+  OrderSession,
   PaymentStatus,
   PrepStatus,
   Restaurant,
@@ -80,6 +81,8 @@ export type Database = {
       item_addon_groups: Table<ItemAddonGroup>;
       item_addons: Table<ItemAddon>;
       dining_tables: Table<DiningTable>;
+      /** The sitting represented by the consolidated table bill. */
+      order_sessions: Table<OrderSession>;
       /**
        * The printed card's code. This is the scheme scanning uses.
        *
