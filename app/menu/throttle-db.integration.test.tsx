@@ -416,7 +416,7 @@ describe.skipIf(!DB)('throttling, against a real PostgreSQL', () => {
 
     const lifecycle = await db.query(
       `select o.prep_status, o.payment_status, s.status as session_status,
-              s.paid_by, s.closed_by, p.method, p.amount_paise,
+              s.paid_by, s.closed_by, p.method, p.amount_paise, p.recorded_by,
               a.event_type, i.document_type, i.invoice_number,
               i.totals_snapshot->>'total_paise' as invoiced_total_paise,
               count(l.id)::int as invoice_line_count
@@ -439,6 +439,7 @@ describe.skipIf(!DB)('throttling, against a real PostgreSQL', () => {
       closed_by: CASHIER_ID,
       method: 'manual',
       amount_paise: order.rows[0].total_paise,
+      recorded_by: CASHIER_ID,
       event_type: 'manual_marked_paid',
       document_type: 'receipt',
       invoice_line_count: 1,
