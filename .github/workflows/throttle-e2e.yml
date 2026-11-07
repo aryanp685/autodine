@@ -75,8 +75,17 @@ jobs:
               echo 'The full logs are in the uploaded artifact; this is the console tail for quick diagnosis.'
               tail -n 100 "$RUNNER_TEMP/throttle-e2e-console.log"
             } >> "$GITHUB_STEP_SUMMARY"
-            detail="$(tail -n 35 "$RUNNER_TEMP/throttle-e2e-console.log" | tr '\n' ' ' | head -c 5000)"
+            detail="$(tail -n 25 "$RUNNER_TEMP/throttle-e2e-console.log" | tr '\n' ' ' | head -c 3000)"
             echo "::error title=Throttle E2E failure details::$detail"
+            services=''
+            for log in test-results/throttle-e2e/next-start.log test-results/throttle-e2e/postgrest.log test-results/throttle-e2e/postgrest-proxy.log; do
+              if [ -f "$log" ]; then
+                services+=" $log: $(tail -n 20 "$log" | tr '\n' ' ')"
+              fi
+            done
+            if [ -n "$services" ]; then
+              echo "::error title=Local service diagnostics::${services:0:3000}"
+            fi
           fi
           exit "$status"
         env:
