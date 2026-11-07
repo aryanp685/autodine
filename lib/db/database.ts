@@ -214,6 +214,11 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      /** One cross-device winner for a kitchen announcement; staff role is checked in SQL. */
+      claim_kitchen_order_announcement: {
+        Args: { p_order_id: string };
+        Returns: boolean;
+      };
       /**
        * Migration 20261103000100. Publish the menu + brand pair in ONE
        * transaction: the restaurants row is only ever rewritten from here, so

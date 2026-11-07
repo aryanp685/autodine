@@ -4,6 +4,7 @@ import {
   computeOrderTotals,
   computeSubtotal,
   gstLabel,
+  requireTaxRateBps,
   type PriceableLine,
 } from './pricing';
 
@@ -17,6 +18,18 @@ const SEED_LINES: PriceableLine[] = [
   { unitPricePaise: 7900, qty: 2 },
   { unitPricePaise: 14900, qty: 1 },
 ];
+
+describe('requireTaxRateBps', () => {
+  it('preserves the configured zero rate instead of substituting the demo rate', () => {
+    expect(requireTaxRateBps(0)).toBe(0);
+  });
+
+  it('fails closed for a missing, invalid, or fractional live rate', () => {
+    for (const value of [null, undefined, '500', -1, 12.5, Number.NaN]) {
+      expect(() => requireTaxRateBps(value)).toThrow(TypeError);
+    }
+  });
+});
 
 describe('computeSubtotal', () => {
   it('matches the numbers the locked design was signed off against', () => {
@@ -168,9 +181,9 @@ describe('invariants that must hold for every order', () => {
 });
 
 describe('gstLabel', () => {
-  it('says so when the rate is the sample, because the bill is not the restaurant’s own', () => {
-    expect(gstLabel()).toBe('GST 5% · sample');
-    expect(gstLabel(undefined)).toBe('GST 5% · sample');
+  it('does not expose a sample percentage as a restaurant tax label', () => {
+    expect(gstLabel()).toBe('Taxes');
+    expect(gstLabel(undefined)).toBe('Taxes');
   });
 
   it('prints the restaurant’s rate when it has one', () => {

@@ -66,6 +66,13 @@ const render = () =>
   );
 
 describe('checkout payment step', () => {
+  it('does not present the demo fallback rate as restaurant tax information', () => {
+    const html = renderToStaticMarkup(<Checkout slug="maddi" items={items} />);
+
+    expect(html).toContain('<dt>Taxes</dt>');
+    expect(html).not.toContain('GST 5% · sample');
+  });
+
   it('states one way to pay instead of offering two dead buttons', () => {
     const html = render();
 

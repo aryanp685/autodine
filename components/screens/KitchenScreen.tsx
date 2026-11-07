@@ -23,7 +23,7 @@ import { claimKitchenSpeaker, type KitchenSpeakerState } from '@/lib/kitchen-spe
 import { readMissedOrderIds, writeMissedOrderIds } from '@/lib/kitchen-missed';
 import { clockTimeInZone } from '@/lib/db/time';
 import { confirmedPrepChange, LATE_AFTER_MIN, WARN_AFTER_MIN, nextPrepState, type PrepState } from '@/lib/db/prep';
-import { advanceOrderAction } from '@/app/(staff)/kitchen/actions';
+import { advanceOrderAction, claimKitchenOrderAnnouncementAction } from '@/app/(staff)/kitchen/actions';
 import { HeldTableStrip } from '@/components/owner/HeldTableStrip';
 import { cancelStaffOrderAction } from '@/app/orders/actions';
 import { SignInPrompt } from '@/components/SignInPrompt';
@@ -864,66 +864,102 @@ export function Kitchen({
     const fresh = selectNewTickets(orders, seenRef.current);
     if (fresh.length === 0) return;
 
-    // Nothing is spent until both the Hindi voice and same-origin speaker
-    // election have settled. A newly opened tab must not race the active one.
+    // Nothing is spent until the local tab election has settled. The database
+    // claim below is the second election, across all kitchen devices.
     if (!settled || (live && speakerState === 'claiming')) return;
 
     const readyToSpeak = canAnnounceRef.current;
-    const canSpeak = audioRef.current && speaksRef.current && readyToSpeak && speakerAllowedRef.current;
-
-    /**
-     * No Hindi voice, but the sound is on: the room still has to hear that a
-     * ticket landed. A board that fails silently is the one failure a kitchen
-     * cannot notice -- the screen looks fine, the food does not get cooked.
-     *
-     * One chime for the batch, not one per ticket: four orders in the same
-     * second is one arrival, and four tones in a row is noise.
-     *
-     * Not when the device is deliberately muted -- silence there is a choice
-     * somebody made, and the missed list still records the ticket.
-     */
-    if (audioRef.current && !readyToSpeak) {
-      try {
-        chimeRef.current?.();
-      } catch {
-        /* audio locked until a gesture; the ticket is still listed */
-      }
+    // Reserve the complete batch in this tab before any network wait, so a
+    // React refresh cannot start overlapping server claims for later tickets.
+    for (const ticket of fresh) {
+      if (ticket.orderId) seenRef.current.add(ticket.orderId);
     }
 
-    for (const ticket of fresh) {
-      if (!ticket.orderId) continue;
+    const announceFresh = async () => {
+      let chimed = false;
 
-      if (!canSpeak) {
-        // Unheard, and never pretended otherwise. Persist the order ID so a
-        // refresh can restore its recovery entry while the server still returns it.
-        seenRef.current.add(ticket.orderId);
-        setMissedReason(!readyToSpeak ? 'voice' : !speakerAllowedRef.current ? 'speaker' : 'muted');
-        changeMissed((current) => current.some((item) => item.orderId === ticket.orderId)
+      for (const ticket of fresh) {
+        if (!ticket.orderId) continue;
+        const orderId = ticket.orderId;
+
+        // A Web-Lock follower should stay quiet and let its elected tab handle
+        // the device. Muted screens are different: keep a local recovery entry.
+        if (!speakerAllowedRef.current) continue;
+        if (!(audioRef.current && speaksRef.current)) {
+          setMissedReason('muted');
+          changeMissed((current) => current.some((item) => item.orderId === orderId)
+            ? current
+            : [ticket, ...current].slice(0, MISSED_LIMIT));
+          continue;
+        }
+
+        let claim: Awaited<ReturnType<typeof claimKitchenOrderAnnouncementAction>>;
+        try {
+          claim = await claimKitchenOrderAnnouncementAction(orderId);
+        } catch {
+          claim = { ok: false, error: 'Announcement claim could not be reached.' };
+        }
+
+        // A false claim means another device already owns this order's audio;
+        // it is not a missed announcement and should not invite duplicate replay.
+        if (claim.ok && !claim.claimed) continue;
+        if (!claim.ok) {
+          setMissedReason('speaker');
+          changeMissed((current) => current.some((item) => item.orderId === orderId)
+            ? current
+            : [ticket, ...current].slice(0, MISSED_LIMIT));
+          continue;
+        }
+
+        // No Hindi voice: the database winner emits at most one fallback chime
+        // for this batch, then leaves the ticket in the manual replay list.
+        if (!readyToSpeak || !canAnnounceRef.current) {
+          if (!chimed && audioRef.current && speaksRef.current && speakerAllowedRef.current) {
+            try {
+              chimeRef.current?.();
+            } catch {
+              /* audio locked until a gesture; the ticket is still listed */
+            }
+            chimed = true;
+          }
+          setMissedReason('voice');
+          changeMissed((current) => current.some((item) => item.orderId === orderId)
+            ? current
+            : [ticket, ...current].slice(0, MISSED_LIMIT));
+          continue;
+        }
+
+        // The audio switch can change while the claim is in flight. Do not
+        // silently spend the one cross-device claim if the speaker was muted.
+        if (!(audioRef.current && speaksRef.current && speakerAllowedRef.current)) {
+          setMissedReason('muted');
+          changeMissed((current) => current.some((item) => item.orderId === orderId)
+            ? current
+            : [ticket, ...current].slice(0, MISSED_LIMIT));
+          continue;
+        }
+
+        const key = `new:${orderId}`;
+        announcementTicketsRef.current.set(key, ticket);
+        missedAttemptByOrderRef.current.set(orderId, key);
+        // Persist as needing confirmation before the utterance can begin. A
+        // refresh/interruption then restores a replay path.
+        changeMissed((current) => current.some((item) => item.orderId === orderId)
           ? current
           : [ticket, ...current].slice(0, MISSED_LIMIT));
-        continue;
+        const result = speak(key, getAnnouncementText(ticket), announceLogLabel(ticket.table, ticket.items), 'order');
+        if (result === 'full') setMissedReason('queue');
+        if (result !== 'queued') {
+          missedAttemptByOrderRef.current.delete(orderId);
+          announcementTicketsRef.current.delete(key);
+        }
+        // Full/duplicate outcomes remain recoverable; successful onend removes it.
       }
 
-      const key = `new:${ticket.orderId}`;
-      announcementTicketsRef.current.set(key, ticket);
-      missedAttemptByOrderRef.current.set(ticket.orderId, key);
-      // Persist as needing confirmation before the asynchronous utterance can
-      // begin. A refresh/interruption then restores a replay path.
-      changeMissed((current) => current.some((item) => item.orderId === ticket.orderId)
-        ? current
-        : [ticket, ...current].slice(0, MISSED_LIMIT));
-      const result = speak(key, getAnnouncementText(ticket), announceLogLabel(ticket.table, ticket.items), 'order');
-      if (result === 'full') setMissedReason('queue');
-      if (result !== 'queued') {
-        missedAttemptByOrderRef.current.delete(ticket.orderId);
-        announcementTicketsRef.current.delete(key);
-      }
-      // Full/duplicate outcomes remain in the recoverable list; an actual
-      // successful onend is the only event that removes it.
-      seenRef.current.add(ticket.orderId);
-    }
+      writeSeen(restaurantId, [...seenRef.current]);
+    };
 
-    writeSeen(restaurantId, [...seenRef.current]);
+    void announceFresh();
 
   }, [orders, live, restaurantId, speak, settled, voiceState, speakerState, changeMissed]);
 
@@ -1067,7 +1103,7 @@ export function Kitchen({
       return {
         tone: 'quiet',
         title: 'This screen is muted.',
-        body: 'This device is muted. The browser can coordinate tabs in this profile only; mute other devices manually, because cross-device duplicate audio cannot be prevented here.',
+        body: 'This device is muted. Orders remain visible; another sound-enabled kitchen screen can claim and announce each new order.',
         action: { label: 'Speak here too', run: () => setSpeaksHere(true) },
       };
     }
@@ -1077,7 +1113,7 @@ export function Kitchen({
     }
 
     if (live && speakerState === 'local-only') {
-      return { tone: 'quiet', title: 'This browser cannot coordinate kitchen tabs.', body: 'Keep only one kitchen tab open on this browser. Speaker coordination is browser-local and does not guarantee exactly-once audio across devices.' };
+      return { tone: 'quiet', title: 'This browser cannot coordinate kitchen tabs.', body: 'The database still elects one device for each order announcement. Keep only one kitchen tab open here to avoid duplicate attempts.' };
     }
 
     if (lostCount > 0) {
@@ -1687,7 +1723,7 @@ export function Kitchen({
             {missedReason === 'queue'
               ? 'The speech queue was full. These orders remain on the board and can be replayed when it clears.'
               : missedReason === 'speaker'
-                ? 'They arrived while another tab owned the speaker; replay them here if needed.'
+                ? 'This screen could not confirm who owned the speaker; review these orders before replaying.'
               : missedReason === 'muted'
                 ? 'They arrived while this screen was muted or the sound was off.'
                 : voiceState === 'ready'

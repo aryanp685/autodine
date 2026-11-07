@@ -13,20 +13,12 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import type { MenuItemPrice } from '@/lib/cart-pricing';
+import { requireTaxRateBps } from '@/lib/pricing';
 
 export type CartScreenData = {
   slug: string;
   restaurantName: string;
-  /**
-   * The restaurant's own rate, in basis points.
-   *
-   * A bill priced at a rate the restaurant did not set is wrong in a way the
-   * guest cannot check and finance only finds later, so the screens price
-   * with this and the database prices with the same column. It is read here
-   * rather than defaulted, because the fallback in lib/pricing.ts is a
-   * layout sample -- it is the right number to draw a screen with and the
-   * wrong number to charge somebody.
-   */
+  /** The restaurant's explicit rate, in basis points; never a demo fallback. */
   taxRateBps: number;
   /**
    * The published brand state (migration 20261103000100). Absent when the
@@ -34,7 +26,6 @@ export type CartScreenData = {
    * own style through lib/branding/guest-theme.ts.
    */
   brandState?: { brandThemeEnabled?: boolean | null; brandTheme?: unknown | null } | null;
-  /**
   /** Only items a diner can actually order right now. */
   items: MenuItemPrice[];
 };
@@ -198,7 +189,7 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
   return {
     slug: restaurant.slug as string,
     restaurantName: (restaurant.name as string) ?? 'Your table',
-    taxRateBps: Number(restaurant.tax_rate_bps ?? 500),
+    taxRateBps: requireTaxRateBps(restaurant.tax_rate_bps),
     brandState: {
       brandThemeEnabled: restaurant.brand_theme_enabled === true,
       brandTheme: (restaurant as Record<string, unknown>).brand_theme ?? null,

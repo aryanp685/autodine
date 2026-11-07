@@ -46,6 +46,44 @@ export type ConfirmResult =
   | { ok: true; confirmed: number }
   | { ok: false; error: string };
 
+export type AnnouncementClaimResult =
+  | { ok: true; claimed: boolean }
+  | { ok: false; error: string };
+
+/**
+ * Elect one kitchen device to announce a newly arrived order. Web Locks only
+ * coordinate tabs in one browser profile; the SECURITY DEFINER RPC arbitrates
+ * across devices and verifies the caller's kitchen membership.
+ */
+export async function claimKitchenOrderAnnouncementAction(
+  orderId: string,
+): Promise<AnnouncementClaimResult> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)) {
+    return { ok: false, error: 'That order is no longer on the board.' };
+  }
+
+  const staff = await getStaffContext();
+  if (!staff) {
+    return { ok: false, error: 'Not signed in, or the database is not connected.' };
+  }
+
+  if (!KITCHEN_ROLES.includes(staff.role)) {
+    return { ok: false, error: 'Only kitchen staff can claim an order announcement.' };
+  }
+
+  const { data, error } = await staff.supabase.rpc('claim_kitchen_order_announcement', {
+    p_order_id: orderId,
+  });
+
+  if (error) {
+    return { ok: false, error: error.code === '42501'
+      ? 'Kitchen permission was not available for this announcement.'
+      : error.message };
+  }
+
+  return { ok: true, claimed: data === true };
+}
+
 /**
  * Advance one ticket to the next prep state.
  *
