@@ -39,12 +39,16 @@ test.describe('a card scanned too often', () => {
     let refused = false;
     let lastUrl = '';
     let lastResponseInfo = '';
+    const clientErrors: string[] = [];
     let page;
 
     for (let attempt = 1; attempt <= 25; attempt += 1) {
       // A fresh context is a fresh guest: no table session, no flags.
       const context = await browser.newContext();
       page = await context.newPage();
+      page.on('pageerror', (error) => clientErrors.push(error.message));
+      page.on('console', (message) => { if (message.type() === 'error') clientErrors.push(message.text()); });
+      page.on('requestfailed', (request) => clientErrors.push(`${request.method()} ${request.url()}: ${request.failure()?.errorText ?? 'request failed'}`));
       const response = await page.goto(`/t/${TOKEN}`, { waitUntil: 'domcontentloaded' });
       lastUrl = page.url();
       lastResponseInfo = `${response?.status() ?? 'no response'} ${response?.headers()['content-type'] ?? ''}`;
@@ -60,8 +64,8 @@ test.describe('a card scanned too often', () => {
     expect(refused, `no refusal in 25 scans; last address ${lastUrl}`).toBe(true);
 
     const bodyText = await page!.locator('body').innerText();
-    const html = (await page!.content()).slice(0, 1200);
-    expect(bodyText, `throttle notice absent at ${page!.url()}; response=${lastResponseInfo}; body=${bodyText}; html=${html}`).toContain('Table check paused');
+    const bodyHtml = (await page!.locator('body').innerHTML()).slice(0, 1200);
+    expect(bodyText, `throttle notice absent at ${page!.url()}; response=${lastResponseInfo}; body=${bodyText}; bodyHtml=${bodyHtml}; clientErrors=${clientErrors.join(' || ')}`).toContain('Table check paused');
     const notice = page!.getByRole('status').filter({ hasText: 'Table check paused' });
     await expect(notice).toBeVisible();
 
@@ -102,6 +106,10 @@ test.describe('a card scanned too often', () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     let lastResponseInfo = '';
+    const clientErrors: string[] = [];
+    page.on('pageerror', (error) => clientErrors.push(error.message));
+    page.on('console', (message) => { if (message.type() === 'error') clientErrors.push(message.text()); });
+    page.on('requestfailed', (request) => clientErrors.push(`${request.method()} ${request.url()}: ${request.failure()?.errorText ?? 'request failed'}`));
 
     for (let attempt = 1; attempt <= 25; attempt += 1) {
       const response = await page.goto(`/t/${TOKEN}`, { waitUntil: 'domcontentloaded' });
@@ -115,8 +123,8 @@ test.describe('a card scanned too often', () => {
 
     const flag = new URL(page.url(), baseURL).searchParams.get('v') ?? '';
     const bodyText = await page.locator('body').innerText();
-    const html = (await page.content()).slice(0, 1200);
-    expect(bodyText, `throttle notice absent at ${page.url()}; flag=${flag}; response=${lastResponseInfo}; body=${bodyText}; html=${html}`).toContain('Table check paused');
+    const bodyHtml = (await page.locator('body').innerHTML()).slice(0, 1200);
+    expect(bodyText, `throttle notice absent at ${page.url()}; flag=${flag}; response=${lastResponseInfo}; body=${bodyText}; bodyHtml=${bodyHtml}; clientErrors=${clientErrors.join(' || ')}`).toContain('Table check paused');
     const notice = page.getByRole('status').filter({ hasText: 'Table check paused' });
     await expect(notice).toBeVisible();
     const text = await notice.innerText();

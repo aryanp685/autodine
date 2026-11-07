@@ -83,6 +83,9 @@ jobs:
                 services+=" $log: $(tail -n 20 "$log" | tr '\n' ' ')"
               fi
             done
+            for context in $(find test-results -name error-context.md -type f | head -n 2); do
+              services+=" $context: $(tail -n 20 "$context" | tr '\n' ' ')"
+            done
             if [ -n "$services" ]; then
               echo "::error title=Local service diagnostics::${services:0:3000}"
             fi
