@@ -122,7 +122,7 @@ export LOCAL_POSTGREST_PROXY_HOST=127.0.0.1
 export LOCAL_POSTGREST_PROXY_PORT="$PGRST_PORT"
 export LOCAL_POSTGREST_UPSTREAM_HOST=127.0.0.1
 export LOCAL_POSTGREST_UPSTREAM_PORT="$PGRST_UPSTREAM_PORT"
-export LOCAL_POSTGREST_APP_ORIGIN="http://127.0.0.1:${APP_PORT}"
+export LOCAL_POSTGREST_APP_ORIGIN="http://localhost:${APP_PORT}"
 node scripts/e2e/postgrest-path-proxy.mjs >"$ARTIFACTS/postgrest-proxy.log" 2>&1 &
 POSTGREST_PROXY_PID=$!
 
@@ -162,7 +162,7 @@ wait_http "http://127.0.0.1:${APP_PORT}/menu?s=kings-of-kings" 'Next.js app'
 # including NSPR/NSS. The full ldd output is retained as an artifact.
 ./scripts/e2e/check-chromium-runtime.sh 2>&1 | tee "$ARTIFACTS/chromium-runtime.log"
 
-export E2E_BASE_URL="http://127.0.0.1:${APP_PORT}"
+export E2E_BASE_URL="http://localhost:${APP_PORT}"
 export E2E_QR_TOKEN="$QR_TOKEN"
 export PLAYWRIGHT_JSON_OUTPUT_NAME="$ARTIFACTS/playwright-results.json"
 set +e

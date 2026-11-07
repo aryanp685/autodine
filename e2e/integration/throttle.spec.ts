@@ -39,6 +39,7 @@ test.describe('a card scanned too often', () => {
     let refused = false;
     let lastUrl = '';
     let lastResponseInfo = '';
+    let lastCookieInfo = '';
     const clientErrors: string[] = [];
     let page;
 
@@ -54,6 +55,7 @@ test.describe('a card scanned too often', () => {
       lastResponseInfo = `${response?.status() ?? 'no response'} ${response?.headers()['content-type'] ?? ''}`;
       if (lastUrl.includes('v=throttled')) {
         refused = true;
+        lastCookieInfo = JSON.stringify((await context.cookies()).map(({ name, domain, secure, sameSite }) => ({ name, domain, secure, sameSite })));
         break;
       }
 
@@ -65,7 +67,7 @@ test.describe('a card scanned too often', () => {
 
     const bodyText = await page!.locator('body').innerText();
     const bodyHtml = (await page!.locator('body').innerHTML()).slice(0, 1200);
-    expect(bodyText, `throttle notice absent at ${page!.url()}; response=${lastResponseInfo}; body=${bodyText}; bodyHtml=${bodyHtml}; clientErrors=${clientErrors.join(' || ')}`).toContain('Table check paused');
+    expect(bodyText, `throttle notice absent at ${page!.url()}; response=${lastResponseInfo}; cookies=${lastCookieInfo}; body=${bodyText}; bodyHtml=${bodyHtml}; clientErrors=${clientErrors.join(' || ')}`).toContain('Table check paused');
     const notice = page!.getByRole('status').filter({ hasText: 'Table check paused' });
     await expect(notice).toBeVisible();
 
@@ -124,7 +126,8 @@ test.describe('a card scanned too often', () => {
     const flag = new URL(page.url(), baseURL).searchParams.get('v') ?? '';
     const bodyText = await page.locator('body').innerText();
     const bodyHtml = (await page.locator('body').innerHTML()).slice(0, 1200);
-    expect(bodyText, `throttle notice absent at ${page.url()}; flag=${flag}; response=${lastResponseInfo}; body=${bodyText}; bodyHtml=${bodyHtml}; clientErrors=${clientErrors.join(' || ')}`).toContain('Table check paused');
+    const cookieInfo = JSON.stringify((await context.cookies()).map(({ name, domain, secure, sameSite }) => ({ name, domain, secure, sameSite })));
+    expect(bodyText, `throttle notice absent at ${page.url()}; flag=${flag}; response=${lastResponseInfo}; cookies=${cookieInfo}; body=${bodyText}; bodyHtml=${bodyHtml}; clientErrors=${clientErrors.join(' || ')}`).toContain('Table check paused');
     const notice = page.getByRole('status').filter({ hasText: 'Table check paused' });
     await expect(notice).toBeVisible();
     const text = await notice.innerText();
