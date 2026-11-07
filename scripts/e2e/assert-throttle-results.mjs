@@ -24,7 +24,11 @@ for (const { title } of passed) console.log(`PASS ${title}`);
 for (const { title } of skipped) console.error(`SKIP ${title}`);
 for (const { title, results } of failed) {
   const failure = results.find((result) => result.status !== 'passed' && result.status !== 'skipped');
-  console.error(`FAIL ${title}: ${failure?.error?.message ?? failure?.status ?? 'unknown error'}`);
+  const detail = (failure?.error?.message ?? failure?.status ?? 'unknown error')
+    .split('\n')
+    .slice(0, 5)
+    .join(' | ');
+  console.error(`FAIL ${title}: ${detail}`);
 }
 
 if (tests.length !== 2 || passed.length !== 2 || skipped.length !== 0 || failed.length !== 0) {

@@ -58,6 +58,8 @@ test.describe('a card scanned too often', () => {
     // Ten opens per card, twenty per address, so 25 attempts cannot all pass.
     expect(refused, `no refusal in 25 scans; last address ${lastUrl}`).toBe(true);
 
+    const bodyText = await page!.locator('body').innerText();
+    expect(bodyText, `throttle notice absent at ${page!.url()}; body: ${bodyText}`).toContain('Table check paused');
     const notice = page!.getByRole('status').filter({ hasText: 'Table check paused' });
     await expect(notice).toBeVisible();
 
@@ -108,6 +110,8 @@ test.describe('a card scanned too often', () => {
     }
 
     const flag = new URL(page.url(), baseURL).searchParams.get('v') ?? '';
+    const bodyText = await page.locator('body').innerText();
+    expect(bodyText, `throttle notice absent at ${page.url()}; flag=${flag}; body: ${bodyText}`).toContain('Table check paused');
     const notice = page.getByRole('status').filter({ hasText: 'Table check paused' });
     await expect(notice).toBeVisible();
     const text = await notice.innerText();

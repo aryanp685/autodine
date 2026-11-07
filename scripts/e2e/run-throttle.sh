@@ -171,9 +171,20 @@ wait_http "http://127.0.0.1:${APP_PORT}/menu?s=kings-of-kings" 'Next.js app'
 export E2E_BASE_URL="http://127.0.0.1:${APP_PORT}"
 export E2E_QR_TOKEN="$QR_TOKEN"
 export PLAYWRIGHT_JSON_OUTPUT_NAME="$ARTIFACTS/playwright-results.json"
+set +e
 npx playwright test --config playwright.integration.config.ts --project=throttle \
   --reporter=list,json 2>&1 | tee "$ARTIFACTS/playwright.log"
+PLAYWRIGHT_STATUS=${PIPESTATUS[0]}
+set -e
+
+set +e
 node scripts/e2e/assert-throttle-results.mjs "$PLAYWRIGHT_JSON_OUTPUT_NAME" \
-  | tee "$ARTIFACTS/result-summary.txt"
+  2>&1 | tee "$ARTIFACTS/result-summary.txt"
+ASSERTION_STATUS=${PIPESTATUS[0]}
+set -e
+
+if [[ "$PLAYWRIGHT_STATUS" -ne 0 || "$ASSERTION_STATUS" -ne 0 ]]; then
+  exit 1
+fi
 
 echo 'Both isolated browser E2E cases passed.' | tee -a "$ARTIFACTS/run.log"
