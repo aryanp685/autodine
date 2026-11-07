@@ -364,3 +364,53 @@ describe('getKitchenScreenData', () => {
     expect((await getKitchenScreenData())?.canAdvance).toBe(true);
   });
 });
+
+describe('P5 kitchen announcements and waiter calls', () => {
+  it('maps the persisted kitchen voice outcome without changing order state', async () => {
+    mocks.staff.result = signedIn(fakeSupabase({
+      orders: [{
+        id: 'order-voice',
+        code: 'A-1',
+        table_id: null,
+        customer_note: null,
+        prep_status: 'new',
+        payment_status: 'paid',
+        total_paise: 100,
+        placed_at: iso(1),
+        kitchen_announcement_status: 'failed',
+        kitchen_announcement_at: iso(1),
+        kitchen_announcement_error: 'No Hindi voice is available',
+      }],
+      order_items: [],
+    }));
+
+    const ticket = (await getKitchenScreenData())?.tickets[0];
+    expect(ticket).toMatchObject({
+      state: 'new',
+      announcementStatus: 'failed',
+      announcementError: 'No Hindi voice is available',
+    });
+  });
+
+  it('maps active service calls with their saved announcement outcome', async () => {
+    mocks.staff.result = signedIn(fakeSupabase({
+      orders: [],
+      order_items: [],
+      table_waiter_calls: [{
+        id: 'call-1',
+        table_label_snapshot: 'T4',
+        created_at: iso(1),
+        announcement_status: 'announced',
+        announcement_error: null,
+      }],
+    }));
+
+    expect((await getKitchenScreenData())?.waiterCalls).toEqual([{
+      id: 'call-1',
+      table: 'T4',
+      createdAt: iso(1),
+      announcementStatus: 'announced',
+      announcementError: null,
+    }]);
+  });
+});

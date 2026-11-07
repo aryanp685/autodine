@@ -84,6 +84,63 @@ export async function claimKitchenOrderAnnouncementAction(
   return { ok: true, claimed: data === true };
 }
 
+export async function recordKitchenAnnouncementResultAction(input: {
+  orderId: string;
+  status: 'announced' | 'failed';
+  failureReason?: string;
+}): Promise<{ ok: boolean }> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.orderId)) return { ok: false };
+  const staff = await getStaffContext();
+  if (!staff || !KITCHEN_ROLES.includes(staff.role)) return { ok: false };
+  const { data, error } = await staff.supabase.rpc('record_kitchen_announcement_result', {
+    p_order_id: input.orderId,
+    p_status: input.status,
+    p_failure_reason: input.failureReason?.slice(0, 200) ?? null,
+  });
+  return { ok: !error && data === true };
+}
+
+export async function claimTableWaiterCallAnnouncementAction(callId: string): Promise<AnnouncementClaimResult> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(callId)) return { ok: false, error: 'That waiter call is no longer active.' };
+  const staff = await getStaffContext();
+  if (!staff) return { ok: false, error: 'Not signed in, or the database is not connected.' };
+  if (!['owner', 'manager', 'kitchen', 'cashier'].includes(staff.role)) {
+    return { ok: false, error: 'You cannot announce waiter calls for this restaurant.' };
+  }
+  const { data, error } = await staff.supabase.rpc('claim_table_waiter_call_announcement', { p_call_id: callId });
+  if (error) return { ok: false, error: error.code === '42501' ? 'Waiter-call permission was not available.' : error.message };
+  return { ok: true, claimed: data === true };
+}
+
+export async function recordTableWaiterCallAnnouncementAction(input: {
+  callId: string;
+  status: 'announced' | 'failed';
+  failureReason?: string;
+}): Promise<{ ok: boolean }> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.callId)) return { ok: false };
+  const staff = await getStaffContext();
+  if (!staff || !['owner', 'manager', 'kitchen', 'cashier'].includes(staff.role)) return { ok: false };
+  const { data, error } = await staff.supabase.rpc('record_table_waiter_call_announcement', {
+    p_call_id: input.callId,
+    p_status: input.status,
+    p_failure_reason: input.failureReason?.slice(0, 200) ?? null,
+  });
+  return { ok: !error && data === true };
+}
+
+export async function resolveTableWaiterCallAction(callId: string): Promise<{ ok: boolean; error?: string }> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(callId)) return { ok: false, error: 'That waiter call is no longer active.' };
+  const staff = await getStaffContext();
+  if (!staff) return { ok: false, error: 'Not signed in, or the database is not connected.' };
+  if (!['owner', 'manager', 'kitchen', 'cashier'].includes(staff.role)) {
+    return { ok: false, error: 'You cannot clear waiter calls for this restaurant.' };
+  }
+  const { data, error } = await staff.supabase.rpc('resolve_table_waiter_call', { p_call_id: callId });
+  if (error) return { ok: false, error: error.code === '42501' ? 'Waiter-call permission was not available.' : error.message };
+  if (data) revalidatePath(KITCHEN_PATH);
+  return data ? { ok: true } : { ok: false, error: 'This waiter call was already cleared on another screen.' };
+}
+
 /**
  * Advance one ticket to the next prep state.
  *

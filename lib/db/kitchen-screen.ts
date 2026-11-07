@@ -32,10 +32,23 @@ import { getStaffContextDetailed, KITCHEN_ROLES } from '@/lib/db/staff';
 import { paiseToRupees } from '@/lib/money';
 import { clockTimeInZone } from './time';
 import type { MemberRole } from './database';
+import type { Order } from './types';
 
 export type KitchenPrepState = 'new' | 'preparing' | 'ready' | 'served';
 
 /** Mirrors the demo KitchenOrder shape so the locked markup is unchanged. */
+type KitchenOrderRow = Pick<
+  Order,
+  'id' | 'code' | 'table_id' | 'customer_note' | 'prep_status' | 'payment_status' | 'total_paise' | 'placed_at'
+> & {
+  hold_required?: boolean;
+  confirmed_at?: string | null;
+  table_session_id?: string | null;
+  kitchen_announcement_status?: Order['kitchen_announcement_status'];
+  kitchen_announcement_at?: string | null;
+  kitchen_announcement_error?: string | null;
+};
+
 export type KitchenTicket = {
   /**
    * Order UUID. Present only on live rows: the demo rows have no database
@@ -84,6 +97,18 @@ export type KitchenTicket = {
   }[];
   /** Rupees, for display. Derived from total_paise. */
   total: number;
+  /** Last durable voice-delivery result, null until an attempt completes. */
+  announcementStatus?: 'announced' | 'failed' | null;
+  announcementAt?: string | null;
+  announcementError?: string | null;
+};
+
+export type KitchenWaiterCall = {
+  id: string;
+  table: string;
+  createdAt: string;
+  announcementStatus: 'pending' | 'claimed' | 'announced' | 'failed';
+  announcementError: string | null;
 };
 
 /**
@@ -135,6 +160,8 @@ export type KitchenScreenData = {
    */
   restaurantId: string | null;
   tickets: KitchenTicket[];
+  /** Active guest requests for staff to visit a table. */
+  waiterCalls?: KitchenWaiterCall[];
   /**
    * Cancelled in the last fifteen minutes. The board announces new entries
    * once each -- a cook who has a pan on needs to hear a stop, not notice that
@@ -164,6 +191,8 @@ export type KitchenScreenData = {
    * button that would be refused.
    */
   canAdvance: boolean;
+  /** Staff who may clear table-service calls, subject to the write gate. */
+  canResolveWaiterCalls?: boolean;
   cannotAdvance?: 'role' | 'plan';
 };
 
@@ -214,9 +243,11 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
       restaurantName: '',
       restaurantId: null,
       tickets: [],
+      waiterCalls: [],
       cancelled: [],
       role: null,
       canAdvance: false,
+      canResolveWaiterCalls: false,
       cannotAdvance: 'role',
       blocked: staff.reason,
     };
@@ -237,9 +268,10 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
    * whatever the database says.
    */
   let canAdvance = KITCHEN_ROLES.includes(role);
+  let canResolveWaiterCalls = ['owner', 'manager', 'kitchen', 'cashier'].includes(role);
   let cannotAdvance: 'role' | 'plan' | undefined = canAdvance ? undefined : 'role';
 
-  if (canAdvance) {
+  if (canAdvance || canResolveWaiterCalls) {
     const { data: writable, error: writeCheckError } = await supabase.rpc('restaurant_can_write', {
       p_restaurant_id: restaurantId,
     });
@@ -248,6 +280,7 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
       console.error(`[kitchen] could not read the write state: ${writeCheckError.message}`);
     } else if (writable === false) {
       canAdvance = false;
+      canResolveWaiterCalls = false;
       cannotAdvance = 'plan';
     }
   }
@@ -259,54 +292,50 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
   ).toISOString();
 
   /**
-   * The board must work BEFORE migration 20261028000900 is applied.
-   *
-   * The three new columns exist only after that migration runs. Asking for a
-   * column a database does not have is not a warning -- PostgREST answers 42703
-   * and the whole select fails, which would take the kitchen board down for a
-   * deployment that shipped ahead of its migration. So the first attempt asks
-   * for everything, and a missing-column answer falls back to the columns that
-   * have always existed. Held tickets simply do not exist until the migration
-   * is in: which is true, and is what the board shows.
+   * Deployments may precede additive migrations. Fall back in two steps: first
+   * retain the table-confirmation columns if only P5 announcement columns are
+   * absent; only then fall back to the pre-confirmation schema. This avoids
+   * making an unconfirmed table look ready just because voice status is new.
    */
+  const orderColumnsFull =
+    'id, code, table_id, customer_note, prep_status, payment_status, total_paise, placed_at, hold_required, confirmed_at, table_session_id, kitchen_announcement_status, kitchen_announcement_at, kitchen_announcement_error';
   const orderColumnsWithHolds =
     'id, code, table_id, customer_note, prep_status, payment_status, total_paise, placed_at, hold_required, confirmed_at, table_session_id';
   const orderColumnsLegacy =
     'id, code, table_id, customer_note, prep_status, payment_status, total_paise, placed_at';
-
-  const firstOrdersAttempt = await supabase
+  const queryOrders = (columns: string) => supabase
     .from('orders')
-    .select(orderColumnsWithHolds)
+    .select(columns)
     .eq('restaurant_id', restaurantId)
     .neq('prep_status', 'cancelled')
     .gte('placed_at', cutoff)
     .order('placed_at', { ascending: true });
 
-  const ordersWithoutHolds =
-    firstOrdersAttempt.error?.code === '42703'
-      ? await supabase
-          .from('orders')
-          .select(orderColumnsLegacy)
-          .eq('restaurant_id', restaurantId)
-          .neq('prep_status', 'cancelled')
-          .gte('placed_at', cutoff)
-          .order('placed_at', { ascending: true })
-      : null;
+  const fullOrdersAttempt = await queryOrders(orderColumnsFull);
+  const ordersWithHolds = fullOrdersAttempt.error?.code === '42703'
+    ? await queryOrders(orderColumnsWithHolds)
+    : null;
+  const ordersLegacy = ordersWithHolds?.error?.code === '42703'
+    ? await queryOrders(orderColumnsLegacy)
+    : null;
+  const selectedOrdersAttempt = ordersLegacy ?? ordersWithHolds ?? fullOrdersAttempt;
+  const noHoldColumns = Boolean(ordersLegacy);
+  const noAnnouncementColumns = Boolean(ordersWithHolds || ordersLegacy);
+  const selectedRows = (selectedOrdersAttempt.data ?? []) as unknown as KitchenOrderRow[];
 
   const [ordersResult, cancelledResult] = await Promise.all([
-    Promise.resolve(
-      ordersWithoutHolds
-        ? {
-            data: (ordersWithoutHolds.data ?? []).map((row) => ({
-              ...row,
-              hold_required: false,
-              confirmed_at: null,
-              table_session_id: null,
-            })),
-            error: ordersWithoutHolds.error,
-          }
-        : { data: firstOrdersAttempt.data ?? [], error: firstOrdersAttempt.error },
-    ),
+    Promise.resolve({
+      data: selectedRows.map((row) => ({
+        ...row,
+        ...(noHoldColumns ? { hold_required: false, confirmed_at: null, table_session_id: null } : {}),
+        ...(noAnnouncementColumns ? {
+          kitchen_announcement_status: null,
+          kitchen_announcement_at: null,
+          kitchen_announcement_error: null,
+        } : {}),
+      })),
+      error: selectedOrdersAttempt.error,
+    }),
     supabase
       .from('orders')
       .select('id, table_id, updated_at, placed_at')
@@ -338,7 +367,7 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
   // an embed like dining_tables(label) resolves to SelectQueryError and will
   // not compile. Joining in JS also lets us order items by sort_order, which
   // is the sequence the kitchen wants them plated in.
-  const [itemsResult, tablesResult] = await Promise.all([
+  const [itemsResult, tablesResult, waiterCallsResult] = await Promise.all([
     // An empty .in() list is a wasted round trip on a board that refreshes
     // every thirty seconds, so it is skipped rather than sent.
     orderIds.length
@@ -353,6 +382,12 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
     tableIds.length
       ? supabase.from('dining_tables').select('id, label').in('id', tableIds)
       : Promise.resolve({ data: [], error: null }),
+    supabase
+      .from('table_waiter_calls')
+      .select('id, table_label_snapshot, created_at, announcement_status, announcement_error')
+      .eq('restaurant_id', restaurantId)
+      .eq('status', 'open')
+      .order('created_at', { ascending: true }),
   ]);
 
   if (itemsResult.error) {
@@ -360,6 +395,11 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
   }
   if (tablesResult.error) {
     throw new Error(`Could not load tables: ${tablesResult.error.message}`);
+  }
+  const waiterCallsUnavailable = waiterCallsResult.error?.code === '42P01'
+    || waiterCallsResult.error?.code === 'PGRST205';
+  if (waiterCallsResult.error && !waiterCallsUnavailable) {
+    throw new Error(`Could not load waiter calls: ${waiterCallsResult.error.message}`);
   }
 
   // Announcements use the order-time name/variant/add-on snapshots above. The
@@ -473,17 +513,32 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
       note: row.customer_note?.trim() || undefined,
       items,
       total: paiseToRupees(row.total_paise),
+      announcementStatus: row.kitchen_announcement_status ?? null,
+      announcementAt: row.kitchen_announcement_at ?? null,
+      announcementError: row.kitchen_announcement_error ?? null,
     };
   });
+
+  const waiterCalls: KitchenWaiterCall[] = waiterCallsUnavailable
+    ? []
+    : (waiterCallsResult.data ?? []).map((row) => ({
+        id: row.id,
+        table: row.table_label_snapshot,
+        createdAt: row.created_at,
+        announcementStatus: row.announcement_status,
+        announcementError: row.announcement_error,
+      }));
 
   return {
     restaurantName,
     restaurantId,
     tickets,
+    waiterCalls,
     cancelled,
     held,
     role,
     canAdvance,
+    canResolveWaiterCalls,
     ...(cannotAdvance ? { cannotAdvance } : {}),
   };
 }

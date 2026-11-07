@@ -4,6 +4,7 @@ import { ClearCartOnOrder } from '@/components/ClearCartOnOrder';
 import { RememberOrder } from '@/components/RememberOrder';
 import { OrderPlacedScreen } from '@/components/screens/OrderPlacedScreen';
 import { getOrderScreenData } from '@/lib/db/order-screen';
+import { loadTableAccess } from '@/lib/table-access';
 
 // Not "Order placed": this page also renders the state of a link that could
 // not be opened, and a tab promising an order that is not there is a small lie.
@@ -28,7 +29,10 @@ export default async function OrderPage({
   searchParams: Promise<{ s?: string; code?: string; t?: string; placed?: string }>;
 }) {
   const { s, code, t, placed: justPlaced } = await searchParams;
-  const data = await getOrderScreenData(s, code, t);
+  const [data, access] = await Promise.all([
+    getOrderScreenData(s, code, t),
+    loadTableAccess(s),
+  ]);
 
   // The cart provider is mounted here for one reason: the order in it has just
   // become a real order, and the cart must not survive that. See
@@ -56,7 +60,13 @@ export default async function OrderPage({
         placedAt={data?.placedAt}
         enabled={placed}
       />
-      <OrderPlacedScreen data={data} token={t} slug={s} brandState={data?.brandState} />
+      <OrderPlacedScreen
+        data={data}
+        token={t}
+        slug={s}
+        canCallWaiter={access.status === 'verified'}
+        brandState={data?.brandState}
+      />
     </CartProvider>
   );
 }
