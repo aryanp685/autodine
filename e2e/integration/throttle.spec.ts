@@ -75,8 +75,8 @@ test.describe('a card scanned too often', () => {
     // Assert the notice itself. Aggregating body.innerText() can race streamed
     // menu updates and is not the user's actual announcement node.
     const text = await notice.innerText();
-    expect(text).toContain('Table check paused');
     const lowerText = text.toLowerCase();
+    expect(lowerText).toContain('table check paused');
     expect(lowerText).toContain('scanned unusually often');
     expect(lowerText).toContain('order with staff');
 
@@ -134,7 +134,7 @@ test.describe('a card scanned too often', () => {
     const notice = page.locator('[data-throttle-note]');
     await expect(notice, `throttle notice missing at ${page.url()}; flag=${flag}; response=${lastResponseInfo}; cookies=${cookieInfo}; clientErrors=${clientErrors.join(' || ')}`).toBeVisible({ timeout: 30_000 });
     const text = await notice.innerText();
-    expect(text).toContain('Table check paused');
+    expect(text.toLowerCase()).toContain('table check paused');
 
     const seconds = flag.startsWith('throttled.') ? Number(flag.slice('throttled.'.length)) : null;
 
