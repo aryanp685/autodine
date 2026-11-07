@@ -4,7 +4,7 @@
 
 **Full-audit snapshot:** 2026-11-08 · active branch `arena/e9e78732-autodine`; integration fix and lifecycle coverage at `2ab8964`. CI [42407347822](https://github.com/aryanp685/autodine/actions/runs/42407347822), hermetic browser E2E [42407347831](https://github.com/aryanp685/autodine/actions/runs/42407347831), and isolated PostgreSQL browser E2E [42407347812](https://github.com/aryanp685/autodine/actions/runs/42407347812) all pass on this revision. PR #88's remaining health diagnostic is integrated and that conflicted PR is closed as superseded. No PR is open from this branch; it is not merged to `main` or deployed. Live-schema comparison remains blocked: Supabase denied restore access to the inactive non-production project, reports no active services, and timed out retrieving migration history.
 
-**Purpose:** distinguish what is tested from what is merely implemented, and identify safe next steps before claiming every live flow is ready.
+**Purpose:** distinguish what is tested from what is merely implemented, and identify safe next steps before claiming every live flow is ready. The broader commercial SaaS capacity, security, operations, backup/DR, cost and go-live assessment is maintained in [production-saas-readiness-audit.md](production-saas-readiness-audit.md); its NO-GO decision and current verification supersede this document's older snapshots for those topics.
 
 ## Executive finding
 

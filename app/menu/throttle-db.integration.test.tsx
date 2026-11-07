@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { createHash } from 'node:crypto';
-import { Client } from 'pg';
+import { createHash, randomUUID } from 'node:crypto';
+import { Client, Pool } from 'pg';
 
 /**
  * THE THROTTLE, END TO END, AGAINST A REAL POSTGRES.
@@ -34,6 +34,7 @@ import { Client } from 'pg';
 
 const DB = process.env.THROTTLE_DB_URL ?? '';
 const SLUG = 'throttle-it';
+const CARD2 = 'throttleit000000000000000000000000000000000000000000000000002';
 const KITCHEN_ID = '5a39cd8b-4c9e-4c06-bf47-a18a8014d111';
 const CASHIER_ID = '5a39cd8b-4c9e-4c06-bf47-a18a8014d112';
 /** The real dish the cart points at, so the database prices a real row. */
@@ -235,6 +236,14 @@ describe.skipIf(!DB)('throttling, against a real PostgreSQL', () => {
     await db.query(
       `insert into public.table_qr_codes (restaurant_id, table_id, public_token) values ($1, $2, $3)`,
       [restaurantId, table.rows[0].id, 'throttleit000000000000000000000000000000000000000000000000001'],
+    );
+    const secondTable = await db.query(
+      `insert into public.dining_tables (restaurant_id, label, is_active) values ($1, 'T2', true) returning id`,
+      [restaurantId],
+    );
+    await db.query(
+      `insert into public.table_qr_codes (restaurant_id, table_id, public_token) values ($1, $2, $3)`,
+      [restaurantId, secondTable.rows[0].id, CARD2],
     );
   }, 30_000);
 
@@ -446,6 +455,57 @@ describe.skipIf(!DB)('throttling, against a real PostgreSQL', () => {
     });
     expect(lifecycle.rows[0].invoice_number).toMatch(/^INV\/\d{2}-\d{2}\/\d{6}$/);
     expect(lifecycle.rows[0].invoiced_total_paise).toBe(String(order.rows[0].total_paise));
+  }, 60_000);
+
+  it('persists a 16-guest concurrent peak on the disposable database', async () => {
+    // A deliberately small, repeatable write-burst: two synthetic tables,
+    // sixteen independent guests, sixteen distinct idempotency tokens. This is
+    // a database integration/capacity smoke, not a production load forecast.
+    const pool = new Pool({ connectionString: DB, max: 16 });
+    try {
+      await db.query(
+        `update public.table_session_opens set opened_at = now() - interval '2 hours'
+          where qr_code_id in (select id from public.table_qr_codes where public_token = any($1::text[]))`,
+        [['throttleit000000000000000000000000000000000000000000000000001', CARD2]],
+      );
+
+      const fanout = 16;
+      const sessions = await Promise.all(Array.from({ length: fanout }, async (_, index) => {
+        const ipHash = createHash('sha256').update(`capacity-smoke-${randomUUID()}`).digest('hex');
+        const card = index % 2 === 0
+          ? 'throttleit000000000000000000000000000000000000000000000000001'
+          : CARD2;
+        const opened = await pool.query('select * from public.open_table_session($1, $2)', [card, ipHash]);
+        expect(opened.rows[0]?.status).toBe('opened');
+        return { token: opened.rows[0].session_token as string, ipHash, guestToken: randomUUID() };
+      }));
+
+      const started = performance.now();
+      const codes = await Promise.all(sessions.map(async ({ token, ipHash, guestToken }) => {
+        const result = await pool.query(
+          'select public.place_public_order($1, $2::jsonb, $3, $4, $5::uuid, $6) as code',
+          [SLUG, JSON.stringify([{ itemId, qty: 1 }]), null, token, guestToken, ipHash],
+        );
+        return { code: result.rows[0]?.code as string, guestToken };
+      }));
+      const elapsedMs = Math.round(performance.now() - started);
+
+      expect(codes).toHaveLength(fanout);
+      expect(new Set(codes.map((entry) => entry.code)).size).toBe(fanout);
+      const persisted = await db.query(
+        `select count(distinct o.id)::int as orders,
+                count(oi.id)::int as lines,
+                count(*) filter (where o.total_paise = 46900)::int as correctly_priced
+           from public.orders o
+           join public.order_items oi on oi.order_id = o.id
+          where o.guest_token = any($1::uuid[])`,
+        [codes.map((entry) => entry.guestToken)],
+      );
+      expect(persisted.rows[0]).toEqual({ orders: fanout, lines: fanout, correctly_priced: fanout });
+      console.info(`[capacity-smoke] ${fanout} concurrent independent guest orders persisted in ${elapsedMs}ms`);
+    } finally {
+      await pool.end();
+    }
   }, 60_000);
 
   it('rolls back the losing concurrent order before replaying the winning code (C4)', async () => {

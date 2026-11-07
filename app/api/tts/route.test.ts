@@ -15,12 +15,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  */
 
 const mocks = vi.hoisted(() => ({
+  staffContext: null as null | { restaurantId: string; role: string },
+  adminAvailable: true,
+  adminRpc: vi.fn(),
   setMetadata: vi.fn(async (..._args: unknown[]): Promise<void> => {}),
   toStream: vi.fn(),
   close: vi.fn(),
   constructed: [] as unknown[],
   setMetadataCalls: [] as { voice: string; format: unknown }[],
   streamCalls: [] as { input: string; prosody: unknown }[],
+}));
+
+vi.mock('@/lib/db/staff', () => ({
+  getStaffContext: vi.fn(async () => mocks.staffContext),
+  KITCHEN_ROLES: ['owner', 'manager', 'kitchen'],
+}));
+
+vi.mock('@/lib/supabase/admin', () => ({
+  getSupabaseAdmin: vi.fn(() => mocks.adminAvailable ? { rpc: mocks.adminRpc } : null),
 }));
 
 vi.mock('msedge-tts', () => ({
@@ -72,6 +84,13 @@ class ValueErrorStub extends Error {}
 
 describe('POST /api/tts', () => {
   beforeEach(() => {
+    mocks.staffContext = { restaurantId: 'tenant-test', role: 'kitchen' };
+    mocks.adminAvailable = true;
+    mocks.adminRpc.mockReset();
+    mocks.adminRpc.mockResolvedValue({
+      data: [{ allowed: true, retry_after_seconds: 0 }],
+      error: null,
+    });
     mocks.constructed.length = 0;
     mocks.setMetadataCalls.length = 0;
     mocks.streamCalls.length = 0;
@@ -88,10 +107,62 @@ describe('POST /api/tts', () => {
     vi.restoreAllMocks();
   });
 
-  it('returns audio/mpeg for a valid request', async () => {
+  it('rejects requests without an authenticated staff membership before parsing or synthesis', async () => {
+    mocks.staffContext = null;
+    const response = await POST(post({ text: 'नमस्ते' }));
+
+    expect(response.status).toBe(401);
+    expect(mocks.adminRpc).not.toHaveBeenCalled();
+    expect(mocks.streamCalls).toHaveLength(0);
+  });
+
+  it('rejects non-kitchen roles', async () => {
+    mocks.staffContext = { restaurantId: 'tenant-test', role: 'cashier' };
+    const response = await POST(post({ text: 'नमस्ते' }));
+
+    expect(response.status).toBe(403);
+    expect(mocks.adminRpc).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the shared limiter is unavailable', async () => {
+    mocks.adminAvailable = false;
+    const response = await POST(post({ text: 'नमस्ते' }));
+
+    expect(response.status).toBe(503);
+    expect(mocks.streamCalls).toHaveLength(0);
+  });
+
+  it('enforces the shared restaurant rate limit before provider work', async () => {
+    mocks.adminRpc.mockResolvedValue({
+      data: [{ allowed: false, retry_after_seconds: 37 }],
+      error: null,
+    });
+    const response = await POST(post({ text: 'नमस्ते' }));
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('Retry-After')).toBe('37');
+    expect(mocks.streamCalls).toHaveLength(0);
+    expect(mocks.adminRpc).toHaveBeenCalledWith('hit_rate_limit', {
+      p_key: 'tts:r:tenant-test',
+      p_limit: 120,
+      p_window_seconds: 60,
+    });
+  });
+
+  it('rejects oversized bodies and announcement text', async () => {
+    const oversizedBody = await POST(post({ text: 'x'.repeat(9_000) }));
+    const oversizedText = await POST(post({ text: 'x'.repeat(1_201) }));
+
+    expect(oversizedBody.status).toBe(413);
+    expect(oversizedText.status).toBe(413);
+    expect(mocks.streamCalls).toHaveLength(0);
+  });
+
+  it('returns audio/mpeg privately for a valid request', async () => {
     const response = await POST(post({ text: 'नमस्ते' }));
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
     expect(response.headers.get('Content-Type')).toBe('audio/mpeg');
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
     expect(mocks.setMetadataCalls[0].voice).toBe('hi-IN-MadhurNeural');
