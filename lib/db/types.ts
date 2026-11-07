@@ -181,6 +181,55 @@ export type OrderSession = {
   status: 'open' | 'closed';
 };
 
+export type RestaurantInvoice = {
+  id: string;
+  restaurant_id: string;
+  order_session_id: string;
+  invoice_number: string;
+  financial_year: string;
+  sequence_number: number;
+  document_type: 'receipt' | 'gst_tax_invoice';
+  status: 'issued' | 'voided';
+  issued_at: string;
+  issued_by: string | null;
+  table_label_snapshot: string | null;
+  session_opened_at: string;
+  session_closed_at: string;
+  seller_snapshot: unknown;
+  customer_snapshot: unknown | null;
+  totals_snapshot: unknown;
+  payment_snapshot: unknown;
+  source_order_ids: string[];
+  supersedes_invoice_id: string | null;
+  voided_at: string | null;
+  voided_by: string | null;
+  void_reason: string | null;
+  created_at: string;
+};
+
+export type RestaurantInvoiceLine = {
+  id: string;
+  invoice_id: string;
+  restaurant_id: string;
+  line_number: number;
+  source_order_id: string;
+  source_order_item_id: string | null;
+  line_snapshot: unknown;
+  created_at: string;
+};
+
+export type RestaurantPaymentReceipt = {
+  id: string;
+  restaurant_id: string;
+  invoice_id: string;
+  payment_id: string;
+  sequence_number: number;
+  receipt_reference: string;
+  issued_at: string;
+  snapshot: unknown;
+  created_at: string;
+};
+
 export type PrepStatus = 'new' | 'preparing' | 'ready' | 'served' | 'cancelled';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 

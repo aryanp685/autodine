@@ -27,6 +27,9 @@ import type {
   Order,
   OrderItem,
   OrderSession,
+  RestaurantInvoice,
+  RestaurantInvoiceLine,
+  RestaurantPaymentReceipt,
   PaymentStatus,
   PrepStatus,
   Restaurant,
@@ -83,6 +86,18 @@ export type Database = {
       dining_tables: Table<DiningTable>;
       /** The sitting represented by the consolidated table bill. */
       order_sessions: Table<OrderSession>;
+      /** Immutable, sequential customer receipts; rows are written only by RPC. */
+      restaurant_invoices: Table<RestaurantInvoice>;
+      /** Immutable line snapshots belonging to a receipt. */
+      restaurant_invoice_lines: Table<RestaurantInvoiceLine>;
+      /** Immutable supplemental receipts for payments received after invoicing. */
+      restaurant_payment_receipts: Table<RestaurantPaymentReceipt>;
+      /** Private row-locked receipt counters; no client grants. */
+      restaurant_invoice_series: Table<{
+        restaurant_id: string;
+        financial_year: string;
+        next_number: number;
+      }>;
       /**
        * The printed card's code. This is the scheme scanning uses.
        *
@@ -210,6 +225,7 @@ export type Database = {
         provider_payment_ref: string | null;
         idempotency_key: string | null;
         created_at: string;
+        recorded_at: string | null;
       }>;
     };
     Views: Record<string, never>;
@@ -633,6 +649,24 @@ export type Database = {
        * untouched. The token decides the restaurant, and the slug is only
        * checked for agreement.
        */
+      /**
+       * P6: issues the immutable non-GST receipt for a closed table session.
+       * The database reads ticket/payment rows and allocates its own number.
+       */
+      issue_closed_session_receipt: {
+        Args: { p_order_session_id: string };
+        Returns: string;
+      };
+      /** P8: closes a table and issues/returns its receipt in one transaction. */
+      close_order_session_and_issue_receipt: {
+        Args: { p_order_session_id: string };
+        Returns: string;
+      };
+      /** P6: owner/manager-only void that preserves the number and snapshot. */
+      void_restaurant_invoice: {
+        Args: { p_invoice_id: string; p_reason: string };
+        Returns: undefined;
+      };
       /**
        * P4: one authenticated staff tick settles every remaining order in an
        * open table session. No amount, method, restaurant or actor comes from
