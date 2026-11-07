@@ -146,18 +146,12 @@ wait_http() {
 }
 
 wait_http "http://127.0.0.1:${PGRST_PORT}/rest/v1/" 'local PostgREST API' 'Accept: application/openapi+json'
-# Read-only preflight: verify the synthetic card and RPC metadata before the
-# browser test spends its card budget. This does not call open_table_session.
-curl --fail --silent --show-error \
-  -H "apikey: ${ANON_JWT}" -H "Authorization: Bearer ${ANON_JWT}" \
-  -H 'Content-Type: application/json' \
-  --data '{"p_public_token":"'"$QR_TOKEN"'"}' \
-  "http://127.0.0.1:${PGRST_PORT}/rest/v1/rpc/public_qr_intro" \
-  | tee "$ARTIFACTS/public-qr-intro.json"
-
+# Read-only preflight mirrors the app's storefront, card, and menu reads. It
+# does not call open_table_session, spend a scan, or place an order.
 export NEXT_PUBLIC_SUPABASE_URL="http://127.0.0.1:${PGRST_PORT}"
 export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_JWT"
 export NEXT_TELEMETRY_DISABLED=1
+node scripts/e2e/check-local-api.mjs 2>&1 | tee "$ARTIFACTS/api-preflight.log"
 npm run build 2>&1 | tee "$ARTIFACTS/next-build.log"
 "$ROOT/node_modules/.bin/next" start -H 127.0.0.1 -p "$APP_PORT" \
   >"$ARTIFACTS/next-start.log" 2>&1 &

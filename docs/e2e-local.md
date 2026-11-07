@@ -91,10 +91,12 @@ The runner does the following in order:
    `scripts/e2e/create-local-anon-jwt.mjs`.
 4. Builds and starts the app on `127.0.0.1:3100` with only the local API URL and
    local anon JWT. No `.env.local` or production credential is read.
-5. Calls the read-only QR-intro RPC as a preflight (does not spend scan budget),
-   checks Chromium's linked libraries, and runs both throttle browser tests.
-6. Saves migration, seed, PostgREST and path-proxy, Next build/start, `ldd`,
-   Playwright JSON, and result-summary logs under `test-results/throttle-e2e/`;
+5. Runs read-only Supabase-JS preflights for the storefront, QR-intro RPC,
+   published menu, categories, items, and add-ons (no session mint or scan-budget
+   spend), checks Chromium's linked libraries, and runs both throttle browser tests.
+6. Saves migration, seed, API preflight, PostgREST and path-proxy, Next
+   build/start, `ldd`, Playwright JSON, and result-summary logs under
+   `test-results/throttle-e2e/`;
    drops the one test database and stops the local processes on exit.
 
 For cleanup, stop terminal 1 with Ctrl+C. The Docker container has `--rm` and
