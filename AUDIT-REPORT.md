@@ -1,6 +1,6 @@
 # AutoDine — Full Audit Report (2026-11-06)
 
-> **Status update (2026-11-07):** The historical audit below predates the current implementation sequence. P6 Invoice, P8 Checkout, and P7 Printing were completed and merged in PR #161. P5 Voice is implemented on `arena/b7422ba2-autodine`; migration `p5_voice_waiter` (production version `20261107104440`) was applied and verified in production Supabase on 2026-11-07. The application code remains on this branch and has not been merged or deployed. Remaining phases are P9 Security, then P10 Tests.
+> **Status update (2026-11-07):** The historical audit below predates the current implementation sequence. P6 Invoice, P8 Checkout, and P7 Printing were merged in PR #161. P5 Voice and its production migration (`20261107104440`) were applied and verified; application code was merged in PR #162 and deployed to production. P9 Security implementation and migration are prepared on `arena/0524ec7a-autodine`; local behavior checks pass, but its migration has not been applied to production. P10 Tests follows P9.
 
 Branch: `arena/149fe709-autodine` (base = `7917687`, latest main). **No code changed.** (Historical audit snapshot.)
 Gates run today: typecheck ✅ · unit **1817 passed / 3 skipped** ✅ · lint 0 errors (1 warning) · design ✅ (5/5 hex, 2/2 glass, 0/0 fonts). E2E: green at PR #156 merge (CI), not re-run today.

@@ -84,6 +84,7 @@ describe('what an invitation status means', () => {
     'revoked',
     'closed',
     'not_found',
+    'rate_limited',
   ];
 
   it('has a sentence for every status the database can return', () => {
