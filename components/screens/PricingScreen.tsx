@@ -54,7 +54,7 @@ const FAQS = [
   },
   {
     q: 'Can guests pay online?',
-    a: 'Not in this build. Both paths are written, but the gateway is not connected — guests pay at the counter and the order shows as payment pending until recorded.',
+    a: 'Online guest checkout is not available. Guests pay at the counter, and staff record settlement through the restaurant payment flow.',
   },
 ];
 

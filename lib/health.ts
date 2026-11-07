@@ -4,14 +4,12 @@
  *
  * WHY THIS EXISTS
  *
- * Every owner and guest screen degrades quietly when Supabase is not
- * configured: it renders sample data instead. That is right for a preview and
- * terrible for a demo, because "configured but half-migrated" looks identical
- * to "not configured" from the outside. The three migrations that make the
- * trial real, add plan entitlements and add the restaurant's UPI QR were
- * written after the deployment's database was built, so the realistic failure
- * on demo day is: keys present, columns missing, and a screen that says
- * "Payment is not available right now" with no explanation.
+ * Explicit local demo mode can render sample data, but production now fails
+ * closed when public Supabase configuration is absent. This endpoint answers a
+ * different question: whether a configured deployment has the expected schema
+ * for the trial, plan entitlements, and restaurant UPI QR. The realistic
+ * failure is a configured deployment with an unapplied migration, which can
+ * otherwise look like a generic unavailable screen.
  *
  * This module answers the question in one request, in booleans. It is used by
  * GET /api/health, which is public on purpose -- it returns no rows, no ids,

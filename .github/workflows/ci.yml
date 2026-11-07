@@ -9,6 +9,10 @@ jobs:
   check:
     name: typecheck · lint · design · test · build
     runs-on: ubuntu-latest
+    env:
+      CI: 'true'
+      AUTODINE_TEST_DEMO_BUILD: 'true'
+      VERCEL_ENV: 'test'
     steps:
       - uses: actions/checkout@v4
 

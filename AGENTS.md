@@ -29,6 +29,7 @@ These rules apply to every coding agent, developer task, test, and deployment in
 ## Security and operational invariants
 
 - Never commit secrets, production credentials, `.env.local`, or test data copied from production. Secret/service-role keys must never be exposed through `NEXT_PUBLIC_*` variables.
+- Production requires the public Supabase URL and key and must never silently render fictional data. Local demo mode requires `AUTODINE_DEMO_MODE=true` under `next dev`; the hermetic build exception is restricted to GitHub Actions CI with `AUTODINE_TEST_DEMO_BUILD=true` and `VERCEL_ENV=test`. Never put either demo flag in a deployment.
 - Preserve RLS, least-privilege grants, token-scoped guest reads, fixed `search_path` on security-definer functions, safe redirects, CSP protections, and server-side authorization. Do not “fix” a failing test by bypassing these controls.
 - Never run integration, browser, load, or destructive tests against production services or production data. Use disposable local PostgreSQL / local Supabase-compatible services and synthetic seed data only. C4 is proven with the isolated local PostgreSQL harness; it must not be replayed against production.
 - For the database-backed browser throttle suite, use the dedicated isolated setup in `docs/e2e-local.md` and `.github/workflows/throttle-e2e.yml`. The workflow must not require production secrets. Preserve test logs/results as artifacts and do not call the browser E2E complete unless both named tests genuinely pass.
@@ -38,6 +39,7 @@ These rules apply to every coding agent, developer task, test, and deployment in
 
 - This `AGENTS.md` is the cross-cutting source of truth for agents and development tasks.
 - Exact scan-throttle semantics: `docs/scan-limit-l1.md`; coverage and evidence: `docs/scan-throttle-coverage.md`.
-- Reproducible isolated browser E2E setup: `docs/e2e-local.md`.
+- Reproducible isolated browser E2E setup: `docs/e2e-local.md`; operator setup checklist: `docs/SETUP.md`.
+- Current readiness evidence and known integration gaps: `docs/website-readiness-audit.md`.
 - Migration-specific behavior remains in checked-in SQL migrations and their contract/integration tests. Treat old sections of `AUDIT-REPORT.md` that are explicitly marked historical as snapshots; use its current-status notes only for dated verification evidence.
 - Do not create a second competing policy/runbook. Update the relevant canonical document when a rule or verified result changes.

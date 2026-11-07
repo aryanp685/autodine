@@ -6,7 +6,7 @@ describe('buildCsp', () => {
   const csp = buildCsp({ nonce: 'test-nonce', supabaseUrl: 'https://abc.supabase.co' });
 
   it('carries the per-request nonce and never opens script-src wide', () => {
-    expect(csp).toContain("script-src 'self' 'nonce-test-nonce' https://checkout.razorpay.com");
+    expect(csp).toContain("script-src 'self' 'nonce-test-nonce'");
     expect(csp).not.toMatch(/script-src[^;]*unsafe-inline/);
     expect(csp).not.toContain('unsafe-eval');
   });
@@ -19,9 +19,9 @@ describe('buildCsp', () => {
     expect(csp).toContain("default-src 'self'");
   });
 
-  it('names the payment provider and the supabase origin, incl. realtime', () => {
-    expect(csp).toContain('https://checkout.razorpay.com');
-    expect(csp).toContain('frame-src https://api.razorpay.com');
+  it('allows Supabase and realtime but no unapproved payment provider', () => {
+    expect(csp).not.toContain('razorpay');
+    expect(csp).toContain("frame-src 'none'");
     expect(csp).toContain('https://abc.supabase.co');
     expect(csp).toContain('wss://abc.supabase.co');
   });

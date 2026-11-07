@@ -11,22 +11,18 @@
  * Why both: Supabase deprecated the legacy `anon` / `service_role` keys, to be
  * removed by the end of 2026. Projects created after November 2025 are issued
  * ONLY the new short `sb_publishable_...` / `sb_secret_...` keys. Reading the
- * legacy names alone would therefore leave a brand new project permanently
- * unconfigured -- and because this module tolerates empty values, it would not
- * error, it would quietly serve demo data forever. Both names are read so the
- * app works whichever the project has.
+ * legacy names alone would therefore leave a brand new project unconfigured.
+ * Both names are read so the app works whichever format the project has; the
+ * runtime guard below prevents missing configuration from silently becoming
+ * demo data.
  *
  * The keys are interchangeable in the client libraries: Supabase states the new
  * values can be used "without any additional changes".
  *
- * Deliberately tolerant of EMPTY values: the app must build, deploy and render
- * with NO environment variables at all, because the site went live before the
- * database existed. Callers check isSupabaseConfigured and fall back to the
- * demo data in lib/db/demo-menu.ts.
- *
- * That fallback is a pilot convenience, not a design goal. Once the database is
- * live the fallback should be deleted so a misconfiguration fails loudly
- * instead of quietly serving sample data to a real guest.
+ * Empty values are accepted only for tests, the explicit local-development
+ * demo mode, and the explicitly opted-in hermetic CI build. A production
+ * build without the public Supabase URL/key fails; it must never quietly serve
+ * fictional restaurant data to a guest.
  */
 
 export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
@@ -106,3 +102,33 @@ export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE
 
 /** True when the secret key is present. */
 export const isSupabaseAdminConfigured = Boolean(SUPABASE_URL && SUPABASE_SECRET_KEY);
+
+/**
+ * Demo fallback is a local/test convenience, never a production fallback.
+ *
+ * GitHub's hermetic browser workflow intentionally builds without Supabase to
+ * test presentation. It must opt into that exception explicitly; a Vercel or
+ * other production build with missing public Supabase configuration fails at
+ * build/import time instead of serving fictional restaurant data.
+ */
+const allowHermeticDemoBuild =
+  process.env.GITHUB_ACTIONS === 'true' &&
+  process.env.CI === 'true' &&
+  process.env.AUTODINE_TEST_DEMO_BUILD === 'true' &&
+  process.env.VERCEL_ENV === 'test';
+const allowExplicitLocalDemo =
+  process.env.NODE_ENV === 'development' && process.env.AUTODINE_DEMO_MODE === 'true';
+
+/** Local-only demo state; it never becomes true in a production build. */
+export const isDemoMode = !isSupabaseConfigured && allowExplicitLocalDemo;
+
+if (
+  !isSupabaseConfigured &&
+  ((process.env.NODE_ENV === 'production' && !allowHermeticDemoBuild) ||
+    (process.env.NODE_ENV === 'development' && !allowExplicitLocalDemo))
+) {
+  throw new Error(
+    'AutoDine requires NEXT_PUBLIC_SUPABASE_URL and a public Supabase key. ' +
+      'Demo data is never an automatic fallback: configure Supabase, or set AUTODINE_DEMO_MODE=true for local development only.'
+  );
+}

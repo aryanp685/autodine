@@ -43,7 +43,7 @@ import {
  * THE AUDIT (2026-10-24) FOUND
  *
  *   - Nine hand-drawn callouts — read-only notice, database notice, tax-zero
- *     warning, tax example, missing gateway keys, "off", the UPI caveat, the
+ *     warning, tax example, retired gateway settings, "off", the UPI caveat, the
  *     unpublished-menu warning, and the save banner — in four different radii
  *     and three different tones of red. They said the same two things the kit's
  *     Notice says, badly.

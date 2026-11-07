@@ -4,8 +4,8 @@
  * These exist because the failure modes here are silent and expensive:
  *
  *  - reading only the legacy key names leaves a new Supabase project
- *    permanently unconfigured, and because empty values are tolerated that
- *    shows up as demo data rather than an error;
+ *    permanently unconfigured; missing config must never become an implicit
+ *    demo-data fallback in development or production;
  *  - a secret key behind a NEXT_PUBLIC_ prefix ships a full RLS bypass to
  *    every visitor's browser.
  *
@@ -100,6 +100,80 @@ describe('supabase env', () => {
       const env = await loadEnv();
 
       expect(env.SUPABASE_SECRET_KEY).toBe('eyJlegacy-service-role');
+    });
+  });
+
+  describe('demo data is never an implicit fallback', () => {
+    it('requires an explicit local-development demo opt-in', async () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '');
+      vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', '');
+      vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', '');
+
+      await expect(loadEnv()).rejects.toThrow(/Demo data is never an automatic fallback/);
+    });
+
+    it('allows the explicitly opted-in local demo without a live database', async () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      vi.stubEnv('AUTODINE_DEMO_MODE', 'true');
+      vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '');
+      vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', '');
+      vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', '');
+
+      await expect(loadEnv()).resolves.toMatchObject({ isDemoMode: true, isSupabaseConfigured: false });
+    });
+  });
+
+  describe('production does not silently serve demo data', () => {
+    it('fails closed when a production build has no public Supabase configuration', async () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '');
+      vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', '');
+      vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', '');
+
+      await expect(loadEnv()).rejects.toThrow(/Demo data is never an automatic fallback/);
+    });
+
+    it('does not let the local-demo flag enable fictional data in production', async () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('AUTODINE_DEMO_MODE', 'true');
+      vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '');
+      vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', '');
+
+      await expect(loadEnv()).rejects.toThrow(/Demo data is never an automatic fallback/);
+    });
+
+    it('allows the explicit GitHub-only demo build used by hermetic browser CI', async () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('GITHUB_ACTIONS', 'true');
+      vi.stubEnv('CI', 'true');
+      vi.stubEnv('AUTODINE_TEST_DEMO_BUILD', 'true');
+      vi.stubEnv('VERCEL_ENV', 'test');
+      vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '');
+
+      await expect(loadEnv()).resolves.toMatchObject({ isSupabaseConfigured: false });
+    });
+
+    it('rejects the CI demo exception outside the dedicated test environment', async () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('GITHUB_ACTIONS', 'true');
+      vi.stubEnv('CI', 'true');
+      vi.stubEnv('AUTODINE_TEST_DEMO_BUILD', 'true');
+      vi.stubEnv('VERCEL_ENV', 'preview');
+      vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '');
+
+      await expect(loadEnv()).rejects.toThrow(/Demo data is never an automatic fallback/);
+    });
+
+    it('never lets the CI demo override apply to a production deployment', async () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('GITHUB_ACTIONS', 'true');
+      vi.stubEnv('CI', 'true');
+      vi.stubEnv('AUTODINE_TEST_DEMO_BUILD', 'true');
+      vi.stubEnv('VERCEL_ENV', 'production');
+      vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '');
+
+      await expect(loadEnv()).rejects.toThrow(/Demo data is never an automatic fallback/);
     });
   });
 

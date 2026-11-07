@@ -64,8 +64,8 @@ export default function TermsPage() {
       <LegalSection title="Payments">
         <p>
           Counter payments are recorded by a member of staff, and only for the exact amount still owed.
-          Card payments through a gateway are not enabled; the code exists but no gateway is connected
-          and no restaurant can switch it on without deployment keys.
+          Online card payments are not available in AutoDine. Guests settle at the counter through
+          the restaurant's staff-recorded payment flow.
         </p>
         <p>
           A restaurant&rsquo;s own UPI QR is the restaurant&rsquo;s account, not AutoDine&rsquo;s. Scanning it

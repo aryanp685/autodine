@@ -179,10 +179,14 @@ if (site) {
   notes.push('NEXT_PUBLIC_SITE_URL is empty — QR codes will fall back to the request origin. Fine locally, worth setting on Vercel.');
 }
 
-if (value('NEXT_PUBLIC_RAZORPAY_KEY_ID') || value('RAZORPAY_KEY_SECRET')) {
-  notes.push('Razorpay keys are present. Guests still see a pay button only if a restaurant switches online payment on in Settings.');
+if (
+  value('NEXT_PUBLIC_RAZORPAY_KEY_ID') ||
+  value('RAZORPAY_KEY_SECRET') ||
+  value('RAZORPAY_WEBHOOK_SECRET')
+) {
+  notes.push('Gateway variables are not used in the approved pay-at-counter build; remove them and do not enable online guest payments.');
 } else {
-  console.log('  info     no Razorpay keys — correct until KYC clears; guests pay at the counter or by the restaurant\'s UPI QR');
+  console.log('  info     no gateway variables — correct for the approved pay-at-counter flow');
 }
 
 console.log('');

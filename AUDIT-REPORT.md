@@ -1,4 +1,6 @@
-# AutoDine — Full Audit Report (2026-11-06)
+# AutoDine — Historical Audit Report (2026-11-06)
+
+> **Historical snapshot, not current runbook:** sections below record the prior P2–P10 audit and contain stale planning/status references. Use [`docs/website-readiness-audit.md`](docs/website-readiness-audit.md) for current test limits and the active safe follow-ups. The current customer flow is pay-at-counter only; no online payment gateway or subscription checkout is available. GST remains frozen under Option A and is not adviser/legal approval.
 
 > **Status at PR #164 merge (2026-11-07):** The historical audit below predates the completed implementation sequence. P6 Invoice, P8 Checkout, and P7 Printing were merged in PR #161. P5 Voice and its production migration (`20261107104440`) were applied and verified; application code was merged in PR #162 and deployed. P9 Security was merged in PR #163 (`3c6416a`), its production migration is recorded as `20261107112126`, live schema/permissions were verified, and Vercel production deployment `dpl_7k43rCF2WyFxNDL26JiY91ty7M33` is READY/PROMOTED. P10 test implementation completed with 15 named receipt scenarios, print/PDF-share parity, multi-ticket regression, and Call Waiter/paid-tick UI/action coverage. At that point Vitest had **1883 passed, 3 skipped** and lint reported the `ImportedItem` warning; PR #164 CI browser workflow passed. Database-backed integration specs remain environment-gated and were not run without a disposable database.
 >
@@ -11,14 +13,9 @@ Gates run today: typecheck ✅ · unit **1817 passed / 3 skipped** ✅ · lint 0
 
 ---
 
-## 1. Status — kitna hua, kitna baaki
+## 1. Status at the time of this historical snapshot (superseded)
 
-| | |
-|---|---|
-| Platform (menu AI, storefront, QR, orders, payments, voice, security) | **DONE** — production live |
-| Redesign spec (Order→Kitchen→Billing) Phase 1 audit | **DONE** |
-| Redesign implementation P2–P10 | **0% coded** — machinery ~35-40% exists |
-| Overall redesign remaining | **~60%** — heaviest: consolidated invoice (P6), session close (P8), printing (P7) |
+The percentages and remaining-work estimates in the original snapshot are obsolete. For current verified coverage, unverified flows, and active follow-ups, see [`docs/website-readiness-audit.md`](docs/website-readiness-audit.md).
 
 ---
 
@@ -28,14 +25,16 @@ Gates run today: typecheck ✅ · unit **1817 passed / 3 skipped** ✅ · lint 0
 - **Storefront:** design switch, branding, translations (original untouched), multi-outlet, closed-state.
 - **QR & sessions:** 3 verification modes (`code` / `scan_confirm` / `scan`), 59-min sessions, code rate limits (5/15min).
 - **Ordering:** cart → checkout → order status → 10-min change/cancel window. **Server-side price truth** (browser sends ids+qty only). **Idempotent** (guest-token replay returns same order). **Rate limits** (30/session, 60/table, 60/ip per 10 min).
-- **Payments:** Razorpay verify + webhook (raw-body HMAC, amount pinned to attempt, idempotent settle) + counter cash recording (amount never typed).
+- **Payments (historical schema):** counter settlement is the available customer flow. Provider/payment schema remnants are not a usable online gateway; there are no current Razorpay initiation, verification, or webhook routes.
 - **Kitchen/Cashier:** prep state machine (new→preparing→ready→served/cancelled), Hindi voice announcements (Edge TTS neural + browser fallback), per-ticket replay, speaker lock, missed-replay.
 - **Security:** CSP nonce, safe login redirects, guest rate limits, RLS + `security definer` + `search_path`, payment RPCs service_role-only, token-scoped order reads (privacy safe).
 - **Also:** staff invites/RBAC, trial write-gate, per-order bill + WhatsApp share, `orders_math_check` DB constraint, integer-paise money module.
 
 ---
 
-## 3. REMAINING (locked plan, P2→P10)
+## 3. Historical plan (superseded)
+
+The following P2–P10 table is retained only as audit history. It is not a list of current remaining work; see the current readiness audit linked above.
 
 | Phase | Baaki kya | Size |
 |---|---|---|
@@ -86,7 +85,7 @@ Locked decisions: pay-at-counter only (gateway off for customer orders), no paym
 
 ## 5. Verified GOOD (never weaken)
 
-Server-side price truth · integer-paise money (half-away-from-zero) · `orders_math_check` DB constraint · order_items name/price snapshots (menu edits never rewrite history) · Razorpay raw-body HMAC + idempotent settle + attempt-pinned amount · token-scoped order reads (cross-table leak impossible) · atomic DB rate limits · rollback snapshot safe on FKs · payment RPCs service_role-only · QR HMAC + session expiry · RLS + `search_path` everywhere.
+Server-side price truth · integer-paise money (half-away-from-zero) · `orders_math_check` DB constraint · order_items name/price snapshots (menu edits never rewrite history) · token-scoped order reads · atomic DB rate limits · rollback snapshot safe on FKs · counter payment RPC authorization · QR HMAC + session expiry · RLS + fixed `search_path` on protected functions. Historical provider columns do not mean online payments are enabled.
 
 ---
 

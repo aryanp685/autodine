@@ -13,8 +13,8 @@ name: E2E (browser)
 # that touches `main`'s deployment. Merging is what deploys this repository
 # (Vercel's git integration); this workflow cannot make that happen or stop it.
 #
-# It also needs no secrets: with no Supabase environment the app runs in demo
-# mode, which is a supported state and exercises the same shell, rail and links.
+# It also needs no secrets: this job explicitly opts into the hermetic
+# test-build exception. That flag is GitHub-Actions-only and is not for deploys.
 
 on:
   push:
@@ -31,6 +31,10 @@ jobs:
     name: staff shell · kitchen · back/forward · 390px drawer
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      CI: 'true'
+      AUTODINE_TEST_DEMO_BUILD: 'true'
+      VERCEL_ENV: 'test'
     steps:
       - uses: actions/checkout@v4
 
@@ -45,7 +49,7 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Build (demo mode, no database)
+      - name: Build (explicit test-only demo mode, no database)
         run: npm run build
 
       # The count is asserted, not assumed: a config that silently matched no
