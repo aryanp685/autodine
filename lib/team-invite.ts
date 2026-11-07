@@ -87,7 +87,7 @@ export function parseInviteFlash(raw: string | null | undefined): InviteFlash | 
 }
 
 /** What an invitation status means, in the words the person holding it needs. */
-export type InviteStatus = 'ok' | 'already_member' | 'used' | 'expired' | 'revoked' | 'closed' | 'not_found';
+export type InviteStatus = 'ok' | 'already_member' | 'used' | 'expired' | 'revoked' | 'closed' | 'not_found' | 'rate_limited';
 
 export function inviteStatusCopy(status: InviteStatus): {
   tone: 'accent' | 'due' | 'plain';
@@ -137,6 +137,13 @@ export function inviteStatusCopy(status: InviteStatus): {
         tone: 'accent',
         title: 'You are already on this team',
         body: 'Nothing changed, and the invitation is still unused — it can go to a colleague.',
+        askForNewLink: false,
+      };
+    case 'rate_limited':
+      return {
+        tone: 'due',
+        title: 'Please wait before trying again',
+        body: 'There have been too many invitation attempts. Your access has not changed; try again later.',
         askForNewLink: false,
       };
     case 'ok':

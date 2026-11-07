@@ -15,8 +15,8 @@
  *     function requires a session; an anonymous visitor holding a guessed code
  *     learns nothing, not even that the code exists.
  *   - Say "joined" before the database says so. Every outcome here is a status
- *     the database returned: ok, already_member, used, expired, revoked,
- *     closed, not_found.
+   * the database returned: ok, already_member, used, expired, revoked,
+   * closed, not_found, or rate_limited.
  */
 
 'use server';
@@ -27,6 +27,7 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requestOrigin } from '@/lib/site-origin';
 import { homeForRole } from '@/lib/db/team';
+import { consumeStaffInviteIpBudget } from '@/lib/server/staff-invite-rate-limit';
 import { isWellFormedInviteCode, joinPath, normaliseInviteCode } from '@/lib/team-invite';
 import type { MemberRole } from '@/lib/db/database';
 
@@ -46,16 +47,27 @@ async function redeemAndLand(
   supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
   code: string,
 ): Promise<never> {
+  const budget = await consumeStaffInviteIpBudget('accept', code);
+  if (!budget.allowed) {
+    if (budget.reason === 'limited') back(code, 'status', 'rate_limited');
+    back(code, 'error', 'Invitation checks are temporarily unavailable. Nothing was changed; please try again shortly.');
+  }
+
   const { data, error } = await supabase.rpc('redeem_staff_invite', { p_code: code });
 
   if (error) {
-    back(code, 'error', error.message);
+    console.warn('[join] invitation redemption failed', { code: error.code ?? 'unknown' });
+    back(code, 'error', 'We could not accept this invitation right now. Please try again shortly.');
   }
 
   const row = data?.[0];
 
   if (!row) {
     back(code, 'error', 'That invitation could not be read. Please try the link again.');
+  }
+
+  if (row.status === 'rate_limited') {
+    back(code, 'status', 'rate_limited');
   }
 
   if (row.status === 'ok' || row.status === 'already_member') {
@@ -126,6 +138,14 @@ export async function joinSignUpAction(formData: FormData): Promise<void> {
 
   const admin = getSupabaseAdmin();
   if (!admin) back(code, 'error', 'Sign-up is temporarily unavailable. Please try again shortly.');
+
+  const budget = await consumeStaffInviteIpBudget('signup', code, admin);
+  if (!budget.allowed) {
+    if (budget.reason === 'limited') {
+      back(code, 'error', 'Too many account attempts from this network. Please wait a while and try again.');
+    }
+    back(code, 'error', 'Invitation checks are temporarily unavailable. Nothing was changed; please try again shortly.');
+  }
 
   const origin = await requestOrigin();
 

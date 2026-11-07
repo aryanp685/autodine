@@ -233,6 +233,11 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      /** Atomic shared rate-limit counter; service role only. */
+      hit_rate_limit: {
+        Args: { p_key: string; p_limit: number; p_window_seconds: number };
+        Returns: { allowed: boolean; retry_after_seconds: number }[];
+      };
       /** One cross-device winner for a kitchen announcement; staff role is checked in SQL. */
       claim_kitchen_order_announcement: {
         Args: { p_order_id: string };
@@ -356,7 +361,7 @@ export type Database = {
       preview_staff_invite: {
         Args: { p_code: string };
         Returns: Array<{
-          status: 'ok' | 'already_member' | 'used' | 'expired' | 'revoked' | 'closed' | 'not_found';
+          status: 'ok' | 'already_member' | 'used' | 'expired' | 'revoked' | 'closed' | 'not_found' | 'rate_limited';
           restaurant_id: string | null;
           restaurant_name: string | null;
           role: MemberRole | null;
@@ -367,10 +372,23 @@ export type Database = {
       redeem_staff_invite: {
         Args: { p_code: string };
         Returns: Array<{
-          status: 'ok' | 'already_member' | 'used' | 'expired' | 'revoked' | 'closed' | 'not_found';
+          status: 'ok' | 'already_member' | 'used' | 'expired' | 'revoked' | 'closed' | 'not_found' | 'rate_limited';
           restaurant_id: string | null;
           restaurant_name: string | null;
           role: MemberRole | null;
+        }>;
+      };
+      /** Owner/manager-only, read-only staff security audit history. */
+      list_staff_security_audit: {
+        Args: { p_restaurant_id: string; p_limit?: number };
+        Returns: Array<{
+          id: string;
+          actor_id: string | null;
+          event_type: string;
+          target_type: 'staff_invite' | 'membership';
+          target_id: string;
+          metadata: Record<string, unknown>;
+          created_at: string;
         }>;
       };
       /** Migration 20261029000100. Returns 'revoked' | 'used' | 'not_found'. */
