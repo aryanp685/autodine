@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { createHash } from 'node:crypto';
 import { Client } from 'pg';
 
 /**
@@ -343,5 +344,110 @@ describe.skipIf(!DB)('throttling, against a real PostgreSQL', () => {
     // Mode is 'scan', so nothing is held: the guest's order goes to the kitchen.
     expect(order.rows[0].hold_required).toBe(false);
     expect(order.rows[0].confirmed_at).toBeNull();
+  }, 60_000);
+
+  it('rolls back the losing concurrent order before replaying the winning code (C4)', async () => {
+    // Two independent transactions intentionally submit one checkout token.
+    // Keep writer A uncommitted so writer B passes the replay SELECT while A's
+    // order is still invisible, then blocks on the atomic rate-limit upsert.
+    // Once A commits, B continues through core, collides on the unique guest
+    // token, and must roll back every row written by its PL/pgSQL exception
+    // subtransaction before returning A's code.
+    const ipHash = createHash('sha256').update('c4-idempotency-test').digest('hex');
+    const session = await db.query(
+      'select * from public.open_table_session($1, $2)',
+      [CARD, ipHash],
+    );
+    expect(session.rows[0]?.status).toBe('opened');
+    const sessionToken = session.rows[0].session_token as string;
+    const guestToken = 'b050c4e0-0000-4000-8000-000000000001';
+    const orderArgs = [
+      SLUG,
+      JSON.stringify([{ itemId, qty: 1 }]),
+      null,
+      sessionToken,
+      guestToken,
+      ipHash,
+    ];
+    const sql = 'select public.place_public_order($1, $2::jsonb, $3, $4, $5::uuid, $6) as code';
+    const writerA = new Client({ connectionString: DB, application_name: 'autodine-c4-writer-a' });
+    const writerB = new Client({ connectionString: DB, application_name: 'autodine-c4-writer-b' });
+    let writerAInTransaction = false;
+    let writerBInTransaction = false;
+    let secondFinished = false;
+
+    try {
+      await Promise.all([writerA.connect(), writerB.connect()]);
+      const { rows: pidRows } = await writerB.query('select pg_backend_pid() as pid');
+      const writerBPid = pidRows[0].pid as number;
+
+      await writerA.query('begin');
+      writerAInTransaction = true;
+      const first = await writerA.query(sql, orderArgs);
+      const firstCode = first.rows[0]?.code as string;
+      expect(firstCode).toMatch(/^[A-Z0-9-]+$/);
+
+      await writerB.query('begin');
+      writerBInTransaction = true;
+      const secondWork = writerB.query(sql, orderArgs).then(
+        (result) => {
+          secondFinished = true;
+          return { result };
+        },
+        (queryError: unknown) => {
+          secondFinished = true;
+          return { queryError };
+        },
+      );
+
+      // Prove writer B is inside the function and waiting before releasing A.
+      // This removes a timing-only race from the assertion: B must have passed
+      // its initial replay read while A's token was still uncommitted.
+      let blockedOnLock = false;
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        const activity = await db.query(
+          'select wait_event_type from pg_stat_activity where pid = $1 and state = $2',
+          [writerBPid, 'active'],
+        );
+        if (activity.rows[0]?.wait_event_type === 'Lock') {
+          blockedOnLock = true;
+          break;
+        }
+        if (secondFinished) break;
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      expect(blockedOnLock).toBe(true);
+
+      await writerA.query('commit');
+      writerAInTransaction = false;
+      const second = await secondWork;
+      if ('queryError' in second) throw second.queryError;
+      expect(second.result.rows[0]?.code).toBe(firstCode);
+
+      await writerB.query('commit');
+      writerBInTransaction = false;
+
+      const persisted = await db.query(
+        `select count(distinct o.id)::int as order_count,
+                count(oi.id)::int as line_count,
+                max(o.code) as code,
+                count(distinct o.order_session_id)::int as session_count
+           from public.orders o
+           left join public.order_items oi on oi.order_id = o.id
+          where o.restaurant_id = (select id from public.restaurants where slug = $1)
+            and o.guest_token = $2::uuid`,
+        [SLUG, guestToken],
+      );
+      expect(persisted.rows[0]).toMatchObject({
+        order_count: 1,
+        line_count: 1,
+        code: firstCode,
+        session_count: 1,
+      });
+    } finally {
+      if (writerAInTransaction) await writerA.query('rollback').catch(() => undefined);
+      if (writerBInTransaction) await writerB.query('rollback').catch(() => undefined);
+      await Promise.all([writerA.end().catch(() => undefined), writerB.end().catch(() => undefined)]);
+    }
   }, 60_000);
 });
