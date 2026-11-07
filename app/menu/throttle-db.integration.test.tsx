@@ -40,6 +40,7 @@ let itemId = '';
 const state = vi.hoisted(() => ({ jar: new Map<string, string>(), rpc: null as null | ((name: string, params: Record<string, unknown>) => Promise<unknown>) }));
 
 vi.mock('next/headers', () => ({
+  headers: async () => new Headers({ 'x-forwarded-for': '198.51.100.42' }),
   cookies: async () => ({
     get: (name: string) => {
       const value = state.jar.get(name);

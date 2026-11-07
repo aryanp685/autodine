@@ -12,11 +12,11 @@
 #   marked LOCAL HARNESS ONLY.
 #
 # WHAT THIS IS NOT
-#   A production schema. Three tables (table_qr_codes, table_verification_
-#   sessions, qr_verification_attempts) are created by no migration in this
-#   repository; 005_scaffold_missing_tables.sql reconstructs them from the code
-#   that reads them. A real branch database must be cloned with pg_dump, not
-#   built this way (docs/migration-…-review.md §2.1).
+#   A production schema. Several tables are created by no migration in this
+#   repository; 005_scaffold_missing_tables.sql reconstructs their shapes from
+#   the code paths that read/write them, including payment_audit_events. A real
+#   branch database must be cloned with pg_dump, not built this way
+#   (docs/migration-…-review.md §2.1).
 # ============================================================================
 set -euo pipefail
 
