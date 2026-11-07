@@ -1,6 +1,6 @@
 # AutoDine — Full Audit Report (2026-11-06)
 
-> **Status update (2026-11-07):** The historical audit below predates the current implementation sequence. P6 Invoice, P8 Checkout, and P7 Printing were merged in PR #161. P5 Voice and its production migration (`20261107104440`) were applied and verified; application code was merged in PR #162 and deployed to production. P9 Security implementation and migration are prepared on `arena/0524ec7a-autodine`; local behavior checks pass, but its migration has not been applied to production. P10 Tests follows P9.
+> **Status update (2026-11-07):** The historical audit below predates the completed implementation sequence. P6 Invoice, P8 Checkout, and P7 Printing were merged in PR #161. P5 Voice and its production migration (`20261107104440`) were applied and verified; application code was merged in PR #162 and deployed. P9 Security was merged in PR #163 (`3c6416a`), its production migration is recorded as `20261107112126`, live schema/permissions were verified, and Vercel production deployment `dpl_7k43rCF2WyFxNDL26JiY91ty7M33` is READY/PROMOTED. P10 test implementation is complete locally: 15 named receipt scenarios, print/PDF-share parity, multi-ticket regression, and preserved Call Waiter/paid-tick UI/action coverage. Local Vitest: **1883 passed, 3 skipped**; typecheck, build, design, SQL checks passed; lint has only the pre-existing `ImportedItem` warning. Local Playwright browser tests could not launch because the Chromium binary is not installed in this environment; the PR #164 CI browser workflow passed. Database-backed integration specs remain environment-gated and were not run without a disposable database.
 
 Branch: `arena/149fe709-autodine` (base = `7917687`, latest main). **No code changed.** (Historical audit snapshot.)
 Gates run today: typecheck ✅ · unit **1817 passed / 3 skipped** ✅ · lint 0 errors (1 warning) · design ✅ (5/5 hex, 2/2 glass, 0/0 fonts). E2E: green at PR #156 merge (CI), not re-run today.
@@ -86,8 +86,9 @@ Server-side price truth · integer-paise money (half-away-from-zero) · `orders_
 
 ---
 
-## 6. Next steps (aapke approval ke bina koi code nahi)
+## 6. Current status and next steps
 
-1. **Fix phase** (chhota PR): C1–C3/O1–O3 root fixes = orders.code unique index + tax label/comment cleanup. (~half day)
-2. **P2** Pay-at-counter checkout.
-3. Phir P3 → P4 → P5 → P6 → P7 → P8 → P9 → P10, har phase ke baad report (files, migrations, APIs, risks, tests).
+- P2–P9 are complete and deployed through PRs #159–#163. P9's production migration is recorded as `20261107112126` and its live security posture was verified after application.
+- P10 local gate passed: 15 named rendered receipt scenarios, call-waiter action/UI coverage, paid-tick action/UI coverage, receipt print/PDF-vs-share parity, full Vitest (**1883 passed, 3 skipped**), typecheck, production build, design check, SQL DDL check, and diff check. Lint has one pre-existing unused `ImportedItem` warning.
+- Local Playwright could not launch because Chromium is absent from the environment; the PR #164 CI browser workflow passed. Database-backed integration specs still require a disposable branch and credentials, so those were not run against production.
+- No further product/database scope is planned in this phase; report only test gaps found by the gate.
