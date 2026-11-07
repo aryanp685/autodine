@@ -168,6 +168,17 @@ export type DiningTable = {
   is_active: boolean;
 };
 
+/** One guest sitting; independent of the short-lived QR verification session. */
+export type OrderSession = {
+  id: string;
+  restaurant_id: string;
+  table_id: string;
+  opened_at: string;
+  closed_at: string | null;
+  closed_by: string | null;
+  status: 'open' | 'closed';
+};
+
 export type PrepStatus = 'new' | 'preparing' | 'ready' | 'served' | 'cancelled';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 
@@ -209,8 +220,10 @@ export type Order = {
   confirmed_at?: string | null;
   /** Who tapped confirm. Null for anything not confirmed by a person. */
   confirmed_by?: string | null;
-  /** The table sitting this order belongs to, for grouping and confirming. */
+  /** Short-lived QR verification session (not the bill/sitting session). */
   table_session_id?: string | null;
+  /** Durable table sitting used to group incremental tickets into one bill. */
+  order_session_id?: string | null;
 };
 
 export type OrderItem = {
