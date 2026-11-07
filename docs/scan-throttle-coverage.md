@@ -52,9 +52,9 @@ pipeline needs no secrets. The consequence is exact and worth saying out loud:
   route handler, the real page and the real server action (`throttle-flow.test.tsx`);
 - the database-backed integration cases now execute real SQL locally, but do not
   establish parity with the live database's omitted table definitions;
-- the production wrapper's session-attachment regression is fixed by a forward
-  migration and verified locally, but production application remains a separate
-  approval-gated database operation.
+- the production wrapper's session-attachment regression is fixed by the forward
+  migration; Supabase records it as `20261107123437` and read-only inspection
+  confirms it is active. The C4 race test itself was never run against production.
 
 ## Remaining production-fidelity check (separate from local C4)
 
@@ -64,9 +64,9 @@ but is not required to claim the local C4 test passed. The local harness is not 
 production clone; its missing table shapes are inferred and labelled LOCAL ONLY.
 Never point this test at production.
 
-Before a branch-clone check, restore a schema-only dump into an isolated branch
-or disposable database, apply the pending forward migration
-`20261108006000_restore_public_order_session_attach.sql`, then run:
+For an optional branch-clone check, restore a schema-only dump into an isolated
+branch or disposable database, ensure the forward migration
+`20261108006000_restore_public_order_session_attach.sql` is applied there, then run:
 
 ```bash
 THROTTLE_DB_URL="$BRANCH_DATABASE_URL" \
@@ -77,8 +77,8 @@ The separate browser E2E (`e2e/integration/throttle.spec.ts`) has not been run:
 there is no browser binary in this environment, and it needs an isolated
 branch deployment plus database credentials. It can write up to twenty-five
 `table_session_opens` rows. Production is never an acceptable target for either
-integration test. Applying the forward SQL migration to production is a distinct
-operation and requires explicit approval.
+integration test. The forward SQL migration has already been applied to
+production; do not rerun the integration tests there.
 
 ## Why the hermetic suite cannot simply cover it
 
