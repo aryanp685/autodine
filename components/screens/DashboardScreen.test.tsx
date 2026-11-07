@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+  usePathname: () => '/dashboard',
+}));
+
 import { Dashboard } from './DashboardScreen';
 
 // The server action pulls in lib/supabase/admin, which imports the
@@ -38,6 +43,8 @@ function live(over: Partial<DashboardScreenData> = {}): DashboardScreenData {
       },
     ],
     topItems: [{ name: 'koko', qty: 2, revenuePaise: 92_000 }],
+    activeSessions: [],
+    canMarkPaid: true,
     hourlyPaise: [0, 0, 155_760],
     ...over,
   };
@@ -90,6 +97,8 @@ const EMPTY: DashboardScreenData = {
   stats: { ordersToday: 0, revenueTodayPaise: 0, averageTicketPaise: 0, openOrders: 0 },
   orders: [],
   topItems: [],
+  activeSessions: [],
+  canMarkPaid: false,
   hourlyPaise: [0, 0, 0],
   access: {
     plan: 'trial',
@@ -370,5 +379,51 @@ describe('Dashboard, what it does not repeat', () => {
     const at = html.indexOf('All orders');
     const opening = html.slice(html.lastIndexOf('<a', at), at + 20);
     expect(opening).toContain('h-9 px-4');
+  });
+});
+
+describe('Dashboard active table sessions', () => {
+  const session = {
+    id: 'session-1',
+    table: 'T6',
+    openedAt: '2026-11-07T10:00:00.000Z',
+    orderCount: 2,
+    orderCodes: ['A-1001', 'A-1002'],
+    totalPaise: 42000,
+    paidPaise: 10000,
+    outstandingPaise: 32000,
+    paidAt: null,
+  };
+
+  it('shows one table card with the consolidated balance and a single mark-paid tick', () => {
+    const html = renderToStaticMarkup(<Dashboard data={live({ activeSessions: [session] })} />);
+    expect(html).toContain('aria-label="Active table sessions"');
+    expect(html).toContain('T6');
+    expect(html).toContain('A-1001, A-1002');
+    expect(html).toContain('Outstanding');
+    expect(html).toContain('data-mark-session-paid="session-1"');
+    expect(html).toContain('Mark T6 paid');
+    expect(html).not.toContain('method');
+  });
+
+  it('does not expose a write action when the role or trial gate cannot write', () => {
+    const html = renderToStaticMarkup(
+      <Dashboard data={live({ activeSessions: [session], canMarkPaid: false })} />,
+    );
+    expect(html).toContain('T6');
+    expect(html).not.toContain('data-mark-session-paid');
+  });
+
+  it('shows settled status and timestamp without offering another payment tick', () => {
+    const html = renderToStaticMarkup(
+      <Dashboard
+        data={live({
+          activeSessions: [{ ...session, paidPaise: 42000, outstandingPaise: 0, paidAt: '2026-11-07T10:42:00Z' }],
+        })}
+      />,
+    );
+    expect(html).toContain('>Paid<');
+    expect(html).toContain('Paid 4:12 pm');
+    expect(html).not.toContain('data-mark-session-paid');
   });
 });

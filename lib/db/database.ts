@@ -199,7 +199,8 @@ export type Database = {
         id: string;
         order_id: string;
         restaurant_id: string;
-        method: 'cash' | 'card' | 'upi' | 'online';
+        /** `manual` is internal-only for the table-level Mark Paid action. */
+        method: 'cash' | 'card' | 'upi' | 'online' | 'manual';
         amount_paise: number;
         status: 'pending' | 'recorded' | 'failed' | 'refunded';
         provider: string | null;
@@ -627,6 +628,16 @@ export type Database = {
        * untouched. The token decides the restaurant, and the slug is only
        * checked for agreement.
        */
+      /**
+       * P4: one authenticated staff tick settles every remaining order in an
+       * open table session. No amount, method, restaurant or actor comes from
+       * the browser; the function derives all of them and stores a manual
+       * ledger/audit entry transactionally.
+       */
+      mark_order_session_paid: {
+        Args: { p_order_session_id: string };
+        Returns: string;
+      };
       place_public_order: {
         Args: {
           p_slug: string;

@@ -25,7 +25,9 @@
  */
 
 import type { RestaurantAccess } from '@/lib/access';
-import { getStaffContextDetailed } from './staff';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from './database';
+import { CASHIER_ROLES, getStaffContextDetailed } from './staff';
 import { hourInZone, RESTAURANT_TIME_ZONE, startOfDayUtc } from './time';
 
 
@@ -45,6 +47,19 @@ export type DashboardOrder = {
   paymentStatus: string;
   prepStatus: string;
   totalPaise: number;
+};
+
+export type DashboardActiveSession = {
+  id: string;
+  table: string;
+  openedAt: string;
+  orderCount: number;
+  orderCodes: string[];
+  totalPaise: number;
+  paidPaise: number;
+  outstandingPaise: number;
+  /** Only shown when no balance remains. */
+  paidAt: string | null;
 };
 
 export type DashboardTopItem = {
@@ -75,6 +90,10 @@ export type DashboardScreenData = {
   orders: DashboardOrder[];
   /** Empty when there is nothing to rank -- never padded with sample rows. */
   topItems: DashboardTopItem[];
+  /** Live, open table sittings. Demo data never invents billable sessions. */
+  activeSessions: DashboardActiveSession[];
+  /** The signed-in role can mark sessions paid only while write access is live. */
+  canMarkPaid: boolean;
   /**
    * Revenue per elapsed hour of the business day. Length is
    * hours elapsed + 1, not 24: a chart that ran to midnight every morning
@@ -110,6 +129,119 @@ export {
   timeZoneOffsetMs,
 } from './time';
 
+async function loadActiveSessions(
+  supabase: SupabaseClient<Database>,
+  restaurantId: string,
+): Promise<DashboardActiveSession[]> {
+  const sessionsResult = await supabase
+    .from('order_sessions')
+    .select('id, table_id, opened_at, paid_at')
+    .eq('restaurant_id', restaurantId)
+    .eq('status', 'open')
+    .order('opened_at', { ascending: false });
+
+  if (sessionsResult.error) {
+    throw new Error(`Could not load active table sessions: ${sessionsResult.error.message}`);
+  }
+
+  const sessions = sessionsResult.data ?? [];
+  if (sessions.length === 0) return [];
+
+  const sessionIds = sessions.map((session) => session.id);
+  const { data: orders, error: ordersError } = await supabase
+    .from('orders')
+    .select('id, code, order_session_id, table_id, total_paise, prep_status')
+    .eq('restaurant_id', restaurantId)
+    .in('order_session_id', sessionIds)
+    .neq('prep_status', 'cancelled');
+
+  if (ordersError) {
+    throw new Error(`Could not load session tickets: ${ordersError.message}`);
+  }
+
+  const orderRows = orders ?? [];
+  if (orderRows.length === 0) return [];
+
+  const orderIds = orderRows.map((order) => order.id);
+  const tableIds = [...new Set(sessions.map((session) => session.table_id))];
+  const [paymentsResult, tablesResult] = await Promise.all([
+    supabase
+      .from('payments')
+      .select('order_id, amount_paise, status, created_at')
+      .in('order_id', orderIds),
+    tableIds.length
+      ? supabase.from('dining_tables').select('id, label').in('id', tableIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (paymentsResult.error) {
+    throw new Error(`Could not load session payments: ${paymentsResult.error.message}`);
+  }
+  if (tablesResult.error) {
+    throw new Error(`Could not load session tables: ${tablesResult.error.message}`);
+  }
+
+  const paidByOrder = new Map<string, number>();
+  const latestPaymentByOrder = new Map<string, string>();
+  for (const payment of paymentsResult.data ?? []) {
+    if (payment.status !== RECORDED) continue;
+    paidByOrder.set(
+      payment.order_id,
+      (paidByOrder.get(payment.order_id) ?? 0) + Number(payment.amount_paise ?? 0),
+    );
+    const previous = latestPaymentByOrder.get(payment.order_id);
+    if (typeof payment.created_at === 'string' && (!previous || payment.created_at > previous)) {
+      latestPaymentByOrder.set(payment.order_id, payment.created_at);
+    }
+  }
+
+  const ordersBySession = new Map<string, typeof orderRows>();
+  for (const order of orderRows) {
+    if (!order.order_session_id) continue;
+    const rows = ordersBySession.get(order.order_session_id) ?? [];
+    rows.push(order);
+    ordersBySession.set(order.order_session_id, rows);
+  }
+
+  const labelByTable = new Map<string, string>();
+  for (const table of tablesResult.data ?? []) labelByTable.set(table.id, table.label);
+
+  return sessions.flatMap((session) => {
+    const tickets = ordersBySession.get(session.id) ?? [];
+    if (tickets.length === 0) return [];
+
+    let totalPaise = 0;
+    let paidPaise = 0;
+    let outstandingPaise = 0;
+    let latestRecordedAt: string | null = null;
+
+    for (const order of tickets) {
+      const total = Number(order.total_paise ?? 0);
+      const recorded = paidByOrder.get(order.id) ?? 0;
+      totalPaise += total;
+      paidPaise += Math.min(recorded, total);
+      outstandingPaise += Math.max(total - recorded, 0);
+      const paidAt = latestPaymentByOrder.get(order.id);
+      if (paidAt && (!latestRecordedAt || paidAt > latestRecordedAt)) latestRecordedAt = paidAt;
+    }
+
+    return [{
+      id: session.id,
+      table: labelByTable.get(session.table_id) ?? 'Table',
+      openedAt: session.opened_at,
+      orderCount: tickets.length,
+      orderCodes: tickets.map((order) => order.code),
+      totalPaise,
+      paidPaise,
+      outstandingPaise,
+      paidAt:
+        outstandingPaise === 0
+          ? session.paid_at ?? latestRecordedAt
+          : null,
+    }];
+  });
+}
+
 export async function getDashboardScreenData(): Promise<DashboardScreenData | null> {
   const staff = await getStaffContextDetailed();
 
@@ -125,19 +257,22 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
       stats: { ordersToday: 0, revenueTodayPaise: 0, averageTicketPaise: 0, openOrders: 0 },
       orders: [],
       topItems: [],
+      activeSessions: [],
+      canMarkPaid: false,
       hourlyPaise: [],
       blocked: staff.reason,
       access: null,
     };
   }
 
-  const { supabase, restaurantId, restaurantName, timezone } = staff.context;
+  const { supabase, restaurantId, restaurantName, timezone, role, access } = staff.context;
+  const canMarkPaid = CASHIER_ROLES.includes(role) && Boolean(access?.canWrite);
 
   const now = new Date();
   const dayStart = startOfDayUtc(timezone, now);
   const dayStartIso = dayStart.toISOString();
 
-  const [ordersResult, paymentsResult] = await Promise.all([
+  const [ordersResult, paymentsResult, activeSessions] = await Promise.all([
     supabase
       .from('orders')
       .select('id, code, table_id, prep_status, payment_status, total_paise, placed_at')
@@ -150,6 +285,7 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
       .select('order_id, amount_paise, status')
       .eq('restaurant_id', restaurantId)
       .gte('created_at', dayStartIso),
+    loadActiveSessions(supabase, restaurantId),
   ]);
 
   if (ordersResult.error) {
@@ -199,6 +335,8 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
       stats: { ordersToday: 0, revenueTodayPaise, averageTicketPaise: 0, openOrders: 0 },
       orders: [],
       topItems: [],
+      activeSessions,
+      canMarkPaid,
       hourlyPaise,
       access: staff.context.access,
     };
@@ -264,6 +402,8 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
     topItems: [...topItems.values()]
       .sort((a, b) => b.qty - a.qty || b.revenuePaise - a.revenuePaise)
       .slice(0, TOP_ITEM_LIMIT),
+    activeSessions,
+    canMarkPaid,
     hourlyPaise,
     access: staff.context.access,
   };

@@ -176,6 +176,8 @@ export type OrderSession = {
   opened_at: string;
   closed_at: string | null;
   closed_by: string | null;
+  paid_at?: string | null;
+  paid_by?: string | null;
   status: 'open' | 'closed';
 };
 
