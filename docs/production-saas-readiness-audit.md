@@ -1,7 +1,10 @@
 # AutoDine production SaaS readiness assessment
 
 **Snapshot:** 2026-11-08  
-**Branch:** `arena/e9e78732-autodine` (assessment changes are not deployed)  
+**Branch:** `arena/e9e78732-autodine`, commit `3f03e20` (not merged to `main` or deployed to production)
+
+**Hosted checks:** [CI 42410329174](https://github.com/aryanp685/autodine/actions/runs/42410329174), [browser E2E 42410329171](https://github.com/aryanp685/autodine/actions/runs/42410329171), and [isolated PostgreSQL/browser E2E 42410329254](https://github.com/aryanp685/autodine/actions/runs/42410329254) passed.
+
 **Decision:** **NO-GO for general commercial production launch today.** The repository contains substantial production-minded controls and several real disposable-PostgreSQL proofs, but there is no verified capacity envelope, live-schema parity evidence, operator-grade monitoring/backup/restore/incident process, or supported guarantee for the kitchen TTS dependency. No production service or data was used for tests, load tests, or schema verification. No production deployment/configuration was changed. GST Option A is unchanged; this is not a tax/legal approval.
 
 ## 1. Scope and evidence standard
@@ -74,7 +77,7 @@ A minimum acceptance exercise before launch should run on a fresh disposable dat
 | Workflow | Implemented path | Available evidence | Gap/qualification |
 |---|---|---|---|
 | QR/table verification | QR token + code/scan mode, session expiry and attempt budgets in SQL | Unit tests; historical isolated Postgres/PostgREST browser suite passed QR-throttle cases | Exact live-schema parity and broad abuse/failure scenarios unavailable; forwarded IP inputs are forgeable |
-| Guest order placement | Server-priced order RPC, session binding, per-session/table/IP budgets, unique guest idempotency token | Existing disposable PostgreSQL integration proves complete order lifecycle; C4 two-writer race persisted one order/item/session | New 16-order parallel smoke has been added but is **not yet executed** in this local environment; 1×/2× capacity unresolved |
+| Guest order placement | Server-priced order RPC, session binding, per-session/table/IP budgets, unique guest idempotency token | Disposable PostgreSQL integration proves complete order lifecycle; C4 two-writer race persisted one order/item/session; hosted isolated run also passed the 16-guest/16-connection order burst with 16 unique persisted orders, one line each and correct totals | This is a small synthetic burst, not 1×/2× production capacity, soak, resource or horizontal-scale evidence |
 | Incremental ordering / KOT | Order sessions, immutable order items, kitchen board, database announcement claims | Unit/component coverage and prior order lifecycle evidence | No sustained kitchen/Realtime failure test, hardware printer evidence, or multi-device physical restaurant trial |
 | Kitchen state | Compare-and-set prep transitions; realtime fast path and polling fallback | Unit/action tests; database order lifecycle | Web Locks only coordinate same browser profile; external-device election is DB-based. Realtime quotas/outage delivery not measured |
 | Guest checkout | Cart to order, idempotent submit and explicit retry outcomes | Unit tests and DB idempotency race | Browser/network fault-injection for lost response after commit, captive portal and long outage remains incomplete |
@@ -92,7 +95,7 @@ The successful recent disposable lifecycle was: guest order persistence → kitc
 
 - 45 ordered migration files; recent migrations add shared rate limits, idempotency, QR/session flows, menu snapshots, subscriptions/write gates, payment audit, receipts/invoices, and security hardening.
 - Migration tests and static SQL checking exist. The local PostgreSQL runner builds a throwaway database from repository migrations plus explicitly marked compatibility scaffolding for objects absent from this repository. It is not a production schema clone.
-- Prior CI at branch head `626ba26` passed isolated PostgreSQL/browser workflows, including the receipt lifecycle. A new 16-independent-order/16-connection smoke has been added to the DB integration suite, but at this assessment point its execution is pending CI; ordinary `npm test` skips all five DB cases when `THROTTLE_DB_URL` is not set.
+- Prior CI at branch head `626ba26` passed isolated PostgreSQL/browser workflows, including the receipt lifecycle. On this assessment commit, hosted CI and demo-browser E2E passed, and isolated PostgreSQL/browser run `42410329254` passed all five database cases, including the new 16-independent-order/16-connection smoke. Ordinary local `npm test` still skips those five DB cases when `THROTTLE_DB_URL` is not set.
 - No complete automated downgrade/rollback path was found. Many business migrations are forward-only. Before any production migration: take a provider snapshot/PITR point, run the exact migration on a schema-faithful disposable clone, verify pre/post object/grant/index/data behavior, capture executable rollback or forward-fix steps, and obtain separate deployment approval. The user has not authorized production changes.
 - Live schema comparison remains blocked by the inactive non-production Supabase project; do not repeat the denied restore or use production.
 
@@ -130,7 +133,7 @@ Before a budget is approved, obtain actual vendor plans/rate cards and quotes, i
 | `npm run sql:check` | Completed with explicit DDL-only/unverified caveats | Not a full SQL/RLS/migration validation |
 | `npm run env:check` | Failed because local Supabase URL, publishable key and server secret are absent | Expected in this environment; no credentials were requested or supplied |
 | Production build (hermetic, no service credentials) | Passed with `GITHUB_ACTIONS=true CI=true AUTODINE_TEST_DEMO_BUILD=true VERCEL_ENV=test npm run build`; generated all 24 static pages and the route manifest | The first attempt omitted the two CI flags and was correctly rejected by the production-config guard; no guard was weakened |
-| 16-order DB capacity smoke | Added; not executed locally because this environment has no local `psql`/PostgreSQL/Docker | Must pass in the isolated PostgreSQL workflow before quoting even that small-burst evidence |
+| 16-order DB capacity smoke | Passed in isolated PostgreSQL workflow `42410329254`: 16 synthetic independent orders ran concurrently through a 16-connection pool; assertions verified 16 unique persisted orders, one line each and correct totals | Small database burst only; no measured service/resource profile, 1×/2× target load, soak, or horizontal-scale proof |
 | Production/non-production provider tests | Not run | No production use; non-production Supabase project is inactive; no authorized provider credentials |
 
 ## 10. Go-live blockers and concrete next actions
