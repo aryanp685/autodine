@@ -135,7 +135,8 @@ test.describe('a card scanned too often', () => {
     const bodyText = await page.locator('body').innerText();
     const bodyHtml = (await page.locator('body').innerHTML()).slice(0, 1200);
     const cookieInfo = JSON.stringify((await context.cookies()).map(({ name, domain, secure, sameSite }) => ({ name, domain, secure, sameSite })));
-    expect(bodyText, `throttle notice absent at ${page.url()}; flag=${flag}; response=${lastResponseInfo}; cookies=${cookieInfo}; body=${bodyText}; bodyHtml=${bodyHtml}; clientErrors=${clientErrors.join(' || ')}`).toContain('Table check paused');
+    const throttleDebug = await page.locator('[data-e2e-throttle-debug]').getAttribute('data-e2e-throttle-debug').catch(() => null);
+    expect(bodyText, `throttle notice absent at ${page.url()}; flag=${flag}; response=${lastResponseInfo}; cookies=${cookieInfo}; serverThrottle=${throttleDebug}; body=${bodyText}; bodyHtml=${bodyHtml}; clientErrors=${clientErrors.join(' || ')}`).toContain('Table check paused');
     const text = await notice.innerText();
 
     const seconds = flag.startsWith('throttled.') ? Number(flag.slice('throttled.'.length)) : null;

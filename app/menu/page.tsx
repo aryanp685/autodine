@@ -119,13 +119,15 @@ export default async function CustomerMenuPage({
   const rawThrottleCookie = (await cookies()).get(THROTTLE_COOKIE)?.value;
   const fromCookie = readThrottleFlag(rawThrottleCookie);
   const throttle = fromAddress.throttled ? fromAddress : fromCookie;
-  if (process.env.AUTODINE_E2E_DEBUG === '1') {
-    console.error('[throttle-e2e-debug]', JSON.stringify({ v, fromAddress, cookiePresent: Boolean(rawThrottleCookie), fromCookie, throttle }));
-  }
+  const throttleDebug = JSON.stringify({ v: v ?? null, cookie: rawThrottleCookie ?? null, fromAddress, fromCookie, throttle });
 
   // The cart is keyed by restaurant, so it is mounted where the slug is known.
   return (
-    <CartProvider slug={s}>
+    <>
+      {process.env.AUTODINE_E2E_DEBUG === '1' ? (
+        <span hidden data-e2e-throttle-debug={throttleDebug} />
+      ) : null}
+      <CartProvider slug={s}>
       <CustomerMenu
         data={data ? { ...data, table } : undefined}
         throttleNotice={throttle.throttled ? throttleNotice(throttle.retryAfterSeconds) : null}
@@ -133,6 +135,7 @@ export default async function CustomerMenuPage({
         canCallWaiter={access.status === 'verified'}
         lang={params.lang}
       />
-    </CartProvider>
+      </CartProvider>
+    </>
   );
 }
