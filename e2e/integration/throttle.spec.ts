@@ -38,15 +38,16 @@ test.describe('a card scanned too often', () => {
   test('is refused by the database, and the guest is told on the menu itself', async ({ browser }) => {
     let refused = false;
     let lastUrl = '';
+    let lastResponseInfo = '';
     let page;
 
     for (let attempt = 1; attempt <= 25; attempt += 1) {
       // A fresh context is a fresh guest: no table session, no flags.
       const context = await browser.newContext();
       page = await context.newPage();
-      await page.goto(`/t/${TOKEN}`, { waitUntil: 'domcontentloaded' });
-
+      const response = await page.goto(`/t/${TOKEN}`, { waitUntil: 'domcontentloaded' });
       lastUrl = page.url();
+      lastResponseInfo = `${response?.status() ?? 'no response'} ${response?.headers()['content-type'] ?? ''}`;
       if (lastUrl.includes('v=throttled')) {
         refused = true;
         break;
@@ -59,7 +60,8 @@ test.describe('a card scanned too often', () => {
     expect(refused, `no refusal in 25 scans; last address ${lastUrl}`).toBe(true);
 
     const bodyText = await page!.locator('body').innerText();
-    expect(bodyText, `throttle notice absent at ${page!.url()}; body: ${bodyText}`).toContain('Table check paused');
+    const html = (await page!.content()).slice(0, 1200);
+    expect(bodyText, `throttle notice absent at ${page!.url()}; response=${lastResponseInfo}; body=${bodyText}; html=${html}`).toContain('Table check paused');
     const notice = page!.getByRole('status').filter({ hasText: 'Table check paused' });
     await expect(notice).toBeVisible();
 
@@ -99,9 +101,11 @@ test.describe('a card scanned too often', () => {
      */
     const context = await browser.newContext();
     const page = await context.newPage();
+    let lastResponseInfo = '';
 
     for (let attempt = 1; attempt <= 25; attempt += 1) {
-      await page.goto(`/t/${TOKEN}`, { waitUntil: 'domcontentloaded' });
+      const response = await page.goto(`/t/${TOKEN}`, { waitUntil: 'domcontentloaded' });
+      lastResponseInfo = `${response?.status() ?? 'no response'} ${response?.headers()['content-type'] ?? ''}`;
       if (page.url().includes('v=throttled')) break;
 
       // Same browser, cleared cookies: the guest, not the card budget, is what
@@ -111,7 +115,8 @@ test.describe('a card scanned too often', () => {
 
     const flag = new URL(page.url(), baseURL).searchParams.get('v') ?? '';
     const bodyText = await page.locator('body').innerText();
-    expect(bodyText, `throttle notice absent at ${page.url()}; flag=${flag}; body: ${bodyText}`).toContain('Table check paused');
+    const html = (await page.content()).slice(0, 1200);
+    expect(bodyText, `throttle notice absent at ${page.url()}; flag=${flag}; response=${lastResponseInfo}; body=${bodyText}; html=${html}`).toContain('Table check paused');
     const notice = page.getByRole('status').filter({ hasText: 'Table check paused' });
     await expect(notice).toBeVisible();
     const text = await notice.innerText();
