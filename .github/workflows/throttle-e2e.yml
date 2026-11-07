@@ -9,6 +9,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: throttle-e2e-${{ github.ref }}
   cancel-in-progress: true
@@ -60,7 +63,22 @@ jobs:
         run: echo "LOCAL_E2E_JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
       - name: Run both browser tests against isolated local services
-        run: npm run test:e2e:throttle
+        id: throttle-e2e
+        run: |
+          set +e
+          npm run test:e2e:throttle 2>&1 | tee "$RUNNER_TEMP/throttle-e2e-console.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ]; then
+            {
+              echo '## Isolated throttle E2E failure details'
+              echo 'The full logs are in the uploaded artifact; this is the console tail for quick diagnosis.'
+              tail -n 100 "$RUNNER_TEMP/throttle-e2e-console.log"
+            } >> "$GITHUB_STEP_SUMMARY"
+            detail="$(tail -n 35 "$RUNNER_TEMP/throttle-e2e-console.log" | tr '\n' ' ' | head -c 5000)"
+            echo "::error title=Throttle E2E failure details::$detail"
+          fi
+          exit "$status"
         env:
           PGHOST: 127.0.0.1
           PGPORT: 5432
