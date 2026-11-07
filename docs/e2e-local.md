@@ -96,9 +96,11 @@ The runner does the following in order:
 5. Runs read-only Supabase-JS preflights for the storefront, QR-intro RPC,
    published menu, categories, items, and add-ons (no session mint or scan-budget
    spend), checks Chromium's linked libraries, and runs both throttle browser tests.
-6. Saves migration, seed, API preflight, PostgREST and path-proxy, Next
-   build/start, `ldd`, Playwright JSON, and result-summary logs under
-   `test-results/throttle-e2e/`;
+6. Runs the existing `app/menu/throttle-db.integration.test.tsx` suite against
+   the same disposable PostgreSQL database (without changing or skipping those
+   tests), then saves migration, seed, PostgreSQL integration, API preflight,
+   PostgREST and path-proxy, Next build/start, `ldd`, Playwright JSON, and
+   result-summary logs under `test-results/throttle-e2e/`;
    drops the one test database and stops the local processes on exit.
 
 For cleanup, stop terminal 1 with Ctrl+C. The Docker container has `--rm` and

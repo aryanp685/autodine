@@ -83,6 +83,14 @@ DB_AUTH_PASSWORD="$(openssl rand -hex 24)"
   -c "GRANT anon, authenticated, service_role TO authenticator;" \
   2>&1 | tee -a "$ARTIFACTS/seed.log"
 
+# Run the existing real-PostgreSQL throttle integration suite against this
+# disposable database too. It exercises the shipped route/page/order flow and
+# real SQL; the regular Vitest run skips it when THROTTLE_DB_URL is unset.
+export THROTTLE_DB_URL="postgresql://${PGHOST}:${PGPORT}/${DB}"
+npx vitest run app/menu/throttle-db.integration.test.tsx \
+  2>&1 | tee "$ARTIFACTS/postgres-integration.log"
+unset THROTTLE_DB_URL
+
 LOCAL_E2E_JWT_SECRET="${LOCAL_E2E_JWT_SECRET:-$(openssl rand -hex 32)}"
 if [[ "${#LOCAL_E2E_JWT_SECRET}" -lt 32 ]]; then
   echo 'LOCAL_E2E_JWT_SECRET must contain at least 32 characters.' >&2
