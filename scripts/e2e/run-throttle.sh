@@ -151,7 +151,6 @@ wait_http "http://127.0.0.1:${PGRST_PORT}/rest/v1/" 'local PostgREST API' 'Accep
 export NEXT_PUBLIC_SUPABASE_URL="http://127.0.0.1:${PGRST_PORT}"
 export NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_JWT"
 export NEXT_TELEMETRY_DISABLED=1
-export AUTODINE_E2E_DEBUG=1
 node scripts/e2e/check-local-api.mjs 2>&1 | tee "$ARTIFACTS/api-preflight.log"
 npm run build 2>&1 | tee "$ARTIFACTS/next-build.log"
 "$ROOT/node_modules/.bin/next" start -H 127.0.0.1 -p "$APP_PORT" \

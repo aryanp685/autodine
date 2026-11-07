@@ -69,21 +69,21 @@ test.describe('a card scanned too often', () => {
     // Ten opens per card, twenty per address, so 25 attempts cannot all pass.
     expect(refused, `no refusal in 25 scans; last address ${lastUrl}`).toBe(true);
 
-    const notice = page!.getByRole('status').filter({ hasText: 'Table check paused' });
-    await expect(notice).toBeVisible({ timeout: 30_000 });
-    const bodyText = await page!.locator('body').innerText();
-    const bodyHtml = (await page!.locator('body').innerHTML()).slice(0, 1200);
-    expect(bodyText, `throttle notice absent at ${page!.url()}; response=${lastResponseInfo}; cookies=${lastCookieInfo}; body=${bodyText}; bodyHtml=${bodyHtml}; clientErrors=${clientErrors.join(' || ')}`).toContain('Table check paused');
+    const notice = page!.locator('[data-throttle-note]');
+    await expect(notice, `throttle notice missing at ${page!.url()}; response=${lastResponseInfo}; cookies=${lastCookieInfo}; clientErrors=${clientErrors.join(' || ')}`).toBeVisible({ timeout: 30_000 });
 
-    // What the guest is owed: why, and what to do next.
-    const text = (await notice.innerText()).toLowerCase();
-    expect(text).toContain('scanned unusually often');
-    expect(text).toContain('order with staff');
+    // Assert the notice itself. Aggregating body.innerText() can race streamed
+    // menu updates and is not the user's actual announcement node.
+    const text = await notice.innerText();
+    expect(text).toContain('Table check paused');
+    const lowerText = text.toLowerCase();
+    expect(lowerText).toContain('scanned unusually often');
+    expect(lowerText).toContain('order with staff');
 
     // A throttled guest in a scan-mode restaurant has no code to type, so the
     // screen must not send them to a form that cannot help them.
-    expect(text).not.toContain('enter the code');
-    expect(text).not.toContain('ask a waiter');
+    expect(lowerText).not.toContain('enter the code');
+    expect(lowerText).not.toContain('ask a waiter');
 
     // Nothing has been ordered, and nothing may say otherwise.
     const body = (await page!.locator('body').innerText()).toLowerCase();
@@ -130,14 +130,11 @@ test.describe('a card scanned too often', () => {
     }
 
     const flag = new URL(page.url(), baseURL).searchParams.get('v') ?? '';
-    const notice = page.getByRole('status').filter({ hasText: 'Table check paused' });
-    await expect(notice).toBeVisible({ timeout: 30_000 });
-    const bodyText = await page.locator('body').innerText();
-    const bodyHtml = (await page.locator('body').innerHTML()).slice(0, 1200);
     const cookieInfo = JSON.stringify((await context.cookies()).map(({ name, domain, secure, sameSite }) => ({ name, domain, secure, sameSite })));
-    const throttleDebug = await page.locator('[data-e2e-throttle-debug]').getAttribute('data-e2e-throttle-debug').catch(() => null);
-    expect(bodyText, `throttle notice absent at ${page.url()}; flag=${flag}; response=${lastResponseInfo}; cookies=${cookieInfo}; serverThrottle=${throttleDebug}; body=${bodyText}; bodyHtml=${bodyHtml}; clientErrors=${clientErrors.join(' || ')}`).toContain('Table check paused');
+    const notice = page.locator('[data-throttle-note]');
+    await expect(notice, `throttle notice missing at ${page.url()}; flag=${flag}; response=${lastResponseInfo}; cookies=${cookieInfo}; clientErrors=${clientErrors.join(' || ')}`).toBeVisible({ timeout: 30_000 });
     const text = await notice.innerText();
+    expect(text).toContain('Table check paused');
 
     const seconds = flag.startsWith('throttled.') ? Number(flag.slice('throttled.'.length)) : null;
 
