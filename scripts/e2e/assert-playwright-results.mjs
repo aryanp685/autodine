@@ -8,13 +8,14 @@ if (!reportPath || !Number.isInteger(expectedCount) || expectedCount < 1) {
 
 function safeDetail(value) {
   return String(value ?? 'No error detail recorded.')
-    .split(/\r?\n/)[0]
+    .replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '')
     .replace(/https?:\/\/[^\s)]+/gi, '[local URL]')
     .replace(/[A-Fa-f0-9]{40,}/g, '[redacted-token]')
+    .replace(/\r?\n/g, ' | ')
     .replace(/%/g, '%25')
     .replace(/\r/g, '%0D')
     .replace(/\n/g, '%0A')
-    .slice(0, 700);
+    .slice(0, 1500);
 }
 
 function escapeMarkdown(value) {

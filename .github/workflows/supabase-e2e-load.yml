@@ -2,6 +2,17 @@ name: Disposable Supabase E2E and load
 
 on:
   workflow_dispatch:
+    inputs:
+      integration_grep:
+        description: Optional Playwright title regex for a focused disposable-stack diagnostic run
+        required: false
+        default: ''
+        type: string
+      integration_expected:
+        description: Expected number of selected tests (use 47 for the full integration suite)
+        required: false
+        default: '47'
+        type: string
   push:
     branches:
       - arena/e9e78732-autodine
@@ -11,6 +22,7 @@ permissions:
 
 jobs:
   disposable-supabase:
+    if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[skip-supabase-e2e]') }}
     name: 64 hermetic + 47 Supabase-backed E2E, then synthetic load
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -77,20 +89,25 @@ jobs:
             printf 'DB_URL=%s\n' "$DB_URL"
           } >> "$GITHUB_ENV"
 
-      - name: Build against local Supabase and run all integration Playwright tests (47)
+      - name: Build against local Supabase and run integration Playwright tests
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/supabase-e2e/integration-results.json
+          E2E_TEST_GREP: ${{ inputs.integration_grep || '' }}
         run: |
           set -euo pipefail
           set -a
           source "${{ runner.temp }}/autodine-e2e-fixtures.env"
           set +a
           npm run build
-          npx playwright test --project=integration --reporter=list,html,json --output=test-results/supabase-e2e/integration-output
+          args=(--project=integration --reporter=list,html,json --output=test-results/supabase-e2e/integration-output)
+          if [[ -n "$E2E_TEST_GREP" ]]; then args+=(--grep "$E2E_TEST_GREP"); fi
+          npx playwright test "${args[@]}"
 
-      - name: Require 47 integration passes with no skips or retries
+      - name: Require integration passes with no skips or retries
         if: always()
-        run: node scripts/e2e/assert-playwright-results.mjs test-results/supabase-e2e/integration-results.json 47
+        env:
+          INTEGRATION_EXPECTED: ${{ inputs.integration_expected || '47' }}
+        run: node scripts/e2e/assert-playwright-results.mjs test-results/supabase-e2e/integration-results.json "$INTEGRATION_EXPECTED"
 
       - name: Retain integration HTML report
         if: always()
@@ -101,6 +118,7 @@ jobs:
           fi
 
       - name: Run 5,000 synthetic guest sessions, orders, app reads, and kitchen Realtime fan-out
+        if: ${{ success() && inputs.integration_grep == '' }}
         env:
           E2E_FIXTURE_ENV_FILE: ${{ runner.temp }}/autodine-e2e-fixtures.env
           APP_BASE_URL: http://127.0.0.1:3100

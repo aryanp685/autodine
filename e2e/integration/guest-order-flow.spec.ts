@@ -45,7 +45,14 @@ test.describe('guest ordering — real database', () => {
 
     // Whatever the menu charges for the first plain dish, the checkout shows
     // it — computed from the menu payload, not from anything the cart sent.
-    const totalText = await page.getByText('Total payable').locator('..').innerText();
+    // The dock repeats the same label at phone width; the bill <dl> is the
+    // canonical checkout amount and avoids a strict-mode match on both copies.
+    const totalText = await page
+      .locator('dl')
+      .filter({ hasText: 'Total payable' })
+      .locator('dd')
+      .last()
+      .innerText();
     expect(totalText).toMatch(/₹[\d,]+/);
   });
 
