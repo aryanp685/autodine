@@ -24,6 +24,53 @@ A green job counts as complete only when the result evidence says **2 passed,
 0 skipped, 0 failed**. `--list`, a skipped test, or a unit/database-only test is
 not browser E2E evidence.
 
+## Sandbox-runnable PostgreSQL and Chromium checks
+
+On the repository's Linux/Node 22 sandbox, `npm ci` followed by
+`npm run test:db:local` starts an isolated embedded PostgreSQL 17.11 cluster
+under a fresh temporary directory. It replays all 45 checked-in migrations,
+adds only the already documented local Supabase shim and inferred scaffold,
+checks the resulting objects and `supabase/checks/06_scan_limits.sql`, runs all
+five PostgreSQL-gated tests, and destroys the cluster on exit. The same run
+then performs a database-only synthetic workload of 5,000 independent guests
+across 100 synthetic restaurants: 5,000 table sessions and 5,000
+`place_public_order` SQL writes, with a 64-connection pool. This is a local SQL
+throughput smoke, not a 5,000-concurrent-browser test or a forecast of hosted
+Supabase capacity. The completed sandbox run opened 5,000 sessions in 2.824s
+(about 1,771/s) and wrote/verified 5,000 SQL orders in 43.863s (about 114/s)
+with that local pool cap; use a staged provider environment for any hosted
+capacity claim.
+
+`npm run e2e:demo` builds the hermetic demo-mode app and runs the 64
+non-integration Playwright tests with Chromium from `@sparticuz/chromium`. The
+wrapper extracts Chromium's bundled NSS/NSPR libraries into a fresh temporary
+directory and checks every linked library before launch, so it needs neither
+apt nor a system Chromium installation. This turn's run verified **64 passed,
+0 skipped, 0 failed**. `npm run e2e:local` remains the unfiltered 111-test
+catalog command; without Supabase it reports 47 integration cases as skipped,
+not verified.
+
+### Full disposable Supabase suite and realistic load
+
+`.github/workflows/supabase-e2e-load.yml` is the GitHub-hosted full-stack runner. It
+uses the pinned Supabase CLI to start local Postgres 17 plus Auth, Storage,
+Realtime and Studio, applies all 45 checked-in migrations plus only the marked
+inferred local scaffold, creates random synthetic Auth identities and fixtures,
+and builds the app against that loopback stack. It runs the hermetic 64 and the
+47 database-backed Playwright tests in separate stages, so the complete 111-test
+coverage has no skips. It then creates 5,000 synthetic guest sessions and orders
+across 100 restaurants, measures Next.js menu reads, authenticated kitchen
+updates and Realtime fan-out, and saves JSON metrics, test reports, traces and
+screenshots as a 30-day workflow artifact. It uses no hosted project credentials
+or production data and deploys nothing. A workflow definition is not evidence
+until its run finishes; its uploaded per-test reports and `load-report.json` are
+the evidence to retain.
+
+This sandbox has no Docker/Podman daemon or container images and cannot reach
+the container registries, so it cannot truthfully claim to have started the full
+Supabase stack here. The embedded PostgreSQL runners remain a safe subset, not
+a substitute for Auth, Storage, Realtime or Studio.
+
 ## Run locally on Linux
 
 ### Requirements
@@ -126,10 +173,11 @@ no mounted data volume. If these loopback ports are already occupied, override
   inferred local test shapes, not production DDL. Passing this E2E proves the
   repository SQL + local compatibility stack, not exact live-schema parity.
 
-## If the sandbox cannot run the browser
+## Evidence and the sandbox boundary
 
-Use the dedicated GitHub Actions workflow; it is the supported fallback and
-uses the same runner script and local-only data path. A missing browser/system
-library in the development sandbox is a blocker, not a reason to skip the tests
-or target production. Keep the workflow's uploaded evidence and require both
-browser tests to pass before describing this E2E as complete.
+The sandbox can run the hermetic 64 with bundled Chromium, but it has no Docker
+engine or image cache. The GitHub-hosted full-stack workflow is the route for
+the 47 Auth/Storage/Realtime integration tests and the API/Realtime workload.
+Retain and inspect its uploaded JSON/HTML reports and load metrics before
+claiming those tests passed. The separate `throttle-e2e.yml` workflow remains a
+PostgreSQL/PostgREST-only throttle check; it is not full Supabase evidence.

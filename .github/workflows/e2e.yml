@@ -13,8 +13,10 @@ name: E2E (browser)
 # that touches `main`'s deployment. Merging is what deploys this repository
 # (Vercel's git integration); this workflow cannot make that happen or stop it.
 #
-# It also needs no secrets: this job explicitly opts into the hermetic
-# test-build exception. That flag is GitHub-Actions-only and is not for deploys.
+# It also needs no Supabase credentials: this job explicitly opts into the
+# hermetic test-build exception and runs only the 64 demo-mode Playwright tests.
+# `supabase-e2e-load.yml` runs all 47 integration tests against a disposable
+# local Supabase stack with synthetic users and data.
 
 on:
   push:
@@ -52,25 +54,20 @@ jobs:
       - name: Build (explicit test-only demo mode, no database)
         run: npm run build
 
-      # The count is asserted, not assumed: a config that silently matched no
-      # tests would otherwise "pass" and prove nothing.
-      #
-      # 78 = 5 desktop + 5 phone + 14 guest-ordering + 7 security + 8 kitchen
-      # + 8 cashier + 31 integration. The integration ones need a real
-      # deployment and real accounts, so without secrets they report as
-      # SKIPPED -- they are in the list so that they cannot quietly stop being
-      # discoverable, not because this job verifies them. The 47 hermetic ones
-      # (desktop/phone/guest/staff) run here against demo mode.
-      - name: Expect 111 tests
+      # Count is asserted, not assumed: a project filter that silently matches
+      # no tests would otherwise "pass" and prove nothing. The 47 database-backed
+      # tests run separately in supabase-e2e-load.yml and are not skipped here.
+      - name: Expect 64 hermetic tests
         run: |
-          listed=$(npx playwright test --list | tail -1)
+          projects=(--project=desktop --project=phone --project=guest --project=staff --project=brand --project=responsive)
+          listed=$(npx playwright test "${projects[@]}" --list | tail -1)
           echo "$listed"
-          echo "$listed" | grep -q "Total: 111 tests"
+          echo "$listed" | grep -q "Total: 64 tests"
 
       # Two reporters: list for a human reading the log, json for the summary
-      # step below. The json file is the source of the per-test line.
+      # step below. The JSON file is the source of the per-test line.
       - name: Browser tests
-        run: npx playwright test --reporter=list,json
+        run: npx playwright test --project=desktop --project=phone --project=guest --project=staff --project=brand --project=responsive --reporter=list,json
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
 
@@ -141,6 +138,10 @@ jobs:
               process.exitCode = 1;
             }
           '
+
+      - name: Require all 64 hermetic browser tests to pass without skips/retries
+        if: always()
+        run: node scripts/e2e/assert-playwright-results.mjs playwright-report/results.json 64
 
       - name: Upload the responsive screenshots
         if: always()

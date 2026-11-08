@@ -17,6 +17,9 @@
     "env:check": "node scripts/check-env.mjs",
     "e2e": "playwright test",
     "e2e:install": "playwright install chromium",
+    "e2e:local": "GITHUB_ACTIONS=true CI=true AUTODINE_TEST_DEMO_BUILD=true VERCEL_ENV=test npm run build && GITHUB_ACTIONS=true CI=true AUTODINE_TEST_DEMO_BUILD=true VERCEL_ENV=test bash scripts/e2e/run-with-bundled-chromium.sh npm run e2e",
+    "e2e:demo": "GITHUB_ACTIONS=true CI=true AUTODINE_TEST_DEMO_BUILD=true VERCEL_ENV=test npm run build && GITHUB_ACTIONS=true CI=true AUTODINE_TEST_DEMO_BUILD=true VERCEL_ENV=test bash scripts/e2e/run-with-bundled-chromium.sh npm run e2e -- --project=desktop --project=phone --project=guest --project=staff --project=brand --project=responsive --output=test-results/supabase-e2e/demo-output --reporter=list,html,json",
+    "test:db:local": "node scripts/local-pg/run-embedded-tests.mjs",
     "test:e2e:throttle": "bash scripts/e2e/run-throttle.sh"
   },
   "dependencies": {
@@ -41,6 +44,7 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "embedded-postgres": "17.11.0-beta.19",
     "eslint": "^10.13.0",
     "pg": "^8.23.1",
     "pgsql-ast-parser": "^12.0.2",

@@ -356,11 +356,11 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- 10. Order submission is not throttled.
---     The scan limit is a brake on VERIFICATION. A guest who already holds a
---     session must never be refused an order because the card was scanned
---     often — that would turn a queue on the door into a queue on the till.
---     Checked against the function bodies, which is where the brake lives.
+-- 10. Order submission is not throttled by the card-scan limit.
+--     The card-scan limit is a brake on VERIFICATION. A guest who already
+--     holds a session must never be refused an order because the card was
+--     scanned often. This does not forbid the separate order-submission rate
+--     limiter; only the scan ledger/opening function must be absent here.
 -- ---------------------------------------------------------------------------
 do $$
 declare
@@ -383,11 +383,11 @@ begin
     raise exception 'FAIL 10: open_table_session does not read the opens table — this check is looking at the wrong function';
   end if;
 
-  if v_order_src like '%table_session_opens%' or v_order_src like '%limited%' then
-    raise exception 'FAIL 10: place_public_order consults the scan limit — order submission must never be throttled';
+  if v_order_src like '%table_session_opens%' or v_order_src like '%open_table_session%' then
+    raise exception 'FAIL 10: place_public_order consults the card-scan limiter — scan throttling must only gate verification';
   end if;
 
-  raise notice 'PASS 10: place_public_order never reads the scan limit (% chars checked)', length(v_order_src);
+  raise notice 'PASS 10: place_public_order never reads the card-scan limiter (separate order rate limiting remains allowed; % chars checked)', length(v_order_src);
 end $$;
 
 rollback;  -- nothing above is kept

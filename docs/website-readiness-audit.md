@@ -1,5 +1,9 @@
 # AutoDine website readiness audit
 
+## Continuation update (2026-10-28)
+
+On `autodinetest` only, migrations `20261021000005_public_place_order`, `20261021000006_table_qr_verification`, and `20261021000007_table_qr_provisioning` were applied after the earlier snapshot. The hosted project now has six of 45 repository migrations applied (39 remain), plus the local-only scaffold. A catalog check confirmed 16/16 public tables have RLS enabled and 22 policies exist. The expected QR/order functions are present, but `restaurant_can_write(uuid)` and later migration dependencies are not yet available. The Realtime publication has zero tables. Its database clock remains future-dated at 2026-11-08 versus the authoritative 2026-10-28 date; do not run date-sensitive tests. An authorized metadata-only lookup confirmed production is active/healthy, but the connector returned no backup/PITR settings; no production database rows or configuration were accessed or changed, and no restore test was run. This is progress, not a passed full-schema or app-integration gate.
+
 **Snapshot:** 2026-10-28 · branch `arena/e9e78732-autodine` · latest reviewed code `068dd68`; website audit update `04635e0` (active branch; not merged or deployed).
 
 **Latest hosted checks on audit commit `04635e0`:** CI `42505924731` passed; browser E2E `42505924527` passed (64 passed, 47 skipped, 0 failed); isolated PostgreSQL/browser E2E `42505924515` passed. These doc-only commits do not change application code.

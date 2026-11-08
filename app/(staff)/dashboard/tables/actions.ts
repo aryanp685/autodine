@@ -113,8 +113,12 @@ export async function setTableActiveAction(formData: FormData): Promise<void> {
   if (!ctx) fail('You need to be signed in to manage tables.');
 
   const tableId = String(formData.get('tableId') ?? '').trim();
-  const makeActive = formData.get('active') === 'true';
+  const activeValue = formData.get('active');
   if (!tableId) fail('Missing table.');
+  if (activeValue !== 'true' && activeValue !== 'false') {
+    fail('The table state was missing or invalid. Refresh and try again.');
+  }
+  const makeActive = activeValue === 'true';
 
   let issuedCode = false;
 

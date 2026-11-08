@@ -6,9 +6,9 @@ import { expect, type BrowserContext, type Page } from '@playwright/test';
  *
  * THE RULES THESE SPECS LIVE UNDER (read before pointing them anywhere)
  *
- *   · They WRITE ROWS: orders, payments, a staff session. Point them at a
- *     DISPOSABLE branch database only. Never production. The specs cannot
- *     tell the difference — you can.
+ *   · They WRITE ROWS: orders, payments, and staff sessions. Run them only
+ *     against the disposable local Supabase stack (or another explicitly
+ *     approved non-production target). Never production.
  *   · Without their environment variables they skip themselves. A green CI
  *     run with "7 skipped" is this file being discoverable, not verified.
  *   · Every env value is the human's to supply; nothing is guessed and no
@@ -16,8 +16,11 @@ import { expect, type BrowserContext, type Page } from '@playwright/test';
  */
 
 export const BASE = process.env.E2E_BASE_URL ?? '';
-/** A LIVE table card's public token, on a scan-mode restaurant. */
+/** A dedicated live card reserved for the real throttle integration test. */
 export const QR = process.env.E2E_QR_TOKEN ?? '';
+/** Fresh per-test cards keep the ordinary guest flows below the card open limit. */
+const SCAN_TOKENS = (process.env.E2E_QR_TOKENS ?? '').split(',').map((token) => token.trim()).filter(Boolean);
+let scanTokenCursor = 0;
 /** The six-digit on-site code for that card's table. */
 export const TABLE_CODE = process.env.E2E_TABLE_CODE ?? '';
 /** The restaurant slug the card belongs to. */
@@ -34,7 +37,7 @@ export const GUEST_READY = Boolean(BASE && QR && TABLE_CODE && SLUG);
 export const STAFF_READY = Boolean(BASE && OWNER_EMAIL && OWNER_PASSWORD);
 
 export function skipUnless(ready: boolean, needs: string): string {
-  return `needs a disposable deployment (${needs}); set the E2E_* environment and run --config playwright.integration.config.ts or --project=integration`;
+  return `needs a disposable non-production target (${needs}); set the E2E_* environment and run --config playwright.integration.config.ts or --project=integration`;
 }
 
 /** Sign an owner in and wait for the staff shell — the proof of a session. */
@@ -52,9 +55,12 @@ export async function signInOwner(context: BrowserContext): Promise<Page> {
  * Scan the table card. Returns the menu page for the restaurant the card
  * belongs to — with the card-pass cookie the scan handler set.
  */
-export async function scanCard(context: BrowserContext, token = QR): Promise<Page> {
+export async function scanCard(context: BrowserContext, token?: string): Promise<Page> {
+  const selected = token ?? (SCAN_TOKENS.length
+    ? SCAN_TOKENS[scanTokenCursor++ % SCAN_TOKENS.length]
+    : QR);
   const page = await context.newPage();
-  await page.goto(`${BASE}/t/${token}`);
+  await page.goto(`${BASE}/t/${selected}`);
   return page;
 }
 
