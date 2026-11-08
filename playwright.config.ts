@@ -33,7 +33,9 @@ export default defineConfig({
   timeout: 30_000,
   expect: { timeout: 7_000 },
   use: {
-    baseURL: 'http://127.0.0.1:3100',
+    // Use localhost, not its literal loopback IP: Chromium permits Secure
+    // cookies on localhost over the disposable HTTP test server.
+    baseURL: 'http://localhost:3100',
     ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
       ? {
           launchOptions: {
@@ -124,8 +126,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npx next start -H 127.0.0.1 -p 3100',
-    url: 'http://127.0.0.1:3100/dashboard',
+    command: 'npx next start -H 0.0.0.0 -p 3100',
+    url: 'http://localhost:3100/dashboard',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

@@ -121,7 +121,7 @@ jobs:
         if: ${{ success() && inputs.integration_grep == '' }}
         env:
           E2E_FIXTURE_ENV_FILE: ${{ runner.temp }}/autodine-e2e-fixtures.env
-          APP_BASE_URL: http://127.0.0.1:3100
+          APP_BASE_URL: http://localhost:3100
           LOAD_REPORT_FILE: test-results/supabase-e2e/load-report.json
           LOAD_GUESTS: '5000'
           LOAD_RESTAURANTS: '100'
@@ -129,14 +129,14 @@ jobs:
         run: |
           set -euo pipefail
           source "$E2E_FIXTURE_ENV_FILE"
-          npx next start -H 127.0.0.1 -p 3100 > "$RUNNER_TEMP/autodine-next-load.log" 2>&1 &
+          npx next start -H 0.0.0.0 -p 3100 > "$RUNNER_TEMP/autodine-next-load.log" 2>&1 &
           NEXT_PID=$!
           trap 'kill "$NEXT_PID" 2>/dev/null || true' EXIT
           for attempt in $(seq 1 60); do
-            if curl --fail --silent http://127.0.0.1:3100/menu >/dev/null; then break; fi
+            if curl --fail --silent http://localhost:3100/menu >/dev/null; then break; fi
             sleep 2
           done
-          curl --fail --silent http://127.0.0.1:3100/menu >/dev/null
+          curl --fail --silent http://localhost:3100/menu >/dev/null
           node scripts/e2e/load-local-supabase.mjs
 
       - name: Stop disposable Supabase stack
