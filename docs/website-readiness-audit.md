@@ -1,13 +1,15 @@
 # AutoDine website readiness audit
 
-**Snapshot:** 2026-10-28 · branch `arena/e9e78732-autodine` · latest reviewed code `068dd68`; latest docs-only audit update `1cef125` (active branch; not merged or deployed).
+**Snapshot:** 2026-10-28 · branch `arena/e9e78732-autodine` · latest reviewed code `068dd68`; website audit update `04635e0` (active branch; not merged or deployed).
+
+**Latest hosted checks on audit commit `04635e0`:** CI `42505924731` passed; browser E2E `42505924527` passed (64 passed, 47 skipped, 0 failed); isolated PostgreSQL/browser E2E `42505924515` passed. These doc-only commits do not change application code.
 
 **Current decision:** **NO-GO for a broad commercial launch.** The website has broad UI and application-level test coverage, but not all real service journeys are verified. A carefully limited one-restaurant pilot could be considered only after the P0 gates in the [production SaaS readiness audit](production-saas-readiness-audit.md) pass and there is separate approval for production deployment. This report is not legal/tax approval. GST Option A remains locked.
 
 ## Evidence reviewed
 
 - Current repository routes, screens, server actions, SQL migration set, configuration guards, tests, and operating instructions.
-- Latest hosted workflow checks on commit `1cef125`: CI `42467588325` passed; browser E2E `42467588324` passed. The isolated PostgreSQL/browser workflow `42467588323` first failed, then passed after a failed-job rerun. Its uploaded log artifact could not be downloaded in this environment, so the first failure's cause remains unknown; record it as a transient/unexplained failure, not as proof that the underlying test is flaky or fixed.
+- Latest hosted workflow checks on audit commit `04635e0`: CI `42505924731` passed; browser E2E `42505924527` passed with 64 passed, 47 skipped, 0 failed; isolated PostgreSQL/browser workflow `42505924515` passed. The preceding commit's isolated workflow `42467588323` first failed, then passed on failed-job rerun. Its uploaded log artifact could not be downloaded in this environment, so the first failure's cause remains unknown; the new passing run is useful evidence but does not explain that failure.
 - Local checks rerun on the same code: `npm ci` (310 packages, 0 vulnerabilities), Vitest (all executed tests passed; five database-gated tests skipped without `THROTTLE_DB_URL`), lint, typecheck, design check, SQL syntax check, hermetic production build, and `npm audit --omit=dev` (0 vulnerabilities). SQL syntax checking does not validate function bodies, privileges, RLS behavior, or deployed-schema parity.
 - On the user-designated non-production Supabase project `autodinetest`, three repository migrations plus the explicitly local-only inferred scaffold have been applied. A disposable SQL `place_order` smoke succeeded with two 1,234-paise items and the expected 2,591-paise total, then its fixtures were removed and counts were checked. This project has only a partial schema: 42 repository migrations remain. It is not a live app integration or production-parity test.
 - The test project database clock reports 2026-11-08, ahead of the authoritative 2026-10-28 date. Realtime reports healthy service status but `db_connected=false` and `replication_connected=false`; the Realtime publication migration has not yet been applied, so recheck after completing migrations. Do not treat date-sensitive tests as verified.
