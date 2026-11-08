@@ -1,135 +1,145 @@
+-- Preserve the latest session attachment and retry logic; serialize guest-token replays.
 -- ============================================================================
--- AutoDine — migration 20261109000200: one attempt, one order, even concurrently
---
--- WHY THIS EXISTS
---
--- place_public_order is idempotent on p_guest_token, but the check is a
--- read followed by a write. Two requests with the same attempt key can both
--- pass the read, both write an order, and then one update hits
--- orders_guest_token_unique. The exception handler returns the existing code,
--- but the second order row is already in the table: a duplicate kitchen
--- ticket and a double bill for one intention.
---
--- This takes a transaction-scoped advisory lock on the guest token before
--- the replay check, so the second request waits for the first to finish and
--- then sees the order it wrote. The lock is released at commit/rollback and
--- is only taken when a token is present; the no-token path is unchanged.
---
--- The body is the 20261108000200_drift_reconcile version, with the lock added.
+-- Restore the P3 durable order-session attachment in the latest public-order
+-- wrapper. The order-code reliability migration replaced this wrapper from an
+-- older body and accidentally omitted the open-or-join step introduced by
+-- 20261108000200. The core order write and checkout flow are unchanged.
 -- ============================================================================
 
-create or replace function public.place_public_order(
-  p_slug          text,
-  p_lines         jsonb,
-  p_note          text default null,
-  p_session_token text default null,
-  p_guest_token   uuid default null,
-  p_ip_hash       text default null
-) returns text
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-declare
-  v_code      text;
+CREATE OR REPLACE FUNCTION public.place_public_order(
+  p_slug text,
+  p_lines jsonb,
+  p_note text DEFAULT NULL,
+  p_session_token text DEFAULT NULL,
+  p_guest_token uuid DEFAULT NULL,
+  p_ip_hash text DEFAULT NULL
+) RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_code text;
   v_restaurant_id uuid;
-  v_existing  text;
-  v_allowed   boolean;
-  v_retry     integer;
-begin
-  if p_session_token is null or btrim(p_session_token) = '' then
-    raise exception 'Scan the QR code on your table and enter the code showing in the restaurant before ordering.'
-      using errcode = 'P0001';
-  end if;
+  v_existing text;
+  v_allowed boolean;
+  v_retry integer;
+  v_table_id uuid;
+  v_order_session_id uuid;
+BEGIN
+  IF p_guest_token IS NOT NULL THEN
+    PERFORM pg_advisory_xact_lock(hashtext('guest:' || p_guest_token::text));
+  END IF;
+  IF p_session_token IS NULL OR btrim(p_session_token) = '' THEN
+    RAISE EXCEPTION 'Scan the QR code on your table and enter the code showing in the restaurant before ordering.'
+      USING ERRCODE = 'P0001';
+  END IF;
 
-  if p_guest_token is not null then
-    perform pg_advisory_xact_lock(hashtext('guest:' || p_guest_token::text));
-  end if;
+  SELECT r.id INTO v_restaurant_id
+    FROM public.restaurants r
+   WHERE r.slug = btrim(coalesce(p_slug, ''));
 
-  select r.id into v_restaurant_id
-    from public.restaurants r
-   where r.slug = btrim(coalesce(p_slug, ''));
+  -- Replays return before rate counting or any new ticket/session work.
+  IF p_guest_token IS NOT NULL AND v_restaurant_id IS NOT NULL THEN
+    SELECT o.code INTO v_existing
+      FROM public.orders o
+     WHERE o.guest_token = p_guest_token
+       AND o.restaurant_id = v_restaurant_id
+     LIMIT 1;
 
-  if p_guest_token is not null and v_restaurant_id is not null then
-    select o.code into v_existing
-      from public.orders o
-     where o.guest_token = p_guest_token
-       and o.restaurant_id = v_restaurant_id
-     limit 1;
+    IF v_existing IS NOT NULL THEN
+      RETURN v_existing;
+    END IF;
+  END IF;
 
-    if v_existing is not null then
-      return v_existing;
-    end if;
-  end if;
-
-  select a.allowed, a.retry_after_seconds
-    into v_allowed, v_retry
-    from public.hit_rate_limit(
+  SELECT a.allowed, a.retry_after_seconds
+    INTO v_allowed, v_retry
+    FROM public.hit_rate_limit(
       'po:s:' || encode(sha256(btrim(p_session_token)::bytea), 'hex'),
       30, 600
     ) a;
 
-  if coalesce(v_allowed, true) then
-    select a.allowed, a.retry_after_seconds
-      into v_allowed, v_retry
-      from public.hit_rate_limit(
+  IF coalesce(v_allowed, true) THEN
+    SELECT a.allowed, a.retry_after_seconds
+      INTO v_allowed, v_retry
+      FROM public.hit_rate_limit(
         'po:t:' || coalesce(v_restaurant_id::text, 'unknown'),
         60, 600
       ) a;
-  end if;
+  END IF;
 
-  if coalesce(v_allowed, true) and p_ip_hash is not null and btrim(p_ip_hash) <> '' then
-    select a.allowed, a.retry_after_seconds
-      into v_allowed, v_retry
-      from public.hit_rate_limit('po:i:' || btrim(p_ip_hash), 60, 600) a;
-  end if;
+  IF coalesce(v_allowed, true) AND p_ip_hash IS NOT NULL AND btrim(p_ip_hash) <> '' THEN
+    SELECT a.allowed, a.retry_after_seconds
+      INTO v_allowed, v_retry
+      FROM public.hit_rate_limit('po:i:' || btrim(p_ip_hash), 60, 600) a;
+  END IF;
 
-  if coalesce(v_allowed, true) is not true then
-    raise exception 'Too many orders right now. Please wait % seconds and try again.',
+  IF coalesce(v_allowed, true) IS NOT TRUE THEN
+    RAISE EXCEPTION 'Too many orders right now. Please wait % seconds and try again.',
       coalesce(v_retry, 60)
-      using errcode = 'P0001', hint = 'rate-limited';
-  end if;
+      USING ERRCODE = 'P0001', HINT = 'rate-limited';
+  END IF;
 
-  v_code := public.place_public_order_core(p_slug, p_lines, p_note, p_session_token);
+  v_code := public.place_public_order_core_with_code_retry(p_slug, p_lines, p_note, p_session_token);
+  PERFORM public.stamp_guest_verification(v_code, v_restaurant_id, btrim(p_session_token));
 
-  -- Stamp the sitting onto the order: session id always (scan or code), and
-  -- hold_required for a scan_confirm sitting nobody has vouched for yet.
-  -- This is the call 20261028000900 promised and its wrapper forgot; without
-  -- it the hold/confirm machinery is dead code.
-  perform public.stamp_guest_verification(v_code, v_restaurant_id, btrim(p_session_token));
-
-  if p_guest_token is not null then
-    update public.orders o
-       set guest_token = p_guest_token,
+  IF p_guest_token IS NOT NULL THEN
+    UPDATE public.orders o
+       SET guest_token = p_guest_token,
            tax_rate_bps_snapshot = coalesce(
              o.tax_rate_bps_snapshot,
-             (select r.tax_rate_bps from public.restaurants r where r.id = o.restaurant_id)
+             (SELECT r.tax_rate_bps FROM public.restaurants r WHERE r.id = o.restaurant_id)
            )
-     where o.code = v_code
-       and o.restaurant_id = v_restaurant_id;
-  end if;
+     WHERE o.code = v_code
+       AND o.restaurant_id = v_restaurant_id;
+  END IF;
 
-  return v_code;
+  -- Every guest ticket at a table belongs to the table's one open sitting.
+  -- The partial unique index arbitrates concurrent first orders; an order for
+  -- a closed sitting opens a fresh session instead of reusing history.
+  SELECT o.table_id INTO v_table_id
+    FROM public.orders o
+   WHERE o.code = v_code
+     AND o.restaurant_id = v_restaurant_id;
 
-exception
-  when unique_violation then
-    if p_guest_token is not null then
-      select o.code into v_existing
-        from public.orders o
-       where o.guest_token = p_guest_token
-         and (v_restaurant_id is null or o.restaurant_id = v_restaurant_id)
-       limit 1;
+  IF v_table_id IS NOT NULL THEN
+    INSERT INTO public.order_sessions (restaurant_id, table_id)
+    VALUES (v_restaurant_id, v_table_id)
+    ON CONFLICT (table_id) WHERE status = 'open'
+    DO UPDATE SET table_id = excluded.table_id
+    RETURNING id INTO v_order_session_id;
 
-      if v_existing is not null then
-        return v_existing;
-      end if;
-    end if;
-    raise;
-end;
+    UPDATE public.orders o
+       SET order_session_id = v_order_session_id
+     WHERE o.code = v_code
+       AND o.restaurant_id = v_restaurant_id
+       AND o.order_session_id IS NULL;
+  END IF;
+
+  RETURN v_code;
+
+EXCEPTION
+  WHEN unique_violation THEN
+    -- A concurrent replay may lose the guest-token unique-index race. The
+    -- PL/pgSQL exception subtransaction rolls back its core order, line items,
+    -- and session attachment before returning the winning order's code.
+    IF p_guest_token IS NOT NULL THEN
+      SELECT o.code INTO v_existing
+        FROM public.orders o
+       WHERE o.guest_token = p_guest_token
+         AND (v_restaurant_id IS NULL OR o.restaurant_id = v_restaurant_id)
+       LIMIT 1;
+
+      IF v_existing IS NOT NULL THEN
+        RETURN v_existing;
+      END IF;
+    END IF;
+    RAISE;
+END;
 $$;
 
-revoke all on function public.place_public_order(text, jsonb, text, text, uuid, text) from public;
-revoke all on function public.place_public_order(text, jsonb, text, text, uuid, text) from anon;
-revoke all on function public.place_public_order(text, jsonb, text, text, uuid, text) from authenticated;
-grant execute on function public.place_public_order(text, jsonb, text, text, uuid, text) to anon;
-grant execute on function public.place_public_order(text, jsonb, text, text, uuid, text) to authenticated;
+GRANT EXECUTE ON FUNCTION public.place_public_order(text, jsonb, text, text, uuid, text) TO anon;
+GRANT EXECUTE ON FUNCTION public.place_public_order(text, jsonb, text, text, uuid, text) TO authenticated;
+
+COMMENT ON FUNCTION public.place_public_order(text, jsonb, text, text, uuid, text) IS
+  'Guest order placement: server-priced, idempotent on p_guest_token, rate limited, collision-retried, and attached to the table''s open order session.';

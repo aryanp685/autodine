@@ -698,3 +698,9 @@ export function selectNewTickets<T extends AnnounceableTicket>(
   const known = new Set(seen);
   return tickets.filter((ticket) => ticket.orderId && !known.has(ticket.orderId));
 }
+
+/** The exact Hindi call-for-service sentence the kitchen speaks. */
+export function waiterCallAnnouncement(table: string): string {
+  const safeTable = table.replace(/[\r\n\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 40) || 'टेबल';
+  return `टेबल ${safeTable}, वेटर ध्यान दीजिए।`;
+}

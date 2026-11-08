@@ -26,12 +26,6 @@ export type Restaurant = {
   announcement_text: string | null;
   announcement_on: boolean;
   /**
-   * Migration 20261022000800. Whether this outlet takes card/UPI online.
-   * Off until the owner switches it on: taking card money is their decision,
-   * not something a deployment key should turn on for them.
-   */
-  online_payments_enabled: boolean;
-  /**
    * Migration 20261025001000. Storage object paths, not URLs -- see
    * lib/storage/assets.ts for why. Null means "never uploaded", which is the
    * normal case and is drawn as a designed state, never as a broken image.
@@ -174,6 +168,68 @@ export type DiningTable = {
   is_active: boolean;
 };
 
+/** One guest sitting; independent of the short-lived QR verification session. */
+export type OrderSession = {
+  id: string;
+  restaurant_id: string;
+  table_id: string;
+  opened_at: string;
+  closed_at: string | null;
+  closed_by: string | null;
+  paid_at?: string | null;
+  paid_by?: string | null;
+  status: 'open' | 'closed';
+};
+
+export type RestaurantInvoice = {
+  id: string;
+  restaurant_id: string;
+  order_session_id: string;
+  invoice_number: string;
+  financial_year: string;
+  sequence_number: number;
+  document_type: 'receipt' | 'gst_tax_invoice';
+  status: 'issued' | 'voided';
+  issued_at: string;
+  issued_by: string | null;
+  table_label_snapshot: string | null;
+  session_opened_at: string;
+  session_closed_at: string;
+  seller_snapshot: unknown;
+  customer_snapshot: unknown | null;
+  totals_snapshot: unknown;
+  payment_snapshot: unknown;
+  source_order_ids: string[];
+  supersedes_invoice_id: string | null;
+  voided_at: string | null;
+  voided_by: string | null;
+  void_reason: string | null;
+  created_at: string;
+};
+
+export type RestaurantInvoiceLine = {
+  id: string;
+  invoice_id: string;
+  restaurant_id: string;
+  line_number: number;
+  source_order_id: string;
+  source_order_item_id: string | null;
+  line_snapshot: unknown;
+  created_at: string;
+};
+
+export type RestaurantPaymentReceipt = {
+  id: string;
+  restaurant_id: string;
+  invoice_id: string;
+  payment_id: string;
+  sequence_number: number;
+  receipt_reference: string;
+  issued_at: string;
+  snapshot: unknown;
+  created_at: string;
+};
+
 export type PrepStatus = 'new' | 'preparing' | 'ready' | 'served' | 'cancelled';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 
@@ -215,8 +271,32 @@ export type Order = {
   confirmed_at?: string | null;
   /** Who tapped confirm. Null for anything not confirmed by a person. */
   confirmed_by?: string | null;
-  /** The table sitting this order belongs to, for grouping and confirming. */
+  /** Short-lived QR verification session (not the bill/sitting session). */
   table_session_id?: string | null;
+  /** Durable table sitting used to group incremental tickets into one bill. */
+  order_session_id?: string | null;
+  /** Last persistent kitchen announcement outcome, written by a guarded RPC. */
+  kitchen_announcement_status?: 'announced' | 'failed' | null;
+  kitchen_announcement_at?: string | null;
+  kitchen_announcement_error?: string | null;
+};
+
+/** A guest's open request for a staff member to visit their table. */
+export type TableWaiterCall = {
+  id: string;
+  restaurant_id: string;
+  table_id: string;
+  table_session_hash: string | null;
+  table_label_snapshot: string;
+  request_key: string;
+  status: 'open' | 'resolved';
+  created_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  announcement_status: 'pending' | 'claimed' | 'announced' | 'failed';
+  announcement_claimed_at: string | null;
+  announcement_at: string | null;
+  announcement_error: string | null;
 };
 
 export type OrderItem = {

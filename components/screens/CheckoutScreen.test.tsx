@@ -55,18 +55,24 @@ const items = [
   },
 ];
 
-const render = (onlinePaymentAvailable = false) =>
+const render = () =>
   renderToStaticMarkup(
     <Checkout
       slug="maddi"
       restaurantName="Maddi"
       taxRateBps={500}
       items={items}
-      onlinePaymentAvailable={onlinePaymentAvailable}
     />,
   );
 
 describe('checkout payment step', () => {
+  it('does not present the demo fallback rate as restaurant tax information', () => {
+    const html = renderToStaticMarkup(<Checkout slug="maddi" items={items} />);
+
+    expect(html).toContain('<dt>Taxes</dt>');
+    expect(html).not.toContain('GST 5% · sample');
+  });
+
   it('states one way to pay instead of offering two dead buttons', () => {
     const html = render();
 
@@ -84,9 +90,16 @@ describe('checkout payment step', () => {
     expect(html).toContain('marked payment pending');
   });
 
-  it('mentions card and UPI online only when the server said it is offered', () => {
-    expect(render(false)).not.toContain('online, on the order page');
-    expect(render(true)).toContain('online, on the order page');
+  it('offers pay at counter only: no online payment is mentioned anywhere', () => {
+    const html = render();
+    expect(html).not.toContain('online, on the order page');
+    expect(html).not.toContain('Pay online');
+    expect(html).not.toContain('card/UPI on the next screen');
+  });
+
+  it('confirms with the mandated button: Place order & pay at counter', () => {
+    const html = render();
+    expect(html).toContain('Place order &amp; pay at counter');
   });
 });
 

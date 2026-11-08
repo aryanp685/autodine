@@ -40,7 +40,6 @@ function picky(answers: { columns?: Record<string, Failure>; functions?: Record<
 const base = {
   configured: true,
   serverKey: true,
-  gatewayKeys: false,
   trialDays: 7,
 };
 
@@ -107,7 +106,6 @@ describe('probeHealth', () => {
     const health = await probeHealth({
       configured: false,
       serverKey: false,
-      gatewayKeys: false,
       trialDays: 7,
       primary: null,
       publicClient: null,

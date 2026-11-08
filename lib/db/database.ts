@@ -26,6 +26,11 @@ import type {
   Menu,
   Order,
   OrderItem,
+  OrderSession,
+  RestaurantInvoice,
+  RestaurantInvoiceLine,
+  RestaurantPaymentReceipt,
+  TableWaiterCall,
   PaymentStatus,
   PrepStatus,
   Restaurant,
@@ -80,6 +85,22 @@ export type Database = {
       item_addon_groups: Table<ItemAddonGroup>;
       item_addons: Table<ItemAddon>;
       dining_tables: Table<DiningTable>;
+      /** The sitting represented by the consolidated table bill. */
+      order_sessions: Table<OrderSession>;
+      /** Immutable, sequential customer receipts; rows are written only by RPC. */
+      restaurant_invoices: Table<RestaurantInvoice>;
+      /** Immutable line snapshots belonging to a receipt. */
+      restaurant_invoice_lines: Table<RestaurantInvoiceLine>;
+      /** Immutable supplemental receipts for payments received after invoicing. */
+      restaurant_payment_receipts: Table<RestaurantPaymentReceipt>;
+      /** Live guest requests for staff to visit a verified table. */
+      table_waiter_calls: Table<TableWaiterCall>;
+      /** Private row-locked receipt counters; no client grants. */
+      restaurant_invoice_series: Table<{
+        restaurant_id: string;
+        financial_year: string;
+        next_number: number;
+      }>;
       /**
        * The printed card's code. This is the scheme scanning uses.
        *
@@ -196,7 +217,8 @@ export type Database = {
         id: string;
         order_id: string;
         restaurant_id: string;
-        method: 'cash' | 'card' | 'upi' | 'online';
+        /** `manual` is internal-only for the table-level Mark Paid action. */
+        method: 'cash' | 'card' | 'upi' | 'online' | 'manual';
         amount_paise: number;
         status: 'pending' | 'recorded' | 'failed' | 'refunded';
         provider: string | null;
@@ -206,10 +228,41 @@ export type Database = {
         provider_payment_ref: string | null;
         idempotency_key: string | null;
         created_at: string;
+        recorded_at: string | null;
       }>;
     };
     Views: Record<string, never>;
     Functions: {
+      /** Atomic shared rate-limit counter; service role only. */
+      hit_rate_limit: {
+        Args: { p_key: string; p_limit: number; p_window_seconds: number };
+        Returns: { allowed: boolean; retry_after_seconds: number }[];
+      };
+      /** One cross-device winner for a kitchen announcement; staff role is checked in SQL. */
+      claim_kitchen_order_announcement: {
+        Args: { p_order_id: string };
+        Returns: boolean;
+      };
+      record_kitchen_announcement_result: {
+        Args: { p_order_id: string; p_status: 'announced' | 'failed'; p_failure_reason?: string | null };
+        Returns: boolean;
+      };
+      call_waiter: {
+        Args: { p_session_token: string; p_request_key: string };
+        Returns: string;
+      };
+      claim_table_waiter_call_announcement: {
+        Args: { p_call_id: string };
+        Returns: boolean;
+      };
+      record_table_waiter_call_announcement: {
+        Args: { p_call_id: string; p_status: 'announced' | 'failed'; p_failure_reason?: string | null };
+        Returns: boolean;
+      };
+      resolve_table_waiter_call: {
+        Args: { p_call_id: string };
+        Returns: boolean;
+      };
       /**
        * Migration 20261103000100. Publish the menu + brand pair in ONE
        * transaction: the restaurants row is only ever rewritten from here, so
@@ -308,7 +361,7 @@ export type Database = {
       preview_staff_invite: {
         Args: { p_code: string };
         Returns: Array<{
-          status: 'ok' | 'already_member' | 'used' | 'expired' | 'revoked' | 'closed' | 'not_found';
+          status: 'ok' | 'already_member' | 'used' | 'expired' | 'revoked' | 'closed' | 'not_found' | 'rate_limited';
           restaurant_id: string | null;
           restaurant_name: string | null;
           role: MemberRole | null;
@@ -319,10 +372,23 @@ export type Database = {
       redeem_staff_invite: {
         Args: { p_code: string };
         Returns: Array<{
-          status: 'ok' | 'already_member' | 'used' | 'expired' | 'revoked' | 'closed' | 'not_found';
+          status: 'ok' | 'already_member' | 'used' | 'expired' | 'revoked' | 'closed' | 'not_found' | 'rate_limited';
           restaurant_id: string | null;
           restaurant_name: string | null;
           role: MemberRole | null;
+        }>;
+      };
+      /** Owner/manager-only, read-only staff security audit history. */
+      list_staff_security_audit: {
+        Args: { p_restaurant_id: string; p_limit?: number };
+        Returns: Array<{
+          id: string;
+          actor_id: string | null;
+          event_type: string;
+          target_type: 'staff_invite' | 'membership';
+          target_id: string;
+          metadata: Record<string, unknown>;
+          created_at: string;
         }>;
       };
       /** Migration 20261029000100. Returns 'revoked' | 'used' | 'not_found'. */
@@ -624,6 +690,34 @@ export type Database = {
        * untouched. The token decides the restaurant, and the slug is only
        * checked for agreement.
        */
+      /**
+       * P6: issues the immutable non-GST receipt for a closed table session.
+       * The database reads ticket/payment rows and allocates its own number.
+       */
+      issue_closed_session_receipt: {
+        Args: { p_order_session_id: string };
+        Returns: string;
+      };
+      /** P8: closes a table and issues/returns its receipt in one transaction. */
+      close_order_session_and_issue_receipt: {
+        Args: { p_order_session_id: string };
+        Returns: string;
+      };
+      /** P6: owner/manager-only void that preserves the number and snapshot. */
+      void_restaurant_invoice: {
+        Args: { p_invoice_id: string; p_reason: string };
+        Returns: undefined;
+      };
+      /**
+       * P4: one authenticated staff tick settles every remaining order in an
+       * open table session. No amount, method, restaurant or actor comes from
+       * the browser; the function derives all of them and stores a manual
+       * ledger/audit entry transactionally.
+       */
+      mark_order_session_paid: {
+        Args: { p_order_session_id: string };
+        Returns: string;
+      };
       place_public_order: {
         Args: {
           p_slug: string;
@@ -818,39 +912,6 @@ export type Database = {
       restaurant_has_feature: {
         Args: { p_restaurant_id: string; p_feature: string };
         Returns: boolean;
-      };
-      /**
-       * Migration 20261026001300. The restaurant's own UPI details for ONE
-       * order, to a caller holding that order's guest token. Never a
-       * platform-wide payee.
-       */
-      public_upi_details: {
-        Args: { p_slug: string; p_code: string; p_token: string };
-        Returns: {
-          upi_id: string | null;
-          payee_name: string;
-          restaurant_name: string;
-          code: string;
-          payment_status: string;
-          due_paise: number;
-          claimed_at: string | null;
-        } | null;
-      };
-      /** "I have paid" -> a PENDING row. Never marks an order paid. */
-      claim_upi_payment: {
-        Args: { p_slug: string; p_code: string; p_token: string };
-        Returns: {
-          ok: boolean;
-          already_paid?: boolean;
-          already_claimed?: boolean;
-          claim_recorded?: boolean;
-          due_paise?: number;
-        };
-      };
-      /** Orders where the guest says they paid by UPI. Cashier-facing. */
-      counter_claims: {
-        Args: { p_restaurant_id: string };
-        Returns: Array<{ order_id: string; claimed_at: string }>;
       };
     };
     Enums: {

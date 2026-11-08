@@ -4,7 +4,6 @@ import { SettingsScreen } from '@/components/screens/SettingsScreen';
 import { getSettingsScreenData } from '@/lib/db/settings-screen';
 import { getTeamScreenData } from '@/lib/db/team';
 import { getOutletBar } from '@/lib/db/outlet-bar';
-import { onlinePaymentsConfigured } from '@/lib/payments/razorpay';
 import { siteOrigin } from '@/lib/site-origin';
 import { INVITE_FLASH_COOKIE, parseInviteFlash } from '@/lib/team-invite';
 
@@ -44,9 +43,6 @@ export default async function SettingsPage({
       origin={origin}
       error={error}
       notice={notice}
-      // Read on the server: whether this deployment can verify a payment at
-      // all. The switch below is the owner's; this is the server's.
-      gatewayConfigured={onlinePaymentsConfigured()}
     />
   );
 }

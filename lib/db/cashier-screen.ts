@@ -58,21 +58,6 @@ export type CounterOrder = {
   paid: number;
   /** One-line summary of the ticket, e.g. '2 × Biryani · 3 × Roti'. */
   items: string;
-  /**
-   * The guest pressed "I have paid" on the restaurant's UPI QR.
-   *
-   * NOT money. The transfer happens in the guest's app, which tells nobody
-   * here, so this is a prompt to check the restaurant's own bank app before
-   * taking cash — the difference between one more screen and a double payment.
-   */
-  claimed: boolean;
-  /**
-   * A pending online (gateway) attempt exists for this order.
-   *
-   * NOT money. The guest may be mid-checkout, or the webhook may not have
-   * arrived. The cashier must not take cash for the full balance while it is
-   * in flight; record_counter_payment refuses, and this badge is the reason.
-   */
   pendingOnline: boolean;
 };
 
@@ -132,7 +117,7 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
   // recorded against it, and record_cash_payment will only accept the exact
   // outstanding balance -- so showing the full total would be a lie that
   // fails at the till.
-  const [itemsResult, tablesResult, paymentsResult, claimsResult] = await Promise.all([
+  const [itemsResult, tablesResult, paymentsResult] = await Promise.all([
     supabase
       .from('order_items')
       .select('order_id, qty, name_snapshot, sort_order')
@@ -142,10 +127,6 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
       ? supabase.from('dining_tables').select('id, label').in('id', tableIds)
       : Promise.resolve({ data: [], error: null }),
     supabase.from('payments').select('order_id, amount_paise, status, method').in('order_id', orderIds),
-    // Optional: a deployment that has not applied migration 20261026001300 has
-    // no counter_claims(). The queue must work either way, so a missing
-    // function reads as "no claims", not as a failed screen.
-    supabase.rpc('counter_claims', { p_restaurant_id: restaurantId }),
   ]);
 
   if (itemsResult.error) {
@@ -160,14 +141,12 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
 
   // Only 'recorded' money counts. A failed or refunded attempt did not move
   // any cash, so counting it would understate what the guest still owes.
-  const paidByOrder = new Map<string, number>();
   const pendingOnlineByOrder = new Set<string>();
+  const paidByOrder = new Map<string, number>();
   for (const p of paymentsResult.data ?? []) {
-    if (p.status === 'recorded') {
-      paidByOrder.set(p.order_id, (paidByOrder.get(p.order_id) ?? 0) + p.amount_paise);
-    } else if (p.status === 'pending' && p.method === 'online') {
-      pendingOnlineByOrder.add(p.order_id);
-    }
+    if (p.status === 'pending' && p.method === 'online') pendingOnlineByOrder.add(p.order_id);
+    if (p.status !== 'recorded') continue;
+    paidByOrder.set(p.order_id, (paidByOrder.get(p.order_id) ?? 0) + p.amount_paise);
   }
 
   const itemsByOrder = new Map<string, typeof itemsResult.data>();
@@ -176,10 +155,6 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
     list.push(item);
     itemsByOrder.set(item.order_id, list);
   }
-
-  const claimedOrders = new Set<string>(
-    claimsResult.error ? [] : (claimsResult.data ?? []).map((row) => row.order_id)
-  );
 
   const labelByTable = new Map<string, string>();
   for (const table of tablesResult.data ?? []) {
@@ -203,7 +178,6 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
       paid: paiseToRupees(Math.min(paidByOrder.get(row.id) ?? 0, row.total_paise)),
       outstanding: paiseToRupees(Math.max(row.total_paise - (paidByOrder.get(row.id) ?? 0), 0)),
       items: lines.join(' · ') || 'No items recorded',
-      claimed: claimedOrders.has(row.id),
       pendingOnline: pendingOnlineByOrder.has(row.id),
     };
   });

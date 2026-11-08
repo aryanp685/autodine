@@ -30,6 +30,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { getStaffContextDetailed } from '@/lib/db/staff';
+import { nextTableLabel } from '@/lib/table-label';
 
 const TABLES_PATH = '/dashboard/tables';
 
@@ -51,16 +52,6 @@ async function currentRestaurant() {
   return { supabase: staff.context.supabase, restaurantId: staff.context.restaurantId };
 }
 
-/** Next free table label: T1, T2, ... skipping any label already taken. */
-function nextLabel(existing: string[]): string {
-  const used = new Set(existing);
-  for (let i = 1; i <= 999; i++) {
-    const candidate = `T${i}`;
-    if (!used.has(candidate)) return candidate;
-  }
-  return `T${Date.now()}`;
-}
-
 export async function addTableAction(formData: FormData): Promise<void> {
   const ctx = await currentRestaurant();
   if (!ctx) fail('You need to be signed in to manage tables.');
@@ -77,7 +68,7 @@ export async function addTableAction(formData: FormData): Promise<void> {
 
   if (readError) fail(`Could not read tables: ${readError.message}`);
 
-  const label = nextLabel((existing ?? []).map((row) => row.label as string));
+  const label = nextTableLabel((existing ?? []).map((row) => row.label as string));
 
   // No .select(): the returned row is not needed now that the QR code is
   // created by the trigger, and asking for one only to discard it is a

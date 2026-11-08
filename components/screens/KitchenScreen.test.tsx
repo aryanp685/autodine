@@ -22,6 +22,11 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/app/(staff)/kitchen/actions', () => ({
   advanceOrderAction: async () => ({ ok: true, state: 'preparing' }),
+  claimKitchenOrderAnnouncementAction: async () => ({ ok: true, claimed: true }),
+  claimTableWaiterCallAnnouncementAction: async () => ({ ok: true, claimed: true }),
+  recordKitchenAnnouncementResultAction: async () => ({ ok: true }),
+  recordTableWaiterCallAnnouncementAction: async () => ({ ok: true }),
+  resolveTableWaiterCallAction: async () => ({ ok: true }),
 }));
 
 vi.mock('@/lib/supabase/client', () => ({
@@ -126,6 +131,35 @@ describe('Kitchen board', () => {
 
     expect(html).toContain('Sign in');
     expect(html).not.toContain('Demo board · local only');
+  });
+
+  it('offers browser KOT printing only for real live tickets', () => {
+    const html = renderToStaticMarkup(
+      <Kitchen
+        data={{
+          restaurantName: 'Maddi',
+          restaurantId: 'r-1',
+          cancelled: [],
+          role: 'kitchen',
+          canAdvance: false,
+          tickets: [{
+            id: 'order-1',
+            code: 'MA-ABC12',
+            table: 'T1',
+            placedAt: '7:42 pm',
+            placedAtIso: new Date().toISOString(),
+            ageMin: 1,
+            payment: 'pending',
+            state: 'new',
+            items: [{ qty: 1, name: 'Tea', veg: true }],
+            total: 30,
+          }],
+        }}
+      />,
+    );
+    expect(html).toContain('data-print-kot="order-1"');
+    expect(html).toContain('Print KOT');
+    expect(renderToStaticMarkup(<Kitchen />)).not.toContain('data-print-kot');
   });
 
   it('attaches an add-on to the dish it was ordered with, as a tag', () => {
@@ -635,5 +669,34 @@ describe('the line that says where a ticket went', () => {
     expect(html).toBe(
       '<p tabindex="-1" class="mt-2 text-[12.5px] leading-[1.5] text-gink-64 focus-visible:rounded-[var(--p-r-chip)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]">T4 · KI-8F2A1 moved to Preparing.</p>',
     );
+  });
+});
+
+describe('table waiter calls on the kitchen board', () => {
+  it('shows the table, saved voice outcome, and staff resolution action', () => {
+    const html = renderToStaticMarkup(
+      <Kitchen
+        data={{
+          restaurantName: 'Maddi',
+          restaurantId: 'r-1',
+          tickets: [],
+          waiterCalls: [{
+            id: 'call-1',
+            table: 'T4',
+            createdAt: '2026-11-07T12:00:00.000Z',
+            announcementStatus: 'failed',
+            announcementError: 'No Hindi voice is available',
+          }],
+          cancelled: [],
+          role: 'kitchen',
+          canAdvance: true,
+        }}
+      />,
+    );
+
+    expect(html).toContain('data-waiter-call="call-1"');
+    expect(html).toContain('Table T4 · waiter requested');
+    expect(html).toContain('Could not announce aloud · No Hindi voice is available');
+    expect(html).toContain('>Handled</button>');
   });
 });

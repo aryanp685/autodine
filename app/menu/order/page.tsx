@@ -4,8 +4,7 @@ import { ClearCartOnOrder } from '@/components/ClearCartOnOrder';
 import { RememberOrder } from '@/components/RememberOrder';
 import { OrderPlacedScreen } from '@/components/screens/OrderPlacedScreen';
 import { getOrderScreenData } from '@/lib/db/order-screen';
-import { onlinePaymentOffer, type OnlineOffer } from '@/lib/payments/online-availability';
-import { onlinePaymentsConfigured } from '@/lib/payments/razorpay';
+import { loadTableAccess } from '@/lib/table-access';
 
 // Not "Order placed": this page also renders the state of a link that could
 // not be opened, and a tab promising an order that is not there is a small lie.
@@ -30,24 +29,10 @@ export default async function OrderPage({
   searchParams: Promise<{ s?: string; code?: string; t?: string; placed?: string }>;
 }) {
   const { s, code, t, placed: justPlaced } = await searchParams;
-  const data = await getOrderScreenData(s, code, t);
-
-  /**
-   * Two separate facts decide whether a pay button is drawn: the owner's
-   * switch, read from the database with the order, and whether this DEPLOYMENT
-   * has a gateway key. The second is an environment question -- asking it here
-   * keeps the price of a missing key out of every screen that reads an order.
-   */
-  const onlinePay: OnlineOffer | null = data
-    ? onlinePaymentOffer({
-        enabled: data.onlineEnabled,
-        configured: onlinePaymentsConfigured(),
-        paymentStatus: data.paymentStatus,
-        prepStatus: data.prepStatus,
-        duePaise: data.totalPaise,
-        hasToken: Boolean(t),
-      })
-    : null;
+  const [data, access] = await Promise.all([
+    getOrderScreenData(s, code, t),
+    loadTableAccess(s),
+  ]);
 
   // The cart provider is mounted here for one reason: the order in it has just
   // become a real order, and the cart must not survive that. See
@@ -75,7 +60,13 @@ export default async function OrderPage({
         placedAt={data?.placedAt}
         enabled={placed}
       />
-      <OrderPlacedScreen data={data} token={t} slug={s} onlinePay={onlinePay} brandState={data?.brandState} />
+      <OrderPlacedScreen
+        data={data}
+        token={t}
+        slug={s}
+        canCallWaiter={access.status === 'verified'}
+        brandState={data?.brandState}
+      />
     </CartProvider>
   );
 }

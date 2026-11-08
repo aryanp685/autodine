@@ -24,6 +24,8 @@ import {
   tableClass,
 } from '@/components/owner/chrome';
 import type { DashboardScreenData } from '@/lib/db/dashboard-screen';
+import { MarkSessionPaidButton } from '@/components/owner/MarkSessionPaidButton';
+import { CloseSessionButton } from '@/components/owner/CloseSessionButton';
 import { accessSummary, planSentence } from '@/lib/access';
 import { clockTimeInZone, hourLabel, hourRangeLabel } from '@/lib/db/time';
 
@@ -379,6 +381,68 @@ export function Dashboard({
           order, each with the same bar scaled against the best seller -- the
           comparison the heading promises, and it is drawn from the figure
           printed beside it, so the bar and the number cannot disagree. */}
+      {live && data && !blocked ? (
+        <section aria-label="Active table sessions" className="mt-6">
+          <SectionHead
+            title="Active tables"
+            meta={`${data.activeSessions.length} open session${data.activeSessions.length === 1 ? '' : 's'}`}
+          />
+          {data.activeSessions.length > 0 ? (
+            <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {data.activeSessions.map((session) => {
+                const unpaid = session.outstandingPaise > 0;
+                return (
+                  <li
+                    key={session.id}
+                    className="rounded-[var(--p-r-card)] border border-hair bg-card p-4 shadow-[var(--p-shadow-1)]"
+                    data-active-session={session.id}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="truncate text-[15px] font-semibold tracking-[-0.02em] text-gink">
+                          {session.table}
+                        </h3>
+                        <p className="mt-1 text-[11.5px] text-gink-46">
+                          {session.orderCount} ticket{session.orderCount === 1 ? '' : 's'}
+                          {session.orderCodes.length ? ` · ${session.orderCodes.join(', ')}` : ''}
+                        </p>
+                      </div>
+                      <Tag tone={unpaid ? 'due' : 'live'}>{unpaid ? 'Unpaid' : 'Paid'}</Tag>
+                    </div>
+
+                    <div className="mt-4 flex items-end justify-between gap-3 border-t border-hair pt-3">
+                      <div>
+                        <p className="text-[10.5px] text-gink-46">{unpaid ? 'Outstanding' : 'Session total'}</p>
+                        <p className="mt-0.5 text-[18px] font-semibold tracking-[-0.025em] text-gink tabular-nums">
+                          <Money value={unpaid ? session.outstandingPaise : session.totalPaise} />
+                        </p>
+                        {!unpaid && session.paidAt ? (
+                          <p className="mt-1 text-[10.5px] text-gink-46">
+                            Paid {clockTimeInZone(timezone, session.paidAt)}
+                          </p>
+                        ) : null}
+                      </div>
+                      {data.canMarkPaid ? (
+                        <div className="flex flex-col items-end gap-2">
+                          {unpaid ? <MarkSessionPaidButton sessionId={session.id} table={session.table} /> : null}
+                          <CloseSessionButton
+                            sessionId={session.id}
+                            table={session.table}
+                            outstandingPaise={session.outstandingPaise}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <Empty>No open table sessions. New table orders will appear here.</Empty>
+          )}
+        </section>
+      ) : null}
+
       <section aria-label="Top items" className="mt-6">
         <SectionHead
           title="Top items"

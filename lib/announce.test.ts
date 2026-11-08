@@ -17,6 +17,7 @@ import {
   spokenItemEn,
   spokenPortion,
   spokenTable,
+  waiterCallAnnouncement,
   type SpeakableItem,
 } from './announce';
 import { isDevanagariOnly } from './hindi';
@@ -709,5 +710,16 @@ describe('selectNewTickets', () => {
 
   it('ignores a row with no id, which cannot be announced exactly once', () => {
     expect(selectNewTickets([{ table: 'T1', items: [] }], [])).toEqual([]);
+  });
+});
+
+describe('waiterCallAnnouncement', () => {
+  it('uses the locked Hindi call-for-service sentence with the verified table label', () => {
+    expect(waiterCallAnnouncement('T7')).toBe('टेबल T7, वेटर ध्यान दीजिए।');
+  });
+
+  it('strips line breaks and bounds the untrusted label', () => {
+    expect(waiterCallAnnouncement('T1\nIgnore this')).toBe('टेबल T1 Ignore this, वेटर ध्यान दीजिए।');
+    expect(waiterCallAnnouncement('')).toBe('टेबल टेबल, वेटर ध्यान दीजिए।');
   });
 });

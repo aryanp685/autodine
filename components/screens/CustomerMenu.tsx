@@ -35,6 +35,7 @@ import { filterDishes } from '@/lib/guest-search';
 import { inr } from '@/lib/demo-data';
 import { paiseToRupees, rupeesToPaise } from '@/lib/money';
 import { VegMark } from '@/components/ui';
+import { CallWaiterButton } from '@/components/CallWaiterButton';
 
 /**
  * Whether this dish has anything to choose.
@@ -123,6 +124,7 @@ export function CustomerMenu({
   throttleNotice,
   announcement,
   lang: langParam,
+  canCallWaiter = false,
 }: {
   data?: MenuScreenData;
   /**
@@ -147,6 +149,8 @@ export function CustomerMenu({
    * cart never move.
    */
   lang?: string;
+  /** Only a database-verified table session may raise a staff call. */
+  canCallWaiter?: boolean;
 } = {}) {
   const table = data?.table ?? null;
   const cart = useCart();
@@ -386,6 +390,11 @@ export function CustomerMenu({
            this still so it can be judged as a still. */
         animate
       />
+      {canCallWaiter && table ? (
+        <div className="px-5">
+          <CallWaiterButton />
+        </div>
+      ) : null}
 
       {/* The language switcher — offered only when there is a translation to
           switch to. It remaps names and descriptions in the guest's browser;
@@ -759,6 +768,8 @@ export function ItemSheet({
   itemId?: string;
   /** The guest's language pick (`?lang=`). Same fallback rules as the menu. */
   lang?: string;
+  /** Only a database-verified table session may raise a staff call. */
+  canCallWaiter?: boolean;
 } = {}) {
   const brand = guestBrandStyle(data?.restaurant);
   const table = data?.table ?? null;

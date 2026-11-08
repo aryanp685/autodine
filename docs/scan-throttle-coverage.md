@@ -33,79 +33,52 @@ a sentence". This file is the honest map.
 | the same attempt key is re-sent, so a retry cannot duplicate an order | same file | yes | no |
 | an already-verified guest's order is untouched by a refused scan | same file | yes | no |
 | a genuine throttle in a browser, against a real DB | `e2e/integration/throttle.spec.ts` | **no** | **yes** |
-| a genuine throttle through the real route + page + action, real SQL | `app/menu/throttle-db.integration.test.tsx` | **no** (skips without `THROTTLE_DB_URL`) | **yes** — run locally, 3/3 passed |
+| a genuine throttle through the real route + page + action, real SQL | `app/menu/throttle-db.integration.test.tsx` | **no** (skips without `THROTTLE_DB_URL`) | **yes** — all 4 cases, including C4, passed on isolated local PostgreSQL 17.11 |
 
 ## The gap, stated plainly
 
-**Update, 2026-10-26:** a database-backed throttle *has* now run — against a
-local PostgreSQL 16.2 built from this repository's migrations, not against
-Supabase and not against a production clone. Ten `PASS` blocks and three
-integration tests passed; see `docs/validation-local-pg-2026-10-26.md`. The
-paragraph below still describes the CI situation, which is unchanged, and the
-fidelity gap that only a branch database closes.
+**Update, 2026-11-07:** the database-backed suite has run on a disposable native
+PostgreSQL 17.11 database built from all checked-in migrations plus the explicitly
+marked local-only scaffolds. All four integration tests passed, including C4's
+concurrent guest-token race. This was **not** a production clone, and the missing
+live-schema objects use inferred scaffold definitions, so it is isolated local
+validation rather than proof of exact production-schema behavior. See the
+C4 follow-up in `AUDIT-REPORT.md`.
+
 CI has no Supabase environment, by design — the browser suite is hermetic so the
 pipeline needs no secrets. The consequence is exact and worth saying out loud:
 
 - the application's handling of `limited` is proven by tests that drive the real
   route handler, the real page and the real server action (`throttle-flow.test.tsx`);
-- the database's *production* of `limited` is proven by SQL that has never been
-  executed on this branch, because the migration it needs is not applied;
-- the join between those two — a real Postgres refusal reaching a real browser —
-  is proven by **nothing that has run**. Two artefacts exist to close it, and
-  both need you to run them against a branch database.
+- the database-backed integration cases now execute real SQL locally, but do not
+  establish parity with the live database's omitted table definitions;
+- the production wrapper's session-attachment regression is fixed by the forward
+  migration; Supabase records it as `20261107123437` and read-only inspection
+  confirms it is active. The C4 race test itself was never run against production.
 
-## Closing it, step by step
+## Remaining production-fidelity check (separate from local C4)
 
-### 1. Where to do it
+The isolated local PostgreSQL run now covers all four `throttle-db` cases. A
+branch-database clone would provide stronger confidence against the live schema,
+but is not required to claim the local C4 test passed. The local harness is not a
+production clone; its missing table shapes are inferred and labelled LOCAL ONLY.
+Never point this test at production.
 
-A branch database (Supabase dashboard → Branching), restored from the live schema
-with `pg_dump --schema-only`, then:
-
-```bash
-psql "$BRANCH_DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -f supabase/migrations/20261028000900_guest_scan_confirm.sql
-```
-
-`supabase/migrations` alone cannot build a fresh database (three tables are
-created by no migration), which is why the schema is cloned first — see
-`docs/migration-20261028000900-review.md` §2.
-
-### 2. Prove the database side
+For an optional branch-clone check, restore a schema-only dump into an isolated
+branch or disposable database, ensure the forward migration
+`20261108006000_restore_public_order_session_attach.sql` is applied there, then run:
 
 ```bash
-psql "$BRANCH_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/checks/06_scan_limits.sql
+THROTTLE_DB_URL="$BRANCH_DATABASE_URL" \
+  npx vitest run app/menu/throttle-db.integration.test.tsx
 ```
 
-Ten blocks, each printing `PASS n: …` or raising `FAIL n: …`. The whole file runs
-inside a transaction that ends in `rollback`, so it is safe to repeat. Expect
-`PASS 9` to report `retry column present=false` — that is the fact the screens are
-written against today.
-
-### 3. Prove the browser side
-
-Put one restaurant on `scan` mode (dashboard → Settings → verification), copy a
-live card token, point the integration config at that deployment:
-
-```bash
-E2E_BASE_URL=https://<branch-deployment> \
-E2E_QR_TOKEN=<card public token> \
-npx playwright test --config playwright.integration.config.ts
-```
-
-It scans the card from a fresh context each time — a new guest every time, so
-every scan asks the database to mint — until the refusal arrives (ten per card,
-twenty per address, so it cannot take more than twenty-five attempts), then
-asserts what the guest sees: the notice above the food, the menu still readable,
-no success copy, no code form, and a retry number only if the server sent one.
-
-**This has not been run.** There is no browser binary in the environment this
-branch was developed in (`npx playwright install chromium` is blocked there) and
-no database to point it at. `npx playwright test --config playwright.integration.config.ts --list`
-does pass, which proves the spec parses and is wired to the right files — nothing
-more.
-
-It writes up to twenty-five rows into `table_session_opens`. A branch database is
-the right target; production is not.
+The separate browser E2E (`e2e/integration/throttle.spec.ts`) has not been run:
+there is no browser binary in this environment, and it needs an isolated
+branch deployment plus database credentials. It can write up to twenty-five
+`table_session_opens` rows. Production is never an acceptable target for either
+integration test. The forward SQL migration has already been applied to
+production; do not rerun the integration tests there.
 
 ## Why the hermetic suite cannot simply cover it
 

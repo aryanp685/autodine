@@ -77,9 +77,6 @@ export function demoMenu(slug: string): RestaurantMenu {
     is_active: true,
     announcement_text: null,
     announcement_on: false,
-    // The demo says "pay at the counter", which is what an unconnected
-    // deployment shows a guest. See lib/payments/online-availability.ts.
-    online_payments_enabled: false,
     // The demo restaurant has no uploaded branding: no logo, no banner, and
     // the default accent. That is the state the guest header is designed
     // around, so the sample data should exercise it rather than a photograph.

@@ -26,7 +26,6 @@ import {
   MAX_IMPORT_ITEMS,
   type ImportIssue,
   type ImportedCategory,
-
   type ImportedVariant,
   type MenuImportDraft,
 } from '../menu-import';

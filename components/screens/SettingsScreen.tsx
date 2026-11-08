@@ -13,10 +13,8 @@ import { PeoplePanel } from '@/components/owner/PeoplePanel';
 import { formatTaxPercent, taxExamplePaise } from '@/lib/settings-input';
 import {
   saveDetailsAction,
-  saveOnlinePaymentsAction,
   saveGuestVerificationAction,
   saveTaxAction,
-  saveUpiAction,
 } from '@/app/(staff)/dashboard/settings/actions';
 import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
@@ -180,7 +178,6 @@ export function SettingsScreen({
   outlet,
   error,
   notice,
-  gatewayConfigured = false,
   team = null,
   teamFlash = null,
   origin = '',
@@ -196,15 +193,6 @@ export function SettingsScreen({
   outlet?: OutletBar | null;
   error?: string;
   notice?: string;
-  /**
-   * Does this DEPLOYMENT have a payment gateway key pair?
-   *
-   * Passed in rather than read here, because it is an environment fact and
-   * this component is also rendered in tests. The switch and the key are two
-   * different things and the card below says which one is missing -- an owner
-   * who "turned it on" and saw no button needs to know why.
-   */
-  gatewayConfigured?: boolean;
 }) {
   // Blocked callers get the prompt only. See the note above.
   if (data?.blocked) {
@@ -441,7 +429,7 @@ export function SettingsScreen({
               n="02"
               id="settings-money"
               title="What the bill charges"
-              meta="Tax, online payment, guest verification and your own UPI"
+              meta="Tax and guest verification"
             >
 
               <div className="flex flex-col gap-4">
@@ -501,73 +489,6 @@ export function SettingsScreen({
                     Orders already placed keep the tax they were charged — a bill is a record of the
                     rate at that moment, not a live calculation. New orders use the new rate
                     immediately.
-                  </p>
-                </Panel>
-
-                {/* --------------------------------------------- online payment */}
-                <Panel
-                  title="Online payment"
-                  meta={gatewayConfigured ? 'Gateway keys present' : 'No gateway keys'}
-                  bodyClassName="px-5 py-5"
-                >
-                  <p className="m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
-                    Let guests pay by card or UPI from their own order page. Money goes to your
-                    payment-gateway account, and the order is marked paid as soon as the gateway
-                    confirms it.
-                  </p>
-
-                  {/* Shown whenever the keys are missing, not only when the box is
-                      already ticked. The switch is a database flag; the keys are
-                      an environment fact. */}
-                  {!gatewayConfigured ? (
-                    <Notice
-                      tone="due"
-                      label="No gateway keys on this deployment."
-                      className="mt-3 mb-0"
-                    >
-                      This switch is disabled because there is nothing behind it: the server has no
-                      payment-gateway key pair, so no pay button can appear for a guest. Ask
-                      whoever deploys AutoDine to add the keys, then come back.
-                    </Notice>
-                  ) : null}
-
-                  {!data?.onlinePaymentsEnabled && gatewayConfigured ? (
-                    <Notice tone="plain" label="Off." className="mt-3 mb-0">
-                      This server has gateway keys, but guests still see &quot;pay at the
-                      counter&quot;. Tick the box and save to change that.
-                    </Notice>
-                  ) : null}
-
-                  <form action={saveOnlinePaymentsAction} className="mt-3.5 flex flex-col gap-3">
-                    <label className="flex items-start gap-2.5 rounded-[var(--p-r-control)] border border-hair bg-paper-deep px-3 py-2.5">
-                      <input
-                        type="checkbox"
-                        disabled={disabled || !gatewayConfigured}
-                        name="onlinePayments"
-                        defaultChecked={Boolean(data?.onlinePaymentsEnabled)}
-                        className="mt-[2px] size-4 shrink-0 accent-[var(--p-accent)]"
-                      />
-                      <span className="text-[11.5px] leading-[1.5] text-gink-64">
-                        Take card and UPI payment online. Orders stay unpaid until the gateway
-                        confirms the money, so nothing is ever marked paid on the guest&apos;s word.
-                      </span>
-                    </label>
-
-                    <div>
-                      <SubmitButton
-                        tone="solid"
-                        pendingLabel="Saving setting…"
-                        disabled={disabled || !gatewayConfigured}
-                      >
-                        Save payment setting
-                      </SubmitButton>
-                    </div>
-                  </form>
-
-                  <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
-                    Turning this off does not touch orders already paid, and does not refund
-                    anything. Counter payments — cash, card and UPI at the till — keep working
-                    either way.
                   </p>
                 </Panel>
 
@@ -657,78 +578,7 @@ export function SettingsScreen({
                   </p>
                 </Panel>
 
-                {/* ------------------------------------------------- your own UPI */}
-                <Panel
-                  title="Your UPI QR"
-                  meta={data?.upiId ? 'Shown to guests' : 'Not set'}
-                  bodyClassName="px-5 py-5"
-                >
-                  <p className="m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
-                    Your own UPI handle, on the guest&apos;s phone, with the amount already filled
-                    in. The money goes to your account — AutoDine never holds it and takes no cut.
-                  </p>
-
-                  <Notice
-                    tone="accent"
-                    label="This is not a payment gateway."
-                    className="mt-3 mb-0"
-                  >
-                    When a guest scans it, nothing is marked paid here. They say they have paid, and
-                    you or your cashier confirm the transfer in your own UPI app before recording it
-                    at the counter. That keeps the record honest — and it is why this works today,
-                    with no gateway and no KYC.
-                  </Notice>
-
-                  <form action={saveUpiAction} className="mt-3.5 grid gap-3">
-                    <div className="grid gap-3.5 sm:grid-cols-2">
-                      <Field
-                        label="UPI ID"
-                        htmlFor="upiId"
-                        hint="The handle printed on your counter standee. Leave it empty to show no QR."
-                      >
-                        <input
-                          id="upiId"
-                          name="upiId"
-                          type="text"
-                          inputMode="email"
-                          autoComplete="off"
-                          spellCheck={false}
-                          placeholder="thegulmohar@okhdfcbank"
-                          defaultValue={data?.upiId ?? ''}
-                          disabled={disabled}
-                          className={inputClass}
-                        />
-                      </Field>
-
-                      <Field
-                        label="Name shown in the guest's UPI app"
-                        htmlFor="upiPayeeName"
-                        hint="Optional. Defaults to your restaurant name above."
-                      >
-                        <input
-                          id="upiPayeeName"
-                          name="upiPayeeName"
-                          type="text"
-                          defaultValue={data?.upiPayeeName ?? ''}
-                          disabled={disabled}
-                          className={inputClass}
-                        />
-                      </Field>
-                    </div>
-
-                    <div>
-                      <SubmitButton tone="solid" pendingLabel="Saving UPI…" disabled={disabled}>
-                        Save UPI details
-                      </SubmitButton>
-                    </div>
-                  </form>
-
-                  <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
-                    Test it before a service: open your guest menu on a phone, place an order, and
-                    scan the code with your own UPI app. If the payee name is wrong, guests will not
-                    trust it.
-                  </p>
-                </Panel>
+                
               </div>
             </PageSection>
 

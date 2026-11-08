@@ -138,7 +138,7 @@ test.describe('cart operations', () => {
 });
 
 test.describe('totals recomputed from the menu', () => {
-  test('totals are recomputed from the menu: 2 × ₹299 = ₹598 + 5% tax', async ({ page }) => {
+  test('demo cart total is recomputed and marks its tax as a sample', async ({ page }) => {
     await seedCart(page, [{ itemId: 'it-hara-bhara', qty: 2 }]);
     await page.goto('/menu/cart');
     await waitForAppReady(page);
@@ -146,7 +146,8 @@ test.describe('totals recomputed from the menu', () => {
     const summary = page.locator('dl');
     await expect(summary.getByText('Subtotal')).toBeVisible();
     await expect(summary.getByText('₹598')).toBeVisible();
-    await expect(summary.getByText(/Taxes \(GST 5% · sample\)/)).toBeVisible();
+    await expect(summary.getByText('Taxes', { exact: true })).toBeVisible();
+    await expect(page.getByText(/no tax rate configured/)).toBeVisible();
     await expect(summary.getByText('₹30')).toBeVisible();
     // Exact: "Subtotal" also contains "Total", and two matches is a strict-
     // mode failure waiting to happen.

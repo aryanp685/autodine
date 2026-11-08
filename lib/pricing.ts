@@ -1,26 +1,16 @@
 /**
- * Order pricing.
+ * Guest-facing order-price preview.
  *
- * RULE: the server is the only thing allowed to decide what an order costs.
- * The browser sends item ids and quantities; it never sends a total. This
- * module is where a total becomes a fact.
+ * The browser uses this helper to display a quote from the loaded menu and
+ * restaurant rate. The database remains authoritative: it revalidates the
+ * cart, calculates, and stores the order total independently.
  *
- * ── TAX STATUS: UNCONFIRMED ────────────────────────────────────────────────
- * The 5% below is a SAMPLE for layout review only. The real GST treatment is
- * still to be decided with a tax adviser, and three questions are open:
- *
- *   1. Are menu prices tax-inclusive or tax-exclusive? (This module assumes
- *      tax-exclusive: prices are shown and stored without GST, and GST is
- *      added at the end. If they are inclusive, the calculation inverts.)
- *   2. Is GST computed per line item and summed, or once on the order total?
- *      For a single-rate order the answers are identical only if each line
- *      rounds the same way; with mixed rates they are not.
- *   3. Are CGST/SGST (intra-state) and IGST (inter-state) both supported,
- *      and is the rate chosen per restaurant state vs customer state?
- *
- * Nothing here charges anyone. This module must not be used for a live
- * transaction until those questions are answered and this comment is deleted.
- * ───────────────────────────────────────────────────────────────────────────
+ * Tax limitations: a restaurant supplies one basis-point rate, and this
+ * helper treats menu prices as tax-exclusive. It does not model per-item
+ * rates or interstate IGST. The sample default below is for demos and tests;
+ * live cart loaders require an explicit restaurant rate and never substitute
+ * that sample. This is implementation behavior, not tax advice or a claim of
+ * GST compliance.
  */
 
 import { assertValidMoney, applyRate, lineTotal, splitInHalf, type Bps, type Paise } from './money';
@@ -29,18 +19,29 @@ import { assertValidMoney, applyRate, lineTotal, splitInHalf, type Bps, type Pai
 export const SAMPLE_TAX_RATE_BPS: Bps = 500;
 
 /**
+ * Require an explicit, valid rate from live restaurant data. The sample rate
+ * remains available to demo layouts, but a missing or malformed production
+ * value must fail closed rather than silently become a guest-facing charge.
+ */
+export function requireTaxRateBps(value: unknown): Bps {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+    throw new TypeError('The restaurant tax rate is unavailable. Please try again.');
+  }
+  return value;
+}
+
+/**
  * How the tax line on a bill is labelled.
  *
- * The rate comes from the restaurant when it has one, and falls back to the
- * sample. The label used to say "GST 5% · sample" unconditionally, which was
- * wrong the moment a restaurant configured its own rate: the bill showed one
- * percentage and charged another.
+ * A live rate is named explicitly. When a demo has no configured rate, use a
+ * generic label rather than presenting the sample percentage as restaurant
+ * tax information.
  */
 export function gstLabel(taxRateBps?: number): string {
-  const bps = taxRateBps ?? SAMPLE_TAX_RATE_BPS;
-  const pct = bps / 100;
+  if (taxRateBps == null) return 'Taxes';
+  const pct = taxRateBps / 100;
   const shown = Number.isInteger(pct) ? String(pct) : pct.toFixed(2);
-  return taxRateBps == null ? `GST ${shown}% · sample` : `GST ${shown}%`;
+  return `GST ${shown}%`;
 }
 
 export type PriceableLine = {

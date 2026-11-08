@@ -37,8 +37,6 @@ export type SettingsScreenData = {
   canEdit: boolean;
   details: SettingsRestaurant;
   taxRateBps: number;
-  /** Has the owner switched card/UPI payment on? */
-  onlinePaymentsEnabled: boolean;
   /**
    * Migration 20261028000900. How a guest proves they are at a table.
    *
@@ -47,13 +45,6 @@ export type SettingsScreenData = {
    * trade-off written on the screen -- not something a deployment decides.
    */
   guestVerificationMode: 'code' | 'scan_confirm' | 'scan';
-  /** Migration 20261026001300. The restaurant's own handle, or ''. */
-  upiId: string;
-  /**
-   * The name a guest's UPI app shows. Empty means the restaurant's own name is
-   * used at render time -- never a platform name.
-   */
-  upiPayeeName: string;
   /** Read-only: it decides what "today" means in Reports. See the screen. */
   timezone: string;
   /** Absolute when a request origin is known, otherwise the path. */
@@ -83,10 +74,7 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
       canEdit: false,
       details: { name: '', tagline: '', address: '', phone: '', gstin: '', slug: '' },
       taxRateBps: 0,
-      onlinePaymentsEnabled: false,
       guestVerificationMode: 'code' as const,
-      upiId: '',
-      upiPayeeName: '',
       timezone: 'Asia/Kolkata',
       publicMenuUrl: '',
       publicMenuSvg: null,
@@ -109,9 +97,9 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
    * defaulting to 'code', which is what an unmigrated database enforces anyway.
    */
   const restaurantColumns =
-    'name, tagline, address, phone, gstin, slug, timezone, tax_rate_bps, online_payments_enabled, upi_id, upi_payee_name, guest_verification_mode';
+    'name, tagline, address, phone, gstin, slug, timezone, tax_rate_bps, guest_verification_mode';
   const restaurantColumnsLegacy =
-    'name, tagline, address, phone, gstin, slug, timezone, tax_rate_bps, online_payments_enabled, upi_id, upi_payee_name';
+    'name, tagline, address, phone, gstin, slug, timezone, tax_rate_bps';
 
   const firstRestaurantResult = await supabase
     .from('restaurants')
@@ -148,10 +136,7 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
       canEdit: false,
       details: { name: '', tagline: '', address: '', phone: '', gstin: '', slug: '' },
       taxRateBps: 0,
-      onlinePaymentsEnabled: false,
       guestVerificationMode: 'code' as const,
-      upiId: '',
-      upiPayeeName: '',
       timezone: 'Asia/Kolkata',
       publicMenuUrl: '',
       publicMenuSvg: null,
@@ -186,15 +171,12 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
     // lib/pricing.ts. The sample is a layout number; charging it would be
     // inventing a tax nobody set.
     taxRateBps: Number(row.tax_rate_bps ?? 0),
-    onlinePaymentsEnabled: row.online_payments_enabled === true,
     // Read through a cast because the same query has a legacy shape without
     // this column; see the retry above. Absent means 'code'.
     guestVerificationMode: (() => {
       const mode = (row as { guest_verification_mode?: string | null }).guest_verification_mode;
       return mode === 'scan_confirm' || mode === 'scan' ? mode : 'code';
     })(),
-    upiId: String((row as { upi_id?: string | null }).upi_id ?? ''),
-    upiPayeeName: String((row as { upi_payee_name?: string | null }).upi_payee_name ?? ''),
     timezone: String(row.timezone ?? 'Asia/Kolkata'),
     publicMenuUrl,
     publicMenuSvg,

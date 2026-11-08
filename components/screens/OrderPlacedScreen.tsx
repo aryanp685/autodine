@@ -3,14 +3,12 @@ import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
 import { FadeUp, FadeUpItem, PopIn, SpringUp } from '@/components/MotionBits';
 import { GuestOrderEditor } from '@/components/screens/GuestOrderEditor';
-import { PayOnline } from '@/components/PayOnline';
-import { PayUpi } from '@/components/PayUpi';
 import { GuestFlow } from '@/components/GuestFlow';
 import { ReorderOffer } from '@/components/ReorderOffer';
 import { guestBrandStyle, type GuestBrandState } from '@/lib/branding/guest-theme';
 import { OrderStatusRefresh } from '@/components/OrderStatusRefresh';
+import { CallWaiterButton } from '@/components/CallWaiterButton';
 import { GUEST_CHANGE_WINDOW_MS, type OrderScreenData } from '@/lib/db/order-screen';
-import type { OnlineOffer } from '@/lib/payments/online-availability';
 
 /**
  * Why the guest cannot change this order any more, in their own words.
@@ -163,48 +161,37 @@ function unpaidNextStep(
 /**
  * How an unpaid bill gets paid, phrased once per screen.
  *
- * A served guest is asked to settle; everyone else is asked to pay. `orForm`
- * is for the paragraphs that sit under a pay button (UPI or card), where "Or"
- * is what ties the sentence to the alternative above it.
+ * A served guest is asked to settle; everyone else is asked to pay.
  */
-function counterPayment(prepStatus: string, orForm: boolean): string {
+function counterPayment(prepStatus: string): string {
   if (prepStatus === 'served') {
-    return orForm
-      ? 'Or settle the bill at the counter before you leave.'
-      : 'Please settle the bill at the counter before you leave.';
+    return 'Please settle the bill at the counter before you leave.';
   }
-  return orForm
-    ? 'Or pay at the counter before you leave.'
-    : 'Pay at the counter before you leave.';
+  return 'Pay at the counter before you leave.';
 }
 
 /**
  * Confirmation, and the only screen that tells the diner what happens next.
  *
- * It says plainly how the bill gets paid. When the restaurant takes card
- * online the button is here; when it does not, or this deployment has no
- * gateway key, the screen says "pay at the counter" in as many words. Staying
- * quiet would leave someone waiting for a card prompt that is never coming.
+ * It says plainly how the bill gets paid: at the counter, in as many words.
+ * Online payment is gone from customer ordering, so there is no card button
+ * to wait for and nothing here pretends otherwise.
  */
 export function OrderPlacedScreen({
   brandState,
   data,
   token,
   slug,
-  onlinePay,
+  canCallWaiter = false,
 }: {
   brandState?: GuestBrandState | null;
   data: OrderScreenData | null;
   /** The guest's credential from the URL. Absent on a stale or hand-typed link. */
   token?: string;
-  /** Which restaurant, for the pay button's server call. */
+  /** Which restaurant, for the UPI panel's server call. */
   slug?: string;
-  /**
-   * Whether card payment may be offered on this order, decided on the server
-   * (lib/payments/online-availability.ts). Null means the order could not be
-   * read at all.
-   */
-  onlinePay?: OnlineOffer | null;
+  /** Only a current verified table session may request a waiter. */
+  canCallWaiter?: boolean;
 }) {
   const paint = guestBrandStyle(brandState);
   if (!data) {
@@ -248,12 +235,15 @@ export function OrderPlacedScreen({
         /* The flow does not end here: a table usually orders again, and the
            screen used to offer no way back to the menu at all. */
         <SpringUp className="w-full">
-          <Link
-            href={menuHref}
-            className="g-primary flex h-12 w-full items-center justify-center rounded-full text-[14px] font-semibold transition-transform duration-150 active:scale-[0.97]"
-          >
-            Order something else
-          </Link>
+          <div className="grid gap-1.5">
+            {canCallWaiter && data.tableLabel ? <CallWaiterButton /> : null}
+            <Link
+              href={menuHref}
+              className="g-primary flex h-12 w-full items-center justify-center rounded-full text-[14px] font-semibold transition-transform duration-150 active:scale-[0.97]"
+            >
+              Order something else
+            </Link>
+          </div>
         </SpringUp>
       }
     >
@@ -422,46 +412,16 @@ export function OrderPlacedScreen({
           ) : data.paymentStatus === 'pending' ? (
             <>
               {/*
-                The restaurant's own UPI QR comes first when it has one: it is
-                the way most guests will actually pay, and it needs no gateway.
-                It is offered alongside the counter, never instead of it -- a
-                phone with a dead battery still has to be able to leave.
+                Pay at the counter, in the same words everywhere. Online
+                payment and the restaurant's own UPI QR are both gone from
+                this screen: one sentence, one way to settle.
               */}
-              {data.upi && slug && token ? (
-                <PayUpi upi={data.upi} slug={slug} code={data.code} token={token} />
-              ) : null}
-
-              {data.upi ? (
-                <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
-                  {unpaidNextStep(data.prepStatus, data.tableLabel, data.awaitingConfirmation)}{' '}
-                  {counterPayment(data.prepStatus, true)}
-                </p>
-              ) : onlinePay?.available && slug && token ? (
-                <>
-                  <PayOnline
-                    slug={slug}
-                    code={data.code}
-                    token={token}
-                    duePaise={data.totalPaise}
-                  />
-                  <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
-                    {unpaidNextStep(data.prepStatus, data.tableLabel, data.awaitingConfirmation)}{' '}
-                    {counterPayment(data.prepStatus, true)}
-                  </p>
-                </>
-              ) : (
-                <>
-                  {onlinePay?.note ? (
-                    <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">{onlinePay.note}</p>
-                  ) : null}
-                  <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
-                    <strong className="font-semibold text-gink">
-                      {counterPayment(data.prepStatus, false)}
-                    </strong>{' '}
-                    {unpaidNextStep(data.prepStatus, data.tableLabel, data.awaitingConfirmation)}
-                  </p>
-                </>
-              )}
+              <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
+                <strong className="font-semibold text-gink">
+                  {counterPayment(data.prepStatus)}
+                </strong>{' '}
+                {unpaidNextStep(data.prepStatus, data.tableLabel, data.awaitingConfirmation)}
+              </p>
             </>
           ) : (
             <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">Paid. Thank you.</p>

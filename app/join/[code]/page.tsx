@@ -120,6 +120,9 @@ export default async function JoinPage({
         lede="This link adds you to a restaurant's team on AutoDine. Sign in, or create an account in a few seconds, and the invitation is applied."
         action={{ prompt: 'Already work here?', label: 'Sign in', href: `/login?next=${encodeURIComponent(next)}` }}
       >
+        {status === 'rate_limited' ? (
+          <div className={NOTE_STYLE} role="status">{inviteStatusCopy('rate_limited').body}</div>
+        ) : null}
         {error ? <div className={ERROR_STYLE} role="alert">{error}</div> : null}
 
         <p className="text-[13px] leading-[1.55] text-gink-64">
@@ -183,13 +186,14 @@ export default async function JoinPage({
   const preview = data?.[0];
 
   if (previewError) {
+    console.warn('[join] invitation preview failed', { code: previewError.code ?? 'unknown' });
     return (
       <Shell
         title="This invitation cannot be read"
         lede="The link is well formed, but the team system did not answer."
       >
         <div className={ERROR_STYLE} role="alert">
-          {previewError.message}
+          The invitation could not be checked right now. Please try again shortly.
         </div>
         <p className="text-[13px] leading-[1.55] text-gink-64">
           If this deployment was just updated, the team migration may not have been applied yet. Ask
@@ -263,6 +267,9 @@ export default async function JoinPage({
         )
       }
     >
+      {status === 'rate_limited' ? (
+        <div className={NOTE_STYLE} role="status">{inviteStatusCopy('rate_limited').body}</div>
+      ) : null}
       {error ? <div className={ERROR_STYLE} role="alert">{error}</div> : null}
 
       <dl className="mb-5 flex flex-col gap-2 text-[13px]">

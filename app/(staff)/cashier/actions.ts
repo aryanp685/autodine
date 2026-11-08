@@ -54,7 +54,7 @@ import { isCounterMethod } from '@/lib/payment-methods';
 const CASHIER_PATH = '/cashier';
 
 export type RecordPaymentResult =
-  | { ok: true; message: string }
+  | { ok: true; message: string; paymentReceiptUrl?: string }
   | { ok: false; error: string };
 
 /**
@@ -170,6 +170,20 @@ export async function recordPaymentAction(input: {
 
   revalidatePath(CASHIER_PATH);
 
+  // If this order belongs to a session that already has an issued invoice,
+  // the database trigger created a separate immutable payment acknowledgement.
+  // A missing link must not turn a successful payment into an apparent failure.
+  let paymentReceiptUrl: string | undefined;
+  if (typeof paymentId === 'string') {
+    const { data: receipt, error: receiptError } = await supabase
+      .from('restaurant_payment_receipts')
+      .select('id')
+      .eq('payment_id', paymentId)
+      .eq('restaurant_id', restaurantId)
+      .maybeSingle();
+    if (!receiptError && receipt) paymentReceiptUrl = `/invoice/payment/${receipt.id}`;
+  }
+
   const paidAlready = paid > 0 ? ` (${inr(paiseToRupees(paid))} was already recorded)` : '';
 
   // The payment id is the receipt reference. Surfacing it means a disputed
@@ -180,5 +194,6 @@ export async function recordPaymentAction(input: {
   return {
     ok: true,
     message: `${method.toUpperCase()} ${inr(paiseToRupees(outstanding))} recorded for ${order.code}${paidAlready}.${ref}`,
+    ...(paymentReceiptUrl ? { paymentReceiptUrl } : {}),
   };
 }

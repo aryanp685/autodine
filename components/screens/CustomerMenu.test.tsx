@@ -830,3 +830,22 @@ describe('the language switcher', () => {
     expect(html).toContain('lang=hi');
   });
 });
+
+describe('verified-table waiter calls', () => {
+  it('offers Call a waiter only when the server confirms a live table session', () => {
+    const verified = renderToStaticMarkup(
+      <CustomerMenu data={data({ label: 'T4' })} canCallWaiter />,
+    );
+    const browsing = renderToStaticMarkup(
+      <CustomerMenu data={data({ label: 'T4' })} canCallWaiter={false} />,
+    );
+    const noTable = renderToStaticMarkup(
+      <CustomerMenu data={data(null)} canCallWaiter />,
+    );
+
+    expect(verified).toContain('data-call-waiter');
+    expect(verified).toContain('Call a waiter');
+    expect(browsing).not.toContain('data-call-waiter');
+    expect(noTable).not.toContain('data-call-waiter');
+  });
+});

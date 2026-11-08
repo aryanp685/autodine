@@ -17,18 +17,11 @@ import { gstLabel } from '@/lib/pricing';
 /**
  * Checkout.
  *
- * One path, and it is the same order either way: the order goes to the kitchen
- * immediately, marked payment pending. What differs is what happens next, and
- * the screen says which.
- *
- *   counter  the guest pays the cashier, who records it at the till.
- *   online   the guest pays by card/UPI on their own order page, straight
- *            after placing, and the order is marked paid only when the
- *            gateway confirms it.
- *
- * No payment choice is made HERE, because none can be: the order has to exist
- * before it can be paid. Drawing "Pay online" as a selectable option would
- * promise a card sheet this screen cannot open.
+ * One path, one button: the order goes to the kitchen immediately, marked
+ * payment pending, and the guest pays the cashier at the counter. Online
+ * payment used to be mentioned here as something offered after placing; it is
+ * gone from customer ordering, so this screen says the one thing that will
+ * happen and what comes next.
  */
 export function Checkout({
   brandState,
@@ -37,7 +30,6 @@ export function Checkout({
   tableLabel,
   taxRateBps,
   items,
-  onlinePaymentAvailable = false,
 }: {
   brandState?: GuestBrandState | null;
   slug?: string;
@@ -47,12 +39,6 @@ export function Checkout({
   /** The restaurant's own rate. Without it the bill is priced at a sample. */
   taxRateBps?: number;
   items: MenuItemPrice[];
-  /**
-   * Owner switch AND a gateway this deployment can verify with. False means
-   * the guest is told the counter is how payment happens -- including when an
-   * owner has switched it on but the server has no keys.
-   */
-  onlinePaymentAvailable?: boolean;
 }) {
   const paint = guestBrandStyle(brandState);
   const cart = useCart();
@@ -137,9 +123,7 @@ export function Checkout({
               cashier before you leave; the receipt is issued once the payment is recorded.
             </p>
             <p className="mt-2 text-[12.5px] leading-[1.55] text-gink-46">
-              {onlinePaymentAvailable
-                ? 'This restaurant also takes card or UPI online, on the order page you reach after placing — the order is marked paid only when the gateway confirms it.'
-                : 'Card and UPI are accepted at the counter. Nothing is charged from your phone.'}
+              Card and UPI are accepted at the counter. Nothing is charged from your phone.
             </p>
           </div>
 
@@ -242,7 +226,7 @@ export function Checkout({
                 <dd className="tnum">{inr(paiseToRupees(subtotalPaise))}</dd>
               </div>
               <div className="flex items-baseline justify-between py-1 text-gink-64">
-                <dt>Taxes ({gstLabel(taxRateBps)})</dt>
+                <dt>{taxRateBps == null ? 'Taxes' : `Taxes (${gstLabel(taxRateBps)})`}</dt>
                 <dd className="tnum">{inr(paiseToRupees(taxPaise))}</dd>
               </div>
               <div className="mt-1.5 flex items-baseline justify-between border-t border-hair pt-2.5 text-[16px] font-semibold text-gink">
@@ -253,9 +237,7 @@ export function Checkout({
 
             <PlaceOrderButton totalPaise={totalPaise} canOrder={canOrder} form="co-place-order" variant="bill" />
             <p role="note" className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
-              {onlinePaymentAvailable
-                ? 'Pay at the counter, or by card/UPI on the next screen. The kitchen starts straight away either way.'
-                : 'You pay at the counter. The kitchen starts on this straight away.'}
+              You pay at the counter. The kitchen starts on this straight away.
             </p>
           </section>
         </div>

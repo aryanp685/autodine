@@ -109,60 +109,6 @@ describe('Cashier', () => {
 });
 
 /**
- * A guest pressing "I have paid" against the shop's UPI QR is a claim, not
- * money -- the transfer happens in an app this product cannot see. The queue
- * row already said so; the panel that actually records the cash did not, and
- * that is the screen where collecting a paid bill twice can happen.
- */
-describe('Cashier, the UPI claim', () => {
-  const claimed = {
-    restaurantName: 'Kabir',
-    queue: [
-      {
-        id: 'order-1',
-        code: 'K-9001',
-        table: 'T4',
-        at: '8:42 pm',
-        state: 'Ready',
-        total: 640,
-        outstanding: 640,
-        paid: 0,
-        items: '2 × Thali',
-        claimed: true,
-        pendingOnline: false,
-      },
-    ],
-  };
-
-  it('repeats the claim on the ticket being settled', () => {
-    const html = renderToStaticMarkup(<Cashier nav={nav} data={claimed} />);
-
-    expect(html).toContain('data-claim');
-    expect(html).toContain('Guest says paid by UPI');
-    expect(html).toContain('Check the restaurant');
-  });
-
-  it('blocks cash collection while an online payment is in flight', () => {
-    const html = renderToStaticMarkup(
-      <Cashier nav={nav} data={{ ...claimed, queue: [{ ...claimed.queue[0], pendingOnline: true }] }} />,
-    );
-    expect(html).toContain('Online payment in progress');
-    const cta = html.match(/<button[^>]*data-counter-cta[^>]*>/)?.[0] ?? '';
-    expect(cta).toMatch(/\sdisabled=""/);
-  });
-
-  it('says nothing about a claim that was never made', () => {
-    const html = renderToStaticMarkup(
-      <Cashier nav={nav} data={{ ...claimed, queue: [{ ...claimed.queue[0], claimed: false }] }} />,
-    );
-
-    expect(html).not.toContain('data-claim');
-    expect(html).not.toContain('Guest says paid by UPI');
-    expect(html).toContain('Record cash ₹640');
-  });
-});
-
-/**
  * The counter after the 2026-10-24 pass.
  *
  * Two things were wrong here that a screenshot alone would not have caught:
@@ -228,31 +174,10 @@ describe('Counter, the redesign', () => {
   });
 
   it('draws its notices as the same strip the rest of the product uses', () => {
-    const doc = renderToStaticMarkup(
-      <Cashier
-        nav={nav}
-        data={{
-          restaurantName: 'Kabir',
-          queue: [
-            {
-              id: 'o-1',
-              code: 'K-1',
-              table: 'T1',
-              at: '8:00 pm',
-              state: 'Ready',
-              total: 640,
-              outstanding: 640,
-              paid: 0,
-              items: '2 × Thali',
-              claimed: true,
-              pendingOnline: false,
-            },
-          ],
-        }}
-      />,
-    );
+    const doc = renderToStaticMarkup(<Cashier nav={nav} focus="A-9999" />);
 
-    const at = doc.indexOf('data-claim');
+    const text = doc.indexOf('not waiting any more');
+    const at = doc.lastIndexOf('role="status"', text);
     const from = doc.lastIndexOf('<div', at);
     const opening = doc.slice(from, doc.indexOf('>', from) + 1);
     expect(opening).toContain('rounded-[var(--p-r-block)]');
