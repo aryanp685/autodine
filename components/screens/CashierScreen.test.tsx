@@ -129,6 +129,7 @@ describe('Cashier, the UPI claim', () => {
         paid: 0,
         items: '2 × Thali',
         claimed: true,
+        pendingOnline: false,
       },
     ],
   };
@@ -139,6 +140,15 @@ describe('Cashier, the UPI claim', () => {
     expect(html).toContain('data-claim');
     expect(html).toContain('Guest says paid by UPI');
     expect(html).toContain('Check the restaurant');
+  });
+
+  it('blocks cash collection while an online payment is in flight', () => {
+    const html = renderToStaticMarkup(
+      <Cashier nav={nav} data={{ ...claimed, queue: [{ ...claimed.queue[0], pendingOnline: true }] }} />,
+    );
+    expect(html).toContain('Online payment in progress');
+    const cta = html.match(/<button[^>]*data-counter-cta[^>]*>/)?.[0] ?? '';
+    expect(cta).toMatch(/\sdisabled=""/);
   });
 
   it('says nothing about a claim that was never made', () => {
@@ -235,6 +245,7 @@ describe('Counter, the redesign', () => {
               paid: 0,
               items: '2 × Thali',
               claimed: true,
+              pendingOnline: false,
             },
           ],
         }}

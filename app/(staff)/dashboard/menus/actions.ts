@@ -357,7 +357,7 @@ export async function deleteItemAction(formData: FormData): Promise<void> {
     name: row.name as string,
     description: (row.description as string | null) ?? null,
     pricePaise: Number(row.price_paise ?? 0),
-    isVeg: Boolean(row.is_veg),
+    isVeg: row.is_veg === true ? true : row.is_veg === false ? false : null,
     isAvailable: Boolean(row.is_available),
     categoryId: (row.category_id as string | null) ?? null,
     sortOrder: Number(row.sort_order ?? 0),

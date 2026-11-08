@@ -128,8 +128,9 @@ export async function renewTrialAction(restaurantName: string, adminSecret: stri
   if (!updated.trial_started_at) {
     return { ok: false, error: 'Could not read trial start time after update.' };
   }
-  const trialEndsAt = new Date(updated.trial_started_at);
-  trialEndsAt.setDate(trialEndsAt.getDate() + 7);
+  const trialEndsAt = new Date(
+    new Date(updated.trial_started_at).getTime() + 7 * 24 * 60 * 60 * 1000
+  );
 
   revalidatePath('/dashboard', 'layout');
   revalidatePath('/dashboard/settings', 'layout');

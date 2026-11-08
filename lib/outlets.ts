@@ -26,7 +26,7 @@ export const OUTLET_COOKIE = 'ad_outlet';
  * How many outlets one account may own.
  *
  * Not a licensing rule -- a stop on the one abuse this flow opens: creating a
- * restaurant is free and starts a fresh ten-day trial, so an unlimited
+ * restaurant is free and starts a fresh seven-day trial, so an unlimited
  * "add outlet" button is an unlimited free trial. Five is more than the
  * small chains this is built for and few enough to be worth blocking.
  */

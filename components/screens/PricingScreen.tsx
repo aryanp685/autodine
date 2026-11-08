@@ -79,8 +79,8 @@ export function PricingScreen() {
       <SiteNav
         links={[
           { label: 'Product', href: '/#product' },
-          { label: 'How it works', href: '/#flow' },
-          { label: 'The screens', href: '/#tour' },
+          { label: 'How it works', href: '/#how' },
+          { label: 'The screens', href: '/#screens' },
           { label: 'What is live', href: '/#status' },
           { label: 'Pricing', href: '/pricing', active: true },
         ]}

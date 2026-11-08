@@ -430,8 +430,13 @@ export function zeroFillBuckets(
     return out;
   }
 
-  for (let cursor = start; cursor < end; cursor = new Date(cursor.getTime() + 86_400_000)) {
-    const key = `${localDateKey(timeZone, cursor)} 00:00`;
+  // Walk by LOCAL calendar days, not by 24-hour steps. In a DST zone a local
+  // day is 23 or 25 hours, so adding 86_400_000 can skip or repeat a date.
+  // India has no DST today, but the product is meant to expand.
+  let cursor = start;
+  while (cursor < end) {
+    const parts = localDateParts(timeZone, cursor);
+    const key = `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')} 00:00`;
     const row = byKey.get(key);
     out.push({
       key,
@@ -439,6 +444,7 @@ export function zeroFillBuckets(
       bills: row?.bills ?? 0,
       revenuePaise: row?.revenuePaise ?? 0,
     });
+    cursor = startOfLocalDayUtc(timeZone, { ...parts, day: parts.day + 1 });
   }
 
   return out;
@@ -661,7 +667,11 @@ export async function getReportsScreenData(
     timezone,
     range,
     report: { ...report, buckets: zeroFillBuckets(range, report.buckets, timezone, now) },
-    ordersTruncated: report.totals.bills > report.orders.length,
+    // `bills` excludes cancelled orders but `orders` includes them, so
+    // comparing bills to the array length can miss a truncated list when
+    // cancelled orders pad it. Compare the whole order count instead.
+    ordersTruncated:
+      report.totals.bills + report.totals.cancelled > report.orders.length,
   };
 }
 

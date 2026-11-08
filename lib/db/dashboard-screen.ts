@@ -176,7 +176,12 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
 
   const ordersToday = rows.length;
   const openOrders = rows.filter((row) => OPEN_STATES.includes(row.prep_status)).length;
-  const averageTicketPaise = ordersToday > 0 ? Math.round(revenueTodayPaise / ordersToday) : 0;
+  // Average TICKET is billed ÷ orders, not collected ÷ orders. The old
+  // calculation divided money that arrived today (which can include a payment
+  // for yesterday's bill) by orders placed today, so it was neither the
+  // average bill nor the average collection.
+  const billedTodayPaise = rows.reduce((sum, row) => sum + Number(row.total_paise ?? 0), 0);
+  const averageTicketPaise = ordersToday > 0 ? Math.round(billedTodayPaise / ordersToday) : 0;
 
   const hourlyPaise = Array.from({ length: hourInZone(timezone, now) + 1 }, () => 0);
   for (const row of rows) {

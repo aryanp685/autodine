@@ -40,6 +40,7 @@
  */
 
 import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
+import { addressFromHeaders, hashAddress } from '@/lib/ip-hash';
 import {
   DEFAULT_EDGE_VOICE,
   EDGE_HINDI_VOICES,
@@ -48,6 +49,35 @@ import {
   normalizeProsodyHz,
   normalizeProsodyPercent,
 } from '@/lib/tts-voices';
+
+/**
+ * A kitchen announcement is one or two sentences. A megabyte of text is not
+ * an announcement, it is a way to make the free Edge TTS service do work for
+ * as long as the caller likes. The route is public, so the cap is the first
+ * door; the per-instance rate limit is the second.
+ */
+const MAX_TEXT_LENGTH = 1000;
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const RATE_LIMIT_MAX = 30;
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function isRateLimited(key: string): boolean {
+  const now = Date.now();
+  // Bound memory even when callers rotate forwarded addresses.
+  if (rateBuckets.size >= 10000) {
+    for (const [address, entry] of rateBuckets) {
+      if (entry.resetAt <= now) rateBuckets.delete(address);
+    }
+    if (!rateBuckets.has(key) && rateBuckets.size >= 10000) return true;
+  }
+  const bucket = rateBuckets.get(key);
+  if (!bucket || bucket.resetAt <= now) {
+    rateBuckets.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return false;
+  }
+  bucket.count += 1;
+  return bucket.count > RATE_LIMIT_MAX;
+}
 
 /** The runtime must be Node.js: the WebSocket client needs `ws`. */
 export const runtime = 'nodejs';
@@ -119,6 +149,24 @@ export async function POST(request: Request): Promise<Response> {
   const text = body.text?.trim();
   if (!text) {
     return Response.json({ error: 'Missing text' }, { status: 400 });
+  }
+
+  if (text.length > MAX_TEXT_LENGTH) {
+    return Response.json(
+      { error: `That announcement is too long. Keep it under ${MAX_TEXT_LENGTH} characters.` },
+      { status: 400 }
+    );
+  }
+
+  // Per-instance, per-address. Serverless instances do not share this map, so
+  // it is a brake on a single runaway client, not a global quota; the text cap
+  // above is the hard limit.
+  const ip = addressFromHeaders((name) => request.headers.get(name));
+  if (isRateLimited(hashAddress(ip, 'tts'))) {
+    return Response.json(
+      { error: 'Too many announcements. Please wait a minute and try again.' },
+      { status: 429 }
+    );
   }
 
   // Validate voice against the known catalogue. An unknown voice means a

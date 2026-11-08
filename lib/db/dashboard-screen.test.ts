@@ -141,15 +141,16 @@ describe('getDashboardScreenData', () => {
     expect((await getDashboardScreenData())?.stats.revenueTodayPaise).toBe(10000);
   });
 
-  it('averages the ticket over orders, rounding to whole paise', async () => {
+  it('averages the billed ticket over orders, rounding to whole paise', async () => {
     mocks.staff.result = signedIn(
       fakeSupabase({
         orders: [order('1'), order('2'), order('3')],
         payments: [payment('1', 1000), payment('2', 1000), payment('3', 1001)],
       })
     );
-    // 3001 / 3 = 1000.33 -> 1000
-    expect((await getDashboardScreenData())?.stats.averageTicketPaise).toBe(1000);
+    // 3 x 10000 / 3 = 10000. The average is billed, not collected: the
+    // payments above are deliberately different from the order totals.
+    expect((await getDashboardScreenData())?.stats.averageTicketPaise).toBe(10000);
   });
 
   it('counts open orders as new/preparing/ready and excludes served and cancelled', async () => {

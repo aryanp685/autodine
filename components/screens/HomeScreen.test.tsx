@@ -34,6 +34,19 @@ describe('home', () => {
     expect(home).toContain('Three screens, in service order.');
   });
 
+  it('gives the problem section a named landmark and three readable cards', () => {
+    const section = home.match(/<section[^>]*id="why"[\s\S]*?<\/section>/)?.[0] ?? '';
+    expect(section).toContain('aria-labelledby="problem-heading"');
+    expect(section).toContain('bg-[#FBFAF7]');
+    expect(section.match(/<h3/g)).toHaveLength(3);
+    expect(section).toContain('The menu is on paper');
+    expect(section).toContain('Orders are carried, not sent');
+    expect(section).toContain('The bill comes last');
+    expect(section).toContain('data-stagger');
+    expect(section).toContain('motion-safe:hover:');
+    expect(section).not.toContain('text-plum');
+  });
+
   it('counts the build from the lists it renders', () => {
     const line = `${cap(WORDS[LIVE.length])} things work. ${cap(WORDS[NOT_CONNECTED.length])} do not.`;
     expect(home.replace(/<!-- -->/g, '')).toContain(line);

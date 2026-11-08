@@ -46,6 +46,8 @@ type QueueRow = {
    * cashier checks the shop's own bank app before taking cash twice.
    */
   claimed: boolean;
+  /** A pending online attempt is in flight; do not take cash. */
+  pendingOnline: boolean;
 };
 
 function fromDemo(order: (typeof counterQueue)[number]): QueueRow {
@@ -61,6 +63,7 @@ function fromDemo(order: (typeof counterQueue)[number]): QueueRow {
     paid: 0,
     items: order.items,
     claimed: false,
+    pendingOnline: false,
   };
 }
 
@@ -77,6 +80,7 @@ function fromLive(order: CounterOrder): QueueRow {
     paid: order.paid,
     items: order.items,
     claimed: order.claimed === true,
+    pendingOnline: order.pendingOnline === true,
   };
 }
 
@@ -441,6 +445,9 @@ export function Cashier({
                                 {item.claimed ? (
                                   <Tag tone="due">Says paid by UPI</Tag>
                                 ) : null}
+                                {item.pendingOnline ? (
+                                  <Tag tone="due">Online payment in progress</Tag>
+                                ) : null}
                                 {/* The kitchen's own word for where the food is,
                                     as a status tag: the string was bare 11.5px
                                     grey text sitting beside two real tags. */}
@@ -629,7 +636,7 @@ export function Cashier({
                         type="button"
                         data-counter-cta
                         className={`${btn('primary')} mt-4 w-full`}
-                        disabled={isPending || Boolean(live && !order.orderId)}
+                        disabled={isPending || order.pendingOnline || Boolean(live && !order.orderId)}
                         aria-busy={isPending}
                         onClick={recordPayment}
                       >
@@ -664,7 +671,7 @@ export function Cashier({
                             <button
                               type="button"
                               className={btn('danger', 'sm')}
-                              disabled={cancelling === order.orderId}
+                              disabled={order.pendingOnline || cancelling === order.orderId}
                               onClick={cancelOrder}
                             >
                               {cancelling === order.orderId ? 'Cancelling…' : 'Yes, cancel it'}
@@ -682,7 +689,7 @@ export function Cashier({
                         <button
                           type="button"
                           className={`${btn('quiet', 'sm')} mt-1`}
-                          disabled={isPending || Boolean(live && !order.orderId)}
+                          disabled={isPending || order.pendingOnline || Boolean(live && !order.orderId)}
                           onClick={cancelOrder}
                         >
                           Cancel this order

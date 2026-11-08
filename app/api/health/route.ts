@@ -42,7 +42,15 @@ export async function GET() {
   // "ok" means every migration this build expects is present. A deployment with
   // no database at all is not "ok" -- it renders sample data, and pretending
   // otherwise is how a demo ends with a fictional order.
-  const ok = health.configured && health.schema.trialAndWriteGate === 'applied';
+  //
+  // All three schema probes must be applied. Checking only the trial/write
+  // gate let a deployment missing plan_features() or restaurants.upi_id
+  // report healthy while the plan line and the UPI QR were broken.
+  const schemaApplied =
+    health.schema.trialAndWriteGate === 'applied' &&
+    health.schema.planEntitlements === 'applied' &&
+    health.schema.restaurantUpi === 'applied';
+  const ok = health.configured && schemaApplied;
 
   return NextResponse.json(
     { ok, ...health, checkedAt: new Date().toISOString() },
