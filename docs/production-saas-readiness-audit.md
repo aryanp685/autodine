@@ -16,9 +16,9 @@ Evidence is classified as:
 - **Code-reviewed:** implementation and policies were read; not equivalent to runtime proof.
 - **Unit/mock:** deterministic logic or UI; external service/database behavior is mocked.
 - **Disposable DB:** synthetic data on a throwaway PostgreSQL environment built from migrations and local-only compatibility scaffolding.
-- **Hosted service:** real vendor environment; none was used for tests or this assessment.
+- **Hosted service:** one user-designated non-production Supabase project was checked for project health, migration history, and catalog metadata only. No table rows were read, no schema or data was changed, and no provider-backed app tests were run. Production was not queried.
 
-The non-production Supabase project previously identified for this work is inactive; its restore was denied and schema/history retrieval timed out. It cannot supply current schema parity evidence. Do not substitute production.
+The former non-production ref `jubaqjlnmbntogeyjiwt` now returns 404 `Resource has been removed`; do not retry it. The user designated the visible `dealflow` Supabase project (`pkabdtuowxdgqovkfvmp`) as non-production. Its services report `ACTIVE_HEALTHY`, but its migration history is empty and its public schema contains `auto_sends`, `brand_replies`, `deals`, `licenses`, `manager_codes`, `manager_links`, `password_resets`, `payments`, and `users`, with no AutoDine `restaurants`, `orders`, or public RPC functions. Catalog metadata also shows no policies on those tables and RLS disabled on several. Realtime health metadata reports `db_connected=false` and `replication_connected=false`. This is not an AutoDine schema target and may contain another application's data; no rows were queried and no migrations or writes were attempted. The visible `autodine-production` project was not queried or used. A new empty, dedicated AutoDine non-production project is still required for schema-parity/integration work.
 
 ## 2. Architecture and operating model
 
@@ -97,7 +97,7 @@ The successful recent disposable lifecycle was: guest order persistence → kitc
 - Migration tests and static SQL checking exist. The local PostgreSQL runner builds a throwaway database from repository migrations plus explicitly marked compatibility scaffolding for objects absent from this repository. It is not a production schema clone.
 - Prior CI at branch head `626ba26` passed isolated PostgreSQL/browser workflows, including the receipt lifecycle. On this assessment commit, hosted CI and demo-browser E2E passed, and isolated PostgreSQL/browser run `42410329254` passed all five database cases, including the new 16-independent-order/16-connection smoke. Ordinary local `npm test` still skips those five DB cases when `THROTTLE_DB_URL` is not set.
 - No complete automated downgrade/rollback path was found. Many business migrations are forward-only. Before any production migration: take a provider snapshot/PITR point, run the exact migration on a schema-faithful disposable clone, verify pre/post object/grant/index/data behavior, capture executable rollback or forward-fix steps, and obtain separate deployment approval. The user has not authorized production changes.
-- Live schema comparison remains blocked by the inactive non-production Supabase project; do not repeat the denied restore or use production.
+- AutoDine live-schema comparison remains blocked: the former test ref is removed and the user-designated `dealflow` project has a different schema with no AutoDine tables/RPCs. Do not apply this repository's migrations or test data to that project; obtain a dedicated empty AutoDine non-production target. Never use production.
 
 ## 7. Operations, availability, backup/DR and privacy
 
@@ -134,14 +134,15 @@ Before a budget is approved, obtain actual vendor plans/rate cards and quotes, i
 | `npm run env:check` | Failed because local Supabase URL, publishable key and server secret are absent | Expected in this environment; no credentials were requested or supplied |
 | Production build (hermetic, no service credentials) | Passed with `GITHUB_ACTIONS=true CI=true AUTODINE_TEST_DEMO_BUILD=true VERCEL_ENV=test npm run build`; generated all 24 static pages and the route manifest | The first attempt omitted the two CI flags and was correctly rejected by the production-config guard; no guard was weakened |
 | 16-order DB capacity smoke | Passed in isolated PostgreSQL workflow `42410329254`: 16 synthetic independent orders ran concurrently through a 16-connection pool; assertions verified 16 unique persisted orders, one line each and correct totals | Small database burst only; no measured service/resource profile, 1×/2× target load, soak, or horizontal-scale proof |
-| Production/non-production provider tests | Not run | No production use; non-production Supabase project is inactive; no authorized provider credentials |
+| Supabase metadata check | Read-only inspection of user-designated `dealflow` project: active/healthy service status; empty migration history; public schema belongs to a different app; no AutoDine tables/RPCs | No rows read or writes performed; do not use as AutoDine target. Its Realtime health metadata reports `db_connected=false`, `replication_connected=false` |
+| Production/non-production provider tests | Not run | No production use; the former AutoDine test ref is removed and `dealflow` is not an AutoDine schema; no authorized AI/payment provider credentials |
 
 ## 10. Go-live blockers and concrete next actions
 
 **P0 — before any commercial production launch**
 
-1. Provision a **new active disposable** non-production Supabase project (the previously identified project is inactive and restore was denied with 403) or run a schema-faithful approved local clone; verify schema, grants, RLS, storage and function signatures. Do not retry the denied restore and never use production as the substitute.
-2. Run the new 16-order test on isolated PostgreSQL, then build a controlled 1×/2×/soak/fault-injection load suite that measures application, PostgREST, Postgres and Realtime resource limits. Obtain provider limits and define a supported capacity with headroom.
+1. Provision a **new empty, dedicated AutoDine non-production** Supabase project or run a schema-faithful approved local clone; verify schema, grants, RLS, storage and function signatures. The prior ref is now removed, and the user-designated `dealflow` project has a different schema; do not retry the removed ref, do not modify `dealflow`, and never use production as the substitute.
+2. Extend the passed 16-order disposable-PostgreSQL smoke into a controlled 1×/2×/30-minute soak/fault-injection load suite that measures application, PostgREST, Postgres and Realtime resource limits. Obtain provider limits and define supported capacity with headroom; do not treat the 16-order result as a production capacity claim.
 3. Establish automated backups/PITR, retention and a successful restore drill; approve measurable RPO/RTO and a recovery runbook.
 4. Add service monitoring/alerts/on-call and incident/security/privacy response processes; prove alert delivery and recovery in a tabletop/drill.
 5. Decide whether unsupported Microsoft TTS is acceptable as a best-effort, noncritical convenience. If it becomes operationally critical, choose a supported speech service with a vendor SLA and test credentials; browser speech remains fallback only.
