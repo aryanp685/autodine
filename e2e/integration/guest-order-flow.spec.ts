@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
+  BASE,
   GUEST_READY,
   SLUG,
   addOneAndCheckout,
@@ -31,15 +32,45 @@ test.describe('guest ordering — real database', () => {
   test('a live card opens the real menu, with this table named', async ({ context }) => {
     const page = await scanCard(context);
     await expect(page).toHaveURL(new RegExp(`/menu\\?s=${SLUG}`), { timeout: 20_000 });
-    const cookieNames = (await context.cookies()).map((cookie) => cookie.name);
+    const cookies = await context.cookies();
+    const menuRequestPromise = page.waitForRequest((request) => {
+      const url = new URL(request.url());
+      return url.pathname === '/menu' && url.searchParams.get('s') === SLUG;
+    });
+    await page.goto(`${BASE}/menu?s=${encodeURIComponent(SLUG)}`);
+    const menuRequest = await menuRequestPromise;
+    const requestCookieNames = (await menuRequest.allHeaders()).cookie
+      ?.split(';')
+      .map((part) => part.trim().split('=')[0]) ?? [];
+    const cardCookie = cookies.find((cookie) => cookie.name === 'autodine_table_card');
+    const cardTokenShapeOk = Boolean(cardCookie?.value && /^[A-Za-z0-9_-]{8,128}$/.test(cardCookie.value));
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
+    let localSupabase = false;
+    try {
+      const parsed = new URL(supabaseUrl);
+      localSupabase = ['127.0.0.1', 'localhost', '[::1]'].includes(parsed.hostname) && parsed.port === '54321';
+    } catch {
+      // Never probe an unrecognized or non-local Supabase target in diagnostics.
+    }
+    const introResponse = cardTokenShapeOk && localSupabase && anonKey
+      ? await fetch(`${supabaseUrl}/rest/v1/rpc/public_qr_intro`, {
+          method: 'POST',
+          headers: { apikey: anonKey, authorization: `Bearer ${anonKey}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ p_public_token: cardCookie?.value ?? '' }),
+        })
+      : null;
+    const introRows = introResponse?.ok ? await introResponse.json() as unknown[] : [];
     const body = await page.locator('body').innerText();
+    const diagnostic = `browser cookies=${cookies.map(({ name, secure, value }) => `${name}(secure=${secure},length=${value.length})`).join(',')}; menu request cookies=${requestCookieNames.join(',')}; card token shape=${cardTokenShapeOk}; public_qr_intro HTTP=${introResponse?.status ?? 'not-called'} rows=${Array.isArray(introRows) ? introRows.length : 'not-array'}`;
     // Exact fixture values matter here: the generic "Table access" gate copy
     // must not accidentally satisfy a weak `/Table /` locator.
-    expect(body, `Scan did not render the synthetic menu. Cookies: ${cookieNames.join(', ')}. Page:\n${body}`)
+    expect(body, `Scan did not render the synthetic menu. ${diagnostic}. Page:\n${body}`)
       .toContain('Synthetic Paneer Dish');
-    expect(body, `Scan did not identify the synthetic table. Page:\n${body}`).toContain('E2E Table');
-    expect(cookieNames, 'the scan response must retain a card or session pass')
-      .toEqual(expect.arrayContaining(['autodine_table_card']));
+    expect(body, `Scan did not identify the synthetic table. ${diagnostic}. Page:\n${body}`)
+      .toContain('E2E Table');
+    expect(cardTokenShapeOk, `the scan must retain a valid card token; ${diagnostic}`)
+      .toBe(true);
   });
 
   test('the bill is priced by the server: quantities and notes travel, prices do not', async ({

@@ -15,7 +15,7 @@ function safeDetail(value) {
     .replace(/%/g, '%25')
     .replace(/\r/g, '%0D')
     .replace(/\n/g, '%0A')
-    .slice(0, 1500);
+    .slice(0, 3000);
 }
 
 function escapeMarkdown(value) {
