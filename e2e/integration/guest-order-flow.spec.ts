@@ -31,10 +31,15 @@ test.describe('guest ordering — real database', () => {
   test('a live card opens the real menu, with this table named', async ({ context }) => {
     const page = await scanCard(context);
     await expect(page).toHaveURL(new RegExp(`/menu\\?s=${SLUG}`), { timeout: 20_000 });
-    // The table badge is the database's answer about where this browser is.
-    await expect(page.getByText(/Table /).first()).toBeVisible();
-    // Real dishes with prices, not the sample menu.
-    await expect(page.locator('dl, [data-gtab-bar]')).not.toHaveCount(0);
+    const cookieNames = (await context.cookies()).map((cookie) => cookie.name);
+    const body = await page.locator('body').innerText();
+    // Exact fixture values matter here: the generic "Table access" gate copy
+    // must not accidentally satisfy a weak `/Table /` locator.
+    expect(body, `Scan did not render the synthetic menu. Cookies: ${cookieNames.join(', ')}. Page:\n${body}`)
+      .toContain('Synthetic Paneer Dish');
+    expect(body, `Scan did not identify the synthetic table. Page:\n${body}`).toContain('E2E Table');
+    expect(cookieNames, 'the scan response must retain a card or session pass')
+      .toEqual(expect.arrayContaining(['autodine_table_card']));
   });
 
   test('the bill is priced by the server: quantities and notes travel, prices do not', async ({
