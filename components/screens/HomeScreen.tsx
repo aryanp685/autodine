@@ -97,15 +97,29 @@ export function Home() {
 function Hero() {
   return (
     <section className="relative isolate overflow-hidden bg-ink" data-hero>
-      {/* A warm light wash instead of the old dark photograph. The product
-          shot is the hero; the background stays quiet so the type and the
-          phone carry the page. */}
+      {/* A light, airy restaurant interior behind the product shot. The
+          overlay keeps the charcoal type legible while letting the room show
+          through on the right, where the phone sits. */}
+      <div className="absolute inset-0 -z-20" data-hero-image>
+        <Image
+          src="/img/restaurant-interior-light.jpg"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-center"
+        />
+      </div>
       <div
-        className="absolute inset-0 -z-10 bg-[radial-gradient(70%_60%_at_82%_18%,rgba(31,77,58,0.10),transparent_68%)]"
+        className="absolute inset-0 -z-10 bg-[linear-gradient(105deg,rgba(251,250,247,0.94)_0%,rgba(251,250,247,0.86)_45%,rgba(251,250,247,0.62)_100%)]"
         aria-hidden="true"
       />
       <div
-        className="absolute inset-0 -z-10 bg-[radial-gradient(50%_40%_at_10%_90%,rgba(185,138,75,0.08),transparent_70%)]"
+        className="absolute inset-0 -z-10 bg-[radial-gradient(70%_60%_at_82%_18%,rgba(31,77,58,0.08),transparent_68%)]"
+        aria-hidden="true"
+      />
+      <div
+        className="absolute inset-0 -z-10 bg-[radial-gradient(50%_40%_at_10%_90%,rgba(185,138,75,0.06),transparent_70%)]"
         aria-hidden="true"
       />
 
@@ -274,43 +288,77 @@ function Problem() {
     {
       title: 'The menu is on paper',
       body: 'A price changes or a dish runs out — the printed menu is already wrong.',
+      detail: 'A menu that cannot keep up.',
+      icon: 'M6 3h9l3 3v15H6V3Zm8 0v5h4M9 12h6M9 16h4',
     },
     {
       title: 'Orders are carried, not sent',
       body: 'Table, pad, pass. Every hand-off can lose a number or a note.',
+      detail: 'One more hand-off. One more chance to miss.',
+      icon: 'M4 7h11m-3-3 3 3-3 3M20 17H9m3-3-3 3 3 3',
     },
     {
       title: 'The bill comes last',
       body: 'The guest waits, the server walks, the table sits finished.',
+      detail: 'A good meal, followed by a wait.',
+      icon: 'M12 8v4l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
     },
   ];
 
   return (
-    <section className="border-t border-cream/[0.12] py-24">
+    <section
+      id="why"
+      aria-labelledby="problem-heading"
+      className="border-t border-[#E8E3DA] bg-[#FBFAF7] py-16 text-[#1C1B18] sm:py-24 lg:py-28"
+    >
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
-        <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-plum">Why it exists</p>
-            <h2 className="mt-5 max-w-[18ch] text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.05] tracking-[-0.04em]" data-reveal>
-              Service is not slow. The hand-offs are.
-            </h2>
-            <p className="mt-4 max-w-[46ch] text-[15px] leading-[1.6] text-mute" data-reveal>
-              AutoDine removes the walk between the table and the kitchen. Staff still run the room.
+        <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-start lg:gap-16">
+          <div className="lg:pt-4">
+            <p className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-forest">
+              <span className="h-px w-7 bg-[#B98A4B]" aria-hidden="true" />
+              Why it exists
             </p>
+            <h2
+              id="problem-heading"
+              className="mt-6 max-w-[18ch] text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.1] tracking-[-0.04em]"
+              data-reveal
+            >
+              Service is not slow. <span className="text-forest">The hand-offs are.</span>
+            </h2>
+            <p className="mt-5 max-w-[42ch] text-[15px] leading-[1.8] text-[#6B665E]" data-reveal>
+              A busy room has enough moving parts. Your menu, orders and bills shouldn’t add to them.
+            </p>
+            <div className="mt-8 max-w-[42ch] border-l-2 border-[#B98A4B]/50 pl-5" data-reveal>
+              <p className="text-[14px] font-medium leading-relaxed text-forest">Less back-and-forth. More hospitality.</p>
+              <p className="mt-2 text-[13px] leading-relaxed text-[#6B665E]">
+                AutoDine sends orders from the table to the kitchen. Your staff still run the room.
+              </p>
+            </div>
           </div>
 
-          <ol className="divide-y divide-cream/[0.12] border-y border-cream/[0.12]" data-stagger>
+          <ol className="grid min-w-0 gap-4" data-stagger>
             {items.map((item, index) => (
-              <li key={item.title} className="flex gap-5 py-6">
-                <span className="mt-0.5 text-[11px] font-semibold tracking-[0.16em] text-mute-dim">
-                  {String(index + 1).padStart(2, '0')}
-                </span>
-                <span>
-                  <span className="block text-[16px] font-medium tracking-tight text-cream">{item.title}</span>
-                  <span className="mt-1.5 block max-w-[52ch] text-[13.5px] leading-relaxed text-mute">
-                    {item.body}
+              <li
+                key={item.title}
+                className="group relative rounded-2xl border border-[#E8E3DA] bg-white p-5 shadow-[0_4px_24px_rgba(28,27,24,0.025)] motion-safe:transition-[transform,box-shadow] motion-safe:duration-300 motion-safe:hover:-translate-y-0.5 motion-safe:hover:shadow-[0_8px_30px_rgba(31,77,58,0.07)] sm:p-7"
+              >
+                <div className="flex items-start gap-4 sm:gap-5">
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#E9F0EA] text-forest" aria-hidden="true">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d={item.icon} />
+                    </svg>
                   </span>
-                </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <h3 className="text-[16px] font-medium leading-snug tracking-[-0.02em] sm:text-[18px]">{item.title}</h3>
+                      <span className="pt-0.5 text-[10px] font-medium tabular-nums tracking-[0.12em] text-[#6B665E]" aria-hidden="true">
+                        {String(index + 1).padStart(2, '0')}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-[13.5px] leading-relaxed text-[#6B665E]">{item.body}</p>
+                    <p className="mt-4 border-t border-[#E8E3DA]/70 pt-3 text-[11px] font-medium leading-relaxed text-forest">{item.detail}</p>
+                  </div>
+                </div>
               </li>
             ))}
           </ol>
@@ -338,7 +386,7 @@ function Steps() {
           {STEPS.map((step) => (
             <li
               key={step.n}
-              className="group rounded-2xl border border-cream/[0.12] bg-ink-card p-6 transition-colors hover:border-cream/15 hover:bg-ink-card"
+              className="group rounded-2xl border border-cream/[0.12] bg-ink-card p-6 transition-colors hover:border-cream/15 hover:bg-ink-soft"
             >
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-semibold tracking-[0.16em] text-mute-dim">{step.n}</span>
@@ -386,7 +434,7 @@ function Screens() {
           Three screens, in service order.
         </h2>
 
-        <div className="mt-14 grid gap-5 md:grid-cols-3" data-tour>
+        <div className="mt-14 grid gap-5 md:grid-cols-3" data-stagger>
           {panels.map((panel, index) => (
             <article
               key={panel.title}
@@ -402,7 +450,7 @@ function Screens() {
                   className="object-cover transition-transform duration-700 group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-ink-card via-ink-card/20 to-transparent" />
-                <span className="absolute left-4 top-4 rounded-full bg-ink/70 px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-plum backdrop-blur">
+                <span className="absolute left-4 top-4 rounded-full bg-paper/80 px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-forest backdrop-blur">
                   {panel.kicker}
                 </span>
               </div>
@@ -494,11 +542,11 @@ function Honest() {
           </div>
 
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-plum">Not connected</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-mute-dim">Not connected</p>
             <ul className="mt-5 space-y-3">
               {NOT_CONNECTED.map((item) => (
                 <li key={item.id} className="flex gap-3 text-[13.5px] leading-relaxed text-mute">
-                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-grass" aria-hidden="true" />
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-mute-dim" aria-hidden="true" />
                   <span><span className="text-cream">{item.label}</span> — {item.detail}</span>
                 </li>
               ))}

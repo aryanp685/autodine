@@ -203,7 +203,7 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
         name: (r.name as string) ?? '',
         ...(typeof img === 'string' && img ? { img } : {}),
         pricePaise: Number(r.price_paise ?? 0),
-        isVeg: Boolean(r.is_veg),
+        isVeg: r.is_veg === true ? true : r.is_veg === false ? false : null,
         isAvailable: Boolean(r.is_available),
         ...(variants.length ? { variants } : {}),
         ...(addons.length ? { addons } : {}),

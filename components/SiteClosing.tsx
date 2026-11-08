@@ -46,7 +46,7 @@ export function SiteClosing({
           {secondary && (
             <Link
               href={secondary.href}
-              className="inline-flex h-12 items-center rounded-full border border-cream/20 px-6 text-[14px] font-medium text-cream transition-colors hover:border-cream/40 hover:bg-white"
+              className="inline-flex h-12 items-center rounded-full border border-cream/20 px-6 text-[14px] font-medium text-cream transition-colors hover:border-cream/40 hover:bg-ink-soft"
             >
               {secondary.label}
             </Link>

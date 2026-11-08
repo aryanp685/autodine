@@ -29,7 +29,7 @@ export function LegalPage({
       <header className="border-b border-cream/[0.12]">
         <div className="mx-auto flex h-16 max-w-[820px] items-center justify-between px-5 sm:px-8">
           <Link href="/" aria-label="AutoDine home">
-            <BrandLockup size={21} ink="#f7f3ea" dot={BRAND_GREEN} />
+            <BrandLockup size={21} ink="currentColor" dot={BRAND_GREEN} />
           </Link>
           <Link href="/" className="text-[13px] text-mute transition-colors hover:text-cream">
             Back to the site
