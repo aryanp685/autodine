@@ -778,10 +778,8 @@ export const selectClass = `${control} h-11 pr-8`;
 export function TableWrap({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
     <div
-      className={[
-        '-mx-4 min-w-0 max-w-[calc(100vw-0.5rem)] overflow-x-auto sm:mx-0',
-        className,
-      ].join(' ')}
+      className={['-mx-4 min-w-0 max-w-full overflow-x-auto sm:mx-0', className].join(' ')}
+      style={{ minWidth: 0, maxWidth: 'calc(100vw - 0.5rem)', overflowX: 'auto' }}
     >
       {children}
     </div>
