@@ -156,7 +156,10 @@ test.describe('a team invitation, clicked through', () => {
     test.skip(!EXPIRED_CODE, 'set E2E_EXPIRED_INVITE_CODE from a branch database with an aged row');
 
     const context = await browser.newContext();
-    const page = await context.newPage();
+    // The join page deliberately hides invite status from signed-out visitors.
+    // Previewing the aged row as an authenticated staff member verifies expiry
+    // without weakening that privacy boundary.
+    const page = await signIn(context, OWNER_EMAIL, OWNER_PASSWORD);
     await page.goto(`${BASE}/join/${EXPIRED_CODE}`);
 
     // Said plainly, on the page, with the one action that fixes it.

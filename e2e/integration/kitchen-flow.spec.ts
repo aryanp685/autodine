@@ -74,7 +74,9 @@ test.describe('kitchen — real database', () => {
     // The guest's own page — the thing that must follow the kitchen.
     const guest = await context.newPage();
     await guest.goto(guestUrl);
-    await expect(guest.getByText('Sent to the kitchen')).toBeVisible({ timeout: 20_000 });
+    await expect(guest.locator('[data-placed-step="now"]')).toContainText('Sent to the kitchen', {
+      timeout: 20_000,
+    });
 
     const board = await signInOwner(context);
     await board.goto(`${BASE}/kitchen`);
@@ -117,8 +119,8 @@ test.describe('kitchen — real database', () => {
     await board.getByRole('button', { name: 'Yes, cancel' }).click();
     await expect(ticket).toHaveCount(0, { timeout: 20_000 });
 
-    await expect(guest.getByText('Order cancelled')).toBeVisible({ timeout: 45_000 });
-    await expect(guest.getByText('nothing is owed')).toBeVisible();
+    await expect(guest.getByText(/This order was cancelled/)).toBeVisible({ timeout: 45_000 });
+    await expect(guest.getByText(/nothing is owed/i)).toBeVisible();
   });
 
   test('orders that arrive while the board cannot speak are kept and replayable', async ({
@@ -133,8 +135,9 @@ test.describe('kitchen — real database', () => {
     const board = await signInOwner(context);
     await recordAnnouncements(board);
     await board.goto(`${BASE}/kitchen`);
-    const mute = board.getByRole('button', { name: 'Turn the announcements off on this screen' });
-    await mute.click();
+    const audioToggle = board.getByRole('button', { name: /^Kitchen audio (on|off)$/ });
+    if ((await audioToggle.getAttribute('aria-pressed')) === 'true') await audioToggle.click();
+    await expect(audioToggle).toHaveAttribute('aria-pressed', 'false');
 
     await placeGuestOrder(context, 'e2e: arrived while muted');
 
@@ -147,7 +150,8 @@ test.describe('kitchen — real database', () => {
 
     // Reading them out is the recovery: put the voice back on, ask for the
     // replay, and the announcements fire now.
-    await board.getByRole('button', { name: 'Turn the announcements on' }).click();
+    await audioToggle.click();
+    await expect(audioToggle).toHaveAttribute('aria-pressed', 'true');
     await board.getByRole('button', { name: 'Read them out' }).click();
     await expect
       .poll(() => announcementCount(board), { timeout: 15_000 })

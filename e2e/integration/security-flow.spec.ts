@@ -107,7 +107,12 @@ test.describe('security — real database', () => {
 
     // The bill totals come from the database's price snapshots. A one-paisa
     // line would show a one-rupee-or-less bill; real menu prices never do.
-    const totals = await page.getByText(/Total/).first().innerText();
+    const totals = await page
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: 'Bill', exact: true }) })
+      .locator('dl dd')
+      .last()
+      .innerText();
     expect(Number(totals.replace(/[^0-9]/g, ''))).toBeGreaterThan(9);
     expect(url).toContain('code=');
   });

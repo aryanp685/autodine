@@ -201,7 +201,7 @@ export function Card({
       className={[
         /* A slightly warm white, not pure white: on sand, #fff is a hole.
            `--p-card` is the paper's own white and it carries the sheet. */
-        'rounded-[var(--p-r-card)] border border-hair bg-card shadow-[var(--p-shadow-1)]',
+        'min-w-0 rounded-[var(--p-r-card)] border border-hair bg-card shadow-[var(--p-shadow-1)]',
         lift ? 'o-lift' : '',
         className,
       ]
@@ -776,7 +776,7 @@ export const selectClass = `${control} h-11 pr-8`;
 
 /** The scroll container. A table that overflows its card scrolls inside it. */
 export function TableWrap({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={['-mx-4 overflow-x-auto sm:mx-0', className].join(' ')}>{children}</div>;
+  return <div className={['-mx-4 min-w-0 max-w-full overflow-x-auto sm:mx-0', className].join(' ')}>{children}</div>;
 }
 
 export const tableClass = 'w-full border-collapse text-[13px]';

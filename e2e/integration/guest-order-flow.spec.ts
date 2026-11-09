@@ -65,8 +65,8 @@ test.describe('guest ordering — real database', () => {
     await addOneAndCheckout(page);
     const url = await placeOrder(page, 'e2e: one order, one note');
 
-    // The database answered with the public AU- reference and a guest token.
-    expect(codeFromOrderUrl(url)).toMatch(/^AU-[A-Z0-9]{5}$/);
+    // The database answered with a two-letter restaurant reference and a guest token.
+    expect(codeFromOrderUrl(url)).toMatch(/^[A-Z]{2}-[A-Z0-9]{5}$/);
     expect(tokenFromOrderUrl(url).length).toBeGreaterThanOrEqual(8);
 
     await expect(page.getByText('Order placed')).toBeVisible();
