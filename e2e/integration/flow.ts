@@ -1,4 +1,4 @@
-import { expect, type BrowserContext, type Page, type Request } from '@playwright/test';
+import { expect, type BrowserContext, type Page } from '@playwright/test';
 
 /**
  * Shared plumbing for the integration specs — the ones that click through a
@@ -55,23 +55,11 @@ export async function signInOwner(context: BrowserContext): Promise<Page> {
  * Scan the table card. Returns the menu page for the restaurant the card
  * belongs to — with the card-pass cookie the scan handler set.
  */
-export async function scanCard(
-  context: BrowserContext,
-  token?: string,
-  onMenuRequest?: (request: Request) => void,
-  onPageError?: (error: Error) => void,
-): Promise<Page> {
+export async function scanCard(context: BrowserContext, token?: string): Promise<Page> {
   const selected = token ?? (SCAN_TOKENS.length
     ? SCAN_TOKENS[scanTokenCursor++ % SCAN_TOKENS.length]
     : QR);
   const page = await context.newPage();
-  if (onMenuRequest) {
-    page.on('request', (request) => {
-      const url = new URL(request.url());
-      if (url.pathname === '/menu' && url.searchParams.get('s') === SLUG) onMenuRequest(request);
-    });
-  }
-  if (onPageError) page.on('pageerror', onPageError);
   await page.goto(`${BASE}/t/${selected}`);
   return page;
 }
