@@ -66,7 +66,7 @@ test.describe('guest ordering — real database', () => {
     expect(body, `Scan did not render the synthetic menu. ${diagnostic}. Page:\n${body}`)
       .toContain('Synthetic Paneer Dish');
     expect(body, `Scan did not identify the synthetic table. ${diagnostic}. Page:\n${body}`)
-      .toContain('E2E Table');
+      .toMatch(/E2E GUEST \d{2}/i);
     expect(cardTokenShapeOk, `the scan must retain a valid card token; ${diagnostic}`)
       .toBe(true);
   });
