@@ -4,6 +4,8 @@ import {
   GUEST_READY,
   SLUG,
   addOneAndCheckout,
+  addAnotherAndCheckout,
+  nextScanToken,
   codeFromOrderUrl,
   placeOrder,
   scanCard,
@@ -95,7 +97,8 @@ test.describe('guest ordering — real database', () => {
   });
 
   test('two intentional rounds on one table create two tickets in the same sitting', async ({ context }) => {
-    const page = await scanCard(context);
+    const cardToken = nextScanToken();
+    const page = await scanCard(context, cardToken);
 
     await addOneAndCheckout(page);
     const firstUrl = await placeOrder(page, 'e2e: first intentional round');
@@ -105,7 +108,7 @@ test.describe('guest ordering — real database', () => {
 
     // A fresh cart and fresh attempt token are a second guest intention, not
     // a retry of the first form. Keep the same scanned table/browser context.
-    await addOneAndCheckout(page);
+    await addAnotherAndCheckout(page);
     const secondUrl = await placeOrder(page, 'e2e: second intentional round');
     const secondToken = tokenFromOrderUrl(secondUrl);
     const secondOrder = await orderSessionForGuestToken(secondToken);

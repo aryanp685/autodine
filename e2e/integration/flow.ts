@@ -21,6 +21,12 @@ export const QR = process.env.E2E_QR_TOKEN ?? '';
 /** Fresh per-test cards keep the ordinary guest flows below the card open limit. */
 const SCAN_TOKENS = (process.env.E2E_QR_TOKENS ?? '').split(',').map((token) => token.trim()).filter(Boolean);
 let scanTokenCursor = 0;
+
+/** Reserve one fresh fixture card per browser scenario; a caller may retain it for a re-scan. */
+export function nextScanToken(): string {
+  return SCAN_TOKENS.length ? SCAN_TOKENS[scanTokenCursor++ % SCAN_TOKENS.length] : QR;
+}
+
 /** The six-digit on-site code for that card's table. */
 export const TABLE_CODE = process.env.E2E_TABLE_CODE ?? '';
 /** The restaurant slug the card belongs to. */
@@ -56,9 +62,7 @@ export async function signInOwner(context: BrowserContext): Promise<Page> {
  * belongs to — with the card-pass cookie the scan handler set.
  */
 export async function scanCard(context: BrowserContext, token?: string): Promise<Page> {
-  const selected = token ?? (SCAN_TOKENS.length
-    ? SCAN_TOKENS[scanTokenCursor++ % SCAN_TOKENS.length]
-    : QR);
+  const selected = token ?? nextScanToken();
   const page = await context.newPage();
   await page.goto(`${BASE}/t/${selected}`);
   return page;
@@ -68,13 +72,33 @@ export async function scanCard(context: BrowserContext, token?: string): Promise
  * Put one plain dish on the order and walk to checkout. Returns the checkout
  * page. Adds nothing else: each spec decides its own quantities and notes.
  */
-export async function addOneAndCheckout(page: Page): Promise<void> {
-  await page.goto(`${BASE}/menu?s=${encodeURIComponent(SLUG)}`);
+async function addOneAndContinue(page: Page): Promise<void> {
   const add = page.getByRole('button', { name: /^Add / }).first();
+  await expect(add).toBeVisible({ timeout: 15_000 });
   await add.click();
   await page.locator('[data-gtab-bar]').getByRole('link', { name: 'Cart' }).click();
   await page.getByRole('link', { name: 'Continue to checkout' }).click();
   await expect(page).toHaveURL(/\/menu\/checkout/);
+}
+
+export async function addOneAndCheckout(page: Page): Promise<void> {
+  await page.goto(`${BASE}/menu?s=${encodeURIComponent(SLUG)}`);
+  await addOneAndContinue(page);
+}
+
+/** Continue from the placed-order screen so the guest keeps the verified table session. */
+export async function addAnotherAndCheckout(page: Page): Promise<void> {
+  // Clearing is a post-commit client effect. Wait for its durable localStorage
+  // signal before navigating, so a fast E2E click cannot race hydration and
+  // mistake the previous ticket's cart for a fresh intention.
+  await page.waitForFunction(
+    (key) => window.localStorage.getItem(key) === null,
+    `autodine.cart.${SLUG}`,
+    { timeout: 10_000 },
+  );
+  await page.getByRole('link', { name: 'Order something else' }).click();
+  await expect(page).toHaveURL(/\/menu(?:\?|$)/);
+  await addOneAndContinue(page);
 }
 
 /**

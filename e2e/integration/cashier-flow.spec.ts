@@ -4,6 +4,8 @@ import {
   GUEST_READY,
   STAFF_READY,
   addOneAndCheckout,
+  addAnotherAndCheckout,
+  nextScanToken,
   placeOrder,
   tokenFromOrderUrl,
   scanCard,
@@ -128,11 +130,12 @@ test.describe('cashier — real database', () => {
 
   test('two ticket sitting settles, prints the exact total, closes and starts a fresh sitting', async ({ context }) => {
     test.skip(!GUEST_READY, skipUnless(false, 'guest env for the order half'));
-    const guest = await scanCard(context);
+    const cardToken = nextScanToken();
+    const guest = await scanCard(context, cardToken);
 
     await addOneAndCheckout(guest);
     const firstUrl = await placeOrder(guest, 'e2e: session ticket one');
-    await addOneAndCheckout(guest);
+    await addAnotherAndCheckout(guest);
     const secondUrl = await placeOrder(guest, 'e2e: session ticket two');
     const first = await orderSessionForGuestToken(tokenFromOrderUrl(firstUrl));
     const second = await orderSessionForGuestToken(tokenFromOrderUrl(secondUrl));
@@ -198,8 +201,9 @@ test.describe('cashier — real database', () => {
 
     // After closure, a further intentional order on the same QR must not
     // attach to the settled sitting or its immutable invoice.
-    await addOneAndCheckout(guest);
-    const thirdUrl = await placeOrder(guest, 'e2e: fresh sitting after checkout');
+    const reopenedGuest = await scanCard(context, cardToken);
+    await addOneAndCheckout(reopenedGuest);
+    const thirdUrl = await placeOrder(reopenedGuest, 'e2e: fresh sitting after checkout');
     const third = await orderSessionForGuestToken(tokenFromOrderUrl(thirdUrl));
     expect(third).not.toBeNull();
     expect(third?.order_session_id).not.toBe(first?.order_session_id);

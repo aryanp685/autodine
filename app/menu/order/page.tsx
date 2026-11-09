@@ -71,6 +71,7 @@ export default async function OrderPage({
         token={t}
         slug={s}
         canCallWaiter={access.status === 'verified'}
+        cartClearing={placed}
         brandState={data?.brandState}
       />
     </CartProvider>
