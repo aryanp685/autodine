@@ -145,3 +145,43 @@ Hosted E2E is **not green**. Still outstanding: remaining browser failures and e
 unconfigured adversarial fixtures, audible/provider/device-print acceptance, realistic
 HTTP load and payment/cancel/close interleavings. Tax/GST and subscriptions remain deferred
 by the owner. No 100% readiness or 5,000-user capacity claim.
+
+
+## Confirmation-flow failures fixed and hosted regression green
+
+Supersedes the failed-browser status above for the configured guest/kitchen/cashier/security
+suite. App commit `7039c8c` deployed only to the isolated staging preview:
+`dpl_87atekZiQzhtvpPtVXrgk7yEScvY` (READY; stable branch alias assigned).
+Test revisions through `fad1afb` verified in Actions run
+[42584676317](https://github.com/aryanp685/autodine/actions/runs/42584676317):
+**22 passed, 0 failed, 3 skipped, 0 flaky**, approximately 386 seconds.
+Secret preflight, real Auth provisioning, protected-preview access, browser workflows and
+redacted diagnostics all succeeded.
+
+Root causes and fixes:
+- Reorder offer read remembered cart only on mount, before CartProvider hydrated and
+  ClearCartOnOrder saved it. Re-read after cart readiness/count changes. Lifecycle test
+  proves immediate offer, restored quantities and preservation of a new cart when opening
+  a historical order.
+- Editable new orders had no status refresh, so kitchen start/cancellation could remain
+  stale. Mount credentialed status polling for editable orders too; refresh server props
+  only when status/confirmation/payment state changes. Unchanged polls preserve unsaved
+  edits. Reuse bounded/backoff/visibility-aware polling; stop on unmount/terminal status.
+- Scope kitchen assertions to current header status, not all labels in the progress track.
+  Bring the observed page to the foreground instead of defeating hidden-tab polling rules.
+- Audio button names are “Kitchen audio on/off” (long descriptions are titles). Wait for
+  a completed announcement before counting utterances: sentence segments are not duplicate
+  announcements. Assert exactly one completed log entry before stability/reload checks.
+- Scope security amount checks to the bill total row. Replace obsolete Orders-tab navigation
+  on confirmation with a unique-note order count on the real staff board, verified again
+  after reload and matched to the guest's returned code.
+
+Validation: **1,941 local tests passed, 21 native database tests skipped**, four new mounted
+React lifecycle regressions passed, typecheck/lint/production build passed. Native database
+and restore evidence remain separate. jsdom is a development-only lifecycle test dependency.
+
+Three hosted skips remain explicit: no other-tenant bill fixture, no expired QR fixture,
+and no configured UPI details. This green result does not certify those cases, audible paid
+provider output, physical printers, broader integration suites, HTTP capacity or the deferred
+commercial/tax requirements. Production and existing tenant data remain untouched; only new
+namespaced disposable fixtures were created and retained.
