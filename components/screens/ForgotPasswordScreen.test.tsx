@@ -17,6 +17,10 @@ describe('ForgotPasswordScreen', () => {
     expect(html).toContain('Reset your password');
     expect(html).toContain('name="email"');
     expect(html).toContain('Send reset link');
+    expect(html).toContain('Account recovery guide');
+    expect(html).toContain('If it has an AutoDine account');
+    expect(html).toContain('autoComplete="email"');
+    expect(html).toContain('aria-label="Send reset link"');
     // No "current password" field: it is the thing they have forgotten.
     expect(html).not.toContain('current-password');
   });

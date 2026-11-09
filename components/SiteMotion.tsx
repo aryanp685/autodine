@@ -186,6 +186,77 @@ export function SiteMotion() {
             );
           });
 
+          /* Service flow: reversible scroll progress, one-shot card entrances.
+             No pinning, scroll interception, or animation on essential copy. */
+          const flow = document.querySelector<HTMLElement>('[data-service-flow]');
+          const progress = document.querySelector<HTMLElement>('[data-service-progress]');
+          if (flow && progress) {
+            gsap.fromTo(progress, { scaleX: 0 }, {
+              scaleX: 1, ease: 'none',
+              scrollTrigger: { trigger: flow, start: 'top 85%', end: 'bottom 40%', scrub: 0.5 },
+            });
+            Array.from(flow.children).forEach((card, index) => {
+              gsap.fromTo(card, { opacity: 0, y: 44, rotation: index === 1 ? 0 : (index === 0 ? -1.5 : 1.5) }, {
+                opacity: 1, y: 0, rotation: 0, duration: 0.9,
+                ease: 'power3.out', delay: index * 0.08, clearProps: 'transform,opacity',
+                scrollTrigger: { trigger: card, start: 'top 90%', once: true },
+              });
+              const icon = card.querySelector('[data-service-icon]');
+              if (icon) gsap.fromTo(icon, { scale: 0.8, rotation: -12 }, {
+                scale: 1, rotation: 0, duration: 0.85, delay: 0.18,
+                ease: 'back.out(1.4)', clearProps: 'transform',
+                scrollTrigger: { trigger: card, start: 'top 85%', once: true },
+              });
+            });
+          }
+
+          /* Screen gallery: independent entrance and inner-frame depth so
+             the two animations never compete for the same transform. */
+          const galleryMotion = gsap.matchMedia();
+          galleryMotion.add({
+            desktop: '(min-width: 768px)',
+            mobile: '(max-width: 767px)',
+            reduced: '(prefers-reduced-motion: reduce)',
+          }, (media) => {
+            if (media.conditions?.reduced) return;
+            const desktop = media.conditions?.desktop;
+            document.querySelectorAll<HTMLElement>('[data-screen-card]').forEach((card, index) => {
+              gsap.fromTo(card, {
+                opacity: 0, y: desktop ? 56 : 24,
+              }, {
+                opacity: 1, y: 0, duration: 0.95,
+                delay: desktop ? index * 0.12 : 0,
+                ease: 'power3.out', clearProps: 'transform,opacity',
+                scrollTrigger: { trigger: card, start: 'top 92%', once: true },
+              });
+              const frame = card.querySelector('[data-screen-frame]');
+              if (!frame) return;
+              gsap.fromTo(frame, {
+                y: desktop ? 18 : 8,
+                rotationX: desktop ? 7 : 0,
+                rotationY: desktop ? (1 - index) * 5 : 0,
+                transformPerspective: 1000,
+              }, {
+                y: desktop ? -8 : -3, rotationX: 0, rotationY: 0,
+                ease: 'none',
+                scrollTrigger: { trigger: card, start: 'top bottom', end: 'bottom top', scrub: 0.7 },
+              });
+            });
+          });
+
+          /* Prices stay literal and stable. Animate the containers, never
+             count up money or imply that an indicative plan is selectable. */
+          gsap.utils.toArray<HTMLElement>('[data-pricing-grid]').forEach((grid) => {
+            grid.querySelectorAll<HTMLElement>('[data-pricing-card]').forEach((card, index) => {
+              gsap.fromTo(card, { opacity: 0, y: 36, scale: 0.97 }, {
+                opacity: 1, y: 0, scale: 1, duration: 0.85,
+                delay: window.innerWidth >= 768 ? index * 0.1 : 0,
+                ease: 'power3.out', clearProps: 'transform,opacity',
+                scrollTrigger: { trigger: card, start: 'top 92%', once: true },
+              });
+            });
+          });
+
           /* --------------------------------------------- the product tour */
 
           /* Three screens, one frame. Above 900px the panels stack in a
