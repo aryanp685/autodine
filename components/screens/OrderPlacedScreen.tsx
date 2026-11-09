@@ -334,10 +334,9 @@ export function OrderPlacedScreen({
         ) : (
           <>
             <OrderTrack prepStatus={data.prepStatus} />
-            {/* Only when the guest cannot edit any more: see the comment in
-                OrderStatusRefresh for why a refresh must not land on a screen
-                holding unsaved changes. */}
-            {!data.canGuestChange ? <OrderStatusRefresh /> : null}
+            {slug && token ? <OrderStatusRefresh slug={slug} code={data.code} token={token}
+              status={data.prepStatus} awaitingConfirmation={data.awaitingConfirmation}
+              paymentStatus={data.paymentStatus} /> : null}
           </>
         )}
       </header>
