@@ -1,5 +1,9 @@
 # AutoDine — production-readiness handoff
 
+## Latest live staging correction verified
+
+User-provided shareable access opened staging homepage/login. It exposed a health bug caused by legitimate service-role financial-table restrictions. Fixed using a server-only catalog RPC (no tenant data reads and no widened financial grants), applied only to staging and redeployed commit `8fd6e02`. Fresh authorized health fetch now returns **`ok:true`, credentials accepted, all operational probes applied**. Local full suite **1,931 pass / 21 native skips**, native suite **56 clean migrations / 21 pass**, cold recovery reverified. Direct sandbox Chromium is blocked by outbound network restrictions; actual hosted login/order browser flows remain unverified and need a network-enabled authorized runner. Share token is not stored in Git.
+
 ## Latest evidence: hosted preview + CI recovery
 
 Preview for commit `fb04397` is **READY**, staging-only, no production promotion. Stable URL and verification details: [STAGING-PREFLIGHT.md](STAGING-PREFLIGHT.md). Hosted rollback-only SQL smoke passed pricing, denied direct money writes, settlement idempotency, durable receipt retry and staff TTS quota. GitHub run **42567533471 passed**, including **PG 15/17/18 populated logical dump/restore** jobs; older “logical restore unrun” wording below is historical and superseded for that isolated fixture workload. Local full suite now **1,930 passed / 20 native tests skipped**, native tests separately passed.
@@ -108,3 +112,36 @@ No 5,000-user capacity claim. Existing local sample is 16 SQL clients; last dupl
 See [OPERATIONS-READINESS.md](OPERATIONS-READINESS.md) for exact local/CI commands, migration review, recovery drill, monitoring and go-live gates. See [FEATURE-INVENTORY.md](FEATURE-INVENTORY.md) for the repository route inventory and its verification limits.
 
 Session evidence logs were produced under `/tmp/readiness-{unit,build,db-test,sql}.log` and `/tmp/readiness-browser-results.json`; these are ephemeral local evidence, not committed artifacts. Browser screenshots live in ignored `responsive-artifacts/`. Preserve desired evidence outside Git before discarding the workspace. No secrets or database dumps are committed.
+
+## Hosted browser runner execution attempt
+
+Secure runner implemented on session branch (commit `1e4018e`), with fixed staging guards, private auth state and credential-free public artifacts. Five negative guard regressions/typecheck/lint passed. Run **42569092107** failed at required-secrets preflight: actual fixtures/browser steps did not run. Required repo secrets: `AUTODINE_STAGING_SERVICE_ROLE_KEY`, `AUTODINE_STAGING_SHARE_URL`. Integration returns permission **403** for managing them. Owner action required; no credentials should be supplied in chat or public workflow inputs. No hosted E2E success is claimed, and production remains untouched.
+
+
+## Updated hosted evidence — supersedes the missing-secrets blocker
+
+The owner configured both repository secrets. Hosted preflight, dependency installation,
+fixture provisioning, real Supabase Auth password login and protected-preview browser
+access now pass. The earlier missing-secret failure above is historical, not a current
+request for credentials or reconnection.
+
+- Run [42570801317](https://github.com/aryanp685/autodine/actions/runs/42570801317):
+  7 passed, 3 failed, 15 reported skipped after the configured early-stop budget.
+- Updated stale label, order-code, bill-marker and total-row assertions against actual UI.
+  Each integration suite now receives an isolated QR card so they do not consume the
+  same per-card scan budget. Production rate limits were not relaxed.
+- Run [42571371134](https://github.com/aryanp685/autodine/actions/runs/42571371134),
+  commit `65500a1`: **13 passed, 3 failed, 9 reported skipped**, stopped at three failures.
+  Remaining observed failures: reorder offer absent after ordering; duplicate initial
+  kitchen-status text in a test locator; kitchen cancellation not reflected on the guest
+  page within the test's remaining timeout. The latter needs product/polling investigation,
+  not a weaker assertion or an assumption of success. Unexecuted tests are not passes.
+- Local full suite: **1,937 passed, 21 native database tests skipped** (native evidence
+  is tracked separately); typecheck/lint passed. Six runner safety/redaction regressions pass.
+- Synthetic Auth users/tenant fixtures remain intentionally retained by namespace. No
+  existing tenant reset, financial-grant broadening, production change or paid activation.
+
+Hosted E2E is **not green**. Still outstanding: remaining browser failures and explicitly
+unconfigured adversarial fixtures, audible/provider/device-print acceptance, realistic
+HTTP load and payment/cancel/close interleavings. Tax/GST and subscriptions remain deferred
+by the owner. No 100% readiness or 5,000-user capacity claim.

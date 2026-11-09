@@ -80,3 +80,34 @@ Requires `initdb`, `postgres`, `pg_ctl`; refuses to accept an existing data dire
 ## Secure network-enabled browser runner prepared
 
 Added `.github/workflows/staging-e2e.yml`, isolated fixture provisioner, share-access global setup and `playwright.staging.config.ts`. Hard-pinned to approved staging endpoints; five negative guard tests/typecheck/lint passed. Requires repository Actions secrets `AUTODINE_STAGING_SERVICE_ROLE_KEY` and `AUTODINE_STAGING_SHARE_URL`. Current GitHub connection still returns **403 Resource not accessible by integration** for Actions-secret management. Missing secrets fail before fixture writes, never masquerade as a passing/skipped browser run. Setup: `scripts/staging/RUNNER-SETUP.md`. No tokens/keys are committed. Synthetic fixture data is retained by UUID namespace for inspection, not destructively auto-cleaned. This runner's existence is not hosted browser verification evidence.
+
+Actual hosted runner attempt: [42569092107](https://github.com/aryanp685/autodine/actions/runs/42569092107), commit `1e4018e`. **Failed at required-secrets preflight**; fixture creation and real browser steps explicitly skipped. No new persistent fixtures/users were created by this run. This is a configuration block, not a product browser failure or a passing E2E result. Actions-secrets API still returns permission 403; repository owner must grant permission or add the two named secrets securely in GitHub settings.
+
+
+## Updated hosted evidence — supersedes the missing-secrets blocker
+
+The owner configured both repository secrets. Hosted preflight, dependency installation,
+fixture provisioning, real Supabase Auth password login and protected-preview browser
+access now pass. The earlier missing-secret failure above is historical, not a current
+request for credentials or reconnection.
+
+- Run [42570801317](https://github.com/aryanp685/autodine/actions/runs/42570801317):
+  7 passed, 3 failed, 15 reported skipped after the configured early-stop budget.
+- Updated stale label, order-code, bill-marker and total-row assertions against actual UI.
+  Each integration suite now receives an isolated QR card so they do not consume the
+  same per-card scan budget. Production rate limits were not relaxed.
+- Run [42571371134](https://github.com/aryanp685/autodine/actions/runs/42571371134),
+  commit `65500a1`: **13 passed, 3 failed, 9 reported skipped**, stopped at three failures.
+  Remaining observed failures: reorder offer absent after ordering; duplicate initial
+  kitchen-status text in a test locator; kitchen cancellation not reflected on the guest
+  page within the test's remaining timeout. The latter needs product/polling investigation,
+  not a weaker assertion or an assumption of success. Unexecuted tests are not passes.
+- Local full suite: **1,937 passed, 21 native database tests skipped** (native evidence
+  is tracked separately); typecheck/lint passed. Six runner safety/redaction regressions pass.
+- Synthetic Auth users/tenant fixtures remain intentionally retained by namespace. No
+  existing tenant reset, financial-grant broadening, production change or paid activation.
+
+Hosted E2E is **not green**. Still outstanding: remaining browser failures and explicitly
+unconfigured adversarial fixtures, audible/provider/device-print acceptance, realistic
+HTTP load and payment/cancel/close interleavings. Tax/GST and subscriptions remain deferred
+by the owner. No 100% readiness or 5,000-user capacity claim.
