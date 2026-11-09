@@ -1,4 +1,4 @@
-import { expect, test, type BrowserContext } from '@playwright/test';
+import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import {
   BASE,
   GUEST_READY,
@@ -33,6 +33,19 @@ async function placeGuestOrder(context: BrowserContext, note: string): Promise<s
   const token = tokenFromOrderUrl(url);
   expect(token.length).toBeGreaterThanOrEqual(8);
   return url;
+}
+
+/** A fresh guest render must reflect the committed kitchen transition. */
+async function reloadGuestUntilStep(page: Page, label: string) {
+  await expect
+    .poll(
+      async () => {
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        return page.locator('[data-placed-step="now"]').innerText();
+      },
+      { timeout: 15_000, intervals: [250, 500, 1_000, 2_000] },
+    )
+    .toContain(label);
 }
 
 test.describe('kitchen — real database', () => {
@@ -90,23 +103,20 @@ test.describe('kitchen — real database', () => {
       hasText: 'e2e: status sync ticket',
     });
     await expect(preparing).toBeVisible({ timeout: 45_000 });
-    await guest.reload();
-    await expect(guest.locator('[data-placed-step="now"]')).toContainText('Being cooked');
+    await reloadGuestUntilStep(guest, 'Being cooked');
 
     await preparing.getByRole('button', { name: 'Mark ready' }).click();
     const ready = board.locator('article[data-state="ready"]', {
       hasText: 'e2e: status sync ticket',
     });
     await expect(ready).toBeVisible({ timeout: 45_000 });
-    await guest.reload();
-    await expect(guest.locator('[data-placed-step="now"]')).toContainText('Ready to serve');
+    await reloadGuestUntilStep(guest, 'Ready to serve');
 
     await ready.getByRole('button', { name: 'Mark served' }).click();
     await expect(
       board.locator('article[data-state="served"]', { hasText: 'e2e: status sync ticket' }),
     ).toBeVisible({ timeout: 20_000 });
-    await guest.reload();
-    await expect(guest.locator('[data-placed-step="now"]')).toContainText('Served');
+    await reloadGuestUntilStep(guest, 'Served');
   });
 
   test('a kitchen cancellation reaches the guest as cancelled', async ({ context }) => {
@@ -130,8 +140,10 @@ test.describe('kitchen — real database', () => {
     // The placed screen preserves an editable bill while it is new; refresh it
     // after cancellation to read the persisted terminal status without wiping
     // a guest's in-progress edits during ordinary polling.
-    await guest.reload();
-    await expect(guest.getByText(/This order was cancelled/)).toBeVisible();
+    await guest.reload({ waitUntil: 'domcontentloaded' });
+    await expect(
+      guest.getByText('This order was cancelled, so nothing is being cooked and nothing is owed.'),
+    ).toBeVisible();
     await expect(guest.getByText(/nothing is owed/i)).toBeVisible();
   });
 
