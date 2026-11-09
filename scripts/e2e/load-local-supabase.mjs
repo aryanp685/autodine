@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { Client } from 'pg';
@@ -73,6 +73,80 @@ function addFailure(stage, index, error) {
   if (failures.length < 100) {
     failures.push({ stage, index, code: error?.code ?? null, message: String(error?.message ?? error).slice(0, 300) });
   }
+}
+
+function safeDiagnostic(message) {
+  return String(message)
+    .replace(/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}/gi, '[uuid]')
+    .replace(/\beyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\b/g, '[jwt]')
+    .replace(/\b(password|secret|token|key)\s*[:=]\s*["']?[^\s,"'}]+/gi, '$1=[redacted]')
+    .replace(/[\r\n]+/g, ' ')
+    .slice(0, 240);
+}
+
+function escapeWorkflowCommand(value) {
+  return String(value)
+    .replace(/%/g, '%25')
+    .replace(/\r/g, '%0D')
+    .replace(/\n/g, '%0A')
+    .replace(/:/g, '%3A')
+    .replace(/,/g, '%2C');
+}
+
+function loadNotice() {
+  const metric = (item) => item
+    ? `n=${item.completed ?? 0}/${item.requested ?? 0},fail=${item.failures ?? 0},rps=${item.throughputPerSecond ?? 0},p95=${item.latencyMs?.p95 ?? 'na'}ms,p99=${item.latencyMs?.p99 ?? 'na'}ms`
+    : 'not recorded';
+  const kitchen = report.workloads.kitchenDashboard;
+  return [
+    `guests=${guests}; restaurants=${restaurantCount}; concurrency=${concurrency}`,
+    `sessions[${metric(report.workloads.tableSessions)}]`,
+    `orders[${metric(report.workloads.orderCreation)}]`,
+    `appReads[${metric(report.workloads.appMenuReads)}]`,
+    `kitchen[${metric(kitchen?.apiUpdateRequests)}; clients=${kitchen?.subscribers ?? 0}; events=${kitchen?.realtimeEventsReceived ?? 0}/${kitchen?.realtimeEventsExpected ?? 0}; eventRps=${kitchen?.realtimeFanoutEventsPerSecond ?? 0}; eventP95=${kitchen?.realtimeEventLatencyMs?.p95 ?? 'na'}ms; failures=${kitchen?.failures ?? 0}]`,
+    `overallFailures=${failures.length}`,
+  ].join('; ');
+}
+
+function loadSummary() {
+  const lines = [
+    '## Synthetic disposable Supabase load evidence',
+    '',
+    `- Generated: ${report.generatedAt}`,
+    `- Target: ${report.target}`,
+    `- Requested workload: ${guests} guest sessions across ${restaurantCount} synthetic restaurants; API concurrency ${concurrency}.`,
+    '',
+    '| Workload | Completed / requested | Failures | Throughput/s | p50 / p95 / p99 / max ms | Concurrency or fan-out |',
+    '|---|---:|---:|---:|---:|---:|',
+  ];
+  for (const [name, label] of [
+    ['tableSessions', 'Table sessions'],
+    ['orderCreation', 'Order creation'],
+    ['appMenuReads', 'Server-rendered menu reads'],
+  ]) {
+    const item = report.workloads[name];
+    if (!item) continue;
+    const latency = item.latencyMs ?? {};
+    lines.push(
+      `| ${label} | ${item.completed ?? 0} / ${item.requested ?? 0} | ${item.failures ?? 0} | ${item.throughputPerSecond ?? 0} | ${latency.p50 ?? '—'} / ${latency.p95 ?? '—'} / ${latency.p99 ?? '—'} / ${latency.max ?? '—'} | ${item.concurrency ?? '—'} |`,
+    );
+  }
+  const kitchen = report.workloads.kitchenDashboard;
+  if (kitchen) {
+    const api = kitchen.apiUpdateRequests ?? {};
+    const latency = api.latencyMs ?? {};
+    lines.push(
+      `| Kitchen updates + Realtime | ${api.completed ?? 0} / ${api.requested ?? 0} | ${kitchen.failures ?? 0} | ${kitchen.realtimeFanoutEventsPerSecond ?? 0} | ${latency.p50 ?? '—'} / ${latency.p95 ?? '—'} / ${latency.p99 ?? '—'} / ${latency.max ?? '—'} | ${kitchen.subscribers ?? 0} clients; ${kitchen.realtimeEventsReceived ?? 0} / ${kitchen.realtimeEventsExpected ?? 0} events |`,
+    );
+  }
+  lines.push('', `Overall: **${failures.length ? `${failures.length} failure(s)` : 'no recorded failures'}**.`);
+  if (failures.length) {
+    lines.push('', 'Failure details (synthetic identifiers redacted):');
+    for (const failure of failures.slice(0, 20)) {
+      lines.push(`- \`${failure.stage}\` (${failure.code ?? 'no code'}): ${safeDiagnostic(failure.message)}`);
+    }
+  }
+  return `${lines.join('\n')}\n`;
 }
 
 checkLoopback(apiUrl, 'Supabase API URL', 'http:');
@@ -438,7 +512,15 @@ try {
   const outputPath = path.resolve(reportFile);
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
+  const summary = loadSummary();
+  if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, summary);
   console.log(`Load evidence written to ${outputPath}`);
+  console.log(summary);
+  console.log(`::notice title=Synthetic load measurements::${escapeWorkflowCommand(loadNotice())}`);
   console.log(JSON.stringify(report, null, 2));
+  for (const failure of failures.slice(0, 10)) {
+    const detail = `${failure.stage} (${failure.code ?? 'no code'}): ${safeDiagnostic(failure.message)}`;
+    console.log(`::error title=${escapeWorkflowCommand(`Synthetic load: ${failure.stage}`)}::${escapeWorkflowCommand(detail)}`);
+  }
   if (failures.length) process.exitCode = 1;
 }
