@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Home } from './HomeScreen';
 import { PricingScreen } from './PricingScreen';
-import { LIVE, NOT_CONNECTED, DIFFERENCES } from '@/lib/plans';
+import { LIVE, NOT_CONNECTED } from '@/lib/plans';
 
 /**
  * The marketing pages' claims, pinned.
@@ -116,10 +116,15 @@ describe('pricing', () => {
     expect(pricing.match(/Planned · not on sale/g)?.length).toBe(3);
   });
 
-  it('counts the tier differences from the data', () => {
-    expect(pricing.replace(/<!-- -->/g, '')).toContain(
-      `${cap(WORDS[DIFFERENCES.length])} differences, not fifty.`,
-    );
+  it('does not promise unlimited usage or indefinite free access', () => {
+    expect(pricing).not.toContain('Unlimited orders');
+    expect(pricing).not.toContain('Nothing is metered');
+    expect(pricing).not.toContain('Free while the product is in preview');
+    expect(pricing).toContain('read-only');
+    expect(pricing).toContain('7-day trial');
+    expect(pricing).not.toContain('Which plan fits');
+    expect(pricing).not.toContain('Recommended');
+    for (const plan of [{id:'starter'},{id:'professional'},{id:'business'}]) expect(pricing).toContain(`id="plan-${plan.id}"`);
   });
 });
 

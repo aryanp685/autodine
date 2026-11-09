@@ -10,7 +10,7 @@ import { useState } from 'react';
 import { BrandLockup } from '@/components/BrandMark';
 import { BRAND_GREEN } from '@/lib/brand';
 
-export function HomeNav() {
+export function HomeNav({ activePricing = false }: { activePricing?: boolean } = {}) {
 
   const [open, setOpen] = useState(false);
   return (
@@ -22,10 +22,10 @@ export function HomeNav() {
 
         <nav aria-label="Primary" className="hidden flex-1 md:block">
           <ul className="flex items-center gap-7 text-[13px] text-mute">
-            <li><Link href="#product" className="transition-colors hover:text-cream">Product</Link></li>
-            <li><Link href="#how" className="transition-colors hover:text-cream">How it works</Link></li>
-            <li><Link href="#screens" className="transition-colors hover:text-cream">Screens</Link></li>
-            <li><Link href="/pricing" className="transition-colors hover:text-cream">Pricing</Link></li>
+            <li><Link href="/#product" className="transition-colors hover:text-cream">Product</Link></li>
+            <li><Link href="/#how" className="transition-colors hover:text-cream">How it works</Link></li>
+            <li><Link href="/#screens" className="transition-colors hover:text-cream">Screens</Link></li>
+            <li><Link href="/pricing" aria-current={activePricing ? 'page' : undefined} className="transition-colors hover:text-cream">Pricing</Link></li>
           </ul>
         </nav>
 
@@ -58,14 +58,15 @@ export function HomeNav() {
         <nav id="home-nav-menu" aria-label="Primary (mobile)" className="border-t border-cream/[0.12] bg-ink px-5 pb-4 pt-2 md:hidden">
           <ul className="flex flex-col gap-1">
             {[
-              ['Product', '#product'],
-              ['How it works', '#how'],
-              ['Screens', '#screens'],
+              ['Product', '/#product'],
+              ['How it works', '/#how'],
+              ['Screens', '/#screens'],
               ['Pricing', '/pricing'],
             ].map(([label, href]) => (
               <li key={href}>
                 <a
                   href={href}
+                  aria-current={activePricing && href === '/pricing' ? 'page' : undefined}
                   onClick={() => setOpen(false)}
                   className="block rounded-[10px] px-3 py-2.5 text-[14px] text-cream/75 transition-colors hover:bg-cream/[0.05]"
                 >
