@@ -26,6 +26,8 @@
  * counts anything: it only decides what the response to a given answer is.
  */
 
+import { shouldUseSecureCookies } from '@/lib/cookie-security';
+
 /** Every status `open_table_session` can return, now or under L1. */
 export type ScanStatus =
   | 'opened'
@@ -166,7 +168,7 @@ export const THROTTLE_COOKIE = 'autodine_throttled';
 export const THROTTLE_COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: 'lax' as const,
-  secure: process.env.NODE_ENV === 'production',
+  secure: shouldUseSecureCookies(),
   path: '/',
   maxAge: 60 * 15,
 };

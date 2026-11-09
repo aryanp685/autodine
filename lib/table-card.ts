@@ -38,6 +38,7 @@
 
 import { cookies } from 'next/headers';
 import { isQrToken } from '@/lib/table-session';
+import { shouldUseSecureCookies } from '@/lib/cookie-security';
 
 export const TABLE_CARD_COOKIE = 'autodine_table_card';
 
@@ -51,7 +52,7 @@ export const TABLE_CARD_COOKIE = 'autodine_table_card';
 export const TABLE_CARD_COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: 'lax' as const,
-  secure: process.env.NODE_ENV === 'production',
+  secure: shouldUseSecureCookies(),
   path: '/',
   maxAge: 60 * 60,
 };
