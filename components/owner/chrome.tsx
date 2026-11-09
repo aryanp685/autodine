@@ -779,7 +779,7 @@ export function TableWrap({ children, className = '' }: { children: ReactNode; c
   return (
     <div
       className={['-mx-4 min-w-0 max-w-full overflow-x-auto sm:mx-0', className].join(' ')}
-      style={{ minWidth: 0, maxWidth: 'calc(100vw - 0.5rem)', overflowX: 'auto' }}
+      style={{ minWidth: 0, maxWidth: 'calc(100vw - 0.5rem)', overflowX: 'auto', contain: 'layout paint' }}
     >
       {children}
     </div>
