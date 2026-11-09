@@ -69,7 +69,7 @@ test.describe('cashier — real database', () => {
 
     const bill = await till.context().newPage();
     await bill.goto(`${BASE}/bill/${orderId}`);
-    await expect(bill.locator('[data-bill]')).toBeVisible({ timeout: 20_000 });
+    await expect(bill.locator('[data-bill-sheet]')).toBeVisible({ timeout: 20_000 });
     await expect(bill.getByText(/Total/).first()).toContainText(/₹[\d,]+/);
   });
 

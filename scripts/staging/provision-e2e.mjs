@@ -41,7 +41,7 @@ const verification=await owner.rpc('current_verification_code',{p_restaurant_id:
 const code=Array.isArray(verification.data)?verification.data[0]?.code:verification.data?.code;
 if(verification.error||!code)throw new Error('Staging fixture verification code could not be read.');
 mask(card.data.public_token);mask(String(code));
-const env={E2E_BASE_URL:base.origin,E2E_SLUG:slug,E2E_QR_TOKEN:card.data.public_token,E2E_TABLE_CODE:String(code),E2E_OWNER_EMAIL:email,E2E_OWNER_PASSWORD:password};
+const env={E2E_TABLE_LABEL:'E2E-T1',E2E_BASE_URL:base.origin,E2E_SLUG:slug,E2E_QR_TOKEN:card.data.public_token,E2E_TABLE_CODE:String(code),E2E_OWNER_EMAIL:email,E2E_OWNER_PASSWORD:password};
 await writeFile('.staging-private/fixture-env.json',JSON.stringify(env),{mode:0o600});
 if(process.env.GITHUB_ENV)for(const [name,value]of Object.entries(env))await appendFile(process.env.GITHUB_ENV,`${name}=${value}\n`);
 console.log('New isolated staging fixture provisioned; real Auth login checked. No external email sent.');

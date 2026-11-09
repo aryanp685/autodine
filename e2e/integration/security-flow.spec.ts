@@ -75,7 +75,7 @@ test.describe('security — real database', () => {
     await expect(till.getByRole('heading', { name: 'Bill not found' })).toBeVisible({
       timeout: 20_000,
     });
-    await expect(till.locator('[data-bill]')).toHaveCount(0);
+    await expect(till.locator('[data-bill-sheet]')).toHaveCount(0);
   });
 
   test('an expired card is refused with words, not with a menu', async ({ context }) => {

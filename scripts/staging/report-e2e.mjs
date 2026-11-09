@@ -15,5 +15,6 @@ const escape=s=>safe(s).replace(/%/g,'%25').replace(/\r/g,'%0D').replace(/\n/g,'
 let failed=0;
 function walk(suites){for(const suite of suites||[]){for(const spec of suite.specs||[])for(const test of spec.tests||[]){if(test.status==='unexpected'){failed++;if(failed<=5){const errors=(test.results||[]).flatMap(x=>x.errors||[]).map(x=>x.message||'Assertion failed').join('\n');console.log(`::error title=${escape(spec.title)}::${escape(errors)}`);}}}walk(suite.suites);}}
 walk(result.suites);
-console.log('STAGING_BROWSER_COUNTS',JSON.stringify(result.stats));
+for(const error of (result.errors||[]).slice(0,3))console.log(`::error title=Staging browser setup::${escape(error.message||'Global setup failed')}`);
+console.log(`::notice title=Staging browser counts::${escape(JSON.stringify(result.stats))}`);
 if(result.stats.expected===0) {console.error('No verified browser tests; refusing an all-skipped success.');process.exitCode=1;}

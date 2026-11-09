@@ -32,7 +32,8 @@ test.describe('guest ordering — real database', () => {
     const page = await scanCard(context);
     await expect(page).toHaveURL(new RegExp(`/menu\\?s=${SLUG}`), { timeout: 20_000 });
     // The table badge is the database's answer about where this browser is.
-    await expect(page.getByText(/Table /).first()).toBeVisible();
+    const label=process.env.E2E_TABLE_LABEL;
+    await expect(label ? page.getByText(label,{exact:true}).first() : page.getByText(/Table /).first()).toBeVisible();
     // Real dishes with prices, not the sample menu.
     await expect(page.locator('dl, [data-gtab-bar]')).not.toHaveCount(0);
   });
@@ -45,7 +46,7 @@ test.describe('guest ordering — real database', () => {
 
     // Whatever the menu charges for the first plain dish, the checkout shows
     // it — computed from the menu payload, not from anything the cart sent.
-    const totalText = await page.getByText('Total payable').locator('..').innerText();
+    const totalText = await page.locator('dl').getByText('Total payable',{exact:true}).locator('..').innerText();
     expect(totalText).toMatch(/₹[\d,]+/);
   });
 

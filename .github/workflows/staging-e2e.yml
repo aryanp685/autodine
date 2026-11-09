@@ -6,8 +6,8 @@ on:
     paths:
       - '.github/workflows/staging-e2e.yml'
       - 'playwright.staging.config.ts'
-      - 'scripts/staging/provision-e2e.mjs'
-      - 'scripts/staging/browser-access.ts'
+      - 'scripts/staging/**'
+      - 'e2e/integration/**'
 permissions:
   contents: read
 concurrency:
