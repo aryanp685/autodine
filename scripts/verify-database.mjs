@@ -40,7 +40,7 @@ try {
     if (!alreadyApplied.size) throw new Error('Staging bundle requires explicit staging_scaffold baseline');
     await db.query(await readFile('scripts/staging/approved-upgrade.sql', 'utf8'));
   }
-  for (const file of migrations.filter(file => process.env.READINESS_STAGING_BUNDLE !== '1' && !alreadyApplied.has(file))) {
+  for (const file of migrations.filter(file => (process.env.READINESS_STAGING_BUNDLE !== '1' || file > '20261109000900_staff_tts_budget.sql') && !alreadyApplied.has(file))) {
     await db.query(await readFile(`supabase/migrations/${file}`, 'utf8'));
     console.log(`APPLIED ${file}`);
   }

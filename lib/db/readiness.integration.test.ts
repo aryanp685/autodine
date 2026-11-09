@@ -81,6 +81,16 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
       expect(results.filter(Boolean)).toHaveLength(30);expect(results.filter(x=>!x)).toHaveLength(10);
     }finally{await Promise.all(clients.map(client=>client.end()));}
   });
+  it('probes operational schema without granting service-role access to invoices', async()=>{
+    await db.query('begin');
+    try {
+      await db.query('set local role service_role');
+      const result=(await db.query('select operational_schema_readiness() ready')).rows[0].ready;
+      expect(Object.values(result)).toEqual(Array(5).fill(true));
+      expect((await db.query("select has_table_privilege('service_role','public.restaurant_invoices','SELECT') allowed")).rows[0].allowed).toBe(false);
+    }finally{await db.query('rollback');}
+    expect((await db.query("select has_function_privilege('anon','public.operational_schema_readiness()','EXECUTE') allowed")).rows[0].allowed).toBe(false);
+  });
   it('denies direct financial-state changes even to the tenant owner',async()=>{
     await expect(asStaff(a.user,()=>db.query("update orders set payment_status='paid' where id=$1",[a.order]))).rejects.toMatchObject({code:'42501'});
   });

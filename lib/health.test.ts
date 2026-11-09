@@ -180,11 +180,19 @@ describe('commercial readiness', () => {
   it('requires server credentials and current operations, not only the pilot columns', async () => {
     const { isReady, probeOperationalSchema } = await import('./health');
     const health = await probeHealth({ ...base, primary: client(null), publicClient: client(null) });
-    const operational = await probeOperationalSchema(client(null));
+    const operational = await probeOperationalSchema({ ...client(null), rpc: async () => ({ error: null, data: { orderSessions: true, settlement: true, invoices: true, paymentReceipts: true, announcementClaims: true } }) });
     expect(isReady(health, operational)).toBe(true);
     expect(isReady({ ...health, serverKey: false }, operational)).toBe(false);
     expect(isReady(health, { ...operational, invoices: 'missing' })).toBe(false);
     expect(isReady(health, {})).toBe(false);
     expect(isReady({ ...health, credentials: 'rejected' }, operational)).toBe(false);
   });
+});
+
+describe('restricted financial schema health',()=>{
+ it('does not treat missing/invalid RPC output as ready',async()=>{
+  const {probeOperationalSchema}=await import('./health');
+  expect(Object.values(await probeOperationalSchema(client(null)))).toEqual(Array(5).fill('unknown'));
+  expect(Object.values(await probeOperationalSchema(client({code:'PGRST202',message:'missing'})))).toEqual(Array(5).fill('missing'));
+ });
 });

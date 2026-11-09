@@ -1,5 +1,24 @@
 # Existing staging: read-only preflight
 
+## Shareable-access follow-up and readiness correction
+
+User-provided shareable access successfully opened the staging homepage through the managed page fetcher. Do not store/share the access token in Git or logs. Direct sandbox Chromium navigation failed with `ERR_CONNECTION_CLOSED` (sandbox outbound host restrictions), so interactive browser tests remain unverified; do not ask the user to disable protection to solve a sandbox network limitation.
+
+Authenticated shareable fetch of `/api/health` exposed a **real readiness bug**: database credentials accepted and basic schema reachable, but settlement/invoice/payment-receipt zero-row reads returned `unknown`. Their service-role table SELECT grants were deliberately revoked by existing financial security migrations. Fix: **catalog-only `operational_schema_readiness()`**, executable only by service_role, returning fixed existence/RPC-grant booleans without reading tenant financial rows or granting access to those tables. Applied as a separate staging migration; no production change. Fresh native replay: **56 migrations / 21 tests passed**. New native assertion checks service-role health succeeds while invoice table SELECT and anonymous probe execution remain denied.
+
+## Latest deployment and verification evidence
+
+- App commit `fb0439723c5eae51d5109587b02f4691a41ae0fb` deployed successfully as **preview**, target null / environment preview / state READY, on the existing Hobby plan. No production promotion/domain update.
+- Deployment ID: `dpl_CxN8dfaN4RrgnSXkvFmyDi8uMS3u`.
+- Stable staging URL: `https://new-git-arena-3711df6a-autodine-iamjarvis9896-3988s-projects.vercel.app`.
+- Immutable URL: `https://new-qm0h8wvf8-iamjarvis9896-3988s-projects.vercel.app`.
+- Staging Auth site URL and exact preview-origin allowlist updated; localhost retained. Email confirmation remains enabled. No test email was sent and no production Auth settings changed.
+- **Hosted SQL smoke passed**, using synthetic fixtures inside a rolled-back transaction: authoritative ₹250 pricing (₹125 × 2), direct financial update denied under authenticated role, manual settlement retry creates exactly one payment, issued receipt retry returns the same ID, staff voice budget succeeds. Test fixture profile/tenant/menu/order/payment/invoice rows were rolled back. This is **SQL/RPC evidence**, not a real Auth login/HTTP/browser flow. An initial smoke query had a test-variable ambiguity (`code`), fixed to `v_code`; no product fix was needed.
+- Full local suite: **1,930 passed / 20 native cases skipped** (those native cases passed separately). Typecheck/lint/build passed.
+- GitHub CI run **42567533471: success**, all four jobs including actual PostgreSQL **15/17/18** clean migration/native-boundary/**logical dump/restore** jobs. This supersedes earlier “remote CI / logical restore unrun” statements for the tested fixture workload. Workflow runs `READINESS_VERIFY_RESTORE=1` and fails on a failed dump/restore fingerprint comparison. Detailed archived log download was blocked by sandbox network; job/step success retrieved from GitHub API. Do not claim production backup/PITR recovery.
+- External HTTP fetch of `/api/health` was redirected to **Vercel SSO login**. Existing deployment protection was **not disabled or bypassed**. Therefore hosted health/authenticated browser tests remain **unverified, blocked on authorized automation/shareable-preview access**. Build READY is not HTTP health PASS. Do not create a secret bypass route in the application.
+- Vercel selected Node 26 from the existing `engines >=22` range; build passed, but CI/local tests use Node 22. Pin a reviewed runtime before release to avoid uncontrolled future-major drift; no production project runtime setting was changed.
+
 ## Approved staging upgrade — latest state supersedes preflight findings below
 
 User subsequently approved option A: reviewed staging migrations/test fixtures and a free nonproduction preview, no existing-data reset/delete, no production operations. Reproduced the observed scaffold baseline locally and ran the exact generated forward-upgrade artifact: **20/20 native tests passed**.

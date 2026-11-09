@@ -1,5 +1,7 @@
 # Safe verification and release runbook
 
+Latest evidence: GitHub CI run 42567533471 passed the PG 15/17/18 clean migrations/native tests/logical dump-and-restore jobs. Earlier “not run” statements describe the pre-push snapshot. Hosted staging preview is READY but protected by Vercel SSO; authorized automation access is needed before calling HTTP health/browser workflows verified. See STAGING-PREFLIGHT.md.
+
 ## Nonproduction checks
 
 Use Node 22+, install locked dependencies, and do not load production credentials:

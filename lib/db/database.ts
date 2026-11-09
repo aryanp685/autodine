@@ -233,6 +233,7 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      operational_schema_readiness: { Args: Record<string, never>; Returns: Record<string, boolean> };
       reserve_staff_tts_attempt: {
         Args: { p_restaurant_id: string };
         Returns: { allowed: boolean; retry_after_seconds: number }[];

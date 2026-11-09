@@ -1,5 +1,11 @@
 # AutoDine — production-readiness handoff
 
+## Latest evidence: hosted preview + CI recovery
+
+Preview for commit `fb04397` is **READY**, staging-only, no production promotion. Stable URL and verification details: [STAGING-PREFLIGHT.md](STAGING-PREFLIGHT.md). Hosted rollback-only SQL smoke passed pricing, denied direct money writes, settlement idempotency, durable receipt retry and staff TTS quota. GitHub run **42567533471 passed**, including **PG 15/17/18 populated logical dump/restore** jobs; older “logical restore unrun” wording below is historical and superseded for that isolated fixture workload. Local full suite now **1,930 passed / 20 native tests skipped**, native tests separately passed.
+
+**Remaining immediate blocker:** preview requests redirect to existing Vercel SSO protection, including `/api/health`. We did not disable/bypass that protection. No hosted browser/login/email flow is certified. Authorized shareable-preview/automation access is required to continue browser tests. No external paid service enabled and no production environment/data/deployment changed.
+
 ## Latest approved staging execution
 
 User approved staging-only changes. The existing `autodinetest` forward upgrade is now **applied and verified**: 49 pending source migrations, 33 public tables, current receipt/TTS functions and Storage bucket present, legacy anonymous order/limiter access revoked, empty tenant/order counts preserved. Exact scaffold→upgrade artifact passed 20 native tests first. Branch-specific preview credentials/isolation and paid-AI disablement configured; production untouched. See [STAGING-PREFLIGHT.md](STAGING-PREFLIGHT.md) for pinned source/hash and chronology. Session branch now pushed for the approved nonproduction work; earlier “no push/no hosted modification” statements describe the earlier snapshot, not this new approval. Browser integration/commercial readiness is not implied by applying schema.
