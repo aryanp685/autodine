@@ -185,9 +185,9 @@ try {
   );
 
   const envValues = {
-    // Keep the browser origin aligned with Next's loopback bind so redirects
-    // remain same-host and the disposable HTTP cookie override can apply.
-    E2E_BASE_URL: 'http://127.0.0.1:3100',
+    // Next emits same-origin redirects with localhost on its production server;
+    // match that host so the browser returns the host-only fixture cookies.
+    E2E_BASE_URL: 'http://localhost:3100',
     E2E_QR_TOKEN: liveToken,
     E2E_QR_TOKENS: scanTokens.join(','),
     E2E_TABLE_CODE: tableCode,
