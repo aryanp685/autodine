@@ -117,13 +117,15 @@ test.describe('brand studio flow', () => {
     await page.goto(`${BASE}/dashboard/menus/import`);
     // A file that is not an image at all. The refusal is a sentence, not a
     // stack trace, and the screen stays usable.
-    const chooser = page.locator('input[type="file"][accept="image/jpeg,image/png,image/webp"]').first();
-    await chooser.setInputFiles({
+    const chooserPromise = page.waitForEvent('filechooser');
+    await page.getByRole('button', { name: 'Upload logo' }).click();
+    const chooser = await chooserPromise;
+    await chooser.setFiles({
       name: 'not-a-menu.html',
       mimeType: 'text/html',
       buffer: Buffer.from('<html>hello</html>'),
     });
-    await expect(page.getByText(/not a JPG, PNG, WebP|contents do not match/i)).toBeVisible();
+    await expect(page.getByRole('alert')).toContainText(/not a JPG, PNG, WebP|contents do not match/i);
     await expect(page.getByRole('heading', { name: 'Brand — how guests see you' })).toBeVisible();
   });
 
@@ -143,7 +145,7 @@ test.describe('brand studio flow', () => {
     await page.getByRole('button', { name: /Save .* as a draft/i }).click();
     await expect(page).toHaveURL(/\/dashboard\/menus(\?|$)/, { timeout: 15_000 });
 
-    const publish = page.getByRole('button', { name: /^publish$/i }).first();
+    const publish = page.getByRole('button', { name: /^publish menu$/i }).first();
     await expect(publish).toBeVisible({ timeout: 10_000 });
     await publish.click();
 
