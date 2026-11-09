@@ -70,7 +70,7 @@ test.describe('cashier — real database', () => {
     const bill = await till.context().newPage();
     await bill.goto(`${BASE}/bill/${orderId}`);
     await expect(bill.locator('[data-bill-sheet]')).toBeVisible({ timeout: 20_000 });
-    await expect(bill.getByText(/Total/).first()).toContainText(/₹[\d,]+/);
+    await expect(bill.locator('[data-bill-sheet]').getByText('Total',{exact:true}).locator('..')).toContainText(/₹[\d,]+/);
   });
 
   test('recording a counter payment moves the money from pending to paid', async ({

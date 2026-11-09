@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import {
   GUEST_READY,
+  fixtureTableLabel,
   SLUG,
   addOneAndCheckout,
   codeFromOrderUrl,
@@ -32,7 +33,7 @@ test.describe('guest ordering — real database', () => {
     const page = await scanCard(context);
     await expect(page).toHaveURL(new RegExp(`/menu\\?s=${SLUG}`), { timeout: 20_000 });
     // The table badge is the database's answer about where this browser is.
-    const label=process.env.E2E_TABLE_LABEL;
+    const label=fixtureTableLabel();
     await expect(label ? page.getByText(label,{exact:true}).first() : page.getByText(/Table /).first()).toBeVisible();
     // Real dishes with prices, not the sample menu.
     await expect(page.locator('dl, [data-gtab-bar]')).not.toHaveCount(0);
@@ -58,7 +59,7 @@ test.describe('guest ordering — real database', () => {
     const url = await placeOrder(page, 'e2e: one order, one note');
 
     // The database answered with a code and a guest token.
-    expect(codeFromOrderUrl(url)).toHaveLength(5);
+    expect(codeFromOrderUrl(url)).toMatch(/^[A-Z0-9]{2,8}-[A-Z0-9]{5}$/);
     expect(tokenFromOrderUrl(url).length).toBeGreaterThanOrEqual(8);
 
     await expect(page.getByText('Order placed')).toBeVisible();
@@ -96,7 +97,7 @@ test.describe('guest ordering — real database', () => {
     // The bill's total is on the page and is the same number the checkout
     // promised — the UPI panel, when the restaurant has one, carries exactly
     // this amount into the QR.
-    const billTotal = await page.getByText(/Total/).first().innerText();
+    const billTotal = await page.locator('dl').getByText('Total',{exact:true}).locator('..').innerText();
     expect(billTotal).toMatch(/₹[\d,]+/);
 
     const upi = page.locator('[data-pay-upi]');
@@ -144,7 +145,7 @@ test.describe('guest ordering — real database', () => {
 
     await placeOrder(page);
     // The bill on the order page is the database's, and it is not ₹0.01.
-    const totalText = await page.getByText(/Total/).first().innerText();
+    const totalText = await page.locator('dl').getByText('Total',{exact:true}).locator('..').innerText();
     const rupees = Number(totalText.replace(/[^0-9]/g, ''));
     expect(rupees).toBeGreaterThan(1);
   });

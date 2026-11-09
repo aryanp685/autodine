@@ -31,17 +31,23 @@ await insert('memberships',{restaurant_id:manifest.restaurantId,user_id:manifest
 const menu=await insert('menus',{restaurant_id:manifest.restaurantId,name:'E2E menu',is_published:true});
 const category=await insert('categories',{restaurant_id:manifest.restaurantId,menu_id:menu,name:'E2E mains'});
 await insert('items',{restaurant_id:manifest.restaurantId,category_id:category,name:'E2E plain dish',price_paise:12500,is_available:true,is_veg:true});
-const table=await insert('dining_tables',{restaurant_id:manifest.restaurantId,label:'E2E-T1',seats:4});
-const card=await admin.from('table_qr_codes').select('public_token').eq('table_id',table).is('revoked_at',null).single();
-if(card.error||!card.data?.public_token)throw new Error('Staging fixture QR provisioning failed.');
+const cards={};
+for(const [index,spec] of ['guest-order-flow','cashier-flow','kitchen-flow','security-flow'].entries()){
+ const label=`E2E-T${index+1}`;
+ const table=await insert('dining_tables',{restaurant_id:manifest.restaurantId,label,seats:4});
+ const card=await admin.from('table_qr_codes').select('public_token').eq('table_id',table).is('revoked_at',null).single();
+ if(card.error||!card.data?.public_token)throw new Error('Staging fixture QR provisioning failed.');
+ cards[`${spec}.spec.ts`]={token:card.data.public_token,label};mask(card.data.public_token);
+}
+const first=cards['guest-order-flow.spec.ts'];
 const owner=createClient(url,process.env.STAGING_SUPABASE_PUBLISHABLE_KEY||key,{auth:{persistSession:false,autoRefreshToken:false}});
 const session=await owner.auth.signInWithPassword({email,password});
 if(session.error)throw new Error('Real staging fixture Auth sign-in failed.');
 const verification=await owner.rpc('current_verification_code',{p_restaurant_id:manifest.restaurantId});
 const code=Array.isArray(verification.data)?verification.data[0]?.code:verification.data?.code;
 if(verification.error||!code)throw new Error('Staging fixture verification code could not be read.');
-mask(card.data.public_token);mask(String(code));
-const env={E2E_TABLE_LABEL:'E2E-T1',E2E_BASE_URL:base.origin,E2E_SLUG:slug,E2E_QR_TOKEN:card.data.public_token,E2E_TABLE_CODE:String(code),E2E_OWNER_EMAIL:email,E2E_OWNER_PASSWORD:password};
+mask(String(code));
+const env={E2E_CARDS_JSON:JSON.stringify(cards),E2E_TABLE_LABEL:first.label,E2E_BASE_URL:base.origin,E2E_SLUG:slug,E2E_QR_TOKEN:first.token,E2E_TABLE_CODE:String(code),E2E_OWNER_EMAIL:email,E2E_OWNER_PASSWORD:password};
 await writeFile('.staging-private/fixture-env.json',JSON.stringify(env),{mode:0o600});
 if(process.env.GITHUB_ENV)for(const [name,value]of Object.entries(env))await appendFile(process.env.GITHUB_ENV,`${name}=${value}\n`);
 console.log('New isolated staging fixture provisioned; real Auth login checked. No external email sent.');

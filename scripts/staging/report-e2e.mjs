@@ -5,7 +5,8 @@ const path='.staging-private/results.json';
 if(!existsSync(path)){console.log('No completed browser report; setup, access or cancellation prevented completion.');process.exit(0);}
 const result=JSON.parse(readFileSync(path,'utf8'));
 const fixture=existsSync('.staging-private/fixture-env.json')?JSON.parse(readFileSync('.staging-private/fixture-env.json','utf8')):{};
-const secrets=[...Object.values(fixture),process.env.STAGING_SHARE_URL,process.env.STAGING_SUPABASE_SERVICE_ROLE_KEY].filter(x=>typeof x==='string'&&x.length>3);
+let cardSecrets=[];try{cardSecrets=Object.values(JSON.parse(fixture.E2E_CARDS_JSON||'{}')).map(card=>card.token);}catch{/* No raw fixture output on a malformed report. */}
+const secrets=[...cardSecrets,...Object.values(fixture),process.env.STAGING_SHARE_URL,process.env.STAGING_SUPABASE_SERVICE_ROLE_KEY].filter(x=>typeof x==='string'&&x.length>3);
 const safe=input=>{
  let s=String(input||'').replace(/\u001b\[[0-9;]*m/g,'');
  for(const secret of secrets)s=s.split(secret).join('[redacted]');

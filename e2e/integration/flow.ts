@@ -1,4 +1,4 @@
-import { expect, type BrowserContext, type Page } from '@playwright/test';
+import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
 /**
  * Shared plumbing for the integration specs — the ones that click through a
@@ -52,9 +52,16 @@ export async function signInOwner(context: BrowserContext): Promise<Page> {
  * Scan the table card. Returns the menu page for the restaurant the card
  * belongs to — with the card-pass cookie the scan handler set.
  */
-export async function scanCard(context: BrowserContext, token = QR): Promise<Page> {
+function specCard(): {token?: string;label?: string} {
+  if (!process.env.E2E_CARDS_JSON) return {};
+  let cards: Record<string,{token?:string;label?:string}>;
+  try { cards=JSON.parse(process.env.E2E_CARDS_JSON); } catch { throw new Error('Invalid private fixture card mapping'); }
+  return cards[test.info().file.split(/[\\/]/).pop() || ''] || {};
+}
+export function fixtureTableLabel(): string | undefined { return specCard().label || process.env.E2E_TABLE_LABEL; }
+export async function scanCard(context: BrowserContext, token?: string): Promise<Page> {
   const page = await context.newPage();
-  await page.goto(`${BASE}/t/${token}`);
+  await page.goto(`${BASE}/t/${token ?? specCard().token ?? QR}`);
   return page;
 }
 
