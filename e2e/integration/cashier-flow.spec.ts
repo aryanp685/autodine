@@ -5,7 +5,7 @@ import {
   STAFF_READY,
   addOneAndCheckout,
   addAnotherAndCheckout,
-  nextScanToken,
+  reservedScanToken,
   placeOrder,
   tokenFromOrderUrl,
   scanCard,
@@ -130,7 +130,7 @@ test.describe('cashier — real database', () => {
 
   test('two ticket sitting settles, prints the exact total, closes and starts a fresh sitting', async ({ context }) => {
     test.skip(!GUEST_READY, skipUnless(false, 'guest env for the order half'));
-    const cardToken = nextScanToken();
+    const cardToken = reservedScanToken(24);
     const guest = await scanCard(context, cardToken);
 
     await addOneAndCheckout(guest);
@@ -159,7 +159,8 @@ test.describe('cashier — real database', () => {
     const sheet = till.locator('[data-invoice-sheet]');
     await expect(sheet).toBeVisible();
     const invoiceTotal = (await till.locator('[data-invoice-total]').innerText()).trim();
-    expect(invoiceTotal).toBe(dashboardTotal);
+    const amountInPaise = (value: string) => Math.round(Number(value.replace(/[₹,]/g, '')) * 100);
+    expect(amountInPaise(invoiceTotal)).toBe(amountInPaise(dashboardTotal));
     await expect(sheet.locator('tbody tr')).toHaveCount(2);
 
     await till.getByRole('button', { name: 'Create 24-hour link' }).click();

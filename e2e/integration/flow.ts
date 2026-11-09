@@ -27,6 +27,13 @@ export function nextScanToken(): string {
   return SCAN_TOKENS.length ? SCAN_TOKENS[scanTokenCursor++ % SCAN_TOKENS.length] : QR;
 }
 
+/** A fixture card reserved by index for an end-to-end scenario that spans many actions. */
+export function reservedScanToken(index: number): string {
+  const token = SCAN_TOKENS[index];
+  if (!token) throw new Error(`E2E_QR_TOKENS has no card at reserved index ${index}.`);
+  return token;
+}
+
 /** The six-digit on-site code for that card's table. */
 export const TABLE_CODE = process.env.E2E_TABLE_CODE ?? '';
 /** The restaurant slug the card belongs to. */

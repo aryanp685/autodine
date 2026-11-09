@@ -5,7 +5,7 @@ import {
   SLUG,
   addOneAndCheckout,
   addAnotherAndCheckout,
-  nextScanToken,
+  reservedScanToken,
   codeFromOrderUrl,
   placeOrder,
   scanCard,
@@ -97,7 +97,7 @@ test.describe('guest ordering — real database', () => {
   });
 
   test('two intentional rounds on one table create two tickets in the same sitting', async ({ context }) => {
-    const cardToken = nextScanToken();
+    const cardToken = reservedScanToken(23);
     const page = await scanCard(context, cardToken);
 
     await addOneAndCheckout(page);
