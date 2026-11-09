@@ -29,9 +29,15 @@ test.describe('guest ordering — real database', () => {
   test.skip(!GUEST_READY, skipUnless(false, NEEDS));
 
   test('a live card opens the real menu, with this table named', async ({ context }) => {
-    const page = await scanCard(context);
+    let menuRequestHeaders: Promise<Record<string, string>> | undefined;
+    const page = await scanCard(context, undefined, (request) => {
+      menuRequestHeaders = request.allHeaders();
+    });
     await expect(page).toHaveURL(new RegExp(`/menu\\?s=${SLUG}`), { timeout: 20_000 });
     const cookies = await context.cookies();
+    const sentCookieNames = (await menuRequestHeaders)?.cookie
+      ?.split(';')
+      .map((part) => part.trim().split('=')[0]) ?? [];
     const cardCookie = cookies.find((cookie) => cookie.name === 'autodine_table_card');
     const cardTokenShapeOk = Boolean(cardCookie?.value && /^[A-Za-z0-9_-]{8,128}$/.test(cardCookie.value));
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
@@ -52,7 +58,7 @@ test.describe('guest ordering — real database', () => {
       : null;
     const introRows = introResponse?.ok ? await introResponse.json() as unknown[] : [];
     const body = await page.locator('body').innerText();
-    const diagnostic = `browser cookies=${cookies.map(({ name, secure, value }) => `${name}(secure=${secure},length=${value.length})`).join(',')}; card token shape=${cardTokenShapeOk}; public_qr_intro HTTP=${introResponse?.status ?? 'not-called'} rows=${Array.isArray(introRows) ? introRows.length : 'not-array'}; URL=${page.url()}; title=${await page.title()}`;
+    const diagnostic = `browser cookies=${cookies.map(({ name, secure, value }) => `${name}(secure=${secure},length=${value.length})`).join(',')}; menu request cookies=${sentCookieNames.join(',')}; card token shape=${cardTokenShapeOk}; public_qr_intro HTTP=${introResponse?.status ?? 'not-called'} rows=${Array.isArray(introRows) ? introRows.length : 'not-array'}; URL=${page.url()}; title=${await page.title()}`;
     // Exact fixture values matter here: the generic "Table access" gate copy
     // must not accidentally satisfy a weak `/Table /` locator.
     expect(body, `Scan did not render the synthetic menu. ${diagnostic}. Page:\n${body}`)
