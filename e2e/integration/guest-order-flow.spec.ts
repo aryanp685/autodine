@@ -1,6 +1,5 @@
 import { expect, test } from '@playwright/test';
 import {
-  BASE,
   GUEST_READY,
   SLUG,
   addOneAndCheckout,
@@ -33,15 +32,6 @@ test.describe('guest ordering — real database', () => {
     const page = await scanCard(context);
     await expect(page).toHaveURL(new RegExp(`/menu\\?s=${SLUG}`), { timeout: 20_000 });
     const cookies = await context.cookies();
-    const menuRequestPromise = page.waitForRequest((request) => {
-      const url = new URL(request.url());
-      return url.pathname === '/menu' && url.searchParams.get('s') === SLUG;
-    });
-    await page.goto(`${BASE}/menu?s=${encodeURIComponent(SLUG)}`);
-    const menuRequest = await menuRequestPromise;
-    const requestCookieNames = (await menuRequest.allHeaders()).cookie
-      ?.split(';')
-      .map((part) => part.trim().split('=')[0]) ?? [];
     const cardCookie = cookies.find((cookie) => cookie.name === 'autodine_table_card');
     const cardTokenShapeOk = Boolean(cardCookie?.value && /^[A-Za-z0-9_-]{8,128}$/.test(cardCookie.value));
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
@@ -62,7 +52,7 @@ test.describe('guest ordering — real database', () => {
       : null;
     const introRows = introResponse?.ok ? await introResponse.json() as unknown[] : [];
     const body = await page.locator('body').innerText();
-    const diagnostic = `browser cookies=${cookies.map(({ name, secure, value }) => `${name}(secure=${secure},length=${value.length})`).join(',')}; menu request cookies=${requestCookieNames.join(',')}; card token shape=${cardTokenShapeOk}; public_qr_intro HTTP=${introResponse?.status ?? 'not-called'} rows=${Array.isArray(introRows) ? introRows.length : 'not-array'}`;
+    const diagnostic = `browser cookies=${cookies.map(({ name, secure, value }) => `${name}(secure=${secure},length=${value.length})`).join(',')}; card token shape=${cardTokenShapeOk}; public_qr_intro HTTP=${introResponse?.status ?? 'not-called'} rows=${Array.isArray(introRows) ? introRows.length : 'not-array'}; URL=${page.url()}; title=${await page.title()}`;
     // Exact fixture values matter here: the generic "Table access" gate copy
     // must not accidentally satisfy a weak `/Table /` locator.
     expect(body, `Scan did not render the synthetic menu. ${diagnostic}. Page:\n${body}`)
