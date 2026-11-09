@@ -59,6 +59,7 @@ export async function scanCard(
   context: BrowserContext,
   token?: string,
   onMenuRequest?: (request: Request) => void,
+  onPageError?: (error: Error) => void,
 ): Promise<Page> {
   const selected = token ?? (SCAN_TOKENS.length
     ? SCAN_TOKENS[scanTokenCursor++ % SCAN_TOKENS.length]
@@ -70,6 +71,7 @@ export async function scanCard(
       if (url.pathname === '/menu' && url.searchParams.get('s') === SLUG) onMenuRequest(request);
     });
   }
+  if (onPageError) page.on('pageerror', onPageError);
   await page.goto(`${BASE}/t/${selected}`);
   return page;
 }

@@ -32,11 +32,12 @@ test.describe('guest ordering — real database', () => {
     let menuRequestHeaders: Promise<Record<string, string>> | undefined;
     let menuRequest: Request | undefined;
     let menuRequestHostname = '';
+    const pageErrors: string[] = [];
     const page = await scanCard(context, undefined, (request) => {
       menuRequest = request;
       menuRequestHeaders = request.allHeaders();
       menuRequestHostname = new URL(request.url()).hostname;
-    });
+    }, (error) => pageErrors.push(error.message));
     await expect(page).toHaveURL(new RegExp(`/menu\\?s=${SLUG}`), { timeout: 20_000 });
     const cookies = await context.cookies();
     const sentCookieNames = (await menuRequestHeaders)?.cookie
@@ -63,8 +64,13 @@ test.describe('guest ordering — real database', () => {
     const introRows = introResponse?.ok ? await introResponse.json() as unknown[] : [];
     const menuResponse = await menuRequest?.response();
     const menuHtml = await menuResponse?.text().catch(() => '') ?? '';
+    const bodyText = await page.locator('body').textContent() ?? '';
+    const bodyStyle = await page.locator('body').evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { display: style.display, visibility: style.visibility, textLength: element.textContent?.length ?? 0 };
+    });
     const body = await page.locator('body').innerText();
-    const diagnostic = `menu HTTP=${menuResponse?.status() ?? 'no-response'} HTML-bytes=${menuHtml.length} HTML-has-dish=${menuHtml.includes('Synthetic Paneer Dish')}; browser cookies=${cookies.map(({ name, secure, value, domain, path }) => `${name}(secure=${secure},length=${value.length},domain=${domain},path=${path})`).join(',')}; menu host=${menuRequestHostname}; menu request cookies=${sentCookieNames.join(',')}; card token shape=${cardTokenShapeOk}; public_qr_intro HTTP=${introResponse?.status ?? 'not-called'} rows=${Array.isArray(introRows) ? introRows.length : 'not-array'}; URL=${page.url()}; title=${await page.title()}`;
+    const diagnostic = `menu HTTP=${menuResponse?.status() ?? 'no-response'} HTML-bytes=${menuHtml.length} HTML-has-dish=${menuHtml.includes('Synthetic Paneer Dish')}; DOM-text=${bodyText.length} body-style=${JSON.stringify(bodyStyle)} page-errors=${pageErrors.join(' | ')}; browser cookies=${cookies.map(({ name, secure, value, domain, path }) => `${name}(secure=${secure},length=${value.length},domain=${domain},path=${path})`).join(',')}; menu host=${menuRequestHostname}; menu request cookies=${sentCookieNames.join(',')}; card token shape=${cardTokenShapeOk}; public_qr_intro HTTP=${introResponse?.status ?? 'not-called'} rows=${Array.isArray(introRows) ? introRows.length : 'not-array'}; URL=${page.url()}; title=${await page.title()}`;
     // Exact fixture values matter here: the generic "Table access" gate copy
     // must not accidentally satisfy a weak `/Table /` locator.
     expect(body, `Scan did not render the synthetic menu. ${diagnostic}. Page:\n${body}`)
