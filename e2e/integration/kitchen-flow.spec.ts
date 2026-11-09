@@ -137,7 +137,7 @@ test.describe('kitchen — real database', () => {
     const board = await signInOwner(context);
     await recordAnnouncements(board);
     await board.goto(`${BASE}/kitchen`);
-    const mute = board.getByRole('button', { name: 'Turn the announcements off on this screen' });
+    const mute = board.getByRole('button', { name: 'Kitchen audio on', exact: true });
     await mute.click();
 
     await placeGuestOrder(context, 'e2e: arrived while muted');
@@ -152,7 +152,7 @@ test.describe('kitchen — real database', () => {
 
     // Reading them out is the recovery: put the voice back on, ask for the
     // replay, and the announcements fire now.
-    await board.getByRole('button', { name: 'Turn the announcements on' }).click();
+    await board.getByRole('button', { name: 'Kitchen audio off', exact: true }).click();
     await board.getByRole('button', { name: 'Read them out' }).click();
     await expect
       .poll(() => announcementCount(board), { timeout: 15_000 })
@@ -178,6 +178,12 @@ test.describe('kitchen — real database', () => {
         message: 'the new order was never announced',
       })
       .toBeGreaterThan(0);
+    // One order is several sentence-sized Web Speech utterances. Wait for
+    // the complete queue entry before measuring; an increasing segment count
+    // during one announcement is not a duplicate order announcement.
+    const log = board.getByLabel('Recent announcements');
+    await expect(log.getByLabel('Speech completed', {exact:true})).toHaveCount(1, {timeout:20_000});
+    await expect(log.locator('li')).toHaveCount(1);
     const once = await announcementCount(board);
     await board.waitForTimeout(2500);
     expect(await announcementCount(board), 'the order was announced twice').toBe(once);
