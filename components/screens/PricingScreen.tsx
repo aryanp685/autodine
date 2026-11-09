@@ -41,10 +41,10 @@ export function PricingScreen() {
             <p className="text-[11px] font-semibold tracking-[0.2em] text-forest uppercase">Pricing</p>
             <div className="mt-6 grid gap-7 md:grid-cols-[1.2fr_0.8fr] md:items-end md:gap-16">
               <div>
-                <h1 className="max-w-[15ch] text-[clamp(42px,6vw,76px)] leading-[1.02] font-semibold tracking-[-0.055em] text-balance">Good service.<br />A clearer price.</h1>
+                <h1 data-reveal className="max-w-[15ch] text-[clamp(42px,6vw,76px)] leading-[1.02] font-semibold tracking-[-0.055em] text-balance">Good service.<br />A clearer price.</h1>
                 <p className="mt-6 max-w-[42ch] text-[16px] leading-relaxed text-mute">From the first scan to the final bill. Explore the planned pricing for your restaurant.</p>
               </div>
-              <div className="rounded-2xl border border-forest/15 bg-forest-soft p-6">
+              <div data-reveal className="rounded-2xl border border-forest/15 bg-forest-soft p-6">
                 <p className="flex items-center gap-2 text-[12px] font-semibold text-forest"><span aria-hidden="true" className="size-1.5 rounded-full bg-forest" />Plans are not on sale yet</p>
                 <p className="mt-3 text-[14px] leading-relaxed text-mute">You can create an account for a {BILLING.trialDays}-day trial. No subscription is purchased when you sign up.</p>
                 <Link href="/signup" className="mt-5 inline-flex min-h-11 items-center gap-3 rounded-full bg-forest px-5 text-[13px] font-medium text-white hover:bg-forest-strong">Start your trial <span aria-hidden="true">↗</span></Link>
@@ -59,16 +59,16 @@ export function PricingScreen() {
               <h2 id="plans-heading" className="text-[25px] font-semibold tracking-[-0.03em] sm:text-[30px]">One product. Room to grow.</h2>
               <p className="text-[12px] text-mute">Indicative prices · per restaurant / month</p>
             </div>
-            <div data-stagger className="grid gap-4 md:grid-cols-3">
+            <div data-pricing-grid className="grid gap-4 md:grid-cols-3">
               {PLANS.map((plan, index) => (
-                <article id={`plan-${plan.id}`} data-plan-id={plan.id} key={plan.id} className="public-card scroll-mt-24 rounded-[22px] border border-cream/10 bg-white p-6 sm:p-7">
+                <article id={`plan-${plan.id}`} data-pricing-card data-plan-id={plan.id} key={plan.id} className="public-card motion-safe:transition-[box-shadow,border-color] motion-safe:duration-300 hover:border-forest/25 hover:shadow-[0_16px_40px_rgba(31,77,58,0.07)] scroll-mt-24 rounded-[22px] border border-cream/10 bg-white p-6 sm:p-7">
                   <div className="flex items-center justify-between gap-3">
                     <h3 className="text-[16px] font-semibold tracking-[-0.02em]">{plan.name}</h3>
                     <span aria-hidden="true" className="tnum text-[11px] text-mute-dim">0{index + 1}</span>
                   </div>
                   <p className="mt-2 min-h-12 text-[13px] leading-relaxed text-mute">{plan.fit}</p>
                   <p className="mt-7 flex flex-wrap items-baseline gap-2"><span className="tnum text-[42px] leading-none font-semibold tracking-[-0.05em]">{inr(plan.price)}</span><span className="text-[12px] text-mute">/ month</span></p>
-                  <div className="my-7 h-px bg-cream/10" />
+                  <div data-draw aria-hidden="true" className="my-7 h-px origin-left bg-gradient-to-r from-forest/35 via-[#B98A4B]/40 to-transparent" />
                   <p className="text-[13px] font-medium text-forest">{FOCUS[plan.id][0]}</p>
                   <p className="mt-2 min-h-12 text-[13px] leading-relaxed text-mute">{FOCUS[plan.id][1]}</p>
                   <p className="mt-6 text-[10px] font-medium tracking-[0.12em] text-mute uppercase">Planned · not on sale</p>

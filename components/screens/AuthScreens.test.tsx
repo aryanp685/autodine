@@ -33,7 +33,7 @@ import { SignupScreen } from './SignupScreen';
 describe('sign in', () => {
   const html = renderToStaticMarkup(<LoginScreen />);
 
-  it('is one column with the two fields that open the door', () => {
+  it('keeps the sign-in form focused with a separate desktop overview', () => {
     expect(html).toContain('Sign in to your restaurant');
     expect(html).toContain('name="email"');
     expect(html).toContain('name="password"');
@@ -44,7 +44,9 @@ describe('sign in', () => {
     expect(html).not.toContain('pg__asideCard');
     // One shell, one card, and the notes under it as a list.
     expect(html).toContain('data-auth-shell');
-    expect(html).toContain('What this build actually does');
+    expect(html).toContain('Before you sign in');
+    expect(html).toContain('Restaurant workspace overview');
+    expect(html).toContain('autoComplete="current-password"');
   });
 
   it('keeps the recovery route next to the password field', () => {
@@ -69,6 +71,11 @@ describe('sign up', () => {
   const html = renderToStaticMarkup(<SignupScreen />);
 
   it('asks for the restaurant name, because the account is one', () => {
+    expect(html).toContain('Restaurant setup overview');
+    expect(html).toContain('href="/privacy"');
+    expect(html).toContain('href="/terms"');
+    expect(html).toContain('Mobile number (optional)');
+    expect(html).toContain('type="tel"');
     expect(html).toContain('name="restaurantName"');
     expect(html).toContain('name="fullName"');
     expect(html).toContain('name="email"');
@@ -82,6 +89,7 @@ describe('sign up', () => {
 
   it('does not pre-tick consent', () => {
     expect(html).toContain('name="agree"');
+    expect(html.match(/<input[^>]*name="agree"[^>]*>/)?.[0]).toContain('required=""');
     expect(html).not.toMatch(/name="agree"[^>]*checked/);
     expect(html).not.toMatch(/checked[^>]*name="agree"/);
   });

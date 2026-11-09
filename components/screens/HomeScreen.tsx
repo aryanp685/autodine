@@ -1,7 +1,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { LIVE, NOT_CONNECTED, NumberWord, PLANS, capabilitiesFor } from '@/lib/plans';
+import { LIVE, NOT_CONNECTED, PLANS, capabilitiesFor } from '@/lib/plans';
 import { inr } from '@/lib/demo-data';
+import { ProductScene } from '@/components/ProductScene';
 import { SiteMotion } from '@/components/SiteMotion';
 import { HomeNav } from '@/components/HomeNav';
 import { BrandLockup } from '@/components/BrandMark';
@@ -35,41 +36,58 @@ import { BRAND_GREEN } from '@/lib/brand';
 const STEPS = [
   {
     n: '01',
-    title: 'Set up the menu',
-    body: 'Dishes, prices, photos, tables. Print a card per table.',
+    role: 'Before service',
+    title: 'Make the menu yours.',
+    body: 'Add dishes, prices and available options. Set up your tables, publish the menu and print a QR card for each table.',
+    outcome: 'A table card that opens your menu.',
+    icon: 'M5 4h14v16H5V4Zm4 4h6M9 12h6M9 16h3',
   },
   {
     n: '02',
-    title: 'Guests scan and order',
-    body: 'The card opens the menu. Guests choose dishes and send their order with notes.',
+    role: 'At the table',
+    title: 'Scan. Choose. Send.',
+    body: 'Guests scan the card on a connected phone, choose dishes and add notes. They review the total before sending the order.',
+    outcome: 'An order with its table and guest notes.',
+    icon: 'M8 3h8v18H8V3Zm3 15h2M11 6h2',
   },
   {
     n: '03',
-    title: 'Cook, serve, bill',
-    body: 'The board shows every ticket. Review the bill and record payment at the counter.',
+    role: 'Kitchen & counter',
+    title: 'Prepare, serve, settle.',
+    body: 'Staff follow the kitchen tickets and update their status. At the counter, review the bill and record payment after checking it.',
+    outcome: 'Service tracked. Payment recorded by staff.',
+    icon: 'M4 5h16v12H4V5Zm4 16h8M12 17v4M8 10l3 3 5-5',
   },
 ];
 
 const FEATURES = [
   {
-    title: 'Better dining experience',
-    body: 'Guests order from their own phone, at their own pace.',
-    icon: 'M4 7h16M4 12h16M4 17h10',
+    title: 'Let guests take their time.',
+    body: 'Dishes, portions, extras and notes — guests build their order on their own phone, without installing an app.',
+    role: 'For your guests',
+    detail: 'A menu they can explore at their own pace.',
+    icon: 'M8 3h8a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1ZM10 6h4M11 18h2',
   },
   {
-    title: 'Smoother operations',
-    body: 'Orders arrive on the kitchen board with the guest’s notes attached.',
-    icon: 'M12 3v18M5 10l7-7 7 7',
+    title: 'Keep the pass in the picture.',
+    body: 'See the table, dishes and guest notes together. Move tickets through preparation, ready and served.',
+    role: 'For the kitchen',
+    detail: 'One place to follow what needs cooking next.',
+    icon: 'M4 5h16v14H4V5ZM8 9h8M8 13h5M8 16h3',
   },
   {
-    title: 'Easy menu management',
-    body: 'Edit once — live everywhere the menu is.',
-    icon: 'M4 6h16M4 12h10M4 18h7',
+    title: 'Update the menu, not the paper.',
+    body: 'Change prices, organise dishes and mark unavailable items from the dashboard. Publish updates to the digital menu.',
+    role: 'For the menu manager',
+    detail: 'Your menu stays easier to maintain.',
+    icon: 'M4 5h10M4 10h7M4 15h5m4 3 7-7-3-3-7 7-1 4 4-1ZM16 9l3 3',
   },
   {
-    title: 'Works for every room',
-    body: 'Cafés to family restaurants. One product.',
-    icon: 'M4 20V8l8-4 8 4v12M9 20v-6h6v6',
+    title: 'Keep billed and paid separate.',
+    body: 'Review the outstanding bill, then record cash, card or UPI at the counter after checking the payment.',
+    role: 'For the counter',
+    detail: 'An order placed is not a payment received.',
+    icon: 'M6 3h12v18l-3-2-3 2-3-2-3 2V3ZM9 7h6M9 11h6M9 15h3',
   },
 ];
 
@@ -371,47 +389,40 @@ function Problem() {
 /* ---------------------------------------------------------------- steps */
 
 function Steps() {
-  const icons = [
-    'M5 4h14v16H5V4Zm4 4h6M9 12h6M9 16h3',
-    'M8 3h8v18H8V3Zm3 15h2M11 6h2',
-    'M4 5h16v12H4V5Zm4 16h8M12 17v4M8 10l3 3 5-5',
-  ];
   return (
-    <section id="how" aria-labelledby="how-heading" className="border-t border-[#E8E3DA] bg-white py-16 text-[#1C1B18] sm:py-24 lg:py-28">
+    <section id="how" aria-labelledby="how-heading" className="border-t border-ink-line bg-white py-16 text-cream sm:py-24 lg:py-28">
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <div className="grid gap-6 lg:grid-cols-[1fr_0.8fr] lg:items-end lg:gap-16">
           <div>
-            <p className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-forest">
-              <span className="h-px w-7 bg-[#B98A4B]" aria-hidden="true" />Simple process
-            </p>
-            <h2 id="how-heading" className="mt-5 max-w-[20ch] text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.1] tracking-[-0.04em]" data-reveal>
-              From scan <span className="text-forest">to serving.</span>
-            </h2>
+            <p className="flex items-center gap-3 text-[11px] font-semibold tracking-[0.2em] text-forest uppercase"><span aria-hidden="true" className="h-px w-7 bg-[#B98A4B]" />How it works</p>
+            <h2 id="how-heading" className="mt-6 max-w-[19ch] text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.1] tracking-[-0.04em]" data-reveal>From the first scan<br /><span className="text-forest">to the final bill.</span></h2>
           </div>
-          <p className="max-w-[36ch] text-[15px] leading-relaxed text-[#6B665E]" data-reveal>
-            Three steps. No guest app to download. Just a table card and a connected phone.
-          </p>
+          <p className="max-w-[39ch] text-[15px] leading-[1.8] text-mute" data-reveal>Three steps, with your team in control. No guest app to download — just a table card and a connected phone.</p>
         </div>
 
-        <ol className="mt-10 grid gap-4 md:mt-14 md:grid-cols-3 md:gap-5" data-stagger>
-          {STEPS.map((step, index) => (
-            <li key={step.n} className="relative min-w-0 rounded-2xl border border-[#E8E3DA] bg-[#FBFAF7] p-6 motion-safe:transition-transform motion-safe:duration-300 motion-safe:hover:-translate-y-1 sm:p-8">
-              <div className="flex items-center justify-between gap-4">
-                <span className="grid h-12 w-12 place-items-center rounded-xl border border-[#E8E3DA] bg-white text-forest" aria-hidden="true">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d={icons[index]} /></svg>
-                </span>
-                <span className="text-[11px] font-semibold tracking-[0.16em] text-[#6B665E]">STEP {step.n}</span>
+        <div className="relative mt-10 flex items-center justify-between gap-4 md:mt-14" aria-hidden="true">
+          <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.16em] text-forest">Scan</span>
+          <div className="relative h-px flex-1 overflow-hidden bg-forest/10"><span data-service-progress className="absolute inset-0 origin-left bg-gradient-to-r from-forest to-[#B98A4B]" /></div>
+          <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.16em] text-forest">Serve · Settle</span>
+        </div>
+        <ol aria-label="Restaurant service in three steps" className="mt-6 grid gap-4 md:grid-cols-3 md:gap-5" data-service-flow>
+          {STEPS.map(step => (
+            <li key={step.n} data-service-step={step.n} className="relative flex min-w-0 flex-col rounded-[22px] border border-ink-line bg-ink p-6 motion-safe:transition-[transform,box-shadow] motion-safe:duration-300 motion-safe:hover:-translate-y-1 motion-safe:hover:shadow-[0_12px_30px_rgba(31,77,58,0.06)] sm:p-7">
+              <div className="flex items-center justify-between gap-4 border-b border-ink-line pb-5">
+                <span className="text-[10px] font-semibold tracking-[0.14em] text-forest">STEP {step.n}</span>
+                <p className="text-right text-[10px] font-medium tracking-[0.08em] text-mute uppercase">{step.role}</p>
               </div>
-              <h3 className="mt-7 text-[19px] font-medium tracking-tight">{step.title}</h3>
-              <p className="mt-3 text-[14px] leading-[1.75] text-[#6B665E]">{step.body}</p>
-              <div className="mt-6 flex items-center gap-3 text-[11px] font-medium text-forest">
-                <span className="h-px w-5 bg-[#B98A4B]" aria-hidden="true" />
-                {['Your menu, ready for the room', 'Their phone. Your menu.', 'Your team stays in control'][index]}
-              </div>
+              <span data-service-icon className="mt-6 grid size-12 place-items-center rounded-xl border border-forest/10 bg-forest-soft text-forest" aria-hidden="true"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d={step.icon} /></svg></span>
+              <h3 className="mt-6 text-[22px] font-medium leading-snug tracking-[-0.035em]">{step.title}</h3>
+              <p className="mt-3 flex-1 text-[14px] leading-[1.8] text-mute">{step.body}</p>
+              <p className="mt-7 border-t border-ink-line pt-4 text-[11px] font-medium leading-relaxed text-forest">{step.outcome}</p>
             </li>
           ))}
         </ol>
-        <p className="mt-7 text-[12px] leading-relaxed text-[#6B665E]">Guests order in their browser. Staff manage service from the kitchen and counter screens.</p>
+        <div className="mt-6 flex flex-col items-start justify-between gap-5 rounded-2xl border border-ink-line px-5 py-5 sm:px-6 lg:flex-row lg:items-center">
+          <div><p className="text-[12px] font-medium text-cream">What you need to get started</p><p className="mt-1.5 max-w-[62ch] text-[12px] leading-relaxed text-mute">Printed table cards, internet access for guests, and a compatible browser on a staff laptop or tablet.</p></div>
+          <Link href="/#screens" className="inline-flex min-h-11 shrink-0 items-center gap-3 rounded-full px-2 text-[13px] font-medium text-forest hover:text-forest-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">See the screens <span aria-hidden="true">↗</span></Link>
+        </div>
       </div>
     </section>
   );
@@ -422,28 +433,29 @@ function Steps() {
 function Screens() {
   const panels = [
     { kicker: 'Guest menu', title: 'Browse the menu', body: 'Photos, prices and dish details, together on the guest’s phone.' },
-    { kicker: 'Guest order', title: 'Customise the order', body: 'Choose available portions and add-ons. Check the total before ordering.' },
-    { kicker: 'Kitchen board', title: 'Keep service moving', body: 'See the table, dishes and notes. Update each ticket as the kitchen works.' },
+    { kicker: 'Kitchen board', title: 'Follow the ticket', body: 'Keep table numbers, dishes and guest notes together. Staff update the ticket as preparation moves forward.' },
+    { kicker: 'Counter bill', title: 'Review, then record', body: 'See what is billed, what is recorded as paid and what is still outstanding. Staff verify payment before recording it.' },
   ];
   return (
     <section id="screens" aria-labelledby="screens-heading" className="border-t border-[#E8E3DA] bg-[#FBFAF7] py-16 text-[#1C1B18] sm:py-24 lg:py-28">
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
         <p className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-forest">
-          <span className="h-px w-7 bg-[#B98A4B]" aria-hidden="true" />The product
+          <span className="h-px w-7 bg-[#B98A4B]" aria-hidden="true" />A closer look
         </p>
         <h2 id="screens-heading" className="mt-5 text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.1] tracking-[-0.04em]" data-reveal>
           Three screens, in service order.
         </h2>
-        <p className="mt-5 max-w-[55ch] text-[15px] leading-relaxed text-[#6B665E]" data-reveal>One journey from the first look at the menu to the ticket on the kitchen board.</p>
+        <p className="mt-5 max-w-[55ch] text-[15px] leading-relaxed text-[#6B665E]" data-reveal>One order, seen from the table, the pass and the counter. A focused view for each part of service.</p>
         <p className="mt-3 text-[12px] text-[#6B665E]">Illustrative product previews · sample dishes and tickets</p>
 
-        <div className="mt-10 grid gap-5 md:mt-14 md:grid-cols-3" data-stagger>
+        <div className="mt-10 grid gap-5 md:mt-14 md:grid-cols-3" data-screen-gallery>
           {panels.map((panel, index) => (
-            <article key={panel.title} data-tour-panel className="min-w-0 overflow-hidden rounded-2xl border border-[#E8E3DA] bg-white shadow-[0_6px_28px_rgba(28,27,24,0.03)]">
-              <div className="overflow-hidden border-b border-[#E8E3DA] bg-[#E9F0EA]/60 px-5 pt-7 sm:px-7" aria-hidden="true">
-                <div className="mx-auto h-[280px] max-w-[280px] overflow-hidden rounded-t-2xl border border-[#E8E3DA] bg-white p-4 shadow-[0_6px_24px_rgba(31,77,58,0.06)]">
+            <article key={panel.title} data-screen-card data-tour-panel className="group flex min-w-0 flex-col overflow-hidden rounded-[22px] border border-ink-line bg-white shadow-[0_6px_28px_rgba(28,27,24,0.03)] motion-safe:transition-[transform,box-shadow] motion-safe:duration-300 motion-safe:hover:-translate-y-1 motion-safe:hover:shadow-[0_14px_36px_rgba(31,77,58,0.08)]">
+              <div className="overflow-hidden border-b border-ink-line bg-forest-soft/60 px-5 pt-6 sm:px-7" aria-hidden="true">
+                <p className="mb-4 flex items-center justify-between text-[9px] font-medium tracking-[0.1em] text-forest uppercase"><span>{panel.kicker}</span><span>Illustration</span></p>
+                <div data-screen-frame className="mx-auto min-h-[330px] max-w-[280px] rounded-t-2xl border border-[#E8E3DA] bg-white p-4 shadow-[0_6px_24px_rgba(31,77,58,0.06)]">
                   <div className="flex items-center justify-between border-b border-[#E8E3DA] pb-3 text-[10px] text-[#6B665E]">
-                    <span className="font-semibold text-forest">AutoDine</span><span>Table 05</span>
+                    <span className="font-semibold text-forest">AutoDine</span><span>{index === 1 ? 'Kitchen' : 'Table 05'}</span>
                   </div>
                   {index === 0 ? (
                     <>
@@ -461,27 +473,32 @@ function Screens() {
                     </>
                   ) : index === 1 ? (
                     <>
-                      <p className="mt-4 text-[17px] font-medium tracking-tight">Make it yours.</p>
-                      <p className="mt-1 text-[10px] text-[#6B665E]">Paneer tikka · ₹260</p>
-                      <p className="mt-5 text-[10px] font-medium">Portion</p>
-                      <div className="mt-2 flex gap-2 text-[10px]"><span className="rounded-lg border border-forest bg-[#E9F0EA] px-3 py-2 text-forest">Full</span><span className="rounded-lg border border-[#E8E3DA] px-3 py-2">Half</span></div>
-                      <div className="mt-4 rounded-lg border border-[#E8E3DA] bg-[#FBFAF7] p-3 text-[10px] text-[#6B665E]">Kitchen note: less spicy, please.</div>
-                      <div className="mt-4 flex justify-between rounded-lg bg-forest p-3 text-[11px] font-medium text-white"><span>1 item · Full portion</span><span>₹260</span></div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="mt-4 flex items-center justify-between"><p className="text-[17px] font-medium tracking-tight">In the kitchen</p><span className="h-2 w-2 rounded-full bg-forest" /></div>
-                      {[{ code: 'A-1042', state: 'New', dish: '1 × Paneer tikka', note: 'Less spicy, please.' }, { code: 'A-1041', state: 'Preparing', dish: '2 × Butter naan', note: 'Table 03' }].map(ticket => (
-                        <div key={ticket.code} className="mt-3 rounded-xl border border-[#E8E3DA] p-3">
-                          <div className="flex justify-between gap-2 text-[10px] font-medium"><span>{ticket.code}</span><span className="rounded-full bg-[#E9F0EA] px-2 py-0.5 text-forest">{ticket.state}</span></div>
-                          <p className="mt-2 text-[11px]">{ticket.dish}</p><p className="mt-1 text-[10px] text-[#6B665E]">{ticket.note}</p>
+                      <div className="mt-4 flex items-center justify-between"><p className="text-[17px] font-medium tracking-tight">On the pass</p><span className="text-[9px] text-mute">2 tickets</span></div>
+                      {[{ code: 'AD-1042', table: 'Table 05', state: 'New', dish: '1 × Paneer tikka', note: 'Less spicy, please.' }, { code: 'AD-1041', table: 'Table 03', state: 'Preparing', dish: '2 × Butter naan', note: 'No additional notes' }].map(ticket => (
+                        <div key={ticket.code} className="mt-3 rounded-xl border border-ink-line border-l-[3px] border-l-forest bg-ink p-3">
+                          <div className="flex justify-between gap-2 text-[10px] font-medium"><span>{ticket.table}</span><span className="rounded-full bg-forest-soft px-2 py-0.5 text-forest">{ticket.state}</span></div>
+                          <p className="mt-2 text-[11px] font-medium">{ticket.dish}</p><p className="mt-1 text-[10px] text-mute">{ticket.note}</p>
+                          <p className="mt-2 text-[8px] tracking-wider text-mute">{ticket.code}</p>
                         </div>
                       ))}
                     </>
+                  ) : (
+                    <>
+                      <p className="mt-4 text-[17px] font-medium tracking-tight">At the counter</p>
+                      <div className="mt-3 flex items-center justify-between text-[9px] text-mute"><span>AD-1042 · Table 05</span><span>Unpaid</span></div>
+                      <div className="mt-4 flex justify-between gap-2 border-y border-ink-line py-3 text-[10px]"><span>1 × Paneer tikka</span><span>₹260</span></div>
+                      <div className="mt-4 space-y-2 text-[10px]">
+                        <div className="flex justify-between"><span className="text-mute">Bill total</span><span>₹260</span></div>
+                        <div className="flex justify-between"><span className="text-mute">Recorded as paid</span><span>₹0</span></div>
+                        <div className="flex justify-between border-t border-ink-line pt-3 font-medium text-forest"><span>Outstanding</span><span>₹260</span></div>
+                      </div>
+                      <div className="mt-4 rounded-lg bg-forest-soft px-3 py-2.5 text-[9px] leading-relaxed text-forest">Cash, card or UPI at the counter.<br />Payment is checked and recorded by staff.</div>
+                    </>
+
                   )}
                 </div>
               </div>
-              <div className="p-6">
+              <div className="flex flex-1 flex-col p-6">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-forest">{String(index + 1).padStart(2, '0')} / {panel.kicker}</p>
                 <h3 className="mt-3 text-[19px] font-medium tracking-tight">{panel.title}</h3>
                 <p className="mt-2 text-[14px] leading-relaxed text-[#6B665E]">{panel.body}</p>
@@ -490,7 +507,7 @@ function Screens() {
           ))}
         </div>
         <div className="mt-8 flex flex-col items-start justify-between gap-5 rounded-2xl border border-[#E8E3DA] bg-white p-6 sm:flex-row sm:items-center">
-          <p className="max-w-[45ch] text-[14px] leading-relaxed text-[#6B665E]">Built around your menu, your tables and the people running your restaurant.</p>
+          <p className="max-w-[45ch] text-[14px] leading-relaxed text-[#6B665E]">Your staff stay in control. Sending an order does not automatically mark its bill as paid.</p>
           <Link href="/signup" className="inline-flex min-h-11 shrink-0 items-center justify-center gap-3 rounded-full bg-forest px-6 py-3 text-[13px] font-medium text-white motion-safe:transition-transform motion-safe:hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">Set up your restaurant <span aria-hidden="true">↗</span></Link>
         </div>
       </div>
@@ -502,36 +519,39 @@ function Screens() {
 
 function Features() {
   return (
-    <section id="product" aria-labelledby="features-heading" className="border-t border-ink-line bg-white py-16 sm:py-24">
-      <div className="mx-auto grid max-w-[1180px] gap-14 px-5 sm:px-8 lg:grid-cols-[0.85fr_1.15fr]">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-forest">Built for real restaurants</p>
-          <h2 id="features-heading" className="mt-5 text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.05] tracking-[-0.04em]" data-reveal>
-            Made for the people running the room.
-          </h2>
-          <p className="mt-4 max-w-[42ch] text-[15px] leading-[1.6] text-mute" data-reveal>
-            For the room, not a dashboard with a menu bolted on.
-          </p>
+    <section id="product" aria-labelledby="features-heading" className="border-t border-ink-line bg-ink py-16 sm:py-24 lg:py-28">
+      <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
+        <div data-draw aria-hidden="true" className="mb-10 h-px origin-left bg-gradient-to-r from-forest/40 via-[#B98A4B]/40 to-transparent" />
+        <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start lg:gap-16">
+          <div className="min-w-0 lg:pt-3">
+            <p className="flex items-center gap-3 text-[11px] font-semibold tracking-[0.2em] text-forest uppercase"><span aria-hidden="true" className="h-px w-7 bg-[#B98A4B]" />Built around service</p>
+            <h2 id="features-heading" className="mt-6 max-w-[15ch] text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.1] tracking-[-0.04em]" data-reveal>
+              Less to pass around.<br /><span className="text-forest">More time for the room.</span>
+            </h2>
+            <p className="mt-5 max-w-[39ch] text-[15px] leading-[1.8] text-mute" data-reveal>
+              A clear place for the menu, the kitchen ticket and the bill. Your team still does what matters most: look after the guest.
+            </p>
+            <div className="mt-7 max-w-[39ch] border-l-2 border-[#B98A4B]/50 pl-5" data-reveal>
+              <p className="text-[13px] leading-relaxed text-mute">Guests order on their phone. Staff prepare, serve and record payment. Each step has its own place.</p>
+            </div>
+            <Link href="/#screens" className="mt-7 inline-flex min-h-11 items-center gap-3 rounded-full border border-forest/20 px-5 text-[13px] font-medium text-forest hover:bg-forest-soft focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">Explore the screens <span aria-hidden="true">↗</span></Link>
+            <ProductScene />
+          </div>
 
-
+          <ul className="grid min-w-0 gap-4 sm:grid-cols-2" data-stagger>
+            {FEATURES.map(feature => (
+              <li key={feature.role} data-product-benefit className="group min-w-0 rounded-[20px] border border-ink-line bg-white p-6 shadow-[0_4px_24px_rgba(28,27,24,0.025)] motion-safe:transition-[transform,box-shadow] motion-safe:duration-300 motion-safe:hover:-translate-y-1 motion-safe:hover:shadow-[0_12px_30px_rgba(31,77,58,0.07)]">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-forest-soft text-forest" aria-hidden="true"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d={feature.icon} /></svg></span>
+                  <p className="text-right text-[10px] font-medium tracking-[0.08em] text-mute uppercase">{feature.role}</p>
+                </div>
+                <h3 className="mt-5 text-[18px] font-medium leading-snug tracking-[-0.025em]">{feature.title}</h3>
+                <p className="mt-3 text-[13px] leading-[1.75] text-mute">{feature.body}</p>
+                <p className="mt-5 border-t border-ink-line pt-4 text-[11px] font-medium leading-relaxed text-forest">{feature.detail}</p>
+              </li>
+            ))}
+          </ul>
         </div>
-
-        <ul className="grid gap-4 sm:grid-cols-2" data-stagger>
-          {FEATURES.map((feature) => (
-            <li
-              key={feature.title}
-              className="public-card rounded-2xl border border-ink-line bg-ink p-6"
-            >
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-forest-soft text-forest" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d={feature.icon} strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </span>
-              <h3 className="mt-5 text-[15px] font-medium tracking-tight">{feature.title}</h3>
-              <p className="mt-2 text-[13px] leading-relaxed text-mute">{feature.body}</p>
-            </li>
-          ))}
-        </ul>
       </div>
     </section>
   );
@@ -539,47 +559,27 @@ function Features() {
 
 /* --------------------------------------------------------------- honest */
 
-/**
- * What is live and what is not.
- *
- * Both counts come from the same lists the rest of the site reads, so the line
- * cannot drift from the truth the way a typed "six and three" did.
- */
+/** Keep the preview boundary visible without presenting an internal release log. */
 function Honest() {
   return (
     <section id="status" aria-labelledby="status-heading" className="border-t border-ink-line bg-ink py-16 sm:py-24">
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
-        <h2 id="status-heading" className="text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.05] tracking-[-0.04em]" data-reveal>
-          {/* Spelled out from the lists, never typed: a number in a headline
-              is the first thing to go stale. */}
-          {`${NumberWord(LIVE.length)} things work. ${NumberWord(NOT_CONNECTED.length)} do not.`}
-        </h2>
-        <p className="mt-4 max-w-[56ch] text-[15px] leading-[1.6] text-mute" data-reveal>
-          A working product in preview. Its real state, not a launch badge.
-        </p>
-
-        <div className="mt-10 grid gap-5 md:grid-cols-2">
-          <div className="rounded-2xl border border-forest/20 bg-white p-6 sm:p-8" data-reveal>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-forest">Live now</p>
-            <ul className="mt-5 space-y-3">
-              {LIVE.map((item) => (
-                <li key={item.id} className="flex gap-3 text-[13.5px] leading-relaxed text-mute">
-                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-forest" aria-hidden="true" />
-                  <span><span className="text-cream">{item.label}</span> — {item.detail}</span>
-                </li>
-              ))}
+        <div data-draw aria-hidden="true" className="mb-10 h-px origin-left bg-gradient-to-r from-forest/40 via-[#B98A4B]/40 to-transparent" />
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-forest">Before you start</p>
+        <h2 id="status-heading" className="mt-5 max-w-[22ch] text-[clamp(2rem,4vw,3rem)] font-medium leading-[1.08] tracking-[-0.04em]" data-reveal>A clear picture.<br /><span className="text-forest">No surprises.</span></h2>
+        <p className="mt-5 max-w-[55ch] text-[15px] leading-relaxed text-mute" data-reveal>AutoDine is a product preview. Explore the ordering workflow, and know what is not connected before you begin.</p>
+        <div className="mt-10 grid gap-5 md:grid-cols-2" data-stagger>
+          <div className="rounded-[22px] border border-forest/20 bg-white p-6 sm:p-8">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-forest">Explore the workflow</p>
+            <ul className="mt-5 grid gap-3 sm:grid-cols-2">
+              {LIVE.map(item => <li key={item.id} className="flex items-start gap-3 text-[14px] leading-relaxed"><span aria-hidden="true" className="mt-2 size-1.5 shrink-0 rounded-full bg-forest" />{item.label}</li>)}
             </ul>
+            <p className="mt-6 border-t border-ink-line pt-4 text-[12px] leading-relaxed text-mute">Sample content demonstrates the product. This preview is not a certification for live restaurant operations.</p>
           </div>
-
-          <div className="rounded-2xl border border-ink-line bg-white p-6 sm:p-8" data-reveal>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-mute">Not connected</p>
-            <ul className="mt-5 space-y-3">
-              {NOT_CONNECTED.map((item) => (
-                <li key={item.id} className="flex gap-3 text-[13.5px] leading-relaxed text-mute">
-                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#8C857A]" aria-hidden="true" />
-                  <span><span className="text-cream">{item.label}</span> — {item.detail}</span>
-                </li>
-              ))}
+          <div className="rounded-[22px] border border-ink-line bg-white p-6 sm:p-8">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">Not connected</p>
+            <ul className="mt-5 space-y-4">
+              {NOT_CONNECTED.map(item => <li key={item.id} className="flex gap-3 text-[13px] leading-relaxed text-mute"><span aria-hidden="true" className="mt-2 size-1.5 shrink-0 rounded-full bg-[#8C857A]" /><span><span className="font-medium text-cream">{item.label}</span><br />{item.id === 'payments' ? 'Guests pay at the counter. Staff check and record payment; AutoDine does not collect it online.' : item.id === 'billing' ? 'Plans are not on sale. After the seven-day trial, access becomes read-only until extended.' : 'No SMS or WhatsApp receipts or reminders are sent.'}</span></li>)}
             </ul>
           </div>
         </div>
@@ -602,22 +602,15 @@ function Pricing() {
           Three sizes. Seven free days. No card to begin.
         </p>
 
-        <div className="mt-12 grid gap-5 lg:grid-cols-3" data-stagger>
+        <div className="mt-12 grid gap-5 lg:grid-cols-3" data-pricing-grid>
           {PLANS.map((plan) => (
             <article
               key={plan.id}
+              data-pricing-card
               className={`public-card relative flex min-w-0 flex-col rounded-2xl border p-6 sm:p-7 ${
-                plan.recommended
-                  ? 'border-forest/40 bg-forest-soft'
-                  : 'border-ink-line bg-ink-card'
+                'border-ink-line bg-ink-card'
               }`}
             >
-              {plan.recommended && (
-                <span className="absolute -top-3 left-7 rounded-full bg-forest px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
-                  Recommended
-                </span>
-              )}
-
               <h3 className="text-[15px] font-medium tracking-tight">{plan.name}</h3>
               <p className="mt-1.5 min-h-[40px] text-[12.5px] leading-relaxed text-mute">{plan.fit}</p>
 
@@ -653,7 +646,7 @@ function Pricing() {
 
         <p className="mt-8 text-[12.5px] leading-relaxed text-mute-dim">
           Plans are not on sale yet: nothing can be bought on this site, and no card is taken. The
-          trial is a real seven days, enforced on the server — after it ends the workspace is
+          trial lasts seven days — after it ends the workspace is
           read-only until access is extended, and nothing is deleted.
         </p>
       </div>
@@ -666,7 +659,7 @@ function Pricing() {
 function Close() {
   return (
     <footer className="border-t border-ink-line bg-ink" aria-labelledby="close-heading">
-      <div className="relative isolate overflow-hidden">
+      <div className="relative isolate overflow-hidden" data-close>
         <Image
           src="/img/restaurant-interior-light.jpg"
           alt=""
@@ -678,17 +671,18 @@ function Close() {
 
         <div className="mx-auto max-w-[1180px] px-5 py-24 text-center sm:px-8">
           <h2 id="close-heading" data-reveal className="mx-auto max-w-[22ch] text-[clamp(2rem,4.4vw,3.2rem)] font-medium leading-[1.03] tracking-[-0.045em]">
-            Bring a better ordering experience to your restaurant.
+            Give your next service a clearer flow.
           </h2>
           <p className="mx-auto mt-5 max-w-[46ch] text-[14.5px] leading-relaxed text-mute" data-reveal>
             A calmer service starts with a connected menu, kitchen and counter.
           </p>
+          <p className="mt-4 text-[12px] leading-relaxed text-mute" data-reveal>Product preview · No paid subscription is activated at signup.</p>
           <div className="mt-9 flex flex-wrap justify-center gap-3" data-reveal>
             <Link
               href="/signup"
               className="inline-flex h-12 items-center gap-2 rounded-full bg-forest px-7 text-[14px] font-medium text-white transition-colors hover:bg-forest-strong"
             >
-              Create your restaurant <span aria-hidden="true">→</span>
+              Start your seven-day trial <span aria-hidden="true">→</span>
             </Link>
             <Link
               href="/pricing"
@@ -710,9 +704,10 @@ function Close() {
           </div>
 
           <nav aria-label="Footer" className="flex flex-wrap gap-x-8 gap-y-3 text-[12.5px] text-mute">
-            <Link href="/pricing" className="hover:text-cream">Pricing</Link>
-            <Link href="/login" className="hover:text-cream">Sign in</Link>
-            <Link href="/signup" className="hover:text-cream">Create account</Link>
+            <Link href="/#status" className="hover:text-forest focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">Preview details</Link>
+            <Link href="/pricing" className="hover:text-forest focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">Pricing</Link>
+            <Link href="/login" className="hover:text-forest focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">Sign in</Link>
+            <Link href="/signup" className="hover:text-forest focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">Create account</Link>
             <Link href="/privacy" className="hover:text-forest">Privacy</Link>
             <Link href="/terms" className="hover:text-forest">Terms</Link>
           </nav>
