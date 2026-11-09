@@ -433,7 +433,7 @@ try {
       // in the disposable stack, while later waves arrived normally. Let the
       // subscription/publication pipeline settle before measuring delivery;
       // this is intentionally only a startup barrier, not a per-wave delay.
-      const realtimeWarmupMs = 2_000;
+      const realtimeWarmupMs = 10_000;
       await new Promise((resolve) => setTimeout(resolve, realtimeWarmupMs));
 
       const waveResults = [];
