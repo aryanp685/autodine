@@ -103,7 +103,7 @@ function loadNotice() {
     `sessions[${metric(report.workloads.tableSessions)}]`,
     `orders[${metric(report.workloads.orderCreation)}]`,
     `appReads[${metric(report.workloads.appMenuReads)}]`,
-    `kitchen[${metric(kitchen?.apiUpdateRequests)}; clients=${kitchen?.subscribers ?? 0}; events=${kitchen?.realtimeEventsReceived ?? 0}/${kitchen?.realtimeEventsExpected ?? 0}; eventRps=${kitchen?.realtimeFanoutEventsPerSecond ?? 0}; eventP95=${kitchen?.realtimeEventLatencyMs?.p95 ?? 'na'}ms; failures=${kitchen?.failures ?? 0}]`,
+    `kitchen[${metric(kitchen?.apiUpdateRequests)}; clients=${kitchen?.subscribers ?? 0}; events=${kitchen?.realtimeEventsReceived ?? 0}/${kitchen?.realtimeEventsExpected ?? 0}; eventRps=${kitchen?.realtimeFanoutEventsPerSecond ?? 0}; eventP95=${kitchen?.realtimeEventLatencyMs?.p95 ?? 'na'}ms; waves=${(kitchen?.updateWaves ?? []).map((wave) => `${wave.status}:${wave.receivedRealtimeEvents}/${wave.expectedRealtimeEvents}`).join('|') || 'not recorded'}; failures=${kitchen?.failures ?? 0}]`,
     `overallFailures=${failures.length}`,
   ].join('; ');
 }
@@ -136,7 +136,7 @@ function loadSummary() {
     const api = kitchen.apiUpdateRequests ?? {};
     const latency = api.latencyMs ?? {};
     lines.push(
-      `| Kitchen updates + Realtime | ${api.completed ?? 0} / ${api.requested ?? 0} | ${kitchen.failures ?? 0} | ${kitchen.realtimeFanoutEventsPerSecond ?? 0} | ${latency.p50 ?? '—'} / ${latency.p95 ?? '—'} / ${latency.p99 ?? '—'} / ${latency.max ?? '—'} | ${kitchen.subscribers ?? 0} clients; ${kitchen.realtimeEventsReceived ?? 0} / ${kitchen.realtimeEventsExpected ?? 0} events |`,
+      `| Kitchen updates + Realtime | ${api.completed ?? 0} / ${api.requested ?? 0} | ${kitchen.failures ?? 0} | ${kitchen.realtimeFanoutEventsPerSecond ?? 0} | ${latency.p50 ?? '—'} / ${latency.p95 ?? '—'} / ${latency.p99 ?? '—'} / ${latency.max ?? '—'} | ${kitchen.subscribers ?? 0} clients; ${kitchen.realtimeEventsReceived ?? 0} / ${kitchen.realtimeEventsExpected ?? 0} events; ${(kitchen.updateWaves ?? []).map((wave) => `${wave.status} ${wave.receivedRealtimeEvents}/${wave.expectedRealtimeEvents}`).join(', ')} |`,
     );
   }
   lines.push('', `Overall: **${failures.length ? `${failures.length} failure(s)` : 'no recorded failures'}**.`);
@@ -448,14 +448,22 @@ try {
         while (received.length - priorEvents < expectedEvents && performance.now() < deadline) {
           await new Promise((resolve) => setTimeout(resolve, 50));
         }
+        const receivedEvents = received.length - priorEvents;
         waveResults.push({
           status: prepStatus,
           requestedOrderUpdates: updateOrders.length,
           successfulOrderUpdates: updates.filter(Boolean).length,
           expectedRealtimeEvents: expectedEvents,
-          receivedRealtimeEvents: received.length - priorEvents,
+          receivedRealtimeEvents: receivedEvents,
           durationMs: Number((performance.now() - waveStart).toFixed(2)),
         });
+        if (receivedEvents !== expectedEvents) {
+          addFailure(
+            `kitchen_realtime_${prepStatus}`,
+            null,
+            new Error(`${expectedEvents - receivedEvents} of ${expectedEvents} expected events received for the ${prepStatus} wave.`),
+          );
+        }
         currentWave = null;
       }
       const kitchenUpdateDuration = performance.now() - kitchenUpdatesStarted;
