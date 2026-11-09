@@ -185,9 +185,9 @@ try {
   );
 
   const envValues = {
-    // Chromium treats localhost as a secure context on the disposable HTTP
-    // runner, so production Secure cookies are sent just as they are on HTTPS.
-    E2E_BASE_URL: 'http://localhost:3100',
+    // Keep the browser origin aligned with Next's loopback bind so redirects
+    // remain same-host and the disposable HTTP cookie override can apply.
+    E2E_BASE_URL: 'http://127.0.0.1:3100',
     E2E_QR_TOKEN: liveToken,
     E2E_QR_TOKENS: scanTokens.join(','),
     E2E_TABLE_CODE: tableCode,
