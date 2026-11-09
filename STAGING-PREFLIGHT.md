@@ -1,5 +1,11 @@
 # Existing staging: read-only preflight
 
+## Latest verified readiness result
+
+Staging-only deployment **dpl_58628RrxJGGsoiKctrUasMsuKMNP**, commit **8fd6e027f0a98a072066f3226cb4a7c6603ffbae**, is READY. A fresh authorized page fetch of `/api/health?check=8fd6e02` returned **`ok:true`**, credentials accepted and all five operational probes applied. The initial identical-URL refetch returned the fetcher's older cached `checkedAt` payload; a revision-specific query confirmed the fresh deployment. Token omitted from this record deliberately.
+
+Latest full local suite: **1,931 passed / 21 native cases skipped**; native suite separately **21/21 passed**, **56 clean migrations**. Reproduced historical staging-bundle plus follow-up upgrade also passes 21 native tests. Cold physical restore reverified after the change: 35 tables/23 orders/1 payment/2 invoices, original disposable source removed, exact fingerprint/privilege comparison passes. Production unchanged. Direct sandbox interactive Chromium remains network-blocked; homepage/login fetches and health are not a substitute for actual login/order browser workflows. A network-enabled browser runner with secure test-only fixture credentials is required for those workflows; no need to remove Vercel protection.
+
 ## Shareable-access follow-up and readiness correction
 
 User-provided shareable access successfully opened the staging homepage through the managed page fetcher. Do not store/share the access token in Git or logs. Direct sandbox Chromium navigation failed with `ERR_CONNECTION_CLOSED` (sandbox outbound host restrictions), so interactive browser tests remain unverified; do not ask the user to disable protection to solve a sandbox network limitation.
@@ -70,3 +76,7 @@ READINESS_PG_BIN=/path/to/matching/postgres/bin npm run test:recovery:cold
 ```
 
 Requires `initdb`, `postgres`, `pg_ctl`; refuses to accept an existing data directory or database URL. Full local Supabase services remain untested here: Docker is unavailable, and emulated platform schemas are not the real Auth/Storage/Realtime services.
+
+## Secure network-enabled browser runner prepared
+
+Added `.github/workflows/staging-e2e.yml`, isolated fixture provisioner, share-access global setup and `playwright.staging.config.ts`. Hard-pinned to approved staging endpoints; five negative guard tests/typecheck/lint passed. Requires repository Actions secrets `AUTODINE_STAGING_SERVICE_ROLE_KEY` and `AUTODINE_STAGING_SHARE_URL`. Current GitHub connection still returns **403 Resource not accessible by integration** for Actions-secret management. Missing secrets fail before fixture writes, never masquerade as a passing/skipped browser run. Setup: `scripts/staging/RUNNER-SETUP.md`. No tokens/keys are committed. Synthetic fixture data is retained by UUID namespace for inspection, not destructively auto-cleaned. This runner's existence is not hosted browser verification evidence.
