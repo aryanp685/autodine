@@ -232,6 +232,7 @@ try {
   report.workloads.orderCreation.status = 'place_public_order RPC; priced by database';
   report.workloads.orderCreation.concurrency = concurrency;
 
+  const guestByRestaurant = new Map(guestsData.map((guest) => [guest.restaurantId, guest]));
   const appLatencies = [];
   let appErrors = 0;
   const appRequests = Math.min(guests, 1000);
@@ -240,13 +241,20 @@ try {
     const restaurant = restaurantRows.rows[index % restaurantRows.rowCount];
     const start = performance.now();
     try {
-      const response = await fetch(`${appUrl}/menu?s=${encodeURIComponent(restaurant.slug)}`, { redirect: 'manual' });
+      const guest = guestByRestaurant.get(restaurant.id);
+      if (!guest) throw new Error(`No synthetic guest card for ${restaurant.slug}.`);
+      const response = await fetch(`${appUrl}/menu?s=${encodeURIComponent(restaurant.slug)}`, {
+        redirect: 'manual',
+        // Each synthetic app read is a real guest holding the card token for
+        // that restaurant, not an anonymous request that only sees the gate.
+        headers: { cookie: `autodine_table_card=${guest.publicToken}` },
+      });
+      const html = await response.text();
       appLatencies.push(performance.now() - start);
-      if (response.status !== 200) {
+      if (response.status !== 200 || !html.includes('Synthetic load dish')) {
         appErrors += 1;
-        addFailure('app_menu_ssr', index, new Error(`HTTP ${response.status}`));
+        addFailure('app_menu_ssr', index, new Error(`HTTP ${response.status}; synthetic menu marker=${html.includes('Synthetic load dish')}`));
       }
-      await response.body?.cancel();
     } catch (error) {
       appLatencies.push(performance.now() - start);
       appErrors += 1;
