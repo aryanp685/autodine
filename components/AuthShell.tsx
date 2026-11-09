@@ -2,6 +2,8 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { BrandMark } from '@/components/BrandMark';
 
+export const authButtonClass = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-forest px-5 py-3 text-[13px] font-medium text-white hover:bg-forest-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest disabled:cursor-not-allowed disabled:opacity-50';
+
 /**
  * The shell every signed-out account screen wears.
  *
@@ -39,8 +41,8 @@ export function AuthShell({
   notesTitle?: string;
 }) {
   return (
-    <div data-surface="owner" data-auth-shell className="min-h-dvh bg-paper text-gink antialiased">
-      <header className="border-b border-hair">
+    <div data-surface="owner" data-auth-shell className="auth-forest min-h-dvh bg-paper text-gink antialiased">
+      <header className="border-b border-hair bg-white/75">
         <div className="mx-auto flex h-14 w-full max-w-[1080px] items-center justify-between gap-4 px-5 sm:px-7">
           <Link href="/" className="inline-flex items-baseline gap-2 text-gink">
             <BrandMark size={24} className="translate-y-[2px]" tone="auth" />
@@ -63,8 +65,8 @@ export function AuthShell({
 
       <main className="mx-auto w-full max-w-[1080px] px-5 pt-10 pb-16 sm:px-7 sm:pt-14">
         <div className="mx-auto w-full max-w-[440px]">
-          <section className="rounded-[16px] border border-hair bg-card px-6 py-7 sm:px-8 sm:py-8">
-            <p className="text-[10.5px] font-semibold tracking-[0.12em] text-gink-46 uppercase">
+          <section data-auth-card className="rounded-[20px] border border-hair bg-card px-5 py-7 shadow-[0_16px_60px_-30px_rgba(31,77,58,0.18)] sm:px-8 sm:py-8">
+            <p className="text-[10.5px] font-semibold tracking-[0.12em] text-forest uppercase">
               {eyebrow}
             </p>
             <h1 className="mt-2.5 text-[clamp(1.5rem,3.4vw,1.9rem)] leading-[1.15] font-medium tracking-[-0.04em] text-gink">
@@ -78,7 +80,7 @@ export function AuthShell({
           </section>
 
           {notes && notes.length > 0 ? (
-            <aside className="mt-6 px-1">
+            <aside data-auth-notes className="mt-6 px-1">
               <p className="text-[10.5px] font-semibold tracking-[0.1em] text-gink-46 uppercase">
                 {notesTitle}
               </p>

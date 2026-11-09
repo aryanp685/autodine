@@ -58,8 +58,8 @@ export async function GET(request: Request) {
       orderLimit: 10_000,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error('[reports-export] request failed', error instanceof Error ? error.name : 'Error');
+    return NextResponse.json({ error: 'The report could not be exported. Please try again.' }, { status: 503 });
   }
 
   if (!data) {

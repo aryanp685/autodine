@@ -80,7 +80,10 @@ async function assertNoSidewaysScroll(page: Page, where: string) {
 }
 
 for (const route of ROUTES) {
-  test(`responsive: ${route.slug} holds from 320px to 1440px`, async ({ page }) => {
+  // Each case visits five widths and captures full-page evidence.
+test.describe.configure({ timeout: 90_000 });
+
+test(`responsive: ${route.slug} holds from 320px to 1440px`, async ({ page }) => {
     for (const vp of VIEWPORTS) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
 

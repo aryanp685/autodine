@@ -1,3 +1,5 @@
+import { assertExpectedProject } from '@/lib/staging-config';
+
 /**
  * Supabase environment.
  *
@@ -106,3 +108,5 @@ export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE
 
 /** True when the secret key is present. */
 export const isSupabaseAdminConfigured = Boolean(SUPABASE_URL && SUPABASE_SECRET_KEY);
+
+assertExpectedProject(SUPABASE_URL, SUPABASE_SECRET_KEY, process.env.AUTODINE_EXPECTED_PROJECT_REF);

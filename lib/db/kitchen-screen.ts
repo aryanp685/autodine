@@ -1,3 +1,4 @@
+import { readAllRows, readRowsForIds } from '@/lib/db/paged-read';
 /**
  * Load the kitchen board.
  *
@@ -303,13 +304,13 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
     'id, code, table_id, customer_note, prep_status, payment_status, total_paise, placed_at, hold_required, confirmed_at, table_session_id';
   const orderColumnsLegacy =
     'id, code, table_id, customer_note, prep_status, payment_status, total_paise, placed_at';
-  const queryOrders = (columns: string) => supabase
+  const queryOrders = (columns: string) => readAllRows((from, to) => supabase
     .from('orders')
     .select(columns)
     .eq('restaurant_id', restaurantId)
     .neq('prep_status', 'cancelled')
     .gte('placed_at', cutoff)
-    .order('placed_at', { ascending: true });
+    .order('placed_at', { ascending: true }).order('id', { ascending: true }).range(from, to));
 
   const fullOrdersAttempt = await queryOrders(orderColumnsFull);
   const ordersWithHolds = fullOrdersAttempt.error?.code === '42703'
@@ -371,13 +372,13 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
     // An empty .in() list is a wasted round trip on a board that refreshes
     // every thirty seconds, so it is skipped rather than sent.
     orderIds.length
-      ? supabase
+      ? readRowsForIds(orderIds, (ids, from, to) => supabase
           .from('order_items')
           .select(
             'order_id, item_id, qty, name_snapshot, variant_snapshot, addons_snapshot, is_veg, sort_order'
           )
-          .in('order_id', orderIds)
-          .order('sort_order', { ascending: true })
+          .in('order_id', ids)
+          .order('sort_order', { ascending: true }).order('id', { ascending: true }).range(from, to))
       : Promise.resolve({ data: [], error: null }),
     tableIds.length
       ? supabase.from('dining_tables').select('id, label').in('id', tableIds)

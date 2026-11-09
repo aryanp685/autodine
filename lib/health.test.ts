@@ -175,3 +175,16 @@ describe('health reports a rejected credential', () => {
     expect(health.credentials).toBe('accepted');
   });
 });
+
+describe('commercial readiness', () => {
+  it('requires server credentials and current operations, not only the pilot columns', async () => {
+    const { isReady, probeOperationalSchema } = await import('./health');
+    const health = await probeHealth({ ...base, primary: client(null), publicClient: client(null) });
+    const operational = await probeOperationalSchema(client(null));
+    expect(isReady(health, operational)).toBe(true);
+    expect(isReady({ ...health, serverKey: false }, operational)).toBe(false);
+    expect(isReady(health, { ...operational, invoices: 'missing' })).toBe(false);
+    expect(isReady(health, {})).toBe(false);
+    expect(isReady({ ...health, credentials: 'rejected' }, operational)).toBe(false);
+  });
+});

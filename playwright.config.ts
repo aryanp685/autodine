@@ -34,6 +34,10 @@ export default defineConfig({
   expect: { timeout: 7_000 },
   use: {
     baseURL: 'http://127.0.0.1:3100',
+    launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? {
+      executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+      args: process.env.PLAYWRIGHT_CHROMIUM_ARGS ? JSON.parse(process.env.PLAYWRIGHT_CHROMIUM_ARGS) : ['--no-sandbox'],
+    } : undefined,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     /* The app draws its entrance and layout animations as springs, and a

@@ -47,6 +47,47 @@ describe('home', () => {
     expect(section).not.toContain('text-plum');
   });
 
+  it('renders three ordered process cards with accessible, light styling', () => {
+    const section = home.match(/<section[^>]*id="how"[\s\S]*?<\/section>/)?.[0] ?? '';
+    expect(section).toContain('aria-labelledby="how-heading"');
+    expect(section).toContain('bg-white');
+    expect(section.match(/<h3/g)).toHaveLength(3);
+    expect(section).toContain('STEP 01');
+    expect(section).toContain('STEP 03');
+    expect(section).toContain('connected phone');
+    expect(section).toContain('md:grid-cols-3');
+    expect(section).toContain('motion-safe:hover:');
+    expect(section).not.toContain('instantly');
+    expect(section).not.toContain('text-plum');
+  });
+
+  it('labels product mockups honestly and keeps decorative controls out of the tab order', () => {
+    const section = home.match(/<section[^>]*id="screens"[\s\S]*?<\/section>/)?.[0] ?? '';
+    expect(section).toContain('aria-labelledby="screens-heading"');
+    expect(section).toContain('Illustrative product previews');
+    expect(section.match(/data-tour-panel/g)).toHaveLength(3);
+    expect(section.match(/aria-hidden="true"/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(section).not.toContain('<button');
+    expect(section).toContain('href="/signup"');
+    expect(section).toContain('focus-visible:outline-offset-4');
+    expect(section).not.toContain('text-plum');
+  });
+
+  it('finishes the landing palette, status distinction and accessible footer', () => {
+    const tail = home.slice(home.indexOf('id="product"'));
+    expect(tail).not.toContain('text-plum');
+    expect(tail).not.toContain('bg-grass');
+    expect(tail).toContain('Recommended');
+    expect(tail).toContain('bg-forest text-white');
+    expect(tail).toContain('Not connected');
+    expect(tail).toContain('bg-[#8C857A]');
+    expect(tail).toContain('href="/privacy"');
+    expect(tail).toContain('href="/terms"');
+    expect(tail).not.toContain('ink="#f7f3ea"');
+    expect(home).toContain('data-phone-float');
+    expect(home).toContain('rgba(251,250,247,0.24)');
+  });
+
   it('counts the build from the lists it renders', () => {
     const line = `${cap(WORDS[LIVE.length])} things work. ${cap(WORDS[NOT_CONNECTED.length])} do not.`;
     expect(home.replace(/<!-- -->/g, '')).toContain(line);

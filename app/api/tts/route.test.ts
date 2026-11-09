@@ -49,7 +49,9 @@ vi.mock('msedge-tts', () => ({
   },
 }));
 
+vi.mock('@/lib/tts-access', () => ({ authorizeTts: vi.fn(async () => null) }));
 import { POST } from './route';
+import { authorizeTts } from '@/lib/tts-access';
 
 function post(body: unknown): Request {
   return new Request('http://localhost/api/tts', {
@@ -72,6 +74,7 @@ class ValueErrorStub extends Error {}
 
 describe('POST /api/tts', () => {
   beforeEach(() => {
+    vi.mocked(authorizeTts).mockResolvedValue(null);
     mocks.constructed.length = 0;
     mocks.setMetadataCalls.length = 0;
     mocks.streamCalls.length = 0;
@@ -86,6 +89,21 @@ describe('POST /api/tts', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it.each([null, [], 1, { text: 123 }, { text: {} }])('rejects unexpected JSON shapes without synthesis: %j', async body => {
+    expect((await POST(post(body))).status).toBe(400);
+    expect(mocks.constructed).toHaveLength(0);
+  });
+  it('rejects a chunked oversized payload before synthesis', async () => {
+    expect((await POST(post({ text: 'a'.repeat(9000) }))).status).toBe(413);
+    expect(mocks.constructed).toHaveLength(0);
+  });
+
+  it('does not contact the provider for unauthenticated callers', async()=>{
+    vi.mocked(authorizeTts).mockResolvedValue(Response.json({error:'Sign in'},{status:401}));
+    expect((await POST(post({text:'नमस्ते'}))).status).toBe(401);
+    expect(mocks.constructed).toHaveLength(0);
   });
 
   it('returns audio/mpeg for a valid request', async () => {

@@ -1,3 +1,4 @@
+import { readJsonObject, JsonInputError } from '@/lib/http-json';
 import { NextResponse, type NextRequest } from 'next/server';
 import { readGuestOrderStatus } from '@/lib/db/order-status';
 
@@ -45,9 +46,9 @@ function body(input: unknown): { slug: string; code: string; token: string } {
 export async function POST(request: NextRequest) {
   let parsed: unknown;
   try {
-    parsed = await request.json();
-  } catch {
-    return NextResponse.json({ ok: false, reason: 'bad_request' }, { status: 400, headers: NO_STORE });
+    parsed = await readJsonObject(request);
+  } catch (error) {
+    return NextResponse.json({ ok: false, reason: 'bad_request' }, { status: error instanceof JsonInputError ? error.status : 400, headers: NO_STORE });
   }
 
   const input = body(parsed);

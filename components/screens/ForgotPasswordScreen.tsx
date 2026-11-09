@@ -1,6 +1,6 @@
-import { AuthShell } from '@/components/AuthShell';
+import { AuthShell, authButtonClass } from '@/components/AuthShell';
 import { requestPasswordResetAction } from '@/app/auth/actions';
-import { btn, Field, inputClass } from '@/components/owner/chrome';
+import { Field, inputClass } from '@/components/owner/chrome';
 
 /**
  * Ask for a reset link.
@@ -65,7 +65,7 @@ export function ForgotPasswordScreen({ error, notice }: { error?: string; notice
           />
         </Field>
 
-        <button className={`${btn('solid')} mt-1 w-full`} type="submit">
+        <button className={`${authButtonClass} mt-1 w-full`} type="submit">
           Send reset link
         </button>
 

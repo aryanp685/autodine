@@ -205,3 +205,24 @@ export async function probeHealth(input: {
     },
   };
 }
+
+
+/** Readiness for current operational features, not merely the pilot schema.
+ * Zero-row column probes inspect no tenant data. Missing grants also fail closed. */
+export async function probeOperationalSchema(client: ProbeClient | null): Promise<Record<string, Probe>> {
+  const required = {
+    orderSessions: ['orders', 'order_session_id'],
+    settlement: ['order_sessions', 'paid_at'],
+    invoices: ['restaurant_invoices', 'invoice_number'],
+    paymentReceipts: ['restaurant_payment_receipts', 'snapshot'],
+    announcementClaims: ['kitchen_announcement_claims', 'order_id'],
+  } as const;
+  return Object.fromEntries(await Promise.all(Object.entries(required).map(async ([name, [table, column]]) =>
+    [name, client ? await columnExists(client, table, column) : 'unreachable'])));
+}
+
+export function isReady(health: Health, operational: Record<string, Probe>): boolean {
+  return health.configured && health.serverKey && health.reachable && health.credentials === 'accepted' &&
+    Object.values(health.schema).every(value => value === 'applied') &&
+    Object.values(operational).length > 0 && Object.values(operational).every(value => value === 'applied');
+}

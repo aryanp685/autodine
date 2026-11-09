@@ -233,6 +233,14 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      reserve_staff_tts_attempt: {
+        Args: { p_restaurant_id: string };
+        Returns: { allowed: boolean; retry_after_seconds: number }[];
+      };
+      table_order_activity: {
+        Args: { p_restaurant_id: string };
+        Returns: { table_id: string; order_count: number; last_order_at: string | null }[];
+      };
       /** Atomic shared rate-limit counter; service role only. */
       hit_rate_limit: {
         Args: { p_key: string; p_limit: number; p_window_seconds: number };

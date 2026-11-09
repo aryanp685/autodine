@@ -178,10 +178,7 @@ export async function getTablesScreenData(): Promise<TablesScreenData | null> {
       .select('id, table_id, public_token, created_at')
       .eq('restaurant_id', restaurantId)
       .is('revoked_at', null),
-    supabase
-      .from('orders')
-      .select('table_id, placed_at')
-      .eq('restaurant_id', restaurantId),
+    supabase.rpc('table_order_activity', { p_restaurant_id: restaurantId }),
     // The on-site code. SECURITY DEFINER with a membership check inside, so
     // this cannot be pointed at another restaurant by passing an id from the
     // browser -- restaurantId here came from the caller's own membership row.
@@ -241,10 +238,7 @@ export async function getTablesScreenData(): Promise<TablesScreenData | null> {
   const statsByTable = new Map<string, { orders: number; last: string | null }>();
   for (const row of ordersResult.data ?? []) {
     if (!row.table_id) continue;
-    const current = statsByTable.get(row.table_id) ?? { orders: 0, last: null };
-    current.orders += 1;
-    if (!current.last || row.placed_at > current.last) current.last = row.placed_at;
-    statsByTable.set(row.table_id, current);
+    statsByTable.set(row.table_id, { orders: Number(row.order_count), last: row.last_order_at });
   }
 
   const tables: TableRow[] = (tablesResult.data ?? []).map((row) => {

@@ -25,6 +25,8 @@ export async function proxy(request: NextRequest) {
   // where the browser reads it. Staff-route session work below is untouched:
   // it still only runs where it ran before.
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
+  const requestId = crypto.randomUUID();
+  request.headers.set('x-request-id', requestId);
   const csp = buildCsp({ nonce, supabaseUrl: SUPABASE_URL });
   request.headers.set('x-nonce', nonce);
   request.headers.set('Content-Security-Policy', csp);
@@ -33,8 +35,18 @@ export async function proxy(request: NextRequest) {
 
   const finish = (response: NextResponse): NextResponse => {
     response.headers.set('Content-Security-Policy', csp);
+    response.headers.set('X-Request-ID', requestId);
     return response;
   };
+
+  // Explicit live mode never turns a missing database into a convincing demo.
+  // Local/CI previews keep their existing no-secret demonstration contract.
+  if (process.env.AUTODINE_MODE === 'live' && !isSupabaseConfigured &&
+      (staffPath || /^\/(menu|t|bill|invoice|join)(\/|$)/.test(request.nextUrl.pathname))) {
+    return finish(new NextResponse('Ordering is temporarily unavailable. Please contact restaurant staff.', {
+      status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '60' },
+    }));
+  }
 
   if (!isSupabaseConfigured || !staffPath) {
     return finish(NextResponse.next({ request: { headers: request.headers } }));
