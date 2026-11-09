@@ -39,8 +39,9 @@
  * says which layer failed.
  */
 
+import { readJsonObject, JsonInputError } from '@/lib/http-json';
 import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
-import { addressFromHeaders, hashAddress } from '@/lib/ip-hash';
+import { authorizeTts } from '@/lib/tts-access';
 import {
   DEFAULT_EDGE_VOICE,
   EDGE_HINDI_VOICES,
@@ -53,32 +54,10 @@ import {
 /**
  * A kitchen announcement is one or two sentences. A megabyte of text is not
  * an announcement, it is a way to make the free Edge TTS service do work for
- * as long as the caller likes. The route is public, so the cap is the first
- * door; the per-instance rate limit is the second.
+ * as long as the caller likes. The relay requires staff membership and shared database quotas; the cap
+ * bounds work even for an authorized caller.
  */
 const MAX_TEXT_LENGTH = 1000;
-const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
-const RATE_LIMIT_MAX = 30;
-const rateBuckets = new Map<string, { count: number; resetAt: number }>();
-
-function isRateLimited(key: string): boolean {
-  const now = Date.now();
-  // Bound memory even when callers rotate forwarded addresses.
-  if (rateBuckets.size >= 10000) {
-    for (const [address, entry] of rateBuckets) {
-      if (entry.resetAt <= now) rateBuckets.delete(address);
-    }
-    if (!rateBuckets.has(key) && rateBuckets.size >= 10000) return true;
-  }
-  const bucket = rateBuckets.get(key);
-  if (!bucket || bucket.resetAt <= now) {
-    rateBuckets.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return false;
-  }
-  bucket.count += 1;
-  return bucket.count > RATE_LIMIT_MAX;
-}
-
 /** The runtime must be Node.js: the WebSocket client needs `ws`. */
 export const runtime = 'nodejs';
 
@@ -141,12 +120,13 @@ type TTSRequest = {
 export async function POST(request: Request): Promise<Response> {
   let body: TTSRequest;
   try {
-    body = await request.json() as TTSRequest;
-  } catch {
-    return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
+    body = await readJsonObject(request) as TTSRequest;
+  } catch (error) {
+    return Response.json({ error: error instanceof JsonInputError ? error.message : 'Invalid JSON body' },
+      { status: error instanceof JsonInputError ? error.status : 400 });
   }
 
-  const text = body.text?.trim();
+  const text = typeof body.text === 'string' ? body.text.trim() : '';
   if (!text) {
     return Response.json({ error: 'Missing text' }, { status: 400 });
   }
@@ -158,16 +138,8 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  // Per-instance, per-address. Serverless instances do not share this map, so
-  // it is a brake on a single runaway client, not a global quota; the text cap
-  // above is the hard limit.
-  const ip = addressFromHeaders((name) => request.headers.get(name));
-  if (isRateLimited(hashAddress(ip, 'tts'))) {
-    return Response.json(
-      { error: 'Too many announcements. Please wait a minute and try again.' },
-      { status: 429 }
-    );
-  }
+  const denied = await authorizeTts();
+  if (denied) return denied;
 
   // Validate voice against the known catalogue. An unknown voice means a
   // stale preference from another deployment — fall back to the default
@@ -207,7 +179,7 @@ export async function POST(request: Request): Promise<Response> {
       return new Response(new Uint8Array(audio), {
         headers: {
           'Content-Type': 'audio/mpeg',
-          'Cache-Control': 'public, max-age=300',
+          'Cache-Control': 'private, no-store',
           'X-Content-Type-Options': 'nosniff',
         },
       });

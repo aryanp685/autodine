@@ -1,7 +1,6 @@
 # Supabase local configuration.
 #
-# Scaffold only — there are no migrations yet. M1 creates the first one.
-# Until then, `supabase start` (needs Docker) will bring up a local stack for
+# `supabase start` (needs Docker) brings up a disposable local stack for
 # development at zero cost and without consuming one of the two free cloud
 # project slots.
 #
@@ -32,10 +31,10 @@ port = 54323
 [auth]
 enabled = true
 site_url = "http://localhost:3000"
-additional_redirect_urls = ["http://localhost:3000"]
+additional_redirect_urls = ["http://localhost:3000/**"]
 jwt_expiry = 3600
 enable_signup = true
 
 [storage]
 enabled = true
-file_size_limit = "1MB"
+file_size_limit = "4MB"

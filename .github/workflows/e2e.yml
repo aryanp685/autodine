@@ -51,21 +51,20 @@ jobs:
       # The count is asserted, not assumed: a config that silently matched no
       # tests would otherwise "pass" and prove nothing.
       #
-      # 78 = 5 desktop + 5 phone + 14 guest-ordering + 7 security + 8 kitchen
-      # + 8 cashier + 31 integration. The integration ones need a real
-      # deployment and real accounts, so without secrets they report as
-      # SKIPPED -- they are in the list so that they cannot quietly stop being
-      # discoverable, not because this job verifies them. The 47 hermetic ones
-      # (desktop/phone/guest/staff) run here against demo mode.
-      - name: Expect 111 tests
+      # Includes hermetic browser checks and discoverable integration specs.
+      # Integration skips in this secret-free job are NOT hosted evidence;
+      # the dedicated staging workflow verifies its configured live subset.
+      # Keep the exact discovery guard in sync with deliberate test additions.
+      - name: Expect 112 tests
         run: |
           listed=$(npx playwright test --list | tail -1)
           echo "$listed"
-          echo "$listed" | grep -q "Total: 111 tests"
+          echo "$listed" | grep -q "Total: 112 tests"
 
       # Two reporters: list for a human reading the log, json for the summary
       # step below. The json file is the source of the per-test line.
       - name: Browser tests
+        id: browser
         run: npx playwright test --reporter=list,json
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
@@ -74,7 +73,7 @@ jobs:
       # annotation is: this turns each test into one API-readable line, so the
       # result of every individual test can be quoted rather than summarised.
       - name: Per-test results
-        if: always()
+        if: ${{ !cancelled() && steps.browser.outcome != 'skipped' && steps.browser.outcome != '' }}
         run: |
           node -e '
             try {

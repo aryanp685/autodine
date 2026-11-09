@@ -1,9 +1,14 @@
+import { createClient } from '@supabase/supabase-js';
 import { expect, test, type BrowserContext } from '@playwright/test';
 import {
   BASE,
   GUEST_READY,
   STAFF_READY,
+  SLUG,
+  OWNER_EMAIL,
+  OWNER_PASSWORD,
   addOneAndCheckout,
+  codeFromOrderUrl,
   placeOrder,
   scanCard,
   signInOwner,
@@ -69,8 +74,8 @@ test.describe('cashier — real database', () => {
 
     const bill = await till.context().newPage();
     await bill.goto(`${BASE}/bill/${orderId}`);
-    await expect(bill.locator('[data-bill]')).toBeVisible({ timeout: 20_000 });
-    await expect(bill.getByText(/Total/).first()).toContainText(/₹[\d,]+/);
+    await expect(bill.locator('[data-bill-sheet]')).toBeVisible({ timeout: 20_000 });
+    await expect(bill.locator('[data-bill-sheet]').getByText('Total',{exact:true}).locator('..')).toContainText(/₹[\d,]+/);
   });
 
   test('recording a counter payment moves the money from pending to paid', async ({
@@ -92,33 +97,39 @@ test.describe('cashier — real database', () => {
     await expect(till.locator('[data-counter-cta]')).not.toHaveText(/₹0[^0-9]/);
   });
 
-  test('the UPI claim is a claim: pending at the guest, confirmable at the till', async ({
-    context,
-  }) => {
-    test.skip(!GUEST_READY, skipUnless(false, 'guest env for the order half'));
-    const guestUrl = await placeCounterOrder(context, 'e2e: upi claim flow');
-
-    const guest = await context.newPage();
-    await guest.goto(guestUrl);
-
-    const payUpi = guest.locator('[data-pay-upi]');
-    test.skip(!(await payUpi.count()), 'this restaurant has no UPI details configured');
-
-    await guest.getByRole('button', { name: 'I have paid' }).click();
-    // A claim, not a receipt: the order stays pending and says so.
-    await expect(guest.locator('[data-upi-claimed]')).toBeVisible({ timeout: 20_000 });
-
-    const till = await signInOwner(context);
-    await till.goto(`${BASE}/cashier`);
-    // The till knows a guest is claiming, and warns the cashier to check the
-    // shop's own UPI app before recording anything.
-    await expect(
-      till.getByText("Check the restaurant’s own UPI app before recording it as cash"),
-    ).toBeVisible({ timeout: 45_000 });
-
-    await till.getByRole('group', { name: 'Payment method' }).getByRole('button', { name: 'UPI' }).click();
+  test('UPI is recorded only by staff at the counter, with a persisted payment', async ({context}) => {
+    const guestUrl=await placeCounterOrder(context,'e2e: manual UPI fixture no real transfer');
+    const code=codeFromOrderUrl(guestUrl);
+    const guest=await context.newPage();await guest.goto(guestUrl);
+    await expect(guest.getByText('Pay at the counter before you leave.',{exact:true})).toBeVisible();
+    await expect(guest.locator('[data-pay-upi], [data-upi-claimed]')).toHaveCount(0);
+    await expect(guest.getByRole('button',{name:'I have paid',exact:true})).toHaveCount(0);
+    const till=await signInOwner(context);await till.goto(`${BASE}/cashier`);
+    await till.getByRole('button',{name:new RegExp(`Select ${code} at`)}).click();
+    await till.getByRole('group',{name:'Payment method'}).getByRole('button',{name:'UPI',exact:true}).click();
+    await expect(till.locator('[data-counter-cta]')).toHaveText('Record UPI ₹125');
     await till.locator('[data-counter-cta]').click();
-    await expect(till.locator('[data-counter-cta]')).toBeVisible(); // queue moved on
+    await expect(till.getByText(new RegExp(`UPI.*recorded for ${code}`))).toBeVisible({timeout:20_000});
+    // Counter payments only have supplemental receipt links when an invoice
+    // was issued first. Verify persistence as the authenticated fixture owner,
+    // not by assuming an invoice exists or granting service-role money reads.
+    if(process.env.STAGING_SUPABASE_URL!=='https://juwyhslzchjevqkdvwjm.supabase.co'||!process.env.STAGING_SUPABASE_SERVICE_ROLE_KEY)throw new Error('Approved staging persistence credentials required');
+    const db=createClient(process.env.STAGING_SUPABASE_URL,process.env.STAGING_SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
+    const login=await db.auth.signInWithPassword({email:OWNER_EMAIL,password:OWNER_PASSWORD});
+    if(login.error)throw new Error('Fixture owner persistence login failed');
+    try {
+      const tenant=await db.from('restaurants').select('id,upi_id').eq('slug',SLUG).single();
+      if(tenant.error)throw new Error('Fixture tenant persistence read failed');
+      expect(tenant.data.upi_id).toBe('autodine-synthetic@invalid');
+      const order=await db.from('orders').select('id,payment_status').eq('restaurant_id',tenant.data.id).eq('code',code).single();
+      if(order.error)throw new Error('UPI order persistence read failed');
+      expect(order.data.payment_status).toBe('paid');
+      const payments=await db.from('payments').select('method,amount_paise,status').eq('restaurant_id',tenant.data.id).eq('order_id',order.data.id);
+      if(payments.error)throw new Error('UPI payment persistence read failed');
+      expect(payments.data).toEqual([{method:'upi',amount_paise:12500,status:'recorded'}]);
+    } finally {await db.auth.signOut();}
+    await guest.reload();
+    await expect(guest.getByText('Paid. Thank you.',{exact:true})).toBeVisible();
   });
 
   test('double-tapping Record writes ONE payment', async ({ context }) => {

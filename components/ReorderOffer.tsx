@@ -87,7 +87,9 @@ export function ReorderOffer({
   useEffect(() => {
     if (!enabled || !slug) return;
     setLines(readLastCart(browserStorage(), slug));
-  }, [enabled, slug]);
+    // ClearCartOnOrder saves the snapshot after CartProvider hydrates. Read
+    // again when that provider becomes ready / clears, not just on mount.
+  }, [enabled, slug, cart?.ready, cart?.count]);
 
   if (!enabled || !slug || !cart || !cart.ready || lines.length === 0) return null;
 

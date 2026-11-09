@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { isSupabaseAdminConfigured, isSupabaseConfigured } from '@/lib/supabase/env';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { probeHealth, type ProbeClient } from '@/lib/health';
+import { probeHealth, probeOperationalSchema, isReady, type ProbeClient } from '@/lib/health';
 import { BILLING } from '@/lib/plans';
 
 /**
@@ -37,21 +37,11 @@ export async function GET() {
     publicClient: (await createSupabaseServerClient()) as unknown as ProbeClient | null,
   });
 
-  // "ok" means every migration this build expects is present. A deployment with
-  // no database at all is not "ok" -- it renders sample data, and pretending
-  // otherwise is how a demo ends with a fictional order.
-  //
-  // All three schema probes must be applied. Checking only the trial/write
-  // gate let a deployment missing plan_features() or restaurants.upi_id
-  // report healthy while the plan line and the UPI QR were broken.
-  const schemaApplied =
-    health.schema.trialAndWriteGate === 'applied' &&
-    health.schema.planEntitlements === 'applied' &&
-    health.schema.restaurantUpi === 'applied';
-  const ok = health.configured && schemaApplied;
+  const operational = await probeOperationalSchema((server as unknown as ProbeClient | null) ?? null);
+  const ok = isReady(health, operational);
 
   return NextResponse.json(
-    { ok, ...health, checkedAt: new Date().toISOString() },
-    { headers: { 'cache-control': 'no-store' } }
+    { ok, ...health, operational, checkedAt: new Date().toISOString() },
+    { status: ok ? 200 : 503, headers: { 'cache-control': 'no-store' } }
   );
 }

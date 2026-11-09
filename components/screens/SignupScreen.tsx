@@ -1,6 +1,6 @@
-import { AuthShell } from '@/components/AuthShell';
+import { AuthShell, authButtonClass } from '@/components/AuthShell';
 import { signUpAction } from '@/app/auth/actions';
-import { btn, Field, inputClass } from '@/components/owner/chrome';
+import { Field, inputClass } from '@/components/owner/chrome';
 
 /**
  * Create an account.
@@ -30,7 +30,8 @@ export function SignupScreen({ error }: { error?: string }) {
         </>,
         <>
           <strong>Nothing is charged.</strong> No payment gateway is connected, no plan can be
-          bought and no trial is being enforced. Do not enter card details anywhere.
+          bought. A seven-day trial starts when your restaurant is created; after it ends, the workspace
+          becomes read-only until access is extended.
         </>,
       ]}
     >
@@ -124,13 +125,13 @@ export function SignupScreen({ error }: { error?: string }) {
           </span>
         </label>
 
-        <button className={`${btn('solid')} mt-1 w-full`} type="submit">
+        <button className={`${authButtonClass} mt-1 w-full`} type="submit">
           Create account
         </button>
 
         <p className="text-[11.5px] leading-[1.5] text-gink-46">
-          Signing up creates a restaurant workspace with one menu and one owner. No trial and no
-          subscription is created by this form.
+          Signing up creates a restaurant workspace with one menu and one owner. A seven-day trial starts
+          with the workspace. No paid subscription is created by this form.
         </p>
       </form>
     </AuthShell>

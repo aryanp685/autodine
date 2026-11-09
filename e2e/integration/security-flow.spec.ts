@@ -1,12 +1,14 @@
 import { expect, test } from '@playwright/test';
 import {
   BASE,
-  EXPIRED_QR,
+  SLUG,
   GUEST_READY,
   OWNER_EMAIL,
   OWNER_PASSWORD,
   STAFF_READY,
   addOneAndCheckout,
+  codeFromOrderUrl,
+  signInOwner,
   placeOrder,
   scanCard,
   skipUnless,
@@ -75,14 +77,28 @@ test.describe('security — real database', () => {
     await expect(till.getByRole('heading', { name: 'Bill not found' })).toBeVisible({
       timeout: 20_000,
     });
-    await expect(till.locator('[data-bill]')).toHaveCount(0);
+    await expect(till.locator('[data-bill-sheet]')).toHaveCount(0);
   });
 
-  test('an expired card is refused with words, not with a menu', async ({ context }) => {
-    test.skip(!EXPIRED_QR, skipUnless(false, 'E2E_EXPIRED_QR_TOKEN (a card aged past expiry on the branch db)'));
-    const page = await scanCard(context, EXPIRED_QR);
-    await expect(page).toHaveURL(/\/t\/problem\?r=/, { timeout: 20_000 });
-    await expect(page.getByText('Table access')).toBeVisible();
+  test('a revoked permanent card is refused, not shown a menu', async ({ context }) => {
+    const token=process.env.E2E_REVOKED_QR_TOKEN;
+    test.skip(!token, skipUnless(false,'E2E_REVOKED_QR_TOKEN'));
+    const page=await context.newPage();
+    await page.goto(`${BASE}/t/${token}`);
+    await expect(page).toHaveURL(/\/t\/problem\?r=/, {timeout:20_000});
+    await expect(page.locator('[data-flow-table]')).toHaveCount(0);
+    await expect(page.getByRole('heading')).toBeVisible();
+  });
+
+  test('an expired database session cannot be revived by a future-dated browser cookie', async ({context}) => {
+    const token=process.env.E2E_EXPIRED_SESSION_TOKEN;
+    test.skip(!token,skipUnless(false,'E2E_EXPIRED_SESSION_TOKEN'));
+    await context.addCookies([{name:'autodine_table',value:JSON.stringify({token,slug:SLUG,tableLabel:'E2E-DEAD',expiresAt:new Date(Date.now()+3600000).toISOString()}),url:BASE,httpOnly:true,secure:true,sameSite:'Lax'}]);
+    const page=await context.newPage();
+    await page.goto(`${BASE}/menu/checkout?s=${encodeURIComponent(SLUG)}`);
+    await expect(page.locator('[data-place-order="bill"]')).toHaveCount(0);
+    await expect(page.locator('[data-flow-table]')).toHaveCount(0);
+    await expect(page.getByRole('heading',{name:'Your table session has ended'})).toBeVisible();
   });
 
   test('a tampered cart prices at the menu when the order is written', async ({ context }) => {
@@ -107,7 +123,7 @@ test.describe('security — real database', () => {
 
     // The bill totals come from the database's price snapshots. A one-paisa
     // line would show a one-rupee-or-less bill; real menu prices never do.
-    const totals = await page.getByText(/Total/).first().innerText();
+    const totals = await page.locator('dl').getByText('Total',{exact:true}).locator('..').innerText();
     expect(Number(totals.replace(/[^0-9]/g, ''))).toBeGreaterThan(9);
     expect(url).toContain('code=');
   });
@@ -117,14 +133,23 @@ test.describe('security — real database', () => {
     const page = await scanCard(context);
     await addOneAndCheckout(page);
 
-    await page.locator('[data-place-order="bill"]').click({ clickCount: 2, delay: 40 }).catch(() => {});
+    const note = `e2e: duplicate submission ${Date.now()}`;
+    await page.locator('textarea[name="note"]').fill(note);
+    await page.locator('[data-place-order="bill"]').click({ clickCount: 2, delay: 40 });
     await expect(page).toHaveURL(/\/menu\/order\?.*code=/, { timeout: 30_000 });
+    const code = codeFromOrderUrl(page.url());
+    expect(code).toBeTruthy();
+    await expect(page.locator('[aria-label="Order reference"]')).toContainText(code);
 
-    // One code, one order. The Orders tab — the guest's own memory of what
-    // this phone placed — opens on a single order, and the tracking page
-    // carries exactly one code.
-    await page.locator('[data-gtab-bar]').getByRole('link', { name: 'Orders' }).click();
-    await expect(page.getByText(/status/i).first()).toBeVisible({ timeout: 20_000 });
-    await expect(page.locator('[data-reorder-button]')).toHaveCount(1);
+    // The confirmation flow deliberately has no Orders tab. Inspect the real
+    // staff board instead: count orders carrying this unique submission note,
+    // not buttons on a guest page (which cannot prove database uniqueness).
+    const board = await signInOwner(context);
+    await board.goto(`${BASE}/kitchen`);
+    const matches = board.locator('article[data-state]', {hasText:note});
+    await expect(matches).toHaveCount(1, {timeout:20_000});
+    await expect(matches).toContainText(code);
+    await board.reload();
+    await expect(matches).toHaveCount(1, {timeout:20_000});
   });
 });

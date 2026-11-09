@@ -1,0 +1,48 @@
+name: Staging E2E (explicit secrets, nonproduction only)
+on:
+  workflow_dispatch:
+  push:
+    branches: ['arena/3711df6a-autodine']
+    paths:
+      - '.github/workflows/staging-e2e.yml'
+      - 'playwright.staging.config.ts'
+      - 'scripts/staging/**'
+      - 'e2e/integration/**'
+permissions:
+  contents: read
+concurrency:
+  group: isolated-staging-e2e
+  cancel-in-progress: false
+jobs:
+  staging-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      STAGING_BASE_URL: https://new-git-arena-3711df6a-autodine-iamjarvis9896-3988s-projects.vercel.app
+      STAGING_SUPABASE_URL: https://juwyhslzchjevqkdvwjm.supabase.co
+      STAGING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.AUTODINE_STAGING_SERVICE_ROLE_KEY }}
+      STAGING_SHARE_URL: ${{ secrets.AUTODINE_STAGING_SHARE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require secrets before accessing services or writing fixtures
+        shell: bash
+        run: |
+          if [[ -z "$STAGING_SUPABASE_SERVICE_ROLE_KEY" || -z "$STAGING_SHARE_URL" ]]; then
+            echo '::error::Staging setup blocked: configure AUTODINE_STAGING_SERVICE_ROLE_KEY and AUTODINE_STAGING_SHARE_URL as repository Actions secrets. Do not put them in workflow inputs or code.'
+            exit 1
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Provision uniquely namespaced fixtures (no email, no existing-data reset)
+        run: node scripts/staging/provision-e2e.mjs
+      - name: Real staging browser workflows
+        run: npx playwright test --config playwright.staging.config.ts
+      - name: Publish counts only (no traces, URLs, credentials or raw reports)
+        if: always()
+        shell: bash
+        run: |
+          node scripts/staging/report-e2e.mjs

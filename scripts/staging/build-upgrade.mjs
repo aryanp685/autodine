@@ -1,0 +1,11 @@
+/** Reviewed upgrade artifact for the observed *empty* autodinetest baseline.
+ * Source SQL is copied verbatim; original hashes bind the manifest. No secrets.
+ * Do not use on production or as a generic migration repair tool. */
+import { readFile,readdir,writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+const applied=new Set(['20261019000001_init.sql','20261019000002_public_read.sql','20261020000004_counter_payment.sql','20261021000005_public_place_order.sql','20261021000006_table_qr_verification.sql','20261021000007_table_qr_provisioning.sql']);
+const files=(await readdir('supabase/migrations')).filter(f=>f.endsWith('.sql')&&!applied.has(f)).sort();
+let sql=`-- STAGING ONLY: observed empty autodinetest, never production.\n-- All changes are one transaction supplied by the migration connector.\nselect pg_advisory_xact_lock(3711,55001);\ndo $preflight$ begin\n if exists(select 1 from public.restaurants) or exists(select 1 from public.orders) then\n raise exception 'Staging baseline changed: refusing upgrade of populated tenant data'; end if;\n if to_regprocedure('public.place_public_order(text,jsonb,text,text)') is null then\n raise exception 'Observed staging baseline does not match'; end if;\nend $preflight$;\ncreate schema if not exists supabase_migrations;\ncreate table if not exists supabase_migrations.arena_staging_upgrade_manifest (filename text primary key, sha256 text not null, applied_at timestamptz not null default now());\ndo $manifest_guard$ begin if exists(select 1 from supabase_migrations.arena_staging_upgrade_manifest) then raise exception 'Upgrade already recorded: review before retrying'; end if; end $manifest_guard$;\n`;
+for(const file of files){const source=await readFile(`supabase/migrations/${file}`,'utf8');const hash=createHash('sha256').update(source).digest('hex');sql+=`\n-- SOURCE ${file} SHA256 ${hash}\n${source}\ninsert into supabase_migrations.arena_staging_upgrade_manifest(filename,sha256) values ('${file}','${hash}');\n`;}
+await writeFile('scripts/staging/approved-upgrade.sql',sql);
+console.log(JSON.stringify({migrations:files.length,bytes:Buffer.byteLength(sql),sha256:createHash('sha256').update(sql).digest('hex')}));

@@ -39,15 +39,15 @@ type Row = { id: string; name: string; trial_started_at: string };
 
 function fakeDb(rows: Row[]) {
   const calls = {
-    ilikePattern: null as string | null,
+    namePattern: null as string | null,
     updates: [] as Record<string, unknown>[],
     eqIds: [] as string[],
   };
   const db = {
     from: vi.fn((_table: string) => ({
       select: vi.fn((_cols: string) => ({
-        ilike: vi.fn(async (_col: string, pattern: string) => {
-          calls.ilikePattern = pattern;
+        filter: vi.fn(async (_col: string, _op: string, pattern: string) => {
+          calls.namePattern = pattern;
           return { data: rows, error: null };
         }),
       })),
@@ -168,7 +168,7 @@ describe('POST /api/admin/renew-trial', () => {
 
     await POST(request({ restaurantName: 'The King' }, `Bearer ${A_SECRET}`));
 
-    expect(calls.ilikePattern).toBe('The King');
+    expect(calls.namePattern).toBe('^The King$');
     expect(calls.eqIds).toEqual(['rest-1']);
     expect(Object.keys(calls.updates[0])).toEqual(['trial_started_at']);
   });

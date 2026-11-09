@@ -1363,3 +1363,65 @@ p { margin: 0; }
   from { opacity: 0; transform: translateY(-6px) scale(0.99); }
   to { opacity: 1; transform: none; }
 }
+
+/* Public landing: tactile controls and a gentle, independent phone drift.
+   Content remains visible without JavaScript; motion is opt-in by OS setting. */
+.public-landing section[id] { scroll-margin-top: 5.5rem; }
+.public-landing a:focus-visible,
+.public-landing button:focus-visible {
+  outline: 2px solid var(--color-forest);
+  outline-offset: 4px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .public-landing a, .public-landing button {
+    transition: transform 200ms ease, background-color 200ms ease, color 200ms ease, box-shadow 200ms ease;
+  }
+  .public-landing a:active, .public-landing button:active { transform: translateY(1px) scale(0.98); }
+  .public-landing .public-card { transition: transform 300ms ease, box-shadow 300ms ease; }
+  .public-landing .public-card:hover { transform: translateY(-5px); box-shadow: var(--p-shadow-2); }
+  .public-landing [data-phone-float] { animation: public-phone-drift 7s ease-in-out infinite; }
+  @keyframes public-phone-drift {
+    0%, 100% { transform: translateY(0) rotate(-1deg); }
+    50% { transform: translateY(-10px) rotate(1deg); }
+  }
+}
+
+/* Only signed-out account pages inherit the landing palette. Staff screens
+   retain their own tokens; authentication actions and validation are unchanged. */
+[data-surface='owner'][data-auth-shell] {
+  --p-paper: #fbfaf7;
+  --p-paper-deep: #f3f0e9;
+  --p-ink: #1c1b18;
+  --p-accent: #1f4d3a;
+  --p-accent-strong: #163a2b;
+  --p-accent-soft: #e9f0ea;
+  --p-accent-wash: rgba(31,77,58,.05);
+  --p-line: #e8e3da;
+  background: radial-gradient(ellipse at 10% 8%, rgba(31,77,58,.05), transparent 45%), var(--p-paper);
+}
+[data-auth-shell] input { min-width: 0; font-size: 16px; }
+[data-auth-shell] input:focus-visible {
+  outline: 2px solid var(--color-forest);
+  outline-offset: 2px;
+  border-color: var(--p-accent);
+}
+[data-auth-shell] a:focus-visible, [data-auth-shell] button:focus-visible {
+  outline: 2px solid var(--color-forest);
+  outline-offset: 4px;
+}
+[data-auth-shell] button[type='submit'] { min-height: 44px; }
+[data-auth-shell] [role='alert'], [data-auth-shell] [role='status'],
+[data-auth-shell] [data-auth-notes] { overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: no-preference) {
+  [data-auth-card] { animation: auth-enter 650ms cubic-bezier(.2,.65,.3,1) both; }
+  [data-auth-notes] { animation: auth-enter 700ms 100ms cubic-bezier(.2,.65,.3,1) both; }
+  [data-auth-shell] input, [data-auth-shell] a, [data-auth-shell] button {
+    transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease, transform 180ms ease;
+  }
+  [data-auth-shell] button[type='submit']:hover { transform: translateY(-1px); }
+  [data-auth-shell] button[type='submit']:active { transform: translateY(1px); }
+  @keyframes auth-enter {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}

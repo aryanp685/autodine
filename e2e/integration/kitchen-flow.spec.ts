@@ -74,7 +74,7 @@ test.describe('kitchen — real database', () => {
     // The guest's own page — the thing that must follow the kitchen.
     const guest = await context.newPage();
     await guest.goto(guestUrl);
-    await expect(guest.getByText('Sent to the kitchen')).toBeVisible({ timeout: 20_000 });
+    await expect(guest.locator('header .g-lede').filter({hasText:'Sent to the kitchen'})).toBeVisible({ timeout: 20_000 });
 
     const board = await signInOwner(context);
     await board.goto(`${BASE}/kitchen`);
@@ -84,19 +84,22 @@ test.describe('kitchen — real database', () => {
     await expect(ticket).toBeVisible({ timeout: 45_000 });
 
     await ticket.getByRole('button', { name: 'Start preparing' }).click();
-    await expect(guest.getByText('Being cooked')).toBeVisible({ timeout: 45_000 });
+    await guest.bringToFront();
+    await expect(guest.locator('header .g-lede').filter({hasText:'Being cooked'})).toBeVisible({ timeout: 45_000 });
 
     const preparing = board.locator('article[data-state="preparing"]', {
       hasText: 'e2e: status sync ticket',
     });
     await preparing.getByRole('button', { name: 'Mark ready' }).click();
-    await expect(guest.getByText('Ready to serve')).toBeVisible({ timeout: 45_000 });
+    await guest.bringToFront();
+    await expect(guest.locator('header .g-lede').filter({hasText:'Ready to serve'})).toBeVisible({ timeout: 45_000 });
 
     const ready = board.locator('article[data-state="ready"]', {
       hasText: 'e2e: status sync ticket',
     });
     await ready.getByRole('button', { name: 'Mark served' }).click();
-    await expect(guest.getByText('Served')).toBeVisible({ timeout: 45_000 });
+    await guest.bringToFront();
+    await expect(guest.locator('header .g-lede').filter({hasText:'Served'})).toBeVisible({ timeout: 45_000 });
   });
 
   test('a kitchen cancellation reaches the guest as cancelled', async ({ context }) => {
@@ -117,8 +120,9 @@ test.describe('kitchen — real database', () => {
     await board.getByRole('button', { name: 'Yes, cancel' }).click();
     await expect(ticket).toHaveCount(0, { timeout: 20_000 });
 
+    await guest.bringToFront();
     await expect(guest.getByText('Order cancelled')).toBeVisible({ timeout: 45_000 });
-    await expect(guest.getByText('nothing is owed')).toBeVisible();
+    await expect(guest.locator('header .g-lede').filter({hasText:'nothing is owed'})).toBeVisible();
   });
 
   test('orders that arrive while the board cannot speak are kept and replayable', async ({
@@ -133,10 +137,11 @@ test.describe('kitchen — real database', () => {
     const board = await signInOwner(context);
     await recordAnnouncements(board);
     await board.goto(`${BASE}/kitchen`);
-    const mute = board.getByRole('button', { name: 'Turn the announcements off on this screen' });
+    const mute = board.getByRole('button', { name: 'Kitchen audio on', exact: true });
     await mute.click();
 
     await placeGuestOrder(context, 'e2e: arrived while muted');
+    await board.bringToFront();
 
     // The banner counts what was not read out, and keeps the orders below.
     await expect(
@@ -147,7 +152,7 @@ test.describe('kitchen — real database', () => {
 
     // Reading them out is the recovery: put the voice back on, ask for the
     // replay, and the announcements fire now.
-    await board.getByRole('button', { name: 'Turn the announcements on' }).click();
+    await board.getByRole('button', { name: 'Kitchen audio off', exact: true }).click();
     await board.getByRole('button', { name: 'Read them out' }).click();
     await expect
       .poll(() => announcementCount(board), { timeout: 15_000 })
@@ -165,6 +170,7 @@ test.describe('kitchen — real database', () => {
     expect(await announcementCount(board)).toBe(0);
 
     await placeGuestOrder(context, 'e2e: announce me exactly once');
+    await board.bringToFront();
 
     await expect
       .poll(() => announcementCount(board), {
@@ -172,6 +178,12 @@ test.describe('kitchen — real database', () => {
         message: 'the new order was never announced',
       })
       .toBeGreaterThan(0);
+    // One order is several sentence-sized Web Speech utterances. Wait for
+    // the complete queue entry before measuring; an increasing segment count
+    // during one announcement is not a duplicate order announcement.
+    const log = board.getByLabel('Recent announcements');
+    await expect(log.getByLabel('Speech completed', {exact:true})).toHaveCount(1, {timeout:20_000});
+    await expect(log.locator('li')).toHaveCount(1);
     const once = await announcementCount(board);
     await board.waitForTimeout(2500);
     expect(await announcementCount(board), 'the order was announced twice').toBe(once);

@@ -43,6 +43,7 @@ function fakeSupabase(rows: Record<string, Row[]>, writable: boolean | 'error' =
       gte: () => chain,
       in: () => chain,
       order: () => chain,
+      range: () => chain,
       limit: () => chain,
       maybeSingle: () => Promise.resolve({ data: data[0] ?? null, error: null }),
       then: (onFulfilled?: unknown, onRejected?: unknown) =>
