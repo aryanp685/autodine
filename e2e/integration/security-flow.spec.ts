@@ -7,6 +7,8 @@ import {
   OWNER_PASSWORD,
   STAFF_READY,
   addOneAndCheckout,
+  codeFromOrderUrl,
+  signInOwner,
   placeOrder,
   scanCard,
   skipUnless,
@@ -117,14 +119,23 @@ test.describe('security — real database', () => {
     const page = await scanCard(context);
     await addOneAndCheckout(page);
 
-    await page.locator('[data-place-order="bill"]').click({ clickCount: 2, delay: 40 }).catch(() => {});
+    const note = `e2e: duplicate submission ${Date.now()}`;
+    await page.locator('textarea[name="note"]').fill(note);
+    await page.locator('[data-place-order="bill"]').click({ clickCount: 2, delay: 40 });
     await expect(page).toHaveURL(/\/menu\/order\?.*code=/, { timeout: 30_000 });
+    const code = codeFromOrderUrl(page.url());
+    expect(code).toBeTruthy();
+    await expect(page.locator('[aria-label="Order reference"]')).toContainText(code);
 
-    // One code, one order. The Orders tab — the guest's own memory of what
-    // this phone placed — opens on a single order, and the tracking page
-    // carries exactly one code.
-    await page.locator('[data-gtab-bar]').getByRole('link', { name: 'Orders' }).click();
-    await expect(page.getByText(/status/i).first()).toBeVisible({ timeout: 20_000 });
-    await expect(page.locator('[data-reorder-button]')).toHaveCount(1);
+    // The confirmation flow deliberately has no Orders tab. Inspect the real
+    // staff board instead: count orders carrying this unique submission note,
+    // not buttons on a guest page (which cannot prove database uniqueness).
+    const board = await signInOwner(context);
+    await board.goto(`${BASE}/kitchen`);
+    const matches = board.locator('article[data-state]', {hasText:note});
+    await expect(matches).toHaveCount(1, {timeout:20_000});
+    await expect(matches).toContainText(code);
+    await board.reload();
+    await expect(matches).toHaveCount(1, {timeout:20_000});
   });
 });
