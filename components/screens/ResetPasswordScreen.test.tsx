@@ -19,6 +19,9 @@ describe('ResetPasswordScreen', () => {
     expect(html).toContain('name="password"');
     expect(html).toContain('name="confirmation"');
     expect(html).toContain('Save the new password');
+    expect(html).toContain('Password recovery overview');
+    expect(html).toContain('aria-label="Save the new password"');
+    expect(html).toContain('autoComplete="new-password"');
   });
 
   it('states the minimum length on the form itself', () => {
@@ -36,6 +39,8 @@ describe('ResetPasswordScreen', () => {
     const html = renderToStaticMarkup(<ResetPasswordScreen email={null} />);
     expect(html).toContain('This reset link has expired');
     expect(html).not.toContain('name="password"');
+    expect(html).not.toContain('<form');
+    expect(html).toContain('Password recovery overview');
     expect(html).toContain('href="/forgot-password"');
   });
 

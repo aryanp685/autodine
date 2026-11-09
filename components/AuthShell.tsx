@@ -22,6 +22,7 @@ export const authButtonClass = 'inline-flex min-h-11 items-center justify-center
  * finished rather than assembled.
  */
 export function AuthShell({
+  visual,
   eyebrow,
   title,
   lede,
@@ -30,6 +31,7 @@ export function AuthShell({
   notes,
   notesTitle = 'What this build actually does',
 }: {
+  visual?: ReactNode;
   eyebrow: string;
   title: string;
   lede: ReactNode;
@@ -63,7 +65,8 @@ export function AuthShell({
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[1080px] px-5 pt-10 pb-16 sm:px-7 sm:pt-14">
+      <main data-auth-enhanced={visual ? '' : undefined} className={`mx-auto w-full max-w-[1080px] px-5 pt-10 pb-16 sm:px-7 sm:pt-14 ${visual ? 'grid items-start gap-12 lg:grid-cols-[1fr_440px] lg:gap-16 lg:pt-20' : ''}`}>
+        {visual}
         <div className="mx-auto w-full max-w-[440px]">
           <section data-auth-card className="rounded-[20px] border border-hair bg-card px-5 py-7 shadow-[0_16px_60px_-30px_rgba(31,77,58,0.18)] sm:px-8 sm:py-8">
             <p className="text-[10.5px] font-semibold tracking-[0.12em] text-forest uppercase">

@@ -1,8 +1,26 @@
 import Link from 'next/link';
+import { AuthSubmit } from '@/components/AuthSubmit';
 import { AuthShell, authButtonClass } from '@/components/AuthShell';
 import { updatePasswordAction } from '@/app/auth/actions';
 import { MIN_PASSWORD } from '@/lib/password';
 import { Field, inputClass } from '@/components/owner/chrome';
+
+function RecoveryVisual({ expired }: { expired: boolean }) {
+  return (
+    <aside className="hidden pt-6 lg:block" aria-label="Password recovery overview">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-forest">Keep your workspace yours</p>
+      <h2 className="mt-6 max-w-[13ch] text-[clamp(2.5rem,4.5vw,3.8rem)] font-medium leading-[1.06] tracking-[-0.05em]">{expired ? 'A new link.' : 'A new password.'}<br /><span className="text-forest">A clear way back.</span></h2>
+      <p className="mt-6 max-w-[35ch] text-[15px] leading-relaxed text-gink-64">{expired ? 'Recovery links are temporary. Request another from this browser when you’re ready to continue.' : 'Choose a unique password for this account. Once saved, other signed-in devices will need to sign in again.'}</p>
+      <div aria-hidden="true" className="login-service-node relative mt-10 grid h-52 place-items-center overflow-hidden rounded-[28px] border border-forest/10 bg-forest-soft/50">
+        <div className="absolute size-40 rounded-full border border-[#B98A4B]/25" />
+        <div className="relative grid size-24 place-items-center rounded-3xl border border-forest/15 bg-white shadow-[0_8px_24px_rgba(31,77,58,0.06)]">
+          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" className="text-forest"><rect x="5" y="10" width="14" height="11" rx="3" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /><circle cx="12" cy="15" r="1" /><path d="M12 16v2" stroke="#B98A4B" /></svg>
+        </div>
+      </div>
+      <Link href="/login" className="mt-6 inline-flex min-h-11 items-center gap-3 text-[13px] font-medium text-forest"><span aria-hidden="true">←</span> Back to sign in</Link>
+    </aside>
+  );
+}
 
 /**
  * Choose a new password, on the session the emailed link created.
@@ -25,6 +43,7 @@ export function ResetPasswordScreen({ email, error }: { email: string | null; er
   if (!email) {
     return (
       <AuthShell
+        visual={<RecoveryVisual expired />}
         eyebrow="Account recovery"
         title="This reset link has expired"
         lede="The link works once and only for an hour, and it only opens in the browser that asked for it. Nothing has changed on your account."
@@ -56,11 +75,12 @@ export function ResetPasswordScreen({ email, error }: { email: string | null; er
 
   return (
     <AuthShell
+      visual={<RecoveryVisual expired={false} />}
       eyebrow="Account recovery"
       title="Choose a new password"
       lede={
         <>
-          Setting the password for <strong className="font-medium text-gink">{email}</strong>. This
+          Setting the password for <strong className="break-all font-medium text-gink">{email}</strong>. This
           also signs out every other device that was signed in to the account.
         </>
       }
@@ -68,22 +88,20 @@ export function ResetPasswordScreen({ email, error }: { email: string | null; er
       notesTitle="Before you save"
       notes={[
         <>
-          <strong>Other people are signed in.</strong> Saving the new password ends their sessions
-          too, so tell the counter staff before you change it during service.
+          <strong>Other sessions will end.</strong> If this account is used on a counter or kitchen device, let your team know before saving.
         </>,
         <>
-          <strong>Longer beats complicated.</strong> A phrase you can type one-handed on a phone is
-          safer than ten characters you have to write down.
+          <strong>Use a unique password.</strong> Choose a long passphrase or a password-manager-generated password that you do not use for another account.
         </>,
       ]}
     >
       {alert}
 
-      <form className="flex flex-col gap-3.5" action={updatePasswordAction}>
+      <form className="flex flex-col gap-4" action={updatePasswordAction}>
         <Field
           label="New password"
           htmlFor="reset-password"
-          hint={`At least ${MIN_PASSWORD} characters. Longer is safer than complicated.`}
+          hint={`At least ${MIN_PASSWORD} characters. Use a unique password.`}
         >
           <input
             id="reset-password"
@@ -110,9 +128,8 @@ export function ResetPasswordScreen({ email, error }: { email: string | null; er
           />
         </Field>
 
-        <button className={`${authButtonClass} mt-1 w-full`} type="submit">
-          Save the new password
-        </button>
+        <AuthSubmit label="Save the new password" pendingLabel="Saving your password…" />
+        <p className="rounded-xl border border-forest/10 bg-forest-soft/50 p-3.5 text-[12px] leading-relaxed text-gink-64">Saving updates your account password and ends other active sessions. You may need to sign in again on your other devices.</p>
       </form>
     </AuthShell>
   );

@@ -1,23 +1,32 @@
-import { AuthShell, authButtonClass } from '@/components/AuthShell';
+import Link from 'next/link';
+import { AuthSubmit } from '@/components/AuthSubmit';
+import { AuthShell } from '@/components/AuthShell';
 import { signUpAction } from '@/app/auth/actions';
 import { Field, inputClass } from '@/components/owner/chrome';
 
-/**
- * Create an account.
- *
- * A real form that posts to signUpAction: it creates the auth user, the
- * restaurant, its first menu and the owner membership.
- *
- * The copy is careful about what it does NOT do, because the two things people
- * assume a signup does are the two things this one deliberately does not: take
- * a card, and start a trial clock.
- */
+/** Signup creates a workspace and starts its seven-day trial, not a paid plan. */
 export function SignupScreen({ error }: { error?: string }) {
   return (
     <AuthShell
+      visual={
+        <aside className="hidden pt-6 lg:block" aria-label="Restaurant setup overview">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-forest">Make room for better service</p>
+          <h2 className="mt-6 max-w-[13ch] text-[clamp(2.5rem,4.5vw,3.8rem)] font-medium leading-[1.06] tracking-[-0.05em]">Your restaurant.<br /><span className="text-forest">A fresh start.</span></h2>
+          <p className="mt-6 max-w-[35ch] text-[15px] leading-relaxed text-gink-64">Create your workspace, then make it yours. Add dishes and prepare your table cards before trying the ordering flow.</p>
+          <ol className="mt-10 space-y-3" aria-label="Your setup journey">
+            {[
+              { title: 'Create your workspace', body: 'Your restaurant, menu and owner account.' },
+              { title: 'Build your menu', body: 'Add dishes, prices and the details guests need.' },
+              { title: 'Prepare your table cards', body: 'Try the guest, kitchen and counter workflow.' },
+            ].map((step, i) => <li key={step.title} style={{ animationDelay: `${i * 120}ms` }} className="login-service-node flex items-start gap-4 rounded-2xl border border-forest/10 bg-white/70 p-5"><span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-full bg-forest-soft text-[11px] font-medium text-forest">0{i + 1}</span><div><h3 className="text-[14px] font-medium">{step.title}</h3><p className="mt-1 text-[12px] leading-relaxed text-gink-64">{step.body}</p></div></li>)}
+          </ol>
+          <Link href="/pricing" className="mt-6 inline-flex min-h-11 items-center gap-3 text-[13px] font-medium text-forest">Read the trial and pricing details <span aria-hidden="true">↗</span></Link>
+        </aside>
+      }
+      notesTitle="Your workspace, clearly explained"
       eyebrow="Create an account"
       title="Start with your restaurant"
-      lede="One account, one restaurant to start with, one menu to fill in. More outlets can be added later. No card, nothing to install."
+      lede="Start your seven-day trial with one restaurant and one menu. No card required."
       action={{ prompt: 'Already have an account?', label: 'Sign in', href: '/login' }}
       notes={[
         <>
@@ -25,8 +34,7 @@ export function SignupScreen({ error }: { error?: string }) {
           one owner membership, ready for dishes.
         </>,
         <>
-          <strong>The screens are live.</strong> Menu, orders, kitchen board and counter all read
-          and write the same database.
+          <strong>Product preview.</strong> Explore the guest, kitchen and counter workflow. Not certified for live restaurant operations.
         </>,
         <>
           <strong>Nothing is charged.</strong> No payment gateway is connected, no plan can be
@@ -44,7 +52,7 @@ export function SignupScreen({ error }: { error?: string }) {
         </div>
       ) : null}
 
-      <form className="flex flex-col gap-3.5" action={signUpAction}>
+      <form className="flex flex-col gap-4" action={signUpAction}>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Full name" htmlFor="signup-name">
             <input
@@ -81,9 +89,10 @@ export function SignupScreen({ error }: { error?: string }) {
           />
         </Field>
 
-        <Field label="Mobile number" htmlFor="signup-phone">
+        <Field label="Mobile number (optional)" htmlFor="signup-phone">
           <input
             id="signup-phone"
+            type="tel"
             className={inputClass}
             name="phone"
             autoComplete="tel"
@@ -94,7 +103,7 @@ export function SignupScreen({ error }: { error?: string }) {
         <Field
           label="Password"
           htmlFor="signup-password"
-          hint="Minimum 10 characters. Stored hashed — never in plain text."
+          hint="Minimum 10 characters. Use a unique password for this account."
         >
           <input
             id="signup-password"
@@ -117,22 +126,22 @@ export function SignupScreen({ error }: { error?: string }) {
           <input
             type="checkbox"
             name="agree"
+            required
             className="mt-[2px] size-4 shrink-0 accent-[var(--p-accent)]"
           />
           <span className="text-[11.5px] leading-[1.5] text-gink-64">
             I understand this is a preview, and that my details are used to create this account in
-            the configured Supabase project.
+            AutoDine’s configured account service.
           </span>
         </label>
 
-        <button className={`${authButtonClass} mt-1 w-full`} type="submit">
-          Create account
-        </button>
+        <AuthSubmit label="Create account" pendingLabel="Creating your workspace…" />
 
         <p className="text-[11.5px] leading-[1.5] text-gink-46">
           Signing up creates a restaurant workspace with one menu and one owner. A seven-day trial starts
           with the workspace. No paid subscription is created by this form.
         </p>
+        <p className="text-[11.5px] leading-relaxed text-gink-46">Read our <Link href="/privacy" className="underline underline-offset-4">Privacy policy</Link> and <Link href="/terms" className="underline underline-offset-4">Terms</Link> before creating an account.</p>
       </form>
     </AuthShell>
   );

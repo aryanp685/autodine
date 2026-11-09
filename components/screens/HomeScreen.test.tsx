@@ -19,8 +19,6 @@ import { LIVE, NOT_CONNECTED } from '@/lib/plans';
 const home = renderToStaticMarkup(<Home />);
 const pricing = renderToStaticMarkup(<PricingScreen />);
 
-const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
-const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
 describe('home', () => {
   it('does not offer a sample menu', () => {
@@ -51,6 +49,13 @@ describe('home', () => {
     const section = home.match(/<section[^>]*id="how"[\s\S]*?<\/section>/)?.[0] ?? '';
     expect(section).toContain('aria-labelledby="how-heading"');
     expect(section).toContain('bg-white');
+    expect(section.match(/data-service-step=/g)).toHaveLength(3);
+    expect(section).toContain('aria-label="Restaurant service in three steps"');
+    expect(section).toContain('Before service');
+    expect(section).toContain('What you need to get started');
+    expect(section).toContain('Payment recorded by staff.');
+    expect(section).toContain('href="/#screens"');
+    expect(section).not.toContain('<button');
     expect(section.match(/<h3/g)).toHaveLength(3);
     expect(section).toContain('STEP 01');
     expect(section).toContain('STEP 03');
@@ -68,16 +73,35 @@ describe('home', () => {
     expect(section.match(/data-tour-panel/g)).toHaveLength(3);
     expect(section.match(/aria-hidden="true"/g)?.length).toBeGreaterThanOrEqual(3);
     expect(section).not.toContain('<button');
+    expect(section).toContain('Counter bill');
+    expect(section).toContain('Recorded as paid');
+    expect(section).toContain('Outstanding');
+    expect(section).toContain('does not automatically mark its bill as paid');
+    expect(section).toContain('motion-safe:hover:');
     expect(section).toContain('href="/signup"');
     expect(section).toContain('focus-visible:outline-offset-4');
     expect(section).not.toContain('text-plum');
+  });
+
+  it('shows four practical product benefits without unsupported promises or fake controls', () => {
+    const section = home.match(/<section[^>]*id="product"[\s\S]*?<\/section>/)?.[0] ?? '';
+    expect(section).toContain('aria-labelledby="features-heading"');
+    expect(section.match(/data-product-benefit/g)).toHaveLength(4);
+    expect(section.match(/<h3/g)).toHaveLength(4);
+    for (const role of ['For your guests','For the kitchen','For the menu manager','For the counter']) expect(section).toContain(role);
+    expect(section).toContain('An order placed is not a payment received.');
+    expect(section).toContain('href="/#screens"');
+    expect(section).toContain('motion-safe:hover:');
+    expect(section).toContain('data-stagger');
+    expect(section).not.toContain('<button');
+    expect(section).not.toMatch(/instantly|same second|unlimited|Works for every room|text-plum/);
   });
 
   it('finishes the landing palette, status distinction and accessible footer', () => {
     const tail = home.slice(home.indexOf('id="product"'));
     expect(tail).not.toContain('text-plum');
     expect(tail).not.toContain('bg-grass');
-    expect(tail).toContain('Recommended');
+    expect(tail).not.toContain('Recommended');
     expect(tail).toContain('bg-forest text-white');
     expect(tail).toContain('Not connected');
     expect(tail).toContain('bg-[#8C857A]');
@@ -88,9 +112,16 @@ describe('home', () => {
     expect(home).toContain('rgba(251,250,247,0.24)');
   });
 
-  it('counts the build from the lists it renders', () => {
-    const line = `${cap(WORDS[LIVE.length])} things work. ${cap(WORDS[NOT_CONNECTED.length])} do not.`;
-    expect(home.replace(/<!-- -->/g, '')).toContain(line);
+  it('keeps preview boundaries and capability lists visible without release-log counts', () => {
+    const status = home.slice(home.indexOf('id="status"'), home.indexOf('id="pricing"'));
+    for (const item of [...LIVE, ...NOT_CONNECTED]) expect(status).toContain(item.label.replaceAll('&', '&amp;'));
+    expect(status).toContain('not a certification for live restaurant operations');
+    expect(status).toContain('No SMS or WhatsApp receipts');
+    expect(status).toContain('access becomes read-only');
+    expect(status).not.toContain('things work.');
+    expect(home).toContain('Start your seven-day trial');
+    expect(home).toContain('No paid subscription is activated at signup.');
+    expect(home).toContain('href="/#status"');
   });
 
   it('links every plan card to that plan, not to the top of pricing', () => {

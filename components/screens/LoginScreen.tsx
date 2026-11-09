@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { AuthShell, authButtonClass } from '@/components/AuthShell';
+import { LoginSubmit } from '@/components/LoginSubmit';
+import { AuthShell } from '@/components/AuthShell';
 import { signInAction } from '@/app/auth/actions';
 import { Field, inputClass } from '@/components/owner/chrome';
 
@@ -15,22 +16,36 @@ import { Field, inputClass } from '@/components/owner/chrome';
 export function LoginScreen({ error, notice, next }: { error?: string; notice?: string; next?: string }) {
   return (
     <AuthShell
+      visual={
+        <aside className="hidden pt-6 lg:block" aria-label="Restaurant workspace overview">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-forest">Back to your service</p>
+          <h2 className="mt-6 max-w-[13ch] text-[clamp(2.5rem,4.5vw,3.8rem)] font-medium leading-[1.06] tracking-[-0.05em]">The room moves.<br /><span className="text-forest">Stay connected.</span></h2>
+          <p className="mt-6 max-w-[35ch] text-[15px] leading-relaxed text-gink-64">Your menu, kitchen tickets and counter, with a place for every part of service.</p>
+          <div aria-hidden="true" className="login-service-art relative mt-10 flex h-52 items-center justify-center overflow-hidden rounded-[28px] border border-forest/10 bg-forest-soft/50">
+            <div className="absolute size-40 rounded-full border border-forest/10" />
+            <div className="absolute size-56 rounded-full border border-[#B98A4B]/20" />
+            <div className="relative flex items-center gap-3">
+              {['Menu', 'Kitchen', 'Counter'].map((label, i) => <div key={label} style={{ animationDelay: `${i * 120}ms` }} className="login-service-node grid h-20 w-24 place-content-center gap-2 rounded-2xl border border-forest/15 bg-white text-center shadow-[0_8px_24px_rgba(31,77,58,0.05)]"><span className="text-[10px] tracking-[0.15em] text-[#B98A4B]">0{i + 1}</span><span className="text-[12px] font-medium text-forest">{label}</span></div>)}
+            </div>
+          </div>
+          <Link href="/#screens" className="mt-6 inline-flex min-h-11 items-center gap-3 text-[13px] font-medium text-forest">Take a look around <span aria-hidden="true">↗</span></Link>
+        </aside>
+      }
+      notesTitle="Before you sign in"
       eyebrow="Welcome back"
       title="Sign in to your restaurant"
       lede="Use the email address you signed up with."
       action={{ prompt: 'New to AutoDine?', label: 'Create an account', href: '/signup' }}
       notes={[
         <>
-          <strong>Ordering, the kitchen board and the counter are live.</strong> An order from a
-          verified table reaches the kitchen with its notes.
+          <strong>Ordering, the kitchen board and the counter are live in this preview.</strong> Not certified for live restaurant operations.
         </>,
         <>
           <strong>Plans are not on sale.</strong> No card is asked for. The workspace has a seven-day trial; after that, access is
           read-only until extended.
         </>,
         <>
-          <strong>Payments are recorded at the counter.</strong> Card and UPI online are not
-          switched on in this build.
+          <strong>Payments are recorded at the counter.</strong> AutoDine does not collect online payments.
         </>,
       ]}
     >
@@ -51,7 +66,7 @@ export function LoginScreen({ error, notice, next }: { error?: string; notice?: 
         </div>
       ) : null}
 
-      <form className="flex flex-col gap-3.5" action={signInAction}>
+      <form className="flex flex-col gap-4" action={signInAction}>
         {next && <input type="hidden" name="next" value={next} />}
 
         <Field label="Work email" htmlFor="login-email">
@@ -78,9 +93,7 @@ export function LoginScreen({ error, notice, next }: { error?: string; notice?: 
           />
         </Field>
 
-        <button className={`${authButtonClass} mt-1 w-full`} type="submit">
-          Sign in
-        </button>
+        <LoginSubmit />
 
         <p className="text-center text-[11.5px] leading-[1.5] text-gink-46">
           Forgotten it?{' '}
