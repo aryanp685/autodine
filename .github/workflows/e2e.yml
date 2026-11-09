@@ -15,7 +15,7 @@ name: E2E (browser)
 #
 # It also needs no Supabase credentials: this job explicitly opts into the
 # hermetic test-build exception and runs only the 64 demo-mode Playwright tests.
-# `supabase-e2e-load.yml` runs all 47 integration tests against a disposable
+# `supabase-e2e-load.yml` runs all 49 integration tests against a disposable
 # local Supabase stack with synthetic users and data.
 
 on:

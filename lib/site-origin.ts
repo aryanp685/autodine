@@ -16,6 +16,12 @@
  */
 
 export async function siteOrigin(): Promise<string> {
+  // Isolated staging must not inherit the production QR canonical URL from
+  // generic preview variables. Vercel's system branch URL survives rebuilds.
+  if (process.env.AUTODINE_ISOLATED_STAGING === '1') {
+    const host = process.env.VERCEL_BRANCH_URL?.trim() || process.env.VERCEL_URL?.trim();
+    return host ? `https://${host.replace(/\/+$/, '')}` : '';
+  }
   // Two names for one value. `SITE_URL` is what this module has always read;
   // `NEXT_PUBLIC_SITE_URL` is what .env.example and the Vercel project have
   // actually been carrying, so the documented variable was ignored and every

@@ -38,21 +38,21 @@ type Row = { id: string; name: string; trial_started_at: string };
 
 /**
  * A stand-in for the exact query chain the action uses:
- * select().ilike() for the lookup, update().eq().select().single() for the
+ * select().filter() for the lookup, update().eq().select().single() for the
  * write. It records what the action actually asked for, which is how the
  * "only the intended restaurant" tests prove their claim.
  */
 function fakeDb(rows: Row[]) {
   const calls = {
-    ilikePattern: null as string | null,
+    namePattern: null as string | null,
     updates: [] as Record<string, unknown>[],
     eqIds: [] as string[],
   };
   const db = {
     from: vi.fn((_table: string) => ({
       select: vi.fn((_cols: string) => ({
-        ilike: vi.fn(async (_col: string, pattern: string) => {
-          calls.ilikePattern = pattern;
+        filter: vi.fn(async (_col: string, _op: string, pattern: string) => {
+          calls.namePattern = pattern;
           return { data: rows, error: null };
         }),
       })),
@@ -150,14 +150,22 @@ describe('renewTrialAction — direct invocation', () => {
 
     const result = await renewTrialAction('%', A_SECRET);
 
-    expect(calls.ilikePattern).toBe('\\%');
+    expect(calls.namePattern).toBe('^%$');
     expect(result.ok).toBe(false);
     expect(calls.updates).toHaveLength(0);
 
     const second = fakeDb([]);
     mocks.getSupabaseAdmin.mockReturnValue(second.db);
     await renewTrialAction('a_b', A_SECRET);
-    expect(second.calls.ilikePattern).toBe('a\\_b');
+    expect(second.calls.namePattern).toBe('^a_b$');
+  });
+
+  it('matches literal asterisks and regex characters without wildcard expansion', async () => {
+    const { db, calls } = fakeDb([]);
+    mocks.getSupabaseAdmin.mockReturnValue(db);
+    await renewTrialAction('Cafe * (A+B).', A_SECRET);
+    expect(calls.namePattern).toBe('^Cafe \\* \\(A\\+B\\)\\.$');
+    expect(calls.updates).toHaveLength(0);
   });
 
   it('refuses an ambiguous match instead of guessing which restaurant to renew', async () => {

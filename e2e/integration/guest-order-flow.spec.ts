@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import {
   BASE,
+  fixtureTableLabel,
   GUEST_READY,
   SLUG,
   addOneAndCheckout,
@@ -28,7 +29,7 @@ import { orderCountForGuestToken, orderSessionForGuestToken } from './disposable
  * production. Without its environment it skips itself entirely.
  */
 
-const NEEDS = 'E2E_BASE_URL, E2E_QR_TOKEN, E2E_TABLE_CODE, E2E_SLUG';
+const NEEDS = 'E2E_BASE_URL, E2E_QR_TOKEN (or E2E_CARDS_JSON), E2E_TABLE_CODE, E2E_SLUG';
 
 test.describe('guest ordering — real database', () => {
   test.skip(!GUEST_READY, skipUnless(false, NEEDS));
@@ -40,7 +41,7 @@ test.describe('guest ordering — real database', () => {
     // The scan redirects through a local HTTP host, so wait for hydrated,
     // visible menu content rather than reading body text at the redirect edge.
     await expect(page.getByText('Synthetic Paneer Dish', { exact: true })).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText(/E2E GUEST \d{2}/i).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(new RegExp(fixtureTableLabel(), 'i')).first()).toBeVisible({ timeout: 15_000 });
     await expect(page.locator('[data-gtab-bar]')).toBeVisible();
   });
 

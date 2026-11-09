@@ -89,7 +89,7 @@ export function Dashboard({
         {
           label: 'Average ticket',
           value: <Money value={stats.averageTicketPaise} />,
-          meta: stats.ordersToday > 0 ? 'Revenue ÷ orders today' : 'No orders yet today',
+          meta: stats.ordersToday > 0 ? 'Billed ÷ orders today' : 'No orders yet today',
         },
         {
           label: 'Open orders',

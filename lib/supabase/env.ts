@@ -1,3 +1,5 @@
+import { assertExpectedProject } from '@/lib/staging-config';
+
 /**
  * Supabase environment.
  *
@@ -131,3 +133,7 @@ export const isDemoMode = isServerRuntime
       localDemoMode: process.env.AUTODINE_DEMO_MODE,
     })
   : false;
+
+// Optional exact-project invariant used by isolated staging deployments. It is
+// inactive unless explicitly configured; never hard-code production identity.
+assertExpectedProject(SUPABASE_URL, SUPABASE_SECRET_KEY, process.env.AUTODINE_EXPECTED_PROJECT_REF);

@@ -58,6 +58,7 @@ export type CounterOrder = {
   paid: number;
   /** One-line summary of the ticket, e.g. '2 × Biryani · 3 × Roti'. */
   items: string;
+  pendingOnline: boolean;
 };
 
 export type CashierScreenData = {
@@ -125,7 +126,7 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
     tableIds.length
       ? supabase.from('dining_tables').select('id, label').in('id', tableIds)
       : Promise.resolve({ data: [], error: null }),
-    supabase.from('payments').select('order_id, amount_paise, status').in('order_id', orderIds),
+    supabase.from('payments').select('order_id, amount_paise, status, method').in('order_id', orderIds),
   ]);
 
   if (itemsResult.error) {
@@ -140,8 +141,10 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
 
   // Only 'recorded' money counts. A failed or refunded attempt did not move
   // any cash, so counting it would understate what the guest still owes.
+  const pendingOnlineByOrder = new Set<string>();
   const paidByOrder = new Map<string, number>();
   for (const p of paymentsResult.data ?? []) {
+    if (p.status === 'pending' && p.method === 'online') pendingOnlineByOrder.add(p.order_id);
     if (p.status !== 'recorded') continue;
     paidByOrder.set(p.order_id, (paidByOrder.get(p.order_id) ?? 0) + p.amount_paise);
   }
@@ -175,6 +178,7 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
       paid: paiseToRupees(Math.min(paidByOrder.get(row.id) ?? 0, row.total_paise)),
       outstanding: paiseToRupees(Math.max(row.total_paise - (paidByOrder.get(row.id) ?? 0), 0)),
       items: lines.join(' · ') || 'No items recorded',
+      pendingOnline: pendingOnlineByOrder.has(row.id),
     };
   });
 

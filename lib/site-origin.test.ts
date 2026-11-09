@@ -18,6 +18,9 @@ import { requestOrigin, siteOrigin } from './site-origin';
  */
 
 beforeEach(() => {
+  delete process.env.AUTODINE_ISOLATED_STAGING;
+  delete process.env.VERCEL_BRANCH_URL;
+  delete process.env.VERCEL_URL;
   state.headers.clear();
   delete process.env.SITE_URL;
   delete process.env.NEXT_PUBLIC_SITE_URL;
@@ -70,4 +73,16 @@ describe('siteOrigin', () => {
     expect(await siteOrigin()).toBe('');
     expect(await requestOrigin()).toBe('');
   });
+});
+
+describe('isolated staging QR origins',()=>{
+ it('ignores inherited production canonical settings',async()=>{
+  process.env.AUTODINE_ISOLATED_STAGING='1';process.env.SITE_URL='https://production.example';
+  process.env.VERCEL_BRANCH_URL='test-branch.vercel.app';
+  expect(await siteOrigin()).toBe('https://test-branch.vercel.app');
+ });
+ it('refuses to guess production when staging host is absent',async()=>{
+  process.env.AUTODINE_ISOLATED_STAGING='1';process.env.SITE_URL='https://production.example';
+  expect(await siteOrigin()).toBe('');
+ });
 });

@@ -352,7 +352,7 @@ export function TablesScreen({
                       <dl className="mx-4 mt-3.5 grid grid-cols-2 gap-2 border-t border-hair pt-3">
                         <div>
                           <dt className="text-[10.5px] font-semibold tracking-[0.1em] text-gink-46 uppercase">
-                            Last scan
+                            Last order
                           </dt>
                           <dd className="mt-0.5 text-[12.5px] text-gink">{t.lastScan}</dd>
                         </div>

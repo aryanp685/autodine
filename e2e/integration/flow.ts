@@ -1,4 +1,4 @@
-import { expect, type BrowserContext, type Page } from '@playwright/test';
+import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
 /**
  * Shared plumbing for the integration specs — the ones that click through a
@@ -22,15 +22,36 @@ export const QR = process.env.E2E_QR_TOKEN ?? '';
 const SCAN_TOKENS = (process.env.E2E_QR_TOKENS ?? '').split(',').map((token) => token.trim()).filter(Boolean);
 let scanTokenCursor = 0;
 
+// The isolated staging workflow provisions one synthetic card per spec file;
+// the disposable Supabase workflow provisions a larger per-scenario token pool.
+// Both are non-production inputs, and neither falls back to a real restaurant.
+function stagingCard(): { token: string; label: string } | null {
+  const raw = process.env.E2E_CARDS_JSON;
+  if (!raw) return null;
+  let cards: Record<string, { token?: unknown; label?: unknown }>;
+  try { cards = JSON.parse(raw) as typeof cards; }
+  catch { throw new Error('E2E_CARDS_JSON must be valid JSON fixture data.'); }
+  const key = test.info().file.split(/[\\/]/).at(-1) ?? '';
+  const card = cards[key];
+  if (!card || typeof card.token !== 'string' || typeof card.label !== 'string') {
+    throw new Error(`E2E_CARDS_JSON has no valid card for ${key}.`);
+  }
+  return { token: card.token, label: card.label };
+}
+
+export function fixtureTableLabel(): string {
+  return stagingCard()?.label ?? process.env.E2E_TABLE_LABEL ?? 'E2E Guest \\d{2}';
+}
+
 /** Reserve one fresh fixture card per browser scenario; a caller may retain it for a re-scan. */
 export function nextScanToken(): string {
-  return SCAN_TOKENS.length ? SCAN_TOKENS[scanTokenCursor++ % SCAN_TOKENS.length] : QR;
+  return SCAN_TOKENS.length ? SCAN_TOKENS[scanTokenCursor++ % SCAN_TOKENS.length] : stagingCard()?.token ?? QR;
 }
 
 /** A fixture card reserved by index for an end-to-end scenario that spans many actions. */
 export function reservedScanToken(index: number): string {
-  const token = SCAN_TOKENS[index];
-  if (!token) throw new Error(`E2E_QR_TOKENS has no card at reserved index ${index}.`);
+  const token = SCAN_TOKENS[index] ?? stagingCard()?.token ?? QR;
+  if (!token) throw new Error(`No E2E fixture card is available for reserved index ${index}.`);
   return token;
 }
 

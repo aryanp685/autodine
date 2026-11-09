@@ -1,402 +1,114 @@
 import Link from 'next/link';
-import { SiteNav } from '@/components/SiteNav';
+import { HomeNav } from '@/components/HomeNav';
 import { SiteMotion } from '@/components/SiteMotion';
 import { SiteFooter } from '@/components/SiteFooter';
-import { SiteClosing } from '@/components/SiteClosing';
-import { PlanMatcher } from '@/components/PlanMatcher';
 import { inr } from '@/lib/demo-data';
-import {
-  BILLING,
-  DIFFERENCES,
-  LIVE,
-  PLANS,
-  NumberWord,
-  capabilitiesFor,
-} from '@/lib/plans';
-
-/* ============================================================================
-   Pricing — what it costs, and what is actually true today.
-
-   The page has one job beyond looking expensive: it must not sell anything
-   that does not exist. Billing is not connected in this deployment, so:
-
-     - no card carries a "Choose" button; there is nothing to choose, and a
-       button that leads to a signup form that ignores the plan is a lie
-     - every capability is labelled live or planned, from lib/plans.ts
-     - "what you get today" is a list of built features, not of promises
-     - the trial is described as it will work WHEN billing opens, in a section
-       that says so, rather than in the present tense on a page with prices
-
-   Section order is deliberate: price, then proof, then the differences, then
-   the money mechanics, then the questions a person actually asks.
-   ========================================================================== */
+import { BILLING, LIVE, PLANS } from '@/lib/plans';
 
 const FAQS = [
-  {
-    q: 'Can I buy a plan today?',
-    a: 'No. Billing is not connected — no gateway, and no card is ever asked for. Accounts created now stay free while the product is in preview.',
-  },
-  {
-    q: 'What do I get if I create an account now?',
-    a: 'Everything: menus, table cards, guest ordering, the kitchen board, the counter and reports. Nothing is metered, and that will not change without telling you first.',
-  },
-  {
-    q: 'Are these prices final?',
-    a: 'Planning figures. The amounts are our intent; final pricing and tax are not settled. Nothing here is a quote.',
-  },
-  {
-    q: 'How will a subscription work when it opens?',
-    a: `Monthly, per restaurant, with a ${BILLING.trialDays}-day trial before the first charge. A lapsed account goes read-only — never deleted. We will give notice before any of that switches on.`,
-  },
-  {
-    q: 'Do I need any hardware?',
-    a: 'No. Print table cards on ordinary paper, run the kitchen board on any laptop or tablet, print receipts from the browser.',
-  },
-  {
-    q: 'Can guests pay online?',
-    a: 'Online guest checkout is not available. Guests pay at the counter, and staff record settlement through the restaurant payment flow.',
-  },
+  { q: 'Can I purchase a plan now?', a: 'Not yet. These are indicative monthly prices, not an offer to purchase. Final pricing and applicable taxes will be confirmed before plans go on sale.' },
+  { q: 'What happens after the trial?', a: `The current trial lasts ${BILLING.trialDays} days. When access expires, the restaurant becomes read-only until access is extended. Creating an account does not purchase or activate a paid subscription.` },
+  { q: 'Do I need special hardware?', a: 'Use a phone for guest ordering and a compatible browser on a laptop or tablet for staff. Table cards can be printed on ordinary paper. Receipt printing depends on your browser and printer setup.' },
+  { q: 'How do guests pay?', a: 'Guests pay at the counter. Staff record cash, card or UPI after checking the payment. AutoDine does not collect an online payment from the guest.' },
 ];
 
-function TierTags({ tiers }: { tiers: string[] }) {
-  return (
-    <span className="mt-2 flex flex-wrap gap-1.5">
-      {tiers.map((tier) => (
-        <span
-          key={tier}
-          className="rounded-full border border-cream/15 px-2 py-0.5 text-[10px] font-medium tracking-[0.06em] text-mute uppercase"
-        >
-          {tier}
-        </span>
-      ))}
-    </span>
-  );
-}
+const CAPABILITY_COPY: Record<string, string> = {
+  menus: 'Organise dishes, portions, add-ons and prices. Publish updates from the dashboard.',
+  qr: 'Give each table a QR card, with short-lived guest sessions for ordering.',
+  ordering: 'Guests browse, customise and place an order from their phone. No app to install.',
+  kitchen: 'Track tickets and preparation stages. Voice announcements depend on the device and sound settings.',
+  cashier: 'Review the bill and record cash, card or UPI at the counter. Print from a compatible browser.',
+  reports: 'Review daily sales and item performance, with CSV exports.',
+};
 
+const FOCUS = {
+  starter: ['A straightforward setup', 'For a single-room restaurant or café.'],
+  professional: ['A busier service', 'For a full floor with a dedicated kitchen team.'],
+  business: ['A larger operation', 'For teams planning service across several rooms.'],
+};
+
+/** Public pricing is informational, not a checkout or an entitlement promise.
+ * Keep anchors used by the landing page; do not imply unlimited capacity,
+ * recommend an unpurchasable tier, or promise an indefinite free account. */
 export function PricingScreen() {
   return (
-    <>
-      <SiteNav
-        links={[
-          { label: 'Product', href: '/#product' },
-          { label: 'How it works', href: '/#flow' },
-          { label: 'The screens', href: '/#tour' },
-          { label: 'What is live', href: '/#status' },
-          { label: 'Pricing', href: '/pricing', active: true },
-        ]}
-        onImage
-      />
-
-      <main className="bg-ink text-cream antialiased">
-        {/* ---------------------------------------------------------- header */}
-        <header className="border-b border-cream/[0.12] px-5 pt-20 pb-14 sm:px-8">
-          <div className="mx-auto w-full max-w-[1180px]">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-plum uppercase">01 · Plans</p>
-
-            <div className="mt-6 grid gap-8 md:grid-cols-[1.15fr_0.85fr] md:items-end">
-              <h1 className="max-w-[15ch] text-[clamp(34px,5.6vw,62px)] leading-[0.98] font-semibold tracking-[-0.04em] text-balance">
-                Priced for one restaurant, not a chain.
-              </h1>
-              <p className="max-w-[46ch] text-[15px] leading-[1.65] text-mute">
-                Three sizes, one product. Prices are planning figures — nothing is for sale yet.
-                Seven free days, then read-only until access is extended. Nothing is deleted.
-              </p>
-            </div>
-
-            <div
-              data-reveal
-              className="mt-10 flex flex-col gap-3 rounded-2xl border border-cream/[0.12] bg-ink-soft px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <PlanMatcher
-                options={PLANS.map((plan) => ({
-                  planId: plan.id,
-                  label: plan.fit.split(',')[0],
-                  hint: plan.fit,
-                }))}
-              />
-              <span className="inline-flex items-center gap-2 text-[11.5px] font-medium tracking-[0.03em] text-mute">
-                <span aria-hidden="true" className="size-1.5 rounded-full bg-grass" />
-                {BILLING.connected ? 'Billing connected' : 'Preview · billing not connected'}
-              </span>
+    <div className="public-landing min-h-screen bg-ink text-cream antialiased">
+      <HomeNav activePricing />
+      <main id="pricing-content">
+        <header className="relative overflow-hidden border-b border-cream/10 px-5 pt-14 pb-12 sm:px-8 sm:pt-20 sm:pb-16">
+          <div aria-hidden="true" className="pointer-events-none absolute -top-40 right-[-10%] size-[550px] rounded-full bg-forest/[0.05] blur-3xl" />
+          <div className="relative mx-auto max-w-[1116px]">
+            <p className="text-[11px] font-semibold tracking-[0.2em] text-forest uppercase">Pricing</p>
+            <div className="mt-6 grid gap-7 md:grid-cols-[1.2fr_0.8fr] md:items-end md:gap-16">
+              <div>
+                <h1 className="max-w-[15ch] text-[clamp(42px,6vw,76px)] leading-[1.02] font-semibold tracking-[-0.055em] text-balance">Good service.<br />A clearer price.</h1>
+                <p className="mt-6 max-w-[42ch] text-[16px] leading-relaxed text-mute">From the first scan to the final bill. Explore the planned pricing for your restaurant.</p>
+              </div>
+              <div className="rounded-2xl border border-forest/15 bg-forest-soft p-6">
+                <p className="flex items-center gap-2 text-[12px] font-semibold text-forest"><span aria-hidden="true" className="size-1.5 rounded-full bg-forest" />Plans are not on sale yet</p>
+                <p className="mt-3 text-[14px] leading-relaxed text-mute">You can create an account for a {BILLING.trialDays}-day trial. No subscription is purchased when you sign up.</p>
+                <Link href="/signup" className="mt-5 inline-flex min-h-11 items-center gap-3 rounded-full bg-forest px-5 text-[13px] font-medium text-white hover:bg-forest-strong">Start your trial <span aria-hidden="true">↗</span></Link>
+              </div>
             </div>
           </div>
         </header>
 
-        {/* ----------------------------------------------------------- plans */}
-        <section id="plans" className="px-5 pt-14 pb-16 sm:px-8">
-          <div className="mx-auto w-full max-w-[1180px]">
+        <section id="plans" aria-labelledby="plans-heading" className="px-5 py-12 sm:px-8 sm:py-16">
+          <div className="mx-auto max-w-[1116px]">
+            <div className="mb-7 flex flex-wrap items-end justify-between gap-3">
+              <h2 id="plans-heading" className="text-[25px] font-semibold tracking-[-0.03em] sm:text-[30px]">One product. Room to grow.</h2>
+              <p className="text-[12px] text-mute">Indicative prices · per restaurant / month</p>
+            </div>
             <div data-stagger className="grid gap-4 md:grid-cols-3">
-              {PLANS.map((plan) => {
-                const included = capabilitiesFor(plan.id);
-                return (
-                  <article
-                    key={plan.id}
-                    id={`plan-${plan.id}`}
-                    data-plan-id={plan.id}
-                    className={[
-                      'relative flex flex-col rounded-[22px] border p-6',
-                      /* The middle tier is lifted rather than decorated: a
-                         warmer ground and a plum rule say "this one" without a
-                         badge shouting over the other two. */
-                      plan.recommended
-                        ? 'border-plum/35 bg-ink-card shadow-[0_40px_80px_-50px_rgba(125,43,107,0.35)]'
-                        : 'border-cream/[0.09] bg-ink-soft',
-                    ].join(' ')}
-                  >
-                    {plan.recommended && (
-                      <div className="absolute -top-3 left-6 rounded-full bg-grass px-2.5 py-1 text-[10px] font-semibold tracking-[0.08em] text-cream uppercase">
-                        Recommended
-                      </div>
-                    )}
-
-                    <h2 className="text-[13px] font-semibold tracking-[0.09em] text-mute uppercase">
-                      {plan.name}
-                    </h2>
-                    <p className="mt-2 min-h-10 text-[13.5px] leading-[1.5] text-cream/75">{plan.fit}</p>
-
-                    <div className="mt-5 flex items-baseline gap-1.5">
-                      <span className="tnum text-[34px] leading-none font-semibold tracking-[-0.03em] text-cream">
-                        {inr(plan.price)}
-                      </span>
-                      <span className="text-[12px] text-mute-dim">/month · planned</span>
-                    </div>
-
-                    <hr className="my-5 border-cream/[0.12]" />
-
-                    <ul className="flex flex-1 flex-col gap-2.5 text-[13.5px] leading-[1.45] text-cream/80">
-                      {plan.id === 'starter' ? (
-                        <>
-                          <li>All {LIVE.length} live capabilities</li>
-                          <li>Unlimited orders and tables</li>
-                          <li>Available today, nothing charged</li>
-                        </>
-                      ) : (
-                        <>
-                          <li>Everything in {PLANS[PLANS.indexOf(plan) - 1].name}, plus:</li>
-                          {/* Only what this tier adds over the one below it.
-                              Repeating Professional's rows on Business reads as
-                              a longer list and is the same list. */}
-                          {included
-                            .filter((c) => {
-                              if (c.tiers === 'all') return false;
-                              const below = PLANS[PLANS.indexOf(plan) - 1].id;
-                              return !c.tiers.includes(below);
-                            })
-                            .map((c) => (
-                              <li key={c.id} className="flex gap-2">
-                                <span aria-hidden="true" className="mt-1.5 size-1 shrink-0 rounded-full bg-grass" />
-                                {c.label}
-                              </li>
-                            ))}
-                        </>
-                      )}
-                    </ul>
-
-                    <p className="mt-5 border-t border-cream/[0.12] pt-3 text-[10.5px] font-medium tracking-[0.09em] text-mute-dim uppercase">
-                      Planned · not on sale
-                    </p>
-                  </article>
-                );
-              })}
-            </div>
-
-            {/* One action for the whole page. Three "Choose" buttons would be
-                three ways to do the same thing, and none of them would put the
-                account on a plan. */}
-            <div data-reveal className="mt-10 flex flex-col items-start gap-2">
-              <Link
-                href="/signup"
-                className="inline-flex h-12 items-center rounded-full bg-grass px-6 text-[14px] font-medium text-cream transition-colors hover:bg-grass-strong"
-              >
-                Create an account
-              </Link>
-              <p className="text-[12px] text-mute-dim">
-                Free while the product is in preview. No card, nothing charged.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* ------------------------------------------------------ live today */}
-        <section id="live" className="border-t border-cream/[0.12] px-5 py-16 sm:px-8">
-          <div className="mx-auto w-full max-w-[1180px]">
-            <div data-reveal className="grid gap-6 md:grid-cols-[1fr_0.9fr] md:items-end">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-plum uppercase">
-                  02 · In the product today
-                </p>
-                <h2 className="mt-4 max-w-[16ch] text-[clamp(28px,4vw,44px)] leading-[1.03] font-semibold tracking-[-0.035em]">
-                  Built, and switched on.
-                </h2>
-              </div>
-              <p className="max-w-[44ch] text-[15px] leading-[1.6] text-mute">
-                Not a roadmap. Every one of these is running in this build, on every account,
-                whatever the plans end up costing.
-              </p>
-            </div>
-
-            <div data-stagger className="mt-12 grid gap-x-8 gap-y-9 sm:grid-cols-2 lg:grid-cols-3">
-              {LIVE.map((capability, index) => (
-                <article key={capability.id} className="border-t border-cream/[0.12] pt-4">
-                  <p className="tnum text-[10.5px] font-semibold tracking-[0.1em] text-mute-dim">
-                    {String(index + 1).padStart(2, '0')}
-                  </p>
-                  <h3 className="mt-2 text-[16px] font-semibold tracking-[-0.015em] text-cream">
-                    {capability.label}
-                  </h3>
-                  <p className="mt-1.5 text-[13px] leading-[1.6] text-mute">{capability.detail}</p>
+              {PLANS.map((plan, index) => (
+                <article id={`plan-${plan.id}`} data-plan-id={plan.id} key={plan.id} className="public-card scroll-mt-24 rounded-[22px] border border-cream/10 bg-white p-6 sm:p-7">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-[16px] font-semibold tracking-[-0.02em]">{plan.name}</h3>
+                    <span aria-hidden="true" className="tnum text-[11px] text-mute-dim">0{index + 1}</span>
+                  </div>
+                  <p className="mt-2 min-h-12 text-[13px] leading-relaxed text-mute">{plan.fit}</p>
+                  <p className="mt-7 flex flex-wrap items-baseline gap-2"><span className="tnum text-[42px] leading-none font-semibold tracking-[-0.05em]">{inr(plan.price)}</span><span className="text-[12px] text-mute">/ month</span></p>
+                  <div className="my-7 h-px bg-cream/10" />
+                  <p className="text-[13px] font-medium text-forest">{FOCUS[plan.id][0]}</p>
+                  <p className="mt-2 min-h-12 text-[13px] leading-relaxed text-mute">{FOCUS[plan.id][1]}</p>
+                  <p className="mt-6 text-[10px] font-medium tracking-[0.12em] text-mute uppercase">Planned · not on sale</p>
                 </article>
               ))}
             </div>
+            <p className="mt-5 max-w-[70ch] text-[12px] leading-relaxed text-mute">These are proposed plans, not selectable packages. Final features, limits and taxes will be confirmed before purchase is available.</p>
           </div>
         </section>
 
-        {/* ------------------------------------------------------- statement */}
-        <section className="border-y border-cream/[0.12] bg-ink-soft px-5 py-20 sm:px-8">
-          <div className="mx-auto w-full max-w-[1180px]">
-            <p data-reveal className="text-[10.5px] font-semibold tracking-[0.14em] text-mute-dim uppercase">
-              Why nothing is gated
-            </p>
-            <h2
-              data-reveal
-              className="mt-6 max-w-[24ch] text-[clamp(26px,4vw,42px)] leading-[1.06] font-semibold tracking-[-0.035em] text-cream"
-            >
-              A restaurant that cannot take an order is not a smaller customer.
-            </h2>
-            <p data-reveal className="mt-5 max-w-[52ch] text-[15px] leading-[1.6] text-mute">
-              The parts that run service are in every plan, and today they are not metered at
-              all. Billing, when it arrives, will not take away the kitchen board.
-            </p>
-          </div>
-        </section>
-
-        {/* -------------------------------------------------------- differs */}
-        <section id="differs" className="px-5 py-16 sm:px-8">
-          <div className="mx-auto w-full max-w-[1180px]">
-            <div data-reveal className="grid gap-6 md:grid-cols-[1fr_0.9fr] md:items-end">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-plum uppercase">
-                  03 · What the tiers change
-                </p>
-                <h2 className="mt-4 max-w-[18ch] text-[clamp(28px,4vw,44px)] leading-[1.03] font-semibold tracking-[-0.035em]">
-                  {`${NumberWord(DIFFERENCES.length)} differences, not fifty.`}
-                </h2>
-              </div>
-              <p className="max-w-[44ch] text-[15px] leading-[1.6] text-mute">
-                What each step up will add when billing opens. Nothing here exists yet, which is
-                why every row is marked planned.
-              </p>
-            </div>
-
-            <div data-stagger className="mt-10 divide-y divide-cream/[0.12] border-y border-cream/[0.12]">
-              {DIFFERENCES.map((difference) => {
-                const tiers = difference.tiers === 'all' ? [] : difference.tiers;
-                return (
-                  <div key={difference.id} className="grid gap-2 py-5 md:grid-cols-[0.8fr_1.2fr] md:gap-8">
-                    <div>
-                      <p className="text-[14.5px] font-medium text-cream">{difference.label}</p>
-                      <TierTags tiers={tiers.map((t) => PLANS.find((p) => p.id === t)!.name)} />
-                    </div>
-                    <p className="text-[13.5px] leading-[1.6] text-mute">{difference.detail}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        {/* --------------------------------------------------------- billing */}
-        <section id="billing" className="border-t border-cream/[0.12] px-5 py-16 sm:px-8">
-          <div className="mx-auto grid w-full max-w-[1180px] gap-10 md:grid-cols-[0.85fr_1.15fr]">
+        <section aria-labelledby="included-heading" className="border-y border-cream/10 bg-ink-soft px-5 py-12 sm:px-8 sm:py-16">
+          <div className="mx-auto grid max-w-[1116px] gap-9 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20">
             <div data-reveal>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-plum uppercase">
-                04 · The money side
-              </p>
-              <h2 className="mt-4 max-w-[14ch] text-[clamp(26px,3.6vw,40px)] leading-[1.04] font-semibold tracking-[-0.035em]">
-                How billing will work.
-              </h2>
-              <p className="mt-4 max-w-[34ch] text-[14px] leading-[1.65] text-mute">
-                None of this is switched on. It is written down so the shape is not a
-                surprise when it is.
-              </p>
+              <p className="text-[11px] font-semibold tracking-[0.18em] text-forest uppercase">The essentials</p>
+              <h2 id="included-heading" className="mt-4 max-w-[15ch] text-[clamp(30px,4vw,42px)] leading-[1.1] font-semibold tracking-[-0.04em]">Built around your service.</h2>
+              <p className="mt-4 max-w-[35ch] text-[14px] leading-relaxed text-mute">Explore the core workflow during your trial, from setting up your menu to recording payments.</p>
             </div>
-
-            <div data-stagger className="flex flex-col gap-6">
-              {[
-                {
-                  n: '01',
-                  title: `${BILLING.trialDays} days, everything on`,
-                  body: 'A new account starts on the whole product. No card is taken to begin, and the trial is not a cut-down tier.',
-                },
-                {
-                  n: '02',
-                  title: 'Monthly, per restaurant',
-                  body: 'One amount in rupees, once a month. No setup fee, no percentage of sales, no charge per order or per table.',
-                },
-                {
-                  n: '03',
-                  title: 'If it lapses, it goes quiet',
-                  body: 'The account becomes read-only: menus, orders, receipts and reports stay visible and are never deleted. New orders stop until a plan is active.',
-                },
-              ].map((step) => (
-                <div key={step.n} className="grid grid-cols-[auto_1fr] gap-4 border-t border-cream/[0.1] pt-4">
-                  <p className="tnum text-[11px] font-semibold tracking-[0.08em] text-plum">{step.n}</p>
-                  <div>
-                    <h3 className="text-[15.5px] font-semibold tracking-[-0.01em] text-cream">{step.title}</h3>
-                    <p className="mt-1.5 text-[13.5px] leading-[1.6] text-mute">{step.body}</p>
-                  </div>
-                </div>
-              ))}
+            <div data-stagger className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
+              {LIVE.map(capability => <div key={capability.id} className="border-t border-cream/15 pt-4"><h3 className="flex items-center gap-2 text-[14px] font-semibold"><span aria-hidden="true" className="text-forest">↗</span>{capability.label}</h3><p className="mt-2 text-[13px] leading-relaxed text-mute">{CAPABILITY_COPY[capability.id]}</p></div>)}
             </div>
           </div>
         </section>
 
-        {/* ------------------------------------------------------------- FAQ */}
-        <section id="questions" className="border-t border-cream/[0.12] px-5 py-16 sm:px-8">
-          <div className="mx-auto w-full max-w-[1180px]">
-            <div data-reveal>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-plum uppercase">05 · Questions</p>
-              <h2 className="mt-4 max-w-[20ch] text-[clamp(26px,3.6vw,40px)] leading-[1.04] font-semibold tracking-[-0.035em]">
-                The ones worth asking first.
-              </h2>
+        <section aria-labelledby="questions-heading" className="px-5 py-12 sm:px-8 sm:py-16">
+          <div className="mx-auto grid max-w-[1116px] gap-8 md:grid-cols-[0.8fr_1.2fr] md:gap-20">
+            <h2 id="questions-heading" data-reveal className="text-[32px] leading-tight font-semibold tracking-[-0.04em]">Before you start.</h2>
+            <div className="divide-y divide-cream/10 border-y border-cream/10">
+              {FAQS.map(item => <details key={item.q} className="group py-5"><summary className="flex min-h-6 cursor-pointer list-none items-center justify-between gap-5 text-[14px] font-medium marker:hidden focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">{item.q}<span aria-hidden="true" className="text-xl text-forest motion-safe:transition-transform group-open:rotate-45">+</span></summary><p className="mt-3 max-w-[58ch] text-[13px] leading-relaxed text-mute">{item.a}</p></details>)}
             </div>
-
-            <div data-stagger className="mt-8 max-w-[820px] divide-y divide-cream/[0.12] border-y border-cream/[0.12]">
-              {FAQS.map((item) => (
-                <details key={item.q} className="group py-4">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[14.5px] font-medium text-cream marker:hidden">
-                    {item.q}
-                    <span
-                      aria-hidden="true"
-                      className="shrink-0 text-[18px] leading-none text-mute transition-transform group-open:rotate-45"
-                    >
-                      +
-                    </span>
-                  </summary>
-                  <p className="mt-2.5 max-w-[62ch] text-[13.5px] leading-[1.65] text-mute">{item.a}</p>
-                </details>
-              ))}
-            </div>
-
-            <p className="mt-7 max-w-[70ch] text-[12px] leading-[1.6] text-mute-dim">{BILLING.note}</p>
           </div>
         </section>
-
-        <SiteClosing
-          title="Start with the product, decide later."
-          body="An account is free today and gives you the entire product. When plans open, you will hear about it before anything is charged."
-          primary={{ label: 'Create an account', href: '/signup' }}
-          secondary={{ label: 'See what is live', href: '/#status' }}
-        />
-
-        <SiteFooter
-          note="Table QR ordering and restaurant operations."
-          scope="Product preview. Billing is not connected and nothing is for sale."
-          fineRight="Prices are planning figures"
-        />
+        <section className="px-5 pb-12 sm:px-8 sm:pb-16">
+          <div className="mx-auto flex max-w-[1116px] flex-col items-start justify-between gap-6 rounded-[24px] bg-forest px-7 py-9 text-white sm:flex-row sm:items-center sm:px-10">
+            <div><h2 className="text-[clamp(26px,3vw,36px)] font-semibold tracking-[-0.035em]">See how it fits your restaurant.</h2><p className="mt-2 text-[14px] leading-relaxed text-white/75">Start with a {BILLING.trialDays}-day trial. No automatic subscription purchase.</p></div>
+            <Link href="/signup" className="inline-flex min-h-12 shrink-0 items-center gap-4 rounded-full bg-white px-6 text-[13px] font-semibold text-forest hover:bg-white/90">Create account <span aria-hidden="true">↗</span></Link>
+          </div>
+        </section>
       </main>
-
+      <SiteFooter note="Table QR ordering and restaurant operations." scope="Planned pricing. Paid plans are not currently available." fineRight="Made for restaurant service" />
       <SiteMotion />
-    </>
+    </div>
   );
 }

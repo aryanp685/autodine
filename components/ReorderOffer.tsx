@@ -90,16 +90,14 @@ export function ReorderOffer({
       return;
     }
 
-    // The order page and the cart provider mount together. On the first
-    // render the provider has not read localStorage yet, and the sibling
-    // ClearCartOnOrder must copy the just-ordered lines before emptying it.
-    // Read after passive effects have settled so this offer cannot race that
-    // copy and permanently render as empty for the page's lifetime.
+    // ClearCartOnOrder writes the remembered cart after provider hydration.
+    // Re-read after mount and whenever cart state changes so this offer can
+    // observe that saved snapshot without racing the sibling effect.
     const timer = window.setTimeout(() => {
       setLines(readLastCart(browserStorage(), slug));
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [enabled, slug, cart?.ready]);
+  }, [enabled, slug, cart?.ready, cart?.count]);
 
   if (!enabled || !slug || !cart || !cart.ready || lines.length === 0) return null;
 

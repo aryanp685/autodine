@@ -1,3 +1,4 @@
+import { readAllRows, readRowsForIds } from '@/lib/db/paged-read';
 /**
  * Load the owner-facing dashboard overview from the real database.
  *
@@ -309,18 +310,18 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
   const dayStartIso = dayStart.toISOString();
 
   const [ordersResult, paymentsResult, activeSessions] = await Promise.all([
-    supabase
+    readAllRows((from, to) => supabase
       .from('orders')
       .select('id, code, table_id, prep_status, payment_status, total_paise, placed_at')
       .eq('restaurant_id', restaurantId)
       .neq('prep_status', 'cancelled')
       .gte('placed_at', dayStartIso)
-      .order('placed_at', { ascending: false }),
-    supabase
+      .order('placed_at', { ascending: false }).order('id').range(from, to)),
+    readAllRows((from, to) => supabase
       .from('payments')
       .select('order_id, amount_paise, status')
       .eq('restaurant_id', restaurantId)
-      .gte('created_at', dayStartIso),
+      .or(`recorded_at.gte.${dayStartIso},and(recorded_at.is.null,created_at.gte.${dayStartIso})`).order('id').range(from, to)),
     loadActiveSessions(supabase, restaurantId),
   ]);
 
@@ -348,7 +349,12 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
 
   const ordersToday = rows.length;
   const openOrders = rows.filter((row) => OPEN_STATES.includes(row.prep_status)).length;
-  const averageTicketPaise = ordersToday > 0 ? Math.round(revenueTodayPaise / ordersToday) : 0;
+  // Average TICKET is billed ÷ orders, not collected ÷ orders. The old
+  // calculation divided money that arrived today (which can include a payment
+  // for yesterday's bill) by orders placed today, so it was neither the
+  // average bill nor the average collection.
+  const billedTodayPaise = rows.reduce((sum, row) => sum + Number(row.total_paise ?? 0), 0);
+  const averageTicketPaise = ordersToday > 0 ? Math.round(billedTodayPaise / ordersToday) : 0;
 
   const hourlyPaise = Array.from({ length: hourInZone(timezone, now) + 1 }, () => 0);
   for (const row of rows) {
@@ -385,10 +391,10 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
   // hand-written and does not declare every relationship, so an embed such as
   // dining_tables(label) resolves to a SelectQueryError and will not compile.
   const [itemsResult, tablesResult] = await Promise.all([
-    supabase
+    readRowsForIds(orderIds, (ids, from, to) => supabase
       .from('order_items')
       .select('order_id, name_snapshot, qty, unit_price_paise')
-      .in('order_id', orderIds),
+      .in('order_id', ids).order('id').range(from, to)),
     tableIds.length
       ? supabase.from('dining_tables').select('id, label').in('id', tableIds)
       : Promise.resolve({ data: [], error: null }),

@@ -69,6 +69,7 @@ import {
   type AnnouncementDialect,
 } from '@/lib/voice-personality';
 import { voiceLabel } from '@/lib/tts-voices';
+import { createRealtimeMonitor } from '@/lib/realtime-monitor';
 
 /* The thresholds live next to the query that computes the age, so the badge
    and the board cannot disagree about what "late" means. */
@@ -1127,6 +1128,18 @@ export function Kitchen({
     if (!supabase) return;
 
     let timer: ReturnType<typeof setTimeout> | null = null;
+    const monitor = createRealtimeMonitor({
+      onDelivery: setDelivery,
+      onSignal: ({ kind, durationMs }) => {
+        void fetch('/api/ops/realtime-alert', {
+          method: 'POST',
+          credentials: 'same-origin',
+          keepalive: true,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ kind, durationMs }),
+        }).catch(() => { /* polling remains the fallback when monitoring is unavailable */ });
+      },
+    });
     const schedule = () => {
       // A burst of four orders commits within a few milliseconds of each
       // other. One refresh covers all four; four refreshes would race.
@@ -1149,14 +1162,11 @@ export function Kitchen({
         { event: '*', schema: 'public', table: 'table_waiter_calls', filter: `restaurant_id=eq.${restaurantId}` },
         schedule,
       )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') setDelivery('live');
-        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setDelivery('polling');
-        else setDelivery('connecting');
-      });
+      .subscribe((status) => monitor.onStatus(status));
 
     return () => {
       if (timer) clearTimeout(timer);
+      monitor.dispose();
       void supabase.removeChannel(channel);
     };
   }, [live, restaurantId, refresh]);

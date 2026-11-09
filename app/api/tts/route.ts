@@ -39,9 +39,9 @@
  * says which layer failed.
  */
 
+import { readJsonObject, JsonInputError } from '@/lib/http-json';
 import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
-import { getStaffContext, KITCHEN_ROLES } from '@/lib/db/staff';
-import { getSupabaseAdmin } from '@/lib/supabase/admin';
+import { authorizeTts } from '@/lib/tts-access';
 import {
   DEFAULT_EDGE_VOICE,
   EDGE_HINDI_VOICES,
@@ -51,6 +51,13 @@ import {
   normalizeProsodyPercent,
 } from '@/lib/tts-voices';
 
+/**
+ * A kitchen announcement is one or two sentences. A megabyte of text is not
+ * an announcement, it is a way to make the free Edge TTS service do work for
+ * as long as the caller likes. The relay requires staff membership and shared database quotas; the cap
+ * bounds work even for an authorized caller.
+ */
+const MAX_TEXT_LENGTH = 1000;
 /** The runtime must be Node.js: the WebSocket client needs `ws`. */
 export const runtime = 'nodejs';
 
@@ -100,51 +107,6 @@ type TTSRequest = {
   pitch?: string;
 };
 
-/** Keep request parsing bounded even when Content-Length is absent or false. */
-const MAX_REQUEST_BYTES = 8 * 1024;
-/** Kitchen ticket announcements are short; cap provider work and memory use. */
-const MAX_TEXT_CHARACTERS = 1_200;
-const TTS_REQUESTS_PER_RESTAURANT_PER_MINUTE = 120;
-
-type BoundedJsonResult =
-  | { ok: true; value: unknown }
-  | { ok: false; status: 400 | 413 };
-
-async function readBoundedJson(request: Request): Promise<BoundedJsonResult> {
-  const contentLength = Number(request.headers.get('content-length'));
-  if (Number.isFinite(contentLength) && contentLength > MAX_REQUEST_BYTES) {
-    return { ok: false, status: 413 };
-  }
-  if (!request.body) return { ok: false, status: 400 };
-
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > MAX_REQUEST_BYTES) {
-        await reader.cancel().catch(() => undefined);
-        return { ok: false, status: 413 };
-      }
-      chunks.push(value);
-    }
-    const bytes = new Uint8Array(size);
-    let offset = 0;
-    for (const chunk of chunks) {
-      bytes.set(chunk, offset);
-      offset += chunk.byteLength;
-    }
-    return { ok: true, value: JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown };
-  } catch {
-    return { ok: false, status: 400 };
-  } finally {
-    reader.releaseLock();
-  }
-}
-
 /**
  * POST /api/tts
  *
@@ -156,68 +118,28 @@ async function readBoundedJson(request: Request): Promise<BoundedJsonResult> {
  * route passes exactly that: escaped text in one outer prosody frame.
  */
 export async function POST(request: Request): Promise<Response> {
-  // This relay can consume serverless capacity and an external provider. It is
-  // only a kitchen feature, so authenticate the current staff membership before
-  // reading caller-controlled bytes or contacting the provider.
-  let staff: Awaited<ReturnType<typeof getStaffContext>>;
+  let body: TTSRequest;
   try {
-    staff = await getStaffContext();
-  } catch {
-    return Response.json({ error: 'TTS service unavailable' }, { status: 503 });
-  }
-  if (!staff) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!KITCHEN_ROLES.includes(staff.role)) {
-    return Response.json({ error: 'Forbidden' }, { status: 403 });
+    body = await readJsonObject(request) as TTSRequest;
+  } catch (error) {
+    return Response.json({ error: error instanceof JsonInputError ? error.message : 'Invalid JSON body' },
+      { status: error instanceof JsonInputError ? error.status : 400 });
   }
 
-  const parsed = await readBoundedJson(request);
-  if (!parsed.ok) {
-    return Response.json(
-      { error: parsed.status === 413 ? 'Request body too large' : 'Invalid JSON body' },
-      { status: parsed.status },
-    );
-  }
-  if (!parsed.value || typeof parsed.value !== 'object' || Array.isArray(parsed.value)) {
-    return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
-  const body = parsed.value as Partial<TTSRequest>;
-  if (typeof body.text !== 'string') {
-    return Response.json({ error: 'Missing text' }, { status: 400 });
-  }
-  const text = body.text.trim();
+  const text = typeof body.text === 'string' ? body.text.trim() : '';
   if (!text) {
     return Response.json({ error: 'Missing text' }, { status: 400 });
   }
-  if ([...text].length > MAX_TEXT_CHARACTERS) {
-    return Response.json({ error: 'Text is too long' }, { status: 413 });
-  }
 
-  // The service key stays server-only. A shared database counter makes this
-  // limit consistent across serverless instances; a missing limiter fails
-  // closed instead of silently turning into a per-instance throttle.
-  const admin = getSupabaseAdmin();
-  if (!admin) return Response.json({ error: 'TTS service unavailable' }, { status: 503 });
-  let budget;
-  try {
-    budget = await admin.rpc('hit_rate_limit', {
-      p_key: `tts:r:${staff.restaurantId}`,
-      p_limit: TTS_REQUESTS_PER_RESTAURANT_PER_MINUTE,
-      p_window_seconds: 60,
-    });
-  } catch {
-    return Response.json({ error: 'TTS service unavailable' }, { status: 503 });
-  }
-  if (budget.error || !budget.data?.[0]) {
-    return Response.json({ error: 'TTS service unavailable' }, { status: 503 });
-  }
-  const rateLimit = budget.data[0];
-  if (!rateLimit.allowed) {
-    const retryAfter = Math.max(1, rateLimit.retry_after_seconds || 60);
+  if ([...text].length > MAX_TEXT_LENGTH) {
     return Response.json(
-      { error: 'Too many kitchen announcements. Please wait and try again.' },
-      { status: 429, headers: { 'Retry-After': String(retryAfter), 'Cache-Control': 'no-store' } },
+      { error: `That announcement is too long. Keep it under ${MAX_TEXT_LENGTH} characters.` },
+      { status: 413, headers: { 'Cache-Control': 'no-store' } }
     );
   }
+
+  const denied = await authorizeTts();
+  if (denied) return denied;
 
   // Validate voice against the known catalogue. An unknown voice means a
   // stale preference from another deployment — fall back to the default
@@ -257,7 +179,6 @@ export async function POST(request: Request): Promise<Response> {
       return new Response(new Uint8Array(audio), {
         headers: {
           'Content-Type': 'audio/mpeg',
-          // Announcement audio can contain table and order details; never put it in shared caches.
           'Cache-Control': 'private, no-store',
           'X-Content-Type-Options': 'nosniff',
         },
@@ -271,9 +192,8 @@ export async function POST(request: Request): Promise<Response> {
     // kitchen engine treats a 503 as "server speech failed" and falls
     // back to the browser Web Speech API. No stack trace is sent to
     // the client — the reason stays in the server logs.
-    // Avoid logging ticket text or upstream diagnostics that may echo it.
-    const errorType = error instanceof Error ? error.name : 'UnknownError';
-    console.error('[tts] Edge TTS synthesis failed:', errorType);
+    const message = error instanceof Error ? error.message : 'TTS synthesis failed';
+    console.error('[tts] Edge TTS synthesis failed:', message);
     return Response.json(
       { error: 'TTS service unavailable' },
       { status: 503 },

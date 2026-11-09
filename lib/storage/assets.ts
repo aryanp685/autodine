@@ -182,6 +182,9 @@ export function bucketPathFromUrl(url: string | null | undefined): string | null
   if (!clean || !SUPABASE_URL) return null;
   const prefix = `${SUPABASE_URL.replace(/\/$/, '')}/storage/v1/object/public/${ASSET_BUCKET}/`;
   if (!clean.startsWith(prefix)) return null;
-  const path = decodeURIComponent(clean.slice(prefix.length));
-  return isBucketPath(path) ? path : null;
+  try {
+    const path = decodeURIComponent(clean.slice(prefix.length));
+    if (path.split('/').some(segment => segment === '..' || segment === '.')) return null;
+    return isBucketPath(path) ? path : null;
+  } catch { return null; }
 }

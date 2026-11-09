@@ -24,6 +24,7 @@
  * auth.uid() is null (service role).
  */
 
+import { readJsonObject, JsonInputError } from '@/lib/http-json';
 import { NextResponse } from 'next/server';
 import { renewTrialAction } from '@/app/admin/renew-trial/actions';
 import { isValidAdminSecret, UNAUTHORIZED_MESSAGE } from '@/lib/admin-auth';
@@ -48,12 +49,13 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   let body: { restaurantName?: string };
   try {
-    body = await request.json() as { restaurantName?: string };
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    body = await readJsonObject(request) as { restaurantName?: string };
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof JsonInputError ? error.message : 'Invalid JSON body' },
+      { status: error instanceof JsonInputError ? error.status : 400 });
   }
 
-  const restaurantName = body.restaurantName?.trim();
+  const restaurantName = typeof body.restaurantName === 'string' ? body.restaurantName.trim() : '';
   if (!restaurantName) {
     return NextResponse.json({ error: 'Missing restaurantName' }, { status: 400 });
   }

@@ -47,15 +47,10 @@ export type RenewTrialResult = {
   error?: string;
 };
 
-/**
- * Escape the LIKE pattern metacharacters in a caller-supplied name.
- *
- * Without this, a name of "%" is not a name — it is "every restaurant",
- * and the renewal would move some arbitrary restaurant's trial clock.
- * The name is a name; the pattern language is not part of the input.
- */
-function escapeLikePattern(name: string): string {
-  return name.replace(/[\\%_]/g, (char) => `\\${char}`);
+/** Exact case-insensitive regex: unlike PostgREST ILIKE, '*' is not an alias
+ * for '%'. Escape every regex operator so restaurant names stay literal. */
+function exactNamePattern(name: string): string {
+  return `^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`;
 }
 
 /**
@@ -74,8 +69,8 @@ export async function renewTrialAction(restaurantName: string, adminSecret: stri
     return { ok: false, error: UNAUTHORIZED_MESSAGE };
   }
 
-  const name = restaurantName.trim();
-  if (!name) {
+  const name = typeof restaurantName === 'string' ? restaurantName.trim() : '';
+  if (!name || name.length > 200) {
     return { ok: false, error: 'Missing restaurantName' };
   }
 
@@ -89,11 +84,11 @@ export async function renewTrialAction(restaurantName: string, adminSecret: stri
   }
 
   // Find the restaurant by exact name match (case-insensitive). The
-  // pattern is escaped so the name can only ever mean itself.
+  // regex is anchored and escaped so the name can only ever mean itself.
   const { data: restaurants, error: findError } = await supabase
     .from('restaurants')
     .select('id, name, trial_started_at')
-    .ilike('name', escapeLikePattern(name));
+    .filter('name', 'imatch', exactNamePattern(name));
 
   if (findError) {
     return { ok: false, error: `Could not find restaurant: ${findError.message}` };
@@ -128,8 +123,9 @@ export async function renewTrialAction(restaurantName: string, adminSecret: stri
   if (!updated.trial_started_at) {
     return { ok: false, error: 'Could not read trial start time after update.' };
   }
-  const trialEndsAt = new Date(updated.trial_started_at);
-  trialEndsAt.setDate(trialEndsAt.getDate() + 7);
+  const trialEndsAt = new Date(
+    new Date(updated.trial_started_at).getTime() + 7 * 24 * 60 * 60 * 1000
+  );
 
   revalidatePath('/dashboard', 'layout');
   revalidatePath('/dashboard/settings', 'layout');

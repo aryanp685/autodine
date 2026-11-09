@@ -40,6 +40,7 @@ type QueueRow = {
   outstanding: number;
   paid: number;
   items: string;
+  pendingOnline: boolean;
 };
 
 function fromDemo(order: (typeof counterQueue)[number]): QueueRow {
@@ -54,6 +55,7 @@ function fromDemo(order: (typeof counterQueue)[number]): QueueRow {
     outstanding: order.total,
     paid: 0,
     items: order.items,
+    pendingOnline: false,
   };
 }
 
@@ -69,6 +71,7 @@ function fromLive(order: CounterOrder): QueueRow {
     outstanding: order.outstanding,
     paid: order.paid,
     items: order.items,
+    pendingOnline: order.pendingOnline === true,
   };
 }
 
@@ -534,6 +537,7 @@ export function Cashier({
                       </div>
                       <div className="flex flex-col items-end gap-1.5">
                         <Tag tone="due">Payment due</Tag>
+                        {order.pendingOnline ? <Tag tone="due">Online payment in progress</Tag> : null}
                       </div>
                     </div>
 
@@ -596,7 +600,7 @@ export function Cashier({
                         type="button"
                         data-counter-cta
                         className={`${btn('primary')} mt-4 w-full`}
-                        disabled={isPending || Boolean(live && !order.orderId)}
+                        disabled={isPending || order.pendingOnline || Boolean(live && !order.orderId)}
                         aria-busy={isPending}
                         onClick={recordPayment}
                       >
@@ -631,7 +635,7 @@ export function Cashier({
                             <button
                               type="button"
                               className={btn('danger', 'sm')}
-                              disabled={cancelling === order.orderId}
+                              disabled={order.pendingOnline || cancelling === order.orderId}
                               onClick={cancelOrder}
                             >
                               {cancelling === order.orderId ? 'Cancelling…' : 'Yes, cancel it'}
@@ -649,7 +653,7 @@ export function Cashier({
                         <button
                           type="button"
                           className={`${btn('quiet', 'sm')} mt-1`}
-                          disabled={isPending || Boolean(live && !order.orderId)}
+                          disabled={isPending || order.pendingOnline || Boolean(live && !order.orderId)}
                           onClick={cancelOrder}
                         >
                           Cancel this order

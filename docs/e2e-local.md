@@ -28,7 +28,7 @@ not browser E2E evidence.
 
 On the repository's Linux/Node 22 sandbox, `npm ci` followed by
 `npm run test:db:local` starts an isolated embedded PostgreSQL 17.11 cluster
-under a fresh temporary directory. It replays all 48 checked-in migrations,
+under a fresh temporary directory. It replays all 60 checked-in migrations,
 adds only the already documented local Supabase shim and inferred scaffold,
 checks the resulting objects and SQL regressions in
 `supabase/checks/06_scan_limits.sql`, `07_p8_close_settlement.sql`, and
@@ -49,17 +49,17 @@ wrapper extracts Chromium's bundled NSS/NSPR libraries into a fresh temporary
 directory and checks every linked library before launch, so it needs neither
 apt nor a system Chromium installation. The latest hosted browser workflow verified **64 passed,
 0 skipped, 0 failed** for the hermetic project. `npm run e2e:local` remains the
-unfiltered 111-test catalog command; without Supabase it reports 47 integration
+unfiltered 113-test catalog command; without Supabase it reports 49 integration
 cases as skipped, not verified.
 
 ### Full disposable Supabase suite and realistic load
 
 `.github/workflows/supabase-e2e-load.yml` is the GitHub-hosted full-stack runner. It
 uses the pinned Supabase CLI to start local Postgres 17 plus Auth, Storage,
-Realtime and Studio, applies all 48 checked-in migrations plus only the marked
+Realtime and Studio, applies all 60 checked-in migrations plus only the marked
 inferred local scaffold, creates random synthetic Auth identities and fixtures,
 and builds the app against that loopback stack. It runs the hermetic 64 and the
-47 database-backed Playwright tests in separate stages, so the complete 111-test
+49 database-backed Playwright tests in separate stages, so the complete 113-test
 coverage has no skips. It then creates 5,000 synthetic guest sessions and orders
 across 100 restaurants, measures Next.js menu reads, authenticated kitchen
 updates and Realtime fan-out, and saves JSON metrics, test reports, traces and

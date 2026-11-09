@@ -2,7 +2,7 @@
 -- SAMPLE DATA for a fictional restaurant. Replace before going live.
 
 insert into public.restaurants (id, slug, name, tagline, address, phone, gstin, timezone, tax_rate_bps)
-values ('00000000-0000-4000-8000-000000000001', 'saffron-smoke', 'Saffron & Smoke', 'Modern Indian kitchen · Nagpur', '14 Civil Lines, Near Zero Mile, Nagpur 440001, Maharashtra', '+91 712 000 0000', 'GSTIN — add in Settings', 'Asia/Kolkata', 500)
+values ('00000000-0000-4000-8000-000000000001', 'saffron-smoke', 'Saffron & Smoke', 'Modern Indian kitchen · Nagpur', '14 Civil Lines, Near Zero Mile, Nagpur 440001, Maharashtra', '+91 712 000 0000', null, 'Asia/Kolkata', 500)
 on conflict (id) do update set name = excluded.name;
 
 insert into public.menus (id, restaurant_id, name, is_published) values ('00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000001', 'Main menu', true) on conflict (id) do nothing;
@@ -18,18 +18,18 @@ insert into public.categories (id, restaurant_id, menu_id, name, sort_order) val
 on conflict (id) do nothing;
 
 insert into public.items (id, restaurant_id, category_id, name, description, price_paise, is_veg, is_available, image_url, sort_order) values
-  ('3f26d487-bb32-47b4-b524-4ebd6856edc2', '00000000-0000-4000-8000-000000000001', '5e0a1b3c-6944-4674-b68b-4b305e4480f0', 'Paneer Tikka', 'Charred cottage cheese, ajwain marinade, bell pepper, red onion', 34900, true, true, '/img/dish-paneer-tikka.jpg', 0),
+  ('3f26d487-bb32-47b4-b524-4ebd6856edc2', '00000000-0000-4000-8000-000000000001', '5e0a1b3c-6944-4674-b68b-4b305e4480f0', 'Paneer Tikka', 'Charred cottage cheese, ajwain marinade, bell pepper, red onion', 34900, true, true, '/img/dishes/paneer-tikka.jpg', 0),
   ('4c7f1af4-e49f-4047-86e6-495e3f807859', '00000000-0000-4000-8000-000000000001', '5e0a1b3c-6944-4674-b68b-4b305e4480f0', 'Hara Bhara Kebab', 'Spinach, green pea and potato patty, toasted cashew centre', 29900, true, true, null, 1),
-  ('f00441bf-2373-4d89-aa02-135ff4bc1935', '00000000-0000-4000-8000-000000000001', '5e0a1b3c-6944-4674-b68b-4b305e4480f0', 'Chicken Malai Tikka', 'Cream, cheddar and cardamom marinade, finished in the tandoor', 42900, false, true, '/img/dish-butter-chicken.jpg', 2),
+  ('f00441bf-2373-4d89-aa02-135ff4bc1935', '00000000-0000-4000-8000-000000000001', '5e0a1b3c-6944-4674-b68b-4b305e4480f0', 'Chicken Malai Tikka', 'Cream, cheddar and cardamom marinade, finished in the tandoor', 42900, false, true, '/img/dishes/butter-chicken.jpg', 2),
   ('47165d7d-5f16-424a-9508-ea2b0b2e5b50', '00000000-0000-4000-8000-000000000001', '965dc707-9cba-418c-adfe-dc517b8c499e', 'Tandoori Chicken', 'Kashmiri chilli and yoghurt marinade, served with mint chutney', 34900, false, true, null, 3),
   ('3856ef49-7557-42df-9375-4169e2a1bd53', '00000000-0000-4000-8000-000000000001', '965dc707-9cba-418c-adfe-dc517b8c499e', 'Seekh Kebab', 'Hand-minced lamb, green chilli and warm spices, iron skewer', 45900, false, true, null, 4),
-  ('add53403-7be7-4f1e-8cda-93a924baa62c', '00000000-0000-4000-8000-000000000001', 'c578bcef-9609-4280-97cb-64e5fe0246ce', 'Butter Chicken', 'Tandoor-cooked chicken in a tomato, cashew and butter gravy', 46900, false, true, '/img/dish-butter-chicken.jpg', 5),
+  ('add53403-7be7-4f1e-8cda-93a924baa62c', '00000000-0000-4000-8000-000000000001', 'c578bcef-9609-4280-97cb-64e5fe0246ce', 'Butter Chicken', 'Tandoor-cooked chicken in a tomato, cashew and butter gravy', 46900, false, true, '/img/dishes/butter-chicken.jpg', 5),
   ('114a5555-4461-41e5-a3c1-5df5edf634a5', '00000000-0000-4000-8000-000000000001', 'c578bcef-9609-4280-97cb-64e5fe0246ce', 'Dal Bukhara', 'Black urad slow-cooked 18 hours, tomato, ghee, kasuri methi', 38900, true, true, null, 6),
   ('986ba22f-ef60-4675-882c-4f93217a4f9d', '00000000-0000-4000-8000-000000000001', 'c578bcef-9609-4280-97cb-64e5fe0246ce', 'Paneer Butter Masala', 'Fresh paneer in a fenugreek-scented tomato and cashew gravy', 39900, true, true, null, 7),
   ('80558ba6-f0b6-4ede-8923-77f6fb9e3796', '00000000-0000-4000-8000-000000000001', 'c578bcef-9609-4280-97cb-64e5fe0246ce', 'Laal Maas', 'Mathania chilli lamb curry, smoked ghee', 54900, false, false, null, 8),
   ('c5209a05-a1c0-4139-9123-9db532ce7671', '00000000-0000-4000-8000-000000000001', 'b1ad2b82-b822-44c7-99a2-3b08ce0ca1c5', 'Hyderabadi Chicken Biryani', 'Kacchi-style dum biryani, saffron, fried onion, served with salan', 49900, false, true, null, 9),
   ('1e0723fc-bf6c-4542-98ec-92b4609d93fe', '00000000-0000-4000-8000-000000000001', 'b1ad2b82-b822-44c7-99a2-3b08ce0ca1c5', 'Subz Dum Biryani', 'Seasonal vegetables, saffron rice, dum-sealed handi', 37900, true, true, null, 10),
-  ('2e074a2c-c262-46be-aff5-05ac28b452fa', '00000000-0000-4000-8000-000000000001', 'b1ad2b82-b822-44c7-99a2-3b08ce0ca1c5', 'Masala Dosa', 'Crisp fermented crepe, potato masala, coconut chutney, sambar', 24900, true, true, '/img/dish-masala-dosa.jpg', 11),
+  ('2e074a2c-c262-46be-aff5-05ac28b452fa', '00000000-0000-4000-8000-000000000001', 'b1ad2b82-b822-44c7-99a2-3b08ce0ca1c5', 'Masala Dosa', 'Crisp fermented crepe, potato masala, coconut chutney, sambar', 24900, true, true, '/img/dishes/masala-dosa.jpg', 11),
   ('5dccd841-0706-41a6-939d-b3f7c34ebd9c', '00000000-0000-4000-8000-000000000001', 'af803823-d594-4ac7-a1bb-a3534f91cb27', 'Butter Naan', 'Tandoor-baked, brushed with butter', 7900, true, true, null, 12),
   ('2d081d32-7f11-4aa8-bdac-4bc629d853c8', '00000000-0000-4000-8000-000000000001', 'af803823-d594-4ac7-a1bb-a3534f91cb27', 'Garlic Naan', 'Fresh garlic and coriander', 9900, true, true, null, 13),
   ('3c4254d7-56ce-4a90-a417-7ee9ba413bca', '00000000-0000-4000-8000-000000000001', 'af803823-d594-4ac7-a1bb-a3534f91cb27', 'Tandoori Roti', 'Whole wheat, tandoor-fired', 5900, true, true, null, 14),

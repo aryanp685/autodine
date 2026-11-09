@@ -58,3 +58,6 @@ _h*.mjs
 # Local TTS smoke output (uploaded as CI artifacts, never committed)
 tts-smoke-artifacts/
 /images
+
+# Private staging auth state, fixture credentials and raw browser reports
+/.staging-private/

@@ -195,15 +195,14 @@ describe('OrderPlacedScreen', () => {
   });
 
   it('says the status updates itself only while it actually polls', () => {
-    // The poller is mounted when the guest can no longer edit. On an editable
-    // order it is absent, because a refresh would land on unsaved quantities.
-    const locked = renderToStaticMarkup(<OrderPlacedScreen data={order({ canGuestChange: false })} />);
-    expect(locked).toContain('Status updates on its own');
-
-    const editable = renderToStaticMarkup(
-      <OrderPlacedScreen data={order({ canGuestChange: true })} token="t-1" />
-    );
-    expect(editable).not.toContain('Status updates on its own');
+    for (const canGuestChange of [false, true]) {
+      const html = renderToStaticMarkup(<OrderPlacedScreen data={order({ canGuestChange })} slug="test" token="t-1" />);
+      expect(html).toContain('Status updates on its own');
+    }
+    const noCredential = renderToStaticMarkup(<OrderPlacedScreen data={order()} slug="test" />);
+    expect(noCredential).not.toContain('Status updates on its own');
+    const cancelled = renderToStaticMarkup(<OrderPlacedScreen data={order({ prepStatus: 'cancelled' })} slug="test" token="t-1" />);
+    expect(cancelled).not.toContain('Status updates on its own');
   });
 
   it('does not draw the controls on a link that carries no token', () => {

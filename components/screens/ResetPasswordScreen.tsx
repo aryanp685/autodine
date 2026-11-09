@@ -1,8 +1,8 @@
 import Link from 'next/link';
-import { AuthShell } from '@/components/AuthShell';
+import { AuthShell, authButtonClass } from '@/components/AuthShell';
 import { updatePasswordAction } from '@/app/auth/actions';
 import { MIN_PASSWORD } from '@/lib/password';
-import { btn, Field, inputClass } from '@/components/owner/chrome';
+import { Field, inputClass } from '@/components/owner/chrome';
 
 /**
  * Choose a new password, on the session the emailed link created.
@@ -43,7 +43,7 @@ export function ResetPasswordScreen({ email, error }: { email: string | null; er
       >
         {alert}
 
-        <Link className={`${btn('solid')} w-full`} href="/forgot-password">
+        <Link className={`${authButtonClass} w-full`} href="/forgot-password">
           Send a new reset link
         </Link>
 
@@ -110,7 +110,7 @@ export function ResetPasswordScreen({ email, error }: { email: string | null; er
           />
         </Field>
 
-        <button className={`${btn('solid')} mt-1 w-full`} type="submit">
+        <button className={`${authButtonClass} mt-1 w-full`} type="submit">
           Save the new password
         </button>
       </form>

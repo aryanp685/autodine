@@ -231,3 +231,25 @@ export async function probeHealth(input: {
     },
   };
 }
+
+
+/** Catalog-only server RPC: financial table grants intentionally exclude the
+ * service role. Never widen those grants just to make a health probe green. */
+export async function probeOperationalSchema(client: ProbeClient | null): Promise<Record<string, Probe>> {
+  const names = ['orderSessions', 'settlement', 'invoices', 'paymentReceipts', 'announcementClaims'];
+  const all = (status: Probe) => Object.fromEntries(names.map(name => [name, status]));
+  if (!client) return all('unreachable');
+  try {
+    const { data, error } = await client.rpc('operational_schema_readiness', {});
+    if (error) return all(isUnauthorized(error) ? 'unauthorized' : isMissing(error) ? 'missing' : 'unknown');
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return all('unknown');
+    const result = data as Record<string, unknown>;
+    return Object.fromEntries(names.map(name => [name, result[name] === true ? 'applied' : result[name] === false ? 'missing' : 'unknown']));
+  } catch { return all('unreachable'); }
+}
+
+export function isReady(health: Health, operational: Record<string, Probe>): boolean {
+  return health.configured && health.serverKey && health.reachable && health.credentials === 'accepted' &&
+    Object.values(health.schema).every(value => value === 'applied') &&
+    Object.values(operational).length > 0 && Object.values(operational).every(value => value === 'applied');
+}

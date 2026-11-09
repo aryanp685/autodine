@@ -1,6 +1,7 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import {
   BASE,
+  fixtureTableLabel,
   GUEST_READY,
   STAFF_READY,
   addOneAndCheckout,
@@ -77,7 +78,7 @@ test.describe('kitchen — real database', () => {
     });
     await expect(ticket).toBeVisible({ timeout: 45_000 });
     await expect(ticket).toContainText(/×/); // quantities per line
-    await expect(ticket).toContainText(/E2E Guest \d{2}/); // the synthetic table it belongs to
+    await expect(ticket).toContainText(new RegExp(fixtureTableLabel(), 'i')); // synthetic fixture table
   });
 
   test('Preparing → Ready → Served, and the guest watches it happen', async ({ context }) => {

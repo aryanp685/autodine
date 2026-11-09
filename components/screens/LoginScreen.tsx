@@ -1,7 +1,7 @@
 import Link from 'next/link';
-import { AuthShell } from '@/components/AuthShell';
+import { AuthShell, authButtonClass } from '@/components/AuthShell';
 import { signInAction } from '@/app/auth/actions';
-import { btn, Field, inputClass } from '@/components/owner/chrome';
+import { Field, inputClass } from '@/components/owner/chrome';
 
 /**
  * Sign in.
@@ -22,11 +22,11 @@ export function LoginScreen({ error, notice, next }: { error?: string; notice?: 
       notes={[
         <>
           <strong>Ordering, the kitchen board and the counter are live.</strong> An order from a
-          verified table reaches the board in the same second.
+          verified table reaches the kitchen with its notes.
         </>,
         <>
-          <strong>Plans are not on sale.</strong> No card is asked for, and no trial is counting
-          down.
+          <strong>Plans are not on sale.</strong> No card is asked for. The workspace has a seven-day trial; after that, access is
+          read-only until extended.
         </>,
         <>
           <strong>Payments are recorded at the counter.</strong> Card and UPI online are not
@@ -78,7 +78,7 @@ export function LoginScreen({ error, notice, next }: { error?: string; notice?: 
           />
         </Field>
 
-        <button className={`${btn('solid')} mt-1 w-full`} type="submit">
+        <button className={`${authButtonClass} mt-1 w-full`} type="submit">
           Sign in
         </button>
 

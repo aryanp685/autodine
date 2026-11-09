@@ -88,7 +88,11 @@ describe('sign up', () => {
 
   it('promises nothing that is not connected', () => {
     expect(html).toContain('No payment gateway is connected');
-    expect(html).toContain('no trial is being enforced');
-    expect(html).toContain('No trial and no subscription is created by this form');
+    expect(html).toContain('A seven-day trial starts');
+    expect(html).not.toContain('no trial is being enforced');
+    expect(html).toContain('No paid subscription is created by this form');
+    expect(html).toContain('data-auth-card');
+    expect(html).toContain('bg-forest');
+    expect(html).toContain('text-white');
   });
 });
