@@ -102,6 +102,9 @@ export default defineConfig({
        */
       name: 'integration',
       testMatch: 'integration/**/*.spec.ts',
+      // The CI evidence gate requires one clean attempt; never hide a flaky
+      // database flow behind Playwright retries.
+      retries: 0,
       // Serial by nature: one test mints an invitation the next one redeems,
       // and each of them writes rows.
       workers: 1,

@@ -91,14 +91,24 @@ test.describe('brand studio flow', () => {
   test('publishing the menu publishes the brand together on the guest QR menu', async ({ browser }) => {
     test.skip(!READY, skipUnless(READY, NEEDS));
     const page = await signInOwner(await browser.newContext());
-    // The editor's Publish is the only switch; with a linked brand draft it
-    // goes live as a pair (publish_menu_brand_pair). The guest menu then
-    // carries the brand attributes — the marker that the theme applied.
-    await page.goto(`${BASE}/dashboard/menus`);
-    const publish = page.getByRole('button', { name: /^publish$/i }).first();
-    if (await publish.count()) {
-      await publish.click();
-    }
+    await page.goto(`${BASE}/dashboard/menus/import`);
+
+    // Create this test's own confirmed brand/menu pair. A publish test must not
+    // depend on a draft left by another test or publish the fixture menu.
+    await page.getByLabel('Restaurant name').fill(`Publish Flow ${Date.now()}`);
+    await page.getByRole('button', { name: 'Use this name' }).click();
+    await expect(page.getByRole('button', { name: 'Name confirmed' })).toBeVisible();
+    const textarea = page.locator('textarea').first();
+    await textarea.fill('MAINS\nPublish Test Paneer 320');
+    await page.getByRole('button', { name: /read the menu|read menu/i }).first().click();
+    await page.getByRole('button', { name: /Save .* as a draft/i }).click();
+    await expect(page).toHaveURL(/\/dashboard\/menus(\?|$)/, { timeout: 15_000 });
+
+    const publish = page.getByRole('button', { name: /^publish menu$/i }).first();
+    await expect(publish).toBeVisible({ timeout: 10_000 });
+    await publish.click();
+    await expect(page.getByText('Live — diners can see this menu')).toBeVisible({ timeout: 15_000 });
+
     const guest = await page.context().newPage();
     await guest.goto(`${BASE}/menu?s=${encodeURIComponent(SLUG)}`);
     await expect(guest.locator('[data-flow-root]').first()).toBeVisible();
@@ -125,7 +135,7 @@ test.describe('brand studio flow', () => {
       mimeType: 'text/html',
       buffer: Buffer.from('<html>hello</html>'),
     });
-    await expect(page.getByRole('alert')).toContainText(/not a JPG, PNG, WebP|contents do not match/i);
+    await expect(page.locator('p[role="alert"]')).toContainText(/not a JPG, PNG, WebP|contents do not match/i);
     await expect(page.getByRole('heading', { name: 'Brand — how guests see you' })).toBeVisible();
   });
 
