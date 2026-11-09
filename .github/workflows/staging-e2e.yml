@@ -45,11 +45,4 @@ jobs:
         if: always()
         shell: bash
         run: |
-          node - <<'JS'
-          const fs=require('fs');
-          const p='.staging-private/results.json';
-          if(!fs.existsSync(p)){console.log('No browser result: setup/provisioning did not complete.');process.exit(0);}
-          const result=JSON.parse(fs.readFileSync(p,'utf8'));
-          console.log(JSON.stringify(result.stats));
-          if(result.stats.expected===0) {console.error('No verified tests; refusing an all-skipped success.');process.exit(1);}
-          JS
+          node scripts/staging/report-e2e.mjs
