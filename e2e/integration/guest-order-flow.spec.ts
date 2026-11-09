@@ -125,7 +125,7 @@ test.describe('guest ordering — real database', () => {
     await expect(session).toContainText('2 tickets');
     await expect(session).toContainText(codeFromOrderUrl(firstUrl));
     await expect(session).toContainText(codeFromOrderUrl(secondUrl));
-    await expect(session.getByText('2 × Synthetic Paneer Dish').first()).toBeVisible();
+    await expect(session.getByText('1 × Synthetic Paneer Dish')).toHaveCount(2);
   });
 
   test('the tracking page follows the kitchen, and the bill keeps the exact amount', async ({
