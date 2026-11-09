@@ -13,10 +13,9 @@ import {
 /**
  * THE COUNTER (CASHIER), END TO END, ON A REAL DEPLOYMENT.
  *
- * Real bills, real record_counter_payment writes, the UPI claim turning a
- * guest's "I have paid" into a confirmable state at the till, and the
- * idempotent duplicate-confirmation guard. Each test places its own order —
- * money state is exactly the thing tests must not share.
+ * Real bills, real record_counter_payment writes, counter-only guest payment
+ * messaging, and the idempotent duplicate-confirmation guard. Each test places
+ * its own order — money state is exactly the thing tests must not share.
  *
  * IT WRITES ROWS (orders AND payments). Point it at a DISPOSABLE branch
  * database only.
@@ -69,8 +68,9 @@ test.describe('cashier — real database', () => {
 
     const bill = await till.context().newPage();
     await bill.goto(`${BASE}/bill/${orderId}`);
-    await expect(bill.locator('[data-bill]')).toBeVisible({ timeout: 20_000 });
-    await expect(bill.getByText(/Total/).first()).toContainText(/₹[\d,]+/);
+    const billSheet = bill.locator('[data-bill-sheet]');
+    await expect(billSheet).toBeVisible({ timeout: 20_000 });
+    await expect(billSheet.getByText('Total', { exact: true }).locator('..')).toContainText(/₹[\d,]+/);
   });
 
   test('recording a counter payment moves the money from pending to paid', async ({
@@ -92,33 +92,18 @@ test.describe('cashier — real database', () => {
     await expect(till.locator('[data-counter-cta]')).not.toHaveText(/₹0[^0-9]/);
   });
 
-  test('the UPI claim is a claim: pending at the guest, confirmable at the till', async ({
-    context,
-  }) => {
+  test('guest payment stays at the counter; no online UPI claim is exposed', async ({ context }) => {
     test.skip(!GUEST_READY, skipUnless(false, 'guest env for the order half'));
-    const guestUrl = await placeCounterOrder(context, 'e2e: upi claim flow');
+    const guestUrl = await placeCounterOrder(context, 'e2e: counter-only payment');
 
     const guest = await context.newPage();
     await guest.goto(guestUrl);
 
-    const payUpi = guest.locator('[data-pay-upi]');
-    test.skip(!(await payUpi.count()), 'this restaurant has no UPI details configured');
-
-    await guest.getByRole('button', { name: 'I have paid' }).click();
-    // A claim, not a receipt: the order stays pending and says so.
-    await expect(guest.locator('[data-upi-claimed]')).toBeVisible({ timeout: 20_000 });
-
-    const till = await signInOwner(context);
-    await till.goto(`${BASE}/cashier`);
-    // The till knows a guest is claiming, and warns the cashier to check the
-    // shop's own UPI app before recording anything.
-    await expect(
-      till.getByText("Check the restaurant’s own UPI app before recording it as cash"),
-    ).toBeVisible({ timeout: 45_000 });
-
-    await till.getByRole('group', { name: 'Payment method' }).getByRole('button', { name: 'UPI' }).click();
-    await till.locator('[data-counter-cta]').click();
-    await expect(till.locator('[data-counter-cta]')).toBeVisible(); // queue moved on
+    // Product policy: customers do not claim or submit online payments. UPI,
+    // cash and card are recorded by staff at the counter only.
+    await expect(guest.locator('[data-pay-upi]')).toHaveCount(0);
+    await expect(guest.getByRole('button', { name: 'I have paid' })).toHaveCount(0);
+    await expect(guest.getByText(/Pay at the counter before you leave/)).toBeVisible();
   });
 
   test('double-tapping Record writes ONE payment', async ({ context }) => {

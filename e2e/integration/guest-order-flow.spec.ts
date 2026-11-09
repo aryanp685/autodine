@@ -65,8 +65,8 @@ test.describe('guest ordering — real database', () => {
     await addOneAndCheckout(page);
     const url = await placeOrder(page, 'e2e: one order, one note');
 
-    // The database answered with a code and a guest token.
-    expect(codeFromOrderUrl(url)).toHaveLength(5);
+    // The database answered with the public AU- reference and a guest token.
+    expect(codeFromOrderUrl(url)).toMatch(/^AU-[A-Z0-9]{5}$/);
     expect(tokenFromOrderUrl(url).length).toBeGreaterThanOrEqual(8);
 
     await expect(page.getByText('Order placed')).toBeVisible();
@@ -101,18 +101,16 @@ test.describe('guest ordering — real database', () => {
     await expect(page.locator('[data-placed-mark="ok"]')).toBeVisible();
     await expect(page.getByText('Bill').first()).toBeVisible();
 
-    // The bill's total is on the page and is the same number the checkout
-    // promised — the UPI panel, when the restaurant has one, carries exactly
-    // this amount into the QR.
-    const billTotal = await page.getByText(/Total/).first().innerText();
+    // The bill's Total row is distinct from the other labels on the order page.
+    const billTotal = await page
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: 'Bill', exact: true }) })
+      .locator('dl dd')
+      .last()
+      .innerText();
     expect(billTotal).toMatch(/₹[\d,]+/);
-
-    const upi = page.locator('[data-pay-upi]');
-    if (await upi.count()) {
-      await expect(upi).toBeVisible();
-      // The amount is filled in by the server, not typed.
-      await expect(upi).toContainText(/₹[\d,]+/);
-    }
+    await expect(page.getByText(/Pay at the counter before you leave/)).toBeVisible();
+    await expect(page.locator('[data-pay-upi]')).toHaveCount(0);
 
     // Status reads need the token; the poller is what keeps this fresh. A
     // reload must not lose it (a real reload is the reconnect story).
@@ -152,7 +150,12 @@ test.describe('guest ordering — real database', () => {
 
     await placeOrder(page);
     // The bill on the order page is the database's, and it is not ₹0.01.
-    const totalText = await page.getByText(/Total/).first().innerText();
+    const totalText = await page
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: 'Bill', exact: true }) })
+      .locator('dl dd')
+      .last()
+      .innerText();
     const rupees = Number(totalText.replace(/[^0-9]/g, ''));
     expect(rupees).toBeGreaterThan(1);
   });
