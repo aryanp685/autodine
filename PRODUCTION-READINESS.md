@@ -185,3 +185,38 @@ and no configured UPI details. This green result does not certify those cases, a
 provider output, physical printers, broader integration suites, HTTP capacity or the deferred
 commercial/tax requirements. Production and existing tenant data remain untouched; only new
 namespaced disposable fixtures were created and retained.
+
+
+## Previously skipped coverage now executed: 26/26 hosted pass
+
+Actions run [42587290727](https://github.com/aryanp685/autodine/actions/runs/42587290727),
+test/fixture commit `4c52b66`, against staging app `7039c8c`:
+**26 passed, 0 failed, 0 skipped, 0 flaky**, approximately 422 seconds.
+This supersedes the earlier three-skip result for this curated integration suite only.
+
+- Other-tenant bill: provisioned a real second restaurant/menu/table and order through
+  guest session/order RPCs. Verified the order exists through its guest credential, then
+  tested the first restaurant's owner gets “Bill not found” and no bill sheet. The owner
+  was never granted membership in the second tenant.
+- QR lifecycle: permanent printed cards have revocation, not an expiry column. Replaced
+  the obsolete “expired card” assumption with two real tests: a deliberately revoked card
+  is refused; an independently expired database session attached to a LIVE card is refused
+  at checkout even when its browser cookie claims a future expiry. No clock manipulation
+  or production expiry-policy change.
+- UPI: fixture uses synthetic `autodine-synthetic@invalid` (not a payment destination).
+  Guest UPI QR/self-claim UI was intentionally removed from the current product; tests
+  assert it remains absent. Staff selects the exact order and records **UPI ₹125**.
+  Separate authenticated fixture-owner reads verify exactly one recorded UPI payment of
+  12,500 paise and a persisted paid order; guest reload confirms paid status. Reads stay
+  tenant-scoped; service-role financial SELECT grants remain unchanged. No real transfer,
+  gateway activation, bank settlement/reconciliation or provider-verification claim.
+- Supplemental payment receipts require an already-issued invoice. The initial expanded
+  run (42586240678: 25 pass / 1 fail / 0 skip) correctly exposed an invalid unconditional
+  receipt-link expectation; changed the test to verify the actual stored payment rather
+  than invent an invoice or misrepresent a counter payment as provider confirmation.
+
+Staging config now requires all adversarial fixture environment values before running,
+so missing fixtures cannot silently reinstate these skips. New fixture users/tenants/rows
+are retained by isolated run namespace; existing data and production remain untouched.
+Typecheck/lint and six runner safety/redaction regressions passed. No app/schema change
+was needed in this follow-up; no production deployment or paid resource was created.
