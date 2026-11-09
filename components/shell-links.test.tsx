@@ -69,7 +69,7 @@ describe('the rail for one role', () => {
 
   it('gives a cashier the counter and the bills, not the menu', () => {
     const hrefs = linksForRole('cashier').map((link) => link.href);
-    expect(hrefs).toEqual(expect.arrayContaining(['/cashier', '/dashboard/orders']));
+    expect(hrefs).toEqual(expect.arrayContaining(['/cashier', '/dashboard/orders', '/dashboard/invoices']));
     expect(hrefs).not.toContain('/dashboard/menus');
     expect(hrefs).not.toContain('/dashboard/settings');
   });

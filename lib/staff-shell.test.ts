@@ -27,6 +27,7 @@ const ROUTES: Record<string, { dir: string; key: string }> = {
   branding: { dir: 'app/(staff)/dashboard/branding', key: 'branding' },
   tables: { dir: 'app/(staff)/dashboard/tables', key: 'tables' },
   reports: { dir: 'app/(staff)/dashboard/reports', key: 'reports' },
+  invoices: { dir: 'app/(staff)/dashboard/invoices', key: 'invoices' },
   settings: { dir: 'app/(staff)/dashboard/settings', key: 'settings' },
   kitchen: { dir: 'app/(staff)/kitchen', key: 'kitchen' },
   counter: { dir: 'app/(staff)/cashier', key: 'counter' },
@@ -64,6 +65,7 @@ describe('the staff shell', () => {
       ['components/screens/BrandingScreen.tsx', 'branding'],
       ['components/screens/TablesScreen.tsx', 'tables'],
       ['components/screens/ReportsScreen.tsx', 'reports'],
+      ['components/screens/InvoiceHistoryScreen.tsx', 'invoices'],
       ['components/screens/SettingsScreen.tsx', 'settings'],
       ['components/screens/KitchenScreen.tsx', 'kitchen'],
     ];

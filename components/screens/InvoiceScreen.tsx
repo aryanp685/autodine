@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { createInvoiceShareLinkAction, revokeInvoiceShareLinkAction } from '@/app/(staff)/dashboard/share-actions';
 
 import { PrintButton } from '@/components/PrintButton';
 import { btn } from '@/components/owner/chrome';
@@ -17,11 +18,59 @@ const PAGE: Record<Layout, { size: string; margin: string; label: string }> = {
   '80mm': { size: '80mm auto', margin: '3mm', label: '80 mm' },
 };
 
-export function InvoiceScreen({ invoice }: { invoice: ReceiptData }) {
+export function InvoiceScreen({ invoice, shared = false }: { invoice: ReceiptData; shared?: boolean }) {
   const [layout, setLayout] = useState<Layout>('a4');
+  const [shareLinks, setShareLinks] = useState(invoice.shareLinks ?? []);
+  const [createdLink, setCreatedLink] = useState<{ id: string; href: string; expiresAt: string } | null>(null);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareMessage, setShareMessage] = useState('');
   const page = PAGE[layout];
   const shareText = buildReceiptMessage(invoice);
   const paid = invoice.totals.paymentStatus === 'paid';
+
+  async function createSecureLink() {
+    if (shareBusy) return;
+    setShareBusy(true);
+    setShareMessage('');
+    const result = await createInvoiceShareLinkAction(invoice.id);
+    setShareBusy(false);
+    if (!result.ok || !result.path || !result.expiresAt) {
+      setShareMessage(result.ok ? 'The link could not be verified.' : result.error);
+      return;
+    }
+    const href = `${window.location.origin}${result.path}`;
+    setCreatedLink({ id: result.id, href, expiresAt: result.expiresAt });
+    setShareLinks((current) => [{
+      id: result.id,
+      createdAt: new Date().toISOString(),
+      expiresAt: result.expiresAt!,
+      revokedAt: null,
+      lastAccessedAt: null,
+      accessCount: 0,
+    }, ...current]);
+    try {
+      await navigator.clipboard.writeText(href);
+      setShareMessage('Secure receipt link copied. It expires in 24 hours.');
+    } catch {
+      setShareMessage('Secure link created. Copy it from the field below; it expires in 24 hours.');
+    }
+  }
+
+  async function revokeLink(id: string) {
+    if (shareBusy) return;
+    setShareBusy(true);
+    setShareMessage('');
+    const result = await revokeInvoiceShareLinkAction(id);
+    setShareBusy(false);
+    if (!result.ok) {
+      setShareMessage(result.error);
+      return;
+    }
+    const revokedAt = new Date().toISOString();
+    setShareLinks((current) => current.map((link) => link.id === id ? { ...link, revokedAt } : link));
+    if (createdLink?.id === id) setCreatedLink(null);
+    setShareMessage('Receipt link revoked.');
+  }
 
   function shareReceipt() {
     if (navigator.share) {
@@ -60,8 +109,13 @@ export function InvoiceScreen({ invoice }: { invoice: ReceiptData }) {
               </select>
             </label>
             <button type="button" className={btn('ghost', 'sm')} onClick={shareReceipt}>
-              Share receipt
+              Share receipt text
             </button>
+            {!shared ? (
+              <button type="button" className={btn('ghost', 'sm')} onClick={createSecureLink} disabled={shareBusy}>
+                {shareBusy ? 'Working…' : 'Create 24-hour link'}
+              </button>
+            ) : null}
             <PrintButton className={btn('solid', 'sm')}>Print / Save PDF</PrintButton>
           </div>
         </div>
@@ -153,7 +207,7 @@ export function InvoiceScreen({ invoice }: { invoice: ReceiptData }) {
             ) : null}
             <div className="mt-1 flex justify-between gap-3 border-t border-gink py-2 font-semibold">
               <span>Total payable</span>
-              <span className="tabular-nums">{formatBillMoney(invoice.totals.totalPaise)}</span>
+              <span data-invoice-total className="tabular-nums">{formatBillMoney(invoice.totals.totalPaise)}</span>
             </div>
             <Summary label="Amount paid" value={formatBillMoney(invoice.totals.paidPaise)} />
             <Summary label="Outstanding" value={formatBillMoney(invoice.totals.outstandingPaise)} />
@@ -180,6 +234,51 @@ export function InvoiceScreen({ invoice }: { invoice: ReceiptData }) {
             <p className="mt-3 text-center">Thank you.</p>
           </footer>
         </article>
+
+        {!shared ? (
+          <section aria-label="Secure receipt links" className="mx-auto mt-4 max-w-[760px] rounded-[14px] border border-hair bg-card p-5 print:hidden">
+            <h2 className="text-[13px] font-semibold">Secure receipt links</h2>
+            <p className="mt-1 text-[11.5px] leading-[1.45] text-gink-64">
+              Links show this issued receipt only, expire after 24 hours, and can be revoked. The raw link is shown only when first created.
+            </p>
+            {shareMessage ? <p role="status" className="mt-2 text-[11.5px] text-gink-64">{shareMessage}</p> : null}
+            {createdLink ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <input
+                  aria-label="New secure receipt link"
+                  readOnly
+                  value={createdLink.href}
+                  className="min-w-0 flex-1 rounded border border-hair bg-paper px-2 py-1.5 text-[11.5px]"
+                />
+                <button type="button" className={btn('ghost', 'sm')} onClick={() => void navigator.clipboard.writeText(createdLink.href)}>
+                  Copy link
+                </button>
+                <span className="self-center text-[10.5px] text-gink-46">Expires {new Date(createdLink.expiresAt).toLocaleString()}</span>
+              </div>
+            ) : null}
+            {shareLinks.length ? (
+              <ul className="mt-3 divide-y divide-hair">
+                {shareLinks.map((link) => {
+                  const expired = Date.now() >= new Date(link.expiresAt).getTime();
+                  const status = link.revokedAt ? 'Revoked' : expired ? 'Expired' : 'Active';
+                  return (
+                    <li key={link.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-[11.5px]">
+                      <span>
+                        {status} · expires {new Date(link.expiresAt).toLocaleString()} · opened {link.accessCount} time{link.accessCount === 1 ? '' : 's'}
+                        {link.lastAccessedAt ? ` · last opened ${new Date(link.lastAccessedAt).toLocaleString()}` : ''}
+                      </span>
+                      {!link.revokedAt && !expired ? (
+                        <button type="button" className={btn('quiet', 'sm')} onClick={() => void revokeLink(link.id)} disabled={shareBusy}>
+                          Revoke link
+                        </button>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : <p className="mt-3 text-[11.5px] text-gink-46">No receipt links have been created.</p>}
+          </section>
+        ) : null}
 
         {invoice.paymentReceipts.length ? (
           <section data-supplemental-payment-receipts className="mx-auto mt-4 max-w-[760px] rounded-[14px] border border-hair bg-card p-5 print:hidden">

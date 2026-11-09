@@ -93,6 +93,19 @@ export type Database = {
       restaurant_invoice_lines: Table<RestaurantInvoiceLine>;
       /** Immutable supplemental receipts for payments received after invoicing. */
       restaurant_payment_receipts: Table<RestaurantPaymentReceipt>;
+      /** Opaque hashed credentials for bounded public receipt links. */
+      restaurant_invoice_share_links: Table<{
+        id: string;
+        restaurant_id: string;
+        invoice_id: string;
+        token_hash: string;
+        created_by: string;
+        created_at: string;
+        expires_at: string;
+        revoked_at: string | null;
+        last_accessed_at: string | null;
+        access_count: number;
+      }>;
       /** Live guest requests for staff to visit a verified table. */
       table_waiter_calls: Table<TableWaiterCall>;
       /** Private row-locked receipt counters; no client grants. */
@@ -233,6 +246,29 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      create_restaurant_invoice_share_link: {
+        Args: { p_invoice_id: string; p_token_hash: string };
+        Returns: { share_link_id: string; expires_at: string }[];
+      };
+      revoke_restaurant_invoice_share_link: {
+        Args: { p_share_link_id: string };
+        Returns: boolean;
+      };
+      list_restaurant_invoice_share_links: {
+        Args: { p_invoice_id: string };
+        Returns: {
+          id: string;
+          created_at: string;
+          expires_at: string;
+          revoked_at: string | null;
+          last_accessed_at: string | null;
+          access_count: number;
+        }[];
+      };
+      read_shared_restaurant_invoice: {
+        Args: { p_token_hash: string };
+        Returns: unknown;
+      };
       /** Atomic shared rate-limit counter; service role only. */
       hit_rate_limit: {
         Args: { p_key: string; p_limit: number; p_window_seconds: number };

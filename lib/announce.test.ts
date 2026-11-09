@@ -8,6 +8,7 @@ import {
   isTakeaway,
   newOrderText,
   newOrderTextEn,
+  newOrderTextHinglish,
   orderAnnouncement,
   primeOnOpen,
   selectNewTickets,
@@ -351,6 +352,22 @@ describe('newOrderTextEn', () => {
   it('says no note at all when there is none', () => {
     const text = newOrderTextEn('T2', [naan]);
     expect(text.endsWith('2 Full Butter Naan.')).toBe(true);
+  });
+});
+
+describe('newOrderTextHinglish', () => {
+  it('keeps Hindi order structure and quantities while preserving English dish names and notes', () => {
+    expect(newOrderTextHinglish(
+      'T5',
+      [{ qty: 2, name: 'Paneer Tikka', detail: 'Half · Extra cheese' }],
+      'less spicy',
+    )).toBe('नया order आया है। Table पाँच। दो Half, Extra cheese Paneer Tikka। Note: less spicy।');
+  });
+
+  it('does not add a table for takeaway', () => {
+    const text = newOrderTextHinglish('Takeaway', [{ qty: 1, name: 'Masala Dosa' }]);
+    expect(text).toContain('नया takeaway order आया है।');
+    expect(text).not.toContain('Table');
   });
 });
 

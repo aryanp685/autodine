@@ -5,10 +5,12 @@ import {
   STAFF_READY,
   addOneAndCheckout,
   placeOrder,
+  tokenFromOrderUrl,
   scanCard,
   signInOwner,
   skipUnless,
 } from './flow';
+import { orderSessionForGuestToken } from './disposable-db';
 
 /**
  * THE COUNTER (CASHIER), END TO END, ON A REAL DEPLOYMENT.
@@ -122,6 +124,89 @@ test.describe('cashier — real database', () => {
     // Re-read the till and the bill: one payment, nothing outstanding twice.
     await till.reload();
     await expect(till.getByText(/outstanding/i).first()).toBeVisible();
+  });
+
+  test('two ticket sitting settles, prints the exact total, closes and starts a fresh sitting', async ({ context }) => {
+    test.skip(!GUEST_READY, skipUnless(false, 'guest env for the order half'));
+    const guest = await scanCard(context);
+
+    await addOneAndCheckout(guest);
+    const firstUrl = await placeOrder(guest, 'e2e: session ticket one');
+    await addOneAndCheckout(guest);
+    const secondUrl = await placeOrder(guest, 'e2e: session ticket two');
+    const first = await orderSessionForGuestToken(tokenFromOrderUrl(firstUrl));
+    const second = await orderSessionForGuestToken(tokenFromOrderUrl(secondUrl));
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    expect(first?.order_session_id).toBe(second?.order_session_id);
+
+    const till = await signInOwner(context);
+    await till.goto(`${BASE}/dashboard`);
+    const session = till.locator(`[data-active-session="${first?.order_session_id}"]`);
+    await expect(session).toBeVisible({ timeout: 45_000 });
+    await expect(session).toContainText('2 tickets');
+    const dashboardTotal = (await session.locator('[data-session-total]').innerText()).trim();
+
+    await session.getByRole('button', { name: /Mark .* paid/ }).click();
+    await expect(session.getByRole('button', { name: /Close .* issue final receipt/ })).toBeVisible({ timeout: 20_000 });
+    await session.getByRole('button', { name: /Close .* issue final receipt/ }).click();
+    const confirm = session.getByRole('group', { name: /Confirm checkout/ });
+    await confirm.getByRole('button', { name: 'Close & issue' }).click();
+    await expect(till).toHaveURL(/\/invoice\/[0-9a-f-]{36}$/i, { timeout: 30_000 });
+    const sheet = till.locator('[data-invoice-sheet]');
+    await expect(sheet).toBeVisible();
+    const invoiceTotal = (await till.locator('[data-invoice-total]').innerText()).trim();
+    expect(invoiceTotal).toBe(dashboardTotal);
+    await expect(sheet.locator('tbody tr')).toHaveCount(2);
+
+    await till.getByRole('button', { name: 'Create 24-hour link' }).click();
+    const secureLinkInput = till.getByLabel('New secure receipt link');
+    await expect(secureLinkInput).toBeVisible({ timeout: 20_000 });
+    const shareUrl = await secureLinkInput.inputValue();
+    expect(shareUrl).toMatch(/\/receipt-share\/[A-Za-z0-9_-]{43}$/);
+    const sharedReceipt = await context.newPage();
+    await sharedReceipt.goto(shareUrl);
+    await expect(sharedReceipt.locator('[data-invoice-sheet]')).toBeVisible({ timeout: 20_000 });
+    await expect(sharedReceipt.locator('[data-invoice-total]')).toHaveText(invoiceTotal);
+    await expect(sharedReceipt.getByRole('button', { name: 'Create 24-hour link' })).toHaveCount(0);
+
+    // Exercise the browser's CSS page-size path and make sure each PDF is a
+    // real PDF artifact generated from the same final receipt DOM.
+    const layout = till.getByLabel('Receipt print layout');
+    for (const [name, options] of [
+      ['a4', { printBackground: true, preferCSSPageSize: true }],
+      ['58mm', { printBackground: true, preferCSSPageSize: true }],
+      ['80mm', { printBackground: true, preferCSSPageSize: true }],
+    ] as const) {
+      await layout.selectOption(name);
+      await expect(sheet).toHaveAttribute('data-layout', name);
+      await till.emulateMedia({ media: 'print' });
+      const pdf = await till.pdf(options);
+      expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
+      expect(pdf.length).toBeGreaterThan(2_000);
+      await till.emulateMedia({ media: 'screen' });
+      expect((await till.locator('[data-invoice-total]').innerText()).trim()).toBe(invoiceTotal);
+    }
+
+    await till.getByRole('button', { name: 'Revoke link' }).click();
+    await expect(till.getByText('Receipt link revoked.')).toBeVisible();
+    await sharedReceipt.reload();
+    await expect(sharedReceipt.getByText('This link is unavailable')).toBeVisible({ timeout: 20_000 });
+
+    await till.goto(`${BASE}/dashboard/invoices`);
+    await expect(till.getByRole('link', { name: /INV\// }).first()).toBeVisible({ timeout: 20_000 });
+
+    // After closure, a further intentional order on the same QR must not
+    // attach to the settled sitting or its immutable invoice.
+    await addOneAndCheckout(guest);
+    const thirdUrl = await placeOrder(guest, 'e2e: fresh sitting after checkout');
+    const third = await orderSessionForGuestToken(tokenFromOrderUrl(thirdUrl));
+    expect(third).not.toBeNull();
+    expect(third?.order_session_id).not.toBe(first?.order_session_id);
+    expect(third?.session_status).toBe('open');
+    await till.goto(`${BASE}/dashboard`);
+    await expect(till.locator(`[data-active-session="${third?.order_session_id}"]`)).toBeVisible({ timeout: 30_000 });
+    await expect(till.locator(`[data-active-session="${first?.order_session_id}"]`)).toHaveCount(0);
   });
 
   test('a cancelled order cannot be settled — money for food that will not come', async ({

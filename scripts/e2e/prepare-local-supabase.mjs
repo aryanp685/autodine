@@ -82,7 +82,7 @@ try {
     }
     await apply(await readFile(path.join(migrationDir, file), 'utf8'), `supabase/migrations/${file}`);
   }
-  if (migrationFiles.length !== 45) throw new Error(`Expected 45 checked-in migrations, found ${migrationFiles.length}.`);
+  if (migrationFiles.length !== 48) throw new Error(`Expected 48 checked-in migrations, found ${migrationFiles.length}.`);
 
   const required = await client.query(`
     select
@@ -203,7 +203,7 @@ try {
   };
   const lines = Object.entries(envValues).map(([key, value]) => `${key}=${value}`);
   await writeFile(envFile, `${lines.join('\n')}\n`, { mode: 0o600 });
-  console.log(`Seeded only synthetic Supabase Auth/database fixtures for ${slug}; migration chain: ${migrationFiles.length}/45.`);
+  console.log(`Seeded only synthetic Supabase Auth/database fixtures for ${slug}; migration chain: ${migrationFiles.length}/48.`);
 } finally {
   await client.end();
 }

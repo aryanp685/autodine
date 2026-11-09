@@ -389,6 +389,10 @@ describe('Dashboard active table sessions', () => {
     openedAt: '2026-11-07T10:00:00.000Z',
     orderCount: 2,
     orderCodes: ['A-1001', 'A-1002'],
+    items: [
+      { ticketCode: 'A-1001', name: 'Paneer Tikka', quantity: 2, variant: 'Half', addons: ['Extra mint'] },
+      { ticketCode: 'A-1002', name: 'Butter Naan', quantity: 1, variant: null, addons: [] },
+    ],
     totalPaise: 42000,
     paidPaise: 10000,
     outstandingPaise: 32000,
@@ -400,9 +404,16 @@ describe('Dashboard active table sessions', () => {
     expect(html).toContain('aria-label="Active table sessions"');
     expect(html).toContain('T6');
     expect(html).toContain('A-1001, A-1002');
+    expect(html).toContain('Session session-1');
+    expect(html).toContain('2 × Paneer Tikka');
+    expect(html).toContain('Half · Extra mint');
+    expect(html).toContain('Butter Naan');
+    expect(html).toContain('Session total');
     expect(html).toContain('Outstanding');
     expect(html).toContain('data-mark-session-paid="session-1"');
     expect(html).toContain('Mark T6 paid');
+    expect(html).toContain('Settle the outstanding balance before closing this table.');
+    expect(html).not.toContain('data-checkout-session="session-1"');
     expect(html).not.toContain('method');
   });
 
@@ -425,5 +436,6 @@ describe('Dashboard active table sessions', () => {
     expect(html).toContain('>Paid<');
     expect(html).toContain('Paid 4:12 pm');
     expect(html).not.toContain('data-mark-session-paid');
+    expect(html).toContain('data-checkout-session="session-1"');
   });
 });

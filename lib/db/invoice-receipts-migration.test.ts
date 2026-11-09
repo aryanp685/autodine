@@ -5,6 +5,10 @@ const sql = readFileSync(
   new URL('../../supabase/migrations/20261108002000_invoice_receipts.sql', import.meta.url),
   'utf8',
 );
+const checkoutSecuritySql = readFileSync(
+  new URL('../../supabase/migrations/20261108008000_p8_require_settlement_before_close.sql', import.meta.url),
+  'utf8',
+);
 
 function functionBody(name: string): string {
   const start = sql.indexOf(`create or replace function public.${name}(`);
@@ -67,7 +71,7 @@ describe('P6 receipt migration guards', () => {
     expect(sql).toContain('using (public.is_member(restaurant_id))');
     expect(sql).toContain('revoke all on public.restaurant_invoices from public, anon, authenticated, service_role');
     expect(sql).toContain('grant select on public.restaurant_invoices, public.restaurant_invoice_lines to authenticated');
-    expect(sql).toContain('grant execute on function public.issue_closed_session_receipt(uuid) to authenticated');
+    expect(checkoutSecuritySql).toContain('revoke all on function public.issue_closed_session_receipt(uuid) from public, anon, authenticated, service_role');
     expect(sql).toContain('grant execute on function public.void_restaurant_invoice(uuid, text) to authenticated');
   });
 

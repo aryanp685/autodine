@@ -28,33 +28,35 @@ not browser E2E evidence.
 
 On the repository's Linux/Node 22 sandbox, `npm ci` followed by
 `npm run test:db:local` starts an isolated embedded PostgreSQL 17.11 cluster
-under a fresh temporary directory. It replays all 45 checked-in migrations,
+under a fresh temporary directory. It replays all 48 checked-in migrations,
 adds only the already documented local Supabase shim and inferred scaffold,
-checks the resulting objects and `supabase/checks/06_scan_limits.sql`, runs all
-five PostgreSQL-gated tests, and destroys the cluster on exit. The same run
-then performs a database-only synthetic workload of 5,000 independent guests
-across 100 synthetic restaurants: 5,000 table sessions and 5,000
-`place_public_order` SQL writes, with a 64-connection pool. This is a local SQL
-throughput smoke, not a 5,000-concurrent-browser test or a forecast of hosted
-Supabase capacity. The completed sandbox run opened 5,000 sessions in 2.824s
-(about 1,771/s) and wrote/verified 5,000 SQL orders in 43.863s (about 114/s)
-with that local pool cap; use a staged provider environment for any hosted
-capacity claim.
+checks the resulting objects and SQL regressions in
+`supabase/checks/06_scan_limits.sql`, `07_p8_close_settlement.sql`, and
+`08_p3_incremental_tickets.sql`, runs all five PostgreSQL-gated tests, and
+destroys the cluster on exit. The same run
+then performs a database-only synthetic workload (default 5,000 distinct
+guests across 100 synthetic restaurants) with a 64-connection pool. This is a
+local SQL throughput smoke, not a 5,000-concurrent-browser test or a forecast
+of hosted Supabase capacity. The latest command used `LOCAL_LOAD_USERS=100`:
+100 sessions and 100 SQL orders were verified; session-open took 307ms and
+order-write took 860ms. Earlier 5,000-row measurements remain historical and
+are not repeated-load evidence. Use a staged provider environment for any
+hosted capacity claim.
 
 `npm run e2e:demo` builds the hermetic demo-mode app and runs the 64
 non-integration Playwright tests with Chromium from `@sparticuz/chromium`. The
 wrapper extracts Chromium's bundled NSS/NSPR libraries into a fresh temporary
 directory and checks every linked library before launch, so it needs neither
-apt nor a system Chromium installation. This turn's run verified **64 passed,
-0 skipped, 0 failed**. `npm run e2e:local` remains the unfiltered 111-test
-catalog command; without Supabase it reports 47 integration cases as skipped,
-not verified.
+apt nor a system Chromium installation. The latest hosted browser workflow verified **64 passed,
+0 skipped, 0 failed** for the hermetic project. `npm run e2e:local` remains the
+unfiltered 111-test catalog command; without Supabase it reports 47 integration
+cases as skipped, not verified.
 
 ### Full disposable Supabase suite and realistic load
 
 `.github/workflows/supabase-e2e-load.yml` is the GitHub-hosted full-stack runner. It
 uses the pinned Supabase CLI to start local Postgres 17 plus Auth, Storage,
-Realtime and Studio, applies all 45 checked-in migrations plus only the marked
+Realtime and Studio, applies all 48 checked-in migrations plus only the marked
 inferred local scaffold, creates random synthetic Auth identities and fixtures,
 and builds the app against that loopback stack. It runs the hermetic 64 and the
 47 database-backed Playwright tests in separate stages, so the complete 111-test
@@ -64,7 +66,11 @@ updates and Realtime fan-out, and saves JSON metrics, test reports, traces and
 screenshots as a 30-day workflow artifact. It uses no hosted project credentials
 or production data and deploys nothing. A workflow definition is not evidence
 until its run finishes; its uploaded per-test reports and `load-report.json` are
-the evidence to retain.
+the evidence to retain. Run `42609513688` completed successfully: 64
+hermetic and 47 Supabase-backed tests passed; all 1,500 kitchen events were
+delivered (500 each for preparing, ready and served), with zero load failures.
+That is evidence for this run only; repeat the isolated workload before treating
+delivery as repeatedly verified.
 
 This sandbox has no Docker/Podman daemon or container images and cannot reach
 the container registries, so it cannot truthfully claim to have started the full

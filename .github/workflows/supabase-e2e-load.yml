@@ -9,9 +9,9 @@ on:
         default: ''
         type: string
       integration_expected:
-        description: Expected number of selected tests (use 47 for the full integration suite)
+        description: Expected number of selected tests (use 49 for the full integration suite)
         required: false
-        default: '47'
+        default: '49'
         type: string
   push:
     branches:
@@ -23,7 +23,7 @@ permissions:
 jobs:
   disposable-supabase:
     if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[skip-supabase-e2e]') }}
-    name: 64 hermetic + 47 Supabase-backed E2E, then synthetic load
+    name: 64 hermetic + 49 Supabase-backed E2E, then synthetic load
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
@@ -107,7 +107,7 @@ jobs:
       - name: Require integration passes with no skips or retries
         if: always()
         env:
-          INTEGRATION_EXPECTED: ${{ inputs.integration_expected || '47' }}
+          INTEGRATION_EXPECTED: ${{ inputs.integration_expected || '49' }}
         run: node scripts/e2e/assert-playwright-results.mjs test-results/supabase-e2e/integration-results.json "$INTEGRATION_EXPECTED"
 
       - name: Retain integration HTML report

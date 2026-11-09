@@ -49,12 +49,21 @@ export type DashboardOrder = {
   totalPaise: number;
 };
 
+export type DashboardActiveSessionItem = {
+  ticketCode: string;
+  name: string;
+  quantity: number;
+  variant: string | null;
+  addons: string[];
+};
+
 export type DashboardActiveSession = {
   id: string;
   table: string;
   openedAt: string;
   orderCount: number;
   orderCodes: string[];
+  items: DashboardActiveSessionItem[];
   totalPaise: number;
   paidPaise: number;
   outstandingPaise: number;
@@ -164,7 +173,7 @@ async function loadActiveSessions(
 
   const orderIds = orderRows.map((order) => order.id);
   const tableIds = [...new Set(sessions.map((session) => session.table_id))];
-  const [paymentsResult, tablesResult] = await Promise.all([
+  const [paymentsResult, tablesResult, itemsResult] = await Promise.all([
     supabase
       .from('payments')
       .select('order_id, amount_paise, status, created_at')
@@ -172,6 +181,11 @@ async function loadActiveSessions(
     tableIds.length
       ? supabase.from('dining_tables').select('id, label').in('id', tableIds)
       : Promise.resolve({ data: [], error: null }),
+    supabase
+      .from('order_items')
+      .select('id, order_id, name_snapshot, qty, variant_snapshot, addons_snapshot, sort_order')
+      .in('order_id', orderIds)
+      .order('sort_order', { ascending: true }),
   ]);
 
   if (paymentsResult.error) {
@@ -179,6 +193,9 @@ async function loadActiveSessions(
   }
   if (tablesResult.error) {
     throw new Error(`Could not load session tables: ${tablesResult.error.message}`);
+  }
+  if (itemsResult.error) {
+    throw new Error(`Could not load session ticket items: ${itemsResult.error.message}`);
   }
 
   const paidByOrder = new Map<string, number>();
@@ -206,6 +223,24 @@ async function loadActiveSessions(
   const labelByTable = new Map<string, string>();
   for (const table of tablesResult.data ?? []) labelByTable.set(table.id, table.label);
 
+  const ticketCodeByOrder = new Map(orderRows.map((order) => [order.id, order.code]));
+  const itemsBySession = new Map<string, DashboardActiveSessionItem[]>();
+  const sessionByOrder = new Map(orderRows.map((order) => [order.id, order.order_session_id]));
+  for (const item of itemsResult.data ?? []) {
+    const sessionId = sessionByOrder.get(item.order_id);
+    const ticketCode = ticketCodeByOrder.get(item.order_id);
+    if (!sessionId || !ticketCode) continue;
+    const sessionItems = itemsBySession.get(sessionId) ?? [];
+    sessionItems.push({
+      ticketCode,
+      name: item.name_snapshot,
+      quantity: item.qty,
+      variant: item.variant_snapshot,
+      addons: item.addons_snapshot ?? [],
+    });
+    itemsBySession.set(sessionId, sessionItems);
+  }
+
   return sessions.flatMap((session) => {
     const tickets = ordersBySession.get(session.id) ?? [];
     if (tickets.length === 0) return [];
@@ -231,6 +266,7 @@ async function loadActiveSessions(
       openedAt: session.opened_at,
       orderCount: tickets.length,
       orderCodes: tickets.map((order) => order.code),
+      items: itemsBySession.get(session.id) ?? [],
       totalPaise,
       paidPaise,
       outstandingPaise,

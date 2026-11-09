@@ -235,7 +235,7 @@ export function Checkout({
               </div>
             </dl>
 
-            <PlaceOrderButton totalPaise={totalPaise} canOrder={canOrder} form="co-place-order" variant="bill" />
+            <PlaceOrderButton canOrder={canOrder} form="co-place-order" variant="bill" />
             <p role="note" className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
               You pay at the counter. The kitchen starts on this straight away.
             </p>
@@ -257,7 +257,7 @@ export function Checkout({
                 <span className="text-[10px] font-semibold tracking-[0.09em] text-gink-46 uppercase">Total payable</span>
                 <strong className="tnum text-[17px] font-semibold text-gink">{inr(paiseToRupees(totalPaise))}</strong>
               </span>
-                <PlaceOrderButton totalPaise={totalPaise} canOrder={canOrder} form="co-place-order" variant="dock" />
+                <PlaceOrderButton canOrder={canOrder} form="co-place-order" variant="dock" />
               </div>
             </div>
           </div>

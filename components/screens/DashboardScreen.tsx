@@ -406,15 +406,39 @@ export function Dashboard({
                           {session.orderCount} ticket{session.orderCount === 1 ? '' : 's'}
                           {session.orderCodes.length ? ` · ${session.orderCodes.join(', ')}` : ''}
                         </p>
+                        <p className="mt-1 break-all text-[10px] text-gink-46">
+                          Session {session.id} · opened {clockTimeInZone(timezone, session.openedAt)}
+                        </p>
                       </div>
                       <Tag tone={unpaid ? 'due' : 'live'}>{unpaid ? 'Unpaid' : 'Paid'}</Tag>
                     </div>
 
-                    <div className="mt-4 flex items-end justify-between gap-3 border-t border-hair pt-3">
+                    {session.items.length ? (
+                      <ul aria-label={`Items in session ${session.id}`} className="mt-3 space-y-1 border-t border-hair pt-3">
+                        {session.items.map((item, index) => (
+                          <li key={`${item.ticketCode}-${index}`} className="flex items-start justify-between gap-3 text-[11.5px]">
+                            <span className="min-w-0 break-words text-gink">
+                              <strong className="font-semibold">{item.quantity} × {item.name}</strong>
+                              {item.variant || item.addons.length ? (
+                                <span className="block text-[10px] text-gink-46">
+                                  {[item.variant, ...item.addons].filter(Boolean).join(' · ')}
+                                </span>
+                              ) : null}
+                            </span>
+                            <span className="shrink-0 text-[10px] text-gink-46">{item.ticketCode}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+
+                    <div className="mt-3 flex items-end justify-between gap-3 border-t border-hair pt-3">
                       <div>
-                        <p className="text-[10.5px] text-gink-46">{unpaid ? 'Outstanding' : 'Session total'}</p>
-                        <p className="mt-0.5 text-[18px] font-semibold tracking-[-0.025em] text-gink tabular-nums">
-                          <Money value={unpaid ? session.outstandingPaise : session.totalPaise} />
+                        <p className="text-[10.5px] text-gink-46">Session total</p>
+                        <p data-session-total className="mt-0.5 text-[18px] font-semibold tracking-[-0.025em] text-gink tabular-nums">
+                          <Money value={session.totalPaise} />
+                        </p>
+                        <p className="mt-1 text-[10.5px] text-gink-46">
+                          Paid <Money value={session.paidPaise} /> · Outstanding <Money value={session.outstandingPaise} />
                         </p>
                         {!unpaid && session.paidAt ? (
                           <p className="mt-1 text-[10.5px] text-gink-46">

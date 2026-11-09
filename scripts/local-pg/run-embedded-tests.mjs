@@ -232,7 +232,7 @@ try {
       (select count(*)::int from information_schema.columns where table_schema = 'public') as columns
   `);
   const schemaCounts = schema.rows[0];
-  if (migrationFiles.length !== 45 || schemaCounts.tables < 20 || schemaCounts.functions < 20) {
+  if (migrationFiles.length !== 48 || schemaCounts.tables < 20 || schemaCounts.functions < 20) {
     throw new Error(`Unexpected schema verification counts: ${JSON.stringify({ migrations: migrationFiles.length, ...schemaCounts })}`);
   }
   const keyObjects = await client.query(`
@@ -253,6 +253,13 @@ try {
     await readFile(path.join(root, 'supabase/checks/06_scan_limits.sql'), 'utf8'),
     'supabase/checks/06_scan_limits.sql (transaction rolls back its synthetic checks)',
   );
+  for (const name of ['07_p8_close_settlement.sql', '08_p3_incremental_tickets.sql']) {
+    await apply(
+      client,
+      await readFile(path.join(root, 'supabase/checks', name), 'utf8'),
+      `supabase/checks/${name} (transaction rolls back its synthetic checks)`,
+    );
+  }
 
   await client.query(`
     alter role authenticator with login noinherit password '${password}';

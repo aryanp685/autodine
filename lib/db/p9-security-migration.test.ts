@@ -5,6 +5,10 @@ const sql = readFileSync(
   new URL('../../supabase/migrations/20261108005000_p9_security_hardening.sql', import.meta.url),
   'utf8',
 );
+const financialReadSql = readFileSync(
+  new URL('../../supabase/migrations/20261108009000_p9_financial_read_roles.sql', import.meta.url),
+  'utf8',
+);
 
 function functionBody(name: string): string {
   const start = sql.indexOf(`create or replace function public.${name}(`);
@@ -37,6 +41,15 @@ describe('P9 security hardening migration', () => {
     expect(used).toBeGreaterThan(replay);
     expect(redeem.slice(replay, used)).toContain('public.memberships');
     expect(redeem.slice(replay, used)).toContain("'already_member'");
+  });
+
+  it('limits invoice, invoice-line, and payment-receipt reads to finance roles', () => {
+    for (const table of ['restaurant_invoices', 'restaurant_invoice_lines', 'restaurant_payment_receipts']) {
+      expect(financialReadSql).toContain(`drop policy if exists ${table === 'restaurant_invoices' ? 'restaurant_invoices_staff_read' : table === 'restaurant_invoice_lines' ? 'restaurant_invoice_lines_staff_read' : 'restaurant_payment_receipts_staff_read'}`);
+      expect(financialReadSql).toContain(`on public.${table}`);
+      expect(financialReadSql).toContain("m.role in ('owner', 'manager', 'cashier')");
+      expect(financialReadSql).toContain('m.user_id = auth.uid()');
+    }
   });
 
   it('records invite and team membership changes in an append-only log without code hashes', () => {

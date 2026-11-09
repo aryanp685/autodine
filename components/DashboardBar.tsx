@@ -448,6 +448,12 @@ const ICONS: Record<DashboardSection, ReactNode> = {
       <path d="M9 8h6M9 12h6M9 16h4" strokeLinecap="round" />
     </svg>
   ),
+  invoices: (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M5.5 3.5h9l4 4v13h-13z" strokeLinejoin="round" />
+      <path d="M14.5 3.5v4h4M8.5 12h7M8.5 15.5h7" strokeLinecap="round" />
+    </svg>
+  ),
   kitchen: (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6">
       <path d="M5 9h14" strokeLinecap="round" />

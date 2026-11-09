@@ -1,14 +1,17 @@
 import { expect, test } from '@playwright/test';
 import {
+  BASE,
   GUEST_READY,
   SLUG,
   addOneAndCheckout,
   codeFromOrderUrl,
   placeOrder,
   scanCard,
+  signInOwner,
   skipUnless,
   tokenFromOrderUrl,
 } from './flow';
+import { orderCountForGuestToken, orderSessionForGuestToken } from './disposable-db';
 
 /**
  * THE GUEST ORDERING FLOW, END TO END, ON A REAL DEPLOYMENT.
@@ -88,6 +91,38 @@ test.describe('guest ordering — real database', () => {
     // it twice and the tracking page would have a second code. What must NOT
     // exist is an error saying the second tap ordered again.
     await expect(page.getByText('Order placed')).toBeVisible();
+    expect(await orderCountForGuestToken(tokenFromOrderUrl(page.url()))).toBe(1);
+  });
+
+  test('two intentional rounds on one table create two tickets in the same sitting', async ({ context }) => {
+    const page = await scanCard(context);
+
+    await addOneAndCheckout(page);
+    const firstUrl = await placeOrder(page, 'e2e: first intentional round');
+    const firstToken = tokenFromOrderUrl(firstUrl);
+    const firstOrder = await orderSessionForGuestToken(firstToken);
+    expect(firstOrder).not.toBeNull();
+
+    // A fresh cart and fresh attempt token are a second guest intention, not
+    // a retry of the first form. Keep the same scanned table/browser context.
+    await addOneAndCheckout(page);
+    const secondUrl = await placeOrder(page, 'e2e: second intentional round');
+    const secondToken = tokenFromOrderUrl(secondUrl);
+    const secondOrder = await orderSessionForGuestToken(secondToken);
+
+    expect(secondToken).not.toBe(firstToken);
+    expect(secondOrder).not.toBeNull();
+    expect(secondOrder?.id).not.toBe(firstOrder?.id);
+    expect(secondOrder?.order_session_id).toBe(firstOrder?.order_session_id);
+
+    const dashboard = await signInOwner(context);
+    await dashboard.goto(`${BASE}/dashboard`);
+    const session = dashboard.locator(`[data-active-session="${firstOrder?.order_session_id}"]`);
+    await expect(session).toBeVisible({ timeout: 45_000 });
+    await expect(session).toContainText('2 tickets');
+    await expect(session).toContainText(codeFromOrderUrl(firstUrl));
+    await expect(session).toContainText(codeFromOrderUrl(secondUrl));
+    await expect(session.getByText('2 × Synthetic Paneer Dish').first()).toBeVisible();
   });
 
   test('the tracking page follows the kitchen, and the bill keeps the exact amount', async ({
