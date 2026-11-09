@@ -145,12 +145,13 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
     await expect(asStaff(c.user,()=>db.query('select set_order_line_quantities($1,$2::jsonb,null)',[c.order,JSON.stringify([{line_id:randomUUID(),qty:1}])]))).rejects.toMatchObject({code:'22023'});
   });
 
-  it('freezes unpaid source amounts and cancellation after receipt issuance', async()=>{
+  it('freezes finalized source amounts and cancellation after receipt issuance', async()=>{
     const c=await fixture();
     await db.query("select set_config('request.jwt.claim.sub',$1,false)",[c.user]);
+    await db.query('select mark_order_session_paid($1)',[c.sitting]);
     await db.query('select close_order_session_and_issue_receipt($1)',[c.sitting]);
-    await expect(db.query('select cancel_order($1,null,null)',[c.order])).rejects.toThrow(/finalized invoice/i);
-    await expect(db.query('select set_order_line_quantities($1,$2::jsonb,null)',[c.order,JSON.stringify([{line_id:(await db.query('select id from order_items where order_id=$1',[c.order])).rows[0].id,qty:1}])])).rejects.toThrow(/finalized invoice/i);
+    await expect(db.query('select cancel_order($1,null,null)',[c.order])).rejects.toThrow(/already been paid/i);
+    await expect(db.query('select set_order_line_quantities($1,$2::jsonb,null)',[c.order,JSON.stringify([{line_id:(await db.query('select id from order_items where order_id=$1',[c.order])).rows[0].id,qty:1}])])).rejects.toThrow(/already been paid/i);
     expect((await db.query('select total_paise from orders where id=$1',[c.order])).rows[0].total_paise).toBe('25000');
   });
   it('keeps concurrent duplicate and distinct submissions correct under a bounded local workload', async()=>{
