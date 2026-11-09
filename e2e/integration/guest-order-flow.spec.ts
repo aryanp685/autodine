@@ -124,8 +124,16 @@ test.describe('guest ordering — real database', () => {
     await addOneAndCheckout(page);
     await placeOrder(page);
 
+    // The submitted cart is copied to a separate key before the live cart is
+    // cleared. Wait for that storage write explicitly so a missing offer points
+    // to the save/read path rather than an arbitrary hydration timeout.
+    await expect
+      .poll(() => page.evaluate((slug) => localStorage.getItem(`ad_last_cart:${slug}`), SLUG), {
+        timeout: 15_000,
+      })
+      .not.toBeNull();
     const reorder = page.locator('[data-reorder-button]');
-    await expect(reorder).toBeVisible();
+    await expect(reorder).toBeVisible({ timeout: 15_000 });
     await reorder.click();
 
     // The cart is refilled from the order that was just placed.

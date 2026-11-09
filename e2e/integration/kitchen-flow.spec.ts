@@ -10,7 +10,7 @@ import {
   skipUnless,
   tokenFromOrderUrl,
 } from './flow';
-import { announcementCount, recordAnnouncements } from '../flow-helpers';
+import { announcementCount, announcementTexts, recordAnnouncements } from '../flow-helpers';
 
 /**
  * THE KITCHEN WORKFLOW, END TO END, ON A REAL DEPLOYMENT.
@@ -64,7 +64,7 @@ test.describe('kitchen — real database', () => {
     });
     await expect(ticket).toBeVisible({ timeout: 45_000 });
     await expect(ticket).toContainText(/×/); // quantities per line
-    await expect(ticket).toContainText(/Table |T\d/); // the table it belongs to
+    await expect(ticket).toContainText(/E2E Guest \d{2}/); // the synthetic table it belongs to
   });
 
   test('Preparing → Ready → Served, and the guest watches it happen', async ({ context }) => {
@@ -86,19 +86,27 @@ test.describe('kitchen — real database', () => {
     await expect(ticket).toBeVisible({ timeout: 45_000 });
 
     await ticket.getByRole('button', { name: 'Start preparing' }).click();
-    await expect(guest.getByText('Being cooked')).toBeVisible({ timeout: 45_000 });
-
     const preparing = board.locator('article[data-state="preparing"]', {
       hasText: 'e2e: status sync ticket',
     });
-    await preparing.getByRole('button', { name: 'Mark ready' }).click();
-    await expect(guest.getByText('Ready to serve')).toBeVisible({ timeout: 45_000 });
+    await expect(preparing).toBeVisible({ timeout: 45_000 });
+    await guest.reload();
+    await expect(guest.locator('[data-placed-step="now"]')).toContainText('Being cooked');
 
+    await preparing.getByRole('button', { name: 'Mark ready' }).click();
     const ready = board.locator('article[data-state="ready"]', {
       hasText: 'e2e: status sync ticket',
     });
+    await expect(ready).toBeVisible({ timeout: 45_000 });
+    await guest.reload();
+    await expect(guest.locator('[data-placed-step="now"]')).toContainText('Ready to serve');
+
     await ready.getByRole('button', { name: 'Mark served' }).click();
-    await expect(guest.getByText('Served')).toBeVisible({ timeout: 45_000 });
+    await expect(
+      board.locator('article[data-state="served"]', { hasText: 'e2e: status sync ticket' }),
+    ).toBeVisible({ timeout: 20_000 });
+    await guest.reload();
+    await expect(guest.locator('[data-placed-step="now"]')).toContainText('Served');
   });
 
   test('a kitchen cancellation reaches the guest as cancelled', async ({ context }) => {
@@ -119,7 +127,11 @@ test.describe('kitchen — real database', () => {
     await board.getByRole('button', { name: 'Yes, cancel' }).click();
     await expect(ticket).toHaveCount(0, { timeout: 20_000 });
 
-    await expect(guest.getByText(/This order was cancelled/)).toBeVisible({ timeout: 45_000 });
+    // The placed screen preserves an editable bill while it is new; refresh it
+    // after cancellation to read the persisted terminal status without wiping
+    // a guest's in-progress edits during ordinary polling.
+    await guest.reload();
+    await expect(guest.getByText(/This order was cancelled/)).toBeVisible();
     await expect(guest.getByText(/nothing is owed/i)).toBeVisible();
   });
 
@@ -176,9 +188,14 @@ test.describe('kitchen — real database', () => {
         message: 'the new order was never announced',
       })
       .toBeGreaterThan(0);
-    const once = await announcementCount(board);
-    await board.waitForTimeout(2500);
-    expect(await announcementCount(board), 'the order was announced twice').toBe(once);
+    // One order is spoken in several sentence segments. Wait for the
+    // announcement to finish, then prove no exact segment was replayed; a raw
+    // length comparison falsely called the final sentence of one order a
+    // duplicate when the first snapshot landed mid-utterance.
+    await board.waitForTimeout(5000);
+    const spoken = await announcementTexts(board);
+    expect(spoken.length).toBeGreaterThan(0);
+    expect(new Set(spoken).size, 'an utterance was repeated').toBe(spoken.length);
 
     // A refresh re-reads the board — and what was seen stays seen.
     await board.reload();

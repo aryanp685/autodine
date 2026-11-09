@@ -9,6 +9,7 @@ import {
   addOneAndCheckout,
   placeOrder,
   scanCard,
+  signInOwner,
   skipUnless,
 } from './flow';
 
@@ -122,14 +123,17 @@ test.describe('security — real database', () => {
     const page = await scanCard(context);
     await addOneAndCheckout(page);
 
+    const note = 'e2e: duplicate submission';
+    await page.locator('textarea[name="note"]').fill(note);
     await page.locator('[data-place-order="bill"]').click({ clickCount: 2, delay: 40 }).catch(() => {});
     await expect(page).toHaveURL(/\/menu\/order\?.*code=/, { timeout: 30_000 });
 
-    // One code, one order. The Orders tab — the guest's own memory of what
-    // this phone placed — opens on a single order, and the tracking page
-    // carries exactly one code.
-    await page.locator('[data-gtab-bar]').getByRole('link', { name: 'Orders' }).click();
-    await expect(page.getByText(/status/i).first()).toBeVisible({ timeout: 20_000 });
-    await expect(page.locator('[data-reorder-button]')).toHaveCount(1);
+    // The tracking page has no Orders tab. Verify the actual persisted rows on
+    // the kitchen board instead: the unique note must identify exactly one
+    // ticket after both submits have settled.
+    const board = await signInOwner(context);
+    await board.goto(`${BASE}/kitchen`);
+    const matchingTickets = board.locator('article').filter({ hasText: note });
+    await expect(matchingTickets).toHaveCount(1, { timeout: 45_000 });
   });
 });

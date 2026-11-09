@@ -37,7 +37,7 @@ const ownerEmail = `e2e-owner-${randomUUID().slice(0, 8)}@autodine.test`;
 const ownerPassword = randomBytes(18).toString('base64url');
 const memberEmail = `e2e-member-${randomUUID().slice(0, 8)}@autodine.test`;
 const memberPassword = randomBytes(18).toString('base64url');
-const expiredInviteCode = 'E2E-EXPIRED-INVITE-2026';
+const expiredInviteCode = 'E2EABCD2345FGH78';
 const tableCode = '482916';
 
 async function apply(sql, source) {

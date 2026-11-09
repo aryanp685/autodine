@@ -62,7 +62,7 @@ test.describe('a card scanned too often', () => {
       // Let the server-rendered menu finish before closing this fresh guest's
       // context; otherwise many abandoned streamed renders can queue behind the
       // real database and make the throttle observation nondeterministic.
-      await page.getByText('Local E2E dish', { exact: true }).first().waitFor({ state: 'visible', timeout: 30_000 });
+      await page.getByText(/^(?:Local E2E dish|Synthetic Paneer Dish)$/).first().waitFor({ state: 'visible', timeout: 30_000 });
       await context.close();
     }
 
@@ -125,7 +125,7 @@ test.describe('a card scanned too often', () => {
       // Same browser, cleared cookies: the guest, not the card budget, is what
       // the loop varies; the opens table keeps counting either way. Wait for
       // this render to finish before starting the next scan.
-      await page.getByText('Local E2E dish', { exact: true }).first().waitFor({ state: 'visible', timeout: 30_000 });
+      await page.getByText(/^(?:Local E2E dish|Synthetic Paneer Dish)$/).first().waitFor({ state: 'visible', timeout: 30_000 });
       await context.clearCookies();
     }
 

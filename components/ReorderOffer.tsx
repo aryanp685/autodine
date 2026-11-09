@@ -85,9 +85,21 @@ export function ReorderOffer({
   const [lines, setLines] = useState<StoredLine[]>([]);
 
   useEffect(() => {
-    if (!enabled || !slug) return;
-    setLines(readLastCart(browserStorage(), slug));
-  }, [enabled, slug]);
+    if (!enabled || !slug || !cart?.ready) {
+      setLines([]);
+      return;
+    }
+
+    // The order page and the cart provider mount together. On the first
+    // render the provider has not read localStorage yet, and the sibling
+    // ClearCartOnOrder must copy the just-ordered lines before emptying it.
+    // Read after passive effects have settled so this offer cannot race that
+    // copy and permanently render as empty for the page's lifetime.
+    const timer = window.setTimeout(() => {
+      setLines(readLastCart(browserStorage(), slug));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [enabled, slug, cart?.ready]);
 
   if (!enabled || !slug || !cart || !cart.ready || lines.length === 0) return null;
 
