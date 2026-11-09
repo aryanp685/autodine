@@ -144,7 +144,7 @@ test.describe('kitchen — real database', () => {
     await expect(
       guest.getByText('This order was cancelled, so nothing is being cooked and nothing is owed.'),
     ).toBeVisible();
-    await expect(guest.getByText(/nothing is owed/i)).toBeVisible();
+    await expect(guest.getByText(/^Nothing is being cooked and nothing is owed\./)).toBeVisible();
   });
 
   test('orders that arrive while the board cannot speak are kept and replayable', async ({

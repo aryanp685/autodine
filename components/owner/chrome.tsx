@@ -776,7 +776,16 @@ export const selectClass = `${control} h-11 pr-8`;
 
 /** The scroll container. A table that overflows its card scrolls inside it. */
 export function TableWrap({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={['-mx-4 min-w-0 max-w-full overflow-x-auto sm:mx-0', className].join(' ')}>{children}</div>;
+  return (
+    <div
+      className={[
+        '-mx-4 min-w-0 max-w-[calc(100vw-0.5rem)] overflow-x-auto sm:mx-0',
+        className,
+      ].join(' ')}
+    >
+      {children}
+    </div>
+  );
 }
 
 export const tableClass = 'w-full border-collapse text-[13px]';
