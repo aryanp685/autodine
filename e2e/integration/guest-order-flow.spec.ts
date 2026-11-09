@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Request } from '@playwright/test';
 import {
   GUEST_READY,
   SLUG,
@@ -30,8 +30,10 @@ test.describe('guest ordering — real database', () => {
 
   test('a live card opens the real menu, with this table named', async ({ context }) => {
     let menuRequestHeaders: Promise<Record<string, string>> | undefined;
+    let menuRequest: Request | undefined;
     let menuRequestHostname = '';
     const page = await scanCard(context, undefined, (request) => {
+      menuRequest = request;
       menuRequestHeaders = request.allHeaders();
       menuRequestHostname = new URL(request.url()).hostname;
     });
@@ -59,8 +61,10 @@ test.describe('guest ordering — real database', () => {
         })
       : null;
     const introRows = introResponse?.ok ? await introResponse.json() as unknown[] : [];
+    const menuResponse = await menuRequest?.response();
+    const menuHtml = await menuResponse?.text().catch(() => '') ?? '';
     const body = await page.locator('body').innerText();
-    const diagnostic = `browser cookies=${cookies.map(({ name, secure, value, domain, path }) => `${name}(secure=${secure},length=${value.length},domain=${domain},path=${path})`).join(',')}; menu host=${menuRequestHostname}; menu request cookies=${sentCookieNames.join(',')}; card token shape=${cardTokenShapeOk}; public_qr_intro HTTP=${introResponse?.status ?? 'not-called'} rows=${Array.isArray(introRows) ? introRows.length : 'not-array'}; URL=${page.url()}; title=${await page.title()}`;
+    const diagnostic = `menu HTTP=${menuResponse?.status() ?? 'no-response'} HTML-bytes=${menuHtml.length} HTML-has-dish=${menuHtml.includes('Synthetic Paneer Dish')}; browser cookies=${cookies.map(({ name, secure, value, domain, path }) => `${name}(secure=${secure},length=${value.length},domain=${domain},path=${path})`).join(',')}; menu host=${menuRequestHostname}; menu request cookies=${sentCookieNames.join(',')}; card token shape=${cardTokenShapeOk}; public_qr_intro HTTP=${introResponse?.status ?? 'not-called'} rows=${Array.isArray(introRows) ? introRows.length : 'not-array'}; URL=${page.url()}; title=${await page.title()}`;
     // Exact fixture values matter here: the generic "Table access" gate copy
     // must not accidentally satisfy a weak `/Table /` locator.
     expect(body, `Scan did not render the synthetic menu. ${diagnostic}. Page:\n${body}`)
