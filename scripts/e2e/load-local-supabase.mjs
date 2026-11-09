@@ -426,6 +426,15 @@ try {
       }
       if (subscriptionError) throw new Error(`Realtime subscription failed: ${subscriptionError}`);
       if (subscribedCount < realtimeClientCount) throw new Error(`Only ${subscribedCount}/${realtimeClientCount} kitchen clients subscribed.`);
+      // Supabase Realtime acknowledges each channel join before every local
+      // replication worker has necessarily caught up with the publication.
+      // Starting the first database write on the same event-loop turn as the
+      // last SUBSCRIBED acknowledgement caused the cold-start wave to be lost
+      // in the disposable stack, while later waves arrived normally. Let the
+      // subscription/publication pipeline settle before measuring delivery;
+      // this is intentionally only a startup barrier, not a per-wave delay.
+      const realtimeWarmupMs = 2_000;
+      await new Promise((resolve) => setTimeout(resolve, realtimeWarmupMs));
 
       const waveResults = [];
       const kitchenUpdatesStarted = performance.now();
