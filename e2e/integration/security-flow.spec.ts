@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import {
   BASE,
-  EXPIRED_QR,
+  SLUG,
   GUEST_READY,
   OWNER_EMAIL,
   OWNER_PASSWORD,
@@ -80,11 +80,25 @@ test.describe('security — real database', () => {
     await expect(till.locator('[data-bill-sheet]')).toHaveCount(0);
   });
 
-  test('an expired card is refused with words, not with a menu', async ({ context }) => {
-    test.skip(!EXPIRED_QR, skipUnless(false, 'E2E_EXPIRED_QR_TOKEN (a card aged past expiry on the branch db)'));
-    const page = await scanCard(context, EXPIRED_QR);
-    await expect(page).toHaveURL(/\/t\/problem\?r=/, { timeout: 20_000 });
-    await expect(page.getByText('Table access')).toBeVisible();
+  test('a revoked permanent card is refused, not shown a menu', async ({ context }) => {
+    const token=process.env.E2E_REVOKED_QR_TOKEN;
+    test.skip(!token, skipUnless(false,'E2E_REVOKED_QR_TOKEN'));
+    const page=await context.newPage();
+    await page.goto(`${BASE}/t/${token}`);
+    await expect(page).toHaveURL(/\/t\/problem\?r=/, {timeout:20_000});
+    await expect(page.locator('[data-flow-table]')).toHaveCount(0);
+    await expect(page.getByRole('heading')).toBeVisible();
+  });
+
+  test('an expired database session cannot be revived by a future-dated browser cookie', async ({context}) => {
+    const token=process.env.E2E_EXPIRED_SESSION_TOKEN;
+    test.skip(!token,skipUnless(false,'E2E_EXPIRED_SESSION_TOKEN'));
+    await context.addCookies([{name:'autodine_table',value:JSON.stringify({token,slug:SLUG,tableLabel:'E2E-DEAD',expiresAt:new Date(Date.now()+3600000).toISOString()}),url:BASE,httpOnly:true,secure:true,sameSite:'Lax'}]);
+    const page=await context.newPage();
+    await page.goto(`${BASE}/menu/checkout?s=${encodeURIComponent(SLUG)}`);
+    await expect(page.locator('[data-place-order="bill"]')).toHaveCount(0);
+    await expect(page.locator('[data-flow-table]')).toHaveCount(0);
+    await expect(page.getByRole('heading',{name:'Your table session has ended'})).toBeVisible();
   });
 
   test('a tampered cart prices at the menu when the order is written', async ({ context }) => {
