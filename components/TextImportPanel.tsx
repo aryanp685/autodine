@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
-import { parseMenuText, MAX_IMPORT_TEXT } from '@/lib/menus/bulk-parse';
+import { useState, useTransition } from 'react';
+import { previewTextMenuImportAction } from '@/app/(staff)/dashboard/menus/import-actions';
+import type { MenuImportDraft } from '@/lib/menu-import';
 import { Card, btn, inputClass } from '@/components/owner/chrome';
 import type { PhotoDraft } from '@/components/PhotoImportPanel';
 
 const EXAMPLE = 'STARTERS\nPaneer Tikka 320';
+const MAX_TEXT_CHARS = 20_000;
 
 /** Deterministic, no-AI path for owners who have a text menu or no vision service. */
 export function TextImportPanel({
@@ -16,37 +18,46 @@ export function TextImportPanel({
   onDraftChange: (draft: PhotoDraft | null) => void;
 }) {
   const [text, setText] = useState('');
-  const [parsed, setParsed] = useState<ReturnType<typeof parseMenuText> | null>(null);
+  const [parsed, setParsed] = useState<MenuImportDraft | null>(null);
   const [error, setError] = useState('');
+  const [reading, startReading] = useTransition();
 
   function read() {
     setError('');
-    const draft = parseMenuText(text);
-    const itemCount = draft.categories.reduce((sum, category) => sum + category.items.length, 0);
-    if (itemCount === 0) {
-      setParsed(null);
-      onDraftChange(null);
-      setError('No priced dishes found. Add a section heading and a dish with its printed price.');
-      return;
-    }
+    startReading(async () => {
+      try {
+        const result = await previewTextMenuImportAction(text);
+        if (!result.ok) {
+          setParsed(null);
+          onDraftChange(null);
+          setError(result.error);
+          return;
+        }
 
-    setParsed(draft);
-    onDraftChange({
-      payload: {
-        categories: draft.categories.map((category) => ({
-          name: category.name,
-          items: category.items.map((item) => ({
-            name: item.name,
-            pricePaise: item.pricePaise,
-            description: item.description,
-            isVeg: item.isVeg,
-            ...(item.variants?.length ? { variants: item.variants } : {}),
-          })),
-        })),
-      },
-      missingPrice: false,
-      crops: [],
-      file: null,
+        const draft = result.draft;
+        setParsed(draft);
+        onDraftChange({
+          payload: {
+            categories: draft.categories.map((category) => ({
+              name: category.name,
+              items: category.items.map((item) => ({
+                name: item.name,
+                pricePaise: item.pricePaise,
+                description: item.description,
+                isVeg: item.isVeg,
+                ...(item.variants?.length ? { variants: item.variants } : {}),
+              })),
+            })),
+          },
+          missingPrice: false,
+          crops: [],
+          file: null,
+        });
+      } catch {
+        setParsed(null);
+        onDraftChange(null);
+        setError('Could not read that text. Try again.');
+      }
     });
   }
 
@@ -66,7 +77,7 @@ export function TextImportPanel({
           <textarea
             aria-label="Menu text"
             className={`${inputClass} min-h-36 resize-y font-mono text-[12.5px]!`}
-            maxLength={MAX_IMPORT_TEXT}
+            maxLength={MAX_TEXT_CHARS}
             value={text}
             onChange={(event) => {
               setText(event.target.value);
@@ -80,7 +91,7 @@ export function TextImportPanel({
           <button
             type="button"
             className={btn('solid', 'sm')}
-            disabled={!canWrite || text.trim() === ''}
+            disabled={!canWrite || reading || text.trim() === ''}
             onClick={read}
           >
             Read the menu
@@ -88,7 +99,7 @@ export function TextImportPanel({
           <button
             type="button"
             className={btn('quiet', 'sm')}
-            disabled={!canWrite}
+            disabled={!canWrite || reading}
             onClick={() => {
               setText(EXAMPLE);
               setParsed(null);
