@@ -18,14 +18,14 @@ export function LoginScreen({ error, notice, next }: { error?: string; notice?: 
     <AuthShell
       visual={
         <aside className="hidden pt-6 lg:block" aria-label="Restaurant workspace overview">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-forest">Back to your service</p>
+          <p className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-forest">Back to your service</p>
           <h2 className="mt-6 max-w-[13ch] text-[clamp(2.5rem,4.5vw,3.8rem)] font-medium leading-[1.06] tracking-[-0.05em]">The room moves.<br /><span className="text-forest">Stay connected.</span></h2>
           <p className="mt-6 max-w-[35ch] text-[15px] leading-relaxed text-gink-64">Your menu, kitchen tickets and counter, with a place for every part of service.</p>
           <div aria-hidden="true" className="login-service-art relative mt-10 flex h-52 items-center justify-center overflow-hidden rounded-[28px] border border-forest/10 bg-forest-soft/50">
             <div className="absolute size-40 rounded-full border border-forest/10" />
             <div className="absolute size-56 rounded-full border border-[#B98A4B]/20" />
             <div className="relative flex items-center gap-3">
-              {['Menu', 'Kitchen', 'Counter'].map((label, i) => <div key={label} style={{ animationDelay: `${i * 120}ms` }} className="login-service-node grid h-20 w-24 place-content-center gap-2 rounded-2xl border border-forest/15 bg-white text-center shadow-[0_8px_24px_rgba(31,77,58,0.05)]"><span className="text-[10px] tracking-[0.15em] text-[#B98A4B]">0{i + 1}</span><span className="text-[12px] font-medium text-forest">{label}</span></div>)}
+              {['Menu', 'Kitchen', 'Counter'].map((label, i) => <div key={label} style={{ animationDelay: `${i * 120}ms` }} className="login-service-node grid h-20 w-24 place-content-center gap-2 rounded-2xl border border-forest/15 bg-white text-center shadow-[0_8px_24px_rgba(31,77,58,0.05)]"><span className="text-[10px] tracking-[0.15em] text-[#B98A4B]">0{i + 1}</span><span className="text-[12.5px] font-medium text-forest">{label}</span></div>)}
             </div>
           </div>
           <Link href="/#screens" className="mt-6 inline-flex min-h-11 items-center gap-3 text-[13px] font-medium text-forest">Take a look around <span aria-hidden="true">↗</span></Link>

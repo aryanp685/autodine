@@ -10,7 +10,7 @@ export function SignupScreen({ error }: { error?: string }) {
     <AuthShell
       visual={
         <aside className="hidden pt-6 lg:block" aria-label="Restaurant setup overview">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-forest">Make room for better service</p>
+          <p className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-forest">Make room for better service</p>
           <h2 className="mt-6 max-w-[13ch] text-[clamp(2.5rem,4.5vw,3.8rem)] font-medium leading-[1.06] tracking-[-0.05em]">Your restaurant.<br /><span className="text-forest">A fresh start.</span></h2>
           <p className="mt-6 max-w-[35ch] text-[15px] leading-relaxed text-gink-64">Create your workspace, then make it yours. Add dishes and prepare your table cards before trying the ordering flow.</p>
           <ol className="mt-10 space-y-3" aria-label="Your setup journey">
@@ -18,7 +18,7 @@ export function SignupScreen({ error }: { error?: string }) {
               { title: 'Create your workspace', body: 'Your restaurant, menu and owner account.' },
               { title: 'Build your menu', body: 'Add dishes, prices and the details guests need.' },
               { title: 'Prepare your table cards', body: 'Try the guest, kitchen and counter workflow.' },
-            ].map((step, i) => <li key={step.title} style={{ animationDelay: `${i * 120}ms` }} className="login-service-node flex items-start gap-4 rounded-2xl border border-forest/10 bg-white/70 p-5"><span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-full bg-forest-soft text-[11px] font-medium text-forest">0{i + 1}</span><div><h3 className="text-[14px] font-medium">{step.title}</h3><p className="mt-1 text-[12px] leading-relaxed text-gink-64">{step.body}</p></div></li>)}
+            ].map((step, i) => <li key={step.title} style={{ animationDelay: `${i * 120}ms` }} className="login-service-node flex items-start gap-4 rounded-2xl border border-forest/10 bg-white/70 p-5"><span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-full bg-forest-soft text-[10.5px] font-medium text-forest">0{i + 1}</span><div><h3 className="text-[13.5px] font-medium">{step.title}</h3><p className="mt-1 text-[12.5px] leading-relaxed text-gink-64">{step.body}</p></div></li>)}
           </ol>
           <Link href="/pricing" className="mt-6 inline-flex min-h-11 items-center gap-3 text-[13px] font-medium text-forest">Read the trial and pricing details <span aria-hidden="true">↗</span></Link>
         </aside>

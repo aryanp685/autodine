@@ -8,7 +8,7 @@ import { Field, inputClass } from '@/components/owner/chrome';
 function RecoveryVisual({ expired }: { expired: boolean }) {
   return (
     <aside className="hidden pt-6 lg:block" aria-label="Password recovery overview">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-forest">Keep your workspace yours</p>
+      <p className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-forest">Keep your workspace yours</p>
       <h2 className="mt-6 max-w-[13ch] text-[clamp(2.5rem,4.5vw,3.8rem)] font-medium leading-[1.06] tracking-[-0.05em]">{expired ? 'A new link.' : 'A new password.'}<br /><span className="text-forest">A clear way back.</span></h2>
       <p className="mt-6 max-w-[35ch] text-[15px] leading-relaxed text-gink-64">{expired ? 'Recovery links are temporary. Request another from this browser when you’re ready to continue.' : 'Choose a unique password for this account. Once saved, other signed-in devices will need to sign in again.'}</p>
       <div aria-hidden="true" className="login-service-node relative mt-10 grid h-52 place-items-center overflow-hidden rounded-[28px] border border-forest/10 bg-forest-soft/50">
@@ -129,7 +129,7 @@ export function ResetPasswordScreen({ email, error }: { email: string | null; er
         </Field>
 
         <AuthSubmit label="Save the new password" pendingLabel="Saving your password…" />
-        <p className="rounded-xl border border-forest/10 bg-forest-soft/50 p-3.5 text-[12px] leading-relaxed text-gink-64">Saving updates your account password and ends other active sessions. You may need to sign in again on your other devices.</p>
+        <p className="rounded-xl border border-forest/10 bg-forest-soft/50 p-3.5 text-[12.5px] leading-relaxed text-gink-64">Saving updates your account password and ends other active sessions. You may need to sign in again on your other devices.</p>
       </form>
     </AuthShell>
   );

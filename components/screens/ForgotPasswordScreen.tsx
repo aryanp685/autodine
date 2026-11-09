@@ -16,7 +16,7 @@ export function ForgotPasswordScreen({ error, notice }: { error?: string; notice
     <AuthShell
       visual={
         <aside className="hidden pt-6 lg:block" aria-label="Account recovery guide">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-forest">A way back in</p>
+          <p className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-forest">A way back in</p>
           <h2 className="mt-6 max-w-[13ch] text-[clamp(2.5rem,4.5vw,3.8rem)] font-medium leading-[1.06] tracking-[-0.05em]">A fresh password.<br /><span className="text-forest">The same workspace.</span></h2>
           <p className="mt-6 max-w-[35ch] text-[15px] leading-relaxed text-gink-64">Start with your account email. Keep this browser handy to open the recovery link and choose your new password.</p>
           <div aria-hidden="true" className="login-service-node relative mt-10 grid h-52 place-items-center overflow-hidden rounded-[28px] border border-forest/10 bg-forest-soft/50">
@@ -81,7 +81,7 @@ export function ForgotPasswordScreen({ error, notice }: { error?: string; notice
 
         <AuthSubmit label="Send reset link" pendingLabel="Sending reset link…" />
 
-        <p className="rounded-xl border border-forest/10 bg-forest-soft/50 p-3.5 text-[12px] leading-relaxed text-gink-64">
+        <p className="rounded-xl border border-forest/10 bg-forest-soft/50 p-3.5 text-[12.5px] leading-relaxed text-gink-64">
           The link is single-use and expires in an hour. Open it in this browser — a link asked for
           here will not work on a different device.
         </p>
