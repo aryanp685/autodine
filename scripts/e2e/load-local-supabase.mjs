@@ -103,7 +103,7 @@ function loadNotice() {
     `sessions[${metric(report.workloads.tableSessions)}]`,
     `orders[${metric(report.workloads.orderCreation)}]`,
     `appReads[${metric(report.workloads.appMenuReads)}]`,
-    `kitchen[${metric(kitchen?.apiUpdateRequests)}; clients=${kitchen?.subscribers ?? 0}; events=${kitchen?.realtimeEventsReceived ?? 0}/${kitchen?.realtimeEventsExpected ?? 0}; eventRps=${kitchen?.realtimeFanoutEventsPerSecond ?? 0}; eventP95=${kitchen?.realtimeEventLatencyMs?.p95 ?? 'na'}ms; waves=${(kitchen?.updateWaves ?? []).map((wave) => `${wave.status}:${wave.receivedRealtimeEvents}/${wave.expectedRealtimeEvents}`).join('|') || 'not recorded'}; failures=${kitchen?.failures ?? 0}]`,
+    `kitchen[${metric(kitchen?.apiUpdateRequests)}; clients=${kitchen?.subscribers ?? 0}; initial=${JSON.stringify(kitchen?.initialPrepStatusCounts ?? {})}; events=${kitchen?.realtimeEventsReceived ?? 0}/${kitchen?.realtimeEventsExpected ?? 0}; eventRps=${kitchen?.realtimeFanoutEventsPerSecond ?? 0}; eventP95=${kitchen?.realtimeEventLatencyMs?.p95 ?? 'na'}ms; waves=${(kitchen?.updateWaves ?? []).map((wave) => `${wave.status}:${wave.receivedRealtimeEvents}/${wave.expectedRealtimeEvents},raw=${wave.rawPostgresEvents},states=${Object.entries(wave.rawStatusCounts ?? {}).map(([status, count]) => `${status}:${count}`).join('+')}`).join('|') || 'not recorded'}; failures=${kitchen?.failures ?? 0}]`,
     `overallFailures=${failures.length}`,
   ].join('; ');
 }
@@ -351,7 +351,7 @@ try {
     let updateOrders = [];
     if (updateTokenSet.length) {
       const query = await db.query(
-        `select id, guest_token from public.orders where guest_token = any($1::uuid[]) order by placed_at, id`,
+        `select id, guest_token, prep_status from public.orders where guest_token = any($1::uuid[]) order by placed_at, id`,
         [updateTokenSet],
       );
       updateOrders = query.rows;
@@ -365,6 +365,10 @@ try {
     const channels = [];
     const received = [];
     const eventErrors = [];
+    const initialPrepStatusCounts = updateOrders.reduce((counts, order) => {
+      counts[order.prep_status] = (counts[order.prep_status] ?? 0) + 1;
+      return counts;
+    }, {});
     const kitchenUpdateLatencies = [];
     let kitchenUpdateFailures = 0;
     let subscribedCount = 0;
@@ -387,6 +391,9 @@ try {
             if (!currentWave) return;
             const id = payload.new?.id;
             const status = payload.new?.prep_status;
+            currentWave.rawPostgresEvents += 1;
+            const statusKey = typeof status === 'string' ? status : String(status ?? 'missing');
+            currentWave.rawStatusCounts[statusKey] = (currentWave.rawStatusCounts[statusKey] ?? 0) + 1;
             const key = `${id}:${status}`;
             const sentAt = currentWave.sentAt.get(key);
             if (sentAt !== undefined) {
@@ -427,18 +434,22 @@ try {
         for (const order of updateOrders) sentAt.set(`${order.id}:${prepStatus}`, performance.now());
         const priorEvents = received.length;
         const waveStart = performance.now();
-        currentWave = { sentAt, seen: new Set() };
+        currentWave = { sentAt, seen: new Set(), rawPostgresEvents: 0, rawStatusCounts: {} };
         const updates = await Promise.all(updateOrders.map(async (order) => {
           const requestStarted = performance.now();
           const { data, error } = await staff.from('orders')
             .update({ prep_status: prepStatus })
             .eq('id', order.id)
-            .select('id')
+            .select('id, prep_status')
             .maybeSingle();
           kitchenUpdateLatencies.push(performance.now() - requestStarted);
-          if (error || !data?.id) {
+          if (error || !data?.id || data.prep_status !== prepStatus) {
             kitchenUpdateFailures += 1;
-            addFailure(`kitchen_update_${prepStatus}`, order.id, error ?? new Error('Update returned no row.'));
+            addFailure(
+              `kitchen_update_${prepStatus}`,
+              order.id,
+              error ?? new Error(`Update returned state ${data?.prep_status ?? 'no row'} instead of ${prepStatus}.`),
+            );
             return false;
           }
           return true;
@@ -455,7 +466,10 @@ try {
           successfulOrderUpdates: updates.filter(Boolean).length,
           expectedRealtimeEvents: expectedEvents,
           receivedRealtimeEvents: receivedEvents,
+          rawPostgresEvents: currentWave.rawPostgresEvents,
+          rawStatusCounts: { ...currentWave.rawStatusCounts },
           durationMs: Number((performance.now() - waveStart).toFixed(2)),
+
         });
         if (receivedEvents !== expectedEvents) {
           addFailure(
@@ -469,6 +483,7 @@ try {
       const kitchenUpdateDuration = performance.now() - kitchenUpdatesStarted;
       report.workloads.kitchenDashboard = {
         subscribers: realtimeClientCount,
+        initialPrepStatusCounts,
         restaurantCount: 1,
         concurrentOrderUpdates: updateOrderCount,
         ordersUpdatedThroughAuthenticatedPostgREST: waveResults.reduce((sum, wave) => sum + wave.successfulOrderUpdates, 0),
@@ -499,6 +514,7 @@ try {
       addFailure('kitchen_realtime', null, error);
       report.workloads.kitchenDashboard = {
         subscribers: realtimeClientCount,
+        initialPrepStatusCounts,
         restaurantCount: 1,
         ordersUpdatedThroughAuthenticatedPostgREST: 0,
         realtimeEventsReceived: received.length,
