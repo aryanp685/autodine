@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { probe, validateTarget, resultAnnotation } from './read-only-probe.mjs';
+import { probe, validateTarget, resultAnnotation, failureCategory } from './read-only-probe.mjs';
 test('rejects production, external hosts, alternate staging paths and embedded credentials', () => {
   for (const target of ['https://bdbaqpevwmgdvghszjno.supabase.co/rest/v1/', 'https://example.com/', 'https://juwyhslzchjevqkdvwjm.supabase.co/rest/v1/orders', 'http://user:pass@localhost/', 'http://localhost/?key=secret', 'ftp://localhost/']) assert.throws(() => validateTarget(target));
 });
@@ -70,7 +70,7 @@ test('staging JWT from another project is refused before network access', async 
 
 test('failure annotations allowlist HTTP status/category and never interpolate untrusted data', () => {
   const secret='SECRET\n::notice::injected';
-  assert.equal(resultAnnotation({failure:{kind:'http',status:401,body:secret}}),'::error::Phase3 baseline stopped: HTTP 401. No further requests sent.');
+  assert.equal(resultAnnotation({failure:{kind:'http',status:401,body:secret}}),'::error::Phase3 baseline stopped: HTTP 401, category=unclassified. No further requests sent.');
   assert.ok(!resultAnnotation({failure:{kind:'http',status:secret}}).includes('SECRET'));
   assert.ok(!resultAnnotation({failure:{kind:secret,message:secret}}).includes('SECRET'));
 });
@@ -78,4 +78,27 @@ test('success annotation contains finite metrics only, not payloads or URLs', ()
   const result={successful:10,latencyMs:{p50:12,p95:34,max:34},payload:'SECRET'};
   assert.match(resultAnnotation(result),/successful=10, p50_ms=12, p95_ms=34/);
   assert.ok(!resultAnnotation({...result,latencyMs:{p50:'SECRET',p95:Infinity,max:NaN}}).includes('SECRET'));
+});
+
+test('legacy staging anon JWT uses matching bearer header; short publishable key does not', async () => {
+  const jwt=`a.${Buffer.from(JSON.stringify({role:'anon',ref:'juwyhslzchjevqkdvwjm'})).toString('base64url')}.b`;
+  for(const key of [jwt,'sb_publishable_test']) {
+    let sent;
+    const result=await probe({target:'https://juwyhslzchjevqkdvwjm.supabase.co/rest/v1/',key,requests:1,fetchImpl:async(_url,options)=>{
+      sent=options.headers;
+      return new Response('');
+    }});
+    assert.equal(result.failure,null);
+    assert.equal(sent.apikey,key);
+    assert.equal(sent.Authorization,key===jwt?`Bearer ${jwt}`:undefined);
+  }
+});
+
+
+test('failure body classification retains no raw message, hint, token or oversized payload', async () => {
+  assert.equal(await failureCategory(new Response(JSON.stringify({code:'PGRST301',message:'PRIVATE TOKEN'}))),'postgrest_jwt_rejected');
+  assert.equal(await failureCategory(new Response(JSON.stringify({message:'Invalid API key'}))),'gateway_api_key_rejected');
+  assert.equal(await failureCategory(new Response(JSON.stringify({message:'PRIVATE TOKEN',code:'PRIVATE'}))),'unclassified');
+  assert.equal(await failureCategory(new Response('x'.repeat(5000))),'unclassified');
+  assert.equal(await failureCategory(new Response('not json')),'unclassified');
 });

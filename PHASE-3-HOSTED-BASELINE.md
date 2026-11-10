@@ -258,3 +258,23 @@ repository access if applicable. Do not paste the key in chat. An environment-
 scoped or Dependabot-only secret is not a replacement for the named repository
 Actions secret in this workflow. The run's diagnostic annotation contains no
 secret value; no raw environment or decrypted credential was printed.
+
+## Follow-up result: secret visible, HTTP authorization failure
+
+Run 42865084686 passed secret presence and safety steps, then failed in the HTTP
+probe. Raw run-log download failed at the network-restricted redirected log
+host, so its precise failure reason was not inferred. Added allowlisted GitHub
+annotations (no credential/URL/error-body interpolation), plus two injection/
+metric sanitization tests. All14 local safety/builder tests pass. Committed and
+pushed diagnostic/recovered report changes as1aa0574 on the current branch.
+
+Fresh diagnostic run42865298912 also passed secret presence and safety steps;
+GitHub check annotation confirms: HTTP401, stopped with no further requests.
+This is an authentication/authorization failure, not a successful10-request
+latency baseline and not proof of a database performance defect. No customer
+payload was printed. The exact reason (incorrect/rotated/wrong-project key or
+REST gateway authorization configuration) is not established by status alone.
+Do not keep retrying or substitute a privileged service-role key. Verify the
+repository secret uses the actual autodinetest public API key and then inspect
+public auth/header requirements if it still fails. No hosted schema change or
+production operation was made. Main release hold remains unchanged.
