@@ -329,3 +329,18 @@ measures response-header timing. Its result cannot demonstrate order/RPC
 performance or database capacity. Eighteen local safety/builder tests pass;
 the newly targeted hosted request has not yet run. No hosted DB writes, policy
 changes, or production changes were made.
+
+## Safe-route hosted result
+
+After the owner-provided root-path diagnosis, dispatched the updated manual
+workflow run42867144033 at commit dba624d669729b8657e881b645953af5974a7cf4.
+All10 of10 sequential public-key GETs to the exact zero-row restaurants route
+returned HTTP success. GitHub-hosted runner response-header timings: p50
+665.46ms, p95 1273.4ms, max 1273.4ms. Successful bodies were canceled, and the
+query's `limit=0` returned no restaurant rows. This confirms the publishable-key
+REST resource route is reachable at low request rate; it does not measure an
+order/RPC path, financial lock contention, database throughput/capacity, or
+peak/soak behavior. No hosted DB writes, policy changes, migration, or
+production operation occurred. Phase3 operational workload validation and
+Phase4 hosted peak/soak remain pending; do not treat this small HTTP baseline as
+a capacity claim.
