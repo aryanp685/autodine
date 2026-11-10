@@ -221,3 +221,18 @@ transaction checks, maintenance/drain requirements, exact app/schema cutover,
 post-cutover checks and coordinated rollback constraints. It is a proposal,
 not evidence of execution or permission to operate on a hosted target.
 No commit, push, merge, hosted migration or deployment performed.
+
+## PR self-review follow-up
+
+- Catalog-based native regression enumerates all place_public_order* and
+  place_order RPCs for anon/authenticated: only place_public_order_attempt is
+  executable. Both roles lack INSERT on orders and order_items. This avoids
+  checking only one known legacy signature and missing another overload.
+- Fixed ambiguous-response feedback: ORDER_RESULT_INVALID no longer implies an
+  unplaced order or urges a blind retry. It asks the guest to check Orders/staff
+  before placing another, since a malformed response cannot prove rollback.
+- PostgreSQL 18 local native suite: **49 passed**; ordinary unit suite **1954
+  passed / 49 database tests skipped there**, native tests run separately.
+  Typecheck, lint, design guard and production build passed.
+- This is author/self-review, not independent reviewer approval. No hosted
+  transaction/proxy verification, migration deployment or merge performed.

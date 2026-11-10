@@ -459,6 +459,19 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
     expect((await db.query('select count(*) n from rate_limit_hits where key=$1',['po:attempt:t:'+f.restaurant])).rows[0].n).toBe('0');
   });
 
+  it('exposes only versioned order admission among placement RPCs and denies direct inserts', async () => {
+    for(const role of ['anon','authenticated']) {
+      const entrypoints=(await db.query(`select p.proname,p.oid::regprocedure::text signature
+        from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+        where n.nspname='public' and (p.proname like 'place_public_order%' or p.proname='place_order')
+          and has_function_privilege($1,p.oid,'EXECUTE') order by 2`,[role])).rows;
+      expect(entrypoints.map(r=>r.proname)).toEqual(['place_public_order_attempt']);
+      for(const table of ['orders','order_items']) {
+        expect((await db.query("select has_table_privilege($1,$2,'INSERT') allowed",[role,'public.'+table])).rows[0].allowed).toBe(false);
+      }
+    }
+  });
+
   it('prices orders from the database and attaches a durable sitting', async()=>{
     const row=(await db.query('select subtotal_paise,total_paise,order_session_id from orders where id=$1',[a.order])).rows[0];
     expect(row.subtotal_paise).toBe('25000');expect(row.total_paise).toBe('25000');expect(row.order_session_id).toBe(a.sitting);
