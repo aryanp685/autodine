@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { probe, validateTarget } from './read-only-probe.mjs';
+import { probe, validateTarget, resultAnnotation } from './read-only-probe.mjs';
 test('rejects production, external hosts, alternate staging paths and embedded credentials', () => {
   for (const target of ['https://bdbaqpevwmgdvghszjno.supabase.co/rest/v1/', 'https://example.com/', 'https://juwyhslzchjevqkdvwjm.supabase.co/rest/v1/orders', 'http://user:pass@localhost/', 'http://localhost/?key=secret', 'ftp://localhost/']) assert.throws(() => validateTarget(target));
 });
@@ -65,4 +65,17 @@ test('real loopback timeout aborts a stalled response', async () => {
 test('staging JWT from another project is refused before network access', async () => {
   const key=`a.${Buffer.from(JSON.stringify({role:'anon',ref:'bdbaqpevwmgdvghszjno'})).toString('base64url')}.b`;
   await assert.rejects(probe({target:'https://juwyhslzchjevqkdvwjm.supabase.co/rest/v1/',key,fetchImpl:()=>{throw new Error('must not fetch');}}), /publishable\/anon/);
+});
+
+
+test('failure annotations allowlist HTTP status/category and never interpolate untrusted data', () => {
+  const secret='SECRET\n::notice::injected';
+  assert.equal(resultAnnotation({failure:{kind:'http',status:401,body:secret}}),'::error::Phase3 baseline stopped: HTTP 401. No further requests sent.');
+  assert.ok(!resultAnnotation({failure:{kind:'http',status:secret}}).includes('SECRET'));
+  assert.ok(!resultAnnotation({failure:{kind:secret,message:secret}}).includes('SECRET'));
+});
+test('success annotation contains finite metrics only, not payloads or URLs', () => {
+  const result={successful:10,latencyMs:{p50:12,p95:34,max:34},payload:'SECRET'};
+  assert.match(resultAnnotation(result),/successful=10, p50_ms=12, p95_ms=34/);
+  assert.ok(!resultAnnotation({...result,latencyMs:{p50:'SECRET',p95:Infinity,max:NaN}}).includes('SECRET'));
 });

@@ -40,10 +40,21 @@ export async function probe({ target, key, requests = 10, intervalMs = 1000, tim
   const percentile = p => times.length ? Math.round(times[Math.ceil(times.length * p) - 1] * 100) / 100 : null;
   return { scope: 'GET response headers only; no order/RPC/DB capacity conclusion', requested: requests, successful: times.length, failure, latencyMs: { p50: percentile(0.5), p95: percentile(0.95), max: percentile(1) } };
 }
+/** Allowlisted annotation only: never interpolate errors, URLs, keys or payloads. */
+export function resultAnnotation(result) {
+  if (result.failure?.kind === 'http') {
+    const status = result.failure.status;
+    return `::error::Phase3 baseline stopped: HTTP ${Number.isInteger(status) && status >= 100 && status <= 599 ? status : 'unknown'}. No further requests sent.`;
+  }
+  if (result.failure) return '::error::Phase3 baseline stopped: transport, timeout or redirect failure. No further requests sent.';
+  const safe = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 'unavailable';
+  return `::notice::Phase3 HTTP-root baseline completed: successful=${safe(result.successful)}, p50_ms=${safe(result.latencyMs?.p50)}, p95_ms=${safe(result.latencyMs?.p95)}, max_ms=${safe(result.latencyMs?.max)}. Not an ordering/capacity benchmark.`;
+}
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     const result = await probe({ target: process.env.PHASE3_TARGET || '', key: process.env.PHASE3_STAGING_PUBLISHABLE_KEY, requests: Number(process.env.PHASE3_REQUESTS || 10) });
     console.log(JSON.stringify(result, null, 2));
+    console.error(resultAnnotation(result));
     if (result.failure) process.exitCode = 1;
-  } catch { console.error('Probe refused or failed. Check approved target, key and bounded request settings; credentials are not logged.'); process.exitCode = 1; }
+  } catch { console.error('::error::Phase3 probe configuration rejected before requests: check approved target, public staging key type/project and bounded settings. Credentials are not logged.'); process.exitCode = 1; }
 }

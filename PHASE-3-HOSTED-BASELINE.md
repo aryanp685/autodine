@@ -204,3 +204,57 @@ never reads app environment credentials, accepts a pre-existing target database,
 or resets/restores hosted data. All fixtures are generated in its own randomly
 created disposable database. Still pending: exact hosted staging preservation/
 cutover review, compatible isolated app deployment, and bounded hosted workloads.
+
+## Current-session hosted setup attempt — arena/9c143766-autodine
+
+Published only the current session branch; no merge or production deployment
+was requested. Vercel metadata confirmed the latest prior preview is a READY
+build for arena/6d8badd1-autodine at 640d015, not this current branch. Inspection
+of env metadata found production URL defaults and old-branch staging overrides.
+The listing was truncated, so missing current overrides cannot be proved from
+that listing. No logs or privileged credentials were decrypted.
+
+Read the old branch's public staging URL/public key specifically for authorized
+staging setup. The URL confirms juwyhslzchjevqkdvwjm. No public key is reproduced
+here or committed. First guard creation was rejected because the current branch
+was not published in GitHub. After branch publication, created encrypted
+AUTODINE_EXPECTED_PROJECT_REF=juwyhslzchjevqkdvwjm for Preview only, scoped to
+arena/9c143766-autodine (provider ID QJm3XMAB206MSGsf). Production/global settings
+were not changed. This is a fail-closed build/runtime project guard, NOT complete
+credential isolation. With inherited production URL, future builds may fail
+intentionally until complete staging config is ready. Existing deployments do
+not retroactively inherit the new guard and must not be assumed safe targets.
+
+Attempt to securely set repository Actions secret AUTODINE_STAGING_PUBLISHABLE_KEY
+failed with HTTP403 at the GitHub secrets public-key endpoint (integration
+permission). No secret was created by that failed call, and the hosted baseline
+workflow was not dispatched. Do not bypass this integration restriction by
+embedding credentials in Git/workflow inputs/variables. Repository owner can
+configure the named Actions secret directly in GitHub Settings, or adjust the
+GitHub connection's authorized permissions. Do not send credentials in chat.
+Only the designated staging publishable/anon key is permitted, never production
+or service-role credentials. This is a concrete runner-setup blocker, not a need
+for repeat testing approval.
+
+Fresh staging read-only catalog check still reports attempt_api_exists=false
+and legacy_api_anon=true. No hosted migration, customer/fixture write, HTTP load,
+peak/soak or production config/DB change was performed in this follow-up.
+Recovered the prior unmerged PHASE-4-REGRESSION-REPORT.md onto the current branch
+without switching branches; it retains the historical scope/limitations.
+
+## Hosted baseline dispatch after owner secret setup
+
+Dispatched workflow phase3-hosted-baseline.yml on current session branch after
+owner reported setup done. Run 42864715883 targeted SHA
+8ae4feb01459238ffbace429a7ef1859529ef702. It FAILED in the dedicated-public-key
+preflight: AUTODINE_STAGING_PUBLISHABLE_KEY resolved empty/unavailable to the
+job. Safety tests and HTTP-probe steps were skipped. No hosted requests were
+sent by this run; no latency/capacity evidence was produced. Do not mark this
+as a successful baseline or automatically rerun without fixing secret scope.
+
+Owner should verify the exact repository, exact secret name, Actions repository
+secret scope (workflow declares no GitHub environment), and organization secret
+repository access if applicable. Do not paste the key in chat. An environment-
+scoped or Dependabot-only secret is not a replacement for the named repository
+Actions secret in this workflow. The run's diagnostic annotation contains no
+secret value; no raw environment or decrypted credential was printed.
