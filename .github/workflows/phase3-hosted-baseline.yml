@@ -1,0 +1,32 @@
+name: Phase 3 staging HTTP baseline (manual, read-only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: phase3-staging-http-baseline
+  cancel-in-progress: false
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      PHASE3_TARGET: https://juwyhslzchjevqkdvwjm.supabase.co/rest/v1/
+      PHASE3_REQUESTS: '10'
+      PHASE3_STAGING_PUBLISHABLE_KEY: ${{ secrets.AUTODINE_STAGING_PUBLISHABLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Require dedicated public staging key (no service-role fallback)
+        shell: bash
+        run: |
+          if [[ -z "$PHASE3_STAGING_PUBLISHABLE_KEY" ]]; then
+            echo '::error::Configure AUTODINE_STAGING_PUBLISHABLE_KEY securely in repository Actions secrets. No hosted requests were sent.'
+            exit 1
+          fi
+      - name: Safety tests (no hosted traffic)
+        run: node --test scripts/phase3/*.test.mjs
+      - name: Ten sequential GET requests; stop on first refusal/error
+        run: node scripts/phase3/read-only-probe.mjs
