@@ -1,0 +1,45 @@
+name: Phase 3 probe safety (local only)
+on:
+  pull_request:
+    paths: ['scripts/phase3/**', '.github/workflows/phase3-probe-safety.yml']
+  push:
+    paths: ['scripts/phase3/**', '.github/workflows/phase3-probe-safety.yml']
+permissions:
+  contents: read
+jobs:
+  probe-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Guard tests and real loopback redirect/timeout tests (no hosted traffic or secrets)
+        run: node --test scripts/phase3/*.test.mjs
+  staging-reconstruction:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: disposable-phase3
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Populated native reconstruction (not a hosted staging clone)
+        run: node scripts/phase3/verify-staging-rehearsal.mjs
+        env:
+          READINESS_PG_ADMIN_URL: postgres://postgres:disposable-phase3@127.0.0.1:5432/postgres

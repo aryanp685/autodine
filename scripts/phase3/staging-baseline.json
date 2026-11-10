@@ -1,0 +1,12 @@
+{
+  "projectRef": "juwyhslzchjevqkdvwjm",
+  "functions": [
+    {"signature":"cancel_order(uuid,uuid,text)","body_hash":"4dd19752f4108536024a0418afc77e4b","acl":"{postgres=X/postgres,service_role=X/postgres,anon=X/postgres,authenticated=X/postgres}","settings":["search_path=public, pg_temp"]},
+    {"signature":"open_table_session(text,text)","body_hash":"196e2aeba5f3955e0c025fa7618c70ee","acl":"{postgres=X/postgres,service_role=X/postgres,anon=X/postgres,authenticated=X/postgres}","settings":["search_path=public, pg_temp"]},
+    {"signature":"operational_schema_readiness()","body_hash":"70f434bbe555c10ba825d4aaae807ee6","acl":"{postgres=X/postgres,service_role=X/postgres}","settings":["search_path=pg_catalog, public"]},
+    {"signature":"place_public_order(text,jsonb,text,text,uuid,text)","body_hash":"dbb59213d65d7724c9862938c5e983f8","acl":"{=X/postgres,postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}","settings":["search_path=public, pg_temp"]},
+    {"signature":"record_counter_payment(text,uuid,text,bigint,uuid)","body_hash":"ed721313afc568cd8754707c9ee215a3","acl":"{postgres=X/postgres,service_role=X/postgres,authenticated=X/postgres}","settings":["search_path=public"]},
+    {"signature":"set_order_line_quantities(uuid,jsonb,uuid)","body_hash":"633ba6d2eda433b39650a6573da3807b","acl":"{postgres=X/postgres,service_role=X/postgres,anon=X/postgres,authenticated=X/postgres}","settings":["search_path=public, pg_temp"]},
+    {"signature":"settle_online_payment(text,text,text,bigint)","body_hash":"145e808e862fef95dc7b4784599d5223","acl":"{postgres=X/postgres,service_role=X/postgres}","settings":["search_path=public, pg_temp"]}
+  ]
+}
