@@ -42,6 +42,222 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
   beforeAll(async()=> { db=new Client({connectionString:URL_VALUE});await db.connect();a=await fixture();b=await fixture(); },30000);
   beforeEach(async()=>{await db.query("select set_config('request.jwt.claim.sub','',false)");});
   afterAll(async()=>{if(db)await db.end();});
+  it('counter payment waits for the session before taking the order lock', async () => {
+    const f = await fixture();
+    const holder = new Client({ connectionString: URL_VALUE });
+    const payer = new Client({ connectionString: URL_VALUE });
+    await holder.connect(); await payer.connect();
+    const paymentKey = randomUUID();
+    let payment: Promise<unknown> | undefined;
+    try {
+      await holder.query('begin');
+      await holder.query("set local statement_timeout = '8s'");
+      await holder.query('select id from order_sessions where id=$1 for update', [f.sitting]);
+      await payer.query('begin');
+      await payer.query("set local statement_timeout = '8s'");
+      await payer.query("select set_config('request.jwt.claim.sub',$1,true)", [f.user]);
+      await payer.query('set local role authenticated');
+      const pid = (await payer.query('select pg_backend_pid() pid')).rows[0].pid;
+      // Attach the rejection handler immediately; cleanup always releases the holder.
+      payment = payer.query('select record_counter_payment($1,$2,$3,$4,$5)',
+        [f.slug, f.order, 'cash', 25000, paymentKey]).then(r => ({ result: r }), error => ({ error }));
+      await expect.poll(async () => (await db.query(
+        'select cardinality(pg_blocking_pids($1)) > 0 blocked', [pid])).rows[0].blocked,
+        { timeout: 4000 }).toBe(true);
+      // While payment is waiting, checkout must still be able to lock the order.
+      await holder.query('select id from orders where id=$1 for update nowait', [f.order]);
+      await holder.query('commit');
+      const outcome = await payment as { error?: Error };
+      expect(outcome.error).toBeUndefined();
+      await payer.query('commit');
+      const balance = (await db.query(`select o.total_paise,
+        (select sum(p.amount_paise) from payments p where p.order_id=o.id and p.status='recorded') paid
+        from orders o where o.id=$1`, [f.order])).rows[0];
+      expect(balance.paid).toBe(balance.total_paise);
+      await payer.query('begin');
+      await payer.query("select set_config('request.jwt.claim.sub',$1,true)", [f.user]);
+      await payer.query('set local role authenticated');
+      await payer.query('select record_counter_payment($1,$2,$3,$4,$5)',
+        [f.slug, f.order, 'cash', 25000, paymentKey]);
+      await payer.query('commit');
+      expect((await db.query('select count(*) n from payments where order_id=$1 and status=$2',
+        [f.order, 'recorded'])).rows[0].n).toBe('1');
+
+    } finally {
+      await holder.query('rollback');
+      if (payment) await payment;
+      await payer.query('rollback');
+      await holder.end(); await payer.end();
+    }
+  }, 15000);
+  for (const operation of ['cancel', 'quantities', 'begin-online', 'settle-online']) {
+    for (const checkout of [false, true]) it(`${operation} takes session first (checkout=${checkout})`, async () => {
+      const f = await fixture();
+      const ref = randomUUID();
+      const line = (await db.query('select id from order_items where order_id=$1', [f.order])).rows[0].id;
+      const token = (await db.query('select guest_token from orders where id=$1', [f.order])).rows[0].guest_token;
+      await db.query('update restaurants set online_payments_enabled=true where id=$1', [f.restaurant]);
+      if (operation === 'settle-online') await db.query(`insert into payments
+        (restaurant_id,order_id,method,status,amount_paise,provider,provider_ref)
+        values($1,$2,'online','pending',25000,'phase1',$3)`, [f.restaurant,f.order,ref]);
+      const holder = new Client({connectionString:URL_VALUE});
+      const worker = new Client({connectionString:URL_VALUE});
+      await holder.connect(); await worker.connect();
+      let task: Promise<{error?: Error}> | undefined;
+      try {
+        await holder.query('begin');
+        await holder.query("set local statement_timeout='8s'");
+        await holder.query('select id from order_sessions where id=$1 for update',[f.sitting]);
+        await worker.query('begin');
+        await worker.query("set local statement_timeout='8s'");
+        await worker.query("select set_config('request.jwt.claim.sub',$1,true)",[f.user]);
+        await worker.query(`set local role ${operation.includes('online') ? 'service_role' : 'authenticated'}`);
+        const pid=(await worker.query('select pg_backend_pid() pid')).rows[0].pid;
+        const sql = operation === 'cancel' ? 'select cancel_order($1,null,null)' :
+          operation === 'quantities' ? 'select set_order_line_quantities($1,$2::jsonb,null)' :
+          operation === 'begin-online' ? 'select begin_online_payment($1,$2,$3,$4,$5,$6)' :
+          'select settle_online_payment($1,$2,$3,$4)';
+        const args = operation === 'cancel' ? [f.order] : operation === 'quantities' ?
+          [f.order,JSON.stringify([{line_id:line,qty:1}])] : operation === 'begin-online' ?
+          ['phase1',ref,f.slug,f.order,token,25000] : ['phase1',ref,'paid-'+ref,25000];
+        task=worker.query(sql,args).then(()=>({}),error=>({error}));
+        await expect.poll(async()=> (await db.query('select cardinality(pg_blocking_pids($1))>0 blocked',[pid])).rows[0].blocked,{timeout:4000}).toBe(true);
+        await holder.query('select id from orders where id=$1 for update nowait',[f.order]);
+        if(operation === 'settle-online') await holder.query('select id from payments where order_id=$1 for update nowait',[f.order]);
+        let invoice: { id: string; snapshot: unknown } | undefined;
+        if(checkout) {
+          await holder.query("select set_config('request.jwt.claim.sub',$1,true)",[f.user]);
+          const id=(await holder.query('select close_order_session_and_issue_receipt($1) id',[f.sitting])).rows[0].id;
+          invoice={id,snapshot:(await holder.query('select totals_snapshot from restaurant_invoices where id=$1',[id])).rows[0].totals_snapshot};
+        }
+        await holder.query('commit');
+        const result=await task;
+        if(checkout && ['cancel','quantities'].includes(operation)) {
+          expect(result.error?.message).toMatch(/finalized invoice/i);
+          await worker.query('rollback');
+          expect((await db.query('select total_paise from orders where id=$1',[f.order])).rows[0].total_paise).toBe('25000');
+        } else {
+          expect(result.error).toBeUndefined();
+          await worker.query('commit');
+        }
+        if(invoice) {
+          expect((await db.query('select totals_snapshot from restaurant_invoices where id=$1',[invoice.id])).rows[0].totals_snapshot).toEqual(invoice.snapshot);
+          if(operation === 'settle-online') {
+            expect((await db.query('select count(*) n from restaurant_payment_receipts where invoice_id=$1',[invoice.id])).rows[0].n).toBe('1');
+            expect((await db.query("select sum(amount_paise) paid from payments where order_id=$1 and status='recorded'",[f.order])).rows[0].paid).toBe('25000');
+          }
+        }
+      } finally {
+        await holder.query('rollback'); if(task) await task;
+        await worker.query('rollback'); await holder.end(); await worker.end();
+      }
+    },15000);
+  }
+
+  it('allows only one of two distinct full collections after invoice issuance', async () => {
+    const f=await fixture();
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)",[f.user]);
+    const invoice=(await db.query('select close_order_session_and_issue_receipt($1) id',[f.sitting])).rows[0].id;
+    const before=(await db.query('select totals_snapshot from restaurant_invoices where id=$1',[invoice])).rows[0].totals_snapshot;
+    const clients=[new Client({connectionString:URL_VALUE}),new Client({connectionString:URL_VALUE})];
+    const keys=[randomUUID(),randomUUID()];
+    try {
+      await Promise.all(clients.map(c=>c.connect()));
+      const outcomes=await Promise.all(clients.map(async(c,i)=>{
+        await c.query('begin'); await c.query("set local statement_timeout='8s'");
+        await c.query("select set_config('request.jwt.claim.sub',$1,true)",[f.user]);
+        await c.query('set local role authenticated');
+        try {
+          await c.query('select record_counter_payment($1,$2,$3,$4,$5)',[f.slug,f.order,'cash',25000,keys[i]]);
+          await c.query('commit'); return 'recorded';
+        } catch(error) { await c.query('rollback'); return (error as Error).message; }
+      }));
+      expect(outcomes.filter(x=>x==='recorded')).toHaveLength(1);
+      expect((await db.query("select sum(amount_paise) paid,count(*) n from payments where order_id=$1 and status='recorded'",[f.order])).rows[0]).toEqual({paid:'25000',n:'1'});
+      expect((await db.query('select sequence_number from restaurant_payment_receipts where invoice_id=$1 order by sequence_number',[invoice])).rows.map(r=>r.sequence_number)).toEqual([1]);
+      expect((await db.query('select totals_snapshot from restaurant_invoices where id=$1',[invoice])).rows[0].totals_snapshot).toEqual(before);
+      await expect(db.query('select record_counter_payment($1,$2,$3,$4,$5)',[f.slug,f.order,'cash',1,randomUUID()])).rejects.toThrow();
+      expect((await db.query('select count(*) n from restaurant_payment_receipts where invoice_id=$1',[invoice])).rows[0].n).toBe('1');
+    } finally {await Promise.all(clients.map(async c=>{await c.query('rollback');await c.end();}));}
+  },15000);
+
+  it('payment-first checkout snapshots payment without a redundant supplemental receipt', async () => {
+    const f=await fixture();
+    const payer=new Client({connectionString:URL_VALUE}), checkout=new Client({connectionString:URL_VALUE});
+    await payer.connect();await checkout.connect();
+    let task: Promise<{id?: string; error?: Error}> | undefined;
+    try {
+      for(const c of [payer,checkout]) {
+        await c.query('begin');await c.query("set local statement_timeout='8s'");
+        await c.query("select set_config('request.jwt.claim.sub',$1,true)",[f.user]);
+        await c.query('set local role authenticated');
+      }
+      await payer.query('select record_counter_payment($1,$2,$3,$4,$5)',[f.slug,f.order,'cash',25000,randomUUID()]);
+      const pid=(await checkout.query('select pg_backend_pid() pid')).rows[0].pid;
+      task=checkout.query('select close_order_session_and_issue_receipt($1) id',[f.sitting])
+        .then(r=>({id:r.rows[0].id}),error=>({error}));
+      await expect.poll(async()=> (await db.query('select cardinality(pg_blocking_pids($1))>0 blocked',[pid])).rows[0].blocked,{timeout:4000}).toBe(true);
+      await payer.query('commit');
+      const result=await task;expect(result.error).toBeUndefined();await checkout.query('commit');
+      const invoice=(await db.query('select totals_snapshot from restaurant_invoices where id=$1',[result.id])).rows[0];
+      expect(invoice.totals_snapshot.amount_paid_paise).toBe(25000);
+      expect((await db.query('select count(*) n from restaurant_payment_receipts where invoice_id=$1',[result.id])).rows[0].n).toBe('0');
+    } finally {
+      await payer.query('rollback');if(task)await task;
+      await checkout.query('rollback');await payer.end();await checkout.end();
+    }
+  },15000);
+
+  it('rejects provider amount mismatches atomically and keeps webhook retries idempotent', async () => {
+    const f=await fixture();const ref=randomUUID();
+    await db.query("insert into payments(restaurant_id,order_id,method,status,amount_paise,provider,provider_ref) values($1,$2,'online','pending',25000,'phase1',$3)",[f.restaurant,f.order,ref]);
+    await expect(db.query('select settle_online_payment($1,$2,$3,$4)',['phase1',ref,'provider-'+ref,24999])).rejects.toThrow(/amount/i);
+    expect((await db.query('select status,provider_payment_ref from payments where order_id=$1',[f.order])).rows[0]).toEqual({status:'pending',provider_payment_ref:null});
+    expect((await db.query('select payment_status from orders where id=$1',[f.order])).rows[0].payment_status).toBe('pending');
+    expect((await db.query('select count(*) n from payment_audit_events where order_id=$1',[f.order])).rows[0].n).toBe('0');
+    const first=(await db.query('select settle_online_payment($1,$2,$3,$4) id',['phase1',ref,'provider-'+ref,25000])).rows[0].id;
+    const second=(await db.query('select settle_online_payment($1,$2,$3,$4) id',['phase1',ref,'provider-'+ref,25000])).rows[0].id;
+    expect(second).toBe(first);
+    expect((await db.query('select count(*) n from payment_audit_events where order_id=$1',[f.order])).rows[0].n).toBe('1');
+    expect((await db.query("select sum(amount_paise) paid from payments where order_id=$1 and status='recorded'",[f.order])).rows[0].paid).toBe('25000');
+  });
+
+  it('keeps provider settlement executable only by the service role, not guests or staff', async () => {
+    for(const role of ['anon','authenticated']) {
+      expect((await db.query("select has_function_privilege($1,'public.settle_online_payment(text,text,text,bigint)','EXECUTE') allowed",[role])).rows[0].allowed).toBe(false);
+    }
+    expect((await db.query("select has_function_privilege('service_role','public.settle_online_payment(text,text,text,bigint)','EXECUTE') allowed")).rows[0].allowed).toBe(true);
+    await asStaff(a.user,async()=>{
+      await expect(db.query('select settle_online_payment($1,$2,$3,$4)',['phase1','missing','missing',25000])).rejects.toMatchObject({code:'42501'});
+    });
+  });
+
+  it('void-first payment race does not create a receipt against a voided invoice', async () => {
+    const f=await fixture();const ref=randomUUID();
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)",[f.user]);
+    const invoice=(await db.query('select close_order_session_and_issue_receipt($1) id',[f.sitting])).rows[0].id;
+    await db.query("insert into payments(restaurant_id,order_id,method,status,amount_paise,provider,provider_ref) values($1,$2,'online','pending',25000,'phase1',$3)",[f.restaurant,f.order,ref]);
+    const voider=new Client({connectionString:URL_VALUE}),payer=new Client({connectionString:URL_VALUE});
+    await voider.connect();await payer.connect();
+    let task: Promise<{error?: Error}> | undefined;
+    try {
+      await voider.query('begin');await voider.query("set local statement_timeout='8s'");
+      await voider.query("select set_config('request.jwt.claim.sub',$1,true)",[f.user]);
+      await voider.query('set local role authenticated');
+      await voider.query('select void_restaurant_invoice($1,$2)',[invoice,'Local regression correction']);
+      await payer.query('begin');await payer.query("set local statement_timeout='8s'");await payer.query('set local role service_role');
+      const pid=(await payer.query('select pg_backend_pid() pid')).rows[0].pid;
+      task=payer.query('select settle_online_payment($1,$2,$3,$4)',['phase1',ref,'provider-'+ref,25000]).then(()=>({}),error=>({error}));
+      await expect.poll(async()=> (await db.query('select cardinality(pg_blocking_pids($1))>0 blocked',[pid])).rows[0].blocked,{timeout:4000}).toBe(true);
+      await voider.query('commit');expect((await task).error).toBeUndefined();await payer.query('commit');
+      expect((await db.query('select status from restaurant_invoices where id=$1',[invoice])).rows[0].status).toBe('voided');
+      expect((await db.query('select count(*) n from restaurant_payment_receipts where invoice_id=$1',[invoice])).rows[0].n).toBe('0');
+      expect((await db.query("select sum(amount_paise) paid from payments where order_id=$1 and status='recorded'",[f.order])).rows[0].paid).toBe('25000');
+    } finally {
+      await voider.query('rollback');if(task)await task;await payer.query('rollback');await voider.end();await payer.end();
+    }
+  },15000);
+
   it('prices orders from the database and attaches a durable sitting', async()=>{
     const row=(await db.query('select subtotal_paise,total_paise,order_session_id from orders where id=$1',[a.order])).rows[0];
     expect(row.subtotal_paise).toBe('25000');expect(row.total_paise).toBe('25000');expect(row.order_session_id).toBe(a.sitting);

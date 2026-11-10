@@ -7,6 +7,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { verifyRestore } from './verify-restore.mjs';
+import { prepareFinancialUpgrade, checkFinancialUpgrade } from './verify-financial-upgrade.mjs';
 const url = new URL(process.env.READINESS_PG_ADMIN_URL || 'postgres://postgres@127.0.0.1:5432/postgres');
 if (!['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) throw new Error('Refusing non-loopback PostgreSQL target');
 const name = `autodine_check_${randomUUID().replaceAll('-', '')}`;
@@ -31,7 +32,10 @@ try {
       '../../scripts/local-pg/005_scaffold_missing_tables.sql','20261020000004_counter_payment.sql',
       '20261021000005_public_place_order.sql','20261021000006_table_qr_verification.sql','20261021000007_table_qr_provisioning.sql'];
     for (const file of baseline) {
-      await db.query(await readFile(`supabase/migrations/${file}`, 'utf8'));
+      if (process.env.READINESS_FINANCIAL_UPGRADE === '1' && file === '20261110000100_counter_payment_lock_order.sql') {
+      financialBefore = await prepareFinancialUpgrade(db);
+    }
+    await db.query(await readFile(`supabase/migrations/${file}`, 'utf8'));
       alreadyApplied.add(file);
     }
     console.log('Recreated observed historical staging baseline (including its scaffold); testing forward upgrade, NOT clean-replay evidence.');
@@ -40,9 +44,18 @@ try {
     if (!alreadyApplied.size) throw new Error('Staging bundle requires explicit staging_scaffold baseline');
     await db.query(await readFile('scripts/staging/approved-upgrade.sql', 'utf8'));
   }
+  let financialBefore;
+  if (process.env.READINESS_FINANCIAL_UPGRADE === '1' && (alreadyApplied.size || process.env.READINESS_STAGING_BUNDLE === '1')) throw new Error('Financial upgrade drill requires clean repository history');
   for (const file of migrations.filter(file => (process.env.READINESS_STAGING_BUNDLE !== '1' || file > '20261109000900_staff_tts_budget.sql') && !alreadyApplied.has(file))) {
+    if (process.env.READINESS_FINANCIAL_UPGRADE === '1' && file === '20261110000100_counter_payment_lock_order.sql') {
+      financialBefore = await prepareFinancialUpgrade(db);
+    }
     await db.query(await readFile(`supabase/migrations/${file}`, 'utf8'));
     console.log(`APPLIED ${file}`);
+  }
+  if (process.env.READINESS_FINANCIAL_UPGRADE === '1') {
+    if (!financialBefore) throw new Error('Financial upgrade boundary was not reached');
+    await checkFinancialUpgrade(db, financialBefore);
   }
   console.log(alreadyApplied.size ? `Verified forward upgrade to ${migrations.length} repository migrations from observed staging baseline.` : `Replayed ${migrations.length} migrations without application-table scaffolds.`);
   await db.end(); db = null;

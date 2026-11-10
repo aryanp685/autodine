@@ -63,9 +63,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Replay from empty schema, test native SQL, dump and restore populated fixtures
+      - name: Replay, populated financial upgrade, native SQL and restore
         run: npm run test:db
         env:
           READINESS_PG_ADMIN_URL: postgres://postgres:disposable-ci-password@127.0.0.1:5432/postgres
           READINESS_VERIFY_RESTORE: '1'
+          READINESS_FINANCIAL_UPGRADE: '1'
           READINESS_PG_CONTAINER: ${{ job.services.postgres.id }}
