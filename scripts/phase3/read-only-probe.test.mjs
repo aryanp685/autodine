@@ -102,3 +102,10 @@ test('failure body classification retains no raw message, hint, token or oversiz
   assert.equal(await failureCategory(new Response('x'.repeat(5000))),'unclassified');
   assert.equal(await failureCategory(new Response('not json')),'unclassified');
 });
+
+
+test('gateway plain-text and nested errors map to fixed categories without body disclosure', async () => {
+  assert.equal(await failureCategory(new Response('Invalid authentication credentials')),'gateway_credentials_rejected');
+  assert.equal(await failureCategory(new Response(JSON.stringify({error:{code:'PGRST301',message:'PRIVATE'}}))),'postgrest_jwt_rejected');
+  assert.equal(await failureCategory(new Response(JSON.stringify({error:'Invalid API key: PRIVATE'}))),'gateway_api_key_rejected');
+});

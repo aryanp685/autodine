@@ -22,7 +22,15 @@ export async function failureCategory(response) {
       if(bytes>4096) return 'unclassified';
       chunks.push(value);
     }
-    const payload=JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    const text=Buffer.concat(chunks).toString('utf8');
+    let payload;
+    try { payload=JSON.parse(text); } catch { payload={message:text}; }
+    if (payload && typeof payload.error === 'object' && payload.error !== null) payload=payload.error;
+    const message=typeof payload === 'string' ? payload : typeof payload?.message === 'string' ? payload.message : typeof payload?.error === 'string' ? payload.error : '';
+    if (/invalid api key/i.test(message)) return 'gateway_api_key_rejected';
+    if (/invalid authentication credentials/i.test(message)) return 'gateway_credentials_rejected';
+    if (/no api key found in request/i.test(message)) return 'gateway_api_key_missing';
+    if (/invalid jwt/i.test(message)) return 'gateway_jwt_rejected';
     const categories={PGRST301:'postgrest_jwt_rejected',PGRST302:'postgrest_missing_auth',PGRST303:'postgrest_claims_rejected','42501':'database_permission_denied'};
     if(Object.hasOwn(categories,payload?.code)) return categories[payload.code];
     if(payload?.message==='Invalid API key') return 'gateway_api_key_rejected';
@@ -66,7 +74,7 @@ export async function probe({ target, key, requests = 10, intervalMs = 1000, tim
 export function resultAnnotation(result) {
   if (result.failure?.kind === 'http') {
     const status = result.failure.status;
-    const allowed=['postgrest_jwt_rejected','postgrest_missing_auth','postgrest_claims_rejected','database_permission_denied','gateway_api_key_rejected','gateway_api_key_missing'];
+    const allowed=['postgrest_jwt_rejected','postgrest_missing_auth','postgrest_claims_rejected','database_permission_denied','gateway_api_key_rejected','gateway_api_key_missing','gateway_credentials_rejected','gateway_jwt_rejected'];
     const category=allowed.includes(result.failure.category)?result.failure.category:'unclassified';
     return `::error::Phase3 baseline stopped: HTTP ${Number.isInteger(status) && status >= 100 && status <= 599 ? status : 'unknown'}, category=${category}. No further requests sent.`;
   }
