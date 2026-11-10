@@ -278,3 +278,54 @@ Do not keep retrying or substitute a privileged service-role key. Verify the
 repository secret uses the actual autodinetest public API key and then inspect
 public auth/header requirements if it still fails. No hosted schema change or
 production operation was made. Main release hold remains unchanged.
+
+## Auth/header investigation after owner confirmed the key
+
+Did not assume owner supplied the wrong key. Test-first reproduction found the
+probe omitted Authorization for legacy staging anon JWTs. Initial test assertions
+inside mocked fetch were swallowed by the probe's expected transport handling;
+moved assertions outside fetch and reproduced14pass/1fail. Fixed legacy-JWT
+bearer handling; short sb_publishable keys remain apikey-only (never put a short
+publishable key in Authorization). Added bounded4KiB failure-body classification
+that emits only allowlisted categories, including nested/text gateway formats;
+no body, raw code/message, credentials or tokens are logged. Successful timing
+remains response-headers-only.17 safety/builder tests pass.
+
+Native source tests and node syntax pass; diagnostics committed/pushed at
+fa2e50c and0fc1fcc on current branch. Workflow run42865815899 (header fix) and
+42866008013 (expanded safe classification) passed secret preflight/safety tests
+but each stopped at first HTTP401, category unclassified. Thus the header bug
+is real but is NOT established as the cause of the hosted401 and its fix did
+not resolve the baseline. No additional requests were sent after each refusal.
+Stop repeated baseline retries pending provider-side diagnosis.
+
+Read-only Supabase catalog query confirmed anon role exists and both anon and
+authenticated have public schema USAGE. This does not prove every function/table
+permission, REST gateway key validity, API configuration or network policy.
+No grants, auth config or security controls were changed to make the probe pass.
+Next diagnostic requires sanitized provider API401 error/reason or a securely
+verified request comparison; never disclose request headers/keys/session tokens
+or disable authorization/RLS. Actual hosted baseline/peak/soak remains incomplete.
+
+## Owner-provided API Gateway diagnosis and safe-route follow-up
+
+The owner-provided dashboard screenshot resolves the earlier HTTP401 cause for
+`GET /rest/v1/`: API Gateway reports
+`UNAUTHORIZED_INVALID_API_KEY_TYPE`, “Only secret API keys can be used for this
+endpoint” / “Secret API key required.” This does not mean the configured public
+staging key is mistyped; the root endpoint rejects its key type. Do not place a
+secret/service-role key in Actions or weaken API authorization to satisfy this
+root request. The root request is not a hosted baseline result.
+
+A fresh read-only catalog check found `public.restaurants` exists, anon has
+SELECT, RLS is enabled, and its SELECT policy is `is_active` (plus the tenant
+membership policy). No table rows were queried through SQL. For a narrow next
+check, the probe allowlist now targets exactly
+`/rest/v1/restaurants?select=id&limit=0`: a public-role GET with a zero-row
+limit and no returned restaurant/customer data. This is not an auth bypass or
+privileged credential fallback. The manual workflow remains capped at ten
+requests spaced at least one second apart, stops on first failure, and only
+measures response-header timing. Its result cannot demonstrate order/RPC
+performance or database capacity. Eighteen local safety/builder tests pass;
+the newly targeted hosted request has not yet run. No hosted DB writes, policy
+changes, or production changes were made.

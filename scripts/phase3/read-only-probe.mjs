@@ -3,10 +3,13 @@ import { performance } from 'node:perf_hooks';
 import { pathToFileURL } from 'node:url';
 export function validateTarget(value) {
   const url = new URL(value);
-  if (url.username || url.password || url.search || url.hash) throw new Error('Credentials/query/fragment are forbidden');
+  if (url.username || url.password || url.hash) throw new Error('Credentials/fragment are forbidden');
   const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
-  const staging = url.origin === 'https://juwyhslzchjevqkdvwjm.supabase.co' && url.pathname === '/rest/v1/';
-  if ((!local || !['http:', 'https:'].includes(url.protocol)) && !staging) throw new Error('Only loopback or the exact approved staging REST root is allowed');
+  const staging = url.origin === 'https://juwyhslzchjevqkdvwjm.supabase.co'
+    && url.pathname === '/rest/v1/restaurants'
+    && url.search === '?select=id&limit=0';
+  if (local && url.search) throw new Error('Loopback probes must not include a query');
+  if ((!local || !['http:', 'https:'].includes(url.protocol)) && !staging) throw new Error('Only loopback or the exact approved staging no-row restaurants probe is allowed');
   return { url, staging };
 }
 // Read at most 4KiB on failures; return only a fixed category, never payload text.
@@ -27,6 +30,7 @@ export async function failureCategory(response) {
     try { payload=JSON.parse(text); } catch { payload={message:text}; }
     if (payload && typeof payload.error === 'object' && payload.error !== null) payload=payload.error;
     const message=typeof payload === 'string' ? payload : typeof payload?.message === 'string' ? payload.message : typeof payload?.error === 'string' ? payload.error : '';
+    if (payload?.unauthorized_hint?.error_code==='UNAUTHORIZED_INVALID_API_KEY_TYPE' || /only secret api keys can be used for this endpoint|secret api key required/i.test(message)) return 'gateway_secret_api_key_required';
     if (/invalid api key/i.test(message)) return 'gateway_api_key_rejected';
     if (/invalid authentication credentials/i.test(message)) return 'gateway_credentials_rejected';
     if (/no api key found in request/i.test(message)) return 'gateway_api_key_missing';
@@ -68,19 +72,19 @@ export async function probe({ target, key, requests = 10, intervalMs = 1000, tim
   }
   times.sort((a, b) => a - b);
   const percentile = p => times.length ? Math.round(times[Math.ceil(times.length * p) - 1] * 100) / 100 : null;
-  return { scope: 'GET response headers only; no order/RPC/DB capacity conclusion', requested: requests, successful: times.length, failure, latencyMs: { p50: percentile(0.5), p95: percentile(0.95), max: percentile(1) } };
+  return { scope: 'GET headers-only for zero-row restaurants projection; no order/RPC/DB capacity conclusion', requested: requests, successful: times.length, failure, latencyMs: { p50: percentile(0.5), p95: percentile(0.95), max: percentile(1) } };
 }
 /** Allowlisted annotation only: never interpolate errors, URLs, keys or payloads. */
 export function resultAnnotation(result) {
   if (result.failure?.kind === 'http') {
     const status = result.failure.status;
-    const allowed=['postgrest_jwt_rejected','postgrest_missing_auth','postgrest_claims_rejected','database_permission_denied','gateway_api_key_rejected','gateway_api_key_missing','gateway_credentials_rejected','gateway_jwt_rejected'];
+    const allowed=['postgrest_jwt_rejected','postgrest_missing_auth','postgrest_claims_rejected','database_permission_denied','gateway_api_key_rejected','gateway_api_key_missing','gateway_credentials_rejected','gateway_jwt_rejected','gateway_secret_api_key_required'];
     const category=allowed.includes(result.failure.category)?result.failure.category:'unclassified';
     return `::error::Phase3 baseline stopped: HTTP ${Number.isInteger(status) && status >= 100 && status <= 599 ? status : 'unknown'}, category=${category}. No further requests sent.`;
   }
   if (result.failure) return '::error::Phase3 baseline stopped: transport, timeout or redirect failure. No further requests sent.';
   const safe = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 'unavailable';
-  return `::notice::Phase3 HTTP-root baseline completed: successful=${safe(result.successful)}, p50_ms=${safe(result.latencyMs?.p50)}, p95_ms=${safe(result.latencyMs?.p95)}, max_ms=${safe(result.latencyMs?.max)}. Not an ordering/capacity benchmark.`;
+  return `::notice::Phase3 no-row REST baseline completed: successful=${safe(result.successful)}, p50_ms=${safe(result.latencyMs?.p50)}, p95_ms=${safe(result.latencyMs?.p95)}, max_ms=${safe(result.latencyMs?.max)}. Not an ordering/capacity benchmark.`;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {

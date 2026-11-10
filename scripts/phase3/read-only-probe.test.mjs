@@ -2,16 +2,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { probe, validateTarget, resultAnnotation, failureCategory } from './read-only-probe.mjs';
 test('rejects production, external hosts, alternate staging paths and embedded credentials', () => {
-  for (const target of ['https://bdbaqpevwmgdvghszjno.supabase.co/rest/v1/', 'https://example.com/', 'https://juwyhslzchjevqkdvwjm.supabase.co/rest/v1/orders', 'http://user:pass@localhost/', 'http://localhost/?key=secret', 'ftp://localhost/']) assert.throws(() => validateTarget(target));
+  for (const target of ['https://bdbaqpevwmgdvghszjno.supabase.co/rest/v1/', 'https://example.com/', 'https://juwyhslzchjevqkdvwjm.supabase.co/rest/v1/restaurants?select=id&limit=0&extra=1', 'http://user:pass@localhost/', 'http://localhost/?key=secret', 'ftp://localhost/']) assert.throws(() => validateTarget(target));
 });
-test('accepts exact staging root and loopback', () => {
-  assert.equal(validateTarget('https://juwyhslzchjevqkdvwjm.supabase.co/rest/v1/').staging, true);
+test('accepts exact staging no-row resource and loopback', () => {
+  assert.equal(validateTarget('https://juwyhslzchjevqkdvwjm.supabase.co/rest/v1/restaurants?select=id&limit=0').staging, true);
   assert.equal(validateTarget('http://127.0.0.1:3000/').staging, false);
 });
 test('enforces request bounds before fetching', async () => {
   for (const requests of [0, 31, 1.5]) await assert.rejects(probe({target:'http://localhost/',requests}));
   await assert.rejects(probe({target:'http://localhost/',intervalMs:1}));
-  await assert.rejects(probe({target:'https://juwyhslzchjevqkdvwjm.supabase.co/rest/v1/'}));
+  await assert.rejects(probe({target:'https://juwyhslzchjevqkdvwjm.supabase.co/rest/v1/restaurants?select=id&limit=0'}));
 });
 test('uses GET, forbids redirect following, spaces requests and emits no payload', async () => {
   let fetched=0, waited=0;
@@ -31,7 +31,7 @@ test('stops on first HTTP or transport failure without logging details', async (
 
 test('rejects privileged staging credentials before sending any request', async () => {
   for (const key of ['sb_secret_not-allowed', `a.${Buffer.from(JSON.stringify({role:'service_role'})).toString('base64url')}.b`]) {
-    await assert.rejects(probe({target:'https://juwyhslzchjevqkdvwjm.supabase.co/rest/v1/',key,fetchImpl:()=>{throw new Error('must not fetch');}}), /publishable\/anon/);
+    await assert.rejects(probe({target:'https://juwyhslzchjevqkdvwjm.supabase.co/rest/v1/restaurants?select=id&limit=0',key,fetchImpl:()=>{throw new Error('must not fetch');}}), /publishable\/anon/);
   }
 });
 
@@ -64,7 +64,7 @@ test('real loopback timeout aborts a stalled response', async () => {
 
 test('staging JWT from another project is refused before network access', async () => {
   const key=`a.${Buffer.from(JSON.stringify({role:'anon',ref:'bdbaqpevwmgdvghszjno'})).toString('base64url')}.b`;
-  await assert.rejects(probe({target:'https://juwyhslzchjevqkdvwjm.supabase.co/rest/v1/',key,fetchImpl:()=>{throw new Error('must not fetch');}}), /publishable\/anon/);
+  await assert.rejects(probe({target:'https://juwyhslzchjevqkdvwjm.supabase.co/rest/v1/restaurants?select=id&limit=0',key,fetchImpl:()=>{throw new Error('must not fetch');}}), /publishable\/anon/);
 });
 
 
@@ -84,7 +84,8 @@ test('legacy staging anon JWT uses matching bearer header; short publishable key
   const jwt=`a.${Buffer.from(JSON.stringify({role:'anon',ref:'juwyhslzchjevqkdvwjm'})).toString('base64url')}.b`;
   for(const key of [jwt,'sb_publishable_test']) {
     let sent;
-    const result=await probe({target:'https://juwyhslzchjevqkdvwjm.supabase.co/rest/v1/',key,requests:1,fetchImpl:async(_url,options)=>{
+    const result=await probe({target:'https://juwyhslzchjevqkdvwjm.supabase.co/rest/v1/restaurants?select=id&limit=0',key,requests:1,fetchImpl:async(url,options)=>{
+      assert.equal(url.href,'https://juwyhslzchjevqkdvwjm.supabase.co/rest/v1/restaurants?select=id&limit=0');
       sent=options.headers;
       return new Response('');
     }});
@@ -108,4 +109,11 @@ test('gateway plain-text and nested errors map to fixed categories without body 
   assert.equal(await failureCategory(new Response('Invalid authentication credentials')),'gateway_credentials_rejected');
   assert.equal(await failureCategory(new Response(JSON.stringify({error:{code:'PGRST301',message:'PRIVATE'}}))),'postgrest_jwt_rejected');
   assert.equal(await failureCategory(new Response(JSON.stringify({error:'Invalid API key: PRIVATE'}))),'gateway_api_key_rejected');
+});
+
+
+test('secret-only API gateway refusal maps to a fixed safe category', async () => {
+  assert.equal(await failureCategory(new Response(JSON.stringify({unauthorized_hint:{error_code:'UNAUTHORIZED_INVALID_API_KEY_TYPE',message:'Secret API key required',hint:'Only secret API keys can be used for this endpoint'}}))),'gateway_secret_api_key_required');
+  assert.equal(await failureCategory(new Response('Only secret API keys can be used for this endpoint')),'gateway_secret_api_key_required');
+  assert.ok(resultAnnotation({failure:{kind:'http',status:401,category:'gateway_secret_api_key_required'}}).includes('category=gateway_secret_api_key_required'));
 });
