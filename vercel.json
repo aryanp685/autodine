@@ -5,7 +5,8 @@
   ],
   "git": {
     "deploymentEnabled": {
-      "arena/3711df6a-autodine": false
+      "arena/3711df6a-autodine": false,
+      "main": false
     }
   }
 }
