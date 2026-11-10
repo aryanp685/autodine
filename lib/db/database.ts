@@ -727,6 +727,10 @@ export type Database = {
         Args: { p_order_session_id: string };
         Returns: string;
       };
+      place_public_order_attempt: {
+        Args: { p_slug: string; p_lines: unknown; p_note?: string | null; p_session_token?: string | null; p_guest_token?: string | null; p_ip_hash?: string | null };
+        Returns: unknown;
+      };
       place_public_order: {
         Args: {
           p_slug: string;

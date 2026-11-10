@@ -146,9 +146,9 @@ async function installRpc(db: Client) {
         ]);
         return { data: rows, error: null };
       }
-      if (name === 'place_public_order') {
+      if (name === 'place_public_order_attempt') {
         const { rows } = await db.query(
-          'select public.place_public_order($1, $2::jsonb, $3, $4, $5::uuid) as code',
+          'select public.place_public_order_attempt($1, $2::jsonb, $3, $4, $5::uuid) as code',
           [params.p_slug, JSON.stringify(params.p_lines), params.p_note, params.p_session_token, params.p_guest_token],
         );
         return { data: rows[0]?.code ?? null, error: null };

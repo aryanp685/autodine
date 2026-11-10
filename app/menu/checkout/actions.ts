@@ -6,6 +6,7 @@ import { parseCart } from '@/lib/cart-storage';
 import { codePageHref, loadTableAccess } from '@/lib/table-access';
 import { cookies } from 'next/headers';
 import { THROTTLE_COOKIE, notPlacedNotice, readThrottleFlag } from '@/lib/scan-outcome';
+import { decodeOrderAttempt } from '@/lib/order-attempt-result';
 import { ipHash } from '@/lib/ip-hash';
 import {
   describePlaceFailure,
@@ -182,14 +183,16 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
     ? attempt
     : crypto.randomUUID();
 
-  let { data: code, error } = await supabase.rpc('place_public_order', {
-    p_slug: slug,
-    p_lines: lines,
-    p_note: note,
-    p_session_token: liveSession,
-    p_guest_token: guestToken,
-    p_ip_hash: await ipHash(slug),
-  });
+  const requestArgs = {
+    p_slug: slug, p_lines: lines, p_note: note, p_session_token: liveSession,
+    p_guest_token: guestToken, p_ip_hash: await ipHash(slug),
+  };
+  const submit = async () => {
+    const result = await supabase.rpc('place_public_order_attempt', requestArgs);
+    if (result.error) return { data: null, error: result.error };
+    return decodeOrderAttempt(result.data);
+  };
+  let { data: code, error } = await submit();
 
   /**
    * One more try, but only for failures that prove nothing was written.
@@ -212,14 +215,7 @@ export async function placeOrderAction(formData: FormData): Promise<void> {
     });
     await new Promise((resolve) => setTimeout(resolve, waitMs));
 
-    const retry = await supabase.rpc('place_public_order', {
-      p_slug: slug,
-      p_lines: lines,
-      p_note: note,
-      p_session_token: liveSession,
-      p_guest_token: guestToken,
-      p_ip_hash: await ipHash(slug),
-    });
+    const retry = await submit();
     code = retry.data;
     error = retry.error;
   }

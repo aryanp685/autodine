@@ -258,6 +258,207 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
     }
   },15000);
 
+  it('admits guests on different table cards behind the same shared Wi-Fi address', async () => {
+    const f=await fixture();const shared='d'.repeat(64);
+    const cards:string[]=[];
+    for(let i=0;i<3;i++) {
+      const table=(await db.query('insert into dining_tables(restaurant_id,label) values($1,$2) returning id',[f.restaurant,'WiFi-'+i])).rows[0].id;
+      const token=randomUUID().replaceAll('-','')+randomUUID().replaceAll('-','');cards.push(token);
+      await db.query('insert into table_qr_codes(restaurant_id,table_id,public_token) values($1,$2,$3)',[f.restaurant,table,token]);
+    }
+    for(const card of cards) for(let i=0;i<8;i++) {
+      const result=(await db.query('select * from open_table_session($1,$2)',[card,shared])).rows[0];
+      expect(result.status).toBe('opened');expect(result.session_token).toBeTruthy();
+    }
+  });
+
+  it('atomically enforces the existing ten-opens-per-card ceiling under concurrent scans', async () => {
+    const f=await fixture();
+    const card=(await db.query('select q.public_token from table_qr_codes q join table_verification_sessions s on s.qr_code_id=q.id where q.restaurant_id=$1',[f.restaurant])).rows[0].public_token;
+    const clients=Array.from({length:16},()=>new Client({connectionString:URL_VALUE}));
+    try {
+      await Promise.all(clients.map(c=>c.connect()));
+      const results=await Promise.all(clients.map((c,i)=>c.query('select * from open_table_session($1,$2)',[card,i.toString(16).padStart(64,'0')])));
+      const opened=results.map(r=>r.rows[0]).filter(r=>r.status==='opened');
+      const limited=results.map(r=>r.rows[0]).filter(r=>r.status==='limited');
+      expect(opened).toHaveLength(9); // fixture already minted one session.
+      expect(limited).toHaveLength(7);
+      for(const result of limited) expect(result.session_token).toBeNull();
+      expect((await db.query('select count(*) n from table_session_opens o join table_qr_codes q on q.id=o.qr_code_id where q.restaurant_id=$1',[f.restaurant])).rows[0].n).toBe('10');
+      expect((await db.query('select count(*) n from table_verification_sessions where restaurant_id=$1',[f.restaurant])).rows[0].n).toBe('10');
+    } finally {await Promise.all(clients.map(c=>c.end()));}
+  },15000);
+
+  it('does not let a tenant IP quota block another restaurant on the same address', async () => {
+    const first=await fixture(),second=await fixture();const shared='e'.repeat(64);
+    await db.query('insert into rate_limit_hits(key,window_started_at,count) values($1,statement_timestamp(),60)',
+      ['po:i:'+first.restaurant+':'+shared]);
+    const sql='select place_public_order($1,$2::jsonb,null,$3,$4,$5) code';
+    await expect(db.query(sql,[first.slug,JSON.stringify([{itemId:first.item,qty:1}]),first.sessionToken,randomUUID(),shared])).rejects.toMatchObject({hint:'rate-limited'});
+    const result=await db.query(sql,[second.slug,JSON.stringify([{itemId:second.item,qty:1}]),second.sessionToken,randomUUID(),shared]);
+    expect(result.rows[0].code).toBeTruthy();
+    expect((await db.query('select count(*) n from orders where restaurant_id=$1',[first.restaurant])).rows[0].n).toBe('1');
+    expect((await db.query('select count(*) n from orders where restaurant_id=$1',[second.restaurant])).rows[0].n).toBe('2');
+  });
+
+  it('persists wrong-code budgets atomically and releases shared-Wi-Fi guests after expiry/success', async () => {
+    const f=await fixture();const ip='f'.repeat(64);
+    const qr=(await db.query('select q.id,q.public_token from table_qr_codes q join table_verification_sessions s on s.qr_code_id=q.id where q.restaurant_id=$1',[f.restaurant])).rows[0];
+    await db.query("update restaurants set guest_verification_mode='code' where id=$1",[f.restaurant]);
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)",[f.user]);
+    await db.query('select current_verification_code($1)',[f.restaurant]);
+    const clients=Array.from({length:12},()=>new Client({connectionString:URL_VALUE}));
+    try {
+      await Promise.all(clients.map(c=>c.connect()));
+      const results=await Promise.all(clients.map(c=>c.query('select * from verify_table_qr_with_code($1,$2,$3)',[qr.public_token,'not-digits',ip])));
+      expect(results.filter(r=>r.rows[0].status==='wrong')).toHaveLength(5);
+      expect(results.filter(r=>r.rows[0].status==='limited')).toHaveLength(7);
+      for(const result of results) expect(result.rows[0].session_token).toBeNull();
+      const attempt=(await db.query('select attempt_count,blocked_until>statement_timestamp() blocked from qr_verification_attempts where qr_code_id=$1 and ip_hash=$2',[qr.id,ip])).rows[0];
+      expect(attempt).toEqual({attempt_count:5,blocked:true});
+      await db.query("update qr_verification_attempts set window_started_at=statement_timestamp()-interval '16 minutes',blocked_until=statement_timestamp()-interval '1 second' where qr_code_id=$1 and ip_hash=$2",[qr.id,ip]);
+      const code=(await db.query('select verification_code_for(secret,floor(extract(epoch from statement_timestamp())/window_seconds)::bigint) code from restaurant_verification_codes where restaurant_id=$1',[f.restaurant])).rows[0].code;
+      for(let i=0;i<2;i++) expect((await db.query('select * from verify_table_qr_with_code($1,$2,$3)',[qr.public_token,code,ip])).rows[0].status).toBe('ok');
+      expect((await db.query('select count(*) n from qr_verification_attempts where qr_code_id=$1 and ip_hash=$2',[qr.id,ip])).rows[0].n).toBe('0');
+    } finally {await Promise.all(clients.map(c=>c.end()));}
+  },15000);
+
+  it('reopens scan admission after the window without reviving expired verification tokens', async () => {
+    const f=await fixture();const ip='c'.repeat(64);
+    const qr=(await db.query('select q.id,q.public_token from table_qr_codes q join table_verification_sessions s on s.qr_code_id=q.id where q.restaurant_id=$1',[f.restaurant])).rows[0];
+    for(let i=0;i<9;i++) expect((await db.query('select * from open_table_session($1,$2)',[qr.public_token,ip])).rows[0].status).toBe('opened');
+    expect((await db.query('select * from open_table_session($1,$2)',[qr.public_token,ip])).rows[0].status).toBe('limited');
+    await db.query("update table_session_opens set opened_at=statement_timestamp()-interval '1 hour' where qr_code_id=$1",[qr.id]);
+    expect((await db.query('select * from open_table_session($1,$2)',[qr.public_token,ip])).rows[0].status).toBe('opened');
+    await db.query("update table_verification_sessions set expires_at=statement_timestamp()-interval '1 second' where restaurant_id=$1",[f.restaurant]);
+    await expect(db.query('select place_public_order($1,$2::jsonb,null,$3,$4)',[f.slug,JSON.stringify([{itemId:f.item,qty:1}]),f.sessionToken,randomUUID()])).rejects.toThrow();
+    expect((await db.query('select count(*) n from orders where restaurant_id=$1',[f.restaurant])).rows[0].n).toBe('1');
+  });
+
+  it('preserves scan-confirm holds until authorized staff confirms the verification session', async () => {
+    const f=await fixture();
+    await db.query("update restaurants set guest_verification_mode='scan_confirm' where id=$1",[f.restaurant]);
+    const qr=(await db.query('select q.public_token from table_qr_codes q join table_verification_sessions s on s.qr_code_id=q.id where q.restaurant_id=$1',[f.restaurant])).rows[0];
+    const session=(await db.query('select * from open_table_session($1,$2)',[qr.public_token,'b'.repeat(64)])).rows[0].session_token;
+    const code=(await db.query('select place_public_order($1,$2::jsonb,null,$3,$4) code',[f.slug,JSON.stringify([{itemId:f.item,qty:1}]),session,randomUUID()])).rows[0].code;
+    const order=(await db.query('select hold_required,confirmed_at,table_session_id from orders where restaurant_id=$1 and code=$2',[f.restaurant,code])).rows[0];
+    expect(order.hold_required).toBe(true);expect(order.confirmed_at).toBeNull();
+    await expect(asStaff(b.user,()=>db.query('select confirm_table_orders($1)',[order.table_session_id]))).rejects.toThrow();
+    await asStaff(f.user,async()=>{
+      await db.query('select confirm_table_orders($1)',[order.table_session_id]);
+      expect((await db.query('select confirmed_at is not null confirmed from orders where restaurant_id=$1 and code=$2',[f.restaurant,code])).rows[0].confirmed).toBe(true);
+    });
+  });
+
+  it('keeps session caps authoritative with no IP and makes retries quota-free', async () => {
+    const f=await fixture();const key=randomUUID();
+    const sql='select place_public_order($1,$2::jsonb,null,$3,$4,$5) code';
+    const args=[f.slug,JSON.stringify([{itemId:f.item,qty:1}]),f.sessionToken,key,null];
+    const first=(await db.query(sql,args)).rows[0].code;
+    const budgetKey='po:s:'+(await db.query("select encode(sha256($1::bytea),'hex') hash",[f.sessionToken])).rows[0].hash;
+    await db.query('update rate_limit_hits set count=30 where key=$1',[budgetKey]);
+    expect((await db.query(sql,args)).rows[0].code).toBe(first);
+    expect((await db.query('select count from rate_limit_hits where key=$1',[budgetKey])).rows[0].count).toBe(30);
+    for(const ip of [null,'0'.repeat(64),'1'.repeat(64)]) {
+      await expect(db.query(sql,[...args.slice(0,3),randomUUID(),ip])).rejects.toMatchObject({hint:'rate-limited'});
+    }
+    expect((await db.query('select count(*) n from orders where restaurant_id=$1',[f.restaurant])).rows[0].n).toBe('2');
+    await db.query("update rate_limit_hits set window_started_at=statement_timestamp()-interval '601 seconds' where key=$1",[budgetKey]);
+    expect((await db.query(sql,[...args.slice(0,3),randomUUID(),null])).rows[0].code).toBeTruthy();
+  });
+
+  it('keeps the restaurant cap authoritative across fresh sessions and IP hashes', async () => {
+    const f=await fixture();
+    await db.query('update rate_limit_hits set count=60 where key=$1',['po:t:'+f.restaurant]);
+    const qr=(await db.query('select q.public_token from table_qr_codes q join table_verification_sessions s on s.qr_code_id=q.id where q.restaurant_id=$1',[f.restaurant])).rows[0];
+    for(let i=0;i<3;i++) {
+      const ip=i.toString().repeat(64);
+      const token=(await db.query('select * from open_table_session($1,$2)',[qr.public_token,ip])).rows[0].session_token;
+      await expect(db.query('select place_public_order($1,$2::jsonb,null,$3,$4,$5)',[f.slug,JSON.stringify([{itemId:f.item,qty:1}]),token,randomUUID(),i===0?null:ip])).rejects.toMatchObject({hint:'rate-limited'});
+    }
+    expect((await db.query('select count(*) n from orders where restaurant_id=$1',[f.restaurant])).rows[0].n).toBe('1');
+  });
+
+  it('commits malformed-order attempt budgets and denies the old public bypass', async () => {
+    const f=await fixture();
+    for(let i=0;i<60;i++) {
+      const result=(await db.query('select place_public_order_attempt($1,$2::jsonb,null,$3,$4) result',[f.slug,'[]',f.sessionToken,randomUUID()])).rows[0].result;
+      expect(result.code).toBeNull();expect(result.error).toBeTruthy();
+    }
+    const result=(await db.query('select place_public_order_attempt($1,$2::jsonb,null,$3,$4) result',[f.slug,JSON.stringify([{itemId:f.item,qty:1}]),f.sessionToken,randomUUID()])).rows[0].result;
+    expect(result.error.hint).toBe('rate-limited');
+    expect((await db.query('select count(*) n from orders where restaurant_id=$1',[f.restaurant])).rows[0].n).toBe('1');
+    const count=(await db.query("select count from rate_limit_hits where key='po:attempt:s:'||encode(sha256($1::bytea),'hex')",[f.sessionToken])).rows[0].count;
+    expect(count).toBe(61);
+    for(const role of ['anon','authenticated']) {
+      expect((await db.query("select has_function_privilege($1,'public.place_public_order(text,jsonb,text,text,uuid,text)','EXECUTE') allowed",[role])).rows[0].allowed).toBe(false);
+      expect((await db.query("select has_function_privilege($1,'public.place_public_order_attempt(text,jsonb,text,text,uuid,text)','EXECUTE') allowed",[role])).rows[0].allowed).toBe(true);
+    }
+    await asStaff(f.user,async()=>{
+      await expect(db.query('select place_public_order($1,$2::jsonb,null,$3,$4)',[f.slug,'[]',f.sessionToken,randomUUID()])).rejects.toMatchObject({code:'42501'});
+    });
+  });
+
+  it('returns existing orders through the versioned API without consuming attempt quota', async () => {
+    const f=await fixture();const key=randomUUID();
+    const sql='select place_public_order_attempt($1,$2::jsonb,null,$3,$4) result';
+    const args=[f.slug,JSON.stringify([{itemId:f.item,qty:1}]),f.sessionToken,key];
+    const first=(await db.query(sql,args)).rows[0].result;
+    expect(first.error).toBeNull();expect(first.code).toBeTruthy();
+    await db.query("update rate_limit_hits set count=60 where key='po:attempt:s:'||encode(sha256($1::bytea),'hex')",[f.sessionToken]);
+    expect((await db.query(sql,args)).rows[0].result).toEqual(first);
+    const count=(await db.query("select count from rate_limit_hits where key='po:attempt:s:'||encode(sha256($1::bytea),'hex')",[f.sessionToken])).rows[0].count;
+    expect(count).toBe(60);
+  });
+
+  it('atomically commits anonymous failed attempts at the admission boundary', async () => {
+    const f=await fixture();
+    const budgetKey='po:attempt:s:'+(await db.query("select encode(sha256($1::bytea),'hex') hash",[f.sessionToken])).rows[0].hash;
+    await db.query('insert into rate_limit_hits(key,window_started_at,count) values($1,statement_timestamp(),50)',[budgetKey]);
+    const clients=Array.from({length:16},()=>new Client({connectionString:URL_VALUE}));
+    try {
+      await Promise.all(clients.map(async c=>{await c.connect();await c.query("set statement_timeout='8s'");await c.query('set role anon');}));
+      const results=await Promise.all(clients.map(async c=>(await c.query('select place_public_order_attempt($1,$2::jsonb,null,$3,$4) result',[f.slug,'[]',f.sessionToken,randomUUID()])).rows[0].result));
+      expect(results.filter(r=>r.error?.hint==='rate-limited')).toHaveLength(6);
+      expect(results.filter(r=>r.error && r.error.hint!=='rate-limited')).toHaveLength(10);
+      expect((await db.query('select count from rate_limit_hits where key=$1',[budgetKey])).rows[0].count).toBe(66);
+      expect((await db.query('select count from rate_limit_hits where key=$1',['po:attempt:t:'+f.restaurant])).rows[0].count).toBe(10);
+      expect((await db.query('select count(*) n from orders where restaurant_id=$1',[f.restaurant])).rows[0].n).toBe('1');
+    } finally {await Promise.all(clients.map(c=>c.end()));}
+  },15000);
+
+  it('enforces durable tenant-attempt caps across new sessions and permits window recovery', async () => {
+    const f=await fixture();const tenantKey='po:attempt:t:'+f.restaurant;
+    await db.query('insert into rate_limit_hits(key,window_started_at,count) values($1,statement_timestamp(),120)',[tenantKey]);
+    const qr=(await db.query('select q.public_token from table_qr_codes q join table_verification_sessions s on s.qr_code_id=q.id where q.restaurant_id=$1',[f.restaurant])).rows[0];
+    const sessions:string[]=[];
+    for(let i=0;i<2;i++) sessions.push((await db.query('select * from open_table_session($1,$2)',[qr.public_token,i.toString().repeat(64)])).rows[0].session_token);
+    const sql='select place_public_order_attempt($1,$2::jsonb,null,$3,$4) result';
+    for(const session of sessions) {
+      const result=(await db.query(sql,[f.slug,JSON.stringify([{itemId:f.item,qty:1}]),session,randomUUID()])).rows[0].result;
+      expect(result.error.hint).toBe('rate-limited');expect(result.code).toBeNull();
+    }
+    expect((await db.query('select count from rate_limit_hits where key=$1',[tenantKey])).rows[0].count).toBe(122);
+    await db.query("update rate_limit_hits set window_started_at=statement_timestamp()-interval '601 seconds' where key=$1",[tenantKey]);
+    await asStaff(f.user,async()=>{
+      const result=(await db.query(sql,[f.slug,JSON.stringify([{itemId:f.item,qty:1}]),sessions[0],randomUUID()])).rows[0].result;
+      expect(result.error).toBeNull();expect(result.code).toBeTruthy();
+    });
+  });
+
+  it('rejects wrong-tenant and expired credentials before durable admission', async () => {
+    const f=await fixture(),other=await fixture();
+    const sql='select place_public_order_attempt($1,$2::jsonb,null,$3,$4) result';
+    const lines=JSON.stringify([{itemId:f.item,qty:1}]);
+    const wrong=(await db.query(sql,[f.slug,lines,other.sessionToken,randomUUID()])).rows[0].result;
+    expect(wrong.code).toBeNull();expect(wrong.error).toBeTruthy();
+    await db.query("update table_verification_sessions set expires_at=statement_timestamp()-interval '1 second' where restaurant_id=$1",[f.restaurant]);
+    const expired=(await db.query(sql,[f.slug,lines,f.sessionToken,randomUUID()])).rows[0].result;
+    expect(expired.code).toBeNull();expect(expired.error).toBeTruthy();
+    expect((await db.query('select count(*) n from orders where restaurant_id=$1',[f.restaurant])).rows[0].n).toBe('1');
+    expect((await db.query('select count(*) n from rate_limit_hits where key=$1',['po:attempt:t:'+f.restaurant])).rows[0].n).toBe('0');
+  });
+
   it('prices orders from the database and attaches a durable sitting', async()=>{
     const row=(await db.query('select subtotal_paise,total_paise,order_session_id from orders where id=$1',[a.order])).rows[0];
     expect(row.subtotal_paise).toBe('25000');expect(row.total_paise).toBe('25000');expect(row.order_session_id).toBe(a.sitting);

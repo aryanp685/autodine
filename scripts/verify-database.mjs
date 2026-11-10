@@ -32,7 +32,11 @@ try {
       '../../scripts/local-pg/005_scaffold_missing_tables.sql','20261020000004_counter_payment.sql',
       '20261021000005_public_place_order.sql','20261021000006_table_qr_verification.sql','20261021000007_table_qr_provisioning.sql'];
     for (const file of baseline) {
-      if (process.env.READINESS_FINANCIAL_UPGRADE === '1' && file === '20261110000100_counter_payment_lock_order.sql') {
+      if (financialBefore && file === '20261110000300_shared_wifi_scan_limits.sql') {
+      await checkFinancialUpgrade(db, financialBefore);
+      financialChecked = true;
+    }
+    if (process.env.READINESS_FINANCIAL_UPGRADE === '1' && file === '20261110000100_counter_payment_lock_order.sql') {
       financialBefore = await prepareFinancialUpgrade(db);
     }
     await db.query(await readFile(`supabase/migrations/${file}`, 'utf8'));
@@ -45,8 +49,13 @@ try {
     await db.query(await readFile('scripts/staging/approved-upgrade.sql', 'utf8'));
   }
   let financialBefore;
+  let financialChecked = false;
   if (process.env.READINESS_FINANCIAL_UPGRADE === '1' && (alreadyApplied.size || process.env.READINESS_STAGING_BUNDLE === '1')) throw new Error('Financial upgrade drill requires clean repository history');
   for (const file of migrations.filter(file => (process.env.READINESS_STAGING_BUNDLE !== '1' || file > '20261109000900_staff_tts_budget.sql') && !alreadyApplied.has(file))) {
+    if (financialBefore && file === '20261110000300_shared_wifi_scan_limits.sql') {
+      await checkFinancialUpgrade(db, financialBefore);
+      financialChecked = true;
+    }
     if (process.env.READINESS_FINANCIAL_UPGRADE === '1' && file === '20261110000100_counter_payment_lock_order.sql') {
       financialBefore = await prepareFinancialUpgrade(db);
     }
@@ -55,7 +64,7 @@ try {
   }
   if (process.env.READINESS_FINANCIAL_UPGRADE === '1') {
     if (!financialBefore) throw new Error('Financial upgrade boundary was not reached');
-    await checkFinancialUpgrade(db, financialBefore);
+    if (!financialChecked) await checkFinancialUpgrade(db, financialBefore);
   }
   console.log(alreadyApplied.size ? `Verified forward upgrade to ${migrations.length} repository migrations from observed staging baseline.` : `Replayed ${migrations.length} migrations without application-table scaffolds.`);
   await db.end(); db = null;
