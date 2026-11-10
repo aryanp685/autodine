@@ -37,7 +37,23 @@ for each row execute function public.guard_direct_order_progress();
 
 -- The retired token-less-era entrypoint bypasses the modern verification,
 -- rate budget and sitting attachment. No application caller uses it.
-revoke all on function public.place_order(text, text, jsonb, text) from public, anon, authenticated;
+-- Hosted histories also contain a three-argument overload, or no legacy
+-- function. Enumerate the retired name rather than assuming one signature.
+do $$
+declare
+  legacy_function regprocedure;
+begin
+  for legacy_function in
+    select p.oid::regprocedure
+    from pg_catalog.pg_proc p
+    join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'place_order'
+      and p.prokind = 'f'
+  loop
+    execute format('revoke all on function %s from public, anon, authenticated', legacy_function);
+  end loop;
+end;
+$$;
 -- A public caller must not choose arbitrary budgets/windows for internal keys.
 revoke all on function public.hit_rate_limit(text, integer, integer) from public, anon, authenticated;
 grant execute on function public.hit_rate_limit(text, integer, integer) to service_role;

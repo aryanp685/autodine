@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { beforeAll, beforeEach, afterAll, describe, expect, it } from 'vitest';
 import { Client } from 'pg';
 const URL_VALUE = process.env.READINESS_DB_URL || '';
@@ -532,6 +533,21 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
     await db.query('update orders set hold_required=true where id=$1',[a.order]);
     try { await expect(asStaff(a.kitchen,()=>db.query("update orders set prep_status='preparing' where id=$1",[a.order]))).rejects.toMatchObject({code:'42501'}); }
     finally { await db.query('update orders set hold_required=false where id=$1',[a.order]); }
+  });
+  it('revokes every retired placement overload even when the four-argument signature is absent',async()=>{
+    await db.query('begin');
+    try {
+      await db.query('drop function if exists public.place_order(text,text,jsonb,text)');
+      await db.query(`create function public.place_order(text,jsonb,text) returns text language sql as $$ select 'test-only'::text $$;
+        grant execute on function public.place_order(text,jsonb,text) to public,anon,authenticated;`);
+      await db.query(await readFile('supabase/migrations/20261109000400_order_write_boundary.sql','utf8'));
+      for (const role of ['anon','authenticated']) {
+        expect((await db.query("select has_function_privilege($1,'public.place_order(text,jsonb,text)','EXECUTE') allowed",[role])).rows[0].allowed).toBe(false);
+      }
+      await db.query('drop function public.place_order(text,jsonb,text)');
+      // Zero legacy overloads must be a safe no-op too.
+      await db.query(await readFile('supabase/migrations/20261109000400_order_write_boundary.sql','utf8'));
+    } finally { await db.query('rollback'); }
   });
   it('does not expose the legacy order entrypoint or caller-selected rate budgets',async()=>{
     const row=(await db.query(`select has_function_privilege('anon','public.place_order(text,text,jsonb,text)','EXECUTE') legacy,
