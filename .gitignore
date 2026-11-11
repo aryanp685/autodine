@@ -46,6 +46,8 @@ yarn-error.log*
 !/docs/verification-2026-11-10.md
 !/docs/subscription-billing-2026-11-10.md
 !/docs/review-deployment-2026-11-11.md
+!/docs/production-migration-plan-2026-11-11.md
+!/docs/production-operator-setup-2026-11-11.md
 
 # scratch scripts
 _shot.mjs
