@@ -7,6 +7,15 @@
 > `ok: false`. For current measured state and the rollout sequence, see
 > [production-migration-plan-2026-11-11.md](production-migration-plan-2026-11-11.md).
 > The rest of this file is kept as the reasoning behind the readiness verdict.
+>
+> Three specific claims below are now known to be out of date, and are left as
+> written because they were accurate when recorded:
+> - "The Realtime publication has zero tables" — rechecked 2026-11-11: both
+>   projects publish `orders` and `table_waiter_calls`.
+> - "Realtime reports `db_connected=false`" — rechecked 2026-11-11, both
+>   projects report the `auth`, `db`, `rest` and `pooler` services healthy.
+> - "six of 45 repository migrations applied (39 remain)" — staging has since
+>   received the bundled forward upgrade and is schema-complete.
 
 ## Continuation update (2026-10-28)
 
