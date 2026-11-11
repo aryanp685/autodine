@@ -496,6 +496,33 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
     } finally { await Promise.all(clients.map((c) => c.end())); }
   }, 30000);
 
+  /**
+   * BRANCH CONFLICT RESOLVED HERE.
+   *
+   * origin/main (PRs #173 and #174) carries seven tests asserting that guest
+   * order submission IS throttled: per-IP, per-session and per-tenant attempt
+   * budgets that reject a guest with hint 'rate-limited'.
+   *
+   * This branch carries migration 20261110000800_remove_order_submission_caps,
+   * which is LATER than the two that introduced those budgets (000300, 000400)
+   * and deliberately removes them: every one of them counts attempts rather
+   * than placed orders, so a shared Wi-Fi address -- the network this product
+   * is sold for, where the router hands every guest the same NAT address --
+   * refuses honest guests because the room is busy. AGENTS.md states the rule
+   * canonically: a legitimate guest order submission is never throttled.
+   *
+   * The two behaviours contradict each other, so both cannot be shipped. This
+   * release candidate keeps 000800's rule, and each of main's seven tests has a
+   * counterpart below asserting the opposite: no budget anywhere, no tenant
+   * ceiling, stale counters ignored, validation failures that are not budget
+   * refusals, replay that costs nothing, concurrency without loss or
+   * duplication, and the guard immediately after this comment.
+   *
+   * What is PRESERVED from #174: the versioned place_public_order_attempt
+   * entrypoint and its privilege contract (re-declared verbatim in 000800),
+   * the attempt-wrapper error envelope, guest-token replay idempotency, the QR
+   * code-entry budget, and the scan/session-open limits from 000300.
+   */
   it('never reintroduces an order-submission budget', async () => {
     // A guard, not a behaviour test: the five keys migrations 000300 and
     // 000400 put in front of ordering. If any of them comes back in a

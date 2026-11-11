@@ -238,7 +238,7 @@ export function SubscriptionScreen({
                   className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-hair px-4 py-3"
                 >
                   <div className="min-w-0">
-                    <p className="flex items-center gap-2 text-[14px] font-medium">
+                    <p className="flex items-center gap-2 text-[15px] font-medium">
                       {plan.name}
                       {current ? <Tag tone="live">Current</Tag> : null}
                     </p>
@@ -350,7 +350,7 @@ export function SubscriptionScreen({
               <li key={event.id} className="border-b border-hair px-5 py-4 last:border-0">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                   <p className="text-[13.5px] font-medium">{historyTitle(event.kind, event)}</p>
-                  <p className="text-[12px] text-gink-46">{whenWithTime(event.occurredAt)}</p>
+                  <p className="text-[12.5px] text-gink-46">{whenWithTime(event.occurredAt)}</p>
                 </div>
                 {event.note ? (
                   <p className="mt-1 text-[12.5px] leading-[1.6] text-gink-64">{event.note}</p>

@@ -68,7 +68,7 @@ export default async function SubscriptionReceiptPage({
           </div>
           <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-[12.5px]">
             <dt className="text-gink-64">Receipt</dt>
-            <dd className="font-mono text-[12px]">{receipt.receiptNumber}</dd>
+            <dd className="font-mono text-[12.5px]">{receipt.receiptNumber}</dd>
             <dt className="text-gink-64">Issued</dt>
             <dd>{when(receipt.issuedAt, true)}</dd>
             <dt className="text-gink-64">Paid</dt>
@@ -95,7 +95,7 @@ export default async function SubscriptionReceiptPage({
               <tr className="border-b border-hair">
                 <td className="px-1 py-3">
                   <p className="font-medium">{receipt.planLabel} plan</p>
-                  <p className="mt-0.5 text-[12px] text-gink-64">Monthly subscription, one account, every outlet</p>
+                  <p className="mt-0.5 text-[12.5px] text-gink-64">Monthly subscription, one account, every outlet</p>
                 </td>
                 <td className="px-1 py-3 text-gink-64">
                   {receipt.periodStart ? `${when(receipt.periodStart)} – ${when(receipt.periodEnd)}` : '—'}
@@ -110,9 +110,9 @@ export default async function SubscriptionReceiptPage({
                 <td className="px-1 py-3 text-right tabular-nums text-gink-64">Shown on the tax invoice</td>
               </tr>
               <tr>
-                <td className="px-1 py-4 text-[14px] font-semibold">Total received</td>
+                <td className="px-1 py-4 text-[15px] font-semibold">Total received</td>
                 <td className="px-1 py-4" />
-                <td className="px-1 py-4 text-right text-[14px] font-semibold tabular-nums">
+                <td className="px-1 py-4 text-right text-[15px] font-semibold tabular-nums">
                   {formatBillMoney(receipt.amountPaise)} {receipt.currency}
                 </td>
               </tr>
@@ -120,7 +120,7 @@ export default async function SubscriptionReceiptPage({
           </table>
         </div>
 
-        <p className="mt-6 max-w-[70ch] text-[12px] leading-[1.6] text-gink-46">{RECEIPT_DISCLAIMER}</p>
+        <p className="mt-6 max-w-[70ch] text-[12.5px] leading-[1.6] text-gink-46">{RECEIPT_DISCLAIMER}</p>
       </section>
 
       <section className="mt-6" aria-label="Back to subscription">
