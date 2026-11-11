@@ -13,28 +13,20 @@ merged to `main`, and production was not touched.
 
 **`https://new-git-arena-a5344572-autodine-iamjarvis9896-3988s-projects.vercel.app`**
 
-Deployment `dpl_26KPYXmTngdNgrgh3sH5beKyx34Z` — state `READY`, branch alias
-assigned, built from branch HEAD `7f2e00e` (the code commit below plus this
-document).
+Deployment `dpl_2i2oYjgNje5xQtkD9CzFSoWEmH9U` — state `READY`, branch alias
+assigned, built from branch HEAD `425279e`.
 
-> **Action needed before it can be used.** Vercel Deployment Protection is
-> enabled on this project, so opening the URL above shows a Vercel login page
-> rather than the app. Fetching the URL returns a "Protected Deployment –
-> Vercel" page redirecting to `vercel.com/login`.
+> **Deployment Protection is on, so use the share link.** Opening the bare URL
+> shows a Vercel login page rather than the app. This share link bypasses it
+> without changing any project setting:
 >
-> To open it, do **one** of these in the Vercel dashboard
-> (`iamjarvis9896-3988s-projects` → project **new** → Settings → Deployment
-> Protection):
-> - turn off protection for the **Preview** environment only, or
-> - use **Share** on this specific deployment to generate a `_vercel_share` link.
+> **`https://new-git-arena-a5344572-autodine-iamjarvis9896-3988s-projects.vercel.app?_vercel_share=RbkpxAfZ3c77C7RqytXVzZczITNwO1is`**
 >
-> Turn it off for Preview only. Leaving Production protection enabled is
-> correct and should not be changed.
->
-> I deliberately did **not** change this myself: Deployment Protection is a
-> project-level setting, and changing it project-wide would alter production
-> configuration, which is out of scope here. The Vercel tooling available to me
-> has no deployment-level "share" or "make public" call.
+> If that ever stops working, regenerate it from the Vercel dashboard
+> (`iamjarvis9896-3988s-projects` → project **new** → the deployment →
+> **Share**). Turning protection off for the **Preview** environment only also
+> works. Leave Production protection enabled — that is correct and should not
+> be changed.
 
 ### Sign in as any of four staff roles
 
@@ -47,13 +39,27 @@ All four share the password `Review2026!`.
 | Kitchen | `kitchen@autodine-review.test` | Kitchen display, KOT progression |
 | Cashier | `cashier@autodine-review.test` | Counter, payments, settlement, receipts |
 
+> **Fixed 2026-11-11: these four accounts could not sign in.**
+> They reported "Email or password is incorrect." even though the password was
+> right. The accounts had been provisioned by inserting straight into
+> `auth.users`, leaving `confirmation_token`, `recovery_token`, `email_change`
+> and `email_change_token_new` `NULL`. GoTrue scans those into plain Go strings
+> and always writes `''`, so every read of such a row failed with a database
+> error that the login form flattens into a bad-password message. The columns
+> are now `''`, the passwords have been re-hashed by GoTrue itself, and all four
+> accounts sign in. Auth users must be created through `admin.auth.admin.createUser()`;
+> `scripts/staging/provision-e2e.mjs` now says so at the call site.
+
+Every mention of the trial length on the landing page, pricing and terms now
+reads from one constant (`TRIAL_DAYS = 21` in `lib/trial.ts`), so the copy
+cannot drift from the migration that actually opens the trial.
+
 ## 2. Release branch and commit
 
 | | |
 |---|---|
 | Branch | `arena/a5344572-autodine` |
-| Branch HEAD (served) | `7f2e00e1d52e602e13382318be5641c8b98d920a` — this document only |
-| Code commit | `a8087af0d4e6f0730b2d62cd67e907f60a08bb59` — the release candidate |
+| Branch HEAD (served) | `425279e733120e1e29573f81da508926c662513b` |
 | Remote | pushed to `origin/arena/a5344572-autodine` |
 
 `a8087af` is the merge of `origin/main` (PRs #173, #174, #175) into the Phase 0
