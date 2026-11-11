@@ -65,6 +65,12 @@ export async function GET(request: Request): Promise<NextResponse> {
     userId: probe.data?.user?.id ?? null,
   };
 
+  // 1b. Is the database reachable at all from this deployment? PostgREST runs
+  //     on the same project, so this separates "Supabase is unreachable" from
+  //     "GoTrue specifically cannot query".
+  const rest = await supabase.from('profiles').select('id').limit(1);
+  out.restProfiles = { error: describe(rest.error), rows: rest.data?.length ?? null };
+
   const admin = getSupabaseAdmin();
   if (!admin) {
     out.fatal = 'no admin client: SUPABASE_SECRET_KEY missing or empty';
