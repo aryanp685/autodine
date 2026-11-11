@@ -120,7 +120,7 @@ describe('home', () => {
     expect(status).toContain('No SMS or WhatsApp receipts');
     expect(status).toContain('access becomes read-only');
     expect(status).not.toContain('things work.');
-    expect(home).toContain('Start your seven-day trial');
+    expect(home).toContain(`Start your ${TRIAL_DAYS}-day trial`);
     expect(home).toContain('No paid subscription is activated at signup.');
     expect(home).toContain('href="/#status"');
   });
