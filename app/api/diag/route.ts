@@ -5,6 +5,10 @@
  * collapses every auth failure into one deliberately vague sentence, so the
  * real GoTrue error is invisible from the UI.
  *
+ * Each probe below is independent of the others. That matters: an earlier
+ * version gated everything behind a successful user list, so one upstream
+ * failure hid every other answer.
+ *
  * Guarded by a one-off token and deleted as soon as the answer is known.
  * It never belongs in a merge.
  */
@@ -43,6 +47,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   const out: Record<string, unknown> = {
+    at: new Date().toISOString(),
     supabaseUrl: SUPABASE_URL,
     isSupabaseConfigured,
     isSupabaseAdminConfigured,
@@ -54,22 +59,20 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.json(out, { headers: { 'cache-control': 'no-store' } });
   }
 
-  // 1. The error the login form is hiding.
+  // Probe 1 -- the error the login form is hiding.
   const probe = await supabase.auth.signInWithPassword({
     email: REVIEW_USERS[0],
     password: PASSWORD,
   });
-  out.signInBeforeFix = {
+  out.probe1_signInExisting = {
     error: describe(probe.error),
     hasSession: Boolean(probe.data?.session),
     userId: probe.data?.user?.id ?? null,
   };
 
-  // 1b. Is the database reachable at all from this deployment? PostgREST runs
-  //     on the same project, so this separates "Supabase is unreachable" from
-  //     "GoTrue specifically cannot query".
+  // Probe 2 -- is the database reachable at all from this deployment?
   const rest = await supabase.from('profiles').select('id').limit(1);
-  out.restProfiles = { error: describe(rest.error), rows: rest.data?.length ?? null };
+  out.probe2_rest = { error: describe(rest.error), rows: rest.data?.length ?? null };
 
   const admin = getSupabaseAdmin();
   if (!admin) {
@@ -77,37 +80,58 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.json(out, { headers: { 'cache-control': 'no-store' } });
   }
 
-  // 2. Does GoTrue even see these users through the Admin API?
+  // Probe 3 -- can GoTrue READ the auth schema?
   const { data: listed, error: listError } = await admin.auth.admin.listUsers({ page: 1, perPage: 500 });
-  out.adminListUsers = {
+  out.probe3_adminList = {
     error: describe(listError),
     total: listed?.users?.length ?? null,
+    emails: (listed?.users ?? []).map((u) => u.email).slice(0, 30),
   };
 
-  // 3. Re-set each password through GoTrue's OWN Admin API. This is the real
-  //    fix: GoTrue hashes it itself, so the stored hash is by construction in
-  //    the format GoTrue will later accept -- unlike a hash we wrote with
-  //    pgcrypto's crypt()/gen_salt().
-  out.repair = [] as unknown[];
+  // Probe 4 -- can GoTrue WRITE to the auth schema? A brand new user proves
+  // the write path independently of whether the existing rows are readable.
+  const freshEmail = `diag-${Date.now()}@autodine-review.test`;
+  const created = await admin.auth.admin.createUser({
+    email: freshEmail,
+    password: PASSWORD,
+    email_confirm: true,
+  });
+  out.probe4_adminCreate = {
+    email: freshEmail,
+    error: describe(created.error),
+    userId: created.data?.user?.id ?? null,
+  };
+
+  // Probe 5 -- and can a GoTrue-created user then sign in?
+  if (created.data?.user?.id) {
+    const retry = await supabase.auth.signInWithPassword({ email: freshEmail, password: PASSWORD });
+    out.probe5_signInFresh = {
+      error: describe(retry.error),
+      hasSession: Boolean(retry.data?.session),
+      userId: retry.data?.user?.id ?? null,
+    };
+    await admin.auth.admin.deleteUser(created.data.user.id);
+  }
+
+  // Probe 6 -- last attempt at the real goal: make the four review accounts
+  // work by having GoTrue itself re-hash their passwords.
+  out.probe6_repair = [];
   for (const email of REVIEW_USERS) {
     const target = listed?.users?.find((user) => user.email?.toLowerCase() === email);
     if (!target) {
-      (out.repair as unknown[]).push({ email, error: 'not found in auth.users' });
+      (out.probe6_repair as unknown[]).push({ email, skipped: 'not returned by listUsers' });
       continue;
     }
-
     const { error: updateError } = await admin.auth.admin.updateUserById(target.id, {
       password: PASSWORD,
       email_confirm: true,
     });
-
     const retry = await supabase.auth.signInWithPassword({ email, password: PASSWORD });
-    (out.repair as unknown[]).push({
+    (out.probe6_repair as unknown[]).push({
       email,
       updateError: describe(updateError),
       signInError: describe(retry.error),
       hasSession: Boolean(retry.data?.session),
-      userId: retry.data?.user?.id ?? null,
     });
   }
 
