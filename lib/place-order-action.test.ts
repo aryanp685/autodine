@@ -38,7 +38,7 @@ vi.mock('next/headers', () => ({
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
-  createSupabaseServerClient: async () => ({ rpc: mocks.rpc }),
+  createSupabaseServerClient: async () => ({ rpc: async (...args: unknown[]) => { const result = await mocks.rpc(...args); return result && typeof result.data === 'string' ? { ...result, data: { code: result.data, error: null } } : result; } }),
 }));
 
 vi.mock('@/lib/cart-storage', () => ({ parseCart: mocks.parseCart }));
@@ -369,7 +369,7 @@ describe('placeOrderAction', () => {
     const url = await run(() => placeOrderAction(data));
 
     expect(mocks.rpc).toHaveBeenCalledWith(
-      'place_public_order',
+      'place_public_order_attempt',
       expect.objectContaining({ p_guest_token: attempt })
     );
     // The same key is what the confirmation link carries.
@@ -397,7 +397,7 @@ describe('placeOrderAction', () => {
 
     expect(url).toMatch(/^\/menu\/order\?s=kings-of-kings&code=ORD-123&t=/);
     expect(mocks.rpc).toHaveBeenCalledWith(
-      'place_public_order',
+      'place_public_order_attempt',
       expect.objectContaining({ p_slug: 'kings-of-kings', p_session_token: 'session-token' })
     );
   });

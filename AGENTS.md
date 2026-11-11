@@ -25,6 +25,20 @@ These rules apply to every coding agent, developer task, test, and deployment in
 - Invoice, checkout, and printing behavior must follow the approved Invoice Spec v1.0 and the already-implemented flows. Browser/OS printing is the supported printing model; do not add printer hardware integrations without approval. Kitchen tickets remain screen-first; do not reintroduce KOT print without approval.
 - Kitchen announcements must retain the approved content in this order: order number, table, items, quantities, and guest note. Preserve deduplication and persistence. Call Waiter copy is `टेबल X, वेटर ध्यान दीजिए。` unless the user explicitly changes it.
 - For QR/session throttling, follow `docs/scan-limit-l1.md`: throttle verification/session minting only, never order submission; a refused scan does not create a session or order. Keep the race/idempotency guarantees covered by the database tests.
+- **Order submission is never throttled.** Throttle QR verification, session minting and other sensitive endpoints; never count or refuse a legitimate guest
+  order. Migration `20261110000800` removed the per-session, per-restaurant and per-IP attempt budgets from `place_public_order` and
+  `place_public_order_attempt`, keeping the session/tenant check, QR validation, idempotency and replay protection. A guard test in
+  `lib/db/readiness.integration.test.ts` fails if any of those budget keys reappear in a function body.
+- **Commercial subscriptions are Model C: one subscription per ACCOUNT, shared by every outlet.** Trial 21 days from activation. Starter Rs 999 / month — 1
+  outlet; Professional Rs 2,699 / month — 5 outlets; Business Rs 3,699 / month — unlimited outlets. Trial activation must work. A trial that was still
+  running when the length changed keeps its original activation date and runs 21 days from it; a trial that had already expired stays expired — which is why
+  the end date is materialised in `accounts.trial_ends_at` instead of recomputed from a bare interval. Downgrades and expiries preserve every outlet and
+  every row of data: they stop NEW outlet creation and make the account read-only, and nothing is ever deleted. Authority:
+  `supabase/migrations/20261110001000_account_subscriptions.sql` (public.account_can_write, public.account_outlet_limit, public.create_outlet,
+  public.admin_set_subscription) and `lib/plans.ts`; `lib/plans.test.ts` pins the two against each other.
+- **Public restaurant data is three facts: name, customer-facing phone, customer-facing address.** Read it only through `public_restaurant_profile()`
+  (`lib/db/public-restaurant.ts`, migration 20261110000500). GSTIN, subscription plan, trial dates, payee details and internal settings are never public —
+  a GSTIN reaches a guest only on a bill the business issues, through `lib/db/bill.ts`, which is staff-authenticated.
 
 ## Security and operational invariants
 
@@ -33,6 +47,7 @@ These rules apply to every coding agent, developer task, test, and deployment in
 - Preserve RLS, least-privilege grants, token-scoped guest reads, fixed `search_path` on security-definer functions, safe redirects, CSP protections, and server-side authorization. Do not “fix” a failing test by bypassing these controls.
 - Never run integration, browser, load, or destructive tests against production services or production data. Use disposable local PostgreSQL / local Supabase-compatible services and synthetic seed data only. C4 is proven with the isolated local PostgreSQL harness; it must not be replayed against production.
 - For the database-backed browser throttle suite, use the dedicated isolated setup in `docs/e2e-local.md` and `.github/workflows/throttle-e2e.yml`. The workflow must not require production secrets. Preserve test logs/results as artifacts and do not call the browser E2E complete unless both named tests genuinely pass.
+- Only the production deployment may use the production Supabase project. Preview, Development, CI and local runs must point at another project or none; the build and the Supabase environment loader refuse otherwise. The rule, its variables and the operator steps are in `docs/preview-isolation.md`. Do not add a bypass.
 - Local scaffolds under `scripts/local-pg/` are test-only approximations where repository migrations omit live-schema objects. They are not production DDL or proof of production-schema parity.
 
 ## Source-of-truth map
@@ -41,5 +56,7 @@ These rules apply to every coding agent, developer task, test, and deployment in
 - Exact scan-throttle semantics: `docs/scan-limit-l1.md`; coverage and evidence: `docs/scan-throttle-coverage.md`.
 - Reproducible isolated browser E2E setup: `docs/e2e-local.md`; operator setup checklist: `docs/SETUP.md`.
 - Current readiness evidence and known integration gaps: `docs/website-readiness-audit.md`.
+- Deployment isolation (which environments may reach production data): `docs/preview-isolation.md`.
+- Deciding what a database still needs from `supabase/migrations/` (method, tools, findings to date): `docs/migration-reconciliation.md`. Hosted rollout steps stay in `PHASE-3-HOSTED-BASELINE.md` and `PRODUCTION-BACKUP-RUNBOOK.md`.
 - Migration-specific behavior remains in checked-in SQL migrations and their contract/integration tests. Treat old sections of `AUDIT-REPORT.md` that are explicitly marked historical as snapshots; use its current-status notes only for dated verification evidence.
 - Do not create a second competing policy/runbook. Update the relevant canonical document when a rule or verified result changes.

@@ -185,12 +185,26 @@ export function Dashboard({
           tone={data.access.readOnly ? 'due' : 'live'}
           label={<Tag tone={data.access.readOnly ? 'due' : 'live'}>{accessSummary(data.access)}</Tag>}
           action={
-            <Link
-              href="/pricing"
-              className="text-[12.5px] font-medium text-gink-64 underline decoration-hair-strong underline-offset-[3px] hover:text-gink hover:decoration-gink"
-            >
-              Plans
-            </Link>
+            <>
+              <Link
+                href="/pricing"
+                className="text-[12.5px] font-medium text-gink-64 underline decoration-hair-strong underline-offset-[3px] hover:text-gink hover:decoration-gink"
+              >
+                Plans
+              </Link>
+              {/* The plan line is where an owner notices their trial is ending.
+                  It also points at the subscription page rather than only at
+                  the marketing pricing page, because what they need next is
+                  their own account: the date it ends, what it costs, and what
+                  stays when it does. */}
+              <Link
+                data-subscription-link
+                href="/dashboard/subscription"
+                className="text-[12.5px] font-medium text-gink-64 underline decoration-hair-strong underline-offset-[3px] hover:text-gink hover:decoration-gink"
+              >
+                Subscription
+              </Link>
+            </>
           }
         >
           {planSentence(data.access)}

@@ -17,6 +17,7 @@
  */
 
 import type { OutletOption } from '../outlets';
+import type { OutletEntitlement } from '../access';
 import { getStaffContextDetailed } from './staff';
 import { canEditSettings } from '../settings-input';
 import { qrSvg, siteOrigin } from '../qr';
@@ -61,6 +62,12 @@ export type SettingsScreenData = {
   /** Every outlet on this account, so Settings can list and add them. */
   outlets: OutletOption[];
   activeOutletId: string;
+  /**
+   * Migration 20261110001000 (Model C). How many outlets the ACCOUNT's plan
+   * allows and how many it has. Null when the entitlement could not be read,
+   * which the screen treats as "ask the server", never as "allowed".
+   */
+  outletEntitlement?: OutletEntitlement | null;
   blocked?: 'signed-out' | 'no-membership';
 };
 
@@ -82,6 +89,7 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
       totalMenus: 0,
       outlets: [],
       activeOutletId: '',
+      outletEntitlement: null,
       blocked: staff.reason,
     };
   }
@@ -184,5 +192,8 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
     totalMenus: menus.length,
     outlets,
     activeOutletId: restaurantId,
+    // The plan lives on the account, so this is the account's allowance and
+    // the account's outlet count -- not this outlet's.
+    outletEntitlement: staff.context.access?.outlets ?? null,
   };
 }

@@ -22,9 +22,9 @@ const CAPABILITY_COPY: Record<string, string> = {
 };
 
 const FOCUS = {
-  starter: ['A straightforward setup', 'For a single-room restaurant or café.'],
-  professional: ['A busier service', 'For a full floor with a dedicated kitchen team.'],
-  business: ['A larger operation', 'For teams planning service across several rooms.'],
+  starter: ['A straightforward setup', 'For a single-room restaurant or café: one outlet, everything switched on.'],
+  professional: ['A busier service', 'For a full floor with a kitchen team, and up to five outlets on one subscription.'],
+  business: ['A larger operation', 'For teams running service across several rooms, with no outlet ceiling.'],
 };
 
 /** Public pricing is informational, not a checkout or an entitlement promise.
@@ -57,7 +57,7 @@ export function PricingScreen() {
           <div className="mx-auto max-w-[1116px]">
             <div className="mb-7 flex flex-wrap items-end justify-between gap-3">
               <h2 id="plans-heading" className="text-[25px] font-semibold tracking-[-0.03em] sm:text-[30px]">One product. Room to grow.</h2>
-              <p className="text-[12px] text-mute">Indicative prices · per restaurant / month</p>
+              <p className="text-[12px] text-mute">Indicative prices · per account / month, every outlet included</p>
             </div>
             <div data-pricing-grid className="grid gap-4 md:grid-cols-3">
               {PLANS.map((plan, index) => (
@@ -68,6 +68,11 @@ export function PricingScreen() {
                   </div>
                   <p className="mt-2 min-h-12 text-[13px] leading-relaxed text-mute">{plan.fit}</p>
                   <p className="mt-7 flex flex-wrap items-baseline gap-2"><span className="tnum text-[42px] leading-none font-semibold tracking-[-0.05em]">{inr(plan.price)}</span><span className="text-[12px] text-mute">/ month</span></p>
+                  <p data-plan-outlets className="mt-2 text-[12.5px] font-medium text-forest">
+                    {plan.outlets === null
+                      ? 'Unlimited outlets'
+                      : `${plan.outlets} ${plan.outlets === 1 ? 'outlet' : 'outlets'}`}
+                  </p>
                   <div data-draw aria-hidden="true" className="my-7 h-px origin-left bg-gradient-to-r from-forest/35 via-[#B98A4B]/40 to-transparent" />
                   <p className="text-[13px] font-medium text-forest">{FOCUS[plan.id][0]}</p>
                   <p className="mt-2 min-h-12 text-[13px] leading-relaxed text-mute">{FOCUS[plan.id][1]}</p>

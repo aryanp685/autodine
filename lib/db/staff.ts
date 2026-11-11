@@ -244,5 +244,10 @@ async function loadAccess(
     canWrite: data.can_write !== false,
     readOnly: data.read_only === true,
     features: Array.isArray(data.features) ? data.features : [],
+    accountId: data.account_id ?? null,
+    // Migration 20261110001000. Absent on a database that predates it, which
+    // is why the screen-side helpers in lib/access.ts treat "unknown" as
+    // "ask the server" rather than as a licence.
+    outlets: data.outlets ?? undefined,
   };
 }

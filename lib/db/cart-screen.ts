@@ -14,6 +14,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import type { MenuItemPrice } from '@/lib/cart-pricing';
 import { requireTaxRateBps } from '@/lib/pricing';
+import { readPublicRestaurant } from '@/lib/db/public-restaurant';
 
 export type CartScreenData = {
   slug: string;
@@ -37,15 +38,10 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
   const supabase = await createSupabaseServerClient();
   if (!supabase) return null;
 
-  const { data: restaurant, error: restaurantError } = await supabase
-    .from('restaurants')
-    .select('id, name, slug, tax_rate_bps, brand_theme_enabled, brand_theme')
-    .eq('slug', slug.trim())
-    .eq('is_active', true)
-    .maybeSingle();
+  const { data: restaurant, error: restaurantError } = await readPublicRestaurant(supabase, slug);
 
   if (restaurantError) throw new Error(`Could not load restaurant: ${restaurantError.message}`);
-  if (!restaurant) return null;
+  if (!restaurant || !restaurant.is_active) return null;
 
   /**
    * Only dishes on a PUBLISHED menu are priced here.
@@ -231,15 +227,10 @@ export async function getRestaurantName(slug?: string | null): Promise<string | 
   const supabase = await createSupabaseServerClient();
   if (!supabase) return null;
 
-  const { data, error } = await supabase
-    .from('restaurants')
-    .select('name')
-    .eq('slug', slug.trim())
-    .eq('is_active', true)
-    .maybeSingle();
+  const { data, error } = await readPublicRestaurant(supabase, slug);
 
   if (error) throw new Error(`Could not load restaurant: ${error.message}`);
-  if (!data) return null;
+  if (!data || !data.is_active) return null;
 
   const name = (data as { name?: string | null }).name;
   return typeof name === 'string' && name.trim() ? name : null;

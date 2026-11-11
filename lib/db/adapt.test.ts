@@ -152,12 +152,26 @@ describe('toDisplayRestaurant', () => {
     expect(out.timezone).toBe('Asia/Kolkata');
   });
 
-  it('substitutes a visible placeholder for columns that do not exist yet', () => {
-    const out = toDisplayRestaurant({ ...restaurant, gstin: null, tagline: null });
-    // A blank on a printed receipt looks like a bug. A placeholder reads as
-    // "not filled in yet", which is the truth.
-    expect(out.gstin).toBe('GSTIN — add in Settings');
+  it('substitutes a visible placeholder for the columns the schema has not caught up with', () => {
+    const out = toDisplayRestaurant({ ...restaurant, tagline: null });
+    // FSSAI and opening hours are not columns yet, so the display layer says
+    // so out loud rather than printing a blank where a value should be.
+    expect(out.fssai).toBe('FSSAI — add in Settings');
+    expect(out.openHours).toBe('Hours — add in Settings');
     expect(out.tagline).toBe('');
+  });
+
+  it('leaves a GSTIN it was never given blank, and invents nothing', () => {
+    // A GSTIN is private: it is not in the public storefront projection at
+    // all, so a restaurant read for a guest arrives without one. Blank is the
+    // honest answer. A placeholder here would be worse than blank for two
+    // reasons: it tells a stranger that a GSTIN exists to be fetched, and it
+    // points a guest at a Settings screen only staff can reach. The printed
+    // bill is a staff document and reads the number from the tenant row
+    // itself (lib/db/bill.ts), not through this adapter.
+    const out = toDisplayRestaurant({ ...restaurant, gstin: null });
+    expect(out.gstin).toBe('');
+    expect(out.gstin).not.toContain('GSTIN');
   });
 });
 

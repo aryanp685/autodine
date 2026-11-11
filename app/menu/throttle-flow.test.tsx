@@ -205,7 +205,7 @@ function database(answers: {
       return { data: rows, error: null };
     }
     if (name === 'open_table_session') return answers.open?.() ?? { data: [], error: null };
-    if (name === 'place_public_order') return answers.place?.(params) ?? { data: null, error: null };
+    if (name === 'place_public_order_attempt') return answers.place?.(params) ?? { data: null, error: null };
     return { data: null, error: null };
   });
 }
@@ -370,7 +370,7 @@ describe('a scan the database refuses for rate limiting', () => {
     expect(message.startsWith('Your order was not sent.')).toBe(true);
     expect(message).toContain('cart is safe');
     // Nothing was written: no insert, no RPC, no second order.
-    expect(mocks.calls.filter((call) => call.name === 'place_public_order')).toEqual([]);
+    expect(mocks.calls.filter((call) => call.name === 'place_public_order_attempt')).toEqual([]);
     // And not the code page, which cannot help this guest.
     expect(target).not.toContain('/code');
   });
@@ -385,7 +385,7 @@ describe('a scan the database refuses for rate limiting', () => {
     const second = await place(checkoutForm());
 
     expect(second).toBe(first);
-    expect(mocks.calls.filter((call) => call.name === 'place_public_order')).toEqual([]);
+    expect(mocks.calls.filter((call) => call.name === 'place_public_order_attempt')).toEqual([]);
   });
 });
 
@@ -453,7 +453,7 @@ describe('an order the guest already has', () => {
      */
     database({
       session: [{ restaurant_slug: 'maddi', table_label: 'T3', expires_at: LIVE_SESSION.expiresAt }],
-      place: () => ({ data: 'A-1042', error: null }),
+      place: () => ({ data: {code:'A-1042',error:null}, error: null }),
     });
     mocks.jar.set('autodine_table', JSON.stringify(LIVE_SESSION));
 
@@ -461,7 +461,7 @@ describe('an order the guest already has', () => {
     const second = await place(checkoutForm());
 
     const attempts = mocks.calls
-      .filter((call) => call.name === 'place_public_order')
+      .filter((call) => call.name === 'place_public_order_attempt')
       .map((call) => call.params.p_guest_token);
 
     expect(attempts).toHaveLength(2);
@@ -496,6 +496,6 @@ describe('an order the guest already has', () => {
     expect(text).not.toContain('Table check paused');
     // The refused scan did not even ask to open a session.
     expect(mocks.calls.filter((call) => call.name === 'open_table_session')).toEqual([]);
-    expect(mocks.calls.filter((call) => call.name === 'place_public_order')).toEqual([]);
+    expect(mocks.calls.filter((call) => call.name === 'place_public_order_attempt')).toEqual([]);
   });
 });

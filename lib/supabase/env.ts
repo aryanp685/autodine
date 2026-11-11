@@ -28,6 +28,7 @@ import { assertExpectedProject } from '@/lib/staging-config';
  */
 
 import { assertSupabaseRuntimeConfig } from './env-guard';
+import { assertDeploymentIsolation } from './deployment-isolation';
 
 export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 
@@ -100,6 +101,22 @@ export const SUPABASE_PUBLISHABLE_KEY = assertNotSecretKey(PUBLISHABLE_KEY);
  * restaurant's data. Never import this from a file marked 'use client'.
  */
 export const SUPABASE_SECRET_KEY = SECRET_KEY;
+
+/**
+ * Only the production deployment may use the production Supabase project.
+ * Throws here -- before any client can be built -- when a Preview, Development
+ * or local environment is pointed at it. On Vercel that fails the build, so no
+ * such deployment exists. The browser has no VERCEL_ENV, so next.config.mjs
+ * inlines the build's value as NEXT_PUBLIC_AUTODINE_DEPLOY_ENV.
+ */
+assertDeploymentIsolation({
+  supabaseUrl: SUPABASE_URL,
+  keys: [PUBLISHABLE_KEY, SECRET_KEY],
+  vercelEnv: process.env.VERCEL_ENV,
+  buildEnv: process.env.NEXT_PUBLIC_AUTODINE_DEPLOY_ENV || process.env.NEXT_PUBLIC_VERCEL_ENV,
+  declaredEnv: process.env.AUTODINE_DEPLOY_ENV,
+  extraProductionRefs: process.env.NEXT_PUBLIC_AUTODINE_PRODUCTION_SUPABASE_REFS,
+});
 
 /** True when the browser-safe Supabase values are present. */
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY);

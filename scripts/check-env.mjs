@@ -30,6 +30,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ISOLATION_ENV_KEYS, isolationProblem } from './deployment-isolation.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -112,6 +113,10 @@ const REQUIRED = [
 
 const problems = [];
 const notes = [];
+
+// Only the production deployment may use the production Supabase project.
+const isolation = isolationProblem(Object.fromEntries(ISOLATION_ENV_KEYS.map((name) => [name, value(name)])));
+if (isolation) problems.push(isolation);
 
 console.log(`\nReading: ${sources.length ? sources.join(', ') : 'nothing — no .env.local found'}\n`);
 

@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { Home } from './HomeScreen';
 import { PricingScreen } from './PricingScreen';
 import { LIVE, NOT_CONNECTED } from '@/lib/plans';
+import { TRIAL_DAYS } from '@/lib/trial';
 
 /**
  * The marketing pages' claims, pinned.
@@ -152,7 +153,7 @@ describe('pricing', () => {
     expect(pricing).not.toContain('Nothing is metered');
     expect(pricing).not.toContain('Free while the product is in preview');
     expect(pricing).toContain('read-only');
-    expect(pricing).toContain('7-day trial');
+    expect(pricing).toContain(`${TRIAL_DAYS}-day trial`);
     expect(pricing).not.toContain('Which plan fits');
     expect(pricing).not.toContain('Recommended');
     for (const plan of [{id:'starter'},{id:'professional'},{id:'business'}]) expect(pricing).toContain(`id="plan-${plan.id}"`);

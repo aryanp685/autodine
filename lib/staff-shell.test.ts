@@ -28,6 +28,7 @@ const ROUTES: Record<string, { dir: string; key: string }> = {
   tables: { dir: 'app/(staff)/dashboard/tables', key: 'tables' },
   reports: { dir: 'app/(staff)/dashboard/reports', key: 'reports' },
   invoices: { dir: 'app/(staff)/dashboard/invoices', key: 'invoices' },
+  subscription: { dir: 'app/(staff)/dashboard/subscription', key: 'subscription' },
   settings: { dir: 'app/(staff)/dashboard/settings', key: 'settings' },
   kitchen: { dir: 'app/(staff)/kitchen', key: 'kitchen' },
   counter: { dir: 'app/(staff)/cashier', key: 'counter' },

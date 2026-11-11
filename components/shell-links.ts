@@ -25,6 +25,7 @@ export type DashboardSection =
   | 'kitchen'
   | 'counter'
   | 'reports'
+  | 'subscription'
   | 'settings';
 
 export type ShellLink = {
@@ -67,6 +68,7 @@ export const DASHBOARD_LINKS: ReadonlyArray<ShellLink> = [
   { key: 'tables', label: 'Tables & QR', href: '/dashboard/tables', group: 'Menu', roles: MANAGE },
 
   { key: 'reports', label: 'Reports', href: '/dashboard/reports', group: 'Business', roles: MANAGE },
+  { key: 'subscription', label: 'Subscription', href: '/dashboard/subscription', group: 'Business', roles: MANAGE },
   { key: 'settings', label: 'Settings', href: '/dashboard/settings', group: 'Business', roles: MANAGE },
 ];
 

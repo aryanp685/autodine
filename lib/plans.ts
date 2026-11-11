@@ -34,8 +34,8 @@ export type PlanId = 'starter' | 'professional' | 'business';
  * still decides — lib/entitlements.ts asks the database — because a hidden
  * button is not a permission.
  *
- * `trial` carries everything. A restaurant evaluating the product for a week
- * and unable to import its menu is not evaluating the product.
+ * `trial` carries everything. A restaurant evaluating the product for three
+ * weeks and unable to import its menu is not evaluating the product.
  */
 export type FeatureId =
   | 'menus'
@@ -66,7 +66,7 @@ export const ALL_FEATURES: FeatureId[] = [
 export const ENTITLEMENTS: Record<PlanId | 'trial', FeatureId[]> = {
   trial: ALL_FEATURES,
   starter: ['menus', 'qr', 'ordering', 'kitchen', 'cashier', 'reports'],
-  professional: ['menus', 'qr', 'ordering', 'kitchen', 'cashier', 'reports', 'roles', 'import'],
+  professional: ['menus', 'qr', 'ordering', 'kitchen', 'cashier', 'reports', 'roles', 'import', 'outlets'],
   business: ALL_FEATURES,
 };
 
@@ -83,6 +83,12 @@ export type Plan = {
   price: number;
   /** One line, in the voice of the restaurant, not the vendor. */
   fit: string;
+  /**
+   * How many outlets one account may own on this plan. `null` is unlimited.
+   * Mirrors public.account_outlet_limit() in migration 20261110001000;
+   * lib/plans.test.ts parses that file so the two cannot drift.
+   */
+  outlets: number | null;
   /** The plan we would recommend, and why it is marked. */
   recommended?: boolean;
 };
@@ -91,23 +97,60 @@ export const PLANS: Plan[] = [
   {
     id: 'starter',
     name: 'Starter',
-    price: 899,
+    price: 999,
     fit: 'One room, one menu, one counter.',
+    outlets: 1,
   },
   {
     id: 'professional',
     name: 'Professional',
-    price: 1599,
+    price: 2699,
     fit: 'A full floor, a kitchen board and a manager.',
+    outlets: 5,
     recommended: true,
   },
   {
     id: 'business',
     name: 'Business',
-    price: 2699,
+    price: 3699,
     fit: 'Several rooms, several screens, a team.',
+    outlets: null,
   },
 ];
+
+/**
+ * Outlets per plan, keyed the way the database keys them.
+ *
+ * `null` is unlimited (Business). `trial` is the same number the product has
+ * always used as its self-serve stop: adding an outlet is free and anonymous
+ * until a plan is chosen, so an unbounded "add outlet" button is an unbounded
+ * free trial. The trial shows every feature; it is not a licence to mint
+ * unlimited workspaces.
+ */
+export const PLAN_OUTLET_LIMITS: Record<PlanId | 'trial', number | null> = {
+  trial: 5,
+  starter: 1,
+  professional: 5,
+  business: null,
+};
+
+/**
+ * How many outlets this plan allows. `null` is unlimited.
+ *
+ * Unknown plan -> the smallest allowance, because an unrecognised tier must
+ * never be read as "unlimited". Note the `in` check: Business's allowance is
+ * `null`, and `??` would replace that null with the fallback.
+ */
+export function planOutletLimit(plan: string): number | null {
+  const table = PLAN_OUTLET_LIMITS as Record<string, number | null | undefined>;
+  return plan in table ? (table[plan] ?? null) : PLAN_OUTLET_LIMITS.starter;
+}
+
+/** "1 outlet" / "5 outlets" / "Unlimited outlets". Never says "null". */
+export function outletLimitLabel(limit: number | null): string {
+  if (limit === null) return 'Unlimited outlets';
+  return `${limit} ${limit === 1 ? 'outlet' : 'outlets'}`;
+}
 
 export type Capability = {
   id: string;
@@ -276,7 +319,7 @@ export const NOT_CONNECTED = [
     id: 'billing',
     label: 'Buying a plan',
     detail:
-      'No plan can be bought yet. A new account runs on the whole product for seven days; after that it is read-only until access is extended by hand.',
+      `No plan can be bought yet. A new account runs on the whole product for ${21} days; after that it is read-only until access is extended by hand.`,
   },
   {
     id: 'messages',
@@ -294,11 +337,17 @@ export const NOT_CONNECTED = [
 export const BILLING = {
   connected: false,
   /**
-   * Seven days, and it is not copy: public.restaurant_can_write() enforces the
-   * same interval, and lib/plans.test.ts reads both files to make sure the two
+   * Twenty-one days, and it is not copy: public.account_can_write() and the
+   * new-account path in migration 20261110001000 both use
+   * `interval '21 days'`, and lib/plans.test.ts reads that file so the two
    * numbers cannot drift. lib/trial.ts holds the app-side constant.
+   *
+   * The interval is how a NEW trial is measured. A trial that was already
+   * running when the length changed keeps its own activation date and runs 21
+   * days from it, and one that had already expired stays expired -- both are
+   * materialised per account in `accounts.trial_ends_at`, not recomputed here.
    */
-  trialDays: 7,
+  trialDays: 21,
   /** Shown wherever a price appears. */
   note: 'Planning figures. Plans are not on sale and nothing is charged.',
 } as const;

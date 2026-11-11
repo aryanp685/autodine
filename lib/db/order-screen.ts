@@ -21,6 +21,7 @@
 
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
+import { readPublicRestaurant } from '@/lib/db/public-restaurant';
 
 /**
  * How long after placing an order a guest may still change or cancel it.
@@ -147,11 +148,7 @@ export async function getOrderScreenData(
     // already placed. A closed storefront blocks NEW orders at
     // place_public_order; hiding a placed order's status and payment behind
     // the owner's close would punish the guest for it.
-    supabase
-      .from('restaurants')
-      .select('name, brand_theme_enabled, brand_theme')
-      .eq('slug', slug.trim())
-      .maybeSingle(),
+    readPublicRestaurant(supabase, slug),
     supabase.rpc('get_public_order', {
       p_slug: slug.trim(),
       p_code: code.trim(),

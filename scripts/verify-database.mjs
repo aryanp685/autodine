@@ -7,6 +7,10 @@ import { readFile, readdir } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { verifyRestore } from './verify-restore.mjs';
+import { seedLegacyFinancialFixture, snapshotFinancialUpgrade, checkFinancialUpgrade } from './verify-financial-upgrade.mjs';
+// Last migration of the recorded financial baseline. Legacy-flow fixture rows are
+// seeded immediately after it, before any later migration can forbid that flow.
+const FINANCIAL_BASELINE = '20261108006000_restore_public_order_session_attach.sql';
 const url = new URL(process.env.READINESS_PG_ADMIN_URL || 'postgres://postgres@127.0.0.1:5432/postgres');
 if (!['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) throw new Error('Refusing non-loopback PostgreSQL target');
 const name = `autodine_check_${randomUUID().replaceAll('-', '')}`;
@@ -38,15 +42,42 @@ try {
   }
   if (process.env.READINESS_STAGING_BUNDLE === '1') {
     if (!alreadyApplied.size) throw new Error('Staging bundle requires explicit staging_scaffold baseline');
-    await db.query(await readFile('scripts/staging/approved-upgrade.sql', 'utf8'));
+    const bundle = await readFile('scripts/staging/approved-upgrade.sql', 'utf8');
+    await db.query(bundle);
+    // The bundle names every migration it contains. Use that list, never a version
+    // cut-off: later work can carry OLDER version numbers than the newest bundled
+    // file (20261108007000-010000 do), and a cut-off skips those files silently.
+    const bundled = [...bundle.matchAll(/^-- SOURCE (\S+) SHA256 [0-9a-f]{64}/gm)].map(match => match[1]);
+    if (!bundled.length) throw new Error('Staging bundle has no SOURCE manifest');
+    for (const file of bundled) alreadyApplied.add(file);
   }
-  for (const file of migrations.filter(file => (process.env.READINESS_STAGING_BUNDLE !== '1' || file > '20261109000900_staff_tts_budget.sql') && !alreadyApplied.has(file))) {
+  let financialBefore;
+  let financialChecked = false;
+  let financialSeeded = false;
+  if (process.env.READINESS_FINANCIAL_UPGRADE === '1' && (alreadyApplied.size || process.env.READINESS_STAGING_BUNDLE === '1')) throw new Error('Financial upgrade drill requires clean repository history');
+  for (const file of migrations.filter(file => !alreadyApplied.has(file))) {
+    if (financialBefore && file === '20261110000300_shared_wifi_scan_limits.sql') {
+      await checkFinancialUpgrade(db, financialBefore);
+      financialChecked = true;
+    }
+    if (process.env.READINESS_FINANCIAL_UPGRADE === '1' && !financialSeeded && file > FINANCIAL_BASELINE) {
+      await seedLegacyFinancialFixture(db);
+      financialSeeded = true;
+      console.log(`SEEDED legacy financial fixture before ${file}`);
+    }
+    if (process.env.READINESS_FINANCIAL_UPGRADE === '1' && file === '20261110000100_counter_payment_lock_order.sql') {
+      financialBefore = await snapshotFinancialUpgrade(db);
+    }
     await db.query(await readFile(`supabase/migrations/${file}`, 'utf8'));
     console.log(`APPLIED ${file}`);
   }
+  if (process.env.READINESS_FINANCIAL_UPGRADE === '1') {
+    if (!financialBefore) throw new Error('Financial upgrade boundary was not reached');
+    if (!financialChecked) await checkFinancialUpgrade(db, financialBefore);
+  }
   console.log(alreadyApplied.size ? `Verified forward upgrade to ${migrations.length} repository migrations from observed staging baseline.` : `Replayed ${migrations.length} migrations without application-table scaffolds.`);
   await db.end(); db = null;
-  const result = spawnSync('npx', ['vitest', 'run', 'lib/db/readiness.integration.test.ts', 'app/menu/throttle-db.integration.test.tsx'], {
+  const result = spawnSync('npx', ['vitest', 'run', 'lib/db/readiness.integration.test.ts', 'lib/db/phase0-security.integration.test.ts', 'lib/db/subscription-billing.integration.test.ts', 'app/menu/throttle-db.integration.test.tsx'], {
     stdio: 'inherit', env: { ...process.env, READINESS_DB_URL: url.href, THROTTLE_DB_URL: url.href },
   });
   if (result.error) throw result.error;

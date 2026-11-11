@@ -2,7 +2,7 @@
  * Subscription trial state.
  *
  * RULES (from the product spec — these are not negotiable):
- *   - Every new account gets a 7-day trial with all main features on.
+ *   - Every new account gets a 21-day trial with all main features on.
  *   - When the trial ends and there is no subscription: the account becomes
  *     READ-ONLY. New orders are BLOCKED.
  *   - Data is NEVER deleted for non-payment. Not after a week, not after a
@@ -12,13 +12,19 @@
  */
 
 /**
- * Seven days. Change this and the database must change with it:
- * `public.restaurant_can_write()` and `public.restaurant_trial_ends_at()` both
- * hard-code `interval '7 days'`, and lib/trial.test.ts asserts the two agree by
- * reading this number. The server is the authority; this constant exists so the
- * app can describe the same clock without a round trip.
+ * Twenty-one days. Change this and the database must change with it:
+ * `public.account_can_write()` and `public.account_trial_ends_at()` measure a
+ * new trial as `interval '21 days'` (migration 20261110001000), and
+ * lib/trial.test.ts asserts the two agree by reading this number. The server
+ * is the authority; this constant exists so the app can describe the same
+ * clock without a round trip.
+ *
+ * This is the length of a NEW trial. An account that was already trialling
+ * when the length changed keeps its own end date, written into
+ * `accounts.trial_ends_at` when that migration ran, and one whose trial had
+ * already ended stays ended. Nothing here revives an expired trial.
  */
-export const TRIAL_DAYS = 7;
+export const TRIAL_DAYS = 21;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 

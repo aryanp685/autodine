@@ -106,6 +106,9 @@ export function describePlaceFailure(code?: string): string {
   }
 
   switch (code) {
+    case 'ORDER_RESULT_INVALID':
+      // A malformed response does not prove the order transaction failed.
+      return 'We could not confirm the order response. Check Orders or ask staff whether it arrived before placing another order.';
     case '23505':
       return 'This order already went through. Open Orders to see it before placing another.';
     case '22P02':

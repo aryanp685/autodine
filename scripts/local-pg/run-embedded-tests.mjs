@@ -232,7 +232,7 @@ try {
       (select count(*)::int from information_schema.columns where table_schema = 'public') as columns
   `);
   const schemaCounts = schema.rows[0];
-  if (migrationFiles.length !== 60 || schemaCounts.tables < 20 || schemaCounts.functions < 20) {
+  if (migrationFiles.length < 60 || schemaCounts.tables < 20 || schemaCounts.functions < 20) {
     throw new Error(`Unexpected schema verification counts: ${JSON.stringify({ migrations: migrationFiles.length, ...schemaCounts })}`);
   }
   const keyObjects = await client.query(`

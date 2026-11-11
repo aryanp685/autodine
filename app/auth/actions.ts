@@ -40,6 +40,10 @@ async function rollbackSignup(
   // one transaction. Compensate on failure so a partial workspace is not left
   // behind and logged as a successful registration.
   if (restaurantId) await admin.from('restaurants').delete().eq('id', restaurantId);
+  // Migration 20261110001000: signup also creates the ACCOUNT that owns the
+  // first outlet, so a half-built workspace leaves an ownerless account behind
+  // unless this removes it too.
+  await admin.from('accounts').delete().eq('owner_id', userId);
   await admin.from('profiles').delete().eq('id', userId);
   await admin.auth.admin.deleteUser(userId);
 }
@@ -104,23 +108,19 @@ export async function signUpAction(formData: FormData): Promise<void> {
       .upsert({ id: userId, full_name: fullName, phone }, { onConflict: 'id' });
     if (profileError) throw profileError;
 
-    const { data: restaurant, error: restaurantError } = await admin
-      .from('restaurants')
-      .insert({ slug, name: restaurantName, timezone: 'Asia/Kolkata' })
-      .select('id')
-      .single();
-    if (restaurantError) throw restaurantError;
-    restaurantId = restaurant.id;
-
-    const { error: menuError } = await admin
-      .from('menus')
-      .insert({ restaurant_id: restaurantId, name: 'Main menu', is_published: true });
-    if (menuError) throw menuError;
-
-    const { error: membershipError } = await admin
-      .from('memberships')
-      .insert({ restaurant_id: restaurantId, user_id: userId, role: 'owner' });
-    if (membershipError) throw membershipError;
+    // Migration 20261110001000 (Model C). The account, its first outlet, the
+    // outlet's starter menu and the owner membership are created in ONE
+    // transaction: the account is what trials and what is billed, and a
+    // restaurant inserted directly would belong to no account at all — no
+    // trial, no plan, and no way to add a second outlet.
+    const { data: created, error: createError } = await admin.rpc('create_account_with_restaurant', {
+      p_name: restaurantName,
+      p_slug: slug,
+      p_timezone: 'Asia/Kolkata',
+      p_owner: userId,
+    });
+    if (createError) throw createError;
+    restaurantId = created ?? undefined;
   } catch (error) {
     try {
       await rollbackSignup(admin, userId, restaurantId);
