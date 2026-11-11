@@ -13,8 +13,9 @@ merged to `main`, and production was not touched.
 
 **`https://new-git-arena-a5344572-autodine-iamjarvis9896-3988s-projects.vercel.app`**
 
-Deployment `dpl_FwN2fyaBovZqmoa8cjWjzqKGweiq` — state `READY`, branch alias
-assigned, built from commit `a8087af`.
+Deployment `dpl_26KPYXmTngdNgrgh3sH5beKyx34Z` — state `READY`, branch alias
+assigned, built from branch HEAD `7f2e00e` (the code commit below plus this
+document).
 
 > **Action needed before it can be used.** Vercel Deployment Protection is
 > enabled on this project, so opening the URL above shows a Vercel login page
@@ -51,7 +52,8 @@ All four share the password `Review2026!`.
 | | |
 |---|---|
 | Branch | `arena/a5344572-autodine` |
-| Commit | `a8087af0d4e6f0730b2d62cd67e907f60a08bb59` |
+| Branch HEAD (served) | `7f2e00e1d52e602e13382318be5641c8b98d920a` — this document only |
+| Code commit | `a8087af0d4e6f0730b2d62cd67e907f60a08bb59` — the release candidate |
 | Remote | pushed to `origin/arena/a5344572-autodine` |
 
 `a8087af` is the merge of `origin/main` (PRs #173, #174, #175) into the Phase 0
