@@ -1,5 +1,13 @@
 # AutoDine website readiness audit
 
+> **Read this first (2026-11-11).** This audit is dated 2026-10-28 and its
+> migration counts are a month out of date. Staging has since received the
+> bundled forward upgrade and is schema-complete; production has **not**, and is
+> **28 migrations behind** this repository, with `GET /api/health` returning
+> `ok: false`. For current measured state and the rollout sequence, see
+> [production-migration-plan-2026-11-11.md](production-migration-plan-2026-11-11.md).
+> The rest of this file is kept as the reasoning behind the readiness verdict.
+
 ## Continuation update (2026-10-28)
 
 On `autodinetest` only, migrations `20261021000005_public_place_order`, `20261021000006_table_qr_verification`, and `20261021000007_table_qr_provisioning` were applied after the earlier snapshot. The hosted project now has six of 45 repository migrations applied (39 remain), plus the local-only scaffold. A catalog check confirmed 16/16 public tables have RLS enabled and 22 policies exist. The expected QR/order functions are present, but `restaurant_can_write(uuid)` and later migration dependencies are not yet available. The Realtime publication has zero tables. Its database clock remains future-dated at 2026-11-08 versus the authoritative 2026-10-28 date; do not run date-sensitive tests. An authorized metadata-only lookup confirmed production is active/healthy, but the connector returned no backup/PITR settings; no production database rows or configuration were accessed or changed, and no restore test was run. This is progress, not a passed full-schema or app-integration gate.
@@ -37,7 +45,15 @@ On `autodinetest` only, migrations `20261021000005_public_place_order`, `2026102
 ## Immediate launch blockers
 
 1. **Restore readiness:** the production dashboard screenshot showed “No backups.” Establish provider backup/PITR, retention, and a successful restore plan/drill before real orders. No production setting was changed.
-2. **Complete non-production schema:** only 3 of 45 repository migrations plus a local-only test scaffold are on `autodinetest`; apply/review the remaining 42 in order, then verify function bodies, grants, RLS, and the Realtime publication. Keep the inferred scaffold clearly test-only.
+2. **Close the production schema gap (updated 2026-11-11).** This was written
+   when `autodinetest` held 3 of 45 migrations. Staging is now schema-complete
+   via the bundled forward upgrade (`arena_staging_forward_upgrade_55`), so this
+   blocker has moved: the gap is now **production**, which is missing 28
+   repository migrations and reports `ok: false` on `/api/health`. The ordered
+   three-step plan, its per-migration risk notes and its one hard ordering
+   constraint are in
+   [production-migration-plan-2026-11-11.md](production-migration-plan-2026-11-11.md).
+   Applying it needs explicit approval and a confirmed backup; see §5 there.
 3. **Resolve/test clock behavior:** the test database clock is future-dated relative to the authoritative date. Establish whether this is a provider/environment clock discrepancy before testing expiry, retention, timestamps, or trial/subscription boundaries.
 4. **Run real app integration:** exercise QR → menu → order → kitchen → cashier/session close → receipt with synthetic data in the test environment; include auth roles, two-tenant isolation, retry/network failure, cleanup counts, and mobile/desktop browsers.
 5. **Investigate the hosted workflow failure:** the isolated PostgreSQL/browser job failed once on `1cef125` and passed when rerun. Retrieve/inspect its artifact when possible and retain the failure cause; do not silently discard this evidence.
