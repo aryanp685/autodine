@@ -1,16 +1,19 @@
 /**
- * TEMPORARY sign-in diagnostic.
+ * TEMPORARY sign-in diagnostic and repair.
  *
- * Created to find out why a provisioned review account cannot sign in: the app
- * collapses every auth failure into one deliberately vague sentence, so the
- * real GoTrue error is invisible from the UI.
+ * Why this exists: the login form deliberately collapses every auth failure
+ * into one vague sentence, so the real GoTrue error was invisible. Probes
+ * showed GoTrue itself is healthy -- it can create a user and sign that user
+ * in -- but every operation that READS the pre-existing rows in auth.users
+ * fails with "Database error querying schema".
  *
- * Each probe below is independent of the others. That matters: an earlier
- * version gated everything behind a successful user list, so one upstream
- * failure hid every other answer.
+ * So this route does two things:
+ *   1. Reads every user by id, to find which specific rows GoTrue cannot read.
+ *   2. Re-hashes the four review accounts through GoTrue's own Admin API,
+ *      which does not depend on listUsers, then proves each one can sign in.
  *
- * Guarded by a one-off token and deleted as soon as the answer is known.
- * It never belongs in a merge.
+ * Guarded by a one-off token and deleted as soon as it has served its
+ * purpose. It never belongs in a merge.
  */
 
 import { NextResponse } from 'next/server';
@@ -23,14 +26,32 @@ export const runtime = 'nodejs';
 
 const TOKEN = 'diag-8fa31c07';
 
-const REVIEW_USERS = [
+const PASSWORD = 'Review2026!';
+
+/** Every user currently in auth.users, from `select id, email from auth.users`. */
+const ALL_USERS: Array<{ id: string; email: string }> = [
+  { id: 'a6f2c759-fc54-4c3c-8178-50f0f3a8ce11', email: 'owner@autodine-review.test' },
+  { id: 'ee86b6a9-2bca-470e-abe7-2a50121a0362', email: 'manager@autodine-review.test' },
+  { id: '727a36e0-f7e4-43ce-a27b-bc94473c996f', email: 'kitchen@autodine-review.test' },
+  { id: 'd499e721-38a8-4f37-93a5-21cbf3d53381', email: 'cashier@autodine-review.test' },
+  { id: '80785b42-690c-4eaa-83a1-02adf7b3d54d', email: 'arena-0add67c3@example.invalid' },
+  { id: '43ec3eb9-4ba7-4592-a13b-0701c70df220', email: 'arena-1da84209@example.invalid' },
+  { id: 'f8e3fc11-242d-458d-8a26-b1bef91544a6', email: 'arena-3c06f80b@example.invalid' },
+  { id: '204d7ee0-d140-429b-a5a2-2348040b9c67', email: 'arena-6fe81052@example.invalid' },
+  { id: 'faa036ae-0b9b-4256-9331-76370c662a36', email: 'arena-8cef1565@example.invalid' },
+  { id: '81aa3ab2-40bb-4eed-8c51-108b6ff1aa66', email: 'arena-a715f820@example.invalid' },
+  { id: 'd8ddb4ea-e2b2-4031-a852-c386358733c9', email: 'arena-c73d7fe1@example.invalid' },
+  { id: '66090623-4a42-4ecf-a028-a10c5b7b606f', email: 'arena-cd483a60@example.invalid' },
+  { id: '56f3cb05-f7d0-4105-a494-46cfc89f12d5', email: 'arena-e5994dc2@example.invalid' },
+  { id: '6e2d6894-2249-4952-b99c-38e2fc460073', email: 'kingprateek255@gmail.com' },
+];
+
+const REVIEW_EMAILS = [
   'owner@autodine-review.test',
   'manager@autodine-review.test',
   'kitchen@autodine-review.test',
   'cashier@autodine-review.test',
 ];
-
-const PASSWORD = 'Review2026!';
 
 type MaybeError = { name?: string; message?: string; status?: number; code?: string };
 
@@ -54,84 +75,46 @@ export async function GET(request: Request): Promise<NextResponse> {
   };
 
   const supabase = await createSupabaseServerClient();
-  if (!supabase) {
-    out.fatal = 'no server client';
-    return NextResponse.json(out, { headers: { 'cache-control': 'no-store' } });
-  }
-
-  // Probe 1 -- the error the login form is hiding.
-  const probe = await supabase.auth.signInWithPassword({
-    email: REVIEW_USERS[0],
-    password: PASSWORD,
-  });
-  out.probe1_signInExisting = {
-    error: describe(probe.error),
-    hasSession: Boolean(probe.data?.session),
-    userId: probe.data?.user?.id ?? null,
-  };
-
-  // Probe 2 -- is the database reachable at all from this deployment?
-  const rest = await supabase.from('profiles').select('id').limit(1);
-  out.probe2_rest = { error: describe(rest.error), rows: rest.data?.length ?? null };
-
   const admin = getSupabaseAdmin();
-  if (!admin) {
-    out.fatal = 'no admin client: SUPABASE_SECRET_KEY missing or empty';
+  if (!supabase || !admin) {
+    out.fatal = !supabase ? 'no server client' : 'no admin client';
     return NextResponse.json(out, { headers: { 'cache-control': 'no-store' } });
   }
 
-  // Probe 3 -- can GoTrue READ the auth schema?
-  const { data: listed, error: listError } = await admin.auth.admin.listUsers({ page: 1, perPage: 500 });
-  out.probe3_adminList = {
-    error: describe(listError),
-    total: listed?.users?.length ?? null,
-    emails: (listed?.users ?? []).map((u) => u.email).slice(0, 30),
-  };
-
-  // Probe 4 -- can GoTrue WRITE to the auth schema? A brand new user proves
-  // the write path independently of whether the existing rows are readable.
-  const freshEmail = `diag-${Date.now()}@autodine-review.test`;
-  const created = await admin.auth.admin.createUser({
-    email: freshEmail,
-    password: PASSWORD,
-    email_confirm: true,
-  });
-  out.probe4_adminCreate = {
-    email: freshEmail,
-    error: describe(created.error),
-    userId: created.data?.user?.id ?? null,
-  };
-
-  // Probe 5 -- and can a GoTrue-created user then sign in?
-  if (created.data?.user?.id) {
-    const retry = await supabase.auth.signInWithPassword({ email: freshEmail, password: PASSWORD });
-    out.probe5_signInFresh = {
-      error: describe(retry.error),
-      hasSession: Boolean(retry.data?.session),
-      userId: retry.data?.user?.id ?? null,
-    };
-    await admin.auth.admin.deleteUser(created.data.user.id);
+  // 1. Which rows can GoTrue actually read? One call per id, so a single bad
+  //    row cannot mask the result for all the others.
+  out.readById = [];
+  for (const user of ALL_USERS) {
+    const { data, error } = await admin.auth.admin.getUserById(user.id);
+    (out.readById as unknown[]).push({
+      email: user.email,
+      ok: Boolean(data?.user),
+      error: describe(error),
+    });
   }
 
-  // Probe 6 -- last attempt at the real goal: make the four review accounts
-  // work by having GoTrue itself re-hash their passwords.
-  out.probe6_repair = [];
-  for (const email of REVIEW_USERS) {
-    const target = listed?.users?.find((user) => user.email?.toLowerCase() === email);
-    if (!target) {
-      (out.probe6_repair as unknown[]).push({ email, skipped: 'not returned by listUsers' });
+  // 2. The actual fix: let GoTrue hash the password itself, by id, without
+  //    going anywhere near listUsers.
+  out.repair = [];
+  for (const email of REVIEW_EMAILS) {
+    const id = ALL_USERS.find((user) => user.email === email)?.id;
+    if (!id) {
+      (out.repair as unknown[]).push({ email, skipped: 'no id' });
       continue;
     }
-    const { error: updateError } = await admin.auth.admin.updateUserById(target.id, {
+
+    const { error: updateError } = await admin.auth.admin.updateUserById(id, {
       password: PASSWORD,
       email_confirm: true,
     });
+
     const retry = await supabase.auth.signInWithPassword({ email, password: PASSWORD });
-    (out.probe6_repair as unknown[]).push({
+    (out.repair as unknown[]).push({
       email,
       updateError: describe(updateError),
       signInError: describe(retry.error),
       hasSession: Boolean(retry.data?.session),
+      userId: retry.data?.user?.id ?? null,
     });
   }
 
