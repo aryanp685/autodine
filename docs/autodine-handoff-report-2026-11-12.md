@@ -95,7 +95,7 @@ password: Review2026!
 
 PR #178 removed the `git.deploymentEnabled` override while preserving the existing `bom1` region. The merge triggered the Git-sourced production deployment recorded above, confirming that the hold is gone.
 
-**Preview/Development Supabase configuration updated:** with user approval, the project-wide Supabase URL, publishable key, and server secret-key entries for Preview/Development were set to the staging project (`juwyhslzchjevqkdvwjm`). The secret key used was the staging project's service-role key; Vercel continues to mask it. Production-scoped values were not changed. The open PR #177's branch-specific Preview URL/key were previously verified as staging. Vercel deployments are immutable: old Preview deployments keep their original build-time configuration and were not deleted or rebuilt here. Only new builds pick up the new settings. Follow `docs/preview-isolation.md` before using or sharing any pre-change preview deployment.
+**Preview/Development Supabase configuration updated:** with user approval, the project-wide Supabase URL and publishable key point to staging (`juwyhslzchjevqkdvwjm`). Preview/Development server-secret entries were updated, but Vercel masks their values and the supplied legacy JWT was not independently verified as the staging secret; do not treat secret isolation as verified. Production-scoped values were not changed. The open PR #177's branch-specific Preview URL/key were previously verified as staging. Vercel deployments are immutable: old Preview deployments keep their build-time configuration. With the user's explicit approval, 74 older Preview deployments have been retired so far; cleanup remains in progress from cursor `1794201761554`. Preserve latest READY deployment `dpl_4BhoXbt82NzQzW3txc21rbYrG2VQ`. Do not use remaining pre-change previews; follow `docs/preview-isolation.md` before sharing them.
 
 ## 5. Current measured state (updated 2026-11-12)
 
@@ -230,9 +230,12 @@ The historical audit (`AUDIT-REPORT.md`, 2026-11-06) catalogued C1–C4 (custome
    deliberately fail-closed for GST documents and issues a clearly-labelled non-GST receipt
    only. **Do not invent rates, defaults, classifications, inclusive/exclusive treatment,
    exemptions or place-of-supply rules.**
-3. **Test-database clock is future-dated** relative to the authoritative date. Must be
-   resolved before trusting any expiry, retention, timestamp, trial or subscription
-   boundary test.
+3. **Staging database clock recheck (2026-11-12 17:31 UTC):** a read-only query returned
+   `UTC`, database time `2026-11-12 17:31:25.899084`, and PostgreSQL start time
+   `2026-11-11 13:50:18.691224`, matching the authoritative date at this recheck. The
+   older 2026-11-08 future-clock anomaly is not currently reproduced. Do not rewrite the
+   historical audit entries; recheck the database clock before relying on future time-bound
+   tests.
 4. **Isolated PostgreSQL/browser job failed once** (`1cef125`) and passed on rerun. The
    failure cause was never retrieved. Do not discard this evidence.
 
@@ -311,12 +314,12 @@ These come from `AGENTS.md` and are locked. Read that file before changing code.
 
 ## 12. Recommended changes, in priority order
 
-1. **Retire or rebuild pre-isolation Preview deployments before use.** Their environment values are immutable; they were not deleted or rebuilt during this work.
+1. **Finish retiring pre-isolation Preview deployments.** 74 older Preview deployments have been deleted with explicit user approval; more remain. Continue exact-ID pagination from cursor `1794201761554`, preserve the latest READY deployment, and never delete Production deployments.
 2. **Reconcile 49 production-only schema-migration versions.** Exact classify results are not available yet due connector output caps. Capture the probe in bounded chunks or use another authorized read-only path; do not edit migration history or rerun schema migrations based only on ledger names.
 3. **Configure SMTP and raise the email send rate limit** — separate settings. Exercise reset and invite flows on staging first. Do not disable `mailer_autoconfirm` without an explicit product decision.
 4. **Complete the real hosted integration pass** on an approved non-production project: QR → menu → order → kitchen → cashier/close → receipt, two-tenant isolation, retry/network failure, mobile and desktop.
 5. **Wire `/api/health` to monitoring and alerting.**
-6. **Settle the quantity 1–99 contract** (cap vs reject) and resolve the test database clock discrepancy before trusting time-bound tests.
+6. **Settle the quantity 1–99 contract** (cap vs reject). The staging database clock matched the authoritative UTC date on a read-only recheck at 2026-11-12 17:31 UTC; recheck it before relying on later time-bound tests.
 7. **Obtain GST adviser sign-off** before enabling GST-dependent invoices or changing the locked tax behavior.
 8. **Run a capacity pass** sized for the actual pilot before broad launch.
 
@@ -329,7 +332,8 @@ Completed across this continuation: Preview/Development Supabase URL, publishabl
 | Production expiry scheduler | Agent | **Complete.** User approved; guarded migration `20261112000100` was applied and the active 15-minute cron job was verified. |
 | Vercel Git deployment restoration | Agent | **Complete.** PR #178 merged; subsequent Git-sourced `main` deployment `dpl_VgBU9J9TRH2FMhZJbx29FDKQbRdL` reached READY/PROMOTED. |
 | Reconcile 49 production-only migration versions | Agent + operator | Need complete read-only catalog probe and classification; do not use ledger names as proof. |
-| Preview/Development Supabase configuration | Agent | Project-wide URL, publishable key, and server secret now target staging; Production entries unchanged. Existing pre-change Preview deployments remain immutable and must be rebuilt/retired before use. |
+| Preview/Development Supabase configuration | Agent | URL and publishable key target staging; secret entries were updated but exact staging secret is unverified because values are masked. Production entries unchanged. 74 older Preview deployments retired; more remain, with cursor `1794201761554`. |
+| Staging database clock | Agent | **Rechecked** at 2026-11-12 17:31 UTC; database UTC date matched the authoritative date. Recheck before future time-bound tests. |
 | Configure SMTP and raise email rate limit | Operator | Supabase dashboard configuration; connector exposes no SMTP setting. |
 | Approve GST rules | Adviser | Legal/financial approval. |
 | Decide cap-vs-reject for quantities > 99 | Product owner | Behavioral contract decision. |
