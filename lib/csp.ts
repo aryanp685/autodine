@@ -54,6 +54,9 @@ export function buildCsp({ nonce, supabaseUrl }: CspInput): string {
   const scriptSrc = ["'self'", `'nonce-${nonce}'`];
   const connectSrc = ["'self'"];
   const imgSrc = ["'self'", 'data:', 'blob:'];
+  // Kitchen TTS fetches an MP3 and plays it through an object URL. Keep blob:
+  // scoped to media instead of relying on default-src (which correctly blocks it).
+  const mediaSrc = ["'self'", 'blob:'];
 
   if (supabase) {
     imgSrc.push(supabase);
@@ -66,6 +69,7 @@ export function buildCsp({ nonce, supabaseUrl }: CspInput): string {
     // React style attributes have no nonce mechanism; scripts stay strict.
     "style-src 'self' 'unsafe-inline'",
     `img-src ${imgSrc.join(' ')}`,
+    `media-src ${mediaSrc.join(' ')}`,
     "font-src 'self'",
     `connect-src ${connectSrc.join(' ')}`,
     "frame-src 'none'",
