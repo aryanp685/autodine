@@ -48,6 +48,7 @@ yarn-error.log*
 !/docs/review-deployment-2026-11-11.md
 !/docs/production-migration-plan-2026-11-11.md
 !/docs/production-operator-setup-2026-11-11.md
+!/docs/autodine-handoff-report-2026-11-12.md
 
 # scratch scripts
 _shot.mjs
