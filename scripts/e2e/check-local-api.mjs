@@ -22,12 +22,14 @@ async function check(label, query) {
   return data;
 }
 
+// The storefront read goes through `public_restaurant_profile`, exactly as
+// lib/db/public-restaurant.ts does it. Migration 20261110000700 drops the
+// guest-readable policy on public.restaurants, so a direct `.from('restaurants')`
+// returns nothing for anon from that migration onwards. This preflight mirrors
+// the shipped code path, not the historical one.
 const storefront = await check(
-  'getStorefrontStatusBySlug restaurant read',
-  client.from('restaurants')
-    .select('name, is_active, announcement_text, announcement_on')
-    .eq('slug', slug)
-    .maybeSingle(),
+  'getStorefrontStatusBySlug storefront read (public_restaurant_profile)',
+  client.rpc('public_restaurant_profile', { p_slug: slug }).maybeSingle(),
 );
 if (!storefront || storefront.is_active === false) throw new Error('Synthetic restaurant is missing or inactive.');
 
@@ -39,14 +41,25 @@ const introRow = Array.isArray(intro) ? intro[0] : null;
 if (!introRow || introRow.restaurant_slug !== slug) throw new Error('Synthetic scan card did not resolve to the expected restaurant.');
 
 const restaurant = await check(
-  'getRestaurantMenu restaurant lookup',
-  client.from('restaurants')
-    .select('*')
-    .eq('slug', slug)
-    .eq('is_active', true)
-    .maybeSingle(),
+  'getRestaurantMenu restaurant lookup (public_restaurant_profile)',
+  client.rpc('public_restaurant_profile', { p_slug: slug }).maybeSingle(),
 );
-if (!restaurant) throw new Error('Full synthetic restaurant row is not available to anon.');
+if (!restaurant) throw new Error('Synthetic restaurant row is not available through the public projection.');
+
+// The contract 20261110000700 asserts: a guest reaches one storefront by slug
+// through the function, and cannot enumerate or read the tenant table directly.
+// PostgREST answers an RLS denial with an empty body rather than an error, so
+// this is an assertion on the rows, not on `error`.
+const direct = await client.from('restaurants').select('id').eq('slug', slug);
+if (direct.error) {
+  console.error(`FAIL direct guest read of public.restaurants should be refused, not error: ${direct.error.message}`);
+  process.exitCode = 1;
+} else if ((direct.data ?? []).length > 0) {
+  console.error('FAIL public.restaurants is still readable by anon: 20261110000700 did not take effect.');
+  process.exitCode = 1;
+} else {
+  console.log('PASS direct guest read of public.restaurants is refused by row security');
+}
 
 const menus = await check(
   'published menus read',
