@@ -342,7 +342,7 @@ export const kitchenOrders: KitchenOrder[] = [
     placedAt: '12:42 PM',
     ageMin: 4,
     payment: 'paid',
-    paymentMethod: 'UPI · paid online',
+    paymentMethod: 'UPI · counter',
     state: 'new',
     note: 'Ring the bell — no onion in the gravy.',
     items: [
@@ -372,7 +372,7 @@ export const kitchenOrders: KitchenOrder[] = [
     placedAt: '12:31 PM',
     ageMin: 15,
     payment: 'paid',
-    paymentMethod: 'Card · paid online',
+    paymentMethod: 'Card · counter',
     state: 'ready',
     items: [
       { qty: 1, name: 'Paneer Tikka', detail: 'Sharing · Medium · Extra mint chutney', veg: true },
@@ -386,7 +386,7 @@ export const kitchenOrders: KitchenOrder[] = [
     placedAt: '12:24 PM',
     ageMin: 22,
     payment: 'paid',
-    paymentMethod: 'UPI · paid online',
+    paymentMethod: 'UPI · counter',
     state: 'served',
     items: [
       { qty: 1, name: 'Dal Bukhara', veg: true },
@@ -490,9 +490,9 @@ export const topItems = [
 ];
 
 export const recentOrders = [
-  { id: 'A-1042', table: 'T7', at: '12:42 PM', total: 776, payment: 'Paid online', state: 'New' },
+  { id: 'A-1042', table: 'T7', at: '12:42 PM', total: 776, payment: 'Paid at counter', state: 'New' },
   { id: 'A-1041', table: 'T3', at: '12:38 PM', total: 1247, payment: 'Counter due', state: 'Preparing' },
-  { id: 'A-1040', table: 'T12', at: '12:31 PM', total: 985, payment: 'Paid online', state: 'Ready' },
-  { id: 'A-1039', table: 'T5', at: '12:24 PM', total: 864, payment: 'Paid online', state: 'Served' },
+  { id: 'A-1040', table: 'T12', at: '12:31 PM', total: 985, payment: 'Paid at counter', state: 'Ready' },
+  { id: 'A-1039', table: 'T5', at: '12:24 PM', total: 864, payment: 'Paid at counter', state: 'Served' },
   { id: 'A-1038', table: 'T9', at: '12:19 PM', total: 737, payment: 'Counter due', state: 'Ready' },
 ];

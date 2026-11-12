@@ -63,15 +63,16 @@ export default function TermsPage() {
 
       <LegalSection title="Payments">
         <p>
-          Counter payments are recorded by a member of staff, and only for the exact amount still owed.
-          Card payments through a gateway are not enabled; the code exists but no gateway is connected
-          and no restaurant can switch it on without deployment keys.
+          A guest&rsquo;s order is unpaid until a member of staff records the exact amount still owed.
+          Cash, card and UPI are collected outside AutoDine at the counter; staff should check that the
+          payment arrived before recording it. AutoDine does not process card details or verify a bank
+          transfer.
         </p>
         <p>
-          A restaurant&rsquo;s own UPI QR is the restaurant&rsquo;s account, not AutoDine&rsquo;s. Scanning it
-          does not mark an order paid: the guest&rsquo;s claim is stored as pending, and staff confirm the
-          transfer before recording it. Any dispute about a UPI transfer is between the guest, the
-          restaurant and their banks.
+          The current customer app does not offer a gateway checkout, display the restaurant&rsquo;s UPI
+          QR, or accept a guest &ldquo;I have paid&rdquo; claim. Payment schema or database functions do not
+          mean those customer flows are available. A payment arranged separately is between the guest,
+          the restaurant and their payment provider or bank.
         </p>
       </LegalSection>
 

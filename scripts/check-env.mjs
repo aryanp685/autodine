@@ -180,9 +180,9 @@ if (site) {
 }
 
 if (value('NEXT_PUBLIC_RAZORPAY_KEY_ID') || value('RAZORPAY_KEY_SECRET')) {
-  notes.push('Razorpay keys are present. Guests still see a pay button only if a restaurant switches online payment on in Settings.');
+  notes.push('Razorpay keys are present, but this app has no customer payment initiation or provider-verification route. Keep online payments disabled; keys alone do not enable a supported flow.');
 } else {
-  console.log('  info     no Razorpay keys — correct until KYC clears; guests pay at the counter or by the restaurant\'s UPI QR');
+  console.log('  info     no Razorpay keys — expected: online checkout is not implemented; guests settle at the counter and staff record verified payments');
 }
 
 console.log('');
@@ -197,4 +197,4 @@ if (problems.length) {
 }
 
 console.log('Environment looks right. Restart `npm run dev` if you just edited .env.local,');
-console.log('then open http://localhost:3000/api/health — it says which migrations are applied.\n');
+console.log('then open http://localhost:3000/api/health for limited readiness probes (not a complete migration or release certification).\n');

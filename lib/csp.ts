@@ -19,9 +19,11 @@
  *
  * WHAT IS ALLOWED BY NAME
  *
- *   checkout.razorpay.com  the payment modal's script, loaded by PayOnline
- *   api.razorpay.com       the modal's iframe and its calls
  *   the Supabase origin    auth, data and realtime (wss) for every screen
+ *
+ * No payment-provider origin is allowed: the current customer flow has no
+ * online-payment UI or provider callback route. Re-add a narrowly scoped
+ * origin only alongside a reviewed, implemented provider flow.
  *
  * Everything else is 'self'. object-src 'none' and base-uri 'self' close the
  * plugin and <base> tricks; frame-ancestors 'self' matches the existing
@@ -50,8 +52,8 @@ function httpsOrigin(value: string | null | undefined): string | null {
 export function buildCsp({ nonce, supabaseUrl }: CspInput): string {
   const supabase = httpsOrigin(supabaseUrl);
 
-  const scriptSrc = ["'self'", `'nonce-${nonce}'`, 'https://checkout.razorpay.com'];
-  const connectSrc = ["'self'", 'https://api.razorpay.com'];
+  const scriptSrc = ["'self'", `'nonce-${nonce}'`];
+  const connectSrc = ["'self'"];
   const imgSrc = ["'self'", 'data:', 'blob:'];
 
   if (supabase) {
@@ -67,7 +69,7 @@ export function buildCsp({ nonce, supabaseUrl }: CspInput): string {
     `img-src ${imgSrc.join(' ')}`,
     "font-src 'self'",
     `connect-src ${connectSrc.join(' ')}`,
-    'frame-src https://api.razorpay.com https://checkout.razorpay.com',
+    "frame-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
     "frame-ancestors 'self'",

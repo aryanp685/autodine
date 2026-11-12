@@ -1,5 +1,7 @@
 # AutoDine — production-readiness handoff
 
+> **Current gate (Arena date 2026-11-06 UTC):** The dated hosted/Preview/CI statements below are historical and were not reverified in this continuation. No hosted system was accessed, no deployment or database operation was performed, and no fresh Preview/runtime, recovery, E2E, or performance evidence was produced. Current instructions keep Production read-only and Staging NO-GO; online payments stay disabled. See `RELEASE-BLOCKER-REPORT.md` for the live blocker register.
+
 ## Latest live staging correction verified
 
 User-provided shareable access opened staging homepage/login. It exposed a health bug caused by legitimate service-role financial-table restrictions. Fixed using a server-only catalog RPC (no tenant data reads and no widened financial grants), applied only to staging and redeployed commit `8fd6e02`. Fresh authorized health fetch now returns **`ok:true`, credentials accepted, all operational probes applied**. Local full suite **1,931 pass / 21 native skips**, native suite **56 clean migrations / 21 pass**, cold recovery reverified. Direct sandbox Chromium is blocked by outbound network restrictions; actual hosted login/order browser flows remain unverified and need a network-enabled authorized runner. Share token is not stored in Git.

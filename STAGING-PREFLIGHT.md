@@ -1,5 +1,7 @@
 # Existing staging: read-only preflight
 
+> **Current instruction boundary (Arena date 2026-11-06 UTC):** All hosted Staging statuses and actions recorded below are historical claims, not fresh verification or authorization. The current user direction supersedes any older “approved staging upgrade” text: Staging is NO-GO and may receive only authorized read-only metadata/catalog inspection until operator acceptance, recovery evidence, and migration gates are satisfied. No hosted system was accessed in this continuation. Production remains read-only. See `RELEASE-BLOCKER-REPORT.md` for the current blocker register.
+
 ## Latest verified readiness result
 
 Staging-only deployment **dpl_58628RrxJGGsoiKctrUasMsuKMNP**, commit **8fd6e027f0a98a072066f3226cb4a7c6603ffbae**, is READY. A fresh authorized page fetch of `/api/health?check=8fd6e02` returned **`ok:true`**, credentials accepted and all five operational probes applied. The initial identical-URL refetch returned the fetcher's older cached `checkedAt` payload; a revision-specific query confirmed the fresh deployment. Token omitted from this record deliberately.

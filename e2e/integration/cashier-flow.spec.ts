@@ -18,10 +18,11 @@ import {
 /**
  * THE COUNTER (CASHIER), END TO END, ON A REAL DEPLOYMENT.
  *
- * Real bills, real record_counter_payment writes, the UPI claim turning a
- * guest's "I have paid" into a confirmable state at the till, and the
- * idempotent duplicate-confirmation guard. Each test places its own order —
- * money state is exactly the thing tests must not share.
+ * Real bills, real record_counter_payment writes for cash/card/UPI, and the
+ * idempotent duplicate-payment guard. Guest UPI QR/self-claim is intentionally
+ * absent: the UPI case below verifies that a guest gets no claim control and
+ * staff can record an externally verified counter payment. Each test places
+ * its own order — money state is exactly the thing tests must not share.
  *
  * IT WRITES ROWS (orders AND payments). Point it at a DISPOSABLE branch
  * database only.

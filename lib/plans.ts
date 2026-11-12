@@ -270,7 +270,7 @@ export const NOT_CONNECTED = [
     id: 'payments',
     label: 'Card payments',
     detail:
-      'No card gateway is connected and no money is taken by AutoDine. Guests pay at the counter, or into the restaurant\'s own UPI QR, and staff record what arrived.',
+      'No customer gateway or restaurant UPI-QR flow is available. Guests pay at the counter; staff record cash, card or UPI only after checking that it arrived.',
   },
   {
     id: 'billing',
@@ -288,8 +288,9 @@ export const NOT_CONNECTED = [
 /**
  * The state of billing, in one place, because it is said in four.
  *
- * Nothing in this deployment can charge anybody: there are no gateway keys and
- * no subscription table. Every screen that mentions money reads this.
+ * No subscription checkout or subscription write path is connected. This is
+ * separate from staff recording a payment already collected at the counter.
+ * Every screen that describes buying a plan reads this state.
  */
 export const BILLING = {
   connected: false,

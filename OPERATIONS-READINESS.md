@@ -1,6 +1,8 @@
 # Safe verification and release runbook
 
-Latest evidence: GitHub CI run 42567533471 passed the PG 15/17/18 clean migrations/native tests/logical dump-and-restore jobs. Earlier “not run” statements describe the pre-push snapshot. Hosted staging preview is READY but protected by Vercel SSO; authorized automation access is needed before calling HTTP health/browser workflows verified. See STAGING-PREFLIGHT.md.
+> **Current evidence note (Arena date 2026-11-06 UTC):** The CI, Preview, and hosted statements below are historical and were not rechecked in this continuation. No hosted system, deployment, recovery target, or payment provider was accessed. Staging remains NO-GO and Production remains read-only; a Preview marked READY or a green health probe is not launch acceptance. See `RELEASE-BLOCKER-REPORT.md` for the live blocker register.
+
+Latest historical evidence: GitHub CI run 42567533471 passed the PG 15/17/18 clean migrations/native tests/logical dump-and-restore jobs. Earlier “not run” statements describe the pre-push snapshot. Hosted staging preview was reported READY but protected by Vercel SSO; authorized automation access is needed before calling HTTP health/browser workflows verified. See STAGING-PREFLIGHT.md.
 
 ## Nonproduction checks
 

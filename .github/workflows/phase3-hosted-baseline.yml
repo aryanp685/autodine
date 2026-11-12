@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     env:
-      PHASE3_TARGET: https://juwyhslzchjevqkdvwjm.supabase.co/rest/v1/
+      PHASE3_TARGET: https://juwyhslzchjevqkdvwjm.supabase.co/rest/v1/restaurants?select=id&limit=0
       PHASE3_REQUESTS: '10'
       PHASE3_STAGING_PUBLISHABLE_KEY: ${{ secrets.AUTODINE_STAGING_PUBLISHABLE_KEY }}
     steps:
@@ -28,5 +28,5 @@ jobs:
           fi
       - name: Safety tests (no hosted traffic)
         run: node --test scripts/phase3/*.test.mjs
-      - name: Ten sequential GET requests; stop on first refusal/error
+      - name: Ten sequential no-row GET requests; stop on first refusal/error
         run: node scripts/phase3/read-only-probe.mjs

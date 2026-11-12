@@ -240,9 +240,9 @@ export function Pill({ children, tone = 'outline' }: { children: React.ReactNode
    *
    * `Tag` in the owner kit is the same object: a pill, no ring, 11.5px. This
    * one kept its own ring, its own 10.5px type and its own padding for a year,
-   * so a dashboard row could carry a "Paid online" at one size and a "Live" at
-   * another in the same column. The tones are named differently here because
-   * the callers predate the kit; the geometry is identical.
+   * so a dashboard row could carry "Paid" at one size and "Live" at another
+   * in the same column. The tones are named differently here because the
+   * callers predate the kit; the geometry is identical.
    */
   const tones: Record<PillTone, string> = {
     sage: 'bg-[color-mix(in_oklab,var(--p-live)_12%,white)] text-[var(--p-live)]',
@@ -265,7 +265,7 @@ export function Pill({ children, tone = 'outline' }: { children: React.ReactNode
 }
 
 export function PaymentPill({ state }: { state: 'paid' | 'pending' | 'failed' }) {
-  if (state === 'paid') return <Pill tone="sage">Paid online</Pill>;
+  if (state === 'paid') return <Pill tone="sage">Paid</Pill>;
   if (state === 'pending') return <Pill tone="alert">Counter due</Pill>;
   return <Pill tone="alert">Payment failed</Pill>;
 }

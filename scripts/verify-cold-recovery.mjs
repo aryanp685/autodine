@@ -34,6 +34,15 @@ async function fingerprint(c){
   const functions=(await c.query("select p.oid::regprocedure::text signature,p.proacl::text acl from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' order by 1")).rows;
   return {content,policies,functions};
 }
+async function seedAclOwnerFixtures(c){
+  await c.query('create table public.acl_existing_postgres(id uuid primary key)');
+  await c.query('create sequence public.acl_existing_postgres_seq');
+  await c.query('set role supabase_admin');
+  try{
+    await c.query('create table public.acl_existing_supabase_admin(id uuid primary key)');
+    await c.query('create sequence public.acl_existing_supabase_admin_seq');
+  }finally{await c.query('reset role');}
+}
 try{
   await mkdir(source);
   command(join(bin,'initdb'),['-D',source,'-U','postgres','--auth=trust','--encoding=UTF8','--no-locale']);
@@ -43,8 +52,18 @@ try{
   await db.query(`grant usage on schema public,auth to anon,authenticated,service_role;
     alter default privileges in schema public grant all on tables to anon,authenticated,service_role;
     alter default privileges in schema public grant all on sequences to anon,authenticated,service_role;`);
+  await db.query('set role supabase_admin');
+  try{
+    await db.query(`alter default privileges in schema public grant all on tables to anon,authenticated,service_role;
+      alter default privileges in schema public grant all on sequences to anon,authenticated,service_role;`);
+  }finally{await db.query('reset role');}
+  await seedAclOwnerFixtures(db);
   const migrations=(await readdir('supabase/migrations')).filter(f=>f.endsWith('.sql')).sort();
   for(const file of migrations) await db.query(await readFile(join('supabase/migrations',file),'utf8'));
+  await db.query('set role supabase_admin');
+  try{
+    await db.query(await readFile('supabase/owner-operations/20261110000501_revoke_supabase_admin_client_defaults.sql','utf8'));
+  }finally{await db.query('reset role');}
   const url=`postgres://postgres@127.0.0.1:${port}/${database}`;
   await db.end();db=null;
   const tests=command('npx',['vitest','run','lib/db/readiness.integration.test.ts','app/menu/throttle-db.integration.test.tsx'],{...process.env,READINESS_DB_URL:url,THROTTLE_DB_URL:url});

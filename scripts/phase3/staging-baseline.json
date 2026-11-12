@@ -1,7 +1,9 @@
 {
   "projectRef": "juwyhslzchjevqkdvwjm",
   "functions": [
+    {"signature":"begin_online_payment(text,text,text,uuid,uuid,bigint)","body_hash":"35f77b0e60c17f14907aab6ebe588a38","acl":"{postgres=X/postgres,service_role=X/postgres}","settings":["search_path=public, pg_temp"]},
     {"signature":"cancel_order(uuid,uuid,text)","body_hash":"4dd19752f4108536024a0418afc77e4b","acl":"{postgres=X/postgres,service_role=X/postgres,anon=X/postgres,authenticated=X/postgres}","settings":["search_path=public, pg_temp"]},
+    {"signature":"close_order_session_and_issue_receipt(uuid)","body_hash":"aa91f0ae7000bd92c736439bc59abcb0","acl":"{postgres=X/postgres,service_role=X/postgres,authenticated=X/postgres}","settings":["search_path=public, pg_temp"]},
     {"signature":"open_table_session(text,text)","body_hash":"196e2aeba5f3955e0c025fa7618c70ee","acl":"{postgres=X/postgres,service_role=X/postgres,anon=X/postgres,authenticated=X/postgres}","settings":["search_path=public, pg_temp"]},
     {"signature":"operational_schema_readiness()","body_hash":"70f434bbe555c10ba825d4aaae807ee6","acl":"{postgres=X/postgres,service_role=X/postgres}","settings":["search_path=pg_catalog, public"]},
     {"signature":"place_public_order(text,jsonb,text,text,uuid,text)","body_hash":"dbb59213d65d7724c9862938c5e983f8","acl":"{=X/postgres,postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}","settings":["search_path=public, pg_temp"]},

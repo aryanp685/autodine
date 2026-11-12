@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { Money } from './ui';
+import { Money, PaymentPill } from './ui';
 
 /**
  * Money is the one component every money screen in the product renders
@@ -22,5 +22,14 @@ describe('Money', () => {
 
   it('renders zero as zero', () => {
     expect(renderToStaticMarkup(<Money value={0} />)).toContain('₹0');
+  });
+});
+
+describe('PaymentPill', () => {
+  it('does not imply a paid status was gateway-processed', () => {
+    const markup = renderToStaticMarkup(<PaymentPill state="paid" />);
+
+    expect(markup).toContain('>Paid</span>');
+    expect(markup).not.toMatch(/online|gateway/i);
   });
 });

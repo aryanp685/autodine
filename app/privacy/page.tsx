@@ -56,15 +56,15 @@ export default function PrivacyPage() {
 
       <LegalSection title="Money">
         <p>
-          AutoDine does not take card money today: no card gateway is connected, and no card number
-          is ever typed into these pages. What is stored is a record of what staff collected at the
-          counter — cash, card or UPI — written by the person who collected it.
+          AutoDine does not process guest card or bank payments, and card numbers are never entered
+          into these pages. Authorized staff can record a counter payment (cash, card or UPI), including
+          its method, amount and time, after checking that it was received. That record is not a bank
+          confirmation or a payment processed by AutoDine.
         </p>
         <p>
-          When a restaurant configures its own UPI ID, guests can scan that QR with the amount
-          filled in. The money goes directly to the restaurant. If a guest presses &ldquo;I have
-          paid&rdquo;, the software stores a pending claim, not a payment; staff confirm the transfer in
-          their own bank app and then record it.
+          The current customer app does not show a restaurant UPI QR or accept a guest &ldquo;I have
+          paid&rdquo; claim. If a guest and restaurant arrange payment separately, the transaction is
+          handled by them and their payment provider or bank; AutoDine does not verify it.
         </p>
       </LegalSection>
 

@@ -51,8 +51,8 @@ test.describe('incoming orders are readable at a glance', () => {
     await page.goto('/kitchen');
     await waitForAppReady(page);
 
-    // Paid online leaves no doubt to state: no chip at all. The pending one
-    // names exactly what is owed.
+    // A paid ticket has no extra chip. The pending one names exactly what is
+    // owed, without implying that payment is taken in the app.
     await expect(
       page.locator('article[data-state="new"]', { hasText: 'T7' }),
     ).not.toContainText('Unpaid');
