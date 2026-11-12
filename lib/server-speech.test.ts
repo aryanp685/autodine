@@ -15,6 +15,7 @@ import {
 } from './tts-voices';
 import { createServerSpeech, type ServerSpeechEnv } from './server-speech';
 import { createDualSpeech } from './dual-speech';
+import { createKitchenSpeech, type SpeechEnv, type SpeechOutcome, type UtteranceLike } from './speech';
 
 
 /**
@@ -318,6 +319,23 @@ describe('createServerSpeech', () => {
     expect(call.rate).toMatch(/^[+-]\d+%$/);
   });
 
+  it('speak() sends the explicitly selected male character to the TTS request', async () => {
+    const env = makeMockEnv();
+    const engine = createServerSpeech(env, { startTimeoutMs: 5000, completionTimeoutMs: 5000 });
+
+    // This is the value selected and persisted by the kitchen picker. Assert
+    // the engine's actual fetch payload, not only voiceName() or UI state.
+    expect(engine.setVoiceName('hi-IN-MadhurNeural')).toBe(true);
+    engine.speak('नमस्ते।', vi.fn());
+    await new Promise((resolve) => setTimeout(resolve, 600));
+
+    expect(env.fetchCalls).toHaveLength(1);
+    expect(env.fetchCalls[0]).toMatchObject({
+      voice: 'hi-IN-MadhurNeural',
+      pitch: '-4Hz',
+    });
+  });
+
   it('speak() uses the female voice\'s own pitch for the female character', async () => {
     const env = makeMockEnv();
     const engine = createServerSpeech(env, { startTimeoutMs: 5000, completionTimeoutMs: 5000 });
@@ -510,6 +528,55 @@ describe('createDualSpeech', () => {
     expect(serverSpeak).toHaveBeenCalledWith('नमस्ते।', expect.any(Function));
     expect(browserSpeak).toHaveBeenCalledWith('नमस्ते।', expect.any(Function));
     expect(onEnd).toHaveBeenCalledWith({ status: 'completed', completedSegments: 1, totalSegments: 1 });
+  });
+
+  it('does not play a female device voice when the selected male Edge voice fails', () => {
+    const server = makeMockEngine({
+      speak: (_text, onEnd) => onEnd({
+        status: 'failed',
+        reason: 'TTS relay returned 503',
+        completedSegments: 0,
+        totalSegments: 1,
+      }),
+    });
+    const browserSpeak = vi.fn();
+    const browserEnv: SpeechEnv = {
+      synthesis: {
+        speak: browserSpeak,
+        cancel: vi.fn(),
+        getVoices: () => [{ name: 'Lekha', lang: 'hi-IN', localService: true }],
+        speaking: false,
+      },
+      createUtterance: (_text): UtteranceLike => ({
+        voice: null,
+        lang: '',
+        rate: 1,
+        pitch: 1,
+        volume: 1,
+        onstart: null,
+        onend: null,
+        onerror: null,
+      }),
+      chime: vi.fn(),
+      setTimer: () => 1,
+      clearTimer: () => {},
+    };
+    const browser = createKitchenSpeech(browserEnv);
+    const dual = createDualSpeech(server as never, browser);
+
+    // The Edge catalogue accepts this selection even though the device does
+    // not have it. If Edge TTS fails, the device must not substitute Lekha.
+    expect(dual.setVoiceName('hi-IN-MadhurNeural')).toBe(true);
+    let outcome: SpeechOutcome | undefined;
+    dual.speak('नमस्ते।', (result) => { outcome = result; });
+
+    expect(browserSpeak).not.toHaveBeenCalled();
+    expect(outcome).toMatchObject({
+      status: 'failed',
+      reason: 'No Hindi voice matching the selected character is available',
+    });
+    expect(dual.voiceName()).toBeNull();
+    expect(dual.available()).toBe(false);
   });
 
   it('uses browser directly when server is already failed', () => {
