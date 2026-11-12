@@ -98,18 +98,18 @@ objects that **do not exist on production**. Measured on `bdbaqpevwmgdvghszjno` 
 
 | Object the merged code needs | Present on production? |
 |---|---|
-| `public.accounts` (table) | **0 — missing** |
-| `public.public_restaurant_profile(text)` (function) | **0 — missing** |
-| `public.subscription_payments` (table) | **0 — missing** |
+| `public.public_restaurant_profile(text)` (function) | **1 — present** (applied 2026-11-12) |
+| `public.accounts` (table) | **0 — still missing** |
+| `public.subscription_payments` (table) | **0 — still missing** |
 
-`accounts` and `subscription_payments` are created by `20261110001000_account_subscriptions`
-and `20261110001100_subscription_billing` (items 26 and 27 of §6.2);
-`public_restaurant_profile()` is created by `20261110000500_public_restaurant_profile`
-(item 22). **None of the three has been applied yet.**
+`public_restaurant_profile()` is created by `20261110000500_public_restaurant_profile`.
+`accounts` comes from `20261110001000_account_subscriptions` and `subscription_payments`
+from `20261110001100_subscription_billing` — **the last two migrations in Batch A.**
 
-Merging before those land would deploy code that calls a function and reads tables that do
-not exist. Expect errors on guest menu pages, the owner dashboard and the subscription
-screen. The 21-day trial would still not appear, because that value lives in the code.
+Merging before those two land would deploy code that reads tables that do not exist. Expect
+errors on the owner dashboard and the subscription screen; guest menu pages are already
+covered because `public_restaurant_profile()` now exists. The 21-day trial would still not
+appear, because that value lives in the code, not the database.
 
 The correct order is the one in §6: finish Batch A → `/api/health` reports `ok:true` →
 **then** merge → then Batch B.
@@ -142,6 +142,22 @@ The correct order is the one in §6: finish Batch A → `/api/health` reports `o
                 "paymentReceipts":"applied","announcementClaims":"applied"},
  "checkedAt":"2026-11-12T08:41:42.207Z"}
 ```
+
+**Production, after 23 of the 33 migrations were applied (2026-11-12 12:39 UTC):**
+
+```json
+{"ok":true,"configured":true,"serverKey":true,"reachable":true,
+ "credentials":"accepted",
+ "schema":{"trialAndWriteGate":"applied","planEntitlements":"applied","restaurantUpi":"applied"},
+ "trialDays":7,
+ "operational":{"orderSessions":"applied","settlement":"applied","invoices":"applied",
+                "paymentReceipts":"applied","announcementClaims":"applied"},
+ "checkedAt":"2026-11-12T12:39:13.259Z"}
+```
+
+`ok` is now `true` on production. **`trialDays` is still 7** — that number lives in the
+application code, not the database, so it only changes when PR #176 is merged and Vercel
+deploys. Do not treat `ok:true` as "the trial fix is live".
 
 Two things follow, and they are the whole story:
 
@@ -219,7 +235,8 @@ separate `test:db` job in CI on a PostgreSQL 15/17/18 matrix.
 
 ## 6. Work in flight — the production migration
 
-**This is the active task. 6 of 33 done; 27 remain.**
+**This is the active task. 29 of 33 done; 4 remain.** `/api/health` flipped to `ok:true`
+at migration 23 of 33; see §5.1 for the after-probe.
 
 The rollout order is fixed and must not be reordered:
 
@@ -250,37 +267,52 @@ breaks every guest menu.
 20261108002000_invoice_receipts
 ```
 
-### 6.2 The 27 remaining, in the exact order to apply
+### 6.2 Applied so far — 29 of 33
 
 ```
- 1  20261108003000_session_checkout_payment_receipts
- 2  20261108005000_p9_security_hardening
- 3  20261108006000_restore_public_order_session_attach
- 4  20261108007000_payment_recorded_by
- 5  20261108008000_p8_require_settlement_before_close
- 6  20261108009000_p9_financial_read_roles
- 7  20261108010000_invoice_share_links
- 8  20261109000100_restore_hold_fields
- 9  20261109000200_order_attempt_lock
-10  20261109000300_payment_state_guards
-11  20261109000400_order_write_boundary
-12  20261109000500_session_payment_guard
-13  20261109000600_finalized_source_guard
-14  20261109000700_order_line_removal
-15  20261109000800_table_activity_summary
-16  20261109000900_staff_tts_budget
-17  20261109001000_operational_readiness      ← /api/health flips to ok:true here
-18  20261110000100_counter_payment_lock_order
-19  20261110000200_financial_session_serialization
-20  20261110000300_shared_wifi_scan_limits
-21  20261110000400_durable_order_attempt_budget
-22  20261110000500_public_restaurant_profile
-23  20261110000600_staff_finance_boundaries
-24  20261110000800_remove_order_submission_caps
-25  20261110000900_converge_qr_verification_attempts
-26  20261110001000_account_subscriptions      ← creates public.accounts
-27  20261110001100_subscription_billing
+ 1  20261021000004_missing_qr_tables
+ 2  20261107080000_payment_audit_ledger
+ 3  20261108000300_publish_menu_snapshot
+ 4  20261108000500_order_session_staff_read
+ 5  20261108001000_order_code_and_kitchen_announce_guard
+ 6  20261108002000_invoice_receipts
+ 7  20261108003000_session_checkout_payment_receipts
+ 8  20261108005000_p9_security_hardening
+ 9  20261108006000_restore_public_order_session_attach
+10  20261108007000_payment_recorded_by
+11  20261108008000_p8_require_settlement_before_close
+12  20261108009000_p9_financial_read_roles
+13  20261108010000_invoice_share_links
+14  20261109000100_restore_hold_fields
+15  20261109000200_order_attempt_lock
+16  20261109000300_payment_state_guards
+17  20261109000400_order_write_boundary
+18  20261109000500_session_payment_guard
+19  20261109000600_finalized_source_guard
+20  20261109000700_order_line_removal
+21  20261109000800_table_activity_summary
+22  20261109000900_staff_tts_budget
+23  20261109001000_operational_readiness      ← /api/health flipped to ok:true here
+24  20261110000100_counter_payment_lock_order
+25  20261110000200_financial_session_serialization
+26  20261110000300_shared_wifi_scan_limits
+27  20261110000400_durable_order_attempt_budget
+28  20261110000500_public_restaurant_profile
+29  20261110000600_staff_finance_boundaries
 ```
+
+### 6.2b The 4 remaining, in the exact order to apply
+
+```
+30  20261110000800_remove_order_submission_caps        (239 lines)
+31  20261110000900_converge_qr_verification_attempts   (206 lines)
+32  20261110001000_account_subscriptions               (750 lines) ← creates public.accounts
+33  20261110001100_subscription_billing               (1463 lines) ← largest; split it
+```
+
+Migrations 32 and 33 are the merge gate: until `public.accounts` and the subscription
+tables exist, PR #176 must stay unmerged. Both are large; split them at statement
+boundaries across several `execute_query` calls and verify afterwards.
 
 ### 6.3 How to apply them safely
 
