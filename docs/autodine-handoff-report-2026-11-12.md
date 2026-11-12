@@ -86,13 +86,33 @@ password: Review2026!
 ## 4. Branch and PR state
 
 - Branch: **`arena/a5344572-autodine`**, based on `71f46ce` of `arena/e9e78732-autodine`.
-- **PR #176** → `main`, **OPEN and deliberately a DRAFT**, 94 commits, mergeable.
-- Branch tip: `04b4632`. Working tree clean, `ahead=0 behind=0` against origin.
+- **PR #176** → `main`, **OPEN and deliberately a DRAFT**, 95 commits, `mergeable: MERGEABLE`.
+- Branch tip: **`e0f362b`** = PR #176 head. Working tree clean, `ahead=0 behind=0` against
+  origin. Nothing is pending; everything described in this report is committed and pushed.
 
-**Why the PR is a draft and must stay one until told otherwise:** Vercel auto-deploys `main`
-to production. Production's schema cannot run this code yet (no `accounts` table, no
-`public_restaurant_profile()` function). Merging now would deploy code onto an incompatible
-database and break every guest menu and the owner dashboard.
+### ⛔ DO NOT MERGE PR #176 YET — measured, not assumed
+
+Vercel auto-deploys `main` to production on merge. The code on this branch requires database
+objects that **do not exist on production**. Measured on `bdbaqpevwmgdvghszjno` on
+2026-11-12:
+
+| Object the merged code needs | Present on production? |
+|---|---|
+| `public.accounts` (table) | **0 — missing** |
+| `public.public_restaurant_profile(text)` (function) | **0 — missing** |
+| `public.subscription_payments` (table) | **0 — missing** |
+
+`accounts` and `subscription_payments` are created by `20261110001000_account_subscriptions`
+and `20261110001100_subscription_billing` (items 26 and 27 of §6.2);
+`public_restaurant_profile()` is created by `20261110000500_public_restaurant_profile`
+(item 22). **None of the three has been applied yet.**
+
+Merging before those land would deploy code that calls a function and reads tables that do
+not exist. Expect errors on guest menu pages, the owner dashboard and the subscription
+screen. The 21-day trial would still not appear, because that value lives in the code.
+
+The correct order is the one in §6: finish Batch A → `/api/health` reports `ok:true` →
+**then** merge → then Batch B.
 
 ---
 
