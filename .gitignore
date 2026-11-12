@@ -41,6 +41,7 @@ yarn-error.log*
 !/docs/scan-throttle-coverage.md
 !/docs/website-readiness-audit.md
 !/docs/production-saas-readiness-audit.md
+!/docs/autodine-handoff-report-2026-11-12.md
 
 # scratch scripts
 _shot.mjs
