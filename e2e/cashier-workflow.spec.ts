@@ -12,10 +12,9 @@ import { waitForAppReady } from './flow-helpers';
  *
  * WHAT LIVES IN e2e/integration/cashier-flow.spec.ts INSTEAD
  *
- * Real bill generation from an order id, the database-calculated amount,
- * recorded counter payments, the UPI "I have paid" claim → confirm, and the
- * idempotent duplicate-confirmation guard on record_payment. Those need a
- * deployment; they skip themselves without one.
+ * Real bill generation from an order id, database-calculated amounts, staff-
+ * recorded counter payments (including UPI), and the idempotent duplicate-
+ * payment guard. Those need a deployment; they skip themselves without one.
  */
 
 test.describe('the queue and the bill', () => {

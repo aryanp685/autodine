@@ -4,11 +4,12 @@ AutoDine is a mobile-first QR ordering and restaurant-operations application for
 
 ## Current capability and limits
 
-- Customer ordering is **pay at the counter**. AutoDine does not offer a guest online-payment gateway or subscription checkout. Staff record counter settlement through the authorized flow.
+- Customer ordering is **pay at the counter**. Staff record cash, card, or UPI only after verifying that the restaurant received it. Guests cannot claim an online payment or use a gateway checkout; keep online guest payments disabled.
+- Subscription plans use one account-level subscription shared across its outlets. The approved monthly prices are Starter ₹999 (1 outlet), Professional ₹2,699 (5 outlets), and Business ₹3,699 (unlimited); the trial is 21 days. Subscription screens and database records are implemented, but no payment provider is approved or configured, so provider-dependent checkout and charges fail closed.
 - GST behavior must follow adviser-approved rules. The current code supports only its explicitly configured rate path; it does not implement a complete tax-policy model for every jurisdiction, inclusive price, item classification, exemption, or place of supply. Do not treat sample values as tax advice or extend the model by guessing.
 - Local and automated UI tests may use fictional sample data only when a developer explicitly opts into demo mode. A production build without the required Supabase URL and public key fails rather than serving sample restaurant data.
 - `/demo/menu`, where enabled, is a clearly identified, read-only sample. It is not a real restaurant, order path, or database-backed flow.
-- Passing unit or demo-mode browser tests does not prove that production credentials, email delivery, AI providers, or a specific restaurant's configuration work. The current readiness assessment and remaining integration coverage are in [`docs/website-readiness-audit.md`](docs/website-readiness-audit.md).
+- Passing unit or demo-mode browser tests does not prove that production credentials, email delivery, AI providers, or a specific restaurant's configuration work. See [`docs/website-readiness-audit.md`](docs/website-readiness-audit.md) and `RELEASE-BLOCKER-REPORT.md` for the dated readiness evidence and open gates. Production readiness remains **NO-GO** until fresh, authorized acceptance evidence is recorded.
 
 ## Local development
 
@@ -26,17 +27,13 @@ Choose one mode:
    AUTODINE_DEMO_MODE=true npm run dev
    ```
 
-2. **Database-backed development:** copy `.env.example` to `.env.local`, enter credentials for a local or non-production Supabase project, run `npm run env:check`, then start `npm run dev`. Keep `.env.local` private and never use production data for integration tests.
+2. **Database-backed development:** copy `.env.example` to `.env.local`, enter credentials for a local or non-production Supabase project, run `npm run env:check`, then start `npm run dev`. Keep `.env.local` private and never use Production data for integration tests. Preview/Development builds refuse to use a configured Production Supabase project; see [`docs/preview-isolation.md`](docs/preview-isolation.md).
 
 The demo flag is for local development only. Never set `AUTODINE_TEST_DEMO_BUILD` in a deployment; it is an explicit GitHub Actions-only flag for hermetic UI tests. Production requires Supabase configuration and does not fall back to fictional data.
 
-## Database-backed browser test
+See [`docs/SETUP.md`](docs/SETUP.md) for the tracked setup checklist.
 
-The throttle integration suite uses a disposable local PostgreSQL database and local PostgREST, not production. Follow [`docs/e2e-local.md`](docs/e2e-local.md). It runs both real-browser throttle cases and the existing PostgreSQL throttle regressions, retaining evidence as CI artifacts.
-
-For what is covered and what still needs a non-production integration environment, see [`docs/scan-throttle-coverage.md`](docs/scan-throttle-coverage.md) and the [`website readiness audit`](docs/website-readiness-audit.md).
-
-## Quality checks
+## Tests and quality checks
 
 ```bash
 npm run typecheck
@@ -47,10 +44,10 @@ npm test
 npm run build
 ```
 
-`npm run sql:check` parses migration syntax; it does not execute every RLS policy or prove production-schema parity. Run database and browser integration tests only against disposable local or approved non-production services.
+`npm run sql:check` parses migration syntax; it does not execute every RLS policy or prove Production-schema parity. Database integration and browser tests must use disposable local services and synthetic data. The isolated throttle and full-stack browser-test setup is documented in [`docs/e2e-local.md`](docs/e2e-local.md); skipped cases are not verified.
 
-## Configuration and security
+## Configuration, health, and security
 
-See [`docs/SETUP.md`](docs/SETUP.md) for the tracked operator setup checklist. `GET /api/health` returns a no-store readiness response with fixed status fields; it never returns keys, restaurant names, or rows. `npm run env:check` identifies missing or malformed required environment values and never prints full key values.
+`GET /api/health` returns fixed readiness fields without keys, restaurant names, or rows. It is not a full migration audit or release-acceptance check; a green response alone does not certify hosted ordering, security, recovery, or pilot readiness. `npm run env:check` identifies missing or malformed required environment values and never prints full key values.
 
-Never commit real credentials, `.env.local`, production data, or secret/service-role keys in `NEXT_PUBLIC_*` variables. The server-side Supabase secret key bypasses RLS and must remain server-only.
+Never commit real credentials, `.env.local`, Production data, or secret/service-role keys in `NEXT_PUBLIC_*` variables. The server-side Supabase secret key bypasses RLS and must remain server-only.

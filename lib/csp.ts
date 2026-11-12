@@ -21,6 +21,9 @@
  *
  *   the Supabase origin    auth, data and realtime (wss) for every screen
  *
+ * No payment-provider origin or frame is allowed: guest checkout is
+ * pay-at-counter only and no reviewed provider-iframe flow is shipped.
+ *
  * Everything else is 'self'. object-src 'none' and base-uri 'self' close the
  * plugin and <base> tricks; frame-ancestors 'self' matches the existing
  * X-Frame-Options.

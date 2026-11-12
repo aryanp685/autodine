@@ -16,6 +16,8 @@ import type { MenuItemPrice } from '@/lib/cart-pricing';
 import { requireTaxRateBps } from '@/lib/pricing';
 import { readPublicRestaurant } from '@/lib/db/public-restaurant';
 
+const ADDON_PRICING_READ_ERROR = 'Could not load add-on pricing. Please try again.';
+
 export type CartScreenData = {
   slug: string;
   restaurantName: string;
@@ -116,7 +118,11 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
     : { data: [], error: null };
 
   if (groupsError) {
-    console.error(`[cart] could not load add-on groups: ${groupsError.message}`);
+    // Returning base dish prices here would silently omit selected add-ons from
+    // the cart quote. The database will still price them on placement, so fail
+    // closed rather than show a total that can rise at the final tap.
+    console.error('[cart] add-on pricing read failed', { code: groupsError.code ?? 'unknown' });
+    throw new Error(ADDON_PRICING_READ_ERROR);
   }
 
   const groupIds = (groupRows ?? []).map((g) => g.id as string);
@@ -131,7 +137,10 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
     : { data: [], error: null };
 
   if (addonsError) {
-    console.error(`[cart] could not load add-ons: ${addonsError.message}`);
+    // Same invariant as the group read above: a partial quote is not a safe
+    // reason to let checkout continue.
+    console.error('[cart] add-on pricing read failed', { code: addonsError.code ?? 'unknown' });
+    throw new Error(ADDON_PRICING_READ_ERROR);
   }
 
   const groupById = new Map(

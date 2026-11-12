@@ -4,6 +4,8 @@ Generated from the current repository, not inferred from marketing. Route groups
 
 **Coverage limit:** source/build inclusion is not verification of every button. Group-level local/native/browser evidence and live blockers are in [PRODUCTION-READINESS.md](PRODUCTION-READINESS.md). Each authenticated route still needs the disposable Supabase lifecycle/relogin and role matrix acceptance; neither this inventory nor demo browser coverage certifies that.
 
+**Current local pricing regression (Arena date 2026-11-06 UTC):** `/menu/cart` and `/menu/checkout` load item add-on groups and prices before showing a total. If either read fails, `getCartScreenData` now throws a fixed error rather than returning a lower, incomplete quote. `lib/db/cart-screen.test.ts` covers both failures and the successful price mapping. This is local loader evidence only; it does not verify hosted order persistence or a live guest-to-staff journey.
+
 ## Pages (37)
 
 | URL pattern | Source | Acceptance dependency |

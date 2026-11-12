@@ -206,4 +206,4 @@ if (problems.length) {
 }
 
 console.log('Environment looks right. Restart `npm run dev` if you just edited .env.local,');
-console.log('then open http://localhost:3000/api/health — it says which migrations are applied.\n');
+console.log('then open http://localhost:3000/api/health for limited readiness probes (not a complete migration or release certification).\n');

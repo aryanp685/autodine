@@ -8,6 +8,8 @@ do $$ begin
   if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon nologin; end if;
   if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
   if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role nologin; end if;
+  -- Synthetic local owner used only to test owner-specific default ACLs.
+  if not exists (select 1 from pg_roles where rolname = 'supabase_admin') then create role supabase_admin nologin superuser; end if;
   -- PostgREST switches this local login to anon/authenticated after validating
   -- a JWT. The E2E runner sets its disposable password at runtime; never reuse
   -- this role or its credentials outside the isolated harness.

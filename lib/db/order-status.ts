@@ -12,11 +12,11 @@
  *
  * WHY A SEPARATE CALL FROM getOrderScreenData()
  *
- * That loader also reads the restaurant row, builds the UPI QR (which renders
- * an SVG server-side) and parses every line item. Polling it every ten seconds
- * would pay for all of that to answer one question -- "which of five states is
- * it in" -- and would put a QR encode in a phone's refresh loop. This reads the
- * one function and returns four fields.
+ * The full order-screen loader also reads the restaurant row, parses every
+ * line item, and computes the controls available for that order. Polling it
+ * every ten seconds would repeat that work just to answer one question --
+ * "which of five states is it in". This reads the status RPC and returns the
+ * small snapshot the refresh component needs.
  */
 
 import type { Database } from '@/lib/db/database';

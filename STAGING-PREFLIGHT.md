@@ -1,6 +1,6 @@
 # Existing staging: read-only preflight
 
-> **Current continuation (2026-10-28):** This imported file contains prior-main claims about staging access/deployments, CI, and local restores. None were performed or independently reverified during this reconciliation; their later dates are not accepted as current evidence here. No hosted staging/production operation or restore was performed in this continuation. For current blockers, exact access requests, and evidence boundaries, see [docs/production-readiness-continuation.md](docs/production-readiness-continuation.md).
+> **Current instruction boundary (Arena date 2026-11-06 UTC):** Staging remains NO-GO and may receive only separately authorized read-only metadata/catalog inspection until operator acceptance, recovery evidence, and migration gates are satisfied. The hosted deployment/migration claims below are imported historical evidence, not fresh verification or authorization for this task. No Supabase/Staging/Production database was accessed or changed here. Vercel project metadata was inspected read-only; no deployment was created. Production remains read-only. See `RELEASE-BLOCKER-REPORT.md` for the current blocker register.
 
 ## Latest verified readiness result
 

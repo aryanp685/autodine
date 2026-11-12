@@ -4,6 +4,27 @@ How to find out what a database still needs from `supabase/migrations/` without 
 
 This file describes a local method and what it has established so far. It authorises nothing. Steps that touch a hosted project stay in `PHASE-3-HOSTED-BASELINE.md` and `PRODUCTION-BACKUP-RUNBOOK.md`, and each needs the owner's approval.
 
+## Current merge update — 2026-11-06
+
+The active branch has reconciled the incoming `main` migration set without
+reusing a Supabase version prefix. The competing branch-only migrations were
+renumbered as follows:
+
+| Kept behavior | Current migration | Reason |
+|---|---|---|
+| Payment-audit provider actor repair | `20261110000851_payment_audit_provider_actor.sql` | Main uses `20261110000700` for restaurant membership. |
+| Online-payment attempt uniqueness | `20261110000950_online_payment_attempt_uniqueness.sql` | Main uses `20261110000900` for QR-attempt convergence. |
+| Checkout outstanding-balance guard | `20261110001210_checkout_outstanding_guard.sql` | Main uses `20261110000800` to remove order-submission throttles. |
+| Client bypass privilege cleanup | `20261110001220_revoke_client_bypass_privileges.sql` | Main uses `20261110000500` for the public restaurant projection. |
+
+The incompatible standalone `20261110000600_qr_attempt_budget_compat.sql` draft
+was not kept. Its data-preservation requirement is incorporated into the main
+`20261110000900_converge_qr_verification_attempts.sql`: supported active QR
+attempt state is imported into the canonical table while the original source
+remains archived. The source shape is still unknown for hosted Staging and
+Production; no hosted operation is authorized. `scripts/check-sql.mjs` now
+rejects duplicate 14-digit migration versions.
+
 ## Why the ledger is not enough
 
 - Production's ledger uses console-style versions, repeats names, holds names that are not in this repository, and ends at `20261108000200 drift_reconcile`. Its versions cannot be compared with file names here.
@@ -54,31 +75,37 @@ reaches one body) or record the divergence as accepted. It is not something to c
 
 ### `qr_verification_attempts`
 
-`20261108000200_drift_reconcile.sql` creates this table with `create table if not exists`, as a COUNTER keyed by `(qr_code_id, ip_hash)`, and
-`reserve_qr_verification_attempt()` bumps it with `on conflict (qr_code_id, ip_hash)`.
+`20261108000200_drift_reconcile.sql` creates this table with `create table if not
+exists`, as a counter keyed by `(qr_code_id, ip_hash)`, and
+`reserve_qr_verification_attempt()` writes with `on conflict (qr_code_id,
+ip_hash)`. A pre-existing table with another shape is not repaired by that DDL.
 
-Because the statement is `if not exists`, any database that already held a table of that name in a DIFFERENT shape kept it, and the reserve function then
-failed with *"there is no unique or exclusion constraint matching the ON CONFLICT specification"* the first time a guest mistyped a table code. That is the
-staging-shaped replay failure.
+The merged `20261110000900_converge_qr_verification_attempts.sql` now:
 
-`20261110000900_converge_qr_verification_attempts.sql` closes it for every starting state:
+1. Recognizes the exact canonical six-column table and pair primary key; if the
+table is absent it creates that shape, and if it is noncanonical it renames the
+source (including its indexes, constraints and sequence) to
+`qr_verification_attempts_legacy_<timestamp>` before creating the canonical
+counter.
+2. Imports active state from the two evidenced legacy layouts: the four-column
+event log `(id, qr_code_id, ip_hash, attempted_at)` and the six-column
+pair-keyed counter. Event attempts in the active 15-minute window are grouped
+by pair and capped at five; expired events remain in the archive but do not
+charge the current budget.
+3. If the branch-only `qr_verification_attempt_budgets` table exists, copies
+its active counter/block state too. For a pair present in that table, that live
+state is authoritative, so its archived source rows are not charged twice.
+4. Re-declares the reservation and clear functions against the canonical table.
+The clear function also clears the optional branch budget table; archived source
+rows remain intact for inspection.
 
-| Start state | What the migration does |
-|---|---|
-| canonical counter: the six columns and a primary key on `(qr_code_id, ip_hash)` | nothing. It is idempotent. |
-| table absent | creates the canonical table |
-| any other shape | renames the table and every index, constraint and sequence on it to `qr_verification_attempts_legacy_<timestamp>`, then creates the canonical table |
-
-Nothing is dropped. The renamed table keeps whatever was in it, which is the only record of the shape that database actually had. After a rename the two
-functions that touch the table are re-declared from their repository definitions (`20261108000200`, byte-identical bodies), because a PL/pgSQL plan holds the
-OID of the table it was compiled against and renaming does not re-point it.
-
-The local stand-in in `scripts/local-pg/005_scaffold_missing_tables.sql` is one such non-canonical shape — an event log with `id bigserial`. The
-staging-shaped replay now converges, and the only difference left between it and a clean replay is the `qr_verification_attempts_legacy_*` table the
-migration preserves.
-
-**Still unresolved:** the shape in hosted staging and in production. It has never been read. If either is not canonical, `20261110000900` renames it and the
-legacy table records what was there — but that only becomes known after an authorised read. Nothing here guesses it.
+Unknown shapes, invalid identity/state, or malformed row data fail closed rather
+than silently reset rate limits. The local stand-in in
+`scripts/local-pg/005_scaffold_missing_tables.sql` is the event-log shape. A
+synthetic migration test seeds six rows (four recent, two expired) and verifies
+four active attempts are imported while all six source rows remain preserved;
+this is local evidence only. The actual hosted Staging and Production shapes
+have not been queried during this merge.
 
 ### The 25 files with no ledger record
 

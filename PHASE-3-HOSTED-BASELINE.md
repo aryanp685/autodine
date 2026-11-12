@@ -133,14 +133,25 @@ returned 49 recorded source files, including 20261109000100 through
 The separately installed readiness function is fingerprinted, not inferred from
 its filename. Do not replay all history over the populated staging project.
 
-Captured seven live function bodies (md5), ACL text and search_path settings in
-`scripts/phase3/staging-baseline.json`; no tenant data or secrets are included.
-`build-staging-rehearsal.mjs` now generates a local-only five-source candidate:
+The original read-only snapshot recorded seven live function bodies (md5), ACL
+text and search-path settings in `scripts/phase3/staging-baseline.json`; no
+tenant data or secrets are included. The rehearsal guard now checks nine exact
+signatures: those seven plus `begin_online_payment` and
+`close_order_session_and_issue_receipt`, both replaced by the new sources. Their
+expected body hashes were reconciled against the ordered historical source
+reconstruction and replayed locally; this is not a fresh hosted fingerprint.
+`place_public_order_attempt` is intentionally excluded from the pre-cutover set:
+it is absent from Staging and created by candidate source 20261110000400.
+Re-read the nine signatures, bodies, ACLs and settings on hosted Staging before
+any application; no hosted verification was made for this extension.
+
+`build-staging-rehearsal.mjs` now generates a local-only seven-source candidate:
 hardened 20261109000400 boundary reassertion (the recorded version predates the
-overload fix), followed by the four 20261110 Phase1/2 migrations. It compares
-all observed placement/financial/readiness signatures, body hashes, ACLs and
-settings before any source statement and fails on drift/new overloads. It does
-not claim to fingerprint the entire database or establish complete prerequisites.
+overload fix), followed by six 20261110 sources (00100, 00200, 00300, 00400,
+00800 and 00900). The builder pins the exact expected signature list and
+compares body hashes, ACLs and settings before any source statement, failing on
+drift or overloads. It does not claim to fingerprint the entire database or
+establish complete prerequisites.
 
 Generation example from repository root:
 
@@ -149,16 +160,15 @@ node scripts/phase3/build-staging-rehearsal.mjs /tmp/phase3-staging-rehearsal.sq
 node --test scripts/phase3/*.test.mjs
 ```
 
-Generation was executed successfully; 12 safety/builder tests pass. The new
-candidate has NOT been executed against any database. Syntax/string tests do
-not prove PostgreSQL execution or populated upgrade compatibility. Its SQL
-contains BEGIN/COMMIT, lock/statement timeouts and an explicit
+Generation and all 18 Phase3 Node safety/builder tests pass. The seven-source
+candidate has also been executed only against the disposable PostgreSQL 17.11
+historical reconstruction detailed below; it has not been applied to hosted
+Staging. It contains BEGIN/COMMIT, lock/statement timeouts and an explicit
 `autodine.rehearsal_project_ref` context tripwire. That session setting is NOT
-project identity proof and does not make a production target safe. Only run on
-a verified isolated staging-schema clone, using an error-stopping client; do not
-use as a hosted migration payload containing transaction statements without
-review of the runner's transaction/ledger semantics. No automatic ledger edits,
-DB connection, backup, data reset or rollout command is bundled.
+project identity proof and does not make a production target safe. Do not use
+this SQL as a hosted migration payload without review of the runner's
+transaction/ledger semantics. No automatic ledger edits, hosted DB connection,
+backup, data reset or rollout command is bundled.
 
 Still required: representative isolated staging restore/clone for native
 rehearsal, reviewed existing-data/ACL preservation, compatible staging app target,
@@ -171,13 +181,13 @@ staging baseline. No new backup data or credentials should be uploaded to chat.
 Installed native PostgreSQL17.11 binaries outside the repository and executed
 `scripts/phase3/verify-staging-rehearsal.mjs` against loopback only. The script
 creates a random autodine_check_* database, reconstructs the scaffold plus
-historical bundled upgrade and readiness definition, verifies all seven captured
-function body/settings fingerprints, and reconstructs their captured execute
-ACLs. Plain PostgreSQL lacks the platform's service_role function grants;
-initial execution correctly refused that ACL difference. Only the fresh local
-DB's ACLs were then explicitly reconstructed from the checked-in observed
-snapshot; the candidate's drift guard was not loosened. This is reconstruction,
-not a clone of hosted staging or a hosted backup/restore test.
+historical bundled upgrade and readiness definition, compares all nine expected
+function signatures/body/settings fingerprints, and reconstructs their execute
+ACLs from the checked-in baseline. Plain PostgreSQL lacks the platform's
+service_role function grants; initial execution correctly refused that ACL
+difference. Only the fresh local DB's ACLs were then explicitly reconstructed;
+the candidate's drift guard was not loosened. This is reconstruction, not a
+clone of hosted staging or a hosted backup/restore test.
 
 Executed outcomes on PostgreSQL17.11:
 - no explicit rehearsal context: refused before source SQL;
@@ -192,7 +202,7 @@ This does not assert unchanged function ACLs/policies: the candidate intentional
 changes those and checks selected postconditions. It does not establish real
 REST commits, guest/browser ordering, upstream proxy provenance, full security
 review or hosted capacity. Native reconstruction CI job added on PostgreSQL17;
-it has not run on GitHub yet. Local typecheck, lint for phase3 scripts, 12 safety/
+it has not run on GitHub yet. Local typecheck, lint for phase3 scripts, 18 safety/
 builder tests and git diff whitespace check pass.
 
 Repeat native drill with a local throwaway PostgreSQL service:
@@ -207,3 +217,143 @@ never reads app environment credentials, accepts a pre-existing target database,
 or resets/restores hosted data. All fixtures are generated in its own randomly
 created disposable database. Still pending: exact hosted staging preservation/
 cutover review, compatible isolated app deployment, and bounded hosted workloads.
+
+## Current-session hosted setup attempt — arena/9c143766-autodine
+
+Published only the current session branch; no merge or production deployment
+was requested. Vercel metadata confirmed the latest prior preview is a READY
+build for arena/6d8badd1-autodine at 640d015, not this current branch. Inspection
+of env metadata found production URL defaults and old-branch staging overrides.
+The listing was truncated, so missing current overrides cannot be proved from
+that listing. No logs or privileged credentials were decrypted.
+
+Read the old branch's public staging URL/public key specifically for authorized
+staging setup. The URL confirms juwyhslzchjevqkdvwjm. No public key is reproduced
+here or committed. First guard creation was rejected because the current branch
+was not published in GitHub. After branch publication, created encrypted
+AUTODINE_EXPECTED_PROJECT_REF=juwyhslzchjevqkdvwjm for Preview only, scoped to
+arena/9c143766-autodine (provider ID QJm3XMAB206MSGsf). Production/global settings
+were not changed. This is a fail-closed build/runtime project guard, NOT complete
+credential isolation. With inherited production URL, future builds may fail
+intentionally until complete staging config is ready. Existing deployments do
+not retroactively inherit the new guard and must not be assumed safe targets.
+
+Attempt to securely set repository Actions secret AUTODINE_STAGING_PUBLISHABLE_KEY
+failed with HTTP403 at the GitHub secrets public-key endpoint (integration
+permission). No secret was created by that failed call, and the hosted baseline
+workflow was not dispatched. Do not bypass this integration restriction by
+embedding credentials in Git/workflow inputs/variables. Repository owner can
+configure the named Actions secret directly in GitHub Settings, or adjust the
+GitHub connection's authorized permissions. Do not send credentials in chat.
+Only the designated staging publishable/anon key is permitted, never production
+or service-role credentials. This is a concrete runner-setup blocker, not a need
+for repeat testing approval.
+
+Fresh staging read-only catalog check still reports attempt_api_exists=false
+and legacy_api_anon=true. No hosted migration, customer/fixture write, HTTP load,
+peak/soak or production config/DB change was performed in this follow-up.
+Recovered the prior unmerged PHASE-4-REGRESSION-REPORT.md onto the current branch
+without switching branches; it retains the historical scope/limitations.
+
+## Hosted baseline dispatch after owner secret setup
+
+Dispatched workflow phase3-hosted-baseline.yml on current session branch after
+owner reported setup done. Run 42864715883 targeted SHA
+8ae4feb01459238ffbace429a7ef1859529ef702. It FAILED in the dedicated-public-key
+preflight: AUTODINE_STAGING_PUBLISHABLE_KEY resolved empty/unavailable to the
+job. Safety tests and HTTP-probe steps were skipped. No hosted requests were
+sent by this run; no latency/capacity evidence was produced. Do not mark this
+as a successful baseline or automatically rerun without fixing secret scope.
+
+Owner should verify the exact repository, exact secret name, Actions repository
+secret scope (workflow declares no GitHub environment), and organization secret
+repository access if applicable. Do not paste the key in chat. An environment-
+scoped or Dependabot-only secret is not a replacement for the named repository
+Actions secret in this workflow. The run's diagnostic annotation contains no
+secret value; no raw environment or decrypted credential was printed.
+
+## Follow-up result: secret visible, HTTP authorization failure
+
+Run 42865084686 passed secret presence and safety steps, then failed in the HTTP
+probe. Raw run-log download failed at the network-restricted redirected log
+host, so its precise failure reason was not inferred. Added allowlisted GitHub
+annotations (no credential/URL/error-body interpolation), plus two injection/
+metric sanitization tests. All14 local safety/builder tests pass. Committed and
+pushed diagnostic/recovered report changes as1aa0574 on the current branch.
+
+Fresh diagnostic run42865298912 also passed secret presence and safety steps;
+GitHub check annotation confirms: HTTP401, stopped with no further requests.
+This is an authentication/authorization failure, not a successful10-request
+latency baseline and not proof of a database performance defect. No customer
+payload was printed. The exact reason (incorrect/rotated/wrong-project key or
+REST gateway authorization configuration) is not established by status alone.
+Do not keep retrying or substitute a privileged service-role key. Verify the
+repository secret uses the actual autodinetest public API key and then inspect
+public auth/header requirements if it still fails. No hosted schema change or
+production operation was made. Main release hold remains unchanged.
+
+## Auth/header investigation after owner confirmed the key
+
+Did not assume owner supplied the wrong key. Test-first reproduction found the
+probe omitted Authorization for legacy staging anon JWTs. Initial test assertions
+inside mocked fetch were swallowed by the probe's expected transport handling;
+moved assertions outside fetch and reproduced14pass/1fail. Fixed legacy-JWT
+bearer handling; short sb_publishable keys remain apikey-only (never put a short
+publishable key in Authorization). Added bounded4KiB failure-body classification
+that emits only allowlisted categories, including nested/text gateway formats;
+no body, raw code/message, credentials or tokens are logged. Successful timing
+remains response-headers-only.17 safety/builder tests pass.
+
+Native source tests and node syntax pass; diagnostics committed/pushed at
+fa2e50c and0fc1fcc on current branch. Workflow run42865815899 (header fix) and
+42866008013 (expanded safe classification) passed secret preflight/safety tests
+but each stopped at first HTTP401, category unclassified. Thus the header bug
+is real but is NOT established as the cause of the hosted401 and its fix did
+not resolve the baseline. No additional requests were sent after each refusal.
+Stop repeated baseline retries pending provider-side diagnosis.
+
+Read-only Supabase catalog query confirmed anon role exists and both anon and
+authenticated have public schema USAGE. This does not prove every function/table
+permission, REST gateway key validity, API configuration or network policy.
+No grants, auth config or security controls were changed to make the probe pass.
+Next diagnostic requires sanitized provider API401 error/reason or a securely
+verified request comparison; never disclose request headers/keys/session tokens
+or disable authorization/RLS. Actual hosted baseline/peak/soak remains incomplete.
+
+## Owner-provided API Gateway diagnosis and safe-route follow-up
+
+The owner-provided dashboard screenshot resolves the earlier HTTP401 cause for
+`GET /rest/v1/`: API Gateway reports
+`UNAUTHORIZED_INVALID_API_KEY_TYPE`, “Only secret API keys can be used for this
+endpoint” / “Secret API key required.” This does not mean the configured public
+staging key is mistyped; the root endpoint rejects its key type. Do not place a
+secret/service-role key in Actions or weaken API authorization to satisfy this
+root request. The root request is not a hosted baseline result.
+
+A fresh read-only catalog check found `public.restaurants` exists, anon has
+SELECT, RLS is enabled, and its SELECT policy is `is_active` (plus the tenant
+membership policy). No table rows were queried through SQL. For a narrow next
+check, the probe allowlist now targets exactly
+`/rest/v1/restaurants?select=id&limit=0`: a public-role GET with a zero-row
+limit and no returned restaurant/customer data. This is not an auth bypass or
+privileged credential fallback. The manual workflow remains capped at ten
+requests spaced at least one second apart, stops on first failure, and only
+measures response-header timing. Its result cannot demonstrate order/RPC
+performance or database capacity. Eighteen local safety/builder tests pass;
+the newly targeted hosted request has not yet run. No hosted DB writes, policy
+changes, or production changes were made.
+
+## Safe-route hosted result
+
+After the owner-provided root-path diagnosis, dispatched the updated manual
+workflow run42867144033 at commit dba624d669729b8657e881b645953af5974a7cf4.
+All10 of10 sequential public-key GETs to the exact zero-row restaurants route
+returned HTTP success. GitHub-hosted runner response-header timings: p50
+665.46ms, p95 1273.4ms, max 1273.4ms. Successful bodies were canceled, and the
+query's `limit=0` returned no restaurant rows. This confirms the publishable-key
+REST resource route is reachable at low request rate; it does not measure an
+order/RPC path, financial lock contention, database throughput/capacity, or
+peak/soak behavior. No hosted DB writes, policy changes, migration, or
+production operation occurred. Phase3 operational workload validation and
+Phase4 hosted peak/soak remain pending; do not treat this small HTTP baseline as
+a capacity claim.

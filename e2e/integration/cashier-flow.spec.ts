@@ -7,6 +7,7 @@ import {
   addAnotherAndCheckout,
   reservedScanToken,
   placeOrder,
+  codeFromOrderUrl,
   tokenFromOrderUrl,
   scanCard,
   signInOwner,
@@ -96,18 +97,31 @@ test.describe('cashier — real database', () => {
     await expect(till.locator('[data-counter-cta]')).not.toHaveText(/₹0[^0-9]/);
   });
 
-  test('guest payment stays at the counter; no online UPI claim is exposed', async ({ context }) => {
+  test('UPI is recorded by staff only; guests cannot claim an online payment', async ({ context }) => {
     test.skip(!GUEST_READY, skipUnless(false, 'guest env for the order half'));
-    const guestUrl = await placeCounterOrder(context, 'e2e: counter-only payment');
+    const guestUrl = await placeCounterOrder(context, 'e2e: staff-recorded UPI fixture');
+    const code = codeFromOrderUrl(guestUrl);
 
     const guest = await context.newPage();
     await guest.goto(guestUrl);
+    await expect(guest.getByText('Pay at the counter before you leave.', { exact: true })).toBeVisible();
+    await expect(guest.locator('[data-pay-upi], [data-upi-claimed]')).toHaveCount(0);
+    await expect(guest.getByRole('button', { name: 'I have paid', exact: true })).toHaveCount(0);
 
-    // Product policy: customers do not claim or submit online payments. UPI,
-    // cash and card are recorded by staff at the counter only.
-    await expect(guest.locator('[data-pay-upi]')).toHaveCount(0);
-    await expect(guest.getByRole('button', { name: 'I have paid' })).toHaveCount(0);
-    await expect(guest.getByText(/Pay at the counter before you leave/)).toBeVisible();
+    // The browser fixture records an explicitly synthetic counter payment;
+    // it does not initiate a bank transfer or contact a payment provider.
+    const till = await signInOwner(context);
+    await till.goto(`${BASE}/cashier`);
+    await till.getByRole('button', { name: new RegExp(`Select ${code} at`) }).click();
+    await till.getByRole('group', { name: 'Payment method' }).getByRole('button', { name: 'UPI', exact: true }).click();
+    await expect(till.locator('[data-counter-cta]')).toHaveText('Record UPI ₹125');
+    await till.locator('[data-counter-cta]').click();
+    await expect(till.getByText(new RegExp(`UPI.*recorded for ${code}`))).toBeVisible({ timeout: 20_000 });
+
+    // A fresh status read observes the staff-recorded result without relying
+    // on service-role credentials or touching a hosted data plane.
+    await guest.reload();
+    await expect(guest.getByText('Paid. Thank you.', { exact: true })).toBeVisible();
   });
 
   test('double-tapping Record writes ONE payment', async ({ context }) => {

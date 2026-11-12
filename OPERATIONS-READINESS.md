@@ -1,8 +1,8 @@
 # Safe verification and release runbook
 
-> **Current continuation (2026-10-28):** This file was imported from `main` and contains earlier status claims and commands that were not independently re-run in this reconciliation. Do not treat its hosted/local recovery claims as evidence for this branch or for Supabase PITR. No restore was executed in this continuation. Do **not** execute a restore until a separate non-production target and explicit written approval are in hand; current branch CI intentionally does not enable the optional local restore step. Current status/evidence is in [production-readiness-continuation.md](docs/production-readiness-continuation.md).
-
-Latest evidence recorded by the imported main snapshot: GitHub CI run 42567533471 passed the PG 15/17/18 clean migrations/native tests/logical dump-and-restore jobs. Earlier “not run” statements describe the pre-push snapshot. Hosted staging preview is READY but protected by Vercel SSO; authorized automation access is needed before calling HTTP health/browser workflows verified. See STAGING-PREFLIGHT.md.
+> **Current evidence note (Arena date 2026-11-06 UTC):** This PR reconciliation has not changed a database or created a deployment. GitHub PR/check metadata and Vercel project metadata were inspected read-only; no Supabase database, recovery target, or payment-provider operation was performed. Staging remains NO-GO and Production remains read-only. A READY Preview or green health probe is not launch acceptance. See `RELEASE-BLOCKER-REPORT.md` for the live blocker register.
+>
+> Historical CI, Preview, and restore statements below are dated evidence from earlier snapshots, not results of this reconciliation. Do not execute a restore under this task; any separately requested restore must name an isolated non-production target and have explicit approval.
 
 ## Nonproduction checks
 

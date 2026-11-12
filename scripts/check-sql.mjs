@@ -9,9 +9,10 @@
  *   CHECKED:     CREATE TABLE / INDEX / TYPE, COMMENT. That is all.
  *   NOT CHECKED: everything that makes a Supabase schema safe.
  *                CREATE FUNCTION bodies, CREATE POLICY, DROP POLICY, GRANT,
- *                ALTER TABLE ... ADD/DROP CONSTRAINT, ALTER FUNCTION ... RENAME,
- *                and ALTER TABLE ... ENABLE ROW LEVEL SECURITY are all stripped
- *                out before parsing, because the parser cannot read them.
+ *                ALTER TABLE ... ADD/DROP CONSTRAINT, ALTER TABLE ... ALTER
+ *                COLUMN ... DROP NOT NULL, ALTER FUNCTION ... RENAME, and ALTER
+ *                TABLE ... ENABLE ROW LEVEL SECURITY are all stripped before
+ *                parsing, because the parser cannot read them.
  *
  *                That list grew as migrations started using drop-then-create
  *                for re-runnability and explicit GRANTs. Bear in mind that a
@@ -74,6 +75,9 @@ function stripUnsupported(sql) {
   out = out.replace(/^\s*comment\s+on\s+function[\s\S]*?;\s*$/gim, '');
   // alter table ... enable/disable row level security;
   out = out.replace(/^\s*alter\s+table[\s\S]*?row\s+level\s+security\s*;\s*$/gim, '');
+  // alter table ... alter column ... drop not null; (the parser cannot read
+  // this ALTER COLUMN form; native PostgreSQL replay covers its syntax).
+  out = out.replace(/^\s*alter\s+table[\s\S]*?alter\s+column[\s\S]*?drop\s+not\s+null\s*;\s*$/gim, '');
   // alter table ... add/drop constraint ...;
   out = out.replace(/^\s*alter\s+table[\s\S]*?(add|drop)\s+constraint[\s\S]*?;\s*$/gim, '');
   // create trigger ... ;  (the parser has no CREATE TRIGGER. Trigger bodies
@@ -98,6 +102,23 @@ function stripUnsupported(sql) {
 }
 
 let failed = 0;
+const versions = new Map();
+for (const file of files) {
+  const match = /^(\d{14})_(.+)\.sql$/.exec(file);
+  if (!match) {
+    failed += 1;
+    console.error(`${file}: migration filename must be <14-digit-version>_<name>.sql`);
+    continue;
+  }
+  const [, version] = match;
+  const previous = versions.get(version);
+  if (previous) {
+    failed += 1;
+    console.error(`Duplicate migration version ${version}: ${previous} and ${file}`);
+  } else {
+    versions.set(version, file);
+  }
+}
 
 for (const file of files) {
   const full = join(MIGRATIONS, file);
@@ -112,6 +133,7 @@ for (const file of files) {
   const removedComments =
     (sql.match(/^\s*comment\s+on\s+function/gim) || []).length;
   const removedRls = (sql.match(/row\s+level\s+security/gi) || []).length;
+  const removedAlterNotNull = (sql.match(/^\s*alter\s+table[\s\S]*?alter\s+column[\s\S]*?drop\s+not\s+null\s*;/gim) || []).length;
   const removedTriggers = (sql.match(/^\s*create\s+(?:or\s+replace\s+)?trigger/gim) || []).length;
   const removedTriggerDrops = (sql.match(/^\s*drop\s+trigger/gim) || []).length;
   const removedDoBlocks = (sql.match(/^\s*do\s+\$\$/gim) || []).length;
@@ -129,10 +151,12 @@ for (const file of files) {
 
   if (!checkable) {
     console.log(
-      `${file}: nothing checkable (only functions/policies/grants) — ` +
-        `UNVERIFIED: ${removedFns} function(s), ${removedPolicies} policy/policies, ` +
+      `${file}: nothing parser-checkable — UNVERIFIED: ` +
+        `${removedFns} function(s), ${removedPolicies} policy/policies, ` +
         `${removedDrops} policy drop(s), ${removedGrants} grant(s), ` +
-        `${removedRevokes} revoke(s), ${removedComments} function comment(s)`,
+        `${removedRevokes} revoke(s), ${removedComments} function comment(s), ` +
+        `${removedAlterNotNull} ALTER COLUMN nullability change(s), ` +
+        `${removedRls} RLS statement(s), ` +
         `${removedTriggers} trigger(s), ${removedTriggerDrops} trigger drop(s), ` +
         `${removedDoBlocks} do block(s), ${removedPublications} publication change(s), ` +
         `${removedReplicaIdentity} replica identity statement(s), ` +
@@ -150,6 +174,7 @@ for (const file of files) {
       `${removedGrants} grant(s)`,
       `${removedRevokes} revoke(s)`,
       `${removedComments} function comment(s)`,
+      `${removedAlterNotNull} ALTER COLUMN nullability change(s)`,
       `${removedRls} RLS statement(s)`,
       `${removedTriggers} trigger(s), ${removedTriggerDrops} trigger drop(s)`,
       `${removedDoBlocks} do block(s), ${removedPublications} publication change(s), ` +

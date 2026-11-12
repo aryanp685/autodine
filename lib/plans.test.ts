@@ -101,6 +101,13 @@ describe('plans', () => {
     expect(NOT_CONNECTED.map((n) => n.id)).toEqual(['payments', 'billing', 'messages']);
     for (const item of NOT_CONNECTED) expect(item.detail.length).toBeGreaterThan(20);
   });
+
+  it('does not advertise a guest UPI QR or payment claim that the app does not ship', () => {
+    const payments = NOT_CONNECTED.find((item) => item.id === 'payments');
+    expect(payments?.detail).toMatch(/no customer gateway or restaurant UPI-QR flow is available/i);
+    expect(payments?.detail).toMatch(/staff record cash, card or UPI only after checking/i);
+    expect(payments?.detail).not.toMatch(/guest.{0,20}(?:QR|I have paid)/i);
+  });
 });
 
 /**

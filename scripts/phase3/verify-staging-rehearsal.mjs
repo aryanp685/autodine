@@ -3,7 +3,7 @@ import { Client } from 'pg';
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import assert from 'node:assert/strict';
-import { build } from './build-staging-rehearsal.mjs';
+import { build, expectedSignatures } from './build-staging-rehearsal.mjs';
 import { prepareFinancialUpgrade, financialFingerprint } from '../verify-financial-upgrade.mjs';
 const target=new URL(process.env.READINESS_PG_ADMIN_URL || 'postgres://postgres@127.0.0.1:5432/postgres');
 if(!['127.0.0.1','localhost','[::1]'].includes(target.hostname)) throw Error('Refusing non-loopback target');
@@ -21,9 +21,14 @@ try {
     await db.query(await readFile(file,'utf8'));
   }
   const baseline=JSON.parse(await readFile('scripts/phase3/staging-baseline.json','utf8'));
-  const observed=(await db.query(`select p.oid::regprocedure::text signature,md5(p.prosrc) body_hash,p.proacl::text acl,p.proconfig settings from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('cancel_order','open_table_session','operational_schema_readiness','place_public_order','place_public_order_attempt','record_counter_payment','set_order_line_quantities','settle_online_payment') order by signature`)).rows;
+  // The attempt RPC is intentionally absent from this pre-cutover snapshot;
+  // migration 20261110000400 creates it inside the candidate itself.
+  const functionNames=[...new Set(expectedSignatures.map(signature=>signature.slice(0,signature.indexOf('('))))];
+  const observed=(await db.query(`select p.oid::regprocedure::text signature,md5(p.prosrc) body_hash,p.proacl::text acl,p.proconfig settings
+    from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+   where n.nspname='public' and p.proname=any($1::text[]) order by signature`,[functionNames])).rows;
   // Plain PG lacks Supabase's per-function platform grants. Reconstruct only
-  // the captured ACLs inside this fresh disposable DB; never weaken the guard.
+  // the checked-in baseline ACLs inside this fresh disposable DB; never weaken the guard.
   assert.deepEqual(observed.map(({signature,body_hash,settings})=>({signature,body_hash,settings})),baseline.functions.map(({signature,body_hash,settings})=>({signature,body_hash,settings})));
   for(const row of baseline.functions){
     await db.query(`revoke all on function ${row.signature} from public,postgres,service_role,anon,authenticated`);

@@ -68,11 +68,103 @@ async function asStaff<T>(user: string, work: () => Promise<T>): Promise<T> {
     return await work();
   } finally { await db.query('rollback'); }
 }
+async function withActor<T>(user: string, work: () => Promise<T>): Promise<T> {
+  await db.query("select set_config('request.jwt.claim.sub',$1,false)",[user]);
+  try { return await work(); }
+  finally { await db.query("select set_config('request.jwt.claim.sub','',false)"); }
+}
+async function seedLegacyUnpaidInvoice(f: Fixture): Promise<string> {
+  // Reconstruct a pre-guard state for compatibility tests only; current
+  // checkout must reject this state and new sessions cannot create it.
+  await db.query("update order_sessions set status='closed',closed_at=statement_timestamp(),closed_by=$2 where id=$1",[f.sitting,f.user]);
+  return withActor(f.user,async()=>
+    (await db.query('select issue_closed_session_receipt($1) id',[f.sitting])).rows[0].id);
+}
 describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', () => {
   let a: Fixture, b: Fixture;
   beforeAll(async()=> { db=new Client({connectionString:URL_VALUE});await db.connect();a=await fixture();b=await fixture(); },30000);
   beforeEach(async()=>{await db.query("select set_config('request.jwt.claim.sub','',false)");});
   afterAll(async()=>{if(db)await db.end();});
+  it('removes browser maintenance and sequence access for current and future public objects', async () => {
+    const version=Number((await db.query("select current_setting('server_version_num')::int version")).rows[0].version);
+    const roles=['anon','authenticated'];
+    const tablePrivileges=['TRUNCATE','REFERENCES','TRIGGER',...(version>=170000?['MAINTAIN']:[])];
+    const ownerFixtures=(await db.query(`select c.relname,r.rolname owner,c.relkind
+      from pg_class c join pg_namespace n on n.oid=c.relnamespace
+      join pg_roles r on r.oid=c.relowner
+      where n.nspname='public' and c.relname=any($1::text[]) order by c.relname`,[
+      ['acl_existing_postgres','acl_existing_postgres_seq','acl_existing_supabase_admin','acl_existing_supabase_admin_seq']])).rows;
+    expect(ownerFixtures).toEqual([
+      {relname:'acl_existing_postgres',owner:'postgres',relkind:'r'},
+      {relname:'acl_existing_postgres_seq',owner:'postgres',relkind:'S'},
+      {relname:'acl_existing_supabase_admin',owner:'supabase_admin',relkind:'r'},
+      {relname:'acl_existing_supabase_admin_seq',owner:'supabase_admin',relkind:'S'},
+    ]);
+    for(const table of ['public.acl_existing_postgres','public.acl_existing_supabase_admin']) {
+      for(const role of roles) {
+        for(const privilege of ['SELECT','INSERT','UPDATE','DELETE']) {
+          expect((await db.query('select has_table_privilege($1,$2,$3) allowed',[role,table,privilege])).rows[0].allowed,
+            `${role} retains ${privilege} on current object-owner fixture ${table}`).toBe(true);
+        }
+      }
+    }
+    for(const sequence of ['public.acl_existing_postgres_seq','public.acl_existing_supabase_admin_seq']) {
+      expect((await db.query('select has_sequence_privilege(\'service_role\',$1,\'USAGE\') allowed',[sequence])).rows[0].allowed).toBe(true);
+    }
+    for(const role of roles) {
+      for(const privilege of tablePrivileges) {
+        const count=(await db.query(`select count(*)::int n from pg_class c join pg_namespace n on n.oid=c.relnamespace
+          where n.nspname='public' and c.relkind in ('r','p') and has_table_privilege($1,c.oid,$2)`,[role,privilege])).rows[0].n;
+        expect(count,`${role} ${privilege} on an existing public table`).toBe(0);
+      }
+      for(const privilege of ['USAGE','SELECT','UPDATE']) {
+        const count=(await db.query(`select count(*)::int n from pg_class c join pg_namespace n on n.oid=c.relnamespace
+          where n.nspname='public' and case when c.relkind='S' then has_sequence_privilege($1,c.oid,$2) else false end`,[role,privilege])).rows[0].n;
+        expect(count,`${role} ${privilege} on an existing public sequence`).toBe(0);
+      }
+    }
+    expect((await db.query("select has_schema_privilege('anon','public','USAGE') usage,has_schema_privilege('anon','public','CREATE') can_create")).rows[0])
+      .toEqual({usage:true,can_create:false});
+    expect((await db.query("select has_column_privilege('authenticated','public.orders','prep_status','UPDATE') allowed")).rows[0].allowed).toBe(true);
+
+    await db.query('begin');
+    try {
+      await db.query('create table public.acl_future_postgres(id uuid primary key)');
+      await db.query('create sequence public.acl_future_postgres_seq');
+      await db.query('set local role supabase_admin');
+      await db.query('create table public.acl_future_supabase_admin(id uuid primary key)');
+      await db.query('create sequence public.acl_future_supabase_admin_seq');
+      await db.query('reset role');
+      for(const table of ['public.acl_future_postgres','public.acl_future_supabase_admin']) {
+        for(const role of roles) {
+          for(const privilege of tablePrivileges) {
+            expect((await db.query('select has_table_privilege($1,$2,$3) allowed',[role,table,privilege])).rows[0].allowed,
+              `${role} ${privilege} on future table ${table}`).toBe(false);
+          }
+          // These are deliberately retained for existing RLS-backed API
+          // workflows; a new table still must enable RLS and define policies.
+          for(const privilege of ['SELECT','INSERT','UPDATE','DELETE']) {
+            expect((await db.query('select has_table_privilege($1,$2,$3) allowed',[role,table,privilege])).rows[0].allowed,
+              `${role} retains ${privilege} on future table ${table}`).toBe(true);
+          }
+        }
+      }
+      for(const sequence of ['public.acl_future_postgres_seq','public.acl_future_supabase_admin_seq']) {
+        for(const role of roles) {
+          for(const privilege of ['USAGE','SELECT','UPDATE']) {
+            expect((await db.query('select has_sequence_privilege($1,$2,$3) allowed',[role,sequence,privilege])).rows[0].allowed,
+              `${role} ${privilege} on future sequence ${sequence}`).toBe(false);
+          }
+        }
+        expect((await db.query('select has_sequence_privilege(\'service_role\',$1,\'USAGE\') allowed',[sequence])).rows[0].allowed).toBe(true);
+      }
+      const publicUnsafe=(await db.query(`select count(*)::int n from pg_class c join pg_namespace n on n.oid=c.relnamespace
+        cross join lateral aclexplode(c.relacl) acl where n.nspname='public'
+          and c.relname in ('acl_future_postgres','acl_future_supabase_admin') and acl.grantee=0
+          and acl.privilege_type in ('TRUNCATE','REFERENCES','TRIGGER','MAINTAIN')`)).rows[0].n;
+      expect(publicUnsafe).toBe(0);
+    } finally {await db.query('rollback');}
+  });
   it('counter payment waits for the session before taking the order lock', async () => {
     const f = await fixture();
     const holder = new Client({ connectionString: URL_VALUE });
@@ -128,6 +220,10 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
       const line = (await db.query('select id from order_items where order_id=$1', [f.order])).rows[0].id;
       const token = (await db.query('select guest_token from orders where id=$1', [f.order])).rows[0].guest_token;
       await db.query('update restaurants set online_payments_enabled=true where id=$1', [f.restaurant]);
+      if (checkout && ['cancel','quantities'].includes(operation)) {
+        await withActor(f.user,()=>db.query('select record_counter_payment($1,$2,$3,$4,$5)',
+          [f.slug,f.order,'cash',25000,randomUUID()]));
+      }
       if (operation === 'settle-online') await db.query(`insert into payments
         (restaurant_id,order_id,method,status,amount_paise,provider,provider_ref)
         values($1,$2,'online','pending',25000,'phase1',$3)`, [f.restaurant,f.order,ref]);
@@ -156,29 +252,56 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
         await holder.query('select id from orders where id=$1 for update nowait',[f.order]);
         if(operation === 'settle-online') await holder.query('select id from payments where order_id=$1 for update nowait',[f.order]);
         let invoice: { id: string; snapshot: unknown } | undefined;
-        if(checkout) {
+        if(checkout && ['cancel','quantities'].includes(operation)) {
           await holder.query("select set_config('request.jwt.claim.sub',$1,true)",[f.user]);
           const id=await issueLegacyUnpaidReceipt(holder,f);
           invoice={id,snapshot:(await holder.query('select totals_snapshot from restaurant_invoices where id=$1',[id])).rows[0].totals_snapshot};
+        } else if(checkout) {
+          // Pending or not-yet-created gateway money is still outstanding.
+          // Prove checkout fails without aborting the lock-holder transaction.
+          await holder.query('savepoint checkout_attempt');
+          await holder.query("select set_config('request.jwt.claim.sub',$1,true)",[f.user]);
+          let checkoutError: Error | undefined;
+          try { await holder.query('select close_order_session_and_issue_receipt($1)',[f.sitting]); }
+          catch(error) { checkoutError=error as Error; }
+          expect(checkoutError?.message).toMatch(/outstanding balance/i);
+          await holder.query('rollback to savepoint checkout_attempt');
+          expect((await holder.query('select status from order_sessions where id=$1',[f.sitting])).rows[0].status).toBe('open');
+          expect((await holder.query('select count(*)::int n from restaurant_invoices where order_session_id=$1',[f.sitting])).rows[0].n).toBe(0);
         }
         await holder.query('commit');
         const result=await task;
         if(checkout && ['cancel','quantities'].includes(operation)) {
-          expect(result.error?.message).toMatch(/finalized invoice/i);
+          expect(result.error?.message).toMatch(/already been paid/i);
           await worker.query('rollback');
           expect((await db.query('select total_paise from orders where id=$1',[f.order])).rows[0].total_paise).toBe('25000');
         } else {
           expect(result.error).toBeUndefined();
           await worker.query('commit');
         }
+        if(checkout && operation === 'begin-online') {
+          await withActor(f.user,async()=>{
+            await expect(db.query('select close_order_session_and_issue_receipt($1)',[f.sitting])).rejects.toThrow(/outstanding balance/i);
+          });
+          expect((await db.query('select status from order_sessions where id=$1',[f.sitting])).rows[0].status).toBe('open');
+          expect((await db.query('select count(*)::int n from restaurant_invoices where order_session_id=$1',[f.sitting])).rows[0].n).toBe(0);
+        }
+        if(checkout && operation === 'settle-online') {
+          const id=await withActor(f.user,async()=>
+            (await db.query('select close_order_session_and_issue_receipt($1) id',[f.sitting])).rows[0].id);
+          invoice={id,snapshot:(await db.query('select totals_snapshot from restaurant_invoices where id=$1',[id])).rows[0].totals_snapshot};
+          expect((invoice.snapshot as {amount_paid_paise:number}).amount_paid_paise).toBe(25000);
+          expect((invoice.snapshot as {outstanding_paise:number}).outstanding_paise).toBe(0);
+          expect((await db.query('select count(*)::int n from restaurant_payment_receipts where invoice_id=$1',[id])).rows[0].n).toBe(0);
+        }
         if(invoice) {
           expect((await db.query('select totals_snapshot from restaurant_invoices where id=$1',[invoice.id])).rows[0].totals_snapshot).toEqual(invoice.snapshot);
           if(operation === 'settle-online') {
-            expect((await db.query('select count(*) n from restaurant_payment_receipts where invoice_id=$1',[invoice.id])).rows[0].n).toBe('1');
             expect((await db.query("select sum(amount_paise) paid from payments where order_id=$1 and status='recorded'",[f.order])).rows[0].paid).toBe('25000');
           }
         }
       } finally {
+        await db.query("select set_config('request.jwt.claim.sub','',false)");
         await holder.query('rollback'); if(task) await task;
         await worker.query('rollback'); await holder.end(); await worker.end();
       }
@@ -192,6 +315,35 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
     expect((await db.query('select status from order_sessions where id=$1',[f.sitting])).rows[0].status).toBe('open');
     expect((await db.query('select count(*) n from restaurant_invoices where order_session_id=$1',[f.sitting])).rows[0].n).toBe('0');
   });
+
+  it('preserves supplemental receipt bookkeeping for a legacy unpaid invoice under competing counter collections', async () => {
+    const f=await fixture();
+    const invoice=await seedLegacyUnpaidInvoice(f);
+    const before=(await db.query('select totals_snapshot from restaurant_invoices where id=$1',[invoice])).rows[0].totals_snapshot;
+    const clients=[new Client({connectionString:URL_VALUE}),new Client({connectionString:URL_VALUE})];
+    const keys=[randomUUID(),randomUUID()];
+    try {
+      await Promise.all(clients.map(c=>c.connect()));
+      const outcomes=await Promise.all(clients.map(async(c,i)=>{
+        await c.query('begin'); await c.query("set local statement_timeout='8s'");
+        await c.query("select set_config('request.jwt.claim.sub',$1,true)",[f.user]);
+        await c.query('set local role authenticated');
+        try {
+          await c.query('select record_counter_payment($1,$2,$3,$4,$5)',[f.slug,f.order,'cash',25000,keys[i]]);
+          await c.query('commit'); return 'recorded';
+        } catch(error) { await c.query('rollback'); return (error as Error).message; }
+      }));
+      expect(outcomes.filter(x=>x==='recorded')).toHaveLength(1);
+      expect((await db.query("select sum(amount_paise) paid,count(*) n from payments where order_id=$1 and status='recorded'",[f.order])).rows[0]).toEqual({paid:'25000',n:'1'});
+      expect((await db.query(`select actor_id,event_type,method,amount_paise from payment_audit_events where order_id=$1`,[f.order])).rows)
+        .toEqual([{actor_id:f.user,event_type:'cash_collected',method:'cash',amount_paise:'25000'}]);
+      expect((await db.query('select sequence_number from restaurant_payment_receipts where invoice_id=$1 order by sequence_number',[invoice])).rows.map(r=>r.sequence_number)).toEqual([1]);
+      expect((await db.query('select totals_snapshot from restaurant_invoices where id=$1',[invoice])).rows[0].totals_snapshot).toEqual(before);
+      await expect(withActor(f.user,()=>db.query('select record_counter_payment($1,$2,$3,$4,$5)',
+        [f.slug,f.order,'cash',1,randomUUID()]))).rejects.toThrow();
+      expect((await db.query('select count(*) n from restaurant_payment_receipts where invoice_id=$1',[invoice])).rows[0].n).toBe('1');
+    } finally {await Promise.all(clients.map(async c=>{await c.query('rollback');await c.end();}));}
+  },15000);
 
   it('allows only one of two distinct full collections after invoice issuance', async () => {
     const f=await fixture();
@@ -215,7 +367,8 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
       expect((await db.query("select sum(amount_paise) paid,count(*) n from payments where order_id=$1 and status='recorded'",[f.order])).rows[0]).toEqual({paid:'25000',n:'1'});
       expect((await db.query('select sequence_number from restaurant_payment_receipts where invoice_id=$1 order by sequence_number',[invoice])).rows.map(r=>r.sequence_number)).toEqual([1]);
       expect((await db.query('select totals_snapshot from restaurant_invoices where id=$1',[invoice])).rows[0].totals_snapshot).toEqual(before);
-      await expect(db.query('select record_counter_payment($1,$2,$3,$4,$5)',[f.slug,f.order,'cash',1,randomUUID()])).rejects.toThrow();
+      await expect(withActor(f.user,()=>db.query('select record_counter_payment($1,$2,$3,$4,$5)',
+        [f.slug,f.order,'cash',1,randomUUID()]))).rejects.toThrow();
       expect((await db.query('select count(*) n from restaurant_payment_receipts where invoice_id=$1',[invoice])).rows[0].n).toBe('1');
     } finally {await Promise.all(clients.map(async c=>{await c.query('rollback');await c.end();}));}
   },15000);
@@ -248,6 +401,12 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
   },15000);
 
   it('rejects provider amount mismatches atomically and keeps webhook retries idempotent', async () => {
+    const actorColumn = (await db.query(`
+      select attnotnull
+        from pg_catalog.pg_attribute
+       where attrelid = 'public.payment_audit_events'::regclass
+         and attname = 'actor_id' and not attisdropped`)).rows[0];
+    expect(actorColumn.attnotnull).toBe(false); // Provider webhooks have no staff actor.
     const f=await fixture();const ref=randomUUID();
     await db.query("insert into payments(restaurant_id,order_id,method,status,amount_paise,provider,provider_ref) values($1,$2,'online','pending',25000,'phase1',$3)",[f.restaurant,f.order,ref]);
     await expect(db.query('select settle_online_payment($1,$2,$3,$4)',['phase1',ref,'provider-'+ref,24999])).rejects.toThrow(/amount/i);
@@ -257,24 +416,108 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
     const first=(await db.query('select settle_online_payment($1,$2,$3,$4) id',['phase1',ref,'provider-'+ref,25000])).rows[0].id;
     const second=(await db.query('select settle_online_payment($1,$2,$3,$4) id',['phase1',ref,'provider-'+ref,25000])).rows[0].id;
     expect(second).toBe(first);
-    expect((await db.query('select count(*) n from payment_audit_events where order_id=$1',[f.order])).rows[0].n).toBe('1');
+    const providerAudit=(await db.query(`select actor_id,event_type,method,amount_paise
+      from payment_audit_events where order_id=$1`,[f.order])).rows;
+    expect(providerAudit).toEqual([{actor_id:null,event_type:'online_collected',method:'online',amount_paise:'25000'}]);
     expect((await db.query("select sum(amount_paise) paid from payments where order_id=$1 and status='recorded'",[f.order])).rows[0].paid).toBe('25000');
+    const actorFk=(await db.query(`select c.confrelid::regclass::text references_table,c.confdeltype,c.convalidated
+      from pg_constraint c
+      where c.conrelid='public.payment_audit_events'::regclass and c.contype='f'
+        and c.conkey=array[(select attnum::smallint from pg_attribute where attrelid='public.payment_audit_events'::regclass and attname='actor_id')]::smallint[]`)).rows;
+    expect(actorFk).toEqual([{references_table:'profiles',confdeltype:'n',convalidated:true}]);
   });
 
-  it('keeps provider settlement executable only by the service role, not guests or staff', async () => {
-    for(const role of ['anon','authenticated']) {
-      expect((await db.query("select has_function_privilege($1,'public.settle_online_payment(text,text,text,bigint)','EXECUTE') allowed",[role])).rows[0].allowed).toBe(false);
+  it('keeps cancelled online orders unpaid and leaves the provider attempt pending', async () => {
+    const f=await fixture();const ref=randomUUID();
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)",[f.user]);
+    await db.query('select cancel_order($1,null,null)',[f.order]);
+    await db.query("select set_config('request.jwt.claim.sub','',false)");
+    await db.query("insert into payments(restaurant_id,order_id,method,status,amount_paise,provider,provider_ref) values($1,$2,'online','pending',25000,'phase1',$3)",[f.restaurant,f.order,ref]);
+    await expect(db.query('select settle_online_payment($1,$2,$3,$4)',['phase1',ref,'provider-'+ref,25000])).rejects.toThrow(/cancelled/i);
+    expect((await db.query('select prep_status,payment_status from orders where id=$1',[f.order])).rows[0])
+      .toEqual({prep_status:'cancelled',payment_status:'pending'});
+    expect((await db.query('select status,provider_payment_ref from payments where order_id=$1',[f.order])).rows[0])
+      .toEqual({status:'pending',provider_payment_ref:null});
+    expect((await db.query('select count(*)::int n from payment_audit_events where order_id=$1',[f.order])).rows[0].n).toBe(0);
+  });
+
+  it('keeps online intent and settlement executable only by the service role, not guests or staff', async () => {
+    for(const signature of [
+      'public.begin_online_payment(text,text,text,uuid,uuid,bigint)',
+      'public.settle_online_payment(text,text,text,bigint)',
+    ]) {
+      const fn=(await db.query(`select p.prosecdef,p.proconfig,
+          has_function_privilege('anon',p.oid,'EXECUTE') anon_execute,
+          has_function_privilege('authenticated',p.oid,'EXECUTE') authenticated_execute,
+          has_function_privilege('service_role',p.oid,'EXECUTE') service_execute
+        from pg_proc p where p.oid=to_regprocedure($1)`,[signature])).rows[0];
+      expect(fn).toMatchObject({prosecdef:true,anon_execute:false,authenticated_execute:false,service_execute:true});
+      expect(fn.proconfig).toContain('search_path=public, pg_temp');
     }
-    expect((await db.query("select has_function_privilege('service_role','public.settle_online_payment(text,text,text,bigint)','EXECUTE') allowed")).rows[0].allowed).toBe(true);
     await asStaff(a.user,async()=>{
       await expect(db.query('select settle_online_payment($1,$2,$3,$4)',['phase1','missing','missing',25000])).rejects.toMatchObject({code:'42501'});
     });
   });
 
+  it('admits one online intent per order and rejects a stale second capture without double-recording', async () => {
+    const f=await fixture();
+    const token=(await db.query('select guest_token from orders where id=$1',[f.order])).rows[0].guest_token;
+    const firstRef=randomUUID(),secondRef=randomUUID();
+    await db.query('update restaurants set online_payments_enabled=true where id=$1',[f.restaurant]);
+    const provider=new Client({connectionString:URL_VALUE});
+    await provider.connect();
+    try {
+      await provider.query('set role service_role');
+      const args=['phase1',firstRef,f.slug,f.order,token,25000];
+      const first=(await provider.query('select begin_online_payment($1,$2,$3,$4,$5,$6) id',args)).rows[0].id;
+      const retry=(await provider.query('select begin_online_payment($1,$2,$3,$4,$5,$6) id',args)).rows[0].id;
+      expect(retry).toBe(first);
+      await expect(provider.query('select begin_online_payment($1,$2,$3,$4,$5,$6)',
+        ['phase1',secondRef,f.slug,f.order,token,25000])).rejects.toThrow(/already in progress/i);
+
+      // Model a duplicate intent left by an older writer. The first provider
+      // callback records the exact outstanding balance; the stale second one
+      // must remain pending for provider reconciliation, not create an overpay.
+      await db.query("insert into payments(restaurant_id,order_id,method,status,amount_paise,provider,provider_ref) values($1,$2,'online','pending',25000,'phase1',$3)",
+        [f.restaurant,f.order,secondRef]);
+      const settled=(await provider.query('select settle_online_payment($1,$2,$3,$4) id',
+        ['phase1',firstRef,'payment-'+firstRef,25000])).rows[0].id;
+      expect(settled).toBe(first);
+      await expect(provider.query('select settle_online_payment($1,$2,$3,$4)',
+        ['phase1',secondRef,'payment-'+secondRef,25000])).rejects.toThrow(/already been settled|outstanding balance/i);
+      expect((await db.query('select status from payments where provider_ref=$1',[secondRef])).rows[0].status).toBe('pending');
+      expect((await db.query("select sum(amount_paise) paid,count(*)::int n from payments where order_id=$1 and status='recorded'",[f.order])).rows[0])
+        .toEqual({paid:'25000',n:1});
+      expect((await db.query('select payment_status from orders where id=$1',[f.order])).rows[0].payment_status).toBe('paid');
+      expect((await db.query('select count(*)::int n from payment_audit_events where order_id=$1',[f.order])).rows[0].n).toBe(1);
+    } finally {await provider.end();}
+  });
+
+  it('serializes concurrent distinct online intents so only one becomes pending', async () => {
+    const f=await fixture();
+    const token=(await db.query('select guest_token from orders where id=$1',[f.order])).rows[0].guest_token;
+    await db.query('update restaurants set online_payments_enabled=true where id=$1',[f.restaurant]);
+    const refs=[randomUUID(),randomUUID()];
+    const providers=refs.map(()=>new Client({connectionString:URL_VALUE}));
+    await Promise.all(providers.map(client=>client.connect()));
+    try {
+      await Promise.all(providers.map(client=>client.query('set role service_role')));
+      const outcomes=await Promise.all(providers.map((client,index)=>client
+        .query('select begin_online_payment($1,$2,$3,$4,$5,$6)',
+          ['phase1',refs[index],f.slug,f.order,token,25000])
+        .then(()=>({ok:true as const}),error=>({ok:false as const,error}))));
+      expect(outcomes.filter(result=>result.ok)).toHaveLength(1);
+      const rejected=outcomes.find(result=>!result.ok);
+      expect(rejected && !rejected.ok ? rejected.error.message : '').toMatch(/already in progress/i);
+      expect((await db.query("select count(*)::int n from payments where order_id=$1 and method='online' and status='pending'",[f.order])).rows[0].n).toBe(1);
+    } finally {await Promise.all(providers.map(client=>client.end()));}
+  });
+
   it('void-first payment race does not create a receipt against a voided invoice', async () => {
     const f=await fixture();const ref=randomUUID();
-    await db.query("select set_config('request.jwt.claim.sub',$1,false)",[f.user]);
-    const invoice=await issueLegacyUnpaidReceipt(db,f);
+    // Reconstruct a pre-guard invoice while preserving the authenticated actor;
+    // settlement still races only on this disposable local fixture.
+    const invoice=await seedLegacyUnpaidInvoice(f);
     await db.query("insert into payments(restaurant_id,order_id,method,status,amount_paise,provider,provider_ref) values($1,$2,'online','pending',25000,'phase1',$3)",[f.restaurant,f.order,ref]);
     const voider=new Client({connectionString:URL_VALUE}),payer=new Client({connectionString:URL_VALUE});
     await voider.connect();await payer.connect();
@@ -357,12 +600,60 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
       for(const result of results) expect(result.rows[0].session_token).toBeNull();
       const attempt=(await db.query('select attempt_count,blocked_until>statement_timestamp() blocked from qr_verification_attempts where qr_code_id=$1 and ip_hash=$2',[qr.id,ip])).rows[0];
       expect(attempt).toEqual({attempt_count:5,blocked:true});
+      await db.query("update qr_verification_attempts set blocked_until=statement_timestamp()-interval '1 second' where qr_code_id=$1 and ip_hash=$2",[qr.id,ip]);
+      const reblocked=(await db.query('select * from reserve_qr_verification_attempt($1,$2)',[qr.id,ip])).rows[0];
+      expect(reblocked.allowed).toBe(false);
+      expect(reblocked.retry_after_seconds).toBeGreaterThan(800);
       await db.query("update qr_verification_attempts set window_started_at=statement_timestamp()-interval '16 minutes',blocked_until=statement_timestamp()-interval '1 second' where qr_code_id=$1 and ip_hash=$2",[qr.id,ip]);
       const code=(await db.query('select verification_code_for(secret,floor(extract(epoch from statement_timestamp())/window_seconds)::bigint) code from restaurant_verification_codes where restaurant_id=$1',[f.restaurant])).rows[0].code;
       for(let i=0;i<2;i++) expect((await db.query('select * from verify_table_qr_with_code($1,$2,$3)',[qr.public_token,code,ip])).rows[0].status).toBe('ok');
       expect((await db.query('select count(*) n from qr_verification_attempts where qr_code_id=$1 and ip_hash=$2',[qr.id,ip])).rows[0].n).toBe('0');
     } finally {await Promise.all(clients.map(c=>c.end()));}
   },15000);
+
+  it('preserves legacy QR-attempt events while migrating the active budget into the canonical table', async () => {
+    const archives=(await db.query(`select c.relname,quote_ident(c.relname) quoted_name
+      from pg_catalog.pg_class c
+      join pg_catalog.pg_namespace n on n.oid=c.relnamespace
+      where n.nspname='public'
+        and c.relkind='r'
+        and c.relname like 'qr_verification_attempts_legacy_%'
+        and exists(select 1 from pg_catalog.pg_attribute a
+          where a.attrelid=c.oid and a.attname='attempted_at' and a.attnum>0 and not a.attisdropped)
+      order by c.relname`)).rows;
+    let archive;
+    let seeded=[];
+    for(const candidate of archives){
+      const table=`public.${candidate.quoted_name}`;
+      const rows=(await db.query(`select q.id,
+          (select count(*)::int from ${table} old where old.qr_code_id=q.id and old.ip_hash=$2) legacy_rows,
+          state.attempt_count
+        from restaurants r
+        join dining_tables t on t.restaurant_id=r.id
+        join table_qr_codes q on q.table_id=t.id
+        left join qr_verification_attempts state on state.qr_code_id=q.id and state.ip_hash=$2
+        where r.slug=$1
+          and exists(select 1 from ${table} old where old.qr_code_id=q.id and old.ip_hash=$2)`,
+      ['readiness-qr-legacy-upgrade','c'.repeat(64)])).rows;
+      if(rows.length){archive=table;seeded=rows;break;}
+    }
+    if(!archive) return; // Clean replay has no synthetic legacy event archive.
+
+    expect(seeded).toHaveLength(1);
+    const {id,legacy_rows,attempt_count}=seeded[0];
+    expect(legacy_rows).toBe(6); // four recent events plus two expired remain intact.
+    expect(attempt_count).toBe(4); // only the active 15-minute window is charged.
+
+    expect((await db.query('select * from reserve_qr_verification_attempt($1,$2)',[id,'c'.repeat(64)])).rows[0].allowed).toBe(true);
+    expect((await db.query('select * from reserve_qr_verification_attempt($1,$2)',[id,'c'.repeat(64)])).rows[0].allowed).toBe(false);
+    expect((await db.query('select attempt_count,blocked_until>statement_timestamp() blocked from qr_verification_attempts where qr_code_id=$1 and ip_hash=$2',[id,'c'.repeat(64)])).rows[0])
+      .toEqual({attempt_count:5,blocked:true});
+    expect((await db.query(`select count(*)::int n from ${archive} where qr_code_id=$1 and ip_hash=$2`,[id,'c'.repeat(64)])).rows[0].n).toBe(6);
+
+    await db.query('select clear_qr_verification_attempts($1,$2)',[id,'c'.repeat(64)]);
+    expect((await db.query('select count(*)::int n from qr_verification_attempts where qr_code_id=$1 and ip_hash=$2',[id,'c'.repeat(64)])).rows[0].n).toBe(0);
+    expect((await db.query(`select count(*)::int n from ${archive} where qr_code_id=$1 and ip_hash=$2`,[id,'c'.repeat(64)])).rows[0].n).toBe(6);
+  });
 
   it('reopens scan admission after the window without reviving expired verification tokens', async () => {
     const f=await fixture();const ip='c'.repeat(64);
@@ -564,6 +855,43 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
     }
   });
 
+  it('revokes bypassing table privileges from current client roles and preserves kitchen status updates', async () => {
+    const serverVersion = Number((await db.query('show server_version_num')).rows[0].server_version_num);
+    const unsafePrivileges = ['TRUNCATE', 'REFERENCES', 'TRIGGER'];
+    if (serverVersion >= 170000) unsafePrivileges.push('MAINTAIN');
+
+    const leaked = await db.query(`
+      select r.rolname, c.relname, p.privilege_name
+        from pg_catalog.pg_class c
+        join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+        cross join (values ('anon'), ('authenticated')) as r(rolname)
+        cross join unnest($1::text[]) as p(privilege_name)
+       where n.nspname = 'public'
+         and c.relkind in ('r', 'p')
+         and has_table_privilege(r.rolname, c.oid, p.privilege_name)
+       order by r.rolname, c.relname, p.privilege_name`, [unsafePrivileges]);
+    expect(leaked.rows).toEqual([]);
+
+    // This assertion covers the standard migration owner (postgres). The test
+    // near the beginning of this suite separately exercises the owner-correct
+    // supabase_admin step and objects created under both owners.
+    const defaultAclLeak = await db.query(`
+      select acl.grantee, acl.privilege_type
+        from pg_catalog.pg_default_acl d
+        cross join lateral aclexplode(d.defaclacl) acl
+       where d.defaclrole = (select oid from pg_catalog.pg_roles where rolname = current_user)
+         and d.defaclnamespace = 'public'::regnamespace
+         and d.defaclobjtype = 'r'
+         and acl.grantee in (0, 'anon'::regrole::oid, 'authenticated'::regrole::oid)
+         and acl.privilege_type = any($1::text[])
+       order by acl.grantee, acl.privilege_type`, [unsafePrivileges]);
+    expect(defaultAclLeak.rows).toEqual([]);
+
+    expect((await db.query("select has_column_privilege('authenticated','public.orders','prep_status','UPDATE') allowed")).rows[0].allowed).toBe(true);
+    expect((await db.query("select has_column_privilege('authenticated','public.orders','total_paise','UPDATE') allowed")).rows[0].allowed).toBe(false);
+    expect((await db.query("select has_column_privilege('anon','public.orders','prep_status','UPDATE') allowed")).rows[0].allowed).toBe(false);
+  });
+
   it('prices orders from the database and attaches a durable sitting', async()=>{
     const row=(await db.query('select subtotal_paise,total_paise,order_session_id from orders where id=$1',[a.order])).rows[0];
     expect(row.subtotal_paise).toBe('25000');expect(row.total_paise).toBe('25000');expect(row.order_session_id).toBe(a.sitting);
@@ -661,6 +989,8 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
     await db.query('select mark_order_session_paid($1)',[a.sitting]);
     await db.query('select mark_order_session_paid($1)',[a.sitting]);
     expect((await db.query('select count(*)::int n from payments where order_id=$1',[a.order])).rows[0].n).toBe(1);
+    expect((await db.query(`select actor_id,event_type,method,amount_paise from payment_audit_events where order_id=$1`,[a.order])).rows)
+      .toEqual([{actor_id:a.user,event_type:'manual_marked_paid',method:'manual',amount_paise:'25000'}]);
     const issued=(await db.query('select close_order_session_and_issue_receipt($1) id',[a.sitting])).rows[0].id;
     expect((await db.query('select close_order_session_and_issue_receipt($1) id',[a.sitting])).rows[0].id).toBe(issued);
     const invoice=(await db.query('select invoice_number,totals_snapshot from restaurant_invoices where id=$1',[issued])).rows[0];
@@ -682,15 +1012,50 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
     await expect(asStaff(c.user,()=>db.query('select set_order_line_quantities($1,$2::jsonb,null)',[c.order,JSON.stringify([{line_id:randomUUID(),qty:1}])]))).rejects.toMatchObject({code:'22023'});
   });
 
+  it('keeps checkout open until every active ticket is fully paid and snapshots the settled balance', async()=>{
+    const c=await fixture();
+    const secondCode=(await db.query('select place_public_order($1,$2::jsonb,null,$3,$4::uuid,null) code',
+      [c.slug,JSON.stringify([{itemId:c.item,qty:1}]),c.sessionToken,randomUUID()])).rows[0].code;
+    const secondOrder=(await db.query('select id from orders where restaurant_id=$1 and code=$2',[c.restaurant,secondCode])).rows[0].id;
+
+    await withActor(c.user,async()=>{
+      await expect(db.query('select close_order_session_and_issue_receipt($1)',[c.sitting])).rejects.toThrow(/outstanding balance/i);
+    });
+    expect((await db.query('select status from order_sessions where id=$1',[c.sitting])).rows[0].status).toBe('open');
+    expect((await db.query('select count(*)::int n from restaurant_invoices where order_session_id=$1',[c.sitting])).rows[0].n).toBe(0);
+
+    const invoice=await withActor(c.user,async()=>{
+      await db.query('select record_counter_payment($1,$2,$3,$4,$5)',[c.slug,c.order,'cash',25000,randomUUID()]);
+      await db.query('select record_counter_payment($1,$2,$3,$4,$5)',[c.slug,secondOrder,'upi',12500,randomUUID()]);
+      return (await db.query('select close_order_session_and_issue_receipt($1) id',[c.sitting])).rows[0].id as string;
+    });
+    const snapshot=(await db.query('select totals_snapshot from restaurant_invoices where id=$1',[invoice])).rows[0].totals_snapshot;
+    expect(snapshot).toMatchObject({total_paise:37500,amount_paid_paise:37500,outstanding_paise:0,payment_status:'paid'});
+    expect((await withActor(c.user,()=>db.query('select close_order_session_and_issue_receipt($1) id',[c.sitting]))).rows[0].id).toBe(invoice);
+    expect((await db.query('select count(*)::int n from restaurant_invoice_lines where invoice_id=$1',[invoice])).rows[0].n).toBe(2);
+
+    await withActor(c.user,async()=>{
+      await expect(db.query('select cancel_order($1,null,null)',[c.order])).rejects.toThrow(/already been paid/i);
+      const line=(await db.query('select id from order_items where order_id=$1',[c.order])).rows[0].id;
+      await expect(db.query('select set_order_line_quantities($1,$2::jsonb,null)',[c.order,JSON.stringify([{line_id:line,qty:1}])])).rejects.toThrow(/already been paid/i);
+    });
+    expect((await db.query('select total_paise from orders where id=$1',[c.order])).rows[0].total_paise).toBe('25000');
+    expect((await db.query('select totals_snapshot from restaurant_invoices where id=$1',[invoice])).rows[0].totals_snapshot).toEqual(snapshot);
+  });
+
   it('freezes finalized source amounts and cancellation after receipt issuance', async()=>{
     const c=await fixture();
     await db.query("select set_config('request.jwt.claim.sub',$1,false)",[c.user]);
     await db.query('select mark_order_session_paid($1)',[c.sitting]);
-    await db.query('select close_order_session_and_issue_receipt($1)',[c.sitting]);
+    const invoice=(await db.query('select close_order_session_and_issue_receipt($1) id',[c.sitting])).rows[0].id;
+    const snapshot=(await db.query('select totals_snapshot from restaurant_invoices where id=$1',[invoice])).rows[0].totals_snapshot;
     await expect(db.query('select cancel_order($1,null,null)',[c.order])).rejects.toThrow(/already been paid/i);
-    await expect(db.query('select set_order_line_quantities($1,$2::jsonb,null)',[c.order,JSON.stringify([{line_id:(await db.query('select id from order_items where order_id=$1',[c.order])).rows[0].id,qty:1}])])).rejects.toThrow(/already been paid/i);
+    const line=(await db.query('select id from order_items where order_id=$1',[c.order])).rows[0].id;
+    await expect(db.query('select set_order_line_quantities($1,$2::jsonb,null)',[c.order,JSON.stringify([{line_id:line,qty:1}])])).rejects.toThrow(/already been paid/i);
     expect((await db.query('select total_paise from orders where id=$1',[c.order])).rows[0].total_paise).toBe('25000');
+    expect((await db.query('select totals_snapshot from restaurant_invoices where id=$1',[invoice])).rows[0].totals_snapshot).toEqual(snapshot);
   });
+
   it('keeps concurrent duplicate and distinct submissions correct under a bounded local workload', async()=>{
     const c=await fixture();const duplicate=randomUUID();const clients=Array.from({length:16},()=>new Client({connectionString:URL_VALUE}));
     await Promise.all(clients.map(client=>client.connect()));

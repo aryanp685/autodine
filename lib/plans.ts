@@ -1,3 +1,5 @@
+import { TRIAL_DAYS } from './trial';
+
 /**
  * Plans, and what is actually in the product.
  *
@@ -7,19 +9,16 @@
  *
  * ── WHAT THIS FILE IS CAREFUL ABOUT ────────────────────────────────────────
  *
- * Billing is not connected. There is no subscription table, no entitlement
- * check and no gateway in this deployment, so nothing here is purchasable and
- * no account is limited by it. The tiers are a plan for how the product will
- * be split, which is why every capability carries a state:
+ * No subscription checkout or payment provider is configured, so a customer
+ * cannot buy a plan or be charged. The account-level subscription, trial and
+ * outlet entitlements are nevertheless stored and enforced by the database;
+ * this catalog is presentation data, never authorization. It separates:
  *
- *   live      built, and in the product today for every account
- *   planned   not built yet; belongs to a tier when billing opens
+ *   live      built and available to an account whose server-side access allows it
+ *   planned   not currently available as a plan-specific paid entitlement
  *
- * That split is the honest one. The previous pricing page sold "expanded
- * staff roles" and "higher plan limits" as if they were gated features when
- * roles were available to every account and no limit was enforced anywhere.
- * A price list that describes a product that does not exist is not a
- * placeholder, it is a false claim.
+ * Prices and plan details are approved, but they remain unavailable for
+ * purchase until the provider boundary is explicitly configured and approved.
  */
 
 export type PlanId = 'starter' | 'professional' | 'business';
@@ -167,10 +166,9 @@ export type Capability = {
 /**
  * The product as it exists today.
  *
- * Everything here is built and switched on for every account: the trial is
- * not metered, features are not gated, and the smallest plan is not a demo.
- * That is deliberate — a restaurant that cannot take an order is not a
- * smaller customer.
+ * Everything here is built and included in the full trial. The server still
+ * enforces account access: a trial has a recorded end date, and a plan or
+ * expired state can restrict writes. A plan card is not an authorization check.
  */
 export const LIVE: Capability[] = [
   {
@@ -313,13 +311,13 @@ export const NOT_CONNECTED = [
     id: 'payments',
     label: 'Card payments',
     detail:
-      'No card gateway is connected and no money is taken by AutoDine. Guests pay at the counter, or into the restaurant\'s own UPI QR, and staff record what arrived.',
+      'No customer gateway or restaurant UPI-QR flow is available. Guests pay at the counter; staff record cash, card or UPI only after checking that it arrived.',
   },
   {
     id: 'billing',
     label: 'Buying a plan',
     detail:
-      `No plan can be bought yet. A new account runs on the whole product for ${21} days; after that it is read-only until access is extended by hand.`,
+      `No plan can be bought yet. A new account runs on the whole product for ${TRIAL_DAYS} days; after that it is read-only until access is extended by hand.`,
   },
   {
     id: 'messages',
@@ -331,8 +329,11 @@ export const NOT_CONNECTED = [
 /**
  * The state of billing, in one place, because it is said in four.
  *
- * Nothing in this deployment can charge anybody: there are no gateway keys and
- * no subscription table. Every screen that mentions money reads this.
+ * No subscription checkout or payment provider is configured. Account
+ * subscription writes and access decisions are database-backed, but provider-
+ * dependent purchase and charge operations fail closed. This is separate from
+ * staff recording a payment already collected at the counter. Every screen
+ * that describes buying a plan reads this state.
  */
 export const BILLING = {
   connected: false,
@@ -347,7 +348,7 @@ export const BILLING = {
    * days from it, and one that had already expired stays expired -- both are
    * materialised per account in `accounts.trial_ends_at`, not recomputed here.
    */
-  trialDays: 21,
+  trialDays: TRIAL_DAYS,
   /** Shown wherever a price appears. */
   note: 'Planning figures. Plans are not on sale and nothing is charged.',
 } as const;

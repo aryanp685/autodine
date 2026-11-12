@@ -1,6 +1,6 @@
 # AutoDine — production-readiness handoff
 
-> **Current continuation (2026-10-28):** This imported file records status claims from earlier `main` history; they were not independently verified or repeated during this branch reconciliation. In particular, prior local restore and hosted-staging claims are not proof of current production backup/PITR, live monitoring delivery, or device/printer acceptance. No production deployment/mutation or restore was performed in this continuation. The current verdict and required external approvals are in [docs/production-readiness-continuation.md](docs/production-readiness-continuation.md).
+> **Current gate (Arena date 2026-11-06 UTC):** The hosted/Preview/CI statements below are imported historical claims and were not reverified in this continuation. GitHub PR/check metadata and Vercel project metadata were inspected read-only; no Supabase database or deployment was changed or created, and no recovery, E2E, performance, or payment-provider operation was performed. Production remains read-only, Staging remains NO-GO, and online guest payments stay disabled. See `RELEASE-BLOCKER-REPORT.md` for the live blocker register.
 
 ## Latest live staging correction verified
 
