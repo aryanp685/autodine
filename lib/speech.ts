@@ -42,7 +42,7 @@ export type VoiceLike = {
   default?: boolean;
 };
 
-import { DEFAULT_EDGE_VOICE, type Gender, voiceGender } from './tts-voices';
+import { DEFAULT_EDGE_VOICE, type Gender, findEdgeVoice, voiceGender } from './tts-voices';
 
 /**
  * Language tags that are Hindi. There is no third entry and no English entry:
@@ -450,6 +450,11 @@ export function createKitchenSpeech(
   // The character the operator picked (male Madhur or female Swara on the
   // server engine). The fallback matches it where the device allows.
   let targetGender: Gender = voiceGender(DEFAULT_EDGE_VOICE) ?? 'Male';
+  // When the selected server character is not installed on this device, a
+  // browser fallback may use a different local voice only if its name gives
+  // us evidence that it matches the selected character. Never silently use
+  // a known female voice for a selected male character (or vice versa).
+  let requiredGender: Gender | null = null;
   let rateScale = 1;
   let cancelCurrent: (() => void) | null = null;
   /** Which language the board announces in. Follows the board's control. */
@@ -464,8 +469,9 @@ export function createKitchenSpeech(
     if (next.length === 0) return;
     voices = next;
     loaded = true;
-    // A previously selected voice may disappear after an OS update or while
-    // the browser refreshes its voice catalogue. Never retain a stale choice.
+    // A previously selected local voice may disappear after an OS update or
+    // while the browser refreshes its catalogue. Drop that stale device choice;
+    // an Edge catalogue preference is tracked separately by requiredGender.
     if (forced && !voices.some((candidate) => candidate.name === forced)) forced = null;
   }
 
@@ -482,6 +488,20 @@ export function createKitchenSpeech(
       const chosen = voices.find((candidate) => candidate.name === forced);
       if (chosen) return chosen;
     }
+
+    if (requiredGender) {
+      // The browser does not expose voice gender as structured metadata. The
+      // names in the Edge catalogue do have an authoritative character, so
+      // only use a device fallback whose known name agrees with it. If there
+      // is no defensible match, fail instead of sounding the opposite gender.
+      const matching = familyVoices(voices).filter(
+        (candidate) => voiceGender(candidate.name) === requiredGender,
+      );
+      return family === 'en'
+        ? pickEnglishVoice(matching, requiredGender)
+        : pickHindiVoice(matching, requiredGender);
+    }
+
     return family === 'en'
       ? pickEnglishVoice(voices, targetGender)
       : pickHindiVoice(voices, targetGender);
@@ -527,10 +547,15 @@ export function createKitchenSpeech(
       };
       cancelCurrent = cancel;
 
+      const languageName = family === 'en' ? 'English' : 'Hindi';
+      const unavailableVoiceReason = requiredGender
+        ? `No ${languageName} voice matching the selected character is available`
+        : `No ${languageName} voice is available`;
+
       if (!synthesis || !body || !voiceToUse || sentences.length === 0) {
         finish({
           status: 'failed',
-          reason: !synthesis ? 'Speech synthesis is unavailable' : !voiceToUse ? 'No Hindi voice is available' : 'Announcement text is empty',
+          reason: !synthesis ? 'Speech synthesis is unavailable' : !voiceToUse ? unavailableVoiceReason : 'Announcement text is empty',
           completedSegments: 0,
           totalSegments: sentences.length,
         });
@@ -651,21 +676,35 @@ export function createKitchenSpeech(
     setVoiceName(name) {
       if (name === null) {
         forced = null;
+        requiredGender = null;
         targetGender = voiceGender(DEFAULT_EDGE_VOICE) ?? 'Male';
         return true;
       }
       // Track the chosen character's gender even when the name is a server
       // catalogue name this device does not have (hi-IN-MadhurNeural and
-      // hi-IN-SwaraNeural are Edge names) — the fallback must not answer a
-      // female character with a male device voice.
+      // hi-IN-SwaraNeural are Edge names). A browser fallback must not
+      // silently replace the selected character with the opposite gender.
       const gender = voiceGender(name);
       if (gender) targetGender = gender;
       if (!loaded) refreshVoices();
       // The chosen voice must belong to the family being announced: Hindi
       // text in an English voice is silence.
       const tag = family === 'en' ? /^en(-|$)/i : /^hi(-|$)/i;
-      if (!voices.some((candidate) => candidate.name === name && tag.test(candidate.lang.replace('_', '-')))) return false;
+      const installed = voices.some(
+        (candidate) => candidate.name === name && tag.test(candidate.lang.replace('_', '-')),
+      );
+      if (!installed) {
+        // Clear a previous forced voice before falling back. Otherwise a
+        // stored female device voice can override a later male Edge choice.
+        forced = null;
+        // A server catalogue choice (Madhur/Swara) is a character selection,
+        // not a request to use whatever voice happens to be installed. Keep
+        // its exact gender requirement for a browser fallback.
+        requiredGender = findEdgeVoice(name)?.gender ?? null;
+        return false;
+      }
       forced = name;
+      requiredGender = null;
       return true;
     },
     setRateScale(scale) {

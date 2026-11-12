@@ -512,6 +512,44 @@ describe('voices the operator can choose between', () => {
     expect(engine.setVoiceName(null)).toBe(true);
   });
 
+  it('never reuses a previously selected female device voice as fallback for male Madhur', () => {
+    const fake = env({ voices: [{ name: 'Lekha', lang: 'hi-IN', localService: true }] });
+    const engine = createKitchenSpeech(fake.env);
+
+    // Reproduce the UI path: a female device voice was active, then the user
+    // chose the server's male Madhur voice. The server model is not installed
+    // in Web Speech, so the browser must not keep the stale forced female.
+    expect(engine.setVoiceName('Lekha')).toBe(true);
+    expect(engine.setVoiceName('hi-IN-MadhurNeural')).toBe(false);
+    expect(engine.voiceName()).toBeNull();
+    expect(engine.available()).toBe(false);
+
+    let outcome: SpeechOutcome | undefined;
+    engine.speak('नया ऑर्डर।', (result) => { outcome = result; });
+
+    expect(fake.spoken).toHaveLength(0);
+    expect(outcome).toMatchObject({
+      status: 'failed',
+      reason: 'No Hindi voice matching the selected character is available',
+    });
+  });
+
+  it('uses a matching male device voice when server Madhur is unavailable', () => {
+    const fake = env({ voices: [
+      { name: 'Lekha', lang: 'hi-IN', localService: true },
+      { name: 'Ravi', lang: 'hi-IN', localService: true },
+    ] });
+    const engine = createKitchenSpeech(fake.env);
+
+    // The Edge voice is not a browser voice, but a known male device voice is
+    // a safe fallback for the selected male character.
+    expect(engine.setVoiceName('hi-IN-MadhurNeural')).toBe(false);
+    expect(engine.voiceName()).toBe('Ravi');
+    engine.speak('नया ऑर्डर।', () => {});
+    fake.flush();
+    expect(fake.spoken[0].voice?.name).toBe('Ravi');
+  });
+
   it('drops a stored voice preference when that voice disappears', () => {
     const fake = env({ voices: [...english, ...hindi] });
     const engine = createKitchenSpeech(fake.env);

@@ -166,6 +166,13 @@ describe('POST /api/tts', () => {
     expect(mocks.setMetadataCalls[0].voice).toBe('hi-IN-SwaraNeural');
   });
 
+  it('passes an explicitly selected male voice to synthesis metadata', async () => {
+    await POST(post({ text: 'नमस्ते', voice: 'hi-IN-MadhurNeural' }));
+
+    expect(mocks.setMetadataCalls[0].voice).toBe('hi-IN-MadhurNeural');
+    expect(mocks.streamCalls[0].prosody).toMatchObject({ pitch: '-4Hz' });
+  });
+
   it('defaults each voice to its own natural pitch', async () => {
     // The female voice must never inherit the male voice's warmth.
     await POST(post({ text: 'नमस्ते', voice: 'hi-IN-SwaraNeural' }));
