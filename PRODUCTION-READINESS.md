@@ -1,5 +1,7 @@
 # AutoDine — production-readiness handoff
 
+> **Current continuation (2026-10-28):** This imported file records status claims from earlier `main` history; they were not independently verified or repeated during this branch reconciliation. In particular, prior local restore and hosted-staging claims are not proof of current production backup/PITR, live monitoring delivery, or device/printer acceptance. No production deployment/mutation or restore was performed in this continuation. The current verdict and required external approvals are in [docs/production-readiness-continuation.md](docs/production-readiness-continuation.md).
+
 ## Latest live staging correction verified
 
 User-provided shareable access opened staging homepage/login. It exposed a health bug caused by legitimate service-role financial-table restrictions. Fixed using a server-only catalog RPC (no tenant data reads and no widened financial grants), applied only to staging and redeployed commit `8fd6e02`. Fresh authorized health fetch now returns **`ok:true`, credentials accepted, all operational probes applied**. Local full suite **1,931 pass / 21 native skips**, native suite **56 clean migrations / 21 pass**, cold recovery reverified. Direct sandbox Chromium is blocked by outbound network restrictions; actual hosted login/order browser flows remain unverified and need a network-enabled authorized runner. Share token is not stored in Git.

@@ -5,6 +5,10 @@ const sql = readFileSync(
   new URL('../../supabase/migrations/20261108003000_session_checkout_payment_receipts.sql', import.meta.url),
   'utf8',
 );
+const settlementGateSql = readFileSync(
+  new URL('../../supabase/migrations/20261108008000_p8_require_settlement_before_close.sql', import.meta.url),
+  'utf8',
+);
 
 function functionBody(name: string): string {
   const start = sql.indexOf(`create or replace function public.${name}(`);
@@ -55,6 +59,20 @@ describe('P8 checkout and supplemental payment receipt migration', () => {
     expect(sql).toContain('after insert or update of status on public.payments');
     expect(timestampTrigger).toContain("new.status = 'recorded'");
     expect(timestampTrigger).toContain('statement_timestamp()');
+  });
+
+  it('rejects unpaid and partially paid sessions before changing them to closed', () => {
+    const close = settlementGateSql.slice(
+      settlementGateSql.indexOf('create or replace function public.close_order_session_and_issue_receipt('),
+      settlementGateSql.indexOf('$$;', settlementGateSql.indexOf('create or replace function public.close_order_session_and_issue_receipt(')),
+    );
+    expect(close).toContain("pay.status = 'recorded'");
+    expect(close).toContain('greatest(o.total_paise - coalesce(p.recorded_paise, 0), 0)');
+    expect(close).toContain('if v_outstanding_paise > 0 then');
+    expect(close.indexOf('if v_outstanding_paise > 0 then')).toBeLessThan(close.indexOf("set status = 'closed'"));
+    expect(close).toContain('Collect the full outstanding balance before closing this table session.');
+    expect(settlementGateSql).toContain('revoke all on function public.issue_closed_session_receipt(uuid) from public, anon, authenticated, service_role');
+    expect(settlementGateSql).toContain('grant execute on function public.close_order_session_and_issue_receipt(uuid) to authenticated');
   });
 
   it('keeps payment receipt reads tenant-scoped and denies direct writes', () => {

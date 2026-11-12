@@ -1,0 +1,155 @@
+name: Disposable Supabase E2E and load
+
+on:
+  workflow_dispatch:
+    inputs:
+      integration_grep:
+        description: Optional Playwright title regex for a focused disposable-stack diagnostic run
+        required: false
+        default: ''
+        type: string
+      integration_expected:
+        description: Expected number of selected tests (use 49 for the full integration suite)
+        required: false
+        default: '49'
+        type: string
+  push:
+    branches:
+      - arena/e9e78732-autodine
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-supabase:
+    if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[skip-supabase-e2e]') }}
+    name: 64 hermetic + 49 Supabase-backed E2E, then synthetic load
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CI: 'true'
+      GITHUB_ACTIONS: 'true'
+      PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/supabase-e2e/demo-results.json
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Install Playwright Chromium and OS dependencies
+        run: npx playwright install --with-deps chromium
+
+      - name: Run all hermetic Playwright tests (64)
+        run: |
+          mkdir -p test-results/supabase-e2e
+          npm run e2e:demo
+
+      - name: Require 64 hermetic passes with no skips or retries
+        if: always()
+        run: node scripts/e2e/assert-playwright-results.mjs test-results/supabase-e2e/demo-results.json 64
+
+      - name: Retain hermetic HTML report
+        if: always()
+        run: |
+          if [ -d playwright-report ]; then
+            mkdir -p test-results/supabase-e2e
+            cp -R playwright-report test-results/supabase-e2e/demo-html
+          fi
+
+      - name: Install pinned Supabase CLI
+        id: supabase-cli
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.67.1
+
+      - name: Start full disposable Supabase stack
+        run: supabase start
+
+      - name: Apply migrations and seed only synthetic fixtures
+        env:
+          E2E_FIXTURE_ENV_FILE: ${{ runner.temp }}/autodine-e2e-fixtures.env
+        run: |
+          set -euo pipefail
+          set -a
+          source <(supabase status -o env)
+          set +a
+          echo "::add-mask::$SERVICE_ROLE_KEY"
+          node scripts/e2e/prepare-local-supabase.mjs
+          {
+            printf 'NEXT_PUBLIC_SUPABASE_URL=%s\n' "$API_URL"
+            printf 'NEXT_PUBLIC_SUPABASE_ANON_KEY=%s\n' "$ANON_KEY"
+            printf 'SUPABASE_SECRET_KEY=%s\n' "$SERVICE_ROLE_KEY"
+            printf 'SUPABASE_SERVICE_ROLE_KEY=%s\n' "$SERVICE_ROLE_KEY"
+            printf 'API_URL=%s\n' "$API_URL"
+            printf 'ANON_KEY=%s\n' "$ANON_KEY"
+            printf 'SERVICE_ROLE_KEY=%s\n' "$SERVICE_ROLE_KEY"
+            printf 'DB_URL=%s\n' "$DB_URL"
+          } >> "$GITHUB_ENV"
+
+      - name: Build against local Supabase and run integration Playwright tests
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/supabase-e2e/integration-results.json
+          SUPABASE_E2E_ALLOW_HTTP_COOKIES: 'true'
+          E2E_TEST_GREP: ${{ inputs.integration_grep || '' }}
+        run: |
+          set -euo pipefail
+          set -a
+          source "${{ runner.temp }}/autodine-e2e-fixtures.env"
+          set +a
+          npm run build
+          args=(--project=integration --reporter=list,html,json --output=test-results/supabase-e2e/integration-output)
+          if [[ -n "$E2E_TEST_GREP" ]]; then args+=(--grep "$E2E_TEST_GREP"); fi
+          npx playwright test "${args[@]}"
+
+      - name: Require integration passes with no skips or retries
+        if: always()
+        env:
+          INTEGRATION_EXPECTED: ${{ inputs.integration_expected || '49' }}
+        run: node scripts/e2e/assert-playwright-results.mjs test-results/supabase-e2e/integration-results.json "$INTEGRATION_EXPECTED"
+
+      - name: Retain integration HTML report
+        if: always()
+        run: |
+          if [ -d playwright-report ]; then
+            mkdir -p test-results/supabase-e2e
+            cp -R playwright-report test-results/supabase-e2e/integration-html
+          fi
+
+      - name: Run 5,000 synthetic guest sessions, orders, app reads, and kitchen Realtime fan-out
+        if: ${{ success() && inputs.integration_grep == '' }}
+        env:
+          E2E_FIXTURE_ENV_FILE: ${{ runner.temp }}/autodine-e2e-fixtures.env
+          SUPABASE_E2E_ALLOW_HTTP_COOKIES: 'true'
+          APP_BASE_URL: http://localhost:3100
+          LOAD_REPORT_FILE: test-results/supabase-e2e/load-report.json
+          LOAD_GUESTS: '5000'
+          LOAD_RESTAURANTS: '100'
+          LOAD_API_CONCURRENCY: '128'
+        run: |
+          set -euo pipefail
+          source "$E2E_FIXTURE_ENV_FILE"
+          npx next start -H 127.0.0.1 -p 3100 > "$RUNNER_TEMP/autodine-next-load.log" 2>&1 &
+          NEXT_PID=$!
+          trap 'kill "$NEXT_PID" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://localhost:3100/menu >/dev/null; then break; fi
+            sleep 2
+          done
+          curl --fail --silent http://localhost:3100/menu >/dev/null
+          node scripts/e2e/load-local-supabase.mjs
+
+      - name: Stop disposable Supabase stack
+        if: always() && steps.supabase-cli.outcome == 'success'
+        run: supabase stop --no-backup
+
+      - name: Retain Playwright results and measured load report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: disposable-supabase-e2e-load-${{ github.run_id }}
+          path: test-results/supabase-e2e/
+          if-no-files-found: warn
+          retention-days: 30

@@ -33,7 +33,8 @@ import {
   type VisionDraft,
 } from '@/lib/ai/menu-vision';
 import { ASSET_BUCKET, dishAssetPath, publicAssetUrl } from '@/lib/storage/assets';
-import { sanitiseDraft } from '@/lib/menu-import';
+import { sanitiseDraft, type MenuImportDraft } from '@/lib/menu-import';
+import { MAX_IMPORT_TEXT, parseMenuText } from '@/lib/menus/bulk-parse';
 
 const MENUS_PATH = '/dashboard/menus';
 
@@ -214,6 +215,24 @@ export async function createImportedMenuAction(payload: unknown): Promise<Import
 
   revalidatePath(MENUS_PATH);
   return { ok: true, menuId, items: itemCount };
+}
+
+/** Parse pasted text locally on the server. This is deterministic and never calls a model. */
+export async function previewTextMenuImportAction(
+  value: unknown,
+): Promise<{ ok: true; draft: MenuImportDraft } | { ok: false; error: string }> {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return { ok: false, error: 'Paste the menu text first.' };
+  }
+  if (value.length > MAX_IMPORT_TEXT) {
+    return { ok: false, error: `That paste is over ${MAX_IMPORT_TEXT.toLocaleString()} characters. Split it into smaller parts.` };
+  }
+
+  const draft = parseMenuText(value);
+  if (draft.categories.every((category) => category.items.length === 0)) {
+    return { ok: false, error: 'No priced dishes found. Add a section heading and a dish with its printed price.' };
+  }
+  return { ok: true, draft };
 }
 
 /**

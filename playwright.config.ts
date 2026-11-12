@@ -33,11 +33,17 @@ export default defineConfig({
   timeout: 30_000,
   expect: { timeout: 7_000 },
   use: {
-    baseURL: 'http://127.0.0.1:3100',
-    launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? {
-      executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
-      args: process.env.PLAYWRIGHT_CHROMIUM_ARGS ? JSON.parse(process.env.PLAYWRIGHT_CHROMIUM_ARGS) : ['--no-sandbox'],
-    } : undefined,
+    baseURL: 'http://localhost:3100',
+    ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
+      ? {
+          launchOptions: {
+            executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+            args: process.env.PLAYWRIGHT_CHROMIUM_ARGS
+              ? JSON.parse(process.env.PLAYWRIGHT_CHROMIUM_ARGS)
+              : ['--no-sandbox'],
+          },
+        }
+      : {}),
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     /* The app draws its entrance and layout animations as springs, and a
@@ -87,18 +93,21 @@ export default defineConfig({
     },
     {
       /*
-       * Tests that need a real deployment and real accounts.
+       * Tests that need a real Supabase stack and synthetic accounts.
        *
-       * They exist as a project rather than as loose files so that
-       * `npx playwright test --project=integration` runs them and nothing
-       * else. Every test in here skips itself when its environment is
-       * missing, which is the state CI is in: no secrets, so the run is green
-       * and the report says "skipped" rather than "verified". A file that no
-       * project matched would be a file that silently never ran, which is how
-       * a documented flow becomes a flow nobody ever clicked.
+       * `npx playwright test --project=integration` selects these and nothing
+       * else. The disposable-supabase-e2e-load workflow provisions Auth,
+       * Storage, Realtime and Postgres locally, seeds throwaway fixtures, and
+       * runs this project without skips. When someone invokes the hermetic
+       * demo suite without E2E variables, individual tests skip themselves;
+       * that run is discoverability, never evidence that the database flow
+       * passed. A file matched by no project is a file nobody clicked.
        */
       name: 'integration',
       testMatch: 'integration/**/*.spec.ts',
+      // The CI evidence gate requires one clean attempt; never hide a flaky
+      // database flow behind Playwright retries.
+      retries: 0,
       // Serial by nature: one test mints an invitation the next one redeems,
       // and each of them writes rows.
       workers: 1,

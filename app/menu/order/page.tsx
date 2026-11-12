@@ -10,6 +10,12 @@ import { loadTableAccess } from '@/lib/table-access';
 // not be opened, and a tab promising an order that is not there is a small lie.
 export const metadata: Metadata = { title: 'Your order · AutoDine' };
 
+// This page is keyed by a guest credential and contains a private bill plus
+// the current kitchen state. Never cache it across order requests; a stale
+// render would expose another guest's bill or misreport a ticket's status.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /**
  * ?s=<slug>&code=<order code>&t=<guest token>
  *
@@ -65,6 +71,7 @@ export default async function OrderPage({
         token={t}
         slug={s}
         canCallWaiter={access.status === 'verified'}
+        cartClearing={placed}
         brandState={data?.brandState}
       />
     </CartProvider>

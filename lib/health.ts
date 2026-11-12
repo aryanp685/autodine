@@ -4,14 +4,12 @@
  *
  * WHY THIS EXISTS
  *
- * Every owner and guest screen degrades quietly when Supabase is not
- * configured: it renders sample data instead. That is right for a preview and
- * terrible for a demo, because "configured but half-migrated" looks identical
- * to "not configured" from the outside. The three migrations that make the
- * trial real, add plan entitlements and add the restaurant's UPI QR were
- * written after the deployment's database was built, so the realistic failure
- * on demo day is: keys present, columns missing, and a screen that says
- * "Payment is not available right now" with no explanation.
+ * Explicit local demo mode can render sample data, but production now fails
+ * closed when public Supabase configuration is absent. This endpoint answers a
+ * different question: whether a configured deployment has the expected schema
+ * for the trial, plan entitlements, and restaurant UPI QR. The realistic
+ * failure is a configured deployment with an unapplied migration, which can
+ * otherwise look like a generic unavailable screen.
  *
  * This module answers the question in one request, in booleans. It is used by
  * GET /api/health, which is public on purpose -- it returns no rows, no ids,
@@ -19,10 +17,10 @@
  *
  * WHAT IT MUST NEVER DO
  *
- * Return a key, a URL, an email, a restaurant name or an error message straight
- * from the database. A health endpoint that echoes a Postgres error is a small
- * schema oracle. Everything here is mapped to a fixed vocabulary before it
- * leaves: 'applied' | 'missing' | 'unknown' | 'unreachable'.
+ * Return a key, a URL, an email, a restaurant name, an error message, or an
+ * unvalidated error field straight from the database. Probe outcomes use a
+ * fixed vocabulary; the optional diagnostic code is allowlisted to standard
+ * SQLSTATE or PostgREST code formats and never includes a database message.
  *
  * Logic lives here rather than in the route so it can be tested without a
  * network, a database or an environment.
@@ -37,6 +35,11 @@ export type Health = {
   serverKey: boolean;
   /** The database answered a query at all. */
   reachable: boolean;
+  /**
+   * A validated PostgREST or SQLSTATE code from the first failed privileged
+   * column probe; diagnostic only, not itself a credential verdict.
+   */
+  credentialProbe: string | null;
   /**
    * Did the database accept the credentials this deployment is holding?
    *
@@ -98,16 +101,32 @@ function isMissing(error: { message: string; code?: string }): boolean {
 }
 
 /**
+ * Keep the public diagnostic to standard error identifiers only. PostgreSQL
+ * SQLSTATE values are five uppercase alphanumerics; PostgREST uses PGRST plus
+ * three digits. Do not expose arbitrary client error codes or messages.
+ */
+function safeProbeCode(code: string | undefined): string | null {
+  if (!code) return null;
+  return /^[A-Z0-9]{5}$/.test(code) || /^PGRST\d{3}$/.test(code) ? code : null;
+}
+
+/**
  * Does this column exist?
  *
  * `limit(0)` costs one round trip and returns no rows: the column is named in
  * the select list, so PostgREST either resolves it or refuses. No row of a real
  * restaurant is read, which matters because this runs unauthenticated.
  */
-async function columnExists(client: ProbeClient, table: string, column: string): Promise<Probe> {
+async function columnExists(
+  client: ProbeClient,
+  table: string,
+  column: string,
+  note?: (code: string | undefined) => void
+): Promise<Probe> {
   try {
     const { error } = await client.from(table).select(column).limit(0);
     if (!error) return 'applied';
+    note?.(error.code);
     if (isUnauthorized(error)) return 'unauthorized';
     return isMissing(error) ? 'missing' : 'unknown';
   } catch {
@@ -149,6 +168,7 @@ export async function probeHealth(input: {
     configured: input.configured,
     serverKey: input.serverKey,
     reachable: false,
+    credentialProbe: null,
     credentials: 'unknown',
     schema: {
       trialAndWriteGate: 'unknown',
@@ -160,10 +180,15 @@ export async function probeHealth(input: {
 
   if (!input.configured || !input.primary) return empty;
 
+  let credentialProbe: string | null = null;
+  const note = (code: string | undefined) => {
+    if (!credentialProbe) credentialProbe = safeProbeCode(code);
+  };
+
   const [trialColumn, planColumn, upiColumn, planFeatures] = await Promise.all([
-    columnExists(input.primary, 'restaurants', 'trial_started_at'),
-    columnExists(input.primary, 'restaurants', 'plan'),
-    columnExists(input.primary, 'restaurants', 'upi_id'),
+    columnExists(input.primary, 'restaurants', 'trial_started_at', note),
+    columnExists(input.primary, 'restaurants', 'plan', note),
+    columnExists(input.primary, 'restaurants', 'upi_id', note),
     input.publicClient
       ? functionExists(input.publicClient, 'plan_features', { p_plan: 'starter' })
       : input.primary
@@ -197,6 +222,7 @@ export async function probeHealth(input: {
   return {
     ...empty,
     reachable: trialColumn !== 'unreachable' && trialColumn !== 'unauthorized',
+    credentialProbe,
     credentials,
     schema: {
       trialAndWriteGate,

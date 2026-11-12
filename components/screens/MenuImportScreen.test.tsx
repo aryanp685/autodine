@@ -29,13 +29,8 @@ vi.mock('@/components/PhotoImportPanel', () => ({
 }));
 
 /**
- * One way in: photograph the menu.
- *
- * The screen used to offer text pasting and a spreadsheet upload alongside
- * the photo path; the owner asked for just the photo. What these pin is the
- * shape of the one-path screen: the photo reader when the deployment can
- * read a photo, an honest sentence when it cannot, and no path that can only
- * disappoint.
+ * The photo reader is optional; deterministic text import remains available
+ * without a vision key, and both routes lead into the same checked draft.
  */
 describe('Menu import with no vision key', () => {
   it('does not offer the photo path', () => {
@@ -44,20 +39,21 @@ describe('Menu import with no vision key', () => {
     expect(html).not.toContain('data-photo-panel');
   });
 
-  it('says why, and points at the path that works', () => {
+  it('offers the deterministic text path when photo reading is unavailable', () => {
     const html = renderToStaticMarkup(<MenuImportScreen visionEnabled={false} />);
 
-    expect(html).toContain('does not have it configured');
-    expect(html).toContain('Add dishes by hand');
+    expect(html).toContain('Paste a menu');
+    expect(html).toContain('Menu text');
+    expect(html).toContain('Read the menu');
   });
 });
 
 describe('Menu import with a vision key', () => {
-  it('offers the photo reader and nothing else', () => {
+  it('offers both the photo reader and the no-AI text path', () => {
     const html = renderToStaticMarkup(<MenuImportScreen visionEnabled />);
 
     expect(html).toContain('data-photo-panel');
-    expect(html).not.toContain('Paste the text');
+    expect(html).toContain('Paste a menu');
     expect(html).not.toContain('Spreadsheet');
   });
 

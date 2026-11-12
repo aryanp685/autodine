@@ -19,9 +19,11 @@
  * bypasses RLS. It must never be called from client-side code — the admin
  * client must never reach the browser bundle.
  *
- * The trial renewal sets `trial_started_at` to `now()`, starting a fresh
- * 7-day trial. The `protect_restaurant_plan()` trigger allows this because
- * auth.uid() is null (service role).
+ * The trial renewal moves the ACCOUNT's clock: `accounts.trial_ends_at`
+ * becomes `now() + 21 days`, and the original activation date is kept. The
+ * `protect_account_plan()` trigger allows this because auth.uid() is null
+ * (service role). A trial that had already ended stays ended unless an
+ * operator renews it here — nothing recomputes a clock from a bare interval.
  */
 
 import { readJsonObject, JsonInputError } from '@/lib/http-json';

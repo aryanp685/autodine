@@ -165,14 +165,41 @@ describe('health reports a rejected credential', () => {
     });
 
     expect(health.credentials).toBe('rejected');
+    expect(health.credentialProbe).toBe('PGRST301');
     expect(health.schema.trialAndWriteGate).toBe('unauthorized');
     // The database is up; it is the credential that is wrong.
     expect(health.reachable).toBe(false);
   });
 
+  it('reports a standard SQLSTATE for an unclassified privileged failure', async () => {
+    const health = await probeHealth({
+      ...base,
+      primary: picky({
+        columns: { trial_started_at: { message: 'internal failure', code: 'XX000' } },
+      }),
+      publicClient: picky({}),
+    });
+
+    expect(health.credentialProbe).toBe('XX000');
+    expect(health.credentials).toBe('unknown');
+  });
+
+  it('does not expose arbitrary error codes through the public health response', async () => {
+    const health = await probeHealth({
+      ...base,
+      primary: client({ message: 'internal failure for secret schema', code: 'schema-secret' }),
+      publicClient: client(null),
+    });
+
+    expect(health.credentialProbe).toBeNull();
+    expect(JSON.stringify(health)).not.toContain('schema-secret');
+    expect(JSON.stringify(health)).not.toContain('secret schema');
+  });
+
   it('says the credential was accepted when the probes can read', async () => {
     const health = await probeHealth({ ...base, primary: picky({}), publicClient: picky({}) });
     expect(health.credentials).toBe('accepted');
+    expect(health.credentialProbe).toBeNull();
   });
 });
 

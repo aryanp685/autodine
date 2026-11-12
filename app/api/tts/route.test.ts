@@ -95,8 +95,9 @@ describe('POST /api/tts', () => {
     expect((await POST(post(body))).status).toBe(400);
     expect(mocks.constructed).toHaveLength(0);
   });
-  it('rejects a chunked oversized payload before synthesis', async () => {
+  it('rejects oversized request bodies and announcement text before synthesis', async () => {
     expect((await POST(post({ text: 'a'.repeat(9000) }))).status).toBe(413);
+    expect((await POST(post({ text: 'a'.repeat(1001) }))).status).toBe(413);
     expect(mocks.constructed).toHaveLength(0);
   });
 

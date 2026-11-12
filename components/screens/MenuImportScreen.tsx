@@ -11,6 +11,7 @@ import { DesignChooser } from '@/components/screens/DesignChooser';
 import { designCandidates, type DesignId } from '@/lib/branding/designs';
 import { ImportShowcase } from '@/components/screens/ImportShowcase';
 import { PhotoImportPanel, type PhotoDraft } from '@/components/PhotoImportPanel';
+import { TextImportPanel } from '@/components/TextImportPanel';
 import { cropFromImage } from '@/lib/import/crop';
 import type { OutletBar } from '@/lib/outlets';
 import { Card, OwnerPage, PageHead, btn } from '@/components/owner/chrome';
@@ -95,13 +96,7 @@ export function MenuImportScreen({
   /** owner/manager can write; anyone else can read this screen and not save. */
   role?: string;
   blocked?: 'signed-out' | 'no-membership';
-  /**
-   * Does this deployment have a vision key?
-   *
-   * Passed from the server because it is an environment fact. When it is
-   * false there is nothing this screen can do — a photo is the only way in —
-   * and it says so instead of offering a path that cannot succeed.
-   */
+  /** Does this deployment have a vision key for the optional photo path? */
   visionEnabled?: boolean;
 }) {
   const router = useRouter();
@@ -328,14 +323,7 @@ export function MenuImportScreen({
       {!blocked && visionEnabled && (
         <PhotoImportPanel canWrite={canWrite} onFileChange={setMenuFile} onDraftChange={setPhotoDraft} />
       )}
-      {!blocked && !visionEnabled && (
-        <Card>
-          <p className="m-0 px-4 py-4 text-[12.5px] leading-[1.55] text-gink-64 sm:px-5">
-            Reading a photograph needs a vision service on this deployment, and this one does not
-            have it configured. Add dishes by hand in the menu editor instead.
-          </p>
-        </Card>
-      )}
+      {!blocked && <TextImportPanel canWrite={canWrite} onDraftChange={setPhotoDraft} />}
 
       {error && (
         <p

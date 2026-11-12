@@ -5,7 +5,7 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'AutoDine',
   description:
-    'AutoDine — QR ordering and restaurant management for Indian restaurants. Scan, order, and the kitchen board hears it in Hindi. Online payments are not connected yet.',
+    'AutoDine — QR ordering and restaurant management for Indian restaurants. Guests scan and order, then pay at the counter while the kitchen board announces new tickets in Hindi.',
   manifest: '/manifest.webmanifest',
   applicationName: 'AutoDine',
   /**

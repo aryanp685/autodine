@@ -640,6 +640,35 @@ export function orderAnnouncementEn(ticket: AnnounceableTicket): string {
 }
 
 /**
+ * A deliberately mixed Hindi/English pass for kitchens that speak Hinglish.
+ * Hindi carries the order/table structure and quantity; menu names, modifiers
+ * and guest notes stay in the written language so familiar English dish names
+ * are not force-transliterated. This requires a Hindi-capable voice, which is
+ * what the kitchen voice picker uses for this mode.
+ */
+export function newOrderTextHinglish(table: string, items: SpeakableItem[], note?: string | null): string {
+  const clauses: string[] = [];
+  if (isTakeaway(table)) clauses.push('नया takeaway order आया है।');
+  else {
+    clauses.push('नया order आया है।');
+    clauses.push(`Table ${spokenTable(table)}।`);
+  }
+  for (const item of items) {
+    const quantity = hindiNumber(item.qty);
+    const name = item.spoken?.trim() || item.name.trim() || 'item';
+    const details = (item.detail ?? '').replace(/\s*·\s*/g, ', ').replace(/\s+/g, ' ').trim();
+    clauses.push(`${quantity} ${[details, name].filter(Boolean).join(' ')}।`);
+  }
+  const trimmedNote = (note ?? '').trim().replace(/\s+/g, ' ').replace(/[.,;:!?।]+$/, '');
+  if (trimmedNote) clauses.push(`Note: ${trimmedNote}।`);
+  return clauses.join(' ');
+}
+
+export function orderAnnouncementHinglish(ticket: AnnounceableTicket): string {
+  return newOrderTextHinglish(ticket.table, ticket.items, ticket.note);
+}
+
+/**
  * How recently an order must have been placed for the board to offer to read
  * it on open. Longer than this and the food is already out; the banner would
  * be telling the pass about work it has finished.

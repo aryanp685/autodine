@@ -90,14 +90,11 @@ test.describe('a team invitation, clicked through', () => {
     const owner = await browser.newContext();
     const page = await signIn(owner, OWNER_EMAIL, OWNER_PASSWORD);
 
-    await page.goto(`${BASE}/dashboard/settings`);
-    await page.getByRole('tab', { name: /people/i }).click().catch(async () => {
-      // The tab strip is the normal route; the direct link is the fallback, so
-      // a rename of the strip does not turn this into a false failure.
-      await page.goto(`${BASE}/dashboard/settings?tab=people`);
-    });
-
-    await expect(page.getByRole('heading', { name: /people/i }).first()).toBeVisible();
+    // People is a real section anchor, not an ARIA tab. Navigating directly
+    // avoids waiting the full action timeout for a role the page does not use.
+    await page.goto(`${BASE}/dashboard/settings#settings-people`);
+    await expect(page.locator('#settings-people')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'People', exact: true })).toBeVisible();
 
     // The role picker only offers what the caller may hand out.
     await page.getByLabel(/which role/i).selectOption(INVITE_ROLE);
@@ -159,7 +156,10 @@ test.describe('a team invitation, clicked through', () => {
     test.skip(!EXPIRED_CODE, 'set E2E_EXPIRED_INVITE_CODE from a branch database with an aged row');
 
     const context = await browser.newContext();
-    const page = await context.newPage();
+    // The join page deliberately hides invite status from signed-out visitors.
+    // Previewing the aged row as an authenticated staff member verifies expiry
+    // without weakening that privacy boundary.
+    const page = await signIn(context, OWNER_EMAIL, OWNER_PASSWORD);
     await page.goto(`${BASE}/join/${EXPIRED_CODE}`);
 
     // Said plainly, on the page, with the one action that fixes it.

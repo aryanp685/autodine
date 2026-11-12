@@ -19,8 +19,6 @@
  *
  * WHAT IS ALLOWED BY NAME
  *
- *   checkout.razorpay.com  the payment modal's script, loaded by PayOnline
- *   api.razorpay.com       the modal's iframe and its calls
  *   the Supabase origin    auth, data and realtime (wss) for every screen
  *
  * Everything else is 'self'. object-src 'none' and base-uri 'self' close the
@@ -50,8 +48,8 @@ function httpsOrigin(value: string | null | undefined): string | null {
 export function buildCsp({ nonce, supabaseUrl }: CspInput): string {
   const supabase = httpsOrigin(supabaseUrl);
 
-  const scriptSrc = ["'self'", `'nonce-${nonce}'`, 'https://checkout.razorpay.com'];
-  const connectSrc = ["'self'", 'https://api.razorpay.com'];
+  const scriptSrc = ["'self'", `'nonce-${nonce}'`];
+  const connectSrc = ["'self'"];
   const imgSrc = ["'self'", 'data:', 'blob:'];
 
   if (supabase) {
@@ -67,7 +65,7 @@ export function buildCsp({ nonce, supabaseUrl }: CspInput): string {
     `img-src ${imgSrc.join(' ')}`,
     "font-src 'self'",
     `connect-src ${connectSrc.join(' ')}`,
-    'frame-src https://api.razorpay.com https://checkout.razorpay.com',
+    "frame-src 'none'",
     "object-src 'none'",
     "base-uri 'self'",
     "frame-ancestors 'self'",

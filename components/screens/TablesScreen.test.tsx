@@ -112,6 +112,20 @@ describe('a table with no live code', () => {
 });
 
 describe('TablesScreen', () => {
+  it('submits the intended table state as a hidden form field, not the Server Action button name', () => {
+    const activeMarkup = renderToStaticMarkup(<TablesScreen data={data()} />);
+    expect(activeMarkup).toMatch(/name="active" value="false"/);
+    const activeToggle = activeMarkup.match(/<button[^>]*data-table-action="toggle"[^>]*>/)?.[0] ?? '';
+    expect(activeToggle).not.toContain('name="active"');
+
+    const disabledMarkup = renderToStaticMarkup(
+      <TablesScreen data={data({ tables: [table({ qr: 'disabled', token: null, scanUrl: null })] })} />
+    );
+    expect(disabledMarkup).toMatch(/name="active" value="true"/);
+    const disabledToggle = disabledMarkup.match(/<button[^>]*data-table-action="toggle"[^>]*>/)?.[0] ?? '';
+    expect(disabledToggle).not.toContain('name="active"');
+  });
+
   it('shows the six digits staff have to read out', () => {
     const html = renderToStaticMarkup(<TablesScreen data={data()} />);
 

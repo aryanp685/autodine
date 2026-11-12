@@ -1,15 +1,20 @@
 import { expect, test } from '@playwright/test';
 import {
-  GUEST_READY,
+  BASE,
   fixtureTableLabel,
+  GUEST_READY,
   SLUG,
   addOneAndCheckout,
+  addAnotherAndCheckout,
+  reservedScanToken,
   codeFromOrderUrl,
   placeOrder,
   scanCard,
+  signInOwner,
   skipUnless,
   tokenFromOrderUrl,
 } from './flow';
+import { orderCountForGuestToken, orderSessionForGuestToken } from './disposable-db';
 
 /**
  * THE GUEST ORDERING FLOW, END TO END, ON A REAL DEPLOYMENT.
@@ -24,7 +29,7 @@ import {
  * production. Without its environment it skips itself entirely.
  */
 
-const NEEDS = 'E2E_BASE_URL, E2E_QR_TOKEN, E2E_TABLE_CODE, E2E_SLUG';
+const NEEDS = 'E2E_BASE_URL, E2E_QR_TOKEN (or E2E_CARDS_JSON), E2E_TABLE_CODE, E2E_SLUG';
 
 test.describe('guest ordering — real database', () => {
   test.skip(!GUEST_READY, skipUnless(false, NEEDS));
@@ -32,11 +37,12 @@ test.describe('guest ordering — real database', () => {
   test('a live card opens the real menu, with this table named', async ({ context }) => {
     const page = await scanCard(context);
     await expect(page).toHaveURL(new RegExp(`/menu\\?s=${SLUG}`), { timeout: 20_000 });
-    // The table badge is the database's answer about where this browser is.
-    const label=fixtureTableLabel();
-    await expect(label ? page.getByText(label,{exact:true}).first() : page.getByText(/Table /).first()).toBeVisible();
-    // Real dishes with prices, not the sample menu.
-    await expect(page.locator('dl, [data-gtab-bar]')).not.toHaveCount(0);
+
+    // The scan redirects through a local HTTP host, so wait for hydrated,
+    // visible menu content rather than reading body text at the redirect edge.
+    await expect(page.getByText('Synthetic Paneer Dish', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(new RegExp(fixtureTableLabel(), 'i')).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('[data-gtab-bar]')).toBeVisible();
   });
 
   test('the bill is priced by the server: quantities and notes travel, prices do not', async ({
@@ -47,7 +53,14 @@ test.describe('guest ordering — real database', () => {
 
     // Whatever the menu charges for the first plain dish, the checkout shows
     // it — computed from the menu payload, not from anything the cart sent.
-    const totalText = await page.locator('dl').getByText('Total payable',{exact:true}).locator('..').innerText();
+    // The dock repeats the same label at phone width; the bill <dl> is the
+    // canonical checkout amount and avoids a strict-mode match on both copies.
+    const totalText = await page
+      .locator('dl')
+      .filter({ hasText: 'Total payable' })
+      .locator('dd')
+      .last()
+      .innerText();
     expect(totalText).toMatch(/₹[\d,]+/);
   });
 
@@ -58,8 +71,8 @@ test.describe('guest ordering — real database', () => {
     await addOneAndCheckout(page);
     const url = await placeOrder(page, 'e2e: one order, one note');
 
-    // The database answered with a code and a guest token.
-    expect(codeFromOrderUrl(url)).toMatch(/^[A-Z0-9]{2,8}-[A-Z0-9]{5}$/);
+    // The database answered with a two-letter restaurant reference and a guest token.
+    expect(codeFromOrderUrl(url)).toMatch(/^[A-Z]{2}-[A-Z0-9]{5}$/);
     expect(tokenFromOrderUrl(url).length).toBeGreaterThanOrEqual(8);
 
     await expect(page.getByText('Order placed')).toBeVisible();
@@ -81,6 +94,39 @@ test.describe('guest ordering — real database', () => {
     // it twice and the tracking page would have a second code. What must NOT
     // exist is an error saying the second tap ordered again.
     await expect(page.getByText('Order placed')).toBeVisible();
+    expect(await orderCountForGuestToken(tokenFromOrderUrl(page.url()))).toBe(1);
+  });
+
+  test('two intentional rounds on one table create two tickets in the same sitting', async ({ context }) => {
+    const cardToken = reservedScanToken(23);
+    const page = await scanCard(context, cardToken);
+
+    await addOneAndCheckout(page);
+    const firstUrl = await placeOrder(page, 'e2e: first intentional round');
+    const firstToken = tokenFromOrderUrl(firstUrl);
+    const firstOrder = await orderSessionForGuestToken(firstToken);
+    expect(firstOrder).not.toBeNull();
+
+    // A fresh cart and fresh attempt token are a second guest intention, not
+    // a retry of the first form. Keep the same scanned table/browser context.
+    await addAnotherAndCheckout(page);
+    const secondUrl = await placeOrder(page, 'e2e: second intentional round');
+    const secondToken = tokenFromOrderUrl(secondUrl);
+    const secondOrder = await orderSessionForGuestToken(secondToken);
+
+    expect(secondToken).not.toBe(firstToken);
+    expect(secondOrder).not.toBeNull();
+    expect(secondOrder?.id).not.toBe(firstOrder?.id);
+    expect(secondOrder?.order_session_id).toBe(firstOrder?.order_session_id);
+
+    const dashboard = await signInOwner(context);
+    await dashboard.goto(`${BASE}/dashboard`);
+    const session = dashboard.locator(`[data-active-session="${firstOrder?.order_session_id}"]`);
+    await expect(session).toBeVisible({ timeout: 45_000 });
+    await expect(session).toContainText('2 tickets');
+    await expect(session).toContainText(codeFromOrderUrl(firstUrl));
+    await expect(session).toContainText(codeFromOrderUrl(secondUrl));
+    await expect(session.getByText('1 × Synthetic Paneer Dish')).toHaveCount(2);
   });
 
   test('the tracking page follows the kitchen, and the bill keeps the exact amount', async ({
@@ -94,18 +140,16 @@ test.describe('guest ordering — real database', () => {
     await expect(page.locator('[data-placed-mark="ok"]')).toBeVisible();
     await expect(page.getByText('Bill').first()).toBeVisible();
 
-    // The bill's total is on the page and is the same number the checkout
-    // promised — the UPI panel, when the restaurant has one, carries exactly
-    // this amount into the QR.
-    const billTotal = await page.locator('dl').getByText('Total',{exact:true}).locator('..').innerText();
+    // The bill's Total row is distinct from the other labels on the order page.
+    const billTotal = await page
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: 'Bill', exact: true }) })
+      .locator('dl dd')
+      .last()
+      .innerText();
     expect(billTotal).toMatch(/₹[\d,]+/);
-
-    const upi = page.locator('[data-pay-upi]');
-    if (await upi.count()) {
-      await expect(upi).toBeVisible();
-      // The amount is filled in by the server, not typed.
-      await expect(upi).toContainText(/₹[\d,]+/);
-    }
+    await expect(page.getByText(/Pay at the counter before you leave/)).toBeVisible();
+    await expect(page.locator('[data-pay-upi]')).toHaveCount(0);
 
     // Status reads need the token; the poller is what keeps this fresh. A
     // reload must not lose it (a real reload is the reconnect story).
@@ -119,8 +163,16 @@ test.describe('guest ordering — real database', () => {
     await addOneAndCheckout(page);
     await placeOrder(page);
 
+    // The submitted cart is copied to a separate key before the live cart is
+    // cleared. Wait for that storage write explicitly so a missing offer points
+    // to the save/read path rather than an arbitrary hydration timeout.
+    await expect
+      .poll(() => page.evaluate((slug) => localStorage.getItem(`ad_last_cart:${slug}`), SLUG), {
+        timeout: 15_000,
+      })
+      .not.toBeNull();
     const reorder = page.locator('[data-reorder-button]');
-    await expect(reorder).toBeVisible();
+    await expect(reorder).toBeVisible({ timeout: 15_000 });
     await reorder.click();
 
     // The cart is refilled from the order that was just placed.
@@ -145,7 +197,12 @@ test.describe('guest ordering — real database', () => {
 
     await placeOrder(page);
     // The bill on the order page is the database's, and it is not ₹0.01.
-    const totalText = await page.locator('dl').getByText('Total',{exact:true}).locator('..').innerText();
+    const totalText = await page
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: 'Bill', exact: true }) })
+      .locator('dl dd')
+      .last()
+      .innerText();
     const rupees = Number(totalText.replace(/[^0-9]/g, ''));
     expect(rupees).toBeGreaterThan(1);
   });

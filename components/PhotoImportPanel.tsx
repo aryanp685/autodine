@@ -41,7 +41,13 @@ type EditableCategory = { name: string; items: Editable[] };
 export type MenuDraftPayload = {
   categories: {
     name: string;
-    items: { name: string; pricePaise: number; description: string | null; isVeg: boolean | null }[];
+    items: {
+      name: string;
+      pricePaise: number;
+      description: string | null;
+      isVeg: boolean | null;
+      variants?: { name: string; pricePaise: number }[];
+    }[];
   }[];
   importId?: string;
 };

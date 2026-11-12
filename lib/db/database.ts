@@ -52,7 +52,137 @@ export type Database = {
   public: {
     Tables: {
       restaurants: Table<Restaurant>;
+      /**
+       * Migration 20261110001000 (Model C). One subscription per account;
+       * every restaurant row points at one through `restaurants.account_id`.
+       * Read-only from the app: subscription state changes only through
+       * public.admin_set_subscription(), which is service-role only.
+       */
+      accounts: Table<{
+        id: string;
+        owner_id: string | null;
+        plan: 'trial' | 'starter' | 'professional' | 'business';
+        /**
+         * 'past_due' is a failed payment inside a period that has not ended;
+         * 'cancel_requested' is an owner's cancellation that still runs to the
+         * end of what was paid for. Neither is read-only on its own: the gate
+         * is the period, not the label (migration 20261110001100).
+         */
+        plan_status: 'trialing' | 'active' | 'past_due' | 'cancel_requested' | 'expired' | 'cancelled';
+        trial_started_at: string;
+        /** Materialised: never recomputed from a bare interval. */
+        trial_ends_at: string | null;
+        plan_started_at: string | null;
+        plan_expires_at: string | null;
+        /** Migration 20261110001100. Set by request_subscription_cancellation(). */
+        cancel_requested_at: string | null;
+        /** The end of what was already paid for. Never earlier. */
+        cancel_effective_at: string | null;
+        created_at: string;
+        updated_at: string;
+      }>;
       profiles: Table<{ id: string; full_name: string | null; phone: string | null; created_at: string }>;
+
+      /**
+       * Migration 20261110001100. Money received or refused for a subscription.
+       * Append-only in the database (a trigger refuses UPDATE and DELETE), so a
+       * retry or a refund is a new row and never a rewritten one.
+       */
+      subscription_payments: Table<{
+        id: string;
+        account_id: string;
+        plan: 'starter' | 'professional' | 'business';
+        /** Integer paise. Never a float. */
+        amount_paise: number;
+        currency: string;
+        status: 'pending' | 'succeeded' | 'failed' | 'refunded';
+        period_start: string | null;
+        period_end: string | null;
+        provider: string;
+        /** The replay key: one provider event, one payment. */
+        provider_event_id: string | null;
+        provider_reference: string | null;
+        failure_reason: string | null;
+        occurred_at: string;
+        recorded_at: string;
+      }>;
+
+      /**
+       * Migration 20261110001100. An immutable receipt for one succeeded
+       * payment. Not a GST tax invoice, and every surface says so.
+       */
+      subscription_receipts: Table<{
+        id: string;
+        receipt_number: string;
+        account_id: string;
+        payment_id: string;
+        plan: string;
+        plan_label: string;
+        amount_paise: number;
+        currency: string;
+        period_start: string | null;
+        period_end: string | null;
+        paid_at: string;
+        provider: string;
+        issued_at: string;
+      }>;
+
+      /**
+       * Migration 20261110001100. The story of one subscription: trial granted,
+       * plan changed, renewed, payment failed, cancellation requested and
+       * confirmed, expired. Read by the owner dashboard; never an authority.
+       */
+      subscription_events: Table<{
+        id: string;
+        account_id: string;
+        kind:
+          | 'trial_granted'
+          | 'trial_denied'
+          | 'trial_extended'
+          | 'plan_changed'
+          | 'renewed'
+          | 'payment_succeeded'
+          | 'payment_failed'
+          | 'cancellation_requested'
+          | 'cancellation_confirmed'
+          | 'expired'
+          | 'provider_unavailable';
+        from_plan: string | null;
+        to_plan: string | null;
+        amount_paise: number | null;
+        currency: string | null;
+        provider: string | null;
+        actor: 'system' | 'owner' | 'provider' | 'admin';
+        note: string | null;
+        occurred_at: string;
+      }>;
+
+      /**
+       * Migration 20261110001100. One row per person who has ever had a trial,
+       * so a trial cannot be issued twice by creating another account.
+       */
+      trial_grants: Table<{
+        owner_id: string;
+        account_id: string;
+        source: string;
+        granted_at: string;
+      }>;
+
+      /**
+       * Migration 20261110001100. Every billing webhook that arrived and what
+       * we did with it. The unique (provider, event id) key is the replay
+       * protection; the evidence columns cannot be rewritten.
+       */
+      billing_webhook_events: Table<{
+        id: string;
+        provider: string;
+        provider_event_id: string;
+        event_type: string | null;
+        payload_digest: string;
+        signature_ok: boolean;
+        outcome: string;
+        received_at: string;
+      }>;
       memberships: Table<{
         id: string;
         restaurant_id: string;
@@ -93,6 +223,19 @@ export type Database = {
       restaurant_invoice_lines: Table<RestaurantInvoiceLine>;
       /** Immutable supplemental receipts for payments received after invoicing. */
       restaurant_payment_receipts: Table<RestaurantPaymentReceipt>;
+      /** Opaque hashed credentials for bounded public receipt links. */
+      restaurant_invoice_share_links: Table<{
+        id: string;
+        restaurant_id: string;
+        invoice_id: string;
+        token_hash: string;
+        created_by: string;
+        created_at: string;
+        expires_at: string;
+        revoked_at: string | null;
+        last_accessed_at: string | null;
+        access_count: number;
+      }>;
       /** Live guest requests for staff to visit a verified table. */
       table_waiter_calls: Table<TableWaiterCall>;
       /** Private row-locked receipt counters; no client grants. */
@@ -233,6 +376,117 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      /** Migration 20261110001100. The approved monthly price, in paise. */
+      plan_price_paise: {
+        Args: { p_plan: string };
+        Returns: number;
+      };
+      /** One trial per person. Service role only. */
+      claim_account_trial: {
+        Args: { p_account_id: string };
+        Returns: boolean;
+      };
+      /** Record a succeeded payment and extend the period. Service role only. */
+      record_subscription_payment: {
+        Args: {
+          p_restaurant_name: string;
+          p_provider: string;
+          p_provider_event_id: string;
+          p_plan: string;
+          p_amount_paise: number;
+          p_currency?: string;
+          p_months?: number;
+          p_occurred_at?: string;
+        };
+        Returns: Record<string, unknown>;
+      };
+      /** Record a failed payment: the account goes past due, nothing is lost. */
+      record_subscription_payment_failure: {
+        Args: {
+          p_restaurant_name: string;
+          p_provider: string;
+          p_provider_event_id: string;
+          p_plan?: string;
+          p_amount_paise?: number;
+          p_reason?: string;
+          p_occurred_at?: string;
+        };
+        Returns: Record<string, unknown>;
+      };
+      /** Record a refund as its own event. Never edits the original payment. */
+      record_subscription_refund: {
+        Args: {
+          p_restaurant_name: string;
+          p_provider: string;
+          p_provider_event_id: string;
+          p_reference?: string;
+          p_occurred_at?: string;
+        };
+        Returns: Record<string, unknown>;
+      };
+      /** The owner's own subscription, membership-checked inside the function. */
+      account_subscription_state: {
+        Args: { p_restaurant_id: string };
+        Returns: Record<string, unknown>;
+      };
+      account_subscription_history: {
+        Args: { p_restaurant_id: string; p_limit?: number };
+        Returns: Record<string, unknown>[];
+      };
+      account_payment_history: {
+        Args: { p_restaurant_id: string; p_limit?: number };
+        Returns: Record<string, unknown>[];
+      };
+      account_receipt: {
+        Args: { p_receipt_id: string };
+        Returns: Record<string, unknown>;
+      };
+      /** Owner: ask for the subscription to stop at the end of the period. */
+      request_subscription_cancellation: {
+        Args: { p_restaurant_id: string };
+        Returns: Record<string, unknown>;
+      };
+      withdraw_subscription_cancellation: {
+        Args: { p_restaurant_id: string };
+        Returns: boolean;
+      };
+      /** Provider or operator: the cancellation is a fact now. */
+      confirm_subscription_cancellation: {
+        Args: {
+          p_restaurant_name: string;
+          p_provider?: string;
+          p_provider_event_id?: string;
+        };
+        Returns: Record<string, unknown>;
+      };
+      /** Run on a schedule: end-of-period accounts become read-only. */
+      expire_subscriptions: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
+      create_restaurant_invoice_share_link: {
+        Args: { p_invoice_id: string; p_token_hash: string };
+        Returns: { share_link_id: string; expires_at: string }[];
+      };
+      revoke_restaurant_invoice_share_link: {
+        Args: { p_share_link_id: string };
+        Returns: boolean;
+      };
+      list_restaurant_invoice_share_links: {
+        Args: { p_invoice_id: string };
+        Returns: {
+          id: string;
+          created_at: string;
+          expires_at: string;
+          revoked_at: string | null;
+          last_accessed_at: string | null;
+          access_count: number;
+        }[];
+      };
+      read_shared_restaurant_invoice: {
+        Args: { p_token_hash: string };
+        Returns: unknown;
+      };
       operational_schema_readiness: { Args: Record<string, never>; Returns: Record<string, boolean> };
       reserve_staff_tts_attempt: {
         Args: { p_restaurant_id: string };
@@ -878,12 +1132,17 @@ export type Database = {
         Returns: string; // payment id (uuid)
       };
       /**
-       * Migration 00700. Open a second, third ... outlet on the same account.
+       * Migration 00700, re-declared by 20261110001000 (Model C).
+       *
+       * Open a second, third ... outlet on the same account.
        *
        * SECURITY DEFINER because there is no INSERT policy on restaurants: the
        * function creates the restaurant, an owner membership and a starter
        * menu in one transaction, validates the name and slug itself, and
-       * refuses once the caller owns MAX_OUTLETS_PER_OWNER restaurants.
+       * attaches the outlet to the caller's ACCOUNT. Since Model C the cap is
+       * the account plan's outlet limit (Starter 1, Professional 5, Business
+       * unlimited), enforced at creation time only -- a plan change never
+       * removes an outlet that already exists.
        */
       create_outlet: {
         Args: {
@@ -891,6 +1150,41 @@ export type Database = {
           p_slug: string;
         };
         Returns: string; // new restaurant id (uuid)
+      };
+      /**
+       * Migration 20261110001000. Manual activation: there is no payment
+       * provider in this deployment, so an operator with the service role
+       * records a subscription arranged off-line. Service role only.
+       */
+      admin_set_subscription: {
+        Args: {
+          p_restaurant_name: string;
+          p_plan: string;
+          p_days?: number | null;
+          p_months?: number | null;
+        };
+        Returns: {
+          account_id: string;
+          plan: string;
+          plan_status: string;
+          trial_ends_at: string | null;
+          plan_expires_at: string | null;
+          outlets: number;
+        } | null;
+      };
+      /**
+       * Migration 20261110001000. Signup: account + first outlet + owner
+       * membership + starter menu in one transaction. Service role only, so a
+       * guest cannot mint a subscription by calling it.
+       */
+      create_account_with_restaurant: {
+        Args: {
+          p_name: string;
+          p_slug: string;
+          p_timezone?: string | null;
+          p_owner?: string | null;
+        };
+        Returns: string;
       };
       /**
        * Migration 20261026001200. Plan, trial clock, the write gate and the
@@ -911,6 +1205,14 @@ export type Database = {
           can_write: boolean;
           read_only: boolean;
           features: string[];
+          /** Migration 20261110001000 (Model C). Null only before that migration. */
+          account_id: string | null;
+          outlets: {
+            used: number;
+            limit: number | null;
+            unlimited: boolean;
+            remaining: number | null;
+          } | null;
         } | null;
       };
       /** Migration 20261026001200. The entitlement matrix for one plan. */

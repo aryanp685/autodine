@@ -1,0 +1,83 @@
+{
+  "description": "Point-in-time evidence about the hosted production project, used as a fixture by scripts/reconcile/reconcile-migrations.mjs. That script never connects to a hosted database. Nothing here proves the current live schema: every item is a dated observation and must be re-confirmed by an authorised read-only probe before any rollout.",
+  "project": "autodine-production",
+  "capturedOn": "2026-11-10",
+  "ledgerSummary": {
+    "source": "Supabase migration-history metadata, read once on 2026-11-10 before the Phase 0 access restriction.",
+    "entries": 86,
+    "firstEntry": "20261019000001 init",
+    "lastEntry": "20261108000200 drift_reconcile",
+    "fullListRetained": false,
+    "observations": [
+      "No entry is dated 2026-11-09 or later.",
+      "Many entries carry console-generated versions, several names repeat, and some names do not exist in the repository (for example initial_schema, trial_entitlements, counter_orders, cash_collection).",
+      "Because production SQL was applied under other names and versions, 'no same-named entry' does not prove a file's SQL was never run."
+    ]
+  },
+  "lastRecordedVersion": "20261108000200",
+  "catalogFacts": {
+    "source": "PHASE-2-PRODUCTION-PREFLIGHT.md and PHASE-2-PRODUCTION-MANIFEST.md in this repository (read-only catalog inspection recorded by the Phase 2 session). Not re-observed in Phase 0.",
+    "functionSourceMd5": {
+      "cancel_order": "c985a21c24240de3b1c7386bbd01a5aa",
+      "open_table_session": "1e28252b1852ad094c636198f2168d0e",
+      "place_public_order": "96950f08e083e35e8e7f0ece7e1692f5",
+      "record_counter_payment": "8fe311e536fc3737be9b9b2d9ae16ed8",
+      "set_order_line_quantities": "369c4e7615aa47188763223c65315da8",
+      "settle_online_payment": "5005ec641a11ca6b6b08d8dcf9761bcb"
+    },
+    "functionsAbsent": [
+      "operational_schema_readiness",
+      "place_public_order_attempt"
+    ],
+    "functionsPresent": [
+      "hit_rate_limit(text,integer,integer)",
+      "current_table_session(text)",
+      "place_order(text,jsonb,text)",
+      "place_public_order with six arguments, executable by anon"
+    ],
+    "columnsPresent": [
+      "orders.hold_required",
+      "orders.confirmed_at",
+      "orders.order_session_id",
+      "order_sessions.paid_at",
+      "restaurant_invoices.invoice_number",
+      "restaurant_payment_receipts.snapshot",
+      "kitchen_announcement_claims.order_id"
+    ],
+    "notes": [
+      "Four financial function bodies lacked the 'FOR UPDATE OF s' pattern introduced by 20261110000100 and 20261110000200.",
+      "Production function-body hashes differed from the staging bodies, so staging is not an exact production rehearsal.",
+      "The Phase 2 document reports a user-run restore of a production dump that accepted the 14 files 20261109000100..20261110000400 in one transaction after the place_order overload fix. That rehearsal was not observed by any agent and did not include the four 202611080070..10 files or anything added in Phase 0."
+    ]
+  },
+  "capturedThroughRepositoryVersion": "20261110000400",
+  "repositoryFilesWithoutSameNamedEntry": {
+    "method": "Each repository file name (without its version) was compared with the names in the ledger. Files dated after lastRecordedVersion that are NOT listed here did have a same-named entry under another version.",
+    "olderThanLastRecordedVersion": [
+      "20261021000004_missing_qr_tables.sql",
+      "20261107080000_payment_audit_ledger.sql"
+    ],
+    "newerThanLastRecordedVersion": [
+      "20261108000500_order_session_staff_read.sql",
+      "20261108007000_payment_recorded_by.sql",
+      "20261108008000_p8_require_settlement_before_close.sql",
+      "20261108009000_p9_financial_read_roles.sql",
+      "20261108010000_invoice_share_links.sql",
+      "20261109000100_restore_hold_fields.sql",
+      "20261109000200_order_attempt_lock.sql",
+      "20261109000300_payment_state_guards.sql",
+      "20261109000400_order_write_boundary.sql",
+      "20261109000500_session_payment_guard.sql",
+      "20261109000600_finalized_source_guard.sql",
+      "20261109000700_order_line_removal.sql",
+      "20261109000800_table_activity_summary.sql",
+      "20261109000900_staff_tts_budget.sql",
+      "20261109001000_operational_readiness.sql",
+      "20261110000100_counter_payment_lock_order.sql",
+      "20261110000200_financial_session_serialization.sql",
+      "20261110000300_shared_wifi_scan_limits.sql",
+      "20261110000400_durable_order_attempt_budget.sql"
+    ],
+    "note": "20261110000300 and 20261110000400 were not in the checkout when names were matched; their absence from the ledger is stated in PHASE-2-PRODUCTION-PREFLIGHT.md."
+  }
+}

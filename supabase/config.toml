@@ -1,8 +1,6 @@
-# Supabase local configuration.
-#
-# `supabase start` (needs Docker) brings up a disposable local stack for
-# development at zero cost and without consuming one of the two free cloud
-# project slots.
+# Supabase local configuration. This targets only local Docker services; it
+# does not identify or connect to a hosted project. `supabase start` needs
+# Docker and brings up disposable Auth, PostgREST, Realtime, Storage and Studio.
 #
 # The CLI is intentionally NOT a project dependency: it downloads a platform
 # binary at install time, which would make Netlify builds depend on a GitHub
@@ -22,7 +20,17 @@ max_rows = 1000
 [db]
 port = 54322
 shadow_port = 54320
-major_version = 15
+major_version = 17
+
+# The repository has explicitly inferred local-only base-table scaffolds.
+# Disable CLI auto-migration so the E2E fixture preparer can apply them in the
+# documented order before the checked-in migrations. Never auto-run seed.sql;
+# its compatibility with the full migration chain has not been verified.
+[db.migrations]
+enabled = false
+
+[db.seed]
+enabled = false
 
 [studio]
 enabled = true
@@ -31,9 +39,16 @@ port = 54323
 [auth]
 enabled = true
 site_url = "http://localhost:3000"
-additional_redirect_urls = ["http://localhost:3000/**"]
+additional_redirect_urls = ["http://localhost:3000/**", "http://localhost:3100/**", "http://127.0.0.1:3100/**"]
 jwt_expiry = 3600
 enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+
+[realtime]
+enabled = true
 
 [storage]
 enabled = true

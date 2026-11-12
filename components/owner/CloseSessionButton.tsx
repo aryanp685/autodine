@@ -4,7 +4,6 @@ import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { checkoutSessionAction } from '@/app/(staff)/dashboard/actions';
-import { formatBillMoney } from '@/lib/bill';
 import { btn } from '@/components/owner/chrome';
 
 export function CloseSessionButton({
@@ -21,6 +20,14 @@ export function CloseSessionButton({
   const [error, setError] = useState('');
   const [pending, startTransition] = useTransition();
   const inFlight = useRef(false);
+
+  if (outstandingPaise > 0) {
+    return (
+      <p role="note" className="max-w-[260px] text-right text-[10.5px] leading-[1.45] text-gink-46">
+        Settle the outstanding balance before closing this table.
+      </p>
+    );
+  }
 
   function checkout() {
     if (inFlight.current) return;
@@ -48,10 +55,7 @@ export function CloseSessionButton({
       {confirm ? (
         <div role="group" aria-label={`Confirm checkout for ${table}`} className="max-w-[260px] rounded-[var(--p-r-control)] border border-hair bg-paper-deep px-3 py-2 text-right">
           <p className="text-[11.5px] leading-[1.45] text-gink-64">
-            Close {table} and issue the final receipt?
-            {outstandingPaise > 0
-              ? ` It will show ${formatBillMoney(outstandingPaise)} due; later payment will get a separate receipt.`
-              : ' The receipt snapshots all tickets and payments.'}
+            Close {table} and issue the final receipt? The receipt snapshots all tickets and payments.
           </p>
           <div className="mt-2 flex justify-end gap-2">
             <button type="button" className={btn('quiet', 'sm')} onClick={() => setConfirm(false)} disabled={pending}>Keep open</button>

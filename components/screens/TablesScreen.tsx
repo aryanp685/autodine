@@ -387,6 +387,12 @@ export function TablesScreen({
                          */
                         <form className="mt-auto flex flex-wrap items-center gap-1 border-t border-hair bg-[color-mix(in_oklab,var(--p-ink)_2%,transparent)] px-2.5 py-2">
                           <input type="hidden" name="tableId" value={t.id} />
+                          {/* Server Actions reserve the submitter's name/value for
+                              dispatch, so the desired state belongs in the form
+                              payload instead of on a button with formAction. */}
+                          {(t.qr === 'active' || t.qr === 'disabled') && (
+                            <input type="hidden" name="active" value={t.qr === 'disabled' ? 'true' : 'false'} />
+                          )}
 
                           {t.qr === 'no-code' && (
                             /* The code is what is missing, so creating one is
@@ -407,8 +413,6 @@ export function TablesScreen({
                                with nothing to scan is not a success. */
                             <SubmitButton
                               formAction={setTableActiveAction}
-                              name="active"
-                              value="true"
                               data-table-action="toggle"
                               pendingLabel="Enabling…"
                             >
@@ -443,8 +447,6 @@ export function TablesScreen({
                               </SubmitButton>
                               <SubmitButton
                                 formAction={setTableActiveAction}
-                                name="active"
-                                value="false"
                                 data-table-action="toggle"
                                 tone="quiet"
                                 pendingLabel="Disabling…"

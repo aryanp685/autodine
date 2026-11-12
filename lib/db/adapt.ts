@@ -83,6 +83,11 @@ export type DisplayRestaurant = {
   tagline: string;
   address: string;
   phone: string;
+  /**
+   * Not part of the public storefront projection (migration 20261110000500):
+   * a GSTIN reaches a guest only on a bill, through lib/db/bill.ts. Empty for
+   * any restaurant read through the guest projection.
+   */
   gstin: string;
   fssai: string;
   currency: string;
@@ -196,9 +201,10 @@ export function toDisplayRestaurant(r: Restaurant): DisplayRestaurant {
     tagline: r.tagline ?? '',
     address: r.address ?? '',
     phone: r.phone ?? '',
-    // The seed writes the literal string 'GSTIN — add in Settings' so the
-    // placeholder is visible on a real receipt rather than silently blank.
-    gstin: r.gstin ?? 'GSTIN — add in Settings',
+    // Guest reads never carry a GSTIN -- it is not in the public storefront
+    // projection. The staff bill path (lib/db/bill.ts) reads it from the
+    // tenant row itself, which is where a billing document must get it.
+    gstin: r.gstin ?? '',
     fssai: 'FSSAI — add in Settings',
     currency: 'INR',
     openHours: 'Hours — add in Settings',

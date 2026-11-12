@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { createHash } from 'node:crypto';
-import { Client } from 'pg';
+import { createHash, randomUUID } from 'node:crypto';
+import { Client, Pool } from 'pg';
 
 /**
  * THE THROTTLE, END TO END, AGAINST A REAL POSTGRES.
@@ -34,6 +34,9 @@ import { Client } from 'pg';
 
 const DB = process.env.THROTTLE_DB_URL ?? '';
 const SLUG = 'throttle-it';
+const CARD2 = 'throttleit000000000000000000000000000000000000000000000000002';
+const KITCHEN_ID = '5a39cd8b-4c9e-4c06-bf47-a18a8014d111';
+const CASHIER_ID = '5a39cd8b-4c9e-4c06-bf47-a18a8014d112';
 /** The real dish the cart points at, so the database prices a real row. */
 let itemId = '';
 
@@ -163,11 +166,19 @@ async function installRpc(db: Client) {
 
 /** Orders reference the restaurant, so they go first. */
 async function cleanup(db: Client) {
+  const restaurantId = '(select id from public.restaurants where slug = $1)';
+  await db.query(`delete from public.restaurant_invoice_lines where restaurant_id = ${restaurantId}`, [SLUG]);
+  await db.query(`delete from public.restaurant_payment_receipts where restaurant_id = ${restaurantId}`, [SLUG]);
+  await db.query(`delete from public.restaurant_invoices where restaurant_id = ${restaurantId}`, [SLUG]);
+  await db.query(`delete from public.restaurant_invoice_series where restaurant_id = ${restaurantId}`, [SLUG]);
+  await db.query(`delete from public.payment_audit_events where restaurant_id = ${restaurantId}`, [SLUG]);
+  await db.query(`delete from public.payments where restaurant_id = ${restaurantId}`, [SLUG]);
   await db.query(
     'delete from public.orders where restaurant_id = (select id from public.restaurants where slug = $1)',
     [SLUG],
   );
   await db.query('delete from public.restaurants where slug = $1', [SLUG]);
+  await db.query('delete from public.profiles where id = any($1::uuid[])', [[KITCHEN_ID, CASHIER_ID]]);
 }
 
 function visibleText(html: string): string {
@@ -190,11 +201,20 @@ describe.skipIf(!DB)('throttling, against a real PostgreSQL', () => {
 
     await cleanup(db);
     const { rows } = await db.query(
-      `insert into public.restaurants (slug, name, timezone, is_active, trial_started_at, guest_verification_mode)
-       values ($1, 'Throttle IT', 'Asia/Kolkata', true, now(), 'scan') returning id`,
+      `insert into public.restaurants (slug, name, address, timezone, is_active, trial_started_at, guest_verification_mode)
+       values ($1, 'Throttle IT', '1 Test Road', 'Asia/Kolkata', true, now(), 'scan') returning id`,
       [SLUG],
     );
     const restaurantId = rows[0].id as string;
+    await db.query(
+      `insert into public.profiles (id, full_name) values ($1, 'Test Kitchen'), ($2, 'Test Cashier')`,
+      [KITCHEN_ID, CASHIER_ID],
+    );
+    await db.query(
+      `insert into public.memberships (restaurant_id, user_id, role)
+       values ($1, $2, 'kitchen'), ($1, $3, 'cashier')`,
+      [restaurantId, KITCHEN_ID, CASHIER_ID],
+    );
     const menu = await db.query(
       `insert into public.menus (restaurant_id, name, is_published) values ($1, 'Main', true) returning id`,
       [restaurantId],
@@ -216,6 +236,14 @@ describe.skipIf(!DB)('throttling, against a real PostgreSQL', () => {
     await db.query(
       `insert into public.table_qr_codes (restaurant_id, table_id, public_token) values ($1, $2, $3)`,
       [restaurantId, table.rows[0].id, 'throttleit000000000000000000000000000000000000000000000000001'],
+    );
+    const secondTable = await db.query(
+      `insert into public.dining_tables (restaurant_id, label, is_active) values ($1, 'T2', true) returning id`,
+      [restaurantId],
+    );
+    await db.query(
+      `insert into public.table_qr_codes (restaurant_id, table_id, public_token) values ($1, $2, $3)`,
+      [restaurantId, secondTable.rows[0].id, CARD2],
     );
   }, 30_000);
 
@@ -340,11 +368,144 @@ describe.skipIf(!DB)('throttling, against a real PostgreSQL', () => {
     // A real order, written by the real function, with a real code.
     expect(target).toContain('/menu/order?');
     const code = new URL(target, 'http://localhost:3000').searchParams.get('code');
-    const order = await db.query('select code, hold_required, confirmed_at from public.orders where code = $1', [code]);
+    const order = await db.query(
+      `select id, order_session_id, code, hold_required, confirmed_at, prep_status,
+              payment_status, total_paise
+         from public.orders where code = $1`,
+      [code],
+    );
     expect(order.rows).toHaveLength(1);
     // Mode is 'scan', so nothing is held: the guest's order goes to the kitchen.
     expect(order.rows[0].hold_required).toBe(false);
     expect(order.rows[0].confirmed_at).toBeNull();
+    expect(order.rows[0].order_session_id).toBeTruthy();
+
+    // Continue this same persisted guest ticket through the staff lifecycle on
+    // the disposable DB: kitchen transition, cashier settlement, then atomic
+    // close plus a numbered non-GST receipt. Only identity/session IDs cross
+    // the boundary; the SQL functions derive payment totals and invoice lines.
+    await db.query('begin');
+    let transactionOpen = true;
+    let invoiceId = '';
+    try {
+      await db.query("select set_config('request.jwt.claim.sub', $1, true)", [KITCHEN_ID]);
+      const kitchen = await db.query(
+        `update public.orders set prep_status = 'preparing'
+          where id = $1 and prep_status = 'new' returning prep_status`,
+        [order.rows[0].id],
+      );
+      expect(kitchen.rows).toEqual([{ prep_status: 'preparing' }]);
+
+      await db.query("select set_config('request.jwt.claim.sub', $1, true)", [CASHIER_ID]);
+      const paid = await db.query(
+        'select public.mark_order_session_paid($1) as paid_at',
+        [order.rows[0].order_session_id],
+      );
+      expect(paid.rows[0].paid_at).toBeTruthy();
+
+      const closed = await db.query(
+        'select public.close_order_session_and_issue_receipt($1) as invoice_id',
+        [order.rows[0].order_session_id],
+      );
+      invoiceId = closed.rows[0].invoice_id as string;
+      expect(invoiceId).toMatch(/^[0-9a-f-]{36}$/i);
+
+      // A retry must return the same immutable receipt, not allocate a number.
+      const retried = await db.query(
+        'select public.close_order_session_and_issue_receipt($1) as invoice_id',
+        [order.rows[0].order_session_id],
+      );
+      expect(retried.rows[0].invoice_id).toBe(invoiceId);
+      await db.query('commit');
+      transactionOpen = false;
+    } catch (error) {
+      if (transactionOpen) await db.query('rollback').catch(() => undefined);
+      throw error;
+    }
+
+    const lifecycle = await db.query(
+      `select o.prep_status, o.payment_status, s.status as session_status,
+              s.paid_by, s.closed_by, p.method, p.amount_paise, p.recorded_by,
+              a.event_type, i.document_type, i.invoice_number,
+              i.totals_snapshot->>'total_paise' as invoiced_total_paise,
+              count(l.id)::int as invoice_line_count
+         from public.orders o
+         join public.order_sessions s on s.id = o.order_session_id
+         join public.payments p on p.order_id = o.id and p.status = 'recorded'
+         join public.payment_audit_events a on a.payment_id = p.id
+         join public.restaurant_invoices i on i.order_session_id = s.id
+         join public.restaurant_invoice_lines l on l.invoice_id = i.id
+        where o.id = $1 and i.id = $2
+        group by o.id, s.id, p.id, a.id, i.id`,
+      [order.rows[0].id, invoiceId],
+    );
+    expect(lifecycle.rows).toHaveLength(1);
+    expect(lifecycle.rows[0]).toMatchObject({
+      prep_status: 'preparing',
+      payment_status: 'paid',
+      session_status: 'closed',
+      paid_by: CASHIER_ID,
+      closed_by: CASHIER_ID,
+      method: 'manual',
+      amount_paise: order.rows[0].total_paise,
+      recorded_by: CASHIER_ID,
+      event_type: 'manual_marked_paid',
+      document_type: 'receipt',
+      invoice_line_count: 1,
+    });
+    expect(lifecycle.rows[0].invoice_number).toMatch(/^INV\/\d{2}-\d{2}\/\d{6}$/);
+    expect(lifecycle.rows[0].invoiced_total_paise).toBe(String(order.rows[0].total_paise));
+  }, 60_000);
+
+  it('persists a 16-guest concurrent peak on the disposable database', async () => {
+    // A deliberately small, repeatable write-burst: two synthetic tables,
+    // sixteen independent guests, sixteen distinct idempotency tokens. This is
+    // a database integration/capacity smoke, not a production load forecast.
+    const pool = new Pool({ connectionString: DB, max: 16 });
+    try {
+      await db.query(
+        `update public.table_session_opens set opened_at = now() - interval '2 hours'
+          where qr_code_id in (select id from public.table_qr_codes where public_token = any($1::text[]))`,
+        [['throttleit000000000000000000000000000000000000000000000000001', CARD2]],
+      );
+
+      const fanout = 16;
+      const sessions = await Promise.all(Array.from({ length: fanout }, async (_, index) => {
+        const ipHash = createHash('sha256').update(`capacity-smoke-${randomUUID()}`).digest('hex');
+        const card = index % 2 === 0
+          ? 'throttleit000000000000000000000000000000000000000000000000001'
+          : CARD2;
+        const opened = await pool.query('select * from public.open_table_session($1, $2)', [card, ipHash]);
+        expect(opened.rows[0]?.status).toBe('opened');
+        return { token: opened.rows[0].session_token as string, ipHash, guestToken: randomUUID() };
+      }));
+
+      const started = performance.now();
+      const codes = await Promise.all(sessions.map(async ({ token, ipHash, guestToken }) => {
+        const result = await pool.query(
+          'select public.place_public_order($1, $2::jsonb, $3, $4, $5::uuid, $6) as code',
+          [SLUG, JSON.stringify([{ itemId, qty: 1 }]), null, token, guestToken, ipHash],
+        );
+        return { code: result.rows[0]?.code as string, guestToken };
+      }));
+      const elapsedMs = Math.round(performance.now() - started);
+
+      expect(codes).toHaveLength(fanout);
+      expect(new Set(codes.map((entry) => entry.code)).size).toBe(fanout);
+      const persisted = await db.query(
+        `select count(distinct o.id)::int as orders,
+                count(oi.id)::int as lines,
+                count(*) filter (where o.total_paise = 46900)::int as correctly_priced
+           from public.orders o
+           join public.order_items oi on oi.order_id = o.id
+          where o.guest_token = any($1::uuid[])`,
+        [codes.map((entry) => entry.guestToken)],
+      );
+      expect(persisted.rows[0]).toEqual({ orders: fanout, lines: fanout, correctly_priced: fanout });
+      console.info(`[capacity-smoke] ${fanout} concurrent independent guest orders persisted in ${elapsedMs}ms`);
+    } finally {
+      await pool.end();
+    }
   }, 60_000);
 
   it('rolls back the losing concurrent order before replaying the winning code (C4)', async () => {

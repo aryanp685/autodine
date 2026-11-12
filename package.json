@@ -2,7 +2,7 @@
   "name": "autodine",
   "version": "0.1.0",
   "private": true,
-  "description": "AutoDine — mobile-first QR ordering and restaurant-operations product preview.",
+  "description": "AutoDine \u2014 mobile-first QR ordering and restaurant-operations product preview.",
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3000",
     "build": "next build",
@@ -17,7 +17,13 @@
     "env:check": "node scripts/check-env.mjs",
     "e2e": "playwright test",
     "e2e:install": "playwright install chromium",
+    "e2e:local": "GITHUB_ACTIONS=true CI=true AUTODINE_TEST_DEMO_BUILD=true VERCEL_ENV=test npm run build && GITHUB_ACTIONS=true CI=true AUTODINE_TEST_DEMO_BUILD=true VERCEL_ENV=test bash scripts/e2e/run-with-bundled-chromium.sh npm run e2e",
+    "e2e:demo": "GITHUB_ACTIONS=true CI=true AUTODINE_TEST_DEMO_BUILD=true VERCEL_ENV=test npm run build && GITHUB_ACTIONS=true CI=true AUTODINE_TEST_DEMO_BUILD=true VERCEL_ENV=test bash scripts/e2e/run-with-bundled-chromium.sh npm run e2e -- --project=desktop --project=phone --project=guest --project=staff --project=brand --project=responsive --output=test-results/supabase-e2e/demo-output --reporter=list,html,json",
+    "test:db:local": "node scripts/local-pg/run-embedded-tests.mjs",
+    "test:e2e:throttle": "bash scripts/e2e/run-throttle.sh",
     "test:db": "node scripts/verify-database.mjs",
+    "test:db:embedded": "node scripts/local-pg/with-embedded-postgres.mjs node scripts/verify-database.mjs",
+    "db:reconcile": "node scripts/reconcile/reconcile-migrations.mjs",
     "test:recovery:cold": "node scripts/verify-cold-recovery.mjs"
   },
   "dependencies": {
@@ -38,24 +44,28 @@
     "@playwright/test": "^1.64.1",
     "@sparticuz/chromium": "^153.0.0",
     "@tailwindcss/postcss": "^4.3.3",
-    "@types/jsdom": "^30.0.0",
     "@types/node": "^22.10.0",
     "@types/pg": "^8.23.1",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
-    "@types/three": "^0.187.0",
+    "embedded-postgres": "17.11.0-beta.19",
     "eslint": "^10.13.0",
-    "jsdom": "^31.0.0",
     "pg": "^8.23.1",
     "pgsql-ast-parser": "^12.0.2",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.15",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.71.2",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "@types/jsdom": "^30.0.0",
+    "jsdom": "^31.0.0",
+    "@types/three": "^0.187.0"
   },
   "engines": {
     "node": ">=22"
+  },
+  "overrides": {
+    "minimatch": "11.0.1"
   }
 }

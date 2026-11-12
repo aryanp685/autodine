@@ -29,6 +29,7 @@ import type {
   Restaurant,
   RestaurantMenu,
 } from './types';
+import { readPublicRestaurant } from '@/lib/db/public-restaurant';
 
 export { usingDemoData } from './demo-menu';
 
@@ -48,15 +49,12 @@ export async function getRestaurantMenu(
   const supabase = await createSupabaseServerClient();
   if (!supabase) return demoMenu(slug);
 
-  const { data: restaurant, error: restaurantError } = await supabase
-    .from('restaurants')
-    .select('*')
-    .eq('slug', slug)
-    .eq('is_active', true)
-    .maybeSingle();
+  // The public projection only -- never `select('*')` on the tenant row, which
+  // also carries plan, trial and UPI payee data. See lib/db/public-restaurant.ts.
+  const { data: restaurant, error: restaurantError } = await readPublicRestaurant(supabase, slug);
 
   if (restaurantError) throw new Error(`Could not load restaurant: ${restaurantError.message}`);
-  if (!restaurant) return null;
+  if (!restaurant || !restaurant.is_active) return null;
 
   // Every published menu, so the guest can switch, and the chosen one, so the
   // dishes below are scoped to it. `created_at` is the tie-break: two menus

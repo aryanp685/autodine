@@ -27,6 +27,15 @@ export type InvoicePaymentReceiptData = {
   receivedAt: string;
 };
 
+export type InvoiceShareLinkData = {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  revokedAt: string | null;
+  lastAccessedAt: string | null;
+  accessCount: number;
+};
+
 export type ReceiptData = {
   id: string;
   restaurantId: string;
@@ -62,6 +71,7 @@ export type ReceiptData = {
   };
   payments: InvoicePaymentData[];
   paymentReceipts: InvoicePaymentReceiptData[];
+  shareLinks?: InvoiceShareLinkData[];
   lines: InvoiceLineData[];
 };
 
@@ -153,7 +163,7 @@ function parsePaymentReceipt(row: RestaurantPaymentReceipt, timezone: string): I
   };
 }
 
-function parseInvoice(
+export function parseInvoice(
   row: RestaurantInvoice,
   rows: RestaurantInvoiceLine[],
   paymentReceiptRows: RestaurantPaymentReceipt[],
@@ -241,14 +251,32 @@ export async function getInvoiceData(invoiceId: string): Promise<InvoiceResult> 
     .order('sequence_number', { ascending: true });
   if (paymentReceiptsError) throw new Error(`Could not load supplemental payment receipts: ${paymentReceiptsError.message}`);
 
+  // Older non-production stacks may not have the share-link migration yet.
+  // Receipt viewing must continue to work there; create/revoke actions will
+  // report the missing function if an operator explicitly tries to use them.
+  const shareLinksResult = await supabase.rpc('list_restaurant_invoice_share_links', {
+    p_invoice_id: invoice.id,
+  });
+  const shareLinks = (shareLinksResult.error ? [] : (shareLinksResult.data ?? [])).map((link) => ({
+    id: link.id,
+    createdAt: link.created_at,
+    expiresAt: link.expires_at,
+    revokedAt: link.revoked_at,
+    lastAccessedAt: link.last_accessed_at,
+    accessCount: Number(link.access_count),
+  }));
+
   return {
     ok: true,
-    invoice: parseInvoice(
-      invoice as unknown as RestaurantInvoice,
-      (lines ?? []) as unknown as RestaurantInvoiceLine[],
-      (paymentReceipts ?? []) as unknown as RestaurantPaymentReceipt[],
-      timezone,
-    ),
+    invoice: {
+      ...parseInvoice(
+        invoice as unknown as RestaurantInvoice,
+        (lines ?? []) as unknown as RestaurantInvoiceLine[],
+        (paymentReceipts ?? []) as unknown as RestaurantPaymentReceipt[],
+        timezone,
+      ),
+      shareLinks,
+    },
   };
 }
 

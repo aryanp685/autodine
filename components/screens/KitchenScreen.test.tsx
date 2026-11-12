@@ -34,7 +34,7 @@ vi.mock('@/lib/supabase/client', () => ({
 }));
 
 describe('Kitchen board', () => {
-  it('offers the announcement language the user asked for: Hindi or English', () => {
+  it('offers Hindi, English and a distinct mixed-language Hinglish mode', () => {
     const html = renderToStaticMarkup(<Kitchen />);
 
     // "Kitchen me option: Hindi me announce kare ya English me" -- as plain a
@@ -42,6 +42,7 @@ describe('Kitchen board', () => {
     expect(html).toContain('aria-label="Announcement language"');
     expect(html).toContain('>हिन्दी<');
     expect(html).toContain('>English<');
+    expect(html).toContain('>Hinglish<');
   });
 
   it('names the voice it will use rather than promising Hindi blindly', () => {

@@ -43,8 +43,10 @@ import {
   createAnnounceQueue,
   newOrderText,
   newOrderTextEn,
+  newOrderTextHinglish,
   orderAnnouncement,
   orderAnnouncementEn,
+  orderAnnouncementHinglish,
   primeOnOpen,
   selectNewTickets,
   waiterCallAnnouncement,
@@ -67,6 +69,7 @@ import {
   type AnnouncementDialect,
 } from '@/lib/voice-personality';
 import { voiceLabel } from '@/lib/tts-voices';
+import { createRealtimeMonitor } from '@/lib/realtime-monitor';
 
 /* The thresholds live next to the query that computes the age, so the badge
    and the board cannot disagree about what "late" means. */
@@ -99,7 +102,7 @@ const LANG_KEY = 'autodine:kitchen:lang';
  * is the plain twin: the same announcement, said the way an English kitchen
  * hears it.
  */
-type AnnounceLang = 'hi' | 'en';
+type AnnounceLang = 'hi' | 'en' | 'hinglish';
 
 /**
  * How fast to read, as a multiple of the kitchen's natural pace
@@ -485,7 +488,7 @@ export function Kitchen({
       }
 
       const storedLang = localStorage.getItem(LANG_KEY);
-      if (storedLang === 'hi' || storedLang === 'en') {
+      if (storedLang === 'hi' || storedLang === 'en' || storedLang === 'hinglish') {
         setAnnounceLang(storedLang);
         langRef.current = storedLang;
       }
@@ -585,7 +588,7 @@ export function Kitchen({
     const refresh = () => {
       engine.refreshVoices();
       engine.setRateScale(SPEEDS[speedRef.current]);
-      engine.setTargetFamily(langRef.current);
+      engine.setTargetFamily(langRef.current === 'en' ? 'en' : 'hi');
       refreshRef.current = refresh;
 
       // A saved preference may not exist on this browser. Clear it only after
@@ -773,6 +776,9 @@ export function Kitchen({
         // English says the plain pass. The expressive personality is Hindi,
         // dialect and all -- mixing the two would speak neither well.
         return orderAnnouncementEn({ ...ticket, note: ticket.note ?? undefined });
+      }
+      if (announceLang === 'hinglish') {
+        return orderAnnouncementHinglish({ ...ticket, note: ticket.note ?? undefined });
       }
       if (expressive) {
         return buildKitchenAnnouncement(ticket.table, ticket.items, ticket.note, dialect);
@@ -1122,6 +1128,18 @@ export function Kitchen({
     if (!supabase) return;
 
     let timer: ReturnType<typeof setTimeout> | null = null;
+    const monitor = createRealtimeMonitor({
+      onDelivery: setDelivery,
+      onSignal: ({ kind, durationMs }) => {
+        void fetch('/api/ops/realtime-alert', {
+          method: 'POST',
+          credentials: 'same-origin',
+          keepalive: true,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ kind, durationMs }),
+        }).catch(() => { /* polling remains the fallback when monitoring is unavailable */ });
+      },
+    });
     const schedule = () => {
       // A burst of four orders commits within a few milliseconds of each
       // other. One refresh covers all four; four refreshes would race.
@@ -1144,14 +1162,11 @@ export function Kitchen({
         { event: '*', schema: 'public', table: 'table_waiter_calls', filter: `restaurant_id=eq.${restaurantId}` },
         schedule,
       )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') setDelivery('live');
-        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setDelivery('polling');
-        else setDelivery('connecting');
-      });
+      .subscribe((status) => monitor.onStatus(status));
 
     return () => {
       if (timer) clearTimeout(timer);
+      monitor.dispose();
       void supabase.removeChannel(channel);
     };
   }, [live, restaurantId, refresh]);
@@ -1482,6 +1497,9 @@ export function Kitchen({
     if (announceLang === 'en') {
       return newOrderTextEn('T5', items, 'less spicy');
     }
+    if (announceLang === 'hinglish') {
+      return newOrderTextHinglish('T5', items, 'less spicy');
+    }
     if (expressive) {
       return buildKitchenAnnouncement('T5', items, 'less spicy', dialect);
     }
@@ -1576,7 +1594,9 @@ export function Kitchen({
           <span className="text-[11.5px] text-gink-46">
             {announceLang === 'en'
               ? 'Orders are read out in English, one sentence at a time.'
-              : 'Orders are read out in Hindi, one sentence at a time.'}
+              : announceLang === 'hinglish'
+                ? 'Hindi order structure with English dish names and notes — Hinglish.'
+                : 'Orders are read out in Hindi, one sentence at a time.'}
           </span>
           <span className="ml-auto flex flex-wrap items-center gap-1.5">
             <Tag tone={voiceState === 'ready' ? 'live' : 'due'}>
@@ -1586,11 +1606,17 @@ export function Kitchen({
                   : voiceState === 'ready'
                     ? 'English · तैयार'
                     : 'English · आवाज़ नहीं'
-                : voiceState === 'starting'
-                  ? 'हिंदी · आवाज़ खोज रहे हैं'
-                  : voiceState === 'ready'
-                    ? 'हिंदी · तैयार'
-                    : 'हिंदी · आवाज़ नहीं'}
+                : announceLang === 'hinglish'
+                  ? voiceState === 'starting'
+                    ? 'Hinglish · Hindi voice खोज रहे हैं'
+                    : voiceState === 'ready'
+                      ? 'Hinglish · Hindi voice तैयार'
+                      : 'Hinglish · Hindi voice नहीं'
+                  : voiceState === 'starting'
+                    ? 'हिंदी · आवाज़ खोज रहे हैं'
+                    : voiceState === 'ready'
+                      ? 'हिंदी · तैयार'
+                      : 'हिंदी · आवाज़ नहीं'}
             </Tag>
             {live && (
               <Tag tone={speaksHere ? 'neutral' : 'due'}>
@@ -1633,6 +1659,7 @@ export function Kitchen({
             options={[
               { value: 'hi', label: 'हिन्दी' },
               { value: 'en', label: 'English' },
+              { value: 'hinglish', label: 'Hinglish' },
             ]}
           />
 
@@ -1696,7 +1723,7 @@ export function Kitchen({
               they do not guarantee human-sounding pronunciation. */}
           {voiceList.length > 1 && (
             <select
-              aria-label={announceLang === 'en' ? 'Voice' : 'Hindi voice'}
+              aria-label={announceLang === 'en' ? 'Voice' : announceLang === 'hinglish' ? 'Hinglish voice' : 'Hindi voice'}
               value={voicePref}
               onChange={(event) => {
                 const next = event.target.value;
@@ -1706,7 +1733,7 @@ export function Kitchen({
               }}
               className="h-9 max-w-[190px] rounded-[var(--p-r-control)] border border-hair-strong bg-card px-2.5 pr-7 text-[12.5px] text-gink transition-colors hover:border-gink-28 focus:border-[var(--p-accent)] focus:ring-2 focus:ring-[color-mix(in_oklab,var(--p-accent)_16%,transparent)] focus:outline-none"
             >
-              <option value="">{announceLang === 'en' ? 'Auto (en first)' : 'स्वचालित (पहले hi-IN)'}</option>
+              <option value="">{announceLang === 'en' ? 'Auto (en first)' : announceLang === 'hinglish' ? 'Auto (Hindi voice)' : 'स्वचालित (पहले hi-IN)'}</option>
               {voiceList.map((voice) => (
                 <option key={voice.name} value={voice.name}>
                   {voiceLabel(voice.name)} · {voice.lang}{voice.default ? ' · system default' : ''}
@@ -1740,7 +1767,9 @@ export function Kitchen({
               type="button"
               aria-label={announceLang === 'en'
                 ? 'Test the selected voice with a representative English sample order'
-                : 'Test the selected voice with a representative Hindi sample order'}
+                : announceLang === 'hinglish'
+                  ? 'Test the selected Hindi voice with a representative Hinglish sample order'
+                  : 'Test the selected voice with a representative Hindi sample order'}
               title={sampleText}
               onClick={() => replay(`test:${Date.now()}`, sampleText, 'Test')}
               className={btn('ghost', 'sm')}

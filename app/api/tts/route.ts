@@ -131,10 +131,10 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: 'Missing text' }, { status: 400 });
   }
 
-  if (text.length > MAX_TEXT_LENGTH) {
+  if ([...text].length > MAX_TEXT_LENGTH) {
     return Response.json(
       { error: `That announcement is too long. Keep it under ${MAX_TEXT_LENGTH} characters.` },
-      { status: 400 }
+      { status: 413, headers: { 'Cache-Control': 'no-store' } }
     );
   }
 

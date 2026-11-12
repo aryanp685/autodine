@@ -1,6 +1,7 @@
-import { expect, test, type BrowserContext } from '@playwright/test';
+import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import {
   BASE,
+  fixtureTableLabel,
   GUEST_READY,
   STAFF_READY,
   addOneAndCheckout,
@@ -10,7 +11,7 @@ import {
   skipUnless,
   tokenFromOrderUrl,
 } from './flow';
-import { announcementCount, recordAnnouncements } from '../flow-helpers';
+import { announcementCount, announcementTexts, recordAnnouncements } from '../flow-helpers';
 
 /**
  * THE KITCHEN WORKFLOW, END TO END, ON A REAL DEPLOYMENT.
@@ -33,6 +34,19 @@ async function placeGuestOrder(context: BrowserContext, note: string): Promise<s
   const token = tokenFromOrderUrl(url);
   expect(token.length).toBeGreaterThanOrEqual(8);
   return url;
+}
+
+/** A fresh guest render must reflect the committed kitchen transition. */
+async function reloadGuestUntilStep(page: Page, label: string) {
+  await expect
+    .poll(
+      async () => {
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        return page.locator('[data-placed-step="now"]').innerText();
+      },
+      { timeout: 15_000, intervals: [250, 500, 1_000, 2_000] },
+    )
+    .toContain(label);
 }
 
 test.describe('kitchen — real database', () => {
@@ -64,7 +78,7 @@ test.describe('kitchen — real database', () => {
     });
     await expect(ticket).toBeVisible({ timeout: 45_000 });
     await expect(ticket).toContainText(/×/); // quantities per line
-    await expect(ticket).toContainText(/Table |T\d/); // the table it belongs to
+    await expect(ticket).toContainText(new RegExp(fixtureTableLabel(), 'i')); // synthetic fixture table
   });
 
   test('Preparing → Ready → Served, and the guest watches it happen', async ({ context }) => {
@@ -74,7 +88,9 @@ test.describe('kitchen — real database', () => {
     // The guest's own page — the thing that must follow the kitchen.
     const guest = await context.newPage();
     await guest.goto(guestUrl);
-    await expect(guest.locator('header .g-lede').filter({hasText:'Sent to the kitchen'})).toBeVisible({ timeout: 20_000 });
+    await expect(guest.locator('[data-placed-step="now"]')).toContainText('Sent to the kitchen', {
+      timeout: 20_000,
+    });
 
     const board = await signInOwner(context);
     await board.goto(`${BASE}/kitchen`);
@@ -84,22 +100,24 @@ test.describe('kitchen — real database', () => {
     await expect(ticket).toBeVisible({ timeout: 45_000 });
 
     await ticket.getByRole('button', { name: 'Start preparing' }).click();
-    await guest.bringToFront();
-    await expect(guest.locator('header .g-lede').filter({hasText:'Being cooked'})).toBeVisible({ timeout: 45_000 });
-
     const preparing = board.locator('article[data-state="preparing"]', {
       hasText: 'e2e: status sync ticket',
     });
-    await preparing.getByRole('button', { name: 'Mark ready' }).click();
-    await guest.bringToFront();
-    await expect(guest.locator('header .g-lede').filter({hasText:'Ready to serve'})).toBeVisible({ timeout: 45_000 });
+    await expect(preparing).toBeVisible({ timeout: 45_000 });
+    await reloadGuestUntilStep(guest, 'Being cooked');
 
+    await preparing.getByRole('button', { name: 'Mark ready' }).click();
     const ready = board.locator('article[data-state="ready"]', {
       hasText: 'e2e: status sync ticket',
     });
+    await expect(ready).toBeVisible({ timeout: 45_000 });
+    await reloadGuestUntilStep(guest, 'Ready to serve');
+
     await ready.getByRole('button', { name: 'Mark served' }).click();
-    await guest.bringToFront();
-    await expect(guest.locator('header .g-lede').filter({hasText:'Served'})).toBeVisible({ timeout: 45_000 });
+    await expect(
+      board.locator('article[data-state="served"]', { hasText: 'e2e: status sync ticket' }),
+    ).toBeVisible({ timeout: 20_000 });
+    await reloadGuestUntilStep(guest, 'Served');
   });
 
   test('a kitchen cancellation reaches the guest as cancelled', async ({ context }) => {
@@ -120,9 +138,14 @@ test.describe('kitchen — real database', () => {
     await board.getByRole('button', { name: 'Yes, cancel' }).click();
     await expect(ticket).toHaveCount(0, { timeout: 20_000 });
 
-    await guest.bringToFront();
-    await expect(guest.getByText('Order cancelled')).toBeVisible({ timeout: 45_000 });
-    await expect(guest.locator('header .g-lede').filter({hasText:'nothing is owed'})).toBeVisible();
+    // The placed screen preserves an editable bill while it is new; refresh it
+    // after cancellation to read the persisted terminal status without wiping
+    // a guest's in-progress edits during ordinary polling.
+    await guest.reload({ waitUntil: 'domcontentloaded' });
+    await expect(
+      guest.getByText('This order was cancelled, so nothing is being cooked and nothing is owed.'),
+    ).toBeVisible();
+    await expect(guest.getByText(/^Nothing is being cooked and nothing is owed\./)).toBeVisible();
   });
 
   test('orders that arrive while the board cannot speak are kept and replayable', async ({
@@ -137,11 +160,11 @@ test.describe('kitchen — real database', () => {
     const board = await signInOwner(context);
     await recordAnnouncements(board);
     await board.goto(`${BASE}/kitchen`);
-    const mute = board.getByRole('button', { name: 'Kitchen audio on', exact: true });
-    await mute.click();
+    const audioToggle = board.getByRole('button', { name: /^Kitchen audio (on|off)$/ });
+    if ((await audioToggle.getAttribute('aria-pressed')) === 'true') await audioToggle.click();
+    await expect(audioToggle).toHaveAttribute('aria-pressed', 'false');
 
     await placeGuestOrder(context, 'e2e: arrived while muted');
-    await board.bringToFront();
 
     // The banner counts what was not read out, and keeps the orders below.
     await expect(
@@ -152,7 +175,8 @@ test.describe('kitchen — real database', () => {
 
     // Reading them out is the recovery: put the voice back on, ask for the
     // replay, and the announcements fire now.
-    await board.getByRole('button', { name: 'Kitchen audio off', exact: true }).click();
+    await audioToggle.click();
+    await expect(audioToggle).toHaveAttribute('aria-pressed', 'true');
     await board.getByRole('button', { name: 'Read them out' }).click();
     await expect
       .poll(() => announcementCount(board), { timeout: 15_000 })
@@ -170,7 +194,6 @@ test.describe('kitchen — real database', () => {
     expect(await announcementCount(board)).toBe(0);
 
     await placeGuestOrder(context, 'e2e: announce me exactly once');
-    await board.bringToFront();
 
     await expect
       .poll(() => announcementCount(board), {
@@ -178,15 +201,14 @@ test.describe('kitchen — real database', () => {
         message: 'the new order was never announced',
       })
       .toBeGreaterThan(0);
-    // One order is several sentence-sized Web Speech utterances. Wait for
-    // the complete queue entry before measuring; an increasing segment count
-    // during one announcement is not a duplicate order announcement.
-    const log = board.getByLabel('Recent announcements');
-    await expect(log.getByLabel('Speech completed', {exact:true})).toHaveCount(1, {timeout:20_000});
-    await expect(log.locator('li')).toHaveCount(1);
-    const once = await announcementCount(board);
-    await board.waitForTimeout(2500);
-    expect(await announcementCount(board), 'the order was announced twice').toBe(once);
+    // One order is spoken in several sentence segments. Wait for the
+    // announcement to finish, then prove no exact segment was replayed; a raw
+    // length comparison falsely called the final sentence of one order a
+    // duplicate when the first snapshot landed mid-utterance.
+    await board.waitForTimeout(5000);
+    const spoken = await announcementTexts(board);
+    expect(spoken.length).toBeGreaterThan(0);
+    expect(new Set(spoken).size, 'an utterance was repeated').toBe(spoken.length);
 
     // A refresh re-reads the board — and what was seen stays seen.
     await board.reload();

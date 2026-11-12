@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const m=vi.hoisted(()=>({staff:vi.fn(),rpc:vi.fn()}));
-vi.mock('@/lib/db/staff',()=>({getStaffContextDetailed:m.staff}));
+vi.mock('@/lib/db/staff',()=>({getStaffContextDetailed:m.staff,KITCHEN_ROLES:['owner','manager','kitchen']}));
 import { authorizeTts } from './tts-access';
-beforeEach(()=>{vi.resetAllMocks();m.staff.mockResolvedValue({ok:true,context:{restaurantId:'tenant',supabase:{rpc:m.rpc}}});m.rpc.mockResolvedValue({data:[{allowed:true,retry_after_seconds:0}],error:null});});
+beforeEach(()=>{vi.resetAllMocks();m.staff.mockResolvedValue({ok:true,context:{restaurantId:'tenant',role:'kitchen',supabase:{rpc:m.rpc}}});m.rpc.mockResolvedValue({data:[{allowed:true,retry_after_seconds:0}],error:null});});
 describe('staff-only distributed TTS gate',()=>{
   it.each([['signed-out',401],['no-membership',403],['unconfigured',503]])('denies %s without spending provider work',async(reason,status)=>{
     m.staff.mockResolvedValue({ok:false,reason});expect((await authorizeTts())?.status).toBe(status);expect(m.rpc).not.toHaveBeenCalled();
+  });
+  it('denies non-kitchen restaurant roles before reserving quota',async()=>{
+    m.staff.mockResolvedValue({ok:true,context:{restaurantId:'tenant',role:'cashier',supabase:{rpc:m.rpc}}});
+    expect((await authorizeTts())?.status).toBe(403);expect(m.rpc).not.toHaveBeenCalled();
   });
   it('reserves budget only for the server-resolved restaurant',async()=>{
     expect(await authorizeTts()).toBeNull();expect(m.rpc).toHaveBeenCalledWith('reserve_staff_tts_attempt',{p_restaurant_id:'tenant'});

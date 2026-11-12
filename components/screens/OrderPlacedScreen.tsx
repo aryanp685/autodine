@@ -3,6 +3,7 @@ import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
 import { FadeUp, FadeUpItem, PopIn, SpringUp } from '@/components/MotionBits';
 import { GuestOrderEditor } from '@/components/screens/GuestOrderEditor';
+import { OrderMoreLink } from '@/components/OrderMoreLink';
 import { GuestFlow } from '@/components/GuestFlow';
 import { ReorderOffer } from '@/components/ReorderOffer';
 import { guestBrandStyle, type GuestBrandState } from '@/lib/branding/guest-theme';
@@ -183,6 +184,7 @@ export function OrderPlacedScreen({
   token,
   slug,
   canCallWaiter = false,
+  cartClearing = false,
 }: {
   brandState?: GuestBrandState | null;
   data: OrderScreenData | null;
@@ -192,6 +194,8 @@ export function OrderPlacedScreen({
   slug?: string;
   /** Only a current verified table session may request a waiter. */
   canCallWaiter?: boolean;
+  /** The just-placed cart must finish clearing before the next-round CTA navigates. */
+  cartClearing?: boolean;
 }) {
   const paint = guestBrandStyle(brandState);
   if (!data) {
@@ -237,12 +241,7 @@ export function OrderPlacedScreen({
         <SpringUp className="w-full">
           <div className="grid gap-1.5">
             {canCallWaiter && data.tableLabel ? <CallWaiterButton /> : null}
-            <Link
-              href={menuHref}
-              className="g-primary flex h-12 w-full items-center justify-center rounded-full text-[14px] font-semibold transition-transform duration-150 active:scale-[0.97]"
-            >
-              Order something else
-            </Link>
+            <OrderMoreLink href={menuHref} waitForEmptyCart={cartClearing} />
           </div>
         </SpringUp>
       }

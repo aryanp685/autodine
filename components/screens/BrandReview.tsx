@@ -149,18 +149,21 @@ export function BrandReview({
   };
   // Push the state up after render, never during it. The parent stores it
   // with a functional update keyed on this object.
+  const themeSnapshot = JSON.stringify(state.theme);
+  const conflictsSnapshot = JSON.stringify(state.conflicts);
+  const notesSnapshot = JSON.stringify(state.notes);
   useEffect(() => {
     onStateChange(state);
   }, [
     state.name,
     state.nameConfirmed,
-    state.theme,
+    themeSnapshot,
     state.logoAssetId,
     state.bannerAssetId,
     state.logoUrl,
     state.bannerUrl,
-    state.conflicts.length,
-    state.notes.length,
+    conflictsSnapshot,
+    notesSnapshot,
   ]);
 
   /* ---------------------------------------------------------- extraction */
@@ -267,8 +270,9 @@ export function BrandReview({
       {!enabled && (
         <div className="px-4 py-4 sm:px-5">
           <p className="text-[12.5px] leading-[1.55] text-gink-64">
-            Reading brand style from a photo is not switched on for this deployment. You can still upload a
-            logo and banner and pick a colour — they save with the draft like everything else.
+            Reading brand style from a photo is not switched on for this deployment. You can still set the
+            name and upload a logo or banner. The guest menu keeps its safe default colour until a theme is
+            available.
           </p>
         </div>
       )}

@@ -1,5 +1,7 @@
 # Existing staging: read-only preflight
 
+> **Current continuation (2026-10-28):** This imported file contains prior-main claims about staging access/deployments, CI, and local restores. None were performed or independently reverified during this reconciliation; their later dates are not accepted as current evidence here. No hosted staging/production operation or restore was performed in this continuation. For current blockers, exact access requests, and evidence boundaries, see [docs/production-readiness-continuation.md](docs/production-readiness-continuation.md).
+
 ## Latest verified readiness result
 
 Staging-only deployment **dpl_58628RrxJGGsoiKctrUasMsuKMNP**, commit **8fd6e027f0a98a072066f3226cb4a7c6603ffbae**, is READY. A fresh authorized page fetch of `/api/health?check=8fd6e02` returned **`ok:true`**, credentials accepted and all five operational probes applied. The initial identical-URL refetch returned the fetcher's older cached `checkedAt` payload; a revision-specific query confirmed the fresh deployment. Token omitted from this record deliberately.

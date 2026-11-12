@@ -448,6 +448,12 @@ const ICONS: Record<DashboardSection, ReactNode> = {
       <path d="M9 8h6M9 12h6M9 16h4" strokeLinecap="round" />
     </svg>
   ),
+  invoices: (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M5.5 3.5h9l4 4v13h-13z" strokeLinejoin="round" />
+      <path d="M14.5 3.5v4h4M8.5 12h7M8.5 15.5h7" strokeLinecap="round" />
+    </svg>
+  ),
   kitchen: (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6">
       <path d="M5 9h14" strokeLinecap="round" />
@@ -491,6 +497,16 @@ const ICONS: Record<DashboardSection, ReactNode> = {
   reports: (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6">
       <path d="M5 19.5v-6M10 19.5V7M15 19.5v-9M20 19.5V4.5" strokeLinecap="round" />
+    </svg>
+  ),
+  subscription: (
+    // A card with a tick: the subscription is a standing arrangement, not an
+    // action, which is why it is not a bolt or a lightning mark.
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M3.5 7.5h17v11h-17z" strokeLinejoin="round" />
+      <path d="M3.5 11h17" strokeLinecap="round" />
+      <path d="m7 14.8 1.8 1.8 3.4-3.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M15 14.2h3M15 16.4h3" strokeLinecap="round" />
     </svg>
   ),
   settings: (

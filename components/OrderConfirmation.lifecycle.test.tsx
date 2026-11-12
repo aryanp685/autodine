@@ -30,6 +30,9 @@ describe('order confirmation lifecycle', () => {
   it('offers the newly saved cart without requiring a reload and restores quantities', async () => {
     localStorage.setItem(cartKey('test'), JSON.stringify([{ itemId: 'dish-1', qty: 2 }]));
     await act(async () => root.render(<CartProvider slug="test"><ClearCartOnOrder clear slug="test" /><ReorderOffer slug="test" /></CartProvider>));
+    // ReorderOffer defers its localStorage re-read one task so it observes the
+    // sibling's remembered-cart write after the clear effect has committed.
+    await act(async () => new Promise<void>((resolve) => window.setTimeout(resolve, 0)));
     expect(localStorage.getItem(cartKey('test'))).toBeNull();
     expect(readLastCart(localStorage, 'test')).toEqual([{ itemId: 'dish-1', qty: 2 }]);
     const button = host.querySelector<HTMLButtonElement>('[data-reorder-button]');

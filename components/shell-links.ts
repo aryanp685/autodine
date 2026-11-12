@@ -21,9 +21,11 @@ export type DashboardSection =
   | 'import'
   | 'tables'
   | 'orders'
+  | 'invoices'
   | 'kitchen'
   | 'counter'
   | 'reports'
+  | 'subscription'
   | 'settings';
 
 export type ShellLink = {
@@ -56,6 +58,7 @@ export const DASHBOARD_LINKS: ReadonlyArray<ShellLink> = [
   { key: 'overview', label: 'Overview', href: '/dashboard', group: 'Today', roles: MANAGE },
 
   { key: 'orders', label: 'Orders', href: '/dashboard/orders', group: 'Service', roles: COUNTER },
+  { key: 'invoices', label: 'Invoices', href: '/dashboard/invoices', group: 'Service', roles: COUNTER },
   { key: 'kitchen', label: 'Kitchen', href: '/kitchen', group: 'Service', roles: KITCHEN },
   { key: 'counter', label: 'Counter', href: '/cashier', group: 'Service', roles: COUNTER },
 
@@ -65,6 +68,7 @@ export const DASHBOARD_LINKS: ReadonlyArray<ShellLink> = [
   { key: 'tables', label: 'Tables & QR', href: '/dashboard/tables', group: 'Menu', roles: MANAGE },
 
   { key: 'reports', label: 'Reports', href: '/dashboard/reports', group: 'Business', roles: MANAGE },
+  { key: 'subscription', label: 'Subscription', href: '/dashboard/subscription', group: 'Business', roles: MANAGE },
   { key: 'settings', label: 'Settings', href: '/dashboard/settings', group: 'Business', roles: MANAGE },
 ];
 
@@ -140,5 +144,5 @@ export function sectionForPathname(pathname: string | null | undefined): Dashboa
  */
 export function isWideSection(pathname: string | null | undefined): boolean {
   const key = sectionForPathname(pathname);
-  return key === 'kitchen' || key === 'menus' || key === 'orders' || key === 'reports' || key === 'counter';
+  return key === 'kitchen' || key === 'menus' || key === 'orders' || key === 'invoices' || key === 'reports' || key === 'counter';
 }

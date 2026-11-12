@@ -6,6 +6,11 @@ import { PrintButton } from '@/components/PrintButton';
 import { SubmitButton } from '@/components/owner/SubmitButton';
 import type { ReactNode } from 'react';
 import type { OutletBar } from '@/lib/outlets';
+import {
+  entitlementBlockedReason,
+  entitlementSummary,
+  type OutletEntitlement,
+} from '@/lib/access';
 import type { SettingsScreenData } from '@/lib/db/settings-screen';
 import type { TeamScreenData } from '@/lib/db/team';
 import type { InviteFlash } from '@/lib/team-invite';
@@ -43,7 +48,7 @@ import {
  * THE AUDIT (2026-10-24) FOUND
  *
  *   - Nine hand-drawn callouts — read-only notice, database notice, tax-zero
- *     warning, tax example, missing gateway keys, "off", the UPI caveat, the
+ *     warning, tax example, retired gateway settings, "off", the UPI caveat, the
  *     unpublished-menu warning, and the save banner — in four different radii
  *     and three different tones of red. They said the same two things the kit's
  *     Notice says, badly.
@@ -194,6 +199,18 @@ export function SettingsScreen({
   error?: string;
   notice?: string;
 }) {
+  /**
+   * Outlets, and what the account's plan allows.
+   *
+   * The entitlement is read from the account (Model C): one subscription, one
+   * allowance, every outlet counted against it. `null` means the read did not
+   * happen, so the screen offers the form and lets the database decide --
+   * the server refuses an over-limit create either way.
+   */
+  const entitlement: OutletEntitlement | null = data?.outletEntitlement ?? null;
+  const outletCount = data?.outlets?.length ?? 0;
+  const outletBlocked = entitlementBlockedReason(entitlement);
+
   // Blocked callers get the prompt only. See the note above.
   if (data?.blocked) {
     return (
@@ -592,7 +609,13 @@ export function SettingsScreen({
 
               <Panel
                 title="Outlets"
-                meta={live ? `${data?.outlets?.length ?? 0} on this account` : 'none'}
+                meta={
+                  live
+                    ? entitlement
+                      ? `${outletCount} on this account · ${entitlementSummary(entitlement)}`
+                      : `${outletCount} on this account`
+                    : 'none'
+                }
                 bodyClassName="px-5 py-5"
               >
                 <p className="m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
@@ -624,7 +647,13 @@ export function SettingsScreen({
                   </ul>
                 ) : null}
 
-                {live && data?.role === 'owner' ? (
+                {live && data?.role === 'owner' && outletBlocked ? (
+                  <p className="mt-3 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-64">
+                    {outletBlocked} Every outlet above is still open and still taking orders.
+                  </p>
+                ) : null}
+
+                {live && data?.role === 'owner' && !outletBlocked ? (
                   <form
                     className="mt-3 flex flex-col gap-2.5"
                     method="post"
@@ -633,7 +662,11 @@ export function SettingsScreen({
                     <Field
                       label="Add another outlet"
                       htmlFor="new-outlet-name"
-                      hint="Up to five per account. A new outlet starts empty, with its own web address and a 0% tax rate to set."
+                      hint={
+                        entitlement
+                          ? `${entitlementSummary(entitlement)} on this plan. A new outlet starts empty, with its own web address and a 0% tax rate to set.`
+                          : 'A new outlet starts empty, with its own web address and a 0% tax rate to set.'
+                      }
                     >
                       <input
                         id="new-outlet-name"

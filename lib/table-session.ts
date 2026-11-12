@@ -37,6 +37,7 @@
  */
 
 import { cookies } from 'next/headers';
+import { shouldUseSecureCookies } from '@/lib/cookie-security';
 
 export const TABLE_SESSION_COOKIE = 'autodine_table';
 
@@ -145,7 +146,7 @@ export function isExpired(session: TableSession, now: Date = new Date()): boolea
 export const TABLE_SESSION_COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: 'lax' as const,
-  secure: process.env.NODE_ENV === 'production',
+  secure: shouldUseSecureCookies(),
   path: '/',
   maxAge: 60 * 60, // matches the database's one-hour ceiling on a session
 };

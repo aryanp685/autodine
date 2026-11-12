@@ -1,37 +1,40 @@
 # AutoDine
 
-**AutoDine is an early-stage, mobile-first QR ordering and restaurant-operations prototype for Indian restaurants.** The current repository includes a polished UI, sample restaurant data, Supabase schema/auth foundations, and a server-side menu reader. It is **not ready to accept real customer orders or payments**.
+AutoDine is a mobile-first QR ordering and restaurant-operations application for Indian restaurants. It includes guest ordering, owner/staff operations, kitchen and cashier screens, bills/invoices, and database-backed menu and session flows.
 
-## Current status
+## Current capability and limits
 
-| Area | Status |
-|---|---|
-| Responsive marketing, menu, cart, dashboard, kitchen and cashier screens | Prototype UI; local/demo interactions only |
-| Restaurant signup/sign-in | Supabase Auth actions are present; requires a configured Supabase project |
-| Public menu reading | Supabase-backed read path is present, with a demo-data fallback |
-| Database schema and row-level security | Initial migrations exist; must be applied and tested against a real Supabase project |
-| Order placement and kitchen sync | Connected: orders, kitchen board, cancellation and bill printing run against the database |
-| Guest UPI payment | The restaurant's own UPI ID, shown as a QR with the amount filled in. **Not** a gateway: it never marks an order paid |
-| Online payments | Built and wired end to end, but **switched off**: no gateway keys are configured on the deployment, and each restaurant's online-payment switch defaults to off |
-| Subscriptions | The seven-day trial is enforced in the database (`restaurant_can_write`). No plan can be bought, and there is no checkout — see `docs/SETUP.md` §6 |
-| Production readiness | Not ready for live money until a gateway key is configured and one real payment has been run through it |
+- Customer ordering is **pay at the counter**. AutoDine does not offer a guest online-payment gateway or subscription checkout. Staff record counter settlement through the authorized flow.
+- GST behavior must follow adviser-approved rules. The current code supports only its explicitly configured rate path; it does not implement a complete tax-policy model for every jurisdiction, inclusive price, item classification, exemption, or place of supply. Do not treat sample values as tax advice or extend the model by guessing.
+- Local and automated UI tests may use fictional sample data only when a developer explicitly opts into demo mode. A production build without the required Supabase URL and public key fails rather than serving sample restaurant data.
+- `/demo/menu`, where enabled, is a clearly identified, read-only sample. It is not a real restaurant, order path, or database-backed flow.
+- Passing unit or demo-mode browser tests does not prove that production credentials, email delivery, AI providers, or a specific restaurant's configuration work. The current readiness assessment and remaining integration coverage are in [`docs/website-readiness-audit.md`](docs/website-readiness-audit.md).
 
-All restaurant names, orders, dashboard metrics, QR states and payments shown without a configured database are fictional demo content. The displayed 5% tax rate and plan prices are illustrative and must not be treated as tax or billing advice.
+## Local development
 
-## Run locally
-
-Requirements: Node.js 22 or newer and npm.
+Requirements: Node.js 22 and npm.
 
 ```bash
 npm ci
-npm run dev
 ```
 
-Open <http://localhost:3000>. With no Supabase environment variables, the site runs in demo mode. To configure Supabase, copy `.env.example` to `.env.local`, fill in your own project values, and apply the migrations in `supabase/migrations/`. Never commit `.env.local` or a Supabase secret key. Step by step, and the SQL to check each one: `docs/SETUP.md` (an operator runbook, kept local by `.gitignore` — see the note under Repository layout).
+Choose one mode:
 
-`GET /api/health` answers "is this deployment wired up, and are the migrations on it?" in booleans — no keys, no ids, no rows.
+1. **Explicit local visual demo** (fictional data, no writes):
 
-Before that, `npm run env:check` reads `.env.local` and names what is missing, catches a placeholder left in place, and refuses to pass if a secret key is in a `NEXT_PUBLIC_` variable — the one mistake that would hand every visitor full database access. It prints key prefixes, never values.
+   ```bash
+   AUTODINE_DEMO_MODE=true npm run dev
+   ```
+
+2. **Database-backed development:** copy `.env.example` to `.env.local`, enter credentials for a local or non-production Supabase project, run `npm run env:check`, then start `npm run dev`. Keep `.env.local` private and never use production data for integration tests.
+
+The demo flag is for local development only. Never set `AUTODINE_TEST_DEMO_BUILD` in a deployment; it is an explicit GitHub Actions-only flag for hermetic UI tests. Production requires Supabase configuration and does not fall back to fictional data.
+
+## Database-backed browser test
+
+The throttle integration suite uses a disposable local PostgreSQL database and local PostgREST, not production. Follow [`docs/e2e-local.md`](docs/e2e-local.md). It runs both real-browser throttle cases and the existing PostgreSQL throttle regressions, retaining evidence as CI artifacts.
+
+For what is covered and what still needs a non-production integration environment, see [`docs/scan-throttle-coverage.md`](docs/scan-throttle-coverage.md) and the [`website readiness audit`](docs/website-readiness-audit.md).
 
 ## Quality checks
 
@@ -44,51 +47,10 @@ npm test
 npm run build
 ```
 
-The SQL check parses DDL syntax; it does **not** execute migrations or prove that RLS policies/functions are correct. Run migrations and security tests against a disposable Supabase project before relying on them.
+`npm run sql:check` parses migration syntax; it does not execute every RLS policy or prove production-schema parity. Run database and browser integration tests only against disposable local or approved non-production services.
 
-## Repository layout
+## Configuration and security
 
-- `app/` — Next.js App Router routes and auth actions
-- `components/` — screen components and shared UI
-- `lib/` — demo data, money/pricing logic, Supabase clients and database adapters
-- `supabase/` — database migrations and fictional seed data
-- `app/globals.css` — Tailwind entry, design tokens and the small amount of base CSS
-- `styles/premium.css` — the marketing layer only (the product is Tailwind)
-- `supabase/checks/` — the SQL to run before and after the trial/plan/UPI migrations
-- `/api/health` — booleans only: is this deployment configured, and which migrations are on it?
-- `docs/SETUP.md`, `docs/DEMO.md` — the operator's runbook and the demo script. Local
-  files, not committed: `.gitignore` keeps internal notes and runbooks out of the
-  published repository, and these two contain the SQL that extends a trial by hand.
+See [`docs/SETUP.md`](docs/SETUP.md) for the tracked operator setup checklist. `GET /api/health` returns a no-store readiness response with fixed status fields; it never returns keys, restaurant names, or rows. `npm run env:check` identifies missing or malformed required environment values and never prints full key values.
 
-## Payments
-
-Guests pay at the counter by default. Online card/UPI payment exists and is
-deliberately off in two places, because either one alone would let a guest see a
-button that cannot be honoured:
-
-1. **The deployment** must have a gateway key pair:
-   `NEXT_PUBLIC_RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`, plus
-   `RAZORPAY_WEBHOOK_SECRET` for the webhook.
-2. **The restaurant** must have `online_payments_enabled`, which an owner turns
-   on in Settings → Online payment.
-
-The flow, and why each step is where it is:
-
-- the guest presses **Pay online** on their order page; a server action asks the
-  database what is owed (never the browser) and creates a provider order;
-- the provider's checkout window returns a signature, which
-  `/api/payments/razorpay/verify` checks with the key secret;
-- `/api/payments/razorpay/webhook` is the same confirmation, without needing the
-  guest's browser, verified against the raw request body;
-- only then does `public.settle_online_payment()` mark the order paid. It is
-  idempotent, so both paths firing for one payment is harmless;
-- those three SQL functions are executable by `service_role` only — anon and
-  authenticated were explicitly revoked.
-
-Webhook URL to register with the provider:
-`https://<your-domain>/api/payments/razorpay/webhook`
-(after merging: `https://new-alpha-five-43.vercel.app/api/payments/razorpay/webhook`).
-
-## Privacy and secrets
-
-The repository contains no production credentials. `.env.example` contains blank placeholders only. Keep all real keys in local environment variables or your hosting provider's secret manager; the Supabase secret/service-role key must never use a `NEXT_PUBLIC_` variable.
+Never commit real credentials, `.env.local`, production data, or secret/service-role keys in `NEXT_PUBLIC_*` variables. The server-side Supabase secret key bypasses RLS and must remain server-only.

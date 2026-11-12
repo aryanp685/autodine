@@ -1,16 +1,17 @@
 import type { Metadata } from 'next';
 import { LegalPage, LegalSection } from '@/components/LegalPage';
+import { TRIAL_DAYS } from '@/lib/trial';
 
 export const metadata: Metadata = {
   title: 'Terms · AutoDine',
-  description: 'Preview terms: the seven-day trial, what is not for sale yet, and how orders and payments are actually handled.',
+  description: `Preview terms: the ${TRIAL_DAYS}-day trial, what is not for sale yet, and how orders and payments are actually handled.`,
 };
 
 /**
  * The terms page.
  *
  * Short on purpose. Three things here are not boilerplate but the actual,
- * enforced behaviour of the product: a seven-day trial that ends in read-only,
+ * enforced behaviour of the product: a trial (TRIAL_DAYS days) that ends in read-only,
  * plans that cannot be bought yet, and payments that are recorded by staff
  * rather than claimed by a browser. Each is backed by a migration this
  * repository ships.
@@ -24,13 +25,13 @@ export default function TermsPage() {
     >
       <LegalSection title="The trial">
         <p>
-          A new restaurant gets seven days on the whole product, measured from when the workspace was
+          A new restaurant gets {TRIAL_DAYS} days on the whole product, measured from when the workspace was
           created, by the database&rsquo;s clock. No card is taken to start. It is not a cut-down
           version: menus, QR ordering, the kitchen board, the counter, reports and menu import are all
           on.
         </p>
         <p>
-          When the seven days end without an active plan, the workspace becomes read-only. New orders
+          When the {TRIAL_DAYS} days end without an active plan, the workspace becomes read-only. New orders
           are refused, and edits to menus and settings are refused, while everything already recorded
           stays readable. Nothing is deleted, and the trial is not silently extended. The start date
           cannot be moved from a browser.
@@ -64,8 +65,8 @@ export default function TermsPage() {
       <LegalSection title="Payments">
         <p>
           Counter payments are recorded by a member of staff, and only for the exact amount still owed.
-          Card payments through a gateway are not enabled; the code exists but no gateway is connected
-          and no restaurant can switch it on without deployment keys.
+          Online card payments are not available in AutoDine. Guests settle at the counter through
+          the restaurant's staff-recorded payment flow.
         </p>
         <p>
           A restaurant&rsquo;s own UPI QR is the restaurant&rsquo;s account, not AutoDine&rsquo;s. Scanning it

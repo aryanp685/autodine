@@ -11,6 +11,7 @@
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { GuestBrandState } from './guest-theme';
+import { readPublicRestaurant } from '@/lib/db/public-restaurant';
 
 export async function getGuestBrandState(slug?: string | null): Promise<GuestBrandState | null> {
   const target = slug?.trim() ?? '';
@@ -19,16 +20,11 @@ export async function getGuestBrandState(slug?: string | null): Promise<GuestBra
   const supabase = await createSupabaseServerClient();
   if (!supabase) return null;
 
-  const { data, error } = await supabase
-    .from('restaurants')
-    .select('brand_theme_enabled, brand_theme')
-    .eq('slug', target)
-    .eq('is_active', true)
-    .maybeSingle();
+  const { data, error } = await readPublicRestaurant(supabase, target);
 
   // A failed brand read must never take the menu down: no theme is the
   // designed default and the guest still orders.
-  if (error || !data) return null;
+  if (error || !data || !data.is_active) return null;
   return {
     brandThemeEnabled: data.brand_theme_enabled === true,
     brandTheme: data.brand_theme ?? null,

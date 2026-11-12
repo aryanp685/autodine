@@ -19,6 +19,19 @@ await mkdir('.staging-private',{recursive:true});
 const manifest={run,project:ref,createdUserId:null,restaurantId:null,otherRestaurantId:null,otherOrderId:null,expiredSessionId:null,revokedCardId:null};
 const save=()=>writeFile('.staging-private/fixture-manifest.json',JSON.stringify(manifest),{mode:0o600});
 async function insert(table,row){const result=await admin.from(table).insert(row).select('id').single();if(result.error)throw new Error(`Staging fixture ${table} insert failed (${result.error.code||'unknown'}).`);return result.data.id;}
+/* Create the Auth user through GoTrue's Admin API, never by inserting into
+ * auth.users with SQL.
+ *
+ * GoTrue scans several token columns -- confirmation_token, recovery_token,
+ * email_change and email_change_token_new -- into plain Go strings. GoTrue
+ * always writes '' into them; a raw INSERT that leaves them NULL makes every
+ * read of that row fail with "Database error loading user", which the app
+ * surfaces only as "Email or password is incorrect." The row looks perfect in
+ * psql and the password hash verifies, so the real cause is invisible until
+ * each user is fetched by id.
+ *
+ * This cost a whole debugging session on 2026-11-11. Do not "optimise" this
+ * into an INSERT. */
 const created=await admin.auth.admin.createUser({email,password,email_confirm:true,user_metadata:{full_name:'Arena isolated E2E owner',arena_fixture:run}});
 if(created.error||!created.data.user)throw new Error('Staging Auth fixture creation failed.');
 manifest.createdUserId=created.data.user.id;await save();

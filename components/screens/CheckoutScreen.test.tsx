@@ -97,9 +97,9 @@ describe('checkout payment step', () => {
     expect(html).not.toContain('card/UPI on the next screen');
   });
 
-  it('confirms with the mandated button: Place order & pay at counter', () => {
+  it('confirms with the mandated uppercase button: PLACE ORDER & PAY AT COUNTER', () => {
     const html = render();
-    expect(html).toContain('Place order &amp; pay at counter');
+    expect(html).toContain('PLACE ORDER &amp; PAY AT COUNTER');
   });
 });
 

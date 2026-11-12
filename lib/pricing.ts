@@ -52,7 +52,7 @@ export type PriceableLine = {
 
 export type OrderTotalsInput = {
   lines: PriceableLine[];
-  /** Applied to the pre-tax subtotal. Positive number, subtracted. */
+  /** Must remain zero until written financial policy approval enables discounts. */
   discountPaise?: Paise;
   /** Defaults to the sample rate. Bps, e.g. 500 = 5.00%. */
   taxRateBps?: Bps;
@@ -88,17 +88,10 @@ export function computeSubtotal(lines: PriceableLine[]): Paise {
 /**
  * Full order totals.
  *
- * ORDER OF PRECEDENCE (this is the definition, do not reorder casually):
- *   1. subtotal  = sum of (unit price x qty), each line rounded to the paisa
- *   2. taxable   = max(subtotal - discount, 0)
- *   3. tax       = round(taxable x rate)
- *   4. total     = taxable + tax
- *
- * Tax is charged on the DISCOUNTED amount, which is the standard treatment:
- * a discount granted before supply reduces the value of supply, so GST
- * follows the reduced value, not the original. A discount that exceeds the
- * subtotal clamps the taxable base to zero rather than producing a negative
- * bill — the discount itself is reported unclamped so the anomaly is visible.
+ * Discount arithmetic is deliberately unavailable until written financial
+ * policy approval specifies authority, tax treatment and audit requirements.
+ * Every live order path currently supplies zero; this guard prevents a future
+ * caller from activating a guessed policy through this shared helper.
  */
 export function computeOrderTotals(input: OrderTotalsInput): OrderTotals {
   const { lines, discountPaise = 0, taxRateBps = SAMPLE_TAX_RATE_BPS } = input;
@@ -106,6 +99,9 @@ export function computeOrderTotals(input: OrderTotalsInput): OrderTotals {
   assertValidMoney(discountPaise);
   if (discountPaise < 0) {
     throw new RangeError(`Discount must not be negative, got: ${discountPaise} paise`);
+  }
+  if (discountPaise !== 0) {
+    throw new Error('Discounts are disabled until written financial policy approval.');
   }
 
   const subtotalPaise = computeSubtotal(lines);

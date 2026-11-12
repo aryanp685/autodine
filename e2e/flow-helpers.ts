@@ -177,11 +177,14 @@ export async function recordAnnouncements(page: Page): Promise<void> {
   );
 }
 
-/** How many announcement attempts this page load has made. */
+/** Spoken segments recorded on this page load. One order may have several. */
+export async function announcementTexts(page: Page): Promise<string[]> {
+  return page.evaluate(() => [...((window as unknown as { __spoken?: string[] }).__spoken ?? [])]);
+}
+
+/** How many announcement segments this page load has emitted. */
 export async function announcementCount(page: Page): Promise<number> {
-  return page.evaluate(
-    () => ((window as unknown as { __spoken?: string[] }).__spoken ?? []).length,
-  );
+  return (await announcementTexts(page)).length;
 }
 
 /** Parse "₹1,247" into 1247. */
