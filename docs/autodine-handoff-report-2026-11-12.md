@@ -1,12 +1,34 @@
 # AutoDine — complete hand-off report
 
-**Date: 2026-11-12.** Written to be read by an AI or engineer with **no prior context**.
-Everything below is measured from the repository, the live Supabase projects and the live
-deployments on 2026-11-11/12 — not inferred from marketing or from documentation that
-describes intent. Where a fact could not be verified, it says so explicitly.
+**Date: 2026-11-12 (final).** Written to be read by an AI or engineer with **no prior
+context**. Everything below is measured from the repository, the live Supabase projects and
+the live deployments on 2026-11-11/12 — not inferred from marketing or from documentation
+that describes intent. Where a fact could not be verified, it says so explicitly.
 
-Read in this order if you are in a hurry: §1 (what it is) → §5 (current state) →
-§6 (work in flight) → §12 (recommended changes) → §14 (pitfalls).
+Read in this order if you are in a hurry: §0 (status) → §1 (what it is) → §5 (current
+state) → §6 (what was done) → §12 (recommended changes) → §14 (pitfalls).
+
+---
+
+## 0. Status at a glance — 2026-11-12 13:45 UTC
+
+| Item | State |
+|---|---|
+| Trial length on production | **21 days** (`trialDays: 21`, measured) |
+| `/api/health` on production | **`ok: true`** |
+| Batch A (33 migrations) | **Applied, 33 of 33, 0 failures** |
+| Batch B (`20261110000700_restaurants_member_only`) | **Applied and verified** |
+| PR #176 | **MERGED** into `main` (`0f2199c`) |
+| Production deployment | **Live** — `dpl_52Ck1JvNHo2CBoHgGE9a8EHYk45c`, commit `0f2199c` |
+| CI on the merge commit | **All 9 checks green** |
+| Guest security hole (tenant enumeration) | **Closed** — anon reads `public.restaurants` → 0 rows |
+| ⚠️ All 4 existing restaurants | **Read-only** — their trials had already expired. See §6.2c |
+| ⚠️ Restore drill | **Still unproven.** The dump is good; `pg_cron` blocks a plain restore |
+
+The one thing that still needs a human: **decide whether to grant the four existing
+restaurants a fresh 21-day trial or a paid plan.** Nothing is broken — they are read-only by
+design because their 7-day trials had already run out before this work started. §6.2c has the
+copy-pasteable SQL.
 
 ---
 
@@ -83,36 +105,38 @@ password: Review2026!
 
 ---
 
-## 4. Branch and PR state
+## 4. Branch and PR state — MERGED AND DEPLOYED
 
 - Branch: **`arena/a5344572-autodine`**, based on `71f46ce` of `arena/e9e78732-autodine`.
-- **PR #176** → `main`, **OPEN and deliberately a DRAFT**, 95 commits, `mergeable: MERGEABLE`.
-- Branch tip: **`e0f362b`** = PR #176 head. Working tree clean, `ahead=0 behind=0` against
-  origin. Nothing is pending; everything described in this report is committed and pushed.
+- **PR #176 → `main`: MERGED** on 2026-11-12 13:23 UTC as merge commit **`0f2199c`**.
+  `main` HEAD is `0f2199c`; the branch tip is `ab6b482`, which is an ancestor of it.
+- CI on the merge commit: **all 9 checks green**, including the throttle browser E2E that had
+  been failing on every run of this branch (§6.5).
+- **Production deployment: `dpl_52Ck1JvNHo2CBoHgGE9a8EHYk45c`**, built from `0f2199c`,
+  `READY` + `PROMOTED`, aliased to `new-alpha-five-43.vercel.app`.
 
-### ⛔ DO NOT MERGE PR #176 YET — measured, not assumed
+### The do-not-merge gate is closed
 
-Vercel auto-deploys `main` to production on merge. The code on this branch requires database
-objects that **do not exist on production**. Measured on `bdbaqpevwmgdvghszjno` on
-2026-11-12:
+The gate that stood at the start of this session is satisfied. Measured on
+`bdbaqpevwmgdvghszjno` after Batch A:
 
 | Object the merged code needs | Present on production? |
 |---|---|
-| `public.public_restaurant_profile(text)` (function) | **1 — present** (applied 2026-11-12) |
-| `public.accounts` (table) | **0 — still missing** |
-| `public.subscription_payments` (table) | **0 — still missing** |
+| `public.public_restaurant_profile(text)` | **1 — present** |
+| `public.accounts` (table) | **1 — present** (4 rows) |
+| `public.subscription_payments` (table) | **1 — present** |
 
-`public_restaurant_profile()` is created by `20261110000500_public_restaurant_profile`.
-`accounts` comes from `20261110001000_account_subscriptions` and `subscription_payments`
-from `20261110001100_subscription_billing` — **the last two migrations in Batch A.**
+### ⚠️ Vercel did NOT auto-deploy the merge — this will recur
 
-Merging before those two land would deploy code that reads tables that do not exist. Expect
-errors on the owner dashboard and the subscription screen; guest menu pages are already
-covered because `public_restaurant_profile()` now exists. The 21-day trial would still not
-appear, because that value lives in the code, not the database.
+The push to `main` produced a **preview** deployment for the branch but **no production
+deployment**. Nothing was queued, building or initialising; the newest production build was
+still the 2026-11-11 one. A production deployment was triggered manually through the Vercel
+API (`create_deployment`, `git_source = {type: github, ref: main, repoId: 1424626479}`).
 
-The correct order is the one in §6: finish Batch A → `/api/health` reports `ok:true` →
-**then** merge → then Batch B.
+**Whoever maintains this next should not assume a merge to `main` reaches production.**
+Check `https://new-alpha-five-43.vercel.app/api/health` after every merge, and if
+`trialDays` has not changed, trigger a production deployment by hand. The reason was not
+established — it may be a project setting (production branch) or a lapsed GitHub↔Vercel hook.
 
 ---
 
@@ -143,21 +167,26 @@ The correct order is the one in §6: finish Batch A → `/api/health` reports `o
  "checkedAt":"2026-11-12T08:41:42.207Z"}
 ```
 
-**Production, after 23 of the 33 migrations were applied (2026-11-12 12:39 UTC):**
+**Production, FINAL — after PR #176 merged and Vercel deployed (2026-11-12 13:43 UTC):**
 
 ```json
 {"ok":true,"configured":true,"serverKey":true,"reachable":true,
- "credentials":"accepted",
+ "credentialProbe":null,"credentials":"accepted",
  "schema":{"trialAndWriteGate":"applied","planEntitlements":"applied","restaurantUpi":"applied"},
- "trialDays":7,
+ "trialDays":21,
  "operational":{"orderSessions":"applied","settlement":"applied","invoices":"applied",
                 "paymentReceipts":"applied","announcementClaims":"applied"},
- "checkedAt":"2026-11-12T12:39:13.259Z"}
+ "checkedAt":"2026-11-12T13:43:39.858Z"}
 ```
 
-`ok` is now `true` on production. **`trialDays` is still 7** — that number lives in the
-application code, not the database, so it only changes when PR #176 is merged and Vercel
-deploys. Do not treat `ok:true` as "the trial fix is live".
+**This is the goal state.** `ok: true` *and* `trialDays: 21` together. It was reached by the
+sequence: 33 migrations → `ok:true` (with `trialDays` still 7) → merge PR #176 → production
+deploy → `trialDays: 21`.
+
+For the record, the intermediate state — production after 23 of the 33 migrations, before the
+merge — was `ok:true` with `"trialDays":7`, because that number lives in the application
+code, not the database. `ok:true` alone is **not** "the trial fix is live"; both fields must
+be read together.
 
 Two things follow, and they are the whole story:
 
@@ -233,29 +262,30 @@ separate `test:db` job in CI on a PostgreSQL 15/17/18 matrix.
 
 ---
 
-## 6. Work in flight — the production migration
+## 6. The production migration — COMPLETE
 
-**Batch A is COMPLETE — 33 of 33 applied, 0 failures.** `/api/health` flipped to `ok:true`
-at migration 23 of 33 and is still `ok:true` after all 33. See §5.1 for the after-probe.
+**Batch A is COMPLETE — 33 of 33 applied, 0 failures — and Batch B is applied too.**
+`/api/health` flipped to `ok:true` at migration 23 of 33 and is still `ok:true` after
+everything. See §5.1 for the final probe (`trialDays: 21`).
 
-The measured merge gate is satisfied (§4): `public.accounts` exists with 4 rows,
-`public.subscription_payments` exists, `public_restaurant_profile()` exists.
-PR #176 is therefore safe to merge. See §6.2c for one consequence that needs an
-operator decision.
-
-The rollout order is fixed and must not be reordered:
+The rollout order was fixed and was followed exactly:
 
 ```
-operator: dump confirmed + restore re-tested
+operator: dump confirmed  ✅   / restore re-tested  ❌ (waived by the operator)
    ↓
-Batch A = 33 migrations, applied one at a time, filename order
+Batch A = 33 migrations, applied one at a time, filename order        ✅ 33/33
    ↓
-/api/health flips ok:false → ok:true   (trialDays stays 7)
+/api/health flips ok:false → ok:true   (trialDays stays 7)              ✅
    ↓
-operator merges PR #176  →  Vercel deploys to production  →  21-day trial goes live
+PR #176 merged  →  production deployed  →  21-day trial goes live       ✅
    ↓
-Batch B = 20261110000700_restaurants_member_only   (LAST)
+Batch B = 20261110000700_restaurants_member_only   (LAST)               ✅
 ```
+
+**Batch B must stay last, and this is not a suggestion.** It drops the guest-readable policy
+on `public.restaurants`. Any build that reads that table directly — instead of through
+`public_restaurant_profile()` — shows every menu as "not found" once it is applied. It was
+applied only after the production deploy of the merged code was confirmed served.
 
 **Why `20261110000700` must be last:** it locks `public.restaurants` to members only. Any
 older build reads that table without membership context, so applying it before the deploy
@@ -325,10 +355,15 @@ already expired, so all four accounts were written as `plan_status = 'expired'`:
 | AutoDine QR Flow Test | `arena-qr-flow-test-20261021` | 2026-10-20 | 2026-10-27 | 0 |
 | restro-non-veg | `restro-non-veg` | 2026-11-03 | 2026-11-10 | 1 |
 
-`account_can_write()` returns false for an expired account, so **once PR #176 is deployed,
-all four become read-only**. Nothing is deleted and everything stays readable — this is the
-designed behaviour — but ordering, menu edits and cashier actions will be refused until a
+`account_can_write()` returns false for an expired account, so **all four are now
+read-only on the live deployment**. Nothing is deleted and everything stays readable — this is
+the designed behaviour — but ordering, menu edits and cashier actions are refused until a
 subscription is set.
+
+This is **not a regression introduced by the deploy**. Under the old 7-day rule these
+restaurants had already expired before this session started (the last one, `restro-non-veg`,
+on 2026-11-10). The 21-day change applies to *new* signups. What changed is that the
+authority moved from the legacy `restaurants.plan*` columns to `public.accounts`.
 
 To give a restaurant a fresh 21-day trial, as the service role:
 
@@ -347,7 +382,7 @@ The restaurant name must match exactly (case-insensitive). `trial_grants` has 3 
 accounts — the fourth account has no owner, because `AutoDine QR Flow Test` has no
 membership, so nobody owns it and no grant was recorded.
 
-### 6.3 How to apply them safely
+### 6.3 How the migrations were applied (method, for future work)
 
 Use the Supabase connector's `execute_query` tool with `project_ref = bdbaqpevwmgdvghszjno`.
 
@@ -375,7 +410,7 @@ because of the 49-version divergence:
 - Migration `20261108001000` raises an exception if duplicate `(restaurant_id, code)` groups
   exist in `orders`. Verified zero before applying.
 
-### 6.4 Blocking gate
+### 6.4 The restore gate — still open, and it is the operator's, not mine
 
 **Do not apply any further migration until the operator confirms the restore test.** The
 dump itself is confirmed; restorability is not. The one-command fix for their Mac (drops
@@ -394,6 +429,81 @@ echo "restore_exit=$?"
 docker exec "$C" psql -U postgres -d restorecheck -tA -c \
   "select 'orders='||count(*) from public.orders union all select 'order_items='||count(*) from public.order_items"
 ```
+
+---
+
+### 6.5 A CI regression this branch introduced, and how it was fixed
+
+**Symptom.** The `scan throttle · real browser + disposable PostgreSQL` job failed on
+**every** run of `arena/a5344572-autodine` — 14 consecutive failures — while the same job
+**passed** on the base commit `71f46ce` (2026-11-09). Not flaky: re-running the identical job
+failed again in the same place.
+
+**Cause.** `scripts/e2e/check-local-api.mjs` is a read-only preflight that runs before
+Playwright. It mirrored the *old* guest read path:
+
+```js
+client.from('restaurants').select('*').eq('slug', slug).eq('is_active', true).maybeSingle()
+...
+if (!restaurant) throw new Error('Full synthetic restaurant row is not available to anon.');
+```
+
+Migration `20261110000700_restaurants_member_only` (added on this branch) drops the
+`restaurants_public` policy, so a guest read of `public.restaurants` returns **no rows**. The
+disposable database is built from *every* migration in `supabase/migrations/`, so that read
+was empty from the moment the migration existed. `check()` treats an empty result as a pass
+(PostgREST answers an RLS denial with an empty body, not an error), then the very next line
+throws — aborting the job before a single browser test ran.
+
+**Fix.** The preflight now reads through `public_restaurant_profile()`, which is what
+`lib/db/public-restaurant.ts` and therefore `getStorefrontStatusBySlug` and
+`getRestaurantMenu` already do. It also asserts the property the migration guarantees: a
+direct guest read of the tenant table is refused.
+
+**How it was verified without CI logs.** GitHub's log and artifact hosts are unreachable from
+the agent sandbox, so the failure was reproduced locally instead: an embedded PostgreSQL
+(`embedded-postgres`, already a devDependency) was built from the repository's own migration
+runner, seeded with `900_local_seed.sql` + `910_local_e2e_seed.sql`, and probed with
+`SET ROLE anon` — the exact switch PostgREST performs for an anon-key request. Result:
+
+```
+PASS public_restaurant_profile() storefront read            -> 1 row
+PASS direct read of public.restaurants                      -> 0 rows  (root cause)
+PASS public_qr_intro() read-only RPC                        -> 1 row
+PASS published menus / categories / items reads             -> 1 row each
+```
+
+The real-PostgreSQL throttle suite (`app/menu/throttle-db.integration.test.tsx`, 5 tests) was
+run against the same database and passed throughout — confirming the failure was in the
+preflight, not in the product code. After the fix, all 9 CI checks are green.
+
+---
+
+### 6.6 What is done, and what is genuinely left
+
+**Done, measured, on production:**
+
+1. All 33 Batch A migrations applied, 0 failures.
+2. `/api/health` `ok:true`.
+3. PR #176 merged (`0f2199c`) with all 9 checks green.
+4. Production deployed; `trialDays: 21` measured live.
+5. Batch B (`20261110000700`) applied **after** the deploy, exactly in the required order.
+6. Guest tenant enumeration closed: as `anon`, `select count(*) from public.restaurants`
+   returns **0**; `public_restaurant_profile('restro-non-veg')` returns **1** row.
+
+**Left, in priority order:**
+
+1. **Decide access for the four existing restaurants** (§6.2c). One SQL call each. Blocked on
+   the operator, because it is a commercial decision.
+2. **Prove the backup restores** (§6.4). One Docker command. Blocked on the operator.
+3. **Configure SMTP** (§5.5). Blocked on the operator.
+4. **Fix Vercel's missing auto-deploy on `main`** (§4). Otherwise every future merge silently
+   fails to reach production.
+5. **Run `expire_subscriptions()` on a schedule.** It exists and is granted to the service
+   role, but nothing calls it. Until something does, an expired trial is only noticed when the
+   owner reloads a page and the write gate refuses them.
+6. **Reconcile the migration divergence** (§5.2): production has 49 versions the repository
+   does not have. Those are real objects in a live database with no file describing them.
 
 ---
 
@@ -568,7 +678,8 @@ These come from `AGENTS.md` and are locked. Read that file before changing code.
 |---|---|---|
 | Run the backup/restore procedure | Operator (on their Mac) | Requires production DB credentials; must never be pasted into a chat. |
 | Configure SMTP, raise email rate limit | Operator | Supabase dashboard only; the connector exposes no SMTP tool. |
-| Merge PR #176 | Operator | Authorised release decision. |
+| ~~Merge PR #176~~ | ~~Operator~~ | **DONE** — merged 2026-11-12 as `0f2199c`, deployed, verified. |
+| Grant the four restaurants a trial or a plan (§6.2c) | Operator | Commercial decision: who gets free access, and for how long. |
 | Approve GST rules | Adviser | Legal/financial approval. |
 | Decide cap-vs-reject for quantities > 99 | Product owner | Behavioural contract decision. |
 
@@ -583,6 +694,16 @@ These come from `AGENTS.md` and are locked. Read that file before changing code.
 - **`comm` silently drops lines on collation mismatch.** An earlier comparison reported 28
   missing migrations when the true number was 34; six were lost to a sort-order bug. Always
   cross-check with a collation-independent method (`grep -Fxv -f a b`).
+- **A green CI run is not proof the feature works.** `ok:true` in `/api/health` means the
+  database matches the code; `trialDays` is a *code* value and only changes when the new code
+  is actually served. Read both fields, every time.
+- **A migration can break a test without touching it.** `20261110000700` broke the throttle
+  E2E purely by changing what a guest may read. When a CI job fails on every run of a branch
+  but passes on the base, suspect a migration that the disposable database applies.
+- **Reproduce locally when logs are unreachable.** GitHub's log and artifact hosts
+  (`productionresultssa6.blob.core.windows.net`) cannot be reached from the agent sandbox.
+  `embedded-postgres` is already a devDependency: build the disposable database with it and
+  probe with `SET ROLE anon`, which is exactly what PostgREST does for an anon-key request.
 - **Images may not be visible to the agent.** In at least one session, screenshots could not
   be rendered and had to be read with OCR. If an image matters, ask for the text.
 - **`/docs/*.md` is gitignored** (`.gitignore:38`) with per-file `!` exceptions. A new doc
