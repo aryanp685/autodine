@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const sql = readFileSync(
-  new URL('../../supabase/migrations/20261110000800_checkout_outstanding_guard.sql', import.meta.url),
+  new URL('../../supabase/migrations/20261110001210_checkout_outstanding_guard.sql', import.meta.url),
   'utf8',
 );
 const start = sql.indexOf('create or replace function public.close_order_session_and_issue_receipt(');

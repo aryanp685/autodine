@@ -2,10 +2,15 @@
  * Open a second (third, ...) outlet on the same account.
  *
  * POST from the Outlets card on Settings. The insert itself happens inside
- * `create_outlet()` -- see supabase/migrations/20261022000700_multi_outlet.sql
- * -- because there is no INSERT policy on public.restaurants and there must
- * not be one: an authenticated user who could insert restaurants directly
- * could create workspaces in a loop, each with a fresh trial.
+ * `create_outlet()` -- see supabase/migrations/20261022000700_multi_outlet.sql,
+ * re-declared by 20261110001000 (Model C) -- because there is no INSERT policy
+ * on public.restaurants and there must not be one: an authenticated user who
+ * could insert restaurants directly could create workspaces in a loop.
+ *
+ * Since Model C the outlet joins the caller's ACCOUNT and the cap is the
+ * account plan's allowance (Starter 1, Professional 5, Business unlimited),
+ * not a fixed five. A plan change never removes an outlet: it only stops new
+ * ones from being created.
  *
  * The name and slug are validated in both places on purpose. Here so the
  * owner reads a sentence instead of a Postgres exception; there so a caller
@@ -15,7 +20,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getStaffContextDetailed } from '@/lib/db/staff';
 import { OUTLET_COOKIE, outletNameProblem, sameOrigin } from '@/lib/outlets';
+import { outletBlockedReason } from '@/lib/access';
 import { slugify, uniqueSlug } from '@/lib/slug';
+import { readPublicRestaurant } from '@/lib/db/public-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +35,9 @@ function back(request: NextRequest, key: 'error' | 'notice', message: string) {
 }
 
 const REFUSALS: Array<{ code: string; message: string }> = [
-  { code: 'outlet_limit', message: 'This account already has the maximum of five outlets.' },
+  // Replaced at runtime by the plan's own sentence when the account's
+  // entitlement is known; this is the fallback for a read that failed.
+  { code: 'outlet_limit', message: 'This plan has no outlet allowance left. Every existing outlet keeps working.' },
   { code: 'name_invalid', message: 'Give the outlet a name of at least two characters.' },
   { code: 'slug_invalid', message: 'That name could not be turned into a web address. Try letters and numbers.' },
   { code: 'slug_taken', message: 'Another restaurant already uses that web address. Try a slightly different name.' },
@@ -60,7 +69,9 @@ export async function POST(request: NextRequest) {
   // with another signup -- the unique index is the real guard, and 23505 below
   // is what a lost race looks like.
   const slug = await uniqueSlug(slugify(name), async (candidate) => {
-    const { data } = await supabase.from('restaurants').select('id').eq('slug', candidate).maybeSingle();
+    // Other tenants' rows are not readable (migration 20261110000700), so "is
+    // this address taken" is asked through the public storefront projection.
+    const { data } = await readPublicRestaurant(supabase, candidate);
     return Boolean(data);
   });
 
@@ -68,7 +79,16 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     const refusal = REFUSALS.find((entry) => error.message.includes(entry.code));
-    if (refusal) return back(request, 'error', refusal.message);
+    if (refusal) {
+      // The database said "no more outlets". Say which plan and how many,
+      // because "you have hit a limit" reads to an owner as "one of my
+      // restaurants has stopped".
+      const message =
+        refusal.code === 'outlet_limit'
+          ? outletBlockedReason(staff.context.access) ?? refusal.message
+          : refusal.message;
+      return back(request, 'error', message);
+    }
     if (error.code === '23505') return back(request, 'error', REFUSALS[3].message);
     console.error('[autodine] could not create outlet:', error.message);
     return back(request, 'error', 'The outlet could not be created. Please try again.');

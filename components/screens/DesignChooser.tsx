@@ -51,7 +51,7 @@ export function DesignChooser({
         is what guests see after scanning. You can change it later in Branding.
       </p>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-2">
         {designs.map((design) => {
           const selected = design.id === selectedId;
           return (
@@ -60,7 +60,7 @@ export function DesignChooser({
               data-design={design.id}
               data-selected={selected ? 'true' : undefined}
               className={[
-                'rounded-[12px] p-2.5 transition-colors duration-150',
+                'min-w-0 rounded-[12px] p-2.5 transition-colors duration-150',
                 selected ? 'border-2 border-plum bg-plum-soft' : 'border border-hair',
               ].join(' ')}
             >

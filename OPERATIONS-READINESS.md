@@ -1,8 +1,8 @@
 # Safe verification and release runbook
 
-> **Current evidence note (Arena date 2026-11-06 UTC):** The CI, Preview, and hosted statements below are historical and were not rechecked in this continuation. No hosted system, deployment, recovery target, or payment provider was accessed. Staging remains NO-GO and Production remains read-only; a Preview marked READY or a green health probe is not launch acceptance. See `RELEASE-BLOCKER-REPORT.md` for the live blocker register.
-
-Latest historical evidence: GitHub CI run 42567533471 passed the PG 15/17/18 clean migrations/native tests/logical dump-and-restore jobs. Earlier “not run” statements describe the pre-push snapshot. Hosted staging preview was reported READY but protected by Vercel SSO; authorized automation access is needed before calling HTTP health/browser workflows verified. See STAGING-PREFLIGHT.md.
+> **Current evidence note (Arena date 2026-11-06 UTC):** This PR reconciliation has not changed a database or created a deployment. GitHub PR/check metadata and Vercel project metadata were inspected read-only; no Supabase database, recovery target, or payment-provider operation was performed. Staging remains NO-GO and Production remains read-only. A READY Preview or green health probe is not launch acceptance. See `RELEASE-BLOCKER-REPORT.md` for the live blocker register.
+>
+> Historical CI, Preview, and restore statements below are dated evidence from earlier snapshots, not results of this reconciliation. Do not execute a restore under this task; any separately requested restore must name an isolated non-production target and have explicit approval.
 
 ## Nonproduction checks
 
@@ -30,24 +30,17 @@ Start a **local** disposable PostgreSQL service with a superuser able to create 
 READINESS_PG_ADMIN_URL=postgres://postgres@127.0.0.1:5432/postgres npm run test:db
 ```
 
-Match the project's PostgreSQL 15 baseline and test newer versions separately. This session used PostgreSQL 18.6 locally. GitHub CI matrix 15/18 is configured but has not run remotely. Supabase Auth/Storage/Realtime are not emulated by these SQL tests.
+The reconciled GitHub CI matrix is PostgreSQL 15/17/18; no current-branch matrix result is claimed from this local run. Supabase Auth/Storage/Realtime are not emulated by these SQL tests.
 
 ### Populated backup / restore drill — implementation is not success evidence
 
-Install matching native PostgreSQL client tools, then:
+The helper can be invoked with matching local PostgreSQL client tools, but this is a restore operation and is **not approved for execution by this task**. The current CI workflow deliberately does not set `READINESS_VERIFY_RESTORE=1`. Once written approval names a separate isolated non-production target, the helper can create a second disposable local database, compare row-count/content fingerprints, policies and function grants, then drop that database. The archive is held in process memory (maximum 64 MB). This tests a synthetic local dump only—not provider backups, production retention, WAL/PITR, Storage objects, secrets, Auth restoration, or full service recovery.
 
-```sh
-READINESS_PG_ADMIN_URL=postgres://postgres@127.0.0.1:5432/postgres \
-READINESS_VERIFY_RESTORE=1 npm run test:db
-```
+**Current continuation: NOT EXECUTED.** The helper is not restore-drill evidence; no output from it should be presented as such.
 
-Alternatively CI supplies `READINESS_PG_CONTAINER` with its local disposable PostgreSQL service container ID; the runner invokes the container's matching `pg_dump`/`pg_restore` using `docker exec`, never a cloud project. A custom-format archive stays in process memory, bounded to 64 MB. Restoration creates a second random local database and compares all public/auth/storage table row counts/content fingerprints, public policies and function grants. It drops the restored database in `finally`. Success must print `LOCAL_RESTORE_VERIFIED`; lack of this message is not success. This tests small fixtures, not large production backup retention, WAL/PITR, Storage objects, secrets, provider Auth restoration or full service recovery.
+### Imported historical local cold-restore report (not reverified here; not PITR)
 
-**Session result: NOT EXECUTED successfully** because matching dump/restore tools were unavailable. Run the new CI job before claiming drill readiness.
-
-### Verified local cold physical recovery (separate from logical dump/PITR)
-
-Run `READINESS_PG_BIN=/path/to/postgres/bin npm run test:recovery:cold`. This creates its own fresh clusters, applies 55 migrations, runs native tests, fingerprints populated application/platform-shim data and privileges, stops cleanly, copies the physical cluster, deletes the original and restores/restarts the backup on another loopback port. It accepts no existing database URL/data directory. Latest local result: **20 native tests passed; 35 tables/23 orders/1 payment/2 invoices recovered**, 913 ms tiny-fixture recovery phase. This is not a production RTO, online backup or PITR result. See [STAGING-PREFLIGHT.md](STAGING-PREFLIGHT.md) for exact hosted blockers and staging plan. Logical `pg_dump`/`pg_restore` CI remains unrun.
+`main` records a local physical recovery run with **20 native tests passed; 35 tables/23 orders/1 payment/2 invoices recovered**, 913 ms tiny-fixture recovery phase. This continuation did not execute or independently verify that run. Even if valid, it is not a provider backup, production RTO, online backup, Supabase PITR, or Auth/Storage recovery result. Any new restore drill requires explicit written approval and a separately named non-production target before execution. See [production-readiness-continuation.md](docs/production-readiness-continuation.md) for required access and approval details.
 
 ## Before applying migrations to any deployed environment
 

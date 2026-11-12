@@ -21,9 +21,8 @@
  *
  *   the Supabase origin    auth, data and realtime (wss) for every screen
  *
- * No payment-provider origin is allowed: the current customer flow has no
- * online-payment UI or provider callback route. Re-add a narrowly scoped
- * origin only alongside a reviewed, implemented provider flow.
+ * No payment-provider origin or frame is allowed: guest checkout is
+ * pay-at-counter only and no reviewed provider-iframe flow is shipped.
  *
  * Everything else is 'self'. object-src 'none' and base-uri 'self' close the
  * plugin and <base> tricks; frame-ancestors 'self' matches the existing
@@ -69,7 +68,7 @@ export function buildCsp({ nonce, supabaseUrl }: CspInput): string {
     `img-src ${imgSrc.join(' ')}`,
     "font-src 'self'",
     `connect-src ${connectSrc.join(' ')}`,
-    "frame-src 'self'",
+    "frame-src 'none'",
     "object-src 'none'",
     "base-uri 'self'",
     "frame-ancestors 'self'",

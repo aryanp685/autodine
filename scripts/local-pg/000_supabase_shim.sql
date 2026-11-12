@@ -8,10 +8,14 @@ do $$ begin
   if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon nologin; end if;
   if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
   if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role nologin; end if;
-  -- The hosted ACL audit found a separate owner with its own default ACLs.
-  -- Local replay needs that role only to test owner-correct default changes.
+  -- Synthetic local owner used only to test owner-specific default ACLs.
   if not exists (select 1 from pg_roles where rolname = 'supabase_admin') then create role supabase_admin nologin superuser; end if;
+  -- PostgREST switches this local login to anon/authenticated after validating
+  -- a JWT. The E2E runner sets its disposable password at runtime; never reuse
+  -- this role or its credentials outside the isolated harness.
+  if not exists (select 1 from pg_roles where rolname = 'authenticator') then create role authenticator noinherit nologin; end if;
 end $$;
+grant anon, authenticated, service_role to authenticator;
 
 -- Supabase ships a realtime publication; plain Postgres does not.
 do $$ begin

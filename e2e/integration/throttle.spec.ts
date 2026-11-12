@@ -17,19 +17,17 @@ import { expect, test } from '@playwright/test';
  * address), so within a couple of dozen attempts the database must start
  * answering `limited`. The test then checks what the guest actually sees.
  *
- * IT WRITES ROWS. `table_session_opens` gains up to two dozen. That is fine on a
- * branch database and unacceptable on production, which is why this never runs
- * automatically.
+ * IT WRITES ROWS. `table_session_opens` gains up to two dozen. The supported
+ * runner provisions a disposable local database; never point this at a branch
+ * or production database.
  *
  * REQUIRES
  *
- *   E2E_BASE_URL   an environment with 20261028000900 applied
- *   E2E_QR_TOKEN   a live card whose restaurant is in 'scan' or 'scan_confirm'
- *                  mode (dashboard → Settings → verification)
+ *   E2E_BASE_URL   the local Next.js process started by scripts/e2e/run-throttle.sh
+ *   E2E_QR_TOKEN   the synthetic card seeded into the disposable local database
  *
- * If a card's hour is already spent, the limit is simply reached sooner — that
- * only makes the test pass faster. If the card is on a code-mode restaurant,
- * the scan never mints and the test fails with that explanation.
+ * The runner rebuilds the DB for each invocation, so card usage starts fresh.
+ * It refuses non-loopback database hosts and never reads production credentials.
  */
 
 const TOKEN = process.env.E2E_QR_TOKEN ?? '';
@@ -40,38 +38,52 @@ test.describe('a card scanned too often', () => {
   test('is refused by the database, and the guest is told on the menu itself', async ({ browser }) => {
     let refused = false;
     let lastUrl = '';
+    let lastResponseInfo = '';
+    let lastCookieInfo = '';
+    const clientErrors: string[] = [];
     let page;
 
     for (let attempt = 1; attempt <= 25; attempt += 1) {
       // A fresh context is a fresh guest: no table session, no flags.
       const context = await browser.newContext();
       page = await context.newPage();
-      await page.goto(`/t/${TOKEN}`, { waitUntil: 'domcontentloaded' });
-
+      page.on('pageerror', (error) => clientErrors.push(error.message));
+      page.on('console', (message) => { if (message.type() === 'error') clientErrors.push(message.text()); });
+      page.on('requestfailed', (request) => clientErrors.push(`${request.method()} ${request.url()}: ${request.failure()?.errorText ?? 'request failed'}`));
+      const response = await page.goto(`/t/${TOKEN}`, { waitUntil: 'domcontentloaded' });
       lastUrl = page.url();
+      lastResponseInfo = `${response?.status() ?? 'no response'} ${response?.headers()['content-type'] ?? ''}`;
       if (lastUrl.includes('v=throttled')) {
         refused = true;
+        lastCookieInfo = JSON.stringify((await context.cookies()).map(({ name, domain, secure, sameSite }) => ({ name, domain, secure, sameSite })));
         break;
       }
 
+      // Let the server-rendered menu finish before closing this fresh guest's
+      // context; otherwise many abandoned streamed renders can queue behind the
+      // real database and make the throttle observation nondeterministic.
+      await page.getByText(/^(?:Local E2E dish|Synthetic Paneer Dish)$/).first().waitFor({ state: 'visible', timeout: 30_000 });
       await context.close();
     }
 
     // Ten opens per card, twenty per address, so 25 attempts cannot all pass.
     expect(refused, `no refusal in 25 scans; last address ${lastUrl}`).toBe(true);
 
-    const notice = page!.getByRole('status').filter({ hasText: 'Table check paused' });
-    await expect(notice).toBeVisible();
+    const notice = page!.locator('[data-throttle-note]');
+    await expect(notice, `throttle notice missing at ${page!.url()}; response=${lastResponseInfo}; cookies=${lastCookieInfo}; clientErrors=${clientErrors.join(' || ')}`).toBeVisible({ timeout: 30_000 });
 
-    // What the guest is owed: why, and what to do next.
-    const text = (await notice.innerText()).toLowerCase();
-    expect(text).toContain('scanned unusually often');
-    expect(text).toContain('order with staff');
+    // Assert the notice itself. Aggregating body.innerText() can race streamed
+    // menu updates and is not the user's actual announcement node.
+    const text = await notice.innerText();
+    const lowerText = text.toLowerCase();
+    expect(lowerText).toContain('table check paused');
+    expect(lowerText).toContain('scanned unusually often');
+    expect(lowerText).toContain('order with staff');
 
     // A throttled guest in a scan-mode restaurant has no code to type, so the
     // screen must not send them to a form that cannot help them.
-    expect(text).not.toContain('enter the code');
-    expect(text).not.toContain('ask a waiter');
+    expect(lowerText).not.toContain('enter the code');
+    expect(lowerText).not.toContain('ask a waiter');
 
     // Nothing has been ordered, and nothing may say otherwise.
     const body = (await page!.locator('body').innerText()).toLowerCase();
@@ -99,20 +111,30 @@ test.describe('a card scanned too often', () => {
      */
     const context = await browser.newContext();
     const page = await context.newPage();
+    let lastResponseInfo = '';
+    const clientErrors: string[] = [];
+    page.on('pageerror', (error) => clientErrors.push(error.message));
+    page.on('console', (message) => { if (message.type() === 'error') clientErrors.push(message.text()); });
+    page.on('requestfailed', (request) => clientErrors.push(`${request.method()} ${request.url()}: ${request.failure()?.errorText ?? 'request failed'}`));
 
     for (let attempt = 1; attempt <= 25; attempt += 1) {
-      await page.goto(`/t/${TOKEN}`, { waitUntil: 'domcontentloaded' });
+      const response = await page.goto(`/t/${TOKEN}`, { waitUntil: 'domcontentloaded' });
+      lastResponseInfo = `${response?.status() ?? 'no response'} ${response?.headers()['content-type'] ?? ''}`;
       if (page.url().includes('v=throttled')) break;
 
       // Same browser, cleared cookies: the guest, not the card budget, is what
-      // the loop varies; the opens table keeps counting either way.
+      // the loop varies; the opens table keeps counting either way. Wait for
+      // this render to finish before starting the next scan.
+      await page.getByText(/^(?:Local E2E dish|Synthetic Paneer Dish)$/).first().waitFor({ state: 'visible', timeout: 30_000 });
       await context.clearCookies();
     }
 
     const flag = new URL(page.url(), baseURL).searchParams.get('v') ?? '';
-    const notice = page.getByRole('status').filter({ hasText: 'Table check paused' });
-    await expect(notice).toBeVisible();
+    const cookieInfo = JSON.stringify((await context.cookies()).map(({ name, domain, secure, sameSite }) => ({ name, domain, secure, sameSite })));
+    const notice = page.locator('[data-throttle-note]');
+    await expect(notice, `throttle notice missing at ${page.url()}; flag=${flag}; response=${lastResponseInfo}; cookies=${cookieInfo}; clientErrors=${clientErrors.join(' || ')}`).toBeVisible({ timeout: 30_000 });
     const text = await notice.innerText();
+    expect(text.toLowerCase()).toContain('table check paused');
 
     const seconds = flag.startsWith('throttled.') ? Number(flag.slice('throttled.'.length)) : null;
 

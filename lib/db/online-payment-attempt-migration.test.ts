@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const sql = readFileSync(
-  new URL('../../supabase/migrations/20261110000900_online_payment_attempt_uniqueness.sql', import.meta.url),
+  new URL('../../supabase/migrations/20261110000950_online_payment_attempt_uniqueness.sql', import.meta.url),
   'utf8',
 );
 function body(name: string): string {

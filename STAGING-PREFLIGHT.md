@@ -1,6 +1,6 @@
 # Existing staging: read-only preflight
 
-> **Current instruction boundary (Arena date 2026-11-06 UTC):** All hosted Staging statuses and actions recorded below are historical claims, not fresh verification or authorization. The current user direction supersedes any older “approved staging upgrade” text: Staging is NO-GO and may receive only authorized read-only metadata/catalog inspection until operator acceptance, recovery evidence, and migration gates are satisfied. No hosted system was accessed in this continuation. Production remains read-only. See `RELEASE-BLOCKER-REPORT.md` for the current blocker register.
+> **Current instruction boundary (Arena date 2026-11-06 UTC):** Staging remains NO-GO and may receive only separately authorized read-only metadata/catalog inspection until operator acceptance, recovery evidence, and migration gates are satisfied. The hosted deployment/migration claims below are imported historical evidence, not fresh verification or authorization for this task. No Supabase/Staging/Production database was accessed or changed here. Vercel project metadata was inspected read-only; no deployment was created. Production remains read-only. See `RELEASE-BLOCKER-REPORT.md` for the current blocker register.
 
 ## Latest verified readiness result
 

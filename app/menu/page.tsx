@@ -116,7 +116,8 @@ export default async function CustomerMenuPage({
    * both, and the address is the newer statement of the two.
    */
   const fromAddress = readThrottleFlag(v);
-  const fromCookie = readThrottleFlag((await cookies()).get(THROTTLE_COOKIE)?.value);
+  const rawThrottleCookie = (await cookies()).get(THROTTLE_COOKIE)?.value;
+  const fromCookie = readThrottleFlag(rawThrottleCookie);
   const throttle = fromAddress.throttled ? fromAddress : fromCookie;
 
   // The cart is keyed by restaurant, so it is mounted where the slug is known.

@@ -23,12 +23,17 @@
 export const OUTLET_COOKIE = 'ad_outlet';
 
 /**
- * How many outlets one account may own.
+ * How many outlets one account may own while it is on the trial.
  *
  * Not a licensing rule -- a stop on the one abuse this flow opens: creating a
- * restaurant is free and starts a fresh seven-day trial, so an unlimited
- * "add outlet" button is an unlimited free trial. Five is more than the
- * small chains this is built for and few enough to be worth blocking.
+ * restaurant is free and starts a fresh trial, so an unlimited "add outlet"
+ * button is an unlimited free trial. Five is more than the small chains this
+ * is built for and few enough to be worth blocking.
+ *
+ * Since migration 20261110001000 (Model C) the number lives on the ACCOUNT
+ * plan, in public.account_outlet_limit(): Starter 1, Professional 5, Business
+ * unlimited. This constant is the trial allowance, which is what an account
+ * has before any plan is chosen.
  */
 export const MAX_OUTLETS_PER_OWNER = 5;
 

@@ -8,6 +8,7 @@
 
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { readPublicRestaurant } from '@/lib/db/public-restaurant';
 
 export type StorefrontStatus = {
   name: string;
@@ -22,11 +23,7 @@ export async function getStorefrontStatusBySlug(slug: string): Promise<Storefron
   const supabase = await createSupabaseServerClient();
   if (!supabase) return null;
 
-  const { data, error } = await supabase
-    .from('restaurants')
-    .select('name, is_active, announcement_text, announcement_on')
-    .eq('slug', slug.trim())
-    .maybeSingle();
+  const { data, error } = await readPublicRestaurant(supabase, slug);
 
   if (error) throw new Error(`Could not load restaurant: ${error.message}`);
   if (!data) return null;

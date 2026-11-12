@@ -1,27 +1,25 @@
-import { createClient } from '@supabase/supabase-js';
 import { expect, test, type BrowserContext } from '@playwright/test';
 import {
   BASE,
   GUEST_READY,
   STAFF_READY,
-  SLUG,
-  OWNER_EMAIL,
-  OWNER_PASSWORD,
   addOneAndCheckout,
-  codeFromOrderUrl,
+  addAnotherAndCheckout,
+  reservedScanToken,
   placeOrder,
+  codeFromOrderUrl,
+  tokenFromOrderUrl,
   scanCard,
   signInOwner,
   skipUnless,
 } from './flow';
+import { orderSessionForGuestToken } from './disposable-db';
 
 /**
  * THE COUNTER (CASHIER), END TO END, ON A REAL DEPLOYMENT.
  *
- * Real bills, real record_counter_payment writes for cash/card/UPI, and the
- * idempotent duplicate-payment guard. Guest UPI QR/self-claim is intentionally
- * absent: the UPI case below verifies that a guest gets no claim control and
- * staff can record an externally verified counter payment. Each test places
+ * Real bills, real record_counter_payment writes, counter-only guest payment
+ * messaging, and the idempotent duplicate-confirmation guard. Each test places
  * its own order — money state is exactly the thing tests must not share.
  *
  * IT WRITES ROWS (orders AND payments). Point it at a DISPOSABLE branch
@@ -75,8 +73,9 @@ test.describe('cashier — real database', () => {
 
     const bill = await till.context().newPage();
     await bill.goto(`${BASE}/bill/${orderId}`);
-    await expect(bill.locator('[data-bill-sheet]')).toBeVisible({ timeout: 20_000 });
-    await expect(bill.locator('[data-bill-sheet]').getByText('Total',{exact:true}).locator('..')).toContainText(/₹[\d,]+/);
+    const billSheet = bill.locator('[data-bill-sheet]');
+    await expect(billSheet).toBeVisible({ timeout: 20_000 });
+    await expect(billSheet.getByText('Total', { exact: true }).locator('..')).toContainText(/₹[\d,]+/);
   });
 
   test('recording a counter payment moves the money from pending to paid', async ({
@@ -98,39 +97,31 @@ test.describe('cashier — real database', () => {
     await expect(till.locator('[data-counter-cta]')).not.toHaveText(/₹0[^0-9]/);
   });
 
-  test('UPI is recorded only by staff at the counter, with a persisted payment', async ({context}) => {
-    const guestUrl=await placeCounterOrder(context,'e2e: manual UPI fixture no real transfer');
-    const code=codeFromOrderUrl(guestUrl);
-    const guest=await context.newPage();await guest.goto(guestUrl);
-    await expect(guest.getByText('Pay at the counter before you leave.',{exact:true})).toBeVisible();
+  test('UPI is recorded by staff only; guests cannot claim an online payment', async ({ context }) => {
+    test.skip(!GUEST_READY, skipUnless(false, 'guest env for the order half'));
+    const guestUrl = await placeCounterOrder(context, 'e2e: staff-recorded UPI fixture');
+    const code = codeFromOrderUrl(guestUrl);
+
+    const guest = await context.newPage();
+    await guest.goto(guestUrl);
+    await expect(guest.getByText('Pay at the counter before you leave.', { exact: true })).toBeVisible();
     await expect(guest.locator('[data-pay-upi], [data-upi-claimed]')).toHaveCount(0);
-    await expect(guest.getByRole('button',{name:'I have paid',exact:true})).toHaveCount(0);
-    const till=await signInOwner(context);await till.goto(`${BASE}/cashier`);
-    await till.getByRole('button',{name:new RegExp(`Select ${code} at`)}).click();
-    await till.getByRole('group',{name:'Payment method'}).getByRole('button',{name:'UPI',exact:true}).click();
+    await expect(guest.getByRole('button', { name: 'I have paid', exact: true })).toHaveCount(0);
+
+    // The browser fixture records an explicitly synthetic counter payment;
+    // it does not initiate a bank transfer or contact a payment provider.
+    const till = await signInOwner(context);
+    await till.goto(`${BASE}/cashier`);
+    await till.getByRole('button', { name: new RegExp(`Select ${code} at`) }).click();
+    await till.getByRole('group', { name: 'Payment method' }).getByRole('button', { name: 'UPI', exact: true }).click();
     await expect(till.locator('[data-counter-cta]')).toHaveText('Record UPI ₹125');
     await till.locator('[data-counter-cta]').click();
-    await expect(till.getByText(new RegExp(`UPI.*recorded for ${code}`))).toBeVisible({timeout:20_000});
-    // Counter payments only have supplemental receipt links when an invoice
-    // was issued first. Verify persistence as the authenticated fixture owner,
-    // not by assuming an invoice exists or granting service-role money reads.
-    if(process.env.STAGING_SUPABASE_URL!=='https://juwyhslzchjevqkdvwjm.supabase.co'||!process.env.STAGING_SUPABASE_SERVICE_ROLE_KEY)throw new Error('Approved staging persistence credentials required');
-    const db=createClient(process.env.STAGING_SUPABASE_URL,process.env.STAGING_SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
-    const login=await db.auth.signInWithPassword({email:OWNER_EMAIL,password:OWNER_PASSWORD});
-    if(login.error)throw new Error('Fixture owner persistence login failed');
-    try {
-      const tenant=await db.from('restaurants').select('id,upi_id').eq('slug',SLUG).single();
-      if(tenant.error)throw new Error('Fixture tenant persistence read failed');
-      expect(tenant.data.upi_id).toBe('autodine-synthetic@invalid');
-      const order=await db.from('orders').select('id,payment_status').eq('restaurant_id',tenant.data.id).eq('code',code).single();
-      if(order.error)throw new Error('UPI order persistence read failed');
-      expect(order.data.payment_status).toBe('paid');
-      const payments=await db.from('payments').select('method,amount_paise,status').eq('restaurant_id',tenant.data.id).eq('order_id',order.data.id);
-      if(payments.error)throw new Error('UPI payment persistence read failed');
-      expect(payments.data).toEqual([{method:'upi',amount_paise:12500,status:'recorded'}]);
-    } finally {await db.auth.signOut();}
+    await expect(till.getByText(new RegExp(`UPI.*recorded for ${code}`))).toBeVisible({ timeout: 20_000 });
+
+    // A fresh status read observes the staff-recorded result without relying
+    // on service-role credentials or touching a hosted data plane.
     await guest.reload();
-    await expect(guest.getByText('Paid. Thank you.',{exact:true})).toBeVisible();
+    await expect(guest.getByText('Paid. Thank you.', { exact: true })).toBeVisible();
   });
 
   test('double-tapping Record writes ONE payment', async ({ context }) => {
@@ -149,6 +140,92 @@ test.describe('cashier — real database', () => {
     // Re-read the till and the bill: one payment, nothing outstanding twice.
     await till.reload();
     await expect(till.getByText(/outstanding/i).first()).toBeVisible();
+  });
+
+  test('two ticket sitting settles, prints the exact total, closes and starts a fresh sitting', async ({ context }) => {
+    test.skip(!GUEST_READY, skipUnless(false, 'guest env for the order half'));
+    const cardToken = reservedScanToken(24);
+    const guest = await scanCard(context, cardToken);
+
+    await addOneAndCheckout(guest);
+    const firstUrl = await placeOrder(guest, 'e2e: session ticket one');
+    await addAnotherAndCheckout(guest);
+    const secondUrl = await placeOrder(guest, 'e2e: session ticket two');
+    const first = await orderSessionForGuestToken(tokenFromOrderUrl(firstUrl));
+    const second = await orderSessionForGuestToken(tokenFromOrderUrl(secondUrl));
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    expect(first?.order_session_id).toBe(second?.order_session_id);
+
+    const till = await signInOwner(context);
+    await till.goto(`${BASE}/dashboard`);
+    const session = till.locator(`[data-active-session="${first?.order_session_id}"]`);
+    await expect(session).toBeVisible({ timeout: 45_000 });
+    await expect(session).toContainText('2 tickets');
+    const dashboardTotal = (await session.locator('[data-session-total]').innerText()).trim();
+
+    await session.getByRole('button', { name: /Mark .* paid/ }).click();
+    await expect(session.getByRole('button', { name: /Close .* issue final receipt/ })).toBeVisible({ timeout: 20_000 });
+    await session.getByRole('button', { name: /Close .* issue final receipt/ }).click();
+    const confirm = session.getByRole('group', { name: /Confirm checkout/ });
+    await confirm.getByRole('button', { name: 'Close & issue' }).click();
+    await expect(till).toHaveURL(/\/invoice\/[0-9a-f-]{36}$/i, { timeout: 30_000 });
+    const sheet = till.locator('[data-invoice-sheet]');
+    await expect(sheet).toBeVisible();
+    const invoiceTotal = (await till.locator('[data-invoice-total]').innerText()).trim();
+    const amountInPaise = (value: string) => Math.round(Number(value.replace(/[₹,]/g, '')) * 100);
+    expect(amountInPaise(invoiceTotal)).toBe(amountInPaise(dashboardTotal));
+    await expect(sheet.locator('tbody tr')).toHaveCount(2);
+
+    await till.getByRole('button', { name: 'Create 24-hour link' }).click();
+    const secureLinkInput = till.getByLabel('New secure receipt link');
+    await expect(secureLinkInput).toBeVisible({ timeout: 20_000 });
+    const shareUrl = await secureLinkInput.inputValue();
+    expect(shareUrl).toMatch(/\/receipt-share\/[A-Za-z0-9_-]{43}$/);
+    const sharedReceipt = await context.newPage();
+    await sharedReceipt.goto(shareUrl);
+    await expect(sharedReceipt.locator('[data-invoice-sheet]')).toBeVisible({ timeout: 20_000 });
+    await expect(sharedReceipt.locator('[data-invoice-total]')).toHaveText(invoiceTotal);
+    await expect(sharedReceipt.getByRole('button', { name: 'Create 24-hour link' })).toHaveCount(0);
+
+    // Exercise the browser's CSS page-size path and make sure each PDF is a
+    // real PDF artifact generated from the same final receipt DOM.
+    const layout = till.getByLabel('Receipt print layout');
+    for (const [name, options] of [
+      ['a4', { printBackground: true, preferCSSPageSize: true }],
+      ['58mm', { printBackground: true, preferCSSPageSize: true }],
+      ['80mm', { printBackground: true, preferCSSPageSize: true }],
+    ] as const) {
+      await layout.selectOption(name);
+      await expect(sheet).toHaveAttribute('data-layout', name);
+      await till.emulateMedia({ media: 'print' });
+      const pdf = await till.pdf(options);
+      expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
+      expect(pdf.length).toBeGreaterThan(2_000);
+      await till.emulateMedia({ media: 'screen' });
+      expect((await till.locator('[data-invoice-total]').innerText()).trim()).toBe(invoiceTotal);
+    }
+
+    await till.getByRole('button', { name: 'Revoke link' }).click();
+    await expect(till.getByText('Receipt link revoked.')).toBeVisible();
+    await sharedReceipt.reload();
+    await expect(sharedReceipt.getByText('This link is unavailable')).toBeVisible({ timeout: 20_000 });
+
+    await till.goto(`${BASE}/dashboard/invoices`);
+    await expect(till.getByRole('link', { name: /INV\// }).first()).toBeVisible({ timeout: 20_000 });
+
+    // After closure, a further intentional order on the same QR must not
+    // attach to the settled sitting or its immutable invoice.
+    const reopenedGuest = await scanCard(context, cardToken);
+    await addOneAndCheckout(reopenedGuest);
+    const thirdUrl = await placeOrder(reopenedGuest, 'e2e: fresh sitting after checkout');
+    const third = await orderSessionForGuestToken(tokenFromOrderUrl(thirdUrl));
+    expect(third).not.toBeNull();
+    expect(third?.order_session_id).not.toBe(first?.order_session_id);
+    expect(third?.session_status).toBe('open');
+    await till.goto(`${BASE}/dashboard`);
+    await expect(till.locator(`[data-active-session="${third?.order_session_id}"]`)).toBeVisible({ timeout: 30_000 });
+    await expect(till.locator(`[data-active-session="${first?.order_session_id}"]`)).toHaveCount(0);
   });
 
   test('a cancelled order cannot be settled — money for food that will not come', async ({

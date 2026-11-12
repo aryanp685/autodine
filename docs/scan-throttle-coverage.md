@@ -32,29 +32,38 @@ a sentence". This file is the honest map.
 | the wait quoted matches what the server sent (and nothing is invented) | same file + `lib/scan-outcome.test.ts` | yes | no |
 | the same attempt key is re-sent, so a retry cannot duplicate an order | same file | yes | no |
 | an already-verified guest's order is untouched by a refused scan | same file | yes | no |
-| a genuine throttle in a browser, against a real DB | `e2e/integration/throttle.spec.ts` | **no** | **yes** |
-| a genuine throttle through the real route + page + action, real SQL | `app/menu/throttle-db.integration.test.tsx` | **no** (skips without `THROTTLE_DB_URL`) | **yes** — all 4 cases, including C4, passed on isolated local PostgreSQL 17.11 |
+| a genuine throttle in a browser, against a real DB | `e2e/integration/throttle.spec.ts` | **yes** — dedicated isolated local PostgreSQL/PostgREST workflow | **yes**, disposable only |
+| a genuine throttle through the real route + page + action, real SQL | `app/menu/throttle-db.integration.test.tsx` | **yes** — same workflow runs all four cases | **yes** — disposable local PostgreSQL 17.11 |
 
-## The gap, stated plainly
+## Database-backed coverage and its limits
 
-**Update, 2026-11-07:** the database-backed suite has run on a disposable native
-PostgreSQL 17.11 database built from all checked-in migrations plus the explicitly
-marked local-only scaffolds. All four integration tests passed, including C4's
-concurrent guest-token race. This was **not** a production clone, and the missing
-live-schema objects use inferred scaffold definitions, so it is isolated local
-validation rather than proof of exact production-schema behavior. See the
-C4 follow-up in `AUDIT-REPORT.md`.
+**Verified 2026-11-07:** workflow run [42398395823](https://github.com/aryanp685/autodine/actions/runs/42398395823)
+ran both named Playwright tests and the existing `throttle-db.integration.test.tsx`
+suite against disposable local PostgreSQL 17.11 and local PostgREST. The browser
+result checker requires exactly **2 passed, 0 skipped, 0 failed**; the job passed.
+The PostgreSQL suite's four cases also passed, including C4's concurrent
+guest-token race. The workflow uploaded logs, test results, migration replay,
+and per-test evidence for 30 days. Reproduction instructions are in
+`docs/e2e-local.md`.
 
-CI has no Supabase environment, by design — the browser suite is hermetic so the
-pipeline needs no secrets. The consequence is exact and worth saying out loud:
+This was **not** a production clone. Missing live-schema objects use explicitly
+marked, inferred local scaffolds, so the run proves the repository SQL and local
+compatibility stack, not exact production-schema parity. No production services
+or data were used. See the C4 follow-up in `AUDIT-REPORT.md`.
 
-- the application's handling of `limited` is proven by tests that drive the real
-  route handler, the real page and the real server action (`throttle-flow.test.tsx`);
-- the database-backed integration cases now execute real SQL locally, but do not
-  establish parity with the live database's omitted table definitions;
-- the production wrapper's session-attachment regression is fixed by the forward
-  migration; Supabase records it as `20261107123437` and read-only inspection
-  confirms it is active. The C4 race test itself was never run against production.
+CI uses no production Supabase environment or secrets. The dedicated workflow
+starts its own PostgreSQL database and local PostgREST service; the normal
+hermetic suite remains independent of external services. The distinction is:
+
+- `throttle-flow.test.tsx` covers app handling of `limited` through the real
+  route handler, page, and server action with the Supabase boundary mocked;
+- the database-backed integration and browser suites now execute real local SQL
+  and browser traffic, but cannot establish parity with omitted live-schema
+  definitions;
+- the production wrapper's session-attachment regression is fixed by the
+  forward migration; Supabase records it as `20261107123437`, and read-only
+  inspection confirms it is active. The C4 race test was never run against
+  production.
 
 ## Remaining production-fidelity check (separate from local C4)
 
@@ -73,12 +82,12 @@ THROTTLE_DB_URL="$BRANCH_DATABASE_URL" \
   npx vitest run app/menu/throttle-db.integration.test.tsx
 ```
 
-The separate browser E2E (`e2e/integration/throttle.spec.ts`) has not been run:
-there is no browser binary in this environment, and it needs an isolated
-branch deployment plus database credentials. It can write up to twenty-five
-`table_session_opens` rows. Production is never an acceptable target for either
-integration test. The forward SQL migration has already been applied to
-production; do not rerun the integration tests there.
+The browser E2E (`e2e/integration/throttle.spec.ts`) now runs in the dedicated
+isolated workflow described above. It writes synthetic scan rows only to the
+throwaway `autodine_e2e` database, which the runner drops at exit. Production is
+never an acceptable target for either integration test. The forward SQL migration
+has already been applied to production; do not replay it or run the integration
+tests there.
 
 ## Why the hermetic suite cannot simply cover it
 

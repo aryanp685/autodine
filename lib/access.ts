@@ -26,7 +26,114 @@ export type RestaurantAccess = {
   readOnly: boolean;
   /** Feature ids from the server's matrix. */
   features: string[];
+  /**
+   * Migration 20261110001000 (Model C). The account that owns this outlet and
+   * pays for it. Optional: a deployment predating the migration has no account
+   * link, and a screen must not break for it.
+   */
+  accountId?: string | null;
+  /**
+   * Migration 20261110001000. How many outlets the account's plan allows, and
+   * how many it has. Optional for the same reason, and read through
+   * `outletEntitlementOf()` so a missing value is never treated as a licence.
+   */
+  outlets?: OutletEntitlement;
 };
+
+/**
+ * Outlets: what the plan allows and what the account already has.
+ *
+ * `limit: null` is unlimited. `remaining: null` is "not known", which is not
+ * the same as "allowed": the server refuses over-limit creation either way
+ * (public.create_outlet(), migration 20261110001000). This type only decides
+ * what a screen may promise.
+ */
+export type OutletEntitlement = {
+  used: number;
+  /** Null = unlimited. */
+  limit: number | null;
+  unlimited: boolean;
+  /** Null when the limit is unlimited or unknown. */
+  remaining: number | null;
+};
+
+/** What a screen assumes before the server has answered. */
+export const UNKNOWN_OUTLET_ENTITLEMENT: OutletEntitlement = {
+  used: 1,
+  limit: null,
+  unlimited: true,
+  remaining: null,
+};
+
+/** The entitlement of an access read, with an honest default. */
+export function outletEntitlementOf(
+  access: RestaurantAccess | null | undefined,
+): OutletEntitlement {
+  const outlets = access?.outlets;
+  if (!outlets || typeof outlets !== 'object') return UNKNOWN_OUTLET_ENTITLEMENT;
+  const limit = typeof outlets.limit === 'number' ? outlets.limit : null;
+  const used = typeof outlets.used === 'number' ? outlets.used : 1;
+  return {
+    used,
+    limit,
+    unlimited: limit === null,
+    remaining: limit === null ? null : Math.max(limit - used, 0),
+  };
+}
+
+/** "3 of 5 outlets", "Unlimited outlets", or '' when nothing is known. */
+export function outletSummary(access: RestaurantAccess | null | undefined): string {
+  if (!access?.outlets) return '';
+  return entitlementSummary(outletEntitlementOf(access));
+}
+
+/** The same sentence, for a caller that already holds the entitlement. */
+export function entitlementSummary(entitlement: OutletEntitlement | null | undefined): string {
+  if (!entitlement) return '';
+  const { used, limit, unlimited } = entitlement;
+  if (unlimited) return 'Unlimited outlets';
+  if (limit === null) return '';
+  return `${used} of ${limit} ${limit === 1 ? 'outlet' : 'outlets'}`;
+}
+
+/** Whether an entitlement still allows another outlet. */
+export function entitlementAllowsAnother(entitlement: OutletEntitlement | null | undefined): boolean {
+  // Unknown entitlement: offer the control and let the server decide. The
+  // database refuses an over-limit create regardless of what this returns.
+  if (!entitlement) return true;
+  if (entitlement.unlimited) return true;
+  return entitlement.remaining === null || entitlement.remaining > 0;
+}
+
+/** Why an entitlement blocks another outlet, or null. */
+export function entitlementBlockedReason(entitlement: OutletEntitlement | null | undefined): string | null {
+  if (!entitlement) return null;
+  if (entitlementAllowsAnother(entitlement)) return null;
+  const { limit, used } = entitlement;
+  return `This plan includes ${limit} ${limit === 1 ? 'outlet' : 'outlets'} and ${used} ${used === 1 ? 'is' : 'are'} already open. Every outlet keeps working — adding another one needs a larger plan.`;
+}
+
+/**
+ * Whether the account may add another outlet.
+ *
+ * A rendering hint. The limit is enforced in public.create_outlet(), and a
+ * plan that shrinks never removes an outlet that already exists: it stops NEW
+ * creation only, and this function says which case the caller is in.
+ */
+export function canCreateOutlet(access: RestaurantAccess | null | undefined): boolean {
+  return entitlementAllowsAnother(outletEntitlementOf(access));
+}
+
+/**
+ * Why an outlet cannot be added, or null.
+ *
+ * Says what still works, because "you have hit your limit" reads to an owner
+ * as "one of my restaurants has stopped". None of them have: a downgrade or an
+ * expiry keeps every outlet and every row of data.
+ */
+export function outletBlockedReason(access: RestaurantAccess | null | undefined): string | null {
+  return entitlementBlockedReason(outletEntitlementOf(access));
+}
 
 /** How the plan is named on screen. Never invents a tier. */
 export function planLabel(plan: string): string {

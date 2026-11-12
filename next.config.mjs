@@ -1,6 +1,17 @@
 /** @type {import('next').NextConfig} */
+// Refuse to build or start a non-production deployment that is pointed at the
+// production Supabase project. See docs/preview-isolation.md.
+import { assertBuildIsolation, deployEnvironment } from './scripts/deployment-isolation.mjs';
+
+assertBuildIsolation(process.env);
+
 const nextConfig = {
   reactStrictMode: true,
+  // The browser bundle has no VERCEL_ENV. Inline the deployment's environment so
+  // the same isolation rule holds on the client (lib/supabase/env.ts).
+  env: {
+    NEXT_PUBLIC_AUTODINE_DEPLOY_ENV: deployEnvironment(process.env),
+  },
 
   /*
    * Cross-origin dev requests are allowed from a hosted preview, feature by

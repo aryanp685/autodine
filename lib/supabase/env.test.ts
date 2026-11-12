@@ -4,8 +4,8 @@
  * These exist because the failure modes here are silent and expensive:
  *
  *  - reading only the legacy key names leaves a new Supabase project
- *    permanently unconfigured, and because empty values are tolerated that
- *    shows up as demo data rather than an error;
+ *    permanently unconfigured; missing config must never become an implicit
+ *    demo-data fallback in development or production;
  *  - a secret key behind a NEXT_PUBLIC_ prefix ships a full RLS bypass to
  *    every visitor's browser.
  *

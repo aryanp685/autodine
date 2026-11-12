@@ -30,6 +30,36 @@ async function fixture(): Promise<Fixture> {
   const order = (await db.query('select id,order_session_id from orders where restaurant_id=$1 and code=$2',[restaurant,code])).rows[0];
   return {restaurant,table,item,user,kitchen,slug,sessionToken,order:order.id,sitting:order.order_session_id};
 }
+/**
+ * Recreates a sitting from before 20261108008000: closed and invoiced while its
+ * bill is still unpaid. The checkout RPC no longer produces this state -- it
+ * refuses to close an unsettled table -- but rows like it already exist, and
+ * later payments against their immutable receipt must stay correct. The
+ * lock-order and receipt regressions below therefore build the state the way
+ * the old RPC did, without the settlement gate.
+ */
+async function issueLegacyUnpaidReceipt(client: Client, f: Fixture): Promise<string> {
+  await client.query("update order_sessions set status='closed', closed_at=statement_timestamp(), closed_by=$2 where id=$1", [f.sitting, f.user]);
+  return (await client.query('select issue_closed_session_receipt($1) id', [f.sitting])).rows[0].id;
+}
+/**
+ * The same role switch, but COMMITTED.
+ *
+ * asStaff() rolls back, which is right for a permission probe and wrong for
+ * "the owner added an outlet": the row has to be there for the next query,
+ * because a second outlet is what the account's plan is counted against.
+ */
+async function asStaffCommitted<T>(user: string, work: () => Promise<T>): Promise<T> {
+  await db.query('begin');
+  try {
+    await db.query("select set_config('request.jwt.claim.sub',$1,true)",[user]);
+    await db.query('set local role authenticated');
+    const result = await work();
+    await db.query('commit');
+    return result;
+  } catch (error) { await db.query('rollback'); throw error; }
+  finally { await db.query("select set_config('request.jwt.claim.sub','',false)"); }
+}
 async function asStaff<T>(user: string, work: () => Promise<T>): Promise<T> {
   await db.query('begin');
   try {
@@ -224,7 +254,7 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
         let invoice: { id: string; snapshot: unknown } | undefined;
         if(checkout && ['cancel','quantities'].includes(operation)) {
           await holder.query("select set_config('request.jwt.claim.sub',$1,true)",[f.user]);
-          const id=(await holder.query('select close_order_session_and_issue_receipt($1) id',[f.sitting])).rows[0].id;
+          const id=await issueLegacyUnpaidReceipt(holder,f);
           invoice={id,snapshot:(await holder.query('select totals_snapshot from restaurant_invoices where id=$1',[id])).rows[0].totals_snapshot};
         } else if(checkout) {
           // Pending or not-yet-created gateway money is still outstanding.
@@ -278,6 +308,14 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
     },15000);
   }
 
+  it('refuses to close an unpaid sitting through the checkout RPC and leaves it open', async () => {
+    const f=await fixture();
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)",[f.user]);
+    await expect(db.query('select close_order_session_and_issue_receipt($1)',[f.sitting])).rejects.toThrow(/Collect the full outstanding balance/);
+    expect((await db.query('select status from order_sessions where id=$1',[f.sitting])).rows[0].status).toBe('open');
+    expect((await db.query('select count(*) n from restaurant_invoices where order_session_id=$1',[f.sitting])).rows[0].n).toBe('0');
+  });
+
   it('preserves supplemental receipt bookkeeping for a legacy unpaid invoice under competing counter collections', async () => {
     const f=await fixture();
     const invoice=await seedLegacyUnpaidInvoice(f);
@@ -299,6 +337,34 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
       expect((await db.query("select sum(amount_paise) paid,count(*) n from payments where order_id=$1 and status='recorded'",[f.order])).rows[0]).toEqual({paid:'25000',n:'1'});
       expect((await db.query(`select actor_id,event_type,method,amount_paise from payment_audit_events where order_id=$1`,[f.order])).rows)
         .toEqual([{actor_id:f.user,event_type:'cash_collected',method:'cash',amount_paise:'25000'}]);
+      expect((await db.query('select sequence_number from restaurant_payment_receipts where invoice_id=$1 order by sequence_number',[invoice])).rows.map(r=>r.sequence_number)).toEqual([1]);
+      expect((await db.query('select totals_snapshot from restaurant_invoices where id=$1',[invoice])).rows[0].totals_snapshot).toEqual(before);
+      await expect(withActor(f.user,()=>db.query('select record_counter_payment($1,$2,$3,$4,$5)',
+        [f.slug,f.order,'cash',1,randomUUID()]))).rejects.toThrow();
+      expect((await db.query('select count(*) n from restaurant_payment_receipts where invoice_id=$1',[invoice])).rows[0].n).toBe('1');
+    } finally {await Promise.all(clients.map(async c=>{await c.query('rollback');await c.end();}));}
+  },15000);
+
+  it('allows only one of two distinct full collections after invoice issuance', async () => {
+    const f=await fixture();
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)",[f.user]);
+    const invoice=await issueLegacyUnpaidReceipt(db,f);
+    const before=(await db.query('select totals_snapshot from restaurant_invoices where id=$1',[invoice])).rows[0].totals_snapshot;
+    const clients=[new Client({connectionString:URL_VALUE}),new Client({connectionString:URL_VALUE})];
+    const keys=[randomUUID(),randomUUID()];
+    try {
+      await Promise.all(clients.map(c=>c.connect()));
+      const outcomes=await Promise.all(clients.map(async(c,i)=>{
+        await c.query('begin'); await c.query("set local statement_timeout='8s'");
+        await c.query("select set_config('request.jwt.claim.sub',$1,true)",[f.user]);
+        await c.query('set local role authenticated');
+        try {
+          await c.query('select record_counter_payment($1,$2,$3,$4,$5)',[f.slug,f.order,'cash',25000,keys[i]]);
+          await c.query('commit'); return 'recorded';
+        } catch(error) { await c.query('rollback'); return (error as Error).message; }
+      }));
+      expect(outcomes.filter(x=>x==='recorded')).toHaveLength(1);
+      expect((await db.query("select sum(amount_paise) paid,count(*) n from payments where order_id=$1 and status='recorded'",[f.order])).rows[0]).toEqual({paid:'25000',n:'1'});
       expect((await db.query('select sequence_number from restaurant_payment_receipts where invoice_id=$1 order by sequence_number',[invoice])).rows.map(r=>r.sequence_number)).toEqual([1]);
       expect((await db.query('select totals_snapshot from restaurant_invoices where id=$1',[invoice])).rows[0].totals_snapshot).toEqual(before);
       await expect(withActor(f.user,()=>db.query('select record_counter_payment($1,$2,$3,$4,$5)',
@@ -449,8 +515,8 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
 
   it('void-first payment race does not create a receipt against a voided invoice', async () => {
     const f=await fixture();const ref=randomUUID();
-    // Reconstruct an invoice issued before the outstanding-balance guard; a
-    // pending provider attempt was already attached to this legacy order.
+    // Reconstruct a pre-guard invoice while preserving the authenticated actor;
+    // settlement still races only on this disposable local fixture.
     const invoice=await seedLegacyUnpaidInvoice(f);
     await db.query("insert into payments(restaurant_id,order_id,method,status,amount_paise,provider,provider_ref) values($1,$2,'online','pending',25000,'phase1',$3)",[f.restaurant,f.order,ref]);
     const voider=new Client({connectionString:URL_VALUE}),payer=new Client({connectionString:URL_VALUE});
@@ -505,15 +571,17 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
     } finally {await Promise.all(clients.map(c=>c.end()));}
   },15000);
 
-  it('does not let a tenant IP quota block another restaurant on the same address', async () => {
+  it('does not let a saturated tenant IP counter block an order on the same address', async () => {
+    // The counter still exists -- it throttles SESSION MINTING, which is where
+    // a shared Wi-Fi address has to be rate-limited. It must not reach the
+    // order: every table on one NAT address is a different party.
     const first=await fixture(),second=await fixture();const shared='e'.repeat(64);
-    await db.query('insert into rate_limit_hits(key,window_started_at,count) values($1,statement_timestamp(),60)',
+    await db.query('insert into rate_limit_hits(key,window_started_at,count) values($1,statement_timestamp(),60) on conflict (key) do update set count=60',
       ['po:i:'+first.restaurant+':'+shared]);
     const sql='select place_public_order($1,$2::jsonb,null,$3,$4,$5) code';
-    await expect(db.query(sql,[first.slug,JSON.stringify([{itemId:first.item,qty:1}]),first.sessionToken,randomUUID(),shared])).rejects.toMatchObject({hint:'rate-limited'});
-    const result=await db.query(sql,[second.slug,JSON.stringify([{itemId:second.item,qty:1}]),second.sessionToken,randomUUID(),shared]);
-    expect(result.rows[0].code).toBeTruthy();
-    expect((await db.query('select count(*) n from orders where restaurant_id=$1',[first.restaurant])).rows[0].n).toBe('1');
+    expect((await db.query(sql,[first.slug,JSON.stringify([{itemId:first.item,qty:1}]),first.sessionToken,randomUUID(),shared])).rows[0].code).toBeTruthy();
+    expect((await db.query(sql,[second.slug,JSON.stringify([{itemId:second.item,qty:1}]),second.sessionToken,randomUUID(),shared])).rows[0].code).toBeTruthy();
+    expect((await db.query('select count(*) n from orders where restaurant_id=$1',[first.restaurant])).rows[0].n).toBe('2');
     expect((await db.query('select count(*) n from orders where restaurant_id=$1',[second.restaurant])).rows[0].n).toBe('2');
   });
 
@@ -530,44 +598,61 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
       expect(results.filter(r=>r.rows[0].status==='wrong')).toHaveLength(5);
       expect(results.filter(r=>r.rows[0].status==='limited')).toHaveLength(7);
       for(const result of results) expect(result.rows[0].session_token).toBeNull();
-      const attempt=(await db.query('select attempt_count,blocked_until>statement_timestamp() blocked from qr_verification_attempt_budgets where qr_code_id=$1 and ip_hash=$2',[qr.id,ip])).rows[0];
+      const attempt=(await db.query('select attempt_count,blocked_until>statement_timestamp() blocked from qr_verification_attempts where qr_code_id=$1 and ip_hash=$2',[qr.id,ip])).rows[0];
       expect(attempt).toEqual({attempt_count:5,blocked:true});
-      await db.query("update qr_verification_attempt_budgets set window_started_at=statement_timestamp()-interval '16 minutes',blocked_until=statement_timestamp()-interval '1 second' where qr_code_id=$1 and ip_hash=$2",[qr.id,ip]);
+      await db.query("update qr_verification_attempts set blocked_until=statement_timestamp()-interval '1 second' where qr_code_id=$1 and ip_hash=$2",[qr.id,ip]);
+      const reblocked=(await db.query('select * from reserve_qr_verification_attempt($1,$2)',[qr.id,ip])).rows[0];
+      expect(reblocked.allowed).toBe(false);
+      expect(reblocked.retry_after_seconds).toBeGreaterThan(800);
+      await db.query("update qr_verification_attempts set window_started_at=statement_timestamp()-interval '16 minutes',blocked_until=statement_timestamp()-interval '1 second' where qr_code_id=$1 and ip_hash=$2",[qr.id,ip]);
       const code=(await db.query('select verification_code_for(secret,floor(extract(epoch from statement_timestamp())/window_seconds)::bigint) code from restaurant_verification_codes where restaurant_id=$1',[f.restaurant])).rows[0].code;
       for(let i=0;i<2;i++) expect((await db.query('select * from verify_table_qr_with_code($1,$2,$3)',[qr.public_token,code,ip])).rows[0].status).toBe('ok');
-      expect((await db.query('select count(*) n from qr_verification_attempt_budgets where qr_code_id=$1 and ip_hash=$2',[qr.id,ip])).rows[0].n).toBe('0');
       expect((await db.query('select count(*) n from qr_verification_attempts where qr_code_id=$1 and ip_hash=$2',[qr.id,ip])).rows[0].n).toBe('0');
     } finally {await Promise.all(clients.map(c=>c.end()));}
   },15000);
 
-  it('backfills duplicate legacy QR-attempt events without adding uniqueness or dropping state', async () => {
-    const legacy = (await db.query(`select exists(
-      select 1 from pg_attribute where attrelid='public.qr_verification_attempts'::regclass
-        and attname='attempted_at' and not attisdropped) has_event_shape`)).rows[0].has_event_shape;
-    if (!legacy) return;
+  it('preserves legacy QR-attempt events while migrating the active budget into the canonical table', async () => {
+    const archives=(await db.query(`select c.relname,quote_ident(c.relname) quoted_name
+      from pg_catalog.pg_class c
+      join pg_catalog.pg_namespace n on n.oid=c.relnamespace
+      where n.nspname='public'
+        and c.relkind='r'
+        and c.relname like 'qr_verification_attempts_legacy_%'
+        and exists(select 1 from pg_catalog.pg_attribute a
+          where a.attrelid=c.oid and a.attname='attempted_at' and a.attnum>0 and not a.attisdropped)
+      order by c.relname`)).rows;
+    let archive;
+    let seeded=[];
+    for(const candidate of archives){
+      const table=`public.${candidate.quoted_name}`;
+      const rows=(await db.query(`select q.id,
+          (select count(*)::int from ${table} old where old.qr_code_id=q.id and old.ip_hash=$2) legacy_rows,
+          state.attempt_count
+        from restaurants r
+        join dining_tables t on t.restaurant_id=r.id
+        join table_qr_codes q on q.table_id=t.id
+        left join qr_verification_attempts state on state.qr_code_id=q.id and state.ip_hash=$2
+        where r.slug=$1
+          and exists(select 1 from ${table} old where old.qr_code_id=q.id and old.ip_hash=$2)`,
+      ['readiness-qr-legacy-upgrade','c'.repeat(64)])).rows;
+      if(rows.length){archive=table;seeded=rows;break;}
+    }
+    if(!archive) return; // Clean replay has no synthetic legacy event archive.
 
-    const seeded=(await db.query(`select q.id,count(*)::int legacy_rows,b.attempt_count
-      from restaurants r
-      join dining_tables t on t.restaurant_id=r.id
-      join table_qr_codes q on q.table_id=t.id
-      join qr_verification_attempts a on a.qr_code_id=q.id
-      left join qr_verification_attempt_budgets b on b.qr_code_id=q.id and b.ip_hash=a.ip_hash
-      where r.slug=$1 and a.ip_hash=$2
-      group by q.id,b.attempt_count`,['readiness-qr-legacy-upgrade','c'.repeat(64)])).rows;
     expect(seeded).toHaveLength(1);
     const {id,legacy_rows,attempt_count}=seeded[0];
-    expect(legacy_rows).toBe(6); // four recent events plus two expired ones remain intact.
+    expect(legacy_rows).toBe(6); // four recent events plus two expired remain intact.
     expect(attempt_count).toBe(4); // only the active 15-minute window is charged.
 
     expect((await db.query('select * from reserve_qr_verification_attempt($1,$2)',[id,'c'.repeat(64)])).rows[0].allowed).toBe(true);
     expect((await db.query('select * from reserve_qr_verification_attempt($1,$2)',[id,'c'.repeat(64)])).rows[0].allowed).toBe(false);
-    expect((await db.query('select count(*)::int n from qr_verification_attempts where qr_code_id=$1 and ip_hash=$2',[id,'c'.repeat(64)])).rows[0].n).toBe(6);
-    expect((await db.query('select attempt_count,blocked_until>statement_timestamp() blocked from qr_verification_attempt_budgets where qr_code_id=$1 and ip_hash=$2',[id,'c'.repeat(64)])).rows[0])
+    expect((await db.query('select attempt_count,blocked_until>statement_timestamp() blocked from qr_verification_attempts where qr_code_id=$1 and ip_hash=$2',[id,'c'.repeat(64)])).rows[0])
       .toEqual({attempt_count:5,blocked:true});
+    expect((await db.query(`select count(*)::int n from ${archive} where qr_code_id=$1 and ip_hash=$2`,[id,'c'.repeat(64)])).rows[0].n).toBe(6);
 
     await db.query('select clear_qr_verification_attempts($1,$2)',[id,'c'.repeat(64)]);
-    expect((await db.query('select count(*)::int n from qr_verification_attempt_budgets where qr_code_id=$1 and ip_hash=$2',[id,'c'.repeat(64)])).rows[0].n).toBe(0);
     expect((await db.query('select count(*)::int n from qr_verification_attempts where qr_code_id=$1 and ip_hash=$2',[id,'c'.repeat(64)])).rows[0].n).toBe(0);
+    expect((await db.query(`select count(*)::int n from ${archive} where qr_code_id=$1 and ip_hash=$2`,[id,'c'.repeat(64)])).rows[0].n).toBe(6);
   });
 
   it('reopens scan admission after the window without reviving expired verification tokens', async () => {
@@ -597,100 +682,151 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
     });
   });
 
-  it('keeps session caps authoritative with no IP and makes retries quota-free', async () => {
-    const f=await fixture();const key=randomUUID();
-    const sql='select place_public_order($1,$2::jsonb,null,$3,$4,$5) code';
-    const args=[f.slug,JSON.stringify([{itemId:f.item,qty:1}]),f.sessionToken,key,null];
-    const first=(await db.query(sql,args)).rows[0].code;
-    const budgetKey='po:s:'+(await db.query("select encode(sha256($1::bytea),'hex') hash",[f.sessionToken])).rows[0].hash;
-    await db.query('update rate_limit_hits set count=30 where key=$1',[budgetKey]);
-    expect((await db.query(sql,args)).rows[0].code).toBe(first);
-    expect((await db.query('select count from rate_limit_hits where key=$1',[budgetKey])).rows[0].count).toBe(30);
-    for(const ip of [null,'0'.repeat(64),'1'.repeat(64)]) {
-      await expect(db.query(sql,[...args.slice(0,3),randomUUID(),ip])).rejects.toMatchObject({hint:'rate-limited'});
+  // ─────────────────────────────────────────────────────────────────────────
+  // Order submission is not throttled (migration 20261110000800).
+  //
+  // The rule: a legitimate guest order is never refused for counting. What
+  // survives is everything that is not a counter -- the sitting check, the
+  // QR validation, the replay path and the guest-token idempotency.
+  // ─────────────────────────────────────────────────────────────────────────
+  it('places every order a session submits, with no budget anywhere', async () => {
+    const f = await fixture();
+    const sql = 'select place_public_order_attempt($1,$2::jsonb,null,$3,$4) result';
+    const lines = JSON.stringify([{ itemId: f.item, qty: 1 }]);
+    const counters = "select coalesce(sum(count),0)::int n from rate_limit_hits where key like 'po:s:%' or key like 'po:t:%' or key like 'po:i:%'";
+    const before = (await db.query(counters)).rows[0].n;
+    const codes: string[] = [];
+    for (let i = 0; i < 40; i += 1) {
+      const result = (await db.query(sql, [f.slug, lines, f.sessionToken, randomUUID()])).rows[0].result;
+      expect(result.error).toBeNull();
+      codes.push(result.code);
     }
-    expect((await db.query('select count(*) n from orders where restaurant_id=$1',[f.restaurant])).rows[0].n).toBe('2');
-    await db.query("update rate_limit_hits set window_started_at=statement_timestamp()-interval '601 seconds' where key=$1",[budgetKey]);
-    expect((await db.query(sql,[...args.slice(0,3),randomUUID(),null])).rows[0].code).toBeTruthy();
+    // Forty separate orders, not forty refusals of the same one.
+    expect(new Set(codes).size).toBe(40);
+    // Ordering adds nothing to any counter. (Session minting still writes
+    // po:s:/po:t:/po:i:, which is correct: that is the scan path, not the
+    // order path.)
+    expect((await db.query(counters)).rows[0].n).toBe(before);
+    expect((await db.query("select count(*) n from rate_limit_hits where key like 'po:attempt:%'")).rows[0].n).toBe('0');
+  }, 20000);
+
+  it('ignores stale order-submission counters left by an older release', async () => {
+    const f = await fixture();
+    const hash = (await db.query("select encode(sha256($1::bytea),'hex') hash", [f.sessionToken])).rows[0].hash;
+    const keys = [`po:attempt:s:${hash}`, `po:attempt:t:${f.restaurant}`, `po:s:${hash}`, `po:t:${f.restaurant}`];
+    for (const key of keys) {
+      await db.query('insert into rate_limit_hits(key,window_started_at,count) values($1,statement_timestamp(),999) on conflict (key) do update set count=999', [key]);
+    }
+    const result = (await db.query('select place_public_order_attempt($1,$2::jsonb,null,$3,$4) result',
+      [f.slug, JSON.stringify([{ itemId: f.item, qty: 1 }]), f.sessionToken, randomUUID()])).rows[0].result;
+    expect(result.error).toBeNull();
+    expect(result.code).toBeTruthy();
+    await db.query('delete from rate_limit_hits where key = any($1::text[])', [keys]);
   });
 
-  it('keeps the restaurant cap authoritative across fresh sessions and IP hashes', async () => {
-    const f=await fixture();
-    await db.query('update rate_limit_hits set count=60 where key=$1',['po:t:'+f.restaurant]);
-    const qr=(await db.query('select q.public_token from table_qr_codes q join table_verification_sessions s on s.qr_code_id=q.id where q.restaurant_id=$1',[f.restaurant])).rows[0];
-    for(let i=0;i<3;i++) {
-      const ip=i.toString().repeat(64);
-      const token=(await db.query('select * from open_table_session($1,$2)',[qr.public_token,ip])).rows[0].session_token;
-      await expect(db.query('select place_public_order($1,$2::jsonb,null,$3,$4,$5)',[f.slug,JSON.stringify([{itemId:f.item,qty:1}]),token,randomUUID(),i===0?null:ip])).rejects.toMatchObject({hint:'rate-limited'});
+  it('places orders from several fresh sessions without a tenant ceiling', async () => {
+    const f = await fixture();
+    const qr = (await db.query('select q.public_token from table_qr_codes q join table_verification_sessions s on s.qr_code_id=q.id where q.restaurant_id=$1', [f.restaurant])).rows[0];
+    const lines = JSON.stringify([{ itemId: f.item, qty: 1 }]);
+    for (let i = 0; i < 5; i += 1) {
+      const ip = i.toString().repeat(64);
+      const token = (await db.query('select * from open_table_session($1,$2)', [qr.public_token, ip])).rows[0].session_token;
+      const result = (await db.query('select place_public_order_attempt($1,$2::jsonb,null,$3,$4,$5) result', [f.slug, lines, token, randomUUID(), ip])).rows[0].result;
+      expect(result.error).toBeNull();
+      expect(result.code).toBeTruthy();
     }
-    expect((await db.query('select count(*) n from orders where restaurant_id=$1',[f.restaurant])).rows[0].n).toBe('1');
-  });
+    // One from the fixture plus five new ones.
+    expect((await db.query('select count(*) n from orders where restaurant_id=$1', [f.restaurant])).rows[0].n).toBe('6');
+    expect((await db.query("select count(*) n from rate_limit_hits where key like 'po:attempt:%'")).rows[0].n).toBe('0');
+  }, 20000);
 
-  it('commits malformed-order attempt budgets and denies the old public bypass', async () => {
-    const f=await fixture();
-    for(let i=0;i<60;i++) {
-      const result=(await db.query('select place_public_order_attempt($1,$2::jsonb,null,$3,$4) result',[f.slug,'[]',f.sessionToken,randomUUID()])).rows[0].result;
-      expect(result.code).toBeNull();expect(result.error).toBeTruthy();
+  it('returns malformed-order errors and denies the old public bypass', async () => {
+    const f = await fixture();
+    for (let i = 0; i < 5; i += 1) {
+      const result = (await db.query('select place_public_order_attempt($1,$2::jsonb,null,$3,$4) result', [f.slug, '[]', f.sessionToken, randomUUID()])).rows[0].result;
+      expect(result.code).toBeNull();
+      expect(result.error).toBeTruthy();
+      // A validation failure is not a budget refusal.
+      expect(result.error.hint).not.toBe('rate-limited');
     }
-    const result=(await db.query('select place_public_order_attempt($1,$2::jsonb,null,$3,$4) result',[f.slug,JSON.stringify([{itemId:f.item,qty:1}]),f.sessionToken,randomUUID()])).rows[0].result;
-    expect(result.error.hint).toBe('rate-limited');
-    expect((await db.query('select count(*) n from orders where restaurant_id=$1',[f.restaurant])).rows[0].n).toBe('1');
-    const count=(await db.query("select count from rate_limit_hits where key='po:attempt:s:'||encode(sha256($1::bytea),'hex')",[f.sessionToken])).rows[0].count;
-    expect(count).toBe(61);
-    for(const role of ['anon','authenticated']) {
-      expect((await db.query("select has_function_privilege($1,'public.place_public_order(text,jsonb,text,text,uuid,text)','EXECUTE') allowed",[role])).rows[0].allowed).toBe(false);
-      expect((await db.query("select has_function_privilege($1,'public.place_public_order_attempt(text,jsonb,text,text,uuid,text)','EXECUTE') allowed",[role])).rows[0].allowed).toBe(true);
+    const ok = (await db.query('select place_public_order_attempt($1,$2::jsonb,null,$3,$4) result',
+      [f.slug, JSON.stringify([{ itemId: f.item, qty: 1 }]), f.sessionToken, randomUUID()])).rows[0].result;
+    expect(ok.error).toBeNull();
+    expect(ok.code).toBeTruthy();
+    for (const role of ['anon', 'authenticated']) {
+      expect((await db.query("select has_function_privilege($1,'public.place_public_order(text,jsonb,text,text,uuid,text)','EXECUTE') allowed", [role])).rows[0].allowed).toBe(false);
+      expect((await db.query("select has_function_privilege($1,'public.place_public_order_attempt(text,jsonb,text,text,uuid,text)','EXECUTE') allowed", [role])).rows[0].allowed).toBe(true);
     }
-    await asStaff(f.user,async()=>{
-      await expect(db.query('select place_public_order($1,$2::jsonb,null,$3,$4)',[f.slug,'[]',f.sessionToken,randomUUID()])).rejects.toMatchObject({code:'42501'});
+    await asStaff(f.user, async () => {
+      await expect(db.query('select place_public_order($1,$2::jsonb,null,$3,$4)', [f.slug, '[]', f.sessionToken, randomUUID()])).rejects.toMatchObject({ code: '42501' });
     });
   });
 
-  it('returns existing orders through the versioned API without consuming attempt quota', async () => {
-    const f=await fixture();const key=randomUUID();
-    const sql='select place_public_order_attempt($1,$2::jsonb,null,$3,$4) result';
-    const args=[f.slug,JSON.stringify([{itemId:f.item,qty:1}]),f.sessionToken,key];
-    const first=(await db.query(sql,args)).rows[0].result;
+  it('returns existing orders through the versioned API without writing anything', async () => {
+    const f = await fixture();const key = randomUUID();
+    const sql = 'select place_public_order_attempt($1,$2::jsonb,null,$3,$4) result';
+    const args = [f.slug, JSON.stringify([{ itemId: f.item, qty: 1 }]), f.sessionToken, key];
+    const first = (await db.query(sql, args)).rows[0].result;
     expect(first.error).toBeNull();expect(first.code).toBeTruthy();
-    await db.query("update rate_limit_hits set count=60 where key='po:attempt:s:'||encode(sha256($1::bytea),'hex')",[f.sessionToken]);
-    expect((await db.query(sql,args)).rows[0].result).toEqual(first);
-    const count=(await db.query("select count from rate_limit_hits where key='po:attempt:s:'||encode(sha256($1::bytea),'hex')",[f.sessionToken])).rows[0].count;
-    expect(count).toBe(60);
+    // The same guest token is a replay, not a new order, and it costs nothing.
+    expect((await db.query(sql, args)).rows[0].result).toEqual(first);
+    expect((await db.query('select count(*) n from orders where guest_token=$1', [key])).rows[0].n).toBe('1');
   });
 
-  it('atomically commits anonymous failed attempts at the admission boundary', async () => {
-    const f=await fixture();
-    const budgetKey='po:attempt:s:'+(await db.query("select encode(sha256($1::bytea),'hex') hash",[f.sessionToken])).rows[0].hash;
-    await db.query('insert into rate_limit_hits(key,window_started_at,count) values($1,statement_timestamp(),50)',[budgetKey]);
-    const clients=Array.from({length:16},()=>new Client({connectionString:URL_VALUE}));
+  it('places concurrent guest orders without losing or duplicating one', async () => {
+    const f = await fixture();
+    const clients = Array.from({ length: 8 }, () => new Client({ connectionString: URL_VALUE }));
     try {
-      await Promise.all(clients.map(async c=>{await c.connect();await c.query("set statement_timeout='8s'");await c.query('set role anon');}));
-      const results=await Promise.all(clients.map(async c=>(await c.query('select place_public_order_attempt($1,$2::jsonb,null,$3,$4) result',[f.slug,'[]',f.sessionToken,randomUUID()])).rows[0].result));
-      expect(results.filter(r=>r.error?.hint==='rate-limited')).toHaveLength(6);
-      expect(results.filter(r=>r.error && r.error.hint!=='rate-limited')).toHaveLength(10);
-      expect((await db.query('select count from rate_limit_hits where key=$1',[budgetKey])).rows[0].count).toBe(66);
-      expect((await db.query('select count from rate_limit_hits where key=$1',['po:attempt:t:'+f.restaurant])).rows[0].count).toBe(10);
-      expect((await db.query('select count(*) n from orders where restaurant_id=$1',[f.restaurant])).rows[0].n).toBe('1');
-    } finally {await Promise.all(clients.map(c=>c.end()));}
-  },15000);
+      await Promise.all(clients.map(async (c) => { await c.connect(); await c.query("set statement_timeout='20s'"); await c.query('set role anon'); }));
+      const results = await Promise.all(clients.map(async (c) => (await c.query('select place_public_order_attempt($1,$2::jsonb,null,$3,$4) result',
+        [f.slug, JSON.stringify([{ itemId: f.item, qty: 1 }]), f.sessionToken, randomUUID()])).rows[0].result));
+      const codes = results.map((r) => r.code);
+      expect(results.filter((r) => r.error)).toEqual([]);
+      expect(new Set(codes).size).toBe(8);
+      expect((await db.query('select count(*) n from orders where restaurant_id=$1', [f.restaurant])).rows[0].n).toBe('9');
+    } finally { await Promise.all(clients.map((c) => c.end())); }
+  }, 30000);
 
-  it('enforces durable tenant-attempt caps across new sessions and permits window recovery', async () => {
-    const f=await fixture();const tenantKey='po:attempt:t:'+f.restaurant;
-    await db.query('insert into rate_limit_hits(key,window_started_at,count) values($1,statement_timestamp(),120)',[tenantKey]);
-    const qr=(await db.query('select q.public_token from table_qr_codes q join table_verification_sessions s on s.qr_code_id=q.id where q.restaurant_id=$1',[f.restaurant])).rows[0];
-    const sessions:string[]=[];
-    for(let i=0;i<2;i++) sessions.push((await db.query('select * from open_table_session($1,$2)',[qr.public_token,i.toString().repeat(64)])).rows[0].session_token);
-    const sql='select place_public_order_attempt($1,$2::jsonb,null,$3,$4) result';
-    for(const session of sessions) {
-      const result=(await db.query(sql,[f.slug,JSON.stringify([{itemId:f.item,qty:1}]),session,randomUUID()])).rows[0].result;
-      expect(result.error.hint).toBe('rate-limited');expect(result.code).toBeNull();
+  /**
+   * BRANCH CONFLICT RESOLVED HERE.
+   *
+   * origin/main (PRs #173 and #174) carries seven tests asserting that guest
+   * order submission IS throttled: per-IP, per-session and per-tenant attempt
+   * budgets that reject a guest with hint 'rate-limited'.
+   *
+   * This branch carries migration 20261110000800_remove_order_submission_caps,
+   * which is LATER than the two that introduced those budgets (000300, 000400)
+   * and deliberately removes them: every one of them counts attempts rather
+   * than placed orders, so a shared Wi-Fi address -- the network this product
+   * is sold for, where the router hands every guest the same NAT address --
+   * refuses honest guests because the room is busy. AGENTS.md states the rule
+   * canonically: a legitimate guest order submission is never throttled.
+   *
+   * The two behaviours contradict each other, so both cannot be shipped. This
+   * release candidate keeps 000800's rule, and each of main's seven tests has a
+   * counterpart below asserting the opposite: no budget anywhere, no tenant
+   * ceiling, stale counters ignored, validation failures that are not budget
+   * refusals, replay that costs nothing, concurrency without loss or
+   * duplication, and the guard immediately after this comment.
+   *
+   * What is PRESERVED from #174: the versioned place_public_order_attempt
+   * entrypoint and its privilege contract (re-declared verbatim in 000800),
+   * the attempt-wrapper error envelope, guest-token replay idempotency, the QR
+   * code-entry budget, and the scan/session-open limits from 000300.
+   */
+  it('never reintroduces an order-submission budget', async () => {
+    // A guard, not a behaviour test: the five keys migrations 000300 and
+    // 000400 put in front of ordering. If any of them comes back in a
+    // function body, a busy table is refused food again.
+    const banned = ['po:s:', 'po:t:', 'po:i:', 'po:attempt:s:', 'po:attempt:t:'];
+    const rows = (await db.query(`select p.proname, pg_get_functiondef(p.oid) as def
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.proname in ('place_public_order', 'place_public_order_attempt')`)).rows;
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      for (const key of banned) expect(String(row.def)).not.toContain(key);
     }
-    expect((await db.query('select count from rate_limit_hits where key=$1',[tenantKey])).rows[0].count).toBe(122);
-    await db.query("update rate_limit_hits set window_started_at=statement_timestamp()-interval '601 seconds' where key=$1",[tenantKey]);
-    await asStaff(f.user,async()=>{
-      const result=(await db.query(sql,[f.slug,JSON.stringify([{itemId:f.item,qty:1}]),sessions[0],randomUUID()])).rows[0].result;
-      expect(result.error).toBeNull();expect(result.code).toBeTruthy();
-    });
   });
 
   it('rejects wrong-tenant and expired credentials before durable admission', async () => {
@@ -906,6 +1042,20 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
     expect((await db.query('select total_paise from orders where id=$1',[c.order])).rows[0].total_paise).toBe('25000');
     expect((await db.query('select totals_snapshot from restaurant_invoices where id=$1',[invoice])).rows[0].totals_snapshot).toEqual(snapshot);
   });
+
+  it('freezes finalized source amounts and cancellation after receipt issuance', async()=>{
+    const c=await fixture();
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)",[c.user]);
+    await db.query('select mark_order_session_paid($1)',[c.sitting]);
+    const invoice=(await db.query('select close_order_session_and_issue_receipt($1) id',[c.sitting])).rows[0].id;
+    const snapshot=(await db.query('select totals_snapshot from restaurant_invoices where id=$1',[invoice])).rows[0].totals_snapshot;
+    await expect(db.query('select cancel_order($1,null,null)',[c.order])).rejects.toThrow(/already been paid/i);
+    const line=(await db.query('select id from order_items where order_id=$1',[c.order])).rows[0].id;
+    await expect(db.query('select set_order_line_quantities($1,$2::jsonb,null)',[c.order,JSON.stringify([{line_id:line,qty:1}])])).rejects.toThrow(/already been paid/i);
+    expect((await db.query('select total_paise from orders where id=$1',[c.order])).rows[0].total_paise).toBe('25000');
+    expect((await db.query('select totals_snapshot from restaurant_invoices where id=$1',[invoice])).rows[0].totals_snapshot).toEqual(snapshot);
+  });
+
   it('keeps concurrent duplicate and distinct submissions correct under a bounded local workload', async()=>{
     const c=await fixture();const duplicate=randomUUID();const clients=Array.from({length:16},()=>new Client({connectionString:URL_VALUE}));
     await Promise.all(clients.map(client=>client.connect()));
@@ -923,7 +1073,230 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
   },30000);
 
   it('makes expired trials read-only in SQL, not just in the UI',async()=>{
-    await db.query("update restaurants set trial_started_at=now()-interval '10 days' where id=$1",[b.restaurant]);
+    // The trial is 21 days (migration 20261110001000). This fixture has no
+    // account link, so it exercises the legacy fallback path in
+    // restaurant_can_write(), which an outlet only reaches before the
+    // backfill or if it was created outside every supported path.
+    await db.query("update restaurants set trial_started_at=now()-interval '25 days' where id=$1",[b.restaurant]);
     await asStaff(b.user,async()=>{expect((await db.query("update orders set prep_status='preparing' where id=$1 returning id",[b.order])).rowCount).toBe(0);});
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Model C: ONE subscription per ACCOUNT, shared by every outlet
+  // (migration 20261110001000).
+  // ─────────────────────────────────────────────────────────────────────────
+  async function newAccount(
+    plan: string | null = null,
+  ): Promise<{ account: string; restaurant: string; slug: string; name: string; owner: string }> {
+    const owner = randomUUID();
+    const name = 'Model C ' + randomUUID();
+    const slug = 'modelc-' + randomUUID();
+    await db.query('insert into profiles(id) values($1)', [owner]);
+    const restaurant = (await db.query('select create_account_with_restaurant($1,$2,$3,$4) id',
+      [name, slug, 'Asia/Kolkata', owner])).rows[0].id;
+    const account = (await db.query('select account_id from restaurants where id=$1', [restaurant])).rows[0].account_id;
+    expect(account).toBeTruthy();
+    if (plan) {
+      await db.query(
+        "update accounts set plan=$2, plan_status='active', plan_started_at=statement_timestamp(), plan_expires_at=statement_timestamp()+interval '30 days' where id=$1",
+        [account, plan]);
+    }
+    return { account, restaurant, slug, name, owner };
+  }
+
+  describe('Model C: one subscription per account', () => {
+    it('extends a running trial from its activation date and leaves an expired one expired', async () => {
+      // The rule the 21-day change was approved under, run as the migration
+      // runs it: the real statement, extracted from the file, against two
+      // accounts -- one three days into a 7-day trial, one 30 days past it.
+      const sql = await readFile(
+        new URL('../../supabase/migrations/20261110001000_account_subscriptions.sql', import.meta.url),
+        'utf8');
+      const start = sql.indexOf('update public.accounts a\n   set trial_started_at = s.activation');
+      const marker = ' where a.id = s.account_id;';
+      const end = sql.indexOf(marker, start);
+      expect(start).toBeGreaterThan(-1);
+      expect(end).toBeGreaterThan(start);
+      const backfill = sql.slice(start, end + marker.length);
+
+      async function activated(daysAgo: number): Promise<string> {
+        const owner = randomUUID();
+        await db.query('insert into profiles(id) values($1)', [owner]);
+        const account = (await db.query(
+          "insert into accounts(owner_id,plan,plan_status,trial_started_at) values($1,'trial','trialing',statement_timestamp()-make_interval(days=>$2)) returning id",
+          [owner, daysAgo])).rows[0].id;
+        await db.query(
+          "insert into restaurants(slug,name,account_id,trial_started_at) values($1,'Backfill probe',$2,statement_timestamp()-make_interval(days=>$3))",
+          ['backfill-' + randomUUID(), account, daysAgo]);
+        return account;
+      }
+      const running = await activated(3);
+      const expired = await activated(30);
+
+      await db.query(backfill);
+
+      const rows = (await db.query(
+        'select id, account_trial_ends_at(id) trial_ends, account_can_write(id) can_write, plan_status from accounts where id = any($1::uuid[])',
+        [[running, expired]])).rows;
+      const byId = new Map(rows.map((row) => [row.id as string, row]));
+
+      // Still running when the length changed: the original activation date
+      // plus 21 days, so eighteen days remain.
+      const runningLeft = Number((await db.query(
+        'select extract(epoch from ($1::timestamptz - statement_timestamp()))/86400 days',
+        [byId.get(running)?.trial_ends])).rows[0].days);
+      expect(runningLeft).toBeGreaterThan(17.5);
+      expect(runningLeft).toBeLessThanOrEqual(18.5);
+      expect(byId.get(running)?.can_write).toBe(true);
+      expect(byId.get(running)?.plan_status).toBe('trialing');
+
+      // Already expired: it keeps the seven days it actually had. Nothing
+      // here revives it.
+      const expiredFor = Number((await db.query(
+        'select extract(epoch from (statement_timestamp() - $1::timestamptz))/86400 days',
+        [byId.get(expired)?.trial_ends])).rows[0].days);
+      expect(expiredFor).toBeGreaterThan(22.5);
+      expect(expiredFor).toBeLessThan(23.5);
+      expect(byId.get(expired)?.can_write).toBe(false);
+      expect(byId.get(expired)?.plan_status).toBe('expired');
+    }, 20000);
+
+    it('starts a new account on a 21-day trial that can write', async () => {
+      const { account, restaurant, owner } = await newAccount();
+      const row = (await db.query(
+        "select plan, plan_status, account_trial_ends_at($1) trial_ends, account_can_write($1) can_write from accounts where id=$1",
+        [account])).rows[0];
+      expect(row.plan).toBe('trial');
+      expect(row.plan_status).toBe('trialing');
+      expect(row.can_write).toBe(true);
+      const days = Number((await db.query(
+        'select extract(epoch from ($1::timestamptz - statement_timestamp()))/86400 days',
+        [row.trial_ends])).rows[0].days);
+      expect(days).toBeGreaterThan(20.5);
+      expect(days).toBeLessThanOrEqual(21);
+      expect((await db.query('select restaurant_can_write($1) can', [restaurant])).rows[0].can).toBe(true);
+      await asStaff(owner, async () => {
+        const access = (await db.query('select restaurant_access($1) access', [restaurant])).rows[0].access;
+        expect(access.plan).toBe('trial');
+        expect(access.outlets.used).toBe(1);
+        expect(access.outlets.limit).toBe(5);
+        expect(access.can_write).toBe(true);
+      });
+    });
+
+    it('shares one subscription across every outlet of the account', async () => {
+      const { account, owner, restaurant } = await newAccount('professional');
+      let second = '';
+      await asStaffCommitted(owner, async () => {
+        second = (await db.query('select create_outlet($1,$2) id', ['Second room', 'second-' + randomUUID()])).rows[0].id;
+      });
+      expect(second).toBeTruthy();
+      expect((await db.query('select account_id from restaurants where id=$1', [second])).rows[0].account_id).toBe(account);
+      expect((await db.query('select account_outlet_count($1) n', [account])).rows[0].n).toBe(2);
+      // Expiring the account silences every outlet at once, and deletes none.
+      await db.query("update accounts set plan_expires_at=statement_timestamp()-interval '1 day' where id=$1", [account]);
+      expect((await db.query('select account_can_write($1) can', [account])).rows[0].can).toBe(false);
+      expect((await db.query('select restaurant_can_write($1) can', [restaurant])).rows[0].can).toBe(false);
+      expect((await db.query('select restaurant_can_write($1) can', [second])).rows[0].can).toBe(false);
+      expect((await db.query('select count(*) n from restaurants where account_id=$1', [account])).rows[0].n).toBe('2');
+    });
+
+    it('caps new outlets at the plan allowance, and a downgrade keeps every existing one', async () => {
+      const { account, owner } = await newAccount('professional'); // five outlets
+      for (let i = 0; i < 4; i += 1) {
+        await asStaffCommitted(owner, async () => {
+          await db.query('select create_outlet($1,$2)', ['Outlet ' + i, 'outlet-' + randomUUID()]);
+        });
+      }
+      expect((await db.query('select account_outlet_count($1) n', [account])).rows[0].n).toBe(5);
+      await asStaff(owner, async () => {
+        await expect(db.query('select create_outlet($1,$2)', ['One too many', 'over-' + randomUUID()])).rejects.toThrow(/outlet_limit/);
+      });
+      // Downgrade to Starter, which allows ONE outlet. Every outlet the
+      // account already has stays, keeps its data and keeps taking orders;
+      // only new creation is refused.
+      await db.query(
+        "update accounts set plan='starter', plan_status='active', plan_expires_at=statement_timestamp()+interval '30 days' where id=$1",
+        [account]);
+      expect((await db.query('select count(*) n from restaurants where account_id=$1', [account])).rows[0].n).toBe('5');
+      expect((await db.query('select account_can_write($1) can', [account])).rows[0].can).toBe(true);
+      await asStaff(owner, async () => {
+        await expect(db.query('select create_outlet($1,$2)', ['Still too many', 'over2-' + randomUUID()])).rejects.toThrow(/outlet_limit/);
+      });
+    }, 30000);
+
+    it('keeps subscription state out of staff hands and activation with the service role', async () => {
+      const { account, owner, name } = await newAccount();
+      // The table has no write policy for authenticated: a subscription is
+      // not a row a member of the account may edit, whatever their role.
+      await asStaff(owner, async () => {
+        await expect(db.query("update accounts set plan='business', plan_status='active' where id=$1", [account]))
+          .rejects.toMatchObject({ code: '42501' });
+      });
+      // And behind that refusal, a guard trigger in case a future policy or a
+      // definer function writes the row on somebody's behalf.
+      const guards = (await db.query(
+        "select tgname, tgenabled from pg_trigger where tgrelid='public.accounts'::regclass and not tgisinternal")).rows;
+      expect(guards.map((row) => row.tgname)).toContain('accounts_plan_guard');
+      for (const guard of guards) expect(guard.tgenabled).toBe('O');
+      for (const role of ['anon', 'authenticated']) {
+        expect((await db.query(
+          "select has_function_privilege($1,'public.admin_set_subscription(text,text,integer,integer)','EXECUTE') allowed",
+          [role])).rows[0].allowed).toBe(false);
+        expect((await db.query(
+          "select has_function_privilege($1,'public.create_account_with_restaurant(text,text,text,uuid)','EXECUTE') allowed",
+          [role])).rows[0].allowed).toBe(false);
+      }
+      // Manual activation records a plan. There is no provider here: this is
+      // the off-line path an operator uses.
+      const result = (await db.query('select admin_set_subscription($1,$2,null,1) result', [name, 'professional'])).rows[0].result;
+      expect(result.plan).toBe('professional');
+      expect(result.plan_status).toBe('active');
+      expect(result.outlets).toBe(1);
+      expect((await db.query('select account_can_write($1) can', [account])).rows[0].can).toBe(true);
+      // And a trial renewal is the same call with the trial plan.
+      const renewed = (await db.query('select admin_set_subscription($1,$2,21,null) result', [name, 'trial'])).rows[0].result;
+      expect(renewed.plan).toBe('trial');
+      expect(renewed.plan_status).toBe('trialing');
+      expect(renewed.plan_expires_at).toBeNull();
+    }, 20000);
+
+    it('renews by an exact name only, and refuses a name two accounts share', async () => {
+      // The name is how an operator reaches an account, so the lookup is part
+      // of the authorization: it must match ONE account or none, and never
+      // pick one of several. Both refusals are raised by the function, which
+      // is the only place a caller cannot route around.
+      const first = await newAccount();
+      const second = await newAccount();
+      const shared = 'Shared name ' + randomUUID();
+      await db.query('update restaurants set name=$1 where id = any($2::uuid[])',
+        [shared, [first.restaurant, second.restaurant]]);
+
+      await expect(db.query('select admin_set_subscription($1,$2,21,null)', [shared, 'trial']))
+        .rejects.toMatchObject({ code: 'P0001', message: expect.stringContaining('restaurant_ambiguous') });
+
+      const nobody = 'Nobody owns this name ' + randomUUID();
+      await expect(db.query('select admin_set_subscription($1,$2,21,null)', [nobody, 'trial']))
+        .rejects.toMatchObject({ code: 'P0001', message: expect.stringContaining('restaurant_not_found') });
+
+      // A refusal is a refusal: neither account was renewed, and neither lost
+      // the trial it already had.
+      const rows = (await db.query(
+        'select plan, plan_status from accounts where id = any($1::uuid[])', [[first.account, second.account]])).rows;
+      expect(rows).toHaveLength(2);
+      for (const row of rows) {
+        expect(row.plan).toBe('trial');
+        expect(row.plan_status).toBe('trialing');
+      }
+
+      // A name only one account owns still renews, and renews that account.
+      const unique = 'Only mine ' + randomUUID();
+      await db.query('update restaurants set name=$1 where id=$2', [unique, first.restaurant]);
+      const result = (await db.query('select admin_set_subscription($1,$2,21,null) result',
+        [unique, 'professional'])).rows[0].result;
+      expect(result.account_id).toBe(first.account);
+      expect(result.plan).toBe('professional');
+      expect((await db.query('select plan from accounts where id=$1', [second.account])).rows[0].plan).toBe('trial');
+    }, 20000);
   });
 });

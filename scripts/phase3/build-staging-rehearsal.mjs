@@ -8,8 +8,8 @@ export const files = [
   '20261110000200_financial_session_serialization.sql',
   '20261110000300_shared_wifi_scan_limits.sql',
   '20261110000400_durable_order_attempt_budget.sql',
-  '20261110000800_checkout_outstanding_guard.sql',
-  '20261110000900_online_payment_attempt_uniqueness.sql',
+  '20261110000950_online_payment_attempt_uniqueness.sql',
+  '20261110001210_checkout_outstanding_guard.sql',
 ];
 export const expectedSignatures = [
   'begin_online_payment(text,text,text,uuid,uuid,bigint)',

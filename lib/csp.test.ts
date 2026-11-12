@@ -19,10 +19,10 @@ describe('buildCsp', () => {
     expect(csp).toContain("default-src 'self'");
   });
 
-  it('allows the configured supabase origin, but no dormant payment provider', () => {
+  it('allows Supabase and realtime but no unapproved payment provider or iframe', () => {
     expect(csp).toContain('https://abc.supabase.co');
     expect(csp).toContain('wss://abc.supabase.co');
-    expect(csp).toContain("frame-src 'self'");
+    expect(csp).toContain("frame-src 'none'");
     expect(csp).not.toContain('razorpay');
   });
 

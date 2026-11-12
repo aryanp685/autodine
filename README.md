@@ -1,39 +1,39 @@
 # AutoDine
 
-**AutoDine is an early-stage, mobile-first QR ordering and restaurant-operations prototype for Indian restaurants.** The current repository includes a polished UI, sample restaurant data, Supabase schema/auth foundations, and a server-side menu reader. It is **not ready to accept real customer orders or payments**.
+AutoDine is a mobile-first QR ordering and restaurant-operations application for Indian restaurants. It includes guest ordering, owner/staff operations, kitchen and cashier screens, bills/invoices, and database-backed menu and session flows.
 
-## Current status
+## Current capability and limits
 
-| Area | Status |
-|---|---|
-| Responsive marketing, menu, cart, dashboard, kitchen and cashier screens | Prototype UI; local/demo interactions only |
-| Restaurant signup/sign-in | Supabase Auth actions are present; requires a configured Supabase project |
-| Public menu reading | Supabase-backed read path is present, with a demo-data fallback |
-| Database schema and row-level security | Initial migrations exist; must be applied and tested against a real Supabase project |
-| Order placement and kitchen sync | Implemented in source and covered by local tests; hosted end-to-end order acceptance is not certified. Staging remains NO-GO |
-| Guest UPI payment | Not available in the customer flow: no restaurant UPI QR or guest "I have paid" claim is shown. Staff can record a UPI payment they verify outside AutoDine |
-| Online payments | Disabled and incomplete: payment schema/functions exist, but the current app has no customer initiation UI or provider verification/webhook route. Do not enable or use provider flows |
-| Subscriptions | The seven-day trial is enforced in the database (`restaurant_can_write`). No plan can be bought, and there is no checkout — see `docs/SETUP.md` §6 |
-| Production readiness | **NO-GO** until fresh authorized hosted security, recovery, migration, end-to-end, performance, and operator-approval gates are documented. No real payment is an acceptance test |
+- Customer ordering is **pay at the counter**. Staff record cash, card, or UPI only after verifying that the restaurant received it. Guests cannot claim an online payment or use a gateway checkout; keep online guest payments disabled.
+- Subscription plans use one account-level subscription shared across its outlets. The approved monthly prices are Starter ₹999 (1 outlet), Professional ₹2,699 (5 outlets), and Business ₹3,699 (unlimited); the trial is 21 days. Subscription screens and database records are implemented, but no payment provider is approved or configured, so provider-dependent checkout and charges fail closed.
+- GST behavior must follow adviser-approved rules. The current code supports only its explicitly configured rate path; it does not implement a complete tax-policy model for every jurisdiction, inclusive price, item classification, exemption, or place of supply. Do not treat sample values as tax advice or extend the model by guessing.
+- Local and automated UI tests may use fictional sample data only when a developer explicitly opts into demo mode. A production build without the required Supabase URL and public key fails rather than serving sample restaurant data.
+- `/demo/menu`, where enabled, is a clearly identified, read-only sample. It is not a real restaurant, order path, or database-backed flow.
+- Passing unit or demo-mode browser tests does not prove that production credentials, email delivery, AI providers, or a specific restaurant's configuration work. See [`docs/website-readiness-audit.md`](docs/website-readiness-audit.md) and `RELEASE-BLOCKER-REPORT.md` for the dated readiness evidence and open gates. Production readiness remains **NO-GO** until fresh, authorized acceptance evidence is recorded.
 
-All restaurant names, orders, dashboard metrics, QR states and payments shown without a configured database are fictional demo content. The displayed 5% tax rate and plan prices are illustrative and must not be treated as tax or billing advice.
+## Local development
 
-## Run locally
-
-Requirements: Node.js 22 or newer and npm.
+Requirements: Node.js 22 and npm.
 
 ```bash
 npm ci
-npm run dev
 ```
 
-Open <http://localhost:3000>. With no Supabase environment variables, the site runs in demo mode. To configure Supabase, copy `.env.example` to `.env.local`, fill in your own project values, and apply the migrations in `supabase/migrations/`. Never commit `.env.local` or a Supabase secret key. Step by step, and the SQL to check each one: `docs/SETUP.md` (an operator runbook, kept local by `.gitignore` — see the note under Repository layout).
+Choose one mode:
 
-`GET /api/health` returns a limited set of readiness booleans — no keys, ids, rows, or counts. It is not a full migration audit or release-acceptance check; a green response alone does not certify hosted ordering, security, recovery, or pilot readiness.
+1. **Explicit local visual demo** (fictional data, no writes):
 
-Before that, `npm run env:check` reads `.env.local` and names what is missing, catches a placeholder left in place, and refuses to pass if a secret key is in a `NEXT_PUBLIC_` variable — the one mistake that would hand every visitor full database access. It prints key prefixes, never values.
+   ```bash
+   AUTODINE_DEMO_MODE=true npm run dev
+   ```
 
-## Quality checks
+2. **Database-backed development:** copy `.env.example` to `.env.local`, enter credentials for a local or non-production Supabase project, run `npm run env:check`, then start `npm run dev`. Keep `.env.local` private and never use Production data for integration tests. Preview/Development builds refuse to use a configured Production Supabase project; see [`docs/preview-isolation.md`](docs/preview-isolation.md).
+
+The demo flag is for local development only. Never set `AUTODINE_TEST_DEMO_BUILD` in a deployment; it is an explicit GitHub Actions-only flag for hermetic UI tests. Production requires Supabase configuration and does not fall back to fictional data.
+
+See [`docs/SETUP.md`](docs/SETUP.md) for the tracked setup checklist.
+
+## Tests and quality checks
 
 ```bash
 npm run typecheck
@@ -44,37 +44,10 @@ npm test
 npm run build
 ```
 
-The SQL check parses DDL syntax; it does **not** execute migrations or prove that RLS policies/functions are correct. Run migrations and security tests against a disposable Supabase project before relying on them.
+`npm run sql:check` parses migration syntax; it does not execute every RLS policy or prove Production-schema parity. Database integration and browser tests must use disposable local services and synthetic data. The isolated throttle and full-stack browser-test setup is documented in [`docs/e2e-local.md`](docs/e2e-local.md); skipped cases are not verified.
 
-## Repository layout
+## Configuration, health, and security
 
-- `app/` — Next.js App Router routes and auth actions
-- `components/` — screen components and shared UI
-- `lib/` — demo data, money/pricing logic, Supabase clients and database adapters
-- `supabase/` — database migrations and fictional seed data
-- `app/globals.css` — Tailwind entry, design tokens and the small amount of base CSS
-- `styles/premium.css` — the marketing layer only (the product is Tailwind)
-- `supabase/checks/` — the SQL to run before and after the trial/plan/UPI migrations
-- `/api/health` — booleans only: is this deployment configured, and which migrations are on it?
-- `docs/SETUP.md`, `docs/DEMO.md` — the operator's runbook and the demo script. Local
-  files, not committed: `.gitignore` keeps internal notes and runbooks out of the
-  published repository, and these two contain the SQL that extends a trial by hand.
+`GET /api/health` returns fixed readiness fields without keys, restaurant names, or rows. It is not a full migration audit or release-acceptance check; a green response alone does not certify hosted ordering, security, recovery, or pilot readiness. `npm run env:check` identifies missing or malformed required environment values and never prints full key values.
 
-## Payments
-
-The customer ordering flow places an order as unpaid and directs the guest to
-settle at the counter. Staff may record cash, card, or UPI after checking that
-payment was actually received. Those records describe an external collection;
-AutoDine does not process card details or confirm a bank transfer.
-
-The current customer app does not display the restaurant's UPI QR, accept a
-UPI "I have paid" claim, or provide a gateway checkout. The database contains
-online-payment schema/functions from earlier work, but the application has no
-customer initiation UI or provider verification/webhook route. Treat that
-path as unavailable and keep it disabled. Environment keys or a green health
-probe do not make it a supported payment flow. Do not use real payments as a
-smoke test.
-
-## Privacy and secrets
-
-The repository contains no production credentials. `.env.example` contains blank placeholders only. Keep all real keys in local environment variables or your hosting provider's secret manager; the Supabase secret/service-role key must never use a `NEXT_PUBLIC_` variable.
+Never commit real credentials, `.env.local`, Production data, or secret/service-role keys in `NEXT_PUBLIC_*` variables. The server-side Supabase secret key bypasses RLS and must remain server-only.

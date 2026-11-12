@@ -3,6 +3,7 @@ import { LoginSubmit } from '@/components/LoginSubmit';
 import { AuthShell } from '@/components/AuthShell';
 import { signInAction } from '@/app/auth/actions';
 import { Field, inputClass } from '@/components/owner/chrome';
+import { TRIAL_DAYS } from '@/lib/trial';
 
 /**
  * Sign in.
@@ -41,8 +42,7 @@ export function LoginScreen({ error, notice, next }: { error?: string; notice?: 
           <strong>Ordering, the kitchen board and the counter are live in this preview.</strong> Not certified for live restaurant operations.
         </>,
         <>
-          <strong>Plans are not on sale.</strong> No card is asked for. The workspace has a seven-day trial; after that, access is
-          read-only until extended.
+          <strong>Plans are not on sale.</strong> New accounts start with {TRIAL_DAYS} trial days; existing workspaces keep their recorded end date. After it, access is read-only until extended.
         </>,
         <>
           <strong>Payments are recorded at the counter.</strong> AutoDine does not collect online payments.

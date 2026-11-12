@@ -30,58 +30,51 @@ vi.mock('next/cache', () => ({
   revalidatePath: vi.fn(),
 }));
 
+import { TRIAL_DAYS } from '@/lib/trial';
 import { renewTrialAction } from './actions';
 
 const A_SECRET = 's3cure-admin-secret-value-with-32-chars!!';
 
-type Row = { id: string; name: string; trial_started_at: string };
-
 /**
- * A stand-in for the exact query chain the action uses:
- * select().filter() for the lookup, update().eq().select().single() for the
- * write. It records what the action actually asked for, which is how the
- * "only the intended restaurant" tests prove their claim.
+ * A stand-in for the one call the action makes:
+ * rpc('admin_set_subscription', ...).
+ *
+ * It records the arguments the action actually sent, which is how the
+ * "only the intended restaurant" tests prove their claim. Note what is
+ * recorded: the restaurant name arrives as a BOUND PARAMETER, so it can
+ * never be read as a pattern by PostgREST or by SQL. The exact-match and
+ * ambiguity rules live in the function (migration 20261110001000), where
+ * they cannot be bypassed by a caller who reaches the action directly.
  */
-function fakeDb(rows: Row[]) {
+function fakeDb(result: Record<string, unknown> | null, error: { message: string } | null = null) {
   const calls = {
-    namePattern: null as string | null,
-    updates: [] as Record<string, unknown>[],
-    eqIds: [] as string[],
+    rpcCalls: [] as Array<{ fn: string; args: Record<string, unknown> }>,
+    tableWrites: [] as string[],
   };
   const db = {
-    from: vi.fn((_table: string) => ({
-      select: vi.fn((_cols: string) => ({
-        filter: vi.fn(async (_col: string, _op: string, pattern: string) => {
-          calls.namePattern = pattern;
-          return { data: rows, error: null };
-        }),
-      })),
-      update: vi.fn((payload: Record<string, unknown>) => {
-        calls.updates.push(payload);
-        return {
-          eq: vi.fn((_col: string, id: string) => {
-            calls.eqIds.push(id);
-            return {
-              select: vi.fn((_c2: string) => ({
-                single: vi.fn(async () => ({
-                  data: { ...rows[0], trial_started_at: new Date().toISOString() },
-                  error: null,
-                })),
-              })),
-            };
-          }),
-        };
-      }),
-    })),
+    rpc: vi.fn(async (fn: string, args: Record<string, unknown>) => {
+      calls.rpcCalls.push({ fn, args });
+      return { data: result, error };
+    }),
+    from: vi.fn((table: string) => {
+      calls.tableWrites.push(table);
+      throw new Error(`unexpected table access: ${table}`);
+    }),
   };
   return { db, calls };
 }
 
-const theKing: Row = {
-  id: 'rest-1',
-  name: 'The King',
-  trial_started_at: '2026-10-01T00:00:00.000Z',
+/** A successful renewal, shaped like the function's jsonb return value. */
+const renewed = {
+  account_id: 'acct-1',
+  plan: 'trial',
+  plan_status: 'trialing',
+  trial_ends_at: '2026-12-01T00:00:00.000Z',
+  plan_expires_at: null,
+  outlets: 1,
 };
+
+const THE_KING = 'The King';
 
 beforeEach(() => {
   vi.stubEnv('ADMIN_SECRET', A_SECRET);
@@ -130,74 +123,110 @@ describe('renewTrialAction — direct invocation', () => {
   });
 
   it('renews exactly the intended restaurant when authorized', async () => {
-    const { db, calls } = fakeDb([theKing]);
+    const { db, calls } = fakeDb(renewed);
     mocks.getSupabaseAdmin.mockReturnValue(db);
 
-    const result = await renewTrialAction('The King', A_SECRET);
+    const result = await renewTrialAction(THE_KING, A_SECRET);
 
     expect(result.ok).toBe(true);
-    expect(result.restaurantName).toBe('The King');
-    expect(calls.updates).toHaveLength(1);
-    expect(calls.eqIds).toEqual(['rest-1']);
+    expect(result.restaurantName).toBe(THE_KING);
+    expect(result.trialEndsAt).toBe(renewed.trial_ends_at);
+
+    // One call, to the one privileged function, with the name as a parameter.
+    expect(calls.rpcCalls).toHaveLength(1);
+    expect(calls.rpcCalls[0].fn).toBe('admin_set_subscription');
+    expect(calls.rpcCalls[0].args.p_restaurant_name).toBe(THE_KING);
+    // And no direct table write on any path: the whole write is inside the
+    // function, where protect_account_plan() still governs it.
+    expect(calls.tableWrites).toEqual([]);
   });
 
   it('treats the name as a name: LIKE wildcards cannot reach another restaurant', async () => {
     // "%" is not "every restaurant" — it is a restaurant named "%", which
-    // does not exist. Before the escape it matched everything and renewed
-    // whichever row came first.
-    const { db, calls } = fakeDb([]);
+    // does not exist. The name is a bound parameter, so no layer can read it
+    // as a pattern: it is compared with lower(btrim(name)) = lower(btrim(...))
+    // inside the function, and matches nothing.
+    const { db, calls } = fakeDb(null, { message: 'restaurant_not_found' });
     mocks.getSupabaseAdmin.mockReturnValue(db);
 
     const result = await renewTrialAction('%', A_SECRET);
 
-    expect(calls.namePattern).toBe('^%$');
+    expect(calls.rpcCalls[0].args.p_restaurant_name).toBe('%');
     expect(result.ok).toBe(false);
-    expect(calls.updates).toHaveLength(0);
 
-    const second = fakeDb([]);
+    const second = fakeDb(null, { message: 'restaurant_not_found' });
     mocks.getSupabaseAdmin.mockReturnValue(second.db);
     await renewTrialAction('a_b', A_SECRET);
-    expect(second.calls.namePattern).toBe('^a_b$');
+    expect(second.calls.rpcCalls[0].args.p_restaurant_name).toBe('a_b');
   });
 
   it('matches literal asterisks and regex characters without wildcard expansion', async () => {
-    const { db, calls } = fakeDb([]);
+    // No escaping is applied to the name at all, because none is needed: a
+    // bound parameter has no syntax. "Cafe * (A+B)." is searched for as the
+    // eleven characters it is.
+    const { db, calls } = fakeDb(null, { message: 'restaurant_not_found' });
     mocks.getSupabaseAdmin.mockReturnValue(db);
+
     await renewTrialAction('Cafe * (A+B).', A_SECRET);
-    expect(calls.namePattern).toBe('^Cafe \\* \\(A\\+B\\)\\.$');
-    expect(calls.updates).toHaveLength(0);
+
+    expect(calls.rpcCalls[0].args.p_restaurant_name).toBe('Cafe * (A+B).');
   });
 
   it('refuses an ambiguous match instead of guessing which restaurant to renew', async () => {
-    const { db, calls } = fakeDb([theKing, { ...theKing, id: 'rest-2', name: 'The king' }]);
+    // Two accounts own a restaurant called some form of "the king". The
+    // function counts distinct accounts and refuses rather than renewing
+    // whichever one sorted first.
+    const { db } = fakeDb(null, { message: 'restaurant_ambiguous' });
     mocks.getSupabaseAdmin.mockReturnValue(db);
 
     const result = await renewTrialAction('the king', A_SECRET);
 
     expect(result.ok).toBe(false);
-    expect(result.error).toContain('Multiple restaurants match');
-    expect(calls.updates).toHaveLength(0);
+    expect(result.error).toContain('Several accounts own a restaurant called');
+    expect(result.error).toContain('the king');
   });
 
   it('moves only the trial clock — plan columns stay untouched', async () => {
-    const { db, calls } = fakeDb([theKing]);
+    const { db, calls } = fakeDb(renewed);
     mocks.getSupabaseAdmin.mockReturnValue(db);
 
-    await renewTrialAction('The King', A_SECRET);
+    await renewTrialAction(THE_KING, A_SECRET);
 
-    // Exactly one key: trial_started_at. The plan, plan_status and the rest
-    // stay under protect_restaurant_plan(); this write cannot reach them.
-    expect(Object.keys(calls.updates[0])).toEqual(['trial_started_at']);
+    // A trial, and only a trial: never a paid plan, never a term. The
+    // function sets plan='trial', plan_status='trialing' and clears both
+    // plan_started_at and plan_expires_at.
+    expect(calls.rpcCalls[0].args.p_plan).toBe('trial');
+    expect(calls.rpcCalls[0].args.p_days).toBe(TRIAL_DAYS);
+    expect(calls.rpcCalls[0].args).not.toHaveProperty('p_months');
+    // Nothing is written through the table API, so no column can be reached
+    // that the function does not set itself.
+    expect(calls.tableWrites).toEqual([]);
   });
 
-  it('reports a missing restaurant by name, without touching the database', async () => {
-    const { db, calls } = fakeDb([]);
+  it('reports a missing restaurant by name, without guessing at one', async () => {
+    const { db, calls } = fakeDb(null, { message: 'restaurant_not_found' });
     mocks.getSupabaseAdmin.mockReturnValue(db);
 
     const result = await renewTrialAction('Nowhere', A_SECRET);
 
     expect(result.ok).toBe(false);
-    expect(result.error).toContain('No restaurant found');
-    expect(calls.updates).toHaveLength(0);
+    expect(result.error).toContain('No restaurant found with name');
+    expect(result.error).toContain('Nowhere');
+    // Asked once, and refused: no fallback write, no partial renewal.
+    expect(calls.rpcCalls).toHaveLength(1);
+    expect(calls.tableWrites).toEqual([]);
+  });
+
+  it('surfaces an unexpected database error without leaking a raw message to a stranger', async () => {
+    const { db } = fakeDb(null, { message: 'connection to server at "db.internal" failed' });
+    mocks.getSupabaseAdmin.mockReturnValue(db);
+
+    const result = await renewTrialAction(THE_KING, A_SECRET);
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('Could not renew the trial');
+    // The host name is in the message: it stays server-side, in the log, and
+    // is never a claim about the caller's own authorization.
+    expect(result.error).not.toContain('Unauthorized');
   });
 });

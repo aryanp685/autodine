@@ -34,8 +34,21 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 
-# Internal planning notes and operational runbooks are kept locally, not published.
+# Internal planning notes stay local; publish only the canonical operator/test docs.
 /docs/*.md
+!/docs/SETUP.md
+!/docs/e2e-local.md
+!/docs/scan-throttle-coverage.md
+!/docs/website-readiness-audit.md
+!/docs/production-saas-readiness-audit.md
+!/docs/preview-isolation.md
+!/docs/migration-reconciliation.md
+!/docs/verification-2026-11-10.md
+!/docs/subscription-billing-2026-11-10.md
+!/docs/review-deployment-2026-11-11.md
+!/docs/production-migration-plan-2026-11-11.md
+!/docs/production-operator-setup-2026-11-11.md
+!/docs/autodine-handoff-report-2026-11-12.md
 
 # scratch scripts
 _shot.mjs

@@ -7,6 +7,7 @@ import { SiteMotion } from '@/components/SiteMotion';
 import { HomeNav } from '@/components/HomeNav';
 import { BrandLockup } from '@/components/BrandMark';
 import { BRAND_GREEN } from '@/lib/brand';
+import { TRIAL_DAYS } from '@/lib/trial';
 
 /**
  * The landing page.
@@ -168,7 +169,7 @@ function Hero() {
               href="/signup"
               className="inline-flex h-12 items-center gap-2 rounded-full bg-forest px-6 text-[14px] font-medium text-white transition-colors hover:bg-forest-strong"
             >
-              Start the 7-day trial
+              Start the {TRIAL_DAYS}-day trial
               <span aria-hidden="true">→</span>
             </Link>
             <Link
@@ -579,7 +580,7 @@ function Honest() {
           <div className="rounded-[22px] border border-ink-line bg-white p-6 sm:p-8">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">Not connected</p>
             <ul className="mt-5 space-y-4">
-              {NOT_CONNECTED.map(item => <li key={item.id} className="flex gap-3 text-[13px] leading-relaxed text-mute"><span aria-hidden="true" className="mt-2 size-1.5 shrink-0 rounded-full bg-[#8C857A]" /><span><span className="font-medium text-cream">{item.label}</span><br />{item.id === 'payments' ? 'Guests pay at the counter. Staff check and record payment; AutoDine does not collect it online.' : item.id === 'billing' ? 'Plans are not on sale. After the seven-day trial, access becomes read-only until extended.' : 'No SMS or WhatsApp receipts or reminders are sent.'}</span></li>)}
+              {NOT_CONNECTED.map(item => <li key={item.id} className="flex gap-3 text-[13px] leading-relaxed text-mute"><span aria-hidden="true" className="mt-2 size-1.5 shrink-0 rounded-full bg-[#8C857A]" /><span><span className="font-medium text-cream">{item.label}</span><br />{item.id === 'payments' ? 'Guests pay at the counter. Staff check and record payment; AutoDine does not collect it online.' : item.id === 'billing' ? `Plans are not on sale. After the ${TRIAL_DAYS}-day trial, access becomes read-only until extended.` : 'No SMS or WhatsApp receipts or reminders are sent.'}</span></li>)}
             </ul>
           </div>
         </div>
@@ -599,7 +600,7 @@ function Pricing() {
           Start with what you need.
         </h2>
         <p className="mt-4 max-w-[52ch] text-[15px] leading-[1.6] text-mute" data-reveal>
-          Three sizes. Seven free days. No card to begin.
+          Three sizes. {TRIAL_DAYS} free days. No card to begin.
         </p>
 
         <div className="mt-12 grid gap-5 lg:grid-cols-3" data-pricing-grid>
@@ -646,7 +647,7 @@ function Pricing() {
 
         <p className="mt-8 text-[12.5px] leading-relaxed text-mute-dim">
           Plans are not on sale yet: nothing can be bought on this site, and no card is taken. The
-          trial lasts seven days — after it ends the workspace is
+          trial lasts {TRIAL_DAYS} days — after it ends the workspace is
           read-only until access is extended, and nothing is deleted.
         </p>
       </div>
@@ -682,7 +683,7 @@ function Close() {
               href="/signup"
               className="inline-flex h-12 items-center gap-2 rounded-full bg-forest px-7 text-[14px] font-medium text-white transition-colors hover:bg-forest-strong"
             >
-              Start your seven-day trial <span aria-hidden="true">→</span>
+              Start your {TRIAL_DAYS}-day trial <span aria-hidden="true">→</span>
             </Link>
             <Link
               href="/pricing"

@@ -4,11 +4,14 @@
 
 Phase 2 PR174 merged as 7147415052562aff971a236e79bf119977057271.
 Release/preflight commit 471d0dd passed all reported CI checks before merge.
-Main automatic Vercel Git deployment is temporarily disabled in vercel.json
-pending coordinated schema/app cutover. Read-only provider inspection after
-merge showed the latest production deployment still at 7dae9b4 (PR173), not
-the new release. This is point-in-time evidence, not perpetual deployment
-protection. No hosted database migration was performed.
+That commit explicitly disabled automatic Vercel Git deployments for `main` in
+`vercel.json` as a temporary hold pending the coordinated schema/app cutover.
+PR #176 later merged at `0f2199c` on 2026-11-12, but provider events showed no
+production deployment at merge time; the production deployment was manually
+created afterwards. This continuation removes the repo-level disable map so
+future merges can deploy normally. This is point-in-time evidence, not
+perpetual deployment protection. The hosted migrations performed later are
+recorded in the hand-off report and production migration ledger.
 
 ## First bounded tool
 

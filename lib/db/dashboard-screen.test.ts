@@ -302,6 +302,10 @@ describe('active table sessions', () => {
         order_sessions: [
           { id: 'session-1', table_id: 'table-1', opened_at: earlierToday(0.2), paid_at: null },
         ],
+        order_items: [
+          { id: 'item-1', order_id: '1', name_snapshot: 'Paneer Tikka', qty: 2, variant_snapshot: 'Half', addons_snapshot: ['Extra mint'], sort_order: 0 },
+          { id: 'item-2', order_id: '2', name_snapshot: 'Butter Naan', qty: 1, variant_snapshot: null, addons_snapshot: [], sort_order: 0 },
+        ],
         dining_tables: [{ id: 'table-1', label: 'T6' }],
         payments: [
           { order_id: '1', amount_paise: 4000, status: 'recorded', created_at: earlierToday(0.3) },
@@ -318,6 +322,10 @@ describe('active table sessions', () => {
         table: 'T6',
         orderCount: 2,
         orderCodes: ['A-1', 'A-2'],
+        items: [
+          { ticketCode: 'A-1', name: 'Paneer Tikka', quantity: 2, variant: 'Half', addons: ['Extra mint'] },
+          { ticketCode: 'A-2', name: 'Butter Naan', quantity: 1, variant: null, addons: [] },
+        ],
         totalPaise: 30000,
         paidPaise: 19000,
         outstandingPaise: 11000,

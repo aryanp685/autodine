@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { LegalPage, LegalSection } from '@/components/LegalPage';
+import { TRIAL_DAYS } from '@/lib/trial';
 
 export const metadata: Metadata = {
   title: 'Privacy · AutoDine',
@@ -78,10 +79,10 @@ export default function PrivacyPage() {
 
       <LegalSection title="Retention, and what happens when a trial ends">
         <p>
-          A restaurant&rsquo;s data stays for as long as the account exists. When a seven-day trial
-          ends without a plan, the workspace becomes read-only: new orders and edits are refused,
-          while menus, past orders, bills and reports stay readable. Nothing is deleted for
-          non-payment.
+          A restaurant&rsquo;s data stays for as long as the account exists. New accounts receive a {TRIAL_DAYS}-day trial; an existing account keeps the end date already recorded for it.
+          When that trial ends without a plan, the workspace becomes read-only: new orders and edits
+          are refused, while menus, past orders, bills and reports stay readable. Nothing is deleted
+          for non-payment.
         </p>
         <p>
           A restaurant that wants its data removed can ask for the account to be closed; the rows

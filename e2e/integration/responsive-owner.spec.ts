@@ -47,7 +47,19 @@ async function assertNoSidewaysScroll(page: Page, where: string) {
     const doc = document.documentElement;
     const overflow = doc.scrollWidth - doc.clientWidth;
     const offenders: string[] = [];
+    const layoutChain: string[] = [];
     if (overflow > 1) {
+      const table = document.querySelector('[data-menu-items]');
+      let ancestor = table as HTMLElement | null;
+      for (let depth = 0; ancestor && depth < 7; depth += 1, ancestor = ancestor.parentElement) {
+        const style = getComputedStyle(ancestor);
+        const rect = ancestor.getBoundingClientRect();
+        layoutChain.push(
+          `${ancestor.tagName.toLowerCase()}${ancestor.className ? `.${String(ancestor.className).trim().split(/\s+/).slice(0, 3).join('.')}` : ''}` +
+            ` x=${Math.round(rect.x)} w=${Math.round(rect.width)} scroll=${ancestor.scrollWidth}/${ancestor.clientWidth}` +
+            ` overflowX=${style.overflowX} maxW=${style.maxWidth} minW=${style.minWidth}`,
+        );
+      }
       for (const el of Array.from(document.querySelectorAll('*'))) {
         const r = el.getBoundingClientRect();
         if (r.right > doc.clientWidth + 1 && r.width > 0 && r.height > 0) {
@@ -60,11 +72,11 @@ async function assertNoSidewaysScroll(page: Page, where: string) {
         if (offenders.length >= 4) break;
       }
     }
-    return { overflow, offenders };
+    return { overflow, offenders, layoutChain };
   });
   expect(
     report.overflow,
-    `${where}: page scrolls sideways by ${report.overflow}px — ${report.offenders.join(' | ')}`,
+    `${where}: page scrolls sideways by ${report.overflow}px — ${report.offenders.join(' | ')} — ${report.layoutChain.join(' → ')}`,
   ).toBeLessThanOrEqual(1);
 }
 

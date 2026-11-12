@@ -8,11 +8,15 @@ on:
 jobs:
   check:
     name: typecheck · lint · design · test · build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    env:
+      CI: 'true'
+      AUTODINE_TEST_DEMO_BUILD: 'true'
+      VERCEL_ENV: 'test'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -39,7 +43,7 @@ jobs:
         run: npm run build
 
   native-database:
-    name: clean migrations · SQL boundaries · recovery (PG ${{ matrix.postgres }})
+    name: clean migrations · SQL boundaries (PG ${{ matrix.postgres }})
     runs-on: ubuntu-latest
     strategy:
       matrix:

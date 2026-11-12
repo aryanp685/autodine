@@ -416,7 +416,7 @@ export function MenuEditorScreen({
       )}
 
       {!blocked && (
-        <div className="grid gap-6 xl:grid-cols-[212px_minmax(0,1fr)_344px] xl:items-start">
+        <div className="grid min-w-0 max-w-full gap-6 overflow-x-clip xl:grid-cols-[212px_minmax(0,1fr)_344px] xl:items-start">
           {/* ------------------------------------------------- categories rail */}
           <aside aria-labelledby="menu-categories">
             <SectionHead title={<span id="menu-categories">Categories</span>} />

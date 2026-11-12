@@ -2,34 +2,33 @@
 
 ## Current continuation record (Arena date: 2026-11-06 UTC)
 
-This is the live blocker register for the present worktree. The dated hosted/Preview/CI statements in this and related reports are carry-forward evidence from earlier snapshots; they were not reverified in this continuation, do not establish current hosted state, and do not authorize a hosted operation. The live gates below describe only checks actually run in this continuation.
+This is the live blocker register for the current PR #177 merge continuation. It records the locally reconciled tree made from PR head `af8fbbb` and `origin/main` `ff8ceae`. All merge conflicts are resolved; at the time of this record, the merge is staged but not committed or pushed. The protected baseline was checked byte-for-byte by SHA-256. Historical hosted/Preview statements elsewhere in this file are not current evidence or authorization.
 
-### Local changes and regression evidence
+### Merge and repository review
 
-- **P1 quote-integrity defect reproduced and fixed locally.** `lib/db/cart-screen.ts` previously logged and swallowed failures reading `item_addon_groups` or `item_addons`, returning base dish prices without selected add-ons even though the database recomputes the full amount when placing the order. This could show a lower cart quote than the resulting order. Two new regression cases failed before the fix. The loader now fails closed with a fixed message and logs only the SQLSTATE; `lib/db/cart-screen.test.ts` covers both failed reads and a successful price mapping (3/3 pass).
-- **CSP least-privilege tightened.** The app tree has no customer payment initiation, Razorpay verification route, or webhook handler. Removed the unused Razorpay script/connect/frame origins; `lib/csp.test.ts` asserts the provider is absent while the configured Supabase origins remain.
-- **Payment claims reconciled with current source.** Updated README, Terms, Privacy, plan copy, environment guidance and sample payment labels: checkout is counter-only; the guest UPI QR/self-claim flow is absent; online payment SQL primitives do not constitute a supported provider flow. Online payments remain disabled. Paid-state pills now say only “Paid” rather than “Paid online”; the demo rows name counter collection. A focused UI test guards against implying gateway processing.
-- Typed the cart-test Supabase mock to the finite table-name union after typecheck exposed an optional map lookup; `npm run typecheck` now passes without weakening types.
-- ESLint now ignores the Playwright report/result directories already treated as generated output by `.gitignore`; `npm run lint` passes even with the failed E2E attempt's reports present.
-- Added root `AGENTS.md` as the repository engineering playbook. Preserved the protected baseline file; its SHA-256 remains `e986f2ddd48af88e7e887177ffab7f9dadbec96d6d8394f09150da1d9e7f03fb`.
+- Kept the incoming `main` migrations and the branch-only migration behavior. Renumbered the four colliding branch migrations to `20261110000851`, `20261110000950`, `20261110001210`, and `20261110001220`; removed the competing standalone QR-budget migration and folded its state-preservation purpose into `20261110000900_converge_qr_verification_attempts.sql`.
+- Preserved the latest-main `20261112000100_schedule_subscription_expiry.sql`; it is conditional on `pg_cron` and its schedule function. The local replay had no `pg_cron`, so the migration safely did nothing. It was not applied to a hosted project.
+- Reviewed the combined source, SQL migration ordering, environment/deployment boundaries, and Vercel configuration. The merge result contains 226 staged paths, no unmerged paths, and no unstaged or untracked files. The staged diff check reports only two intentional Markdown hard-break spaces in the historical audit file.
+- `scripts/phase3/staging-baseline.json` remains at the protected SHA-256 `e986f2ddd48af88e7e887177ffab7f9dadbec96d6d8394f09150da1d9e7f03fb`.
 
 ### Current gate evidence
 
 | Gate | This continuation | Disposition |
 |---|---|---|
-| Local unit/component/route suite | `npm test -- --reporter=dot`: **1,966 passed, 56 skipped** (168 files passed, 2 skipped). Skipped cases remain unverified; no PostgreSQL replay was repeated. Focused cart/CSP/plans/payment-pill regression set: **27/27 passed**. | Local suite PASS; not hosted acceptance |
-| Type/build/static checks | `typecheck`, `lint`, `design:check`, `sql:check`, and `build` passed. `sql:check` is a static DDL/parser inventory only. | PASS within stated scope |
-| Browser E2E | The 64-test demo/responsive suite (integration project omitted) was attempted twice. The first run could not find Playwright's Chromium headless shell; the bundled Chromium retry failed to launch because `libnspr4.so` is missing. No app assertions ran. | BLOCKED; no E2E pass claimed |
-| Database/migrations | No migration was changed or applied in this continuation; no PostgreSQL replay was repeated. Phase 5C is carry-forward local evidence, not a fresh run. | Hosted migration gate CLOSED |
-| Security/Production | Source review and local CSP tests only; no fresh hosted catalog/role check and no Production access. | UNVERIFIED; Production read-only |
-| Staging / Preview | PR #177's automated Vercel Preview check passed after the branch push; no manual Preview runtime/guest journey or Supabase/Production operation was performed. Older READY/hosted reports remain carry-forward evidence. | Preview check PASS only; runtime acceptance UNVERIFIED; Staging NO-GO |
-| PR / main integration | PR #177's GitHub CI, browser, PostgreSQL migration-matrix, and probe-safety checks passed. GitHub reports the PR conflicts with current `main`; it has not been merged. | Merge BLOCKED pending conflict reconciliation and release gates |
-| E2E / performance / recovery | No hosted browser journey, load/soak test, backup check, restore, or recovery-point verification performed. | OPEN |
-| Pilot / release | No operator approval, recovery evidence, migration authorization, or final pilot acceptance. | **NO-GO** |
+| Dependencies / audit | `npm ci`: 350 packages installed, zero vulnerabilities. `npm audit --audit-level=high --omit=dev`: zero vulnerabilities. | PASS |
+| Unit/component/route suite | `npm test -- --reporter=dot`: 181 test files passed, 4 skipped; **2,110 passed, 122 skipped**. The skipped tests were not counted as passing. | PASS within local scope |
+| Type/build/static checks | `typecheck`, `lint`, `design:check`, `sql:check`, and the production build in `npm run e2e:demo` passed. SQL check accepted all **76 uniquely versioned migration files**; it parses supported DDL only and does not validate function bodies or RLS policy semantics. | PASS within stated scope |
+| Browser E2E | `npm run e2e:demo`: **64 passed, 0 skipped, 0 failed**, using bundled Chromium and demo-mode build. The integration project was intentionally excluded; no hosted browser flow was run. | Local demo E2E PASS only |
+| Clean local database replay | `LOCAL_LOAD_USERS=100 npm run test:db:local`: clean disposable PostgreSQL 17 replay of 76 migrations plus the documented local-only inferred scaffold; five PostgreSQL-gated tests passed. A 100-guest synthetic workload persisted 100 sessions and 100 orders. This is not a hosted-capacity claim. | Local PASS only |
+| Staging-shaped forward upgrade | `READINESS_REPLAY_BASELINE=staging_scaffold npm run test:db:embedded`: reconstructed the synthetic historical baseline, upgraded through all 76 migrations, then passed **122 database-backed tests across 4 files**. This is forward-upgrade evidence, not a hosted schema check or clean-replay substitute. | Local PASS only |
+| Environment check | `npm run env:check` could not pass because no `.env.local` or Supabase URL/keys are present. No credentials were requested or added; this is the expected isolated sandbox state. | Not configured; no secret exception |
+| GitHub / PR | PR #177's previous checks passed on `af8fbbb`. Checks for the newly reconciled merge commit have not run yet; they require pushing the merge commit. PR #177 has not been merged. | Pending new CI |
+| Staging / Production | No hosted Staging or Production query, write, migration, RPC, order, payment, deployment, or operator contact occurred. Staging remains NO-GO; Production remains read-only. | Gates remain CLOSED |
+| Performance / recovery / pilot | No hosted load/soak, backup/restore, recovery-point verification, or operator acceptance was performed. The 100-user local synthetic run is not hosted capacity evidence. | OPEN; overall release **NO-GO** |
 
-Commit `143cc80` and merge-sync commit `dd5aa48` are on the active branch; PR #177 is open. GitHub CI passed, including its automated Vercel Preview check, but no manual hosted runtime or guest-to-staff acceptance was performed. No Supabase/Production operation, hosted database migration, real payment/refund, operator contact, or secret/environment-value inspection occurred. See `AGENTS.md` for the persistent engineering rules and `FEATURE-INVENTORY.md` for the affected route evidence.
+The latest `main` configuration restores Vercel's default production deployment on merge to `main` (the prior branch-specific `main: false` setting is removed). Therefore merging PR #177 into `main` will trigger a Production application deployment. No such deployment has been initiated. Under `AGENTS.md`, a separate explicit authorization for that deployment is required before the GitHub PR merge. The local merge commit and branch CI can be completed without touching hosted Staging or Production.
 
-> **Carry-forward sections below:** Feature classifications, hosted-state descriptions, migration assessments, and verification counts below are retained from earlier report snapshots. None were rechecked in this continuation; they are not current evidence or authorization. Use the current gate table above for this continuation's evidence.
+> **Carry-forward sections below:** Feature classifications and older hosted-state, migration, and verification claims are historical snapshots. They are not current evidence or authorization. Use the gate table above for checks run in this continuation.
 
 ## Historical executive verdict (snapshot only; not current release authorization)
 

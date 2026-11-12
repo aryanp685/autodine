@@ -13,8 +13,10 @@ name: E2E (browser)
 # that touches `main`'s deployment. Merging is what deploys this repository
 # (Vercel's git integration); this workflow cannot make that happen or stop it.
 #
-# It also needs no secrets: with no Supabase environment the app runs in demo
-# mode, which is a supported state and exercises the same shell, rail and links.
+# It also needs no Supabase credentials: this job explicitly opts into the
+# hermetic test-build exception and runs only the 64 demo-mode Playwright tests.
+# `supabase-e2e-load.yml` runs all 49 integration tests against a disposable
+# local Supabase stack with synthetic users and data.
 
 on:
   push:
@@ -29,12 +31,16 @@ concurrency:
 jobs:
   staff-shell:
     name: staff shell · kitchen · back/forward · 390px drawer
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
+    env:
+      CI: 'true'
+      AUTODINE_TEST_DEMO_BUILD: 'true'
+      VERCEL_ENV: 'test'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -45,27 +51,23 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Build (demo mode, no database)
+      - name: Build (explicit test-only demo mode, no database)
         run: npm run build
 
-      # The count is asserted, not assumed: a config that silently matched no
-      # tests would otherwise "pass" and prove nothing.
-      #
-      # Includes hermetic browser checks and discoverable integration specs.
-      # Integration skips in this secret-free job are NOT hosted evidence;
-      # the dedicated staging workflow verifies its configured live subset.
-      # Keep the exact discovery guard in sync with deliberate test additions.
-      - name: Expect 112 tests
+      # Count is asserted, not assumed: a project filter that silently matches
+      # no tests would otherwise "pass" and prove nothing. The 47 database-backed
+      # tests run separately in supabase-e2e-load.yml and are not skipped here.
+      - name: Expect 64 hermetic tests
         run: |
-          listed=$(npx playwright test --list | tail -1)
+          projects=(--project=desktop --project=phone --project=guest --project=staff --project=brand --project=responsive)
+          listed=$(npx playwright test "${projects[@]}" --list | tail -1)
           echo "$listed"
-          echo "$listed" | grep -q "Total: 112 tests"
+          echo "$listed" | grep -q "Total: 64 tests"
 
       # Two reporters: list for a human reading the log, json for the summary
-      # step below. The json file is the source of the per-test line.
+      # step below. The JSON file is the source of the per-test line.
       - name: Browser tests
-        id: browser
-        run: npx playwright test --reporter=list,json
+        run: npx playwright test --project=desktop --project=phone --project=guest --project=staff --project=brand --project=responsive --reporter=list,json
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
 
@@ -73,7 +75,7 @@ jobs:
       # annotation is: this turns each test into one API-readable line, so the
       # result of every individual test can be quoted rather than summarised.
       - name: Per-test results
-        if: ${{ !cancelled() && steps.browser.outcome != 'skipped' && steps.browser.outcome != '' }}
+        if: always()
         run: |
           node -e '
             try {
@@ -137,9 +139,13 @@ jobs:
             }
           '
 
+      - name: Require all 64 hermetic browser tests to pass without skips/retries
+        if: always()
+        run: node scripts/e2e/assert-playwright-results.mjs playwright-report/results.json 64
+
       - name: Upload the responsive screenshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: responsive-artifacts
           path: responsive-artifacts/
@@ -147,7 +153,7 @@ jobs:
 
       - name: Upload the report when something failed
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: playwright-report/

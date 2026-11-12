@@ -3,15 +3,16 @@
 /**
  * Admin: trial renewal page.
  *
- * Lets an administrator renew a restaurant's 7-day trial by entering
+ * Lets an administrator renew a restaurant's trial by entering
  * the restaurant name and clicking the button. The renewal is
  * server-side only — the Supabase admin client (service role) is
- * used, which bypasses RLS. The protect_restaurant_plan() trigger
- * allows the write because auth.uid() is null (service role).
+ * used, which bypasses RLS. The write reaches `accounts` through
+ * `public.admin_set_subscription()`, and the `protect_account_plan()`
+ * trigger allows it because auth.uid() is null (service role).
  *
  * This page is NOT linked from the main navigation. It is an
  * operational tool for specific situations (e.g. a restaurant whose
- * trial expired and needs a fresh 7 days).
+ * trial expired and needs a fresh term).
  *
  * THE ADMIN SECRET
  *
@@ -53,10 +54,11 @@ export default function RenewTrialPage() {
       <h1 className="g-display mt-2.5 text-[30px]">Renew trial</h1>
       <div className="mt-4 text-[14.5px] leading-[1.6] text-gink-64">
         <p className="max-w-[54ch]">
-          Renew a restaurant's 7-day trial. The trial clock is server-side
-          (<code className="text-gink-80">trial_started_at + 7 days</code>),
-          so this must be done from the server. Enter the exact restaurant
-          name and click renew.
+          Renew the trial of the account that owns a restaurant. The trial
+          clock is server-side (<code className="text-gink-80">accounts.trial_ends_at</code>),
+          and one subscription covers every outlet the account owns, so this
+          must be done from the server. Enter the exact restaurant name and
+          click renew.
         </p>
       </div>
 

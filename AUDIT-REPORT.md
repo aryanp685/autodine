@@ -1,4 +1,6 @@
-# AutoDine — Full Audit Report (2026-11-06)
+# AutoDine — Historical Audit Report (2026-11-06)
+
+> **Historical snapshot, not current runbook:** sections below record the prior P2–P10 audit and contain stale planning/status references. Use [`docs/website-readiness-audit.md`](docs/website-readiness-audit.md) for current test limits and the active safe follow-ups. The current customer flow is pay-at-counter only; no online payment gateway or subscription checkout is available. GST remains frozen under Option A and is not adviser/legal approval.
 
 > **Current-source and release correction (Arena date 2026-11-06 UTC):** This is a historical audit snapshot. Its later-dated PR/deployment statements and hosted claims were not independently rechecked in this continuation and are not current release evidence. The current customer code offers counter-only checkout; no guest UPI QR/self-claim UI or Razorpay initiation/verification/webhook route is present. Online payments remain disabled. No hosted system was accessed in this continuation; release/pilot status remains **NO-GO**. See `RELEASE-BLOCKER-REPORT.md` for the current blocker register.
 
@@ -13,14 +15,9 @@ Gates run today: typecheck ✅ · unit **1817 passed / 3 skipped** ✅ · lint 0
 
 ---
 
-## 1. Status — kitna hua, kitna baaki
+## 1. Status at the time of this historical snapshot (superseded)
 
-| | |
-|---|---|
-| Platform (menu AI, storefront, QR, orders, payments, voice, security) | **DONE** — production live |
-| Redesign spec (Order→Kitchen→Billing) Phase 1 audit | **DONE** |
-| Redesign implementation P2–P10 | **0% coded** — machinery ~35-40% exists |
-| Overall redesign remaining | **~60%** — heaviest: consolidated invoice (P6), session close (P8), printing (P7) |
+The percentages and remaining-work estimates in the original snapshot are obsolete. For current verified coverage, unverified flows, and active follow-ups, see [`docs/website-readiness-audit.md`](docs/website-readiness-audit.md).
 
 ---
 
@@ -30,14 +27,16 @@ Gates run today: typecheck ✅ · unit **1817 passed / 3 skipped** ✅ · lint 0
 - **Storefront:** design switch, branding, translations (original untouched), multi-outlet, closed-state.
 - **QR & sessions:** 3 verification modes (`code` / `scan_confirm` / `scan`), 59-min sessions, code rate limits (5/15min).
 - **Ordering:** cart → checkout → order status → 10-min change/cancel window. **Server-side price truth** (browser sends ids+qty only). **Idempotent** (guest-token replay returns same order). **Rate limits** (30/session, 60/table, 60/ip per 10 min).
-- **Payments:** Razorpay verify + webhook (raw-body HMAC, amount pinned to attempt, idempotent settle) + counter cash recording (amount never typed).
+- **Payments (historical schema):** counter settlement is the available customer flow. Provider/payment schema remnants are not a usable online gateway; there are no current Razorpay initiation, verification, or webhook routes.
 - **Kitchen/Cashier:** prep state machine (new→preparing→ready→served/cancelled), Hindi voice announcements (Edge TTS neural + browser fallback), per-ticket replay, speaker lock, missed-replay.
 - **Security:** CSP nonce, safe login redirects, guest rate limits, RLS + `security definer` + `search_path`, payment RPCs service_role-only, token-scoped order reads (privacy safe).
 - **Also:** staff invites/RBAC, trial write-gate, per-order bill + WhatsApp share, `orders_math_check` DB constraint, integer-paise money module.
 
 ---
 
-## 3. REMAINING (locked plan, P2→P10)
+## 3. Historical plan (superseded)
+
+The following P2–P10 table is retained only as audit history. It is not a list of current remaining work; see the current readiness audit linked above.
 
 | Phase | Baaki kya | Size |
 |---|---|---|
@@ -88,7 +87,7 @@ Locked decisions: pay-at-counter only (gateway off for customer orders), no paym
 
 ## 5. Verified GOOD (never weaken)
 
-Server-side price truth · integer-paise money (half-away-from-zero) · `orders_math_check` DB constraint · order_items name/price snapshots (menu edits never rewrite history) · Razorpay raw-body HMAC + idempotent settle + attempt-pinned amount · token-scoped order reads (cross-table leak impossible) · atomic DB rate limits · rollback snapshot safe on FKs · payment RPCs service_role-only · QR HMAC + session expiry · RLS + `search_path` everywhere.
+Server-side price truth · integer-paise money (half-away-from-zero) · `orders_math_check` DB constraint · order_items name/price snapshots (menu edits never rewrite history) · token-scoped order reads · atomic DB rate limits · rollback snapshot safe on FKs · counter payment RPC authorization · QR HMAC + session expiry · RLS + fixed `search_path` on protected functions. Historical provider columns do not mean online payments are enabled.
 
 ---
 
@@ -97,6 +96,7 @@ Server-side price truth · integer-paise money (half-away-from-zero) · `orders_
 - P2–P10 are complete and deployed through PRs #159–#164. P9's production migration is recorded as `20261107112126`; its live schema and permissions were verified.
 - The post-P10 production reliability migration `order_code_and_kitchen_announce_guard` was applied as version `20261107114638`. Production has zero duplicate `(restaurant_id, code)` groups; the unique index, bounded collision retry, public-order grants, private announcement table RLS, and staff-only claim RPC were verified. This also closes the historical C3/O2/O3 collision rows and O1/S2 announcement-persistence row; the invoice-series migration closes S3.
 - Read-only reconciliation: C1/C2 no longer reproduce on the live path. Cart/checkout loads a validated explicit restaurant rate; a missing/malformed live rate fails rather than becoming 5%, while demo mode alone uses the sample. Missing-rate labels are generic `Taxes`. O4 likewise no longer uses a sample label on per-order bills; stored tax figures and the order's rate snapshot are shown, and legacy bills without a known rate omit the rate. C4's PL/pgSQL exception handler preserves token idempotency by rolling back the failed order path before replay lookup. Its concurrent-writer regression passes against the disposable local PostgreSQL harness (one persisted order/item/session). That test exposed the missing session-attachment step in the latest order wrapper; forward migration `20261108006000_restore_public_order_session_attach.sql` is now applied to production as migration `20261107123437` and its function/grants were verified read-only. C4 itself was not run against production. S1's misleading header is corrected, but the model still intentionally supports one exclusive rate and intra-state CGST/SGST only. Any expansion still awaits adviser-approved GST rules; no tax behavior was changed.
-- P10 coverage includes 15 rendered receipt scenarios, call-waiter action/UI, paid-tick action/UI, print/PDF-share parity, and multi-ticket regressions. After C4's local DB run, the full local suite is **1887 passed, 4 skipped**; the four DB-gated tests skip in this suite but all four were run separately against disposable PostgreSQL 17.11 and passed. Typecheck, lint, design, SQL DDL, build, and diff checks pass. The previous unused `ImportedItem` lint warning is gone, and table labels now remain deterministic beyond 999.
-- The PR #164 browser workflow passed; local Playwright could not launch because Chromium is absent. The C4 integration suite was run only on a disposable local PostgreSQL database, never on production. Its forward migration has since been applied and verified on production as `20261107123437`.
+- P10 coverage includes 15 rendered receipt scenarios, call-waiter action/UI, paid-tick action/UI, print/PDF-share parity, and multi-ticket regressions. The full Vitest suite is **1887 passed, 4 DB-gated skipped**; those four database cases were run separately against disposable PostgreSQL 17.11 and passed. Typecheck, lint, design, SQL DDL, build, and diff checks pass. The previous unused `ImportedItem` lint warning is gone, and table labels now remain deterministic beyond 999.
+- **Isolated throttle browser E2E is complete:** workflow run [42398395823](https://github.com/aryanp685/autodine/actions/runs/42398395823) passed both Playwright tests with zero skips and ran all four PostgreSQL throttle integration cases against the throwaway local database. Logs, JSON results, migration replay, and per-test evidence were retained as a 30-day workflow artifact. Reproduction: `docs/e2e-local.md`; coverage/evidence: `docs/scan-throttle-coverage.md`. No production service or data was used.
+- The C4 integration suite was run only on disposable local PostgreSQL, never on production. Its forward migration has since been applied and verified on production as `20261107123437`.
 - GST jurisdiction/inclusive-pricing behavior remains deliberately unchanged until adviser-approved rules are provided; do not invent tax treatment.

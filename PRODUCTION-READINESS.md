@@ -1,6 +1,6 @@
 # AutoDine — production-readiness handoff
 
-> **Current gate (Arena date 2026-11-06 UTC):** The dated hosted/Preview/CI statements below are historical and were not reverified in this continuation. No hosted system was accessed, no deployment or database operation was performed, and no fresh Preview/runtime, recovery, E2E, or performance evidence was produced. Current instructions keep Production read-only and Staging NO-GO; online payments stay disabled. See `RELEASE-BLOCKER-REPORT.md` for the live blocker register.
+> **Current gate (Arena date 2026-11-06 UTC):** The hosted/Preview/CI statements below are imported historical claims and were not reverified in this continuation. GitHub PR/check metadata and Vercel project metadata were inspected read-only; no Supabase database or deployment was changed or created, and no recovery, E2E, performance, or payment-provider operation was performed. Production remains read-only, Staging remains NO-GO, and online guest payments stay disabled. See `RELEASE-BLOCKER-REPORT.md` for the live blocker register.
 
 ## Latest live staging correction verified
 

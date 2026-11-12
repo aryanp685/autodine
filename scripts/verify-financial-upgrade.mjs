@@ -20,7 +20,12 @@ export async function financialFingerprint(db) {
     where n.nspname='public' order by 1`)).rows;
   return {content,policies,functions};
 }
-export async function prepareFinancialUpgrade(db) {
+/** Seeds one sitting the way existing hosted data was created: the receipt is
+ * issued while the bill is still unpaid, and the payment is collected after.
+ * 20261108008000 forbids that order of events from then on, so this fixture
+ * must be seeded BEFORE it to prove such legacy rows survive every later
+ * migration. */
+export async function seedLegacyFinancialFixture(db) {
   await db.query(`do $$
   declare actor uuid:=gen_random_uuid(); rid uuid; tid uuid; mid uuid; cid uuid; iid uuid;
     token text:=replace(gen_random_uuid()::text,'-','')||replace(gen_random_uuid()::text,'-','');
@@ -44,11 +49,19 @@ export async function prepareFinancialUpgrade(db) {
     perform close_order_session_and_issue_receipt(sitting);
     perform record_counter_payment('financial-upgrade-fixture',oid,'cash',25000,gen_random_uuid());
   end $$;`);
+}
+/** Fingerprint taken immediately before the lock-order migrations. */
+export async function snapshotFinancialUpgrade(db) {
   const snapshot=await financialFingerprint(db);
   for(const name of ['orders','order_items','payments','payment_audit_events','restaurant_invoices','restaurant_payment_receipts']) {
     assert.ok(Number(snapshot.content.find(t=>t.relname===name)?.n)>0, `Missing populated ${name}`);
   }
   return snapshot;
+}
+/** Seed and snapshot in one step, for a schema that still allows the legacy flow. */
+export async function prepareFinancialUpgrade(db) {
+  await seedLegacyFinancialFixture(db);
+  return snapshotFinancialUpgrade(db);
 }
 export async function checkFinancialUpgrade(db,before) {
   assert.deepEqual(await financialFingerprint(db),before,

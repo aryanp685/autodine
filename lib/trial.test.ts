@@ -6,45 +6,49 @@ const DAY = 24 * 60 * 60 * 1000;
 const at = (days: number, ms = 0) => new Date(START.getTime() + days * DAY + ms);
 
 describe('trial basics', () => {
-  it('is 7 days long', () => {
-    expect(TRIAL_DAYS).toBe(7);
+  it('is 21 days long', () => {
+    // The approved trial length. The database measures a NEW trial the same
+    // way (public.account_can_write / account_trial_ends_at, migration
+    // 20261110001000), and lib/plans.test.ts reads that file so the two
+    // cannot drift apart.
+    expect(TRIAL_DAYS).toBe(21);
   });
 
   it('gives the full trial the moment an account is created', () => {
     const s = computeTrialState({ startedAt: START, now: START });
     expect(s.status).toBe('trialing');
-    expect(s.daysRemaining).toBe(7);
+    expect(s.daysRemaining).toBe(TRIAL_DAYS);
     expect(s.canPlaceOrders).toBe(true);
     expect(s.readOnly).toBe(false);
   });
 
-  it('ends exactly 7 days after it started', () => {
+  it(`ends exactly ${21} days after it started`, () => {
     const s = computeTrialState({ startedAt: START, now: START });
-    expect(s.endsAt.toISOString()).toBe('2026-10-26T10:00:00.000Z');
+    expect(s.endsAt.toISOString()).toBe('2026-11-09T10:00:00.000Z');
   });
 
   it('counts down', () => {
-    expect(computeTrialState({ startedAt: START, now: at(3) }).daysRemaining).toBe(4);
-    expect(computeTrialState({ startedAt: START, now: at(6) }).daysRemaining).toBe(1);
+    expect(computeTrialState({ startedAt: START, now: at(3) }).daysRemaining).toBe(TRIAL_DAYS - 3);
+    expect(computeTrialState({ startedAt: START, now: at(6) }).daysRemaining).toBe(TRIAL_DAYS - 6);
   });
 });
 
 describe('expiry', () => {
   it('is still trialing one second before the end', () => {
-    const s = computeTrialState({ startedAt: START, now: at(7, -1000) });
+    const s = computeTrialState({ startedAt: START, now: at(TRIAL_DAYS, -1000) });
     expect(s.status).toBe('trialing');
     expect(s.canPlaceOrders).toBe(true);
   });
 
   it('expires exactly at the end, not a moment earlier or later', () => {
-    const s = computeTrialState({ startedAt: START, now: at(10) });
+    const s = computeTrialState({ startedAt: START, now: at(TRIAL_DAYS) });
     expect(s.status).toBe('expired');
     expect(s.expired).toBe(true);
     expect(s.daysRemaining).toBe(0);
   });
 
   it('blocks new orders once expired', () => {
-    const s = computeTrialState({ startedAt: START, now: at(8) });
+    const s = computeTrialState({ startedAt: START, now: at(TRIAL_DAYS + 1) });
     expect(s.canPlaceOrders).toBe(false);
     expect(s.readOnly).toBe(true);
   });
@@ -85,7 +89,7 @@ describe('clock skew', () => {
     // A bad clock must not lock a paying restaurant out of service.
     const s = computeTrialState({ startedAt: START, now: at(-1) });
     expect(s.status).toBe('trialing');
-    expect(s.daysRemaining).toBe(7);
+    expect(s.daysRemaining).toBe(TRIAL_DAYS);
     expect(s.canPlaceOrders).toBe(true);
   });
 });
@@ -97,7 +101,7 @@ describe('orderBlockedReason', () => {
   });
 
   it('explains itself to a human at the counter when blocked', () => {
-    const reason = orderBlockedReason(computeTrialState({ startedAt: START, now: at(9) }));
+    const reason = orderBlockedReason(computeTrialState({ startedAt: START, now: at(TRIAL_DAYS + 2) }));
     expect(reason).not.toBeNull();
     // The message must reassure that nothing was lost: that is the promise.
     expect(reason).toContain('still here');

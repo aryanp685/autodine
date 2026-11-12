@@ -3,8 +3,9 @@ import { AuthSubmit } from '@/components/AuthSubmit';
 import { AuthShell } from '@/components/AuthShell';
 import { signUpAction } from '@/app/auth/actions';
 import { Field, inputClass } from '@/components/owner/chrome';
+import { TRIAL_DAYS } from '@/lib/trial';
 
-/** Signup creates a workspace and starts its seven-day trial, not a paid plan. */
+/** Signup creates a workspace and starts its 21-day trial, not a paid plan. */
 export function SignupScreen({ error }: { error?: string }) {
   return (
     <AuthShell
@@ -26,7 +27,7 @@ export function SignupScreen({ error }: { error?: string }) {
       notesTitle="Your workspace, clearly explained"
       eyebrow="Create an account"
       title="Start with your restaurant"
-      lede="Start your seven-day trial with one restaurant and one menu. No card required."
+      lede={`Start your ${TRIAL_DAYS}-day trial with one restaurant and one menu. No card required.`}
       action={{ prompt: 'Already have an account?', label: 'Sign in', href: '/login' }}
       notes={[
         <>
@@ -38,7 +39,7 @@ export function SignupScreen({ error }: { error?: string }) {
         </>,
         <>
           <strong>Nothing is charged.</strong> No payment gateway is connected, no plan can be
-          bought. A seven-day trial starts when your restaurant is created; after it ends, the workspace
+          bought. A {TRIAL_DAYS}-day trial starts when your restaurant is created; after it ends, the workspace
           becomes read-only until access is extended.
         </>,
       ]}
@@ -138,7 +139,7 @@ export function SignupScreen({ error }: { error?: string }) {
         <AuthSubmit label="Create account" pendingLabel="Creating your workspace…" />
 
         <p className="text-[11.5px] leading-[1.5] text-gink-46">
-          Signing up creates a restaurant workspace with one menu and one owner. A seven-day trial starts
+          Signing up creates a restaurant workspace with one menu and one owner. A {TRIAL_DAYS}-day trial starts
           with the workspace. No paid subscription is created by this form.
         </p>
         <p className="text-[11.5px] leading-relaxed text-gink-46">Read our <Link href="/privacy" className="underline underline-offset-4">Privacy policy</Link> and <Link href="/terms" className="underline underline-offset-4">Terms</Link> before creating an account.</p>

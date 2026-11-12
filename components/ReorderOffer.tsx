@@ -85,10 +85,18 @@ export function ReorderOffer({
   const [lines, setLines] = useState<StoredLine[]>([]);
 
   useEffect(() => {
-    if (!enabled || !slug) return;
-    setLines(readLastCart(browserStorage(), slug));
-    // ClearCartOnOrder saves the snapshot after CartProvider hydrates. Read
-    // again when that provider becomes ready / clears, not just on mount.
+    if (!enabled || !slug || !cart?.ready) {
+      setLines([]);
+      return;
+    }
+
+    // ClearCartOnOrder writes the remembered cart after provider hydration.
+    // Re-read after mount and whenever cart state changes so this offer can
+    // observe that saved snapshot without racing the sibling effect.
+    const timer = window.setTimeout(() => {
+      setLines(readLastCart(browserStorage(), slug));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [enabled, slug, cart?.ready, cart?.count]);
 
   if (!enabled || !slug || !cart || !cart.ready || lines.length === 0) return null;

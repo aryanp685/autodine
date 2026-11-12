@@ -6,9 +6,9 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test';
  *
  * THE RULES THESE SPECS LIVE UNDER (read before pointing them anywhere)
  *
- *   · They WRITE ROWS: orders, payments, a staff session. Point them at a
- *     DISPOSABLE branch database only. Never production. The specs cannot
- *     tell the difference — you can.
+ *   · They WRITE ROWS: orders, payments, and staff sessions. Run them only
+ *     against the disposable local Supabase stack (or another explicitly
+ *     approved non-production target). Never production.
  *   · Without their environment variables they skip themselves. A green CI
  *     run with "7 skipped" is this file being discoverable, not verified.
  *   · Every env value is the human's to supply; nothing is guessed and no
@@ -16,8 +16,45 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test';
  */
 
 export const BASE = process.env.E2E_BASE_URL ?? '';
-/** A LIVE table card's public token, on a scan-mode restaurant. */
+/** A dedicated live card reserved for the real throttle integration test. */
 export const QR = process.env.E2E_QR_TOKEN ?? '';
+/** Fresh per-test cards keep the ordinary guest flows below the card open limit. */
+const SCAN_TOKENS = (process.env.E2E_QR_TOKENS ?? '').split(',').map((token) => token.trim()).filter(Boolean);
+let scanTokenCursor = 0;
+
+// The isolated staging workflow provisions one synthetic card per spec file;
+// the disposable Supabase workflow provisions a larger per-scenario token pool.
+// Both are non-production inputs, and neither falls back to a real restaurant.
+function stagingCard(): { token: string; label: string } | null {
+  const raw = process.env.E2E_CARDS_JSON;
+  if (!raw) return null;
+  let cards: Record<string, { token?: unknown; label?: unknown }>;
+  try { cards = JSON.parse(raw) as typeof cards; }
+  catch { throw new Error('E2E_CARDS_JSON must be valid JSON fixture data.'); }
+  const key = test.info().file.split(/[\\/]/).at(-1) ?? '';
+  const card = cards[key];
+  if (!card || typeof card.token !== 'string' || typeof card.label !== 'string') {
+    throw new Error(`E2E_CARDS_JSON has no valid card for ${key}.`);
+  }
+  return { token: card.token, label: card.label };
+}
+
+export function fixtureTableLabel(): string {
+  return stagingCard()?.label ?? process.env.E2E_TABLE_LABEL ?? 'E2E Guest \\d{2}';
+}
+
+/** Reserve one fresh fixture card per browser scenario; a caller may retain it for a re-scan. */
+export function nextScanToken(): string {
+  return SCAN_TOKENS.length ? SCAN_TOKENS[scanTokenCursor++ % SCAN_TOKENS.length] : stagingCard()?.token ?? QR;
+}
+
+/** A fixture card reserved by index for an end-to-end scenario that spans many actions. */
+export function reservedScanToken(index: number): string {
+  const token = SCAN_TOKENS[index] ?? stagingCard()?.token ?? QR;
+  if (!token) throw new Error(`No E2E fixture card is available for reserved index ${index}.`);
+  return token;
+}
+
 /** The six-digit on-site code for that card's table. */
 export const TABLE_CODE = process.env.E2E_TABLE_CODE ?? '';
 /** The restaurant slug the card belongs to. */
@@ -34,7 +71,7 @@ export const GUEST_READY = Boolean(BASE && QR && TABLE_CODE && SLUG);
 export const STAFF_READY = Boolean(BASE && OWNER_EMAIL && OWNER_PASSWORD);
 
 export function skipUnless(ready: boolean, needs: string): string {
-  return `needs a disposable deployment (${needs}); set the E2E_* environment and run --config playwright.integration.config.ts or --project=integration`;
+  return `needs a disposable non-production target (${needs}); set the E2E_* environment and run --config playwright.integration.config.ts or --project=integration`;
 }
 
 /** Sign an owner in and wait for the staff shell — the proof of a session. */
@@ -52,16 +89,10 @@ export async function signInOwner(context: BrowserContext): Promise<Page> {
  * Scan the table card. Returns the menu page for the restaurant the card
  * belongs to — with the card-pass cookie the scan handler set.
  */
-function specCard(): {token?: string;label?: string} {
-  if (!process.env.E2E_CARDS_JSON) return {};
-  let cards: Record<string,{token?:string;label?:string}>;
-  try { cards=JSON.parse(process.env.E2E_CARDS_JSON); } catch { throw new Error('Invalid private fixture card mapping'); }
-  return cards[test.info().file.split(/[\\/]/).pop() || ''] || {};
-}
-export function fixtureTableLabel(): string | undefined { return specCard().label || process.env.E2E_TABLE_LABEL; }
 export async function scanCard(context: BrowserContext, token?: string): Promise<Page> {
+  const selected = token ?? nextScanToken();
   const page = await context.newPage();
-  await page.goto(`${BASE}/t/${token ?? specCard().token ?? QR}`);
+  await page.goto(`${BASE}/t/${selected}`);
   return page;
 }
 
@@ -69,13 +100,33 @@ export async function scanCard(context: BrowserContext, token?: string): Promise
  * Put one plain dish on the order and walk to checkout. Returns the checkout
  * page. Adds nothing else: each spec decides its own quantities and notes.
  */
-export async function addOneAndCheckout(page: Page): Promise<void> {
-  await page.goto(`${BASE}/menu?s=${encodeURIComponent(SLUG)}`);
+async function addOneAndContinue(page: Page): Promise<void> {
   const add = page.getByRole('button', { name: /^Add / }).first();
+  await expect(add).toBeVisible({ timeout: 15_000 });
   await add.click();
   await page.locator('[data-gtab-bar]').getByRole('link', { name: 'Cart' }).click();
   await page.getByRole('link', { name: 'Continue to checkout' }).click();
   await expect(page).toHaveURL(/\/menu\/checkout/);
+}
+
+export async function addOneAndCheckout(page: Page): Promise<void> {
+  await page.goto(`${BASE}/menu?s=${encodeURIComponent(SLUG)}`);
+  await addOneAndContinue(page);
+}
+
+/** Continue from the placed-order screen so the guest keeps the verified table session. */
+export async function addAnotherAndCheckout(page: Page): Promise<void> {
+  // Clearing is a post-commit client effect. Wait for its durable localStorage
+  // signal before navigating, so a fast E2E click cannot race hydration and
+  // mistake the previous ticket's cart for a fresh intention.
+  await page.waitForFunction(
+    (key) => window.localStorage.getItem(key) === null,
+    `autodine.cart.${SLUG}`,
+    { timeout: 10_000 },
+  );
+  await page.getByRole('link', { name: 'Order something else' }).click();
+  await expect(page).toHaveURL(/\/menu(?:\?|$)/);
+  await addOneAndContinue(page);
 }
 
 /**

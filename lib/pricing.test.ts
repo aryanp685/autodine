@@ -92,42 +92,16 @@ describe('computeOrderTotals', () => {
   });
 });
 
-describe('discount precedence', () => {
-  it('applies the discount BEFORE tax, so GST follows the reduced value', () => {
-    const t = computeOrderTotals({ lines: SEED_LINES, discountPaise: 10000 }); // ₹100 off
-    expect(t.subtotalPaise).toBe(77600);
-    expect(t.discountPaise).toBe(10000);
-    expect(t.taxablePaise).toBe(67600);
-    expect(t.taxPaise).toBe(3380); // 5% of ₹676.00, NOT 5% of ₹776.00
-    expect(t.totalPaise).toBe(70980);
+describe('discount policy gate', () => {
+  it('fails closed for any positive discount until policy approval', () => {
+    for (const discountPaise of [1, 10000, 77600, 999999]) {
+      expect(() => computeOrderTotals({ lines: SEED_LINES, discountPaise }))
+        .toThrow('Discounts are disabled until written financial policy approval.');
+    }
   });
 
-  it('charges less tax with a discount than without', () => {
-    const withDiscount = computeOrderTotals({ lines: SEED_LINES, discountPaise: 10000 });
-    const without = computeOrderTotals({ lines: SEED_LINES });
-    expect(withDiscount.taxPaise).toBeLessThan(without.taxPaise);
-  });
-
-  it('clamps the taxable base at zero instead of producing a negative bill', () => {
-    const t = computeOrderTotals({ lines: SEED_LINES, discountPaise: 999999 });
-    expect(t.taxablePaise).toBe(0);
-    expect(t.taxPaise).toBe(0);
-    expect(t.totalPaise).toBe(0);
-    // The discount is still reported unclamped so the anomaly is visible.
-    expect(t.discountPaise).toBe(999999);
-  });
-
-  it('handles a discount equal to the subtotal', () => {
-    const t = computeOrderTotals({ lines: SEED_LINES, discountPaise: 77600 });
-    expect(t.taxablePaise).toBe(0);
-    expect(t.totalPaise).toBe(0);
-  });
-
-  it('rejects a negative discount', () => {
+  it('rejects a negative or fractional discount before any totals are returned', () => {
     expect(() => computeOrderTotals({ lines: SEED_LINES, discountPaise: -100 })).toThrow(RangeError);
-  });
-
-  it('rejects a fractional discount', () => {
     expect(() => computeOrderTotals({ lines: SEED_LINES, discountPaise: 10.5 })).toThrow(TypeError);
   });
 });
@@ -147,8 +121,7 @@ describe('invariants that must hold for every order', () => {
         unitPricePaise: Math.floor(rand() * 200000),
         qty: Math.floor(rand() * 5),
       }));
-      const discount = rand() < 0.3 ? Math.floor(rand() * 50000) : 0;
-      const t = computeOrderTotals({ lines, discountPaise: discount });
+      const t = computeOrderTotals({ lines, discountPaise: 0 });
       expect(t.totalPaise).toBe(t.taxablePaise + t.taxPaise);
     }
   });
@@ -174,7 +147,7 @@ describe('invariants that must hold for every order', () => {
   it('total is never negative, whatever the inputs', () => {
     for (let i = 0; i < 300; i += 1) {
       const lines = [{ unitPricePaise: Math.floor(rand() * 100000), qty: Math.floor(rand() * 3) }];
-      const t = computeOrderTotals({ lines, discountPaise: Math.floor(rand() * 400000) });
+      const t = computeOrderTotals({ lines, discountPaise: 0 });
       expect(t.totalPaise).toBeGreaterThanOrEqual(0);
     }
   });

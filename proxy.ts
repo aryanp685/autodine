@@ -6,9 +6,10 @@
  *      while someone is working.
  *   2. Send signed-out visitors to /login.
  *
- * When Supabase is not configured this does nothing at all, so the demo site
- * stays browsable. That is a deliberate pilot convenience — before launch it
- * should fail closed instead.
+ * When Supabase is not configured, session refresh is skipped only for the
+ * explicitly enabled local demo and the hermetic CI build. The server-side
+ * runtime guard rejects an unconfigured production build, so this branch can
+ * never turn a production deployment into an unauthenticated demo.
  */
 
 import { createServerClient } from '@supabase/ssr';

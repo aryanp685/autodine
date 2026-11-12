@@ -22,16 +22,11 @@
  */
 
 import { useFormStatus } from 'react-dom';
-import { inr } from '@/lib/demo-data';
-import { paiseToRupees } from '@/lib/money';
-
 export function PlaceOrderButton({
-  totalPaise,
   canOrder,
   form,
   variant,
 }: {
-  totalPaise: number;
   canOrder: boolean;
   /** The id of the form this button submits, when it is not a descendant. */
   form: string;
@@ -45,8 +40,8 @@ export function PlaceOrderButton({
     : pending
       ? 'Placing your order…'
       : variant === 'dock'
-        ? 'Place order & pay at counter'
-        : `Place order & pay at counter · ${inr(paiseToRupees(totalPaise))}`;
+        ? 'PLACE ORDER & PAY AT COUNTER'
+        : 'PLACE ORDER & PAY AT COUNTER';
 
   return (
     <button

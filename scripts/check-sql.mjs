@@ -102,6 +102,23 @@ function stripUnsupported(sql) {
 }
 
 let failed = 0;
+const versions = new Map();
+for (const file of files) {
+  const match = /^(\d{14})_(.+)\.sql$/.exec(file);
+  if (!match) {
+    failed += 1;
+    console.error(`${file}: migration filename must be <14-digit-version>_<name>.sql`);
+    continue;
+  }
+  const [, version] = match;
+  const previous = versions.get(version);
+  if (previous) {
+    failed += 1;
+    console.error(`Duplicate migration version ${version}: ${previous} and ${file}`);
+  } else {
+    versions.set(version, file);
+  }
+}
 
 for (const file of files) {
   const full = join(MIGRATIONS, file);

@@ -57,6 +57,7 @@ describe('sign in', () => {
   it('keeps saying what is live, without a card competing with the form', () => {
     expect(html).toContain('Ordering, the kitchen board and the counter are live');
     expect(html).toContain('Plans are not on sale');
+    expect(html).toContain('New accounts start with 21 trial days');
     expect(html).toContain('Payments are recorded at the counter');
   });
 
@@ -96,7 +97,8 @@ describe('sign up', () => {
 
   it('promises nothing that is not connected', () => {
     expect(html).toContain('No payment gateway is connected');
-    expect(html).toContain('A seven-day trial starts');
+    expect(html).toContain('A 21-day trial starts');
+    expect(html).not.toContain('seven-day trial');
     expect(html).not.toContain('no trial is being enforced');
     expect(html).toContain('No paid subscription is created by this form');
     expect(html).toContain('data-auth-card');

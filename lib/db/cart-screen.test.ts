@@ -28,6 +28,7 @@ const BASE_RESULTS: TableResults = {
       name: 'Saffron Smoke',
       slug: 'saffron-smoke',
       tax_rate_bps: 0,
+      is_active: true,
       brand_theme_enabled: false,
       brand_theme: null,
     },
@@ -62,6 +63,10 @@ const BASE_RESULTS: TableResults = {
 function fakeSupabase(results: TableResults) {
   const queriedTables: string[] = [];
   const client = {
+    rpc(functionName: string) {
+      if (functionName !== 'public_restaurant_profile') throw new Error(`Unexpected RPC: ${functionName}`);
+      return { maybeSingle: () => Promise.resolve({ data: results.restaurants.data, error: results.restaurants.error }) };
+    },
     from(table: keyof TableResults) {
       queriedTables.push(table);
       const result = results[table] ?? { data: [], error: null };
