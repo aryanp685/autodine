@@ -8,10 +8,13 @@ That commit explicitly disabled automatic Vercel Git deployments for `main` in
 `vercel.json` as a temporary hold pending the coordinated schema/app cutover.
 PR #176 later merged at `0f2199c` on 2026-11-12, but provider events showed no
 production deployment at merge time; the production deployment was manually
-created afterwards. This continuation removes the repo-level disable map so
-future merges can deploy normally. This is point-in-time evidence, not
-perpetual deployment protection. The hosted migrations performed later are
-recorded in the hand-off report and production migration ledger.
+created afterwards. PR #178 removed the repo-level disable map. Vercel then created production
+deployment `dpl_VgBU9J9TRH2FMhZJbx29FDKQbRdL` from Git commit
+`ff8ceae0e459cdee638cdadba7475a38b104915e` on `main`; it reached READY and
+PROMOTED. This confirms Git-triggered production deployment is restored. This
+is point-in-time evidence, not perpetual deployment protection. The hosted
+migrations performed later are recorded in the hand-off report and production
+migration ledger.
 
 ## First bounded tool
 

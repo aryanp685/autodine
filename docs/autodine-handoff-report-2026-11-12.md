@@ -85,23 +85,23 @@ password: Review2026!
 
 ## 4. Branch, merge and deployment state
 
-- The hand-off's former PR #176 is **merged** into `main` at `0f2199c90f356c6bb1b4e7c4f885bd4e1350842b` (2026-11-12 13:23 UTC).
-- Production Vercel deployment `52Ck1JvNHo2CBoHgGE9a8EHYk45c` is READY and promoted, from the merged `main` commit. It was created at 13:36 UTC as a **manual deployment**, not automatically on merge.
-- Current working branch for this continuation: `arena/cd4d9ad9-autodine`, based on that commit. Open PR #177 is a separate in-flight change; avoid duplicating its work when preparing any follow-up.
+- PR #176 is merged into `main` at `0f2199c90f356c6bb1b4e7c4f885bd4e1350842b` (2026-11-12 13:23 UTC). PR #178, which removed the temporary Vercel Git deployment hold and added the expiry scheduler migration, merged at `ff8ceae0e459cdee638cdadba7475a38b104915e` (2026-11-12 17:04 UTC).
+- The first deployment after PR #176 (`52Ck1JvNHo2CBoHgGE9a8EHYk45c`) was manual. **After PR #178 merged, Vercel created a Git-sourced production deployment from `main` commit `ff8ceae0e459cdee638cdadba7475a38b104915e`; deployment `dpl_VgBU9J9TRH2FMhZJbx29FDKQbRdL` reached READY and PROMOTED. This verifies automatic deploy restoration.**
+- Current working branch: `arena/01715497-autodine`, based on the PR #178 merge commit. PR #177 remains a separate in-flight change; avoid duplicating its work in follow-ups.
 
 ### Root cause: main auto-deploy was explicitly disabled
 
 `vercel.json` in the merged baseline explicitly sets `git.deploymentEnabled.main` to `false` (and also disables the old Arena branch). This was introduced by commit `471d0dd` as a temporary deployment hold while coordinating the database/app cutover. Vercel provider events show no deployment at the PR #176 merge time; production did not change until the manual deployment above. The preview deployment seen during that period belonged to `arena/a5344572-autodine`, not `main`.
 
-This branch removes the `git.deploymentEnabled` override while preserving the existing `bom1` region. That restores the normal Vercel Git integration behavior once this change reaches the configured production branch; it does not itself deploy or change Vercel project settings.
+PR #178 removed the `git.deploymentEnabled` override while preserving the existing `bom1` region. The merge triggered the Git-sourced production deployment recorded above, confirming that the hold is gone.
 
-**Isolation follow-up completed:** Vercel project-wide `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` for Preview/Development were updated, with user approval, to the existing staging project (`juwyhslzchjevqkdvwjm`). Read-only verification confirmed both values. Production-scoped variables and secrets were not changed. The open PR #177's branch-specific Preview URL/key were also checked and point to staging. Existing deployments are immutable; subsequent Preview/Development deployments will pick up the corrected environment. Follow `docs/preview-isolation.md` for all later env changes.
+**Preview/Development Supabase configuration updated:** with user approval, the project-wide Supabase URL, publishable key, and server secret-key entries for Preview/Development were set to the staging project (`juwyhslzchjevqkdvwjm`). The secret key used was the staging project's service-role key; Vercel continues to mask it. Production-scoped values were not changed. The open PR #177's branch-specific Preview URL/key were previously verified as staging. Vercel deployments are immutable: old Preview deployments keep their original build-time configuration and were not deleted or rebuilt here. Only new builds pick up the new settings. Follow `docs/preview-isolation.md` before using or sharing any pre-change preview deployment.
 
 ## 5. Current measured state (updated 2026-11-12)
 
 ### 5.1 Production release and 21-day trials
 
-The production schema rollout (Batch A plus the final member-only migration) is complete, and `/api/health` had reported `ok:true` after the rollout. PR #176 then merged. The current Vercel production deployment is from that merged commit, but its automatic deployment was blocked by the explicit `main: false` setting described in §4 and it was manually promoted later.
+The production schema rollout (Batch A plus the final member-only migration) is complete, and `/api/health` had reported `ok:true` after the rollout. PR #176 then merged; because the Vercel hold was still present, its deployment was manual. PR #178 removed the hold, and the subsequent Git-triggered deployment from `main` is READY and promoted as recorded in §4.
 
 Production subscription state was rechecked after the merge. **All four existing restaurants already have active, write-enabled 21-day trials**, so the requested `admin_set_subscription` calls were correctly not repeated:
 
@@ -160,7 +160,7 @@ This branch adds `supabase/migrations/20261112000100_schedule_subscription_expir
 
 ### 6.3 Vercel deployment fix
 
-This branch removes the explicit Vercel Git deployment disable map. It addresses the observed cause of the missed deployment on `main`; the fix takes effect after it is merged to `main`. It does not issue a deployment or alter project dashboard settings.
+PR #178 removed the explicit Vercel Git deployment disable map. After merge, Vercel automatically created production deployment `dpl_VgBU9J9TRH2FMhZJbx29FDKQbRdL` from `main` at `ff8ceae0e459cdee638cdadba7475a38b104915e`; it reached READY/PROMOTED. This is observed evidence that the Git integration is restored.
 
 ### 6.4 Legacy migration-history reconciliation
 
@@ -311,7 +311,7 @@ These come from `AGENTS.md` and are locked. Read that file before changing code.
 
 ## 12. Recommended changes, in priority order
 
-1. **Restore Vercel Git auto-deploys.** Merge this branch's `vercel.json` fix and confirm a later merge to `main` creates the expected production deployment. Do not treat a manual deploy as proof of the Git integration.
+1. **Retire or rebuild pre-isolation Preview deployments before use.** Their environment values are immutable; they were not deleted or rebuilt during this work.
 2. **Reconcile 49 production-only schema-migration versions.** Exact classify results are not available yet due connector output caps. Capture the probe in bounded chunks or use another authorized read-only path; do not edit migration history or rerun schema migrations based only on ledger names.
 3. **Configure SMTP and raise the email send rate limit** — separate settings. Exercise reset and invite flows on staging first. Do not disable `mailer_autoconfirm` without an explicit product decision.
 4. **Complete the real hosted integration pass** on an approved non-production project: QR → menu → order → kitchen → cashier/close → receipt, two-tenant isolation, retry/network failure, mobile and desktop.
@@ -320,16 +320,16 @@ These come from `AGENTS.md` and are locked. Read that file before changing code.
 7. **Obtain GST adviser sign-off** before enabling GST-dependent invoices or changing the locked tax behavior.
 8. **Run a capacity pass** sized for the actual pilot before broad launch.
 
-Completed this continuation: changed and verified Preview/Development Supabase targets to staging; applied and verified the guarded subscription-expiry scheduler migration on production after local checks and user approval; all four restaurant trials were already active and were not rewritten.
+Completed across this continuation: Preview/Development Supabase URL, publishable key, and server secret were set to staging (Production envs untouched); PR #178 restored and verified Git-triggered production deployment; the guarded subscription-expiry migration was applied and verified; all four restaurant trials were already active and were not rewritten.
 
 ## 13. Remaining work and operator decisions
 
 | Item | Who | Status / why |
 |---|---|---|
 | Production expiry scheduler | Agent | **Complete.** User approved; guarded migration `20261112000100` was applied and the active 15-minute cron job was verified. |
-| Confirm Vercel Git deployment restoration | Operator | Merge the config fix, then observe a subsequent `main` deployment; no deploy is triggered by this branch itself. |
+| Vercel Git deployment restoration | Agent | **Complete.** PR #178 merged; subsequent Git-sourced `main` deployment `dpl_VgBU9J9TRH2FMhZJbx29FDKQbRdL` reached READY/PROMOTED. |
 | Reconcile 49 production-only migration versions | Agent + operator | Need complete read-only catalog probe and classification; do not use ledger names as proof. |
-| Preview/Development Supabase configuration | Agent | **Complete.** Project-level URL and publishable key now target staging; Production variables and secrets unchanged. |
+| Preview/Development Supabase configuration | Agent | Project-wide URL, publishable key, and server secret now target staging; Production entries unchanged. Existing pre-change Preview deployments remain immutable and must be rebuilt/retired before use. |
 | Configure SMTP and raise email rate limit | Operator | Supabase dashboard configuration; connector exposes no SMTP setting. |
 | Approve GST rules | Adviser | Legal/financial approval. |
 | Decide cap-vs-reject for quantities > 99 | Product owner | Behavioral contract decision. |
