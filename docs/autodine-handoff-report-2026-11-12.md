@@ -235,8 +235,13 @@ separate `test:db` job in CI on a PostgreSQL 15/17/18 matrix.
 
 ## 6. Work in flight — the production migration
 
-**This is the active task. 29 of 33 done; 4 remain.** `/api/health` flipped to `ok:true`
-at migration 23 of 33; see §5.1 for the after-probe.
+**Batch A is COMPLETE — 33 of 33 applied, 0 failures.** `/api/health` flipped to `ok:true`
+at migration 23 of 33 and is still `ok:true` after all 33. See §5.1 for the after-probe.
+
+The measured merge gate is satisfied (§4): `public.accounts` exists with 4 rows,
+`public.subscription_payments` exists, `public_restaurant_profile()` exists.
+PR #176 is therefore safe to merge. See §6.2c for one consequence that needs an
+operator decision.
 
 The rollout order is fixed and must not be reordered:
 
@@ -267,7 +272,7 @@ breaks every guest menu.
 20261108002000_invoice_receipts
 ```
 
-### 6.2 Applied so far — 29 of 33
+### 6.2 Applied — 33 of 33 (complete)
 
 ```
  1  20261021000004_missing_qr_tables
@@ -299,20 +304,48 @@ breaks every guest menu.
 27  20261110000400_durable_order_attempt_budget
 28  20261110000500_public_restaurant_profile
 29  20261110000600_staff_finance_boundaries
+30  20261110000800_remove_order_submission_caps
+31  20261110000900_converge_qr_verification_attempts
+32  20261110001000_account_subscriptions        ← created public.accounts (4 rows)
+33  20261110001100_subscription_billing         ← created public.subscription_payments
 ```
 
-### 6.2b The 4 remaining, in the exact order to apply
+### 6.2c Consequence of migration 32 that needs an operator decision
 
-```
-30  20261110000800_remove_order_submission_caps        (239 lines)
-31  20261110000900_converge_qr_verification_attempts   (206 lines)
-32  20261110001000_account_subscriptions               (750 lines) ← creates public.accounts
-33  20261110001100_subscription_billing               (1463 lines) ← largest; split it
+`20261110001000` backfills one `accounts` row per existing restaurant and materialises the
+trial end from the state **each trial was actually in** at the moment it ran. The rule it
+applies is deliberate: a trial still running on the old 7-day rule is extended to 21 days,
+a trial that had **already expired stays expired**. All four production restaurants had
+already expired, so all four accounts were written as `plan_status = 'expired'`:
+
+| Restaurant | Slug | Trial started | Trial ended | Members |
+|---|---|---|---|---|
+| The King | `theking` | 2026-10-28 | 2026-11-04 | 1 |
+| maddi | `maddi` | 2026-10-20 | 2026-10-27 | 1 |
+| AutoDine QR Flow Test | `arena-qr-flow-test-20261021` | 2026-10-20 | 2026-10-27 | 0 |
+| restro-non-veg | `restro-non-veg` | 2026-11-03 | 2026-11-10 | 1 |
+
+`account_can_write()` returns false for an expired account, so **once PR #176 is deployed,
+all four become read-only**. Nothing is deleted and everything stays readable — this is the
+designed behaviour — but ordering, menu edits and cashier actions will be refused until a
+subscription is set.
+
+To give a restaurant a fresh 21-day trial, as the service role:
+
+```sql
+select public.admin_set_subscription('The King', 'trial', 21);
 ```
 
-Migrations 32 and 33 are the merge gate: until `public.accounts` and the subscription
-tables exist, PR #176 must stay unmerged. Both are large; split them at statement
-boundaries across several `execute_query` calls and verify afterwards.
+To put one on a paid plan for a month (no provider configured yet, so this is an operator
+recording an off-line arrangement):
+
+```sql
+select public.admin_set_subscription('The King', 'starter', null, 1);
+```
+
+The restaurant name must match exactly (case-insensitive). `trial_grants` has 3 rows for 4
+accounts — the fourth account has no owner, because `AutoDine QR Flow Test` has no
+membership, so nobody owns it and no grant was recorded.
 
 ### 6.3 How to apply them safely
 
