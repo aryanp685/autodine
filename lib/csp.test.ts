@@ -19,6 +19,12 @@ describe('buildCsp', () => {
     expect(csp).toContain("default-src 'self'");
   });
 
+  it('allows kitchen TTS blob audio only through the media directive', () => {
+    expect(csp).toContain("media-src 'self' blob:");
+    expect(csp).not.toMatch(/default-src[^;]*blob:/);
+    expect(csp).not.toMatch(/script-src[^;]*blob:/);
+  });
+
   it('allows Supabase and realtime but no unapproved payment provider or iframe', () => {
     expect(csp).toContain('https://abc.supabase.co');
     expect(csp).toContain('wss://abc.supabase.co');
