@@ -35,7 +35,7 @@ browser speech-synthesis fallback. Tests: Vitest (unit + DB integration), Playwr
 |---|---|
 | `app/` | Next.js routes. 41 page components across `(kiosk)`, `(staff)`, `admin`, guest `menu/`, `t/[token]`, `bill/`, `invoice/` groups. |
 | `lib/` | 231 TypeScript modules. `lib/db/*` are the DB access layer, `lib/plans.ts` + `lib/trial.ts` are the commercial source of truth, `lib/health.ts` is the health probe. |
-| `supabase/migrations/` | **71** checked-in SQL migrations, filename `YYYYMMDDHHMMSS_name.sql`. |
+| `supabase/migrations/` | **72** checked-in SQL migrations, filename `YYYYMMDDHHMMSS_name.sql`. |
 | `e2e/` | 16 Playwright spec files (11 top-level + 5 in `integration/`). |
 | `scripts/` | Verification tooling: `check-sql.mjs`, `verify-database.mjs`, `local-pg/` (disposable PostgreSQL harness), `reconcile/`. |
 | `AGENTS.md` | **Authoritative project instructions. Read this first.** Contains locked product/money/GST decisions that must not be changed without approval. |
@@ -83,319 +83,92 @@ password: Review2026!
 
 ---
 
-## 4. Branch and PR state
+## 4. Branch, merge and deployment state
 
-- Branch: **`arena/a5344572-autodine`**, based on `71f46ce` of `arena/e9e78732-autodine`.
-- **PR #176** → `main`, **OPEN and deliberately a DRAFT**, 95 commits, `mergeable: MERGEABLE`.
-- Branch tip: **`e0f362b`** = PR #176 head. Working tree clean, `ahead=0 behind=0` against
-  origin. Nothing is pending; everything described in this report is committed and pushed.
+- The hand-off's former PR #176 is **merged** into `main` at `0f2199c90f356c6bb1b4e7c4f885bd4e1350842b` (2026-11-12 13:23 UTC).
+- Production Vercel deployment `52Ck1JvNHo2CBoHgGE9a8EHYk45c` is READY and promoted, from the merged `main` commit. It was created at 13:36 UTC as a **manual deployment**, not automatically on merge.
+- Current working branch for this continuation: `arena/cd4d9ad9-autodine`, based on that commit. Open PR #177 is a separate in-flight change; avoid duplicating its work when preparing any follow-up.
 
-### ⛔ DO NOT MERGE PR #176 YET — measured, not assumed
+### Root cause: main auto-deploy was explicitly disabled
 
-Vercel auto-deploys `main` to production on merge. The code on this branch requires database
-objects that **do not exist on production**. Measured on `bdbaqpevwmgdvghszjno` on
-2026-11-12:
+`vercel.json` in the merged baseline explicitly sets `git.deploymentEnabled.main` to `false` (and also disables the old Arena branch). This was introduced by commit `471d0dd` as a temporary deployment hold while coordinating the database/app cutover. Vercel provider events show no deployment at the PR #176 merge time; production did not change until the manual deployment above. The preview deployment seen during that period belonged to `arena/a5344572-autodine`, not `main`.
 
-| Object the merged code needs | Present on production? |
-|---|---|
-| `public.public_restaurant_profile(text)` (function) | **1 — present** (applied 2026-11-12) |
-| `public.accounts` (table) | **0 — still missing** |
-| `public.subscription_payments` (table) | **0 — still missing** |
+This branch removes the `git.deploymentEnabled` override while preserving the existing `bom1` region. That restores the normal Vercel Git integration behavior once this change reaches the configured production branch; it does not itself deploy or change Vercel project settings.
 
-`public_restaurant_profile()` is created by `20261110000500_public_restaurant_profile`.
-`accounts` comes from `20261110001000_account_subscriptions` and `subscription_payments`
-from `20261110001100_subscription_billing` — **the last two migrations in Batch A.**
+**Isolation follow-up completed:** Vercel project-wide `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` for Preview/Development were updated, with user approval, to the existing staging project (`juwyhslzchjevqkdvwjm`). Read-only verification confirmed both values. Production-scoped variables and secrets were not changed. The open PR #177's branch-specific Preview URL/key were also checked and point to staging. Existing deployments are immutable; subsequent Preview/Development deployments will pick up the corrected environment. Follow `docs/preview-isolation.md` for all later env changes.
 
-Merging before those two land would deploy code that reads tables that do not exist. Expect
-errors on the owner dashboard and the subscription screen; guest menu pages are already
-covered because `public_restaurant_profile()` now exists. The 21-day trial would still not
-appear, because that value lives in the code, not the database.
+## 5. Current measured state (updated 2026-11-12)
 
-The correct order is the one in §6: finish Batch A → `/api/health` reports `ok:true` →
-**then** merge → then Batch B.
+### 5.1 Production release and 21-day trials
 
----
+The production schema rollout (Batch A plus the final member-only migration) is complete, and `/api/health` had reported `ok:true` after the rollout. PR #176 then merged. The current Vercel production deployment is from that merged commit, but its automatic deployment was blocked by the explicit `main: false` setting described in §4 and it was manually promoted later.
 
-## 5. Current measured state (2026-11-12)
+Production subscription state was rechecked after the merge. **All four existing restaurants already have active, write-enabled 21-day trials**, so the requested `admin_set_subscription` calls were correctly not repeated:
 
-### 5.1 The two health probes side by side
+| Restaurant | Plan / status | Trial end (UTC) | Can write |
+|---|---|---|---|
+| The King | `trial` / `trialing` | 2026-12-03 15:00:57 | yes |
+| maddi | `trial` / `trialing` | 2026-12-03 15:00:57 | yes |
+| AutoDine QR Flow Test | `trial` / `trialing` | 2026-12-03 15:00:57 | yes (no members) |
+| restro-non-veg | `trial` / `trialing` | 2026-12-03 15:00:57 | yes |
 
-`GET /api/health` returns 503 when not ok. It is the single observable proof of the gap.
+All were updated at 2026-11-12 15:00:57 UTC; the subscription event count was zero. This was an observed pre-existing result, not a fresh mutation in this hand-off session. It supersedes the older §6.2c snapshot that all four accounts were expired.
 
-**Production** (`https://new-alpha-five-43.vercel.app/api/health`):
+### 5.2 Migration-history divergence (reconciliation still open)
 
-```json
-{"ok":false,"configured":true,"serverKey":true,"reachable":true,
- "credentials":"accepted",
- "schema":{"trialAndWriteGate":"applied","planEntitlements":"applied","restaurantUpi":"applied"},
- "trialDays":7,
- "operational":{"orderSessions":"missing","settlement":"missing","invoices":"missing",
-                "paymentReceipts":"missing","announcementClaims":"missing"},
- "checkedAt":"2026-11-11T19:15:20.570Z"}
-```
+Production's migration ledger currently has **121 rows**, including this session's recorded expiry-scheduler migration. Compared with the repository, **49 other production-only versions** have no same-named migration file; many are console/MCP timestamped entries. A production catalog probe was attempted, but the Supabase connector truncates large JSON aggregates even when split into several section queries. Therefore an exact per-migration classification has **not** been established here. Do not infer `PRESENT` or `APPLY` from the ledger names alone.
 
-**Review deployment** (staging DB):
+The repository's `scripts/reconcile/reconcile-migrations.mjs classify --probe=...` remains the intended local comparison. Record the precise catalog evidence and the resulting `PRESENT`/`APPLY`/`REVIEW` results before any attempt to reconcile those history rows. No migration ledger rewrite or production schema repair was performed as part of this work.
 
-```json
-{"ok":true,"trialDays":21,
- "operational":{"orderSessions":"applied","settlement":"applied","invoices":"applied",
-                "paymentReceipts":"applied","announcementClaims":"applied"},
- "checkedAt":"2026-11-12T08:41:42.207Z"}
-```
+### 5.3 Realtime
 
-**Production, after 23 of the 33 migrations were applied (2026-11-12 12:39 UTC):**
+`supabase_realtime` publishes `public.orders` and `public.table_waiter_calls` on both projects. An older audit claim that the publication had zero tables was false; it was annotated in place rather than deleted.
 
-```json
-{"ok":true,"configured":true,"serverKey":true,"reachable":true,
- "credentials":"accepted",
- "schema":{"trialAndWriteGate":"applied","planEntitlements":"applied","restaurantUpi":"applied"},
- "trialDays":7,
- "operational":{"orderSessions":"applied","settlement":"applied","invoices":"applied",
-                "paymentReceipts":"applied","announcementClaims":"applied"},
- "checkedAt":"2026-11-12T12:39:13.259Z"}
-```
+### 5.4 Backup / restore evidence
 
-`ok` is now `true` on production. **`trialDays` is still 7** — that number lives in the
-application code, not the database, so it only changes when PR #176 is merged and Vercel
-deploys. Do not treat `ok:true` as "the trial fix is live".
+The backup dump exists on the operator's Mac, not in this sandbox (`~/autodine-private-backups/20261110T151815Z/production.dump`, 961,962 bytes, with archive listing and SHA-256 file).
 
-Two things follow, and they are the whole story:
-
-1. **The trial fix is done but not deployed.** `trialDays` is 21 in code, and the review
-   deployment proves it. Production still reports 7 only because PR #176 is unmerged.
-2. **The five `operational: missing` values are one cause, not five breakages.**
-   `lib/health.ts:238` calls a single RPC, `public.operational_schema_readiness()`. It does
-   not exist on production, so all five keys read `missing`. The underlying tables
-   (`order_sessions`, `payments`, `restaurant_invoices`) **do** exist on production.
-
-### 5.2 Migration history has diverged — this is the real problem
-
-Measured by comparing `supabase/migrations/` against
-`supabase_migrations.schema_migrations` on production:
-
-| Measure | Count |
-|---|---|
-| Migration files in the repository | 71 |
-| Versions recorded on production | 86 |
-| Present in both | 37 |
-| **In repo, missing on production** | **34** |
-| **On production with no repo file** | **49** |
-
-The 49 production-only versions are migrations that were applied to production but whose
-files no longer exist in the repository (no rename explains them — no repo filename
-contains any of those timestamps). **Production was therefore not built purely by replaying
-`supabase/migrations/`, and the two have grown apart.** This is why migrations must be
-applied one at a time with verification, never as a blind batch.
-
-### 5.3 Realtime — re-verified, previously misreported
-
-`supabase_realtime` publishes `public.orders` and `public.table_waiter_calls` on **both**
-projects. An older audit claim that the publication had zero tables is **false**; it has
-been annotated in place rather than deleted.
-
-### 5.4 Backup state
-
-A dump exists **on the operator's Mac**, not in this sandbox:
-
-- Path: `~/autodine-private-backups/20261110T151815Z/`
-- `production.dump` — **961,962 bytes**
-- `archive-list.txt` — **1,328 lines** (a few-hundred-byte file would mean a failed dump)
-- `production.dump.sha256` — present
-
-**The dump is good. The restore test is not proven.** `pg_restore` aborted on
-`CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA pg_catalog` because the vanilla
-`postgres:18` Docker image does not ship `pg_cron` (a Supabase-managed extension). Because
-the run used `--exit-on-error`, nothing after that point was restored and no row counts were
-obtained. This is a limitation of the **restore target**, not of the dump — but it means
-**restorability has never been demonstrated**.
-
-The dump is dated 2026-11-10 15:18 UTC. Acceptable as a schema-migration safety net because
-production's schema has not changed since; it is **not** a current-data backup.
+The vanilla `postgres:18` restore attempt failed at `pg_cron`, as described in the original preflight. **However, restorability was subsequently demonstrated** on 2026-11-10 using an isolated local Supabase PostgreSQL `17.11.0.018` container (`--network none`, `cron.launch_active_jobs=off`, `cron.database_name=restorecheck`): `pg_restore` exited 0 and 20 orders / 30 order-items were preserved. This evidence is recorded in `PHASE-2-PRODUCTION-PREFLIGHT.md`. The older statement that no restore drill ever succeeded is superseded. The dump remains dated 2026-11-10 and is not a current-data backup.
 
 ### 5.5 Transactional email
 
 | Setting | Value | Consequence |
 |---|---|---|
-| `smtp_host` | `null` | No custom SMTP; falls back to the platform sender |
-| `rate_limit_email_sent` | `2` | **2 emails per hour** |
-| `mailer_autoconfirm` | `true` | Signup needs no email, so signup works |
+| `smtp_host` | `null` | No custom SMTP; platform sender fallback |
+| `rate_limit_email_sent` | `2` | 2 emails per hour |
+| `mailer_autoconfirm` | `true` | Signup needs no email |
 
-Signup works. **Password reset and staff invitations both need an email that is rate-limited
-to two per hour.** Fine for one restaurant; not for real customers. Custom SMTP alone does
-**not** raise GoTrue's own send limit — `Authentication → Rate Limits` is a separate setting
-and is the step most likely to be missed.
+Real delivery, staff invitation redemption, and raising the GoTrue send rate remain operator tasks. SMTP setup alone does not raise GoTrue's own rate limit.
 
-### 5.6 Test results (last full run)
+### 5.6 Test results and verification boundary
 
-`typecheck` 0 · `lint` 0 · `design:check` 0 · `sql:check` 0 ·
-Vitest **177 files, 2095 passed, 4 skipped**. The 4 skips are DB-gated and covered by the
-separate `test:db` job in CI on a PostgreSQL 15/17/18 matrix.
+Local checks for this continuation passed: `npm run typecheck`, `npm run lint`, `npm run design:check`, `npm run sql:check`, `npm test -- --reporter=dot` (2,095 passed, 114 skipped across 181 files), `npm run db:reconcile -- converge` (clean replay, classifier self-test 0 wrong verdicts, populated rows preserved), and `npm run test:db:embedded` (114 passed on disposable PostgreSQL). These are local checks, not hosted browser/runtime acceptance.
 
----
+## 6. Post-merge production follow-ups
 
-## 6. Work in flight — the production migration
+**The production rollout and app merge are complete.** The old §6.1–§6.4 rollout narrative below described the pre-merge state and must not be used as an active runbook. Its migration list remains historical evidence only. The final member-only migration was applied as planned; production reported the operational health checks as ready afterwards.
 
-**Batch A is COMPLETE — 33 of 33 applied, 0 failures.** `/api/health` flipped to `ok:true`
-at migration 23 of 33 and is still `ok:true` after all 33. See §5.1 for the after-probe.
+### 6.1 Trial state
 
-The measured merge gate is satisfied (§4): `public.accounts` exists with 4 rows,
-`public.subscription_payments` exists, `public_restaurant_profile()` exists.
-PR #176 is therefore safe to merge. See §6.2c for one consequence that needs an
-operator decision.
+All four accounts already have fresh 21-day trials ending 2026-12-03 15:00:57 UTC, with `account_can_write(a.id) = true`. No `admin_set_subscription` mutation was needed. The test restaurant has zero members, so its write gate result does not imply an owner login exists.
 
-The rollout order is fixed and must not be reordered:
+### 6.2 Subscription-expiry scheduler
 
-```
-operator: dump confirmed + restore re-tested
-   ↓
-Batch A = 33 migrations, applied one at a time, filename order
-   ↓
-/api/health flips ok:false → ok:true   (trialDays stays 7)
-   ↓
-operator merges PR #176  →  Vercel deploys to production  →  21-day trial goes live
-   ↓
-Batch B = 20261110000700_restaurants_member_only   (LAST)
-```
+Production has `pg_cron` 1.6.4. The existing `autodine-qr-attempt-retention` job and the new `autodine-subscription-expiry` job are both active every 15 minutes. Staging and disposable local PostgreSQL do not install `pg_cron` by default.
 
-**Why `20261110000700` must be last:** it locks `public.restaurants` to members only. Any
-older build reads that table without membership context, so applying it before the deploy
-breaks every guest menu.
+This branch adds `supabase/migrations/20261112000100_schedule_subscription_expiry.sql`, guarded so projects without both the extension and named schedule function safely no-op. After local verification and user approval, the exact checked-in SQL was applied transactionally to production and version `20261112000100` recorded. A read-only verification returned `jobname = autodine-subscription-expiry`, `schedule = */15 * * * *`, `command = select public.expire_subscriptions();`, `active = true`. The function was not manually invoked.
 
-### 6.1 Already applied to production (verified in `schema_migrations`)
+### 6.3 Vercel deployment fix
 
-```
-20261021000004_missing_qr_tables
-20261107080000_payment_audit_ledger
-20261108000300_publish_menu_snapshot
-20261108000500_order_session_staff_read
-20261108001000_order_code_and_kitchen_announce_guard
-20261108002000_invoice_receipts
-```
+This branch removes the explicit Vercel Git deployment disable map. It addresses the observed cause of the missed deployment on `main`; the fix takes effect after it is merged to `main`. It does not issue a deployment or alter project dashboard settings.
 
-### 6.2 Applied — 33 of 33 (complete)
+### 6.4 Legacy migration-history reconciliation
 
-```
- 1  20261021000004_missing_qr_tables
- 2  20261107080000_payment_audit_ledger
- 3  20261108000300_publish_menu_snapshot
- 4  20261108000500_order_session_staff_read
- 5  20261108001000_order_code_and_kitchen_announce_guard
- 6  20261108002000_invoice_receipts
- 7  20261108003000_session_checkout_payment_receipts
- 8  20261108005000_p9_security_hardening
- 9  20261108006000_restore_public_order_session_attach
-10  20261108007000_payment_recorded_by
-11  20261108008000_p8_require_settlement_before_close
-12  20261108009000_p9_financial_read_roles
-13  20261108010000_invoice_share_links
-14  20261109000100_restore_hold_fields
-15  20261109000200_order_attempt_lock
-16  20261109000300_payment_state_guards
-17  20261109000400_order_write_boundary
-18  20261109000500_session_payment_guard
-19  20261109000600_finalized_source_guard
-20  20261109000700_order_line_removal
-21  20261109000800_table_activity_summary
-22  20261109000900_staff_tts_budget
-23  20261109001000_operational_readiness      ← /api/health flipped to ok:true here
-24  20261110000100_counter_payment_lock_order
-25  20261110000200_financial_session_serialization
-26  20261110000300_shared_wifi_scan_limits
-27  20261110000400_durable_order_attempt_budget
-28  20261110000500_public_restaurant_profile
-29  20261110000600_staff_finance_boundaries
-30  20261110000800_remove_order_submission_caps
-31  20261110000900_converge_qr_verification_attempts
-32  20261110001000_account_subscriptions        ← created public.accounts (4 rows)
-33  20261110001100_subscription_billing         ← created public.subscription_payments
-```
+There are 49 production-only migration versions. No production-only ledger records were rewritten and no schema objects were changed for reconciliation in this session. The local catalog classification remains pending because connector output truncation prevents safely assembling the complete production probe. Continue with read-only, bounded catalog extraction and the local classifier; retain any ambiguous result as `REVIEW` rather than guessing.
 
-### 6.2c Consequence of migration 32 that needs an operator decision
+### 6.5 Historical rollout evidence
 
-`20261110001000` backfills one `accounts` row per existing restaurant and materialises the
-trial end from the state **each trial was actually in** at the moment it ran. The rule it
-applies is deliberate: a trial still running on the old 7-day rule is extended to 21 days,
-a trial that had **already expired stays expired**. All four production restaurants had
-already expired, so all four accounts were written as `plan_status = 'expired'`:
-
-| Restaurant | Slug | Trial started | Trial ended | Members |
-|---|---|---|---|---|
-| The King | `theking` | 2026-10-28 | 2026-11-04 | 1 |
-| maddi | `maddi` | 2026-10-20 | 2026-10-27 | 1 |
-| AutoDine QR Flow Test | `arena-qr-flow-test-20261021` | 2026-10-20 | 2026-10-27 | 0 |
-| restro-non-veg | `restro-non-veg` | 2026-11-03 | 2026-11-10 | 1 |
-
-`account_can_write()` returns false for an expired account, so **once PR #176 is deployed,
-all four become read-only**. Nothing is deleted and everything stays readable — this is the
-designed behaviour — but ordering, menu edits and cashier actions will be refused until a
-subscription is set.
-
-To give a restaurant a fresh 21-day trial, as the service role:
-
-```sql
-select public.admin_set_subscription('The King', 'trial', 21);
-```
-
-To put one on a paid plan for a month (no provider configured yet, so this is an operator
-recording an off-line arrangement):
-
-```sql
-select public.admin_set_subscription('The King', 'starter', null, 1);
-```
-
-The restaurant name must match exactly (case-insensitive). `trial_grants` has 3 rows for 4
-accounts — the fourth account has no owner, because `AutoDine QR Flow Test` has no
-membership, so nobody owns it and no grant was recorded.
-
-### 6.3 How to apply them safely
-
-Use the Supabase connector's `execute_query` tool with `project_ref = bdbaqpevwmgdvghszjno`.
-
-- **Wrap each migration in `BEGIN; … COMMIT;`** and append
-  `insert into supabase_migrations.schema_migrations (version) values ('<timestamp>') on conflict (version) do nothing;`
-  as the last statement. If any statement fails, the whole file rolls back **and** the
-  version is not recorded.
-- Do **not** use the connector's `create_migration` tool for these. It generates its own
-  version string, which would not match the repository filenames and would make
-  `supabase db push` try to re-apply everything later.
-- Verified safe for all 33: no `CREATE TABLE` without `IF NOT EXISTS`, no `DROP` without
-  `IF EXISTS`, and **no** transaction-unsafe statements (no `CONCURRENTLY`, no
-  `ALTER TYPE … ADD VALUE`, no `VACUUM`).
-- Files larger than ~10 KB should be split at statement boundaries; a 1,463-line file in one
-  call is error-prone to transcribe.
-
-**Two conflicts already found and how they were handled** — expect more of this kind,
-because of the 49-version divergence:
-
-- Migration `20261108002000` does `create policy restaurant_invoices_staff_read` /
-  `restaurant_invoice_lines_staff_read` **without** a preceding `drop policy if exists`.
-  Both policies **already existed** on production. Fix applied: prepend
-  `drop policy if exists <name> on <table>;` so the end state matches the migration's
-  intent exactly.
-- Migration `20261108001000` raises an exception if duplicate `(restaurant_id, code)` groups
-  exist in `orders`. Verified zero before applying.
-
-### 6.4 Blocking gate
-
-**Do not apply any further migration until the operator confirms the restore test.** The
-dump itself is confirmed; restorability is not. The one-command fix for their Mac (drops
-`--exit-on-error` so the run continues past `pg_cron`):
-
-```bash
-D=$(ls -dt "$HOME"/autodine-private-backups/*/ | head -1)
-C="autodine-restore-v2-$(date -u +%Y%m%dT%H%M%SZ)"
-docker run --detach --name "$C" --network none \
-  -e POSTGRES_HOST_AUTH_METHOD=trust -v "$D:/backup:ro" postgres:18
-for i in $(seq 1 60); do docker exec "$C" pg_isready -U postgres >/dev/null 2>&1 && break; sleep 2; done
-docker exec "$C" createdb -U postgres restorecheck
-docker exec "$C" pg_restore -U postgres --dbname=restorecheck \
-  --no-owner --no-privileges "$D/production.dump" > "$D/restore-v2.log" 2>&1
-echo "restore_exit=$?"
-docker exec "$C" psql -U postgres -d restorecheck -tA -c \
-  "select 'orders='||count(*) from public.orders union all select 'order_items='||count(*) from public.order_items"
-```
-
----
+The original 33-file Batch A and Batch B application log, policy collision notes, and per-migration execution instructions in the older draft are retained in the repository history, but they describe work completed before this report update. They are not authorization to rerun migrations. The restore rehearsal is documented in `PHASE-2-PRODUCTION-PREFLIGHT.md`; the Vercel hold rationale is in `PHASE-3-HOSTED-BASELINE.md`.
 
 ## 7. What is built
 
@@ -492,7 +265,7 @@ This is the most important section for anyone judging launch readiness.
 | Hosted Realtime, multi-device kitchen | Realtime publication is correct, but **no hosted multi-device test was ever run**. |
 | Physical printer / KOT output | Not verified. Browser printing only. |
 | TTS audibility | Microsoft Read Aloud is unsupported and has no commercial SLA. Treat TTS as optional. |
-| Provider backup restore drill | **Failed once (`pg_cron`), never succeeded.** |
+| Provider backup restore drill | **Succeeded** in the isolated Supabase PG 17.11.0.018 restore rehearsal (2026-11-10); vanilla PostgreSQL attempt failed on missing `pg_cron`. |
 | Load / capacity evidence | No workload sized for the pilot; no 1×/2×/soak test. |
 | Monitoring and alerting | `/api/health` exists but is **not wired to any monitoring**. |
 | Production response headers, cookie/origin behaviour, external scan | Not verified. |
@@ -538,41 +311,28 @@ These come from `AGENTS.md` and are locked. Read that file before changing code.
 
 ## 12. Recommended changes, in priority order
 
-1. **Finish Batch A (27 migrations).** Blocked only on the operator confirming the restore
-   test. Everything else waits behind this.
-2. **Prove restorability.** Re-run `pg_restore` without `--exit-on-error` (§6.4). A backup
-   you have never restored from is not a backup. Then decide whether platform
-   PITR/daily backups are sufficient for ongoing operations.
-3. **Reconcile the migration history divergence (49 production-only versions).** This is a
-   real, unresolved architectural risk. Either restore the missing migration files to the
-   repository, or formally baseline production's history and record the decision. Until
-   then, `supabase db push` cannot be trusted and every migration must be hand-applied.
-4. **Configure SMTP and raise the email send rate limit** — two separate settings. Do it on
-   staging first and exercise reset + invite end to end before touching production.
-5. **Turn off `mailer_autoconfirm`** once email delivery works. Today anyone can sign up
-   with an address they do not own. This is a **product decision**, not a bug fix — it
-   changes behaviour for everyone who signs up afterwards. It was deliberately left alone.
-6. **Run the real integration pass:** QR → menu → order → kitchen → cashier/close → receipt
-   on a hosted project, including two-tenant isolation, retry/network failure, and mobile
-   and desktop browsers.
-7. **Wire `/api/health` to monitoring** and add alerting. Right now nothing watches it.
-8. **Settle the quantity 1–99 contract question** (§8) before it becomes a data problem.
-9. **Resolve the test-database clock discrepancy** before trusting any time-based test.
-10. **Do a capacity pass** sized for the actual pilot before broad launch.
+1. **Restore Vercel Git auto-deploys.** Merge this branch's `vercel.json` fix and confirm a later merge to `main` creates the expected production deployment. Do not treat a manual deploy as proof of the Git integration.
+2. **Reconcile 49 production-only schema-migration versions.** Exact classify results are not available yet due connector output caps. Capture the probe in bounded chunks or use another authorized read-only path; do not edit migration history or rerun schema migrations based only on ledger names.
+3. **Configure SMTP and raise the email send rate limit** — separate settings. Exercise reset and invite flows on staging first. Do not disable `mailer_autoconfirm` without an explicit product decision.
+4. **Complete the real hosted integration pass** on an approved non-production project: QR → menu → order → kitchen → cashier/close → receipt, two-tenant isolation, retry/network failure, mobile and desktop.
+5. **Wire `/api/health` to monitoring and alerting.**
+6. **Settle the quantity 1–99 contract** (cap vs reject) and resolve the test database clock discrepancy before trusting time-bound tests.
+7. **Obtain GST adviser sign-off** before enabling GST-dependent invoices or changing the locked tax behavior.
+8. **Run a capacity pass** sized for the actual pilot before broad launch.
 
----
+Completed this continuation: changed and verified Preview/Development Supabase targets to staging; applied and verified the guarded subscription-expiry scheduler migration on production after local checks and user approval; all four restaurant trials were already active and were not rewritten.
 
-## 13. Where the remaining work is blocked on a human
+## 13. Remaining work and operator decisions
 
-| Item | Who | Why it cannot be automated |
+| Item | Who | Status / why |
 |---|---|---|
-| Run the backup/restore procedure | Operator (on their Mac) | Requires production DB credentials; must never be pasted into a chat. |
-| Configure SMTP, raise email rate limit | Operator | Supabase dashboard only; the connector exposes no SMTP tool. |
-| Merge PR #176 | Operator | Authorised release decision. |
+| Production expiry scheduler | Agent | **Complete.** User approved; guarded migration `20261112000100` was applied and the active 15-minute cron job was verified. |
+| Confirm Vercel Git deployment restoration | Operator | Merge the config fix, then observe a subsequent `main` deployment; no deploy is triggered by this branch itself. |
+| Reconcile 49 production-only migration versions | Agent + operator | Need complete read-only catalog probe and classification; do not use ledger names as proof. |
+| Preview/Development Supabase configuration | Agent | **Complete.** Project-level URL and publishable key now target staging; Production variables and secrets unchanged. |
+| Configure SMTP and raise email rate limit | Operator | Supabase dashboard configuration; connector exposes no SMTP setting. |
 | Approve GST rules | Adviser | Legal/financial approval. |
-| Decide cap-vs-reject for quantities > 99 | Product owner | Behavioural contract decision. |
-
----
+| Decide cap-vs-reject for quantities > 99 | Product owner | Behavioral contract decision. |
 
 ## 14. Pitfalls learned the hard way
 

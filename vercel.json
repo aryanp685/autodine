@@ -2,11 +2,5 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": [
     "bom1"
-  ],
-  "git": {
-    "deploymentEnabled": {
-      "arena/3711df6a-autodine": false,
-      "main": false
-    }
-  }
+  ]
 }
