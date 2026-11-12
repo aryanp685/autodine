@@ -22,11 +22,12 @@ This is the live blocker register for the present worktree. The dated hosted/Pre
 | Browser E2E | The 64-test demo/responsive suite (integration project omitted) was attempted twice. The first run could not find Playwright's Chromium headless shell; the bundled Chromium retry failed to launch because `libnspr4.so` is missing. No app assertions ran. | BLOCKED; no E2E pass claimed |
 | Database/migrations | No migration was changed or applied in this continuation; no PostgreSQL replay was repeated. Phase 5C is carry-forward local evidence, not a fresh run. | Hosted migration gate CLOSED |
 | Security/Production | Source review and local CSP tests only; no fresh hosted catalog/role check and no Production access. | UNVERIFIED; Production read-only |
-| Staging / Preview | No Supabase, Vercel, or other hosted system accessed. Older READY/hosted reports are historical, not fresh runtime evidence. | Staging NO-GO; Preview runtime UNVERIFIED |
+| Staging / Preview | PR #177's automated Vercel Preview check passed after the branch push; no manual Preview runtime/guest journey or Supabase/Production operation was performed. Older READY/hosted reports remain carry-forward evidence. | Preview check PASS only; runtime acceptance UNVERIFIED; Staging NO-GO |
+| PR / main integration | PR #177's GitHub CI, browser, PostgreSQL migration-matrix, and probe-safety checks passed. GitHub reports the PR conflicts with current `main`; it has not been merged. | Merge BLOCKED pending conflict reconciliation and release gates |
 | E2E / performance / recovery | No hosted browser journey, load/soak test, backup check, restore, or recovery-point verification performed. | OPEN |
 | Pilot / release | No operator approval, recovery evidence, migration authorization, or final pilot acceptance. | **NO-GO** |
 
-No commit, deployment, hosted database operation, real payment/refund, operator contact, or secret/environment-value inspection occurred. See `AGENTS.md` for the persistent engineering rules and `FEATURE-INVENTORY.md` for the affected route evidence.
+Commit `143cc80` and merge-sync commit `dd5aa48` are on the active branch; PR #177 is open. GitHub CI passed, including its automated Vercel Preview check, but no manual hosted runtime or guest-to-staff acceptance was performed. No Supabase/Production operation, hosted database migration, real payment/refund, operator contact, or secret/environment-value inspection occurred. See `AGENTS.md` for the persistent engineering rules and `FEATURE-INVENTORY.md` for the affected route evidence.
 
 > **Carry-forward sections below:** Feature classifications, hosted-state descriptions, migration assessments, and verification counts below are retained from earlier report snapshots. None were rechecked in this continuation; they are not current evidence or authorization. Use the current gate table above for this continuation's evidence.
 
