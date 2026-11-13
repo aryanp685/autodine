@@ -1,8 +1,8 @@
 # Safe verification and release runbook
 
-> **Current evidence note (Arena date 2026-11-06 UTC):** This PR reconciliation has not changed a database or created a deployment. GitHub PR/check metadata and Vercel project metadata were inspected read-only; no Supabase database, recovery target, or payment-provider operation was performed. Staging remains NO-GO and Production remains read-only. A READY Preview or green health probe is not launch acceptance. See `RELEASE-BLOCKER-REPORT.md` for the live blocker register.
+> **Current Phase 7 evidence note (Arena date 2026-11-06 UTC):** GitHub, Vercel, Supabase service/catalog, migration ledger and project metadata were inspected read-only. No hosted database/configuration/deployment was changed. Local repository checks, 130 native database tests, a synthetic cold physical-copy recovery, and a strict 64/64 hermetic demo browser run passed; none is hosted backup/PITR, Production recovery, or customer-flow acceptance. Staging remains NO-GO and Production remains read-only. A READY Preview or green health probe is not launch acceptance. See `PHASE-7-EXECUTION-BASELINE.md`, `PHASE-7-LOCAL-VERIFICATION.md`, `PHASE-7-MIGRATION-RECONCILIATION.md`, `PHASE-7-RECOVERY-RPO-RTO.md`, and `RELEASE-BLOCKER-REPORT.md`.
 >
-> Historical CI, Preview, and restore statements below are dated evidence from earlier snapshots, not results of this reconciliation. Do not execute a restore under this task; any separately requested restore must name an isolated non-production target and have explicit approval.
+> Older CI/Preview/restore statements below are dated evidence from earlier snapshots unless they explicitly cite this Phase 7 run. Local disposable PostgreSQL testing is authorized and has been performed. Any hosted Staging restore still requires an accepted target, current recovery evidence, and all migration/release gates; Production remains read-only until its separate gate.
 
 ## Nonproduction checks
 
@@ -32,15 +32,15 @@ READINESS_PG_ADMIN_URL=postgres://postgres@127.0.0.1:5432/postgres npm run test:
 
 The reconciled GitHub CI matrix is PostgreSQL 15/17/18; no current-branch matrix result is claimed from this local run. Supabase Auth/Storage/Realtime are not emulated by these SQL tests.
 
-### Populated backup / restore drill — implementation is not success evidence
+### Logical dump / restore helper — not run in this execution
 
-The helper can be invoked with matching local PostgreSQL client tools, but this is a restore operation and is **not approved for execution by this task**. The current CI workflow deliberately does not set `READINESS_VERIFY_RESTORE=1`. Once written approval names a separate isolated non-production target, the helper can create a second disposable local database, compare row-count/content fingerprints, policies and function grants, then drop that database. The archive is held in process memory (maximum 64 MB). This tests a synthetic local dump only—not provider backups, production retention, WAL/PITR, Storage objects, secrets, Auth restoration, or full service recovery.
+The optional `READINESS_VERIFY_RESTORE=1` logical dump/restore workflow is distinct from the local cold physical-copy drill below. It has not been run locally in this execution. Historical CI reports of a synthetic logical dump/restore remain specific to those dated workflow runs; neither run proves provider backups, Production retention, WAL/PITR, Storage objects, Auth restoration, or full service recovery. The helper's synthetic archive is bounded in memory and is not a hosted backup. Any hosted restore requires a named, isolated non-Production target and explicit written approval; Production is never a restore target.
 
-**Current continuation: NOT EXECUTED.** The helper is not restore-drill evidence; no output from it should be presented as such.
+### Current local cold physical recovery (synthetic; not PITR)
 
-### Imported historical local cold-restore report (not reverified here; not PITR)
+In the Phase 7 execution, `READINESS_PG_BIN="$PWD/node_modules/@embedded-postgres/linux-x64/native/bin" npm run test:recovery:cold` ran against two fresh disposable loopback PostgreSQL 17.11 clusters. It replayed **77 migrations**, passed **67 native PostgreSQL tests**, populated synthetic fixtures (117 orders / 20 payments / 10 invoices), computed content/RLS/policy/function-grant fingerprints, cleanly shut down, copied the physical source, deleted that original disposable cluster, restored on a different loopback port, and matched the fingerprints. The verified local recovery phase was **1,470 ms** for this small synthetic dataset.
 
-`main` records a local physical recovery run with **20 native tests passed; 35 tables/23 orders/1 payment/2 invoices recovered**, 913 ms tiny-fixture recovery phase. This continuation did not execute or independently verify that run. Even if valid, it is not a provider backup, production RTO, online backup, Supabase PITR, or Auth/Storage recovery result. Any new restore drill requires explicit written approval and a separately named non-production target before execution. See [production-readiness-continuation.md](docs/production-readiness-continuation.md) for required access and approval details.
+This is local physical-copy/recovery evidence only. It does not measure a Production/service RTO or RPO and does not prove a hosted backup, PITR, data-loss window, Supabase Auth/Storage/Realtime recovery, Vercel/DNS/config recovery, or customer continuity. The 1,470 ms local timing is not a pilot SLO. **Current hosted backup/PITR status and owner-approved numeric RPO/RTO remain unknown.** See [`PHASE-7-RECOVERY-RPO-RTO.md`](PHASE-7-RECOVERY-RPO-RTO.md) and [production-readiness-continuation.md](docs/production-readiness-continuation.md) for the evidence boundary and required human/provider inputs.
 
 ## Before applying migrations to any deployed environment
 
