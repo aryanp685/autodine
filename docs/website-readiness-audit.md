@@ -61,7 +61,7 @@ The following list is reconciled against the 2026-11-12 hand-off, rather than th
 
 ## Owner-controlled billing settings — approved in this review
 
-Only the restaurant owner may change the tax rate or GSTIN. This branch implements that rule in the settings UI, server actions, and a database guard so direct authenticated database writes cannot bypass it. It does not change existing order snapshots, tax math, or GST invoice availability. The migration has not been deployed; production behavior remains unchanged until a separately approved release.
+Only the restaurant owner may change the tax rate or GSTIN. This branch implements that rule in the settings UI, server actions, and a database guard so direct authenticated database writes cannot bypass it. The guard migration was applied and catalog-verified on staging. It does not change existing order snapshots, tax math, or GST invoice availability. The production migration and app have not been deployed; production behavior remains unchanged until a separately approved release.
 
 ## Quantity contract — owner decision pending
 

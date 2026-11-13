@@ -334,7 +334,7 @@ Completed across this continuation: Preview/Development Supabase URL, publishabl
 | Configure SMTP and raise email rate limit | Operator | Supabase dashboard configuration; connector exposes no SMTP setting. |
 | Approve GST rules | Adviser | Legal/financial approval. |
 | Quantity >99 behavior | Owner | **Decision pending (reject or cap); current behavior is preserved.** |
-| Tax-rate/GSTIN edit permissions | Owner | **Owner-only behavior approved.** This branch adds UI, server-action and database enforcement; the migration is not deployed, so production remains unchanged until a separately approved release. |
+| Tax-rate/GSTIN edit permissions | Owner | **Owner-only behavior approved.** The branch adds UI/server-action enforcement; the database guard migration is applied and catalog-verified on staging. It has not been applied to production, and production code is unchanged until the approved release.
 
 ## 14. Pitfalls learned the hard way
 
