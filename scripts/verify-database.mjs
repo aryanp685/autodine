@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { verifyRestore } from './verify-restore.mjs';
 import { seedLegacyFinancialFixture, snapshotFinancialUpgrade, checkFinancialUpgrade } from './verify-financial-upgrade.mjs';
+import { proveAccountLinkWasClientMutable } from './verify-account-link-guard.mjs';
 // Last migration of the recorded financial baseline. Legacy-flow fixture rows are
 // seeded immediately after it, before any later migration can forbid that flow.
 const FINANCIAL_BASELINE = '20261108006000_restore_public_order_session_attach.sql';
@@ -128,6 +129,9 @@ try {
         console.log('Seeded six synthetic legacy QR attempts for the state-preserving QR convergence test.');
       }
     }
+    if (file === '20261112000200_immutable_restaurant_account_link.sql') {
+      await proveAccountLinkWasClientMutable(db);
+    }
     await db.query(await readFile(`supabase/migrations/${file}`, 'utf8'));
     console.log(`APPLIED ${file}`);
   }
@@ -147,7 +151,7 @@ try {
   }
   console.log(alreadyApplied.size ? `Verified forward upgrade to ${migrations.length} repository migrations from observed staging baseline.` : `Replayed ${migrations.length} migrations without application-table scaffolds.`);
   await db.end(); db = null;
-  const result = spawnSync('npx', ['vitest', 'run', 'lib/db/readiness.integration.test.ts', 'lib/db/phase0-security.integration.test.ts', 'lib/db/subscription-billing.integration.test.ts', 'app/menu/throttle-db.integration.test.tsx'], {
+  const result = spawnSync('npx', ['vitest', 'run', 'lib/db/readiness.integration.test.ts', 'lib/db/phase0-security.integration.test.ts', 'lib/db/subscription-billing.integration.test.ts', 'lib/db/restaurant-account-link.integration.test.ts', 'app/menu/throttle-db.integration.test.tsx'], {
     stdio: 'inherit', env: { ...process.env, READINESS_DB_URL: url.href, THROTTLE_DB_URL: url.href },
   });
   if (result.error) throw result.error;
