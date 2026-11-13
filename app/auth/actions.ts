@@ -14,9 +14,17 @@
 
 'use server';
 
+import { randomBytes } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { RECOVERY_COOKIE, passwordProblem, passwordsMatch } from '@/lib/password';
+import {
+  RECOVERY_COOKIE,
+  RECOVERY_STATE_COOKIE,
+  RECOVERY_STATE_TTL_SECONDS,
+  isValidRecoveryState,
+  passwordProblem,
+  passwordsMatch,
+} from '@/lib/password';
 import { requestOrigin } from '@/lib/site-origin';
 import { safeLocalPath } from '@/lib/safe-next-path';
 import { slugify, uniqueSlug } from '@/lib/slug';
@@ -24,12 +32,46 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { getStaffContextDetailed } from '@/lib/db/staff';
 import { homeForRole } from '@/lib/db/team';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import {
+  normalizeAuthEmail,
+  PENDING_SIGNUP_EMAIL_COOKIE,
+  PENDING_SIGNUP_EMAIL_TTL_SECONDS,
+  SIGNUP_CONFIRMATION_PENDING_PATH,
+  signupConfirmationRedirectTo,
+  type SignupResendState,
+} from '@/lib/signup-confirmation';
 
 function fail(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+async function rememberPendingSignupEmail(email: string, secure: boolean) {
+  try {
+    const cookieStore = await cookies();
+    cookieStore.set(PENDING_SIGNUP_EMAIL_COOKIE, email, {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/signup',
+      maxAge: PENDING_SIGNUP_EMAIL_TTL_SECONDS,
+      secure,
+    });
+  } catch {
+    // The address is a convenience for the pending page, not signup state.
+    // The page keeps an editable email field if this short-lived cookie cannot be written.
+  }
+}
+
+async function clearPendingSignupEmail() {
+  const cookieStore = await cookies();
+  cookieStore.set(PENDING_SIGNUP_EMAIL_COOKIE, '', {
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/signup',
+    maxAge: 0,
+  });
+}
 
 async function rollbackSignup(
   admin: NonNullable<ReturnType<typeof getSupabaseAdmin>>,
@@ -51,21 +93,21 @@ async function rollbackSignup(
 export async function signUpAction(formData: FormData): Promise<void> {
   const fullName = String(formData.get('fullName') ?? '').trim();
   const restaurantName = String(formData.get('restaurantName') ?? '').trim();
-  const email = String(formData.get('email') ?? '')
-    .trim()
-    .toLowerCase();
+  const email = normalizeAuthEmail(formData.get('email'));
   const phone = String(formData.get('phone') ?? '').trim();
   const password = String(formData.get('password') ?? '');
   const agreed = formData.get('agree') === 'on';
 
   if (!fullName || !restaurantName) fail('/signup', 'Please enter your name and your restaurant name.');
-  if (!EMAIL.test(email)) fail('/signup', 'Please enter a valid email address.');
+  if (!email) fail('/signup', 'Please enter a valid email address.');
   const passwordIssue = passwordProblem(password);
   if (passwordIssue) fail('/signup', passwordIssue);
   // Preview-account data use must be explicitly acknowledged.
   if (!agreed) fail('/signup', 'Please confirm that you understand how this preview uses your account details.');
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient({
+    preservePkceVerifierCookiesOnAuthError: true,
+  });
   if (!supabase) fail('/signup', 'Sign-up is not available yet: the database is not connected.');
 
   const admin = getSupabaseAdmin();
@@ -76,29 +118,41 @@ export async function signUpAction(formData: FormData): Promise<void> {
     return Boolean(data);
   });
 
-  // Where the "confirm your email" link comes back to. Without this Supabase
-  // uses the project's Site URL, which is a single value: every confirmation
-  // mail sent from a preview or a branch deployment pointed at whichever host
-  // happened to be configured months earlier, and those deployments are gone.
+  // Confirmations must return to this deployment so the matching PKCE verifier
+  // cookie is available. The callback path and dashboard destination are fixed;
+  // the configured Supabase redirect allowlist remains the external boundary.
   const origin = await requestOrigin();
+  const emailRedirectTo = signupConfirmationRedirectTo(origin);
+  if (!emailRedirectTo) {
+    fail('/signup', 'Sign-up is not available from this address. Open AutoDine on its usual domain and try again.');
+  }
 
-  const { data: authData, error: authError } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { full_name: fullName, phone },
-      ...(origin ? { emailRedirectTo: `${origin}/auth/confirm?next=/dashboard` } : {}),
-    },
-  });
+  const signupResult = await supabase.auth
+    .signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: fullName, phone },
+        emailRedirectTo,
+      },
+    })
+    .catch(() => null);
+  const userId = signupResult?.data.user?.id;
 
-  if (authError) fail('/signup', 'We could not create your account. Please try again.');
+  // Keep every valid address on the same confirmation-pending surface. Auth
+  // may return different errors for mail/send eligibility, so neither the
+  // redirect nor the PKCE cookie shape should reveal account state.
+  if (!signupResult || signupResult.error || !userId) {
+    await rememberPendingSignupEmail(email, emailRedirectTo.startsWith('https://'));
+    redirect(SIGNUP_CONFIRMATION_PENDING_PATH);
+  }
 
-  const userId = authData.user?.id;
-  if (!userId) fail('/signup', 'We could not create your account. Please try again.');
+  const { data: authData } = signupResult;
   // Supabase can return a user with no identities for an existing email when
   // email-enumeration protection is enabled. Do not create a second workspace.
   if (authData.user?.identities?.length === 0) {
-    redirect('/login?notice=If%20an%20account%20can%20be%20used%20with%20that%20email%2C%20sign%20in%20instead.');
+    await rememberPendingSignupEmail(email, emailRedirectTo.startsWith('https://'));
+    redirect(SIGNUP_CONFIRMATION_PENDING_PATH);
   }
 
   let restaurantId: string | undefined;
@@ -137,12 +191,66 @@ export async function signUpAction(formData: FormData): Promise<void> {
   }
 
   // With email confirmation ON there is no session yet. Sending them to the
-  // dashboard would bounce them straight back out, so say what happened.
+  // dashboard would bounce them straight back out, so send them to a page that
+  // can request another confirmation without claiming that delivery occurred.
   if (!authData.session) {
-    redirect('/login?notice=Check%20your%20email%20to%20confirm%20your%20address%2C%20then%20sign%20in.');
+    await rememberPendingSignupEmail(email, emailRedirectTo.startsWith('https://'));
+    redirect(SIGNUP_CONFIRMATION_PENDING_PATH);
   }
 
+  await clearPendingSignupEmail();
   redirect('/dashboard');
+}
+
+/**
+ * Request another owner signup confirmation. Supabase Auth is the only sender.
+ * Every syntactically valid address gets the same UI result: Auth may return
+ * different throttling or mail-provider errors only after it has found an
+ * unconfirmed user, so reflecting those outcomes would create an account
+ * oracle. The client never receives a raw Auth/provider message or email-state
+ * distinction; acceptance and delivery remain unconfirmed.
+ */
+export async function resendSignupConfirmationAction(
+  _previousState: SignupResendState,
+  formData: FormData,
+): Promise<SignupResendState> {
+  const email = normalizeAuthEmail(formData.get('email'));
+  if (!email) return { status: 'invalid' };
+
+  try {
+    const supabase = await createSupabaseServerClient({
+      preservePkceVerifierCookiesOnAuthError: true,
+    });
+    if (!supabase) return { status: 'requested' };
+
+    const origin = await requestOrigin();
+    const emailRedirectTo = signupConfirmationRedirectTo(origin);
+    if (!emailRedirectTo) return { status: 'requested' };
+
+    // The Auth client creates a per-flow PKCE verifier and writes it through
+    // the Server Action's cookie adapter. The opt-in adapter retains these
+    // short-lived flow cookies even when Auth/provider errors are returned, so
+    // cookie presence cannot distinguish a mail-eligible address either.
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo },
+    });
+
+    if (error) {
+      console.warn('[autodine] signup confirmation resend did not complete', {
+        status: error.status ?? null,
+        code: error.code ?? 'unknown',
+      });
+    }
+  } catch (error) {
+    // Do not log email addresses or raw Auth/provider messages from this path.
+    console.warn('[autodine] signup confirmation resend could not be completed', {
+      name: error instanceof Error ? error.name : 'unknown',
+    });
+  }
+
+  return { status: 'requested' };
 }
 
 export async function signInAction(formData: FormData): Promise<void> {
@@ -224,12 +332,21 @@ export async function requestPasswordResetAction(formData: FormData): Promise<vo
   // The link is built from the request's own host, so a reset started on a
   // preview deployment comes back to that preview, not to production.
   //
-  // `flow=recovery` is carried through the mail link so /auth/confirm can tell
-  // a password reset apart from an email confirmation. Both land on the same
-  // handler with the same `code`, and only a reset may leave behind the
-  // short-lived permission to set a new password without knowing the old one.
+  // `flow=recovery` alone is caller-controlled and cannot prove what kind of
+  // PKCE code is being exchanged. Carry a random state in the email redirect
+  // and store the matching value in an HTTP-only cookie on the requesting
+  // browser. The callback requires both values before granting reset access.
+  const cookieStore = await cookies();
+  const existingState = cookieStore.get(RECOVERY_STATE_COOKIE)?.value;
+  const recoveryState = isValidRecoveryState(existingState)
+    ? existingState
+    : randomBytes(32).toString('base64url');
+  const redirectTo = new URL('/auth/confirm', origin);
+  redirectTo.searchParams.set('flow', 'recovery');
+  redirectTo.searchParams.set('state', recoveryState);
+
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/auth/confirm?flow=recovery`,
+    redirectTo: redirectTo.toString(),
   });
 
   if (error) {
@@ -243,6 +360,16 @@ export async function requestPasswordResetAction(formData: FormData): Promise<vo
     console.error('[autodine] could not send password reset email:', error.message);
     fail('/forgot-password', 'We could not send the email just now. Please try again in a few minutes.');
   }
+
+  // Persist correlation state only after Auth accepted the request, so a
+  // throttled or failed reset does not create a misleading pending flow.
+  cookieStore.set(RECOVERY_STATE_COOKIE, recoveryState, {
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: RECOVERY_STATE_TTL_SECONDS,
+    secure: origin.startsWith('https://'),
+  });
 
   redirect(
     `/forgot-password?notice=${encodeURIComponent(

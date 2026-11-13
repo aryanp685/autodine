@@ -25,6 +25,52 @@ remains archived. The source shape is still unknown for hosted Staging and
 Production; no hosted operation is authorized. `scripts/check-sql.mjs` now
 rejects duplicate 14-digit migration versions.
 
+## Phase 6D account-entitlement link guard — evidence 2026-11-06
+
+The forward-only migration `20261112000200_immutable_restaurant_account_link.sql`
+adds a `BEFORE UPDATE` trigger on `public.restaurants`. If an authenticated
+request changes `account_id`, the trigger raises SQLSTATE `42501`. It does not
+change the existing owner/manager RLS policy or authenticated table-level
+`UPDATE` grant, revoke any restaurant columns, change account/trial functions,
+or alter ordinary settings, tax, guest-verification, branding, storefront,
+operational, UPI, or online-payment-switch behavior. Inserts used for initial
+account creation and `create_outlet()` remain valid. `account_id` remains
+nullable with its existing `ON DELETE SET NULL` FK, and the legacy
+`restaurant_can_write()` fallback remains in place. No transfer/linking RPC is
+added.
+
+The migration version follows the repository high-water file
+`20261112000100_schedule_subscription_expiry.sql`, so it runs after the
+account-link column and account/subscription functions. It makes no data update.
+Do not drop the guard as a rollback: doing so restores the P0 vulnerability.
+A future approved association repair should use a trusted migration/service
+operation; any customer-facing transfer flow requires its own reviewed design.
+
+The disposable native-PostgreSQL runner now proves both sides of the change:
+
+1. Before the guard migration, a synthetic owner detaches an expired linked
+   restaurant and observes the legacy gate switch to writable; a synthetic
+   manager reassigns it to a different writable account and observes the
+   entitlement/account-RLS change. Both attempts run under the actual local
+   `authenticated` role with simulated JWT subjects and are rolled back.
+2. After migration, the same owner and manager changes are rejected, while
+   ordinary settings and brand publish/rollback writes, initial service-role
+   account creation, authenticated `create_outlet()`, and nullable legacy rows
+   continue to work.
+
+Run the full disposable PostgreSQL 17.11 replay and DB regression suite with:
+
+```bash
+npm run test:db:embedded
+```
+
+The Phase 6D run replayed 77 migrations and passed 130 direct-SQL integration
+tests across five files. It uses a local Supabase shim and synthetic data; it is
+**not** HTTP/PostgREST validation and is not hosted Staging/Production evidence.
+`npm run sql:check` remains a static parser check, not proof of function, trigger,
+grant, RLS, or migration behavior. Staging remains NO-GO and Production
+read-only until independent rollout gates pass.
+
 ## Why the ledger is not enough
 
 - Production's ledger uses console-style versions, repeats names, holds names that are not in this repository, and ends at `20261108000200 drift_reconcile`. Its versions cannot be compared with file names here.

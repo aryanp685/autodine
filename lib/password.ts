@@ -18,6 +18,19 @@
  */
 export const RECOVERY_COOKIE = 'ad_recovery';
 
+/**
+ * Non-privileged correlation state for the PKCE password-recovery callback.
+ * The `flow=recovery` query is caller-controlled, so it must never by itself
+ * grant the permission to change a password. The email URL carries this nonce
+ * and the requesting browser keeps the matching value in an HTTP-only cookie.
+ */
+export const RECOVERY_STATE_COOKIE = 'ad_recovery_state';
+export const RECOVERY_STATE_TTL_SECONDS = 60 * 60;
+
+export function isValidRecoveryState(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{43}$/.test(value);
+}
+
 /** Supabase's own minimum is 6; the product sets a higher bar than the floor. */
 export const MIN_PASSWORD = 10;
 

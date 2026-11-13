@@ -1,6 +1,44 @@
 # AutoDine — product completion and release-gate snapshot
 
-## Current continuation record (Arena date: 2026-11-06 UTC)
+## Current Phase 6D continuation record (2026-11-06 UTC)
+
+**Branch / recorded base:** `arena/3878e9b8-autodine` / `e13720652440fc69280caa09e2e60bc151288426`
+
+**Decision:** Staging **NO-GO**; Production **read-only**; overall release **NO-GO**.
+
+- Added forward-only `supabase/migrations/20261112000200_immutable_restaurant_account_link.sql`. It blocks authenticated owner/manager detachment and reassignment of an existing restaurant `account_id`, while preserving the current restaurant UPDATE grant/policy, settings/tax/verification/branding/storefront/operational/billing behavior, service-side creation, and nullable legacy links. No transfer flow or cleanup policy was added.
+- On fresh disposable PostgreSQL 17.11, the runner first reproduced the pre-migration owner detachment/legacy-gate bypass and manager reassignment/account-RLS effect, rolling back both synthetic mutations. It then replayed **77 migrations** and passed the combined DB integration suite: **5 files / 130 tests passed**. The tests use direct SQL with the actual `authenticated`, `anon`, and `service_role` roles plus simulated JWT subjects. This is **not** HTTP/PostgREST validation.
+- Full local app checks passed: `npm test -- --reporter=dot` (**188 files passed, 5 skipped; 2,152 tests passed, 130 skipped**; skipped tests are not passes), `npm run typecheck`, `npm run lint`, `npm run sql:check`, `npm run design:check`, and the guarded optimized build (`GITHUB_ACTIONS=true CI=true AUTODINE_TEST_DEMO_BUILD=true VERCEL_ENV=test npm run build`).
+- No hosted Staging/Production connection, Auth setting, secret, email, payment, database migration, operator contact, or deployment was accessed or changed. The public entitlement-probe grants remain unchanged pending a separate compatibility decision; pending owner-signup lifecycle choices are documented in the Phase 6D report.
+- Full Phase 6D report: `PHASE-6D-ACCOUNT-ENTITLEMENT-SECURITY.md`. Security follow-ups: `SECURITY-REMEDIATION-REGISTER.md`. Migration sequencing/evidence: `docs/migration-reconciliation.md`.
+
+## Historical Phase 6C continuation record (2026-11-06 UTC)
+
+**Branch / recorded base:** `arena/3878e9b8-autodine` / `e13720652440fc69280caa09e2e60bc151288426`
+**Decision:** Staging **NO-GO**; Production **read-only**; overall release **NO-GO**.
+
+At the Phase 6C checkpoint, this was the then-current status and superseded the older branch/PR, hosted-state, and gate entries retained below as historical context. It is kept here as a historical record beneath the Phase 6D status above. No hosted Supabase project, production data, Auth setting, secret, SMTP provider, mailbox, email, DNS record, or deployment was accessed or changed.
+
+### Phase 6C implementation and validation
+
+- Owner signup now sends valid attempts to a generic confirmation-pending route for Auth errors, thrown failures, missing identities, and enumeration-protected identity-less responses. Error/no-user paths do not provision a profile/workspace; a genuinely new identity still provisions the profile/workspace before email confirmation.
+- Signup/resend use correlated PKCE `sb_flow_id` state and opt-in verifier-cookie preservation on Auth errors. Resend distinguishes malformed input only; all valid addresses receive generic `requested` feedback, not a delivery guarantee.
+- Staff invites remain manually shared and separately redeemed. No email provider, CAPTCHA vendor, secret, workspace cleanup policy, or trial reset policy was selected or added.
+- Focused Phase 6C suite: **9 files / 65 tests passed**. Full Vitest suite: **188 files passed, 4 skipped; 2,152 tests passed, 122 skipped**. Typecheck, lint, design check, DDL syntax check, guarded build, and `git diff --check` passed. Skipped tests are not passes; SQL check is syntax-only and does not execute function bodies/RLS.
+- Local Supabase/Mailpit, migration replay, browser PKCE, hosted Auth/SMTP, email delivery, and database/PostgREST integration were not run. Docker/Podman were absent and no privileged daemon was started.
+
+### Phase 6C blockers and workspace audit (historical at that checkpoint)
+
+- **P0 — mutable account entitlement link:** Source review found authenticated owner/manager `UPDATE` on `restaurants` is granted table-wide, while its RLS policy checks membership/role but not changed columns. The account migration adds nullable `account_id` without freezing it; the retained plan guard protects legacy plan fields only. A crafted authenticated request can likely set `account_id` to `NULL` (switching `restaurant_can_write` to the legacy gate) or a known other account ID (remapping entitlement and account-scoped RLS). No database replay was available. Require a forward-only guard and disposable-DB/PostgREST regression tests before Staging; Phase 6C did not change SQL/policies.
+- **P0 — Auth/email integration is unverified:** Hosted confirmation, SMTP/from-domain, templates, redirect allowlist support for `sb_flow_id`, CAPTCHA/abuse settings, and effective send limits are unknown. No browser confirmation or real email delivery evidence exists.
+- **P0 — pending workspace lifecycle needs product/billing approval:** A first-time Auth identity consumes/reserves the 21-day trial and a globally unique slug and creates an active restaurant with a published starter menu before confirmation. The exact-slug public projection returns storefront data and `is_active` without requiring confirmation. Decide pending visibility, trial start, slug reservation, and retention; no automatic deletion policy is implied.
+- The owner-index/trial-claim discrepancy is clarified by source audit: `accounts_owner_key` prevents another non-null account row for that owner while the original row remains. Since the account-creation RPC inserts before `claim_account_trial`, an ordinary duplicate attempt fails at the index instead of creating a no-trial second account. If an account row is removed while its profile/trial-grant remains, a later account can be created but the prior grant denies another trial. The historical comment is overbroad shorthand, not a functional conflict on supported paths; no account-deletion flow was found or added.
+- For linked restaurants, `restaurant_can_write` follows account billing state and does not check `restaurants.is_active`; public menu/item and order/session admission check active state separately. Treat `is_active` as storefront status, not a full write lock. Owner/manager settings and branding repair paths intentionally remain writable after billing expiry.
+- The earlier `anon`/`PUBLIC` execute privilege on `restaurant_can_write(uuid)` remains because the account migration did not revoke it; a current integration-test expectation allows a guest to call this boolean probe. Confirm that exposure is intentional.
+
+Detailed Phase 6C and SMTP evidence is in `PHASE-6C-AUTH-LIFECYCLE-HARDENING.md` and `SMTP-CONFIGURATION-AND-AUTH-READINESS.md`. The historical sections below are preserved and are not current branch status or release authorization.
+
+## Historical continuation record (prior branch / PR #177 snapshot)
 
 This is the live blocker register for PR #177. It records the local reconciliation of PR head `af8fbbb` with `origin/main` `ff8ceae`, committed as `60ff0ec5ac7d34f113d02c437eebebf79e76ec51` and pushed to the active branch `arena/9c143766-autodine`. This is a branch merge commit, not a merge of PR #177 into `main`: GitHub currently reports PR #177 **OPEN**, **MERGEABLE**, and **CLEAN**. The protected baseline was checked byte-for-byte by SHA-256. Historical hosted/Preview statements elsewhere in this file are not current evidence or authorization.
 
@@ -11,7 +49,7 @@ This is the live blocker register for PR #177. It records the local reconciliati
 - Reviewed the combined source, SQL migration ordering, environment/deployment boundaries, and Vercel configuration. The merge audit found no unmerged, unstaged, or untracked paths. `git diff --cached --check` reported two trailing spaces in the historical audit file, retained as intentional Markdown hard-break formatting. No conflict markers were found.
 - `scripts/phase3/staging-baseline.json` remains at the protected SHA-256 `e986f2ddd48af88e7e887177ffab7f9dadbec96d6d8394f09150da1d9e7f03fb`.
 
-### Current gate evidence
+### Gate evidence from that prior continuation (historical)
 
 | Gate | This continuation | Disposition |
 |---|---|---|

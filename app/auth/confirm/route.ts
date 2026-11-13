@@ -13,16 +13,24 @@
  *
  * ONE HONEST LIMITATION
  *
- * PKCE keeps a one-time verifier in a cookie on the browser that asked for the
- * link. Opening the mail on a different device -- requested on the office
- * laptop, clicked on the phone -- therefore cannot complete the exchange, and
- * Supabase reports it as an invalid or expired link. The failure message says
- * so and offers a new link instead of pretending the link was stale.
+ * When an email template returns a PKCE `code`, the one-time verifier is a
+ * cookie on the browser that asked for the link. Opening that mail on another
+ * device cannot complete the exchange. A template using `token_hash` can avoid
+ * that browser binding, but the resulting flow still has to preserve the action
+ * type and redirect to the correct screen (especially password recovery).
+ *
+ * The signup and reset actions currently use Supabase's confirmation URL / PKCE
+ * path. Their cross-device behavior has not been verified against hosted Auth.
  */
 
 import { NextResponse, type NextRequest } from 'next/server';
 import type { EmailOtpType } from '@supabase/supabase-js';
-import { RECOVERY_COOKIE } from '@/lib/password';
+import {
+  RECOVERY_COOKIE,
+  RECOVERY_STATE_COOKIE,
+  isValidRecoveryState,
+} from '@/lib/password';
+import { PENDING_SIGNUP_EMAIL_COOKIE } from '@/lib/signup-confirmation';
 import { safeLocalPath } from '@/lib/safe-next-path';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
@@ -63,26 +71,75 @@ function back(request: NextRequest, path: string, key: 'error' | 'notice', messa
   return NextResponse.redirect(url);
 }
 
-const TYPES: readonly string[] = ['recovery', 'email', 'email_change', 'invite', 'magiclink'];
+function signupLinkProblem(request: NextRequest) {
+  const url = new URL('/signup/confirmation-pending', request.nextUrl.origin);
+  url.searchParams.set('link', 'problem');
+  return NextResponse.redirect(url);
+}
+
+function clearPendingSignupEmail(request: NextRequest, response: NextResponse) {
+  response.cookies.set({
+    name: PENDING_SIGNUP_EMAIL_COOKIE,
+    value: '',
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/signup',
+    maxAge: 0,
+    secure: request.nextUrl.protocol === 'https:',
+  });
+  return response;
+}
+
+const TYPES: readonly string[] = ['signup', 'recovery', 'email', 'email_change', 'invite', 'magiclink'];
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
-  const isRecovery = params.get('flow') === 'recovery' || params.get('next') === '/reset-password';
-  const next = safeNext(params.get('next'), isRecovery ? '/reset-password' : '/dashboard');
+  const type = params.get('type');
+  const flow = params.get('flow');
+  const requestedNext = params.get('next');
+  const isOwnerSignupConfirmation = flow === 'signup';
+  const code = params.get('code');
+  const tokenHash = params.get('token_hash');
+  const isRecoveryIntent = params.get('flow') === 'recovery' || type === 'recovery';
+  const linkState = params.get('state');
+  const cookieState = request.cookies.get(RECOVERY_STATE_COOKIE)?.value;
+  // `flow`, `type`, and `next` are URL parameters. For the PKCE path only a
+  // state value created during the reset request and returned in the same
+  // browser can distinguish recovery from a normal confirmation code.
+  const isPkceRecovery = Boolean(
+    code &&
+      params.get('flow') === 'recovery' &&
+      isValidRecoveryState(linkState) &&
+      linkState === cookieState,
+  );
+
+  if (code && isRecoveryIntent && !isPkceRecovery) {
+    return back(
+      request,
+      '/forgot-password',
+      'error',
+      'This reset link was not opened in the browser that requested it. Request a new one below.',
+    );
+  }
 
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
+    if (isOwnerSignupConfirmation) return signupLinkProblem(request);
     return back(request, '/login', 'error', 'Sign-in is not available yet: the database is not connected.');
   }
 
-  const code = params.get('code');
-  const tokenHash = params.get('token_hash');
-  const type = params.get('type');
-
   if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const flowId = params.get('sb_flow_id');
+    const exchange = flowId
+      ? await supabase.auth.exchangeCodeForSession(code, { flowId })
+      : await supabase.auth.exchangeCodeForSession(code);
+    const { error } = exchange;
     if (error) {
-      console.error('[autodine] auth link exchange failed:', error.message);
+      console.error('[autodine] auth link exchange failed', {
+        status: error.status ?? null,
+        code: error.code ?? 'unknown',
+      });
+      if (isOwnerSignupConfirmation) return signupLinkProblem(request);
       return back(
         request,
         '/forgot-password',
@@ -90,13 +147,26 @@ export async function GET(request: NextRequest) {
         'This link did not work in this browser. Links are single-use and open only in the browser that asked for them — request a new one below.',
       );
     }
-    return withRecovery(request, NextResponse.redirect(new URL(next, request.nextUrl.origin)), isRecovery);
+    const isRecovery = isPkceRecovery;
+    const next = isRecovery
+      ? '/reset-password'
+      : isOwnerSignupConfirmation
+        ? '/dashboard'
+        : safeNext(requestedNext, '/dashboard');
+    const response = NextResponse.redirect(new URL(next, request.nextUrl.origin));
+    if (isRecovery) response.cookies.delete(RECOVERY_STATE_COOKIE);
+    if (isOwnerSignupConfirmation) clearPendingSignupEmail(request, response);
+    return withRecovery(request, response, isRecovery);
   }
 
   if (tokenHash && type && TYPES.includes(type)) {
     const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: type as EmailOtpType });
     if (error) {
-      console.error('[autodine] auth token verification failed:', error.message);
+      console.error('[autodine] auth token verification failed', {
+        status: error.status ?? null,
+        code: error.code ?? 'unknown',
+      });
+      if (isOwnerSignupConfirmation) return signupLinkProblem(request);
       return back(
         request,
         '/forgot-password',
@@ -104,13 +174,19 @@ export async function GET(request: NextRequest) {
         'This link has expired or was already used. Request a new one below.',
       );
     }
-    return withRecovery(
-      request,
-      NextResponse.redirect(new URL(next, request.nextUrl.origin)),
-      isRecovery || type === 'recovery',
-    );
+    const isRecovery = type === 'recovery';
+    const next = isRecovery
+      ? '/reset-password'
+      : isOwnerSignupConfirmation
+        ? '/dashboard'
+        : safeNext(requestedNext, '/dashboard');
+    const response = NextResponse.redirect(new URL(next, request.nextUrl.origin));
+    if (isRecovery) response.cookies.delete(RECOVERY_STATE_COOKIE);
+    if (isOwnerSignupConfirmation) clearPendingSignupEmail(request, response);
+    return withRecovery(request, response, isRecovery);
   }
 
   // Someone opened /auth/confirm on its own, or a link lost its query string.
+  if (isOwnerSignupConfirmation) return signupLinkProblem(request);
   return back(request, '/forgot-password', 'error', 'That link is incomplete. Request a new reset email below.');
 }
