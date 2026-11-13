@@ -5,6 +5,8 @@ No production changes are performed by these instructions. Run on your trusted
 computer in Bash, with Docker installed/running and enough free disk space.
 Backups contain private customer/auth data: never upload them to chat or Git.
 
+> **Phase 7 evidence boundary (Arena date 2026-11-06 UTC):** No Production backup, dump, PITR/retention inspection, or hosted restore was performed in this execution. The local synthetic PostgreSQL cold-recovery pass is not provider recovery evidence. Current Production backup/PITR state and numeric RPO/RTO remain unknown. Do not treat this procedure as an executed backup; see [`PHASE-7-RECOVERY-RPO-RTO.md`](PHASE-7-RECOVERY-RPO-RTO.md).
+
 ## 1. Find connection details
 
 Supabase project → Connect → **Session pooler** (port 5432), or Direct connection
