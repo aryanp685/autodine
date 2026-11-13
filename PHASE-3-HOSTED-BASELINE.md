@@ -1,5 +1,7 @@
 # Phase 3 — hosted baseline preparation
 
+> **Historical work log:** sections below include pre-cutover statements about the pending staging RPC/migration reconciliation and production readiness. The 2026-11-12 [handoff report](docs/autodine-handoff-report-2026-11-12.md) records the later production rollout and deployment. Do not treat older “next step” paragraphs here as current instructions; no live project was queried by the current code audit.
+
 ## Status
 
 Phase 2 PR174 merged as 7147415052562aff971a236e79bf119977057271.

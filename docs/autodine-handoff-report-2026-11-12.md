@@ -66,7 +66,7 @@ npm run e2e:local     # isolated Playwright run
 |---|---|---|---|
 | **Production** | `autodine-production` | `bdbaqpevwmgdvghszjno` | `https://new-alpha-five-43.vercel.app` |
 | **Staging / test** | `autodinetest` | `juwyhslzchjevqkdvwjm` | (review deployments) |
-| **Review app** | branch preview | uses staging | `https://new-git-arena-a5344572-autodine-iamjarvis9896-3988s-projects.vercel.app?_vercel_share=RbkpxAfZ3c77C7RqytXVzZczITNwO1is` |
+| **Review app** | branch preview | uses staging | `https://new-git-arena-a5344572-autodine-iamjarvis9896-3988s-projects.vercel.app?_vercel_share=[REDACTED—revoke/regenerate]` |
 
 Review logins (staging DB, all working — verified with `hasSession: true`):
 
@@ -75,7 +75,7 @@ owner@autodine-review.test
 manager@autodine-review.test
 kitchen@autodine-review.test
 cashier@autodine-review.test
-password: Review2026!
+password: [REDACTED—rotate if active]
 ```
 
 > The Vercel preview is behind deployment protection. The `_vercel_share` token is the only
@@ -142,7 +142,7 @@ Real delivery, staff invitation redemption, and raising the GoTrue send rate rem
 
 ### 5.6 Test results and verification boundary
 
-Local checks for this continuation passed: `npm run typecheck`, `npm run lint`, `npm run design:check`, `npm run sql:check`, `npm test -- --reporter=dot` (2,095 passed, 114 skipped across 181 files), `npm run db:reconcile -- converge` (clean replay, classifier self-test 0 wrong verdicts, populated rows preserved), and `npm run test:db:embedded` (114 passed on disposable PostgreSQL). These are local checks, not hosted browser/runtime acceptance.
+Latest branch-local checks (2026-11-12) passed: `npm run typecheck`, `npm run lint`, `npm run design:check`, and `npm run sql:check` (DDL syntax only; not function/RLS validation); full `npm test` (2,096 passed; 115 database-gated tests skipped without a DB URL); `npm run test:db:embedded` (115 passed after replaying all 73 migrations against disposable PostgreSQL); and `npm run e2e:local` (production build succeeded; 64 browser tests passed, 49 real-stack integration tests skipped because no disposable Supabase E2E stack was configured). `npm audit` reported 0 vulnerabilities. These prove local code/build behavior only, not hosted auth, SMTP, Realtime, backup/restore, monitoring delivery, physical devices, production schema parity, or capacity. The current code audit did not query or change production.
 
 ## 6. Post-merge production follow-ups
 
@@ -216,16 +216,13 @@ The historical audit (`AUDIT-REPORT.md`, 2026-11-06) catalogued C1–C4 (custome
 | O2 / O3 | Duplicate codes on boards; old order re-stamped on collision | **Fixed** by the same unique index as C3. |
 | O4 | Sample tax label on bill screens | **Fixed.** Stored tax figures and the order's rate snapshot are shown. |
 | O5 | Unused-import lint warning; `T${Date.now()}` table label past 999 | **Fixed.** |
-| S1 | `lib/pricing.ts` header said "SAMPLE ONLY" while the code was live | **Partially open.** The header is corrected, but the tax model intentionally supports **one exclusive rate and intra-state CGST/SGST only**. It does not implement IGST, inclusive pricing, per-item rates or GSTIN-conditional documents. |
+| S1 | Generic configured tax is presented in some cart/bill/report surfaces with GST wording and an equal CGST/SGST split | **Open, requires explicit tax/presentation decision.** GST tax invoices remain fail-closed, but guest cart/bill/report UI still uses GST/CGST/SGST labels and `lib/bill.ts` splits stored tax equally. This is not evidence of approved GST treatment; no per-item rates, inclusive pricing or place-of-supply rules exist. Current instructions say preserve existing bill behavior, so this audit did not change those labels/splits. Decide whether to neutralize display-only labels while preserving amounts, or wait for adviser-approved rules. |
 | S2 | Announcement status lived in memory | **Fixed** (persisted claim table). |
 | S3 | No invoice numbering anywhere | **Fixed.** Per-restaurant, per-financial-year numbered series (India FY: 1 Apr – 31 Mar), row-locked and transactional, never reused. |
 
 ### Open defects and open questions
 
-1. **Quantity contract mismatch (open, needs a product decision — do not "fix" silently).**
-   `20261021000005_public_place_order.sql` documents quantities as bounded 1–99, but the
-   implementation **caps** values above 99 at 99. Capping may be intentional. Confirm
-   whether over-limit quantities should be capped or rejected.
+1. **Quantity contract mismatch — owner decision pending.** Current behavior caps quantities above 99 at 99, while the SQL comment describes a 1–99 bound. No behavior change is included in this audit. Preserve the existing contract until the owner decides whether to reject or cap.
 2. **GST is frozen on purpose.** No legal/adviser approval exists. The receipt function is
    deliberately fail-closed for GST documents and issues a clearly-labelled non-GST receipt
    only. **Do not invent rates, defaults, classifications, inclusive/exclusive treatment,
@@ -319,7 +316,7 @@ These come from `AGENTS.md` and are locked. Read that file before changing code.
 3. **Configure SMTP and raise the email send rate limit** — separate settings. Exercise reset and invite flows on staging first. Do not disable `mailer_autoconfirm` without an explicit product decision.
 4. **Complete the real hosted integration pass** on an approved non-production project: QR → menu → order → kitchen → cashier/close → receipt, two-tenant isolation, retry/network failure, mobile and desktop.
 5. **Wire `/api/health` to monitoring and alerting.**
-6. **Settle the quantity 1–99 contract** (cap vs reject). The staging database clock matched the authoritative UTC date on a read-only recheck at 2026-11-12 17:31 UTC; recheck it before relying on later time-bound tests.
+6. **Quantity contract:** owner decision remains pending (reject >99 vs cap at 99). Preserve current behavior until that decision is recorded. The staging database clock matched UTC at the 2026-11-12 17:31 recheck; verify again before future time-bound tests.
 7. **Obtain GST adviser sign-off** before enabling GST-dependent invoices or changing the locked tax behavior.
 8. **Run a capacity pass** sized for the actual pilot before broad launch.
 
@@ -336,7 +333,8 @@ Completed across this continuation: Preview/Development Supabase URL, publishabl
 | Staging database clock | Agent | **Rechecked** at 2026-11-12 17:31 UTC; database UTC date matched the authoritative date. Recheck before future time-bound tests. |
 | Configure SMTP and raise email rate limit | Operator | Supabase dashboard configuration; connector exposes no SMTP setting. |
 | Approve GST rules | Adviser | Legal/financial approval. |
-| Decide cap-vs-reject for quantities > 99 | Product owner | Behavioral contract decision. |
+| Quantity >99 behavior | Owner | **Decision pending (reject or cap); current behavior is preserved.** |
+| Tax-rate/GSTIN edit permissions | Owner | **Owner-only behavior approved.** This branch adds UI, server-action and database enforcement; the migration is not deployed, so production remains unchanged until a separately approved release. |
 
 ## 14. Pitfalls learned the hard way
 
