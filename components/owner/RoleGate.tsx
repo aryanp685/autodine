@@ -33,6 +33,7 @@ import { homeForRole, roleLabel } from '@/lib/db/team';
 const AREA_NAMES: Record<string, string> = {
   dashboard: 'the dashboard',
   money: 'money and reports',
+  subscription: 'subscription and billing',
   menus: 'the menu',
   tables: 'tables and QR codes',
   settings: 'settings',

@@ -51,6 +51,9 @@ export async function choosePlanAction(plan: string): Promise<SubscriptionAction
   if (!context.ok) {
     return { ok: false, message: 'Sign in to change your plan.' };
   }
+  if (context.context.role !== 'owner') {
+    return { ok: false, message: 'Only an owner of this account can change the plan.' };
+  }
 
   if (!['starter', 'professional', 'business'].includes(plan)) {
     return { ok: false, message: 'That is not a plan.' };
@@ -99,6 +102,9 @@ export async function withdrawCancellationAction(): Promise<SubscriptionActionRe
   if (!context.ok) {
     return { ok: false, message: 'Sign in to manage your subscription.' };
   }
+  if (context.context.role !== 'owner') {
+    return { ok: false, message: 'Only an owner of this account can manage the subscription.' };
+  }
 
   const { data, error } = await context.context.supabase.rpc('withdraw_subscription_cancellation', {
     p_restaurant_id: context.context.restaurantId,
@@ -126,6 +132,9 @@ export async function requestCancellationAction(): Promise<SubscriptionActionRes
   const context = await getStaffContextDetailed();
   if (!context.ok) {
     return { ok: false, message: 'Sign in to manage your subscription.' };
+  }
+  if (context.context.role !== 'owner') {
+    return { ok: false, message: 'Only an owner of this account can manage the subscription.' };
   }
 
   const { data, error } = await context.context.supabase.rpc('request_subscription_cancellation', {
@@ -159,6 +168,9 @@ export async function retryPaymentAction(): Promise<SubscriptionActionResult> {
   const context = await getStaffContextDetailed();
   if (!context.ok) {
     return { ok: false, message: 'Sign in to manage your subscription.' };
+  }
+  if (context.context.role !== 'owner') {
+    return { ok: false, message: 'Only an owner of this account can manage the subscription.' };
   }
 
   if (!getBillingProvider()) {

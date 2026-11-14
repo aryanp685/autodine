@@ -73,6 +73,28 @@ describe('the subscription screen an owner sees', () => {
     expect(ownerHtml).toMatch(/does not delete\s+an outlet, an order, a menu or a table/);
   });
 
+  it('lets the owner withdraw a pending cancellation request', () => {
+    const html = renderToStaticMarkup(
+      <SubscriptionScreen
+        data={data({
+          state: {
+            ...data().state!,
+            status: 'cancel_requested',
+            cancellation: {
+              requestedAt: '2026-11-02T00:00:00Z',
+              effectiveAt: '2026-11-22T00:00:00Z',
+              confirmed: false,
+            },
+          },
+        })}
+        outlet={null}
+      />,
+    );
+
+    expect(html).toContain('Cancellation requested');
+    expect(html).toContain('Keep my subscription');
+  });
+
   it('never calls a receipt a tax invoice', () => {
     expect(ownerHtml).not.toMatch(/tax invoice/i);
   });
@@ -89,11 +111,36 @@ describe('the same screen for a manager', () => {
     expect(managerHtml).toContain('₹2,699.00');
   });
 
-  it('does not offer them the owner\'s money buttons', () => {
+  it('does not offer them the owner\'s plan or cancellation actions', () => {
     expect(managerHtml).not.toContain('Request cancellation');
     expect(managerHtml).toContain('Owner only');
     expect(managerHtml).toMatch(/Only an owner of this account can change or cancel the plan/);
   });
+
+  it('does not offer a manager the ability to withdraw a pending cancellation', () => {
+    const managerHtml = renderToStaticMarkup(
+      <SubscriptionScreen
+        data={data({
+          role: 'manager',
+          state: {
+            ...data().state!,
+            status: 'cancel_requested',
+            cancellation: {
+              requestedAt: '2026-11-02T00:00:00Z',
+              effectiveAt: '2026-11-22T00:00:00Z',
+              confirmed: false,
+            },
+          },
+        })}
+        outlet={null}
+      />,
+    );
+
+    expect(managerHtml).toContain('Cancellation requested');
+    expect(managerHtml).not.toContain('Keep my subscription');
+    expect(managerHtml).toContain('Only an owner of this account can withdraw a cancellation request.');
+  });
+
 });
 
 describe('when the account has expired', () => {

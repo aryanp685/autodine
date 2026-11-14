@@ -65,7 +65,11 @@ async function currentRestaurant() {
   const staff = await getStaffContextDetailed();
   if (!staff.ok) return null;
 
-  return { supabase: staff.context.supabase, restaurantId: staff.context.restaurantId };
+  return {
+    supabase: staff.context.supabase,
+    restaurantId: staff.context.restaurantId,
+    role: staff.context.role,
+  };
 }
 
 function ok(message: string): never {
@@ -1161,6 +1165,13 @@ export async function generateDescriptionsAction(
       reason: 'You need to be signed in to edit the menu.',
     }));
   }
+  if (ctx.role !== 'owner' && ctx.role !== 'manager') {
+    return entries.map((entry) => ({
+      id: entry.id,
+      ok: false as const,
+      reason: 'Only an owner or manager can generate menu content.',
+    }));
+  }
   if (entries.length === 0) return [];
 
   const { data, error } = await ctx.supabase
@@ -1283,6 +1294,13 @@ export async function generateTranslationsAction(payload: {
       id: entry.id,
       ok: false as const,
       reason: 'You need to be signed in to edit the menu.',
+    }));
+  }
+  if (ctx.role !== 'owner' && ctx.role !== 'manager') {
+    return wanted.map((entry) => ({
+      id: entry.id,
+      ok: false as const,
+      reason: 'Only an owner or manager can generate menu content.',
     }));
   }
   if (wanted.length === 0) return [];

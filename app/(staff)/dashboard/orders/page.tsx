@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { OrdersScreen, type OrderFilter } from '@/components/screens/OrdersScreen';
-import { getReportsScreenData } from '@/lib/db/reports';
+import { getOrdersScreenData } from '@/lib/db/orders-ledger';
 import { getOutletBar } from '@/lib/db/outlet-bar';
 
 export const metadata: Metadata = { title: 'Orders · AutoDine', robots: { index: false, follow: false } };
@@ -18,16 +18,11 @@ export default async function OrdersPage({
 }) {
   const { range, from, to, status, q } = await searchParams;
 
-  // The ledger reads the same aggregate the sales report does: one definition
-  // of "a bill", one place where a cancelled order is excluded from money.
-  //
-  // `from`/`to` are what a custom range is made of, and they are passed
-  // through for the same reason the sales report passes them: the two screens
-  // are the same aggregate over the same window, so a staff member who picked
-  // 3–9 October on one should find the same week on the other. Before this the
-  // ledger could only offer today, 7 days and 30 days.
+  // Owner and Manager rows come from the same report aggregate as the sales
+  // report. Cashiers use a safe orders-only projection and never load payment
+  // details or the finance CSV from this page. Both paths use this same window.
   const [data, outlet] = await Promise.all([
-    getReportsScreenData({ range: range ?? 'today', from, to }),
+    getOrdersScreenData({ range: range ?? 'today', from, to }),
     getOutletBar(),
   ]);
 

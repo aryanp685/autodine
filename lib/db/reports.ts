@@ -24,7 +24,7 @@
  * these carries the definition next to it.
  */
 
-import { getStaffContextDetailed } from './staff';
+import { getStaffContextDetailed, type StaffContext } from './staff';
 import {
   RESTAURANT_TIME_ZONE,
   hourInZone,
@@ -615,35 +615,27 @@ export type ReportsScreenData = {
  * sets them: a page that pulled every line of a 30-day range would be slower
  * for no reason.
  */
-export async function getReportsScreenData(
-  params: {
-    range?: string;
-    from?: string;
-    to?: string;
-    includeLines?: boolean;
-    orderLimit?: number;
-  } = {},
+export type ReportsQueryParams = {
+  range?: string;
+  from?: string;
+  to?: string;
+  includeLines?: boolean;
+  orderLimit?: number;
+};
+
+/**
+ * Load one report for a context already resolved by the trusted staff helper.
+ *
+ * The export Route Handler uses this after checking the context's actual role,
+ * so it can deny Cashier/Kitchen before the expensive report RPC and avoid a
+ * second membership lookup. `report_sales()` repeats the authorization in SQL.
+ */
+export async function getReportsScreenDataForStaff(
+  context: StaffContext,
+  params: ReportsQueryParams = {},
   now: Date = new Date(),
-): Promise<ReportsScreenData | null> {
-  const staff = await getStaffContextDetailed();
-
-  if (!staff.ok) {
-    // Unconfigured: the screen renders its labelled sample report instead.
-    if (staff.reason === 'unconfigured') return null;
-    const timezone = RESTAURANT_TIME_ZONE;
-    const range = resolveRange(isReportRangeKey(params.range) ? params.range : 'today', timezone, now);
-    return {
-      restaurantName: '',
-      tagline: null,
-      timezone,
-      range,
-      report: { ...emptyPayload(), buckets: zeroFillBuckets(range, [], timezone, now) },
-      ordersTruncated: false,
-      blocked: staff.reason,
-    };
-  }
-
-  const { supabase, restaurantId, restaurantName, timezone, tagline } = staff.context;
+): Promise<ReportsScreenData> {
+  const { supabase, restaurantId, restaurantName, timezone, tagline } = context;
   const key = isReportRangeKey(params.range) ? params.range : 'today';
   const range = resolveRange(key, timezone, now, { from: params.from, to: params.to });
 
@@ -673,6 +665,31 @@ export async function getReportsScreenData(
     ordersTruncated:
       report.totals.bills + report.totals.cancelled > report.orders.length,
   };
+}
+
+export async function getReportsScreenData(
+  params: ReportsQueryParams = {},
+  now: Date = new Date(),
+): Promise<ReportsScreenData | null> {
+  const staff = await getStaffContextDetailed();
+
+  if (!staff.ok) {
+    // Unconfigured: the screen renders its labelled sample report instead.
+    if (staff.reason === 'unconfigured') return null;
+    const timezone = RESTAURANT_TIME_ZONE;
+    const range = resolveRange(isReportRangeKey(params.range) ? params.range : 'today', timezone, now);
+    return {
+      restaurantName: '',
+      tagline: null,
+      timezone,
+      range,
+      report: { ...emptyPayload(), buckets: zeroFillBuckets(range, [], timezone, now) },
+      ordersTruncated: false,
+      blocked: staff.reason,
+    };
+  }
+
+  return getReportsScreenDataForStaff(staff.context, params, now);
 }
 
 export function emptyPayload(): ReportPayload {

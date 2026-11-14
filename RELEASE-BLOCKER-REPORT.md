@@ -1,15 +1,45 @@
 # AutoDine — product completion and release-gate snapshot
 
-## Current Phase 6D continuation record (2026-11-06 UTC)
+## Active infrastructure/security hardening continuation (evidence cutoff: 2026-11-06 UTC)
 
-**Branch / recorded base:** `arena/3878e9b8-autodine` / `e13720652440fc69280caa09e2e60bc151288426`
+**Branch:** `arena/fee715c2-autodine` (active)
+**Base:** `b80ab3c50c3c5067130cde40b2757eb07e15fe7e`
 
-**Decision:** Staging **NO-GO**; Production **read-only**; overall release **NO-GO**.
+**Decision:** overall release **NO-GO**; Staging **NO-GO**; Production remains read-only. No deployment, hosted migration, configuration change, DML, or customer/staff message was made. Read-only Production catalog queries checked table/column privileges and RLS policy metadata only; no application rows were queried.
+
+- Read-only Production catalog checks confirm `public.orders` has RLS enabled (`relrowsecurity=true`, not forced); `authenticated` has table/column SELECT on all 25 columns, including finance amounts and the guest bearer `guest_token`, while `orders_staff_read` is membership-scoped through `current_restaurant_ids()` and does not filter staff role. `anon` also has table/column SELECT ACLs, but no SELECT policy and no RLS bypass were found, so no anonymous row access was demonstrated. `authenticated` has only a `prep_status` column UPDATE grant and no table-level INSERT/UPDATE/DELETE. No order row or token was read or used. Cashier UI projection is **not** a database finance or guest-token boundary. Full evidence, source grant intent, and compatibility implications are in `docs/AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md`.
+- The source hardening delta includes Owner/Manager checks on the report-export handler and `report_sales()` RPC (with a server-side 10,000-order detail cap), menu AI Server Actions, owner-only subscription actions, an Owner/Manager subscription route gate, malformed guest-order UUID rejection before RPC, and forward migrations that bound report details and apply subscription-history `p_limit` before JSON aggregation. These are source changes only; migrations were replayed only on disposable local PostgreSQL.
+- Fresh local checks: focused authorization/order suite (**111 passed across 9 files**); `npm test -- --reporter=dot` (**2,185 passed, 148 skipped**; 194 files passed, 6 skipped); `npm run test:db:embedded` (**148 passed across 6 files; 79 migrations replayed on disposable PostgreSQL**); typecheck, lint, SQL syntax check, design check, and final `git diff --check` passed. The SQL check is DDL/parser-only; local migration replay is the database execution evidence. No browser E2E, production runtime, restore, or live-header test was run.
+- Date reconciliation: 2026-11-06 remains the authoritative evidence cutoff. Vercel/PR #184 provider timestamps dated 2026-11-13, the hand-off document dated 2026-11-12, and the local migration filenames dated 2026-11-12 are anomalous future-dated observations, not newer readiness evidence. PR #184's returned OPEN/draft/mergeable status is not asserted as its state at the cutoff; the underlying chronology remains unresolved.
+- Still unresolved: Vercel Firewall/WAF/DDoS/bot/rate-limit configuration and traffic baseline; ingress/trusted-proxy configuration; the intended database role boundary for orders finance fields and guest bearer tokens (including whether to revoke the unused-by-policy `anon` SELECT ACL); account-member subscription-read scope; guest bearer-token URL exposure; a future provider-compatible webhook body cap; Realtime health discrepancy; backup/PITR and numeric RPO/RTO; full release acceptance.
+- The protected `scripts/phase3/staging-baseline.json` SHA-256 remains `e986f2ddd48af88e7e887177ffab7f9dadbec96d6d8394f09150da1d9e7f03fb`.
+- Consolidated evidence and recommendations: `docs/AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md`.
+
+## Historical Phase 1 Vercel edge-security discovery snapshot (2026-11-06 UTC)
+
+This is the read-only Phase 1 checkpoint at base `b80ab3c…`; it is not a description of the later active-checkout hardening work above. Its claims that no Phase 2+ source changes or tests had occurred were true only at that checkpoint.
+
+**Branch / base:** `arena/fee715c2-autodine` / `b80ab3c50c3c5067130cde40b2757eb07e15fe7e`.
+
+**Decision:** overall release remains **NO-GO**; Production remains read-only; no Vercel configuration change was made. Production Firewall enforcement remains expressly out of scope/unauthorized.
+
+- A read-only Vercel query returned project `new` (`prj_S6aU68euwLsJsaEdzolSdsJHSyS7`) and a Production deployment record (`READY`/`PROMOTED`, region `bom1`, main commit `b80ab3c50c3c5067130cde40b2757eb07e15fe7e`). Its metadata timestamps are 2026-11-13, future-dated relative to this 2026-11-06 snapshot, so the record cannot establish which deployment was current at the cutoff. The returned Preview record is for a different branch/PR; it is not this active branch's Preview.
+- The team/project plan label is Hobby/legacy. Exact entitlements and current state for Firewall rules, WAF, DDoS protection, bot protection, and Vercel rate limiting remain **UNVERIFIED** because the connected Vercel tools do not expose those dashboard controls or rule/analytics inventories. No feature is assumed enabled or disabled.
+- Repository security headers are source-configured, but live Production/Preview response headers and request/traffic analytics remain unverified. No routes, thresholds, or Firewall policies were changed or tested; Phase 2+ was not started.
+- Source-only review requires owner/security decisions on report export/RPC role boundaries, menu AI Server Action authorization/cost controls, subscription-history query bounds, account-member billing visibility, guest bearer-token URL exposure, and a compatible webhook-body bound before any future billing-provider enablement. These are not demonstrated hosted exploits and were not changed in Phase 1.
+- The requested `docs/infrastructure-architecture.md` and `docs/edge-security-runbook.md` are absent from the checkout. Full read-only findings and connector evidence boundary: `PHASE-1-VERCEL-EDGE-SECURITY-DISCOVERY.md`.
+- Vercel metadata timestamps correspond to 2026-11-13 UTC, seven days after Arena's authoritative task date. The chronology discrepancy remains unresolved.
+
+## Historical Phase 6D continuation record (different branch; 2026-11-06 UTC)
+
+**Branch / recorded base:** `arena/3878e9b8-autodine` / `e13720652440fc69280caa09e2e60bc151288426`. This is a prior-branch checkpoint, not the status of the active Phase 1 branch above.
+
+**Decision at that checkpoint:** Staging **NO-GO**; Production **read-only**; overall release **NO-GO**.
 
 - Added forward-only `supabase/migrations/20261112000200_immutable_restaurant_account_link.sql`. It blocks authenticated owner/manager detachment and reassignment of an existing restaurant `account_id`, while preserving the current restaurant UPDATE grant/policy, settings/tax/verification/branding/storefront/operational/billing behavior, service-side creation, and nullable legacy links. No transfer flow or cleanup policy was added.
 - On fresh disposable PostgreSQL 17.11, the runner first reproduced the pre-migration owner detachment/legacy-gate bypass and manager reassignment/account-RLS effect, rolling back both synthetic mutations. It then replayed **77 migrations** and passed the combined DB integration suite: **5 files / 130 tests passed**. The tests use direct SQL with the actual `authenticated`, `anon`, and `service_role` roles plus simulated JWT subjects. This is **not** HTTP/PostgREST validation.
 - Full local app checks passed: `npm test -- --reporter=dot` (**188 files passed, 5 skipped; 2,152 tests passed, 130 skipped**; skipped tests are not passes), `npm run typecheck`, `npm run lint`, `npm run sql:check`, `npm run design:check`, and the guarded optimized build (`GITHUB_ACTIONS=true CI=true AUTODINE_TEST_DEMO_BUILD=true VERCEL_ENV=test npm run build`).
-- No hosted Staging/Production connection, Auth setting, secret, email, payment, database migration, operator contact, or deployment was accessed or changed. The public entitlement-probe grants remain unchanged pending a separate compatibility decision; pending owner-signup lifecycle choices are documented in the Phase 6D report.
+- No hosted Staging/Production connection, Auth setting, secret, email, payment, database migration, operator contact, or deployment was accessed or changed at that checkpoint. The public entitlement-probe grants remained unchanged pending a separate compatibility decision; pending owner-signup lifecycle choices are documented in the Phase 6D report.
 - Full Phase 6D report: `PHASE-6D-ACCOUNT-ENTITLEMENT-SECURITY.md`. Security follow-ups: `SECURITY-REMEDIATION-REGISTER.md`. Migration sequencing/evidence: `docs/migration-reconciliation.md`.
 
 ## Historical Phase 6C continuation record (2026-11-06 UTC)
