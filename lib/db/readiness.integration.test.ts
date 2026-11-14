@@ -762,6 +762,35 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
     });
   });
 
+  it('makes billing settings owner-only without rewriting existing orders', async () => {
+    const f = await fixture();
+    const manager = randomUUID();
+    await db.query('insert into profiles(id) values($1)', [manager]);
+    await db.query("insert into memberships(restaurant_id,user_id,role) values($1,$2,'manager')", [f.restaurant, manager]);
+    const beforeOrder = (await db.query(
+      'select tax_paise,total_paise,tax_rate_bps_snapshot from orders where id=$1', [f.order],
+    )).rows[0];
+
+    await expect(asStaff(manager, () => db.query(
+      'update restaurants set tax_rate_bps=123 where id=$1', [f.restaurant],
+    ))).rejects.toMatchObject({ code: '42501' });
+    await expect(asStaff(manager, () => db.query(
+      "update restaurants set gstin='27ABCDE1234F1Z5' where id=$1", [f.restaurant],
+    ))).rejects.toMatchObject({ code: '42501' });
+
+    await asStaffCommitted(f.user, () => db.query(
+      "update restaurants set tax_rate_bps=123, gstin='27ABCDE1234F1Z5' where id=$1", [f.restaurant],
+    ));
+
+    const afterOrder = (await db.query(
+      'select tax_paise,total_paise,tax_rate_bps_snapshot from orders where id=$1', [f.order],
+    )).rows[0];
+    expect(afterOrder).toEqual(beforeOrder);
+    expect((await db.query(
+      'select tax_rate_bps,gstin from restaurants where id=$1', [f.restaurant],
+    )).rows[0]).toEqual({ tax_rate_bps: 123, gstin: '27ABCDE1234F1Z5' });
+  });
+
   it('returns existing orders through the versioned API without writing anything', async () => {
     const f = await fixture();const key = randomUUID();
     const sql = 'select place_public_order_attempt($1,$2::jsonb,null,$3,$4) result';

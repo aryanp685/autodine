@@ -283,8 +283,9 @@ export function SettingsScreen({
         {live && !canEdit ? (
           <Notice tone="plain" label={<Tag tone="neutral">{data?.role ?? 'staff'}</Tag>}>
             <strong className="font-semibold text-gink">Read-only for your role.</strong> Your
-            restaurant&apos;s name, address, tax rate and web address are changed by the owner or a
-            manager. You can see them here so the tax on a bill is never a mystery.
+            restaurant&apos;s name, address and web address are changed by the owner or a manager.
+            Only the owner changes the tax rate and GSTIN. You can see these settings here so the
+            tax on a bill is never a mystery.
           </Notice>
         ) : null}
 
@@ -375,7 +376,7 @@ export function SettingsScreen({
                     <Field
                       label="GSTIN"
                       htmlFor="settings-gstin"
-                      hint="Leave it blank if you are not registered. The 15-character format is checked here rather than discovered on a filed invoice."
+                      hint="Owner-only billing detail. The 15-character format is checked here; saving a GSTIN does not enable GST tax invoices."
                     >
                       <input
                         id="settings-gstin"
@@ -384,7 +385,7 @@ export function SettingsScreen({
                         type="text"
                         defaultValue={details.gstin}
                         maxLength={15}
-                        disabled={disabled}
+                        disabled={disabled || data?.role !== 'owner'}
                         autoCapitalize="characters"
                         placeholder="22AAAAA0000A1Z5"
                       />
@@ -456,14 +457,13 @@ export function SettingsScreen({
                   bodyClassName="px-5 py-5"
                 >
                   <p className="m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
-                    The rate the bill adds on top of the menu prices. Set what your accountant told
-                    you — this screen does not guess a rate.
+                    The existing per-order tax rate added on top of menu prices. Only the owner can
+                    change this billing setting; AutoDine does not infer a rate.
                   </p>
 
                   {taxBps === 0 ? (
                     <Notice tone="due" label="Tax is 0%." className="mt-3 mb-0">
-                      Every bill right now charges the menu price with no tax. If you are registered
-                      for GST, set the rate here before service.
+                      New orders currently use the menu price with no tax.
                     </Notice>
                   ) : (
                     <Notice tone="plain" label="Example" className="mt-3 mb-0">
@@ -471,6 +471,11 @@ export function SettingsScreen({
                       — {inr(100)} plus {inr(paiseToRupees(example.taxPaise))} tax.
                     </Notice>
                   )}
+
+                  <Notice tone="plain" label="GST tax invoices are not enabled" className="mt-3 mb-0">
+                    This bill rate does not activate GST invoicing. GST tax invoices remain unavailable
+                    until approved tax rules are supplied; ordinary receipts and existing billing are unchanged.
+                  </Notice>
 
                   <form action={saveTaxAction} className="mt-3.5 flex flex-col gap-3">
                     <Field
@@ -489,14 +494,17 @@ export function SettingsScreen({
                         name="taxRate"
                         type="text"
                         inputMode="decimal"
+                        pattern="(?:30(?:\.0{1,2})?|(?:\d|[12]\d)(?:\.\d{1,2})?)%?"
+                        title="Enter a percentage from 0 to 30 with up to two decimal places."
+                        maxLength={7}
                         defaultValue={formatTaxPercent(taxBps)}
-                        disabled={disabled}
+                        disabled={disabled || data?.role !== 'owner'}
                         required
                       />
                     </Field>
 
                     <div>
-                      <SubmitButton pendingLabel="Saving rate…" disabled={disabled} tone="solid">
+                      <SubmitButton pendingLabel="Saving rate…" disabled={disabled || data?.role !== 'owner'} tone="solid">
                         Save tax rate
                       </SubmitButton>
                     </div>

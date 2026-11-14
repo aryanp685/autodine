@@ -1,5 +1,7 @@
 # Phase 3 — hosted baseline preparation
 
+> **Historical work log:** sections below include pre-cutover statements about the pending staging RPC/migration reconciliation and production readiness. The 2026-11-12 [handoff report](docs/autodine-handoff-report-2026-11-12.md) records the later production rollout and deployment. Do not treat older “next step” paragraphs here as current instructions; no live project was queried by the current code audit.
+
 ## Status
 
 Phase 2 PR174 merged as 7147415052562aff971a236e79bf119977057271.
@@ -8,10 +10,13 @@ That commit explicitly disabled automatic Vercel Git deployments for `main` in
 `vercel.json` as a temporary hold pending the coordinated schema/app cutover.
 PR #176 later merged at `0f2199c` on 2026-11-12, but provider events showed no
 production deployment at merge time; the production deployment was manually
-created afterwards. This continuation removes the repo-level disable map so
-future merges can deploy normally. This is point-in-time evidence, not
-perpetual deployment protection. The hosted migrations performed later are
-recorded in the hand-off report and production migration ledger.
+created afterwards. PR #178 removed the repo-level disable map. Vercel then created production
+deployment `dpl_VgBU9J9TRH2FMhZJbx29FDKQbRdL` from Git commit
+`ff8ceae0e459cdee638cdadba7475a38b104915e` on `main`; it reached READY and
+PROMOTED. This confirms Git-triggered production deployment is restored. This
+is point-in-time evidence, not perpetual deployment protection. The hosted
+migrations performed later are recorded in the hand-off report and production
+migration ledger.
 
 ## First bounded tool
 

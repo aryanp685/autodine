@@ -91,7 +91,7 @@ function writeFailure(context: string, error: { code?: string; message: string }
     fail('That web address is already used by another restaurant. Try a different one.');
   }
   if (error.code === '42501') {
-    fail('The database refused this change for your account. Only the owner or a manager can make it.');
+    fail('The database refused this change for your account. Check your role; billing and tax settings are owner-only.');
   }
   if (error.code === '42703' || error.code === 'PGRST204') {
     // The column this screen writes does not exist yet: migration
@@ -110,31 +110,39 @@ function writeFailure(context: string, error: { code?: string; message: string }
 }
 
 export async function saveDetailsAction(formData: FormData): Promise<void> {
-  const { supabase, restaurantId } = await requireEditor();
+  const { supabase, restaurantId, role } = await requireEditor();
+
+  // Read the existing GSTIN before validating the form: that field is disabled
+  // for managers in the UI and therefore absent from their normal POST. It is
+  // never accepted from a manager as a billing-configuration change.
+  const { data: current, error: readError } = await supabase
+    .from('restaurants')
+    .select('slug, gstin')
+    .eq('id', restaurantId)
+    .maybeSingle();
+
+  if (readError) writeFailure('reading the current restaurant', readError);
+  if (!current) fail('This account has no restaurant to save to.');
+
+  const postedGstin = formData.get('gstin');
+  if (
+    role !== 'owner' &&
+    typeof postedGstin === 'string' &&
+    postedGstin.trim().toUpperCase() !== (current.gstin ?? '')
+  ) {
+    fail('Only the owner can change billing or tax configuration.');
+  }
 
   const parsed = validateDetails({
     name: formData.get('name'),
     tagline: formData.get('tagline'),
     address: formData.get('address'),
     phone: formData.get('phone'),
-    gstin: formData.get('gstin'),
+    gstin: postedGstin ?? current.gstin ?? '',
     slug: formData.get('slug'),
   });
 
   if (!parsed.ok) fail(parsed.message);
-
-  // Read the current address before deciding whether the slug is part of this
-  // write. Sending an unchanged slug back would be harmless but would also
-  // re-run the unique constraint on every save, and an owner renaming their
-  // restaurant does not want "address taken" about their own address.
-  const { data: current, error: readError } = await supabase
-    .from('restaurants')
-    .select('slug')
-    .eq('id', restaurantId)
-    .maybeSingle();
-
-  if (readError) writeFailure('reading the current restaurant', readError);
-  if (!current) fail('This account has no restaurant to save to.');
 
   const slugChanged = parsed.value.slug !== current.slug;
   if (slugChanged && formData.get('slugConfirm') !== 'on') {
@@ -163,7 +171,7 @@ export async function saveDetailsAction(formData: FormData): Promise<void> {
     tagline: parsed.value.tagline,
     address: parsed.value.address,
     phone: parsed.value.phone,
-    gstin: parsed.value.gstin,
+    gstin: role === 'owner' ? parsed.value.gstin : current.gstin,
     ...(slugChanged ? { slug: parsed.value.slug } : {}),
   };
 
@@ -242,7 +250,8 @@ export async function saveGuestVerificationAction(formData: FormData): Promise<v
 }
 
 export async function saveTaxAction(formData: FormData): Promise<void> {
-  const { supabase, restaurantId } = await requireEditor();
+  const { supabase, restaurantId, role } = await requireEditor();
+  if (role !== 'owner') fail('Only the owner can change billing or tax configuration.');
 
   const parsed = parseTaxPercent(formData.get('taxRate'));
   if (!parsed.ok) fail(parsed.message);

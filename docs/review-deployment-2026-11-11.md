@@ -1,5 +1,7 @@
 # Interim review deployment — 2026-11-11
 
+> **Historical snapshot.** This document describes an earlier branch preview and its access setup, not the current branch or launch state. Embedded share credentials and a test password have been redacted; they remain in Git history and should be revoked/rotated outside the repository if still active. Use the 2026-11-12 [handoff report](autodine-handoff-report-2026-11-12.md) for later status. Do not reuse this preview access path.
+
 A hosted, isolated review build of everything completed so far, so the whole
 product can be exercised by hand in a browser before anything goes near
 production.
@@ -20,7 +22,7 @@ assigned, built from branch HEAD `425279e`.
 > shows a Vercel login page rather than the app. This share link bypasses it
 > without changing any project setting:
 >
-> **`https://new-git-arena-a5344572-autodine-iamjarvis9896-3988s-projects.vercel.app?_vercel_share=RbkpxAfZ3c77C7RqytXVzZczITNwO1is`**
+> **`https://new-git-arena-a5344572-autodine-iamjarvis9896-3988s-projects.vercel.app?_vercel_share=[REDACTED—revoke/regenerate]`**
 >
 > If that ever stops working, regenerate it from the Vercel dashboard
 > (`iamjarvis9896-3988s-projects` → project **new** → the deployment →
@@ -30,7 +32,7 @@ assigned, built from branch HEAD `425279e`.
 
 ### Sign in as any of four staff roles
 
-All four share the password `Review2026!`.
+All four share the password `[REDACTED—rotate if active]`.
 
 | Role | Email | Can do |
 |---|---|---|

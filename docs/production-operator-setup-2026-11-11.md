@@ -1,12 +1,10 @@
 # Production operator setup — 2026-11-11
 
-Two things have to be done by hand in the Supabase and provider dashboards. The
-Supabase connector exposes no backup tool and no SMTP tool, so neither can be
-done from here.
+> **Status updated 2026-11-12 from the hand-off report.** This checklist predates the reported production rollout and must not be used to rerun migrations. A local production-dump restore rehearsal is recorded as complete; production backup/PITR settings remain unverified. SMTP/email delivery and its rate limit remain pending. The hand-off report is the latest recorded source; this branch did not re-query production.
 
-**Nothing in this document has been done yet.** Both items are prerequisites or
-companions to the rollout in
-[production-migration-plan-2026-11-11.md](production-migration-plan-2026-11-11.md).
+The remaining operator setup items require Supabase/provider dashboards. Do not
+put SMTP credentials in chat or configure delivery until explicitly requested.
+The migration plan and deployment rows below are historical, not pending actions.
 
 Target project: **`autodine-production`**, ref `bdbaqpevwmgdvghszjno`, live at
 `https://new-alpha-five-43.vercel.app`.
@@ -66,7 +64,7 @@ contents:
       can look at
 - [ ] Daily backups and PITR status noted above
 
-I will not apply migrations to production until the dump is confirmed.
+This was the safeguard for the pre-rollout checklist. The later 2026-11-12 hand-off records the rollout as complete; any future production mutation still requires a current backup/recovery check and separate approval.
 
 ---
 
@@ -129,10 +127,10 @@ change it.
 
 ## Summary
 
-| Item | Who | Status |
+| Item | Owner | Latest recorded status |
 |---|---|---|
-| A — dump via `PRODUCTION-BACKUP-RUNBOOK.md` | you | **not started** |
-| B — SMTP + rate limit | you | **not started** |
-| Batch A (27 migrations) | me, after A is confirmed | **not started** |
-| Deploy application | me, after Batch A | **not started** |
-| Batch B (`restaurants_member_only`) | me, after deploy | **not started** |
+| A — production dump / isolated local restore | operator | **Local dump and restore rehearsal recorded complete; current provider backup/PITR settings still unverified** |
+| B — SMTP + email rate limit | operator | **Pending by instruction** |
+| Batch A (27 migrations) | engineering | **Reported complete in 2026-11-12 hand-off; do not rerun from this checklist** |
+| Deploy application | engineering | **Reported complete in 2026-11-12 hand-off; do not redeploy from this checklist** |
+| Batch B (`restaurants_member_only`) | engineering | **Reported complete in 2026-11-12 hand-off; do not rerun from this checklist** |

@@ -66,7 +66,7 @@ npm run e2e:local     # isolated Playwright run
 |---|---|---|---|
 | **Production** | `autodine-production` | `bdbaqpevwmgdvghszjno` | `https://new-alpha-five-43.vercel.app` |
 | **Staging / test** | `autodinetest` | `juwyhslzchjevqkdvwjm` | (review deployments) |
-| **Review app** | branch preview | uses staging | `https://new-git-arena-a5344572-autodine-iamjarvis9896-3988s-projects.vercel.app?_vercel_share=RbkpxAfZ3c77C7RqytXVzZczITNwO1is` |
+| **Review app** | branch preview | uses staging | `https://new-git-arena-a5344572-autodine-iamjarvis9896-3988s-projects.vercel.app?_vercel_share=[REDACTED—revoke/regenerate]` |
 
 Review logins (staging DB, all working — verified with `hasSession: true`):
 
@@ -75,7 +75,7 @@ owner@autodine-review.test
 manager@autodine-review.test
 kitchen@autodine-review.test
 cashier@autodine-review.test
-password: Review2026!
+password: [REDACTED—rotate if active]
 ```
 
 > The Vercel preview is behind deployment protection. The `_vercel_share` token is the only
@@ -85,23 +85,23 @@ password: Review2026!
 
 ## 4. Branch, merge and deployment state
 
-- The hand-off's former PR #176 is **merged** into `main` at `0f2199c90f356c6bb1b4e7c4f885bd4e1350842b` (2026-11-12 13:23 UTC).
-- Production Vercel deployment `52Ck1JvNHo2CBoHgGE9a8EHYk45c` is READY and promoted, from the merged `main` commit. It was created at 13:36 UTC as a **manual deployment**, not automatically on merge.
-- Current working branch for this continuation: `arena/cd4d9ad9-autodine`, based on that commit. Open PR #177 is a separate in-flight change; avoid duplicating its work when preparing any follow-up.
+- PR #176 is merged into `main` at `0f2199c90f356c6bb1b4e7c4f885bd4e1350842b` (2026-11-12 13:23 UTC). PR #178, which removed the temporary Vercel Git deployment hold and added the expiry scheduler migration, merged at `ff8ceae0e459cdee638cdadba7475a38b104915e` (2026-11-12 17:04 UTC).
+- The first deployment after PR #176 (`52Ck1JvNHo2CBoHgGE9a8EHYk45c`) was manual. **After PR #178 merged, Vercel created a Git-sourced production deployment from `main` commit `ff8ceae0e459cdee638cdadba7475a38b104915e`; deployment `dpl_VgBU9J9TRH2FMhZJbx29FDKQbRdL` reached READY and PROMOTED. This verifies automatic deploy restoration.**
+- Current working branch: `arena/01715497-autodine`, based on the PR #178 merge commit. PR #177 remains a separate in-flight change; avoid duplicating its work in follow-ups.
 
 ### Root cause: main auto-deploy was explicitly disabled
 
 `vercel.json` in the merged baseline explicitly sets `git.deploymentEnabled.main` to `false` (and also disables the old Arena branch). This was introduced by commit `471d0dd` as a temporary deployment hold while coordinating the database/app cutover. Vercel provider events show no deployment at the PR #176 merge time; production did not change until the manual deployment above. The preview deployment seen during that period belonged to `arena/a5344572-autodine`, not `main`.
 
-This branch removes the `git.deploymentEnabled` override while preserving the existing `bom1` region. That restores the normal Vercel Git integration behavior once this change reaches the configured production branch; it does not itself deploy or change Vercel project settings.
+PR #178 removed the `git.deploymentEnabled` override while preserving the existing `bom1` region. The merge triggered the Git-sourced production deployment recorded above, confirming that the hold is gone.
 
-**Isolation follow-up completed:** Vercel project-wide `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` for Preview/Development were updated, with user approval, to the existing staging project (`juwyhslzchjevqkdvwjm`). Read-only verification confirmed both values. Production-scoped variables and secrets were not changed. The open PR #177's branch-specific Preview URL/key were also checked and point to staging. Existing deployments are immutable; subsequent Preview/Development deployments will pick up the corrected environment. Follow `docs/preview-isolation.md` for all later env changes.
+**Preview/Development Supabase configuration updated:** with user approval, the project-wide Supabase URL and publishable key point to staging (`juwyhslzchjevqkdvwjm`). Preview/Development server-secret entries were updated, but Vercel masks their values and the supplied legacy JWT was not independently verified as the staging secret; do not treat secret isolation as verified. Production-scoped values were not changed. The open PR #177's branch-specific Preview URL/key were previously verified as staging. Vercel deployments are immutable: old Preview deployments keep their build-time configuration. With the user's explicit approval, 74 older Preview deployments have been retired so far; cleanup remains in progress from cursor `1794201761554`. Preserve latest READY deployment `dpl_4BhoXbt82NzQzW3txc21rbYrG2VQ`. Do not use remaining pre-change previews; follow `docs/preview-isolation.md` before sharing them.
 
 ## 5. Current measured state (updated 2026-11-12)
 
 ### 5.1 Production release and 21-day trials
 
-The production schema rollout (Batch A plus the final member-only migration) is complete, and `/api/health` had reported `ok:true` after the rollout. PR #176 then merged. The current Vercel production deployment is from that merged commit, but its automatic deployment was blocked by the explicit `main: false` setting described in §4 and it was manually promoted later.
+The production schema rollout (Batch A plus the final member-only migration) is complete, and `/api/health` had reported `ok:true` after the rollout. PR #176 then merged; because the Vercel hold was still present, its deployment was manual. PR #178 removed the hold, and the subsequent Git-triggered deployment from `main` is READY and promoted as recorded in §4.
 
 Production subscription state was rechecked after the merge. **All four existing restaurants already have active, write-enabled 21-day trials**, so the requested `admin_set_subscription` calls were correctly not repeated:
 
@@ -142,7 +142,7 @@ Real delivery, staff invitation redemption, and raising the GoTrue send rate rem
 
 ### 5.6 Test results and verification boundary
 
-Local checks for this continuation passed: `npm run typecheck`, `npm run lint`, `npm run design:check`, `npm run sql:check`, `npm test -- --reporter=dot` (2,095 passed, 114 skipped across 181 files), `npm run db:reconcile -- converge` (clean replay, classifier self-test 0 wrong verdicts, populated rows preserved), and `npm run test:db:embedded` (114 passed on disposable PostgreSQL). These are local checks, not hosted browser/runtime acceptance.
+Latest branch-local checks (2026-11-12) passed: `npm run typecheck`, `npm run lint`, `npm run design:check`, and `npm run sql:check` (DDL syntax only; not function/RLS validation); full `npm test` (2,096 passed; 115 database-gated tests skipped without a DB URL); `npm run test:db:embedded` (115 passed after replaying all 73 migrations against disposable PostgreSQL); and `npm run e2e:local` (production build succeeded; 64 browser tests passed, 49 real-stack integration tests skipped because no disposable Supabase E2E stack was configured). `npm audit` reported 0 vulnerabilities. These prove local code/build behavior only, not hosted auth, SMTP, Realtime, backup/restore, monitoring delivery, physical devices, production schema parity, or capacity. The current code audit did not query or change production.
 
 ## 6. Post-merge production follow-ups
 
@@ -160,7 +160,7 @@ This branch adds `supabase/migrations/20261112000100_schedule_subscription_expir
 
 ### 6.3 Vercel deployment fix
 
-This branch removes the explicit Vercel Git deployment disable map. It addresses the observed cause of the missed deployment on `main`; the fix takes effect after it is merged to `main`. It does not issue a deployment or alter project dashboard settings.
+PR #178 removed the explicit Vercel Git deployment disable map. After merge, Vercel automatically created production deployment `dpl_VgBU9J9TRH2FMhZJbx29FDKQbRdL` from `main` at `ff8ceae0e459cdee638cdadba7475a38b104915e`; it reached READY/PROMOTED. This is observed evidence that the Git integration is restored.
 
 ### 6.4 Legacy migration-history reconciliation
 
@@ -216,23 +216,23 @@ The historical audit (`AUDIT-REPORT.md`, 2026-11-06) catalogued C1–C4 (custome
 | O2 / O3 | Duplicate codes on boards; old order re-stamped on collision | **Fixed** by the same unique index as C3. |
 | O4 | Sample tax label on bill screens | **Fixed.** Stored tax figures and the order's rate snapshot are shown. |
 | O5 | Unused-import lint warning; `T${Date.now()}` table label past 999 | **Fixed.** |
-| S1 | `lib/pricing.ts` header said "SAMPLE ONLY" while the code was live | **Partially open.** The header is corrected, but the tax model intentionally supports **one exclusive rate and intra-state CGST/SGST only**. It does not implement IGST, inclusive pricing, per-item rates or GSTIN-conditional documents. |
+| S1 | Generic configured tax is presented in some cart/bill/report surfaces with GST wording and an equal CGST/SGST split | **Open, requires explicit tax/presentation decision.** GST tax invoices remain fail-closed, but guest cart/bill/report UI still uses GST/CGST/SGST labels and `lib/bill.ts` splits stored tax equally. This is not evidence of approved GST treatment; no per-item rates, inclusive pricing or place-of-supply rules exist. Current instructions say preserve existing bill behavior, so this audit did not change those labels/splits. Decide whether to neutralize display-only labels while preserving amounts, or wait for adviser-approved rules. |
 | S2 | Announcement status lived in memory | **Fixed** (persisted claim table). |
 | S3 | No invoice numbering anywhere | **Fixed.** Per-restaurant, per-financial-year numbered series (India FY: 1 Apr – 31 Mar), row-locked and transactional, never reused. |
 
 ### Open defects and open questions
 
-1. **Quantity contract mismatch (open, needs a product decision — do not "fix" silently).**
-   `20261021000005_public_place_order.sql` documents quantities as bounded 1–99, but the
-   implementation **caps** values above 99 at 99. Capping may be intentional. Confirm
-   whether over-limit quantities should be capped or rejected.
+1. **Quantity contract mismatch — owner decision pending.** Current behavior caps quantities above 99 at 99, while the SQL comment describes a 1–99 bound. No behavior change is included in this audit. Preserve the existing contract until the owner decides whether to reject or cap.
 2. **GST is frozen on purpose.** No legal/adviser approval exists. The receipt function is
    deliberately fail-closed for GST documents and issues a clearly-labelled non-GST receipt
    only. **Do not invent rates, defaults, classifications, inclusive/exclusive treatment,
    exemptions or place-of-supply rules.**
-3. **Test-database clock is future-dated** relative to the authoritative date. Must be
-   resolved before trusting any expiry, retention, timestamp, trial or subscription
-   boundary test.
+3. **Staging database clock recheck (2026-11-12 17:31 UTC):** a read-only query returned
+   `UTC`, database time `2026-11-12 17:31:25.899084`, and PostgreSQL start time
+   `2026-11-11 13:50:18.691224`, matching the authoritative date at this recheck. The
+   older 2026-11-08 future-clock anomaly is not currently reproduced. Do not rewrite the
+   historical audit entries; recheck the database clock before relying on future time-bound
+   tests.
 4. **Isolated PostgreSQL/browser job failed once** (`1cef125`) and passed on rerun. The
    failure cause was never retrieved. Do not discard this evidence.
 
@@ -311,28 +311,30 @@ These come from `AGENTS.md` and are locked. Read that file before changing code.
 
 ## 12. Recommended changes, in priority order
 
-1. **Restore Vercel Git auto-deploys.** Merge this branch's `vercel.json` fix and confirm a later merge to `main` creates the expected production deployment. Do not treat a manual deploy as proof of the Git integration.
+1. **Finish retiring pre-isolation Preview deployments.** 74 older Preview deployments have been deleted with explicit user approval; more remain. Continue exact-ID pagination from cursor `1794201761554`, preserve the latest READY deployment, and never delete Production deployments.
 2. **Reconcile 49 production-only schema-migration versions.** Exact classify results are not available yet due connector output caps. Capture the probe in bounded chunks or use another authorized read-only path; do not edit migration history or rerun schema migrations based only on ledger names.
 3. **Configure SMTP and raise the email send rate limit** — separate settings. Exercise reset and invite flows on staging first. Do not disable `mailer_autoconfirm` without an explicit product decision.
 4. **Complete the real hosted integration pass** on an approved non-production project: QR → menu → order → kitchen → cashier/close → receipt, two-tenant isolation, retry/network failure, mobile and desktop.
 5. **Wire `/api/health` to monitoring and alerting.**
-6. **Settle the quantity 1–99 contract** (cap vs reject) and resolve the test database clock discrepancy before trusting time-bound tests.
+6. **Quantity contract:** owner decision remains pending (reject >99 vs cap at 99). Preserve current behavior until that decision is recorded. The staging database clock matched UTC at the 2026-11-12 17:31 recheck; verify again before future time-bound tests.
 7. **Obtain GST adviser sign-off** before enabling GST-dependent invoices or changing the locked tax behavior.
 8. **Run a capacity pass** sized for the actual pilot before broad launch.
 
-Completed this continuation: changed and verified Preview/Development Supabase targets to staging; applied and verified the guarded subscription-expiry scheduler migration on production after local checks and user approval; all four restaurant trials were already active and were not rewritten.
+Completed across this continuation: Preview/Development Supabase URL, publishable key, and server secret were set to staging (Production envs untouched); PR #178 restored and verified Git-triggered production deployment; the guarded subscription-expiry migration was applied and verified; all four restaurant trials were already active and were not rewritten.
 
 ## 13. Remaining work and operator decisions
 
 | Item | Who | Status / why |
 |---|---|---|
 | Production expiry scheduler | Agent | **Complete.** User approved; guarded migration `20261112000100` was applied and the active 15-minute cron job was verified. |
-| Confirm Vercel Git deployment restoration | Operator | Merge the config fix, then observe a subsequent `main` deployment; no deploy is triggered by this branch itself. |
+| Vercel Git deployment restoration | Agent | **Complete.** PR #178 merged; subsequent Git-sourced `main` deployment `dpl_VgBU9J9TRH2FMhZJbx29FDKQbRdL` reached READY/PROMOTED. |
 | Reconcile 49 production-only migration versions | Agent + operator | Need complete read-only catalog probe and classification; do not use ledger names as proof. |
-| Preview/Development Supabase configuration | Agent | **Complete.** Project-level URL and publishable key now target staging; Production variables and secrets unchanged. |
+| Preview/Development Supabase configuration | Agent | URL and publishable key target staging; secret entries were updated but exact staging secret is unverified because values are masked. Production entries unchanged. 74 older Preview deployments retired; more remain, with cursor `1794201761554`. |
+| Staging database clock | Agent | **Rechecked** at 2026-11-12 17:31 UTC; database UTC date matched the authoritative date. Recheck before future time-bound tests. |
 | Configure SMTP and raise email rate limit | Operator | Supabase dashboard configuration; connector exposes no SMTP setting. |
 | Approve GST rules | Adviser | Legal/financial approval. |
-| Decide cap-vs-reject for quantities > 99 | Product owner | Behavioral contract decision. |
+| Quantity >99 behavior | Owner | **Decision pending (reject or cap); current behavior is preserved.** |
+| Tax-rate/GSTIN edit permissions | Owner | **Owner-only behavior approved.** The branch adds UI/server-action enforcement; the database guard migration is applied and catalog-verified on staging. It has not been applied to production, and production code is unchanged until the approved release.
 
 ## 14. Pitfalls learned the hard way
 

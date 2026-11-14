@@ -1,17 +1,21 @@
 # Production migration plan — 2026-11-11
 
-Production (`autodine-production`, ref `bdbaqpevwmgdvghszjno`, live at
-`https://new-alpha-five-43.vercel.app`) is running a database that is
-**28 migrations behind** this repository. This document is the plan to close
-that gap.
+> **Historical plan, superseded:** the 2026-11-12 hand-off report records that the production rollout and application merge were subsequently completed. This plan was written before that work and is not an active execution checklist or authorization. Production was not re-queried in the current code audit; use the latest dated hand-off for recorded evidence and re-verify live state before any new production action.
 
-It is a **plan, not an execution record.** Nothing in this file has been applied
-to production. Applying it needs explicit approval, because
-`AGENTS.md` requires approval before consequential production database changes.
+At the time this plan was written, production (`autodine-production`, ref
+`bdbaqpevwmgdvghszjno`) was measured as **28 migrations behind** this repository.
+That was the gap this plan was designed to close.
+
+At the 2026-11-11 snapshot, this was a **plan, not an execution record**. The
+2026-11-12 hand-off report records subsequent rollout completion. Applying any
+new production database change still requires explicit approval under
+`AGENTS.md`.
 
 ---
 
-## 1. Current state (measured, not assumed)
+## 1. State at the 2026-11-11 snapshot (measured then, not current)
+
+All values in this table are historical measurements from 2026-11-11; later production changes are recorded in the 2026-11-12 hand-off report.
 
 | | Staging (`autodinetest`) | Production |
 |---|---|---|
@@ -60,10 +64,10 @@ true figure: **28**.
 > every menu as "not found" after this migration. Apply 20261110000500 first,
 > deploy the application, then apply this file.*
 
-Production currently serves an **older** application. Applying this file before
-deploying new code would take every guest menu offline.
-
-That single constraint is why this is a three-step rollout and not one batch.
+At the 2026-11-11 snapshot, production served an **older** application. Applying
+this file before deploying the newer storefront reader would have taken every
+guest menu offline. That constraint dictated the historical three-step rollout;
+the hand-off report records its later completion.
 
 ---
 
@@ -159,22 +163,25 @@ npm run db:reconcile
 
 ---
 
-## 5. Prerequisite that is not in this plan
+## 5. Historical pre-rollout prerequisite
 
-**There is no confirmed backup or PITR on production.** The readiness audit
-records the production dashboard showing "No backups", and no restore has been
-proven on a hosted target. Steps 1 and 3 change grants and function bodies in
-ways that cannot be undone by a later forward migration.
+At the 2026-11-11 snapshot, there was no confirmed production backup/PITR or
+hosted restore evidence. The 2026-11-12 hand-off later records an isolated local
+restore rehearsal but still marks current production backup/PITR settings as
+unverified. Steps 1 and 3 change grants and function bodies in ways that cannot
+be undone by a later forward migration.
 
-Do not start step 1 until one of these is true:
-
-- provider PITR is enabled and a restore has been successfully rehearsed into a
-  throwaway target, or
-- a fresh `pg_dump` of production has been taken and its integrity checked.
+Before any future consequential production database change, acceptable
+recovery evidence must include either provider PITR successfully rehearsed into
+a separate throwaway target, or a fresh production `pg_dump` whose integrity
+has been checked. Do not rely on the old dashboard screenshot or this historical
+plan.
 
 ---
 
-## 6. Status
+## 6. Status (snapshot from 2026-11-11; superseded)
+
+The table below records the state when this plan was drafted. It is retained as history only; the 2026-11-12 hand-off report records the later production rollout as complete. Do not infer current live state from this table or rerun the batches.
 
 | Step | State |
 |---|---|
@@ -183,4 +190,4 @@ Do not start step 1 until one of these is true:
 | Step 2 (deploy application) | **not started — needs approval** |
 | Step 3 (Batch B, 1 migration) | **not started — needs approval** |
 
-No migration in this plan has been applied to production.
+At this plan's 2026-11-11 snapshot, none of these batches had been applied. The later 2026-11-12 hand-off records rollout completion; verify against current live state before relying on it.

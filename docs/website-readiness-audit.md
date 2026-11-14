@@ -1,11 +1,6 @@
 # AutoDine website readiness audit
 
-> **Read this first (2026-11-11).** This audit is dated 2026-10-28 and its
-> migration counts are a month out of date. Staging has since received the
-> bundled forward upgrade and is schema-complete; production has **not**, and is
-> **28 migrations behind** this repository, with `GET /api/health` returning
-> `ok: false`. For current measured state and the rollout sequence, see
-> [production-migration-plan-2026-11-11.md](production-migration-plan-2026-11-11.md).
+> **Historical snapshot, superseded (2026-11-12).** This audit's production claim—28 migrations behind with `/api/health` returning `ok: false`—describes the pre-rollout state from 2026-11-11 and is no longer the current recorded status. The 2026-11-12 [handoff report](autodine-handoff-report-2026-11-12.md) records the production rollout and application merge as complete. This branch did not re-query production; verify live state before taking action. The NO-GO launch assessment below remains relevant for unverified backup/restore, monitoring, real-device, hosted integration, and capacity gates.
 > The rest of this file is kept as the reasoning behind the readiness verdict.
 >
 > Three specific claims below are now known to be out of date, and are left as
@@ -51,28 +46,27 @@ On `autodinetest` only, migrations `20261021000005_public_place_order`, `2026102
 | Health, errors, security headers | Health output is allowlisted/redacted; production config fails closed without required Supabase settings; unit/build checks pass. | `/api/health` is not monitoring. Production response headers, cookie/origin behavior and external scanning were not verified. |
 | GST and tax display | Existing configured-rate behavior is preserved under locked Option A. | No legal approval is claimed. Do not change tax behavior or add rates/classifications without written adviser approval. |
 
-## Immediate launch blockers
+## Outstanding launch gates (latest recorded status, not live-rechecked)
+
+The following list is reconciled against the 2026-11-12 hand-off, rather than the older snapshot below. Production migrations and application deployment are recorded as complete; do not rerun the historical schema-gap plan. Live provider state has not been re-queried during this code audit.
 
 1. **Restore readiness:** the production dashboard screenshot showed “No backups.” Establish provider backup/PITR, retention, and a successful restore plan/drill before real orders. No production setting was changed.
-2. **Close the production schema gap (updated 2026-11-11).** This was written
-   when `autodinetest` held 3 of 45 migrations. Staging is now schema-complete
-   via the bundled forward upgrade (`arena_staging_forward_upgrade_55`), so this
-   blocker has moved: the gap is now **production**, which is missing 28
-   repository migrations and reports `ok: false` on `/api/health`. The ordered
-   three-step plan, its per-migration risk notes and its one hard ordering
-   constraint are in
-   [production-migration-plan-2026-11-11.md](production-migration-plan-2026-11-11.md).
-   Applying it needs explicit approval and a confirmed backup; see §5 there.
-3. **Resolve/test clock behavior:** the test database clock is future-dated relative to the authoritative date. Establish whether this is a provider/environment clock discrepancy before testing expiry, retention, timestamps, or trial/subscription boundaries.
+2. **Reconcile the production migration ledger (read-only).** The 2026-11-12 hand-off records production rollout complete, but 49 production-only migration versions still need exact catalog classification. Do not edit the ledger or rerun migrations based on version names alone; use bounded, read-only catalog probes and resolve each version before action.
+3. **SMTP and email rate limit:** configure through the provider dashboard and test invite/password-reset flows on staging. The hand-off says this remains pending; do not disable `mailer_autoconfirm` absent explicit approval.
 4. **Run real app integration:** exercise QR → menu → order → kitchen → cashier/session close → receipt with synthetic data in the test environment; include auth roles, two-tenant isolation, retry/network failure, cleanup counts, and mobile/desktop browsers.
-5. **Investigate the hosted workflow failure:** the isolated PostgreSQL/browser job failed once on `1cef125` and passed when rerun. Retrieve/inspect its artifact when possible and retain the failure cause; do not silently discard this evidence.
-6. **Capacity and operations:** run a workload sized for the actual pilot and a planned 1×/2×/soak test before broad launch; prove monitoring, alerts, rollback, incident handling, and backup restore. Current test results do not establish a supported production capacity.
-7. **Release gate:** production deployment/configuration is not authorized by this audit. Keep customer data/orders in production only after a separately approved release; never use production for tests.
+5. **Resolve and verify Preview/Development isolation.** Staging URL and publishable key were updated, but the server secret is masked and its staging value has not been independently verified. Finish retirement of older pre-isolation Preview deployments using the exact-ID process; preserve the latest READY deployment and never delete Production.
+6. **Hosted application acceptance:** complete synthetic QR → menu → order → kitchen → cashier/session close → receipt, two-tenant isolation, retry/network failure, and supported mobile/desktop flows on an approved non-production hosted project. Local E2E skipped 49 tests because no disposable Supabase E2E stack was configured.
+7. **Monitoring, operations and capacity:** wire health/realtime signals to an approved alert destination; verify alert receipt/acknowledgement, incident ownership, rollback procedure, recoverable backups and a hosted restore drill, real-device/printing acceptance, and capacity sized for the pilot. CI/local evidence does not satisfy these gates.
+8. **Release gate:** this code audit authorizes no new production mutation, deployment, merge, or release. Keep tests on isolated non-production systems.
 
-## Review-only finding awaiting product direction
+## Owner-controlled billing settings — approved in this review
 
-`20261021000005_public_place_order.sql` describes quantities as bounded from 1 to 99, while the implementation caps values over 99 at 99. That may be intentional; it may also be a contract mismatch. **No change has been made.** Confirm whether over-limit quantities should be capped or rejected before any code change.
+Only the restaurant owner may change the tax rate or GSTIN. This branch implements that rule in the settings UI, server actions, and a database guard so direct authenticated database writes cannot bypass it. The guard migration was applied and catalog-verified on staging. It does not change existing order snapshots, tax math, or GST invoice availability. The production migration and app have not been deployed; production behavior remains unchanged until a separately approved release.
+
+## Quantity contract — owner decision pending
+
+The current behavior caps a requested quantity above 99 at 99, while the SQL description says quantities are bounded from 1 to 99. No choice between rejecting and capping has been implemented as part of this audit; the owner will decide. Until that decision is recorded, preserve existing behavior and do not silently change the client/server/database contract.
 
 ## Final assessment
 
-The website is a credible pre-production foundation, not a verified “everything works” commercial service. Local automated checks and selected disposable-PostgreSQL flows pass, but authentication, full hosted app integration, Realtime, operational recovery, and capacity evidence are incomplete. The broad launch decision remains **NO-GO**. A one-restaurant pilot is conditional on passing the gates above, with an on-site owner and a manual fallback for orders. See [production-saas-readiness-audit.md](production-saas-readiness-audit.md) for architecture, tenant/security, capacity assumptions, detailed evidence, cost model, and the complete prioritized go-live checklist.
+The website is a credible pre-production foundation, not a verified “everything works” commercial service. Local automated checks and selected disposable-PostgreSQL flows pass, but full hosted authentication/role acceptance, app integration, Realtime, operational recovery, and capacity evidence are incomplete. The broad launch decision remains **NO-GO**. A one-restaurant pilot is conditional on passing the gates above, with an on-site owner and a manual fallback for orders. See [production-saas-readiness-audit.md](production-saas-readiness-audit.md) for architecture, tenant/security, capacity assumptions, detailed evidence, cost model, and the complete prioritized go-live checklist.

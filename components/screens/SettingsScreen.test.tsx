@@ -96,6 +96,17 @@ describe('SettingsScreen', () => {
     expect(html).toContain('Tax is 0%');
   });
 
+  it('keeps billing settings owner-only while managers can edit ordinary details', () => {
+    const html = renderToStaticMarkup(<SettingsScreen data={data({ role: 'manager' })} />);
+    const gstinInput = html.match(/<input[^>]*id="settings-gstin"[^>]*>/)?.[0] ?? '';
+    const taxInput = html.match(/<input[^>]*id="settings-tax"[^>]*>/)?.[0] ?? '';
+    const addressInput = html.match(/<input[^>]*name="address"[^>]*>/)?.[0] ?? '';
+
+    expect(gstinInput).toMatch(/\sdisabled(?:\s|=|\/?>)/);
+    expect(taxInput).toMatch(/\sdisabled(?:\s|=|\/?>)/);
+    expect(addressInput).not.toMatch(/\sdisabled(?:\s|=|\/?>)/);
+  });
+
   it('disables every control for a role that cannot write', () => {
     const html = renderToStaticMarkup(
       <SettingsScreen data={data({ role: 'cashier', canEdit: false })} />
