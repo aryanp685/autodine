@@ -5,24 +5,33 @@
  * file with a filename, and `Content-Disposition` is not something a rendered
  * page can set.
  *
- * The export re-runs the same loader the screen uses, from the same URL
- * params, rather than trusting a payload echoed back from the client. That
- * means the file and the screen can never disagree, and there is no path by
- * which a caller can ask for another restaurant's ledger -- the restaurant id
- * comes from the caller's session inside getStaffContextDetailed, never from
- * the query string.
+ * The caller's selected outlet and actual role come only from the trusted staff
+ * context helper. Export access is checked here before the report RPC, and the
+ * `report_sales()` database function independently enforces the same boundary.
  */
 
 import { NextResponse } from 'next/server';
-import { getReportsScreenData, itemsCsv, ordersCsv, summaryCsv } from '@/lib/db/reports';
+import { getStaffContextDetailed, type StaffContextResult } from '@/lib/db/staff';
+import {
+  getReportsScreenDataForStaff,
+  itemsCsv,
+  ordersCsv,
+  summaryCsv,
+  type ReportsScreenData,
+} from '@/lib/db/reports';
 import { localDateKey } from '@/lib/db/time';
 
 export const dynamic = 'force-dynamic';
 
+const NO_STORE = { 'Cache-Control': 'no-store, max-age=0' };
 type ExportType = 'summary' | 'orders' | 'items';
 
 function isExportType(value: string | null): value is ExportType {
   return value === 'summary' || value === 'orders' || value === 'items';
+}
+
+function jsonError(error: string, status: number) {
+  return NextResponse.json({ error }, { status, headers: NO_STORE });
 }
 
 /** RFC 4180-ish filename that survives Windows, macOS and the browser. */
@@ -32,25 +41,42 @@ function filename(type: ExportType, fromIso: string, timeZone: string): string {
 }
 
 export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const type = url.searchParams.get('type');
-  const range = url.searchParams.get('range') ?? 'today';
-  const from = url.searchParams.get('from') ?? undefined;
-  const to = url.searchParams.get('to') ?? undefined;
-
-  if (!isExportType(type)) {
-    return NextResponse.json(
-      { error: 'type must be summary, orders or items' },
-      { status: 400 },
-    );
+  let staff: StaffContextResult;
+  try {
+    staff = await getStaffContextDetailed();
+  } catch (error) {
+    console.error('[reports-export] request failed', error instanceof Error ? error.name : 'Error');
+    return jsonError('The report could not be exported. Please try again.', 503);
   }
 
-  let data;
+  if (!staff.ok) {
+    if (staff.reason === 'unconfigured') {
+      return jsonError('The database is not configured, so there is nothing to export.', 503);
+    }
+    if (staff.reason === 'signed-out') {
+      return jsonError('Sign in to export a report.', 401);
+    }
+    return jsonError('You do not have access to a restaurant report.', 403);
+  }
+
+  // This uses the actual membership role for the selected, membership-verified
+  // outlet. A caller's query string or stale outlet cookie grants no authority.
+  if (staff.context.role !== 'owner' && staff.context.role !== 'manager') {
+    return jsonError('Owner or Manager permission is required to export reports.', 403);
+  }
+
+  const url = new URL(request.url);
+  const type = url.searchParams.get('type');
+  if (!isExportType(type)) {
+    return jsonError('type must be summary, orders or items', 400);
+  }
+
+  let data: ReportsScreenData;
   try {
-    data = await getReportsScreenData({
-      range,
-      from,
-      to,
+    data = await getReportsScreenDataForStaff(staff.context, {
+      range: url.searchParams.get('range') ?? 'today',
+      from: url.searchParams.get('from') ?? undefined,
+      to: url.searchParams.get('to') ?? undefined,
       // The line ledger only exists for the items export; asking for it on
       // every request would make a 30-day report twice as heavy for nothing.
       includeLines: type === 'items',
@@ -59,21 +85,7 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error('[reports-export] request failed', error instanceof Error ? error.name : 'Error');
-    return NextResponse.json({ error: 'The report could not be exported. Please try again.' }, { status: 503 });
-  }
-
-  if (!data) {
-    return NextResponse.json(
-      { error: 'The database is not configured, so there is nothing to export.' },
-      { status: 503 },
-    );
-  }
-
-  if (data.blocked) {
-    return NextResponse.json(
-      { error: 'Sign in to export a report.' },
-      { status: 401 },
-    );
+    return jsonError('The report could not be exported. Please try again.', 503);
   }
 
   const body =
@@ -88,7 +100,7 @@ export async function GET(request: Request) {
       'Content-Type': 'text/csv; charset=utf-8',
       'Content-Disposition': `attachment; filename="${filename(type, data.range.fromIso, data.timezone)}"`,
       // Takings are not public and must not sit in a shared cache.
-      'Cache-Control': 'no-store, max-age=0',
+      ...NO_STORE,
     },
   });
 }

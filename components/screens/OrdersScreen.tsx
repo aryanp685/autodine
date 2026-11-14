@@ -3,7 +3,8 @@ import type { OutletBar } from '@/lib/outlets';
 import { Money, PaymentPill, PrepPill } from '@/components/ui';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { AutoRefresh } from '@/components/owner/AutoRefresh';
-import { demoReport, resolveRange, type ReportOrderRow, type ReportsScreenData } from '@/lib/db/reports';
+import { demoReport, resolveRange } from '@/lib/db/reports';
+import type { OrderLedgerRow, OrdersLedgerScreenData } from '@/lib/db/orders-ledger';
 import { dateTimeInZone } from '@/lib/db/time';
 import {
   BtnLink,
@@ -26,11 +27,11 @@ import {
 /**
  * The order ledger.
  *
- * This is the "what actually happened" screen: every bill in the range, with
- * its kitchen state and whether it has been paid for. It is deliberately not
- * the kitchen board -- the board is a live ticket rail that staff work from,
- * ordered by what needs cooking next. This one is a history, newest first, and
- * nobody cooks from it.
+ * This is the "what actually happened" screen: every order in the range, with
+ * its kitchen state and a safe route to the bill. Finance details are rendered
+ * only for Owner/Manager data; Cashier rows deliberately contain no payment
+ * status or amount fields. It is not the kitchen board -- that is a live ticket
+ * rail ordered by what needs cooking next. This one is a history, newest first.
  *
  * Filtering happens here rather than in SQL because the window is one day (or
  * a chosen range) capped at a hundred bills. Pushing a substring search down
@@ -53,7 +54,7 @@ const RANGE_LINKS: Array<{ key: string; label: string }> = [
   { key: '30d', label: 'Last 30 days' },
 ];
 
-function isOpen(order: ReportOrderRow): boolean {
+function isOpen(order: OrderLedgerRow): boolean {
   return order.prepStatus === 'new' || order.prepStatus === 'preparing' || order.prepStatus === 'ready';
 }
 
@@ -67,7 +68,7 @@ function isOpen(order: ReportOrderRow): boolean {
  * other three filters stay mutually exclusive and skip cancelled bills, which
  * is why they are worth having.
  */
-function matches(order: ReportOrderRow, filter: OrderFilter, query: string): boolean {
+function matches(order: OrderLedgerRow, filter: OrderFilter, query: string): boolean {
   // The tab narrows first...
   if (filter === 'cancelled' && order.prepStatus !== 'cancelled') return false;
   if (filter !== 'all' && filter !== 'cancelled' && order.prepStatus === 'cancelled') return false;
@@ -118,7 +119,7 @@ export function OrdersScreen({
   customFrom,
   customTo,
 }: {
-  data?: ReportsScreenData | null;
+  data?: OrdersLedgerScreenData | null;
   /** Which outlet is open, for the switcher in the bar. */
   outlet?: OutletBar | null;
   filter?: OrderFilter;
@@ -129,26 +130,33 @@ export function OrdersScreen({
 }) {
   const live = Boolean(data);
   const blocked = data?.blocked;
+  const canViewFinance = data?.canViewFinance ?? true;
+  const canExport = data?.canExport === true;
   const timezone = data?.timezone ?? 'Asia/Kolkata';
   // A custom range stays itself. It used to be flattened to 'today', which lit
   // the wrong chip and made the custom form's Apply look like it had failed.
   const rangeKey = data?.range.key ?? 'today';
   const dates = { from: customFrom, to: customTo };
+  // A stale or hand-written `status=settled` link cannot make a restricted
+  // order list infer payment state it was never allowed to query.
+  const activeFilter = !canViewFinance && filter === 'settled' ? 'all' : filter;
 
   // Sample rows when nothing is configured, labelled as such below. The range
   // comes from resolveRange rather than from two identical instants: `from`
   // equal to `to` is an empty window, which is how the sample ledger ended up
   // promising rows and rendering none.
-  const orders: ReportOrderRow[] =
-    data?.report.orders ?? demoReport(resolveRange('7d', timezone), timezone).orders;
+  const orders: OrderLedgerRow[] =
+    data?.orders ?? demoReport(resolveRange('7d', timezone), timezone).orders;
 
-  const visible = orders.filter((order) => matches(order, filter, query.trim()));
+  const visible = orders.filter((order) => matches(order, activeFilter, query.trim()));
   const openCount = orders.filter(isOpen).length;
-  const unsettledCount = orders.filter((o) => o.prepStatus !== 'cancelled' && o.paymentStatus !== 'paid').length;
+  const unsettledCount = canViewFinance
+    ? orders.filter((o) => o.prepStatus !== 'cancelled' && o.paymentStatus !== 'paid').length
+    : 0;
   const cancelledCount = orders.filter((o) => o.prepStatus === 'cancelled').length;
-  const settledCount = orders.filter(
-    (o) => o.prepStatus !== 'cancelled' && o.paymentStatus === 'paid'
-  ).length;
+  const settledCount = canViewFinance
+    ? orders.filter((o) => o.prepStatus !== 'cancelled' && o.paymentStatus === 'paid').length
+    : 0;
   // Each chip says how many rows it would show, from the same array the table
   // is drawn from. A filter that turns out to be empty is then a fact about the
   // day rather than something you find out by clicking it.
@@ -158,7 +166,8 @@ export function OrdersScreen({
     settled: settledCount,
     cancelled: cancelledCount,
   };
-  const narrowed = filter !== 'all' || Boolean(query.trim());
+  const visibleFilters = canViewFinance ? FILTERS : FILTERS.filter((item) => item.key !== 'settled');
+  const narrowed = activeFilter !== 'all' || Boolean(query.trim());
 
   /**
    * A compact field at a chosen width.
@@ -192,7 +201,8 @@ export function OrdersScreen({
           <>
             {live && !blocked ? data?.range.label : 'Sample ledger · fictional orders'}
             {' · '}
-            {openCount} open · {unsettledCount} not settled
+            {openCount} open
+            {canViewFinance ? ` · ${unsettledCount} not settled` : ''}
             {cancelledCount > 0 ? ` · ${cancelledCount} cancelled` : ''}
           </>
         }
@@ -202,15 +212,16 @@ export function OrdersScreen({
               <BtnLink href="/kitchen" tone="ghost">
                 Kitchen board
               </BtnLink>
-              {/* A route handler that answers with a file, so an anchor with
-                  `download` rather than <Link>: client-side navigation has no
-                  RSC payload to fetch here. */}
-              {/* Ghost, not solid. Exporting is something you do *about* the
-                  ledger, not the thing the screen is for; a solid button here
-                  outranked every row on the page. */}
-              <a className={btn('ghost')} href={exportHref} download>
-                Order CSV
-              </a>
+              {canExport ? (
+                <>
+                  {/* A route handler that answers with a file, so an anchor
+                      with `download` rather than <Link>: client-side navigation
+                      has no RSC payload to fetch here. */}
+                  <a className={btn('ghost')} href={exportHref} download>
+                    Order CSV
+                  </a>
+                </>
+              ) : null}
             </>
           ) : null
         }
@@ -227,7 +238,7 @@ export function OrdersScreen({
             {RANGE_LINKS.map((r) => (
               <Link
                 key={r.key}
-                href={href(r.key, filter, query, dates)}
+                href={href(r.key, activeFilter, query, dates)}
                 aria-current={rangeKey === r.key ? 'true' : undefined}
                 className={chipClass(rangeKey === r.key)}
               >
@@ -235,10 +246,9 @@ export function OrdersScreen({
               </Link>
             ))}
 
-            {/* The sales report has always had a custom range; the ledger,
-                which reads the same aggregate, only had three presets. A
-                dispute about one evening is exactly the question this screen
-                gets asked.
+            {/* The sales report has always had a custom range; the ledger
+                shares the same range controls so a dispute about one evening
+                can be reviewed here too.
 
                 `details` rather than a hidden panel: it opens without
                 JavaScript, it is keyboard-reachable, and it stays open when a
@@ -258,7 +268,7 @@ export function OrdersScreen({
                 className="mt-2 flex flex-wrap items-end gap-2 rounded-[var(--p-r-block)] border border-hair bg-card p-2.5"
               >
                 <input type="hidden" name="range" value="custom" />
-                {filter !== 'all' && <input type="hidden" name="status" value={filter} />}
+                {activeFilter !== 'all' && <input type="hidden" name="status" value={activeFilter} />}
                 {query ? <input type="hidden" name="q" value={query} /> : null}
                 <label className="block">
                   <span className="mb-1 block text-[11.5px] font-medium text-gink-46">From</span>
@@ -288,18 +298,18 @@ export function OrdersScreen({
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5">
-            {FILTERS.map((f) => (
+            {visibleFilters.map((f) => (
               <Link
                 key={f.key}
                 href={href(rangeKey, f.key, query, dates)}
-                aria-current={filter === f.key ? 'true' : undefined}
-                className={`${chipClass(filter === f.key)} gap-1.5`}
+                aria-current={activeFilter === f.key ? 'true' : undefined}
+                className={`${chipClass(activeFilter === f.key)} gap-1.5`}
               >
                 {f.label}
                 <span
                   className={[
                     'tnum text-[11.5px]',
-                    filter === f.key ? 'text-[var(--p-accent)]' : 'text-gink-46',
+                    activeFilter === f.key ? 'text-[var(--p-accent)]' : 'text-gink-46',
                   ].join(' ')}
                 >
                   {filterCounts[f.key]}
@@ -319,7 +329,7 @@ export function OrdersScreen({
               {rangeKey === 'custom' && customTo ? (
                 <input type="hidden" name="to" value={customTo} />
               ) : null}
-              {filter !== 'all' && <input type="hidden" name="status" value={filter} />}
+              {activeFilter !== 'all' && <input type="hidden" name="status" value={activeFilter} />}
               <input
                 type="search"
                 name="q"
@@ -354,8 +364,8 @@ export function OrdersScreen({
 
           {visible.length > 0 ? (
             <>
-              {/* Seven columns of numbers is a laptop shape. On a phone the same
-                  bills are cards below; exactly one of the two is shown, so
+              {/* The finance columns fit a wide screen; on a phone the same
+                  orders are cards below. Exactly one layout is shown, so
                   neither is read twice by a screen reader. */}
               <div className="hidden lg:block">
                 <TableWrap>
@@ -366,14 +376,20 @@ export function OrdersScreen({
                         <Th>Reference</Th>
                         <Th>Table</Th>
                         <Th>Kitchen</Th>
-                        <Th>Payment</Th>
-                        <Th align="right">Total</Th>
-                        <Th align="right">Outstanding</Th>
+                        {canViewFinance ? (
+                          <>
+                            <Th>Payment</Th>
+                            <Th align="right">Total</Th>
+                            <Th align="right">Outstanding</Th>
+                          </>
+                        ) : (
+                          <Th align="right">Open</Th>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
                       {visible.map((order) => {
-                        const outstanding = Math.max(0, order.totalPaise - order.paidPaise);
+                        const outstanding = Math.max(0, (order.totalPaise ?? 0) - (order.paidPaise ?? 0));
                         const cancelled = order.prepStatus === 'cancelled';
                         return (
                           <Tr key={order.id} className={cancelled ? 'opacity-55' : undefined}>
@@ -382,8 +398,8 @@ export function OrdersScreen({
                             </Td>
                             <Td>
                               {live && !blocked ? (
-                                // The code is the natural door into one bill: it
-                                // is what the counter and the guest both quote.
+                                // The code is the safe door into this specific
+                                // bill; order identity is never taken from the URL.
                                 <Link
                                   href={`/bill/${order.id}`}
                                   title="Open this bill"
@@ -411,42 +427,51 @@ export function OrdersScreen({
                                 />
                               )}
                             </Td>
-                            <Td>
-                              <PaymentPill
-                                state={
-                                  order.paymentStatus === 'pending'
-                                    ? 'pending'
-                                    : order.paymentStatus === 'failed'
-                                      ? 'failed'
-                                      : 'paid'
-                                }
-                              />
-                            </Td>
-                            <Td align="right">
-                              <Money value={order.totalPaise} />
-                            </Td>
-                            <Td align="right">
-                              {/* A cancelled bill is never collectable: money
-                                  must not be taken for food that will not
-                                  arrive. */}
-                              {outstanding > 0 && !cancelled ? (
-                                <Link
-                                  href={`/cashier?order=${encodeURIComponent(live && !blocked ? order.id : order.code)}`}
-                                  title={`Take payment for ${order.code} at the counter`}
-                                  className={btn('ghost', 'sm')}
-                                >
-                                  Collect <Money value={outstanding} />
-                                </Link>
-                              ) : (
-                                /* "—" in a column headed Outstanding reads as a
-                                   missing value. These two rows are not
-                                   missing anything: one is paid, and one is a
-                                   bill nobody may collect. */
-                                <span className="text-[11.5px] text-gink-46">
-                                  {cancelled ? 'Not collectable' : 'Settled'}
-                                </span>
-                              )}
-                            </Td>
+                            {canViewFinance ? (
+                              <>
+                                <Td>
+                                  <PaymentPill
+                                    state={
+                                      order.paymentStatus === 'pending'
+                                        ? 'pending'
+                                        : order.paymentStatus === 'failed'
+                                          ? 'failed'
+                                          : 'paid'
+                                    }
+                                  />
+                                </Td>
+                                <Td align="right">
+                                  <Money value={order.totalPaise ?? 0} />
+                                </Td>
+                                <Td align="right">
+                                  {outstanding > 0 && !cancelled ? (
+                                    <Link
+                                      href={`/cashier?order=${encodeURIComponent(live && !blocked ? order.id : order.code)}`}
+                                      title={`Take payment for ${order.code} at the counter`}
+                                      className={btn('ghost', 'sm')}
+                                    >
+                                      Collect <Money value={outstanding} />
+                                    </Link>
+                                  ) : (
+                                    <span className="text-[11.5px] text-gink-46">
+                                      {cancelled ? 'Not collectable' : 'Settled'}
+                                    </span>
+                                  )}
+                                </Td>
+                              </>
+                            ) : (
+                              <Td align="right">
+                                {!cancelled && live && !blocked ? (
+                                  <Link
+                                    href={`/cashier?order=${encodeURIComponent(order.id)}`}
+                                    title={`Open ${order.code} at the counter`}
+                                    className={btn('ghost', 'sm')}
+                                  >
+                                    Open at counter
+                                  </Link>
+                                ) : null}
+                              </Td>
+                            )}
                           </Tr>
                         );
                       })}
@@ -457,7 +482,7 @@ export function OrdersScreen({
 
               <ul className="flex flex-col divide-y divide-hair lg:hidden">
                 {visible.map((order) => {
-                  const outstanding = Math.max(0, order.totalPaise - order.paidPaise);
+                  const outstanding = Math.max(0, (order.totalPaise ?? 0) - (order.paidPaise ?? 0));
                   const cancelled = order.prepStatus === 'cancelled';
                   return (
                     <li key={order.id} className={['px-4 py-3', cancelled ? 'opacity-55' : ''].join(' ')}>
@@ -491,35 +516,49 @@ export function OrdersScreen({
                             }
                           />
                         )}
-                        <PaymentPill
-                          state={
-                            order.paymentStatus === 'pending'
-                              ? 'pending'
-                              : order.paymentStatus === 'failed'
-                                ? 'failed'
-                                : 'paid'
-                          }
-                        />
+                        {canViewFinance ? (
+                          <PaymentPill
+                            state={
+                              order.paymentStatus === 'pending'
+                                ? 'pending'
+                                : order.paymentStatus === 'failed'
+                                  ? 'failed'
+                                  : 'paid'
+                            }
+                          />
+                        ) : null}
                       </div>
 
-                      <div className="mt-2 flex items-center justify-between gap-3">
-                        <span className="text-[13.5px] font-semibold text-gink">
-                          <Money value={order.totalPaise} />
-                        </span>
-                        {outstanding > 0 && !cancelled ? (
+                      {canViewFinance ? (
+                        <div className="mt-2 flex items-center justify-between gap-3">
+                          <span className="text-[13.5px] font-semibold text-gink">
+                            <Money value={order.totalPaise ?? 0} />
+                          </span>
+                          {outstanding > 0 && !cancelled ? (
+                            <Link
+                              href={`/cashier?order=${encodeURIComponent(live && !blocked ? order.id : order.code)}`}
+                              title={`Take payment for ${order.code} at the counter`}
+                              className={btn('ghost', 'sm')}
+                            >
+                              Collect <Money value={outstanding} />
+                            </Link>
+                          ) : (
+                            <span className="text-[11.5px] text-gink-46">
+                              {cancelled ? 'Not collectable' : 'Settled'}
+                            </span>
+                          )}
+                        </div>
+                      ) : !cancelled && live && !blocked ? (
+                        <div className="mt-2 flex justify-end">
                           <Link
-                            href={`/cashier?order=${encodeURIComponent(live && !blocked ? order.id : order.code)}`}
-                            title={`Take payment for ${order.code} at the counter`}
+                            href={`/cashier?order=${encodeURIComponent(order.id)}`}
+                            title={`Open ${order.code} at the counter`}
                             className={btn('ghost', 'sm')}
                           >
-                            Collect <Money value={outstanding} />
+                            Open at counter
                           </Link>
-                        ) : (
-                          <span className="text-[11.5px] text-gink-46">
-                            {cancelled ? 'Not collectable' : 'Settled'}
-                          </span>
-                        )}
-                      </div>
+                        </div>
+                      ) : null}
                     </li>
                   );
                 })}
@@ -551,14 +590,27 @@ export function OrdersScreen({
 
       {!blocked && (
         <p className="mt-4 max-w-[92ch] text-[11.5px] leading-[1.6] text-gink-46">
-          Outstanding is what the table still owes on that bill;{' '}
-          <strong className="font-semibold text-gink-64">Collect</strong> opens the counter on
-          that exact ticket, and the queue as a whole is at{' '}
-          <Link href="/cashier" className="underline underline-offset-2">
-            the counter
-          </Link>
-          . Cancelled bills stay here so the day&apos;s history is complete, and are excluded
-          from every figure on the sales report.
+          {canViewFinance ? (
+            <>
+              Outstanding is what the table still owes on that bill;{' '}
+              <strong className="font-semibold text-gink-64">Collect</strong> opens the counter on
+              that exact ticket, and the queue as a whole is at{' '}
+              <Link href="/cashier" className="underline underline-offset-2">
+                the counter
+              </Link>
+              . Cancelled bills stay here so the day&apos;s history is complete, and are excluded
+              from every figure on the sales report.
+            </>
+          ) : (
+            <>
+              Payment details are not included in this ledger. Open an order to view its bill, or go
+              to{' '}
+              <Link href="/cashier" className="underline underline-offset-2">
+                the counter
+              </Link>{' '}
+              to manage it. Cancelled orders remain here so the day&apos;s history is complete.
+            </>
+          )}
         </p>
       )}
       {!live && !blocked && (

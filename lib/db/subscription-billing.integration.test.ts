@@ -427,6 +427,79 @@ describe.skipIf(!URL_VALUE)('Model C subscription and billing', () => {
       expect(await staff(a.owner, async () => (await db.query('select id from subscription_events where account_id=$1', [b.account])).rows)).toEqual([]);
     });
 
+    it('bounds account history before aggregation while preserving member-read and owner-write scope', async () => {
+      const a = await newAccount();
+      await payFor(a.name, 'professional');
+
+      const cashier = randomUUID();
+      await db.query('insert into profiles(id) values($1)', [cashier]);
+      await db.query(
+        "insert into memberships(restaurant_id,user_id,role) values($1,$2,'cashier')",
+        [a.restaurant, cashier],
+      );
+      const receiptId = (await db.query(
+        'select id from subscription_receipts where account_id=$1', [a.account])).rows[0].id as string;
+
+      // Synthetic rows are newer than the trial/payment setup rows, with a
+      // unique timestamp per row so the expected newest-first window is stable.
+      const prefix = `history-${randomUUID()}`;
+      await db.query(
+        `insert into public.subscription_events(account_id,kind,note,occurred_at)
+         select $1,'trial_extended',$2 || '-event-' || n::text,
+                clock_timestamp() + (60 - n) * interval '1 second'
+           from generate_series(1,60) as series(n)`,
+        [a.account, prefix],
+      );
+      await db.query(
+        `insert into public.subscription_payments
+           (account_id,plan,amount_paise,currency,status,provider,provider_event_id,occurred_at)
+         select $1,'starter',99900,'INR','succeeded','history-test',
+                $2 || '-payment-' || lpad(n::text,2,'0'),
+                clock_timestamp() + (60 - n) * interval '1 second'
+           from generate_series(1,60) as series(n)`,
+        [a.account, prefix],
+      );
+
+      const expectedNotes = (await db.query(
+        `select note from public.subscription_events
+          where account_id=$1 and note like $2 || '-event-%'
+          order by occurred_at desc,id desc limit 50`,
+        [a.account, prefix],
+      )).rows.map((row) => row.note);
+      const expectedPaymentIds = (await db.query(
+        `select id::text as id from public.subscription_payments
+          where account_id=$1 and provider='history-test'
+            and provider_event_id like $2 || '-payment-%'
+          order by occurred_at desc,recorded_at desc,id desc limit 50`,
+        [a.account, prefix],
+      )).rows.map((row) => row.id);
+
+      const memberReads = await staff(cashier, async () => {
+        const state = (await db.query(
+          'select account_subscription_state($1) value', [a.restaurant])).rows[0].value;
+        const history = (await db.query(
+          'select account_subscription_history($1,50) value', [a.restaurant])).rows[0].value as Array<{ note: string }>;
+        const payments = (await db.query(
+          'select account_payment_history($1,50) value', [a.restaurant])).rows[0].value as Array<{ id: string }>;
+        const receipt = (await db.query(
+          'select account_receipt($1) value', [receiptId])).rows[0].value;
+        return { state, history, payments, receipt };
+      });
+
+      expect(memberReads.state.accountId).toBe(a.account);
+      expect(memberReads.history).toHaveLength(50);
+      expect(memberReads.history.map((row) => row.note)).toEqual(expectedNotes);
+      expect(memberReads.payments).toHaveLength(50);
+      expect(memberReads.payments.map((row) => row.id)).toEqual(expectedPaymentIds);
+      expect(memberReads.receipt).toBeTruthy();
+      expect(Number(memberReads.receipt.amountPaise)).toBe(269900);
+
+      // Read access is membership-scoped, but the matching write remains owner-only.
+      await expect(staff(cashier, () => db.query(
+        'select request_subscription_cancellation($1)', [a.restaurant],
+      ))).rejects.toMatchObject({ message: expect.stringContaining('not_found') });
+    });
+
     it('will not show a receipt to another account', async () => {
       const a = await newAccount();
       await payFor(a.name, 'professional');

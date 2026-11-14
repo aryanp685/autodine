@@ -49,6 +49,9 @@ yarn-error.log*
 !/docs/production-migration-plan-2026-11-11.md
 !/docs/production-operator-setup-2026-11-11.md
 !/docs/autodine-handoff-report-2026-11-12.md
+!/docs/infrastructure-architecture.md
+!/docs/edge-security-runbook.md
+!/docs/AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md
 
 # scratch scripts
 _shot.mjs

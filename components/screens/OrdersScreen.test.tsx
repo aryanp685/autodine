@@ -4,12 +4,10 @@ import { OrdersScreen } from './OrdersScreen';
 import { counterQueue } from '@/lib/demo-data';
 import {
   demoReport,
-  emptyPayload,
   resolveRange,
-  zeroFillBuckets,
-  type ReportsScreenData,
   type ReportOrderRow,
 } from '@/lib/db/reports';
+import type { OrderLedgerRow, OrdersLedgerScreenData } from '@/lib/db/orders-ledger';
 
 // The server action behind the bar pulls in the Supabase admin client, and the
 // outlet switcher needs a router. Neither is what this screen is about.
@@ -46,15 +44,32 @@ function order(over: Partial<ReportOrderRow> = {}): ReportOrderRow {
   };
 }
 
-function live(over: Partial<ReportsScreenData['report']> = {}): ReportsScreenData {
-  const range = resolveRange('today', TZ, NOW);
+function live(over: { orders?: OrderLedgerRow[] } = {}): OrdersLedgerScreenData {
   return {
-    restaurantName: 'maddi',
-    tagline: null,
     timezone: TZ,
-    range,
-    report: { ...emptyPayload(), buckets: zeroFillBuckets(range, [], TZ, NOW), orders: [order()], ...over },
+    range: resolveRange('today', TZ, NOW),
+    orders: over.orders ?? [order()],
     ordersTruncated: false,
+    canViewFinance: true,
+    canExport: true,
+  };
+}
+
+function cashierData(): OrdersLedgerScreenData {
+  return {
+    ...live({
+      orders: [
+        {
+          id: 'o1',
+          code: 'MA-1042',
+          placedAt: '2026-10-21T10:00:00Z',
+          tableLabel: 'T4',
+          prepStatus: 'preparing',
+        },
+      ],
+    }),
+    canViewFinance: false,
+    canExport: false,
   };
 }
 
@@ -77,6 +92,28 @@ describe('OrdersScreen', () => {
       .find((tag) => tag.includes('/dashboard/reports/export'));
     expect(exportTag).toBeDefined();
     expect(exportTag).toContain('download');
+  });
+
+  it('keeps the cashier ledger read-only of finance data without breaking order navigation', () => {
+    const html = renderToStaticMarkup(<OrdersScreen data={cashierData()} />);
+
+    expect(html).toContain('MA-1042');
+    expect(html).toContain('href="/bill/o1"');
+    expect(html).toContain('href="/cashier?order=o1"');
+    expect(html).toContain('Open at counter');
+    expect(html).not.toContain('Order CSV');
+    expect(html).not.toContain('Total</th>');
+    expect(html).not.toContain('Outstanding</th>');
+    expect(html).not.toContain('Pending');
+    expect(html).not.toContain('Settled');
+    expect(html).not.toContain('₹');
+  });
+
+  it('ignores a stale cashier settled filter instead of inferring payment state', () => {
+    const html = renderToStaticMarkup(<OrdersScreen data={cashierData()} filter="settled" />);
+
+    expect(html).toContain('1 order');
+    expect(html).not.toContain('Settled');
   });
 
   it('keeps the range and the search when a filter is picked', () => {

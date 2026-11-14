@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { StaffContext } from './staff';
 
 /**
  * Covers the parts of the report that can be wrong on this side of the wire:
@@ -29,6 +30,7 @@ import {
   csvCell,
   demoReport,
   getReportsScreenData,
+  getReportsScreenDataForStaff,
   itemsCsv,
   ordersCsv,
   parseIsoDate,
@@ -67,13 +69,15 @@ function signedIn(supabase: unknown) {
   return {
     ok: true as const,
     context: {
-      supabase,
+      supabase: supabase as StaffContext['supabase'],
       restaurantId: 'r-1',
       restaurantName: 'maddi',
       timezone: TZ,
       tagline: null,
       slug: 'maddi',
       role: 'owner' as const,
+      outlets: [{ id: 'r-1', name: 'maddi', role: 'owner' as const }],
+      access: null,
     },
   };
 }
@@ -362,6 +366,22 @@ describe('getReportsScreenData', () => {
     expect(args.p_timezone).toBe(TZ);
     expect(args.p_order_limit).toBe(REPORT_ORDER_LIMIT);
     expect(args.p_to).toBe(NOON.toISOString());
+  });
+
+  it('uses a previously resolved trusted context without performing another membership lookup', async () => {
+    mocks.rpc.data = { totals: { bills: 1 }, orders: [] };
+    const context = signedIn(fakeSupabase(mocks.rpc)).context;
+
+    await getReportsScreenDataForStaff(context, { range: '7d', orderLimit: 10_000 }, NOON);
+
+    expect(mocks.staff.result).toBeNull();
+    expect(mocks.rpc.calls).toHaveLength(1);
+    expect(mocks.rpc.calls[0]).toMatchObject({
+      p_restaurant_id: 'r-1',
+      p_bucket: 'day',
+      p_order_limit: 10_000,
+      p_include_lines: false,
+    });
   });
 
   it('defaults to today when the range in the URL is nonsense', async () => {

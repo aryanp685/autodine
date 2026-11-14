@@ -151,7 +151,7 @@ try {
   }
   console.log(alreadyApplied.size ? `Verified forward upgrade to ${migrations.length} repository migrations from observed staging baseline.` : `Replayed ${migrations.length} migrations without application-table scaffolds.`);
   await db.end(); db = null;
-  const result = spawnSync('npx', ['vitest', 'run', 'lib/db/readiness.integration.test.ts', 'lib/db/phase0-security.integration.test.ts', 'lib/db/subscription-billing.integration.test.ts', 'lib/db/restaurant-account-link.integration.test.ts', 'app/menu/throttle-db.integration.test.tsx'], {
+  const result = spawnSync('npx', ['vitest', 'run', 'lib/db/readiness.integration.test.ts', 'lib/db/report-sales.integration.test.ts', 'lib/db/phase0-security.integration.test.ts', 'lib/db/subscription-billing.integration.test.ts', 'lib/db/restaurant-account-link.integration.test.ts', 'app/menu/throttle-db.integration.test.tsx'], {
     stdio: 'inherit', env: { ...process.env, READINESS_DB_URL: url.href, THROTTLE_DB_URL: url.href },
   });
   if (result.error) throw result.error;

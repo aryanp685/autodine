@@ -109,10 +109,9 @@ export function SubscriptionScreen({
 }) {
   const [flash, setFlash] = useState<SubscriptionActionResult | null>(null);
   const state = data.state;
-  // Reading this screen is a manager's business; changing the plan or
-  // cancelling it is the owner's. The database refuses a non-owner either way,
-  // so this is the difference between a button that works and a button that
-  // explains itself.
+  // The subscription routes admit owners and managers. Plan changes, cancellation
+  // and payment retries are owner-only; each Server Action repeats that check,
+  // and the cancellation RPC independently enforces it in the database.
   const isOwner = data.role === 'owner';
 
   async function run(action: () => Promise<SubscriptionActionResult>) {
@@ -140,26 +139,38 @@ export function SubscriptionScreen({
             <span className="mt-1 block text-gink-64">{state.lastPayment.failureReason}</span>
           ) : null}
           <div className="mt-3">
-            <SubmitButton
-              className={btn('solid', 'sm')}
-              pendingLabel="Retrying…"
-              onClick={() => run(retryPaymentAction)}
-            >
-              Retry payment
-            </SubmitButton>
+            {isOwner ? (
+              <SubmitButton
+                className={btn('solid', 'sm')}
+                pendingLabel="Retrying…"
+                onClick={() => run(retryPaymentAction)}
+              >
+                Retry payment
+              </SubmitButton>
+            ) : (
+              <p className="text-[12.5px] leading-[1.6] text-gink-64">
+                Only an owner of this account can retry a payment.
+              </p>
+            )}
           </div>
         </Notice>
       ) : state?.status === 'cancel_requested' ? (
         <Notice tone="due" label="Cancellation requested">
           {statusLine(data)}
           <div className="mt-3">
-            <SubmitButton
-              className={btn('ghost', 'sm')}
-              pendingLabel="Withdrawing…"
-              onClick={() => run(withdrawCancellationAction)}
-            >
-              Keep my subscription
-            </SubmitButton>
+            {isOwner ? (
+              <SubmitButton
+                className={btn('ghost', 'sm')}
+                pendingLabel="Withdrawing…"
+                onClick={() => run(withdrawCancellationAction)}
+              >
+                Keep my subscription
+              </SubmitButton>
+            ) : (
+              <p className="text-[12.5px] leading-[1.6] text-gink-64">
+                Only an owner of this account can withdraw a cancellation request.
+              </p>
+            )}
           </div>
         </Notice>
       ) : state?.trial.running ? (

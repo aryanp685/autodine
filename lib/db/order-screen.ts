@@ -22,6 +22,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { readPublicRestaurant } from '@/lib/db/public-restaurant';
+import { isOrderToken } from '@/lib/db/order-status';
 
 /**
  * How long after placing an order a guest may still change or cancel it.
@@ -138,7 +139,7 @@ export async function getOrderScreenData(
   token?: string
 ): Promise<OrderScreenData | null> {
   if (!isSupabaseConfigured) return null;
-  if (!slug?.trim() || !code?.trim() || !token?.trim()) return null;
+  if (!slug?.trim() || !code?.trim() || !token?.trim() || !isOrderToken(token.trim())) return null;
 
   const supabase = await createSupabaseServerClient();
   if (!supabase) return null;
