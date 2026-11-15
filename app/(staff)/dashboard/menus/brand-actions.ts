@@ -532,20 +532,27 @@ export async function updateAnnouncementAction(formData: FormData): Promise<void
     );
   }
 
-  const { error } = await ctx.supabase
+  const { data: saved, error } = await ctx.supabase
     .from('restaurants')
     .update({ announcement_text: text.length > 0 ? text : null, announcement_on: on && text.length > 0 })
-    .eq('id', ctx.restaurantId);
+    .eq('id', ctx.restaurantId)
+    .select('id');
+
+  if (error || !saved || saved.length === 0) {
+    redirect(
+      `/dashboard/branding?error=${encodeURIComponent(
+        error
+          ? `Could not save the announcement: ${error.message}`
+          : 'Could not save the announcement. Nothing was changed.',
+      )}`,
+    );
+  }
 
   revalidatePath('/menu');
   revalidatePath('/dashboard/branding');
   redirect(
-    `/dashboard/branding?${error ? 'error' : 'notice'}=${encodeURIComponent(
-      error
-        ? `Could not save the announcement: ${error.message}`
-        : on
-          ? 'The announcement is on the guest menu now.'
-          : 'The announcement is off.',
+    `/dashboard/branding?notice=${encodeURIComponent(
+      on ? 'The announcement is on the guest menu now.' : 'The announcement is off.',
     )}`,
   );
 }
@@ -574,20 +581,29 @@ export async function updateOrderingStatusAction(formData: FormData): Promise<vo
     );
   }
 
-  const { error } = await ctx.supabase
+  const { data: saved, error } = await ctx.supabase
     .from('restaurants')
     .update({ is_active: open === 'open' })
-    .eq('id', ctx.restaurantId);
+    .eq('id', ctx.restaurantId)
+    .select('id');
+
+  if (error || !saved || saved.length === 0) {
+    redirect(
+      `/dashboard/branding?error=${encodeURIComponent(
+        error
+          ? `Could not save the ordering status: ${error.message}`
+          : 'Could not save the ordering status. Nothing was changed.',
+      )}`,
+    );
+  }
 
   revalidatePath('/menu');
   revalidatePath('/dashboard/branding');
   redirect(
-    `/dashboard/branding?${error ? 'error' : 'notice'}=${encodeURIComponent(
-      error
-        ? `Could not save the ordering status: ${error.message}`
-        : open === 'open'
-          ? 'Your storefront is open. Guests can order again.'
-          : 'Your storefront is closed. Guests see the closed note and new orders are blocked — orders already placed and the kitchen keep running.',
+    `/dashboard/branding?notice=${encodeURIComponent(
+      open === 'open'
+        ? 'Your storefront is open. Guests can order again.'
+        : 'Your storefront is closed. Guests see the closed note and new orders are blocked — orders already placed and the kitchen keep running.',
     )}`,
   );
 }

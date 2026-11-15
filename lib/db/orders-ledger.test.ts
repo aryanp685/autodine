@@ -95,6 +95,7 @@ function signedIn(
       slug: 'maddi',
       role,
       outlets: [{ id: 'restaurant-1', name: 'Maddi', role }],
+      entitlement: null,
       access: null,
     },
   };

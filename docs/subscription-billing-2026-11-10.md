@@ -1,5 +1,7 @@
 # Subscription and billing — implementation record, 2026-11-10
 
+> **Current-branch boundary note (verification/final review: 2026-11-06 UTC):** this file records the original subscription implementation and its account-member-wide read policy; that policy is not the active checkout's effective source policy. Forward migration `20261114000100_owner_manager_subscription_reads.sql` narrows direct account/payment/event/receipt table reads and all four billing-read RPCs to Owners and Managers, while retaining the Cashier/Kitchen operational entitlement projection. The migration was replayed only on disposable local PostgreSQL; its filename is future-dated relative to the evidence cutoff and does not establish a hosted apply. See the [current hardening report](AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md).
+
 Branch `arena/a5344572-autodine`, worktree `/home/user/autodine`.
 Parent commit `71f46ce5aa5aacbf87fd4d5d46b9f679375c3d01`.
 Chain: **71 migrations**, the last being `20261110001100_subscription_billing.sql`.

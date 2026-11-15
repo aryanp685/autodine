@@ -6,6 +6,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 import { Dashboard } from './DashboardScreen';
+import { StaffShell } from '@/components/owner/StaffShell';
 
 // The server action pulls in lib/supabase/admin, which imports the
 // `server-only` marker package that Next provides at build time and vitest
@@ -144,6 +145,28 @@ describe('Dashboard, live and empty', () => {
     );
     expect(paid).toContain('Professional');
     expect(paid).not.toMatch(/during the trial/);
+  });
+
+  it('keeps the Cashier dashboard free of billing details and subscription navigation', () => {
+    const outlet = {
+      outlets: [{ id: 'cashier-restaurant', name: 'Kings of Kings', role: 'cashier' }],
+      activeId: 'cashier-restaurant',
+    };
+    const html = renderToStaticMarkup(
+      <StaffShell outlet={outlet} signOut={false}>
+        <Dashboard data={{ ...EMPTY, access: null }} />
+      </StaffShell>,
+    );
+
+    // The component receives the same null billing projection as getDashboardScreenData
+    // returns for a Cashier, and the real role-aware shell must not add an Owner link.
+    expect(html).not.toContain('data-plan-line');
+    expect(html).not.toContain('data-subscription-link');
+    expect(html).not.toContain('href="/dashboard/subscription"');
+    expect(html).not.toContain('href="/pricing"');
+    expect(html).toContain('Revenue today');
+    expect(html).toContain('href="/cashier"');
+    expect(html).toContain('href="/dashboard/orders"');
   });
 
   it('tells a read-only workspace its data is still there', () => {

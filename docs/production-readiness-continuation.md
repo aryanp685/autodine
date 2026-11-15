@@ -1,5 +1,7 @@
 # Production-readiness continuation — 2026-10-28
 
+> **Historical snapshot; not current active-branch behavior.** This document records an earlier Realtime-based Kitchen design and test run. On active branch `arena/f104d5d8-autodine`, Kitchen no longer subscribes to raw `orders` or `table_waiter_calls` rows; it refreshes role-scoped server reads every five seconds, and the forward migration removes both tables from the local `supabase_realtime` publication candidate. That migration was replayed only on disposable PostgreSQL; hosted publication/Realtime state is **UNVERIFIED**. Historical Realtime load numbers below do not verify the current polling design. See [the current hardening report](AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md).
+
 ## Verdict
 
 **Not ready for live launch.** This reconciliation and its CI can validate code against synthetic/local fixtures, but they cannot verify production monitoring delivery, actual devices/printers, current hosted backups/PITR, or a recovery from a real backup. A green CI run is not a production-readiness approval and is not a limited-pilot safety case.
