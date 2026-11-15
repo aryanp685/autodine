@@ -51,6 +51,7 @@ yarn-error.log*
 !/docs/report-sales-staging-rehearsal-2026-11-15-result.md
 !/docs/hosted-synthetic-acceptance-2026-11-15-result.md
 !/docs/final-hosted-acceptance-2026-11-15.md
+!/docs/final-hosted-acceptance-retry-2026-11-15.md
 !/docs/gst-staging-application-plan-2026-11-15.md
 !/docs/device-acceptance-2026-11-14.md
 !/docs/migration-reconciliation.md
@@ -90,6 +91,7 @@ tts-smoke-artifacts/
 !/docs/report-sales-staging-rehearsal-2026-11-15-result.md
 !/docs/hosted-synthetic-acceptance-2026-11-15-result.md
 !/docs/final-hosted-acceptance-2026-11-15.md
+!/docs/final-hosted-acceptance-retry-2026-11-15.md
 !/docs/gst-staging-application-plan-2026-11-15.md
 !/docs/resend-auth-readiness-2026-11-14.md
 !/docs/monitoring-readiness-2026-11-14.md
