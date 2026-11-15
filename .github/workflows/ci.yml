@@ -46,19 +46,21 @@ jobs:
         run: npm run test:backup
 
       # The drill's Mode A path shells out to the *system* pg_dump. The
-      # embedded server is PG 17, and ubuntu-24.04 ships pg_dump 16 from
-      # PGDG, so without this step pg_dump aborts on the major-version
-      # mismatch. PGDG is already configured in the runner image (the
-      # preinstalled client reports pgdg24.04). A stale third-party apt
-      # source can fail `apt-get update` (exit 100) without affecting the
-      # PGDG index, so tolerate the update failing but require the client
-      # to install and report v17 — otherwise fall straight to the log.
+      # embedded server is PG 17, and ubuntu-24.04 ships pg_dump 16, which
+      # refuses to dump a PG 17 server — so the PGDG apt repository has to
+      # be registered explicitly (the runner's index carries only the
+      # stock Ubuntu noble + Microsoft sources; 'Unable to locate package
+      # postgresql-client-17' is the failure signature). The preinstalled
+      # pg_dump 16 reports a pgdg24.04 build, so PGDG is the source the
+      # image used as well.
       - name: Install PostgreSQL 17 client tools (PGDG)
         run: |
           set -o pipefail
           {
-            sudo apt-get update || echo "::warning::apt-get update failed; installing from the existing index"
-            apt-cache policy postgresql-client-17 || true
+            sudo install -d /usr/share/postgresql-common/pgdg
+            sudo curl --fail --show-error -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+            echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+            sudo apt-get update
             sudo DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql-client-17
             pg_dump --version
           } 2>&1 | tee pg-client-install.log
