@@ -87,9 +87,13 @@ const before = await fingerprint(urlFor(source), { schemas: ['public'] });
     env: sh({ AUTODINE_BACKUP_SOURCE_URL: urlFor(source), AUTODINE_BACKUP_PASSPHRASE: 'local-drill-passphrase-not-secret-0123456789' }),
     stdio: ['ignore', 'inherit', 'inherit'],
   });
-  const file = readdirSync(outDir).find((f) => f.endsWith('.sql.gz.enc'));
-  assert.ok(file, 'backup produced no Mode B artifact');
-  const manifest = JSON.parse(readFileSync(path.join(outDir, file.replace(/\.sql\.gz\.enc$/, '.manifest.json')), 'utf8'));
+  // Mode A (system pg_dump present, e.g. CI with PGDG 17) writes a
+  // .dump.enc custom-format artifact; Mode B (no pg_dump, e.g. local) writes
+  // .sql.gz.enc. Accept either; downstream restore picks the matching
+  // pg_restore/replay path from the suffix.
+  const file = readdirSync(outDir).find((f) => f.endsWith('.sql.gz.enc') || f.endsWith('.dump.enc'));
+  assert.ok(file, 'backup produced no .sql.gz.enc or .dump.enc artifact');
+  const manifest = JSON.parse(readFileSync(path.join(outDir, file.replace(/\.(sql\.gz|dump)\.enc$/, '.manifest.json')), 'utf8'));
   console.log(`backup: ${manifest.format}, ${manifest.bytes} bytes, sha256 ${manifest.sha256.slice(0, 12)}…`);
 
   // The shim ran first, so the target is NOT empty; allow the restore onto it
