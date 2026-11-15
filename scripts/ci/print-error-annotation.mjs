@@ -28,4 +28,7 @@ if (!file || !existsSync(file)) {
 
 const raw = readFileSync(file, 'utf8');
 const tail = raw.slice(-maxChars);
-console.log(`::error::CI diagnostics tail of ${file}:\n${escapeData(tail)}`);
+// The ::error:: command must be a single physical line — newlines in the
+// payload travel as the %0A escape. A literal newline here truncates the
+// annotation to the first line.
+console.log(`::error::CI diagnostics tail of ${file}: %0A${escapeData(tail)}`);
