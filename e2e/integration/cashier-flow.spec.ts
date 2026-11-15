@@ -114,7 +114,9 @@ test.describe('cashier — real database', () => {
     await till.goto(`${BASE}/cashier`);
     await till.getByRole('button', { name: new RegExp(`Select ${code} at`) }).click();
     await till.getByRole('group', { name: 'Payment method' }).getByRole('button', { name: 'UPI', exact: true }).click();
-    await expect(till.locator('[data-counter-cta]')).toHaveText('Record UPI ₹125');
+    // The fixture menu's single dish is ₹349 (zero tax) — the counter CTA
+    // must show the database-held outstanding for the order this spec placed.
+    await expect(till.locator('[data-counter-cta]')).toHaveText('Record UPI ₹349');
     await till.locator('[data-counter-cta]').click();
     await expect(till.getByText(new RegExp(`UPI.*recorded for ${code}`))).toBeVisible({ timeout: 20_000 });
 
