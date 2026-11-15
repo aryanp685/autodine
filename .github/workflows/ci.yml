@@ -36,6 +36,18 @@ jobs:
       - name: Migration syntax check
         run: npm run sql:check
 
+      - name: Preview/production isolation self-test
+        run: npm run isolation:verify
+
+      - name: Hosted-acceptance and staging guards (offline)
+        run: npm run test:staging:guards
+
+      - name: Backup pipeline selftest (disposable embedded PostgreSQL)
+        run: npm run test:backup
+
+      - name: Logical restore drill (full migration chain, disposable embedded PostgreSQL)
+        run: npm run test:db:logical-restore
+
       - name: Tests
         run: npm test
 

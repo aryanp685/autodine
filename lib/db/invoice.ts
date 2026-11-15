@@ -2,6 +2,25 @@ import { getStaffContextDetailed } from '@/lib/db/staff';
 import { publicAssetUrl } from '@/lib/storage/assets';
 import type { RestaurantInvoice, RestaurantInvoiceLine, RestaurantPaymentReceipt } from '@/lib/db/types';
 
+export type GstSnapshotData = {
+  mode: 'regular' | 'composition';
+  regularProfile: 'other_than_specified_premises' | 'specified_premises' | null;
+  profileNotification: string | null;
+  rateBps: number;
+  cgstBps: number;
+  sgstBps: number;
+  taxablePaise: number;
+  cgstPaise: number;
+  sgstPaise: number;
+  igstPaise: number;
+  placeOfSupplyStateCode: string | null;
+  interState: boolean;
+  configVersion: number;
+  notice: string | null;
+};
+
+export type GstIrnStatus = 'not_required' | 'pending' | 'generated' | 'failed' | 'cancelled';
+
 export type InvoiceLineData = {
   id: string;
   ticketCode: string;
@@ -41,7 +60,20 @@ export type ReceiptData = {
   restaurantId: string;
   number: string;
   financialYear: string;
-  documentType: 'receipt' | 'gst_tax_invoice';
+  documentType: 'receipt' | 'gst_tax_invoice' | 'bill_of_supply';
+  /** e-Invoice state. B2C documents in this build are always 'not_required'. */
+  irpStatus: GstIrnStatus;
+  irn: string | null;
+  /** B2B buyer details, present only on regular GST tax invoices issued for a business customer. */
+  recipient: {
+    name: string;
+    gstin: string;
+    stateCode: string;
+    address: string | null;
+    email: string | null;
+  } | null;
+  /** Immutable GST decomposition; null for non-GST receipts. */
+  gst: GstSnapshotData | null;
   status: 'issued' | 'voided';
   issuedAt: string;
   issuedBy: string | null;
@@ -56,6 +88,11 @@ export type ReceiptData = {
     address: string;
     phone: string | null;
     logoUrl: string | null;
+    /** GST identity, present only on GST documents. */
+    gstin: string | null;
+    legalName: string | null;
+    tradeName: string | null;
+    stateCode: string | null;
   };
   totals: {
     subtotalPaise: number;
@@ -76,7 +113,7 @@ export type ReceiptData = {
 };
 
 export type InvoiceResult =
-  | { ok: true; invoice: ReceiptData }
+  | { ok: true; invoice: ReceiptData; /** Staff role of the viewer (drives UI affordances; the server re-checks). */ role: string }
   | { ok: false; reason: 'unconfigured' | 'signed-out' | 'no-membership' | 'not-found' };
 
 type JsonObject = Record<string, unknown>;
@@ -141,6 +178,40 @@ function parseLine(row: RestaurantInvoiceLine): InvoiceLineData {
   };
 }
 
+function parseGstSnapshot(value: unknown): GstSnapshotData | null {
+  if (value === null || value === undefined) return null;
+  const snap = object(value);
+  if (!Object.keys(snap).length) return null;
+  const mode = snap.mode;
+  if (mode !== 'regular' && mode !== 'composition') {
+    throw new Error('The saved document carries an unknown GST mode.');
+  }
+  const regularProfile = snap.regular_profile;
+  if (
+    regularProfile !== null && regularProfile !== 'other_than_specified_premises' && regularProfile !== 'specified_premises'
+  ) {
+    throw new Error('The saved document carries an unknown GST profile.');
+  }
+  return {
+    mode,
+    regularProfile: regularProfile ?? null,
+    profileNotification: nullableText(snap.profile_notification),
+    rateBps: integer(snap.rate_bps),
+    cgstBps: integer(snap.cgst_bps),
+    sgstBps: integer(snap.sgst_bps),
+    taxablePaise: integer(snap.taxable_paise),
+    cgstPaise: integer(snap.cgst_paise),
+    sgstPaise: integer(snap.sgst_paise),
+    igstPaise: integer(snap.igst_paise),
+    placeOfSupplyStateCode: nullableText(snap.place_of_supply_state_code),
+    interState: snap.inter_state === true,
+    configVersion: integer(snap.config_version),
+    notice: nullableText(snap.notice),
+  };
+}
+
+const IRP_STATUSES: readonly GstIrnStatus[] = ['not_required', 'pending', 'generated', 'failed', 'cancelled'];
+
 function parsePayment(value: unknown, timezone: string): InvoicePaymentData | null {
   const payment = object(value);
   if (typeof payment.method !== 'string') return null;
@@ -178,12 +249,28 @@ export function parseInvoice(
     : [];
   const lineData = rows.map(parseLine);
 
+  const irpStatus = IRP_STATUSES.includes(row.irp_status) ? row.irp_status : 'not_required';
+  const customer = object(row.customer_snapshot);
+  const recipientGstin = nullableText(customer.gstin);
+  const recipient = recipientGstin
+    ? {
+        name: requiredText(customer.name, 'the buyer legal name'),
+        gstin: recipientGstin,
+        stateCode: nullableText(customer.state_code) ?? recipientGstin.slice(0, 2),
+        address: nullableText(customer.address),
+        email: nullableText(customer.email),
+      }
+    : null;
   return {
     id: row.id,
     restaurantId: row.restaurant_id,
     number: row.invoice_number,
     financialYear: row.financial_year,
     documentType: row.document_type,
+    irpStatus,
+    irn: nullableText(row.irn),
+    recipient,
+    gst: parseGstSnapshot(row.gst_snapshot),
     status: row.status,
     issuedAt: formatWhen(row.issued_at, timezone),
     issuedBy: row.issued_by,
@@ -198,6 +285,10 @@ export function parseInvoice(
       address: requiredText(seller.address, 'the restaurant address'),
       phone: nullableText(seller.phone),
       logoUrl: publicAssetUrl(nullableText(seller.logo_path)),
+      gstin: nullableText(seller.gstin),
+      legalName: nullableText(seller.legal_name),
+      tradeName: nullableText(seller.trade_name),
+      stateCode: nullableText(seller.state_code),
     },
     totals: {
       subtotalPaise: integer(totals.subtotal_paise),
@@ -226,7 +317,7 @@ export async function getInvoiceData(invoiceId: string): Promise<InvoiceResult> 
   const { data: invoice, error } = await supabase
     .from('restaurant_invoices')
     .select(
-      'id, restaurant_id, order_session_id, invoice_number, financial_year, sequence_number, document_type, status, issued_at, issued_by, table_label_snapshot, session_opened_at, session_closed_at, seller_snapshot, customer_snapshot, totals_snapshot, payment_snapshot, source_order_ids, supersedes_invoice_id, voided_at, voided_by, void_reason, created_at'
+      'id, restaurant_id, order_session_id, invoice_number, financial_year, sequence_number, document_type, status, issued_at, issued_by, table_label_snapshot, session_opened_at, session_closed_at, seller_snapshot, customer_snapshot, totals_snapshot, payment_snapshot, source_order_ids, supersedes_invoice_id, voided_at, voided_by, void_reason, created_at, gst_snapshot, irn, irp_status'
     )
     .eq('id', invoiceId)
     .eq('restaurant_id', restaurantId)
@@ -268,6 +359,7 @@ export async function getInvoiceData(invoiceId: string): Promise<InvoiceResult> 
 
   return {
     ok: true,
+    role: staff.context.role,
     invoice: {
       ...parseInvoice(
         invoice as unknown as RestaurantInvoice,

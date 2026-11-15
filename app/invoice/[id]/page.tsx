@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const result = await getInvoiceData(id);
-  if (result.ok) return <InvoiceScreen invoice={result.invoice} />;
+  if (result.ok) return <InvoiceScreen invoice={result.invoice} staffRole={result.role} />;
 
   return (
     <div data-surface="owner" className="min-h-dvh bg-paper-deep px-5 py-10 text-gink antialiased">

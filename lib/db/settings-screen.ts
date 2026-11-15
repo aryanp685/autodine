@@ -19,6 +19,7 @@
 import type { OutletOption } from '../outlets';
 import type { OutletEntitlement } from '../access';
 import { getStaffContextDetailed } from './staff';
+import { loadGstSettings, NOT_READY, type GstSettingsData } from './gst-settings';
 import { canEditSettings } from '../settings-input';
 import { qrSvg, siteOrigin } from '../qr';
 import { publicMenuPath } from '../settings-input';
@@ -68,6 +69,8 @@ export type SettingsScreenData = {
    * which the screen treats as "ask the server", never as "allowed".
    */
   outletEntitlement?: OutletEntitlement | null;
+  /** GST configuration, or ready:false when the GST migration is not applied. */
+  gst: GstSettingsData;
   blocked?: 'signed-out' | 'no-membership';
 };
 
@@ -90,6 +93,7 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
       outlets: [],
       activeOutletId: '',
       outletEntitlement: null,
+      gst: NOT_READY,
       blocked: staff.reason,
     };
   }
@@ -124,8 +128,9 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
           .maybeSingle()
       : firstRestaurantResult;
 
-  const [menusResult] = await Promise.all([
+  const [menusResult, gst] = await Promise.all([
     supabase.from('menus').select('id, is_published').eq('restaurant_id', restaurantId),
+    loadGstSettings(supabase, restaurantId),
   ]);
 
   if (restaurantResult.error) {
@@ -152,6 +157,7 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
       totalMenus: 0,
       outlets: [],
       activeOutletId: '',
+      gst: NOT_READY,
       blocked: 'no-membership',
     };
   }
@@ -192,6 +198,7 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
     totalMenus: menus.length,
     outlets,
     activeOutletId: restaurantId,
+    gst,
     // The plan lives on the account, so this is the account's allowance and
     // the account's outlet count -- not this outlet's.
     outletEntitlement: staff.context.access?.outlets ?? null,

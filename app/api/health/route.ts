@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { probeHealth, probeOperationalSchema, isReady, type ProbeClient } from '@/lib/health';
 import { BILLING } from '@/lib/plans';
+import { formatHealthAlertLine } from '@/lib/monitoring-incidents';
 
 /**
  * GET /api/health
@@ -39,6 +40,20 @@ export async function GET() {
 
   const operational = await probeOperationalSchema((server as unknown as ProbeClient | null) ?? null);
   const ok = isReady(health, operational);
+
+  // Application failure path -> structured, fixed-vocabulary alert line.
+  // Provider-independent: a log drain can page on `[autodine:alert]` +
+  // event `health_check_failed`. No keys, ids or tenant data are emitted.
+  if (!ok) {
+    console.warn(formatHealthAlertLine({
+      configured: health.configured,
+      serverKey: health.serverKey,
+      reachable: health.reachable,
+      credentials: health.credentials,
+      credentialProbe: health.credentialProbe,
+      schema: { ...health.schema, ...operational },
+    }));
+  }
 
   return NextResponse.json(
     { ok, ...health, operational, checkedAt: new Date().toISOString() },

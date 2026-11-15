@@ -21,6 +21,7 @@ import {
   saveGuestVerificationAction,
   saveTaxAction,
 } from '@/app/(staff)/dashboard/settings/actions';
+import { GstSettingsPanel } from '@/components/screens/GstSettingsPanel';
 import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
 import {
@@ -508,6 +509,9 @@ export function SettingsScreen({
                     immediately.
                   </p>
                 </Panel>
+
+                {/* ------------------------------------------------------ GST billing */}
+                <GstSettingsPanel gst={data?.gst ?? { ready: false, mode: 'off', regularProfile: 'other_than_specified_premises', gstin: '', legalName: '', tradeName: '', address: '', stateCode: '', pan: '', registrationType: 'regular', compositionAcknowledged: false, specifiedPremisesAttested: false, specifiedPremisesEffectiveFrom: '2025-04-01', offDeclared: false, offDeclaredAt: null, precedingFyTurnoverRupees: '', einvoiceLocation: '', einvoicePincode: '', einvoiceHsnSac: '', configVersion: 0, updatedAt: null }} disabled={disabled} />
 
                 {/* ------------------------------------------- how guests verify */}
                 <Panel

@@ -22,6 +22,28 @@ beforeEach(() => {
   mocks.staff.result = null;
 });
 
+describe('checkoutSessionAction — buyer GSTIN', () => {
+  it('rejects a GSTIN whose checksum fails, before reaching the database', async () => {
+    mocks.staff.result = { supabase: { rpc: mocks.rpc }, role: 'cashier' };
+    const result = await checkoutSessionAction(SESSION_ID, { name: 'Buyer Foods LLP', gstin: '29ABCDE1234F1Z0' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/not usable/);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it('passes a checksum-valid B2B recipient through to the checkout RPC', async () => {
+    const invoiceId = 'ee1bdc77-e632-40a2-b5f7-4c17139d6d85';
+    mocks.staff.result = { supabase: { rpc: mocks.rpc }, role: 'cashier' };
+    mocks.rpc.mockResolvedValue({ data: invoiceId, error: null });
+    const result = await checkoutSessionAction(SESSION_ID, { name: 'Buyer Foods LLP', gstin: '29ABCDE1234F1ZW', address: 'Buyer House, MIDC, Pune - 411001', email: 'Accounts@Buyer.example' });
+    expect(result).toEqual({ ok: true, invoiceId, invoiceUrl: `/invoice/${invoiceId}` });
+    expect(mocks.rpc).toHaveBeenCalledWith('close_order_session_and_issue_receipt', {
+      p_order_session_id: SESSION_ID,
+      p_recipient: { name: 'Buyer Foods LLP', gstin: '29ABCDE1234F1ZW', address: 'Buyer House, MIDC, Pune - 411001', email: 'accounts@buyer.example' },
+    });
+  });
+});
+
 describe('checkoutSessionAction', () => {
   it('rejects malformed ids before reaching the database', async () => {
     expect(await checkoutSessionAction('T3')).toEqual({

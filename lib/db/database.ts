@@ -34,6 +34,8 @@ import type {
   PaymentStatus,
   PrepStatus,
   Restaurant,
+  RestaurantGstConfig,
+  Json,
 } from './types';
 
 type Table<Row, Rel extends unknown[] = []> = {
@@ -217,6 +219,8 @@ export type Database = {
       dining_tables: Table<DiningTable>;
       /** The sitting represented by the consolidated table bill. */
       order_sessions: Table<OrderSession>;
+      /** Per-restaurant GST configuration; one live row, mode 'off' by default. */
+      restaurant_gst_config: Table<RestaurantGstConfig>;
       /** Immutable, sequential customer receipts; rows are written only by RPC. */
       restaurant_invoices: Table<RestaurantInvoice>;
       /** Immutable line snapshots belonging to a receipt. */
@@ -488,6 +492,20 @@ export type Database = {
         Returns: unknown;
       };
       operational_schema_readiness: { Args: Record<string, never>; Returns: Record<string, boolean> };
+      list_restaurant_irp_reconciliation: {
+        Args: Record<string, never>;
+        Returns: {
+          invoice_id: string;
+          restaurant_id: string;
+          invoice_number: string;
+          document_type: string;
+          irp_status: string;
+          is_b2b: boolean;
+          issued_at: string;
+          last_attempt_at: string | null;
+          attempt_count: number;
+        }[];
+      };
       reserve_staff_tts_attempt: {
         Args: { p_restaurant_id: string };
         Returns: { allowed: boolean; retry_after_seconds: number }[];
@@ -958,18 +976,39 @@ export type Database = {
        * The database reads ticket/payment rows and allocates its own number.
        */
       issue_closed_session_receipt: {
-        Args: { p_order_session_id: string };
+        Args: { p_order_session_id: string; p_recipient?: Json | null };
         Returns: string;
       };
       /** P8: closes a table and issues/returns its receipt in one transaction. */
       close_order_session_and_issue_receipt: {
-        Args: { p_order_session_id: string };
+        Args: { p_order_session_id: string; p_recipient?: Json | null };
         Returns: string;
       };
       /** P6: owner/manager-only void that preserves the number and snapshot. */
       void_restaurant_invoice: {
         Args: { p_invoice_id: string; p_reason: string };
         Returns: undefined;
+      };
+      /**
+       * Migration 20261114000500. Credit/debit notes against GST documents.
+       * Owner/manager only; immutable; one live note of each kind per source
+       * document; CN/DN number series allocated transactionally.
+       */
+      issue_invoice_note: {
+        Args: { p_invoice_id: string; p_document_type: 'credit_note' | 'debit_note'; p_reason_code: 'returned_supply' | 'quantity_difference' | 'rate_difference' | 'post_supply_change' | 'other'; p_reason: string };
+        Returns: string;
+      };
+      void_invoice_note: {
+        Args: { p_note_id: string; p_reason: string };
+        Returns: undefined;
+      };
+      record_restaurant_irp_request: {
+        Args: { p_invoice_id: string; p_provider: string; p_payload_version: string; p_status: 'payload_built' | 'submitted' | 'accepted' | 'rejected' | 'transport_error'; p_request_sha256?: string | null; p_response_sha256?: string | null; p_error_code?: string | null; p_error_message?: string | null };
+        Returns: string;
+      };
+      record_note_irp_request: {
+        Args: { p_note_id: string; p_provider: string; p_payload_version: string; p_status: 'payload_built' | 'submitted' | 'accepted' | 'rejected' | 'transport_error'; p_request_sha256?: string | null; p_response_sha256?: string | null; p_error_code?: string | null; p_error_message?: string | null };
+        Returns: string;
       };
       /**
        * P4: one authenticated staff tick settles every remaining order in an

@@ -18,6 +18,10 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
+vi.mock('@/app/(staff)/dashboard/settings/gst-actions', () => ({
+  saveGstAction: mocks.action('saveGstAction'),
+}));
+
 vi.mock('@/app/(staff)/dashboard/settings/actions', () => ({
   saveDetailsAction: mocks.action('saveDetailsAction'),
   saveTaxAction: mocks.action('saveTaxAction'),
@@ -50,6 +54,29 @@ function data(over: Partial<SettingsScreenData> = {}): SettingsScreenData {
     totalMenus: 1,
     outlets: [{ id: 'r-1', name: 'Maddi', role: 'owner' }],
     activeOutletId: 'r-1',
+    gst: {
+      ready: true,
+      mode: 'off',
+      regularProfile: 'other_than_specified_premises',
+      gstin: '',
+      legalName: '',
+      tradeName: '',
+      address: '',
+      stateCode: '',
+      pan: '',
+      registrationType: 'regular',
+      compositionAcknowledged: false,
+      specifiedPremisesAttested: false,
+      specifiedPremisesEffectiveFrom: '2025-04-01',
+      offDeclared: false,
+      offDeclaredAt: null,
+      precedingFyTurnoverRupees: '',
+      einvoiceLocation: '',
+      einvoicePincode: '',
+      einvoiceHsnSac: '',
+      configVersion: 0,
+      updatedAt: null,
+    },
     ...over,
   };
 }
@@ -260,11 +287,12 @@ describe('Settings, the redesign', () => {
   });
 
   it('gives every form the same commit button', () => {
-    // Four forms, four saves, one appearance: the accent fill at the same size,
+    // Five forms, five saves, one appearance: the accent fill at the same size,
     // so "which control commits this card" is answered the same way every time.
-    // The last is the guest-verification choice (migration 20261028000900).
+    // The last is the guest-verification choice (migration 20261028000900);
+    // the GST card (migration 20261113000100) is one more save, same appearance.
     const html = renderToStaticMarkup(<SettingsScreen data={data()} />);
-    expect(count(html, 'bg-grass text-cream')).toBe(4);
+    expect(count(html, 'bg-grass text-cream')).toBe(5);
   });
 
   it('draws no hand-made alert boxes any more', () => {

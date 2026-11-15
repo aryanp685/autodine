@@ -335,4 +335,52 @@ describe.skipIf(!URL_VALUE)('Phase 0 database security boundaries', () => {
       expect(await staff(b.owner, async () => (await db.query('select * from accounts')).rows)).toEqual([]);
     });
   });
+
+  describe('SECURITY DEFINER trigger functions', () => {
+    it('grants EXECUTE on no trigger function to any runtime role', async () => {
+      // PostgreSQL does not consult EXECUTE for trigger-fired functions
+      // (proven on the embedded cluster; see
+      // scripts/local-pg/probe-trigger-execute.mjs). The functions exist in
+      // the PostgREST catalogue, so no runtime role should hold EXECUTE.
+      const { rows } = await db.query(`
+        select p.proname as name,
+               has_function_privilege('anon', p.oid, 'EXECUTE') as anon_exec,
+               has_function_privilege('public', p.oid, 'EXECUTE') as public_exec,
+               has_function_privilege('authenticated', p.oid, 'EXECUTE') as authenticated_exec,
+               has_function_privilege('service_role', p.oid, 'EXECUTE') as service_role_exec
+          from pg_proc p
+          join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public'
+           and p.prorettype = 'trigger'::regtype
+           and p.prosecdef`);
+      expect(rows.length).toBeGreaterThanOrEqual(13);
+      for (const row of rows) {
+        expect(
+          [row.anon_exec, row.public_exec, row.authenticated_exec, row.service_role_exec],
+          `trigger function ${row.name} leaks EXECUTE to a runtime role`,
+        ).toEqual([false, false, false, false]);
+      }
+    });
+
+    it('still fires a trigger whose function holds EXECUTE for no runtime role', async () => {
+      // ensure_table_qr_code() provisions a QR token for every new dining
+      // table, so a table appearing in table_qr_codes proves the trigger
+      // path works with EXECUTE revoked everywhere.
+      const slug = 'trigger-probe-' + randomUUID();
+      const restaurant = (await db.query(
+        `insert into restaurants(slug,name,address,tax_rate_bps,guest_verification_mode)
+         values ($1,'Trigger probe restaurant','Test-only address',0,'scan') returning id`,
+        [slug],
+      )).rows[0].id;
+      const table = (await db.query(
+        `insert into dining_tables(restaurant_id,label) values ($1,'Probe') returning id`,
+        [restaurant],
+      )).rows[0].id;
+      const qr = (await db.query(
+        'select public_token from table_qr_codes where table_id = $1',
+        [table],
+      )).rows[0];
+      expect(qr?.public_token).toBeTruthy();
+    });
+  });
 });

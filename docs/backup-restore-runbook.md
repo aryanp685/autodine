@@ -1,0 +1,125 @@
+# AutoDine backup & restore runbook (independent logical backup)
+
+**Status: pipeline implemented and locally verified; no hosted destination configured (needs owner approval); plan/PITR visibility BLOCKED.**
+
+AutoDine currently has **no independent, verified backup of production data**. The Supabase connector cannot show the project plan or any PITR/backup entitlement (checked 2026-11-14). Third-party sources (check date 2026-11) indicate Free projects get effectively no usable scheduled backups and no PITR; Pro ($25/month) includes daily backups with 7-day retention; PITR is a paid add-on (~$100–$400/month per project depending on retention window) and covers **database only** — Supabase Storage objects are never included in any database backup. Verify your plan in the Supabase dashboard: **Project → Database → Backups**.
+
+Until the owner (a) confirms the plan and (b) approves a destination, this runbook's pipeline is the primary protection. It costs nothing to run against any reachable Postgres connection string.
+
+## What the pipeline covers
+
+- All tables, data, constraints (PK inline; UNIQUE/CHECK deferred, FKs last), indexes, sequences (`setval` restored), views, functions (full `pg_get_functiondef` DDL — SECURITY DEFINER and `search_path` preserved; emitted in dependency order; EXECUTE ACLs recreated from `proacl`), triggers, RLS policies (role lists preserved) and RLS enable/force flags — for the `public` schema.
+- User-defined enum and domain types, which the table DDL references (emitted before any table). Composite types are reported as a WARNING, not silently dropped; domain CHECK constraints are likewise reported, not recreated — see failure modes.
+- Consistency: one `REPEATABLE READ READ ONLY` transaction for the entire dump — a single point-in-time snapshot.
+- Data round-trips through `::text` casts, which is lossless for built-in types (arrays, jsonb, ranges, inet…).
+- Encryption: **AES-256-GCM**, key = scrypt(passphrase, random salt, N=2^14). Layout: `ADBK01\n` magic, 16B salt, 12B IV, 16B tag, ciphertext of gzipped SQL. Losing the passphrase loses the backup.
+- Integrity: SHA-256 recorded in a sidecar `<name>.manifest.json` (rows/bytes/object counts, duration, schema). Restore prints file hash and a verification report.
+- Retention: `--keep-daily 14 --keep-weekly 8 --keep-monthly 6` by default; prunes **only** files it wrote (`autodine-*.*`), never anything else.
+
+## What it does NOT cover (honest gaps)
+
+- `auth.*` (GoTrue users, identities, refresh tokens) — managed by Supabase; export requires the Management API / database `auth` schema access. Not backed up here. Covered only by the platform's own backup/PITR if your plan has it.
+- Supabase Storage buckets (logos, brand assets) — separate system; needs its own sync/mirror. Not backed up here.
+- Platform configuration (Auth settings, SMTP, Realtime config, extensions) — documented in the infrastructure runbooks, not in the dump.
+- Object-level `GRANT`/`REVOKE` on tables/schemas and default privileges — the dump restores function EXECUTE ACLs from `proacl` exactly, but table/schema-level ACLs are recreated only as PostgreSQL defaults. The migrations own those (e.g. revokes from `public`/`anon`); replaying the migration chain onto an empty database reproduces them. Use `--pg-dump` mode on any host that has `pg_dump` for full-fidelity ACLs and extension management.
+- Point-in-time recovery (RPO < the backup interval) — only PITR gives that; this pipeline is snapshot-only (RPO = backup interval).
+
+## Commands
+
+```bash
+# self-verification drill (embedded PostgreSQL, synthetic data, ~10 s)
+node scripts/backup/selftest.mjs
+
+# backup (Mode A when pg_dump exists, else built-in Mode B)
+AUTODINE_BACKUP_SOURCE_URL='postgresql://postgres.<ref>:<password>@aws-...pooler.supabase.com:6543/postgres' \
+AUTODINE_BACKUP_PASSPHRASE='<from your password manager>' \
+node scripts/backup/backup-logical.mjs --out-dir /mnt/backups/autodine \
+  --keep-daily 14 --keep-weekly 8 --keep-monthly 6
+
+# restore into an EMPTY database
+AUTODINE_RESTORE_TARGET_URL='postgresql://...scratch...' \
+AUTODINE_BACKUP_PASSPHRASE='<same>' \
+node scripts/backup/restore-logical.mjs --file /mnt/backups/autodine/autodine-*.sql.gz.enc --confirm-empty-db
+```
+
+Never put either URL on a command line (shell history) — always the environment variables, as shown. Neither command prints the URL.
+
+## Verified evidence (2026-11-14)
+
+- `selftest.mjs` — 14/14 checks PASS on embedded PostgreSQL 17: dump contains DDL/policies/RLS/functions; destroy-and-restore reproduces the row fingerprint (sha256) exactly; trigger, SECURITY DEFINER, `search_path`, RLS flag and policy all preserved; tampered ciphertext and wrong passphrase both rejected.
+- CLI end-to-end — 400-row fixture: backup → manifest (rows=400, sha256 recorded) → drop → restore → exact row count and `sum(qty)` verified (240600). Restore report prints object counts + exact rows.
+- `test:db:logical-restore` — full 88-migration chain replayed onto embedded PostgreSQL 17, Mode B backup → restore into a shim-only target, then public-schema fingerprint compared: 47 tables / 58 policies / 160 functions identical. (This found and fixed four real dump defects in one pass: missing enum/domain types, function dependency order, `name[]` role lists from `pg_policies`, and function EXECUTE ACLs.) It does NOT exercise the `pg_dump --format=custom` path — that drill exists only in the CI `native-database` job and has never been executed; see CI notes.
+- NOT YET PERFORMED: a restore rehearsal against a hosted scratch database (acceptance criterion Part 2). Procedure below; needs owner approval to create the scratch project.
+
+## Isolated hosted restore rehearsal (prepare, then execute with approval)
+
+1. Create a **scratch** Supabase project in the same org (Free tier is fine; ~2 minutes; existing org — this is a cost-neutral creation, but still requires the owner’s go-ahead because it handles real backup data).
+2. Run the backup against production (read-only, one transaction; off-peak; reads only).
+3. Restore into the scratch project with `--confirm-empty-db`.
+4. Verify: row counts per table vs. production manifest; app-level smoke (open menus, counts); spot-check money invariants (e.g., `select sum(amount_paise) from payments` vs. manifest totals).
+5. **Destroy the scratch project** (or keep encrypted in place until acceptance signed). Record: date, who ran it, counts, pass/fail.
+6. Evidence file: store the manifest + verification report in the ops repo; never commit the dump.
+
+## Scheduling
+
+Host cron (operator workstation / a small VM):
+
+```cron
+17 3 * * *  cd /opt/autodine && AUTODINE_BACKUP_SOURCE_URL=... AUTODINE_BACKUP_PASSPHRASE=... node scripts/backup/backup-logical.mjs --out-dir /mnt/backups/autodine --keep-daily 14 --keep-weekly 8 --keep-monthly 6 >> /var/log/autodine-backup.log 2>&1
+```
+
+GitHub Actions (NOT ACTIVATED — needs the two secrets and approval):
+
+```yaml
+name: backup
+on: { schedule: [{ cron: "17 3 * * *" }], workflow_dispatch: {} }
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci --omit=dev
+      - run: node scripts/backup/backup-logical.mjs --out-dir "$RUNNER_TEMP/backups" --keep-daily 14 --keep-weekly 8 --keep-monthly 6
+        env:
+          AUTODINE_BACKUP_SOURCE_URL: ${{ secrets.BACKUP_SOURCE_URL }}
+          AUTODINE_BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      - uses: actions/upload-artifact@v4   # or rclone to the chosen bucket
+        with: { name: autodine-backup, path: ${{ runner.temp }}/backups, retention-days: 35 }
+```
+
+## Storage destination — options and approximate cost (2026 prices; re-verify)
+
+AutoDine’s database is small (44 tables; expect < 500 MB). Any of these is effectively free; **all require account creation and owner approval — none is enabled**:
+
+| Option | Price | Egress | Notes |
+|---|---|---|---|
+| Backblaze B2 | ~$6.95 / TB / month | Free to 3× stored volume | Cheapest; S3-compatible; recommended default for this scale |
+| Cloudflare R2 | $0.015 / GB / month | Free | Zero egress; also S3-compatible |
+| AWS S3 Standard | ~$0.023 / GB / month | ~$0.09 / GB after 100 GB | Most expensive at scale; free tier tiny |
+| Wasabi | $7.99 / TB / month, 1 TB minimum | Free (fair use) | Minimum spend ~$8/month — avoid |
+| Google Drive (already connected) | Free (15 GB) | — | Not S3-compatible; usable via rclone; approval required, and content would sit in a personal drive — prefer B2/R2 |
+| Supabase Pro upgrade ($25/mo) | included daily backups, 7-day retention | — | Separate decision; PITR add-on extra (~$100+/mo) — not needed if this pipeline is scheduled and drills pass |
+
+For < 5 GB/month stored: **B2 or R2 ≈ $0.01–0.08/month**. No paid plan is to be activated without explicit owner approval.
+
+## Key management
+
+- Passphrase: 20+ random chars from a password manager; never in git, env files committed anywhere, or chat. Rotate yearly; re-encrypt means "take a fresh backup".
+- The manifest is not secret (counts and timestamps only). The `.sql.gz.enc` file is.
+- Restore drills: quarterly; after any schema-migration incident; before declaring a new environment "production-ready".
+
+## Alerting
+
+On failure the script POSTs `{ "text": ... }` to `BACKUP_ALERT_WEBHOOK` (Slack-compatible; any JSON webhook works) and exits 1. On success it stays silent by design (alert on absence via your cron/monitor, or add `--alert-on-success` if wanted). Delivery is UNVERIFIED until an endpoint exists; until then failures appear only in the log. Once email (Resend) is live, point the webhook at a relay or wire the runbook's owner-email alert (Part 7).
+
+## Failure modes
+
+| Symptom | Likely cause | Action |
+|---|---|---|
+| ` Decryption failed: wrong passphrase or corrupted file` | Passphrase mismatch / truncated upload | Use password manager; re-download; re-run with `--pg-dump` if the file came from another tool |
+| Replay fails with syntax error | Backup from newer Postgres into older target | Restore into PG ≥ source version |
+| FK violation on restore | Tables restored out of order | Pipeline order handles this; if using psql directly, replay FKs last |
+| Backup hangs | Locked tables / huge data | It takes one consistent snapshot — wait; check `pg_stat_activity` on source |
+| Row fingerprint mismatch in drill | Non-deterministic ordering in compare | Compare per-table counts, not raw order (selftest does ordered compare) |
+| `type "x" does not exist` on restore | Dump predates enum/domain support | Re-take the backup with the current pipeline |
+| Domain CHECK missing after restore | Domain CHECK constraints are reported, not recreated | Recreate the domain CHECK by hand or restore via `pg_dump` mode |

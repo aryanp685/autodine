@@ -28,3 +28,14 @@ Fixture manifest is local to the ephemeral runner. This version deliberately **r
 ## Local preparation evidence, not hosted E2E success
 
 Typecheck/lint and negative guard tests can run without credentials. The actual hosted run is blocked until repository secrets are available. No new Auth users or persistent tenant fixtures are created by a failed missing-secret preflight.
+
+## Pre-flight: validate the acceptance environment locally
+
+With the secrets and fixture env placed (e.g. in a local `.env` or the CI job
+env), run `npm run staging:verify-env`. It refuses anything that is not the
+exact approved isolated-staging fixture shape — wrong origin, production-like
+values, missing adversarial fixtures, duplicate card tokens — and prints only
+key names and rule ids, never values. It contacts no network. A failure here
+must be fixed before dispatching the runner; a green check does not authorize
+a hosted run by itself: the staging rehearsal still requires the owner's
+explicit authorization naming `juwyhslzchjevqkdvwjm`.

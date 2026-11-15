@@ -42,7 +42,17 @@ yarn-error.log*
 !/docs/website-readiness-audit.md
 !/docs/production-saas-readiness-audit.md
 !/docs/preview-isolation.md
+!/docs/preview-isolation-verification-2026-11-14.md
+!/docs/programme-status-2026-11-14.md
+!/docs/monitoring-readiness-2026-11-14.md
+!/docs/resend-auth-readiness-2026-11-14.md
+!/docs/hosted-synthetic-acceptance-2026-11-14.md
+!/docs/report-sales-staging-rehearsal-2026-11-14.md
+!/docs/device-acceptance-2026-11-14.md
 !/docs/migration-reconciliation.md
+!/docs/production-only-migrations-2026-11-14.md
+!/docs/backup-restore-runbook.md
+!/docs/gst-two-mode-2026-11-14.md
 !/docs/verification-2026-11-10.md
 !/docs/subscription-billing-2026-11-10.md
 !/docs/review-deployment-2026-11-11.md
@@ -72,3 +82,9 @@ tts-smoke-artifacts/
 
 # Private staging auth state, fixture credentials and raw browser reports
 /.staging-private/
+!/docs/report-sales-staging-rehearsal-2026-11-14.md
+!/docs/resend-auth-readiness-2026-11-14.md
+!/docs/monitoring-readiness-2026-11-14.md
+!/docs/device-acceptance-2026-11-14.md
+!/docs/hosted-synthetic-acceptance-2026-11-14.md
+!/docs/programme-status-2026-11-14.md

@@ -1,13 +1,17 @@
 import type { Metadata } from 'next';
 import { InvoiceHistoryScreen } from '@/components/screens/InvoiceHistoryScreen';
+import { EinvoiceReconciliationPanel } from '@/components/screens/EinvoiceReconciliationPanel';
 import { getInvoiceHistory } from '@/lib/db/invoice-history';
+import { getEinvoiceReconciliation } from '@/lib/db/einvoice-reconciliation';
 import { getOutletBar } from '@/lib/db/outlet-bar';
 
 export const metadata: Metadata = { title: 'Invoice history · AutoDine', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
 
 export default async function InvoiceHistoryPage() {
-  const [result, outlet] = await Promise.all([getInvoiceHistory(), getOutletBar()]);
+  const [result, outlet, reconciliation] = await Promise.all([getInvoiceHistory(), getOutletBar(), getEinvoiceReconciliation()]);
+  const reconciliationPanel =
+    reconciliation.ok && reconciliation.visible ? <EinvoiceReconciliationPanel rows={reconciliation.rows} /> : null;
   if (!result.ok) {
     const message = result.reason === 'role-denied'
       ? 'Invoice history is available only to owner, manager and cashier roles.'
@@ -23,5 +27,5 @@ export default async function InvoiceHistoryPage() {
       </main>
     );
   }
-  return <InvoiceHistoryScreen rows={result.rows} outlet={outlet} />;
+  return <InvoiceHistoryScreen rows={result.rows} outlet={outlet} einvoiceFollowUps={reconciliationPanel} />;
 }

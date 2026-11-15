@@ -86,6 +86,9 @@ A file with **no ledger record** is therefore not called "unapplied" until the c
 | `scripts/reconcile/reconcile-migrations.mjs` | Every check below, on a throwaway PostgreSQL. Refuses a non-loopback server and reads no application environment. |
 | `scripts/reconcile/catalog-probe.sql` | One read-only statement that returns one JSON document: functions (body hash, security mode, grants), policies, columns, relations and their grants, triggers, indexes, constraints. The harness runs this same file locally, so a hosted result is directly comparable. |
 | `scripts/reconcile/evidence/production-2026-11-10.json` | What was kept from production reads made on 2026-11-10: a ledger summary, the files with no same-named entry, six function body hashes and two functions that were absent. The full ledger was not kept. |
+| `scripts/reconcile/evidence/production-2026-11-14.json` | The ledger summary refreshed on 2026-11-14 (121 entries, last `20261112000100`, unnamed): which repository files have no same-version ledger entry. `catalogFacts` inside are unchanged 2026-11-10 observations and are superseded by the probe. |
+| `scripts/reconcile/evidence/production-2026-11-14-catalog-probe.json` | The seven-section read-only catalog probe captured on 2026-11-14 (1030 objects, per-object md5s, server-side checksum verified). Input to `classify`. |
+| `scripts/reconcile/evidence/classify-production-2026-11-14.json` | The `classify` report produced from that probe and the refreshed fixture. |
 | `scripts/local-pg/with-embedded-postgres.mjs` | Runs any command against a disposable local PostgreSQL. |
 
 ```bash
@@ -193,6 +196,109 @@ have not been queried during this merge.
   database classified `PRESENT` would have its repairing migration recorded as already applied and never run.
 - A populated pre-upgrade database must take the whole pending set with no row lost.
 
+## Findings on 2026-11-14
+
+Read-only re-verification of Production (`bdbaqpevwmgdvghszjno`), no DDL/DML, nothing applied.
+
+**Capture.** All seven catalog sections were read via the read-only connector and saved to `scripts/reconcile/evidence/production-2026-11-14-catalog-probe.json` (1030 objects: 120 functions, 71 policies, 405 columns, 44 relations, 17 triggers, 126 indexes, 247 constraints). Every section was verified against a server-side `md5(string_agg(...))` aggregate computed on the server, except functions, whose aggregate ordering differs from the local reconstruction; those 120 per-object values were instead compared row by row and are all identical. One transcription error in the manually copied column page (`restaurant_invoice_share_links.access_count`) was found by this check and fixed.
+
+**Ledger.** Production now reports 121 ledger entries (was 86 on 2026-11-10); the newest is `20261112000100` with no name. 49 entries still carry no repository file name. Ten repository files have no same-version ledger entry: `20261110000851_payment_audit_provider_actor`, `20261110000950_online_payment_attempt_uniqueness`, `20261110001210_checkout_outstanding_guard`, `20261110001220_revoke_client_bypass_privileges`, `20261112000200_immutable_restaurant_account_link`, `20261112000300_report_sales_export_authorization`, `20261112000400_bound_subscription_history`, and the three unapplied serialization migrations `20261112000500`, `20261112000600`, `20261112000700`. The first four (Phase 6/PR #181-era) are branch files that were never recorded; the last three have never been applied anywhere.
+
+**Classification (local only, against the probe).** Verdicts for the ten pending files, recorded in `classify-production-2026-11-14.json`:
+
+| Migration | Verdict |
+|---|---|
+| `20261110000851_payment_audit_provider_actor` | NO FOOTPRINT |
+| `20261110000950_online_payment_attempt_uniqueness` | REVIEW — drift 2 (`begin_online_payment`, `settle_online_payment`) |
+| `20261110001210_checkout_outstanding_guard` | REVIEW — drift 1 (`close_order_session_and_issue_receipt`) |
+| `20261110001220_revoke_client_bypass_privileges` | NO FOOTPRINT |
+| `20261112000200_immutable_restaurant_account_link` | APPLY — effects absent |
+| `20261112000300_report_sales_export_authorization` | REVIEW — drift 1 (`report_sales`) |
+| `20261112000400_bound_subscription_history` | APPLY — effects absent |
+| `20261112000500_serialize_outlet_creation` | REVIEW — drift 2 (`create_account_with_restaurant`, `create_outlet`) |
+| `20261112000600_serialize_subscription_payments` | REVIEW — drift 2 + absent 1 (`record_subscription_payment`, `record_subscription_payment_failure`) |
+| `20261112000700_serialize_subscription_expiry` | REVIEW — drift 1 (`expire_subscriptions`) |
+
+**Baseline drift.** 75 objects that no pending migration touches differ from the recorded baseline the repository replays — including `place_order` overloads absent in production (`place_order(text,text,jsonb,text)` missing), and the subscription functions the repository itself defines (`account_can_write`, `account_outlet_limit`, `admin_set_subscription`, `plan_price_paise`, `protect_account_plan`, `confirm_subscription_cancellation`, `request_subscription_cancellation`, `withdraw_subscription_cancellation`, `expire_subscriptions`, and others). Production's definitions of these match neither the repository baseline nor any state a repository migration produces.
+
+**Production-only objects.** 95 probe objects exist that no repository migration creates, including the whole relations `restaurant_subscriptions`, `restaurant_verification_settings` and `qr_token_migration_issues`, the column `orders.idempotency_key`, and the `table_verification_sessions`/`restaurant_subscriptions` constraint families. Production therefore runs a hand-applied or separately-deployed feature set that the repository never contained. This is the substance behind the 49 nameless ledger entries: they are not cataloguing artifacts, they correspond to real, unaccounted-for SQL.
+
+**Decisions this forces (not made here).**
+
+1. Do not apply any repository migration to Production on the strength of the ledger; the drift above must be read first. In particular the three 2026-11-12 serialization migrations read REVIEW/drift against production — they were verified only on disposable local PostgreSQL, and whether production carries the same function bodies must be established (read-only body capture) before they are applied or reworded.
+2. The two `APPLY` verdicts (`20261112000200`, `20261112000400`) are candidates to apply, in version order, once the rollout gates in `PHASE-3-HOSTED-BASELINE.md` / `PRODUCTION-BACKUP-RUNBOOK.md` are satisfied and the owner explicitly authorises the target.
+3. `classify` exits non-zero while 176 drift findings are unacknowledged. `--ack-drift` was deliberately **not** passed: each finding still needs a migration-safety decision (a converging forward migration, or a recorded reason to leave it).
+4. Production contains a subscription/verification schema direction that conflicts with the repository's account-subscription design. Reconciling or retiring it is a product decision, not something to settle by editing migrations.
+
+Nothing was applied, committed or acknowledged as part of this verification.
+
+## Drift triage — 2026-11-14 (follow-up to the probe)
+
+Method: replay every repository migration on disposable local PostgreSQL and record `md5(prosrc)` per public function after each step; fetch production's per-function `md5(prosrc)` (and a comment/whitespace-normalized variant) read-only; compare. This separates "production applied the same code written slightly differently" from "production runs code the repository never contained".
+
+Cross-check artifacts: `scripts/reconcile/evidence/prosrc-comparison.json` (raw hash per production function vs repository replay history), `normalized-comparison.json` (comment/whitespace-normalized hash vs the repository's final replayed state), `production-2026-11-14-prosrc.json` (raw hashes). Repository bodies are regenerable by replay; nothing from production beyond hashes and the few bodies quoted here is stored.
+
+**Headline.** Of 120 production functions:
+
+- **92 match the repository's final replayed state once comments/whitespace are normalized** — production runs semantically identical code, minus comments (and with `security invoker`/search_path style differences that do not affect the catalog markers used by `classify`).
+- **15 differ for real** (below).
+- **13 exist nowhere in the repository's migration history** (below).
+- 59 matched some repository state byte-for-byte; the rest of the apparent drift is comments/formatting.
+
+### The 15 real differences, by danger
+
+Security-relevant, in production today:
+
+1. `report_sales(uuid,timestamptz,timestamptz,text,text,integer,boolean)` — production's body **never calls `has_restaurant_role`**. It is `SECURITY DEFINER`, so it bypasses RLS, and it exposes every restaurant's sales report and up to `p_order_limit` underlying orders to any authenticated caller. Repository migration `20261112000300_report_sales_export_authorization.sql` exists precisely to add the owner/manager predicate (plus a 400-day range cap, a 10000-row order bound and a safe timezone fallback). Not applied; production is open. Owner decision needed now, independent of the migration ledger story.
+2. `payment_audit_events` — production holds `actor_id uuid NOT NULL` and no `profiles` FK. Repository migration `20261110000851_payment_audit_provider_actor.sql` is a designed idempotent repair for exactly this state (drop NOT NULL; add the FK `not valid`; then validate). It changes nothing on a healthy database and would fix the settlement RPC's rollback-after-update failure mode on production. Not applied.
+
+Correctness-relevant, confirmed by body/lock inspection:
+
+3. `record_subscription_payment(...)` — production validates plan/amount/currency/INR and deduplicates on `(provider, provider_event_id)`, but takes **no row lock** before reading the replay ledger and the account. Consequences: a retried webhook racing the original can surface a raw unique-violation instead of the documented `duplicate` result, and two different-event payments computed from the same pre-payment view overwrite `plan_expires_at` instead of stacking months; `from_plan` is recorded from the post-update row, so the history says `renewed` when the plan changed. Repository `20261112000600_serialize_subscription_payments.sql` (verified locally only) fixes exactly these three defects. Production has the pre-fix shape.
+4. `record_subscription_payment_failure(...)` — same name lookup, no row lock; sets `past_due` without re-checking the row. Covered by the same migration.
+5. `record_subscription_refund(...)` — differs from repository; same family (refund also records `kind = 'payment_failed'` by design). Not line-by-line reviewed; read before any apply.
+6. `expire_subscriptions()` — production loops over a snapshot and runs an **unlocked** `update ... set plan_status = 'expired'` with no re-check, and inserts an `expired` event unconditionally; a retry or concurrent run can double-insert events and miscount. Repository `20261112000700_serialize_subscription_expiry.sql` makes it idempotent (UPDATE-with-recheck). Not applied anywhere hosted.
+7. `create_outlet(text,text)` and `create_account_with_restaurant(...)` — production checks `v_used >= v_limit` with **no row lock**, so two concurrent calls can both pass the limit check and both insert; the anti-over-outlet race the repository's `20261112000500_serialize_outlet_creation.sql` closes. Not applied anywhere hosted.
+8. `account_payment_history(uuid,integer)` / `account_subscription_history(uuid,integer)` — production puts `limit greatest(coalesce(p_limit,50),1)` on the **outer** single-row aggregate, so it bounds one row (the aggregate itself) and aggregates **every** historical payment/event. Repository `20261112000400_bound_subscription_history.sql` moves the limit into the subquery (newest N first, then aggregate). This matches the `classify` verdict `APPLY` for `20261112000400`.
+9. `begin_online_payment(...)` / `settle_online_payment(...)` — production locks sessions/orders (`for update` present) but lacks the repository's one-open-intent uniqueness and stale-duplicate-capture refusal from `20261110000950_online_payment_attempt_uniqueness.sql`. Dormant only because the payment provider is disabled; the moment a provider is configured, the guard needs to be there first.
+10. `reserve_qr_verification_attempt(uuid,text)` / `clear_qr_verification_attempts(uuid,text)` — production's bodies match no repository state; the repository's `20261110000900_converge_qr_verification_attempts.sql` rewrites these against the canonical budget table (5 attempts / 15 min) and archives legacy shapes. Production's `clear` is a hard `delete`. The actual rate-limit semantics live unverified on the host.
+11. `create_staff_invite(uuid,member_role,integer)` — production's body is coherent (owner/manager boundary, owner-only manager grants, 5-retry code minting) and differs from the repository text; judged cosmetic/stylistic on read, not a correctness finding.
+12. `verification_code_for(text,bigint)` — differs in text; not line-by-line reviewed. Treat as unknown.
+13. `report_sales` export path — see (1); also note the repository adds the 400-day range cap that is absent in production.
+
+### The 13 functions that exist nowhere in the repository
+
+`place_order(text,jsonb,text)`, `place_counter_order(text,jsonb,text)`, `place_order_idempotent(text,jsonb,text,uuid)`, `record_cash_payment(text,uuid,bigint,uuid)`, `record_qr_verification_failure(uuid,text)`, `issue_table_qr_code(uuid,uuid,text,uuid)`, `set_restaurant_tax_rate(uuid,integer)`, `rotate_restaurant_verification_code(uuid,uuid)`, `revoke_table_qr_code(uuid,uuid)`, `revoke_sessions_on_qr_revocation()`, `revoke_sessions_for_ineligible_target()`, `cleanup_expired_qr_verification_attempts()`, `has_restaurant_role(uuid,member_role[])`.
+
+None is referenced by application code in this repository (the only mentions are comments and the hand-written generated-types file `lib/db/database.ts`, which itself exists because the live database could not be introspected and admits it documents the deployed production-era RPC surface, including `place_counter_order` and `record_cash_payment`). The `member_role[]` `has_restaurant_role` overload is production-only; the repository defines only the `text[]` overload (used by `report_sales` after `20261112000300`). These are remnants of the hand-applied console era. Disposition for every one: **inventory only; never drop, rename or retype without hosted usage evidence** (application logs + a restore to scratch). None of them may be used as a compatibility target for new work.
+
+### Non-function drift (catalog objects)
+
+- `table_verification_sessions` — production has **no `id` column** and uses `token_hash text` as the natural key; `qr_code_id` differs; primary key differs; `table_id_fkey`/`token_hash_key` absent because production instead uses composite `(table_id, restaurant_id)` references (same pattern as `table_qr_codes_table_restaurant_fkey` and `table_verification_sessions_table_restaurant_fkey`). This is a deliberately different, hand-applied QR-verification design the repository never contained. Migration convergence on this table would mean **adopting** the production design or a designed replacement — an owner decision, not a replay.
+- `payment_audit_events` — see above; additionally `payment_audit_events_actor_id_fkey` and `categories_menu_id_fkey` / `items_category_id_fkey` / `table_qr_codes_table_id_fkey` / `table_verification_sessions_table_id_fkey` are absent in production because production uses composite-restaurant FKs there too. The four `payment_audit_events_*_check` constraints differ in definition from the repository's.
+- RLS: production's policy set is `*_staff_*` (e.g. `items_staff_read`); the repository's equivalent policies are `*_manage` (e.g. `items_manage`) and are **missing in production**, while the production policies are missing from the repository. Row-level security semantics need a deliberate comparison before any convergence; do not drop production policies.
+- `relation restaurants (differs)` and `place_order(text,text,jsonb,text) (missing)` — production runs a different `restaurants` definition and lacks the four-argument repository overload entirely.
+- `orders.idempotency_key`, `restaurant_subscriptions`, `restaurant_verification_settings`, `qr_token_migration_issues` (relations) — exist only in production; referenced by no migration and no application code in this repository.
+- `orders_idempotency_key_unique` and the other "in the database but not in the repository" indexes — same console-era provenance; inventory only.
+
+### What this means for the pending set
+
+- `20261112000200_immutable_restaurant_account_link.sql` and `20261112000400_bound_subscription_history.sql` (APPLY verdicts) — the classification stands: effects absent in production. `20261112000400` additionally fixes the no-op limit verified above.
+- The three `20261112000500..00700` serialization migrations are **correct for production's actual state** (production exhibits every defect they close) and remain unapplied and uncommitted; applying them there means `create or replace` over the hand-written bodies, which is exactly what capture-before-replace demands: the bodies above are now captured (hashes + full text for the subscription/financial group), so a reviewed apply is technically possible — but it still needs the owner's explicit target authorization, a backup with proven restore, and staging rehearsal first. None of those gates is satisfied.
+- `20261110000950_online_payment_attempt_uniqueness.sql` — production has locking but not the uniqueness discipline; keep this REVIEW until the provider question is settled; it must land **before** any payment provider is configured.
+- `20261112000300_report_sales_export_authorization.sql` — **do this one early**: production is currently running an SECURITY DEFINER report RPC with no role predicate. It is a contained, signature-preserving change; still gated on the same target authorization.
+- `20261110000851_payment_audit_provider_actor.sql` — designed for exactly production's audit table; lowest-risk repair in the set. Same gates.
+- `20261112000200_immutable_restaurant_account_link.sql` — adds the account-link guard trigger; verify no legitimate reassign flows beforehand (there are none in the repository).
+- `--ack-drift` remains unrun: every finding above now has a documented read, but acknowledgment is the owner's migration-safety decision to record, not the agent's.
+
+### Decisions only the owner can make
+
+1. Converge now (apply the repair set to production) versus freeze and document — and in which order, under which backup.
+2. The parallel subscription schema: production's hand-applied `restaurant_subscriptions`/`restaurant_verification_settings`/`qr_token_migration_issues` versus the repository's account-subscription Model C. Retire, adopt or quarantine; this is a product decision with data implications and is **not** something to script blindly.
+3. The QR-verification subsystem: adopt production's design into the repository, or converge production onto the repository's canonical budget model (accepting the data implications for `qr_verification_attempts`).
+4. The `report_sales` role-predicate fix urgency; this is the one item with a direct confidentiality impact.
+5. Whether the `*_staff_*` policies vs `*_manage` policies difference is intended (rename in repository) or a divergence to eliminate.
+
 ## Rules
 
 1. Decide file by file. Never use "newer than the last one applied".
@@ -227,7 +333,7 @@ have not been queried during this merge.
 
 ## What this cannot tell you
 
-- Anything about a hosted database as it is now. Nothing here has read one since the evidence file was captured.
+- Anything about a hosted database as it is now beyond the dated read-only sessions. The 2026-11-14 production probe and ledger read above are dated observations; re-run the read-only procedure before acting on them.
 - Failures that depend on data: a constraint that existing rows violate, a lock held too long under traffic.
 - Differences from the server itself. CI replays on PostgreSQL 15, 17 and 18; production reported 17.11.
 - Whether a **hosted** backup restores. A local round trip has been run: `pg_dump -Fc` and `pg_restore` (PostgreSQL 16.2,

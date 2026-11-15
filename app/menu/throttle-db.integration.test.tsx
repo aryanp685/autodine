@@ -167,9 +167,20 @@ async function installRpc(db: Client) {
 /** Orders reference the restaurant, so they go first. */
 async function cleanup(db: Client) {
   const restaurantId = '(select id from public.restaurants where slug = $1)';
-  await db.query(`delete from public.restaurant_invoice_lines where restaurant_id = ${restaurantId}`, [SLUG]);
-  await db.query(`delete from public.restaurant_payment_receipts where restaurant_id = ${restaurantId}`, [SLUG]);
-  await db.query(`delete from public.restaurant_invoices where restaurant_id = ${restaurantId}`, [SLUG]);
+  // Issued-invoice immutability (migration 20261113000100) refuses DELETE for
+  // every role by design. This is a disposable database, so teardown disables
+  // the guards, removes this suite's rows and re-enables them. The guard is
+  // re-enabled in a finally so a failed cleanup cannot leave it off.
+  await db.query('alter table public.restaurant_invoice_lines disable trigger restaurant_invoice_lines_immutable');
+  await db.query('alter table public.restaurant_invoices disable trigger restaurant_invoices_immutable');
+  try {
+    await db.query(`delete from public.restaurant_invoice_lines where restaurant_id = ${restaurantId}`, [SLUG]);
+    await db.query(`delete from public.restaurant_payment_receipts where restaurant_id = ${restaurantId}`, [SLUG]);
+    await db.query(`delete from public.restaurant_invoices where restaurant_id = ${restaurantId}`, [SLUG]);
+  } finally {
+    await db.query('alter table public.restaurant_invoices enable trigger restaurant_invoices_immutable');
+    await db.query('alter table public.restaurant_invoice_lines enable trigger restaurant_invoice_lines_immutable');
+  }
   await db.query(`delete from public.restaurant_invoice_series where restaurant_id = ${restaurantId}`, [SLUG]);
   await db.query(`delete from public.payment_audit_events where restaurant_id = ${restaurantId}`, [SLUG]);
   await db.query(`delete from public.payments where restaurant_id = ${restaurantId}`, [SLUG]);
