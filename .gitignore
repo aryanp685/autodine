@@ -48,6 +48,8 @@ yarn-error.log*
 !/docs/resend-auth-readiness-2026-11-14.md
 !/docs/hosted-synthetic-acceptance-2026-11-14.md
 !/docs/report-sales-staging-rehearsal-2026-11-14.md
+!/docs/report-sales-staging-rehearsal-2026-11-15-result.md
+!/docs/hosted-synthetic-acceptance-2026-11-15-result.md
 !/docs/device-acceptance-2026-11-14.md
 !/docs/migration-reconciliation.md
 !/docs/production-only-migrations-2026-11-14.md
@@ -83,6 +85,8 @@ tts-smoke-artifacts/
 # Private staging auth state, fixture credentials and raw browser reports
 /.staging-private/
 !/docs/report-sales-staging-rehearsal-2026-11-14.md
+!/docs/report-sales-staging-rehearsal-2026-11-15-result.md
+!/docs/hosted-synthetic-acceptance-2026-11-15-result.md
 !/docs/resend-auth-readiness-2026-11-14.md
 !/docs/monitoring-readiness-2026-11-14.md
 !/docs/device-acceptance-2026-11-14.md
