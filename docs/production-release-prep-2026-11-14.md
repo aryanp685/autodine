@@ -12,6 +12,12 @@ was touched while preparing it. GST/IRP migrations remain
 **NOT AUTHORIZED**. The release itself requires explicit owner approval of
 each gate in §5. Executing any step without that approval is out of scope.
 
+Companion documents: `docs/migration-manifest-2026-11-14.md` (all 92 migrations
+accounted for), `docs/owner-closure-package-2026-11-14.md` (every owner action
+with steps + verification), `docs/credential-exposure-remediation-2026-11-14.md`
+(B5 detail). `npm run verify:release` re-checks the repository-side invariants
+offline and fail-closed (CI step "Release readiness invariants").
+
 This document does not duplicate [production-release-baseline-2026-11-14.md]
 (drift D1–D7, ordering limits), [production-migration-plan-2026-11-11.md]
 (the authoritative 3-step plan), or [external-services-readiness-2026-11-14.md]
@@ -57,8 +63,15 @@ file (NOT AUTHORIZED) and classify-then-verify before applying.
 | 7 | `20261115000100_fix_redeem_staff_invite_status_returns.sql` | P0 auth | Single-use invite fall-through fix (23505 instead of `used`). |
 | 8 | `20261115000200_owner_billing_configuration_guard.sql` | P0 security | Owner-only `tax_rate_bps`/`gstin` trigger; revokes EXECUTE from service_role too; body identical to PR #181, renumbered (version `20261112000200` occupied). |
 | 9 | `20261115000300_audit_restaurant_account_reassignment.sql` | P0 security/audit | Append-only audit of applied `account_id` reassignments; closes D1 silently-reassigned gap. Depends on #1. |
-| 10 | `20261114000400_restrict_trigger_functions_execute.sql` | hardening | Revokes EXECUTE on SECURITY DEFINER trigger functions from all runtime roles. Trigger invocation unaffected (verified locally). |
-| 11 | `20261113000100_gst_two_mode.sql` … `20261114000600_einvoice_issuance_profile.sql` (7 files: `gst_two_mode`, `gst_b2b_einvoice_readiness`, `irp_reconciliation`, `gst_mode_gates`, `credit_debit_notes`, `einvoice_issuance_profile`, plus GST-adjacent #10 above already listed) | **GST/IRP — NOT AUTHORIZED** | Apply NOTHING in this group without separate written owner authorization each. See `docs/gst-irp-production-readiness-2026-11-14.md`. |
+| — | `20261114000400_restrict_trigger_functions_execute.sql` | **GST/IRP Phase B (B5) — NOT AUTHORIZED** | Listed as Phase B5 in `docs/gst-irp-production-readiness-2026-11-14.md` (dependency grouping). Data-safe privilege hardening; may be authorized separately as a pure security item, but **must not be applied without its own authorization decision**. Trigger invocation unaffected (verified locally). |
+| — | `20261113000100_gst_two_mode.sql`, `20261114000100_gst_b2b_einvoice_readiness.sql`, `20261114000200_irp_reconciliation.sql`, `20261114000300_gst_mode_gates.sql`, `20261114000400_restrict_trigger_functions_execute.sql`, `20261114000500_credit_debit_notes.sql`, `20261114000600_einvoice_issuance_profile.sql` | **GST/IRP Phase B (B1–B7) — NOT AUTHORIZED** | Apply NOTHING in this group without separate written owner authorization each. See `docs/gst-irp-production-readiness-2026-11-14.md`. Full accounting of all 92 repo migrations: `docs/migration-manifest-2026-11-14.md`. |
+
+All 92 repository migrations are enumerated and classified in
+`docs/migration-manifest-2026-11-14.md` (76 legacy rollout scope · 9 branch set
+above · 7 GST/IRP Phase B). The owner-operation file
+(`supabase/owner-operations/20261110000501_revoke_supabase_admin_client_defaults.sql`)
+is deliberately **not** part of the 92 and is never applied automatically —
+it is a manual owner operation, recorded there as well.
 
 Plus the legacy 3-step plan ([production-migration-plan-2026-11-11.md]) for
 the older delta it describes (Batch A = 27 migrations, Step 2 = app deploy,
@@ -74,7 +87,7 @@ with or before items #8/#9 (audit hardening assumes the guard trigger exists).
 2. Legacy Batch A (27 files, filename order) — health endpoint turns green at `20261109001000`.
 3. Deploy application (Step 2).
 4. Legacy Batch B (`20261110000700_restaurants_member_only`).
-5. This-branch set #1–#10 above, filename order, **excluding GST/IRP**.
+5. This-branch set #1–#9 above, filename order, **excluding all seven GST/IRP Phase B files** (and excluding B5 `20261114000400` unless separately authorized).
 6. Verify: `/api/health` `ok:true`; guest QR menu opens; owner settings save; invite redeem single-use; staff cannot edit tax rate; financial RPCs serialized.
 7. GST/IRP set only after separate authorizations + adviser sign-off.
 
@@ -110,30 +123,33 @@ state, restore or forward-fix under incident process — do not improvise.
 An environment-variable change is a production change. Each row above is an
 owner-gated action; nothing here is pre-authorized.
 
-## 4. Release checklist (each box = explicit owner sign-off)
+## 4. Release checklist — each gate with its explicit evidence requirement
+
+A gate is not satisfied because "it looks done"; it is satisfied by the named
+artifact. **[E:…]** = the exact evidence to attach to the release record.
 
 **Preflight**
-- [ ] Branch `arena/9b120325-autodine` @ `6c7e1876a254c88f6708b2fd01a07183fd00d0ca` reviewed; PR #181 disposition decided (remains OPEN/unmerged — merge is a separate decision, NOT required by this checklist).
-- [ ] CI green at release SHA (43721924389 / 43721924317 / 43721924315 as of 2026-11-14).
-- [ ] Preview alias verified reachable (deployment `dpl_6hp4kUqMqez8dniTx4ij36EMH7bg`, READY).
-- [ ] Staging acceptance run `43729670878` PASSED (or explicit written acceptance of its result).
-- [ ] Production migration ledger **freshly probed read-only** at release time (the 2026-11-14 listing boundary caveat is closed out), and drift reconciled (D1–D7 in the baseline document).
-- [ ] Provider backup confirmed restorable OR owner accepts residual risk in writing; PITR verification executed per `docs/pitr-verification-procedure-2026-11-14.md` (currently UNMET).
-- [ ] Rollback/cutover owner named; incident contact reachable.
+- [ ] Release SHA reviewed; PR #181 disposition decided (remains OPEN/unmerged — merge is a separate decision, NOT required by this checklist). **[E: review note + MUST reference `bc54eab` or later as release SHA; staging evidence below is for `6c7e187` — if the release SHA differs from staging-tested SHA, written owner acceptance is required, or staging must be re-accepted under fresh authorization.]**
+- [ ] CI green at release SHA. **[E: run IDs — for `6c7e187`: 43721924389 / 43721924317 / 43721924315; for `1193327`: 43730514868 / 43730515580 / 43730514933; for `bc54eab`: 43731260947 / 43731260936 / 43731260937.]**
+- [ ] Preview alias verified reachable (deployment `dpl_6hp4kUqMqez8dniTx4ij36EMH7bg`, READY, alias assigned). **[E: `vercel get_deployment` output archived.]**
+- [ ] Staging acceptance `43729670878` PASSED (expected=28/skipped=3/unexpected=0/flaky=0) — applies to `6c7e187`; later docs-only commits need no re-dispatch, but **any code-bearing commit invalidates it**. **[E: run URL + annotation, or written owner acceptance of the delta.]**
+- [ ] Production migration ledger **freshly probed read-only** at release time; drift D1–D7 reconciled. **[E: dated ledger dump (names only) + reconciliation table vs `docs/migration-manifest-2026-11-14.md`; output reviewed and countersigned by owner.]**
+- [ ] Provider backup confirmed restorable, OR owner accepts residual risk in writing; PITR verification per `docs/pitr-verification-procedure-2026-11-14.md`. **[E: P1–P6 record with timestamps, target identified as isolated/non-production, fingerprint match (table/policy/function counts), retention window, accepted RPO/RTO.]**
+- [ ] Rollback/cutover owner named; incident contact reachable; `BACKUP_ALERT_WEBHOOK` route exists and fired once. **[E: name + one observed test alert + acknowledgement.]**
 
 **Execution (in §2 order)**
-- [ ] §2 step 1 — backup gate satisfied
-- [ ] §2 step 2 — legacy Batch A applied; `/api/health` ok:true verified
-- [ ] §2 step 3 — app deployed from the release SHA
-- [ ] §2 step 4 — Batch B applied; guest QR menu verified live
-- [ ] §2 step 5 — branch set #1–#10 applied (excluding GST/IRP)
-- [ ] §2 step 6 — verification suite (health, QR guest flow, owner settings, invite single-use, tax-rate denial for manager, settlement-before-close) executed and recorded
-- [ ] §2 step 7 — GST/IRP ONLY under separate authorization
+- [ ] §2 step 1 — backup gate satisfied. **[E: A2 drill record reference.]**
+- [ ] §2 step 2 — legacy Batch A applied; health turns green at `20261109001000`. **[E: ledger high-water after each file batch; `GET /api/health` → `ok:true` with timestamp.]**
+- [ ] §2 step 3 — app deployed from the release SHA. **[E: production deployment ID + READY state + commit SHA match.]**
+- [ ] §2 step 4 — Batch B applied; guest QR menu verified live. **[E: anonymous QR open captured (screenshot/log) with timestamp; no login required for guest read.]**
+- [ ] §2 step 5 — branch set #1–#9 applied (excluding all seven GST/IRP Phase B files). **[E: ledger diff showing exactly the 9 filenames; catalog probes: guard trigger present, service_role EXECUTE=false on trigger functions, audit ledger present, invite fix present.]**
+- [ ] §2 step 6 — verification suite executed and recorded. **[E: checklist from §2 step 6 each with timestamped pass/fail — health, QR guest flow, owner settings save, invite single-use (one token, second redemption rejected), manager tax-rate denial, settlement-before-close refusal.]**
+- [ ] §2 step 7 — GST/IRP ONLY under separate written authorization. **[E: per-file authorization document, or dated statement "Phase B NOT AUTHORIZED".]**
 
 **Post-release**
-- [ ] Uptime monitor + alert route verified with one real test alert
-- [ ] Owner dashboards reachable; subscription expiry cron observed once (daily, `30 1 * * *`)
-- [ ] Release record filed (SHA, migration ledger high-water after release, backup reference, sign-offs)
+- [ ] Uptime monitor + alert route verified with one real test alert. **[E: monitor screenshot showing test failure AND recovery; alert delivery log.]**
+- [ ] Owner dashboards reachable; subscription expiry cron observed once. **[E: cron run log for `30 1 * * *` or named external scheduler; dashboard screenshot.]**
+- [ ] Release record filed. **[E: SHA, post-release ledger high-water, backup reference, sign-offs, PR #181 disposition.]**
 
 ## 5. What this preparation does NOT do
 

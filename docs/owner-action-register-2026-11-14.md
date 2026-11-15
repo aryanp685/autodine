@@ -1,5 +1,14 @@
 # Consolidated owner-action register — 2026-11-14
 
+> **2026-11-14 post-staging update:** every item here is now expanded into
+> exact steps, costs (known vs unknown), consequences, and post-action
+> verification in `docs/owner-closure-package-2026-11-14.md` (ordered by
+> urgency: Tier 1 free/risky-first → Tier 4 dispositions). The full migration
+> accounting is in `docs/migration-manifest-2026-11-14.md` (92 migrations +
+> 1 owner-operation). The credential exposure is scoped and remediated
+> (working-tree) in `docs/credential-exposure-remediation-2026-11-14.md`.
+> **B5 is CRITICAL-OPEN until rotation + verification complete.**
+
 **Every action in this register is owner-only.** Each needs an account,
 purchase, credential, approval, or physical presence the agent cannot supply.
 Nothing here was performed. Ordering is by launch-blocking criticality, not by
@@ -99,7 +108,8 @@ Format: action → why → where (dashboard path) → cost → consequence if sk
 
 ---
 
-### B5. Rotate the staging review credentials (leaked in Git history)
+### B5. Rotate the staging review credentials (leaked in Git history) — **CRITICAL-OPEN**
+**Full scope, exposure map, rotation sequence and verification: `docs/credential-exposure-remediation-2026-11-14.md`. Do not reuse the retired values anywhere.**
 - **Why:** the 2026-11-11/2026-11-12 docs committed a Vercel `_vercel_share` token and the shared password of the four synthetic staging review accounts. They are redacted from the working tree as of 2026-11-14, but **Git history retains them** — redaction is not remediation.
 - **Where:** Vercel → deployment → Share → regenerate the link (or delete/recreate the share); Supabase dashboard → Authentication → Users on `juwyhslzchjevqkdvwjm` → reset passwords for owner/manager/kitchen/cashier@autodine-review.test.
 - **Cost:** free.
@@ -213,3 +223,8 @@ Format: action → why → where (dashboard path) → cost → consequence if sk
 
 Unknowns are genuinely unknown from this workspace; do not treat the ranges as
 quotes. Get current pricing from each provider before approving spend.
+
+## G. Product decision required
+
+### Quantity > 99 in guest orders
+`20261021000005_public_place_order.sql` documents a 1–99 bound; the implementation caps at 99. Decide: keep cap (Option A), reject >99 (Option B — I can implement on word), or raise the bound (Option C — needs business reason). See `docs/owner-closure-package-2026-11-14.md` Tier 3. Decision pending; current cap preserved; do not "fix" silently.

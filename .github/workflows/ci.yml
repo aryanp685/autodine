@@ -39,6 +39,9 @@ jobs:
       - name: Migration chain integrity (ordering, duplicates, deployed anchors)
         run: npm run migrations:verify
 
+      - name: Release readiness invariants (offline, fail-closed)
+        run: npm run verify:release
+
       - name: Preview/production isolation self-test
         run: npm run isolation:verify
 
