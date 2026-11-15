@@ -33,7 +33,7 @@ export function EinvoiceReconciliationPanel({ rows }: { rows: EinvoiceReconcilia
               </div>
               <span className="flex items-center gap-3">
                 <span
-                  className={`text-[9.5px] font-semibold uppercase tracking-[0.14em] ${
+                  className={`text-[10.5px] font-semibold uppercase tracking-[0.14em] ${
                     row.irpStatus === 'failed' ? 'text-[var(--p-due)]' : 'text-gink-46'
                   }`}
                 >

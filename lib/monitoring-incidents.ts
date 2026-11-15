@@ -324,6 +324,12 @@ export type DeliverWithRetryOptions = {
   maxAttempts?: number;
   baseDelayMs?: number;
   sleep?: (ms: number) => Promise<void>;
+  /**
+   * Decide whether a thrown error is worth another attempt. Returning false
+   * stops the retry loop early (a permanent 4xx, say). Defaults to retrying
+   * everything, which is the historical behaviour.
+   */
+  shouldRetry?: (error: unknown) => boolean;
 };
 export type DeliverWithRetryResult = { delivered: boolean; attempts: number };
 
@@ -344,7 +350,10 @@ export async function deliverWithRetry(
     try {
       await deliver();
       return { delivered: true, attempts };
-    } catch {
+    } catch (error) {
+      if (options.shouldRetry && !options.shouldRetry(error)) {
+        return { delivered: false, attempts };
+      }
       if (attempt < maxAttempts) await sleep(baseDelayMs * 2 ** (attempt - 1));
     }
   }

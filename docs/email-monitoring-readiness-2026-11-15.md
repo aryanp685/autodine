@@ -85,3 +85,34 @@ The §2 items "email delivery (transactional)" and "alert delivery interface" ar
 - **Backup verification & DR objectives**: `scripts/backup/verify-backup-file.mjs` (magic + manifest sha256 + full decrypt + payload sanity) and `scripts/backup/check-dr-objectives.mjs` (newest backup vs `--rpo-minutes`; optional `--restore-report` parsed for `elapsedMs` vs `--rto-minutes`; webhook alert on miss). `scripts/d2/verify-acl-posture.mjs` runs the D2 §3 probes read-only post-release (`--print-sql` for the SQL-editor path) and was proven on disposable PG 17. `npm run test:dr`, `npm run test:d2` added; both wired into CI.
 
 **Still true:** no provider activated, no credential read, no hosted setting changed, no email or webhook ever observed in transit. Resend/domain activation, Supabase custom-SMTP enablement, `AUTODINE_ALERT_WEBHOOK` and `AUTODINE_CRON_SECRET` set on the deployment, and the §3.4 go-live remain owner actions.
+
+
+---
+
+## Addendum 2 (same day, later): retry policy and delivery telemetry
+
+Two reliability/observability gaps in the pieces above were closed:
+
+- **Permanent 4xx is no longer retried.** `lib/http-retryable.ts` classifies
+  HttpStatusError: 4xx other than 408/429 is permanent (bad key, bad sender,
+  bad webhook URL) and stops the retry loop after the first attempt; 408/429/5xx
+  and network-class failures keep the bounded 3-attempt backoff. Wired into the
+  Resend adapter and `notifyIncident`; the structured `alert_delivery` /
+  `email_delivery` log lines and the returned outcomes are unchanged.
+- **Delivery telemetry is now visible in Settings → Operations.**
+  `lib/delivery-telemetry.ts` keeps per-instance, tenant-free counters for both
+  channels (delivered / failed / not_configured / refused / attempts /
+  consecutiveFailures / lastOutcome), exposed via `POST /api/ops/incidents`
+  `list` as `telemetry` and rendered as a one-line footer in the Operations
+  panel. Counters reset on restart; the structured log remains the durable
+  record. No addresses, payloads or identifiers are stored.
+- **Cron cadence truth**: `vercel.json` declares a daily 01:30 UTC escalation
+  sweep (the Hobby plan refuses sub-daily schedules at deploy time — the
+  7772ade preview was refused before build for exactly that reason and was
+  re-verified READY on 53d00cf with `crons: [{ path: "/api/cron/escalate", schedule: "30 1 * * *" }]`). Tighter cadence needs a Pro plan (owner
+  purchase) or an external HTTPS scheduler calling the same endpoint with the
+  bearer token. `.env.example` now states this accurately.
+
+Test coverage added: `lib/http-retryable.test.ts`, `lib/delivery-telemetry.test.ts`,
+4xx/429 no-retry cases in `lib/email/provider.test.ts` and
+`lib/incident-notify.test.ts`, telemetry shape in `app/api/ops/incidents/route.test.ts`.

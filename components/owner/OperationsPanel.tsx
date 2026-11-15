@@ -32,6 +32,19 @@ type Incident = {
   escalatedAt: number | null;
 };
 
+type ChannelCounters = {
+  delivered: number;
+  failed: number;
+  notConfigured: number;
+  refused: number;
+  attempts: number;
+  consecutiveFailures: number;
+  lastOutcome: string | null;
+  lastAt: number | null;
+};
+
+type Telemetry = { email: ChannelCounters; alert: ChannelCounters };
+
 const SEVERITY_TONE = { info: 'neutral', warning: 'work', critical: 'due' } as const;
 const STATE_TONE = { open: 'due', acknowledged: 'work', resolved: 'neutral' } as const;
 
@@ -109,6 +122,7 @@ function TwoStepButton({
 
 export function OperationsPanel() {
   const [incidents, setIncidents] = useState<Incident[] | null>(null);
+  const [telemetry, setTelemetry] = useState<Telemetry | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [delivery, setDelivery] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -127,6 +141,10 @@ export function OperationsPanel() {
     }
     const list = Array.isArray(payload?.incidents) ? (payload.incidents as Incident[]) : [];
     setIncidents(list.filter((incident) => incident.state !== 'resolved'));
+    const rawTelemetry = payload?.telemetry as Telemetry | undefined;
+    if (rawTelemetry && rawTelemetry.email && rawTelemetry.alert) {
+      setTelemetry(rawTelemetry);
+    }
     setError(null);
     setNow(Date.now());
   }, []);
@@ -175,6 +193,20 @@ export function OperationsPanel() {
         <p className="mt-2 text-[11.5px] text-gink-46">
           Alert webhook: <strong className="font-semibold text-gink">{delivery}</strong>
         </p>
+      ) : null}
+
+      {telemetry ? (
+        <div className="mt-2 border-t border-[var(--p-line-soft)] pt-2">
+          <p className="text-[11.5px] leading-[1.6] text-gink-46">
+            Delivery telemetry (this instance): alerts {telemetry.alert.delivered} delivered ·{' '}
+            {telemetry.alert.failed} failed · email {telemetry.email.delivered} delivered ·{' '}
+            {telemetry.email.failed} failed
+            {telemetry.alert.consecutiveFailures > 0 || telemetry.email.consecutiveFailures > 0
+              ? ` · ${telemetry.alert.consecutiveFailures + telemetry.email.consecutiveFailures} consecutive failure(s) — check the webhook/provider configuration`
+              : ''}
+            . Counters reset on restart; the structured log remains the durable record.
+          </p>
+        </div>
       ) : null}
 
       {incidents !== null && live.length === 0 && !error ? (
@@ -237,14 +269,14 @@ export function OperationsPanel() {
       </ul>
 
       <div className="mt-3 flex items-center justify-between gap-3 border-t border-[var(--p-line-soft)] pt-3">
-        <p className="text-[11px] leading-[1.5] text-gink-46">
+        <p className="text-[11.5px] leading-[1.5] text-gink-46">
           This instance only; other instances report to the same logs. Nothing here is sent anywhere
           unless an alert webhook is configured.
         </p>
         <button
           type="button"
           onClick={() => void load()}
-          className="shrink-0 text-[12px] font-medium text-gink-64 underline underline-offset-2 hover:text-gink"
+          className="shrink-0 text-[12.5px] font-medium text-gink-64 underline underline-offset-2 hover:text-gink"
         >
           Refresh
         </button>

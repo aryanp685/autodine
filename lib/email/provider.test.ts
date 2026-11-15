@@ -79,6 +79,21 @@ describe('sendEmail', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   }, 15000);
 
+  it('does not retry a permanent 4xx (bad key/sender): one call, honest failure', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 403 });
+    const result = await sendEmail('staff_invitation', message, RESEND_ENV);
+    expect(result.outcome).toBe('failed');
+    expect(result.attempts).toBe(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  }, 15000);
+
+  it('retries 429 rate-limit responses like a transient failure', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 429 });
+    const result = await sendEmail('staff_invitation', message, RESEND_ENV);
+    expect(result.outcome).toBe('failed');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  }, 15000);
+
   it('treats a network throw as failure, not as an exception', async () => {
     fetchMock.mockRejectedValue(new Error('dns'));
     const result = await sendEmail('staff_invitation', message, RESEND_ENV);

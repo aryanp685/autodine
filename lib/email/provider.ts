@@ -22,6 +22,8 @@
  */
 
 import { deliverWithRetry } from '@/lib/monitoring-incidents';
+import { recordDelivery } from '@/lib/delivery-telemetry';
+import { HttpStatusError, isRetryableDeliveryError } from '@/lib/http-retryable';
 
 export type EmailMessage = {
   /** One recipient only. No BCC, no lists — transactional mail is 1:1. */
@@ -59,6 +61,7 @@ const MAX_ATTEMPTS = 3;
 
 function logDelivery(kind: EmailKind, outcome: EmailOutcome, attempts: number, status?: number): void {
   const line = JSON.stringify({ event: 'email_delivery', kind, outcome, attempts, ...(status ? { status } : {}) });
+  recordDelivery('email', outcome, attempts);
   if (outcome === 'delivered') console.info(`[autodine:email] ${line}`);
   else if (outcome === 'not_configured') console.info(`[autodine:email] ${line}`);
   else console.warn(`[autodine:email] ${line}`);
@@ -93,8 +96,10 @@ class ResendProvider implements EmailProvider {
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
       lastStatus = response.status;
-      if (!response.ok) throw new Error(`Email provider responded ${response.status}`);
-    }, { maxAttempts: MAX_ATTEMPTS, baseDelayMs: 300 });
+      // A 4xx (bar 408/429) is a bad key, bad sender or bad recipient — not a
+      // transient outage. Do not burn the retry budget repeating it.
+      if (!response.ok) throw new HttpStatusError(response.status, `Email provider responded ${response.status}`);
+    }, { maxAttempts: MAX_ATTEMPTS, baseDelayMs: 300, shouldRetry: isRetryableDeliveryError });
     const outcome: EmailOutcome = result.delivered ? 'delivered' : 'failed';
     logDelivery(kind, outcome, result.attempts, lastStatus);
     return { outcome, provider: this.name, attempts: result.attempts };

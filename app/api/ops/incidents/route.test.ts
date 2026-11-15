@@ -114,6 +114,24 @@ describe('POST /api/ops/incidents', () => {
     expect(JSON.stringify(body)).not.toContain('synthetic-tenant');
   });
 
+  it('carries tenant-free delivery telemetry alongside the list', async () => {
+    const response = await POST(request({ action: 'list' }));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.telemetry).toBeDefined();
+    for (const channel of ['email', 'alert'] as const) {
+      expect(body.telemetry[channel]).toEqual(expect.objectContaining({
+        delivered: expect.any(Number),
+        failed: expect.any(Number),
+        notConfigured: expect.any(Number),
+        refused: expect.any(Number),
+        attempts: expect.any(Number),
+        consecutiveFailures: expect.any(Number),
+      }));
+    }
+    expect(JSON.stringify(body.telemetry)).not.toContain('synthetic-tenant');
+  });
+
   it('acknowledges an open incident exactly once and refuses a second acknowledge', async () => {
     const record = openIncident();
     const response = await POST(request({ action: 'acknowledge', incidentId: record.incidentId }));

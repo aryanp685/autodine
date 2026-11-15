@@ -23,6 +23,7 @@
  */
 
 import { BILLING_CURRENCY } from './catalog';
+import { createSandboxBillingProvider, SANDBOX_PROVIDER_ID } from './sandbox';
 
 /** How the deployment names the provider it has approved. */
 export const BILLING_PROVIDER_ENV = 'BILLING_PROVIDER';
@@ -122,14 +123,25 @@ export function getBillingProvider(
   const apiKey = (env[BILLING_API_KEY_ENV] ?? '').trim();
   const webhookSecret = (env[BILLING_WEBHOOK_SECRET_ENV] ?? '').trim();
 
+  // The offline sandbox is the ONE adapter that exists in this build. It is
+  // credential-free, makes no network calls, and can never move money — but it
+  // can still write subscription rows, so it activates only under an explicit
+  // opt-in and never on a deployment that says it is production. The webhook
+  // route additionally demands BILLING_WEBHOOK_SECRET before it believes an
+  // event. See lib/billing/sandbox.ts.
+  if (name === SANDBOX_PROVIDER_ID) {
+    return createSandboxBillingProvider(env);
+  }
+
   // All three, or nothing. A provider named without credentials is a
   // deployment mistake, and the safe reading of a mistake is "not configured".
   if (!name || name === 'none' || !apiKey || !webhookSecret) return null;
 
-  // Even fully configured, there is still nothing to return: no adapter is
-  // approved or written. This is not an oversight to be filled in by returning
-  // something — it is the whole of the "no provider" guarantee, and it stays
-  // null until a real adapter is written for a real approved provider.
+  // Even fully configured, there is still nothing to return for a live
+  // provider: no live adapter is approved or written. This is not an oversight
+  // to be filled in by returning something — it is the whole of the "no
+  // provider" guarantee, and it stays null until a real adapter is written
+  // for a real approved provider.
   return null;
 }
 

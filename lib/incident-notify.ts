@@ -22,6 +22,8 @@
  */
 
 import { deliverWithRetry, type IncidentRecord } from './monitoring-incidents';
+import { recordDelivery } from './delivery-telemetry';
+import { HttpStatusError, isRetryableDeliveryError } from './http-retryable';
 
 export type AlertEvent =
   | 'incident_opened'
@@ -65,6 +67,7 @@ export function getAlertWebhook(env: Record<string, string | undefined> = proces
 
 function logDelivery(event: AlertEvent, outcome: AlertNotifyOutcome, attempts: number, status?: number): void {
   const line = JSON.stringify({ event: 'alert_delivery', incidentEvent: event, outcome, attempts, ...(status ? { status } : {}) });
+  recordDelivery('alert', outcome, attempts);
   if (outcome === 'delivered' || outcome === 'not_configured') console.info(`[autodine:alert] ${line}`);
   else console.warn(`[autodine:alert] ${line}`);
 }
@@ -89,8 +92,10 @@ export async function postAlert(
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     lastStatus = response.status;
-    if (!response.ok) throw new Error(`Alert webhook responded ${response.status}`);
-  }, { maxAttempts: MAX_ATTEMPTS, baseDelayMs: 300 });
+    // A 4xx (bar 408/429) is a misconfiguration, not a transient outage;
+    // retrying it just repeats a request the receiver already refused.
+    if (!response.ok) throw new HttpStatusError(response.status, `Alert webhook responded ${response.status}`);
+  }, { maxAttempts: MAX_ATTEMPTS, baseDelayMs: 300, shouldRetry: isRetryableDeliveryError });
   const outcome: AlertNotifyOutcome = result.delivered ? 'delivered' : 'failed';
   logDelivery(event, outcome, result.attempts, lastStatus);
   return outcome;

@@ -26,9 +26,10 @@ export const dynamic = 'force-dynamic';
  * SCOPE
  *
  * In-memory per instance: this escalates what THIS instance has open. That is
- * why the durable record stays the structured log line, and why the schedule
- * is frequent (every 5 minutes) rather than clever. No tenant data leaves the
- * process; the webhook payload is the fixed incident vocabulary.
+ * why the durable record stays the structured log line, and why tighter cadence
+ * needs a Pro plan or an external scheduler rather than cleverer logic here.
+ * No tenant data leaves the process; the webhook payload is the fixed incident
+ * vocabulary.
  */
 const STALE_MS = 15 * 60 * 1000;
 

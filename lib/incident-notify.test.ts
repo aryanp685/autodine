@@ -77,6 +77,15 @@ describe('notifyIncident', () => {
     expect(outcome).toBe('failed');
     expect(fetchMock).toHaveBeenCalledTimes(3);
   }, 15000);
+
+  it('does not retry a permanent 4xx: one call, honest failed outcome', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 400 });
+    const outcome = await notifyIncident('incident_opened', record, {
+      AUTODINE_ALERT_WEBHOOK: 'https://hooks.example/services/abc',
+    });
+    expect(outcome).toBe('failed');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  }, 15000);
 });
 
 describe('notifyHealthFailure', () => {

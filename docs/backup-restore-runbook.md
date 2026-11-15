@@ -69,11 +69,30 @@ re-verification of an accessible `p3.backup_file`. It never touches a database o
 
 ## Scheduling
 
-Host cron (operator workstation / a small VM):
+Host cron (operator workstation / a small VM) — use the orchestrator, which
+runs backup → automated recovery check (decrypt + manifest verify of the
+newest artifact) → DR objective check, and exits non-zero with one alert line
+(`BACKUP_ALERT_WEBHOOK`, else `DR_ALERT_WEBHOOK`) on any failure:
 
 ```cron
-17 3 * * *  cd /opt/autodine && AUTODINE_BACKUP_SOURCE_URL=... AUTODINE_BACKUP_PASSPHRASE=... node scripts/backup/backup-logical.mjs --out-dir /mnt/backups/autodine --keep-daily 14 --keep-weekly 8 --keep-monthly 6 >> /var/log/autodine-backup.log 2>&1
+17 3 * * *  cd /opt/autodine && AUTODINE_BACKUP_SOURCE_URL=... AUTODINE_BACKUP_PASSPHRASE=... node scripts/backup/run-scheduled.mjs --out-dir /mnt/backups/autodine --rpo-minutes 1440 >> /var/log/autodine-backup.log 2>&1
 ```
+
+(systemd: a `.timer` invoking the same command with a root-only
+`EnvironmentFile=` for the two variables; Windows: Task Scheduler with a
+stored environment. The wrapper never prints the URL or the passphrase, and
+its failure alert is one capped, redacted line.)
+
+A hand-rolled cron line calling `backup-logical.mjs` alone is legal but skips
+verification; if you keep one, add a second line or a monitoring rule on the
+backup directory. `--skip-verify` / `--skip-dr-objectives` exist for
+rehearsals and are printed as skipped, never silently.
+
+Automated recovery check on demand (GitHub): the manual **DR drill** workflow
+(`.github/workflows/dr-drill.yml`, `workflow_dispatch`) replays the backup
+pipeline self-test, the backup-file/DR-objective verifiers and the full
+logical-restore drill against a disposable embedded PostgreSQL. It touches no
+hosted project and needs no secret. CI also runs all of these on every push.
 
 GitHub Actions (NOT ACTIVATED — needs the two secrets and approval):
 

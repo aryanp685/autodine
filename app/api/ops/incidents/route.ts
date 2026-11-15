@@ -10,6 +10,7 @@ import {
 } from '@/lib/monitoring-incidents';
 import { realtimeIncidents } from '@/lib/incident-registry';
 import { notifyIncident } from '@/lib/incident-notify';
+import { snapshotDeliveryTelemetry } from '@/lib/delivery-telemetry';
 
 export const runtime = 'nodejs';
 
@@ -88,7 +89,11 @@ export async function POST(request: Request): Promise<Response> {
 
     if (action === 'list') {
       const incidents = realtimeIncidents.list().map(present);
-      return NextResponse.json({ incidents }, { headers: { 'Cache-Control': 'no-store' } });
+      // Per-instance delivery counters (tenant-free fixed vocabulary), so a
+      // webhook or provider that started failing is visible without tailing
+      // logs. Other instances counters are their own; the log is the record.
+      const telemetry = snapshotDeliveryTelemetry();
+      return NextResponse.json({ incidents, telemetry }, { headers: { 'Cache-Control': 'no-store' } });
     }
 
     const incidentId = typeof body.incidentId === 'string' ? body.incidentId.trim() : '';
