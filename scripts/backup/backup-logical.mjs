@@ -62,9 +62,11 @@ try {
   const usePgDump = opt['pg-dump'] === '1' || (opt['pg-dump'] === undefined && (() => { try { execFileSync('pg_dump', ['--version'], { stdio: 'ignore' }); return true; } catch { return false; } })());
 
   if (usePgDump) {
-    // Mode A: pg_dump custom format — full fidelity (ACLs, extensions).
+    // Mode A: pg_dump custom format. Scoped to the same schema Mode B and the
+    // restore target cover — the shim/managed scaffold (auth.*, storage.*,
+    // roles) already exists on the restore side and must not be replayed.
     const sqlPath = path.join(outDir, `${base}.dump`);
-    execFileSync('pg_dump', ['--format=custom', '--no-owner', '--no-privileges', `--file=${sqlPath}`, sourceUrl], { stdio: ['ignore', 'ignore', 'inherit'] });
+    execFileSync('pg_dump', ['--format=custom', '--no-owner', '--no-privileges', `--schema=${schema}`, `--file=${sqlPath}`, sourceUrl], { stdio: ['ignore', 'ignore', 'inherit'] });
     const plaintext = readFileSync(sqlPath);
     writeFileSync(sqlPath + '.enc', enc(plaintext, passphrase));
     unlinkSync(sqlPath);

@@ -62,7 +62,7 @@ try {
     try {
       const dumpPath = path.join(tmp, 'restore.dump');
       writeFileSync(dumpPath, plaintext);
-      execFileSync('pg_restore', ['--no-owner', '--no-privileges', '--dbname', targetUrl, dumpPath], { stdio: ['ignore', 'ignore', 'inherit'] });
+      execFileSync('pg_restore', ['--no-owner', '--no-privileges', `--schema=${schema}`, '--dbname', targetUrl, dumpPath], { stdio: ['ignore', 'ignore', 'inherit'] });
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
