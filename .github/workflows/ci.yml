@@ -45,6 +45,17 @@ jobs:
       - name: Backup pipeline selftest (disposable embedded PostgreSQL)
         run: npm run test:backup
 
+      # The drill's Mode A path shells out to the *system* pg_dump. The
+      # embedded server is PG 17, and ubuntu-24.04 ships pg_dump 16 from
+      # PGDG, so without this step pg_dump aborts on the major-version
+      # mismatch. PGDG is already configured in the runner image (the
+      # preinstalled client reports pgdg24.04).
+      - name: Install PostgreSQL 17 client tools (PGDG)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+          pg_dump --version
+
       - name: Logical restore drill (full migration chain, disposable embedded PostgreSQL)
         run: |
           set -o pipefail
