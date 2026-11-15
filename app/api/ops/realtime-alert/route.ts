@@ -6,6 +6,7 @@ import { parseRealtimeSignal, realtimeAlertRateKey } from '@/lib/realtime-alerts
 import { sameOrigin } from '@/lib/outlets';
 import { formatIncidentLogLine } from '@/lib/monitoring-incidents';
 import { realtimeIncidents } from '@/lib/incident-registry';
+import { notifyIncident } from '@/lib/incident-notify';
 
 export const runtime = 'nodejs';
 
@@ -65,6 +66,12 @@ export async function POST(request: Request): Promise<Response> {
         summary: 'Kitchen realtime delivery degraded',
       });
       console.warn(formatIncidentLogLine(outcome, record));
+      // A brand-new failure is worth a push; repeats are deduplicated by the
+      // tracker and a resolved incident is not news. Best-effort: the outcome
+      // is logged inside notifyIncident either way.
+      if (outcome === 'opened' || outcome === 'reopened') {
+        await notifyIncident(outcome === 'opened' ? 'incident_opened' : 'incident_reopened', record);
+      }
     } else {
       const resolved = realtimeIncidents.resolveByKey(key, 'kitchen-realtime-channel');
       if (resolved) console.info(formatIncidentLogLine('resolved', resolved));

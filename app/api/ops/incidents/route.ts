@@ -9,6 +9,7 @@ import {
   type IncidentRecord,
 } from '@/lib/monitoring-incidents';
 import { realtimeIncidents } from '@/lib/incident-registry';
+import { notifyIncident } from '@/lib/incident-notify';
 
 export const runtime = 'nodejs';
 
@@ -21,19 +22,21 @@ export const runtime = 'nodejs';
  * and counter roles get the same 403 a stranger gets; acknowledging an
  * incident is an operations decision, not a board action.
  *
- * WHAT IT CANNOT DO
+ * DELIVERY
  *
- * Nothing here pages anyone, and nothing here sends anything anywhere. The
- * registry is in-memory per instance, so an incident opened on one instance
- * is not visible on another — 404 for an unknown id means exactly that, and
- * the durable, cross-instance record remains the structured log line. No
- * provider is activated by this route.
+ * Every mutation (acknowledge, resolve, escalate) also POSTs a fixed-shape,
+ * tenant-free payload to AUTODINE_ALERT_WEBHOOK when one is configured —
+ * best-effort, bounded retry, outcome logged, never blocking the response.
+ * With no webhook set, behaviour is exactly what it was: the structured log
+ * line is the durable record. The registry is in-memory per instance, so an
+ * incident opened on one instance is not visible on another — 404 for an
+ * unknown id means exactly that.
  *
  * The list carries the same fixed, tenant-free shape the log lines carry.
  */
 const MANAGER_ROLES = ['owner', 'manager'];
 
-const ACTIONS = new Set(['list', 'acknowledge', 'resolve']);
+const ACTIONS = new Set(['list', 'acknowledge', 'resolve', 'escalate']);
 
 /** What staff may see. Ids/timestamps/counts/fixed vocabulary only. */
 function present(record: IncidentRecord) {
@@ -50,6 +53,8 @@ function present(record: IncidentRecord) {
     acknowledgedAt: record.acknowledgedAt,
     resolvedBy: record.resolvedBy,
     resolvedAt: record.resolvedAt,
+    escalatedAt: record.escalatedAt,
+    escalatedBy: record.escalatedBy,
   };
 }
 
@@ -93,11 +98,23 @@ export async function POST(request: Request): Promise<Response> {
 
     const who = staff.context.role; // fixed vocabulary; never a user identifier
     try {
+      if (action === 'escalate') {
+        const { record, outcome } = realtimeIncidents.escalate(incidentId, who);
+        if (outcome === 'escalated') {
+          console.warn(formatIncidentLogLine('escalated', record));
+          const delivery = await notifyIncident('incident_escalated', record);
+          return NextResponse.json({ incident: present(record), delivery }, { headers: { 'Cache-Control': 'no-store' } });
+        }
+        // Already escalated: report the record, notify nothing, send nothing twice.
+        return NextResponse.json({ incident: present(record), delivery: 'already_escalated' }, { headers: { 'Cache-Control': 'no-store' } });
+      }
       const record = action === 'acknowledge'
         ? realtimeIncidents.acknowledge(incidentId, who)
         : realtimeIncidents.resolve(incidentId, who);
-      console.info(formatIncidentLogLine(action === 'acknowledge' ? 'acknowledged' : 'resolved', record));
-      return NextResponse.json({ incident: present(record) }, { headers: { 'Cache-Control': 'no-store' } });
+      const event = action === 'acknowledge' ? 'acknowledged' : 'resolved';
+      console.info(formatIncidentLogLine(event, record));
+      const delivery = await notifyIncident(action === 'acknowledge' ? 'incident_acknowledged' : 'incident_resolved', record);
+      return NextResponse.json({ incident: present(record), delivery }, { headers: { 'Cache-Control': 'no-store' } });
     } catch (error) {
       if (error instanceof IncidentTransitionError) {
         // Unknown id (possibly opened on another instance) or an illegal

@@ -96,6 +96,48 @@ describe('InMemoryIncidentTracker', () => {
     expect(t.get(record.incidentId)).toBeNull();
   });
 
+  it('escalates an open incident to critical exactly once', () => {
+    const t = tracker();
+    const { record } = t.report(signal());
+    expect(record.severity).toBe('warning');
+    expect(record.escalatedAt).toBeNull();
+
+    const escalated = t.escalate(record.incidentId, 'oncall@example');
+    expect(escalated.outcome).toBe('escalated');
+    expect(escalated.record.severity).toBe('critical');
+    expect(escalated.record.escalatedBy).toBe('oncall@example');
+    expect(escalated.record.escalatedAt).toBe(NOW);
+    expect(escalated.record.state).toBe('open'); // escalation is not a resolution
+
+    const again = t.escalate(record.incidentId, 'cron');
+    expect(again.outcome).toBe('already_escalated');
+    expect(again.record.escalatedBy).toBe('oncall@example'); // unchanged
+  });
+
+  it('refuses to escalate a resolved incident and requires an actor', () => {
+    const t = tracker();
+    const { record } = t.report(signal());
+    t.resolve(record.incidentId, 'a');
+    expect(() => t.escalate(record.incidentId, 'oncall@example')).toThrow(IncidentTransitionError);
+    const { record: second } = t.report(signal({ key: 'second:key' }));
+    expect(() => t.escalate(second.incidentId, '   ')).toThrow(IncidentTransitionError);
+  });
+
+  it('lists stale open incidents for the cron, once', () => {
+    let now = NOW;
+    const t = new InMemoryIncidentTracker({ now: () => now, makeId: (() => { let n = 0; return () => `inc-${++n}`; })() });
+    const stale = t.report(signal({ key: 'stale:one' })).record;
+    now += 20 * 60 * 1000;
+    const fresh = t.report(signal({ key: 'fresh:one' })).record;
+
+    const staleList = t.staleOpen(15 * 60 * 1000);
+    expect(staleList.map((record) => record.incidentId)).toEqual([stale.incidentId]);
+
+    t.escalate(stale.incidentId, 'cron');
+    expect(t.staleOpen(15 * 60 * 1000)).toHaveLength(0); // already escalated: never twice
+    expect(fresh.incidentId).not.toBe(stale.incidentId);
+  });
+
   it('lists incidents filtered by state', () => {
     const t = tracker();
     const { record } = t.report(signal());

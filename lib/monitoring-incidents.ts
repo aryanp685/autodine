@@ -50,6 +50,9 @@ export type IncidentRecord = {
   acknowledgedAt: number | null;
   resolvedBy: string | null;
   resolvedAt: number | null;
+  /** Set when an owner/manager (or the cron) escalated an unacknowledged incident. */
+  escalatedAt: number | null;
+  escalatedBy: string | null;
 };
 
 export type ReportOutcome = 'opened' | 'repeated' | 'reopened';
@@ -106,7 +109,9 @@ export class InMemoryIncidentTracker {
     ttlMs?: number;
     makeId?: () => string;
   } = {}) {
-    this.now = options.now ?? Date.now;
+    // Resolved at call time (not construction time) so a frozen Date.now
+    // in tests is honoured by the shared registry.
+    this.now = options.now ?? (() => Date.now());
     this.cooldownMs = options.cooldownMs ?? 10 * 60 * 1000;
     this.ttlMs = options.ttlMs ?? 24 * 60 * 60 * 1000;
     this.makeId = options.makeId ?? (() => globalThis.crypto?.randomUUID?.() ?? `incident-${this.now()}`);
@@ -143,6 +148,8 @@ export class InMemoryIncidentTracker {
       acknowledgedAt: null,
       resolvedBy: null,
       resolvedAt: null,
+      escalatedAt: null,
+      escalatedBy: null,
     };
     this.incidents.set(record.incidentId, record);
     this.liveByKey.set(checked.key, record.incidentId);
@@ -186,6 +193,39 @@ export class InMemoryIncidentTracker {
   get(incidentId: string): IncidentRecord | null {
     const incident = this.incidents.get(incidentId);
     return incident ? { ...incident } : null;
+  }
+
+  /**
+   * Bump an open incident to critical and mark it escalated. Escalation is NOT
+   * a state transition -- the incident is still open and still needs a person.
+   * Idempotent: an already-escalated incident reports `already_escalated` and
+   * changes nothing, so a cron re-run never spams.
+   */
+  escalate(incidentId: string, actor: string): { record: IncidentRecord; outcome: 'escalated' | 'already_escalated' } {
+    const incident = this.require(incidentId);
+    const who = cleanActor(actor);
+    if (!who) throw new IncidentTransitionError('An escalating actor is required.');
+    if (incident.state === 'resolved') {
+      throw new IncidentTransitionError(`Cannot escalate an incident in state '${incident.state}'.`);
+    }
+    if (incident.escalatedAt !== null) {
+      return { record: { ...incident }, outcome: 'already_escalated' };
+    }
+    incident.severity = 'critical';
+    incident.escalatedAt = this.now();
+    incident.escalatedBy = who;
+    return { record: { ...incident }, outcome: 'escalated' };
+  }
+
+  /**
+   * Open, not-yet-escalated incidents whose `firstSeenAt` is older than
+   * `olderThanMs` — the cron's candidate list. Pure read; nothing is mutated.
+   */
+  staleOpen(olderThanMs: number): IncidentRecord[] {
+    const now = this.now();
+    return [...this.incidents.values()]
+      .filter((incident) => incident.state === 'open' && incident.escalatedAt === null && now - incident.firstSeenAt >= olderThanMs)
+      .map((incident) => ({ ...incident }));
   }
 
   /** The live (non-resolved) incident for a key, if any. */
@@ -233,7 +273,7 @@ export class InMemoryIncidentTracker {
 }
 
 /** Fixed-shape JSON line for log drains and alert rules. Prefix is stable. */
-export function formatIncidentLogLine(outcome: ReportOutcome | 'acknowledged' | 'resolved', record: IncidentRecord): string {
+export function formatIncidentLogLine(outcome: ReportOutcome | 'acknowledged' | 'resolved' | 'escalated' | 'already_escalated', record: IncidentRecord): string {
   const event = outcome === 'opened' || outcome === 'reopened' || outcome === 'repeated'
     ? `incident_${outcome}`
     : `incident_${outcome}`;
@@ -245,6 +285,7 @@ export function formatIncidentLogLine(outcome: ReportOutcome | 'acknowledged' | 
     state: record.state,
     count: record.count,
     summary: record.summary,
+    ...(record.escalatedAt ? { escalatedAt: record.escalatedAt, escalatedBy: record.escalatedBy } : {}),
   })}`;
 }
 

@@ -282,10 +282,11 @@ describe('Settings, the redesign', () => {
     const anchors = [...html.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]);
     const ids = new Set([...html.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]));
 
-    // Five since People arrived (migration 20261029000100): an index entry that
-    // scrolls nowhere is how a long page stops being navigable.
-    expect(anchors).toHaveLength(5);
+    // Six since Operations arrived: an index entry that scrolls nowhere is how
+    // a long page stops being navigable.
+    expect(anchors).toHaveLength(6);
     expect(anchors).toContain('settings-people');
+    expect(anchors).toContain('settings-operations');
     for (const anchor of anchors) expect(ids.has(anchor)).toBe(true);
   });
 

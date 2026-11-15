@@ -15,6 +15,7 @@ import type { SettingsScreenData } from '@/lib/db/settings-screen';
 import type { TeamScreenData } from '@/lib/db/team';
 import type { InviteFlash } from '@/lib/team-invite';
 import { PeoplePanel } from '@/components/owner/PeoplePanel';
+import { OperationsPanel } from '@/components/owner/OperationsPanel';
 import { formatTaxPercent, taxExamplePaise } from '@/lib/settings-input';
 import {
   saveDetailsAction,
@@ -106,6 +107,7 @@ const SECTIONS = [
   { id: 'settings-money', label: 'Tax and money' },
   { id: 'settings-outlets', label: 'Outlets' },
   { id: 'settings-people', label: 'People' },
+  { id: 'settings-operations', label: 'Operations' },
   { id: 'settings-qr', label: 'Menu QR' },
 ] as const;
 
@@ -720,6 +722,16 @@ export function SettingsScreen({
                 disabled={!live}
                 timeZone={data?.timezone ?? 'Asia/Kolkata'}
               />
+            </PageSection>
+
+            {/* ---------------------------------------------------------- operations */}
+            <PageSection
+              n="05"
+              id="settings-operations"
+              title="Operations"
+              meta="Live incidents on this instance — acknowledge, resolve, escalate"
+            >
+              <OperationsPanel />
             </PageSection>
           </div>
 

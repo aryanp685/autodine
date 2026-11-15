@@ -31,7 +31,7 @@ import type { ReactNode } from 'react';
 import { CopyButton } from '@/components/CopyButton';
 import { ConfirmSubmit } from '@/components/owner/ConfirmSubmit';
 import { SubmitButton } from '@/components/owner/SubmitButton';
-import { Notice, Panel, Tag, selectClass, TableWrap, tableClass, Th, Td, Tr } from '@/components/owner/chrome';
+import { Notice, Panel, Tag, inputClass, selectClass, TableWrap, tableClass, Th, Td, Tr } from '@/components/owner/chrome';
 import { dateTimeInZone } from '@/lib/db/time';
 import { INVITABLE_ROLES, roleLabel, type TeamScreenData } from '@/lib/db/team';
 import { expiresInWords, formatInviteCode, joinPath, type InviteFlash } from '@/lib/team-invite';
@@ -230,6 +230,20 @@ export function PeoplePanel({
           </label>
 
           <label className="flex flex-col gap-1.5">
+            <span className="text-[12.5px] font-medium text-gink">
+              Email the link to them <span className="font-normal text-gink-46">(optional)</span>
+            </span>
+            <input
+              type="email"
+              name="email"
+              autoComplete="off"
+              placeholder="cook@example.com"
+              className={inputClass}
+              disabled={disabled}
+            />
+          </label>
+
+          <label className="flex flex-col gap-1.5">
             <span className="text-[12.5px] font-medium text-gink">How long should the link work?</span>
             <select name="days" className={selectClass} defaultValue="7" disabled={disabled}>
               <option value="1">1 day</option>
@@ -241,7 +255,8 @@ export function PeoplePanel({
           <div className="flex flex-wrap items-center gap-3">
             <SubmitButton pendingLabel="Creating…">Create invitation link</SubmitButton>
             <span className="text-[11.5px] text-gink-46">
-              No email is sent, and nothing is charged. You share the link yourself.
+              You can share the link yourself, or email it to them if email is connected on this
+              deployment.
             </span>
           </div>
         </form>

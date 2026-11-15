@@ -48,6 +48,12 @@ jobs:
       - name: Backup pipeline selftest (disposable embedded PostgreSQL)
         run: npm run test:backup
 
+      - name: Backup-file and DR objective verifiers (fixtures)
+        run: npm run test:dr
+
+      - name: D2 ACL probe (disposable embedded PostgreSQL)
+        run: npm run test:d2
+
       # The PostgreSQL-gated vitest suites (GST, credit/debit notes,
       # subscriptions, report_sales ACLs, RLS boundaries, readiness) replay the
       # full migration chain on a disposable embedded PG 17 and run against a

@@ -9,6 +9,12 @@ vi.mock('@/lib/db/staff', () => ({
   KITCHEN_ROLES: ['owner', 'manager', 'kitchen'],
 }));
 
+const { notifyIncident } = vi.hoisted(() => ({
+  notifyIncident: vi.fn(async () => 'not_configured'),
+}));
+
+vi.mock('@/lib/incident-notify', () => ({ notifyIncident }));
+
 import { POST } from './route';
 import { realtimeIncidents } from '@/lib/incident-registry';
 
@@ -28,10 +34,49 @@ beforeEach(() => {
     if (incident.state !== 'resolved') realtimeIncidents.resolve(incident.incidentId, 'test-setup');
   }
   getStaffContextDetailed.mockResolvedValue(manager);
+  notifyIncident.mockClear();
+  notifyIncident.mockResolvedValue('not_configured');
 });
 
 const openIncident = () =>
   realtimeIncidents.report({ key: `test-${Date.now()}`, kind: 'kitchen_realtime_degraded', severity: 'warning', summary: 'Kitchen realtime delivery degraded' }).record;
+
+describe('POST /api/ops/incidents — escalation and delivery', () => {
+  it('escalates an open incident once and pushes it to the webhook', async () => {
+    const incident = openIncident();
+    const response = await POST(request({ action: 'escalate', incidentId: incident.incidentId }));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.incident.severity).toBe('critical');
+    expect(body.incident.escalatedAt).not.toBeNull();
+    expect(body.delivery).toBe('not_configured');
+    expect(notifyIncident).toHaveBeenCalledWith('incident_escalated', expect.objectContaining({ incidentId: incident.incidentId }));
+
+    notifyIncident.mockClear();
+    const again = await POST(request({ action: 'escalate', incidentId: incident.incidentId }));
+    const body2 = await again.json();
+    expect(body2.delivery).toBe('already_escalated');
+    expect(notifyIncident).not.toHaveBeenCalled(); // never pushed twice
+  });
+
+  it('acknowledge and resolve also push to the webhook, once each', async () => {
+    const incident = openIncident();
+    const ack = await POST(request({ action: 'acknowledge', incidentId: incident.incidentId }));
+    expect(ack.status).toBe(200);
+    expect(notifyIncident).toHaveBeenCalledWith('incident_acknowledged', expect.anything());
+
+    notifyIncident.mockClear();
+    const resolved = await POST(request({ action: 'resolve', incidentId: incident.incidentId }));
+    expect(resolved.status).toBe(200);
+    expect(notifyIncident).toHaveBeenCalledWith('incident_resolved', expect.anything());
+  });
+
+  it('escalation of an unknown incident reports 409 and pushes nothing', async () => {
+    const response = await POST(request({ action: 'escalate', incidentId: 'nope' }));
+    expect(response.status).toBe(409);
+    expect(notifyIncident).not.toHaveBeenCalled();
+  });
+});
 
 describe('POST /api/ops/incidents', () => {
   it('rejects cross-origin requests before authorization', async () => {

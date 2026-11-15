@@ -71,3 +71,17 @@ or secret store that will hold the credentials before activating.
 ## 6. What this document does NOT authorize
 
 Production Auth/SMTP changes; provider purchases; domain verification; enabling any webhook; DNS edits; real customer mailboxes; treating any item in §2 as "live". Each is a separate owner authorization with its own evidence.
+
+---
+
+## Addendum (same day, this branch): the fail-closed pieces now exist in code
+
+The §2 items "email delivery (transactional)" and "alert delivery interface" are no longer prose — they are implemented, unit-tested, unarmed.
+
+- **Transactional email**: `lib/email/provider.ts` (Resend HTTPS adapter behind `getEmailProvider`; both `RESEND_API_KEY` and `AUTODINE_EMAIL_FROM` required, malformed values fail closed to `not_configured`), `lib/email/templates.ts` (staff invitation template, HTML-escaped, control-char stripped), wired into `app/(staff)/dashboard/settings/team-actions.ts` — an owner/manager may optionally email an invitation link (`email` field on the invite form). Outcomes are reported in the notice exactly as they happened: emailed / not connected / address refused / failed — never "sent" unless the provider accepted it. Signup and password recovery remain Supabase Auth's mail (hosted setting; unchanged). Delivery was never exercised against a live provider here; nothing claims it was.
+- **Alert delivery**: `lib/incident-notify.ts` posts the fixed, tenant-free vocabulary (kind/severity/state/count/summary) to `AUTODINE_ALERT_WEBHOOK` (HTTPS only) on incident opened/reopened/escalated/acknowledged/resolved and on `/api/health` failure. Bounded retry (3 attempts, backoff), outcome logged as `alert_delivery`, never throws, unset webhook = zero network calls. `/api/ops/incidents` gained an `escalate` action (owner/manager; open→critical; idempotent — never pushed twice). `/api/ops/realtime-alert` pushes on open/reopen only.
+- **Scheduled escalation**: `/api/cron/escalate` (Vercel Cron, every 5 min via `vercel.json`) escalates open, unacknowledged incidents older than 15 minutes. Fails closed: no `AUTODINE_CRON_SECRET`/`CRON_SECRET` → 503; wrong token → 401. Per-instance (in-memory registry); the log remains the durable record.
+- **Visibility**: Settings → Operations (owner/manager) lists this instance's live incidents with acknowledge / resolve / escalate; shows the webhook outcome verbatim.
+- **Backup verification & DR objectives**: `scripts/backup/verify-backup-file.mjs` (magic + manifest sha256 + full decrypt + payload sanity) and `scripts/backup/check-dr-objectives.mjs` (newest backup vs `--rpo-minutes`; optional `--restore-report` parsed for `elapsedMs` vs `--rto-minutes`; webhook alert on miss). `scripts/d2/verify-acl-posture.mjs` runs the D2 §3 probes read-only post-release (`--print-sql` for the SQL-editor path) and was proven on disposable PG 17. `npm run test:dr`, `npm run test:d2` added; both wired into CI.
+
+**Still true:** no provider activated, no credential read, no hosted setting changed, no email or webhook ever observed in transit. Resend/domain activation, Supabase custom-SMTP enablement, `AUTODINE_ALERT_WEBHOOK` and `AUTODINE_CRON_SECRET` set on the deployment, and the §3.4 go-live remain owner actions.

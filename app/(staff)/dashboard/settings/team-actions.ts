@@ -26,10 +26,15 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getStaffContextDetailed } from '@/lib/db/staff';
 import { canEditSettings } from '@/lib/settings-input';
+import { requestOrigin } from '@/lib/site-origin';
+import { sendEmail, isValidRecipient } from '@/lib/email/provider';
+import { staffInvitationEmail } from '@/lib/email/templates';
+import { roleLabel } from '@/lib/db/team';
 import {
   INVITE_FLASH_COOKIE,
   INVITE_FLASH_SECONDS,
   encodeInviteFlash,
+  joinPath,
 } from '@/lib/team-invite';
 import type { MemberRole } from '@/lib/db/database';
 
@@ -82,6 +87,11 @@ export async function createInviteAction(formData: FormData): Promise<void> {
     fail('Choose how long the invitation should work — between 1 and 30 days.');
   }
 
+  const email = String(formData.get('email') ?? '').trim();
+  if (email && !isValidRecipient(email)) {
+    fail('That email address does not look right. Check it, or leave the box empty to share the link yourself.');
+  }
+
   const ctx = await requireEditor();
 
   /* Mirrors the database rule, so the owner-facing message is a sentence
@@ -114,6 +124,33 @@ export async function createInviteAction(formData: FormData): Promise<void> {
   });
 
   revalidatePath(SETTINGS_PATH);
+
+  /* Optional email delivery. Without an address the copy-link flow is exactly
+     what it always was; with one, the mail is best-effort and never blocks the
+     invitation — the link on screen always works, and the outcome is reported
+     honestly instead of being silently swallowed. */
+  if (email) {
+    const origin = await requestOrigin();
+    const joinUrl = `${origin}${joinPath(data)}`;
+    const message = staffInvitationEmail({
+      restaurantName: ctx.restaurantName,
+      roleLabel: roleLabel(role),
+      joinUrl,
+      expiresAt,
+    });
+    const delivery = await sendEmail('staff_invitation', { to: email, ...message });
+    if (delivery.outcome === 'delivered') {
+      done('Invitation emailed to that address. The link below also works if you want to share it yourself.');
+    }
+    if (delivery.outcome === 'not_configured') {
+      done(`Invitation ready for a ${role}. Email is not connected on this deployment, so copy the link below and send it yourself.`);
+    }
+    if (delivery.outcome === 'invalid_recipient') {
+      done(`Invitation ready for a ${role}. The email address was refused, so copy the link below and send it yourself.`);
+    }
+    done(`Invitation ready for a ${role}, but the email failed to send. Copy the link below and send it yourself — the link always works.`);
+  }
+
   done(`Invitation ready for a ${role}. Copy the link below and send it to them.`);
 }
 
