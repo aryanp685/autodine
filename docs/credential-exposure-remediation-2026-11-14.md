@@ -48,35 +48,80 @@ workflow consumes it via secrets and fail-closes without it.
 | Production (`bdbaqpevwmgdvghszjno`) | — | **None.** Neither credential exists there; production was untouched by the exposure. |
 | Current preview / staging alias (`arena-9b120325…`) | Vercel | **Not affected** — different deployment, different token, stored only as the `AUTODINE_STAGING_SHARE_URL` secret. |
 
-## 4. Rotation sequence (owner-run; order matters; no lock-out risk if followed)
+## 4. Click-by-click rotation runbook (owner-run; order matters; ≈ 20 min)
 
-The old review deployment is already gone (§3), so step 1 is confirmatory.
-Budget ≈ 20 minutes. Do **not** skip step 3.
+**Interruption budget:** zero for anything you use today. C1's only consumer
+was the stale review preview (already 404). C2's only consumers were the four
+review logins. The current staging alias, its share token, the staging-e2e
+workflow, CI, production and all real users are **unaffected by this rotation**.
+Deployment protection stays enabled throughout — never toggle it off.
 
-1. **Vercel (C1, confirmatory):** Dashboard → team `iamjarvis9896-3988's
-   projects` → Project `new` → Deployments → search `arena/a5344572-autodine`.
-   - If the deployment is absent (matches the 404) or already "deleted", C1 is
-     inert — record that.
-   - If it still exists: open it → **Share** → **Revoke/regenerate** the share
-     link (or delete the deployment — it is a stale review build; deleting a
-     *preview* deployment is safe and does not touch production).
-   - Leave Deployment Protection (SSO) **enabled** for Preview and Production.
-2. **Supabase staging (C2):** Dashboard → `autodinetest` → Authentication →
-   Users → for each of `owner@`, `manager@`, `kitchen@`, `cashier@autodine-review.test`:
-   - **Preferred:** delete the four users (the review phase that needed them is
-     over; nothing in automation depends on them).
-   - **Or:** send password recovery to each and set new, distinct random
-     passwords; store them in your password manager, never in the repo.
-   - If any account was used to provision data you still need, snapshot row
-     counts first — deleting an Auth user does not delete app rows, but treat
-     staging as disposable regardless.
-3. **GitHub / repo hygiene:** consider the shared value compromised permanently.
-   Do **not** reuse the retired shared password for anything, anywhere. If the same password
-   was reused on any other account (owner habit check) — change it there too.
-4. **History rewrite (optional, destructive, owner-gated — §6).** Only after
-   steps 1–3. Recommendation: rotate-then-decide; with both credentials dead,
-   history rewrite becomes cosmetic rather than necessary.
-5. **Verification (§5).**
+### C1 — old Vercel share token (phase 1a)
+
+1. Sign in at `vercel.com` with your account. Top-left scope switcher →
+   team **"iamjarvis9896-3988's projects"** (slug `iamjarvis9896-3988s-projects`).
+   *(Read-only API check on 2026-11-15 confirmed: plan Hobby; team default
+   deployment protection = SSO for all non-custom-domain deployments — you
+   should keep exactly this.)*
+2. Project **`new`** → tab **Deployments** → in the search/filter box type
+   `arena/a5344572-autodine` (or paste deployment id
+   `dpl_2i2oYjgNje5xQtkD9CzFSoWEmH9U`).
+3. Two outcomes, both safe:
+   - **Absent / 404** (expected — matches my read-only check): nothing to
+     revoke; C1 is inert. Proceed to 1d.
+   - **Still listed**: click the deployment → **Share** (or **⋯ → Share**) →
+     **Regenerate**/**Revoke** the share link (wording varies) or, since this
+     is a stale review build, **⋯ → Delete deployment**. Deleting a *preview*
+     deployment never touches production or aliases.
+4. **1d — verify the old token is dead:** in a private/incognito window open
+   the review URL with the old `_vercel_share=…` parameter. Expected results
+   (any of): Vercel "Log in / Protected" screen, or 404 "Deployment not found".
+   **Failure sign:** the app shell or login page renders — that would mean the
+   token still bypasses SSO; stop and re-check step 3 (and tell me).
+   Do not paste the URL or token into chat — report only the result class.
+5. **1e — verify current staging still works:** open the *current* approved
+   staging alias (`new-git-arena-9b120325-autodine-…vercel.app`) with its own,
+   current share link. Expected: app loads as usual. (That token is a
+   different secret held in the `AUTODINE_STAGING_SHARE_URL` Actions secret and
+   in your password manager — it is NOT part of this exposure.)
+6. Record in the release log: date, "C1 confirmed inert at <date>" + the result
+   class from step 4.
+
+### C2 — shared review password (phase 1b)
+
+1. `supabase.com/dashboard` → project **`autodinetest`**
+   (ref `juwyhslzchjevqkdvwjm`) → left nav **Authentication** → **Users**.
+2. Search `@autodine-review.test` — expect exactly four:
+   `owner@`, `manager@`, `kitchen@`, `cashier@autodine-review.test`.
+3. Choose ONE disposition (I recommend A):
+   - **Option A — delete (recommended).** For each: **⋯ → Delete user** →
+     confirm. Nothing in automation references them (verified repository-wide);
+     the review phase is over. Staging data rows are unaffected (Auth delete
+     ≠ data delete); staging is fixtures and can be reprovisioned.
+   - **Option B — reset.** For each: **⋯ → Update user** → set a new **unique,
+     random** password (generate in password manager) → save. Do NOT use
+     "Send password recovery" — these mailboxes cannot receive mail.
+   - Either way: do not reuse or pattern-derive them from anything you use
+     elsewhere.
+4. **1d — verify the old password is dead:** on the staging alias, attempt
+   sign-in as each of the four with the retired password. Expected:
+   "Invalid login credentials" (or, under Option A, the email is not found).
+   **Failure sign:** any successful sign-in — stop and re-check step 3.
+5. **1e — verify current staging still works:** your normal staging access
+   (current alias + current share link; or CI's synthetic fixtures, which are
+   separate namespaced accounts — NOT these four) is unchanged.
+6. **Habit check:** if you ever used the retired password (or a close variant)
+   for any personal, email, banking, GitHub or other account — change those
+   now. The shared value must be considered permanently public via Git history.
+7. Record in the release log: date, option chosen, result class from step 4.
+
+### Then
+8. **GitHub/repo hygiene:** done as of `1193327` (tree redaction; verified by
+   grep + CI guard `verify:release`). History rewrite remains **optional and
+   owner-gated** — see §6; rotating first (steps above) is the correct default.
+9. **Verification split (§5):** tell me the result classes; I re-scan the tree
+   and history for the retired literals, confirm the deployment stays 404, and
+   update B5 → closed in the register.
 
 ## 5. Verification after rotation (split of duties)
 
