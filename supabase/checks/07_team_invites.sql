@@ -162,7 +162,6 @@ begin
   execute 'set local role authenticated';
 
   select status, role into v_status, v_role from public.redeem_staff_invite(v_code);
-  select status into v_status from public.redeem_staff_invite(v_code) limit 1;
 
   execute 'reset role';
 
@@ -170,8 +169,25 @@ begin
     raise exception 'FAIL 3: redeemed as % instead of kitchen', v_role;
   end if;
 
+  -- The same login may retry safely after an unknown network outcome. It must
+  -- not be told the link is burnt, and the retry must not write a second row.
+  perform set_config('request.jwt.claim.sub', v_cook::text, true);
+  execute 'set local role authenticated';
+  select status into v_status from public.redeem_staff_invite(v_code) limit 1;
+  execute 'reset role';
+
+  if v_status <> 'already_member' then
+    raise exception 'FAIL 3: retry by the original redeemer answered %', v_status;
+  end if;
+
+  -- A different signed-in user sees the single-use status and gets nothing.
+  perform set_config('request.jwt.claim.sub', v_second::text, true);
+  execute 'set local role authenticated';
+  select status into v_status from public.redeem_staff_invite(v_code) limit 1;
+  execute 'reset role';
+
   if v_status <> 'used' then
-    raise exception 'FAIL 3: second redemption answered %', v_status;
+    raise exception 'FAIL 3: redemption by another signed-in user answered %', v_status;
   end if;
 
   select count(*) into v_count
@@ -182,7 +198,7 @@ begin
     raise exception 'FAIL 3: expected exactly one membership, found %', v_count;
   end if;
 
-  raise notice 'PASS 3: one link makes one membership, and a second attempt answers used';
+  raise notice 'PASS 3: one link makes one membership; the original login retries safely and anyone else sees used';
 
   -- ==========================================================================
   -- 4. A revoked link never works

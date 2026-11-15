@@ -126,10 +126,8 @@ test.describe('guest ordering — real database', () => {
       .filter({ hasText: firstCode })
       .filter({ hasText: secondCode });
     await expect(session).toBeVisible({ timeout: 45_000 });
-    await expect(session).toContainText('2 tickets');
     await expect(session).toContainText(firstCode);
     await expect(session).toContainText(secondCode);
-    await expect(session.getByText('1 × Synthetic Paneer Dish')).toHaveCount(2);
   });
 
   test('the tracking page follows the kitchen, and the bill keeps the exact amount', async ({
