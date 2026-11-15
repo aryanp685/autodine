@@ -66,7 +66,7 @@ try {
     // restore target cover — the shim/managed scaffold (auth.*, storage.*,
     // roles) already exists on the restore side and must not be replayed.
     const sqlPath = path.join(outDir, `${base}.dump`);
-    execFileSync('pg_dump', ['--format=custom', '--no-owner', '--no-privileges', `--schema=${schema}`, `--file=${sqlPath}`, sourceUrl], { stdio: ['ignore', 'ignore', 'inherit'] });
+    execFileSync('pg_dump', ['--format=custom', '--no-owner', `--schema=${schema}`, `--file=${sqlPath}`, sourceUrl], { stdio: ['ignore', 'ignore', 'inherit'] });
     const plaintext = readFileSync(sqlPath);
     writeFileSync(sqlPath + '.enc', enc(plaintext, passphrase));
     unlinkSync(sqlPath);
