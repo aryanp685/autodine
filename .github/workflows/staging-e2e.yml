@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   staging-browser:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       STAGING_BASE_URL: https://new-git-arena-9b120325-autodine-iamjarvis9896-3988s-projects.vercel.app
@@ -23,7 +23,7 @@ jobs:
       STAGING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.AUTODINE_STAGING_SERVICE_ROLE_KEY }}
       STAGING_SHARE_URL: ${{ secrets.AUTODINE_STAGING_SHARE_URL }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Require secrets before accessing services or writing fixtures
         shell: bash
         run: |
@@ -35,7 +35,7 @@ jobs:
       # Fails closed with rule ids only; nothing else runs on a mismatch.
       - name: Verify share origin matches the approved base (no writes)
         run: node scripts/staging/verify-share-origin.mjs
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm

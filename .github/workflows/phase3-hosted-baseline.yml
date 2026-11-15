@@ -8,15 +8,15 @@ concurrency:
   cancel-in-progress: false
 jobs:
   baseline:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 3
     env:
       PHASE3_TARGET: https://juwyhslzchjevqkdvwjm.supabase.co/rest/v1/restaurants?select=id&limit=0
       PHASE3_REQUESTS: '10'
       PHASE3_STAGING_PUBLISHABLE_KEY: ${{ secrets.AUTODINE_STAGING_PUBLISHABLE_KEY }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Require dedicated public staging key (no service-role fallback)

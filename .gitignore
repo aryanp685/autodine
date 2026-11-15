@@ -98,3 +98,7 @@ tts-smoke-artifacts/
 !/docs/device-acceptance-2026-11-14.md
 !/docs/hosted-synthetic-acceptance-2026-11-14.md
 !/docs/programme-status-2026-11-14.md
+!/docs/production-release-baseline-2026-11-14.md
+!/docs/gst-irp-production-readiness-2026-11-14.md
+!/docs/external-services-readiness-2026-11-14.md
+!/docs/pitr-verification-procedure-2026-11-14.md

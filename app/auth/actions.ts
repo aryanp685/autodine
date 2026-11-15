@@ -45,6 +45,24 @@ function fail(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
 }
 
+/**
+ * The shape of an unknown error that is safe to write to the server log.
+ * Auth and database error objects can carry provider wording; this keeps only
+ * the identifiers support uses (name/status/code, length-capped and free of
+ * control characters) and never the message.
+ */
+function safeErrorShape(error: unknown): { name: string; status: number | null; code: string } {
+  const clean = (value: unknown, max: number): string =>
+    String(value ?? '').replace(/[\x00-\x1f\x7f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+  const source = (error ?? {}) as Record<string, unknown>;
+  const status = typeof source.status === 'number' && Number.isFinite(source.status) ? source.status : null;
+  return {
+    name: clean(error instanceof Error ? error.name : (source.name ?? 'unknown'), 80) || 'unknown',
+    status,
+    code: clean(source.code ?? 'unknown', 64) || 'unknown',
+  };
+}
+
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 async function rememberPendingSignupEmail(email: string, secure: boolean) {
@@ -179,14 +197,14 @@ export async function signUpAction(formData: FormData): Promise<void> {
     try {
       await rollbackSignup(admin, userId, restaurantId);
     } catch (rollbackError) {
-      console.error('[autodine] signup rollback failed:', rollbackError);
+      console.error('[autodine] signup rollback failed', safeErrorShape(rollbackError));
     }
     try {
       await supabase.auth.signOut();
     } catch (signOutError) {
-      console.error('[autodine] signup session cleanup failed:', signOutError);
+      console.error('[autodine] signup session cleanup failed', safeErrorShape(signOutError));
     }
-    console.error('[autodine] workspace creation failed:', error);
+    console.error('[autodine] workspace creation failed', safeErrorShape(error));
     fail('/signup', 'We could not finish setting up your workspace. Please try again.');
   }
 
@@ -357,7 +375,13 @@ export async function requestPasswordResetAction(formData: FormData): Promise<vo
         'Too many reset emails have been sent from this site in the last hour. Wait a few minutes, then try again.',
       );
     }
-    console.error('[autodine] could not send password reset email:', error.message);
+    // The provider's message can carry infrastructure detail (and support has
+    // no use for it). The status and Auth code are enough to diagnose a
+    // refusal without writing the address or provider words into the log.
+    console.error('[autodine] could not send password reset email', {
+      status: status ?? null,
+      code: (error as { code?: string }).code ?? 'unknown',
+    });
     fail('/forgot-password', 'We could not send the email just now. Please try again in a few minutes.');
   }
 
@@ -428,7 +452,14 @@ export async function updatePasswordAction(formData: FormData): Promise<void> {
     if (/weak|pwned|leaked/i.test(error.message)) {
       fail('/reset-password', 'That password is too easy to guess. Choose a longer one.');
     }
-    console.error('[autodine] could not set the new password:', error.message);
+    // Do not log the provider's words here either: they can carry
+    // infrastructure detail and this path is reachable by anyone who opens the
+    // emailed link. Status and code are enough for support to tell a refusal
+    // from an outage.
+    console.error('[autodine] could not set the new password', {
+      status: (error as { status?: number }).status ?? null,
+      code: (error as { code?: string }).code ?? 'unknown',
+    });
     fail('/reset-password', 'We could not save the new password. Request a new reset link and try again.');
   }
 
@@ -442,7 +473,7 @@ export async function updatePasswordAction(formData: FormData): Promise<void> {
   try {
     await supabase.auth.signOut();
   } catch (signOutError) {
-    console.error('[autodine] sign-out after password reset failed:', signOutError);
+    console.error('[autodine] sign-out after password reset failed', safeErrorShape(signOutError));
   }
 
   redirect(`/login?notice=${encodeURIComponent(PASSWORD_CHANGED_NOTICE)}`);
