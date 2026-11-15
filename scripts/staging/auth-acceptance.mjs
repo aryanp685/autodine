@@ -14,6 +14,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { chromium } from '@playwright/test';
 
 const REF = 'juwyhslzchjevqkdvwjm';
 const EXPECTED_ORIGIN = 'https://new-git-arena-9b120325-autodine-iamjarvis9896-3988s-projects.vercel.app';
@@ -109,11 +110,13 @@ for (const role of ['cashier', 'kitchen', 'manager']) {
   // Single-use is for everyone OTHER than the original redeemer. A retry by
   // the same actor is an intentional idempotent 'already_member' (lost
   // response replay, see 20261108005000); a different authenticated actor must
-  // see 'used'. The owner is such an actor and this path writes nothing.
+  // see 'used'. The owner is such an actor and this path writes nothing. The
+  // received status word is an enum, safe to print; it never carries a code.
   const again = await owner.rpc('redeem_staff_invite', { p_code: code });
   const againRow = Array.isArray(again.data) ? again.data[0] : null;
+  console.log(`invite-single-use-${role}: received status=${againRow?.status ?? 'none'} error=${again.error?.code ?? 'none'}`);
   check(`invite-single-use-${role}`, !again.error && againRow?.status === 'used');
-  members[role] = { client: memberClient, email };
+  members[role] = { client: memberClient, email, password: memberPw };
 }
 
 // --- 4. report_sales authorization through the real authenticated paths ---
@@ -179,23 +182,56 @@ let healthOk = false;
 try { healthOk = (await health.json())?.ok === true; } catch { /* leave false */ }
 check('health-endpoint-200-ok', health.status === 200 && healthOk);
 
-const kitchenToken = members.kitchen ? (await members.kitchen.client.auth.getSession()).data.session?.access_token : null;
-if (kitchenToken) {
-  const signal = await stagingHttp('/api/ops/realtime-alert', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', origin: base.origin, host: base.host, authorization: `Bearer ${kitchenToken}` },
-    body: JSON.stringify({ kind: 'recovered', durationMs: 61_000 }),
-  });
-  check('realtime-alert-kitchen-204', signal.status === 204);
+// The realtime-alert route authenticates through the SERVER'S COOKIE SESSION
+// (createSupabaseServerClient), never through a bearer token — so probe it the
+// way a real signed-in member's browser does: sign in through the app and
+// POST same-origin from the page. Bearer-only probes are refused as
+// signed-out (401) by design. Status words and HTTP codes are not secrets;
+// emails and passwords never leave this process.
+async function realtimeAlertStatus(member) {
+  const browser = await chromium.launch();
+  try {
+    const storagePath = '.staging-private/browser-access.json';
+    const hasStorage = await readFile(storagePath, 'utf8').then(() => true, () => false);
+    const context = await browser.newContext(hasStorage
+      ? { storageState: storagePath, baseURL: base.origin }
+      : { baseURL: base.origin });
+    const page = await context.newPage();
+    if (!hasStorage) {
+      const share = process.env.STAGING_SHARE_URL ? new URL(process.env.STAGING_SHARE_URL) : null;
+      if (!share) throw new Error('Staging share access is unavailable for the browser probe.');
+      await page.goto(share.href, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    }
+    await page.goto(`${base.origin}/login`);
+    await page.getByLabel('Work email').fill(member.email);
+    await page.getByLabel('Password').fill(member.password);
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    // The staff shell renders for every staff role; waiting for the redirect
+    // away from /login proves the cookie session exists without assuming
+    // which screen this role lands on.
+    await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 20_000 });
+    return await page.evaluate(async () => {
+      const response = await fetch('/api/ops/realtime-alert', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ kind: 'recovered', durationMs: 61_000 }),
+      });
+      return response.status;
+    });
+  } finally {
+    await browser.close();
+  }
+}
+
+if (members.kitchen) {
+  try {
+    check('realtime-alert-kitchen-204', (await realtimeAlertStatus(members.kitchen)) === 204);
+  } catch { check('realtime-alert-kitchen-204', false); }
 } else skip('realtime-alert-kitchen-204');
-const cashierToken = members.cashier ? (await members.cashier.client.auth.getSession()).data.session?.access_token : null;
-if (cashierToken) {
-  const signal = await stagingHttp('/api/ops/realtime-alert', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', origin: base.origin, host: base.host, authorization: `Bearer ${cashierToken}` },
-    body: JSON.stringify({ kind: 'recovered', durationMs: 61_000 }),
-  });
-  check('realtime-alert-cashier-403', signal.status === 403);
+if (members.cashier) {
+  try {
+    check('realtime-alert-cashier-403', (await realtimeAlertStatus(members.cashier)) === 403);
+  } catch { check('realtime-alert-cashier-403', false); }
 } else skip('realtime-alert-cashier-403');
 
 for (const line of results) console.log(line);

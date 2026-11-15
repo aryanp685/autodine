@@ -4,7 +4,7 @@ import { SettingsScreen } from '@/components/screens/SettingsScreen';
 import { getSettingsScreenData } from '@/lib/db/settings-screen';
 import { getTeamScreenData } from '@/lib/db/team';
 import { getOutletBar } from '@/lib/db/outlet-bar';
-import { siteOrigin } from '@/lib/site-origin';
+import { requestOrigin } from '@/lib/site-origin';
 import { INVITE_FLASH_COOKIE, parseInviteFlash } from '@/lib/team-invite';
 
 export const metadata: Metadata = {
@@ -25,7 +25,9 @@ export default async function SettingsPage({
     getSettingsScreenData(),
     getOutletBar(),
     getTeamScreenData(),
-    siteOrigin(),
+    // The copied invitation link is redeemed from the host that minted it,
+    // exactly like the emailed auth links — not the canonical QR origin.
+    requestOrigin(),
   ]);
 
   /* A code minted moments ago, carried from the action in an httpOnly cookie
