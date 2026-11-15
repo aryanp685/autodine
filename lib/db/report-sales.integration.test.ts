@@ -301,7 +301,12 @@ describe.skipIf(!URL_VALUE)('report_sales role and export-limit boundary (dispos
     exportTestRuntime.db = null;
   });
 
-  it('retains the existing authenticated-only RPC grant and SECURITY DEFINER boundary', async () => {
+  // service_role EXECUTE is present on staging (it survived via Supabase's
+  // default function EXECUTE grant; the initial migration revoked only
+  // public/anon). The 2026-11-15 joint review kept it deliberately, and the
+  // rehearsal recorded it as flagged for the production-gate discussion —
+  // do NOT widen it here, and do not silently strip it either.
+  it('retains the authenticated + service_role RPC grant and SECURITY DEFINER boundary', async () => {
     const { rows } = await db.query(`
       select p.prosecdef as security_definer,
              p.provolatile as volatility,
@@ -321,7 +326,7 @@ describe.skipIf(!URL_VALUE)('report_sales role and export-limit boundary (dispos
     expect(rows[0].authenticated_execute).toBe(true);
     expect(rows[0].anon_execute).toBe(false);
     expect(rows[0].public_execute).toBe(false);
-    expect(rows[0].service_role_execute).toBe(false);
+    expect(rows[0].service_role_execute).toBe(true);
     expect(rows[0].configuration).toContain('search_path=public');
   });
 

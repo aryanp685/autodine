@@ -4,9 +4,8 @@ import { getStaffContextDetailed, KITCHEN_ROLES } from '@/lib/db/staff';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { parseRealtimeSignal, realtimeAlertRateKey } from '@/lib/realtime-alerts';
 import { sameOrigin } from '@/lib/outlets';
-import { formatIncidentLogLine, InMemoryIncidentTracker } from '@/lib/monitoring-incidents';
-
-const kitchenRealtimeIncidents = new InMemoryIncidentTracker();
+import { formatIncidentLogLine } from '@/lib/monitoring-incidents';
+import { realtimeIncidents } from '@/lib/incident-registry';
 
 export const runtime = 'nodejs';
 
@@ -59,7 +58,7 @@ export async function POST(request: Request): Promise<Response> {
     // memory and is never logged.
     const key = `kitchen-realtime:${staff.context.restaurantId}`;
     if (signal.kind === 'degraded') {
-      const { record, outcome } = kitchenRealtimeIncidents.report({
+      const { record, outcome } = realtimeIncidents.report({
         key,
         kind: 'kitchen_realtime_degraded',
         severity: 'warning',
@@ -67,7 +66,7 @@ export async function POST(request: Request): Promise<Response> {
       });
       console.warn(formatIncidentLogLine(outcome, record));
     } else {
-      const resolved = kitchenRealtimeIncidents.resolveByKey(key, 'kitchen-realtime-channel');
+      const resolved = realtimeIncidents.resolveByKey(key, 'kitchen-realtime-channel');
       if (resolved) console.info(formatIncidentLogLine('resolved', resolved));
       else console.info(`[autodine:alert] ${JSON.stringify({ event: 'kitchen_realtime_recovered', kind: 'kitchen_realtime_recovered', severity: 'info', durationMs: signal.durationMs })}`);
     }

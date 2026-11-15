@@ -45,6 +45,13 @@ jobs:
       - name: Backup pipeline selftest (disposable embedded PostgreSQL)
         run: npm run test:backup
 
+      # The eight PostgreSQL-gated vitest suites (GST, credit/debit notes,
+      # subscriptions, report_sales ACLs, RLS boundaries, readiness) replay the
+      # full migration chain on a disposable embedded PG 17 and run against a
+      # throwaway autodine_check_* database. No hosted project involved.
+      - name: PostgreSQL-gated integration suites (disposable embedded PostgreSQL)
+        run: npm run test:db:integration
+
       # The drill's Mode A path shells out to the *system* pg_dump. The
       # embedded server is PG 17, and ubuntu-24.04 ships pg_dump 16, which
       # refuses to dump a PG 17 server — so the PGDG apt repository has to

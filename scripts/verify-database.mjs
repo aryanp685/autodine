@@ -70,11 +70,13 @@ try {
   // owners. This is a synthetic catalog setup, not a hosted connection.
   await db.query(`grant usage on schema public, auth to anon, authenticated, service_role;
     alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
-    alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;`);
+    alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+    alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;`);
   await db.query('set role supabase_admin');
   try {
     await db.query(`alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
-      alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;`);
+      alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+      alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;`);
   } finally {
     await db.query('reset role');
   }

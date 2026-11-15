@@ -22,11 +22,22 @@ Wired application failure paths (safe, additive):
    `[autodine:alert] {"event":"health_check_failed","severity":"critical",…}`
    line carrying booleans and fixed-vocabulary probe results only.
 
+`health_check_failed`), and `deliverWithRetry` —
+bounded exponential backoff, never throws, reports attempts honestly.
+
+2026-11-15 update — staff acknowledgement is now wired in code: one shared
+in-memory registry (`lib/incident-registry.ts`) backs both the realtime
+alert route and `POST /api/ops/incidents`, which lists, acknowledges and
+resolves this instance's incidents. Owner/manager only (kitchen/cashier get
+403), same-origin only, no provider activation, no external delivery. An
+incident opened on another instance is a 409 here; the durable record
+remains the structured log line. Not wired to any UI — the route is an
+API surface only.
+
 Still true: nothing was configured, no provider was chosen, no external
-delivery was observed or claimed. Acknowledgement/resolution endpoints for
-staff are NOT wired to any UI; the tracker is in-memory per instance, so
+delivery was observed or claimed. The tracker is in-memory per instance, so
 structured log lines remain the durable record. External delivery, paging
-and acknowledgement remain owner decisions below.
+and a UI remain owner decisions below.
 
 # Monitoring readiness — signals the app emits, and what only the owner can provision (2026-11-14)
 
