@@ -71,10 +71,18 @@ try {
   // The target is an empty database that already carries the platform scaffold
   // (the Supabase-shaped shim: storage tables, auth schema, roles) — exactly
   // where an operator restores. No application tables; the dump recreates them.
+  // pgcrypto is listed as a required extension by the dump notes; a restore
+  // target receives it from the platform/operator, not the application dump,
+  // so create it here before the restore.
   {
     const client = new pg.Client({ connectionString: urlFor(restored) });
     await client.connect();
-    try { await client.query(readFileSync('scripts/local-pg/000_supabase_shim.sql', 'utf8')); } finally { await client.end(); }
+    try {
+      await client.query(readFileSync('scripts/local-pg/000_supabase_shim.sql', 'utf8'));
+      await client.query('create extension if not exists pgcrypto;');
+    } finally {
+      await client.end();
+    }
   }
 
   // The logical dump covers the public schema only; auth/storage belong to the
