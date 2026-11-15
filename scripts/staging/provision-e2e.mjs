@@ -79,9 +79,14 @@ const opened=await owner.rpc('open_table_session',{p_public_token:otherCard.data
 const otherSession=opened.data?.[0]?.session_token;
 if(opened.error||!otherSession)throw new Error('Other tenant session provisioning failed.');mask(otherSession);
 const otherGuest=randomUUID();mask(otherGuest);
-const placedOther=await owner.rpc('place_public_order',{p_slug:otherSlug,p_lines:[{itemId:otherItem,qty:1}],p_note:'Private other tenant fixture',p_session_token:otherSession,p_guest_token:otherGuest,p_ip_hash:null});
-if(placedOther.error||!placedOther.data)throw new Error('Other tenant order provisioning failed.');
-const otherRead=await owner.rpc('get_public_order',{p_slug:otherSlug,p_code:placedOther.data,p_token:otherGuest});
+// The guest contract is place_public_order_attempt({code,error}); the inner
+// place_public_order is service_role-only by design (20261110000800). Mirror
+// app/menu/checkout/actions.ts. Found by run 43685793739 failing here with
+// permission denied against real staging.
+const placedOther=await owner.rpc('place_public_order_attempt',{p_slug:otherSlug,p_lines:[{itemId:otherItem,qty:1}],p_note:'Private other tenant fixture',p_session_token:otherSession,p_guest_token:otherGuest,p_ip_hash:null});
+const otherCode=placedOther.data&&typeof placedOther.data==='object'?placedOther.data.code:null;
+if(placedOther.error||!otherCode)throw new Error('Other tenant order provisioning failed.');
+const otherRead=await owner.rpc('get_public_order',{p_slug:otherSlug,p_code:otherCode,p_token:otherGuest});
 if(otherRead.error||!otherRead.data?.id)throw new Error('Other tenant real order verification failed.');
 manifest.otherOrderId=otherRead.data.id;await save();
 const first=cards['guest-order-flow.spec.ts'];
