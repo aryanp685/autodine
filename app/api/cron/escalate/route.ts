@@ -13,7 +13,10 @@ export const dynamic = 'force-dynamic';
  * The scheduled half of alerting: any incident that has been open, never
  * acknowledged, for longer than STALE_MS is escalated to critical and pushed
  * to the alert webhook (when configured). Vercel Cron calls this with
- * `Authorization: Bearer <CRON_SECRET>`.
+ * `Authorization: Bearer <CRON_SECRET>`; any external HTTPS scheduler may
+ * call it the same way. Cadence-agnostic — the Vercel schedule declared in
+ * vercel.json is daily (Hobby-plan limit); a Pro plan or an external cron
+ * service is required for tighter cadence.
  *
  * FAIL CLOSED
  *

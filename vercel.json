@@ -6,7 +6,7 @@
   "crons": [
     {
       "path": "/api/cron/escalate",
-      "schedule": "*/5 * * * *"
+      "schedule": "30 1 * * *"
     }
   ]
 }
