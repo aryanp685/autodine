@@ -1,5 +1,7 @@
 # AutoDine website readiness audit
 
+> **Active-branch warning:** The hosted observations and migration counts below belong to earlier dated reviews and were not rechecked on the current branch. Do not use them as current provider state or authorization. See the [current local hardening report](AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md) for this branch's evidence and open gates; its review made no hosted query or change.
+>
 > **Read this first (2026-11-11).** This audit is dated 2026-10-28 and its
 > migration counts are a month out of date. Staging has since received the
 > bundled forward upgrade and is schema-complete; production has **not**, and is

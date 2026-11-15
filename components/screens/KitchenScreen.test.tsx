@@ -150,10 +150,8 @@ describe('Kitchen board', () => {
             placedAt: '7:42 pm',
             placedAtIso: new Date().toISOString(),
             ageMin: 1,
-            payment: 'pending',
             state: 'new',
             items: [{ qty: 1, name: 'Tea', veg: true }],
-            total: 30,
           }],
         }}
       />,
@@ -183,7 +181,6 @@ describe('Kitchen board', () => {
               placedAt: '7:42 pm',
               placedAtIso: new Date().toISOString(),
               ageMin: 1,
-              payment: 'pending',
               state: 'new',
               items: [
                 {
@@ -195,7 +192,6 @@ describe('Kitchen board', () => {
                   veg: true,
                 },
               ],
-              total: 120,
             },
           ],
         }}
@@ -330,10 +326,8 @@ describe('Kitchen board', () => {
           placedAt: '7:42 pm',
           placedAtIso: new Date().toISOString(),
           ageMin: 2,
-          payment: 'pending',
           state: 'new',
           items: [{ qty: 1, name: 'Chai', veg: true }],
-          total: 40,
         },
       ],
     }} />);
@@ -362,10 +356,8 @@ describe('Kitchen board', () => {
           placedAt: '7:42 pm',
           placedAtIso: new Date().toISOString(),
           ageMin: 2,
-          payment: 'paid',
           state: 'preparing',
           items: [{ qty: 1, name: 'Chai', veg: true }],
-          total: 40,
         },
       ],
     }} />);
@@ -401,10 +393,8 @@ describe('Kitchen board, the redesign', () => {
               placedAt: '7:42 pm',
               placedAtIso: new Date().toISOString(),
               ageMin: 2,
-              payment: 'pending',
               state: 'new',
               items: [{ qty: 1, name: 'Chai', veg: true }],
-              total: 40,
             },
           ],
           ...over,
@@ -479,6 +469,33 @@ describe('Kitchen board, the redesign', () => {
     expect(html.slice(at, html.indexOf('</button>', at))).toContain('<svg');
   });
 
+  it('labels both order tickets and waiter calls as five-second polling', () => {
+    const html = live();
+    expect(html).toContain('Tickets and waiter calls refresh every five seconds.');
+    expect(html).toContain('5s polling');
+    expect(html).not.toContain('calls live');
+  });
+
+  it('does not render order payment state or totals on the kitchen board', () => {
+    const html = live();
+    expect(html).not.toContain('Unpaid · pay at counter');
+    expect(html).not.toContain('₹');
+  });
+
+  it('withholds ordinary cancellation from Kitchen while retaining it for finance roles', () => {
+    expect(live()).not.toContain('aria-label="Cancel order for');
+    for (const role of ['owner', 'manager'] as const) {
+      expect(live({ role })).toContain('aria-label="Cancel order for');
+    }
+    // Cashiers may cancel a bill but cannot advance its kitchen state.
+    expect(live({ role: 'cashier', canAdvance: false, cannotAdvance: 'role' }))
+      .toContain('aria-label="Cancel order for');
+    for (const role of ['owner', 'cashier'] as const) {
+      expect(live({ role, canAdvance: false, cannotAdvance: 'plan' }))
+        .not.toContain('aria-label="Cancel order for');
+    }
+  });
+
   it('marks each card with the colour of the stage it is in', () => {
     const html = live();
     expect(html).toContain('data-stage-edge="new"');
@@ -492,10 +509,8 @@ describe('Kitchen board, the redesign', () => {
           placedAt: '7:50 pm',
           placedAtIso: new Date().toISOString(),
           ageMin: 5,
-          payment: 'paid',
           state: 'preparing',
           items: [{ qty: 1, name: 'Chai', veg: true }],
-          total: 40,
         },
       ],
     });
@@ -537,7 +552,7 @@ describe('Kitchen board on a phone', () => {
     const html = renderToStaticMarkup(<Kitchen />);
 
     // Below lg the action is full-bleed inside the card. It used to sit at the
-    // right end of a wrapping row, behind the total and next to the cancel
+    // right end of a wrapping row, next to the cancel
     // pair, which on the narrowest screen puts the one control the board
     // exists for at the edge -- and a five-character label does not fit there.
     for (const label of ['Start preparing']) {
@@ -599,7 +614,6 @@ describe('reading a ticket on a narrow card', () => {
         placedAt: '7:42 pm',
         placedAtIso: new Date().toISOString(),
         ageMin: 3,
-        payment: 'pending' as const,
         state: 'new' as const,
         items: [
           {
@@ -611,7 +625,6 @@ describe('reading a ticket on a narrow card', () => {
           },
         ],
         note: 'No onion in the gravy, and please ring the bell twice at the pass — the table is at the back.',
-        total: 980,
       },
     ],
   };

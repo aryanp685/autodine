@@ -408,7 +408,7 @@ describe.skipIf(!URL_VALUE)('Model C subscription and billing', () => {
       await payFor(a.name, 'starter');
       await payFor(b.name, 'business');
 
-      // Each owner sees exactly their own payment, through the membership check.
+      // Each Owner sees exactly their own payment through the Owner/Manager policy.
       const rowsA = await staff(a.owner, async () => (await db.query('select account_payment_history($1) rows', [a.restaurant])).rows[0].rows as unknown[]);
       const rowsB = await staff(b.owner, async () => (await db.query('select account_payment_history($1) rows', [b.restaurant])).rows[0].rows as unknown[]);
       expect(rowsA).toHaveLength(1);
@@ -427,15 +427,18 @@ describe.skipIf(!URL_VALUE)('Model C subscription and billing', () => {
       expect(await staff(a.owner, async () => (await db.query('select id from subscription_events where account_id=$1', [b.account])).rows)).toEqual([]);
     });
 
-    it('bounds account history before aggregation while preserving member-read and owner-write scope', async () => {
+    it('bounds account history before aggregation while preserving Owner/Manager-read and owner-write scope', async () => {
       const a = await newAccount();
       await payFor(a.name, 'professional');
 
+      const manager = randomUUID();
       const cashier = randomUUID();
-      await db.query('insert into profiles(id) values($1)', [cashier]);
+      const kitchen = randomUUID();
+      await db.query('insert into profiles(id) select unnest($1::uuid[])', [[manager, cashier, kitchen]]);
       await db.query(
-        "insert into memberships(restaurant_id,user_id,role) values($1,$2,'cashier')",
-        [a.restaurant, cashier],
+        `insert into memberships(restaurant_id,user_id,role) values
+          ($1,$2,'manager'),($1,$3,'cashier'),($1,$4,'kitchen')`,
+        [a.restaurant, manager, cashier, kitchen],
       );
       const receiptId = (await db.query(
         'select id from subscription_receipts where account_id=$1', [a.account])).rows[0].id as string;
@@ -474,27 +477,147 @@ describe.skipIf(!URL_VALUE)('Model C subscription and billing', () => {
         [a.account, prefix],
       )).rows.map((row) => row.id);
 
-      const memberReads = await staff(cashier, async () => {
-        const state = (await db.query(
-          'select account_subscription_state($1) value', [a.restaurant])).rows[0].value;
-        const history = (await db.query(
-          'select account_subscription_history($1,50) value', [a.restaurant])).rows[0].value as Array<{ note: string }>;
-        const payments = (await db.query(
-          'select account_payment_history($1,50) value', [a.restaurant])).rows[0].value as Array<{ id: string }>;
-        const receipt = (await db.query(
-          'select account_receipt($1) value', [receiptId])).rows[0].value;
-        return { state, history, payments, receipt };
+      // Membership roles share Postgres' authenticated login, so every billing
+      // RPC and direct table policy checks the role stored in memberships.
+      const readers = [
+        { role: 'owner', user: a.owner },
+        { role: 'manager', user: manager },
+        { role: 'cashier', user: cashier },
+        { role: 'kitchen', user: kitchen },
+      ];
+      for (const reader of readers) {
+        const roleReads = await staff(reader.user, async () => {
+          const state = (await db.query(
+            'select account_subscription_state($1) value', [a.restaurant])).rows[0].value;
+          const history = (await db.query(
+            'select account_subscription_history($1,500) value', [a.restaurant])).rows[0].value as Array<{ note: string }> | null;
+          const payments = (await db.query(
+            'select account_payment_history($1,500) value', [a.restaurant])).rows[0].value as Array<{ id: string }> | null;
+          const receipt = (await db.query(
+            'select account_receipt($1) value', [receiptId])).rows[0].value;
+          const accountRows = await db.query(
+            'select id, plan, plan_status, trial_ends_at from accounts where id=$1', [a.account]);
+          const directRows = await Promise.all([
+            db.query('select id, amount_paise from subscription_events where account_id=$1', [a.account]),
+            db.query('select id, amount_paise from subscription_payments where account_id=$1', [a.account]),
+            db.query('select id, amount_paise from subscription_receipts where account_id=$1', [a.account]),
+          ]);
+          const access = (await db.query(
+            'select restaurant_access($1) value', [a.restaurant])).rows[0].value;
+          const features = (await db.query(
+            'select restaurant_features($1) value', [a.restaurant])).rows[0].value;
+          const restaurantTrialEndsAt = (await db.query(
+            'select restaurant_trial_ends_at($1) value', [a.restaurant])).rows[0].value;
+          const accountTrialEndsAt = (await db.query(
+            'select account_trial_ends_at($1) value', [a.account])).rows[0].value;
+          return { state, history, payments, receipt, accountRows, directRows, access, features, restaurantTrialEndsAt, accountTrialEndsAt };
+        });
+
+        expect(roleReads.features, `${reader.role} operational feature gate`).toContain('kitchen');
+        expect(roleReads.access.can_write, `${reader.role} operational write gate`).toBe(true);
+        expect(roleReads.access.read_only, `${reader.role} operational write gate`).toBe(false);
+
+        if (reader.role === 'owner' || reader.role === 'manager') {
+          expect(roleReads.state.accountId, reader.role).toBe(a.account);
+          expect(roleReads.history, reader.role).toHaveLength(50);
+          expect(roleReads.history?.map((row) => row.note), reader.role).toEqual(expectedNotes);
+          expect(roleReads.payments, reader.role).toHaveLength(50);
+          expect(roleReads.payments?.map((row) => row.id), reader.role).toEqual(expectedPaymentIds);
+          expect(roleReads.receipt, reader.role).toBeTruthy();
+          expect(Number(roleReads.receipt.amountPaise), reader.role).toBe(269900);
+          expect(roleReads.accountRows.rows, `${reader.role} direct accounts RLS`).toHaveLength(1);
+          for (const visible of roleReads.directRows) {
+            expect(visible.rows.length, `${reader.role} direct billing RLS`).toBeGreaterThan(0);
+          }
+          expect(roleReads.access.plan, reader.role).toBe('professional');
+          expect(roleReads.access.status, reader.role).toBe('active');
+          expect(roleReads.access).toHaveProperty('account_id', a.account);
+          expect(roleReads.access).toHaveProperty('outlets');
+          expect(roleReads.restaurantTrialEndsAt, reader.role).not.toBeNull();
+          expect(roleReads.accountTrialEndsAt, reader.role).not.toBeNull();
+        } else {
+          expect(roleReads.state, reader.role).toBeNull();
+          expect(roleReads.history, reader.role).toBeNull();
+          expect(roleReads.payments, reader.role).toBeNull();
+          expect(roleReads.receipt, reader.role).toBeNull();
+          expect(roleReads.accountRows.rows, `${reader.role} direct accounts RLS`).toHaveLength(0);
+          for (const visible of roleReads.directRows) {
+            expect(visible.rows, `${reader.role} direct billing RLS`).toEqual([]);
+          }
+          expect(Object.keys(roleReads.access).sort(), `${reader.role} operational projection`).toEqual([
+            'can_write', 'features', 'read_only',
+          ]);
+          expect(roleReads.access).not.toHaveProperty('plan');
+          expect(roleReads.access).not.toHaveProperty('status');
+          expect(roleReads.access).not.toHaveProperty('trial_ends_at');
+          expect(roleReads.access).not.toHaveProperty('account_id');
+          expect(roleReads.access).not.toHaveProperty('outlets');
+          expect(roleReads.restaurantTrialEndsAt, reader.role).toBeNull();
+          expect(roleReads.accountTrialEndsAt, reader.role).toBeNull();
+        }
+      }
+
+      // Legacy per-restaurant subscription columns remain on the row for
+      // compatibility, but the direct table path is closed to every staff
+      // role. The account-level Owner/Manager read is the only client-facing
+      // source of commercial state.
+      for (const apiRole of ['anon', 'authenticated']) {
+        expect((await db.query(
+          'select has_table_privilege($1,\'public.restaurants\',\'SELECT\') allowed', [apiRole],
+        )).rows[0].allowed, `${apiRole} must not retain table-wide SELECT on restaurants`).toBe(false);
+        for (const column of ['account_id', 'plan', 'plan_status', 'trial_started_at', 'plan_started_at', 'plan_expires_at']) {
+          expect((await db.query(
+            'select has_column_privilege($1,\'public.restaurants\',$2,\'SELECT\') allowed', [apiRole, column],
+          )).rows[0].allowed, `${apiRole} must not select restaurants.${column}`).toBe(false);
+        }
+      }
+      for (const reader of readers) {
+        await expect(staff(reader.user, () => db.query(
+          `select account_id, plan, plan_status, trial_started_at, plan_started_at, plan_expires_at
+             from restaurants where id=$1`,
+          [a.restaurant],
+        ))).rejects.toMatchObject({ code: '42501' });
+      }
+
+      expect((await db.query(
+        "select has_function_privilege('authenticated','public.has_account_role(uuid,text[])','EXECUTE') allowed",
+      )).rows[0].allowed).toBe(true);
+      expect((await db.query(
+        "select has_function_privilege('anon','public.has_account_role(uuid,text[])','EXECUTE') allowed",
+      )).rows[0].allowed).toBe(false);
+      expect((await db.query(`select prosecdef, proconfig from pg_catalog.pg_proc
+        where oid='public.has_account_role(uuid,text[])'::regprocedure`)).rows[0]).toEqual({
+        prosecdef: true,
+        proconfig: ['search_path=public, pg_temp'],
       });
 
-      expect(memberReads.state.accountId).toBe(a.account);
-      expect(memberReads.history).toHaveLength(50);
-      expect(memberReads.history.map((row) => row.note)).toEqual(expectedNotes);
-      expect(memberReads.payments).toHaveLength(50);
-      expect(memberReads.payments.map((row) => row.id)).toEqual(expectedPaymentIds);
-      expect(memberReads.receipt).toBeTruthy();
-      expect(Number(memberReads.receipt.amountPaise)).toBe(269900);
+      for (const signature of [
+        'public.account_subscription_state(uuid)',
+        'public.account_subscription_history(uuid,integer)',
+        'public.account_payment_history(uuid,integer)',
+        'public.account_receipt(uuid)',
+      ]) {
+        expect((await db.query('select has_function_privilege(\'authenticated\',$1,\'EXECUTE\') allowed', [signature])).rows[0].allowed).toBe(true);
+        expect((await db.query('select has_function_privilege(\'anon\',$1,\'EXECUTE\') allowed', [signature])).rows[0].allowed).toBe(false);
+      }
+      await expect(guest(() => db.query('select account_subscription_state($1)', [a.restaurant]))).rejects.toMatchObject({ code: '42501' });
+      await expect(guest(() => db.query('select account_subscription_history($1,500)', [a.restaurant]))).rejects.toMatchObject({ code: '42501' });
+      await expect(guest(() => db.query('select account_payment_history($1,500)', [a.restaurant]))).rejects.toMatchObject({ code: '42501' });
+      await expect(guest(() => db.query('select account_receipt($1)', [receiptId]))).rejects.toMatchObject({ code: '42501' });
+      await expect(guest(() => db.query('select id from subscription_payments'))).rejects.toMatchObject({ code: '42501' });
 
-      // Read access is membership-scoped, but the matching write remains owner-only.
+      const outsider = randomUUID();
+      await db.query('insert into profiles(id) values($1)', [outsider]);
+      await expect(staff(outsider, () => db.query('select account_subscription_state($1)', [a.restaurant])))
+        .resolves.toMatchObject({ rows: [{ account_subscription_state: null }] });
+      await expect(staff(outsider, () => db.query('select account_subscription_history($1,500)', [a.restaurant])))
+        .resolves.toMatchObject({ rows: [{ account_subscription_history: null }] });
+      await expect(staff(outsider, () => db.query('select account_payment_history($1,500)', [a.restaurant])))
+        .resolves.toMatchObject({ rows: [{ account_payment_history: null }] });
+      await expect(staff(outsider, () => db.query('select account_receipt($1)', [receiptId])))
+        .resolves.toMatchObject({ rows: [{ account_receipt: null }] });
+
+      // Reads are account-member-scoped; the matching write remains owner-only.
       await expect(staff(cashier, () => db.query(
         'select request_subscription_cancellation($1)', [a.restaurant],
       ))).rejects.toMatchObject({ message: expect.stringContaining('not_found') });

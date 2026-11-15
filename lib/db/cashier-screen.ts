@@ -94,7 +94,7 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
   const cutoff = new Date(Date.now() - QUEUE_WINDOW_HOURS * 3_600_000).toISOString();
 
   const { data: orders, error: ordersError } = await supabase
-    .from('orders')
+    .from('orders_finance')
     .select('id, code, table_id, prep_status, total_paise, placed_at')
     .eq('restaurant_id', restaurantId)
     .eq('payment_status', 'pending')

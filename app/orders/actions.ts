@@ -8,11 +8,13 @@
  *
  *   guest   the guest token, ten minutes, only while the kitchen has not
  *           started
- *   staff   a membership in this restaurant, any open ticket
+ *   staff   Owner, Manager or Cashier membership in this restaurant
  *
- * Both refuse a paid order. Undoing money is a refund, and this build has no
- * refund path -- so the honest answer is "this has already been paid", not a
- * cancellation that leaves a payment pointing at a dead order.
+ * Kitchen is deliberately excluded from ordinary cancellation because the
+ * refusal depends on payment state; that action would otherwise disclose
+ * whether a ticket was paid. Kitchen can still reject an unconfirmed held
+ * table through its separate, nonfinancial action. Both paths refuse a paid
+ * order because this build has no refund path.
  *
  * Nothing here trusts the browser for identity. The restaurant comes from the
  * signed-in session, the order is checked against it before the call, and the
@@ -22,7 +24,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { getStaffContext } from '@/lib/db/staff';
+import { CASHIER_ROLES, getStaffContext } from '@/lib/db/staff';
 
 export type CancelTicketResult = { ok: true; message: string } | { ok: false; error: string };
 
@@ -41,12 +43,16 @@ export async function cancelStaffOrderAction(input: {
     return { ok: false, error: 'Not signed in, or the database is not connected.' };
   }
 
-  const { supabase, restaurantId } = staff;
+  const { supabase, restaurantId, role } = staff;
+  if (!CASHIER_ROLES.includes(role)) {
+    return { ok: false, error: 'Only an owner, manager or cashier can cancel an order.' };
+  }
 
-  // Read first: the database's own refusals are correct but generic, and a
-  // cashier looking at a served ticket deserves a sentence that names why.
+  // The database-backed finance projection is independently role-scoped.
+  // It lets this action return useful cashier feedback without opening
+  // payment_status to the Kitchen role through the base table.
   const { data: order, error: readError } = await supabase
-    .from('orders')
+    .from('orders_finance')
     .select('id, prep_status, payment_status')
     .eq('id', orderId)
     .eq('restaurant_id', restaurantId)

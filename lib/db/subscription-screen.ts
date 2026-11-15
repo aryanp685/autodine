@@ -1,9 +1,9 @@
 /**
  * Load the Subscription screen.
  *
- * Everything on this screen is read through the account's own functions
- * (migration 20261110001100), which check membership themselves: a caller
- * naming a restaurant they do not work for gets null, not a row. The
+ * Everything on this screen is read through account functions that enforce
+ * Owner/Manager membership in the database (migration 20261114000100); a
+ * Cashier, Kitchen user, or nonmember gets null, not billing data. The
  * restaurant id comes from the session's membership — see lib/db/staff.ts —
  * so there is no id in a URL that could point this at somebody else's
  * subscription.
@@ -267,10 +267,10 @@ export type ReceiptResult =
 /**
  * One receipt, for the account that owns it.
  *
- * The membership check is inside `public.account_receipt()`: a caller from
- * another account gets null, which is the same answer as "no such receipt" —
- * deliberately, because "exists but not yours" is a fact about somebody else's
- * billing.
+ * The Owner/Manager role check is inside `public.account_receipt()`: a
+ * Cashier, Kitchen user, or caller from another account gets null, which is the
+ * same answer as "no such receipt" — deliberately, because "exists but not
+ * yours" is a fact about somebody else's billing.
  */
 export async function getSubscriptionReceipt(receiptId: string): Promise<ReceiptResult> {
   const context = await getStaffContextDetailed();

@@ -35,8 +35,8 @@ import { useRouter } from 'next/navigation';
  *     string and never asks for a router that is not there.
  *
  * The interval is deliberately slow. This is an operator's overview, not a
- * ticker; the kitchen board already has a realtime channel and its own
- * five-second safety net.
+ * ticker; the kitchen board has its own five-second polling loop for tickets
+ * and waiter calls, using role-scoped server reads rather than Realtime.
  */
 
 /** Exported for the test: the whole decision, with no DOM and no hooks. */

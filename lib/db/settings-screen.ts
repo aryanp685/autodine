@@ -194,6 +194,6 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
     activeOutletId: restaurantId,
     // The plan lives on the account, so this is the account's allowance and
     // the account's outlet count -- not this outlet's.
-    outletEntitlement: staff.context.access?.outlets ?? null,
+    outletEntitlement: staff.context.entitlement?.outlets ?? null,
   };
 }

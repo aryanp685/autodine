@@ -25,7 +25,7 @@ function table(over: Partial<HeldTable> = {}): HeldTable {
     placedAtIso: '2026-10-25T15:44:00Z',
     ageMin: 3,
     latest: '9:20 PM',
-    orders: [{ id: 'o-1', code: 'AU-1234', total: 640 }],
+    orders: [{ id: 'o-1', code: 'AU-1234' }],
     itemCount: 3,
     items: [
       { qty: 2, name: 'Paneer Tikka', veg: true },
@@ -58,8 +58,8 @@ describe('HeldTableStrip', () => {
           table({
             itemCount: 5,
             orders: [
-              { id: 'o-1', code: 'AU-1234', total: 640 },
-              { id: 'o-2', code: 'AU-1235', total: 240 },
+              { id: 'o-1', code: 'AU-1234' },
+              { id: 'o-2', code: 'AU-1235' },
             ],
             latest: '9:20 PM',
           }),

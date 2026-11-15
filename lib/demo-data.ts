@@ -292,12 +292,9 @@ export type KitchenOrder = {
   table: string;
   placedAt: string;
   ageMin: number;
-  payment: 'paid' | 'pending' | 'failed';
-  paymentMethod?: string;
   state: 'new' | 'preparing' | 'ready' | 'served';
   note?: string;
   items: { qty: number; name: string; detail?: string; veg: boolean }[];
-  total: number;
 };
 
 /**
@@ -341,8 +338,6 @@ export const kitchenOrders: KitchenOrder[] = [
     table: 'T7',
     placedAt: '12:42 PM',
     ageMin: 4,
-    payment: 'paid',
-    paymentMethod: 'UPI · counter',
     state: 'new',
     note: 'Ring the bell — no onion in the gravy.',
     items: [
@@ -350,64 +345,51 @@ export const kitchenOrders: KitchenOrder[] = [
       { qty: 2, name: 'Butter Naan', veg: true },
       { qty: 1, name: 'Mango Lassi', veg: true },
     ],
-    total: 776,
   },
   {
     id: 'A-1041',
     table: 'T3',
     placedAt: '12:38 PM',
     ageMin: 8,
-    payment: 'pending',
-    paymentMethod: 'Pay at counter',
     state: 'preparing',
     items: [
       { qty: 2, name: 'Hyderabadi Chicken Biryani', detail: 'Hot · Boondi raita', veg: false },
       { qty: 3, name: 'Tandoori Roti', veg: true },
     ],
-    total: 1247,
   },
   {
     id: 'A-1040',
     table: 'T12',
     placedAt: '12:31 PM',
     ageMin: 15,
-    payment: 'paid',
-    paymentMethod: 'Card · counter',
     state: 'ready',
     items: [
       { qty: 1, name: 'Paneer Tikka', detail: 'Sharing · Medium · Extra mint chutney', veg: true },
       { qty: 4, name: 'Laccha Paratha', veg: true },
     ],
-    total: 985,
   },
   {
     id: 'A-1039',
     table: 'T5',
     placedAt: '12:24 PM',
     ageMin: 22,
-    payment: 'paid',
-    paymentMethod: 'UPI · counter',
     state: 'served',
     items: [
       { qty: 1, name: 'Dal Bukhara', veg: true },
       { qty: 3, name: 'Garlic Naan', veg: true },
       { qty: 2, name: 'Masala Chai', veg: true },
     ],
-    total: 864,
   },
   {
     id: 'A-1038',
     table: 'T9',
     placedAt: '12:19 PM',
     ageMin: 27,
-    payment: 'pending',
-    paymentMethod: 'Pay at counter',
     state: 'ready',
     items: [
       { qty: 1, name: 'Subz Dum Biryani', veg: true },
       { qty: 2, name: 'Rasmalai', veg: true },
     ],
-    total: 737,
   },
 ];
 

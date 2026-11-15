@@ -41,7 +41,7 @@ import { OUTLET_COOKIE, pickOutlet, type OutletOption } from '@/lib/outlets';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { Database, MemberRole } from './database';
-import type { RestaurantAccess } from '@/lib/access';
+import type { RestaurantAccess, RestaurantEntitlement } from '@/lib/access';
 
 export type StaffContext = {
   supabase: SupabaseClient<Database>;
@@ -76,11 +76,15 @@ export type StaffContext = {
    */
   outlets: OutletOption[];
   /**
-   * The plan and trial clock, read from public.restaurant_access(). Null when
-   * the read failed — a migration not yet applied, a transient error — and
-   * every caller renders as if the workspace were open, because a failed read
-   * must never be what puts a restaurant into read-only mode. The database
-   * still refuses writes it does not like; this is only what the screen says.
+   * Operational feature/write entitlement from public.restaurant_access().
+   * Available to every staff role so Kitchen/Cashier controls stay aligned
+   * with the database gate. A failed read is only a display hint; the database
+   * remains authoritative for writes.
+   */
+  entitlement: RestaurantEntitlement | null;
+  /**
+   * Detailed plan/trial state for Owner and Manager only. The RPC returns no
+   * billing fields for Cashier or Kitchen, and this value is null for them.
    */
   access: RestaurantAccess | null;
 };
@@ -181,11 +185,11 @@ export async function getStaffContextDetailed(): Promise<StaffContextResult> {
   const active = pickOutlet(rows, preferred);
   if (!active) return { ok: false, reason: 'no-membership' };
 
-  // One extra round trip, on staff screens only, for the line that says how
-  // long the trial has left. It is deliberately not fatal: if the function is
-  // missing (migrations not applied yet) the context still resolves and the
-  // screens still work.
-  const access = await loadAccess(supabase, active.id);
+  // One extra round trip on staff screens for operational gates. The database
+  // returns detailed subscription state only for Owner/Manager; Kitchen and
+  // Cashier receive the minimal feature/write projection they need to render
+  // controls without learning billing state.
+  const access = await loadAccess(supabase, active.id, active.role);
 
   return {
     ok: true,
@@ -198,7 +202,8 @@ export async function getStaffContextDetailed(): Promise<StaffContextResult> {
       tagline: active.tagline ?? null,
       role: active.role,
       outlets: rows.map(({ id, name, role }) => ({ id, name, role })),
-      access,
+      entitlement: access?.entitlement ?? null,
+      access: access?.billing ?? null,
     },
   };
 }
@@ -210,21 +215,15 @@ export async function getStaffContext(): Promise<StaffContext | null> {
 }
 
 /**
- * Read the plan/trial state for one restaurant.
- *
- * Returns null rather than throwing. Two reasons, both deliberate:
- *
- *   1. A deployment that has not applied migration 20261026001100 has no
- *      restaurant_access() function. That is a setup problem, not a reason to
- *      break every owner screen.
- *   2. The value is DISPLAY. The write gate that actually matters lives in the
- *      database, on the same function the RLS policies call, and it does not
- *      care whether this read succeeded.
+ * Read role-safe operational entitlements and, for Owner/Manager, billing
+ * presentation fields. A missing RPC remains non-fatal: the actual write gate
+ * is enforced by PostgreSQL and never depends on this display read.
  */
 async function loadAccess(
   supabase: SupabaseClient<Database>,
-  restaurantId: string
-): Promise<RestaurantAccess | null> {
+  restaurantId: string,
+  role: MemberRole,
+): Promise<{ entitlement: RestaurantEntitlement; billing: RestaurantAccess | null } | null> {
   const { data, error } = await supabase.rpc('restaurant_access', {
     p_restaurant_id: restaurantId,
   });
@@ -236,18 +235,29 @@ async function loadAccess(
     return null;
   }
 
-  return {
-    plan: String(data.plan ?? 'trial'),
-    status: String(data.status ?? 'trialing'),
-    trialEndsAt: data.trial_ends_at ?? null,
-    daysRemaining: Number(data.days_remaining ?? 0),
+  const entitlement: RestaurantEntitlement = {
     canWrite: data.can_write !== false,
     readOnly: data.read_only === true,
     features: Array.isArray(data.features) ? data.features : [],
-    accountId: data.account_id ?? null,
-    // Migration 20261110001000. Absent on a database that predates it, which
-    // is why the screen-side helpers in lib/access.ts treat "unknown" as
-    // "ask the server" rather than as a licence.
-    outlets: data.outlets ?? undefined,
+  };
+  const canReadBilling = role === 'owner' || role === 'manager';
+  if (canReadBilling && data.outlets && typeof data.outlets === 'object') {
+    entitlement.outlets = data.outlets;
+  }
+
+  if (!canReadBilling || typeof data.plan !== 'string') {
+    return { entitlement, billing: null };
+  }
+
+  return {
+    entitlement,
+    billing: {
+      ...entitlement,
+      plan: data.plan,
+      status: String(data.status ?? 'trialing'),
+      trialEndsAt: data.trial_ends_at ?? null,
+      daysRemaining: Number(data.days_remaining ?? 0),
+      accountId: data.account_id ?? null,
+    },
   };
 }
