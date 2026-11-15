@@ -4,7 +4,7 @@ export default async function globalSetup() {
   let base: URL, share: URL;
   try {base=new URL(process.env.E2E_BASE_URL||'https://invalid.invalid');share=new URL(process.env.STAGING_SHARE_URL||'https://invalid.invalid');}
   catch {throw new Error('Staging endpoint/share URL is invalid.');}
-  if(base.origin!=='https://new-git-arena-3711df6a-autodine-iamjarvis9896-3988s-projects.vercel.app'||share.origin!==base.origin||!share.searchParams.get('_vercel_share'))throw new Error('Approved staging share access is required.');
+  if(base.origin!=='https://new-git-arena-9b120325-autodine-iamjarvis9896-3988s-projects.vercel.app'||share.origin!==base.origin||!share.searchParams.get('_vercel_share'))throw new Error('Approved staging share access is required.');
   const browser=await chromium.launch();
   try {
     const context=await browser.newContext();

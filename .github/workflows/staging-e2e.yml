@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      STAGING_BASE_URL: https://new-git-arena-3711df6a-autodine-iamjarvis9896-3988s-projects.vercel.app
+      STAGING_BASE_URL: https://new-git-arena-9b120325-autodine-iamjarvis9896-3988s-projects.vercel.app
       STAGING_SUPABASE_URL: https://juwyhslzchjevqkdvwjm.supabase.co
       STAGING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.AUTODINE_STAGING_SERVICE_ROLE_KEY }}
       STAGING_SHARE_URL: ${{ secrets.AUTODINE_STAGING_SHARE_URL }}

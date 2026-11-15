@@ -21,7 +21,7 @@
  */
 
 export const APPROVED_REF = 'juwyhslzchjevqkdvwjm';
-export const APPROVED_ORIGIN = 'https://new-git-arena-3711df6a-autodine-iamjarvis9896-3988s-projects.vercel.app';
+export const APPROVED_ORIGIN = 'https://new-git-arena-9b120325-autodine-iamjarvis9896-3988s-projects.vercel.app';
 export const PRODUCTION_REF = 'bdbaqpevwmgdvghszjno';
 export const SPEC_FILE_KEYS = ['guest-order-flow.spec.ts', 'kitchen-flow.spec.ts', 'cashier-flow.spec.ts', 'security-flow.spec.ts'];
 

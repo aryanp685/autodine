@@ -9,7 +9,7 @@ const key=process.env.STAGING_SUPABASE_SERVICE_ROLE_KEY;
 let base,share;
 try {base=new URL(process.env.STAGING_BASE_URL||'https://invalid.invalid');share=new URL(process.env.STAGING_SHARE_URL||'https://invalid.invalid');}
 catch {throw new Error('Staging endpoint/share URL is invalid; refusing fixture writes.');}
-if(url!==`https://${ref}.supabase.co` || !key || base.origin!=='https://new-git-arena-3711df6a-autodine-iamjarvis9896-3988s-projects.vercel.app' || share.origin!==base.origin || !share.searchParams.get('_vercel_share')) throw new Error('Missing approved staging endpoint/credentials/share access; refusing fixture writes.');
+if(url!==`https://${ref}.supabase.co` || !key || base.origin!=='https://new-git-arena-9b120325-autodine-iamjarvis9896-3988s-projects.vercel.app' || share.origin!==base.origin || !share.searchParams.get('_vercel_share')) throw new Error('Missing approved staging endpoint/credentials/share access; refusing fixture writes.');
 const mask=value=>{if(process.env.GITHUB_ACTIONS)console.log(`::add-mask::${value}`);};
 mask(key);mask(share.href);mask(share.searchParams.get('_vercel_share'));
 const admin=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});

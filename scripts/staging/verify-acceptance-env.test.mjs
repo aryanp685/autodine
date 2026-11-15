@@ -9,7 +9,7 @@ function validEnv() {
   const labels = ['E2E-T1', 'E2E-T2', 'E2E-T3', 'E2E-T4'];
   SPEC_FILE_KEYS.forEach((key, index) => { cards[key] = { token: hex64(String(index + 1)), label: labels[index] }; });
   return {
-    E2E_BASE_URL: 'https://new-git-arena-3711df6a-autodine-iamjarvis9896-3988s-projects.vercel.app',
+    E2E_BASE_URL: 'https://new-git-arena-9b120325-autodine-iamjarvis9896-3988s-projects.vercel.app',
     E2E_SLUG: 'arena-e2e-00000000-0000-0000-0000-000000000001',
     E2E_OWNER_EMAIL: 'arena-00000000-0000-0000-0000-000000000001@example.invalid',
     E2E_OWNER_PASSWORD: hex64('a'),
@@ -37,7 +37,7 @@ test('refuses the production project reference anywhere in the environment', () 
 });
 
 test('refuses any non-approved origin or extra path', () => {
-  for (const bad of ['https://autodine-production.vercel.app', 'http://new-git-arena-3711df6a-autodine-iamjarvis9896-3988s-projects.vercel.app', 'https://new-git-arena-3711df6a-autodine-iamjarvis9896-3988s-projects.vercel.app/path']) {
+  for (const bad of ['https://autodine-production.vercel.app', 'http://new-git-arena-9b120325-autodine-iamjarvis9896-3988s-projects.vercel.app', 'https://new-git-arena-9b120325-autodine-iamjarvis9896-3988s-projects.vercel.app/path']) {
     assert.equal(validateAcceptanceEnv({ ...validEnv(), E2E_BASE_URL: bad }).ok, false, bad);
   }
 });
