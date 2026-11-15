@@ -23,7 +23,7 @@ const results = [];
 const tally = { pass: 0, fail: 0, skip: 0 };
 function check(name, ok) {
   results.push(`${ok ? 'PASS' : 'FAIL'} ${name}`);
-  ok ? tally.pass++ : tally.fail++;
+  if (ok) { tally.pass += 1; } else { tally.fail += 1; }
   if (!ok && process.env.GITHUB_ACTIONS) console.log(`::error::hosted acceptance check failed: ${name}`);
 }
 function skip(name) {
