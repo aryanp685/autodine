@@ -286,7 +286,10 @@ try {
     }
     const guestToken = randomUUID();
     const start = performance.now();
-    const { data, error } = await anon.rpc('place_public_order', {
+    // The guest contract is place_public_order_attempt({code,error}) — anon
+    // reaches ordering only through the attempt wrapper; the inner
+    // place_public_order is service_role-only by design (20261110000800).
+    const { data: attempt, error } = await anon.rpc('place_public_order_attempt', {
       p_slug: guest.restaurant.slug,
       p_lines: [{ itemId: guest.itemId, qty: 1 }],
       p_note: 'Disposable synthetic concurrent guest load',
@@ -295,15 +298,20 @@ try {
       p_ip_hash: ipHash(`load-order:${prefix}:${index}`),
     });
     orderLatencies.push(performance.now() - start);
-    if (error || typeof data !== 'string' || !data) {
+    const nested = attempt && typeof attempt === 'object' ? attempt.error : null;
+    const code = attempt && typeof attempt === 'object' ? attempt.code : null;
+    const failure = error
+      ?? (nested ? new Error(`${nested.code ?? 'attempt'}: ${nested.message ?? 'order attempt refused'}`) : null)
+      ?? (typeof code === 'string' && code ? null : new Error(`Unexpected order result: ${JSON.stringify(attempt)}`));
+    if (failure) {
       orderErrors += 1;
-      addFailure('place_public_order', index, error ?? new Error(`Unexpected order result: ${JSON.stringify(data)}`));
+      addFailure('place_public_order_attempt', index, failure);
       return;
     }
     guestTokens[index] = guestToken;
   });
   report.workloads.orderCreation = summarizeLatencies(orderLatencies, performance.now() - orderStart, orderErrors, guests);
-  report.workloads.orderCreation.status = 'place_public_order RPC; priced by database';
+  report.workloads.orderCreation.status = 'place_public_order_attempt RPC; priced by database';
   report.workloads.orderCreation.concurrency = concurrency;
 
   const guestByRestaurant = new Map(guestsData.map((guest) => [guest.restaurantId, guest]));
