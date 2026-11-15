@@ -218,6 +218,55 @@ export type RestaurantInvoice = {
 };
 
 /**
+ * Migration 20261114000500. Immutable credit/debit note against one GST
+ * document; written only by the definer RPCs. IDs are stable; amounts are
+ * integer paise copied from the parent's immutable snapshots.
+ */
+export type RestaurantNote = {
+  id: string;
+  restaurant_id: string;
+  invoice_id: string;
+  document_type: 'credit_note' | 'debit_note';
+  document_number: string;
+  financial_year: string;
+  sequence_number: number;
+  status: 'issued' | 'voided';
+  reason_code: 'returned_supply' | 'quantity_difference' | 'rate_difference' | 'post_supply_change' | 'other';
+  reason: string;
+  taxable_paise: number;
+  cgst_paise: number;
+  sgst_paise: number;
+  igst_paise: number;
+  total_paise: number;
+  gst_snapshot: unknown;
+  seller_snapshot: unknown;
+  customer_snapshot: unknown | null;
+  totals_snapshot: unknown;
+  payment_snapshot: unknown;
+  irp_status: 'not_required' | 'pending' | 'generated' | 'failed' | 'cancelled';
+  irn: string | null;
+  source_document_number: string;
+  source_issued_at: string;
+  issued_at: string;
+  issued_by: string | null;
+  voided_at: string | null;
+  voided_by: string | null;
+  void_reason: string | null;
+  created_at: string;
+};
+
+/** Append-only audit ledger for note issuance and voids. */
+export type RestaurantNoteEvent = {
+  id: string;
+  note_id: string;
+  restaurant_id: string;
+  event: 'issued' | 'voided';
+  reason: string;
+  actor: string | null;
+  created_at: string;
+};
+
+/**
  * Migration 20261113000100. One live row per restaurant; mode 'off' is the
  * default and means the historical non-GST receipt behaviour.
  */

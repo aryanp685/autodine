@@ -1,13 +1,12 @@
+# No push trigger by design. A previous revision ran automatically on pushes
+# to the stale branch arena/3711df6a-autodine, which would re-provision
+# staging fixtures for an unrelated line of development. Staging writes now
+# happen only through this explicit manual dispatch, with the secrets gate
+# below as the second factor. Restoring any automatic trigger requires the
+# owner's explicit approval plus a fresh acceptance run.
 name: Staging E2E (explicit secrets, nonproduction only)
 on:
   workflow_dispatch:
-  push:
-    branches: ['arena/3711df6a-autodine']
-    paths:
-      - '.github/workflows/staging-e2e.yml'
-      - 'playwright.staging.config.ts'
-      - 'scripts/staging/**'
-      - 'e2e/integration/**'
 permissions:
   contents: read
 concurrency:

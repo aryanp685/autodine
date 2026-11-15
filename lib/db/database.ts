@@ -29,6 +29,8 @@ import type {
   OrderSession,
   RestaurantInvoice,
   RestaurantInvoiceLine,
+  RestaurantNote,
+  RestaurantNoteEvent,
   RestaurantPaymentReceipt,
   TableWaiterCall,
   PaymentStatus,
@@ -227,6 +229,10 @@ export type Database = {
       restaurant_invoice_lines: Table<RestaurantInvoiceLine>;
       /** Immutable supplemental receipts for payments received after invoicing. */
       restaurant_payment_receipts: Table<RestaurantPaymentReceipt>;
+      /** Full-document credit/debit notes against GST documents (20261114000500). */
+      restaurant_notes: Table<RestaurantNote>;
+      /** Append-only issuance/void audit for notes (20261114000500). */
+      restaurant_note_events: Table<RestaurantNoteEvent>;
       /** Opaque hashed credentials for bounded public receipt links. */
       restaurant_invoice_share_links: Table<{
         id: string;

@@ -14,6 +14,8 @@ const row = {
     issuedAt: '2026-10-28T10:31:00.000Z',
     totalPaise: 12500,
     paymentStatus: 'paid' as const,
+    documentType: 'receipt' as const,
+    irpStatus: 'not_required' as const,
   },
 };
 

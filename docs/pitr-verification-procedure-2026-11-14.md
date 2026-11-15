@@ -152,3 +152,23 @@ destroyed.
 Part 5 scheduled with an alert that has been observed to fire at least once
 (test alarm). Only then should the release-baseline document's preflight §6
 item 8 be considered satisfied.
+
+
+---
+
+## Addendum 2026-11-15 — evidence can now be checked mechanically
+
+`npm run pitr:check` (`scripts/verify-pitr-checklist.mjs`) validates a filled
+evidence file against every checkpoint above:
+
+- `node scripts/verify-pitr-checklist.mjs --template > pitr-evidence.json` — emit the schema.
+- `node scripts/verify-pitr-checklist.mjs --check pitr-evidence.json` — fail (exit 1) and name every
+  missing/inconsistent field, or PASS with a per-note summary. If the evidence names an accessible
+  `p3.backup_file`, its SHA-256 is recomputed and compared against the recorded digest.
+
+The validator is a checklist, not a signature: it proves the evidence file is complete and
+self-consistent; the P1–P6 signatures in the file remain the owner's act. It performs no hosted
+access, no network call and no backup restore. Local drill evidence (selftest 15/15 on embedded
+PostgreSQL 17, logical restore, cold physical recovery) is produced by `npm run test:backup`,
+`npm run test:db:logical-restore`, `npm run test:recovery:cold` — see
+`docs/backup-restore-runbook.md`.

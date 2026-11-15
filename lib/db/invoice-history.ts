@@ -19,6 +19,8 @@ export type InvoiceHistoryRow = {
     issuedAt: string;
     totalPaise: number | null;
     paymentStatus: 'paid' | 'unpaid' | null;
+    documentType: 'receipt' | 'gst_tax_invoice' | 'bill_of_supply';
+    irpStatus: 'not_required' | 'pending' | 'generated' | 'failed' | 'cancelled';
   };
 };
 
@@ -52,6 +54,8 @@ function toHistoryRow(
       paymentStatus: totals.payment_status === 'paid' || totals.payment_status === 'unpaid'
         ? totals.payment_status
         : null,
+      documentType: invoice.document_type,
+      irpStatus: invoice.irp_status,
     } : null,
   };
 }
@@ -87,7 +91,7 @@ export async function getInvoiceHistory(): Promise<InvoiceHistoryResult> {
     supabase.from('dining_tables').select('id, label').eq('restaurant_id', restaurantId).in('id', tableIds),
     supabase
       .from('restaurant_invoices')
-      .select('id, restaurant_id, order_session_id, invoice_number, financial_year, sequence_number, document_type, status, issued_at, issued_by, table_label_snapshot, session_opened_at, session_closed_at, seller_snapshot, customer_snapshot, totals_snapshot, payment_snapshot, source_order_ids, supersedes_invoice_id, voided_at, voided_by, void_reason, created_at')
+      .select('id, restaurant_id, order_session_id, invoice_number, financial_year, sequence_number, document_type, irp_status, status, issued_at, issued_by, table_label_snapshot, session_opened_at, session_closed_at, seller_snapshot, customer_snapshot, totals_snapshot, payment_snapshot, source_order_ids, supersedes_invoice_id, voided_at, voided_by, void_reason, created_at')
       .eq('restaurant_id', restaurantId)
       .in('order_session_id', sessionIds)
       .order('issued_at', { ascending: false }),

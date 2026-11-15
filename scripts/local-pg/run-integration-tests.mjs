@@ -1,5 +1,5 @@
 /**
- * Disposable-cluster runner for the eight PostgreSQL-gated vitest suites.
+ * Disposable-cluster runner for the ten PostgreSQL-gated vitest suites.
  *
  * Before this runner existed, the GST / credit-note / subscription / report-
  * sales / readiness / RLS integration suites could only run when somebody had
@@ -67,6 +67,8 @@ const INTEGRATION_SUITES = [
   'lib/db/phase0-security.integration.test.ts',
   'lib/db/readiness.integration.test.ts',
   'lib/db/report-sales.integration.test.ts',
+  'lib/db/account-link-audit.integration.test.ts',
+  'lib/db/owner-billing-guard.integration.test.ts',
   'lib/db/restaurant-account-link.integration.test.ts',
   'lib/db/subscription-billing.integration.test.ts',
 ];

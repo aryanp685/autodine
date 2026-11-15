@@ -206,3 +206,10 @@ No production access or change; no staging migration/config change; no GST/IRP
 application; no IRP/NIC e-invoice submission; no Resend/payment/provider
 activation; no real customer data; no merge to `main`; no deploy; existing READY
 deployments preserved; destructive git operations not used.
+
+
+---
+
+## Addendum 2026-11-15 — remediation batch landed (still no hosted action)
+
+D1 is now enforced by `20261112000200` **plus** `20261115000300_audit_restaurant_account_reassignment.sql` (applied-change audit ledger). D3 is fixed: PR #181's guard ships as `20261115000200_owner_billing_configuration_guard.sql` (unique version; `npm run migrations:verify` gates duplicates/ordering in CI). D2 is unchanged in posture: artifacts prepared, hosted residual open, execution is release-step 4 with the `supabase_admin` owner operation. D5/D6 remain release-ordering facts. Nothing in this addendum was applied to production or staging; the GST/IRP chain remains NOT AUTHORIZED. See `docs/d1-account-link-remediation-2026-11-15.md`, `docs/d2-postgres-acl-remediation-2026-11-15.md`, `docs/p0-remediation-2026-11-15.md`.

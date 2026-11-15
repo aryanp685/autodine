@@ -179,8 +179,10 @@ describe.skipIf(!URL_VALUE)('Phase 6D restaurant account-link guard', () => {
       .toBe(a.target.name);
   });
 
-  it('preserves owner/manager settings, tax, verification, branding, storefront and operational writes after expiry', async () => {
+  it('preserves ordinary owner/manager settings writes after expiry, with billing fields owner-only', async () => {
     const slug = `phase6d-updated-${randomUUID()}`;
+    // Owner: every ordinary field including tax_rate_bps and gstin (the only
+    // role the billing guard allows on those two). The match is on bps=725.
     const result = await staff(a.linked.owner, async () => (await db.query(`
       update public.restaurants
          set name=$1, tagline=$2, address=$3, phone=$4, gstin=$5, slug=$6,
@@ -223,6 +225,29 @@ describe.skipIf(!URL_VALUE)('Phase 6D restaurant account-link guard', () => {
       upi_payee_name: 'Synthetic Owner',
     });
     expect((await db.query('select public.restaurant_can_write($1) ok', [a.linked.restaurant])).rows[0].ok).toBe(false);
+
+    // Manager: every ordinary field EXCEPT tax_rate_bps / gstin, which the
+    // owner-billing guard (20261115000200) reserves to the owner.
+    const managerResult = await staff(a.manager, () => db.query(`
+      update public.restaurants
+         set name=$1, tagline=$2, address=$3, phone=$4,
+             guest_verification_mode='scan_confirm',
+             announcement_text='Synthetic manager notice', announcement_on=false,
+             is_active=true, accent='maroon', updated_at=now()
+       where id=$5
+       returning name, tagline, guest_verification_mode
+    `, ['Phase 6D manager update', 'Manager tagline', 'Manager address', '+91 90000 00001', a.linked.restaurant]));
+    expect(managerResult.rowCount).toBe(1);
+    expect(managerResult.rows[0].tagline).toBe('Manager tagline');
+
+    await expect(staff(a.manager, () => db.query(
+      'update public.restaurants set tax_rate_bps=900 where id=$1',
+      [a.linked.restaurant],
+    ))).rejects.toMatchObject({ code: '42501' });
+    await expect(staff(a.manager, () => db.query(
+      "update public.restaurants set gstin='27ABCDE1234F1Z5' where id=$1",
+      [a.linked.restaurant],
+    ))).rejects.toMatchObject({ code: '42501' });
   });
 
   it('preserves the authenticated brand publish and rollback path that updates restaurant branding', async () => {

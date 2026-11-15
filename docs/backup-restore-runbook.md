@@ -44,6 +44,13 @@ node scripts/backup/restore-logical.mjs --file /mnt/backups/autodine/autodine-*.
 
 Never put either URL on a command line (shell history) — always the environment variables, as shown. Neither command prints the URL.
 
+## Machine-checkable evidence (2026-11-15)
+
+`npm run pitr:check` validates a filled PITR/restore evidence file (see
+`docs/pitr-verification-procedure-2026-11-14.md` addendum): template emission, per-field schema
+validation, PITR-chosen consistency rules (p4 measured RPO/RTO, copy destroyed), and SHA-256
+re-verification of an accessible `p3.backup_file`. It never touches a database or the network.
+
 ## Verified evidence (2026-11-14)
 
 - `selftest.mjs` — 14/14 checks PASS on embedded PostgreSQL 17: dump contains DDL/policies/RLS/functions; destroy-and-restore reproduces the row fingerprint (sha256) exactly; trigger, SECURITY DEFINER, `search_path`, RLS flag and policy all preserved; tampered ciphertext and wrong passphrase both rejected.

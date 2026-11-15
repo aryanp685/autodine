@@ -44,6 +44,10 @@ yarn-error.log*
 !/docs/preview-isolation.md
 !/docs/preview-isolation-verification-2026-11-14.md
 !/docs/programme-status-2026-11-14.md
+!/docs/d1-account-link-remediation-2026-11-15.md
+!/docs/d2-postgres-acl-remediation-2026-11-15.md
+!/docs/p0-remediation-2026-11-15.md
+!/docs/email-monitoring-readiness-2026-11-15.md
 !/docs/monitoring-readiness-2026-11-14.md
 !/docs/resend-auth-readiness-2026-11-14.md
 !/docs/hosted-synthetic-acceptance-2026-11-14.md
