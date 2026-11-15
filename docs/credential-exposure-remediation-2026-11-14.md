@@ -93,12 +93,12 @@ Deployment protection stays enabled throughout — never toggle it off.
    (ref `juwyhslzchjevqkdvwjm`) → left nav **Authentication** → **Users**.
 2. Search `@autodine-review.test` — expect exactly four:
    `owner@`, `manager@`, `kitchen@`, `cashier@autodine-review.test`.
-3. Choose ONE disposition (I recommend A):
-   - **Option A — delete (recommended).** For each: **⋯ → Delete user** →
+3. **Owner decision (2026-11-15): Option A — delete all four.**
+   - **Option A — delete (SELECTED).** For each: **⋯ → Delete user** →
      confirm. Nothing in automation references them (verified repository-wide);
      the review phase is over. Staging data rows are unaffected (Auth delete
      ≠ data delete); staging is fixtures and can be reprovisioned.
-   - **Option B — reset.** For each: **⋯ → Update user** → set a new **unique,
+   - **Option B — reset (not selected).** For each: **⋯ → Update user** → set a new **unique,
      random** password (generate in password manager) → save. Do NOT use
      "Send password recovery" — these mailboxes cannot receive mail.
    - Either way: do not reuse or pattern-derive them from anything you use
