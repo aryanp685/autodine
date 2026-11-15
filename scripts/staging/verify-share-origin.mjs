@@ -31,7 +31,11 @@ if (share.origin !== base.origin) problems.push('SHARE_URL_ORIGIN_MISMATCH');
 if (!share.searchParams.get('_vercel_share')) problems.push('SHARE_URL_MISSING_VERCEL_SHARE_TOKEN');
 
 if (problems.length) {
-  console.error(`::error::Staging pre-flight refused: ${problems.join(', ')}. No fixtures will be written.`);
+  // Safe diagnostics: origins only (scheme+host+port). The origin is already
+  // public in this workflow; the _vercel_share token sits in the query string
+  // and is never printed.
+  const origins = [`baseOrigin=${base.origin}`, `shareOrigin=${share.origin}`, `shareHostMatchesBase=${share.origin === base.origin}`, `shareHasVercelShare=${Boolean(share.searchParams.get('_vercel_share'))}`, `shareParamNames=${[...share.searchParams.keys()].join('|') || '(none)'}`];
+  console.error(`::error::Staging pre-flight refused: ${problems.join(', ')}. ${origins.join(' ')}. No fixtures will be written.`);
   process.exit(1);
 }
 console.log('Staging pre-flight OK: approved project + approved origin + matching share origin. No writes performed.');
