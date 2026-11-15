@@ -28,7 +28,17 @@ import { fingerprint } from './verify-restore.mjs';
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'autodine-logical-restore-'));
 const password = `local-${crypto.randomUUID().replaceAll('-', '')}`;
-const port = 21000 + Math.floor(Math.random() * 20000);
+// Ask the OS for a free loopback port instead of guessing a range: a fixed
+// range can collide with something already bound on a CI runner.
+import net from 'node:net';
+const port = await new Promise((resolve, reject) => {
+  const probe = net.createServer();
+  probe.once('error', reject);
+  probe.listen(0, '127.0.0.1', () => {
+    const assigned = probe.address().port;
+    probe.close(() => resolve(assigned));
+  });
+});
 
 const server = new EmbeddedPostgres({ databaseDir: path.join(scratch, 'cluster'), port, user: 'postgres', password, persistent: false, onLog: () => {}, onError: () => {} });
 const urlFor = (db) => `postgresql://postgres:${password}@127.0.0.1:${port}/${db}`;
@@ -114,6 +124,7 @@ const before = await fingerprint(urlFor(source), { schemas: ['public'] });
   process.exitCode = 0;
 } catch (error) {
   console.error(`LOCAL LOGICAL RESTORE: FAILED: ${error?.message ?? error}`);
+  if (error?.stack) console.error(error.stack);
   process.exitCode = 1;
 } finally {
   // Close the admin client BEFORE stopping the server; otherwise the
