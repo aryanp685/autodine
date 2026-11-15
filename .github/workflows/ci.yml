@@ -49,12 +49,23 @@ jobs:
       # embedded server is PG 17, and ubuntu-24.04 ships pg_dump 16 from
       # PGDG, so without this step pg_dump aborts on the major-version
       # mismatch. PGDG is already configured in the runner image (the
-      # preinstalled client reports pgdg24.04).
+      # preinstalled client reports pgdg24.04). A stale third-party apt
+      # source can fail `apt-get update` (exit 100) without affecting the
+      # PGDG index, so tolerate the update failing but require the client
+      # to install and report v17 — otherwise fall straight to the log.
       - name: Install PostgreSQL 17 client tools (PGDG)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client-17
-          pg_dump --version
+          set -o pipefail
+          {
+            sudo apt-get update || echo "::warning::apt-get update failed; installing from the existing index"
+            apt-cache policy postgresql-client-17 || true
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql-client-17
+            pg_dump --version
+          } 2>&1 | tee pg-client-install.log
+
+      - name: Surface PG client install failure as an annotation
+        if: failure()
+        run: node scripts/ci/print-error-annotation.mjs pg-client-install.log 3500
 
       - name: Logical restore drill (full migration chain, disposable embedded PostgreSQL)
         run: |
