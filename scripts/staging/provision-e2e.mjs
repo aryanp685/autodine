@@ -43,7 +43,7 @@ console.log('STAGING_FIXTURE_IDS',JSON.stringify({run,restaurantId:manifest.rest
 await insert('memberships',{restaurant_id:manifest.restaurantId,user_id:manifest.createdUserId,role:'owner'});
 const menu=await insert('menus',{restaurant_id:manifest.restaurantId,name:'E2E menu',is_published:true});
 const category=await insert('categories',{restaurant_id:manifest.restaurantId,menu_id:menu,name:'E2E mains'});
-await insert('items',{restaurant_id:manifest.restaurantId,category_id:category,name:'E2E plain dish',price_paise:12500,is_available:true,is_veg:true});
+await insert('items',{restaurant_id:manifest.restaurantId,category_id:category,name:'Synthetic Paneer Dish',price_paise:34900,is_available:true,is_veg:true});
 const cards={};
 for(const [index,spec] of ['guest-order-flow','cashier-flow','kitchen-flow','security-flow'].entries()){
  const label=`E2E-T${index+1}`;

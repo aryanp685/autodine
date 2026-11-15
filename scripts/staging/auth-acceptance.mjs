@@ -106,8 +106,11 @@ for (const role of ['cashier', 'kitchen', 'manager']) {
   const redeemed = await memberClient.rpc('redeem_staff_invite', { p_code: code });
   const row = Array.isArray(redeemed.data) ? redeemed.data[0] : null;
   check(`invite-redeem-${role}`, !redeemed.error && row?.status === 'ok' && row?.role === role);
-  // Redemption must be single-use: a second redeem of the same code reports 'used'.
-  const again = await memberClient.rpc('redeem_staff_invite', { p_code: code });
+  // Single-use is for everyone OTHER than the original redeemer. A retry by
+  // the same actor is an intentional idempotent 'already_member' (lost
+  // response replay, see 20261108005000); a different authenticated actor must
+  // see 'used'. The owner is such an actor and this path writes nothing.
+  const again = await owner.rpc('redeem_staff_invite', { p_code: code });
   const againRow = Array.isArray(again.data) ? again.data[0] : null;
   check(`invite-single-use-${role}`, !again.error && againRow?.status === 'used');
   members[role] = { client: memberClient, email };
@@ -147,14 +150,38 @@ const verificationOther = await owner.rpc('current_verification_code', { p_resta
 check('verification-code-cross-tenant-denied', Boolean(verificationOther.error) || verificationOther.data == null);
 
 // --- 6. Monitoring: public health + kitchen realtime signal endpoint ---
-const health = await fetch(`${base.origin}/api/health`, { headers: { accept: 'application/json' } });
+// The staging preview sits behind Vercel Authentication. Reuse the SSO
+// share-link cookie the browser flow already proved (stored by the Playwright
+// global setup) so these probes reach the app; never print it. If no browser
+// state exists on this runner, fall back to the _vercel_share query, which
+// authorizes any path on the deployment. The app ignores unknown query params.
+async function stagingHttp(path, init = {}) {
+  const headers = new Headers(init.headers ?? {});
+  let cookie = '';
+  try {
+    const state = JSON.parse(await readFile('.staging-private/browser-access.json', 'utf8'));
+    const host = base.host;
+    cookie = (Array.isArray(state?.cookies) ? state.cookies : [])
+      .filter((c) => typeof c?.domain === 'string' && (host === c.domain.replace(/^\./, '') || host.endsWith(`.${c.domain.replace(/^\./, '')}`)))
+      .map((c) => `${c.name}=${c.value}`)
+      .join('; ');
+  } catch { /* no browser state — fall back to the share query below */ }
+  const share = process.env.STAGING_SHARE_URL ? new URL(process.env.STAGING_SHARE_URL) : null;
+  const shareToken = share?.searchParams.get('_vercel_share');
+  const target = new URL(path, base.origin);
+  if (cookie) headers.set('cookie', cookie);
+  else if (shareToken) target.searchParams.set('_vercel_share', shareToken);
+  return fetch(target, { ...init, headers });
+}
+
+const health = await stagingHttp('/api/health', { headers: { accept: 'application/json' } });
 let healthOk = false;
 try { healthOk = (await health.json())?.ok === true; } catch { /* leave false */ }
 check('health-endpoint-200-ok', health.status === 200 && healthOk);
 
 const kitchenToken = members.kitchen ? (await members.kitchen.client.auth.getSession()).data.session?.access_token : null;
 if (kitchenToken) {
-  const signal = await fetch(`${base.origin}/api/ops/realtime-alert`, {
+  const signal = await stagingHttp('/api/ops/realtime-alert', {
     method: 'POST',
     headers: { 'content-type': 'application/json', origin: base.origin, host: base.host, authorization: `Bearer ${kitchenToken}` },
     body: JSON.stringify({ kind: 'recovered', durationMs: 61_000 }),
@@ -163,7 +190,7 @@ if (kitchenToken) {
 } else skip('realtime-alert-kitchen-204');
 const cashierToken = members.cashier ? (await members.cashier.client.auth.getSession()).data.session?.access_token : null;
 if (cashierToken) {
-  const signal = await fetch(`${base.origin}/api/ops/realtime-alert`, {
+  const signal = await stagingHttp('/api/ops/realtime-alert', {
     method: 'POST',
     headers: { 'content-type': 'application/json', origin: base.origin, host: base.host, authorization: `Bearer ${cashierToken}` },
     body: JSON.stringify({ kind: 'recovered', durationMs: 61_000 }),

@@ -146,6 +146,10 @@ test.describe('cashier — real database', () => {
 
   test('two ticket sitting settles, prints the exact total, closes and starts a fresh sitting', async ({ context }) => {
     test.skip(!GUEST_READY, skipUnless(false, 'guest env for the order half'));
+    // The session-continuity assertion reads order_sessions straight from the
+    // database, which only exists on the disposable local stack. Hosted
+    // staging runs the full browser path; the DB_URL proof stays local.
+    test.skip(!process.env.DB_URL, 'needs the disposable local database (DB_URL); the hosted staging run cannot assert database state directly');
     const cardToken = reservedScanToken(24);
     const guest = await scanCard(context, cardToken);
 
