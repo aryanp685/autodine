@@ -37,10 +37,27 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      # The runner prints only generic, pre-redacted diagnostics (no secret
+      # values) by design; tee them to a file and re-emit as an annotation on
+      # failure so the Checks API can carry them when the log CDN is not
+      # reachable from the operator environment. This changes no behavior.
       - name: Provision uniquely namespaced fixtures (no email, no existing-data reset)
-        run: node scripts/staging/provision-e2e.mjs
+        run: |
+          set -o pipefail
+          node scripts/staging/provision-e2e.mjs 2>&1 | tee "$RUNNER_TEMP/staging-provision.log"
+
+      - name: Surface fixture-provision failure as an annotation
+        if: failure()
+        run: node scripts/ci/print-error-annotation.mjs "$RUNNER_TEMP/staging-provision.log" 2500 12
+
       - name: Real staging browser workflows
-        run: npx playwright test --config playwright.staging.config.ts
+        run: |
+          set -o pipefail
+          npx playwright test --config playwright.staging.config.ts 2>&1 | tee "$RUNNER_TEMP/staging-browser.log"
+
+      - name: Surface staging browser failure as an annotation
+        if: failure()
+        run: node scripts/ci/print-error-annotation.mjs "$RUNNER_TEMP/staging-browser.log" 2500 12
       - name: Publish counts only (no traces, URLs, credentials or raw reports)
         if: always()
         shell: bash
