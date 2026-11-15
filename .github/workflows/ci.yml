@@ -62,7 +62,15 @@ jobs:
             echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
             sudo apt-get update
             sudo DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql-client-17
+            # The runner ships a manually installed pg_dump 16 that shadows
+            # the wrapper in PATH (the drill still saw 16.15 with v17
+            # installed). Put the PGDG v17 bin directory first for every
+            # subsequent step and prove what resolves.
+            echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+            export PATH="/usr/lib/postgresql/17/bin:$PATH"
+            which -a pg_dump || true
             pg_dump --version
+            /usr/lib/postgresql/17/bin/pg_dump --version
           } 2>&1 | tee pg-client-install.log
 
       - name: Surface PG client install failure as an annotation
