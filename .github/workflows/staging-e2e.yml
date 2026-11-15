@@ -31,12 +31,14 @@ jobs:
             echo '::error::Staging setup blocked: configure AUTODINE_STAGING_SERVICE_ROLE_KEY and AUTODINE_STAGING_SHARE_URL as repository Actions secrets. Do not put them in workflow inputs or code.'
             exit 1
           fi
+      # Zero-write gate using the runner's system node (no npm install needed).
+      # Fails closed with rule ids only; nothing else runs on a mismatch.
+      - name: Verify share origin matches the approved base (no writes)
+        run: node scripts/staging/verify-share-origin.mjs
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - name: Verify share origin matches the approved base (no writes)
-        run: node scripts/staging/verify-share-origin.mjs
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       # The runner prints only generic, pre-redacted diagnostics (no secret
@@ -79,6 +81,10 @@ jobs:
         if: always()
         run: |
           set -o pipefail
+          if [ ! -d node_modules/@supabase/supabase-js ]; then
+            echo 'auth-acceptance: SKIP (dependencies not installed — an earlier step failed closed)'
+            exit 0
+          fi
           node scripts/staging/auth-acceptance.mjs 2>&1 | tee "$RUNNER_TEMP/staging-auth-acceptance.log"
 
       - name: Surface acceptance probe failure as an annotation
