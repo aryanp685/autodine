@@ -77,7 +77,7 @@ jobs:
           source <(supabase status -o env)
           set +a
           echo "::add-mask::$SERVICE_ROLE_KEY"
-          node scripts/e2e/prepare-local-supabase.mjs
+          node scripts/e2e/prepare-local-supabase.mjs 2>&1 | tee "$RUNNER_TEMP/prepare-local-supabase.log"
           {
             printf 'NEXT_PUBLIC_SUPABASE_URL=%s\n' "$API_URL"
             printf 'NEXT_PUBLIC_SUPABASE_ANON_KEY=%s\n' "$ANON_KEY"
@@ -88,6 +88,10 @@ jobs:
             printf 'SERVICE_ROLE_KEY=%s\n' "$SERVICE_ROLE_KEY"
             printf 'DB_URL=%s\n' "$DB_URL"
           } >> "$GITHUB_ENV"
+
+      - name: Surface fixture-apply failure as an annotation
+        if: failure()
+        run: node scripts/ci/print-error-annotation.mjs "$RUNNER_TEMP/prepare-local-supabase.log" 3500
 
       - name: Build against local Supabase and run integration Playwright tests
         env:

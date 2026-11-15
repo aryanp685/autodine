@@ -46,7 +46,13 @@ jobs:
         run: npm run test:backup
 
       - name: Logical restore drill (full migration chain, disposable embedded PostgreSQL)
-        run: npm run test:db:logical-restore
+        run: |
+          set -o pipefail
+          npm run test:db:logical-restore 2>&1 | tee restore-drill.log
+
+      - name: Surface restore drill failure as an annotation
+        if: failure()
+        run: node scripts/ci/print-error-annotation.mjs restore-drill.log 3500
 
       - name: Tests
         run: npm test
