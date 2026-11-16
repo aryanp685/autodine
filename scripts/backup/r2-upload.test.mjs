@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { deriveSigningKey, r2ConfigFromEnv, r2ObjectKey, signR2Request, sha256Hex } from './lib-r2.mjs';
+import { deriveSigningKey, parseR2ListXml, pickNewestArtifactKey, r2ConfigFromEnv, r2ObjectKey, signR2Request, sha256Hex } from './lib-r2.mjs';
 
 test('SigV4 signing key matches the published AWS derivation vector', () => {
   // AWS documentation example: secret/date/region/service -> known kSigning.
@@ -49,6 +49,39 @@ test('config resolution reports missing NAMES only, never values', () => {
 test('object keys use basenames only (no path traversal)', () => {
   assert.equal(r2ObjectKey('/tmp/../etc/autodine-a.sql.gz.enc'), 'autodine-backups/autodine-a.sql.gz.enc');
   assert.equal(r2ObjectKey('autodine-a.sql.gz.enc', ''), 'autodine-a.sql.gz.enc');
+});
+
+test('R2 list parsing picks the newest artifact and ignores manifests', () => {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+    <Contents><Key>autodine-backups/autodine-a-20260101T000000.sql.gz.enc</Key><LastModified>2026-01-01T00:00:00.000Z</LastModified></Contents>
+    <Contents><Key>autodine-backups/autodine-a-20260101T000000.manifest.json</Key><LastModified>2026-01-01T00:00:01.000Z</LastModified></Contents>
+    <Contents><Key>autodine-backups/autodine-a-20260102T000000.sql.gz.enc</Key><LastModified>2026-01-02T00:00:00.000Z</LastModified></Contents>
+  </ListBucketResult>`;
+  const entries = parseR2ListXml(xml);
+  assert.equal(entries.length, 3);
+  assert.equal(pickNewestArtifactKey(entries), 'autodine-backups/autodine-a-20260102T000000.sql.gz.enc');
+  assert.equal(pickNewestArtifactKey([]), null);
+});
+
+test('download CLI fails closed with missing-config NAMES only', () => {
+  const script = path.join(import.meta.dirname, 'download-r2.mjs');
+  const run = spawnSync(process.execPath, [script, '--out-dir', '/tmp/autodine-r2-dl-test'], {
+    encoding: 'utf8',
+    env: { PATH: process.env.PATH, R2_SECRET_ACCESS_KEY: 'SENTINEL-SECRET-DO-NOT-LEAK' },
+  });
+  assert.equal(run.status, 2);
+  assert.match(run.stderr, /R2_BUCKET/);
+  assert.ok(!run.stderr.includes('SENTINEL-SECRET-DO-NOT-LEAK'));
+});
+
+test('verify-restored refuses any non-loopback target before connecting', () => {
+  const script = path.join(import.meta.dirname, 'verify-restored-db.mjs');
+  const run = spawnSync(process.execPath, [script, '--manifest', import.meta.filename], {
+    encoding: 'utf8',
+    env: { ...process.env, AUTODINE_RESTORE_TARGET_URL: 'postgresql://user:pass@db.example.invalid:5432/prod' },
+  });
+  assert.equal(run.status, 2);
+  assert.match(run.stderr, /REFUSING non-disposable target/);
 });
 
 test('upload CLI dry-run verifies manifest SHA-256 and refuses mismatches', () => {

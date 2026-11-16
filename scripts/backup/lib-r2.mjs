@@ -66,6 +66,27 @@ export function r2ObjectKey(fileName, prefix = 'autodine-backups') {
   return cleanPrefix ? `${cleanPrefix}/${base}` : base;
 }
 
+/** Parse an S3 ListObjectsV2 response into [{ key, lastModified }]. */
+export function parseR2ListXml(xml) {
+  const entries = [];
+  const contentsRe = /<Contents>([\s\S]*?)<\/Contents>/g;
+  let block;
+  while ((block = contentsRe.exec(String(xml))) !== null) {
+    const key = block[1].match(/<Key>([^<]+)<\/Key>/)?.[1];
+    const lastModified = block[1].match(/<LastModified>([^<]+)<\/LastModified>/)?.[1];
+    if (key) entries.push({ key, lastModified: lastModified ?? '' });
+  }
+  return entries;
+}
+
+/** Newest backup artifact key from a list result, or null when none exists. */
+export function pickNewestArtifactKey(entries) {
+  const artifacts = entries
+    .filter((e) => /\.(sql\.gz\.enc|dump\.enc)$/.test(e.key))
+    .sort((a, b) => String(a.lastModified).localeCompare(String(b.lastModified)));
+  return artifacts.length ? artifacts[artifacts.length - 1].key : null;
+}
+
 const amzDate = (date) => date.toISOString().replace(/[:-]|\.\d{3}/g, '');
 
 /**

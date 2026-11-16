@@ -112,6 +112,36 @@ the run at the `upload` stage with the missing variable NAMES (verified
 pass). Follow it with the hosted restore rehearsal above; only a passed
 rehearsal closes the backup gate.
 
+## Hosted execution via GitHub Actions (implemented 2026-11-16; not yet run)
+
+Two workflows make the hosted path independent of any one machine:
+
+- **`.github/workflows/hosted-backup.yml`** — manual dispatch + daily
+  03:17 UTC schedule; `contents: read` only; concurrency-guarded; fails
+  closed naming any missing secret; runs `run-scheduled.mjs --r2` and
+  archives the (non-sensitive) manifest as run evidence.
+- **`.github/workflows/hosted-restore-drill.yml`** — manual dispatch only;
+  downloads the newest R2 artifact (`download-r2.mjs`, SHA-256 vs manifest
+  verified), restores into a disposable `postgres:17` service container,
+  verifies with `verify-restored-db.mjs` (schema fingerprint, row counts,
+  `payments`/`subscription_payments` sums vs manifest), records restore
+  seconds as rehearsal RTO, archives the two JSON reports, and destroys
+  the downloaded material in an unconditional cleanup step. The target is
+  loopback-only by construction, and the verifier refuses non-loopback
+  hosts before connecting.
+
+**Trigger the first runs:** configure the repository secrets below, then
+Actions → *Hosted backup (R2)* → Run workflow; on success Actions →
+*Hosted restore rehearsal (disposable)* → Run workflow. Hosted success is
+claimed only when the backup run prints `uploaded:true, verified:true`
+and the drill job is green — neither has happened yet.
+
+Required repository secrets (Settings → Secrets and variables → Actions):
+`AUTODINE_BACKUP_SOURCE_URL`, `AUTODINE_BACKUP_PASSPHRASE`,
+`CLOUDFLARE_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`,
+`R2_SECRET_ACCESS_KEY` (backup workflow set); the drill needs the last
+five. `BACKUP_ALERT_WEBHOOK` is optional (failure alerting).
+
 (systemd: a `.timer` invoking the same command with a root-only
 `EnvironmentFile=` for the two variables; Windows: Task Scheduler with a
 stored environment. The wrapper never prints the URL or the passphrase, and
