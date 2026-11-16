@@ -16,7 +16,7 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { r2ConfigFromEnv, parseR2ListXml, pickNewestArtifactKey, signR2Request, sha256Hex } from './lib-r2.mjs';
+import { r2ConfigFromEnv, parseR2ListXml, pickNewestArtifactKey, r2ListContinuationToken, signR2Request, sha256Hex } from './lib-r2.mjs';
 
 const args = process.argv.slice(2);
 const opt = {};
@@ -53,13 +53,22 @@ async function signedFetch(method, urlString, body) {
 const objectUrl = (key) => `${config.endpoint}/${config.bucket}/${key.split('/').map(encodeURIComponent).join('/')}`;
 
 try {
-  const listUrl = `${config.endpoint}/${config.bucket}?list-type=2&prefix=${encodeURIComponent('autodine-backups/')}`;
-  const list = await signedFetch('GET', listUrl);
-  if (!list.ok) {
-    process.stderr.write(`download-r2: LIST failed with HTTP ${list.status}\n`);
-    process.exit(1);
-  }
-  const key = pickNewestArtifactKey(parseR2ListXml(await list.text()));
+  const entries = [];
+  let continuation = null;
+  do {
+    const query = continuation
+      ? `continuation-token=${encodeURIComponent(continuation)}&list-type=2&prefix=${encodeURIComponent('autodine-backups/')}`
+      : `list-type=2&prefix=${encodeURIComponent('autodine-backups/')}`;
+    const list = await signedFetch('GET', `${config.endpoint}/${config.bucket}?${query}`);
+    if (!list.ok) {
+      process.stderr.write(`download-r2: LIST failed with HTTP ${list.status}\n`);
+      process.exit(1);
+    }
+    const xml = await list.text();
+    entries.push(...parseR2ListXml(xml));
+    continuation = r2ListContinuationToken(xml);
+  } while (continuation);
+  const key = pickNewestArtifactKey(entries);
   if (!key) {
     process.stderr.write('download-r2: no backup artifact found in the bucket prefix autodine-backups/\n');
     process.exit(1);

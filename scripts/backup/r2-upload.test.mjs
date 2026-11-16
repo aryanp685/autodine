@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { deriveSigningKey, parseR2ListXml, pickNewestArtifactKey, r2ConfigFromEnv, r2ObjectKey, signR2Request, sha256Hex } from './lib-r2.mjs';
+import { deriveSigningKey, parseR2ListXml, pickNewestArtifactKey, r2ListContinuationToken, r2ConfigFromEnv, r2ObjectKey, signR2Request, sha256Hex } from './lib-r2.mjs';
 
 test('SigV4 signing key matches the published AWS derivation vector', () => {
   // AWS documentation example: secret/date/region/service -> known kSigning.
@@ -61,6 +61,11 @@ test('R2 list parsing picks the newest artifact and ignores manifests', () => {
   assert.equal(entries.length, 3);
   assert.equal(pickNewestArtifactKey(entries), 'autodine-backups/autodine-a-20260102T000000.sql.gz.enc');
   assert.equal(pickNewestArtifactKey([]), null);
+  assert.equal(r2ListContinuationToken(xml), null);
+  assert.equal(
+    r2ListContinuationToken('<ListBucketResult><IsTruncated>true</IsTruncated><NextContinuationToken>tok123</NextContinuationToken></ListBucketResult>'),
+    'tok123',
+  );
 });
 
 test('download CLI fails closed with missing-config NAMES only', () => {

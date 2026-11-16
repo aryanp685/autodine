@@ -79,6 +79,13 @@ export function parseR2ListXml(xml) {
   return entries;
 }
 
+/** Continuation token from a truncated ListObjectsV2 response, else null. */
+export function r2ListContinuationToken(xml) {
+  const text = String(xml);
+  if (!/<IsTruncated>true<\/IsTruncated>/.test(text)) return null;
+  return text.match(/<NextContinuationToken>([^<]+)<\/NextContinuationToken>/)?.[1] ?? null;
+}
+
 /** Newest backup artifact key from a list result, or null when none exists. */
 export function pickNewestArtifactKey(entries) {
   const artifacts = entries
