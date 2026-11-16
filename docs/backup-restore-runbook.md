@@ -60,12 +60,36 @@ re-verification of an accessible `p3.backup_file`. It never touches a database o
 
 ## Isolated hosted restore rehearsal (prepare, then execute with approval)
 
+**Prerequisites (all must hold before step 1):** owner approval naming the
+scratch project and the production read; backup passphrase in a password
+manager (never in chat/git); destination bucket chosen (register A2/C-1);
+off-peak window; scratch project in the same org, same region
+(`ap-south-1`), PostgreSQL 17; **no** production writes planned during the
+drill.
+
 1. Create a **scratch** Supabase project in the same org (Free tier is fine; ~2 minutes; existing org — this is a cost-neutral creation, but still requires the owner’s go-ahead because it handles real backup data).
 2. Run the backup against production (read-only, one transaction; off-peak; reads only).
 3. Restore into the scratch project with `--confirm-empty-db`.
 4. Verify: row counts per table vs. production manifest; app-level smoke (open menus, counts); spot-check money invariants (e.g., `select sum(amount_paise) from payments` vs. manifest totals).
 5. **Destroy the scratch project** (or keep encrypted in place until acceptance signed). Record: date, who ran it, counts, pass/fail.
 6. Evidence file: store the manifest + verification report in the ops repo; never commit the dump.
+
+**Acceptance criteria (drill passes only if every line holds):**
+
+- Restore exits 0 with the verification report printed; manifest SHA-256
+  re-verifies against the artifact.
+- Per-table row counts equal the backup manifest exactly (0 mismatches);
+  money spot-checks (`payments`, `subscription_payments` sums) match.
+- Schema fingerprint (tables/policies/functions) matches the manifest
+  counts; SECURITY DEFINER + `search_path` spot-checked on financial RPCs.
+- App-level smoke against the scratch project only: health `ok:true`,
+  menu read, checkout-guard error paths behave (no writes to production).
+- Measured wall-clock recorded as the rehearsal RTO; backup timestamp vs
+  drill start recorded as the rehearsal RPO; both filed with the evidence.
+- Scratch project destroyed (or encrypted-at-rest retention explicitly
+  approved) and its ref recorded as retired in the evidence file.
+- Any failure → drill is FAILED (not partial): artifact and logs retained,
+  defect filed, production backup gate stays UNMET until a pass.
 
 ## Scheduling
 
