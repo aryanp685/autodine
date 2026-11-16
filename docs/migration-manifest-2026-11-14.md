@@ -1,18 +1,22 @@
-# Production migration manifest — 2026-11-14 (all 92 files accounted for)
+# Production migration manifest — 2026-11-14 (all 93 files accounted for; updated 2026-11-16)
 
-**Generated from `supabase/migrations/` on branch `arena/9b120325-autodine`.**
+**Generated from `supabase/migrations/` on branch `arena/9b120325-autodine`;
+extended 2026-11-16 on `arena/2670dd12-autodine`.**
 Purpose: nothing reaches production without appearing in this table with a
 classification and the probe that confirms (or refutes) its presence. Counts:
 **76 legacy-rollout-scope · 9 branch set (pending owner authorization B1) ·
-7 GST/IRP Phase B (NOT AUTHORIZED)**. Zero duplicate versions (checked
-2026-11-14). The release-prep document
+7 GST/IRP Phase B (NOT AUTHORIZED) · 1 scoped ACL revision
+(`20261116000100`, pending its own authorization)**. Zero duplicate versions
+(checked 2026-11-14; rechecked 2026-11-16, `migrations:verify` 93/93). The
+release-prep document
 (`docs/production-release-prep-2026-11-14.md`) binds this manifest into the
 ordered release sequence.
 
 **Evidence boundary:** "Reported applied" means the 2026-11-12 hand-off report
-records the legacy rollout as completed and production ledger listing ended at
-`20261112000100` (a listing boundary, **not** a completeness proof). Only the
-A1 probe (owner-run, read-only) can confirm at release time. Nothing here
+records the legacy rollout as completed. The A1 ledger + catalog-effect
+probes were executed read-only against production on 2026-11-16 (72/92 repo
+versions present at that time; see the probed rows below) and supersede the
+reported-applied assumption for the flagged files. Nothing here
 authorizes any application. GST/IRP files are not to be applied in any form
 without separate written authorization each.
 
@@ -92,7 +96,7 @@ without separate written authorization each.
 | `20261110001000` | `account_subscriptions` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
 | `20261110001100` | `subscription_billing` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
 | `20261110001210` | `checkout_outstanding_guard` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 | **PROBED 2026-11-16: EFFECT EQUIVALENT-PRESENT** (console variant) — both outstanding-balance guards, write-gate and grants (`authenticated` only) verified in the hosted body; wording/comment differ from repo (3216 vs 3451 chars incl. comments). **Hold out of first apply batch** pending full `pg_get_functiondef` diff so no console-only behaviour is lost |
-| `20261110001220` | `revoke_client_bypass_privileges` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 | **PROBED 2026-11-16: EFFECT PARTIAL — DO NOT APPLY VERBATIM.** TRUNCATE/REFERENCES/TRIGGER already revoked on tables, but `MAINTAIN` remains for `anon`+`authenticated` on **17 tables** (D2 confirmed) and in `postgres` default ACLs; `supabase_admin` defaults untouched (owner-operation scope). Two live sequences (`restaurant_invoice_share_audit_id_seq`, `subscription_receipt_seq`) grant client USAGE/SELECT/UPDATE — the file's blanket sequence revoke could break receipt/invoice numbering and needs a scoped revision (new forward migration, locally tested) instead |
+| `20261110001220` | `revoke_client_bypass_privileges` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 | **PROBED 2026-11-16: EFFECT PARTIAL — DO NOT APPLY VERBATIM.** TRUNCATE/REFERENCES/TRIGGER already revoked on tables, but `MAINTAIN` remains for `anon`+`authenticated` on **17 tables** (D2 confirmed) and in `postgres` default ACLs; `supabase_admin` defaults untouched (owner-operation scope). Two live sequences (`restaurant_invoice_share_audit_id_seq`, `subscription_receipt_seq`) grant client USAGE/SELECT/UPDATE; source verification (2026-11-16) shows both are consumed only inside SECURITY DEFINER functions, so the sequence revoke is safe — but production should apply the scoped revision `20261116000100` (below) instead of this file, which stays in the chain for local/staging parity |
 | `20261112000100` | `schedule_subscription_expiry` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
 | `20261112000200` | `immutable_restaurant_account_link` | Branch set — apply only with B1 (release prep §2) | P0 security — effect absent in prod (D1) |
 | `20261112000300` | `report_sales_export_authorization` | Branch set — apply only with B1 (release prep §2) | staging-applied 2026-11-15; prod unverified |
@@ -110,6 +114,7 @@ without separate written authorization each.
 | `20261115000100` | `fix_redeem_staff_invite_status_returns` | Branch set — apply only with B1 (release prep §2) | P0 auth — invite single-use fix |
 | `20261115000200` | `owner_billing_configuration_guard` | Branch set — apply only with B1 (release prep §2) | P0 security — owner-only tax/GSTIN trigger (PR #181 content, renumbered) |
 | `20261115000300` | `audit_restaurant_account_reassignment` | Branch set — apply only with B1 (release prep §2) | P0 security — account-reassignment audit ledger |
+| `20261116000100` | `revoke_client_maintain_privileges` | Scoped ACL revision — NOT AUTHORIZED (own decision; production substitute for `20261110001220`, see its probed row) | Added 2026-11-16 after production catalog probes: completes the MAINTAIN/default-ACL scope 01220 misses in the production-shaped catalog, with fail-closed post-revoke verification; sequence revokes justified by definer-only consumption (verified in source). Locally replay-tested; never applied to any hosted project |
 
 ## Owner-operation (never applied automatically — separate on purpose)
 

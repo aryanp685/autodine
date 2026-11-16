@@ -20,11 +20,11 @@ const check = (name, ok, detail = '') => {
 };
 const read = (p) => readFileSync(join(root, p), 'utf8');
 
-// 1. Migration inventory: exactly 92 files, unique 14-digit versions.
+// 1. Migration inventory: exactly 93 files, unique 14-digit versions.
 const migDir = join(root, 'supabase/migrations');
 const migFiles = readdirSync(migDir).filter((f) => f.endsWith('.sql')).sort();
 const versions = migFiles.map((f) => f.slice(0, 14));
-check('migration_count_92', migFiles.length === 92, `found ${migFiles.length}`);
+check('migration_count_93', migFiles.length === 93, `found ${migFiles.length}`);
 check('migration_versions_unique', new Set(versions).size === versions.length);
 check('migration_versions_14_digit', versions.every((v) => /^[0-9]{14}$/.test(v)));
 
@@ -38,7 +38,7 @@ for (const f of GST_B) check(`gst_irp_present:${f.slice(0,14)}`, migFiles.includ
 const manifest = existsSync(join(root, 'docs/migration-manifest-2026-11-14.md')) ? read('docs/migration-manifest-2026-11-14.md') : '';
 const manifestVersions = new Set([...manifest.matchAll(/`([0-9]{14})`/g)].map((m) => m[1]));
 const actualVersions = new Set(versions);
-check('manifest_tracks_all_92', actualVersions.size === manifestVersions.size && [...actualVersions].every((v) => manifestVersions.has(v)),
+check('manifest_tracks_all_93', actualVersions.size === manifestVersions.size && [...actualVersions].every((v) => manifestVersions.has(v)),
   `manifest ${manifestVersions.size} versions vs actual ${actualVersions.size}`);
 check('manifest_marks_gst_irp_unauthorized', manifest.includes('NOT AUTHORIZED') && manifest.includes('GST/IRP'));
 check('gst_irp_plan_unauthorized', read('docs/gst-irp-production-readiness-2026-11-14.md').includes('NOT AUTHORIZED'));
