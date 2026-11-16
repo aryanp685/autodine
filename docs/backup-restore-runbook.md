@@ -102,6 +102,16 @@ newest artifact) → DR objective check, and exits non-zero with one alert line
 17 3 * * *  cd /opt/autodine && AUTODINE_BACKUP_SOURCE_URL=... AUTODINE_BACKUP_PASSPHRASE=... node scripts/backup/run-scheduled.mjs --out-dir /mnt/backups/autodine --rpo-minutes 1440 >> /var/log/autodine-backup.log 2>&1
 ```
 
+**First hosted run (executes immediately once the R2 variables exist):**
+add `--r2` to the same command. The run then ends with the upload stage:
+artifact SHA-256 re-checked against its manifest, signed PUT of artifact +
+manifest to the bucket, signed HEAD verification of the remote SHA-256.
+Success prints `R2 upload remotely verified`; missing configuration fails
+the run at the `upload` stage with the missing variable NAMES (verified
+2026-11-16 against a disposable cluster — fail-closed, no silent local-only
+pass). Follow it with the hosted restore rehearsal above; only a passed
+rehearsal closes the backup gate.
+
 (systemd: a `.timer` invoking the same command with a root-only
 `EnvironmentFile=` for the two variables; Windows: Task Scheduler with a
 stored environment. The wrapper never prints the URL or the passphrase, and
