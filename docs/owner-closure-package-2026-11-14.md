@@ -12,54 +12,174 @@ pricing before approving.
 
 ---
 
+## ★ ONE CONSOLIDATED OWNER SESSION (2026-11-16) — do everything below in one sitting
+
+Supersedes the per-item sequencing in the tiers below (details stay there).
+Verified baseline for this session: branch `arena/2670dd12-autodine`, HEAD
+`d8d0e52` (= release candidate `5b8a447` + 2 doc commits), full local battery
+green (2448 unit tests passed / 0 failed; typecheck, lint, build, migration
+chain 92, `verify:release` 28/28, backup selftest ALL PASS, DR 16/16,
+D2 ACL 2/2). B5 CLOSED. B3 branch-scoped `readable-secret` entry deleted by
+owner and confirmed gone (2026-11-16 metadata re-check: no `readable-secret`
+flag on any of the 17 env entries). **Production remains NO-GO** until the
+gates in Session C close.
+
+### Session A — Vercel (project `new`, one visit, ~20 min, all free)
+
+`vercel.com` → team `iamjarvis9896-3988's projects` → project `new` →
+**Settings → Environment Variables**. Do all of these *before* any redeploy,
+so one redeploy carries them all:
+
+| # | Key | Action | Type | Target |
+|---|---|---|---|---|
+| A-1 (B2) | `ADMIN_SECRET` | Edit existing → fresh `openssl rand -hex 32` (password manager only) | Sensitive (already) | Production (already) |
+| A-2 (B3) | `QR_VERIFICATION_SECRET` ×2 | Edit Production and Preview entries to **two different** fresh `openssl rand -hex 32` values | Sensitive (already) | Production / Preview (already) |
+| A-3 (A4) | `AUTODINE_CRON_SECRET` + `CRON_SECRET` | Add **both**, **same** fresh `openssl rand -hex 32` value | Sensitive | Production only |
+| A-4 | (decision) | `ADMIN_SECRET` stays Production-only (recommended) — no Preview/Dev admin tool | — | — |
+
+Then: **do not redeploy yet** unless you are approving the release deploy
+itself — env edits are inert until the next Production deployment, and that
+deployment is a separately approved act. When you do redeploy, afterwards run
+(from your machine, values never in chat): B2 checks (old → 401; new +
+non-existent restaurant → 400), A4 checks (no header → 401; correct Bearer →
+200 `staleAfterMinutes:15`). Report status codes only.
+Parallel-safe: A-1/A-2/A-3 are independent. Sequence-bound: all verifications
+come after the one redeploy. Rollback for every row: re-edit to the previous
+value from your password manager and redeploy (keep old values until the new
+ones verify, then delete them).
+
+### Session B — Supabase (two projects, one visit, ~15 min, free, read-only)
+
+1. **Production `autodine-production` (`bdbaqpevwmgdvghszjno`) → SQL Editor
+   → + New query** — confirm the project name twice before running. Run
+   probe 1, export the grid; new tab, probe 2, export. SELECT-only:
+
+   ```sql
+   select version, name from supabase_migrations.schema_migrations order by version;
+   select proname from pg_proc join pg_namespace n on n.oid=pronamespace where n.nspname='public' and proname in ('operational_schema_readiness','guard_restaurant_billing_configuration','audit_restaurant_account_reassignment','immutable_restaurant_account_link','public_restaurant_profile','account_can_write');
+   ```
+
+2. **`autodinetest` (`juwyhslzchjevqkdvwjm`)**: nothing required. (Optional,
+   same visit: Authentication → SMTP stays untouched until Session C email
+   approval.)
+Return: both exports (versions/names only, no secrets, no row data) + run
+timestamp. Arena then reconciles against the 92-migration manifest
+(76 legacy · 9 branch-set pending B1 · 7 GST/IRP NOT AUTHORIZED — any of the
+7 appearing is stop-the-line) and returns the D1–D7 delta. **B1 migration
+approval is decided only after that reconciliation, in the same reply
+thread** — the 9-file branch set, in order, is:
+`20261112000200, 20261112000300, 20261112000400, 20261112000500,
+20261112000600, 20261112000700, 20261115000100, 20261115000200,
+20261115000300` (filename order; owner-operation
+`20261110000501_revoke_supabase_admin_client_defaults.sql` stays separate
+and is never auto-applied; rollback = restore-from-backup, hence Session C
+backup first).
+
+### Session C — external providers & paid gates (one decision block, approvals collected once)
+
+Nothing below is pre-approved by this packet; give one yes/no per line:
+
+| # | Gate | Selected architecture / procedure | Verified cost (2026-11-16, third-party pricing reports — re-check at purchase) | Unknown |
+|---|---|---|---|---|
+| C-1 (A2/D1/D2) | Backup/DR | **Selected:** external encrypted logical backup (`scripts/backup/*`, selftest ALL PASS locally) → private **Backblaze B2** bucket, scheduled runner (GitHub Actions or small VM), retention **14 daily / 8 weekly / 6 monthly**, passphrase only in password manager (never in Vercel/GitHub app env), restore **only** to an isolated non-production target; Supabase Pro daily backups as second layer if/when Pro is bought. **Deferred:** Supabase PITR (finer RPO) until pilot revenue justifies it | B2 ≈ $0.006–0.007/GB-mo, 10 GB free tier; this DB is far below 1 GB → effectively **₹0–100/mo** [2](https://devopsboys.com/blog/cloudflare-r2-vs-aws-s3-vs-backblaze-b2-2026) | Exact B2 bill; VM cost if used (GitHub Actions within free quota = ₹0) |
+| C-2 | PITR (optional upgrade) | Supabase Pro $25/mo + PITR add-on **$100/mo per 7-day window** [1](https://backupdrill.com/compare/supabase-pitr) [3](https://www.bytebase.com/blog/supabase-vs-aws-pricing) | Known-approximate; confirm in dashboard | — |
+| C-3 (A3) | Alerting | `AUTODINE_ALERT_WEBHOOK` + `BACKUP_ALERT_WEBHOOK` → a chat webhook you actually read (code complete, unit-tested); uptime monitor on `/api/health` (BetterStack/UptimeRobot free tier); **one real test alert to one named human phone** | Free tiers exist | Paid tiers if outgrown |
+| C-4 (A5) | Email | Resend → verify domain → SPF/DKIM/DMARC → Supabase **staging first** SMTP (host `smtp.resend.com`, user `resend`, key as password) + raise GoTrue limit → one confirmation + one reset + one invite to an authorized mailbox → production repeat only after release approval. Rollback: revert SMTP to platform default in the same dashboard screen | Resend Free 3,000/mo (100/day cap), Pro $20/mo 50k [1](https://smtpedia.com/platforms/resend/pricing/) | Domain cost if not owned (₹800–1,500/yr class) |
+| C-5 (C1) | Billing | **Stay disabled.** If activated later: Razorpay (₹0 setup/AMC, ~2% + 18% GST per domestic txn, ~3% international [1](https://scalesaathi.in/guides/razorpay-charges/)); Cashfree = comparable MDR class. KYC: PAN, GSTIN (if any), bank proof, business registration, authorised-signatory ID — confirm exact list at onboarding. Adapter = days of engineering against the existing `BillingProvider` interface; sandbox certification first; offline sandbox in repo already passes | Per-transaction % only | Negotiated rates; adapter effort |
+| C-6 (C2/C3) | GST/IRP | Adviser engagement + written per-tenant mode decisions before any code/migration; the 7 Phase B migrations remain **NOT AUTHORIZED**; no IRP provider; applicability (₹5 cr AATO) fails closed | — | Adviser fees; GSP annual fee |
+| C-7 (D4) | Domain/DNS | Register apex (e.g. `autodine.in`) → Vercel Domains → DNS at registrar → `NEXT_PUBLIC_SITE_URL` update **as part of the approved release deploy**, never before | ₹800–1,500/yr (registrar-dependent, unverified) | Exact registrar price |
+| C-8 (Qty) | Quantity >99 | **Recommendation: Option A — keep the cap at 99** (see register §G evidence: DB `least(greatest(qty,1),99)`, cart `MAX_QTY=99` + tests, and the kitchen announcer only speaks numbers 0–99, so raising breaks TTS; no recorded business need). Decision needed in writing; no code change under Option A | Free | — |
+
+### Evidence to return (one message, no secret values ever)
+
+1. Session A: "done + timestamp" per row; B2 two status codes (401/400);
+   A4 two status codes (401/200).
+2. Session B: two probe exports + run timestamp.
+3. Session C: one yes/no per line (C-1…C-8); for C-1 after setup, the
+   P1–P6 record from `docs/pitr-verification-procedure-2026-11-14.md`
+   adapted to the B2 drill (backup timestamp, restore target, duration,
+   fingerprint counts match, retention set).
+4. Anything that fails: the exact error class, never a value.
+
+Arena then: reconciles A1, updates D1–D7/B1, re-verifies env metadata,
+re-runs `npm run verify:release`, and issues the updated GO/NO-GO. Local
+commands behind this packet (all green 2026-11-16): `npm test`
+(2448 passed/212 skipped), `npm run typecheck`, `npm run lint`,
+`npm run build` (demo-build env), `npm run migrations:verify`,
+`npm run sql:check`, `npm run design:check`, `npm run test:backup`,
+`npm run test:dr`, `npm run test:d2`, `npm run test:staging:guards`,
+`npm run isolation:verify`, `npm run verify:release`.
+
+---
+
 ## Tier 1 — do this week (free, closes real risk)
 
-### B5 — Rotate the exposed review credentials · CRITICAL
-**You do:** full sequence in `docs/credential-exposure-remediation-2026-11-14.md`
-§4 (Vercel confirm/revoke share on the deleted review deployment; delete or
-reset passwords of the four `*@autodine-review.test` staging accounts; habit
-check for password reuse).
-**Arena verifies:** tree/history grep shows no retired literals (done for tree;
-re-run after your action); deployment remains 404; reviewer sign-in with the old
-password fails (you confirm).
-**Cost:** free. **If skipped:** any repo reader can sign in to staging as any
-review role and bypass the preview wall (staging data only; production unaffected).
-**Blocks:** security sign-off; nothing else technically.
+### B5 — Rotate the exposed review credentials · **DONE 2026-11-16**
+**Done:** owner completed `docs/credential-exposure-remediation-2026-11-14.md`
+§4 — C1 old share link dead (404/Protected/Revoked; Vercel API confirms the
+deployment is gone) and C2 closed by Option A (all four
+`*@autodine-review.test` accounts deleted; old password rejected for all four;
+current staging alias working). Arena verified read-only: `auth.users` count
+for that domain = 0, tracked-tree scan clean, `verify:release` 28/28,
+staging guards 25/25, no staging suite dispatched. Full record: §5.1 of the
+remediation doc.
+**Cost:** free (spent). **Blocks:** nothing — this gate is cleared. History
+rewrite remains optional and was not performed.
 
 ### B2 — `ADMIN_SECRET` review & rotation
+**Inspected (2026-11-16, metadata only):** exactly one entry — `sensitive`,
+**[production] only**, no `readable-secret` flag; absent in preview/development
+(so there is nothing to "rotate in Preview": the admin tool is production-only
+until you decide to add distinct preview/dev values). Sole consumer is the
+trial-renewal tool (`lib/admin-auth.ts` → `admin_set_subscription`); no other
+env var grants admin. Dashboard steps, interruption analysis and the
+no-real-renewal verification (old → 401; new + non-existent restaurant → 400)
+are in the owner-action register (B2).
 **You do:** Vercel → project `new` → Settings → Environment Variables →
-Production → inspect `ADMIN_SECRET`: if set, rotate (generate new random value,
-update, redeploy Production only when you approve release; until then rotate in
-Preview). If unset, decide whether any admin endpoint is reachable and set one.
-Confirm no other env var grants admin.
-**Arena verifies:** admin routes return 401/403 to a bad token (offline route
-test exists in `e2e`/`lib/*.test.ts` — CI green); after your rotation,
-`grep` the built repo for the old value's shape? (cannot — value unknown);
-instead: you attempt one authorized admin call with the old secret → expect
-401.
+Production → `ADMIN_SECRET` → Edit → fresh `openssl rand -hex 32` (≥32 chars,
+else fail-closed) → save → redeploy Production **only on your release
+approval** (rotation is inert until redeploy).
+**Arena verifies:** metadata (updated-at/type/targets) + your two reported
+status codes. No value is ever printed or pasted.
 **Cost:** free. **If skipped:** stale admin credential window persists.
 **Blocks:** security hygiene gate.
 
 ### B3 — `QR_VERIFICATION_SECRET` review & rotation
-**You do:** Vercel → Environment Variables → Production → find
-`QR_VERIFICATION_SECRET`. Confirm it is **not** exposed to `NEXT_PUBLIC_*`
-(it is not, by CI guard). If it is flagged "readable"/"sensitive-off" in the
-dashboard, or older than 12 months, or was ever pasted into chat/tickets:
-rotate it (update env → redeploy). Note: QR tokens minted before rotation
-will fail verification — acceptable if no live printed QR uses it yet
-(pre-launch: none do).
-**Arena verifies:** after rotation you mint+verify one QR through the app
-(or staging admin) — expect success; CI guard `deployment-isolation` green;
-`/verify` route unit tests pass (they do; do not re-run unless asked).
-**Cost:** free. **If skipped:** forged QR verification material possible if the
-value ever leaked.
+**Correction (2026-11-16, code-verified):** this secret does not sign printed
+QR codes — QR verification is DB-token based (`table_qr_codes.public_token`).
+Its only consumer is the staff-invite rate-limit salt
+(`lib/server/staff-invite-rate-limit.ts`). Rotating it therefore does **not**
+invalidate any printed QR; it only resets invite-attempt hash buckets. The
+earlier "QR tokens minted before rotation will fail" / "forged QR material"
+wording is withdrawn.
+**You do:** Vercel → project `new` → Settings → Environment Variables → find
+the `QR_VERIFICATION_SECRET` entry scoped to branch `arena/3711df6a-autodine`
+(metadata check 2026-11-16: type `encrypted`, flagged **`readable-secret`**;
+the production and preview-wide entries are `sensitive`, unflagged; none for
+development). Delete that branch entry if the branch is dead, or re-save it as
+**Sensitive**; rotate production + preview to fresh distinct sensitive values
+(`openssl rand -hex 32`); redeploy on the approved schedule.
+**Arena verifies:** metadata re-check (no `readable-secret` flag remains;
+entries sensitive/distinct); staging smoke: one invite attempt + one QR scan
+behave as before. Full detail in the owner-action register (B3).
+**Cost:** free. **If skipped:** a readable (decryptable-by-dashboard-viewers)
+copy of the invite-salt secret persists on a stale branch scope.
 **Blocks:** security hygiene gate.
 
 ### A4 — `AUTODINE_CRON_SECRET` + scheduler
-**You do:** (1) Generate a fresh random secret (e.g. `openssl rand -hex 32`);
-(2) Vercel → Settings → Environment Variables → Production → set
-`AUTODINE_CRON_SECRET`; (3) Confirm Production cron `30 1 * * *` exists (it does
-— `vercel.json`, Hobby-legal). (4) If you want escalation checks more often
+**Verified (2026-11-16):** `vercel.json` holds exactly one daily cron
+(`30 1 * * *` → `/api/cron/escalate`); the route fails closed (unset → 503,
+wrong Bearer → 401, correct → 200; offline tests pass). Metadata check:
+**neither `AUTODINE_CRON_SECRET` nor `CRON_SECRET` is set in any
+environment** — hosted escalation is currently inert (503) by design.
+**You do:** (1) Generate a fresh random secret (e.g. `openssl rand -hex 32`),
+store it in your password manager; (2) Vercel → project `new` → Settings →
+Environment Variables → Add **both** `AUTODINE_CRON_SECRET` and `CRON_SECRET`
+with that **same** value, each **Sensitive**, target **[production]** only
+(Vercel Cron auto-sends only the `CRON_SECRET` name; the route accepts both —
+see register A4); (3) redeploy Production on your approval and
+confirm the cron `30 1 * * *` is listed under Cron Jobs (it is declared in
+`vercel.json`, Hobby-legal). (4) If you want escalation checks more often
 than daily: create an external HTTPS scheduler — either a scheduled GitHub
 Actions workflow calling `https://<domain>/api/cron/escalate` with header
 `Authorization: Bearer <secret>`, or a free cron service. Hobby Vercel cannot

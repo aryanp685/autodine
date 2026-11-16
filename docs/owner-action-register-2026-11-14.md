@@ -7,7 +7,9 @@
 > accounting is in `docs/migration-manifest-2026-11-14.md` (92 migrations +
 > 1 owner-operation). The credential exposure is scoped and remediated
 > (working-tree) in `docs/credential-exposure-remediation-2026-11-14.md`.
-> **B5 is CRITICAL-OPEN until rotation + verification complete.**
+> **B5 is DONE (2026-11-16)** — C1 confirmed inert (404), C2 closed by
+> Option A deletion of all four review accounts; verified in
+> `docs/credential-exposure-remediation-2026-11-14.md` §5.1.
 
 **Every action in this register is owner-only.** Each needs an account,
 purchase, credential, approval, or physical presence the agent cannot supply.
@@ -22,13 +24,17 @@ Format: action → why → where (dashboard path) → cost → consequence if sk
 
 ## A. Release-blocking (must be done before/during release)
 
-### A1. Production migration ledger fresh read-only probe
+### A1. Production migration ledger fresh read-only probe — **EXECUTED 2026-11-16 (Arena, owner-authorized SELECT-only); reconciliation below; B1 decision still open**
 - **Why:** the 2026-11-14 listing ended at `20261112000100`; that is a listing boundary, not a completeness proof. Every release step assumes known drift D1–D7.
-- **Where:** Supabase dashboard → project `bdbaqpevwmgdvghszjno` → Database → Migrations; or `supabase migration list --linked` from an authorized machine.
+- **Where (exact):** `supabase.com/dashboard` → confirm the project picker says **autodine-production** (`bdbaqpevwmgdvghszjno` — **not** `autodinetest`) → left nav **SQL Editor** → **+ New query** → paste probe 1 → **Run** → use the result grid's download/export to save CSV out-of-band; repeat for probe 2 in a second query tab. Both are `SELECT`-only (no writes, no locks of consequence, seconds to run). Alternative for probe 1 only: **Database → Migrations** list view — the SQL form is preferred because it is exportable verbatim. Arena does **not** execute production SQL.
+- **Probe 1 — ledger:** `select version, name from supabase_migrations.schema_migrations order by version;`
+- **Probe 2 — guard objects:** `select proname from pg_proc join pg_namespace n on n.oid=pronamespace where n.nspname='public' and proname in ('operational_schema_readiness','guard_restaurant_billing_configuration','audit_restaurant_account_reassignment','immutable_restaurant_account_link','public_restaurant_profile','account_can_write');` (exact text also in `docs/owner-closure-package-2026-11-14.md` Tier 1; D1–D7 follow-ups in `docs/production-release-baseline-2026-11-14.md` §3–4 only if Arena asks after seeing these two).
+- **Hand-back:** attach both result files (names + versions only — they contain no secrets and no row data, but keep them in the release record, not chat) or paste the text of both grids. Note the run date/time alongside.
 - **Cost:** free.
 - **Consequence:** applying Batch A blind can double-apply renames/guards; incident risk on money paths.
 - **Blocks:** the entire §2 sequence in `docs/production-release-prep-2026-11-14.md`.
-- **Verify:** written ledger dump (names + order) attached to the release record; reconciled against `supabase/migrations/`.
+- **Verify / reconciliation (Arena, on receipt):** name-based diff against the **92-migration manifest** (`docs/migration-manifest-2026-11-14.md`: 76 legacy-rollout reported-applied · 9 branch-set pending B1 · 7 GST/IRP **NOT AUTHORIZED** — any of those 7 present in the ledger is a stop-the-line finding); production-only console versions are expected and classified per `docs/production-only-migrations-2026-11-14.md` (never infer contents from version order — D4); probe 2 presence/absence maps to D1 (immutability), the owner-billing guard and the audit function. Output is a delta table + updated D1–D7 disposition; it authorizes nothing by itself.
+- **RESULT (2026-11-16, Arena-executed under owner authorization, SELECT-only; project identity independently verified as `autodine-production`/`bdbaqpevwmgdvghszjno`, ACTIVE_HEALTHY):** ledger = **121 rows**. By version, **72 of 92** repo migrations are present; **49 rows are production-only console versions** (exactly the count classified in `docs/production-only-migrations-2026-11-14.md`). **Missing by version (20):** the **9 branch-set** files (`20261112000200`–`20261112000700`, `20261115000100`–`20261115000300`) · the **7 GST/IRP** files (`20261113000100`, `20261114000100`–`20261114000600`) — **absent as required, no unexpected GST/IRP application** · **4 pre-branch files requiring effect-level investigation** (`20261110000851 payment_audit_provider_actor`, `20261110000950 online_payment_attempt_uniqueness`, `20261110001210 checkout_outstanding_guard`, `20261110001220 revoke_client_bypass_privileges`): version-absent, but per D4 their *effects* may exist under console versions — **do not apply blind; catalog-effect probes (baseline §6) are the next authorized read-only step**. **Probe 2:** present = `account_can_write`, `operational_schema_readiness`, `public_restaurant_profile`; **missing = `immutable_restaurant_account_link` (D1 confirmed live), `guard_restaurant_billing_configuration`, `audit_restaurant_account_reassignment`** — all three ship in the 9-file branch set. No mutation SQL was executed.
 
 ### A2. Production backup / PITR verification (backup gate)
 - **Why:** there is no verified hosted backup destination; rollback is impossible without one. Local restore drills do not count.
@@ -46,13 +52,15 @@ Format: action → why → where (dashboard path) → cost → consequence if sk
 - **Blocks:** launch acceptance; post-release checklist.
 - **Verify:** one real test alert fires, reaches the human, and is acknowledged; log attached to release record.
 
-### A4. Cron secret + external scheduler
+### A4. Cron secret + external scheduler — **CONFIGURED 2026-11-16 (Arena via Vercel, owner-authorized: `AUTODINE_CRON_SECRET` + `CRON_SECRET`, same fresh value, Sensitive, Production-only, metadata-verified; effective on next Production deployment — redeploy and live 401/200 test NOT authorized/performed)**
 - **Why:** `/api/cron/escalate` fail-closes without `AUTODINE_CRON_SECRET`; Vercel Hobby allows only the daily `30 1 * * *` cron (re-adding sub-daily breaks deployment).
-- **Where:** Vercel → Environment Variables (Production) set `AUTODINE_CRON_SECRET` to a fresh random value; if sub-daily escalation is needed, an external HTTPS scheduler (GitHub Actions scheduled workflow calling the endpoint with the secret, or cron-job.org/similar) — paid/free depending on provider (unknown).
+- **Repo-side verification (2026-11-16):** `vercel.json` carries exactly **one** cron — `30 1 * * *` (daily 01:30 UTC) → `/api/cron/escalate` (also enforced by `verify:release`). Route (`app/api/cron/escalate/route.ts`): secret = `AUTODINE_CRON_SECRET` (fallback legacy `CRON_SECRET`), trimmed; **unset → 503, wrong/missing Bearer → 401**, correct → 200 `{scanned, escalated, staleAfterMinutes:15}`; constant-time-ish compare; scope is the in-memory incident registry of the serving instance (structured log remains the durable record). Offline route tests 2026-11-16: 503/401/200 paths pass (part of 28/28 targeted run).
+- **Hosted inventory (Vercel metadata only, 2026-11-16):** **neither `AUTODINE_CRON_SECRET` nor `CRON_SECRET` exists in any environment** (production/preview/development) on project `new`. Hosted cron calls therefore currently receive 503 — escalation is inert, exactly the fail-closed posture, until the owner sets it.
+- **Where:** Vercel → project `new` → Settings → Environment Variables → Add **two** entries with the **same** fresh value (`openssl rand -hex 32`, generate locally, store in password manager): `AUTODINE_CRON_SECRET` **and** `CRON_SECRET`, each type **Sensitive**, target **[production]** only — then redeploy Production on approval. Both names are required for the native job: Vercel Cron auto-sends only `Authorization: Bearer <CRON_SECRET>`, while the route checks `AUTODINE_CRON_SECRET` first and falls back to `CRON_SECRET` (`route.ts:37`); setting only the AUTODINE name leaves Vercel's own call at 401, setting only CRON leaves external callers without the canonical name. Do not add sub-daily entries to `vercel.json` on Hobby. If sub-daily escalation is later needed: external HTTPS scheduler (GitHub Actions scheduled workflow or cron service) calling the production URL with `Authorization: Bearer <same value>` — paid/free depending on provider (unknown).
 - **Cost:** free (GitHub Actions within quota) or Vercel Pro if cron cadence needs it (paid, price unknown).
-- **Consequence:** escalation alerts never fire; or deployment refusal if Hobby cron limits are violated.
+- **Consequence:** until set, escalation alerts never fire (incidents still logged + visible in Settings → Operations); wrong target (e.g. preview-only) leaves production at 503; setting it has no effect on any user flow.
 - **Blocks:** escalation monitoring for launch.
-- **Verify:** trigger the cron once with the secret and observe a 200; confirm unauthorized callers get 401; confirm missing secret yields 503.
+- **Verify (owner-run after approval; Arena does not call production):** from the operator machine only, against the production domain: (1) no header → **401**; (2) wrong Bearer → **401**; (3) correct Bearer → **200** with `staleAfterMinutes:15` (expect `scanned:0, escalated:0` on a quiet system — 200 is the auth proof; never paste the command or value into chat, report status codes only); (4) confirm in Vercel → project `new` → Cron Jobs that the daily job is listed/enabled after the redeploy. Arena re-checks metadata presence/target/type only.
 
 ### A5. Auth email: provider activation (Resend or alternative) + Supabase SMTP
 - **Why:** password reset / staff invites are unreliable on the platform default sender (2/hr GoTrue limit). Launch without email = owners can be locked out.
@@ -82,21 +90,24 @@ Format: action → why → where (dashboard path) → cost → consequence if sk
 - **Blocks:** security sign-off for launch.
 - **Verify:** post-apply catalog probe: trigger present, EXECUTE revoked for service_role/anon/authenticated, audit table exists and records a synthetic reassignment; `/api/health` ok:true.
 
-### B2. `ADMIN_SECRET` rotation
+### B2. `ADMIN_SECRET` rotation — **CONFIGURED 2026-11-16 (Arena via Vercel, owner-authorized; effective on next Production deployment — redeploy NOT authorized/performed; post-deploy 401/400 verification still pending)**
 - **Why:** pre-existing operational secret; rotation cadence is owner policy; rotation is risk-free if staged.
-- **Where:** Vercel → Environment Variables (Production); rotate, redeploy, then verify admin-gated endpoints reject the old value.
+- **Repo-side inspection (2026-11-16, no value retrieved):** sole consumer is the trial-renewal tool — `lib/admin-auth.ts` (`isValidAdminSecret`, constant-time SHA-256 compare, fail-closed if unset/<32 chars, read at call time) gating `app/admin/renew-trial/actions.ts`, `app/admin/renew-trial/page.tsx` and `app/api/admin/renew-trial/route.ts` (`Authorization: Bearer …`, auth checked before body parse; action re-checks). Effect of the secret: service-role `admin_set_subscription` trial renewal (21 days, account-wide). No other env var grants admin; no `NEXT_PUBLIC_` exposure. Offline tests 2026-11-16: admin-auth + renew-trial action/route suites pass (part of 28/28 targeted run).
+- **Hosted inventory (Vercel metadata only, 2026-11-16):** project `new` — exactly **one** `ADMIN_SECRET` entry, type `sensitive`, target **[production]**, no git-branch scope, no `readable-secret` flag. **Absent in preview and development** (fail-closed there; a known gap vs `docs/preview-isolation.md` step 3 — decide: add distinct preview/dev values or consciously accept the admin tool being production-only).
+- **Where:** Vercel → project `new` → Settings → Environment Variables → Production → `ADMIN_SECRET` → Edit; save a fresh `openssl rand -hex 32` value (≥32 chars or the tool refuses everyone), then redeploy Production (owner-approved deploy only — rotation without redeploy does not take effect).
 - **Cost:** free.
-- **Consequence:** stale credential exposure window persists.
+- **Consequence / interruption:** the moment the new value is live, the old value gets generic 401 everywhere and anyone holding it (only the operator, by design) must use the new one. Nothing else depends on it: no guest/staff flow, no webhook, no cron. If the new value is <32 chars or lost, the admin tool is simply dead (fail-closed) until fixed — no lockout of restaurant users.
 - **Blocks:** security hygiene (not a hard launch gate).
-- **Verify:** old secret rejected (401), new secret accepted; no request errors in first hour.
+- **Verify (no value exposed):** after redeploy, operator-locally: (1) old value → `POST /api/admin/renew-trial` returns **401** `{"error":"Unauthorized"}`; (2) new value with a deliberately non-existent restaurant name → **400** `restaurant_not_found`-class error (proves auth passed without moving any trial clock — do **not** verify with a real restaurant name unless you intend a renewal); (3) report only the two status codes. Arena re-checks metadata (updated-at changed, still `sensitive`, still production-only or as decided).
 
-### B3. `QR_VERIFICATION_SECRET` review (readable-secret flag)
-- **Why:** the secret gates QR verification; if flagged readable anywhere it must be regenerated and the flag cleared.
-- **Where:** Vercel → Environment Variables; confirm server-only scope; if flagged, rotate and update verifiers.
+### B3. `QR_VERIFICATION_SECRET` review (readable-secret flag) — **CLOSED 2026-11-16 (branch-scoped readable entry deleted by owner and confirmed gone; Production + Preview rotated by Arena via Vercel to distinct fresh Sensitive values under owner authorization; effective on next deployments; no `readable-secret` flag remains on any entry)**
+- **Why (corrected 2026-11-16):** despite the name, this secret does **not** sign or gate printed QR codes in current code. QR verification is database-token based (`table_qr_codes.public_token` minted by `public.new_qr_public_token()` from `gen_random_uuid()`, checked by the QR RPCs). The secret's only code consumer is `lib/server/staff-invite-rate-limit.ts:21`, where it salts the staff-invite caller IP hash (`QR_VERIFICATION_SECRET || SUPABASE_SECRET_KEY || 'staff-invite-rate-limit'`). Earlier wording ("QR tokens minted before rotation will fail"; "forged QR verification material") is superseded — see the correction in `docs/owner-closure-package-2026-11-14.md`.
+- **Hosted inventory (Vercel metadata only, 2026-11-16):** **three** entries on project `new` — (1) `sensitive`, **[production]**, no flag; (2) `sensitive`, **[preview]**, no flag; (3) `encrypted`, **[preview] scoped to branch `arena/3711df6a-autodine`**, flagged **`readable-secret`** ← the B3 flag. **None for development** (code falls back to the Supabase secret key as salt there — works, but couples the salt to that key).
+- **Where:** Vercel → project `new` → Settings → Environment Variables → find the branch-scoped preview entry (`arena/3711df6a-autodine`) → either delete it if that branch is dead, or Edit → re-save its value as **Sensitive**; then rotate production + preview values to fresh distinct random values (`openssl rand -hex 32`) as `sensitive`, and optionally add a distinct development entry. Redeploy affected targets on the approved schedule (env changes do not affect running deployments).
 - **Cost:** free.
-- **Consequence:** forged QR verification material possible if the value leaks.
+- **Consequence / interruption:** rotating a value only changes the invite rate-limit salt: existing invite-attempt buckets hash differently, so in-flight invite throttling counters effectively reset (a few minutes of fresh budget — the safe direction). **Printed QR codes, guest scanning, sessions and orders are unaffected.** Deleting the branch-scoped entry only affects previews of that one branch (they fall back to the preview-wide entry, or to the Supabase-key salt if none applied).
 - **Blocks:** security hygiene (recommended pre-launch).
-- **Verify:** fresh QR mint + verify round-trip works; old material rejected after rotation.
+- **Verify (no value exposed):** (1) metadata re-check: no `QR_VERIFICATION_SECRET` entry anywhere carries `readable-secret`; production/preview entries `sensitive` and distinct; (2) functional smoke on staging/preview only: one staff-invite attempt still rate-limits normally and one table-QR scan still opens the menu (both expected unchanged — they prove the salt change broke nothing); (3) report only pass/fail classes.
 
 ### B4. Supabase service-role / secret key hygiene check
 - **Why:** legacy service_role keys bypass RLS; confirm the production project uses new `sb_secret_*` keys where supported and that no key appears in client bundles.
@@ -108,14 +119,14 @@ Format: action → why → where (dashboard path) → cost → consequence if sk
 
 ---
 
-### B5. Rotate the staging review credentials (leaked in Git history) — **CRITICAL-OPEN**
-**Full scope, exposure map, rotation sequence and verification: `docs/credential-exposure-remediation-2026-11-14.md`. Do not reuse the retired values anywhere.**
+### B5. Rotate the staging review credentials (leaked in Git history) — **DONE 2026-11-16**
+**Full scope, exposure map, rotation sequence and verification: `docs/credential-exposure-remediation-2026-11-14.md` (§5.1 closure record). Do not reuse the retired values anywhere.**
 - **Why:** the 2026-11-11/2026-11-12 docs committed a Vercel `_vercel_share` token and the shared password of the four synthetic staging review accounts. They are redacted from the working tree as of 2026-11-14, but **Git history retains them** — redaction is not remediation.
-- **Where:** Vercel → deployment → Share → regenerate the link (or delete/recreate the share); Supabase dashboard → Authentication → Users on `juwyhslzchjevqkdvwjm` → reset passwords for owner/manager/kitchen/cashier@autodine-review.test.
-- **Cost:** free.
-- **Consequence:** anyone with repo read access can open the protected review deployment and sign in as any review role (staging data only; production untouched).
-- **Blocks:** nothing production-side; do before sharing the repo more broadly.
-- **Verify:** old share link returns "Protected Deployment"; old passwords rejected; new credentials reach an authorized reviewer only.
+- **Done:** C1 — review deployment `dpl_2i2oYjgNje5xQtkD9CzFSoWEmH9U` confirmed gone (Vercel API 404; owner: old link 404/Protected/Revoked). C2 — Option A: all four `*@autodine-review.test` accounts deleted on `juwyhslzchjevqkdvwjm`; old password rejected for all four (owner), independently confirmed by read-only `auth.users` count = 0 (Arena, 2026-11-16).
+- **Cost:** free (spent).
+- **Consequence if it had been skipped:** anyone with repo read access could open the protected review deployment and sign in as any review role (staging data only; production untouched). That path is now closed; history rewrite remains optional and was not performed.
+- **Blocks:** nothing production-side; this gate is cleared.
+- **Verify:** completed — see §5.1 of the remediation doc (`verify:release` 28/28, staging guards 25/25, current staging alias working, no staging suite dispatched).
 
 ## C. Commercial / GST (separately authorized; likely post-launch)
 
@@ -226,5 +237,5 @@ quotes. Get current pricing from each provider before approving spend.
 
 ## G. Product decision required
 
-### Quantity > 99 in guest orders
-`20261021000005_public_place_order.sql` documents a 1–99 bound; the implementation caps at 99. Decide: keep cap (Option A), reject >99 (Option B — I can implement on word), or raise the bound (Option C — needs business reason). See `docs/owner-closure-package-2026-11-14.md` Tier 3. Decision pending; current cap preserved; do not "fix" silently.
+### Quantity > 99 in guest orders — **recommendation recorded 2026-11-16: Option A (keep cap); owner decision still required in writing**
+Evidence (code-verified 2026-11-16): the cap is consistent at every layer — DB `20261021000005_public_place_order.sql` (`k_max_qty=99`, `least(greatest(qty,1),99)`), cart `lib/cart-storage.ts` (`MAX_QTY=99`, cap tested in `cart-storage.test.ts`). Option C (raise) additionally breaks a hidden dependency: the kitchen announcer (`lib/announce.ts`) only speaks Hindi numbers **0–99**, so larger quantities would be announced wrong/silently — raising is a multi-surface change (DB + cart + TTS + kitchen expectations) needing a recorded business reason (none exists; banquet-scale orders are served by multiple lines/tickets under the session model). Option B (reject) is more honest than silent capping but changes guest UX for a case the cart already prevents (>99 unreachable from the UI today; only API-direct submissions hit the DB cap). **Recommend Option A for the pilot**: no code change, behaviour already uniform and tested; revisit only with a concrete banquet-ordering requirement. Current cap preserved; nothing was changed silently.
