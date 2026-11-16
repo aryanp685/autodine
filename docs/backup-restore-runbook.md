@@ -137,6 +137,42 @@ jobs:
         with: { name: autodine-backup, path: ${{ runner.temp }}/backups, retention-days: 35 }
 ```
 
+## Cloudflare R2 destination (CHOSEN 2026-11-16; implementation complete, credentials pending)
+
+R2 is the selected destination. The upload path is implemented in
+`scripts/backup/upload-r2.mjs` (+ `lib-r2.mjs`): SigV4-signed S3 PUT of the
+encrypted artifact and its manifest under `autodine-backups/`, with SHA-256
+verified three ways (local file vs backup manifest before upload;
+`x-amz-meta-sha256` on the PUT; signed HEAD comparison after). Configuration
+is environment-only — `CLOUDFLARE_ACCOUNT_ID` (or `R2_ENDPOINT`),
+`R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` — and no code path
+prints a value; missing configuration reports variable NAMES only
+(`upload-r2.mjs` exit 2, and the offline shape-check in
+`scripts/verify-external-services-config.mjs`).
+
+```bash
+# after any backup run (e.g. in the scheduling wrapper, post run-scheduled):
+node scripts/backup/upload-r2.mjs --file /mnt/backups/autodine/autodine-*.sql.gz.enc
+node scripts/backup/upload-r2.mjs --file <artifact> --dry-run   # local integrity + config check, no network
+```
+
+**Status (2026-11-16): NOT UPLOADED — no R2 credentials exist** in the repo,
+the operator environment, or any connected tool (checked by variable name /
+presence only). The exact remaining human action: create one private R2
+bucket and an R2 API token with Object Read & Write on that bucket, then
+place the four variables above in the backup host's secret store. Cost at
+AutoDine's scale (< 5 GB stored): ≈ $0.01–0.08/month; no subscription is
+required beyond the free R2 tier allocation. **Local drill evidence
+(2026-11-16, disposable embedded PostgreSQL, never hosted):** full-chain
+logical restore verified (93 migrations; 48 tables / 59 policies / 162
+functions; schema fingerprint identical); backup selftest ALL CHECKS PASS
+(destroy→restore row fingerprint exact; tamper + wrong-passphrase rejected);
+a real artifact + manifest produced from a disposable cluster passed
+`upload-r2 --dry-run` SHA-256/manifest verification and correctly reported
+the four missing config names; disposable cluster and artifacts destroyed
+afterwards. Hosted upload + hosted restore drill remain UNVERIFIED until
+credentials exist.
+
 ## Storage destination — options and approximate cost (2026 prices; re-verify)
 
 AutoDine’s database is small (44 tables; expect < 500 MB). Any of these is effectively free; **all require account creation and owner approval — none is enabled**:
