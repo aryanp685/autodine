@@ -118,17 +118,31 @@ Two workflows make the hosted path independent of any one machine:
 
 - **`.github/workflows/hosted-backup.yml`** — manual dispatch + daily
   03:17 UTC schedule; `contents: read` only; concurrency-guarded; fails
-  closed naming any missing secret; runs `run-scheduled.mjs --r2` and
+  closed naming any missing secret; runs `run-scheduled.mjs --b2 --prune-b2` and
   archives the (non-sensitive) manifest as run evidence.
 - **`.github/workflows/hosted-restore-drill.yml`** — manual dispatch only;
   downloads the newest B2 artifact (`download-b2.mjs`, SHA-256 vs manifest
   verified), restores into a disposable `postgres:17` service container,
-  verifies with `verify-restored-db.mjs` (schema fingerprint, row counts,
-  `payments`/`subscription_payments` sums vs manifest), records restore
+  verifies with `verify-restored-db.mjs`, records restore
   seconds as rehearsal RTO, archives the two JSON reports, and destroys
   the downloaded material in an unconditional cleanup step. The target is
   loopback-only by construction, and the verifier refuses non-loopback
   hosts before connecting.
+
+**Restore-verification contract (fail closed, both backup formats):**
+every manifest — built-in dump and `pg_dump` alike — carries `counts`
+(tables/policies/functions/rows) and `financialSpotChecks`
+(`payments`/`subscription_payments` `amount_paise` sums, null when a
+table/column is absent), measured in the backup snapshot (for `pg_dump`,
+the same exported snapshot the dump itself reads). The drill derives the
+manifest from the artifact's filename (never selects the pair
+independently), and `verify-restored-db.mjs --manifest … --artifact …`
+rejects — before connecting — any manifest that is malformed, of an
+unknown format, missing contract fields, or not cryptographically paired
+with the artifact (name + SHA-256). All six comparisons must match for
+exit 0; expectations are always measured at backup time, never invented
+at verification time. Pre-contract backups cannot be drill-verified and
+must be re-taken.
 
 **Trigger the first runs:** configure the repository secrets below, then
 Actions → *Hosted backup (B2)* → Run workflow; on success Actions →
