@@ -1,0 +1,130 @@
+name: Hosted restore rehearsal (disposable)
+
+# Manually triggered restore drill against the newest hosted backup.
+#
+#   Actions -> "Hosted restore rehearsal (disposable)" -> Run workflow.
+#
+# The backup is downloaded from B2 (SHA-256 verified against its manifest),
+# restored into a DISPOSABLE PostgreSQL 17 service container on this runner,
+# and verified (schema fingerprint, row counts, financial spot checks).
+# The container and the downloaded artifact are destroyed when the job ends
+# — including on failure (the cleanup step runs unconditionally). Nothing
+# here can reach Production: the restore target is built from the runner's
+# loopback service container, and verify-restored-db.mjs refuses any
+# non-loopback target before connecting.
+#
+# Required repository secrets: AUTODINE_BACKUP_PASSPHRASE,
+# B2_REGION, B2_BUCKET, B2_ACCESS_KEY_ID, B2_SECRET_ACCESS_KEY.
+# No production connection string is used by this workflow at all.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hosted-restore-drill
+  cancel-in-progress: false
+
+jobs:
+  drill:
+    name: download -> restore (disposable) -> verify -> cleanup
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    services:
+      drilldb:
+        image: postgres:17
+        env:
+          POSTGRES_DB: drill
+          POSTGRES_PASSWORD: drill-${{ github.run_id }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      AUTODINE_BACKUP_PASSPHRASE: ${{ secrets.AUTODINE_BACKUP_PASSPHRASE }}
+      B2_REGION: ${{ secrets.B2_REGION }}
+      B2_BUCKET: ${{ secrets.B2_BUCKET }}
+      B2_ACCESS_KEY_ID: ${{ secrets.B2_ACCESS_KEY_ID }}
+      B2_SECRET_ACCESS_KEY: ${{ secrets.B2_SECRET_ACCESS_KEY }}
+      DRILL_DIR: ${{ runner.temp }}/restore-drill
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Fail closed when a required secret is missing (names only)
+        run: |
+          missing=""
+          for name in AUTODINE_BACKUP_PASSPHRASE B2_REGION B2_BUCKET B2_ACCESS_KEY_ID B2_SECRET_ACCESS_KEY; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing required repository secrets:$missing — configure them under Settings -> Secrets and variables -> Actions. No drill was attempted."
+            exit 1
+          fi
+          echo "All required drill secrets are present (values are never printed)."
+
+      - name: Download newest hosted backup (SHA-256 verified)
+        run: |
+          set -o pipefail
+          mkdir -p "$DRILL_DIR"
+          node scripts/backup/download-b2.mjs --out-dir "$DRILL_DIR" | tee "$DRILL_DIR/download-report.json"
+
+      - name: Restore into the disposable container (loopback only, timed)
+        env:
+          AUTODINE_RESTORE_TARGET_URL: postgresql://postgres:drill-${{ github.run_id }}@127.0.0.1:5432/drill
+        run: |
+          artifact="$(ls "$DRILL_DIR"/*.enc | head -n 1)"
+          start="$(date +%s)"
+          node scripts/backup/restore-logical.mjs --file "$artifact" --confirm-empty-db
+          end="$(date +%s)"
+          echo "RESTORE_SECONDS=$((end - start))" >> "$GITHUB_ENV"
+
+      - name: Verify restored database against the backup manifest
+        env:
+          AUTODINE_RESTORE_TARGET_URL: postgresql://postgres:drill-${{ github.run_id }}@127.0.0.1:5432/drill
+        run: |
+          set -o pipefail
+          manifest="$(ls "$DRILL_DIR"/*.manifest.json | head -n 1)"
+          node scripts/backup/verify-restored-db.mjs --manifest "$manifest" | tee "$DRILL_DIR/restore-report.json"
+
+      - name: Evidence summary (RPO/RTO, counts — no sensitive values)
+        if: always()
+        run: |
+          {
+            echo "## Hosted restore rehearsal";
+            echo;
+            echo "- Run: ${{ github.run_id }} (manual)";
+            echo "- Result: ${{ job.status }}";
+            echo "- Restore duration (rehearsal RTO): ${RESTORE_SECONDS:-not measured} seconds";
+            echo "- RPO: backup manifest createdAt vs run start — see download-report artifact";
+            echo "- Target: disposable postgres:17 service container (destroyed with the runner)";
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Preserve drill evidence (reports only, never the artifact)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: restore-drill-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/restore-drill/download-report.json
+            ${{ runner.temp }}/restore-drill/restore-report.json
+          if-no-files-found: ignore
+          retention-days: 35
+
+      - name: Destroy downloaded backup material (always)
+        if: always()
+        run: |
+          rm -rf "$DRILL_DIR"
+          echo "Downloaded backup material destroyed; the disposable database container is discarded with the runner."
