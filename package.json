@@ -24,7 +24,8 @@
     "test:db": "node scripts/verify-database.mjs",
     "test:db:embedded": "node scripts/local-pg/with-embedded-postgres.mjs node scripts/verify-database.mjs",
     "db:reconcile": "node scripts/reconcile/reconcile-migrations.mjs",
-    "test:recovery:cold": "node scripts/verify-cold-recovery.mjs"
+    "test:recovery:cold": "node scripts/verify-cold-recovery.mjs",
+    "test:dr": "node --test scripts/backup/verify-backup-file.test.mjs scripts/backup/check-dr-objectives.test.mjs scripts/backup/run-scheduled.test.mjs scripts/backup/b2-upload.test.mjs scripts/backup/prune-b2.test.mjs scripts/backup/verify-restored-db.test.mjs"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",

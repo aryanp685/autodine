@@ -13,6 +13,18 @@
  * (only files matching the autodine-*.{sql.gz.enc,manifest.json} pattern are
  * ever considered; foreign files are never touched).
  *
+ * MANIFEST VERIFICATION CONTRACT (both formats, no exceptions):
+ * every manifest carries `file`, `format`, `bytes` (plaintext length),
+ * `sha256` (of the encrypted artifact), `createdAt`, `counts`
+ * ({tables, rows, functions, policies} measured in the backup snapshot)
+ * and `financialSpotChecks` ({payments_amount_paise,
+ * subscription_payments_amount_paise}; null when a table/column is
+ * absent). verify-restored-db.mjs refuses to verify against a manifest
+ * that lacks any of these — a restore drill must never pass on missing
+ * evidence. Mode A (pg_dump) measures its expectations inside the same
+ * exported snapshot pg_dump reads (`--snapshot`), so the contract
+ * describes the dump exactly even on a live source database.
+ *
  * Exit code 0 = backup complete and verified; 1 = failed (webhook alerted when
  * BACKUP_ALERT_WEBHOOK is set).
  */
@@ -20,7 +32,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { encryptBuffer, sha256 } from './lib-crypto.mjs';
-import { dumpDatabase } from './lib-dump.mjs';
+import { dumpDatabase, openBackupSnapshot } from './lib-dump.mjs';
 
 const args = process.argv.slice(2);
 const opt = {};
@@ -66,19 +78,31 @@ try {
     // restore target cover — the shim/managed scaffold (auth.*, storage.*,
     // roles) already exists on the restore side and must not be replayed.
     const sqlPath = path.join(outDir, `${base}.dump`);
-    execFileSync('pg_dump', ['--format=custom', '--no-owner', `--schema=${schema}`, `--file=${sqlPath}`, sourceUrl], { stdio: ['ignore', 'ignore', 'inherit'] });
+    // The manifest's counts/financial expectations are measured inside the
+    // SAME exported snapshot pg_dump reads, so verification compares the
+    // restored database against exactly what was dumped — concurrent writes
+    // on a live source cannot make a good backup fail its drill (and a bad
+    // one cannot pass: the snapshot is frozen for both readers).
+    const snapshot = await openBackupSnapshot(sourceUrl, { schema });
+    let evidence;
+    try {
+      evidence = await snapshot.collectCounts();
+      execFileSync('pg_dump', ['--format=custom', '--no-owner', `--schema=${schema}`, `--snapshot=${snapshot.snapshotId}`, `--file=${sqlPath}`, sourceUrl], { stdio: ['ignore', 'ignore', 'inherit'] });
+    } finally {
+      await snapshot.close();
+    }
     const plaintext = readFileSync(sqlPath);
     writeFileSync(sqlPath + '.enc', enc(plaintext, passphrase));
     unlinkSync(sqlPath);
     outFile = `${base}.dump.enc`;
-    manifest = { format: 'pg_dump-custom', bytes: plaintext.length, sha256: sha256(readFileSync(path.join(outDir, outFile))) };
+    manifest = { format: 'pg_dump-custom', bytes: plaintext.length, sha256: sha256(readFileSync(path.join(outDir, outFile))), counts: evidence.counts, financialSpotChecks: evidence.financialSpotChecks };
   } else {
     // Mode B: built-in consistent snapshot (REPEATABLE READ READ ONLY).
-    const { sql, counts } = await dumpDatabase(sourceUrl, { schema, log: (m) => process.stderr.write('  ' + m + '\n') });
+    const { sql, counts, financialSpotChecks } = await dumpDatabase(sourceUrl, { schema, log: (m) => process.stderr.write('  ' + m + '\n') });
     const plaintext = Buffer.from(sql, 'utf8');
     writeFileSync(path.join(outDir, `${base}.sql.gz.enc`), enc(plaintext, passphrase));
     outFile = `${base}.sql.gz.enc`;
-    manifest = { format: 'autodine-logical-1', bytes: plaintext.length, sha256: sha256(readFileSync(path.join(outDir, outFile))), counts };
+    manifest = { format: 'autodine-logical-1', bytes: plaintext.length, sha256: sha256(readFileSync(path.join(outDir, outFile))), counts, financialSpotChecks };
   }
 
   const full = path.join(outDir, outFile);

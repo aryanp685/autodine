@@ -81,13 +81,26 @@ jobs:
           mkdir -p "$DRILL_DIR"
           node scripts/backup/download-b2.mjs --out-dir "$DRILL_DIR" | tee "$DRILL_DIR/download-report.json"
 
+      - name: Select the downloaded artifact/manifest pair
+        run: |
+          artifact="$(ls "$DRILL_DIR"/*.enc | head -n 1)"
+          if [ -z "$artifact" ]; then echo "::error::No downloaded artifact found in the drill directory."; exit 1; fi
+          # The manifest is DERIVED from the artifact name — never selected
+          # independently — so the drill cannot pair an artifact with the
+          # wrong manifest. verify-restored-db.mjs additionally enforces the
+          # pairing cryptographically (manifest sha256 vs artifact bytes).
+          manifest="$(printf '%s' "$artifact" | sed -E 's/\.(sql\.gz|dump)\.enc$/.manifest.json/')"
+          if [ ! -f "$manifest" ]; then echo "::error::Matching manifest not found for $(basename "$artifact")."; exit 1; fi
+          echo "DRILL_ARTIFACT=$artifact" >> "$GITHUB_ENV"
+          echo "DRILL_MANIFEST=$manifest" >> "$GITHUB_ENV"
+          echo "Selected pair: $(basename "$artifact") + $(basename "$manifest")"
+
       - name: Restore into the disposable container (loopback only, timed)
         env:
           AUTODINE_RESTORE_TARGET_URL: postgresql://postgres:drill-${{ github.run_id }}@127.0.0.1:5432/drill
         run: |
-          artifact="$(ls "$DRILL_DIR"/*.enc | head -n 1)"
           start="$(date +%s)"
-          node scripts/backup/restore-logical.mjs --file "$artifact" --confirm-empty-db
+          node scripts/backup/restore-logical.mjs --file "$DRILL_ARTIFACT" --confirm-empty-db
           end="$(date +%s)"
           echo "RESTORE_SECONDS=$((end - start))" >> "$GITHUB_ENV"
 
@@ -96,8 +109,7 @@ jobs:
           AUTODINE_RESTORE_TARGET_URL: postgresql://postgres:drill-${{ github.run_id }}@127.0.0.1:5432/drill
         run: |
           set -o pipefail
-          manifest="$(ls "$DRILL_DIR"/*.manifest.json | head -n 1)"
-          node scripts/backup/verify-restored-db.mjs --manifest "$manifest" | tee "$DRILL_DIR/restore-report.json"
+          node scripts/backup/verify-restored-db.mjs --manifest "$DRILL_MANIFEST" --artifact "$DRILL_ARTIFACT" | tee "$DRILL_DIR/restore-report.json"
 
       - name: Evidence summary (RPO/RTO, counts — no sensitive values)
         if: always()
