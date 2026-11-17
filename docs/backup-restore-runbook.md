@@ -218,6 +218,98 @@ the four missing config names (B2_ENDPOINT|B2_REGION forms included); disposable
 afterwards. Hosted upload + hosted restore drill remain UNVERIFIED until
 credentials exist.
 
+## Remote retention in B2 (implemented 2026-11-16; native lifecycle rules are NOT sufficient)
+
+Backblaze lifecycle rules are age-based only (`daysFromUploadingToHiding`,
+`daysFromHidingToDeleting`, `fileNamePrefix`): they can expire everything
+past a fixed age, but they cannot express the recovery-point policy —
+newest 14 daily backups, one per week for 8 weeks, one per month for
+6 months. Retention is therefore enforced by `scripts/backup/prune-b2.mjs`
+(authenticated S3 LIST/GET/DELETE), run after each verified upload via
+`run-scheduled.mjs --b2 --prune-b2` (already wired into the hosted-backup
+workflow):
+
+```bash
+node scripts/backup/prune-b2.mjs            # dry-run: prints keep/expire plan, deletes nothing
+node scripts/backup/prune-b2.mjs --confirm  # execute (what the scheduler runs)
+```
+
+Guarantees: only `autodine-backups/` objects matching the backup pattern
+are candidates (anything else is reported ignored, never touched); the
+**newest valid backup is always kept**; every artifact must carry a
+structurally valid manifest (naming this artifact, well-formed SHA-256,
+positive byte count, format, sane `createdAt` no later than the object's
+server-side upload time) or the run aborts deleting nothing;
+incomplete/repeating pagination aborts; more than 50 expirations aborts
+(--max-delete to override deliberately); a failed DELETE stops the run.
+
+**Pre-deletion integrity gate:** before the first DELETE, every expiring
+artifact is downloaded in full and its SHA-256 recomputed. The hash must
+equal both the manifest's `sha256` and the upload-time `x-amz-meta-sha256`
+object metadata (HEAD metadata alone is never trusted — it only
+cross-checks the recomputed content hash; metadata absence is
+unverifiable and aborts). The downloaded byte count must match the listed
+object size, and the bytes must carry the AutoDine backup magic. **All**
+candidates are verified before **any** deletion begins; one missing,
+corrupt, mismatched or unverifiable pair aborts the run with zero
+deletions. The pruner never sees the backup passphrase.
+
+**Pre-delete recheck (per pair):** immediately before each pair's
+DELETEs, a HEAD must still show the verified SHA-256 metadata and byte
+size; any drift aborts the run (pairs already deleted are counted in the
+error). Deletion itself is artifact-first: an artifact-DELETE failure
+leaves the pair intact for a clean re-run, and a manifest-DELETE failure
+is retried once before the run aborts naming the orphaned manifest.
+
+Optional defense-in-depth (owner, at bucket setup): add a B2 lifecycle
+rule on prefix `autodine-backups/` — hide after 400 days, delete 30 days
+after hiding — as a coarse backstop far beyond the 6-month policy horizon.
+It must never be the only retention mechanism.
+
+### Remote retention — known limitations (P2 observations, accepted)
+
+These are documented deliberately; none is silently "fixed" by changing
+retention semantics, and none blocks the integrity gate above.
+
+1. **No cross-process lock.** `prune-b2.mjs` takes no distributed lock.
+   Overlap is bounded by (a) the hosted-backup workflow's concurrency
+   group (`cancel-in-progress: false`), (b) newest-backup protection, and
+   (c) the rule that an object uploaded after listing is not in the
+   inventory and cannot be selected. A manual `--confirm` prune racing a
+   manual upload outside the workflow remains theoretically possible;
+   run pruning only via the scheduled workflow or a single operator
+   shell. Revisit if pruning ever moves off the workflow.
+2. **Orphan manifests after a partial pair deletion.** Each pair deletes
+   artifact-then-manifest; if the artifact DELETE succeeds and the
+   manifest DELETE fails, the run stops and reports progress, leaving an
+   orphaned `*.manifest.json`. Orphans match no artifact, are reported as
+   ignored by later runs, and can never become deletion candidates or be
+   mistaken for a backup. Cleanup is a manual, operator-visible action;
+   re-running the pruner is safe and idempotent.
+3. **Week buckets are day-of-month segments, not ISO weeks.** The pruner
+   mirrors the local pipeline exactly (`floor(dayOfMonth / 7)` buckets):
+   deterministic, and consistent between local and remote retention so a
+   recovery point survives in both or neither. Switching to ISO weeks
+   would change *which* recovery points are kept, so it is a deliberate
+   policy change to make in both pruners together — never a silent fix.
+
+Residual trust notes: a manifest `createdAt` inside its consistency
+bounds (parseable, not future, not after upload time) is still trusted
+for tier selection — manifests are not cryptographically signed; the
+hash/metadata gate proves the artifact is exactly what the manifest
+describes, and newest-backup protection bounds the blast radius.
+Likewise, an object replaced between its pre-delete HEAD recheck and its
+DELETE (same-key overwrite by a credentialed writer inside that single
+round-trip) cannot be detected by the S3 API available here — S3 offers
+no conditional delete the pruner can rely on; the workflow's serialized
+schedule makes this a credentialed-insider-only scenario. Separately,
+"newest" means manifest `createdAt` to the pruner but server
+`LastModified` to `download-b2.mjs`; after a delayed manual upload of an
+old backup the two can differ, in which case a prune may expire the
+drill's most recent pick — the drill then fails loudly (404) or takes
+the next artifact, never silently restoring the wrong bytes (its
+SHA-256 verification is independent of which artifact it picked).
+
 ## Storage destination — options and approximate cost (2026 prices; re-verify)
 
 AutoDine’s database is small (44 tables; expect < 500 MB). Any of these is effectively free; **all require account creation and owner approval — none is enabled**:
