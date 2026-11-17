@@ -19,7 +19,7 @@
  * --dry-run performs the local manifest/SHA-256 verification and prints the
  * intended destination (bucket/key) without any network access.
  */
-import { readFileSync, statSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { b2ConfigFromEnv, b2ObjectKey, signB2Request, sha256Hex } from './lib-b2.mjs';
 

@@ -67,6 +67,7 @@ const restoreReport = opt['restore-report'] ?? null;
 const skipVerify = opt['skip-verify'] === '1';
 const skipObjectives = opt['skip-dr-objectives'] === '1';
 const uploadB2 = opt['b2'] === '1';
+const pruneB2 = opt['prune-b2'] === '1';
 
 const alertHook = process.env.BACKUP_ALERT_WEBHOOK || process.env.DR_ALERT_WEBHOOK || null;
 const alert = async (stage, detail) => {
@@ -161,6 +162,19 @@ if (uploadB2) {
   const upload = spawnSync(process.execPath, [path.join(scriptDir, 'upload-b2.mjs'), '--file', path.join(outDir, newest.name)], { stdio: 'inherit', env: process.env });
   if (upload.status !== 0) {
     await die('upload', `upload-b2.mjs exited ${upload.status ?? 'unknown'} for ${newest.name} — hosted backup is NOT verified`);
+  }
+}
+
+// 5. Optional remote retention (only with --b2 --prune-b2, after a verified
+//    upload). prune-b2.mjs enforces the 14/8/6 recovery-point policy in the
+//    bucket and fails closed; the newest backup is always protected.
+if (pruneB2) {
+  if (!uploadB2) {
+    await die('prune', '--prune-b2 requires --b2 (remote pruning follows a verified upload)');
+  }
+  const prune = spawnSync(process.execPath, [path.join(scriptDir, 'prune-b2.mjs'), '--confirm'], { stdio: 'inherit', env: process.env });
+  if (prune.status !== 0) {
+    await die('prune', `prune-b2.mjs exited ${prune.status ?? 'unknown'} — remote retention NOT enforced`);
   }
 }
 

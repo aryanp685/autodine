@@ -80,6 +80,28 @@ export function b2ObjectKey(fileName, prefix = 'autodine-backups') {
   return cleanPrefix ? `${cleanPrefix}/${base}` : base;
 }
 
+const XML_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+
+/**
+ * Decode XML entities in S3 response text (keys, continuation tokens).
+ * B2/S3 escape `&`, `<`, `>` etc. in object keys; without decoding, a key
+ * containing `&` would surface literally as `&amp;` and downstream key
+ * derivation (manifest lookup, deletes) would address the wrong object.
+ * Single pass with a replacer function, so `&amp;lt;` decodes to the
+ * literal text `&lt;` exactly once — never double-decoded.
+ */
+export function decodeB2XmlEntities(text) {
+  return String(text).replace(/&(amp|lt|gt|quot|apos|#(\d+)|#x([0-9a-fA-F]+));/g, (match, name, dec, hex) => {
+    if (dec !== undefined || hex !== undefined) {
+      const codePoint = dec !== undefined ? Number(dec) : parseInt(hex, 16);
+      return Number.isSafeInteger(codePoint) && codePoint >= 0 && codePoint <= 0x10ffff
+        ? String.fromCodePoint(codePoint)
+        : match;
+    }
+    return XML_ENTITIES[name] ?? match;
+  });
+}
+
 /** Parse an S3 ListObjectsV2 response into [{ key, lastModified }]. */
 export function parseB2ListXml(xml) {
   const entries = [];
@@ -88,7 +110,7 @@ export function parseB2ListXml(xml) {
   while ((block = contentsRe.exec(String(xml))) !== null) {
     const key = block[1].match(/<Key>([^<]+)<\/Key>/)?.[1];
     const lastModified = block[1].match(/<LastModified>([^<]+)<\/LastModified>/)?.[1];
-    if (key) entries.push({ key, lastModified: lastModified ?? '' });
+    if (key) entries.push({ key: decodeB2XmlEntities(key), lastModified: lastModified ?? '' });
   }
   return entries;
 }
@@ -97,7 +119,8 @@ export function parseB2ListXml(xml) {
 export function b2ListContinuationToken(xml) {
   const text = String(xml);
   if (!/<IsTruncated>true<\/IsTruncated>/.test(text)) return null;
-  return text.match(/<NextContinuationToken>([^<]+)<\/NextContinuationToken>/)?.[1] ?? null;
+  const token = text.match(/<NextContinuationToken>([^<]+)<\/NextContinuationToken>/)?.[1] ?? null;
+  return token === null ? null : decodeB2XmlEntities(token);
 }
 
 /** Newest backup artifact key from a list result, or null when none exists. */

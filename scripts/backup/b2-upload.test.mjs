@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { deriveSigningKey, parseB2ListXml, pickNewestArtifactKey, b2ListContinuationToken, b2ConfigFromEnv, b2ObjectKey, signB2Request, sha256Hex } from './lib-b2.mjs';
+import { deriveSigningKey, parseB2ListXml, pickNewestArtifactKey, b2ListContinuationToken, decodeB2XmlEntities, b2ConfigFromEnv, b2ObjectKey, signB2Request, sha256Hex } from './lib-b2.mjs';
 
 test('SigV4 signing key matches the published AWS derivation vector', () => {
   // AWS documentation example: secret/date/region/service -> known kSigning.
@@ -77,6 +77,21 @@ test('B2 list parsing picks the newest artifact and ignores manifests', () => {
     b2ListContinuationToken('<ListBucketResult><IsTruncated>true</IsTruncated><NextContinuationToken>tok123</NextContinuationToken></ListBucketResult>'),
     'tok123',
   );
+});
+
+test('B2 list parsing decodes XML entities in keys and continuation tokens exactly once', () => {
+  const xml = `<ListBucketResult><IsTruncated>true</IsTruncated><NextContinuationToken>tok&amp;en+1</NextContinuationToken>
+    <Contents><Key>autodine-backups/autodine-a&amp;b-20260101T000000.sql.gz.enc</Key><LastModified>2026-01-01T00:00:00.000Z</LastModified></Contents>
+    <Contents><Key>autodine-backups/literal-&amp;lt;-name.sql.gz.enc</Key><LastModified>2026-01-02T00:00:00.000Z</LastModified></Contents>
+  </ListBucketResult>`;
+  const entries = parseB2ListXml(xml);
+  // `&amp;` in the wire format is a literal `&` in the real key.
+  assert.equal(entries[0].key, 'autodine-backups/autodine-a&b-20260101T000000.sql.gz.enc');
+  // `&amp;lt;` is the literal text `&lt;` — decoded once, never to `<`.
+  assert.equal(entries[1].key, 'autodine-backups/literal-&lt;-name.sql.gz.enc');
+  assert.equal(b2ListContinuationToken(xml), 'tok&en+1');
+  assert.equal(decodeB2XmlEntities('a&lt;b&gt;c&quot;d&apos;e&#38;f&#x26;g'), 'a<b>c"d\'e&f&g');
+  assert.equal(decodeB2XmlEntities('plain-key_1.2'), 'plain-key_1.2');
 });
 
 test('download CLI fails closed with missing-config NAMES only', () => {

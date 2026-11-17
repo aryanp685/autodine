@@ -69,7 +69,7 @@ jobs:
           echo "All required backup secrets are present (values are never printed)."
 
       - name: Scheduled backup with B2 upload + remote SHA-256 verification
-        run: node scripts/backup/run-scheduled.mjs --out-dir "$RUNNER_TEMP/autodine-backups" --rpo-minutes 1440 --b2
+        run: node scripts/backup/run-scheduled.mjs --out-dir "$RUNNER_TEMP/autodine-backups" --rpo-minutes 1440 --b2 --prune-b2
 
       - name: Preserve the backup manifest as run evidence (counts only, never the artifact)
         if: always()
