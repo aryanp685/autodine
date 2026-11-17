@@ -107,12 +107,13 @@ test('download CLI fails closed with missing-config NAMES only', () => {
 
 test('verify-restored refuses any non-loopback target before connecting', () => {
   const script = path.join(import.meta.dirname, 'verify-restored-db.mjs');
-  const run = spawnSync(process.execPath, [script, '--manifest', import.meta.filename], {
+  const run = spawnSync(process.execPath, [script, '--manifest', import.meta.filename, '--artifact', import.meta.filename], {
     encoding: 'utf8',
     env: { ...process.env, AUTODINE_RESTORE_TARGET_URL: 'postgresql://user:pass@db.example.invalid:5432/prod' },
   });
   assert.equal(run.status, 2);
   assert.match(run.stderr, /REFUSING non-disposable target/);
+  assert.ok(!run.stderr.includes('user:pass'), 'refusal must not echo credentials');
 });
 
 test('upload CLI dry-run verifies manifest SHA-256 and refuses mismatches', () => {
