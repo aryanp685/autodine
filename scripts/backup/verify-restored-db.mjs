@@ -17,7 +17,9 @@
  * 2 = usage / non-loopback target refused.
  */
 import { readFileSync } from 'node:fs';
-import pg from 'pg';
+// NOTE: `pg` is imported lazily, AFTER the loopback refusal below — the
+// production-connection guard must fire even in a bare environment where
+// dependencies were never installed.
 
 const args = process.argv.slice(2);
 const opt = {};
@@ -47,6 +49,8 @@ if (!['127.0.0.1', 'localhost', '::1'].includes(host)) {
 
 const manifest = JSON.parse(readFileSync(opt.manifest, 'utf8'));
 const expected = manifest.counts ?? {};
+
+const { default: pg } = await import('pg');
 
 const client = new pg.Client({ connectionString: targetUrl, application_name: 'autodine-verify-restored' });
 await client.connect();
