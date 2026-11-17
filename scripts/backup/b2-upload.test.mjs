@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { deriveSigningKey, parseR2ListXml, pickNewestArtifactKey, r2ListContinuationToken, r2ConfigFromEnv, r2ObjectKey, signR2Request, sha256Hex } from './lib-r2.mjs';
+import { deriveSigningKey, parseB2ListXml, pickNewestArtifactKey, b2ListContinuationToken, b2ConfigFromEnv, b2ObjectKey, signB2Request, sha256Hex } from './lib-b2.mjs';
 
 test('SigV4 signing key matches the published AWS derivation vector', () => {
   // AWS documentation example: secret/date/region/service -> known kSigning.
@@ -12,70 +12,81 @@ test('SigV4 signing key matches the published AWS derivation vector', () => {
   assert.equal(key.toString('hex'), 'c4afb1cc5771d871763a393e44b703571b55cc28424d1a5e86da6ed3c154a4b9');
 });
 
-test('signed R2 request carries a well-formed Authorization header', () => {
-  const headers = signR2Request({
+test('signed B2 request scopes the credential to the bucket region', () => {
+  const headers = signB2Request({
     method: 'PUT',
-    url: 'https://account123.r2.cloudflarestorage.com/backups/autodine-backups/autodine-x.sql.gz.enc',
+    url: 'https://s3.us-west-004.backblazeb2.com/autodine-backups/autodine-backups/autodine-x.sql.gz.enc',
     payloadHash: sha256Hex(Buffer.from('ciphertext')),
     accessKeyId: 'AKIDEXAMPLE',
     secretAccessKey: 'test-secret-not-real',
+    region: 'us-west-004',
     extraHeaders: { 'x-amz-meta-sha256': sha256Hex(Buffer.from('ciphertext')) },
     now: new Date('2026-01-01T00:00:00Z'),
   });
-  assert.match(headers.authorization, /^AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE\/20260101\/auto\/s3\/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date;x-amz-meta-sha256, Signature=[0-9a-f]{64}$/);
+  assert.match(headers.authorization, /^AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE\/20260101\/us-west-004\/s3\/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date;x-amz-meta-sha256, Signature=[0-9a-f]{64}$/);
   assert.equal(headers['x-amz-date'], '20260101T000000Z');
 });
 
-test('config resolution reports missing NAMES only, never values', () => {
+test('config derives the S3 endpoint from the region and reports missing NAMES only', () => {
   const secretSentinel = 'SENTINEL-SECRET-DO-NOT-LEAK';
-  const partial = r2ConfigFromEnv({ R2_SECRET_ACCESS_KEY: secretSentinel });
+  const partial = b2ConfigFromEnv({ B2_SECRET_ACCESS_KEY: secretSentinel });
   assert.equal(partial.ok, false);
-  assert.ok(partial.missing.includes('R2_BUCKET'));
-  assert.ok(partial.missing.includes('R2_ACCESS_KEY_ID'));
-  assert.ok(partial.missing.includes('R2_ENDPOINT|CLOUDFLARE_ACCOUNT_ID'));
+  assert.ok(partial.missing.includes('B2_BUCKET'));
+  assert.ok(partial.missing.includes('B2_ACCESS_KEY_ID'));
+  assert.ok(partial.missing.includes('B2_ENDPOINT|B2_REGION'));
   assert.ok(!JSON.stringify(partial).includes(secretSentinel));
 
-  const full = r2ConfigFromEnv({
-    R2_BUCKET: 'autodine-backups',
-    R2_ACCESS_KEY_ID: 'id',
-    R2_SECRET_ACCESS_KEY: secretSentinel,
-    CLOUDFLARE_ACCOUNT_ID: 'abc123',
+  const full = b2ConfigFromEnv({
+    B2_BUCKET: 'autodine-backups',
+    B2_ACCESS_KEY_ID: 'id',
+    B2_SECRET_ACCESS_KEY: secretSentinel,
+    B2_REGION: 'us-west-004',
   });
   assert.equal(full.ok, true);
-  assert.equal(full.endpoint, 'https://abc123.r2.cloudflarestorage.com');
+  assert.equal(full.endpoint, 'https://s3.us-west-004.backblazeb2.com');
+  assert.equal(full.region, 'us-west-004');
   assert.ok(!JSON.stringify(full).includes(secretSentinel));
+
+  const explicit = b2ConfigFromEnv({
+    B2_BUCKET: 'autodine-backups',
+    B2_ACCESS_KEY_ID: 'id',
+    B2_SECRET_ACCESS_KEY: secretSentinel,
+    B2_ENDPOINT: 'https://s3.eu-central-003.backblazeb2.com',
+  });
+  assert.equal(explicit.ok, true);
+  assert.equal(explicit.region, 'eu-central-003');
 });
 
 test('object keys use basenames only (no path traversal)', () => {
-  assert.equal(r2ObjectKey('/tmp/../etc/autodine-a.sql.gz.enc'), 'autodine-backups/autodine-a.sql.gz.enc');
-  assert.equal(r2ObjectKey('autodine-a.sql.gz.enc', ''), 'autodine-a.sql.gz.enc');
+  assert.equal(b2ObjectKey('/tmp/../etc/autodine-a.sql.gz.enc'), 'autodine-backups/autodine-a.sql.gz.enc');
+  assert.equal(b2ObjectKey('autodine-a.sql.gz.enc', ''), 'autodine-a.sql.gz.enc');
 });
 
-test('R2 list parsing picks the newest artifact and ignores manifests', () => {
+test('B2 list parsing picks the newest artifact and ignores manifests', () => {
   const xml = `<?xml version="1.0" encoding="UTF-8"?><ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
     <Contents><Key>autodine-backups/autodine-a-20260101T000000.sql.gz.enc</Key><LastModified>2026-01-01T00:00:00.000Z</LastModified></Contents>
     <Contents><Key>autodine-backups/autodine-a-20260101T000000.manifest.json</Key><LastModified>2026-01-01T00:00:01.000Z</LastModified></Contents>
     <Contents><Key>autodine-backups/autodine-a-20260102T000000.sql.gz.enc</Key><LastModified>2026-01-02T00:00:00.000Z</LastModified></Contents>
   </ListBucketResult>`;
-  const entries = parseR2ListXml(xml);
+  const entries = parseB2ListXml(xml);
   assert.equal(entries.length, 3);
   assert.equal(pickNewestArtifactKey(entries), 'autodine-backups/autodine-a-20260102T000000.sql.gz.enc');
   assert.equal(pickNewestArtifactKey([]), null);
-  assert.equal(r2ListContinuationToken(xml), null);
+  assert.equal(b2ListContinuationToken(xml), null);
   assert.equal(
-    r2ListContinuationToken('<ListBucketResult><IsTruncated>true</IsTruncated><NextContinuationToken>tok123</NextContinuationToken></ListBucketResult>'),
+    b2ListContinuationToken('<ListBucketResult><IsTruncated>true</IsTruncated><NextContinuationToken>tok123</NextContinuationToken></ListBucketResult>'),
     'tok123',
   );
 });
 
 test('download CLI fails closed with missing-config NAMES only', () => {
-  const script = path.join(import.meta.dirname, 'download-r2.mjs');
-  const run = spawnSync(process.execPath, [script, '--out-dir', '/tmp/autodine-r2-dl-test'], {
+  const script = path.join(import.meta.dirname, 'download-b2.mjs');
+  const run = spawnSync(process.execPath, [script, '--out-dir', '/tmp/autodine-b2-dl-test'], {
     encoding: 'utf8',
-    env: { PATH: process.env.PATH, R2_SECRET_ACCESS_KEY: 'SENTINEL-SECRET-DO-NOT-LEAK' },
+    env: { PATH: process.env.PATH, B2_SECRET_ACCESS_KEY: 'SENTINEL-SECRET-DO-NOT-LEAK' },
   });
   assert.equal(run.status, 2);
-  assert.match(run.stderr, /R2_BUCKET/);
+  assert.match(run.stderr, /B2_BUCKET/);
   assert.ok(!run.stderr.includes('SENTINEL-SECRET-DO-NOT-LEAK'));
 });
 
@@ -90,7 +101,7 @@ test('verify-restored refuses any non-loopback target before connecting', () => 
 });
 
 test('upload CLI dry-run verifies manifest SHA-256 and refuses mismatches', () => {
-  const dir = mkdtempSync(path.join(tmpdir(), 'autodine-r2-test-'));
+  const dir = mkdtempSync(path.join(tmpdir(), 'autodine-b2-test-'));
   try {
     const artifact = path.join(dir, 'autodine-test-20260101T000000.sql.gz.enc');
     const body = Buffer.from('encrypted-fixture-bytes');
@@ -98,13 +109,13 @@ test('upload CLI dry-run verifies manifest SHA-256 and refuses mismatches', () =
     const manifest = { file: path.basename(artifact), sha256: sha256Hex(body), format: 'autodine-logical-1' };
     writeFileSync(path.join(dir, 'autodine-test-20260101T000000.manifest.json'), JSON.stringify(manifest));
 
-    const script = path.join(import.meta.dirname, 'upload-r2.mjs');
-    const ok = spawnSync(process.execPath, [script, '--file', artifact, '--dry-run'], { encoding: 'utf8', env: { ...process.env, R2_BUCKET: '', R2_ACCESS_KEY_ID: '', R2_SECRET_ACCESS_KEY: '', R2_ENDPOINT: '', CLOUDFLARE_ACCOUNT_ID: '' } });
+    const script = path.join(import.meta.dirname, 'upload-b2.mjs');
+    const ok = spawnSync(process.execPath, [script, '--file', artifact, '--dry-run'], { encoding: 'utf8', env: { ...process.env, B2_BUCKET: '', B2_ACCESS_KEY_ID: '', B2_SECRET_ACCESS_KEY: '', B2_ENDPOINT: '', B2_REGION: '' } });
     assert.equal(ok.status, 0, ok.stderr);
     const report = JSON.parse(ok.stdout);
     assert.equal(report.sha256, manifest.sha256);
     assert.equal(report.manifestChecked, true);
-    assert.equal(report.destination, 'R2 not configured');
+    assert.equal(report.destination, 'B2 not configured');
 
     writeFileSync(path.join(dir, 'autodine-test-20260101T000000.manifest.json'), JSON.stringify({ ...manifest, sha256: '0'.repeat(64) }));
     const bad = spawnSync(process.execPath, [script, '--file', artifact, '--dry-run'], { encoding: 'utf8' });

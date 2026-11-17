@@ -12,8 +12,8 @@
  *   SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASS SMTP_FROM SMTP_SECURE
  *                        custom-SMTP block as expected by Supabase Auth settings
  *   BACKUP_ALERT_WEBHOOK  https URL for the backup-failure alert POST
- *   CLOUDFLARE_ACCOUNT_ID / R2_BUCKET / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY
- *                        Cloudflare R2 backup destination (scripts/backup/upload-r2.mjs)
+ *   B2_REGION / B2_BUCKET / B2_ACCESS_KEY_ID / B2_SECRET_ACCESS_KEY
+ *                        Backblaze B2 backup destination (scripts/backup/upload-b2.mjs)
  *
  * Exit codes: 0 = everything set is well-formed (unset keys are reported, not
  * failures — activation is an owner decision); 1 = at least one set key is
@@ -31,10 +31,11 @@ const checks = [
   { key: 'SMTP_FROM', group: 'smtp', test: (v) => /^[^<>@\s]+@[^<>@\s]+\.[^<>@\s]{2,}$/.test(v) || /^[^<>]{1,80}<[^<>@\s]+@[^<>@\s]+\.[^<>@\s]{2,}>$/.test(v), expect: 'an address, or "Display Name <addr@domain>"' },
   { key: 'SMTP_SECURE', group: 'smtp', test: (v) => ['true', 'false'].includes(v.toLowerCase()), expect: '"true" (465) or "false" (587 + STARTTLS)' },
   { key: 'BACKUP_ALERT_WEBHOOK', group: 'backup', test: (v) => /^https:\/\/[^\s/$.?#].[^\s]*$/.test(v), expect: 'an https URL' },
-  { key: 'CLOUDFLARE_ACCOUNT_ID', group: 'r2', test: (v) => /^[a-f0-9]{32}$/i.test(v.trim()), expect: 'the 32-hex Cloudflare account id' },
-  { key: 'R2_BUCKET', group: 'r2', test: (v) => /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(v.trim()), expect: 'a valid bucket name (lowercase, 3-63 chars)' },
-  { key: 'R2_ACCESS_KEY_ID', group: 'r2', test: (v) => v.trim().length > 0 && !/\s/.test(v), expect: 'non-empty, no whitespace' },
-  { key: 'R2_SECRET_ACCESS_KEY', group: 'r2', test: (v) => v.trim().length >= 16, expect: 'at least 16 characters' },
+  { key: 'B2_REGION', group: 'b2', test: (v) => /^[a-z]{2}-[a-z]+-\d{3}$/.test(v.trim()), expect: 'a B2 region, e.g. us-west-004 (or set B2_ENDPOINT instead)' },
+  { key: 'B2_ENDPOINT', group: 'b2', test: (v) => /^https:\/\/[^\s/$.?#].[^\s]*$/.test(v.trim()), expect: 'an https S3 endpoint (optional when B2_REGION is set)' },
+  { key: 'B2_BUCKET', group: 'b2', test: (v) => /^[a-zA-Z0-9][a-zA-Z0-9.-]{5,49}$/.test(v.trim()), expect: 'a valid B2 bucket name (6-50 chars)' },
+  { key: 'B2_ACCESS_KEY_ID', group: 'b2', test: (v) => v.trim().length > 0 && !/\s/.test(v), expect: 'the B2 application keyID, no whitespace' },
+  { key: 'B2_SECRET_ACCESS_KEY', group: 'b2', test: (v) => v.trim().length >= 16, expect: 'the B2 application key (at least 16 characters)' },
 ];
 
 const results = [];

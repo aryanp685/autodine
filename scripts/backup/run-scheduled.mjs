@@ -17,10 +17,10 @@
  *      backup that was written but cannot be decrypted is worse than none.
  *   3. OBJECTIVES. Runs scripts/backup/check-dr-objectives.mjs
  *      (--rpo-minutes; plus --rto-minutes when --restore-report is supplied).
- *   4. UPLOAD (only with --r2). Runs scripts/backup/upload-r2.mjs on the
- *      newest artifact: SHA-256 vs manifest, signed PUT to Cloudflare R2,
- *      signed HEAD verification. Without --r2 the pipeline is local-only,
- *      exactly as before; with --r2 a missing R2 configuration fails the
+ *   4. UPLOAD (only with --b2). Runs scripts/backup/upload-b2.mjs on the
+ *      newest artifact: SHA-256 vs manifest, signed PUT to Backblaze B2,
+ *      signed HEAD verification. Without --b2 the pipeline is local-only,
+ *      exactly as before; with --b2 a missing B2 configuration fails the
  *      run at the `upload` stage (exit 1) rather than passing silently.
  *
  * Exit 0 only when every step passes. On any failure it POSTs one line to
@@ -66,7 +66,7 @@ const rtoMinutes = opt['rto-minutes'] ? Number(opt['rto-minutes']) : null;
 const restoreReport = opt['restore-report'] ?? null;
 const skipVerify = opt['skip-verify'] === '1';
 const skipObjectives = opt['skip-dr-objectives'] === '1';
-const uploadR2 = opt['r2'] === '1';
+const uploadB2 = opt['b2'] === '1';
 
 const alertHook = process.env.BACKUP_ALERT_WEBHOOK || process.env.DR_ALERT_WEBHOOK || null;
 const alert = async (stage, detail) => {
@@ -139,10 +139,10 @@ if (skipObjectives) {
   }
 }
 
-// 4. Optional R2 upload of the newest verified artifact. upload-r2.mjs
+// 4. Optional B2 upload of the newest verified artifact. upload-b2.mjs
 //    re-checks the artifact SHA-256 against its manifest, PUTs artifact +
 //    manifest, and HEAD-verifies the remote SHA-256 metadata.
-if (uploadR2) {
+if (uploadB2) {
   let entries = [];
   try {
     entries = readdirSync(outDir)
@@ -158,12 +158,12 @@ if (uploadR2) {
   if (!newest) {
     await die('upload', `no autodine-* backup found in ${outDir} after the backup step`);
   }
-  const upload = spawnSync(process.execPath, [path.join(scriptDir, 'upload-r2.mjs'), '--file', path.join(outDir, newest.name)], { stdio: 'inherit', env: process.env });
+  const upload = spawnSync(process.execPath, [path.join(scriptDir, 'upload-b2.mjs'), '--file', path.join(outDir, newest.name)], { stdio: 'inherit', env: process.env });
   if (upload.status !== 0) {
-    await die('upload', `upload-r2.mjs exited ${upload.status ?? 'unknown'} for ${newest.name} — hosted backup is NOT verified`);
+    await die('upload', `upload-b2.mjs exited ${upload.status ?? 'unknown'} for ${newest.name} — hosted backup is NOT verified`);
   }
 }
 
-process.stdout.write(uploadR2
-  ? 'run-scheduled: OK — backup taken, newest artifact verified, DR objectives checked, R2 upload remotely verified.\n'
+process.stdout.write(uploadB2
+  ? 'run-scheduled: OK — backup taken, newest artifact verified, DR objectives checked, B2 upload remotely verified.\n'
   : 'run-scheduled: OK — backup taken, newest artifact verified, DR objectives checked.\n');

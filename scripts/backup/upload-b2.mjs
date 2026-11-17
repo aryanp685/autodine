@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Upload one encrypted backup artifact (+ its manifest) to Cloudflare R2 and
+ * Upload one encrypted backup artifact (+ its manifest) to Backblaze B2 and
  * verify integrity end-to-end with SHA-256:
  *
  *   1. The artifact's SHA-256 must equal its backup manifest's `sha256`
@@ -8,11 +8,11 @@
  *   2. The PUT carries `x-amz-meta-sha256` and the payload hash.
  *   3. A signed HEAD afterwards must return the same SHA-256 metadata.
  *
- *   node scripts/backup/upload-r2.mjs --file /path/autodine-....sql.gz.enc [--manifest <path>] [--dry-run]
+ *   node scripts/backup/upload-b2.mjs --file /path/autodine-....sql.gz.enc [--manifest <path>] [--dry-run]
  *
  * Configuration (environment only; values are never printed):
- *   R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and an endpoint from
- *   R2_ENDPOINT or CLOUDFLARE_ACCOUNT_ID. See lib-r2.mjs.
+ *   B2_BUCKET, B2_ACCESS_KEY_ID, B2_SECRET_ACCESS_KEY, and an endpoint from
+ *   B2_ENDPOINT or B2_REGION. See lib-b2.mjs.
  *
  * Exit codes: 0 = uploaded+verified (or dry-run integrity OK); 1 = integrity
  * or transfer failure; 2 = usage / missing configuration (names only).
@@ -21,7 +21,7 @@
  */
 import { readFileSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { r2ConfigFromEnv, r2ObjectKey, signR2Request, sha256Hex } from './lib-r2.mjs';
+import { b2ConfigFromEnv, b2ObjectKey, signB2Request, sha256Hex } from './lib-b2.mjs';
 
 const args = process.argv.slice(2);
 const opt = {};
@@ -29,7 +29,7 @@ for (let i = 0; i < args.length; i += 2) {
   const key = args[i];
   if (key === '--dry-run') { opt.dryRun = true; i -= 1; continue; }
   if (!key?.startsWith('--') || args[i + 1] === undefined) {
-    process.stderr.write('usage: upload-r2.mjs --file <artifact.enc> [--manifest <manifest.json>] [--dry-run]\n');
+    process.stderr.write('usage: upload-b2.mjs --file <artifact.enc> [--manifest <manifest.json>] [--dry-run]\n');
     process.exit(2);
   }
   opt[key.slice(2)] = args[i + 1];
@@ -37,7 +37,7 @@ for (let i = 0; i < args.length; i += 2) {
 
 const file = opt.file;
 if (!file || !existsSync(file)) {
-  process.stderr.write('upload-r2: --file must name an existing backup artifact\n');
+  process.stderr.write('upload-b2: --file must name an existing backup artifact\n');
   process.exit(2);
 }
 
@@ -48,22 +48,22 @@ const actualSha = sha256Hex(bytes);
 let manifest = null;
 if (existsSync(manifestPath)) {
   try { manifest = JSON.parse(readFileSync(manifestPath, 'utf8')); } catch {
-    process.stderr.write(`upload-r2: manifest is not valid JSON: ${path.basename(manifestPath)}\n`);
+    process.stderr.write(`upload-b2: manifest is not valid JSON: ${path.basename(manifestPath)}\n`);
     process.exit(1);
   }
   if (manifest.sha256 && manifest.sha256 !== actualSha) {
-    process.stderr.write('upload-r2: INTEGRITY FAILURE — artifact SHA-256 does not match its backup manifest; refusing to upload\n');
+    process.stderr.write('upload-b2: INTEGRITY FAILURE — artifact SHA-256 does not match its backup manifest; refusing to upload\n');
     process.exit(1);
   }
   if (manifest.file && path.basename(manifest.file) !== path.basename(file)) {
-    process.stderr.write('upload-r2: INTEGRITY FAILURE — manifest names a different artifact; refusing to upload\n');
+    process.stderr.write('upload-b2: INTEGRITY FAILURE — manifest names a different artifact; refusing to upload\n');
     process.exit(1);
   }
 }
 
-const config = r2ConfigFromEnv(process.env);
-const key = r2ObjectKey(file);
-const manifestKey = r2ObjectKey(manifestPath);
+const config = b2ConfigFromEnv(process.env);
+const key = b2ObjectKey(file);
+const manifestKey = b2ObjectKey(manifestPath);
 
 if (opt.dryRun) {
   process.stdout.write(JSON.stringify({
@@ -72,27 +72,27 @@ if (opt.dryRun) {
     bytes: bytes.length,
     sha256: actualSha,
     manifestChecked: Boolean(manifest),
-    destination: config.ok ? { bucket: config.bucket, key, manifestKey } : 'R2 not configured',
+    destination: config.ok ? { bucket: config.bucket, key, manifestKey } : 'B2 not configured',
     missingConfig: config.ok ? [] : config.missing,
   }, null, 2) + '\n');
   process.exit(0);
 }
 
 if (!config.ok) {
-  process.stderr.write(`upload-r2: R2 is not configured; missing environment variables: ${config.missing.join(', ')}\n`);
-  process.stderr.write('upload-r2: provide them from your secret store (values are never printed). See docs/backup-restore-runbook.md.\n');
+  process.stderr.write(`upload-b2: B2 is not configured; missing environment variables: ${config.missing.join(', ')}\n`);
+  process.stderr.write('upload-b2: provide them from your secret store (values are never printed). See docs/backup-restore-runbook.md.\n');
   process.exit(2);
 }
 
 const access = {
-  accessKeyId: process.env.R2_ACCESS_KEY_ID,
-  secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  accessKeyId: process.env.B2_ACCESS_KEY_ID,
+  secretAccessKey: process.env.B2_SECRET_ACCESS_KEY,
 };
 
 async function signedFetch(method, objectKey, body, extraHeaders = {}) {
   const url = `${config.endpoint}/${config.bucket}/${objectKey.split('/').map(encodeURIComponent).join('/')}`;
   const payloadHash = sha256Hex(body ?? Buffer.alloc(0));
-  const headers = signR2Request({ method, url, payloadHash, ...access, extraHeaders });
+  const headers = signB2Request({ method, url, payloadHash, ...access, region: config.region, extraHeaders });
   return fetch(url, { method, headers, body, signal: AbortSignal.timeout(120000) });
 }
 
@@ -102,25 +102,25 @@ try {
     'x-amz-meta-sha256': actualSha,
   });
   if (!put.ok) {
-    process.stderr.write(`upload-r2: PUT failed with HTTP ${put.status}; artifact NOT uploaded\n`);
+    process.stderr.write(`upload-b2: PUT failed with HTTP ${put.status}; artifact NOT uploaded\n`);
     process.exit(1);
   }
   if (manifest) {
     const manifestBody = Buffer.from(JSON.stringify(manifest, null, 2) + '\n');
     const putManifest = await signedFetch('PUT', manifestKey, manifestBody, { 'content-type': 'application/json' });
     if (!putManifest.ok) {
-      process.stderr.write(`upload-r2: manifest PUT failed with HTTP ${putManifest.status}; artifact uploaded but manifest missing — treat destination as unverified\n`);
+      process.stderr.write(`upload-b2: manifest PUT failed with HTTP ${putManifest.status}; artifact uploaded but manifest missing — treat destination as unverified\n`);
       process.exit(1);
     }
   }
   const head = await signedFetch('HEAD', key);
   if (!head.ok) {
-    process.stderr.write(`upload-r2: HEAD verification failed with HTTP ${head.status}\n`);
+    process.stderr.write(`upload-b2: HEAD verification failed with HTTP ${head.status}\n`);
     process.exit(1);
   }
   const remoteSha = head.headers.get('x-amz-meta-sha256');
   if (remoteSha !== actualSha) {
-    process.stderr.write('upload-r2: INTEGRITY FAILURE — remote SHA-256 metadata does not match the local artifact\n');
+    process.stderr.write('upload-b2: INTEGRITY FAILURE — remote SHA-256 metadata does not match the local artifact\n');
     process.exit(1);
   }
   process.stdout.write(JSON.stringify({
@@ -133,6 +133,6 @@ try {
     sha256: actualSha,
   }, null, 2) + '\n');
 } catch (error) {
-  process.stderr.write(`upload-r2: transfer failed (${error?.name ?? 'Error'}); see network/endpoint configuration — no credentials were printed\n`);
+  process.stderr.write(`upload-b2: transfer failed (${error?.name ?? 'Error'}); see network/endpoint configuration — no credentials were printed\n`);
   process.exit(1);
 }

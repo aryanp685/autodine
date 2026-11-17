@@ -102,11 +102,11 @@ newest artifact) → DR objective check, and exits non-zero with one alert line
 17 3 * * *  cd /opt/autodine && AUTODINE_BACKUP_SOURCE_URL=... AUTODINE_BACKUP_PASSPHRASE=... node scripts/backup/run-scheduled.mjs --out-dir /mnt/backups/autodine --rpo-minutes 1440 >> /var/log/autodine-backup.log 2>&1
 ```
 
-**First hosted run (executes immediately once the R2 variables exist):**
-add `--r2` to the same command. The run then ends with the upload stage:
+**First hosted run (executes immediately once the B2 variables exist):**
+add `--b2` to the same command. The run then ends with the upload stage:
 artifact SHA-256 re-checked against its manifest, signed PUT of artifact +
 manifest to the bucket, signed HEAD verification of the remote SHA-256.
-Success prints `R2 upload remotely verified`; missing configuration fails
+Success prints `B2 upload remotely verified`; missing configuration fails
 the run at the `upload` stage with the missing variable NAMES (verified
 2026-11-16 against a disposable cluster — fail-closed, no silent local-only
 pass). Follow it with the hosted restore rehearsal above; only a passed
@@ -121,7 +121,7 @@ Two workflows make the hosted path independent of any one machine:
   closed naming any missing secret; runs `run-scheduled.mjs --r2` and
   archives the (non-sensitive) manifest as run evidence.
 - **`.github/workflows/hosted-restore-drill.yml`** — manual dispatch only;
-  downloads the newest R2 artifact (`download-r2.mjs`, SHA-256 vs manifest
+  downloads the newest B2 artifact (`download-b2.mjs`, SHA-256 vs manifest
   verified), restores into a disposable `postgres:17` service container,
   verifies with `verify-restored-db.mjs` (schema fingerprint, row counts,
   `payments`/`subscription_payments` sums vs manifest), records restore
@@ -131,15 +131,15 @@ Two workflows make the hosted path independent of any one machine:
   hosts before connecting.
 
 **Trigger the first runs:** configure the repository secrets below, then
-Actions → *Hosted backup (R2)* → Run workflow; on success Actions →
+Actions → *Hosted backup (B2)* → Run workflow; on success Actions →
 *Hosted restore rehearsal (disposable)* → Run workflow. Hosted success is
 claimed only when the backup run prints `uploaded:true, verified:true`
 and the drill job is green — neither has happened yet.
 
 Required repository secrets (Settings → Secrets and variables → Actions):
 `AUTODINE_BACKUP_SOURCE_URL`, `AUTODINE_BACKUP_PASSPHRASE`,
-`CLOUDFLARE_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`,
-`R2_SECRET_ACCESS_KEY` (backup workflow set); the drill needs the last
+`B2_REGION`, `B2_BUCKET`, `B2_ACCESS_KEY_ID`,
+`B2_SECRET_ACCESS_KEY` (backup workflow set); the drill needs the last
 five. `BACKUP_ALERT_WEBHOOK` is optional (failure alerting).
 
 (systemd: a `.timer` invoking the same command with a root-only
@@ -177,39 +177,44 @@ jobs:
         with: { name: autodine-backup, path: ${{ runner.temp }}/backups, retention-days: 35 }
 ```
 
-## Cloudflare R2 destination (CHOSEN 2026-11-16; implementation complete, credentials pending)
+## Backblaze B2 destination (APPROVED PROVIDER, confirmed 2026-11-16; implementation complete, credentials pending)
 
-R2 is the selected destination. The upload path is implemented in
-`scripts/backup/upload-r2.mjs` (+ `lib-r2.mjs`): SigV4-signed S3 PUT of the
+Backblaze B2 (S3-compatible API) is the approved destination; an earlier
+same-day switch to Cloudflare R2 was superseded by the owner's provider
+decision. The upload path is implemented in
+`scripts/backup/upload-b2.mjs` (+ `lib-b2.mjs`): SigV4-signed S3 PUT of the
 encrypted artifact and its manifest under `autodine-backups/`, with SHA-256
 verified three ways (local file vs backup manifest before upload;
 `x-amz-meta-sha256` on the PUT; signed HEAD comparison after). Configuration
-is environment-only — `CLOUDFLARE_ACCOUNT_ID` (or `R2_ENDPOINT`),
-`R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` — and no code path
+is environment-only — `B2_REGION` (e.g. `us-west-004`, endpoint derived as
+`https://s3.<region>.backblazeb2.com`, or explicit `B2_ENDPOINT`),
+`B2_BUCKET`, `B2_ACCESS_KEY_ID` (keyID), `B2_SECRET_ACCESS_KEY`
+(application key) — and no code path
 prints a value; missing configuration reports variable NAMES only
 (`upload-r2.mjs` exit 2, and the offline shape-check in
 `scripts/verify-external-services-config.mjs`).
 
 ```bash
 # after any backup run (e.g. in the scheduling wrapper, post run-scheduled):
-node scripts/backup/upload-r2.mjs --file /mnt/backups/autodine/autodine-*.sql.gz.enc
-node scripts/backup/upload-r2.mjs --file <artifact> --dry-run   # local integrity + config check, no network
+node scripts/backup/upload-b2.mjs --file /mnt/backups/autodine/autodine-*.sql.gz.enc
+node scripts/backup/upload-b2.mjs --file <artifact> --dry-run   # local integrity + config check, no network
 ```
 
-**Status (2026-11-16): NOT UPLOADED — no R2 credentials exist** in the repo,
+**Status (2026-11-16): NOT UPLOADED — no B2 credentials exist** in the repo,
 the operator environment, or any connected tool (checked by variable name /
-presence only). The exact remaining human action: create one private R2
-bucket and an R2 API token with Object Read & Write on that bucket, then
-place the four variables above in the backup host's secret store. Cost at
-AutoDine's scale (< 5 GB stored): ≈ $0.01–0.08/month; no subscription is
-required beyond the free R2 tier allocation. **Local drill evidence
+presence only). The exact remaining human action: create one private B2
+bucket and a bucket-scoped B2 application key (read/write), then place
+the four variables above in the backup host's secret store (or as the
+GitHub Actions secrets listed below). Cost at AutoDine's scale
+(< 5 GB stored): ≈ $0.01–0.04/month at $6.95/TB/month; the first 10 GB
+are free. **Local drill evidence
 (2026-11-16, disposable embedded PostgreSQL, never hosted):** full-chain
 logical restore verified (93 migrations; 48 tables / 59 policies / 162
 functions; schema fingerprint identical); backup selftest ALL CHECKS PASS
 (destroy→restore row fingerprint exact; tamper + wrong-passphrase rejected);
 a real artifact + manifest produced from a disposable cluster passed
-`upload-r2 --dry-run` SHA-256/manifest verification and correctly reported
-the four missing config names; disposable cluster and artifacts destroyed
+`upload-b2 --dry-run` SHA-256/manifest verification and correctly reported
+the four missing config names (B2_ENDPOINT|B2_REGION forms included); disposable cluster and artifacts destroyed
 afterwards. Hosted upload + hosted restore drill remain UNVERIFIED until
 credentials exist.
 

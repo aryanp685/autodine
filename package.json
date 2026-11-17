@@ -37,7 +37,7 @@
     "test:db:integration": "node scripts/local-pg/run-integration-tests.mjs",
     "backup:verify-file": "node scripts/backup/verify-backup-file.mjs",
     "dr:objectives": "node scripts/backup/check-dr-objectives.mjs",
-    "test:dr": "node --test scripts/backup/verify-backup-file.test.mjs scripts/backup/check-dr-objectives.test.mjs scripts/backup/run-scheduled.test.mjs scripts/backup/r2-upload.test.mjs",
+    "test:dr": "node --test scripts/backup/verify-backup-file.test.mjs scripts/backup/check-dr-objectives.test.mjs scripts/backup/run-scheduled.test.mjs scripts/backup/b2-upload.test.mjs",
     "backup:run": "node scripts/backup/run-scheduled.mjs",
     "d2:verify": "node scripts/d2/verify-acl-posture.mjs",
     "test:d2": "node --test scripts/d2/verify-acl-posture.test.mjs",

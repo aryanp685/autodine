@@ -4,7 +4,7 @@ name: Hosted restore rehearsal (disposable)
 #
 #   Actions -> "Hosted restore rehearsal (disposable)" -> Run workflow.
 #
-# The backup is downloaded from R2 (SHA-256 verified against its manifest),
+# The backup is downloaded from B2 (SHA-256 verified against its manifest),
 # restored into a DISPOSABLE PostgreSQL 17 service container on this runner,
 # and verified (schema fingerprint, row counts, financial spot checks).
 # The container and the downloaded artifact are destroyed when the job ends
@@ -14,7 +14,7 @@ name: Hosted restore rehearsal (disposable)
 # non-loopback target before connecting.
 #
 # Required repository secrets: AUTODINE_BACKUP_PASSPHRASE,
-# CLOUDFLARE_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY.
+# B2_REGION, B2_BUCKET, B2_ACCESS_KEY_ID, B2_SECRET_ACCESS_KEY.
 # No production connection string is used by this workflow at all.
 
 on:
@@ -47,10 +47,10 @@ jobs:
           --health-retries 12
     env:
       AUTODINE_BACKUP_PASSPHRASE: ${{ secrets.AUTODINE_BACKUP_PASSPHRASE }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      R2_BUCKET: ${{ secrets.R2_BUCKET }}
-      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      B2_REGION: ${{ secrets.B2_REGION }}
+      B2_BUCKET: ${{ secrets.B2_BUCKET }}
+      B2_ACCESS_KEY_ID: ${{ secrets.B2_ACCESS_KEY_ID }}
+      B2_SECRET_ACCESS_KEY: ${{ secrets.B2_SECRET_ACCESS_KEY }}
       DRILL_DIR: ${{ runner.temp }}/restore-drill
     steps:
       - uses: actions/checkout@v7
@@ -66,7 +66,7 @@ jobs:
       - name: Fail closed when a required secret is missing (names only)
         run: |
           missing=""
-          for name in AUTODINE_BACKUP_PASSPHRASE CLOUDFLARE_ACCOUNT_ID R2_BUCKET R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY; do
+          for name in AUTODINE_BACKUP_PASSPHRASE B2_REGION B2_BUCKET B2_ACCESS_KEY_ID B2_SECRET_ACCESS_KEY; do
             if [ -z "${!name}" ]; then missing="$missing $name"; fi
           done
           if [ -n "$missing" ]; then
@@ -79,7 +79,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p "$DRILL_DIR"
-          node scripts/backup/download-r2.mjs --out-dir "$DRILL_DIR" | tee "$DRILL_DIR/download-report.json"
+          node scripts/backup/download-b2.mjs --out-dir "$DRILL_DIR" | tee "$DRILL_DIR/download-report.json"
 
       - name: Restore into the disposable container (loopback only, timed)
         env:
