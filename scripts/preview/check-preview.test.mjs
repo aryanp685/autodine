@@ -9,7 +9,7 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { exitCodeFor, redactUrl, runChecks } from './check-preview.mjs';
+import { exitCodeFor, redactUrl, runChecks, validatePreviewUrl } from './check-preview.mjs';
 
 const SECRET = 'test-bypass-value-not-a-real-secret';
 
@@ -71,6 +71,48 @@ describe('redactUrl', () => {
       redactUrl('https://preview.example/login?x-vercel-protection-bypass=abc#frag'),
       'https://preview.example/login',
     );
+  });
+});
+
+describe('validatePreviewUrl (R2: only permitted branch aliases)', () => {
+  const ALIAS =
+    'https://new-git-arena-2670dd12-autodine-iamjarvis9896-3988s-projects.vercel.app';
+
+  it('accepts an explicit branch-alias host and normalizes to origin', () => {
+    assert.deepEqual(validatePreviewUrl(ALIAS), { ok: true, origin: ALIAS });
+    assert.equal(validatePreviewUrl(`${ALIAS}/login`).ok, true);
+  });
+
+  it('rejects the Production branch alias', () => {
+    assert.deepEqual(
+      validatePreviewUrl('https://new-git-main-iamjarvis9896-3988s-projects.vercel.app'),
+      { ok: false, reason: 'production_alias' },
+    );
+  });
+
+  it('rejects unique per-deployment URLs, custom domains and arbitrary hosts', () => {
+    for (const bad of [
+      'https://new-oh80ddkqy-iamjarvis9896-3988s-projects.vercel.app',
+      'https://autodine.example.com',
+      'https://evil.example',
+      'https://new-git-arena-2670dd12-autodine-iamjarvis9896-3988s-projects.vercel.app.evil.example',
+    ]) {
+      assert.equal(validatePreviewUrl(bad).ok, false, bad);
+      assert.equal(validatePreviewUrl(bad).reason, 'host_not_permitted', bad);
+    }
+  });
+
+  it('rejects malformed, non-https, credentialed and query/fragment URLs', () => {
+    assert.equal(validatePreviewUrl('').reason, 'missing');
+    assert.equal(validatePreviewUrl('not a url').reason, 'malformed');
+    assert.equal(validatePreviewUrl(ALIAS.replace('https:', 'http:')).reason, 'not_https');
+    assert.equal(
+      validatePreviewUrl(ALIAS.replace('https://', 'https://user:pass@')).reason,
+      'credentials_in_url',
+    );
+    assert.equal(validatePreviewUrl(`${ALIAS}?x-vercel-protection-bypass=x`).reason, 'query_or_fragment');
+    assert.equal(validatePreviewUrl(`${ALIAS}#frag`).reason, 'query_or_fragment');
+    assert.equal(validatePreviewUrl(`${ALIAS}:8443`).reason, 'explicit_port');
   });
 });
 

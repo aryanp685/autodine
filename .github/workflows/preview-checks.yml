@@ -68,11 +68,8 @@ jobs:
       - name: Browser auth-flow checks (signup, login, reset, invitation)
         run: npx playwright test --config playwright.preview.config.ts
 
-      - name: Upload browser evidence on failure
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: preview-check-evidence
-          path: test-results/
-          if-no-files-found: ignore
-          retention-days: 14
+      # R1: no artifact upload, deliberately. The Playwright config has
+      # traces, screenshots and video switched off because browser state
+      # from a suite that types credentials must never become a
+      # downloadable artifact. The list-reporter step output above is
+      # the failure evidence; it contains no secrets or personal data.

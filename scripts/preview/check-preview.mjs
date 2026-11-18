@@ -50,6 +50,41 @@
 
 const TIMEOUT_MS = 15_000;
 
+/**
+ * Strict Preview URL allowlist (R2). Only this project's branch-alias
+ * hosts may ever be tested:
+ *
+ *   new-git-<branch>-iamjarvis9896-3988s-projects.vercel.app
+ *
+ * Everything else is refused before any request is made: Production
+ * aliases (`new-git-main-…`), unique per-deployment URLs (`new-…`),
+ * custom domains, arbitrary hosts, non-https URLs, URLs carrying
+ * credentials/query/fragment (a query could smuggle a bypass secret),
+ * and malformed input. Keep this pattern in sync with
+ * playwright.preview.config.ts — a test in check-preview.test.mjs's
+ * sibling suite asserts the two copies match.
+ */
+export const PREVIEW_HOST_PATTERN =
+  /^new-git-([a-z0-9-]+)-iamjarvis9896-3988s-projects\.vercel\.app$/;
+
+export function validatePreviewUrl(raw) {
+  if (typeof raw !== 'string' || !raw.trim()) return { ok: false, reason: 'missing' };
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    return { ok: false, reason: 'malformed' };
+  }
+  if (url.protocol !== 'https:') return { ok: false, reason: 'not_https' };
+  if (url.username || url.password) return { ok: false, reason: 'credentials_in_url' };
+  if (url.search || url.hash) return { ok: false, reason: 'query_or_fragment' };
+  if (url.port) return { ok: false, reason: 'explicit_port' };
+  const match = PREVIEW_HOST_PATTERN.exec(url.hostname);
+  if (!match) return { ok: false, reason: 'host_not_permitted' };
+  if (match[1] === 'main') return { ok: false, reason: 'production_alias' };
+  return { ok: true, origin: url.origin };
+}
+
 /** Strip query + hash so a credential can never ride into the logs. */
 export function redactUrl(raw) {
   try {
@@ -234,12 +269,14 @@ export function exitCodeFor(results, { postureOnly = false } = {}) {
 
 async function main(argv) {
   const postureOnly = argv.includes('--posture');
-  const baseUrl = process.env.PREVIEW_URL ?? '';
-  if (!/^https:\/\//.test(baseUrl)) {
-    console.log(JSON.stringify({ check: 'config', result: 'blocked', detail: 'PREVIEW_URL must be an https URL' }));
-    console.warn(`[autodine:alert] ${JSON.stringify({ event: 'incident_opened', kind: 'preview_check_blocked', severity: 'warning', summary: 'Preview checks blocked: PREVIEW_URL missing or not https' })}`);
+  const validation = validatePreviewUrl(process.env.PREVIEW_URL ?? '');
+  if (!validation.ok) {
+    // Fixed reason vocabulary only — the rejected value is never echoed.
+    console.log(JSON.stringify({ check: 'config', result: 'blocked', detail: `PREVIEW_URL rejected: ${validation.reason}` }));
+    console.warn(`[autodine:alert] ${JSON.stringify({ event: 'incident_opened', kind: 'preview_check_blocked', severity: 'warning', summary: `Preview checks blocked: PREVIEW_URL rejected (${validation.reason})` })}`);
     return 2;
   }
+  const baseUrl = validation.origin;
   const results = await runChecks({
     baseUrl,
     secret: process.env.VERCEL_AUTOMATION_BYPASS_SECRET ?? '',

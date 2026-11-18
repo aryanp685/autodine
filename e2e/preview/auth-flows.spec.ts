@@ -40,7 +40,14 @@ test.describe('hosted preview auth flows', () => {
   });
 
   test('edge refuses anonymous traffic without bypass headers', async ({ playwright }) => {
-    const anon = await playwright.request.newContext({ extraHTTPHeaders: {} });
+    // R3: a manually created request context does not inherit the
+    // config's baseURL or headers — pass PREVIEW_URL explicitly (the
+    // config has already allowlist-validated it) and an explicitly
+    // empty header set, so this probe is anonymous by construction.
+    const anon = await playwright.request.newContext({
+      baseURL: process.env.PREVIEW_URL,
+      extraHTTPHeaders: {},
+    });
     try {
       const response = await anon.get('/login', { maxRedirects: 0 }).catch(() => null);
       expect(response, 'anonymous request should be answered by the edge').not.toBeNull();
