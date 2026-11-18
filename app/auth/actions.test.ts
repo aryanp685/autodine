@@ -44,6 +44,15 @@ import {
 } from './actions';
 import { PENDING_SIGNUP_EMAIL_COOKIE } from '@/lib/signup-confirmation';
 import { RECOVERY_COOKIE } from '@/lib/password';
+import { operationalIncidents } from '@/lib/incident-registry';
+
+function incidentCount(kind: string): number {
+  return operationalIncidents.list().find((record) => record.kind === kind)?.count ?? 0;
+}
+
+function incidentSummary(kind: string): string {
+  return operationalIncidents.list().find((record) => record.kind === kind)?.summary ?? '';
+}
 
 const cookieStore = {
   get: vi.fn(),
@@ -428,5 +437,147 @@ describe('password reset completion', () => {
     const destination = mocks.redirect.mock.calls[0][0] as string;
     expect(destination).toContain('/login?notice=');
     expect(decodeURIComponent(destination)).toContain('Your password was changed');
+  });
+});
+
+describe('operator visibility for silent Auth failures', () => {
+  const idle = { status: 'idle' } as const;
+
+  function silenceLogs() {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    return { warn, error, restore: () => { warn.mockRestore(); error.mockRestore(); } };
+  }
+
+  it('reports a signup mail/provider rejection as an incident while the visitor sees the same pending page', async () => {
+    const logs = silenceLogs();
+    const before = incidentCount('signup_confirmation_email_failed');
+    mocks.getSupabaseAdmin.mockReturnValue(signupAdmin());
+    mocks.signUp.mockResolvedValueOnce({
+      data: { user: null, session: null },
+      error: { status: 500, code: 'smtp_unavailable', message: 'private provider detail for owner@example.test' },
+    });
+
+    await expect(signUpAction(signupForm())).rejects.toThrow(/^REDIRECT:/);
+
+    expect(mocks.redirect).toHaveBeenCalledWith('/signup/confirmation-pending');
+    expect(incidentCount('signup_confirmation_email_failed')).toBe(before + 1);
+    expect(incidentSummary('signup_confirmation_email_failed')).not.toContain('private provider detail');
+    expect(incidentSummary('signup_confirmation_email_failed')).not.toContain('owner@example.test');
+    expect(JSON.stringify(logs.warn.mock.calls)).not.toContain('private provider detail');
+    expect(JSON.stringify(logs.warn.mock.calls)).not.toContain('owner@example.test');
+    logs.restore();
+  });
+
+  it('does not report the enumeration-protected existing-email response or a 429 as a mail failure', async () => {
+    const logs = silenceLogs();
+    const before = incidentCount('signup_confirmation_email_failed');
+    mocks.getSupabaseAdmin.mockReturnValue(signupAdmin());
+    mocks.signUp.mockResolvedValueOnce({
+      data: { user: { id: 'existing-user', identities: [] }, session: null },
+      error: null,
+    });
+    await expect(signUpAction(signupForm())).rejects.toThrow(/^REDIRECT:/);
+
+    mocks.getSupabaseAdmin.mockReturnValue(signupAdmin());
+    mocks.signUp.mockResolvedValueOnce({
+      data: { user: null, session: null },
+      error: { status: 429, code: 'over_email_send_rate_limit', message: 'private throttling detail' },
+    });
+    await expect(signUpAction(signupForm())).rejects.toThrow(/^REDIRECT:/);
+
+    expect(incidentCount('signup_confirmation_email_failed')).toBe(before);
+    logs.restore();
+  });
+
+  it('reports send-again provider and transport failures, but not success or throttling', async () => {
+    const logs = silenceLogs();
+    const before = incidentCount('signup_confirmation_resend_failed');
+
+    await expect(resendSignupConfirmationAction(idle, form())).resolves.toEqual({ status: 'requested' });
+    expect(incidentCount('signup_confirmation_resend_failed')).toBe(before);
+
+    mocks.resend.mockResolvedValueOnce({
+      error: { status: 429, code: 'over_email_send_rate_limit', message: 'private throttling detail' },
+    });
+    await expect(resendSignupConfirmationAction(idle, form())).resolves.toEqual({ status: 'requested' });
+    expect(incidentCount('signup_confirmation_resend_failed')).toBe(before);
+
+    mocks.resend.mockResolvedValueOnce({
+      error: { status: 500, code: 'smtp_unavailable', message: 'private provider response' },
+    });
+    await expect(resendSignupConfirmationAction(idle, form())).resolves.toEqual({ status: 'requested' });
+    expect(incidentCount('signup_confirmation_resend_failed')).toBe(before + 1);
+
+    mocks.resend.mockRejectedValueOnce(new Error('private transport response'));
+    await expect(resendSignupConfirmationAction(idle, form())).resolves.toEqual({ status: 'requested' });
+    expect(incidentCount('signup_confirmation_resend_failed')).toBe(before + 2);
+    expect(incidentSummary('signup_confirmation_resend_failed')).not.toContain('private');
+    logs.restore();
+  });
+
+  it('reports a password-reset provider failure, but not throttling', async () => {
+    const logs = silenceLogs();
+    const before = incidentCount('password_reset_email_failed');
+
+    mocks.resetPasswordForEmail.mockResolvedValueOnce({
+      error: { status: 429, message: 'rate limit exceeded' },
+    });
+    await expect(requestPasswordResetAction(form())).rejects.toThrow(/^REDIRECT:/);
+    expect(incidentCount('password_reset_email_failed')).toBe(before);
+
+    mocks.resetPasswordForEmail.mockResolvedValueOnce({
+      error: { status: 500, code: 'smtp_unavailable', message: 'private provider response' },
+    });
+    await expect(requestPasswordResetAction(form())).rejects.toThrow(/^REDIRECT:/);
+    expect(incidentCount('password_reset_email_failed')).toBe(before + 1);
+    expect(incidentSummary('password_reset_email_failed')).not.toContain('private');
+    logs.restore();
+  });
+
+  it('reports a password-update failure after a valid recovery session', async () => {
+    const logs = silenceLogs();
+    const before = incidentCount('password_update_failed');
+    cookieStore.get.mockImplementation((name: string) =>
+      name === RECOVERY_COOKIE ? { value: '1' } : undefined,
+    );
+    mocks.updateUser.mockResolvedValueOnce({
+      error: { status: 500, code: 'unexpected_failure', message: 'private provider response' },
+    });
+
+    const value = new FormData();
+    value.set('password', 'New-Strong-Password9!');
+    value.set('confirmation', 'New-Strong-Password9!');
+    await expect(updatePasswordAction(value)).rejects.toThrow(/^REDIRECT:/);
+
+    expect(incidentCount('password_update_failed')).toBe(before + 1);
+    expect(incidentSummary('password_update_failed')).not.toContain('private');
+    logs.restore();
+  });
+
+  it('reports workspace creation failure (with successful rollback) as an incident', async () => {
+    const logs = silenceLogs();
+    const workspaceBefore = incidentCount('signup_workspace_creation_failed');
+    const rollbackBefore = incidentCount('signup_rollback_failed');
+    mocks.getSupabaseAdmin.mockReturnValue({
+      from: () => ({
+        select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null }) }) }),
+        upsert: async () => ({ error: { status: 500, code: 'db_failure', message: 'private db detail' } }),
+        delete: () => ({ eq: async () => ({ error: null }) }),
+      }),
+      rpc: mocks.createAccountWithRestaurant,
+      auth: { admin: { deleteUser: async () => ({ error: null }) } },
+    });
+    mocks.signUp.mockResolvedValueOnce({
+      data: { user: { id: 'new-owner', identities: [{ identity_id: 'identity-1' }] }, session: null },
+      error: null,
+    });
+
+    await expect(signUpAction(signupForm())).rejects.toThrow(/^REDIRECT:/);
+
+    expect(incidentCount('signup_workspace_creation_failed')).toBe(workspaceBefore + 1);
+    expect(incidentCount('signup_rollback_failed')).toBe(rollbackBefore);
+    expect(incidentSummary('signup_workspace_creation_failed')).not.toContain('private');
+    logs.restore();
   });
 });
