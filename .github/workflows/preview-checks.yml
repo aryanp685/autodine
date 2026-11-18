@@ -1,0 +1,78 @@
+# Permanent Preview verification for protected Vercel deployments.
+#
+# WHY THIS SHAPE
+#
+# Deployment Protection (Vercel Authentication) stays ON — this workflow
+# never asks for it to be weakened. Automation passes the edge with the
+# project's Protection Bypass for Automation secret, sent as a header by
+# the checker and the Playwright config (Vercel's documented pattern).
+# That consumes no collaborator seats, which matters on Hobby: only one
+# external user per account could ever be granted access, so approving
+# access requests for tooling was never a sustainable path.
+#
+# Manual dispatch only, like staging-e2e: hosted writes (a throwaway
+# signup, an invitation) happen only when a human runs this on purpose.
+# Restoring any automatic trigger requires the owner's explicit approval.
+name: Preview checks (protected deployment, bypass header)
+
+on:
+  workflow_dispatch:
+    inputs:
+      preview_url:
+        description: Branch-alias URL of the Preview deployment to check
+        required: true
+        default: https://new-git-arena-2670dd12-autodine-iamjarvis9896-3988s-projects.vercel.app
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-checks
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PREVIEW_URL: ${{ inputs.preview_url }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      PREVIEW_TEST_EMAIL: ${{ secrets.PREVIEW_TEST_EMAIL }}
+      PREVIEW_TEST_PASSWORD: ${{ secrets.PREVIEW_TEST_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Require the bypass secret before touching the deployment
+        shell: bash
+        run: |
+          if [[ -z "$VERCEL_AUTOMATION_BYPASS_SECRET" ]]; then
+            echo '::error::Preview checks blocked: configure VERCEL_AUTOMATION_BYPASS_SECRET as a repository Actions secret (Vercel project Settings -> Deployment Protection -> Protection Bypass for Automation). Do not put it in workflow inputs or code.'
+            exit 1
+          fi
+
+      # Zero-install gate first: posture + app checks over HTTP. If the
+      # edge is somehow open, or the app auth wall is down, this fails
+      # before any browser is downloaded.
+      - name: HTTP deployment checks (posture + app surfaces)
+        run: node scripts/preview/check-preview.mjs
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx playwright install --with-deps chromium
+
+      - name: Browser auth-flow checks (signup, login, reset, invitation)
+        run: npx playwright test --config playwright.preview.config.ts
+
+      - name: Upload browser evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: preview-check-evidence
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 14
