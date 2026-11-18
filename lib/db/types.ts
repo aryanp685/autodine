@@ -1,3 +1,4 @@
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 /**
  * Row shapes for supabase/migrations/20261019000001_init.sql.
  *
@@ -104,6 +105,8 @@ export type Item = {
   spoken_name?: string | null;
   /** Saved translations. Optional: not selected everywhere an item is read. */
   translations?: TranslationMap;
+  /** Optional: only selected where the GST screens read it. */
+  is_alcoholic?: boolean;
 };
 
 export type ItemVariant = {
@@ -188,7 +191,14 @@ export type RestaurantInvoice = {
   invoice_number: string;
   financial_year: string;
   sequence_number: number;
-  document_type: 'receipt' | 'gst_tax_invoice';
+  /** Migration 20261113000100 adds 'bill_of_supply'. */
+  document_type: 'receipt' | 'gst_tax_invoice' | 'bill_of_supply';
+  /** e-Invoice state; 'not_required' in this build (no IRP provider). */
+  irp_status: 'not_required' | 'pending' | 'generated' | 'failed' | 'cancelled';
+  /** IRN assigned only after the IRP validates. NULL in this build. */
+  irn: string | null;
+  /** Immutable GST decomposition; NULL for non-GST receipts. */
+  gst_snapshot: unknown | null;
   status: 'issued' | 'voided';
   issued_at: string;
   issued_by: string | null;
@@ -205,6 +215,82 @@ export type RestaurantInvoice = {
   voided_by: string | null;
   void_reason: string | null;
   created_at: string;
+};
+
+/**
+ * Migration 20261114000500. Immutable credit/debit note against one GST
+ * document; written only by the definer RPCs. IDs are stable; amounts are
+ * integer paise copied from the parent's immutable snapshots.
+ */
+export type RestaurantNote = {
+  id: string;
+  restaurant_id: string;
+  invoice_id: string;
+  document_type: 'credit_note' | 'debit_note';
+  document_number: string;
+  financial_year: string;
+  sequence_number: number;
+  status: 'issued' | 'voided';
+  reason_code: 'returned_supply' | 'quantity_difference' | 'rate_difference' | 'post_supply_change' | 'other';
+  reason: string;
+  taxable_paise: number;
+  cgst_paise: number;
+  sgst_paise: number;
+  igst_paise: number;
+  total_paise: number;
+  gst_snapshot: unknown;
+  seller_snapshot: unknown;
+  customer_snapshot: unknown | null;
+  totals_snapshot: unknown;
+  payment_snapshot: unknown;
+  irp_status: 'not_required' | 'pending' | 'generated' | 'failed' | 'cancelled';
+  irn: string | null;
+  source_document_number: string;
+  source_issued_at: string;
+  issued_at: string;
+  issued_by: string | null;
+  voided_at: string | null;
+  voided_by: string | null;
+  void_reason: string | null;
+  created_at: string;
+};
+
+/** Append-only audit ledger for note issuance and voids. */
+export type RestaurantNoteEvent = {
+  id: string;
+  note_id: string;
+  restaurant_id: string;
+  event: 'issued' | 'voided';
+  reason: string;
+  actor: string | null;
+  created_at: string;
+};
+
+/**
+ * Migration 20261113000100. One live row per restaurant; mode 'off' is the
+ * default and means the historical non-GST receipt behaviour.
+ */
+export type RestaurantGstConfig = {
+  restaurant_id: string;
+  mode: 'off' | 'regular' | 'composition';
+  regular_profile: 'other_than_specified_premises' | 'specified_premises' | null;
+  gstin: string | null;
+  legal_name: string | null;
+  trade_name: string | null;
+  address: string | null;
+  state_code: string | null;
+  pan: string | null;
+  registration_type: 'regular' | 'composition';
+  composition_acknowledged: boolean;
+  specified_premises_attested: boolean;
+  specified_premises_effective_from: string;
+  off_declared: boolean;
+  off_declared_at: string | null;
+  preceding_fy_turnover_paise: number | null;
+  config_version: number;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
 };
 
 export type RestaurantInvoiceLine = {

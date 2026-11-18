@@ -1,3 +1,18 @@
+-- ============================================================================
+-- DO NOT REPLAY — OBSOLETE STAGING BUNDLE (2026-11-14)
+-- ----------------------------------------------------------------------------
+-- This bundle carries the PRE-FIX public.report_sales() body and was applied
+-- once to the empty staging baseline (autodinetest / juwyhslzchjevqkdvwjm) on
+-- 2026-11-13. Re-running it would (a) refuse on a populated tenant (it fails
+-- closed), (b) overwrite the remediated report_sales(…) body with the
+-- vulnerable one if force-applied out of order, and (c) double-record the
+-- manifest. The report_sales remediation and all later migrations ship
+-- forward-only. For the staging rehearsal use exactly:
+--   supabase/migrations/20261112000300_report_sales_export_authorization.sql
+-- under docs/report-sales-staging-rehearsal-2026-11-14.md (S0 authorization
+-- required). NEVER against production bdbaqpevwmgdvghszjno.
+-- ============================================================================
+
 -- STAGING ONLY: observed empty autodinetest, never production.
 -- All changes are one transaction supplied by the migration connector.
 select pg_advisory_xact_lock(3711,55001);

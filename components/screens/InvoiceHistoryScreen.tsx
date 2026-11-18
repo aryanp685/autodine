@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { OwnerPage, PageHead } from '@/components/owner/chrome';
 import type { InvoiceHistoryRow } from '@/lib/db/invoice-history';
 import { formatBillMoney } from '@/lib/bill';
@@ -11,7 +12,7 @@ function when(value: string) {
     : new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
-export function InvoiceHistoryScreen({ rows, outlet }: { rows: InvoiceHistoryRow[]; outlet: OutletBar | null }) {
+export function InvoiceHistoryScreen({ rows, outlet, einvoiceFollowUps }: { rows: InvoiceHistoryRow[]; outlet: OutletBar | null; einvoiceFollowUps?: ReactNode }) {
   return (
     <OwnerPage active="invoices" outlet={outlet} signOut wide>
       <PageHead
@@ -19,6 +20,8 @@ export function InvoiceHistoryScreen({ rows, outlet }: { rows: InvoiceHistoryRow
         title="Invoice history"
         meta="The latest 100 closed sessions for this restaurant. Receipt snapshots are immutable; a missing receipt means issuance did not complete."
       />
+
+      {einvoiceFollowUps}
       {!rows.length ? (
         <section className="rounded-[14px] border border-hair bg-card p-6" aria-label="No closed sessions">
           <h2 className="text-[15px] font-semibold">No closed table sessions yet</h2>

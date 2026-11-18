@@ -20,7 +20,7 @@ assigned, built from branch HEAD `425279e`.
 > shows a Vercel login page rather than the app. This share link bypasses it
 > without changing any project setting:
 >
-> **`https://new-git-arena-a5344572-autodine-iamjarvis9896-3988s-projects.vercel.app?_vercel_share=RbkpxAfZ3c77C7RqytXVzZczITNwO1is`**
+> **`https://new-git-arena-a5344572-autodine-iamjarvis9896-3988s-projects.vercel.app?_vercel_share=[REDACTED — regenerate the share link]`**
 >
 > If that ever stops working, regenerate it from the Vercel dashboard
 > (`iamjarvis9896-3988s-projects` → project **new** → the deployment →
@@ -30,7 +30,10 @@ assigned, built from branch HEAD `425279e`.
 
 ### Sign in as any of four staff roles
 
-All four share the password `Review2026!`.
+All four share a review password that is no longer stored in this repository.
+The accounts are synthetic staging-only identities; rotate their passwords in
+the staging project (`juwyhslzchjevqkdvwjm`) rather than reusing the
+historical value, which remains visible in Git history.
 
 | Role | Email | Can do |
 |---|---|---|

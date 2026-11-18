@@ -3,7 +3,7 @@ if(!process.env.E2E_BASE_URL||!process.env.E2E_OWNER_EMAIL||!process.env.E2E_OWN
 if(!process.env.E2E_OTHER_ORDER_ID||!process.env.E2E_REVOKED_QR_TOKEN||!process.env.E2E_EXPIRED_SESSION_TOKEN)throw new Error('Adversarial staging fixtures required; refusing skipped coverage.');
 export default defineConfig({
  testDir:'./e2e/integration',
- testMatch:/(guest-order-flow|kitchen-flow|cashier-flow|security-flow)\.spec\.ts/,
+ testMatch:/(guest-order-flow|kitchen-flow|cashier-flow|security-flow|invites)\.spec\.ts/,
  globalSetup:'./scripts/staging/browser-access.ts',
  workers:1,fullyParallel:false,retries:0,timeout:60_000,maxFailures:3,globalTimeout:600_000,
  reporter:[['list'],['json',{outputFile:'.staging-private/results.json'}]],

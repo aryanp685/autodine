@@ -210,6 +210,17 @@ async function fixture(): Promise<Fixture> {
     [restaurant, to],
   );
 
+  // One synthetic line so the p_include_lines boundary can be observed.
+  const anyOrder = await db.query(
+    'select id from public.orders where restaurant_id = $1 order by placed_at limit 1',
+    [restaurant],
+  );
+  await db.query(
+    `insert into public.order_items (order_id, name_snapshot, unit_price_paise, qty)
+     values ($1, 'Synthetic masala dosa', 100, 2)`,
+    [anyOrder.rows[0].id],
+  );
+
   return {
     restaurant,
     foreignRestaurant,
@@ -244,6 +255,27 @@ function reportCall(restaurantId: string, from: string, to: string, orderLimit: 
   );
 }
 
+function reportCallOptions(
+  restaurantId: string,
+  from: string,
+  to: string,
+  options: { bucket?: string; timezone?: string; orderLimit?: number | null; includeLines?: boolean } = {},
+) {
+  return db.query(
+    `select public.report_sales($1::uuid,$2::timestamptz,$3::timestamptz,
+                                $4::text,$5::text,$6::integer,$7::boolean) as report`,
+    [
+      restaurantId,
+      from,
+      to,
+      options.timezone ?? 'UTC',
+      options.bucket ?? 'day',
+      options.orderLimit ?? null,
+      options.includeLines ?? false,
+    ],
+  );
+}
+
 function reportValue(result: { rows: Array<{ report: ReportResult }> }): ReportResult {
   return result.rows[0].report;
 }
@@ -269,12 +301,19 @@ describe.skipIf(!URL_VALUE)('report_sales role and export-limit boundary (dispos
     exportTestRuntime.db = null;
   });
 
-  it('retains the existing authenticated-only RPC grant and SECURITY DEFINER boundary', async () => {
+  // service_role EXECUTE is present on staging (it survived via Supabase's
+  // default function EXECUTE grant; the initial migration revoked only
+  // public/anon). The 2026-11-15 joint review kept it deliberately, and the
+  // rehearsal recorded it as flagged for the production-gate discussion —
+  // do NOT widen it here, and do not silently strip it either.
+  it('retains the authenticated + service_role RPC grant and SECURITY DEFINER boundary', async () => {
     const { rows } = await db.query(`
       select p.prosecdef as security_definer,
              p.provolatile as volatility,
              has_function_privilege('authenticated', p.oid, 'EXECUTE') as authenticated_execute,
              has_function_privilege('anon', p.oid, 'EXECUTE') as anon_execute,
+             has_function_privilege('public', p.oid, 'EXECUTE') as public_execute,
+             has_function_privilege('service_role', p.oid, 'EXECUTE') as service_role_execute,
              p.proconfig as configuration
         from pg_proc p
         join pg_namespace n on n.oid = p.pronamespace
@@ -286,6 +325,8 @@ describe.skipIf(!URL_VALUE)('report_sales role and export-limit boundary (dispos
     expect(rows[0].volatility).toBe('s');
     expect(rows[0].authenticated_execute).toBe(true);
     expect(rows[0].anon_execute).toBe(false);
+    expect(rows[0].public_execute).toBe(false);
+    expect(rows[0].service_role_execute).toBe(true);
     expect(rows[0].configuration).toContain('search_path=public');
   });
 
@@ -368,6 +409,68 @@ describe.skipIf(!URL_VALUE)('report_sales role and export-limit boundary (dispos
     await expect(
       asStaff(f.owner, () => reportCall(f.restaurant, f.from, beyondRange, 1)),
     ).rejects.toMatchObject({ code: '22023' });
+  });
+
+  it('accepts a range of exactly 400 days', async () => {
+    const exactly400 = new Date(Date.parse(f.from) + 400 * 24 * 60 * 60 * 1000).toISOString();
+    const result = await asStaff(f.owner, () => reportCall(f.restaurant, f.from, exactly400, 1));
+
+    expect(Number(reportValue(result).totals.bills)).toBeGreaterThanOrEqual(0);
+  });
+
+  it.each(['week', 'month', 'fortnight', ''])(
+    'rejects the unsupported bucket %j with 22023',
+    async (bucket) => {
+      await expect(
+        asStaff(f.owner, () => reportCallOptions(f.restaurant, f.from, f.to, { bucket })),
+      ).rejects.toMatchObject({ code: '22023' });
+    },
+  );
+
+  it('accepts the hour bucket and reports hourly buckets', async () => {
+    const result = await asStaff(f.owner, () =>
+      reportCallOptions(f.restaurant, f.from, f.to, { bucket: 'hour' }));
+    const report = reportValue(result) as unknown as { bucket: string; buckets: unknown[] };
+
+    expect(report.bucket).toBe('hour');
+    expect(Array.isArray(report.buckets)).toBe(true);
+  });
+
+  it('falls back to UTC instead of failing when the timezone is unknown', async () => {
+    const result = await asStaff(f.owner, () =>
+      reportCallOptions(f.restaurant, f.from, f.to, { timezone: 'Mars/Olympus_Mons' }));
+    const report = reportValue(result) as unknown as { timezone: string };
+
+    expect(report.timezone).toBe('UTC');
+  });
+
+  it('rejects a manager who is a member of a different outlet only', async () => {
+    await expect(
+      asStaff(f.manager, () => reportCall(f.foreignRestaurant, f.from, f.to, 1)),
+    ).rejects.toMatchObject({ code: '42501' });
+    await expect(
+      asStaff(f.manager, () => reportCall(f.restaurant, f.from, f.to, 1)),
+    ).resolves.toBeTruthy();
+  });
+
+  it('returns line details only when p_include_lines is set', async () => {
+    const withoutLines = await asStaff(f.owner, () =>
+      reportCallOptions(f.restaurant, f.from, f.to, { includeLines: false }));
+    const withLines = await asStaff(f.owner, () =>
+      reportCallOptions(f.restaurant, f.from, f.to, { includeLines: true }));
+
+    const withoutReport = reportValue(withoutLines) as unknown as { lines: unknown[] };
+    const withReport = reportValue(withLines) as unknown as {
+      lines: Array<{ name: string; qty: number; unit_price_paise: number }>;
+    };
+
+    expect(withoutReport.lines).toEqual([]);
+    expect(withReport.lines).toHaveLength(1);
+    expect(withReport.lines[0]).toMatchObject({
+      name: 'Synthetic masala dosa',
+      qty: 2,
+      unit_price_paise: 100,
+    });
   });
 
   describe('actual report-export Route Handler with synthetic memberships', () => {

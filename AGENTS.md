@@ -25,6 +25,16 @@ These rules apply to every coding agent, developer task, test, and deployment. R
 - GST calculations must follow a formally approved tax policy; do not infer policy from sample/demo values or existing implementation.
 - Until approval, GST-dependent functionality must remain safely gated and fail closed. Preserve existing safe behavior; do not make a tax calculation appear compliant by guessing.
 
+### GST two-mode billing — owner-approved scope (2026-11-14)
+
+The owner approved building the two-mode GST system on 2026-11-14 (decisions quoted from the approval):
+- **Normal receipts (GST off)** — unchanged historical behaviour; the default for every restaurant.
+- **Composition Scheme** — issues a Bill of Supply, never a tax invoice; collects no GST; claims no ITC. Activation requires the GSTIN registration type to be `composition` plus the owner's acknowledgment of the ineligibility list (alcoholic liquor, tobacco, inter-State, e-commerce operator). No CMP-02 evidence reference is required. Statutory notice printed on every Bill of Supply.
+- **Regular GST** — exactly two profiles: 5% (other than specified premises, no ITC; Notification No. 11/2017-CT(Rate), Sl. 7(i), as amended) and 18% (specified premises only, w.e.f. 2025-04-01; Notification No. 05/2025-CT(Rate)). The 18% profile requires the specified-premises attestation. Menu prices are **tax-inclusive**; tax is extracted at document level (one rounding), never per line, and never recalculated after issue. Place of supply for restaurant services is always the outlet's state (CGST+SGST).
+- **e-Invoice** — no IRP provider is configured or approved. Applicability is decided at issue time (preceding-FY AATO > ₹5 crore, Notification No. 10/2023-CT as amended; B2C never applicable) and applicable B2B documents are issued `irp_status='pending'` — never presented as final tax invoices until a validated IRN exists; unknown AATO fails closed. B2B recipient capture exists only on Regular GST tax invoices (name/GSTIN/state-code derived/optional address+email); Composition bills and normal receipts refuse buyer details. `lib/gst/irp/` holds the provider-agnostic adapter interface, the deterministic offline sandbox used by tests and rehearsals (not an IRP), structural signed-QR validation and the IRP state machine; the append-only `restaurant_irp_requests` table audits every attempt with hashes only.
+- Restaurant checkout behaviour, IGST for restaurant services, per-item rates, exemptions, discounts (still disabled) and any other rate are all **out of scope** and remain locked. Discounts stay disabled until written financial policy approval exists.
+- GST documents are immutable at the database level; only the audited void transition is permitted. `restaurant_invoices` triggers enforce this for every role.
+
 ## Approved product and money decisions
 
 - Money is integer paise (`BIGINT` in SQL); never use floating-point money. The database is the source of truth for order pricing; clients do not submit trusted totals.

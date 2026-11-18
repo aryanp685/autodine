@@ -114,7 +114,9 @@ test.describe('cashier — real database', () => {
     await till.goto(`${BASE}/cashier`);
     await till.getByRole('button', { name: new RegExp(`Select ${code} at`) }).click();
     await till.getByRole('group', { name: 'Payment method' }).getByRole('button', { name: 'UPI', exact: true }).click();
-    await expect(till.locator('[data-counter-cta]')).toHaveText('Record UPI ₹125');
+    // The fixture menu's single dish is ₹349 (zero tax) — the counter CTA
+    // must show the database-held outstanding for the order this spec placed.
+    await expect(till.locator('[data-counter-cta]')).toHaveText('Record UPI ₹349');
     await till.locator('[data-counter-cta]').click();
     await expect(till.getByText(new RegExp(`UPI.*recorded for ${code}`))).toBeVisible({ timeout: 20_000 });
 
@@ -144,6 +146,10 @@ test.describe('cashier — real database', () => {
 
   test('two ticket sitting settles, prints the exact total, closes and starts a fresh sitting', async ({ context }) => {
     test.skip(!GUEST_READY, skipUnless(false, 'guest env for the order half'));
+    // The session-continuity assertion reads order_sessions straight from the
+    // database, which only exists on the disposable local stack. Hosted
+    // staging runs the full browser path; the DB_URL proof stays local.
+    test.skip(!process.env.DB_URL, 'needs the disposable local database (DB_URL); the hosted staging run cannot assert database state directly');
     const cardToken = reservedScanToken(24);
     const guest = await scanCard(context, cardToken);
 

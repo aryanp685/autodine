@@ -4,6 +4,9 @@ import { getStaffContextDetailed, KITCHEN_ROLES } from '@/lib/db/staff';
 import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { parseRealtimeSignal, realtimeAlertRateKey } from '@/lib/realtime-alerts';
 import { sameOrigin } from '@/lib/outlets';
+import { formatIncidentLogLine } from '@/lib/monitoring-incidents';
+import { realtimeIncidents } from '@/lib/incident-registry';
+import { notifyIncident } from '@/lib/incident-notify';
 
 export const runtime = 'nodejs';
 
@@ -51,13 +54,29 @@ export async function POST(request: Request): Promise<Response> {
 
     // Intentionally omit tenant/user identifiers, URLs and free-form error
     // text. Alert rules can match the stable event and severity fields only.
-    const entry = JSON.stringify({
-      event: signal.kind === 'degraded' ? 'kitchen_realtime_degraded' : 'kitchen_realtime_recovered',
-      severity: signal.kind === 'degraded' ? 'alert' : 'info',
-      durationMs: signal.durationMs,
-    });
-    if (signal.kind === 'degraded') console.warn(`[autodine:realtime-alert] ${entry}`);
-    else console.info(`[autodine:realtime-alert] ${entry}`);
+    // The incident tracker deduplicates per server instance; the durable
+    // record is the structured log line itself. The dedup key stays in
+    // memory and is never logged.
+    const key = `kitchen-realtime:${staff.context.restaurantId}`;
+    if (signal.kind === 'degraded') {
+      const { record, outcome } = realtimeIncidents.report({
+        key,
+        kind: 'kitchen_realtime_degraded',
+        severity: 'warning',
+        summary: 'Kitchen realtime delivery degraded',
+      });
+      console.warn(formatIncidentLogLine(outcome, record));
+      // A brand-new failure is worth a push; repeats are deduplicated by the
+      // tracker and a resolved incident is not news. Best-effort: the outcome
+      // is logged inside notifyIncident either way.
+      if (outcome === 'opened' || outcome === 'reopened') {
+        await notifyIncident(outcome === 'opened' ? 'incident_opened' : 'incident_reopened', record);
+      }
+    } else {
+      const resolved = realtimeIncidents.resolveByKey(key, 'kitchen-realtime-channel');
+      if (resolved) console.info(formatIncidentLogLine('resolved', resolved));
+      else console.info(`[autodine:alert] ${JSON.stringify({ event: 'kitchen_realtime_recovered', kind: 'kitchen_realtime_recovered', severity: 'info', durationMs: signal.durationMs })}`);
+    }
 
     return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
   } catch {

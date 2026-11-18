@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { CASHIER_ROLES, getStaffContext } from '@/lib/db/staff';
+import { checkGstin } from '@/lib/gst/gstin';
 
 export type MarkSessionPaidResult =
   | { ok: true; paidAt: string }
@@ -43,10 +44,36 @@ export async function markSessionPaidAction(
   return { ok: true, paidAt: data };
 }
 
+/** Optional B2B buyer details for Regular-GST tax invoices. */
+export type CheckoutRecipient = {
+  name: string;
+  gstin: string;
+  address?: string;
+  email?: string;
+};
+
+const GSTIN_PATTERN = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/;
+
 /** Close a table and issue its immutable final receipt atomically. */
-export async function checkoutSessionAction(sessionId: string): Promise<CheckoutSessionResult> {
+export async function checkoutSessionAction(sessionId: string, recipient?: CheckoutRecipient): Promise<CheckoutSessionResult> {
   const id = String(sessionId ?? '').trim();
   if (!UUID.test(id)) return { ok: false, error: 'This table session is invalid. Refresh the dashboard.' };
+
+  let pRecipient: { name: string; gstin: string; address?: string; email?: string } | null = null;
+  if (recipient) {
+    const name = String(recipient.name ?? '').trim();
+    const gstin = String(recipient.gstin ?? '').trim().toUpperCase();
+    const address = String(recipient.address ?? '').trim();
+    const email = String(recipient.email ?? '').trim().toLowerCase();
+    // An incomplete buyer block is fail-closed: better to stop the cashier than issue a half-recorded B2B invoice.
+    if (name.length < 2) return { ok: false, error: 'Enter the buyer legal name, or clear the buyer details to issue a B2C invoice.' };
+    if (!GSTIN_PATTERN.test(gstin)) return { ok: false, error: 'The buyer GSTIN does not match the 15-character GSTIN layout.' };
+    const gstinCheck = checkGstin(gstin);
+    if (!gstinCheck.ok) return { ok: false, error: `The buyer GSTIN is not usable: ${gstinCheck.reason}` };
+    if (address && address.length < 5) return { ok: false, error: 'The buyer address must be at least 5 characters, or left blank.' };
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return { ok: false, error: 'The buyer email address does not look usable.' };
+    pRecipient = { name, gstin, ...(address ? { address } : {}), ...(email ? { email } : {}) };
+  }
 
   const staff = await getStaffContext();
   if (!staff) return { ok: false, error: 'Sign in to check out this table.' };
@@ -56,6 +83,7 @@ export async function checkoutSessionAction(sessionId: string): Promise<Checkout
 
   const { data, error } = await staff.supabase.rpc('close_order_session_and_issue_receipt', {
     p_order_session_id: id,
+    ...(pRecipient ? { p_recipient: pRecipient } : {}),
   });
   if (error) return { ok: false, error: error.message };
   if (typeof data !== 'string' || !UUID.test(data)) {

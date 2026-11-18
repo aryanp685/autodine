@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   redirect: vi.fn(),
   revalidate: vi.fn(),
   cookieSet: vi.fn(),
+  sendEmail: vi.fn(async () => ({ outcome: 'not_configured', provider: 'none', attempts: 0 })),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -30,6 +31,18 @@ vi.mock('next/cache', () => ({ revalidatePath: (path: string) => mocks.revalidat
 
 vi.mock('next/headers', () => ({
   cookies: async () => ({ set: mocks.cookieSet, get: () => undefined }),
+  headers: async () => new Headers({ host: 'app.test', 'x-forwarded-proto': 'https' }),
+}));
+
+vi.mock('@/lib/site-origin', () => ({
+  requestOrigin: async () => 'https://app.test',
+}));
+
+vi.mock('@/lib/email/provider', () => ({
+  isValidRecipient: (value: unknown) =>
+    typeof value === 'string' && /^[^\s@<>]{1,64}@[^\s@<>]{1,253}\.[^\s@<>]{2,}$/.test(value.trim()),
+  sendEmail: (kind: unknown, message: unknown) =>
+    (mocks.sendEmail as (...args: unknown[]) => unknown)(kind, message),
 }));
 
 vi.mock('@/lib/db/staff', () => ({
@@ -73,6 +86,8 @@ beforeEach(() => {
   mocks.redirect.mockReset();
   mocks.revalidate.mockReset();
   mocks.cookieSet.mockReset();
+  mocks.sendEmail.mockReset();
+  mocks.sendEmail.mockResolvedValue({ outcome: 'not_configured', provider: 'none', attempts: 0 });
 });
 
 describe('creating an invitation', () => {
@@ -126,6 +141,83 @@ describe('creating an invitation', () => {
     expect(value).toContain('K7QM');
     expect(options).toMatchObject({ httpOnly: true, sameSite: 'lax', path: '/dashboard/settings' });
     expect(options.maxAge).toBeLessThanOrEqual(600);
+  });
+
+  it('refuses an address that is not an address, before anything is created', async () => {
+    const url = await urlOf(() =>
+      createInviteAction(form({ role: 'kitchen', days: '7', email: 'not-an-address' })),
+    );
+    expect(new URL(url, 'https://x.test').searchParams.get('error')).toMatch(/does not look right/i);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(mocks.sendEmail).not.toHaveBeenCalled();
+  });
+
+  it('sends the link to the address when email is given, and says so only when it was sent', async () => {
+    mocks.rpc.mockResolvedValue({ data: 'K7QM-3XPD-9RTW-2HNJ', error: null });
+    mocks.sendEmail.mockResolvedValue({ outcome: 'delivered', provider: 'brevo', attempts: 1 });
+
+    const url = await urlOf(() =>
+      createInviteAction(form({ role: 'kitchen', days: '7', email: 'cook@example.com' })),
+    );
+    const notice = new URL(url, 'https://x.test').searchParams.get('notice') ?? '';
+    expect(notice).toMatch(/emailed/i);
+    expect(notice).not.toContain('cook@example.com');
+    const [kind, message] = mocks.sendEmail.mock.calls[0] as unknown as [string, { to: string; text: string }];
+    expect(kind).toBe('staff_invitation');
+    expect(message.to).toBe('cook@example.com');
+    expect(message.text).toContain('https://app.test/join/K7QM-3XPD-9RTW-2HNJ');
+  });
+
+  it('keeps the copy-link flow honest when email is not connected', async () => {
+    mocks.rpc.mockResolvedValue({ data: 'K7QM-3XPD-9RTW-2HNJ', error: null });
+    const url = await urlOf(() =>
+      createInviteAction(form({ role: 'kitchen', days: '7', email: 'cook@example.com' })),
+    );
+    expect(new URL(url, 'https://x.test').searchParams.get('notice')).toMatch(/email is not connected/i);
+  });
+
+  it('says the send failed rather than implying the mail arrived', async () => {
+    mocks.rpc.mockResolvedValue({ data: 'K7QM-3XPD-9RTW-2HNJ', error: null });
+    mocks.sendEmail.mockResolvedValue({ outcome: 'failed', provider: 'brevo', attempts: 3 });
+    const url = await urlOf(() =>
+      createInviteAction(form({ role: 'kitchen', days: '7', email: 'cook@example.com' })),
+    );
+    expect(new URL(url, 'https://x.test').searchParams.get('notice')).toMatch(/failed to send/i);
+  });
+
+  it('emits the fixed-vocabulary alert line when the provider fails, without the recipient', async () => {
+    mocks.rpc.mockResolvedValue({ data: 'K7QM-3XPD-9RTW-2HNJ', error: null });
+    mocks.sendEmail.mockResolvedValue({ outcome: 'failed', provider: 'brevo', attempts: 3 });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await urlOf(() =>
+        createInviteAction(form({ role: 'kitchen', days: '7', email: 'cook@example.com' })),
+      );
+      const lines = warn.mock.calls.map((call) => String(call[0]));
+      const alert = lines.find((line) => line.includes('[autodine:alert]'));
+      expect(alert).toBeTruthy();
+      expect(alert).toContain('staff_invitation_email_failed');
+      // The line is what a log-drain pages on: it must carry no recipient,
+      // no invite code and no tenant identifier.
+      expect(alert).not.toContain('cook@example.com');
+      expect(alert).not.toContain('K7QM-3XPD-9RTW-2HNJ');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('does not alert when the provider accepted the invitation', async () => {
+    mocks.rpc.mockResolvedValue({ data: 'K7QM-3XPD-9RTW-2HNJ', error: null });
+    mocks.sendEmail.mockResolvedValue({ outcome: 'delivered', provider: 'brevo', attempts: 1 });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await urlOf(() =>
+        createInviteAction(form({ role: 'kitchen', days: '7', email: 'cook@example.com' })),
+      );
+      expect(warn.mock.calls.map((call) => String(call[0])).join(' ')).not.toContain('staff_invitation_email_failed');
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('reports the database refusal verbatim instead of claiming success', async () => {

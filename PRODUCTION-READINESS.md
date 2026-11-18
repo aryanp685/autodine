@@ -1,5 +1,7 @@
 # AutoDine — production-readiness handoff
 
+> **2026-11-14 production-readiness batch (this branch):** hosted staging acceptance evidence is run 43709710950 (PASS). Three companion documents now pin the current position: [production-release-baseline-2026-11-14.md](docs/production-release-baseline-2026-11-14.md) (exact code+migration state, drift D1–D7, ordering/rollback limits, authorized release sequence), [gst-irp-production-readiness-2026-11-14.md](docs/gst-irp-production-readiness-2026-11-14.md) (GST/IRP: NOT applied, NOT authorized), [external-services-readiness-2026-11-14.md](docs/external-services-readiness-2026-11-14.md) (TESTED / IMPLEMENTED-NOT-ACTIVATED / INCOMPLETE / OWNER-ACTION matrix), and [pitr-verification-procedure-2026-11-14.md](docs/pitr-verification-procedure-2026-11-14.md) (backup gate: UNMET). Sections below are dated historical evidence unless they explicitly cite this batch.
+
 > **Current gate (Arena date 2026-11-06 UTC):** The hosted/Preview/CI statements below are imported historical claims and were not reverified in this continuation. GitHub PR/check metadata and Vercel project metadata were inspected read-only; no Supabase database or deployment was changed or created, and no recovery, E2E, performance, or payment-provider operation was performed. Production remains read-only, Staging remains NO-GO, and online guest payments stay disabled. See `RELEASE-BLOCKER-REPORT.md` for the live blocker register.
 
 ## Latest live staging correction verified

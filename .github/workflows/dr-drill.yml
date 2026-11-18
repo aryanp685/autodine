@@ -1,0 +1,62 @@
+name: DR drill (disposable PostgreSQL)
+
+on:
+  # Deliberately manual. This runs the full automated recovery check — the
+  # same drill CI runs on the migration chain — on demand, wherever the
+  # operator wants proof before touching a real backup. It never touches a
+  # hosted project, never reads a secret, and writes nothing anywhere.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drill:
+    name: backup self-test · DR verifiers · logical restore drill
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CI: 'true'
+      VERCEL_ENV: 'test'
+      AUTODINE_TEST_DEMO_BUILD: 'true'
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Backup pipeline self-test (embedded PostgreSQL)
+        run: npm run test:backup
+
+      - name: Backup-file and DR objective verifiers (fixtures)
+        run: npm run test:dr
+
+      - name: Install PostgreSQL 17 client tools (PGDG)
+        run: |
+          set -o pipefail
+          {
+            sudo install -d /usr/share/postgresql-common/pgdg
+            sudo curl --fail --show-error -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+            echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+            sudo apt-get update
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql-client-17
+            echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+            export PATH="/usr/lib/postgresql/17/bin:$PATH"
+            pg_dump --version
+          } 2>&1 | tee pg-client-install.log
+
+      - name: Logical restore drill (full migration chain, disposable embedded PostgreSQL)
+        run: |
+          set -o pipefail
+          npm run test:db:logical-restore 2>&1 | tee restore-drill.log
+
+      - name: Surface failure logs as annotations
+        if: failure()
+        run: |
+          node scripts/ci/print-error-annotation.mjs pg-client-install.log 2000 || true
+          node scripts/ci/print-error-annotation.mjs restore-drill.log 3000 || true

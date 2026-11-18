@@ -11,7 +11,21 @@ import { createServer } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import assert from 'node:assert/strict';
-const bin=process.env.READINESS_PG_BIN;
+// Prefer an explicit READINESS_PG_BIN; otherwise fall back to the PG binaries
+// shipped by the embedded-postgres package this repo uses for the other
+// disposable-database drills (linux/darwin/win x64/arm64 layouts). This is a
+// local convenience default, not a toolchain claim — the drill still only
+// ever runs against freshly-created clusters under tmpdir.
+async function defaultEmbeddedBin(){
+  const platform=process.platform, arch=process.arch;
+  const name=platform==='linux'?(arch==='x64'?'linux-x64':arch==='arm64'?'linux-arm64':null)
+    :platform==='darwin'?(arch==='arm64'?'darwin-arm64':arch==='x64'?'darwin-x64':null)
+    :platform==='win32'?(arch==='x64'?'windows-x64':null):null;
+  if(!name) return null;
+  const candidate=new URL(`../node_modules/@embedded-postgres/${name}/native/bin/`, import.meta.url);
+  try{ const { access } = await import('node:fs/promises'); await access(new URL('initdb', candidate)); return candidate.pathname; }catch{ return null; }
+}
+const bin=process.env.READINESS_PG_BIN ?? await defaultEmbeddedBin();
 if(!bin) throw new Error('Set READINESS_PG_BIN to a matching local PostgreSQL bin directory');
 const root=await mkdtemp(join(tmpdir(),'autodine-cold-recovery-'));
 const source=join(root,'source'), backup=join(root,'backup'), restored=join(root,'restored');

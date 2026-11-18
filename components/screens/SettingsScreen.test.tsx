@@ -18,6 +18,10 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
+vi.mock('@/app/(staff)/dashboard/settings/gst-actions', () => ({
+  saveGstAction: mocks.action('saveGstAction'),
+}));
+
 vi.mock('@/app/(staff)/dashboard/settings/actions', () => ({
   saveDetailsAction: mocks.action('saveDetailsAction'),
   saveTaxAction: mocks.action('saveTaxAction'),
@@ -50,6 +54,29 @@ function data(over: Partial<SettingsScreenData> = {}): SettingsScreenData {
     totalMenus: 1,
     outlets: [{ id: 'r-1', name: 'Maddi', role: 'owner' }],
     activeOutletId: 'r-1',
+    gst: {
+      ready: true,
+      mode: 'off',
+      regularProfile: 'other_than_specified_premises',
+      gstin: '',
+      legalName: '',
+      tradeName: '',
+      address: '',
+      stateCode: '',
+      pan: '',
+      registrationType: 'regular',
+      compositionAcknowledged: false,
+      specifiedPremisesAttested: false,
+      specifiedPremisesEffectiveFrom: '2025-04-01',
+      offDeclared: false,
+      offDeclaredAt: null,
+      precedingFyTurnoverRupees: '',
+      einvoiceLocation: '',
+      einvoicePincode: '',
+      einvoiceHsnSac: '',
+      configVersion: 0,
+      updatedAt: null,
+    },
     ...over,
   };
 }
@@ -94,6 +121,17 @@ describe('SettingsScreen', () => {
   it('tells everyone when tax is 0%, because that bill silently charges nothing', () => {
     const html = renderToStaticMarkup(<SettingsScreen data={data({ taxRateBps: 0 })} />);
     expect(html).toContain('Tax is 0%');
+  });
+
+  it('keeps billing settings owner-only while managers can edit ordinary details', () => {
+    const html = renderToStaticMarkup(<SettingsScreen data={data({ role: 'manager' })} />);
+    const gstinInput = html.match(/<input[^>]*id="settings-gstin"[^>]*>/)?.[0] ?? '';
+    const taxInput = html.match(/<input[^>]*id="settings-tax"[^>]*>/)?.[0] ?? '';
+    const addressInput = html.match(/<input[^>]*name="address"[^>]*>/)?.[0] ?? '';
+
+    expect(gstinInput).toMatch(/\sdisabled(?:\s|=|\/?>)/);
+    expect(taxInput).toMatch(/\sdisabled(?:\s|=|\/?>)/);
+    expect(addressInput).not.toMatch(/\sdisabled(?:\s|=|\/?>)/);
   });
 
   it('disables every control for a role that cannot write', () => {
@@ -244,10 +282,11 @@ describe('Settings, the redesign', () => {
     const anchors = [...html.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]);
     const ids = new Set([...html.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]));
 
-    // Five since People arrived (migration 20261029000100): an index entry that
-    // scrolls nowhere is how a long page stops being navigable.
-    expect(anchors).toHaveLength(5);
+    // Six since Operations arrived: an index entry that scrolls nowhere is how
+    // a long page stops being navigable.
+    expect(anchors).toHaveLength(6);
     expect(anchors).toContain('settings-people');
+    expect(anchors).toContain('settings-operations');
     for (const anchor of anchors) expect(ids.has(anchor)).toBe(true);
   });
 
@@ -260,11 +299,12 @@ describe('Settings, the redesign', () => {
   });
 
   it('gives every form the same commit button', () => {
-    // Four forms, four saves, one appearance: the accent fill at the same size,
+    // Five forms, five saves, one appearance: the accent fill at the same size,
     // so "which control commits this card" is answered the same way every time.
-    // The last is the guest-verification choice (migration 20261028000900).
+    // The last is the guest-verification choice (migration 20261028000900);
+    // the GST card (migration 20261113000100) is one more save, same appearance.
     const html = renderToStaticMarkup(<SettingsScreen data={data()} />);
-    expect(count(html, 'bg-grass text-cream')).toBe(4);
+    expect(count(html, 'bg-grass text-cream')).toBe(5);
   });
 
   it('draws no hand-made alert boxes any more', () => {

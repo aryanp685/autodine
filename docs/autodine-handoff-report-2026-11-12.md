@@ -66,7 +66,7 @@ npm run e2e:local     # isolated Playwright run
 |---|---|---|---|
 | **Production** | `autodine-production` | `bdbaqpevwmgdvghszjno` | `https://new-alpha-five-43.vercel.app` |
 | **Staging / test** | `autodinetest` | `juwyhslzchjevqkdvwjm` | (review deployments) |
-| **Review app** | branch preview | uses staging | `https://new-git-arena-a5344572-autodine-iamjarvis9896-3988s-projects.vercel.app?_vercel_share=RbkpxAfZ3c77C7RqytXVzZczITNwO1is` |
+| **Review app** | branch preview | uses staging | `https://new-git-arena-a5344572-autodine-iamjarvis9896-3988s-projects.vercel.app?_vercel_share=[REDACTED — rotate/regenerate the share link]` |
 
 Review logins (staging DB, all working — verified with `hasSession: true`):
 
@@ -75,7 +75,7 @@ owner@autodine-review.test
 manager@autodine-review.test
 kitchen@autodine-review.test
 cashier@autodine-review.test
-password: Review2026!
+password: [REDACTED — rotate if still active]
 ```
 
 > The Vercel preview is behind deployment protection. The `_vercel_share` token is the only

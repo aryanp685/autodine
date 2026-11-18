@@ -4,6 +4,8 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { probeHealth, probeOperationalSchema, isReady, type ProbeClient } from '@/lib/health';
 import { BILLING } from '@/lib/plans';
+import { formatHealthAlertLine } from '@/lib/monitoring-incidents';
+import { notifyHealthFailure } from '@/lib/incident-notify';
 
 /**
  * GET /api/health
@@ -39,6 +41,25 @@ export async function GET() {
 
   const operational = await probeOperationalSchema((server as unknown as ProbeClient | null) ?? null);
   const ok = isReady(health, operational);
+
+  // Application failure path -> structured, fixed-vocabulary alert line.
+  // Provider-independent: a log drain can page on `[autodine:alert]` +
+  // event `health_check_failed`. No keys, ids or tenant data are emitted.
+  if (!ok) {
+    const fixed = {
+      configured: health.configured,
+      serverKey: health.serverKey,
+      reachable: health.reachable,
+      credentials: health.credentials,
+      credentialProbe: health.credentialProbe,
+      schema: { ...health.schema, ...operational },
+    };
+    console.warn(formatHealthAlertLine(fixed));
+    // Same fixed vocabulary to the alert webhook when one is configured;
+    // never throws, outcome logged inside. A log drain must not be the only
+    // place a down deployment is visible.
+    await notifyHealthFailure(fixed);
+  }
 
   return NextResponse.json(
     { ok, ...health, operational, checkedAt: new Date().toISOString() },

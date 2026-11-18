@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { createInvoiceShareLinkAction, revokeInvoiceShareLinkAction } from '@/app/(staff)/dashboard/share-actions';
 
 import { PrintButton } from '@/components/PrintButton';
+import { EinvoiceAttemptButton } from '@/components/screens/EinvoiceAttemptButton';
 import { btn } from '@/components/owner/chrome';
 import { formatBillMoney, paymentMethodLabel, whatsAppLink } from '@/lib/bill';
 import { buildReceiptMessage } from '@/lib/invoice';
@@ -18,7 +19,7 @@ const PAGE: Record<Layout, { size: string; margin: string; label: string }> = {
   '80mm': { size: '80mm auto', margin: '3mm', label: '80 mm' },
 };
 
-export function InvoiceScreen({ invoice, shared = false }: { invoice: ReceiptData; shared?: boolean }) {
+export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice: ReceiptData; shared?: boolean; staffRole?: string }) {
   const [layout, setLayout] = useState<Layout>('a4');
   const [shareLinks, setShareLinks] = useState(invoice.shareLinks ?? []);
   const [createdLink, setCreatedLink] = useState<{ id: string; href: string; expiresAt: string } | null>(null);
@@ -27,6 +28,10 @@ export function InvoiceScreen({ invoice, shared = false }: { invoice: ReceiptDat
   const page = PAGE[layout];
   const shareText = buildReceiptMessage(invoice);
   const paid = invoice.totals.paymentStatus === 'paid';
+  const docType = invoice.documentType;
+  const gstDoc = docType !== 'receipt';
+  const docTitle = docType === 'gst_tax_invoice' ? 'Tax invoice' : docType === 'bill_of_supply' ? 'Bill of supply' : 'Receipt';
+  const pct = (bps: number) => (bps / 100).toFixed(bps % 100 === 0 ? 0 : 2);
 
   async function createSecureLink() {
     if (shareBusy) return;
@@ -116,6 +121,9 @@ export function InvoiceScreen({ invoice, shared = false }: { invoice: ReceiptDat
                 {shareBusy ? 'Working…' : 'Create 24-hour link'}
               </button>
             ) : null}
+            {!shared && (staffRole === 'owner' || staffRole === 'manager') ? (
+              <EinvoiceAttemptButton invoiceId={invoice.id} irpStatus={invoice.irpStatus} />
+            ) : null}
             <PrintButton className={btn('solid', 'sm')}>Print / Save PDF</PrintButton>
           </div>
         </div>
@@ -127,6 +135,16 @@ export function InvoiceScreen({ invoice, shared = false }: { invoice: ReceiptDat
           data-layout={layout}
           className={`mx-auto rounded-[14px] border border-hair bg-card shadow-[0_10px_36px_rgba(30,31,24,.06)] print:rounded-none print:border-0 print:p-0 print:shadow-none ${layoutClass}`}
         >
+          {invoice.irpStatus === 'pending' ? (
+            <div className="mb-5 border-2 border-[var(--p-due)] px-3 py-2 text-center text-[12.5px] font-semibold text-[var(--p-due)] uppercase">
+              IRN pending — not a final tax invoice until the IRP validates this document
+            </div>
+          ) : null}
+          {invoice.irpStatus === 'failed' ? (
+            <div className="mb-5 border-2 border-[var(--p-due)] px-3 py-2 text-center text-[12.5px] font-semibold text-[var(--p-due)] uppercase">
+              e-Invoice failed — treat as pending and do not supply a copy until resolved
+            </div>
+          ) : null}
           {invoice.status === 'voided' ? (
             <div className="mb-5 border-2 border-[var(--alert)] px-3 py-2 text-center text-[13px] font-bold tracking-[0.18em] text-[var(--alert)] uppercase">
               VOID — {invoice.voidReason}
@@ -147,18 +165,41 @@ export function InvoiceScreen({ invoice, shared = false }: { invoice: ReceiptDat
               {invoice.seller.phone ? (
                 <p className="mt-1 text-[11.5px] text-gink-64">Phone {invoice.seller.phone}</p>
               ) : null}
+              {gstDoc && invoice.seller.gstin ? (
+                <div className="mt-1.5 text-[11.5px] leading-[1.5] text-gink-64">
+                  {invoice.seller.legalName && invoice.seller.legalName !== invoice.seller.name ? (
+                    <p className="font-medium text-gink">{invoice.seller.legalName}</p>
+                  ) : null}
+                  <p>GSTIN <span className="font-mono">{invoice.seller.gstin}</span></p>
+                  {invoice.seller.stateCode ? <p>State code {invoice.seller.stateCode}</p> : null}
+                </div>
+              ) : null}
               <p className="mt-2 text-[10px] font-semibold tracking-[0.08em] uppercase">
-                Receipt · Not a GST tax invoice
+                {docType === 'gst_tax_invoice'
+                  ? 'Tax invoice'
+                  : docType === 'bill_of_supply'
+                    ? 'Bill of supply'
+                    : 'Receipt · Not a GST tax invoice'}
               </p>
             </div>
             <div className="shrink-0 text-right">
-              <p className="text-[10px] font-semibold tracking-[0.12em] text-gink-46 uppercase">Receipt no.</p>
+              <p className="text-[10px] font-semibold tracking-[0.12em] text-gink-46 uppercase">{docTitle} no.</p>
               <p className="mt-1 font-mono text-[13.5px] font-semibold tabular-nums">{invoice.number}</p>
               <p className="mt-2 text-[11.5px] text-gink-64">{invoice.issuedAt}</p>
               <p className="mt-1 text-[11.5px] text-gink-64">{invoice.tableLabel ? `Table ${invoice.tableLabel}` : 'Table'}</p>
               <p className="mt-1 text-[10px] text-gink-46">Session {invoice.sessionReference.slice(0, 8).toUpperCase()}</p>
             </div>
           </header>
+
+          {invoice.recipient ? (
+            <section aria-label="Buyer details" className="mt-4 border border-hair px-3 py-2 text-[11.5px] leading-[1.5] text-gink-64 break-inside-avoid">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gink-46">Bill to (buyer)</p>
+              <p className="mt-0.5 font-medium text-gink">{invoice.recipient.name}</p>
+              <p>GSTIN <span className="font-mono">{invoice.recipient.gstin}</span> · State code {invoice.recipient.stateCode}</p>
+              {invoice.recipient.address ? <p className="whitespace-pre-line">{invoice.recipient.address}</p> : null}
+              {invoice.recipient.email ? <p>{invoice.recipient.email}</p> : null}
+            </section>
+          ) : null}
 
           <div className="mt-5 overflow-hidden border-y border-hair">
             <table className="w-full border-collapse text-[11.5px] print:text-[10px]">
@@ -192,14 +233,38 @@ export function InvoiceScreen({ invoice, shared = false }: { invoice: ReceiptDat
           </div>
 
           <section className="ml-auto mt-4 w-full max-w-[310px] text-[11.5px] print:text-[10px]">
-            <Summary label="Subtotal" value={formatBillMoney(invoice.totals.subtotalPaise)} />
+            {docType === 'gst_tax_invoice' && invoice.gst ? (
+              <>
+                <Summary label="Taxable value" value={formatBillMoney(invoice.gst.taxablePaise)} />
+                {invoice.gst.igstPaise > 0 ? (
+                  <Summary label={`IGST @ ${pct(invoice.gst.rateBps)}%`} value={formatBillMoney(invoice.gst.igstPaise)} />
+                ) : (
+                  <>
+                    <Summary label={`CGST @ ${pct(invoice.gst.cgstBps)}%`} value={formatBillMoney(invoice.gst.cgstPaise)} />
+                    <Summary label={`SGST @ ${pct(invoice.gst.sgstBps)}%`} value={formatBillMoney(invoice.gst.sgstPaise)} />
+                  </>
+                )}
+                <Summary label="Total tax" value={formatBillMoney(invoice.totals.taxPaise)} />
+              </>
+            ) : docType === 'bill_of_supply' ? (
+              <>
+                <Summary label="Taxable value" value={formatBillMoney(invoice.gst?.taxablePaise ?? invoice.totals.subtotalPaise)} />
+                {invoice.gst?.notice ? (
+                  <p className="mt-2 text-[10px] font-semibold leading-[1.5] text-gink-64 uppercase">{invoice.gst.notice}</p>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <Summary label="Subtotal" value={formatBillMoney(invoice.totals.subtotalPaise)} />
+              </>
+            )}
             {invoice.totals.ticketDiscountPaise > 0 ? (
               <Summary label="Ticket discounts (as recorded)" value={`−${formatBillMoney(invoice.totals.ticketDiscountPaise)}`} />
             ) : null}
             {invoice.totals.billDiscountPaise > 0 ? (
               <Summary label="Bill discount" value={`−${formatBillMoney(invoice.totals.billDiscountPaise)}`} />
             ) : null}
-            {invoice.totals.taxPaise > 0 ? (
+            {docType === 'receipt' && invoice.totals.taxPaise > 0 ? (
               <Summary label="Tax amount (from ticket records)" value={formatBillMoney(invoice.totals.taxPaise)} />
             ) : null}
             {invoice.totals.otherChargesPaise > 0 ? (
@@ -217,6 +282,16 @@ export function InvoiceScreen({ invoice, shared = false }: { invoice: ReceiptDat
           </section>
 
           <footer className="mt-5 border-t border-hair pt-3 text-[10px] text-gink-64">
+            {docType === 'gst_tax_invoice' && invoice.gst ? (
+              <>
+                <p>Place of supply: {invoice.gst.placeOfSupplyStateCode ?? '—'} · {invoice.gst.interState ? 'IGST (inter-State)' : 'CGST + SGST (intra-State)'} · GSTIN {invoice.seller.gstin}</p>
+                {invoice.gst.profileNotification ? <p className="mt-1">{invoice.gst.profileNotification}</p> : null}
+                {invoice.irn ? <p className="mt-1">IRN: <span className="font-mono break-all">{invoice.irn}</span></p> : <p className="mt-1">No IRN on this document (B2C supplies are not e-invoice applicable).</p>}
+              </>
+            ) : null}
+            {docType === 'bill_of_supply' && invoice.gst ? (
+              <p>Composition taxable person, not eligible to collect tax on supplies. GSTIN {invoice.seller.gstin} · Place of supply: {invoice.gst.placeOfSupplyStateCode ?? '—'}</p>
+            ) : null}
             <p>Table session: {invoice.sessionReference}</p>
             <p className="mt-1">Opened {invoice.sessionOpenedAt} · Closed {invoice.sessionClosedAt}</p>
             {invoice.payments.length ? (

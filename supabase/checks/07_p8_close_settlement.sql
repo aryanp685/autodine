@@ -23,7 +23,7 @@ declare
   v_blocked boolean := false;
   v_share_denied boolean := false;
 begin
-  if has_function_privilege('authenticated', 'public.issue_closed_session_receipt(uuid)', 'EXECUTE') then
+  if has_function_privilege('authenticated', 'public.issue_closed_session_receipt(uuid, jsonb)', 'EXECUTE') then
     raise exception 'P8 regression: authenticated clients can bypass settlement via the receipt helper';
   end if;
 

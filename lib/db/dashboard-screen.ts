@@ -29,6 +29,7 @@ import type { RestaurantAccess } from '@/lib/access';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from './database';
 import { CASHIER_ROLES, getStaffContextDetailed } from './staff';
+import { loadGstMode, type GstMode } from './gst-settings';
 import { hourInZone, RESTAURANT_TIME_ZONE, startOfDayUtc } from './time';
 
 
@@ -104,6 +105,11 @@ export type DashboardScreenData = {
   activeSessions: DashboardActiveSession[];
   /** The signed-in role can mark sessions paid only while write access is live. */
   canMarkPaid: boolean;
+  /**
+   * Billing mode for this outlet's final documents. Regular mode lets the
+   * checkout capture optional B2B buyer details on the tax invoice.
+   */
+  gstMode: GstMode;
   /**
    * Revenue per elapsed hour of the business day. Length is
    * hours elapsed + 1, not 24: a chart that ran to midnight every morning
@@ -296,6 +302,7 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
       topItems: [],
       activeSessions: [],
       canMarkPaid: false,
+      gstMode: 'off',
       hourlyPaise: [],
       blocked: staff.reason,
       access: null,
@@ -309,6 +316,7 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
   const dayStart = startOfDayUtc(timezone, now);
   const dayStartIso = dayStart.toISOString();
 
+  const gstMode = await loadGstMode(supabase, restaurantId).catch(() => 'off' as GstMode);
   const [ordersResult, paymentsResult, activeSessions] = await Promise.all([
     readAllRows((from, to) => supabase
       .from('orders_finance')
@@ -379,6 +387,7 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
       topItems: [],
       activeSessions,
       canMarkPaid,
+      gstMode,
       hourlyPaise,
       access: staff.context.access,
     };
@@ -446,6 +455,7 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
       .slice(0, TOP_ITEM_LIMIT),
     activeSessions,
     canMarkPaid,
+    gstMode,
     hourlyPaise,
     access: staff.context.access,
   };

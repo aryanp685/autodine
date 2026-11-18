@@ -1,6 +1,6 @@
 import { describe,it,expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
-const base='https://new-git-arena-3711df6a-autodine-iamjarvis9896-3988s-projects.vercel.app';
+const base='https://new-git-arena-9b120325-autodine-iamjarvis9896-3988s-projects.vercel.app';
 describe('staging fixture production/write guards',()=>{
  it.each([
   {STAGING_SUPABASE_URL:'',STAGING_SUPABASE_SERVICE_ROLE_KEY:''},

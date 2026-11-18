@@ -875,6 +875,223 @@ describe.skipIf(!URL_VALUE)('Model C subscription and billing', () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
+  describe('concurrent access', () => {
+    /** A second, independent connection — for genuinely concurrent calls. */
+    async function newClient(): Promise<Client> {
+      const client = new Client({ connectionString: URL_VALUE });
+      await client.connect();
+      return client;
+    }
+
+    /** Put a dedicated client into the owning user's shoes, like the app would. */
+    async function asOwner(client: Client, owner: string): Promise<void> {
+      await client.query("select set_config('request.jwt.claim.sub', $1, false)", [owner]);
+      await client.query('set role authenticated');
+    }
+
+    /** A Professional account already holding `count` outlets, plus a second owner for the same account. */
+    async function linkedAccountWithOutlets(count: number) {
+      const a = await newAccount();
+      await payFor(a.name, 'professional');
+      for (let i = 2; i <= count; i += 1) {
+        await committed(a.owner, () => db.query('select create_outlet($1,$2) id',
+          [`Room ${i}`, `conc-${i}-${randomUUID()}`]));
+      }
+      const coOwner = randomUUID();
+      await db.query('insert into profiles(id) values($1)', [coOwner]);
+      await db.query("insert into memberships(restaurant_id, user_id, role) values($1,$2,'owner')", [a.restaurant, coOwner]);
+      return { ...a, coOwner };
+    }
+
+    it('creates one account when the same new user bootstraps twice at once', async () => {
+      const owner = randomUUID();
+      await db.query('insert into profiles(id) values($1)', [owner]);
+
+      const c1 = await newClient();
+      const c2 = await newClient();
+      try {
+        await asOwner(c1, owner);
+        await asOwner(c2, owner);
+        const slug = 'boot-' + randomUUID();
+        const [r1, r2] = await Promise.allSettled([
+          c1.query('select create_outlet($1,$2) id', ['Bootstrap', slug]),
+          c2.query('select create_outlet($1,$2) id', ['Bootstrap', slug]),
+        ]);
+        const settled = [r1, r2];
+        expect(settled.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+        expect(settled.filter((r) => r.status === 'rejected')).toHaveLength(1);
+
+        // One account for the user, one outlet in it — never two of either.
+        expect((await db.query('select count(*)::int n from accounts where owner_id=$1', [owner])).rows[0].n).toBe(1);
+        expect((await db.query('select count(*)::int n from restaurants r join accounts a on a.id = r.account_id where a.owner_id=$1', [owner])).rows[0].n).toBe(1);
+      } finally {
+        await c1.end();
+        await c2.end();
+      }
+    });
+
+    it('never lets two concurrent owners of one account exceed the plan limit', async () => {
+      const a = await linkedAccountWithOutlets(4); // 4 of 5 Professional outlets used
+
+      const c1 = await newClient();
+      const c2 = await newClient();
+      try {
+        await asOwner(c1, a.owner);
+        await asOwner(c2, a.coOwner);
+        const [r1, r2] = await Promise.allSettled([
+          c1.query('select create_outlet($1,$2) id', ['Race A', 'race-a-' + randomUUID()]),
+          c2.query('select create_outlet($1,$2) id', ['Race B', 'race-b-' + randomUUID()]),
+        ]);
+        const settled = [r1, r2];
+        expect(settled.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+        const refused = settled.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+        expect(refused).toBeTruthy();
+        expect(String(refused?.reason?.message ?? refused?.reason)).toContain('outlet_limit');
+        expect((await db.query('select count(*)::int n from restaurants where account_id=$1', [a.account])).rows[0].n).toBe(5);
+      } finally {
+        await c1.end();
+        await c2.end();
+      }
+    });
+
+    it('records a replayed provider event only once, even concurrently', async () => {
+      const a = await newAccount();
+      const eventId = randomUUID();
+      const price = Number((await db.query("select plan_price_paise('starter') p")).rows[0].p);
+
+      const c1 = await newClient();
+      const c2 = await newClient();
+      try {
+        const q = `select record_subscription_payment($1,'test-provider',$2,'starter',$3,'INR',1,now()) result`;
+        const [r1, r2] = await Promise.all([
+          c1.query(q, [a.name, eventId, price]),
+          c2.query(q, [a.name, eventId, price]),
+        ]);
+        const statuses = [r1.rows[0].result.status, r2.rows[0].result.status].sort();
+        expect(statuses).toEqual(['duplicate', 'recorded']);
+        expect((await db.query('select count(*)::int n from subscription_payments where account_id=$1', [a.account])).rows[0].n).toBe(1);
+        expect((await db.query(
+          'select count(*)::int n from subscription_receipts rc join subscription_payments p on p.id = rc.payment_id where p.account_id=$1',
+          [a.account])).rows[0].n).toBe(1);
+      } finally {
+        await c1.end();
+        await c2.end();
+      }
+    });
+
+    it('records a replayed failed payment only once, even concurrently', async () => {
+      const a = await newAccount();
+      await payFor(a.name, 'starter');
+      const eventId = randomUUID();
+
+      const c1 = await newClient();
+      const c2 = await newClient();
+      try {
+        const q = `select record_subscription_payment_failure($1,'test-provider',$2,'starter',99900,'Card declined',now()) result`;
+        const [r1, r2] = await Promise.all([
+          c1.query(q, [a.name, eventId]),
+          c2.query(q, [a.name, eventId]),
+        ]);
+        const statuses = [r1.rows[0].result.status, r2.rows[0].result.status].sort();
+        expect(statuses).toEqual(['duplicate', 'recorded']);
+        expect((await db.query("select count(*)::int n from subscription_payments where account_id=$1 and status='failed'", [a.account])).rows[0].n).toBe(1);
+      } finally {
+        await c1.end();
+        await c2.end();
+      }
+    });
+
+    it('records a replayed refund only once, even concurrently', async () => {
+      const a = await newAccount();
+      const paidEventId = randomUUID();
+      await payFor(a.name, 'business', paidEventId);
+      const refundEventId = randomUUID();
+
+      const c1 = await newClient();
+      const c2 = await newClient();
+      try {
+        const q = `select record_subscription_refund($1,'test-provider',$2,$3,now()) result`;
+        const [r1, r2] = await Promise.all([
+          c1.query(q, [a.name, refundEventId, paidEventId]),
+          c2.query(q, [a.name, refundEventId, paidEventId]),
+        ]);
+        const statuses = [r1.rows[0].result.status, r2.rows[0].result.status].sort();
+        expect(statuses).toEqual(['duplicate', 'recorded']);
+        expect((await db.query("select count(*)::int n from subscription_payments where account_id=$1 and status='refunded'", [a.account])).rows[0].n).toBe(1);
+      } finally {
+        await c1.end();
+        await c2.end();
+      }
+    });
+
+    it('stacks consecutive renewals bought at the same time instead of overwriting', async () => {
+      const a = await newAccount();
+      await payFor(a.name, 'professional');
+      const price = Number((await db.query("select plan_price_paise('professional') p")).rows[0].p);
+
+      const c1 = await newClient();
+      const c2 = await newClient();
+      try {
+        const q = `select record_subscription_payment($1,'test-provider',$2,'professional',$3,'INR',1,now()) result`;
+        const [r1, r2] = await Promise.all([
+          c1.query(q, [a.name, randomUUID(), price]),
+          c2.query(q, [a.name, randomUUID(), price]),
+        ]);
+        expect([r1.rows[0].result.status, r2.rows[0].result.status]).toEqual(['recorded', 'recorded']);
+
+        const periods = (await db.query(
+          'select period_start, period_end from subscription_payments where account_id=$1 order by period_start',
+          [a.account])).rows;
+        expect(periods).toHaveLength(3);
+        // Each renewal extends the previous period; nothing is discarded.
+        expect(new Date(periods[1].period_start).getTime()).toBe(new Date(periods[0].period_end).getTime());
+        expect(new Date(periods[2].period_start).getTime()).toBe(new Date(periods[1].period_end).getTime());
+
+        const account = (await db.query('select plan_expires_at from accounts where id=$1', [a.account])).rows[0];
+        expect(new Date(account.plan_expires_at).getTime()).toBe(new Date(periods[2].period_end).getTime());
+      } finally {
+        await c1.end();
+        await c2.end();
+      }
+    });
+
+    it('records the plan the account was on before each change, not after', async () => {
+      const a = await newAccount();
+      await payFor(a.name, 'starter');
+      await payFor(a.name, 'professional');
+      await payFor(a.name, 'professional');
+
+      const events = (await db.query(
+        "select kind, from_plan, to_plan from subscription_events where account_id=$1 and kind in ('plan_changed','renewed') order by occurred_at, id",
+        [a.account])).rows;
+      expect(events).toEqual([
+        { kind: 'plan_changed', from_plan: 'trial', to_plan: 'starter' },
+        { kind: 'plan_changed', from_plan: 'starter', to_plan: 'professional' },
+        { kind: 'renewed', from_plan: 'professional', to_plan: 'professional' },
+      ]);
+    });
+
+    it('expires an account exactly once under concurrent expiry runs', async () => {
+      const a = await newAccount();
+      await db.query("update accounts set trial_started_at = now() - interval '25 days', trial_ends_at = now() - interval '4 days' where id=$1", [a.account]);
+
+      const c1 = await newClient();
+      const c2 = await newClient();
+      try {
+        await Promise.all([
+          c1.query('select expire_subscriptions()'),
+          c2.query('select expire_subscriptions()'),
+        ]);
+        expect((await db.query('select plan_status from accounts where id=$1', [a.account])).rows[0].plan_status).toBe('expired');
+        expect((await db.query("select count(*)::int n from subscription_events where account_id=$1 and kind='expired'", [a.account])).rows[0].n).toBe(1);
+      } finally {
+        await c1.end();
+        await c2.end();
+      }
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
   describe('unauthorized plan changes', () => {
     it('lets no authenticated caller set a subscription', async () => {
       const a = await newAccount();

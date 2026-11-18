@@ -33,7 +33,17 @@ export async function getSharedInvoiceData(token: string): Promise<ReceiptData |
     invoice_number: text(rawInvoice.invoice_number),
     financial_year: text(rawInvoice.financial_year),
     sequence_number: 0,
-    document_type: rawInvoice.document_type === 'gst_tax_invoice' ? 'gst_tax_invoice' : 'receipt',
+    document_type:
+      rawInvoice.document_type === 'gst_tax_invoice' ? 'gst_tax_invoice'
+      : rawInvoice.document_type === 'bill_of_supply' ? 'bill_of_supply'
+      : 'receipt',
+    irp_status:
+      rawInvoice.irp_status === 'pending' || rawInvoice.irp_status === 'generated'
+      || rawInvoice.irp_status === 'failed' || rawInvoice.irp_status === 'cancelled'
+        ? rawInvoice.irp_status
+        : 'not_required',
+    irn: nullableText(rawInvoice.irn),
+    gst_snapshot: rawInvoice.gst_snapshot ?? null,
     status: rawInvoice.status === 'voided' ? 'voided' : 'issued',
     issued_at: issuedAt,
     issued_by: null,
@@ -41,7 +51,7 @@ export async function getSharedInvoiceData(token: string): Promise<ReceiptData |
     session_opened_at: text(rawInvoice.session_opened_at),
     session_closed_at: text(rawInvoice.session_closed_at),
     seller_snapshot: rawInvoice.seller_snapshot,
-    customer_snapshot: null,
+    customer_snapshot: rawInvoice.customer_snapshot ?? null,
     totals_snapshot: rawInvoice.totals_snapshot,
     payment_snapshot: rawInvoice.payment_snapshot,
     source_order_ids: [],

@@ -12,11 +12,12 @@ function native(tool, args, input) {
   if (result.status !== 0) throw new Error(`${tool} failed: ${result.stderr.toString()}`);
   return result.stdout;
 }
-async function fingerprint(url) {
+export async function fingerprint(url, options = {}) {
+  const schemas = options.schemas ?? ['public', 'auth', 'storage'];
   const db = new Client({ connectionString: url }); await db.connect();
   try {
     const tables = (await db.query(`select n.nspname,c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace
-      where n.nspname in ('public','auth','storage') and c.relkind='r' order by 1,2`)).rows;
+      where n.nspname = any($1) and c.relkind='r' order by 1,2`, [schemas])).rows;
     const snapshots = [];
     for (const {nspname,relname} of tables) {
       const quote = s => '"' + s.replaceAll('"','""') + '"';

@@ -9,6 +9,8 @@ In GitHub repository **Settings → Secrets and variables → Actions**, configu
 - `AUTODINE_STAGING_SERVICE_ROLE_KEY`: server-only service-role/secret API key from **autodinetest**, ref `juwyhslzchjevqkdvwjm`. Never use a production key.
 - `AUTODINE_STAGING_SHARE_URL`: authorized shareable link for the approved staging branch preview. Keep its token out of code, workflow inputs, chat replies and artifacts.
 
+**Current approved preview (re-approved by the owner, 2026-11-15):** the pinned base for this runner is now `https://new-git-arena-9b120325-autodine-iamjarvis9896-3988s-projects.vercel.app` (branch alias for `arena/9b120325-autodine`, the session branch hosting the runner). The previous pin (`new-git-arena-3711df6a-...`) no longer resolves (404 / failed health gate). The owner must regenerate `AUTODINE_STAGING_SHARE_URL` for the new origin before the gate will pass; the runner refuses to write fixtures otherwise (fail-closed). The push-trigger branch list was deliberately left unchanged — dispatch manually until the trigger policy is reviewed.
+
 Alternatively grant the Arena GitHub connection repository Actions-secrets permission, then the agent can configure them securely. Do not provide GitHub passwords/PATs/2FA codes in chat. A permission 403 is not fixed by merely approving an action in chat.
 
 The new workflow initially runs when its runner files are pushed to the session branch. Once registered on the repository default branch it can also be dispatched manually; do not merge/deploy production just to make dispatch available. On this branch, a reviewed runner-file update triggers the push workflow after secrets are configured.
@@ -28,3 +30,14 @@ Fixture manifest is local to the ephemeral runner. This version deliberately **r
 ## Local preparation evidence, not hosted E2E success
 
 Typecheck/lint and negative guard tests can run without credentials. The actual hosted run is blocked until repository secrets are available. No new Auth users or persistent tenant fixtures are created by a failed missing-secret preflight.
+
+## Pre-flight: validate the acceptance environment locally
+
+With the secrets and fixture env placed (e.g. in a local `.env` or the CI job
+env), run `npm run staging:verify-env`. It refuses anything that is not the
+exact approved isolated-staging fixture shape — wrong origin, production-like
+values, missing adversarial fixtures, duplicate card tokens — and prints only
+key names and rule ids, never values. It contacts no network. A failure here
+must be fixed before dispatching the runner; a green check does not authorize
+a hosted run by itself: the staging rehearsal still requires the owner's
+explicit authorization naming `juwyhslzchjevqkdvwjm`.

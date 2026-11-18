@@ -70,11 +70,13 @@ try {
   // owners. This is a synthetic catalog setup, not a hosted connection.
   await db.query(`grant usage on schema public, auth to anon, authenticated, service_role;
     alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
-    alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;`);
+    alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+    alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;`);
   await db.query('set role supabase_admin');
   try {
     await db.query(`alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
-      alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;`);
+      alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+      alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;`);
   } finally {
     await db.query('reset role');
   }
@@ -151,7 +153,7 @@ try {
   }
   console.log(alreadyApplied.size ? `Verified forward upgrade to ${migrations.length} repository migrations from observed staging baseline.` : `Replayed ${migrations.length} migrations without application-table scaffolds.`);
   await db.end(); db = null;
-  const result = spawnSync('npx', ['vitest', 'run', 'lib/db/readiness.integration.test.ts', 'lib/db/report-sales.integration.test.ts', 'lib/db/phase0-security.integration.test.ts', 'lib/db/subscription-billing.integration.test.ts', 'lib/db/restaurant-account-link.integration.test.ts', 'lib/db/order-read-boundary.integration.test.ts', 'app/menu/throttle-db.integration.test.tsx'], {
+  const result = spawnSync('npx', ['vitest', 'run', 'lib/db/gst-two-mode.integration.test.ts', 'lib/db/readiness.integration.test.ts', 'lib/db/report-sales.integration.test.ts', 'lib/db/phase0-security.integration.test.ts', 'lib/db/subscription-billing.integration.test.ts', 'lib/db/restaurant-account-link.integration.test.ts', 'lib/db/credit-debit-notes.integration.test.ts', 'lib/db/order-read-boundary.integration.test.ts', 'app/menu/throttle-db.integration.test.tsx'], {
     stdio: 'inherit', env: { ...process.env, READINESS_DB_URL: url.href, THROTTLE_DB_URL: url.href },
   });
   if (result.error) throw result.error;

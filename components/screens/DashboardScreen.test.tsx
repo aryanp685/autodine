@@ -46,6 +46,7 @@ function live(over: Partial<DashboardScreenData> = {}): DashboardScreenData {
     topItems: [{ name: 'koko', qty: 2, revenuePaise: 92_000 }],
     activeSessions: [],
     canMarkPaid: true,
+    gstMode: 'off',
     hourlyPaise: [0, 0, 155_760],
     ...over,
   };
@@ -100,6 +101,7 @@ const EMPTY: DashboardScreenData = {
   topItems: [],
   activeSessions: [],
   canMarkPaid: false,
+  gstMode: 'off',
   hourlyPaise: [0, 0, 0],
   access: {
     plan: 'trial',

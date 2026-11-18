@@ -1,5 +1,19 @@
 # AutoDine — Phase 1 Vercel edge-security discovery and route audit
 
+> **SUPERSEDED IN PART (2026-11-14).** The `/dashboard/reports` findings in this
+> document (notably lines describing the export Route Handler calling the report
+> RPC without an Owner/Manager check, and SQL `report_sales()` using
+> `is_member` with no upper order bound) describe the pre-remediation code and
+> are no longer true of this branch. Current truth: the export route checks the
+> caller's actual membership role before the RPC (`app/(staff)/dashboard/reports/export/route.ts`),
+> the reports page is behind an Owner/Manager `RoleGate`, the database enforces
+> the same boundary via `has_restaurant_role(..., array['owner','manager'])`
+> (merged to `main` via PR #185 in `20261112000300_report_sales_export_authorization.sql`),
+> and line 252's "no disposable-Postgres test was run" is resolved by
+> `lib/db/report-sales.integration.test.ts` (26 cases). Everything else in this
+> document remains the dated 2026-11-06 record. Retained for provenance; do not
+> cite for the current reports authorization state.
+
 - **As of:** 2026-11-06 UTC
 - **Branch / base / HEAD:** `arena/fee715c2-autodine` / `b80ab3c50c3c5067130cde40b2757eb07e15fe7e` / `b80ab3c50c3c5067130cde40b2757eb07e15fe7e`
 - **Scope:** Phase 1 only. Read-only Vercel discovery, source-level audit of every App Router page and handler plus all Server Action modules, traffic/false-positive analysis, and a bounded rule recommendation. No Vercel setting, Production, application, database, or provider change was made.

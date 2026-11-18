@@ -467,6 +467,7 @@ export function Dashboard({
                             sessionId={session.id}
                             table={session.table}
                             outstandingPaise={session.outstandingPaise}
+                            gstMode={data.gstMode}
                           />
                         </div>
                       ) : null}
