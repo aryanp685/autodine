@@ -93,3 +93,14 @@ No write to Vercel was made or attempted.
 Preview + `autodinetest` only. Production untouched. No plan change,
 no collaborator removed, no Dashboard Protection setting changed, no
 secret read/printed/committed.
+
+## Deployment (2026-11-18, later)
+
+Commit `fb76313` pushed to `arena/2670dd12-autodine` (PR #191).
+GitHub's Vercel status check for the resulting Preview deployment:
+**pass**. Post-deploy live probe of the branch alias, unauthenticated,
+again returns Vercel's SSO login ("Protected Deployment – Vercel") —
+protection posture unchanged by the new deployment. The Vercel
+connector token began denying read calls (`get_project`, `get_team`,
+`list_deployments`) during this session, so deployment state was taken
+from the GitHub status check instead; no workaround attempted.
