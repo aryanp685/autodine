@@ -101,11 +101,15 @@ without separate written authorization each.
 | `20261112000200` | `immutable_restaurant_account_link` | Branch set — apply only with B1 (release prep §2) | P0 security — effect absent in prod (D1) |
 | `20261112000300` | `report_sales_export_authorization` | Branch set — apply only with B1 (release prep §2) | staging-applied 2026-11-15; prod unverified |
 | `20261112000400` | `bound_subscription_history` | Branch set — apply only with B1 (release prep §2) |  |
-| `20261112000500` | `serialize_outlet_creation` | Branch set — apply only with B1 (release prep §2) |  |
-| `20261112000600` | `serialize_subscription_payments` | Branch set — apply only with B1 (release prep §2) |  |
-| `20261112000700` | `serialize_subscription_expiry` | Branch set — apply only with B1 (release prep §2) |  |
+| `20261112000500` | `role_scoped_order_reads` | main (PR #191 main-merge reconciliation, 2026-11-16) — staff-access boundary | NOT AUTHORIZED for hosted application by this merge; arrived via main merge |
+| `20261112000501` | `serialize_outlet_creation` | Branch set — apply only with B1 (release prep §2) |  |
+| `20261112000600` | `cap_subscription_history_ceiling` | main (PR #191 main-merge reconciliation, 2026-11-16) — subscription boundary | NOT AUTHORIZED for hosted application by this merge; arrived via main merge |
+| `20261112000601` | `serialize_subscription_payments` | Branch set — apply only with B1 (release prep §2) |  |
+| `20261112000700` | `order_line_edit_boundary` | main (PR #191 main-merge reconciliation, 2026-11-16) — order-line boundary | NOT AUTHORIZED for hosted application by this merge; arrived via main merge |
+| `20261112000701` | `serialize_subscription_expiry` | Branch set — apply only with B1 (release prep §2) |  |
 | `20261113000100` | `gst_two_mode` | GST/IRP Phase B — NOT AUTHORIZED |  |
-| `20261114000100` | `gst_b2b_einvoice_readiness` | GST/IRP Phase B — NOT AUTHORIZED |  |
+| `20261114000100` | `owner_manager_subscription_reads` | main (PR #191 main-merge reconciliation, 2026-11-16) — subscription boundary | NOT AUTHORIZED for hosted application by this merge; arrived via main merge |
+| `20261114000101` | `gst_b2b_einvoice_readiness` | GST/IRP Phase B — NOT AUTHORIZED |  |
 | `20261114000200` | `irp_reconciliation` | GST/IRP Phase B — NOT AUTHORIZED |  |
 | `20261114000300` | `gst_mode_gates` | GST/IRP Phase B — NOT AUTHORIZED |  |
 | `20261114000400` | `restrict_trigger_functions_execute` | GST/IRP Phase B — NOT AUTHORIZED | Phase B5 — EXECUTE revoke; independent hardening, still NOT AUTHORIZED (Phase B) |
@@ -114,6 +118,7 @@ without separate written authorization each.
 | `20261115000100` | `fix_redeem_staff_invite_status_returns` | Branch set — apply only with B1 (release prep §2) | P0 auth — invite single-use fix |
 | `20261115000200` | `owner_billing_configuration_guard` | Branch set — apply only with B1 (release prep §2) | P0 security — owner-only tax/GSTIN trigger (PR #181 content, renumbered) |
 | `20261115000300` | `audit_restaurant_account_reassignment` | Branch set — apply only with B1 (release prep §2) | P0 security — account-reassignment audit ledger |
+| `20261118000100` | `merge_boundary_gst_order_line_edits` | PR #191 main-merge reconciliation (2026-11-16) | Re-asserts main's order-line edit boundary (owner/manager/cashier only; Kitchen 42501) on the GST replacement; NOT AUTHORIZED for hosted application by this merge |
 | `20261116000100` | `revoke_client_maintain_privileges` | Scoped ACL revision — NOT AUTHORIZED (own decision; production substitute for `20261110001220`, see its probed row) | Added 2026-11-16 after production catalog probes: completes the MAINTAIN/default-ACL scope 01220 misses in the production-shaped catalog, with fail-closed post-revoke verification; sequence revokes justified by definer-only consumption (verified in source). Locally replay-tested; never applied to any hosted project |
 
 ## Owner-operation (never applied automatically — separate on purpose)

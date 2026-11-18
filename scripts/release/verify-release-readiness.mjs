@@ -20,11 +20,14 @@ const check = (name, ok, detail = '') => {
 };
 const read = (p) => readFileSync(join(root, p), 'utf8');
 
-// 1. Migration inventory: exactly 93 files, unique 14-digit versions.
+// 1. Migration inventory: exactly 98 files, unique 14-digit versions.
+// 93 on the reviewed PR branch + 4 added by main + 1 merge-reconciliation
+// migration (20261118000100); four pre-existing branch files were renumbered
+// past duplicate versions from main during the main-merge reconciliation.
 const migDir = join(root, 'supabase/migrations');
 const migFiles = readdirSync(migDir).filter((f) => f.endsWith('.sql')).sort();
 const versions = migFiles.map((f) => f.slice(0, 14));
-check('migration_count_93', migFiles.length === 93, `found ${migFiles.length}`);
+check('migration_count_98', migFiles.length === 98, `found ${migFiles.length}`);
 check('migration_versions_unique', new Set(versions).size === versions.length);
 check('migration_versions_14_digit', versions.every((v) => /^[0-9]{14}$/.test(v)));
 
@@ -33,12 +36,12 @@ check('owner_operation_present', existsSync(join(root, 'supabase/owner-operation
 check('owner_operation_not_in_migrations', !migFiles.includes('20261110000501_revoke_supabase_admin_client_defaults.sql'));
 
 // 3. GST/IRP Phase B (B1–B7) exist and are documented as NOT AUTHORIZED.
-const GST_B = ['20261113000100_gst_two_mode.sql','20261114000100_gst_b2b_einvoice_readiness.sql','20261114000200_irp_reconciliation.sql','20261114000300_gst_mode_gates.sql','20261114000400_restrict_trigger_functions_execute.sql','20261114000500_credit_debit_notes.sql','20261114000600_einvoice_issuance_profile.sql'];
+const GST_B = ['20261113000100_gst_two_mode.sql','20261114000101_gst_b2b_einvoice_readiness.sql','20261114000200_irp_reconciliation.sql','20261114000300_gst_mode_gates.sql','20261114000400_restrict_trigger_functions_execute.sql','20261114000500_credit_debit_notes.sql','20261114000600_einvoice_issuance_profile.sql'];
 for (const f of GST_B) check(`gst_irp_present:${f.slice(0,14)}`, migFiles.includes(f));
 const manifest = existsSync(join(root, 'docs/migration-manifest-2026-11-14.md')) ? read('docs/migration-manifest-2026-11-14.md') : '';
 const manifestVersions = new Set([...manifest.matchAll(/`([0-9]{14})`/g)].map((m) => m[1]));
 const actualVersions = new Set(versions);
-check('manifest_tracks_all_93', actualVersions.size === manifestVersions.size && [...actualVersions].every((v) => manifestVersions.has(v)),
+check('manifest_tracks_all_98', actualVersions.size === manifestVersions.size && [...actualVersions].every((v) => manifestVersions.has(v)),
   `manifest ${manifestVersions.size} versions vs actual ${actualVersions.size}`);
 check('manifest_marks_gst_irp_unauthorized', manifest.includes('NOT AUTHORIZED') && manifest.includes('GST/IRP'));
 check('gst_irp_plan_unauthorized', read('docs/gst-irp-production-readiness-2026-11-14.md').includes('NOT AUTHORIZED'));
