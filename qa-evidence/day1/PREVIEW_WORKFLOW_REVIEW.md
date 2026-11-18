@@ -179,3 +179,65 @@ review): only labeled fixtures.
 subject to owner actions O2–O3 above. The personal-account warning
 stands until O2 is done: until then, simply do not set
 `PREVIEW_TEST_*` to personal credentials.
+
+---
+
+## Owner-approved conflict resolution (2026-11-16) — new head
+
+The owner approved resolving the conflicts **without merging**. `main` was
+merged into this branch (merge commit, never squash, never rebase):
+
+- Merge commit `2832b9d` — parents `3803b5b` (reviewed head) and
+  `b385bf4` (latest `main`). Merge-base was `b866601`; the branch was
+  63 commits ahead, `main` 4 ahead.
+- Text conflicts: only 3 files — `package.json` (branch is a superset;
+  main's differing line is identical), `scripts/e2e/prepare-local-supabase.mjs`
+  (kept main's stronger named-boundary-migration assertion), and
+  `scripts/verify-database.mjs` (kept the union of both integration test
+  lists). **R1–R3 files are byte-identical before and after the merge.**
+- Semantic conflict (no text markers): main's
+  `20261112000700_order_line_edit_boundary` restricted
+  `set_order_line_quantities` to owner/manager/cashier (Kitchen → 42501,
+  write-gate before payment-state guards); this branch's later GST
+  migration `20261113000100` replaced the function and silently
+  re-admitted Kitchen. Neither applied migration was edited. Forward
+  reconciliation migration `20261118000100_merge_boundary_gst_order_line_edits`
+  (commit `3b21bdf`) re-asserts main's boundary, role scope, guard order,
+  and grants on the GST body (tax math copied verbatim).
+- Duplicate migration versions: the merge created 4 (main's boundary set
+  vs this branch's serialize/GST files). Neither colliding file is a
+  deployed-history anchor, so the branch-side files renumbered past main
+  (`20261112000501`, `...601`, `...701`, `20261114000101`) in commit
+  `c73dd6f`; the fail-closed release verifier and the migration manifest
+  now track the merged inventory of **98 migrations** honestly (93 + 4
+  from main + 1 reconciliation), with all five additions marked
+  NOT AUTHORIZED for hosted application by this merge.
+
+### Fresh verification at the merged head (local, clean tree)
+
+- Preview checker/config tests: **14/14 pass** (R1–R3 invariants intact).
+- Typecheck: clean. ESLint: clean. Design guard: pass.
+- `sql:check`: pass. `migrations:verify`: pass (98 files, 98 unique
+  versions, 4 deployed anchors). `verify:release`, isolation,
+  staging guards, backup selftest, DR verifiers, D2 probe: all pass.
+- Unit suite: **2,496 passed / 221 skipped / 0 failed**.
+- Embedded PostgreSQL replay of all 98 migrations: **207 passed / 2
+  skipped** (`test:db:integration`: 10 files, **212 passed**).
+- Clean-tree production build (placeholder env): **green**.
+- Secret scan of the full PR diff vs `main`: no credential patterns;
+  hits only inside test fixtures with labeled fake credentials.
+- GitHub checks and the Vercel Preview deployment for the final head:
+  recorded in the PR after this addendum (final head SHA below).
+
+### Verdict
+
+**GO — conflict resolution complete; PR is mergeable against latest
+`main` with the permanent Preview workflow and R1–R3 intact.** Per the
+owner's instruction this stops here: **merge requires a separate
+explicit approval**, and the eventual merge must use a **merge commit**
+(not squash). Production remains untouched: no Production merge,
+deployment, setting, Vercel, plan, collaborator, or secret change was
+made. Remaining owner actions are unchanged (dedicated Preview test
+account + three Actions secrets per
+`docs/operations/PREVIEW_TEST_ACCOUNT_SETUP.md`, then one manual
+**Preview checks** dispatch after merge).
