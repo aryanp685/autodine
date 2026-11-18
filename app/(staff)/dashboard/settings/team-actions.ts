@@ -28,6 +28,8 @@ import { getStaffContextDetailed } from '@/lib/db/staff';
 import { canEditSettings } from '@/lib/settings-input';
 import { requestOrigin } from '@/lib/site-origin';
 import { sendEmail, isValidRecipient } from '@/lib/email/provider';
+import { formatIncidentLogLine } from '@/lib/monitoring-incidents';
+import { operationalIncidents } from '@/lib/incident-registry';
 import { staffInvitationEmail } from '@/lib/email/templates';
 import { roleLabel } from '@/lib/db/team';
 import {
@@ -148,6 +150,17 @@ export async function createInviteAction(formData: FormData): Promise<void> {
     if (delivery.outcome === 'invalid_recipient') {
       done(`Invitation ready for a ${role}. The email address was refused, so copy the link below and send it yourself.`);
     }
+    // The on-screen sentence dies with the tab; a dead provider (revoked key,
+    // unverified domain) would otherwise fail every invitation silently
+    // forever. Emit the fixed-vocabulary alert line — no recipient, no
+    // address, no tenant id in the line; the dedup key never leaves memory.
+    const { record, outcome } = operationalIncidents.report({
+      key: `staff-invitation-email:${ctx.restaurantId}`,
+      kind: 'staff_invitation_email_failed',
+      severity: 'warning',
+      summary: 'Staff invitation email delivery failed',
+    });
+    console.warn(formatIncidentLogLine(outcome, record));
     done(`Invitation ready for a ${role}, but the email failed to send. Copy the link below and send it yourself — the link always works.`);
   }
 

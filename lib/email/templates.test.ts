@@ -38,6 +38,13 @@ describe('staffInvitationEmail', () => {
     expect(dirty.text).toContain('Maddi Kitchen Deluxe');
   });
 
+  it('is responsive: viewport declared, fluid container, capped line length', () => {
+    const mail = staffInvitationEmail(input);
+    expect(mail.html).toContain('name="viewport"');
+    expect(mail.html).toContain('width:100%;max-width:520px');
+    expect(mail.html).toContain('box-sizing:border-box');
+  });
+
   it('says what happens if the reader ignores the mail', () => {
     const mail = staffInvitationEmail(input);
     expect(mail.text).toMatch(/ignore/i);

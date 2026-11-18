@@ -16,6 +16,7 @@
     "migrations:verify": "node scripts/verify-migration-chain.mjs",
     "pitr:check": "node scripts/verify-pitr-checklist.mjs",
     "seed:sql": "tsx scripts/emit-seed.ts",
+    "email:test-send": "tsx scripts/email/send-test-email.ts",
     "env:check": "node scripts/check-env.mjs",
     "e2e": "playwright test",
     "e2e:install": "playwright install chromium",

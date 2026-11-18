@@ -18,6 +18,12 @@ const mocks = vi.hoisted(() => ({
   uniqueSlug: vi.fn(),
   resetPasswordForEmail: vi.fn(),
   resend: vi.fn(),
+  signInWithPassword: vi.fn(),
+  getUser: vi.fn(),
+  updateUser: vi.fn(),
+  signOut: vi.fn(),
+  getStaffContextDetailed: vi.fn(),
+  homeForRole: vi.fn(),
 }));
 
 vi.mock('next/headers', () => ({ cookies: mocks.cookies }));
@@ -25,12 +31,19 @@ vi.mock('next/navigation', () => ({ redirect: mocks.redirect }));
 vi.mock('@/lib/site-origin', () => ({ requestOrigin: mocks.requestOrigin }));
 vi.mock('@/lib/supabase/server', () => ({ createSupabaseServerClient: mocks.createSupabaseServerClient }));
 vi.mock('@/lib/supabase/admin', () => ({ getSupabaseAdmin: mocks.getSupabaseAdmin }));
-vi.mock('@/lib/db/staff', () => ({ getStaffContextDetailed: vi.fn() }));
-vi.mock('@/lib/db/team', () => ({ homeForRole: vi.fn() }));
+vi.mock('@/lib/db/staff', () => ({ getStaffContextDetailed: mocks.getStaffContextDetailed }));
+vi.mock('@/lib/db/team', () => ({ homeForRole: mocks.homeForRole }));
 vi.mock('@/lib/slug', () => ({ slugify: mocks.slugify, uniqueSlug: mocks.uniqueSlug }));
 
-import { requestPasswordResetAction, resendSignupConfirmationAction, signUpAction } from './actions';
+import {
+  requestPasswordResetAction,
+  resendSignupConfirmationAction,
+  signInAction,
+  signUpAction,
+  updatePasswordAction,
+} from './actions';
 import { PENDING_SIGNUP_EMAIL_COOKIE } from '@/lib/signup-confirmation';
+import { RECOVERY_COOKIE } from '@/lib/password';
 
 const cookieStore = {
   get: vi.fn(),
@@ -77,11 +90,21 @@ beforeEach(() => {
   mocks.uniqueSlug.mockImplementation(async (slug: string) => slug);
   mocks.resetPasswordForEmail.mockResolvedValue({ error: null });
   mocks.resend.mockResolvedValue({ error: null });
+  mocks.signInWithPassword.mockResolvedValue({ error: null });
+  mocks.getUser.mockResolvedValue({ data: { user: { id: 'user-1', email: 'owner@example.test' } } });
+  mocks.updateUser.mockResolvedValue({ error: null });
+  mocks.signOut.mockResolvedValue({ error: null });
+  mocks.getStaffContextDetailed.mockResolvedValue({ ok: true, context: { role: 'owner' } });
+  mocks.homeForRole.mockReturnValue('/dashboard');
   mocks.createSupabaseServerClient.mockResolvedValue({
     auth: {
       signUp: mocks.signUp,
       resetPasswordForEmail: mocks.resetPasswordForEmail,
       resend: mocks.resend,
+      signInWithPassword: mocks.signInWithPassword,
+      getUser: mocks.getUser,
+      updateUser: mocks.updateUser,
+      signOut: mocks.signOut,
     },
   });
   mocks.redirect.mockImplementation((destination: string) => {
@@ -288,5 +311,122 @@ describe('owner signup confirmation recovery', () => {
       },
     );
     expect(mocks.redirect).toHaveBeenCalledWith('/signup/confirmation-pending');
+  });
+});
+
+describe('verified account login', () => {
+  function loginForm(email = ' Owner@Example.test ', password = 'correct horse', next?: string): FormData {
+    const value = form(email);
+    value.set('password', password);
+    if (next !== undefined) value.set('next', next);
+    return value;
+  }
+
+  it('signs a verified account in and lands on the role home', async () => {
+    await expect(signInAction(loginForm())).rejects.toThrow(/^REDIRECT:/);
+
+    expect(mocks.signInWithPassword).toHaveBeenCalledWith({
+      email: 'owner@example.test',
+      password: 'correct horse',
+    });
+    expect(mocks.getStaffContextDetailed).toHaveBeenCalledTimes(1);
+    expect(mocks.homeForRole).toHaveBeenCalledWith('owner');
+    expect(mocks.redirect).toHaveBeenCalledWith('/dashboard');
+  });
+
+  it('honours a safe same-origin next and refuses an off-site one', async () => {
+    await expect(signInAction(loginForm('owner@example.test', 'pw', '/join/K7QM-3XPD'))).rejects.toThrow(/^REDIRECT:/);
+    expect(mocks.redirect).toHaveBeenCalledWith('/join/K7QM-3XPD');
+    expect(mocks.getStaffContextDetailed).not.toHaveBeenCalled();
+
+    vi.clearAllMocks();
+    mocks.signInWithPassword.mockResolvedValue({ error: null });
+    mocks.getStaffContextDetailed.mockResolvedValue({ ok: true, context: { role: 'owner' } });
+    mocks.homeForRole.mockReturnValue('/dashboard');
+    mocks.createSupabaseServerClient.mockResolvedValue({
+      auth: { signInWithPassword: mocks.signInWithPassword },
+    });
+    mocks.redirect.mockImplementation((destination: string) => {
+      throw new Error(`REDIRECT:${destination}`);
+    });
+
+    await expect(signInAction(loginForm('owner@example.test', 'pw', 'https://evil.example/phish'))).rejects.toThrow(
+      /^REDIRECT:/,
+    );
+    expect(mocks.redirect).toHaveBeenCalledWith('/dashboard');
+    expect(mocks.redirect).not.toHaveBeenCalledWith(expect.stringContaining('evil.example'));
+  });
+
+  it('answers bad credentials with one vague sentence and no account oracle', async () => {
+    mocks.signInWithPassword.mockResolvedValueOnce({
+      error: { message: 'Invalid login credentials: user not found detail' },
+    });
+
+    await expect(signInAction(loginForm())).rejects.toThrow(/^REDIRECT:/);
+
+    const destination = mocks.redirect.mock.calls[0][0] as string;
+    expect(destination).toContain('/login?error=');
+    expect(decodeURIComponent(destination)).toContain('Email or password is incorrect.');
+    expect(destination).not.toContain('user not found');
+    expect(mocks.getStaffContextDetailed).not.toHaveBeenCalled();
+  });
+});
+
+describe('password reset completion', () => {
+  function resetForm(password = 'New-Strong-Password9!', confirmation = password): FormData {
+    const value = new FormData();
+    value.set('password', password);
+    value.set('confirmation', confirmation);
+    return value;
+  }
+
+  function grantRecoveryCookie() {
+    cookieStore.get.mockImplementation((name: string) =>
+      name === RECOVERY_COOKIE ? { value: '1' } : undefined,
+    );
+  }
+
+  it('refuses without the recovery permission, before any Auth call', async () => {
+    await expect(updatePasswordAction(resetForm())).rejects.toThrow(/^REDIRECT:/);
+
+    const destination = mocks.redirect.mock.calls[0][0] as string;
+    expect(decodeURIComponent(destination)).toContain('Open the link from the reset email');
+    expect(mocks.createSupabaseServerClient).not.toHaveBeenCalled();
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+  });
+
+  it('treats a spent/expired session as an expired link and changes nothing', async () => {
+    grantRecoveryCookie();
+    mocks.getUser.mockResolvedValueOnce({ data: { user: null } });
+
+    await expect(updatePasswordAction(resetForm())).rejects.toThrow(/^REDIRECT:/);
+
+    const destination = mocks.redirect.mock.calls[0][0] as string;
+    expect(decodeURIComponent(destination)).toContain('This reset link has expired');
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+  });
+
+  it('requires the confirmation to match before asking Auth', async () => {
+    grantRecoveryCookie();
+
+    await expect(updatePasswordAction(resetForm('New-Strong-Password9!', 'Different-Password9!'))).rejects.toThrow(
+      /^REDIRECT:/,
+    );
+
+    expect(decodeURIComponent(mocks.redirect.mock.calls[0][0] as string)).toContain('do not match');
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+  });
+
+  it('sets the password once, spends the permission and signs out everywhere', async () => {
+    grantRecoveryCookie();
+
+    await expect(updatePasswordAction(resetForm())).rejects.toThrow(/^REDIRECT:/);
+
+    expect(mocks.updateUser).toHaveBeenCalledWith({ password: 'New-Strong-Password9!' });
+    expect(cookieStore.delete).toHaveBeenCalledWith(RECOVERY_COOKIE);
+    expect(mocks.signOut).toHaveBeenCalledTimes(1);
+    const destination = mocks.redirect.mock.calls[0][0] as string;
+    expect(destination).toContain('/login?notice=');
+    expect(decodeURIComponent(destination)).toContain('Your password was changed');
   });
 });
