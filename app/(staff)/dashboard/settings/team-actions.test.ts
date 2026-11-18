@@ -154,7 +154,7 @@ describe('creating an invitation', () => {
 
   it('sends the link to the address when email is given, and says so only when it was sent', async () => {
     mocks.rpc.mockResolvedValue({ data: 'K7QM-3XPD-9RTW-2HNJ', error: null });
-    mocks.sendEmail.mockResolvedValue({ outcome: 'delivered', provider: 'resend', attempts: 1 });
+    mocks.sendEmail.mockResolvedValue({ outcome: 'delivered', provider: 'brevo', attempts: 1 });
 
     const url = await urlOf(() =>
       createInviteAction(form({ role: 'kitchen', days: '7', email: 'cook@example.com' })),
@@ -178,11 +178,46 @@ describe('creating an invitation', () => {
 
   it('says the send failed rather than implying the mail arrived', async () => {
     mocks.rpc.mockResolvedValue({ data: 'K7QM-3XPD-9RTW-2HNJ', error: null });
-    mocks.sendEmail.mockResolvedValue({ outcome: 'failed', provider: 'resend', attempts: 3 });
+    mocks.sendEmail.mockResolvedValue({ outcome: 'failed', provider: 'brevo', attempts: 3 });
     const url = await urlOf(() =>
       createInviteAction(form({ role: 'kitchen', days: '7', email: 'cook@example.com' })),
     );
     expect(new URL(url, 'https://x.test').searchParams.get('notice')).toMatch(/failed to send/i);
+  });
+
+  it('emits the fixed-vocabulary alert line when the provider fails, without the recipient', async () => {
+    mocks.rpc.mockResolvedValue({ data: 'K7QM-3XPD-9RTW-2HNJ', error: null });
+    mocks.sendEmail.mockResolvedValue({ outcome: 'failed', provider: 'brevo', attempts: 3 });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await urlOf(() =>
+        createInviteAction(form({ role: 'kitchen', days: '7', email: 'cook@example.com' })),
+      );
+      const lines = warn.mock.calls.map((call) => String(call[0]));
+      const alert = lines.find((line) => line.includes('[autodine:alert]'));
+      expect(alert).toBeTruthy();
+      expect(alert).toContain('staff_invitation_email_failed');
+      // The line is what a log-drain pages on: it must carry no recipient,
+      // no invite code and no tenant identifier.
+      expect(alert).not.toContain('cook@example.com');
+      expect(alert).not.toContain('K7QM-3XPD-9RTW-2HNJ');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('does not alert when the provider accepted the invitation', async () => {
+    mocks.rpc.mockResolvedValue({ data: 'K7QM-3XPD-9RTW-2HNJ', error: null });
+    mocks.sendEmail.mockResolvedValue({ outcome: 'delivered', provider: 'brevo', attempts: 1 });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await urlOf(() =>
+        createInviteAction(form({ role: 'kitchen', days: '7', email: 'cook@example.com' })),
+      );
+      expect(warn.mock.calls.map((call) => String(call[0])).join(' ')).not.toContain('staff_invitation_email_failed');
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('reports the database refusal verbatim instead of claiming success', async () => {

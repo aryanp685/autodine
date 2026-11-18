@@ -32,6 +32,8 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin';
 import { getStaffContextDetailed } from '@/lib/db/staff';
 import { homeForRole } from '@/lib/db/team';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { formatIncidentLogLine } from '@/lib/monitoring-incidents';
+import { operationalIncidents } from '@/lib/incident-registry';
 import {
   normalizeAuthEmail,
   PENDING_SIGNUP_EMAIL_COOKIE,
@@ -40,6 +42,48 @@ import {
   signupConfirmationRedirectTo,
   type SignupResendState,
 } from '@/lib/signup-confirmation';
+
+/**
+ * Every Auth mail failure (confirmation, send-again, password reset,
+ * password update) used to be a lone `console.*` call while the visitor saw
+ * normal anti-enumeration output — so the Brevo 525 IP rejection sat
+ * invisible in production logs for days while signups silently failed.
+ * Route every failure through the shared operational-incident tracker
+ * instead: it dedups into a count, rejects raw provider text, and shows up
+ * wherever operators already watch — the `[autodine:alert]` log line and
+ * the owner/manager ops incident surface (`/api/ops/incidents`, which can
+ * also forward to the configured alert webhook). Reporting must never leak
+ * addresses, tenant ids, or provider messages into the line — callers pass
+ * only the fixed kind plus numeric status/Auth code.
+ */
+type AuthFailureKind =
+  | 'signup_confirmation_email_failed'
+  | 'signup_confirmation_resend_failed'
+  | 'password_reset_email_failed'
+  | 'password_update_failed'
+  | 'signup_workspace_creation_failed'
+  | 'signup_rollback_failed';
+
+function reportAuthFailure(kind: AuthFailureKind, status: number | null): void {
+  try {
+    const { record, outcome } = operationalIncidents.report({
+      key: kind,
+      kind,
+      severity: 'warning',
+      summary:
+        kind === 'signup_workspace_creation_failed'
+          ? 'Signup workspace creation failed after Auth user creation'
+          : kind === 'signup_rollback_failed'
+            ? 'Signup rollback failed; a partial Auth user may remain'
+            : kind === 'password_update_failed'
+            ? `Password update failed (status ${status ?? 'transport'})`
+            : `Auth email failed (${kind}, status ${status ?? 'transport'})`,
+    });
+    console.warn(formatIncidentLogLine(outcome, record));
+  } catch {
+    // Reporting must never change what the visitor sees or break the flow.
+  }
+}
 
 function fail(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
@@ -161,6 +205,17 @@ export async function signUpAction(formData: FormData): Promise<void> {
   // may return different errors for mail/send eligibility, so neither the
   // redirect nor the PKCE cookie shape should reveal account state.
   if (!signupResult || signupResult.error || !userId) {
+    // The visitor must see the identical pending page (anti-enumeration),
+    // but operators must not: a broken mail provider (e.g. the Brevo 525 IP
+    // rejection) otherwise fails every signup invisibly. Report only the
+    // fixed kind plus numeric status — never the address or provider text.
+    // A missing user id with no error is not a mail failure, so only an
+    // explicit error or a transport failure (null result) is reported.
+    if (!signupResult || signupResult.error) {
+      const status = signupResult?.error ? safeErrorShape(signupResult.error).status : null;
+      // A 429 is expected throttling, not a provider failure.
+      if (status !== 429) reportAuthFailure('signup_confirmation_email_failed', status);
+    }
     await rememberPendingSignupEmail(email, emailRedirectTo.startsWith('https://'));
     redirect(SIGNUP_CONFIRMATION_PENDING_PATH);
   }
@@ -198,6 +253,7 @@ export async function signUpAction(formData: FormData): Promise<void> {
       await rollbackSignup(admin, userId, restaurantId);
     } catch (rollbackError) {
       console.error('[autodine] signup rollback failed', safeErrorShape(rollbackError));
+      reportAuthFailure('signup_rollback_failed', safeErrorShape(rollbackError).status);
     }
     try {
       await supabase.auth.signOut();
@@ -205,6 +261,9 @@ export async function signUpAction(formData: FormData): Promise<void> {
       console.error('[autodine] signup session cleanup failed', safeErrorShape(signOutError));
     }
     console.error('[autodine] workspace creation failed', safeErrorShape(error));
+    // Same invisibility trap as mail: without an incident, a broken signup
+    // workspace path would fail every new restaurant with only a log line.
+    reportAuthFailure('signup_workspace_creation_failed', safeErrorShape(error).status);
     fail('/signup', 'We could not finish setting up your workspace. Please try again.');
   }
 
@@ -260,12 +319,20 @@ export async function resendSignupConfirmationAction(
         status: error.status ?? null,
         code: error.code ?? 'unknown',
       });
+      // The visitor still gets the identical anti-enumeration result, but a
+      // provider-wide failure (the Brevo 525 lesson) must become a countable
+      // operator incident instead of a lone warning nobody watches. A 429 is
+      // expected throttling, not a provider failure, so it is not reported.
+      if (error.status !== 429) {
+        reportAuthFailure('signup_confirmation_resend_failed', error.status ?? null);
+      }
     }
   } catch (error) {
     // Do not log email addresses or raw Auth/provider messages from this path.
     console.warn('[autodine] signup confirmation resend could not be completed', {
       name: error instanceof Error ? error.name : 'unknown',
     });
+    reportAuthFailure('signup_confirmation_resend_failed', null);
   }
 
   return { status: 'requested' };
@@ -382,6 +449,11 @@ export async function requestPasswordResetAction(formData: FormData): Promise<vo
       status: status ?? null,
       code: (error as { code?: string }).code ?? 'unknown',
     });
+    // A dead mail provider would otherwise lock every user out of password
+    // recovery with only this log line as evidence. (The 429 branch above
+    // returns earlier and is not reported: throttling is expected, tells
+    // the visitor the truth, and is a property of the site, not a failure.)
+    reportAuthFailure('password_reset_email_failed', status ?? null);
     fail('/forgot-password', 'We could not send the email just now. Please try again in a few minutes.');
   }
 
@@ -460,6 +532,10 @@ export async function updatePasswordAction(formData: FormData): Promise<void> {
       status: (error as { status?: number }).status ?? null,
       code: (error as { code?: string }).code ?? 'unknown',
     });
+    reportAuthFailure(
+      'password_update_failed',
+      (error as { status?: number }).status ?? null,
+    );
     fail('/reset-password', 'We could not save the new password. Request a new reset link and try again.');
   }
 

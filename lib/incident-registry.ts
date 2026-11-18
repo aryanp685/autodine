@@ -12,3 +12,11 @@
 import { InMemoryIncidentTracker } from './monitoring-incidents';
 
 export const realtimeIncidents = new InMemoryIncidentTracker();
+
+/**
+ * Operational failures that have no realtime channel attached: transactional
+ * email delivery and billing-webhook application. Same rules as above — the
+ * tracker dedupes repeats into a count, and only the fixed-vocabulary log
+ * line (kind/severity/count, never the dedup key) leaves the process.
+ */
+export const operationalIncidents = new InMemoryIncidentTracker();
