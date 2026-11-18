@@ -247,3 +247,10 @@ behaviour change):
   branch base — 55/55 focused tests, typecheck clean, `next build`
   green — before pushing to `arena/9b120325-autodine`. No Production
   change, no merge performed by the agent.
+- **Deployed (2026-11-18):** commits `d679a9e` (fix) + `e9b247d` (docs)
+  on `arena/9b120325-autodine`, PR **#192** open (not merged). Preview
+  deployment `dpl_FL8jz6dsh4gQrLzvnMBij8MDc2QH` **READY**; branch alias
+  `new-git-arena-9b120325-autodine-iamjarvis9896-3988s-projects.vercel.app`.
+  The incident-visibility fix is therefore live on that Preview; the
+  earlier Brevo-code Preview (`dpl_GnLaaimCs8H3DnUAr5UC7LBWr8M2`, PR
+  #191) remains the deployment where the confirmation mail was verified.
