@@ -19,18 +19,13 @@ import { readAllRows, readRowsForIds } from '@/lib/db/paged-read';
  *
  * SCHEMA NOTES
  *
- * `prep_status` and `payment_status` are two independent state machines and
- * are never merged. The kitchen drives prep_status only. Whether a ticket has
- * been paid is not the kitchen's concern and does not gate cooking; it is
- * surfaced as a badge so the pass can see "unpaid, collect at counter".
- *
- * `total_paise` is authoritative and is written by place_order(), never by a
- * client. We convert to rupees here for display only -- lib/money.ts is the
- * only place allowed to divide by 100.
+ * Kitchen receives operational fields only. Payment state and every order
+ * amount belong to Owner, Manager and Cashier views; they are not returned by
+ * this loader or shown on the board. Direct database column grants enforce the
+ * same boundary even if a caller bypasses this projection.
  */
 
 import { getStaffContextDetailed, KITCHEN_ROLES } from '@/lib/db/staff';
-import { paiseToRupees } from '@/lib/money';
 import { clockTimeInZone } from './time';
 import type { MemberRole } from './database';
 import type { Order } from './types';
@@ -40,7 +35,7 @@ export type KitchenPrepState = 'new' | 'preparing' | 'ready' | 'served';
 /** Mirrors the demo KitchenOrder shape so the locked markup is unchanged. */
 type KitchenOrderRow = Pick<
   Order,
-  'id' | 'code' | 'table_id' | 'customer_note' | 'prep_status' | 'payment_status' | 'total_paise' | 'placed_at'
+  'id' | 'code' | 'table_id' | 'customer_note' | 'prep_status' | 'placed_at'
 > & {
   hold_required?: boolean;
   confirmed_at?: string | null;
@@ -70,7 +65,6 @@ export type KitchenTicket = {
    */
   placedAtIso: string;
   ageMin: number;
-  payment: 'paid' | 'pending' | 'failed';
   state: KitchenPrepState;
   note?: string;
   items: {
@@ -96,8 +90,6 @@ export type KitchenTicket = {
     /** The owner's written pronunciation, when there is one. */
     spoken?: string | null;
   }[];
-  /** Rupees, for display. Derived from total_paise. */
-  total: number;
   /** Last durable voice-delivery result, null until an attempt completes. */
   announcementStatus?: 'announced' | 'failed' | null;
   announcementAt?: string | null;
@@ -148,7 +140,7 @@ export type HeldTable = {
   ageMin: number;
   latest: string;
   note?: string;
-  orders: { id: string; code: string; total: number }[];
+  orders: { id: string; code: string }[];
   itemCount: number;
   items: KitchenTicket['items'];
 };
@@ -156,8 +148,8 @@ export type HeldTable = {
 export type KitchenScreenData = {
   restaurantName: string;
   /**
-   * Needed by the realtime subscription, which filters INSERTs to this
-   * restaurant in the browser. Null on demo data.
+   * Namespaces Kitchen's local seen/missed-ticket state and single-speaker
+   * coordination to this restaurant. Null on demo data.
    */
   restaurantId: string | null;
   tickets: KitchenTicket[];
@@ -214,20 +206,6 @@ function minutesSince(iso: string, now: number): number {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return 0;
   return Math.max(0, Math.floor((now - then) / 60_000));
-}
-
-/**
- * 'refunded' reads as paid to the kitchen: money did move, and the ticket
- * should not be badged "unpaid, collect at counter" because the guest was
- * refunded after paying. The distinction belongs on the reports screen, not
- * on a board a cook reads while plating.
- */
-function paymentLabel(
-  status: string
-): 'paid' | 'pending' | 'failed' {
-  if (status === 'pending') return 'pending';
-  if (status === 'failed') return 'failed';
-  return 'paid';
 }
 
 export async function getKitchenScreenData(): Promise<KitchenScreenData | null> {
@@ -299,11 +277,11 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
    * making an unconfirmed table look ready just because voice status is new.
    */
   const orderColumnsFull =
-    'id, code, table_id, customer_note, prep_status, payment_status, total_paise, placed_at, hold_required, confirmed_at, table_session_id, kitchen_announcement_status, kitchen_announcement_at, kitchen_announcement_error';
+    'id, code, table_id, customer_note, prep_status, placed_at, hold_required, confirmed_at, table_session_id, kitchen_announcement_status, kitchen_announcement_at, kitchen_announcement_error';
   const orderColumnsWithHolds =
-    'id, code, table_id, customer_note, prep_status, payment_status, total_paise, placed_at, hold_required, confirmed_at, table_session_id';
+    'id, code, table_id, customer_note, prep_status, placed_at, hold_required, confirmed_at, table_session_id';
   const orderColumnsLegacy =
-    'id, code, table_id, customer_note, prep_status, payment_status, total_paise, placed_at';
+    'id, code, table_id, customer_note, prep_status, placed_at';
   const queryOrders = (columns: string) => readAllRows((from, to) => supabase
     .from('orders')
     .select(columns)
@@ -476,7 +454,6 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
         orders: group.map((row) => ({
           id: row.id,
           code: row.code,
-          total: paiseToRupees(row.total_paise),
         })),
         itemCount: items.reduce((total, item) => total + item.qty, 0),
         items,
@@ -509,11 +486,9 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
       placedAt: clockTimeInZone(timezone, row.placed_at),
       placedAtIso: row.placed_at,
       ageMin: minutesSince(row.placed_at, now),
-      payment: paymentLabel(row.payment_status),
       state: row.prep_status as KitchenPrepState,
       note: row.customer_note?.trim() || undefined,
       items,
-      total: paiseToRupees(row.total_paise),
       announcementStatus: row.kitchen_announcement_status ?? null,
       announcementAt: row.kitchen_announcement_at ?? null,
       announcementError: row.kitchen_announcement_error ?? null,

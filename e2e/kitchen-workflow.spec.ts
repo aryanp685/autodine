@@ -6,9 +6,10 @@ import { announcementCount, recordAnnouncements, waitForAppReady } from './flow-
  *
  * The sample board (lib/demo-data.ts) is the fixture: five tickets in every
  * state the pass knows — New, Preparing, Ready, Served — with tables, item
- * quantities, a special instruction and a payment chip. Demo mode keeps the
- * board's moves in this browser (demoState), which is exactly enough to prove
- * the controls, the states and the voice rules at the DOM level.
+ * quantities and a special instruction. Payment state and order totals are
+ * deliberately absent from Kitchen. Demo mode keeps the board's moves in this
+ * browser (demoState), which is enough to prove its controls, states and voice
+ * rules at the DOM level.
  *
  * WHAT LIVES IN e2e/integration/kitchen-flow.spec.ts INSTEAD
  *
@@ -45,20 +46,19 @@ test.describe('incoming orders are readable at a glance', () => {
     await expect(ticket).toContainText('Ring the bell — no onion in the gravy.');
   });
 
-  test('payment state is on the ticket: a pending bill is named, a paid one is not', async ({
+  test('payment state and order totals are absent from kitchen tickets', async ({
     page,
   }) => {
     await page.goto('/kitchen');
     await waitForAppReady(page);
 
-    // A paid ticket has no extra chip. The pending one names exactly what is
-    // owed, without implying that payment is taken in the app.
-    await expect(
+    for (const ticket of [
       page.locator('article[data-state="new"]', { hasText: 'T7' }),
-    ).not.toContainText('Unpaid');
-    await expect(
       page.locator('article[data-state="preparing"]', { hasText: 'T3' }),
-    ).toContainText('Unpaid · pay at counter');
+    ]) {
+      await expect(ticket).not.toContainText('Unpaid');
+      await expect(ticket).not.toContainText('₹');
+    }
   });
 });
 

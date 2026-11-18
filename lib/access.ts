@@ -1,9 +1,10 @@
 /**
  * A restaurant's plan and trial, as the app describes it.
  *
- * The AUTHORITY is `public.restaurant_access()` in migration 20261026001200 —
- * this type is only the shape of what it returns, plus the sentences that turn
- * it into English. Nothing here decides anything, and no screen may treat a
+ * The AUTHORITY is `public.restaurant_access()` as last hardened by migration
+ * 20261114000100 (forward replacement of 20261026001200). This type is only the
+ * shape of what it returns, plus the sentences that turn it into English.
+ * Nothing here decides anything, and no screen may treat a
  * missing value as permission: the database refuses the write either way.
  *
  * Why a separate module: client components (the dashboard's plan line, the
@@ -13,7 +14,21 @@
 
 import { BILLING } from './plans';
 
-export type RestaurantAccess = {
+export type RestaurantEntitlement = {
+  /** Operational gate: false means supported writes are refused by the DB. */
+  canWrite: boolean;
+  readOnly: boolean;
+  /** Feature ids from the server's matrix; used for operational gating. */
+  features: string[];
+  /**
+   * Migration 20261110001000. How many outlets the account's plan allows, and
+   * how many it has. Only the Owner/Manager entitlement projection includes it.
+   */
+  outlets?: OutletEntitlement;
+};
+
+/** Detailed billing state, returned only to Owner/Manager. */
+export type RestaurantAccess = RestaurantEntitlement & {
   /** 'trial' | 'starter' | 'professional' | 'business', or anything the DB says. */
   plan: string;
   status: string;
@@ -21,23 +36,12 @@ export type RestaurantAccess = {
   trialEndsAt: string | null;
   /** Whole days left in the trial, rounded up. 0 when not trialing. */
   daysRemaining: number;
-  /** The write gate: false means orders, menus and payments are read-only. */
-  canWrite: boolean;
-  readOnly: boolean;
-  /** Feature ids from the server's matrix. */
-  features: string[];
   /**
    * Migration 20261110001000 (Model C). The account that owns this outlet and
    * pays for it. Optional: a deployment predating the migration has no account
    * link, and a screen must not break for it.
    */
   accountId?: string | null;
-  /**
-   * Migration 20261110001000. How many outlets the account's plan allows, and
-   * how many it has. Optional for the same reason, and read through
-   * `outletEntitlementOf()` so a missing value is never treated as a licence.
-   */
-  outlets?: OutletEntitlement;
 };
 
 /**

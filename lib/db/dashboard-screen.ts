@@ -165,7 +165,7 @@ async function loadActiveSessions(
 
   const sessionIds = sessions.map((session) => session.id);
   const { data: orders, error: ordersError } = await supabase
-    .from('orders')
+    .from('orders_finance')
     .select('id, code, order_session_id, table_id, total_paise, prep_status')
     .eq('restaurant_id', restaurantId)
     .in('order_session_id', sessionIds)
@@ -309,8 +309,8 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
     };
   }
 
-  const { supabase, restaurantId, restaurantName, timezone, role, access } = staff.context;
-  const canMarkPaid = CASHIER_ROLES.includes(role) && Boolean(access?.canWrite);
+  const { supabase, restaurantId, restaurantName, timezone, role, entitlement } = staff.context;
+  const canMarkPaid = CASHIER_ROLES.includes(role) && Boolean(entitlement?.canWrite);
 
   const now = new Date();
   const dayStart = startOfDayUtc(timezone, now);
@@ -319,7 +319,7 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
   const gstMode = await loadGstMode(supabase, restaurantId).catch(() => 'off' as GstMode);
   const [ordersResult, paymentsResult, activeSessions] = await Promise.all([
     readAllRows((from, to) => supabase
-      .from('orders')
+      .from('orders_finance')
       .select('id, code, table_id, prep_status, payment_status, total_paise, placed_at')
       .eq('restaurant_id', restaurantId)
       .neq('prep_status', 'cancelled')
@@ -401,7 +401,7 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
   // dining_tables(label) resolves to a SelectQueryError and will not compile.
   const [itemsResult, tablesResult] = await Promise.all([
     readRowsForIds(orderIds, (ids, from, to) => supabase
-      .from('order_items')
+      .from('order_items_finance')
       .select('order_id, name_snapshot, qty, unit_price_paise')
       .in('order_id', ids).order('id').range(from, to)),
     tableIds.length

@@ -103,7 +103,7 @@ function loadNotice() {
     `sessions[${metric(report.workloads.tableSessions)}]`,
     `orders[${metric(report.workloads.orderCreation)}]`,
     `appReads[${metric(report.workloads.appMenuReads)}]`,
-    `kitchen[${metric(kitchen?.apiUpdateRequests)}; clients=${kitchen?.subscribers ?? 0}; initial=${JSON.stringify(kitchen?.initialPrepStatusCounts ?? {})}; events=${kitchen?.realtimeEventsReceived ?? 0}/${kitchen?.realtimeEventsExpected ?? 0}; eventRps=${kitchen?.realtimeFanoutEventsPerSecond ?? 0}; eventP95=${kitchen?.realtimeEventLatencyMs?.p95 ?? 'na'}ms; waves=${(kitchen?.updateWaves ?? []).map((wave) => `${wave.status}:${wave.receivedRealtimeEvents}/${wave.expectedRealtimeEvents},raw=${wave.rawPostgresEvents},states=${Object.entries(wave.rawStatusCounts ?? {}).map(([status, count]) => `${status}:${count}`).join('+')}`).join('|') || 'not recorded'}; failures=${kitchen?.failures ?? 0}]`,
+    `kitchen[updates=${metric(kitchen?.apiUpdateRequests)}; polls=${metric(kitchen?.pollingReads)}; concurrentPerWave=${kitchen?.pollingRequestsPerWave ?? 0}; rows=${kitchen?.pollingRowsObserved ?? 0}/${kitchen?.pollingRowsExpected ?? 0}; waves=${(kitchen?.updateWaves ?? []).map((wave) => `${wave.status}:updates=${wave.successfulOrderUpdates}/${wave.requestedOrderUpdates},polls=${wave.successfulPollRequests}/${wave.pollRequests},rows=${wave.rowsObserved}`).join('|') || 'not recorded'}; failures=${kitchen?.failures ?? 0}]`,
     `overallFailures=${failures.length}`,
   ].join('; ');
 }
@@ -115,8 +115,9 @@ function loadSummary() {
     `- Generated: ${report.generatedAt}`,
     `- Target: ${report.target}`,
     `- Requested workload: ${guests} guest sessions across ${restaurantCount} synthetic restaurants; API concurrency ${concurrency}.`,
+    '- Kitchen fan-out is simulated with authenticated PostgREST polling reads; this run opens no Realtime channel.',
     '',
-    '| Workload | Completed / requested | Failures | Throughput/s | p50 / p95 / p99 / max ms | Concurrency or fan-out |',
+    '| Workload | Completed / requested | Failures | Throughput/s | p50 / p95 / p99 / max ms | Concurrency / reads |',
     '|---|---:|---:|---:|---:|---:|',
   ];
   for (const [name, label] of [
@@ -135,18 +136,19 @@ function loadSummary() {
   if (kitchen) {
     const api = kitchen.apiUpdateRequests ?? {};
     const latency = api.latencyMs ?? {};
+    const polling = kitchen.pollingReads ?? {};
     lines.push(
-      `| Kitchen updates + Realtime | ${api.completed ?? 0} / ${api.requested ?? 0} | ${kitchen.failures ?? 0} | ${kitchen.realtimeFanoutEventsPerSecond ?? 0} | ${latency.p50 ?? '—'} / ${latency.p95 ?? '—'} / ${latency.p99 ?? '—'} / ${latency.max ?? '—'} | ${kitchen.subscribers ?? 0} clients; ${kitchen.realtimeEventsReceived ?? 0} / ${kitchen.realtimeEventsExpected ?? 0} events; ${(kitchen.updateWaves ?? []).map((wave) => `${wave.status} ${wave.receivedRealtimeEvents}/${wave.expectedRealtimeEvents}`).join(', ')} |`,
+      `| Kitchen updates + polling reads | ${api.completed ?? 0} / ${api.requested ?? 0} | ${kitchen.failures ?? 0} | ${api.throughputPerSecond ?? 0} | ${latency.p50 ?? '—'} / ${latency.p95 ?? '—'} / ${latency.p99 ?? '—'} / ${latency.max ?? '—'} | ${kitchen.pollingRequestsPerWave ?? 0} concurrent requests/wave; polls ${polling.completed ?? 0}/${polling.requested ?? 0}; rows ${kitchen.pollingRowsObserved ?? 0}/${kitchen.pollingRowsExpected ?? 0} |`,
     );
   }
   lines.push('', `Overall: **${failures.length ? `${failures.length} failure(s)` : 'no recorded failures'}**.`);
   if (failures.length) {
     lines.push('', 'Failure details (synthetic identifiers redacted):');
     for (const failure of failures.slice(0, 20)) {
-      lines.push(`- \`${failure.stage}\` (${failure.code ?? 'no code'}): ${safeDiagnostic(failure.message)}`);
+      lines.push(`- ${failure.stage} (${failure.code ?? 'no code'}): ${safeDiagnostic(failure.message)}`);
     }
   }
-  return `${lines.join('\n')}\n`;
+  return lines.join('\n') + '\n';
 }
 
 checkLoopback(apiUrl, 'Supabase API URL', 'http:');
@@ -352,7 +354,11 @@ try {
   if (staffError || !staffSession?.access_token) {
     addFailure('kitchen_auth', null, staffError ?? new Error('Could not read synthetic owner session.'));
   } else {
-    const realtimeClientCount = 20;
+    // Kitchen now polls role-scoped order reads instead of subscribing to raw
+    // orders rows. Simulate twenty concurrent PostgREST polling requests per
+    // write wave with the fixture Owner's authenticated session; this is not a
+    // Kitchen-role or twenty-independent-session authorization test.
+    const concurrentPollingRequestsPerWave = 20;
     const updateOrderCount = Math.min(25, guestsPerRestaurant);
     const updateGuests = guestsData.slice(0, updateOrderCount).filter((_, index) => guestTokens[index]);
     const updateTokenSet = updateGuests.map((guest) => guestTokens[guest.index]);
@@ -369,89 +375,23 @@ try {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
       global: { headers: { authorization: `Bearer ${staffSession.access_token}` } },
     });
-    const rtClients = [];
-    const channels = [];
-    const received = [];
-    const eventErrors = [];
     const initialPrepStatusCounts = updateOrders.reduce((counts, order) => {
       counts[order.prep_status] = (counts[order.prep_status] ?? 0) + 1;
       return counts;
     }, {});
     const kitchenUpdateLatencies = [];
+    const pollingReadLatencies = [];
     let kitchenUpdateFailures = 0;
-    let subscribedCount = 0;
-    let subscriptionError = null;
-    let currentWave = null;
+    let pollingReadFailures = 0;
+    let pollingRowsObserved = 0;
     const restaurantId = restaurantIds[0];
 
     try {
       if (updateOrders.length !== updateOrderCount) throw new Error(`Expected ${updateOrderCount} kitchen orders, found ${updateOrders.length}.`);
-      const subscriptions = Array.from({ length: realtimeClientCount }, async (_, index) => {
-        const rt = createClient(apiUrl, anonKey, {
-          auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-        });
-        await rt.realtime.setAuth(staffSession.access_token);
-        rtClients.push(rt);
-        const channel = rt.channel(`load-kitchen-${prefix}-${index}`)
-          .on('postgres_changes', {
-            event: 'UPDATE', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}`,
-          }, (payload) => {
-            if (!currentWave) return;
-            const id = payload.new?.id;
-            const status = payload.new?.prep_status;
-            currentWave.rawPostgresEvents += 1;
-            const statusKey = typeof status === 'string' ? status : String(status ?? 'missing');
-            currentWave.rawStatusCounts[statusKey] = (currentWave.rawStatusCounts[statusKey] ?? 0) + 1;
-            const key = `${id}:${status}`;
-            const sentAt = currentWave.sentAt.get(key);
-            if (sentAt !== undefined) {
-              const eventKey = `${index}:${key}`;
-              if (!currentWave.seen.has(eventKey)) {
-                currentWave.seen.add(eventKey);
-                received.push(performance.now() - sentAt);
-              }
-            }
-          })
-          .subscribe((status, error) => {
-            if (status === 'SUBSCRIBED') {
-              subscribedCount += 1;
-              return;
-            }
-            if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-              const message = `${status}${error?.message ? `: ${error.message}` : ''}`;
-              eventErrors.push(message);
-              subscriptionError ??= message;
-            }
-          });
-        channels.push(channel);
-      });
-      await Promise.all(subscriptions);
-      // The callback is the acknowledgement that each socket joined; do not
-      // begin kitchen updates until every synthetic dashboard is subscribed.
-      const subscribedDeadline = performance.now() + 30_000;
-      while (subscribedCount < realtimeClientCount && !subscriptionError && performance.now() < subscribedDeadline) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      }
-      if (subscriptionError) throw new Error(`Realtime subscription failed: ${subscriptionError}`);
-      if (subscribedCount < realtimeClientCount) throw new Error(`Only ${subscribedCount}/${realtimeClientCount} kitchen clients subscribed.`);
-      // Supabase Realtime acknowledges each channel join before every local
-      // replication worker has necessarily caught up with the publication.
-      // Starting the first database write on the same event-loop turn as the
-      // last SUBSCRIBED acknowledgement caused the cold-start wave to be lost
-      // in the disposable stack, while later waves arrived normally. Let the
-      // subscription/publication pipeline settle before measuring delivery;
-      // this is intentionally only a startup barrier, not a per-wave delay.
-      const realtimeWarmupMs = 10_000;
-      await new Promise((resolve) => setTimeout(resolve, realtimeWarmupMs));
-
       const waveResults = [];
-      const kitchenUpdatesStarted = performance.now();
+      const kitchenWorkStarted = performance.now();
       for (const prepStatus of ['preparing', 'ready', 'served']) {
-        const sentAt = new Map();
-        for (const order of updateOrders) sentAt.set(`${order.id}:${prepStatus}`, performance.now());
-        const priorEvents = received.length;
         const waveStart = performance.now();
-        currentWave = { sentAt, seen: new Set(), rawPostgresEvents: 0, rawStatusCounts: {} };
         const updates = await Promise.all(updateOrders.map(async (order) => {
           const requestStarted = performance.now();
           const { data, error } = await staff.from('orders')
@@ -471,78 +411,96 @@ try {
           }
           return true;
         }));
-        const expectedEvents = updateOrders.length * realtimeClientCount;
-        const deadline = performance.now() + 30_000;
-        while (received.length - priorEvents < expectedEvents && performance.now() < deadline) {
-          await new Promise((resolve) => setTimeout(resolve, 50));
-        }
-        const receivedEvents = received.length - priorEvents;
+
+        let waveRowsObserved = 0;
+        const polls = await Promise.all(Array.from({ length: concurrentPollingRequestsPerWave }, async (_, requestIndex) => {
+          const requestStarted = performance.now();
+          const { data, error } = await staff.from('orders')
+            .select('id, prep_status')
+            .eq('restaurant_id', restaurantId)
+            .in('id', updateOrders.map((order) => order.id))
+            .order('id', { ascending: true });
+          pollingReadLatencies.push(performance.now() - requestStarted);
+          const rows = data ?? [];
+          pollingRowsObserved += rows.length;
+          waveRowsObserved += rows.length;
+          const observedIds = new Set(rows.map((row) => row.id));
+          const matchesWave = rows.length === updateOrderCount
+            && observedIds.size === updateOrderCount
+            && rows.every((row) => row.prep_status === prepStatus)
+            && updateOrders.every((order) => observedIds.has(order.id));
+          if (error || !matchesWave) {
+            pollingReadFailures += 1;
+            addFailure(
+              `kitchen_poll_${prepStatus}`,
+              requestIndex,
+              error ?? new Error(`Polling request observed ${rows.length}/${updateOrderCount} orders or a stale prep state.`),
+            );
+            return false;
+          }
+          return true;
+        }));
+
+        const successfulPollRequests = polls.filter(Boolean).length;
         waveResults.push({
           status: prepStatus,
           requestedOrderUpdates: updateOrders.length,
           successfulOrderUpdates: updates.filter(Boolean).length,
-          expectedRealtimeEvents: expectedEvents,
-          receivedRealtimeEvents: receivedEvents,
-          rawPostgresEvents: currentWave.rawPostgresEvents,
-          rawStatusCounts: { ...currentWave.rawStatusCounts },
+          pollRequests: concurrentPollingRequestsPerWave,
+          successfulPollRequests,
+          rowsObserved: waveRowsObserved,
+          expectedRows: updateOrderCount * concurrentPollingRequestsPerWave,
           durationMs: Number((performance.now() - waveStart).toFixed(2)),
-
         });
-        if (receivedEvents !== expectedEvents) {
+        if (successfulPollRequests !== concurrentPollingRequestsPerWave) {
           addFailure(
-            `kitchen_realtime_${prepStatus}`,
+            `kitchen_poll_${prepStatus}`,
             null,
-            new Error(`${expectedEvents - receivedEvents} of ${expectedEvents} expected events received for the ${prepStatus} wave.`),
+            new Error(`${concurrentPollingRequestsPerWave - successfulPollRequests} of ${concurrentPollingRequestsPerWave} polling reads failed to observe the ${prepStatus} wave.`),
           );
         }
-        currentWave = null;
       }
-      const kitchenUpdateDuration = performance.now() - kitchenUpdatesStarted;
+      const kitchenWorkDuration = performance.now() - kitchenWorkStarted;
       report.workloads.kitchenDashboard = {
-        subscribers: realtimeClientCount,
+        pollingRequestsPerWave: concurrentPollingRequestsPerWave,
         initialPrepStatusCounts,
         restaurantCount: 1,
         concurrentOrderUpdates: updateOrderCount,
         ordersUpdatedThroughAuthenticatedPostgREST: waveResults.reduce((sum, wave) => sum + wave.successfulOrderUpdates, 0),
         apiUpdateRequests: summarizeLatencies(
           kitchenUpdateLatencies,
-          kitchenUpdateDuration,
+          kitchenWorkDuration,
           kitchenUpdateFailures,
           updateOrderCount * 3,
         ),
-        realtimeFanoutEventsPerSecond: kitchenUpdateDuration > 0
-          ? Number((received.length * 1000 / kitchenUpdateDuration).toFixed(2))
-          : 0,
+        pollingReads: summarizeLatencies(
+          pollingReadLatencies,
+          kitchenWorkDuration,
+          pollingReadFailures,
+          concurrentPollingRequestsPerWave * 3,
+        ),
+        pollingRowsObserved,
+        pollingRowsExpected: updateOrderCount * concurrentPollingRequestsPerWave * 3,
         updateWaves: waveResults,
-        realtimeEventsReceived: received.length,
-        realtimeEventsExpected: updateOrderCount * 3 * realtimeClientCount,
-        realtimeEventLatencyMs: {
-          p50: quantile([...received].sort((a, b) => a - b), 0.50),
-          p95: quantile([...received].sort((a, b) => a - b), 0.95),
-          p99: quantile([...received].sort((a, b) => a - b), 0.99),
-          max: received.length ? Number(Math.max(...received).toFixed(2)) : null,
-        },
-        failures: eventErrors.length + kitchenUpdateFailures + waveResults.reduce((sum, wave) => sum + Math.max(0, wave.expectedRealtimeEvents - wave.receivedRealtimeEvents), 0),
+        failures: kitchenUpdateFailures + pollingReadFailures,
+        status: 'Authenticated PostgREST order updates plus simulated polling reads; this workload opens no Realtime channel.',
       };
       if (report.workloads.kitchenDashboard.failures) {
-        addFailure('kitchen_realtime', null, new Error(`${report.workloads.kitchenDashboard.failures} expected realtime/update events failed.`));
+        addFailure('kitchen_polling', null, new Error(`${report.workloads.kitchenDashboard.failures} kitchen update/polling requests failed.`));
       }
     } catch (error) {
-      addFailure('kitchen_realtime', null, error);
+      addFailure('kitchen_polling', null, error);
       report.workloads.kitchenDashboard = {
-        subscribers: realtimeClientCount,
+        pollingRequestsPerWave: concurrentPollingRequestsPerWave,
         initialPrepStatusCounts,
         restaurantCount: 1,
         ordersUpdatedThroughAuthenticatedPostgREST: 0,
-        realtimeEventsReceived: received.length,
+        pollingRowsObserved,
+        pollingRowsExpected: updateOrderCount * concurrentPollingRequestsPerWave * 3,
         failures: 1,
-        errors: eventErrors.slice(0, 10),
+        errors: [],
       };
     } finally {
-      currentWave = null;
-      await Promise.all(channels.map((channel, index) => rtClients[index]?.removeChannel(channel).catch(() => undefined)));
-      await Promise.all(rtClients.map((client) => client.removeAllChannels().catch(() => undefined)));
-      await staff.removeAllChannels().catch(() => undefined);
       await ownerAuth.auth.signOut().catch(() => undefined);
     }
   }

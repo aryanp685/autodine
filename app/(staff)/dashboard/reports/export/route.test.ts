@@ -37,6 +37,7 @@ function context(role: StaffContext['role'], restaurantId = 'selected-restaurant
     slug: 'synthetic-report-outlet',
     role,
     outlets: [{ id: restaurantId, name: 'Synthetic report outlet', role }],
+    entitlement: null,
     access: null,
   };
 }

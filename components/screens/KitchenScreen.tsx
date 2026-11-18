@@ -1,10 +1,9 @@
 'use client';
 
-import { rupeesToPaise } from '@/lib/money';
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { kitchenOrders, restaurant, type KitchenOrder } from '@/lib/demo-data';
-import { Money, VegMark } from '@/components/ui';
+import { VegMark } from '@/components/ui';
 import {
   Dot,
   Empty,
@@ -35,7 +34,6 @@ import {
 import { HeldTableStrip } from '@/components/owner/HeldTableStrip';
 import { cancelStaffOrderAction } from '@/app/orders/actions';
 import { SignInPrompt } from '@/components/SignInPrompt';
-import { getSupabaseBrowser } from '@/lib/supabase/client';
 import {
   advanceText,
   announceLogLabel,
@@ -69,7 +67,6 @@ import {
   type AnnouncementDialect,
 } from '@/lib/voice-personality';
 import { voiceLabel } from '@/lib/tts-voices';
-import { createRealtimeMonitor } from '@/lib/realtime-monitor';
 
 /* The thresholds live next to the query that computes the age, so the badge
    and the board cannot disagree about what "late" means. */
@@ -135,7 +132,6 @@ type BoardTicket = {
   placedAt: string;
   placedAtIso?: string;
   ageMin: number;
-  payment: 'paid' | 'pending' | 'failed';
   state: KitchenOrder['state'];
   note?: string;
   items: {
@@ -149,7 +145,6 @@ type BoardTicket = {
     veg: boolean | null;
     spoken?: string | null;
   }[];
-  total: number;
   announcementStatus?: 'announced' | 'failed' | null;
   announcementError?: string | null;
 };
@@ -164,11 +159,9 @@ function fromDemo(order: KitchenOrder): BoardTicket {
     table: order.table,
     placedAt: order.placedAt,
     ageMin: order.ageMin,
-    payment: order.payment,
     state: order.state,
     note: order.note,
     items: order.items,
-    total: order.total,
   };
 }
 
@@ -181,11 +174,9 @@ function fromLive(ticket: KitchenTicket): BoardTicket {
     placedAt: ticket.placedAt,
     placedAtIso: ticket.placedAtIso,
     ageMin: ticket.ageMin,
-    payment: ticket.payment,
     state: ticket.state,
     note: ticket.note,
     items: ticket.items,
-    total: ticket.total,
     announcementStatus: ticket.announcementStatus,
     announcementError: ticket.announcementError,
   };
@@ -277,8 +268,8 @@ function Items({ order, compact }: { order: BoardTicket; compact?: boolean }) {
    about a second, the table and the dishes with their portions, out loud, in
    Hindi. Five things have to be true:
 
-     delivery   realtime pushes the row; a poll every few seconds is the
-                safety net when the socket drops
+     delivery   tickets and waiter calls refresh every five seconds; neither
+                source table is published as a Realtime row stream
      one voice  Hindi, and only Hindi. There is no English fallback, because a
                 Devanagari sentence read by an English voice is silence, and a
                 silent board that looks live is the failure that costs a table
@@ -370,7 +361,6 @@ export function Kitchen({
   const [cancelBusy, setCancelBusy] = useState<string | null>(null);
   const [waiterCallBusy, setWaiterCallBusy] = useState<string | null>(null);
   const [waiterCallError, setWaiterCallError] = useState('');
-  const [delivery, setDelivery] = useState<'connecting' | 'live' | 'polling'>('polling');
   /**
    * What the queue is doing, not what it was asked to do.
    *
@@ -1114,64 +1104,9 @@ export function Kitchen({
     router.refresh();
   }, [router]);
 
-  /**
-   * Realtime first, polling as the safety net.
-   *
-   * A websocket can drop and a kitchen cannot go silent, so the poll never
-   * stops -- it only slows down while the socket is known good. When the
-   * socket dies the interval tightens on its own.
-   */
-  useEffect(() => {
-    if (!live || !restaurantId) return;
-
-    const supabase = getSupabaseBrowser();
-    if (!supabase) return;
-
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const monitor = createRealtimeMonitor({
-      onDelivery: setDelivery,
-      onSignal: ({ kind, durationMs }) => {
-        void fetch('/api/ops/realtime-alert', {
-          method: 'POST',
-          credentials: 'same-origin',
-          keepalive: true,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ kind, durationMs }),
-        }).catch(() => { /* polling remains the fallback when monitoring is unavailable */ });
-      },
-    });
-    const schedule = () => {
-      // A burst of four orders commits within a few milliseconds of each
-      // other. One refresh covers all four; four refreshes would race.
-      if (timer) return;
-      timer = setTimeout(() => {
-        timer = null;
-        refresh();
-      }, 300);
-    };
-
-    const channel = supabase
-      .channel(`kitchen-orders-${restaurantId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restaurantId}` },
-        schedule,
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'table_waiter_calls', filter: `restaurant_id=eq.${restaurantId}` },
-        schedule,
-      )
-      .subscribe((status) => monitor.onStatus(status));
-
-    return () => {
-      if (timer) clearTimeout(timer);
-      monitor.dispose();
-      void supabase.removeChannel(channel);
-    };
-  }, [live, restaurantId, refresh]);
-
-  useAutoRefresh(live, delivery === 'live' ? 30 : 5, refresh);
+  // Order and waiter-call updates are fetched through their role-scoped server
+  // reads. Their raw rows are not sent through Postgres Changes or Realtime.
+  useAutoRefresh(live, 5, refresh);
 
   /* ------------------------------------------------------------------ unlock */
 
@@ -1464,13 +1399,18 @@ export function Kitchen({
   };
 
   /**
-   * Whether this board may offer a control that writes.
+   * Whether prep-advancement controls may write.
    *
    * The sample board is always interactive -- it writes to nothing but this
-   * browser. A live board is interactive only when the server said the caller
-   * can write, which is the same question the database will ask.
+   * browser. Live prep transitions require the server's role and write-gate
+   * check. Cancellation and waiter-call resolution have separate controls.
    */
   const interactive = !live || Boolean(data?.canAdvance);
+  // Ordinary cancellation checks bill state, so only finance roles may use it.
+  // Cashiers cannot advance prep but may cancel. A confirmed read-only plan
+  // gate hides that control; a transient check error leaves the RPC authoritative.
+  const financeRole = data?.role === 'owner' || data?.role === 'manager' || data?.role === 'cashier';
+  const canCancel = !live || Boolean(financeRole && data?.cannotAdvance !== 'plan');
 
   const cols: { key: string; title: string; orders: BoardTicket[] }[] = [
     { key: 'new', title: 'New', orders: orders.filter((o) => o.state === 'new') },
@@ -1546,23 +1486,16 @@ export function Kitchen({
         title={live ? data?.restaurantName || 'Kitchen' : restaurant.name}
         meta={
           live
-            ? 'Tickets arrive the moment a guest confirms. Nothing here is cached.'
+            ? 'Tickets and waiter calls refresh every five seconds.'
             : 'A rehearsal board: nothing here reaches a kitchen.'
         }
         actions={
           <div className="flex flex-wrap items-center gap-1.5">
-            {/* Delivery is a status, so it is a tag. It was a hand-made pill
-                with its own 8px step, which made the head of this screen the
-                only place in the product using that height. */}
-            <Tag tone={live ? (delivery === 'live' ? 'live' : 'neutral') : 'neutral'}>
-              <Dot tone={live && delivery === 'live' ? 'live' : 'idle'} />
-              {live
-                ? delivery === 'live'
-                  ? 'Live · instant'
-                  : delivery === 'connecting'
-                    ? 'Live · connecting…'
-                    : 'Live · checking every 5s'
-                : 'Demo board · local only'}
+            {/* All live board data comes from role-scoped server reads; the
+                source tables are not published as Realtime row streams. */}
+            <Tag tone="neutral">
+              <Dot tone="idle" />
+              {live ? '5s polling' : 'Demo board · local only'}
             </Tag>
             {waiting > 0 && <Tag tone="work">{waiting} waiting</Tag>}
           </div>
@@ -1575,7 +1508,7 @@ export function Kitchen({
        * Everything about the voice lives in one band directly under the title,
        * because it is one job: is it on, which voice, how fast, and can I hear
        * it. In the old full-screen header these controls were mixed in with
-       * navigation and the delivery pill, which made the one thing a cook
+       * navigation and the polling indicator, which made the one thing a cook
        * actually adjusts at 9pm the hardest thing to find.
        *
        * They are controls, not settings: each writes only to this screen --
@@ -2191,12 +2124,6 @@ export function Kitchen({
                     </span>
                   </div>
 
-                  {o.payment === 'pending' && (
-                    <div className="mt-2 flex items-center gap-1.5 rounded-[var(--p-r-chip)] bg-[color-mix(in_oklab,var(--p-due)_8%,var(--p-card))] px-2 py-1 text-[11.5px] font-medium text-[var(--p-due)]">
-                      <span aria-hidden="true" className="size-1.5 rounded-full bg-[var(--p-due)]" />
-                      Unpaid · pay at counter
-                    </div>
-                  )}
                   {o.announcementStatus && (
                     <p data-announcement-result={o.announcementStatus} className="mt-2 text-[11.5px] leading-[1.4] text-gink-64">
                       {o.announcementStatus === 'announced' ? 'Voice announcement confirmed' : 'Voice announcement failed'}
@@ -2213,10 +2140,6 @@ export function Kitchen({
                   )}
 
                   <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-hair pt-2.5">
-                    <span className="mr-auto text-[13px] font-semibold text-gink">
-                      <Money value={rupeesToPaise(o.total)} strong />
-                    </span>
-
                     {o.orderId ? (
                       <button
                         type="button"
@@ -2254,9 +2177,9 @@ export function Kitchen({
                         type="button"
                         /* Full width below lg: this is the one tap the screen
                            exists for, and on a 390px card it used to share the
-                           row with the total, the replay icon and the cancel
-                           pair -- which put it at the right edge, half under a
-                           thumb, on the narrowest screen in the product. */
+                           row with the replay icon and cancel controls -- which
+                           put it at the edge, half under a thumb, on the
+                           narrowest screen in the product. */
                         className={`${kbBtn('solid')} max-lg:w-full`}
                         onClick={() => advance(o)}
                       >
@@ -2268,9 +2191,9 @@ export function Kitchen({
                         type="button"
                         /* Full width below lg: this is the one tap the screen
                            exists for, and on a 390px card it used to share the
-                           row with the total, the replay icon and the cancel
-                           pair -- which put it at the right edge, half under a
-                           thumb, on the narrowest screen in the product. */
+                           row with the replay icon and cancel controls -- which
+                           put it at the edge, half under a thumb, on the
+                           narrowest screen in the product. */
                         className={`${kbBtn('solid')} max-lg:w-full`}
                         onClick={() => advance(o)}
                       >
@@ -2282,9 +2205,9 @@ export function Kitchen({
                         type="button"
                         /* Full width below lg: this is the one tap the screen
                            exists for, and on a 390px card it used to share the
-                           row with the total, the replay icon and the cancel
-                           pair -- which put it at the right edge, half under a
-                           thumb, on the narrowest screen in the product. */
+                           row with the replay icon and cancel controls -- which
+                           put it at the edge, half under a thumb, on the
+                           narrowest screen in the product. */
                         className={`${kbBtn('solid')} max-lg:w-full`}
                         onClick={() => advance(o)}
                       >
@@ -2329,7 +2252,7 @@ export function Kitchen({
                       </svg>
                     </button>
 
-                    {interactive && o.state !== 'served' ? (
+                    {canCancel && o.state !== 'served' ? (
                       confirmCancel === (o.orderId ?? o.key) ? (
                         <>
                           <button
@@ -2474,13 +2397,10 @@ function writeSeen(restaurantId: string | null, ids: string[]): void {
  * A kitchen display is a wall-mounted screen nobody clicks: it has to pull,
  * not wait to be pushed.
  *
- * The interval is chosen by the caller -- short while realtime is down, long
- * while it is known good, so the websocket is the fast path and the poll is
- * only ever the safety net.
- *
- * It stops while the tab is hidden, so a backgrounded tablet costs nothing,
- * and refreshes on becoming visible again, so a cook never walks up to a board
- * showing last night's tickets.
+ * Tickets and waiter calls are fetched through role-scoped Server Component
+ * reads every five seconds; neither source table is published as a Realtime
+ * row stream. The timer remains scheduled in a hidden tab, but `refresh` skips
+ * those ticks; the visibility listener refreshes immediately when the tab returns.
  *
  * router.refresh() re-runs the Server Component and patches the tree in place,
  * so the audio toggle, the announcement log and the scroll position all

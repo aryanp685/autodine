@@ -4,13 +4,25 @@ How to find out what a database still needs from `supabase/migrations/` without 
 
 This file describes a local method and what it has established so far. It authorises nothing. Steps that touch a hosted project stay in `PHASE-3-HOSTED-BASELINE.md` and `PRODUCTION-BACKUP-RUNBOOK.md`, and each needs the owner's approval.
 
-## Current merge update — 2026-11-06
+## Active-branch order and subscription-boundary update — 2026-11-06
 
-The active branch has reconciled the incoming `main` migration set without
-reusing a Supabase version prefix. The competing branch-only migrations were
-renumbered as follows:
+**Verification and final review date:** 2026-11-06 UTC (authoritative task date).
 
-| Kept behavior | Current migration | Reason |
+**Branch:** `arena/f104d5d8-autodine`; **checked-out HEAD / base:** `b866601d5b0441b49b1c5aa7c9eb7d26b664d06c` (`main`, grafted checkout). No separate hardening commit is present here; the previously cited `0b51699f5da26cce8a1117f985081c2caca4ec40` is unavailable and is not this checkout's HEAD. Git records the actual HEAD author/committer time as `2026-11-14T11:56:45+05:30`, later than the authoritative 2026-11-06 task date; chronology remains unresolved and that metadata is not test or hosted-migration evidence. At review, 50 tracked files were modified and 7 were untracked; none were staged and no commit was made. The restaurant-column caller/type audit found no direct application read of `restaurants.account_id` or legacy plan/trial columns; see the complete hardening report for the source trace. No Supabase/Vercel state or database was queried or changed. A read-only GitHub API lookup inspected the load-workflow commit history and associated pull-request metadata; it found no documented rationale for the branch pin, and returned timestamps later than the authoritative cutoff. No repository ref or workflow was changed.
+
+This checkout includes forward migrations `20261112000500_role_scoped_order_reads.sql`, `20261112000600_cap_subscription_history_ceiling.sql`, `20261112000700_order_line_edit_boundary.sql`, and `20261114000100_owner_manager_subscription_reads.sql`. All `20261112` and `20261114` versions are future-dated relative to the historical cutoff. They are source artifacts replayed locally, not hosted apply dates or release approval. The order migrations bound reads and edits by role/tenant, remove sensitive order tables from the local Realtime publication, and restore the restaurant write gate. The subscription migration narrows direct account/event/payment/receipt RLS and all four billing-read RPCs to Owners and Managers, closes direct legacy restaurant plan/trial-column access, keeps Owner/Manager plan presentation in `restaurant_access()`, and preserves the Cashier/Kitchen operational `can_write`/`read_only`/`features` projection. The history RPCs remain capped at 50 rows.
+
+The latest embedded replay applied **83 repository migrations** on disposable PostgreSQL; the SQL integration suite reported **157 passed, 2 optional PostgREST HTTP tests skipped across 7 files**. The skipped HTTP checks do not turn SQL `SET ROLE` tests into PostgREST verification. `npm run sql:check` parses supported DDL only and does not validate function bodies, grants, RLS behavior, publication semantics, or migration replay. No hosted migration, catalog query, or provider change occurred. See `docs/AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md` for current local evidence and open release gates.
+
+The earlier 77-migration / 130-test Phase 6D count below is a dated prior-checkpoint result, not the count for this active branch.
+
+## Historical prior-branch merge update — 2026-11-06
+
+At that earlier checkpoint, the then-active branch reconciled the incoming
+`main` migration set without reusing a Supabase version prefix. The competing
+branch-only migrations were renumbered as follows:
+
+| Kept behavior | Migration at that checkpoint | Reason |
 |---|---|---|
 | Payment-audit provider actor repair | `20261110000851_payment_audit_provider_actor.sql` | Main uses `20261110000700` for restaurant membership. |
 | Online-payment attempt uniqueness | `20261110000950_online_payment_attempt_uniqueness.sql` | Main uses `20261110000900` for QR-attempt convergence. |
@@ -25,7 +37,7 @@ remains archived. The source shape is still unknown for hosted Staging and
 Production; no hosted operation is authorized. `scripts/check-sql.mjs` now
 rejects duplicate 14-digit migration versions.
 
-## Phase 6D account-entitlement link guard — evidence 2026-11-06
+## Historical Phase 6D account-entitlement link guard — prior-checkpoint evidence 2026-11-06
 
 The forward-only migration `20261112000200_immutable_restaurant_account_link.sql`
 adds a `BEFORE UPDATE` trigger on `public.restaurants`. If an authenticated

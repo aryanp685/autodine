@@ -77,6 +77,7 @@ function signedIn(supabase: unknown) {
       slug: 'maddi',
       role: 'owner' as const,
       outlets: [{ id: 'r-1', name: 'maddi', role: 'owner' as const }],
+      entitlement: null,
       access: null,
     },
   };
