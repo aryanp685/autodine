@@ -2,6 +2,26 @@
 
 Date: 2026-11-17 · Branch `arena/2670dd12-autodine` (sandbox HEAD `d8d0e52`) · `main` = `b385bf4`, untouched · Consolidates Batches 1–6. Boundaries honored throughout: no Production/Staging mutation, no hosted migration/dispatch/deploy/merge, no real payment/email/provider activation, no secrets in source or chat, GST/IRP migrations NOT AUTHORIZED, no commit/push.
 
+---
+
+## Integration update — 2026-11-18 (PR #192 onto current `main`)
+
+The run narrative below is the 2026-11-17 record and is left exactly as written. This section states what changed since, on branch `arena/88c342c2-autodine` (base `main` = `3e17c44`). Still no push, no PR merge, no deployment, no hosted setting change, no migration, no workflow dispatch.
+
+**Integrated.** PR #192's operational-incident functionality (`d679a9e`) and its Brevo incident documentation (`e9b247d`, `e3ad205`) are now on top of current `main`, reconciled rather than merged wholesale. All five upstream code blobs are byte-identical to upstream: `app/auth/actions.ts` `142a8fe1`, `app/api/ops/incidents/route.ts` `f2f16c62`, `app/api/ops/incidents/route.test.ts` `a4ab4d66`, `lib/incident-registry.ts` `ae6dc412`, `app/(staff)/dashboard/settings/team-actions.ts` `5fae647d`. `app/auth/actions.test.ts` is the union of main's Auth coverage and PR #192's six operator-visibility tests — 24 tests across 6 describes, all green.
+
+**Auth safety preserved.** Incident summaries carry only the fixed kind and a numeric status — never an address, a tenant id or a provider message. A 429 (expected throttling) and the enumeration-protected existing-email response deliberately raise nothing. Unit-proven in the `operator visibility for silent Auth failures` block.
+
+**Documentation reconciled.** The Brevo checklist, email runbook, domainless-activation evidence and owner register are PR #192's newer versions (the 2026-11-18 activation, the `525` root cause and fix, the first verified Auth delivery, the silent-failure record). The Resend-era Package 4 in the hosted-verification runbook is superseded by Brevo guidance. Two references that pointed at files which did not exist now resolve: `scripts/hosted-verification/preflight.mjs` (read-only, SET/UNSET by name, per-package verdict, `--json`) and this directory's `MASTER_LAUNCH_READINESS.md`.
+
+**Also landed on this branch.** PR #190's registration fix for the restore drill (byte-identical to upstream's result blob `793d2a3c`); a PostgreSQL 17 composite action (`.github/actions/postgres-client`) used by both hosted workflows so the dump and the restore use one client major version; and a shared restore-target guard (`scripts/backup/lib-restore-target.mjs`) that makes the restore loopback-only by default, refuses a Production project outright, and fails closed on a hosted target whose ref cannot be determined.
+
+**Current local counts.** DR suite **78/78** (was 50/50 — the new restore-guard and composite-action suites are in it); full unit suite 2,503 passed / 221 skipped / 0 failed; lint, typecheck, staging guards and release verifier all exit 0.
+
+**Decision unchanged: NO-GO**, on hosted evidence and owner decisions, with zero open P0 code defects. See `MASTER_LAUNCH_READINESS.md`.
+
+---
+
 ## The 11 roadmap priorities — status at a glance
 
 The locked roadmap, as tracked across Batches 1–6 and the owner register (wording consolidated here):
