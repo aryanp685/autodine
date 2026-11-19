@@ -39,7 +39,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      # Bounded retry: the download and the runtime-library install both talk
+      # to the network and fail intermittently on a shared runner.
+      - run: ./scripts/e2e/install-chromium.sh
       # The runner prints only generic, pre-redacted diagnostics (no secret
       # values) by design; tee them to a file and re-emit as an annotation on
       # failure so the Checks API can carry them when the log CDN is not

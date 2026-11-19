@@ -49,7 +49,10 @@ jobs:
         run: npm ci
 
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        # Bounded retry: the download and the runtime-library install both
+        # talk to the network and fail intermittently on a shared runner.
+        # The last attempt's exit code is still the job's exit code.
+        run: ./scripts/e2e/install-chromium.sh
 
       - name: Build (explicit test-only demo mode, no database)
         run: npm run build

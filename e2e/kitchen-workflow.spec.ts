@@ -122,10 +122,14 @@ test.describe('cancellation', () => {
     // Two taps, and the second one is a named question, not a repeat of the
     // first label: "Cancel" next to the move action is one slip from losing a
     // guest's order.
+    //
+    // `exact` matters here: a role-name match is a case-insensitive
+    // SUBSTRING match, so a plain 'No' also matches the "Notifications"
+    // button and the locator resolves to two elements.
     await expect(page.getByRole('button', { name: 'Yes, cancel' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'No' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'No', exact: true })).toBeVisible();
 
-    await page.getByRole('button', { name: 'No' }).click();
+    await page.getByRole('button', { name: 'No', exact: true }).click();
     await expect(page.locator('article[data-state="new"]', { hasText: 'T7' })).toHaveCount(1);
   });
 
@@ -141,8 +145,8 @@ test.describe('cancellation', () => {
   });
 });
 
-test.describe('voice announcements are never repeated', () => {
-  test('the board announces each event once — and a refresh re-announces nothing', async ({
+test.describe('only orders and waiter calls are announced', () => {
+  test('a move and a cancellation are silent, and a refresh re-announces nothing', async ({
     page,
   }) => {
     await recordAnnouncements(page);
@@ -155,30 +159,24 @@ test.describe('voice announcements are never repeated', () => {
     await page.waitForTimeout(1500);
     expect(await announcementCount(page), 'opening the board announced old tickets').toBe(0);
 
-    // A move announces once.
+    // A move is SILENT. The scope is orders and waiter calls only: the cook
+    // is told what arrived and what was called for, and nothing else. A
+    // status change is already on the screen, in the column it moved to,
+    // where it is read rather than spoken.
     await page
       .locator('article[data-state="new"]', { hasText: 'T7' })
       .getByRole('button', { name: 'Start preparing' })
       .click();
-    await expect
-      .poll(() => announcementCount(page), { message: 'the move was never announced' })
-      .toBeGreaterThan(0);
-    const afterMove = await announcementCount(page);
+    await expect(page.locator('article[data-state="preparing"]', { hasText: 'T7' })).toHaveCount(1);
+    await page.waitForTimeout(2500);
+    expect(await announcementCount(page), 'a status move was announced').toBe(0);
 
-    // …once. Not again a beat later (the queue's duplicate rule), not once per
-    // re-render.
-    await page.waitForTimeout(1500);
-    expect(await announcementCount(page), 'the move was announced twice').toBe(afterMove);
-
-    // A cancellation is its own announcement, once.
+    // A cancellation is silent too, for the same reason: it is a change to
+    // the board, not an arrival the cook has not heard yet.
     await page.getByRole('button', { name: 'Cancel order for T3' }).click();
     await page.getByRole('button', { name: 'Yes, cancel' }).click();
-    await expect
-      .poll(() => announcementCount(page), { message: 'the cancel was never announced' })
-      .toBeGreaterThan(afterMove);
-    const afterCancel = await announcementCount(page);
-    await page.waitForTimeout(1500);
-    expect(await announcementCount(page), 'the cancel was announced twice').toBe(afterCancel);
+    await page.waitForTimeout(2500);
+    expect(await announcementCount(page), 'a cancellation was announced').toBe(0);
 
     // A refresh re-reads the board from scratch — and says nothing. What was
     // seen stays seen (localStorage), so the kitchen is not shouted at twice

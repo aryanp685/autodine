@@ -49,7 +49,9 @@ jobs:
 
       - name: Provision Chromium and its Linux runtime libraries
         run: |
-          npx playwright install --with-deps chromium
+          # Bounded retry: the download and the runtime-library install both
+          # talk to the network and fail intermittently on a shared runner.
+          ./scripts/e2e/install-chromium.sh
           ./scripts/e2e/check-chromium-runtime.sh | tee test-results-chromium-runtime.log
 
       - name: Ensure PostgreSQL client tools are present

@@ -30,7 +30,7 @@ and prints a verdict line. It never reports a skip as a pass.
 | 8 | `test:staging:guards` | Hosted-acceptance and staging guards | **PASS** (66/66) | 28.5s |
 | 9 | `test:staging:seed-demo-db` | Demo-seed isolation | **PASS** (1/1) | 1.8s |
 | 10 | `test:backup` | Backup pipeline selftest | **PASS** | 1.2s |
-| 11 | `test:dr` | Backup-file and DR objective verifiers | **PASS** (150/150) | 8.8s |
+| 11 | `test:dr` | Backup-file and DR objective verifiers | **PASS** (155/155) | 8.8s |
 | 12 | `test:d2` | D2 ACL probe | **PASS** (2/2) | 1.5s |
 | 13 | `test:db:integration` | PostgreSQL-gated integration suites | **PASS** (215/215) | 12.9s |
 | 14 | `test:db:logical-restore` | Logical restore drill | **PASS** | 2.6s |
@@ -161,10 +161,10 @@ launch gate depends on.
 
 ```
 $ npm run migrations:verify
-101 files, 101 unique versions
+102 files, 102 unique versions
 ```
 
-101 files, 101 unique versions, no duplicate version, no out-of-order file,
+102 files, 102 unique versions, no duplicate version, no out-of-order file,
 and the deployed anchors present and hashable. Reconciled against the Batch
 2 conflict report merged in PR #193
 (`qa-evidence/day1/MIGRATION_CONFLICT_RESOLUTION_BATCH2.md`): that report
