@@ -20,14 +20,58 @@ when written — are not left standing as unqualified claims.
 | **#192** | **CLOSED** | superseded by #194 after every one of its changes was verified present there (10 of its 12 files byte-identical; 2 supersets) |
 | **#181, #184, #188** | **untouched** | as required |
 
-### The deployment, stated accurately
+### PR #194 update — 2026-11-19 (later the same day)
 
-**A Vercel Preview deployment was produced automatically** for the PR head
-commit when the branch was pushed — deployment
-`6pFExiBEDXx7kooBgt6Puu4ksNE4`, project `new`, Preview host
+**Eleven further commits, then `main` merged in.** The PR head moved from
+`e90ab82` to `bc58a16` and then to the merge commit, with every push
+fast-forward and history preserved. The work in those commits is
+described in `PHASE5_LOCAL_EVIDENCE.md`, `PHASE7_LOCAL_VERIFICATION.md`
+and `MASTER_BLOCKER_REGISTER.md`; this section records only what changed
+about the integration itself.
+
+**A CI failure was found and fixed.** The new evidence guards failed the
+`Hosted-acceptance and staging guards` step — for a reason that was in the
+guard, not in the records. Two independent causes, both fixed:
+
+1. The Phase 7 guard resolved every path a record cites against
+   `origin/main` alone. `actions/checkout` fetches one commit by default,
+   so a CI runner has **no `origin/main` ref at all** — the escape hatch
+   failed there and a correct record was reported as broken. The guard now
+   resolves a cited path against the working tree, **every** ref the clone
+   holds, and `FETCH_HEAD`, and it still fails closed when none of them
+   has the path. The CI job fetches `main`'s tip — read-only, one commit —
+   so CI verifies the same paths the local run does, and the guard asserts
+   that step exists.
+2. GitHub's PR checks run the **merge** of the branch with `main`, not the
+   branch alone. The Phase 7 record quotes exact counts, so a record true
+   of the branch was false of the tree CI actually verifies: `main` carried
+   three more migrations and more test cases. `main` is now merged into the
+   branch, so the branch and the merge result are the same tree, and every
+   count in the records was re-derived on it.
+
+The same class of defect was latent in both browser claims — each asserted
+"Chromium is absent", true of the local run and false of a CI job that
+installs Chromium for the browser suites. Both now assert the claim's
+scoping instead, and keep the strong local check where Chromium really is
+absent.
+
+**Current local counts** (on the merged tree, 2026-11-19): DR suite
+**132/132**; unit suite **2,553 passed / 223 skipped / 0 failed**;
+PostgreSQL-gated integration **214/214**; embedded replay **209 passed |
+2 skipped (211)**; migration chain **101 files, 101 unique versions**;
+staging guards **65/65**; release verifier **28/28**; logical restore drill
+**VERIFIED** (101 migrations, 48 tables, 59 policies, 164 functions);
+**16/16** local gates passed.
+
+**The deployment, stated accurately**
+
+**A Vercel Preview deployment was produced automatically** for each PR head
+commit when the branch was pushed — deployments `6pFExiBEDXx7kooBgt6Puu4ksNE4`
+(`e90ab82`), `7mcwf6HSBZ2DKpM2UVEwBKVWVhZL` (`f75107a`) and
+`J9R1nrMpAJN29ofro5muLZytKubf` (`bc58a16`), project `new`, Preview host
 `new-git-arena-88c342c2-autodine-iamjarvis9896-3988s-projects.vercel.app`.
 
-It is a **Preview**, not Production: the commit is not on `main`, the
+They are **Preview**, not Production: the commit is not on `main`, the
 hostname carries the branch name, and the check that carries the host is
 Vercel's Preview-comments check. **No deployment was created, promoted or
 dispatched by this work, and no Vercel setting was changed.** Merging
@@ -76,7 +120,7 @@ The run narrative below is the 2026-11-17 record and is left exactly as written.
 
 **Also landed on this branch.** PR #190's registration fix for the restore drill (byte-identical to upstream's result blob `793d2a3c`); a PostgreSQL 17 composite action (`.github/actions/postgres-client`) used by both hosted workflows so the dump and the restore use one client major version; and a shared restore-target guard (`scripts/backup/lib-restore-target.mjs`) that makes the restore loopback-only by default, refuses a Production project outright, and fails closed on a hosted target whose ref cannot be determined.
 
-**Current local counts.** DR suite **78/78** (was 50/50 — the new restore-guard and composite-action suites are in it); full unit suite 2,503 passed / 221 skipped / 0 failed; lint, typecheck, staging guards and release verifier all exit 0.
+**Local counts at this step (a snapshot, not today's).** DR suite **78/78** (was 50/50 — the new restore-guard and composite-action suites are in it); full unit suite 2,503 passed / 221 skipped / 0 failed; lint, typecheck, staging guards and release verifier all exit 0.
 
 **Decision unchanged: NO-GO**, on hosted evidence and owner decisions, with zero open P0 code defects. See `MASTER_LAUNCH_READINESS.md`.
 
@@ -104,7 +148,7 @@ A read-only audit batch plus three documents. At the time of this batch: **no pu
 
 **One stale reference fixed.** `docs/backup-restore-runbook.md` still named `upload-r2.mjs` in the B2 section — the only R2-era residue in the repository. Corrected to `upload-b2.mjs`.
 
-**Current local counts.** DR suite **88/88**; unit suite 2,503 passed / 221 skipped / 0 failed; composite-action suite 11/11; wiring suite 8/8; restore-guard suite 19/19; preflight suite 8/8; lint, typecheck, release verifier and staging guards all exit 0; 13 YAML files parse.
+**Local counts at this step (a snapshot, not today's).** DR suite **88/88**; unit suite 2,503 passed / 221 skipped / 0 failed; composite-action suite 11/11; wiring suite 8/8; restore-guard suite 19/19; preflight suite 8/8; lint, typecheck, release verifier and staging guards all exit 0; 13 YAML files parse.
 
 **Decision unchanged: NO-GO**, on hosted evidence and owner decisions, with zero open P0 code defects.
 

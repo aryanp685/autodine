@@ -92,13 +92,13 @@ still needs is an authorized hosted run.
 
 | # | Blocker | Owner action (decisions, credentials) | Technical implementation | Hosted verification |
 |---|---|---|---|---|
-| 1 | **Backup gate** | bucket + bucket-scoped key + the six secret names + passphrase; the Production project ref | **DONE** — pipeline, guard, composite action (verifying psql, pg_dump **and** pg_restore), workflows, 124 DR tests, all locally verified (2026-11-19) | **NOT RUN** — one `Hosted backup (B2)` run, then one `Hosted restore rehearsal (disposable)` run. Both need a separate authorization. |
+| 1 | **Backup gate** | bucket + bucket-scoped key + the six secret names + passphrase; the Production project ref | **DONE** — pipeline, guard, composite action (verifying psql, pg_dump **and** pg_restore), workflows, 132 DR tests, all locally verified (2026-11-19) | **NOT RUN** — one `Hosted backup (B2)` run, then one `Hosted restore rehearsal (disposable)` run. Both need a separate authorization. |
 | 2 | **Migration canonicalization + B1** | one decision per colliding function body — never an inferred source edit | manifest, reconciliation and production-only documents landed; canonical bodies await the decision | none — a decision, not a run |
 | 3 | **Email domain / SMTP** | Brevo **Authorized IPs** off/allow-all (else `525 5.7.1`); purchase a domain | Brevo adapter, webhook receiver, five Auth flows, template — landed and tested | the five controlled observations (signup, reset, invitation, retry, key-loss) |
 | 4 | **Staging designation + pins** | the designation itself; `AUTODINE_EXPECTED_PROJECT_REF`; Auth redirect allow-list; **the designated demo project list** (`AUTODINE_DEMO_SEED_APPROVED_REFS`) | isolation guards landed: deployment isolation, staging config, preview verification, and the demo-seed guard (closed 2026-11-18; corrected 2026-11-19 so no project is authorized by default) | none — standing guard, re-run after every environment change |
 | 5 | **Hosted browser + realtime evidence** | authorize both runs; seed the Staging project | E2E specs, the disposable-stack runner, the three-device fallback test — landed | gates 5 and 6: one authorized CI run green with `retries: 0`, and a human watching the realtime fallback |
 | 6 | **Alert sink wiring + cron live proof** | point the sink at a human-reachable endpoint | the `[autodine:alert]` channel and the escalation cron — landed | the live 401/200 cron proof |
-| 7 | **Production migration per-file authorizations** | one written authorization per migration file | all migrations checked in; the chain replays green locally (98 files) | per-file apply only after that authorization |
+| 7 | **Production migration per-file authorizations** | one written authorization per migration file | all migrations checked in; the chain replays green locally (101 files) | per-file apply only after that authorization |
 | 8 | **Billing provider + GST/IRP tracks** | a separate track with its own approvals | sandbox adapter only; nothing activated | out of scope for this decision |
 
 **The technical item that sat outside the eight is now closed**: PR #190

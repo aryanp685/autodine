@@ -20,36 +20,43 @@ and prints a verdict line. It never reports a skip as a pass.
 
 | # | Gate | CI step it mirrors | Result | Time |
 |---|---|---|---|---|
-| 1 | `typecheck` | Typecheck | **PASS** | 5.0s |
-| 2 | `lint` | Lint | **PASS** | 11.0s |
+| 1 | `typecheck` | Typecheck | **PASS** | 5.2s |
+| 2 | `lint` | Lint | **PASS** | 11.1s |
 | 3 | `design:check` | Design system guard | **PASS** | 0.2s |
-| 4 | `sql:check` | Migration syntax check | **PASS** | 0.5s |
-| 5 | `migrations:verify` | Migration chain integrity | **PASS** | 0.1s |
-| 6 | `verify:release` | Release readiness invariants | **PASS** (28 checks) | 0.1s |
-| 7 | `isolation:verify` | Preview/production isolation self-test | **PASS** | 0.1s |
-| 8 | `test:staging:guards` | Hosted-acceptance and staging guards | **PASS** (56/56) | 5.2s |
-| 9 | `test:staging:seed-demo-db` | Demo-seed isolation | **PASS** (1/1) | 1.9s |
+| 4 | `sql:check` | Migration syntax check | **PASS** | 0.6s |
+| 5 | `migrations:verify` | Migration chain integrity | **PASS** | 0.2s |
+| 6 | `verify:release` | Release readiness invariants | **PASS** (28 checks) | 0.2s |
+| 7 | `isolation:verify` | Preview/production isolation self-test | **PASS** | 0.2s |
+| 8 | `test:staging:guards` | Hosted-acceptance and staging guards | **PASS** (65/65) | 28.5s |
+| 9 | `test:staging:seed-demo-db` | Demo-seed isolation | **PASS** (1/1) | 1.8s |
 | 10 | `test:backup` | Backup pipeline selftest | **PASS** | 1.2s |
-| 11 | `test:dr` | Backup-file and DR objective verifiers | **PASS** (124/124) | 8.6s |
-| 12 | `test:d2` | D2 ACL probe | **PASS** (2/2) | 1.2s |
-| 13 | `test:db:integration` | PostgreSQL-gated integration suites | **PASS** (212/212) | 12.3s |
-| 14 | `test:db:logical-restore` | Logical restore drill | **PASS** | 2.8s |
-| 15 | `test:hosted:preflight` | Hosted preflight (read-only) | **PASS** (8/8) | 19.7s |
-| 16 | `npm test` | Tests | **PASS** (2,547 / 221 skipped / 0 failed) | 81.2s |
+| 11 | `test:dr` | Backup-file and DR objective verifiers | **PASS** (132/132) | 8.8s |
+| 12 | `test:d2` | D2 ACL probe | **PASS** (2/2) | 1.5s |
+| 13 | `test:db:integration` | PostgreSQL-gated integration suites | **PASS** (214/214) | 12.9s |
+| 14 | `test:db:logical-restore` | Logical restore drill | **PASS** | 2.6s |
+| 15 | `test:hosted:preflight` | Hosted preflight (read-only) | **PASS** (8/8) | 20.0s |
+| 16 | `npm test` | Tests | **PASS** (2,553 / 223 skipped / 0 failed) | 76.4s |
 
 **16/16 gates passed.**
 
+This record describes the **merged** state of the PR — the tree CI
+actually verifies. GitHub's PR checks run the merge of the branch with
+`main`, not the branch alone, so a record that quoted the branch's own
+counts would be true on the branch and false in the check that matters.
+`main` is merged into this branch, the branch and the merge result are
+the same tree, and every number below was re-derived on it.
+
 ---
 
-## 2. The unit suite, and every one of its 221 skips
+## 2. The unit suite, and every one of its 223 skips
 
 ```
 Test Files  225 passed | 11 skipped (236)
-      Tests  2547 passed | 221 skipped (2770)
+      Tests  2553 passed | 223 skipped (2778)
 ```
 
-**All 221 skips are the same thing: tests that need a PostgreSQL server.**
-(223 test cases in total; see the table below for the 2-case difference.)
+**All 223 skips are the same thing: tests that need a PostgreSQL server.**
+(225 test cases in total; see the table below for the 2-case difference.)
 They are not skipped because they are hard, flaky or inconvenient — they
 are skipped because `npm test` alone starts no database, and every one of
 them is executed by a suite that does.
@@ -59,7 +66,7 @@ them is executed by a suite that does.
 | `app/menu/throttle-db.integration.test.tsx` | 5 | 5 | `test:db:integration` | **PASS** |
 | `lib/db/account-link-audit.integration.test.ts` | 8 | 8 | `test:db:integration` | **PASS** |
 | `lib/db/credit-debit-notes.integration.test.ts` | 11 | 11 | `test:db:integration` | **PASS** |
-| `lib/db/gst-two-mode.integration.test.ts` | 20 | 20 | `test:db:integration` | **PASS** |
+| `lib/db/gst-two-mode.integration.test.ts` | 22 | 22 | `test:db:integration` | **PASS** |
 | `lib/db/order-read-boundary.integration.test.ts` | 11 | 9 | `test:db:embedded` | **PASS** |
 | `lib/db/owner-billing-guard.integration.test.ts` | 6 | 6 | `test:db:integration` | **PASS** |
 | `lib/db/phase0-security.integration.test.ts` | 25 | 25 | `test:db:integration` | **PASS** |
@@ -67,7 +74,7 @@ them is executed by a suite that does.
 | `lib/db/report-sales.integration.test.ts` | 26 | 26 | `test:db:integration` | **PASS** |
 | `lib/db/restaurant-account-link.integration.test.ts` | 8 | 8 | `test:db:integration` | **PASS** |
 | `lib/db/subscription-billing.integration.test.ts` | 41 | 41 | `test:db:integration` | **PASS** |
-| **Total** | **223** | **221** | | **221 executed and passed, 2 never executed (see §3)** |
+| **Total** | **225** | **223** | | **223 executed and passed, 2 never executed (see §3)** |
 
 The two columns differ by exactly **2**, and that difference is explained
 rather than hidden: `order-read-boundary` holds 11 cases, 9 of which need
@@ -81,7 +88,7 @@ The whole table is re-derivable in about three seconds:
 ```
 $ npx vitest run <the eleven files>
 Test Files  11 skipped (11)
-      Tests  221 skipped (223)
+      Tests  223 skipped (225)
 ```
 
 The runner is `scripts/local-pg/with-embedded-postgres.mjs`: a **disposable**
@@ -91,11 +98,11 @@ data directory is deleted when the command exits. It reaches nothing hosted.
 ```
 $ npm run test:db:integration
 Test Files  10 passed (10)
-      Tests  212 passed (212)
+      Tests  214 passed (214)
 
 $ npm run test:db:embedded
 Test Files  9 passed (9)
-      Tests  207 passed | 2 skipped (209)
+      Tests  209 passed | 2 skipped (211)
 ```
 
 ---
@@ -137,14 +144,13 @@ launch gate depends on.
 
 ```
 $ npm run migrations:verify
-98 files, 98 unique versions
+101 files, 101 unique versions
 ```
 
-98 files, 98 unique versions, no duplicate version, no out-of-order file,
+101 files, 101 unique versions, no duplicate version, no out-of-order file,
 and the deployed anchors present and hashable. Reconciled against the Batch
 2 conflict report merged in PR #193
-(`qa-evidence/day1/MIGRATION_CONFLICT_RESOLUTION_BATCH2.md` — present on
-`main`, not yet in this branch): that report
+(`qa-evidence/day1/MIGRATION_CONFLICT_RESOLUTION_BATCH2.md`): that report
 finds **no literal same-version file collision**, and confirms that
 `20261112000400` → `20261112000600` → `20261114000100` is the correct
 ordered history, so no combined function body is required.
@@ -165,12 +171,12 @@ owner decisions — `MASTER_BLOCKER_REGISTER.md` B2 and B10.
 
 ```
 $ npm run test:db:logical-restore
-LOCAL_LOGICAL_RESTORE_VERIFIED {"pgVersion":17,"migrations":98,"tables":48,
- "policies":59,"functions":163,"backupFormat":"autodine-logical-1",
+LOCAL_LOGICAL_RESTORE_VERIFIED {"pgVersion":17,"migrations":101,"tables":48,
+ "policies":59,"functions":164,"backupFormat":"autodine-logical-1",
  "productionBackupClaim":false,"ciCustomFormatDrill":"not-run-locally"}
 ```
 
-The drill replays the full 98-file chain into a disposable database and
+The drill replays the full 101-file chain into a disposable database and
 compares the fingerprints. `productionBackupClaim: false` means the run
 makes no claim about any Production backup, and `ciCustomFormatDrill` states
 plainly that the custom-format path did not run here.

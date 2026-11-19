@@ -321,7 +321,7 @@ Production with no flag able to unlock them.
 
 ---
 
-## 8. Audit coverage — what was checked
+## 8. Audit coverage — what was checked (2026-11-18 snapshot)
 
 | Check | Result |
 |---|---|

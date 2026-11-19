@@ -1,7 +1,7 @@
 # AUTODINE — VERCEL PREVIEW DEPLOYMENT EVIDENCE (PR #194)
 
 Date: 2026-11-19 · Subject: the deployment event associated with PR #194 ·
-Branch `arena/88c342c2-autodine` · PR head `e90ab824bff191b994a63fb2b83dc461271c0faa`
+Branch `arena/88c342c2-autodine` · PR head `bc58a1616f05899d12c0521aa42284d3634018e7`
 
 ---
 
@@ -26,10 +26,10 @@ comfortable.
 
 | Field | Value | How it was established |
 |---|---|---|
-| **Deployment id** | `6pFExiBEDXx7kooBgt6Puu4ksNE4` | the `Vercel` commit status on the head SHA |
-| **Project** | `new` | the status target URL path: `.../iamjarvis9896-3988s-projects/new/6pFExiBEDXx7kooBgt6Puu4ksNE4` |
+| **Deployment id** | `J9R1nrMpAJN29ofro5muLZytKubf` | the `Vercel` commit status on the head SHA |
+| **Project** | `new` | the status target URL path: `.../iamjarvis9896-3988s-projects/new/J9R1nrMpAJN29ofro5muLZytKubf` |
 | **Team / scope** | `iamjarvis9896-3988s-projects` | the status target URL path |
-| **Commit SHA** | `e90ab824bff191b994a63fb2b83dc461271c0faa` | the commit the status is attached to (the PR head) |
+| **Commit SHA** | `bc58a1616f05899d12c0521aa42284d3634018e7` | the commit the status is attached to (the PR head) |
 | **Source branch** | `arena/88c342c2-autodine` | the branch the SHA belongs to; it is **not** on `main` |
 | **Environment** | **Preview** | the deployment hostname (below) follows Vercel's `git-<branch>` Preview naming convention and contains the branch name |
 | **Deployment type** | automatic Git-push/PR-triggered Preview build by the Vercel GitHub App | the status description is the app's standard "Deployment has completed"; no deployment was created, promoted or dispatched by this work |
@@ -37,12 +37,28 @@ comfortable.
 | **Preview host** | `new-git-arena-88c342c2-autodine-iamjarvis9896-3988s-projects.vercel.app` | the `Vercel Preview Comments` check-run output on the head SHA |
 | **DNS** | resolves to Vercel's edge addresses (`216.198.79.67`, `64.29.17.67`) | read-only DNS lookup from the sandbox |
 
+### Every Preview this branch produced
+
+Each push to `arena/88c342c2-autodine` produced one **Preview**. They are
+listed so the count is not understated:
+
+| PR head | Deployment id | Status |
+|---|---|---|
+| `e90ab82` | `6pFExiBEDXx7kooBgt6Puu4ksNE4` | success |
+| `f75107a` | `7mcwf6HSBZ2DKpM2UVEwBKVWVhZL` | success |
+| `bc58a16` | `J9R1nrMpAJN29ofro5muLZytKubf` | success |
+
+All three share the same Preview host — the branch alias
+`new-git-arena-88c342c2-autodine-…`. **None** is a Production deployment,
+and **none** was created, promoted, redeployed or dispatched by this work:
+each is the Vercel GitHub App reacting to a push.
+
 ## Why this is a Preview and not a Production deployment
 
 Three independent facts establish it:
 
-1. **The commit is not on `main`.** `e90ab82` is a branch-only commit
-   (`git merge-base --is-ancestor e90ab82 origin/main` → false). Vercel
+1. **The commit is not on `main`.** `bc58a16` is a branch-only commit
+   (`git merge-base --is-ancestor bc58a16 origin/main` → false). Vercel
    builds a Production deployment from the production branch; this SHA is
    not it.
 2. **The deployment hostname carries the branch.** The Preview host is
@@ -55,11 +71,11 @@ Three independent facts establish it:
    `vercel.live/open-feedback/…-git-arena-88c342c2-autodine-…vercel.app`
    link — Vercel's own PR-preview feedback surface.
 
-For contrast, `origin/main`'s head `ff00d38d0abe72bfabf85fb84ac4b3423b62b6f6`
-(the PR #190 merge) carries deployment `2trfWGS2puf4YrEiyWSe6VCvNMGe`.
-That is the **Production** deployment produced by merging into `main` — the
-side effect the PR #194 body must warn about, and the reason the body says
-merging PR #194 will trigger a Production build.
+For contrast, `origin/main`'s head `8c557e07c2363d553d5007c257664b673509fef9`
+carries deployment `GZQSmKfZmMoyMsmWk3ZuGZ28EMKM`. That is the
+**Production** deployment produced by merging into `main` — the side effect
+the PR #194 body must warn about, and the reason the body says merging
+PR #194 will trigger a Production build.
 
 ## What was NOT done
 
@@ -79,8 +95,8 @@ Use this, and not "no deployment":
 
 > **No deployment was created or promoted by this work.** Pushing the
 > branch caused the Vercel GitHub App to produce a **Preview** deployment
-> automatically (deployment `6pFExiBEDXx7kooBgt6Puu4ksNE4`, project `new`,
-> head `e90ab82`, Preview host
+> automatically (deployment `J9R1nrMpAJN29ofro5muLZytKubf`, project `new`,
+> head `bc58a16`, Preview host
 > `new-git-arena-88c342c2-autodine-iamjarvis9896-3988s-projects.vercel.app`).
 > It is a Preview: the commit is not on `main`, the hostname carries the
 > branch name, and no Vercel setting was changed. **Merging this branch
