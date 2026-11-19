@@ -48,6 +48,13 @@ jobs:
       - name: Hosted-acceptance and staging guards (offline)
         run: npm run test:staging:guards
 
+      # The demo-seed guard is proven against a real PostgreSQL: the seed is
+      # applied to the repository's own schema on a disposable cluster and
+      # must leave every other tenant untouched. The cluster listens on
+      # loopback with a random password and is destroyed when the run ends.
+      - name: Demo-seed isolation (disposable embedded PostgreSQL)
+        run: npm run test:staging:seed-demo-db
+
       - name: Backup pipeline selftest (disposable embedded PostgreSQL)
         run: npm run test:backup
 

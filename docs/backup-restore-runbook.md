@@ -31,7 +31,11 @@ Until the owner (a) confirms the plan and (b) approves a destination, this runbo
 node scripts/backup/selftest.mjs
 
 # backup (Mode A when pg_dump exists, else built-in Mode B)
-AUTODINE_BACKUP_SOURCE_URL='postgresql://postgres.<ref>:<password>@aws-...pooler.supabase.com:6543/postgres' \
+# The SOURCE must be the SESSION pooler (port 5432) or a direct connection.
+# Never the transaction pooler (6543): Mode A exports a snapshot on one
+# connection and pg_dump imports it on a second, which does not work
+# correctly through transaction-mode pooling. See PRODUCTION-BACKUP-RUNBOOK.md.
+AUTODINE_BACKUP_SOURCE_URL='postgresql://postgres.<ref>:<password>@aws-...pooler.supabase.com:5432/postgres' \
 AUTODINE_BACKUP_PASSPHRASE='<from your password manager>' \
 node scripts/backup/backup-logical.mjs --out-dir /mnt/backups/autodine \
   --keep-daily 14 --keep-weekly 8 --keep-monthly 6

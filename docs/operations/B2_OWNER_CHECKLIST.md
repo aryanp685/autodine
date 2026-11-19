@@ -77,13 +77,39 @@ Production Supabase project, used read-only**. It is the *source*; the
 restore *target* is a different thing entirely (§B3).
 
 - Project ref: **`bdbaqpevwmgdvghszjno`** — the Production project declared in `lib/supabase/production-projects.json`.
-- Shape used by the runbook and by `docs/pitr-verification-procedure-2026-11-14.md`:
-  `postgresql://postgres.<ref>:<password>@aws-1-<region>.pooler.supabase.com:6543/postgres`
-  The pooler is used deliberately: the CI runner has no IPv6, so a direct
-  `db.<ref>.supabase.co` connection is unreliable there.
+- **Use the SESSION pooler (port 5432), or a direct connection. Never the transaction pooler (6543).**
+
+  ```
+  postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres
+  ```
+
+  This is the one detail in this checklist that is easy to get wrong, so here
+  is why. The backup runs in **Mode A** — `pg_dump` is on the runner's PATH,
+  so `backup-logical.mjs` selects it — and Mode A opens one connection,
+  exports a snapshot from it (`pg_export_snapshot()`), then runs `pg_dump`
+  on a **second** connection with `--snapshot=<id>`, so that the dump and the
+  manifest's row counts describe exactly the same frozen data.
+
+  Importing an exported snapshot needs the second connection to be
+  session-affine, and through **transaction-mode** pooling (port 6543) it is
+  not. The repository says so in the two documents written by whoever
+  actually ran a production backup: `PRODUCTION-BACKUP-RUNBOOK.md` §1
+  ("Do NOT use Transaction pooler (6543)") and
+  `docs/production-operator-setup-2026-11-11.md` ("never the transaction
+  pooler (6543), which `pg_dump` does not work correctly through").
+
+  **The host is the same; only the port differs.** Port **5432** is the
+  session pooler and is what belongs here. It is also IPv4-reachable, which
+  matters because the GitHub-hosted runner has no IPv6 — so a direct
+  `db.<ref>.supabase.co` connection (IPv6-only for most projects) is the
+  wrong choice from the hosted workflow, even though it is the right one
+  from a desktop with IPv6.
+
+  The **restore target** is the opposite case and may use either pooler:
+  `pg_restore` imports no snapshot.
 - The pipeline opens `begin isolation level repeatable read read only`
-  (`scripts/backup/lib-dump.mjs`) and, in Mode A, exports a snapshot for
-  `pg_dump --snapshot`. **The role must be able to read every table in the
+  (`scripts/backup/lib-dump.mjs`) and exports the snapshot from that same
+  read-only transaction. **The role must be able to read every table in the
   `public` schema** — the dump is schema-complete by design.
 - Prefer a dedicated **read-only** database role over the `postgres`
   superuser role. Nothing in the pipeline writes to the source, and the

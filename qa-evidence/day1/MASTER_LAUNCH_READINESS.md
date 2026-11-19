@@ -54,12 +54,11 @@ GitHub Actions does not expose `runner` in job-level `env`. The workflow therefo
 - **Alert sink wiring + cron live proof** — gate 7; the sink is the owner's to point at a human-reachable endpoint.
 - **Production migration per-file authorizations** — each migration file needs its own authorization; none is implied by a green local replay.
 - **Billing provider + GST/IRP tracks** — a separate track with its own approvals; out of scope for this decision.
-- **Demo-seed isolation guard** — the fail-closed guard and `npm run staging:seed-demo` described on 2026-11-16 were never committed: `lib/staging/` does not exist and the npm script is absent. **This is a real open code item, not a stale citation.** Until it exists, no demo seed is protected by the guard the run log claims. See `qa-evidence/day1/MISSING_EVIDENCE_REGISTER.md` §3.
+- **Demo-seed isolation guard** — **CLOSED 2026-11-18.** The fail-closed guard and `npm run staging:seed-demo` described on 2026-11-16 were never committed. They now exist: `lib/staging/demo-seed-isolation.ts` (pure guard) and `scripts/staging/seed-demo.ts` (the command, which prints SQL and writes nothing), proven by 24 unit tests, 10 command tests and a real-PostgreSQL proof that the seed leaves another restaurant's rows untouched. See `qa-evidence/day1/MISSING_EVIDENCE_REGISTER.md` §3.
 
-> The eight earlier blockers are all hosted runs or owner decisions. The ninth
-> is the only one that is *also* missing code — and it is small, bounded and
-> does not block the launch gates above; it blocks the claim that staging is
-> demo-safe.
+> **Eight blockers remain**, and all eight are hosted runs or owner decisions.
+> The ninth — the demo-seed guard — was the only one that was also missing
+> code, and it is now closed.
 
 ---
 

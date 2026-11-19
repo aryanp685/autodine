@@ -30,11 +30,11 @@ A read-only audit batch plus three documents. Still **no push, no PR merge, no d
 
 **One competing PR found and excluded.** PR #187 (open, 19 files) is a **Cloudflare R2** implementation of the same workflows and scripts — `Hosted backup (R2)`, `lib-r2.mjs`, `upload-r2.mjs`, `download-r2.mjs`, `run-scheduled.mjs --r2`. It was branched before the B2 implementation landed, so its files register as *added* and merging it would **replace the owner's approved Backblaze B2 destination with the superseded R2 one**, silently switching providers, secret names and endpoints. **Recommendation: close PR #187 as superseded by the merged PR #188.** It is not merged.
 
-**Seven dangling evidence references reconciled.** Every path cited by these documents was searched against the complete Git history of `main`, **all 80 remote branches**, **every pull request** (open, merged and closed) and the working tree. **None of the seven was ever committed.** They are not recoverable and are **not** recreated — a historical evidence document that was never written cannot be reconstructed honestly. Each of the 11 citation sites now carries an explicit `**[MISSING — see qa-evidence/day1/MISSING_EVIDENCE_REGISTER.md]**` marker, and the register records, per item, what *did* land instead. Six are stale citations whose substance exists elsewhere. **One is a real open item:** `lib/staging/demo-seed-isolation.ts` and `npm run staging:seed-demo` never landed — `lib/staging/` does not exist and the npm script is absent — so the demo-seed guard claimed on 2026-11-16 is **not** in the repository. It is now the ninth blocker, and the only blocker that is missing code rather than missing a hosted run.
+**Seven dangling evidence references reconciled.** Every path cited by these documents was searched against the complete Git history of `main`, **all 80 remote branches**, **every pull request** (open, merged and closed) and the working tree. **None of the seven was ever committed.** They are not recoverable and are **not** recreated — a historical evidence document that was never written cannot be reconstructed honestly. Each of the 11 citation sites now carries an explicit `**[MISSING — see qa-evidence/day1/MISSING_EVIDENCE_REGISTER.md]**` marker, and the register records, per item, what *did* land instead. Six are stale citations whose substance exists elsewhere. **One is a real open item:** `lib/staging/demo-seed-isolation.ts` and `npm run staging:seed-demo` never landed — `lib/staging/` does not exist and the npm script is absent — so the demo-seed guard claimed on 2026-11-16 is **not** in the repository. It was the ninth blocker, and the only one that was missing code rather than missing a hosted run — **closed on 2026-11-18**; see the demo-seed section below.
 
 **Restore guard verified against the real drill.** `scripts/backup/lib-restore-target.mjs` is applied by both `restore-logical.mjs` and `verify-restored-db.mjs`. Exercised against the drill's actual loopback target and against Production in both direct and pooled forms: the drill target is allowed; Production is refused outright in both forms and **no flag unlocks it**; a hosted non-Production target is refused without a scratch opt-in, and refused with an opt-in whose ref does not match. Seven of seven scenarios correct.
 
-**B2 requirements derived from the implementation, not from prose.** The authoritative list came from `lib-b2.mjs`, `upload-b2.mjs`, `download-b2.mjs`, `prune-b2.mjs`, `lib-dump.mjs` and the two hosted workflows. Secrets: `AUTODINE_BACKUP_SOURCE_URL` (backup only), `AUTODINE_BACKUP_PASSPHRASE`, `B2_REGION`, `B2_BUCKET`, `B2_ACCESS_KEY_ID`, `B2_SECRET_ACCESS_KEY` — the drill needs only five and must never be given the source URL. The key requires list/read/write/delete on **one** bucket and nothing else; no bucket creation, no bucket deletion, no sharing. The bucket must be **private**; B2 lifecycle rules must **not** be added, because age-based rules cannot express the 14-daily/8-weekly/6-monthly policy that `prune-b2.mjs` enforces and would delete artifacts the policy still needs. The backup source is the Production project `bdbaqpevwmgdvghszjno` used read-only (`begin isolation level repeatable read read only`), via the pooler for IPv4-only runners. The restore target is the runner's own disposable `postgres:17` container on loopback — **never** Production, **never** Staging.
+**B2 requirements derived from the implementation, not from prose.** The authoritative list came from `lib-b2.mjs`, `upload-b2.mjs`, `download-b2.mjs`, `prune-b2.mjs`, `lib-dump.mjs` and the two hosted workflows. Secrets: `AUTODINE_BACKUP_SOURCE_URL` (backup only), `AUTODINE_BACKUP_PASSPHRASE`, `B2_REGION`, `B2_BUCKET`, `B2_ACCESS_KEY_ID`, `B2_SECRET_ACCESS_KEY` — the drill needs only five and must never be given the source URL. The key requires list/read/write/delete on **one** bucket and nothing else; no bucket creation, no bucket deletion, no sharing. The bucket must be **private**; B2 lifecycle rules must **not** be added, because age-based rules cannot express the 14-daily/8-weekly/6-monthly policy that `prune-b2.mjs` enforces and would delete artifacts the policy still needs. The backup source is the Production project `bdbaqpevwmgdvghszjno` used read-only (`begin isolation level repeatable read read only`), through the **session pooler (port 5432)** or a direct connection — never the transaction pooler (6543), because Mode A exports a snapshot on one connection and `pg_dump` imports it on a second, which does not work correctly through transaction-mode pooling (`PRODUCTION-BACKUP-RUNBOOK.md` §1; `docs/production-operator-setup-2026-11-11.md`). The restore target is the runner's own disposable `postgres:17` container on loopback — **never** Production, **never** Staging.
 
 **RTO is UNMEASURED, and the measurement is specified.** The first successful drill produces the first honest number: dispatch-to-green wall-clock, with the restore duration reported separately, the RPO bounded by the daily schedule (≤ 24 h) and by the drill's measured artifact age, and the service RTO called out as *not* covered (no detection, cutover, Auth/Storage/Realtime, DNS or Vercel).
 
@@ -47,6 +47,89 @@ A read-only audit batch plus three documents. Still **no push, no PR merge, no d
 **Current local counts.** DR suite **88/88**; unit suite 2,503 passed / 221 skipped / 0 failed; composite-action suite 11/11; wiring suite 8/8; restore-guard suite 19/19; preflight suite 8/8; lint, typecheck, release verifier and staging guards all exit 0; 13 YAML files parse.
 
 **Decision unchanged: NO-GO**, on hosted evidence and owner decisions, with zero open P0 code defects.
+
+---
+
+## Demo-seed isolation guard — implemented 2026-11-18
+
+The ninth blocker (the only one that was missing code rather than missing a
+hosted run) is **closed**. Built to the claim the 2026-11-16 run log made but
+never committed.
+
+**What exists now**
+
+- `lib/staging/demo-seed-isolation.ts` — a pure, dependency-free guard. No
+  I/O, no connection, no environment read, so the same decision is unit-
+  testable, CI-assertable and applicable by the command with no database in
+  sight. It refuses, in order: a missing or malformed project ref; a
+  **Production** project (no option unlocks it — the check runs before the
+  allowlist); a project not on the hard-coded demo allowlist; a malformed,
+  non-Supabase, Production-named or mismatched target URL; a missing or wrong
+  authorisation; an unsafe slug. The authorisation phrase names its target
+  (`seed-demo:<ref>`), so an authorisation issued for one project does not
+  carry over to another, and no standing permission exists.
+- A second guard re-reads the generated SQL and refuses it unless every row
+  id it writes belongs to the demo fixture, it touches only `public.` tables,
+  it contains no statement that removes or alters data, and it never mentions
+  a Production project. This is the cross-tenant rule: the seed cannot reach
+  a row that is not its own.
+- `scripts/staging/seed-demo.ts` — `npm run staging:seed-demo`. It evaluates
+  the guard **first**, before loading anything that reads the environment, so
+  a refusal is the only thing the operator sees: the rule id, and nothing
+  else. On approval it prints the synthetic seed SQL and **writes nothing** —
+  there is no database client in the file and no connection is opened. This
+  matches the run log's "(nothing seeded; owner runs it)".
+
+**Evidence**
+
+- 24 unit tests (`lib/staging/demo-seed-isolation.test.ts`): positive,
+  negative, the scope rules, and the "no credential is ever echoed" property.
+- 10 command tests (`scripts/staging/seed-demo.test.mjs`) driving the real
+  npm script.
+- A real-PostgreSQL proof (`scripts/staging/seed-demo.db.test.mjs`): the
+  repository's own schema (the Supabase shim plus all 98 migrations) on a
+  disposable embedded cluster, with a second restaurant standing in for a
+  real customer. The seed creates its own restaurant; the other restaurant is
+  unchanged field for field; every dining table and every QR token belongs
+  to the demo restaurant; a second run is idempotent.
+- **14 mutation checks**: removing the production check, the allowlist check,
+  the authorisation check, the URL cross-check, the slug check, the
+  destructive-statement rule, the foreign-row-id rule, the non-public-table
+  rule, the unscoped-update rule, the production-reference rule, or the
+  CLI's call to either guard — each one fails the suite. Widening the
+  allowlist to include Production does **not** break anything, because the
+  production check runs first and is not unlockable; a test now asserts that
+  no approved demo project is ever a Production project.
+
+**Additional audit: the B2 source connection**
+
+Rechecked whether `AUTODINE_BACKUP_SOURCE_URL` must be direct or pooled.
+From the code: the hosted backup runs **Mode A** (`pg_dump` is on the
+runner's PATH, so `backup-logical.mjs` selects it), and Mode A opens one
+connection, exports a snapshot from it (`pg_export_snapshot()`), then runs
+`pg_dump` on a **second** connection with `--snapshot=<id>`. Importing an
+exported snapshot needs that second connection to be session-affine, and
+through **transaction-mode** pooling it is not. The repository's two
+production-operator documents agree: `PRODUCTION-BACKUP-RUNBOOK.md` §1 ("Do
+NOT use Transaction pooler (6543)") and
+`docs/production-operator-setup-2026-11-11.md` ("never the transaction
+pooler (6543), which `pg_dump` does not work correctly through").
+
+**The host is the same; only the port differs.** The source must use the
+**session pooler (port 5432)** or a direct connection. The session pooler is
+also IPv4-reachable, which is what the GitHub-hosted runner needs. The
+**restore target** is the opposite case: `pg_restore` imports no snapshot, so
+either pooler is fine there.
+
+**Corrected:** `docs/operations/B2_OWNER_CHECKLIST.md` §A4 (it recommended
+the transaction pooler), `docs/backup-restore-runbook.md`,
+`docs/pitr-verification-procedure-2026-11-14.md`,
+`qa-evidence/day1/MASTER_HOSTED_VERIFICATION_RUNBOOK.md` Package 1, and the
+B2 requirements paragraph above.
+
+**Decision unchanged: NO-GO**, on hosted evidence and owner decisions, with
+zero open P0 code defects. The blocker count is back to **eight**, all of
+them hosted runs or owner decisions.
 
 ---
 
@@ -125,8 +208,8 @@ Re-inspected the Brevo implementation on this branch against the runbook/registe
 
 ## Staging isolation completion (2026-11-16)
 
-Continuation of Master Run 2 Part B; full report `qa-evidence/day1/STAGING_ISOLATION_COMPLETION.md` **[MISSING — see `qa-evidence/day1/MISSING_EVIDENCE_REGISTER.md`]**; live state re-verified read-only (projects, Vercel envs/branch mapping, Auth configs, buckets/policies) — nothing hosted changed. **Closed repo-side:** O-B2's missing guard direction — both deployment-isolation implementations now enforce a bidirectional trusted-project pin via `AUTODINE_EXPECTED_PROJECT_REF` (a production-pinned build pointed at the test project now fails the build; an unpinned production deployment is documented as still uncaught until the owner adds the one Production-targeted env value). Demo-seed hygiene: fail-closed `lib/staging/demo-seed-isolation.ts` **[MISSING — see `qa-evidence/day1/MISSING_EVIDENCE_REGISTER.md`]** + `npm run staging:seed-demo` (nothing seeded; owner runs it). Migration `20261117000100_revoke_public_storage_views_v2.sql` finalized (guarded revoke; live probe found no such view on either project; static + behavioral tests, full replay green; **not applied**). **Prepared, owner executes:** O-B3 redirect allow-list edits (test wildcard add; production wildcard/localhost removal needs explicit approval), O-B5 `mailer_autoconfirm=false` with consequences + B6 sequencing. **Still open owner decisions:** O-B1 designation (not silently assumed), O-B2 dashboard value, O-B3, O-B5, optional operator-restaurant cleanup/seed run, per-file migration authorizations (register 2.6–2.9, Tier 3). **Validation:** unit 227 files / 2,537 passed / 0 failed; PG integration 12 suites / 223; staging guards 31/31; isolation self-test incl. pin cases; lint/typecheck/build exit 0.
+Continuation of Master Run 2 Part B; full report `qa-evidence/day1/STAGING_ISOLATION_COMPLETION.md` **[MISSING — see `qa-evidence/day1/MISSING_EVIDENCE_REGISTER.md`]**; live state re-verified read-only (projects, Vercel envs/branch mapping, Auth configs, buckets/policies) — nothing hosted changed. **Closed repo-side:** O-B2's missing guard direction — both deployment-isolation implementations now enforce a bidirectional trusted-project pin via `AUTODINE_EXPECTED_PROJECT_REF` (a production-pinned build pointed at the test project now fails the build; an unpinned production deployment is documented as still uncaught until the owner adds the one Production-targeted env value). Demo-seed hygiene: fail-closed `lib/staging/demo-seed-isolation.ts` **[MISSING — see `qa-evidence/day1/MISSING_EVIDENCE_REGISTER.md`]** + `npm run staging:seed-demo` (nothing seeded; owner runs it). *(As of 2026-11-16 this had not landed; it was implemented on 2026-11-18 — see "Demo-seed isolation guard" above.)* Migration `20261117000100_revoke_public_storage_views_v2.sql` finalized (guarded revoke; live probe found no such view on either project; static + behavioral tests, full replay green; **not applied**). **Prepared, owner executes:** O-B3 redirect allow-list edits (test wildcard add; production wildcard/localhost removal needs explicit approval), O-B5 `mailer_autoconfirm=false` with consequences + B6 sequencing. **Still open owner decisions:** O-B1 designation (not silently assumed), O-B2 dashboard value, O-B3, O-B5, optional operator-restaurant cleanup/seed run, per-file migration authorizations (register 2.6–2.9, Tier 3). **Validation:** unit 227 files / 2,537 passed / 0 failed; PG integration 12 suites / 223; staging guards 31/31; isolation self-test incl. pin cases; lint/typecheck/build exit 0.
 
 ## Remaining blockers (one line each; full register in MASTER_LAUNCH_READINESS.md)
 
-Backup gate (bucket/secrets/PR #190/first run/rehearsal — see `docs/operations/B2_OWNER_CHECKLIST.md`) · migration canonicalization + B1 · email domain/SMTP · staging designation + pins (register 2.6–2.9) · hosted browser + realtime evidence · alert sink wiring + cron live proof · Production migration per-file authorizations · billing provider + GST/IRP tracks (separate) · **demo-seed isolation guard (missing code — `lib/staging/` and `npm run staging:seed-demo` never landed; see `qa-evidence/day1/MISSING_EVIDENCE_REGISTER.md` §3)**. **Current decision: NO-GO** — on hosted evidence and owner decisions, with zero open P0 code defects.
+Backup gate (bucket/secrets/PR #190/first run/rehearsal — see `docs/operations/B2_OWNER_CHECKLIST.md`) · migration canonicalization + B1 · email domain/SMTP · staging designation + pins (register 2.6–2.9) · hosted browser + realtime evidence · alert sink wiring + cron live proof · Production migration per-file authorizations · billing provider + GST/IRP tracks (separate) · ~~demo-seed isolation guard~~ — **CLOSED 2026-11-18** (the guard and `npm run staging:seed-demo` now exist and are proven; see `qa-evidence/day1/MISSING_EVIDENCE_REGISTER.md` §3). **Current decision: NO-GO** — on hosted evidence and owner decisions, with zero open P0 code defects.

@@ -74,7 +74,12 @@ same org (Free tier is fine; ~2 minutes); scratch is empty.
 
 ```bash
 # 1) Encrypted backup of production (read-only, one transaction)
-AUTODINE_BACKUP_SOURCE_URL='postgresql://postgres.bdbaqpevwmgdvghszjno:<password>@aws-1-<region>.pooler.supabase.com:6543/postgres' \
+# The SOURCE must be the SESSION pooler (port 5432) or a direct connection --
+# never the transaction pooler (6543). Mode A exports a snapshot on one
+# connection and pg_dump imports it on a second, which does not work correctly
+# through transaction-mode pooling. The RESTORE TARGET below may use either,
+# because pg_restore imports no snapshot.
+AUTODINE_BACKUP_SOURCE_URL='postgresql://postgres.bdbaqpevwmgdvghszjno:<password>@aws-1-<region>.pooler.supabase.com:5432/postgres' \
 AUTODINE_BACKUP_PASSPHRASE='<from password manager>' \
 node scripts/backup/backup-logical.mjs --out-dir /mnt/backups/autodine-drill --keep-daily 3 --keep-weekly 1 --keep-monthly 0
 

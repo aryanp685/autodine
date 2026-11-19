@@ -2,6 +2,8 @@
 
 Seven paths are referenced by documents in this repository but have never existed in it. This register is the authoritative answer to "where is that file?" — **MISSING**, with the search that proves it and the honest consequence for each claim.
 
+**One of the seven has since been implemented** (item 3, the demo-seed guard, on 2026-11-18). It is kept in this register rather than deleted, because the honest record of what was missing on 2026-11-16 — and of what was done about it — is part of the answer.
+
 **Search performed (2026-11-18, read-only).** Every one of the seven was checked against:
 
 - the complete Git history of `main` (693 commits, unshallowed) and of **all 80 remote branches** — `git log --all --diff-filter=A -- <path>`;
@@ -28,12 +30,16 @@ Seven paths are referenced by documents in this repository but have never existe
 - **What DID land:** the boundary implementations and their tests under different names — `lib/supabase/deployment-isolation.ts` (+ `lib/supabase/deployment-isolation.test.ts`), `lib/staging-config.ts` (+ `lib/staging-config.test.ts`), `scripts/verify-preview-isolation.mjs`, `docs/preview-isolation.md`.
 - **Consequence:** the *capability* is present and tested; only the file name in the run log is unresolvable.
 
-## 3. `lib/staging/demo-seed-isolation.ts` — MISSING **and its feature never landed**
+## 3. `lib/staging/demo-seed-isolation.ts` — was MISSING; **implemented 2026-11-18**
 
 - **Referenced by:** `MASTER_EXECUTION_STATUS.md` (staging isolation completion).
 - **Claim it supported:** a fail-closed demo-seed guard plus `npm run staging:seed-demo` ("nothing seeded; owner runs it").
-- **What DID land:** `lib/db/demo-menu.ts` (a `demoSeedSql` helper) — which is **not** the same thing. The `lib/staging/` directory does not exist and `npm run staging:seed-demo` is **absent from `package.json`**.
-- **Consequence:** unlike the other six, this is a **real open item, not a stale reference**. The fail-closed guard and the owner-run seeding command described on 2026-11-16 were never committed. Until they are, any demo seed that runs is not protected by the guard the run log claims. See the blocker register.
+- **What landed on 2026-11-16 (the run log's date):** nothing. The guard and the command were never committed; `lib/staging/` did not exist and `npm run staging:seed-demo` was absent from `package.json`.
+- **What landed on 2026-11-18 (this branch):** the capability itself, built to the claim:
+  - `lib/staging/demo-seed-isolation.ts` — a pure, dependency-free guard. It refuses a Production project (no option unlocks it), a project that is not on the hard-coded demo allowlist, a missing or wrong authorisation, an unsafe slug, and a target URL that names another project or Production. The authorisation phrase names the target (`seed-demo:<ref>`), so an authorisation never carries over to another project.
+  - `scripts/staging/seed-demo.ts` — `npm run staging:seed-demo`. It evaluates the guard **first**, and on refusal prints the rule id and nothing else. On approval it prints the synthetic seed SQL and **writes nothing**: there is no database client in the file and no connection is opened.
+  - A second guard re-reads the generated SQL and refuses it unless every row id it writes belongs to the demo fixture, it touches only `public.` tables, it contains no statement that removes or alters data, and it never mentions a Production project.
+- **Consequence:** this item is **closed**. The demo seed is now fail-closed and tenant-scoped, proven by 24 unit tests, 10 command tests and a real-PostgreSQL proof that the seed leaves another restaurant's rows untouched. The claim the run log made on 2026-11-16 is now true.
 
 ## 4. `qa-evidence/day1/EMAIL_DELIVERABILITY_IMPLEMENTATION.md` — MISSING (superseded)
 
@@ -61,7 +67,7 @@ Seven paths are referenced by documents in this repository but have never existe
 - **Referenced by:** `MASTER_OWNER_ACTION_REGISTER.md` (items 2.6 and the migration note); `MASTER_EXECUTION_STATUS.md` (staging isolation completion).
 - **Claim it supported:** the 2026-11-16 completion record — closed repo-side items, prepared owner items, and the open owner decisions (O-B1…O-B5).
 - **What DID land:** the owner register's rows 2.6–2.9 and the Tier 3 tables, which carry the open owner decisions in actionable form.
-- **Consequence:** the open owner decisions are recorded; the completion narrative is not. Note that item 3 of this register (the demo-seed guard) was part of that same completion and genuinely did not land.
+- **Consequence:** the open owner decisions are recorded; the completion narrative is not. Item 3 of this register (the demo-seed guard) was part of that same completion and genuinely did not land — it was implemented on 2026-11-18, and its entry below records both.
 
 ---
 
@@ -71,4 +77,4 @@ Anywhere a document in this repository cites one of these paths, the citation is
 
 - **the file does not exist** — do not go looking for it, and do not treat its absence as a repository defect to fix by writing the file;
 - **the substance may still be elsewhere** — check the "What DID land" line before concluding anything;
-- **in one case only (item 3) the capability itself is missing** — that is an open item, recorded in the blocker register.
+- **in one case only (item 3) the capability itself was missing** — it has since been implemented (2026-11-18); the other six remain substance-only gaps.
