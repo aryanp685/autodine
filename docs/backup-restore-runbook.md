@@ -97,17 +97,15 @@ drill.
 
 ## Scheduling
 
-Host cron (operator workstation / a small VM) — use the orchestrator, which
-runs backup → automated recovery check (decrypt + manifest verify of the
-newest artifact) → DR objective check, and exits non-zero with one alert line
-(`BACKUP_ALERT_WEBHOOK`, else `DR_ALERT_WEBHOOK`) on any failure:
+A separately authorized host scheduler may run the orchestrator, which
+performs backup → decryption/manifest verification → DR objective check and
+exits non-zero on failure. Inject credentials through an approved protected
+secret manager or service manager; never put credential values in crontab,
+command arguments, logs or chat. The existing GitHub schedule is 03:17 UTC.
+An independent heartbeat monitor is still needed when a scheduled run never
+starts, and an alert sink must be configured and verified separately.
 
-```cron
-17 3 * * *  cd /opt/autodine && AUTODINE_BACKUP_SOURCE_URL=... AUTODINE_BACKUP_PASSPHRASE=... node scripts/backup/run-scheduled.mjs --out-dir /mnt/backups/autodine --rpo-minutes 1440 >> /var/log/autodine-backup.log 2>&1
-```
-
-**First hosted run (executes immediately once the B2 variables exist):**
-add `--b2` to the same command. The run then ends with the upload stage:
+**For an explicitly authorized hosted backup:** add `--b2` to the command. The run then ends with the upload stage:
 artifact SHA-256 re-checked against its manifest, signed PUT of artifact +
 manifest to the bucket, signed HEAD verification of the remote SHA-256.
 Success prints `B2 upload remotely verified`; missing configuration fails
@@ -123,12 +121,14 @@ Two workflows make the hosted path independent of any one machine:
 - **`.github/workflows/hosted-backup.yml`** — manual dispatch + daily
   03:17 UTC schedule; `contents: read` only; concurrency-guarded; fails
   closed naming any missing secret; runs `run-scheduled.mjs --b2 --prune-b2` and
-  archives the (non-sensitive) manifest as run evidence.
+  archives the manifest as access-controlled run evidence. Populating its
+  repository secrets can enable future scheduled and destructive retention
+  operations; doing so requires separate authorization.
 - **`.github/workflows/hosted-restore-drill.yml`** — manual dispatch only;
   downloads the newest B2 artifact (`download-b2.mjs`, SHA-256 vs manifest
   verified), restores into a disposable `postgres:17` service container,
-  verifies with `verify-restored-db.mjs`, records restore
-  seconds as rehearsal RTO, archives the two JSON reports, and destroys
+  verifies with `verify-restored-db.mjs`, records restore-command seconds
+  (not end-to-end RTO), archives the two JSON reports, and destroys
   the downloaded material in an unconditional cleanup step. The target is
   loopback-only by construction, and the verifier refuses non-loopback
   hosts before connecting.

@@ -32,6 +32,15 @@ const quoteLit = (s) => "'" + String(s).replaceAll("'", "''") + "'";
  */
 export const FINANCIAL_SPOT_CHECK_TABLES = ['payments', 'subscription_payments'];
 
+// The current manifest contract stores numbers as JSON numbers. Do not round
+// PostgreSQL bigint evidence into a plausible but wrong financial fingerprint.
+// A future versioned string-based contract can support larger values.
+function manifestInteger(value, label) {
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number < 0) throw new Error(`backup evidence ${label} is not a non-negative safe integer`);
+  return number;
+}
+
 async function financialSpotChecksOn(client, schema, presentTables) {
   const result = {};
   for (const table of FINANCIAL_SPOT_CHECK_TABLES) {
@@ -42,7 +51,7 @@ async function financialSpotChecksOn(client, schema, presentTables) {
       [schema, table]);
     if (!col.rows.length) { result[key] = null; continue; }
     const r = await client.query(`select coalesce(sum(amount_paise), 0)::bigint as s from ${quoteIdent(schema)}.${quoteIdent(table)}`);
-    result[key] = Number(r.rows[0].s);
+    result[key] = manifestInteger(r.rows[0].s, key);
   }
   return result;
 }
@@ -61,7 +70,7 @@ async function schemaCountsOn(client, schema) {
   let rows = 0;
   for (const t of tableNames) {
     const r = await client.query(`select count(*)::bigint as n from ${quoteIdent(schema)}.${quoteIdent(t)}`);
-    rows += Number(r.rows[0].n);
+    rows = manifestInteger(rows + manifestInteger(r.rows[0].n, 'table rows'), 'total rows');
   }
   const functions = await client.query(
     `select count(*)::int as n from pg_proc p join pg_namespace n on n.oid = p.pronamespace

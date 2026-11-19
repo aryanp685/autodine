@@ -12,6 +12,9 @@
  *   financial spot check sum(amount_paise) for payments / subscription_payments
  *                        vs manifest.financialSpotChecks (measured at backup
  *                        time from the source — never invented here)
+ *   catalog health       no invalid/not-ready indexes or unvalidated check/FK
+ *                        constraints in the restored schema. This is not a
+ *                        source-to-target definition comparison.
  *
  *   AUTODINE_RESTORE_TARGET_URL=... node scripts/backup/verify-restored-db.mjs \
  *     --manifest <manifest.json> --artifact <artifact.enc>
@@ -143,6 +146,8 @@ try {
   const tables = await one(`select count(*)::int as n from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = $1 and c.relkind = 'r'`, [schema]);
   const policies = await one(`select count(*)::int as n from pg_policies where schemaname = $1`, [schema]);
   const functions = await one(`select count(*)::int as n from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = $1 and p.prokind in ('f','p')`, [schema]);
+  const invalidIndexes = await one(`select count(*)::int as n from pg_index i join pg_class c on c.oid = i.indexrelid join pg_namespace n on n.oid = c.relnamespace where n.nspname = $1 and (not i.indisvalid or not i.indisready or not i.indislive)`, [schema]);
+  const unvalidatedConstraints = await one(`select count(*)::int as n from pg_constraint c join pg_namespace n on n.oid = c.connamespace where n.nspname = $1 and c.contype in ('f', 'c') and not c.convalidated`, [schema]);
   const tableNames = (await client.query(`select c.relname as tablename from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = $1 and c.relkind = 'r' order by c.relname`, [schema])).rows.map((r) => r.tablename);
   let totalRows = 0;
   for (const t of tableNames) {
@@ -166,6 +171,8 @@ try {
     policies: policies.n === counts.policies,
     functions: functions.n === counts.functions,
     totalRows: totalRows === counts.rows,
+    indexesValid: invalidIndexes.n === 0,
+    constraintsValidated: unvalidatedConstraints.n === 0,
     payments_amount_paise: financialSpotChecks.payments_amount_paise === expectedFinancial.payments_amount_paise,
     subscription_payments_amount_paise: financialSpotChecks.subscription_payments_amount_paise === expectedFinancial.subscription_payments_amount_paise,
   };
@@ -175,6 +182,7 @@ try {
     artifact: path.basename(opt.artifact),
     artifactSha256,
     schemaFingerprint: { tables: tables.n, policies: policies.n, functions: functions.n },
+    catalogHealth: { invalidIndexes: invalidIndexes.n, unvalidatedConstraints: unvalidatedConstraints.n },
     totalRows,
     financialSpotChecks,
     manifestExpectations: { counts, financialSpotChecks: expectedFinancial },

@@ -113,15 +113,22 @@ created a separate private staging B2 bucket, and approved secret changes:
    repository/organization scope and the variables above have the intended
    Environment values. Configure reviewers and allowed deployment branches;
    workflow YAML cannot prove either protection or secret scope.
-3. After review and integration, request a separate explicit authorization to
-   dispatch **Staging B2 backup and disposable restore**. This reads staging
-   data and uploads to the private bucket, potentially incurring charges. The
+3. After review and integration, obtain separate explicit owner authorizations
+   for B2 authentication, the staging backup/upload/download, **and** the
+   disposable restore before dispatching **Staging B2 backup and disposable
+   restore**. The workflow combines these operations in one run; it cannot be
+   dispatched under a backup-only authorization. This reads staging data and
+   uploads to the private bucket, potentially incurring charges. The
    workflow downloads the same run's artifact, checks that every downloaded
    manifest field matches the local manifest, and compares manifest counts and
    financial totals in disposable PostgreSQL. This same-run comparison does
    not cryptographically authenticate a stored manifest for a later restore.
-   It does not establish a full row
-   fingerprint, recover Auth/Storage, or demonstrate service RTO. Preserve
+   The verifier also fails if restored indexes are invalid/not ready or if
+   check/foreign-key constraints are unvalidated. It does not establish a full
+   row fingerprint, per-table counts, critical relationships, source-to-target
+   constraint/index/function definitions, application-level
+   smoke tests, Auth/Storage recovery, or service RTO. These remain separate
+   acceptance evidence; a green workflow alone cannot close them. Preserve
    report/run links and investigate mismatches; do not claim success if any
    stage or cleanup fails. Monitor B2 storage usage, including hidden versions.
 
@@ -364,10 +371,18 @@ project ref; they never echo the URL, the user name or the password.
   monitor B2's total and hidden-version usage; on missed backup, failed drill,
   unexpected storage growth or access change, escalate to the repository
   owner, preserve run links and investigate before any deletion or deployment.
+  The local age checker rejects unreadable directories, invalid file entries
+  and future timestamps; it checks filesystem modification time, not remote
+  availability, decryption, or independent RPO evidence. If its configured
+  webhook rejects or interrupts delivery, it reports the failure without
+  exposing the URL, but an absent webhook or missing run still needs an
+  independent monitor.
 - The backup is a public-schema database export, not Auth, Storage files,
   configuration or a traffic cutover. Backup and restore report sums and
   counts, not full hosted row fingerprints. Restore command duration alone is
-  not an end-to-end service RTO.
+  not an end-to-end service RTO. Financial totals outside the non-negative
+  exact JSON integer range fail the backup rather than being rounded; a
+  versioned exact-integer manifest format is needed to support larger totals.
 
 ### B4. Measuring the RTO — honestly
 

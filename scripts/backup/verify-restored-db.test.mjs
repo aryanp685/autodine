@@ -24,7 +24,7 @@ import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
@@ -144,6 +144,7 @@ test('Mode B: manifest carries the full contract; restore verifies with every co
   assert.equal(report.verified, true);
   assert.deepEqual(report.matches, {
     tables: true, policies: true, functions: true, totalRows: true,
+    indexesValid: true, constraintsValidated: true,
     payments_amount_paise: true, subscription_payments_amount_paise: true,
   });
   assert.equal(report.artifactSha256, artifactSha);
@@ -252,4 +253,68 @@ test('non-loopback targets are refused before any connection (exit 2)', () => {
   assert.equal(res.status, 2);
   assert.match(res.stderr, /REFUSING non-disposable target/);
   assert.ok(!res.stderr.includes('secret'), 'refusal must not echo credentials');
+});
+
+test('both backup modes refuse financial sums beyond the exact JSON integer range', async () => {
+  const src = new pg.Client({ connectionString: urlFor('contract_source') });
+  await src.connect();
+  try {
+    await src.query('insert into public.payments values (99, 9007199254740993)');
+    const bin = mkdtempSync(path.join(scratch, 'unsafe-sum-client-'));
+    const stub = path.join(bin, 'pg_dump');
+    writeFileSync(stub, `#!/usr/bin/env node\nif (process.argv.includes('--version')) { console.log('pg_dump (PostgreSQL) 17.0'); process.exit(0); }\nprocess.exit(9);\n`);
+    chmodSync(stub, 0o755);
+    for (const mode of ['0', '1']) {
+      const dir = mkdtempSync(path.join(scratch, 'unsafe-sum-backup-'));
+      const res = run(BACKUP, ['--out-dir', dir, '--pg-dump', mode], {
+        AUTODINE_BACKUP_SOURCE_URL: urlFor('contract_source'), AUTODINE_BACKUP_PASSPHRASE: PASSPHRASE,
+        PATH: `${bin}:${process.env.PATH}`, PG_CLIENT_BIN_DIR: '', PG_CLIENT_VERSION: '',
+        BACKUP_ALERT_WEBHOOK: '', DR_ALERT_WEBHOOK: '',
+      });
+      assert.equal(res.status, 1, `mode ${mode}: ${res.stderr}`);
+      assert.match(res.stderr, /payments_amount_paise is not a non-negative safe integer/);
+      assert.deepEqual(readdirSync(dir), [], 'refused backup must not leave a misleading artifact or manifest');
+    }
+  } finally {
+    await src.query('delete from public.payments where id = 99');
+    await src.end();
+  }
+});
+
+test('an unvalidated restored constraint fails even when counts and sums match', async () => {
+  const restored = new pg.Client({ connectionString: urlFor('contract_restored') });
+  await restored.connect();
+  try {
+    await restored.query('alter table public.orders add constraint unvalidated_drill_check check (total_paise > 1000000) not valid');
+    const result = verifyAgainstRestored(modeB.manifestPath, modeB.artifactPath);
+    assert.equal(result.status, 1);
+    const report = JSON.parse(result.stdout);
+    assert.equal(report.matches.totalRows, true);
+    assert.equal(report.matches.constraintsValidated, false);
+    assert.equal(report.catalogHealth.unvalidatedConstraints, 1);
+    assert.equal(report.verified, false);
+  } finally {
+    await restored.query('alter table public.orders drop constraint if exists unvalidated_drill_check');
+    await restored.end();
+  }
+});
+
+test('an invalid restored index fails even when counts and sums match', async () => {
+  const restored = new pg.Client({ connectionString: urlFor('contract_restored') });
+  await restored.connect();
+  try {
+    // Disposable local PostgreSQL only: simulate an interrupted index build.
+    await restored.query('set allow_system_table_mods = on');
+    await restored.query("update pg_index set indisvalid = false where indexrelid = 'public.orders_pkey'::regclass");
+    const result = verifyAgainstRestored(modeB.manifestPath, modeB.artifactPath);
+    assert.equal(result.status, 1);
+    const report = JSON.parse(result.stdout);
+    assert.equal(report.matches.totalRows, true);
+    assert.equal(report.matches.indexesValid, false);
+    assert.equal(report.catalogHealth.invalidIndexes, 1);
+    assert.equal(report.verified, false);
+  } finally {
+    await restored.query("update pg_index set indisvalid = true where indexrelid = 'public.orders_pkey'::regclass");
+    await restored.end();
+  }
 });
