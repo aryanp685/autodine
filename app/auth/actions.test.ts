@@ -212,6 +212,11 @@ describe('an Auth endpoint that never answers', () => {
     // And an operator can see that it happened.
     expect(incidentCount('password_reset_email_failed')).toBe(before + 1);
     expect(incidentSummary('password_reset_email_failed')).not.toContain('owner@example.test');
+    // The incident line is what a log drain pages on and what the webhook
+    // forwards: it must carry no address, no tenant and no provider text.
+    const alert = logs.warn.mock.calls.map((call) => String(call[0])).join(' ');
+    expect(alert).not.toContain('owner@example.test');
+    expect(alert).not.toContain('fetch failed');
   });
 
   it('turns an unreachable Auth during sign-in into a message, not a raw 500', async () => {
@@ -233,6 +238,10 @@ describe('an Auth endpoint that never answers', () => {
     // The outage must never be dressed up as a credential problem.
     expect(destination).not.toContain('incorrect');
     expect(incidentCount('sign_in_unavailable')).toBe(before + 1);
+    expect(incidentSummary('sign_in_unavailable')).not.toContain('owner@example.test');
+    const alert = logs.warn.mock.calls.map((call) => String(call[0])).join(' ');
+    expect(alert).not.toContain('owner@example.test');
+    expect(alert).not.toContain('fetch failed');
   });
 });
 

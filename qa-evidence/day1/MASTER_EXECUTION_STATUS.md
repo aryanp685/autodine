@@ -122,12 +122,22 @@ never committed.
   I/O, no connection, no environment read, so the same decision is unit-
   testable, CI-assertable and applicable by the command with no database in
   sight. It refuses, in order: a missing or malformed project ref; a
-  **Production** project (no option unlocks it — the check runs before the
-  allowlist); a project not on the hard-coded demo allowlist; a malformed,
-  non-Supabase, Production-named or mismatched target URL; a missing or wrong
-  authorisation; an unsafe slug. The authorisation phrase names its target
-  (`seed-demo:<ref>`), so an authorisation issued for one project does not
-  carry over to another, and no standing permission exists.
+  **Production** project (no option unlocks it — the check runs first and is
+  unconditional); a project that is **not on the owner-supplied designated
+  list**; a malformed, non-Supabase, Production-named or mismatched target
+  URL; a missing or wrong authorisation; an unsafe slug. The authorisation
+  phrase names its target (`seed-demo:<ref>`), so an authorisation issued for
+  one project does not carry over to another, and no standing permission
+  exists.
+
+  **Corrected 2026-11-19 (Finding A).** The guard used to carry a hard-coded
+  demo allowlist in the source, which meant the repository — not the owner —
+  decided which project could be seeded, and the historical candidate
+  (`juwyhslzchjevqkdvwjm`) was authorised by default. It no longer holds any
+  project ref at all. The designated list is supplied **externally, per run**
+  (`AUTODINE_DEMO_SEED_APPROVED_REFS`), so no project can be authorised from
+  code alone, an unknown or undesignated ref fails closed, and Production
+  refusal stays unconditional and first.
 - A second guard re-reads the generated SQL and refuses it unless every row
   id it writes belongs to the demo fixture, it touches only `public.` tables,
   it contains no statement that removes or alters data, and it never mentions
@@ -142,9 +152,9 @@ never committed.
 
 **Evidence**
 
-- 24 unit tests (`lib/staging/demo-seed-isolation.test.ts`): positive,
+- 32 unit tests (`lib/staging/demo-seed-isolation.test.ts`): positive,
   negative, the scope rules, and the "no credential is ever echoed" property.
-- 10 command tests (`scripts/staging/seed-demo.test.mjs`) driving the real
+- 13 command tests (`scripts/staging/seed-demo.test.mjs`) driving the real
   npm script.
 - A real-PostgreSQL proof (`scripts/staging/seed-demo.db.test.mjs`): the
   repository's own schema (the Supabase shim plus all 98 migrations) on a
@@ -152,14 +162,15 @@ never committed.
   real customer. The seed creates its own restaurant; the other restaurant is
   unchanged field for field; every dining table and every QR token belongs
   to the demo restaurant; a second run is idempotent.
-- **14 mutation checks**: removing the production check, the allowlist check,
-  the authorisation check, the URL cross-check, the slug check, the
+- **14 mutation checks**: removing the production check, the designated-list
+  check, the authorisation check, the URL cross-check, the slug check, the
   destructive-statement rule, the foreign-row-id rule, the non-public-table
   rule, the unscoped-update rule, the production-reference rule, or the
-  CLI's call to either guard — each one fails the suite. Widening the
-  allowlist to include Production does **not** break anything, because the
-  production check runs first and is not unlockable; a test now asserts that
-  no approved demo project is ever a Production project.
+  CLI's call to either guard — each one fails the suite. Adding Production to
+  the designated list does **not** break anything, because the production
+  check runs first and is not unlockable; a test now asserts that no
+  approved demo project is ever a Production project. (Counts below are the
+  2026-11-19 figures: 32 unit tests and 13 command tests, after Finding A.)
 
 **Additional audit: the B2 source connection**
 
@@ -246,7 +257,7 @@ the full unit suite at 2,527 passed / 221 skipped / 0 failed. All four
 security guards were re-exercised there: the restore-target guard still
 refuses Production (direct, pooled, and with the scratch opt-in and the
 correct ref) with no flag able to unlock it; the demo-seed guard still
-refuses Production even when Production is placed on its allowlist; the
+refuses Production even when Production is placed on its designated list; the
 composite action still fails closed on a missing PostgreSQL 17 client; and
 the preflight still prints names only and answers UNKNOWN rather than
 "absent" when GitHub refuses a read. The scratch worktree and its probe
