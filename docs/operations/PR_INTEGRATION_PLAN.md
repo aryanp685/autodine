@@ -271,6 +271,29 @@ drill**, following `docs/operations/B2_OWNER_CHECKLIST.md`.
 
 ---
 
+## 7a. Verified integration sequence (2026-11-18, re-verified with virtual merges)
+
+`git merge-tree --write-tree` computes a merge without touching the working
+tree, so every order below was **actually merged and measured**, not
+reasoned about.
+
+| Sequence | Result |
+|---|---|
+| **A — PR #190 first, then this branch** | **CLEAN.** Final tree `34ac2f91` — **byte-identical to this branch's HEAD**. Zero conflicts, zero content surprises. |
+| **B — PR #192 first, then this branch** | **5 files carry unresolved conflict markers**, including `app/auth/actions.test.ts` (a *test* file — 18 lines of coverage at risk in a hand-resolution). The final tree differs from this branch's. |
+| **C — PR #187 (R2) + this branch** | **7 add/add conflicts** across `hosted-backup.yml`, `hosted-restore-drill.yml`, `backup-logical.mjs`, `lib-dump.mjs`, `restore-logical.mjs`, `run-scheduled.mjs`, `verify-restored-db.mjs`. |
+| **D — PR #184 + this branch** | PR #184 conflicts with `main` **on its own** (2 add/add, both documentation files it adds). Once resolved and merged, **this branch merges clean on top**. Not our conflict. |
+| **E — PR #181 + this branch** | PR #181 conflicts with `main` **on its own** (5 content conflicts). Once resolved and merged, **this branch merges clean on top**. Not our conflict. |
+
+The sequence-A result was then **tested end to end in an isolated worktree**
+at the integrated commit: typecheck, lint, DR 88/88, staging guards 35/35,
+the demo-seed PostgreSQL proof, the release verifier 28/28, the isolation
+self-test, and the full unit suite at 2,527 passed / 221 skipped / 0 failed.
+All four security guards were re-exercised there and all still refuse
+Production with no flag able to unlock them.
+
+---
+
 ## 8. Audit coverage — what was checked
 
 | Check | Result |

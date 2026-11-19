@@ -133,6 +133,93 @@ them hosted runs or owner decisions.
 
 ---
 
+## Integration-readiness batch — 2026-11-18 (branch `arena/88c342c2-autodine`)
+
+Read-only preparation and validation of the integration plan. **No push, no
+PR creation, no merge, no deployment, no workflow dispatch, no hosted
+database access or mutation, no B2 credential inspection, no Vercel change,
+no GST change.** No PR was closed. Every existing commit is preserved.
+
+**Branch and ancestry.** HEAD `544355b` (the demo-seed guard), parent
+`280c2d3`, merge-base with `main` `3e17c44` — which is the merge commit of
+**PR #191** (already merged). `main` is a full ancestor of HEAD: the branch
+is 11 commits ahead and **0 behind**, so it is fast-forwardable. The
+ancestry is `main → PR #192's three commits (d679a9e, e9b247d, e3ad205) →
+the reconciliation merge 105362e7 (p1=e3ad205, p2=3e17c44) → the eight
+shared-infrastructure commits`.
+
+**PR #192's head (`e3ad205`) is already an ancestor of this branch.** Ten
+of PR #192's twelve files are byte-identical to ours; two differ — the
+hosted-verification runbook (ours adds the Brevo Package 4 rewrite, the
+target-guard description and the corrected B2 source-connection rule) and
+the owner register (ours adds the MISSING markers). **PR #190's head is not
+an ancestor, but its one file is contained**: our version is PR #190's blob
+`793d2a3c` plus exactly one added step (the PostgreSQL 17 composite
+action).
+
+**Every merge order was measured, not assumed.** `git merge-tree
+--write-tree` merges without touching the working tree:
+
+- **PR #190 first, then this branch → CLEAN**, and the final tree is
+  `34ac2f91`, **byte-identical to this branch's HEAD**.
+- **PR #192 first → 5 files with unresolved conflict markers**, one of them
+  `app/auth/actions.test.ts`, a test file where a wrong hand-resolution
+  would silently drop 18 lines of coverage.
+- **PR #187 (the competing R2 implementation) → 7 add/add conflicts** across
+  the backup workflow, the drill workflow and four backup scripts.
+- **PR #184 and PR #181 conflict with `main` on their own** (2 and 5
+  conflicts respectively). Once either is resolved and merged, **this
+  branch merges clean on top** — neither is our conflict.
+
+**The integrated result was tested in an isolated worktree** at the
+integrated commit: typecheck, lint, DR 88/88, staging guards 35/35, the
+demo-seed PostgreSQL proof, release verifier 28/28, isolation self-test, and
+the full unit suite at 2,527 passed / 221 skipped / 0 failed. All four
+security guards were re-exercised there: the restore-target guard still
+refuses Production (direct, pooled, and with the scratch opt-in and the
+correct ref) with no flag able to unlock it; the demo-seed guard still
+refuses Production even when Production is placed on its allowlist; the
+composite action still fails closed on a missing PostgreSQL 17 client; and
+the preflight still prints names only and answers UNKNOWN rather than
+"absent" when GitHub refuses a read. The scratch worktree and its probe
+refs were removed afterwards; the primary workspace was not touched.
+
+**B2 connection requirements re-verified against the actual configuration.**
+`hosted-backup.yml` takes `AUTODINE_BACKUP_SOURCE_URL` from a repository
+secret, so the owner chooses the form. The hosted backup runs **Mode A**
+(`pg_dump` is on the runner's PATH and `run-scheduled.mjs` does not force
+Mode B), and Mode A opens one connection, exports a snapshot from it, then
+runs `pg_dump` on a **second** connection with `--snapshot=<id>`. Importing
+an exported snapshot needs session affinity, which transaction-mode pooling
+does not provide — the same conclusion the two production-operator
+documents reached ("Do NOT use Transaction pooler (6543)"). **The source
+must use the session pooler on port 5432, or a direct connection.** The
+**restore target** needs neither: `pg_restore` imports no snapshot (zero
+`--snapshot` occurrences in `restore-logical.mjs`), the hosted drill's
+target is a loopback container, and the guard's hosted-target rules only
+engage for a manual scratch restore. A final sweep confirms **every**
+`AUTODINE_BACKUP_SOURCE_URL` example in the repository now uses 5432, and
+that the only remaining 6543 occurrences are prohibitions, the restore
+target, and test fixtures.
+
+**B2 owner checklist consolidated.** `docs/operations/B2_OWNER_CHECKLIST.md`
+now carries an at-a-glance ownership split, the optional
+`BACKUP_ALERT_WEBHOOK` (and `DR_ALERT_WEBHOOK`) shape, the restore target's
+project-ref and scratch-opt-in requirements for a manual scratch restore,
+and a one-page §D ordered owner-action checklist — thirteen numbered
+actions across credentials, offline checks and hosted runs, each with its
+exact value, its evidence to keep, and its accept condition.
+
+**The eight blockers are reconciled by ownership** in
+`MASTER_LAUNCH_READINESS.md` §3b: every one is an owner action or a hosted
+run, not a code change. One technical item sits outside the eight — PR #190
+must merge before the restore rehearsal can be dispatched by name.
+
+**Decision unchanged: NO-GO**, on hosted evidence and owner decisions, with
+zero open P0 code defects.
+
+---
+
 ## The 11 roadmap priorities — status at a glance
 
 The locked roadmap, as tracked across Batches 1–6 and the owner register (wording consolidated here):

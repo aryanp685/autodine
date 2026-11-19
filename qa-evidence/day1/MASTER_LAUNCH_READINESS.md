@@ -78,6 +78,30 @@ that gate 2 cannot pass until PR #190 is.
 
 ---
 
+## 3b. The eight blockers, by who has to move them
+
+| # | Blocker | Owner action (decisions, credentials) | Technical implementation | Hosted verification |
+|---|---|---|---|---|
+| 1 | **Backup gate** | bucket + bucket-scoped key + the six secret names + passphrase; the Production project ref | **DONE** — pipeline, guard, composite action, workflows, 88 DR tests, all locally verified | **NOT RUN** — one `Hosted backup (B2)` run, then one `Hosted restore rehearsal (disposable)` run. Both need a separate authorization. |
+| 2 | **Migration canonicalization + B1** | one decision per colliding function body — never an inferred source edit | manifest, reconciliation and production-only documents landed; canonical bodies await the decision | none — a decision, not a run |
+| 3 | **Email domain / SMTP** | Brevo **Authorized IPs** off/allow-all (else `525 5.7.1`); purchase a domain | Brevo adapter, webhook receiver, five Auth flows, template — landed and tested | the five controlled observations (signup, reset, invitation, retry, key-loss) |
+| 4 | **Staging designation + pins** | the designation itself; `AUTODINE_EXPECTED_PROJECT_REF`; Auth redirect allow-list | isolation guards landed: deployment isolation, staging config, preview verification, and the demo-seed guard (closed 2026-11-18) | none — standing guard, re-run after every environment change |
+| 5 | **Hosted browser + realtime evidence** | authorize both runs; seed the Staging project | E2E specs, the disposable-stack runner, the three-device fallback test — landed | gates 5 and 6: one authorized CI run green with `retries: 0`, and a human watching the realtime fallback |
+| 6 | **Alert sink wiring + cron live proof** | point the sink at a human-reachable endpoint | the `[autodine:alert]` channel and the escalation cron — landed | the live 401/200 cron proof |
+| 7 | **Production migration per-file authorizations** | one written authorization per migration file | all migrations checked in; the chain replays green locally (98 files) | per-file apply only after that authorization |
+| 8 | **Billing provider + GST/IRP tracks** | a separate track with its own approvals | sandbox adapter only; nothing activated | out of scope for this decision |
+
+**One technical item sits outside the eight**: PR #190 must merge before
+gate 1's restore rehearsal can be dispatched by name. It is one file,
++4/−3, and it is a merge decision rather than a hosted run.
+
+**Nothing in the "technical implementation" column is a substitute for the
+other two.** All eight blockers are, today, owner actions or hosted runs —
+not code changes. That is the honest reason the decision is NO-GO with zero
+open P0 code defects.
+
+---
+
 ## 4. What this document does NOT do
 
 It does not authorize anything. No merge, no deployment, no Production change, no migration, no workflow dispatch, no hosted setting change, no credential disclosure and no paid-service change is implied by any statement here.

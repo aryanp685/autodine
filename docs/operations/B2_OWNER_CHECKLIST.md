@@ -24,6 +24,21 @@ credentials and the authorized runs are missing.
 
 ---
 
+## 0. At a glance — what is already done, and what is not
+
+| | Status | Detail |
+|---|---|---|
+| **Technical implementation** | ✅ **DONE and locally verified** | `scripts/backup/{backup-logical,upload-b2,download-b2,prune-b2,restore-logical,verify-restored-db,lib-b2,lib-crypto,lib-dump}.mjs`, `.github/workflows/hosted-backup.yml`, `.github/workflows/hosted-restore-drill.yml`, the restore-target guard and the PostgreSQL 17 composite action. |
+| **Owner action (credentials + bucket)** | ❌ **NOT DONE** | Sections A1–A5 below. Only the owner can do these. |
+| **Hosted verification** | ❌ **NOT RUN** | Sections B1–B4 below. A human must authorize each dispatch. |
+| **Blocking technical prerequisite** | ❌ **PR #190 unmerged** | The restore drill does not register by name until it merges. One file, +4/−3. |
+
+**Nothing in the technical column is a substitute for the other two.** A
+green local suite is not a backup; a bucket without a verified restore is not
+a recovery story.
+
+---
+
 ## A. Owner action — credentials and bucket
 
 ### A1. Create the private bucket
@@ -143,6 +158,15 @@ Optional: `B2_ENDPOINT` (an explicit S3 endpoint) and `BACKUP_ALERT_WEBHOOK`
 > **both** `B2_REGION` and `B2_ENDPOINT`. The simplest correct setup is
 > `B2_REGION` alone.
 
+**Optional: `BACKUP_ALERT_WEBHOOK`.** An `https://` endpoint that receives a
+`POST` with `{"text": "AutoDine backup FAILED (...)"}` when a backup run
+fails, so a failure reaches a human. It is **optional** — without it a
+failed backup still exits non-zero and is still visible in the Actions UI;
+the webhook only adds an out-of-band ping. It must be an `https` URL: the
+shape-check in `scripts/verify-external-services-config.mjs` rejects
+anything else. Put it in the same repository-secret store as the six above,
+never in a workflow file.
+
 > **The drill needs only five of them.** The drill never connects to
 > Production, so it does not need `AUTODINE_BACKUP_SOURCE_URL` — and must
 > never be given it.
@@ -208,6 +232,23 @@ fails.
 > with `gh workflow list` — the drill must appear as a *name*, not as
 > `.github/workflows/hosted-restore-drill.yml`.
 
+### B3a. If you restore into a real scratch project instead (manual, optional)
+
+The hosted drill uses a loopback container, so the guard's hosted-target rules
+never come into play there. A **manual** restore into a scratch Supabase
+project does engage them, and the project-ref requirements are exact:
+
+| Variable | Requirement |
+|---|---|
+| `AUTODINE_RESTORE_TARGET_URL` | A connection string for the **scratch** project. Either pooler works: `pg_restore` imports no exported snapshot, so session affinity is not required here (unlike the *source* — see §A4). |
+| `AUTODINE_RESTORE_EXPECTED_REF` | The scratch project's 20-character ref, e.g. `juwyhslzchjevqkdvwjm`. The guard reads the target's **own** ref back out of the URL and refuses unless it equals this one. |
+| Scratch opt-in | The guard requires an explicit scratch opt-in **as well as** the ref. The opt-in alone is not enough, and the ref alone is not enough. |
+
+**Production is refused outright and no flag unlocks it** — not the scratch
+opt-in, not the expected ref, not both together. A hosted target whose ref
+cannot be determined also fails closed. Refusals name the host and the
+project ref; they never echo the URL, the user name or the password.
+
 ### B4. Measuring the RTO — honestly
 
 **RTO is currently UNMEASURED.** The first successful drill produces the
@@ -244,3 +285,56 @@ The backup gate closes only when all of the following are recorded in
 
 **Until every line is checked, the backup gate is closed and the launch
 decision is NO-GO.** A green local suite is not a hosted backup.
+
+---
+
+## D. One consolidated owner-action checklist
+
+Everything the owner does, in one ordered list. Nothing here has been done;
+every line is still open. Tick a line only when its evidence exists.
+
+### D1. Credentials and bucket — owner action, no authorization needed beyond the owner's own judgement
+
+| # | Action | Exact value / shape | Evidence to keep |
+|---|---|---|---|
+| 1 | Create a **private** B2 bucket | name matches `^[a-zA-Z0-9][a-zA-Z0-9.-]{5,49}$` (6–50 chars); region matches `^[a-z]{2}-[a-z]+-\d{3}$` (e.g. `us-west-004`, **three digits**) | bucket name + region |
+| 2 | **Do not** add B2 lifecycle rules | the 14-daily / 8-weekly / 6-monthly policy is enforced by `prune-b2.mjs`; age-based rules would delete artifacts the policy still needs | — |
+| 3 | Create a **bucket-scoped** application key | one bucket only; **list, read, write, delete**; **no** bucket-create, bucket-delete or share | key id (never the secret) |
+| 4 | Create the backup passphrase | ≥ 12 characters; owner-held; retrievable later; **same** passphrase for the drill | where it is stored |
+| 5 | Prepare the Production source connection | `postgresql://postgres.bdbaqpevwmgdvghszjno:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres` — **session pooler, port 5432**, or a direct connection. **Never port 6543.** | the ref, never the URL |
+| 6 | Add **six** repository secrets | `AUTODINE_BACKUP_SOURCE_URL`, `AUTODINE_BACKUP_PASSPHRASE`, `B2_REGION`, `B2_BUCKET`, `B2_ACCESS_KEY_ID`, `B2_SECRET_ACCESS_KEY` | names only |
+| 7 | *(optional)* add the alert webhook | `BACKUP_ALERT_WEBHOOK` (or `DR_ALERT_WEBHOOK`) = an `https://` URL | name only |
+
+### D2. Offline checks — read-only, safe to run any time
+
+| # | Action | Command | Pass looks like |
+|---|---|---|---|
+| 8 | Presence of the six names | `npm run hosted:preflight` | every name SET/UNKNOWN — **never a value** |
+| 9 | Shape of each value | `node scripts/verify-external-services-config.mjs` | no violations |
+
+> `UNKNOWN` means "GitHub refused the read", not "absent". Neither result
+> says anything about validity or delivery.
+
+### D3. Hosted runs — each needs a **separate** authorization naming the workflow
+
+| # | Action | Authorization | Accept only if |
+|---|---|---|---|
+| 10 | Merge PR #190 (technical, owner decision) | the owner merges it | the drill registers **by name** in `gh workflow list` |
+| 11 | Dispatch **Hosted backup (B2)** | explicit go-ahead for that workflow | output shows `uploaded:true, verified:true`; manifest archived; manifest carries `counts` **and** `financialSpotChecks` |
+| 12 | Dispatch **Hosted restore rehearsal (disposable)** | explicit go-ahead for that workflow | green, zero unexplained deltas, cleanup confirmed, download artifact destroyed |
+| 13 | Record the rehearsal RTO | — | all four quantities from §B4 recorded |
+
+> The daily schedule (`17 3 * * *`) starts running the backup by itself once
+> the secrets exist. It fails closed at the secret gate until they do. No
+> dispatch, no merge and no credential is created by this document.
+
+### D4. What stays out of the owner's hands, and out of this repository's
+
+- The **restore target** of the hosted drill is a disposable `postgres:17`
+  container on the runner's loopback. It is never Production and never
+  Staging, and no credential can point it anywhere else.
+- The **Production source** is read-only by construction: the pipeline opens
+  `begin isolation level repeatable read read only`, and it never writes.
+- Applying a demo seed, a migration or a restore to a hosted project is an
+  owner action with its own authorization — never a side effect of this
+  checklist.
