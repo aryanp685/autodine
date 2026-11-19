@@ -33,6 +33,7 @@ import { mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSy
 import path from 'node:path';
 import { encryptBuffer, sha256 } from './lib-crypto.mjs';
 import { dumpDatabase, openBackupSnapshot } from './lib-dump.mjs';
+import { backupSourceDecision } from './lib-backup-source.mjs';
 import { resolvePgClient } from './lib-pg-client.mjs';
 
 const args = process.argv.slice(2);
@@ -56,6 +57,11 @@ const outDir = opt['out-dir'];
 if (!outDir) fail('missing --out-dir');
 const sourceUrl = process.env.AUTODINE_BACKUP_SOURCE_URL || opt['source-url'];
 if (!sourceUrl) fail('set AUTODINE_BACKUP_SOURCE_URL (never pass the URL on the command line; it leaks into shell history)');
+// A consistent snapshot cannot be taken through the transaction pooler, so
+// refuse that source BEFORE anything is written or connected to. The rule
+// used to live only in the runbooks; a rule in prose is not a rule.
+const sourceDecision = backupSourceDecision(sourceUrl);
+if (!sourceDecision.allowed) fail(sourceDecision.reason);
 const passphrase = process.env.AUTODINE_BACKUP_PASSPHRASE;
 if (!passphrase) fail('set AUTODINE_BACKUP_PASSPHRASE (12+ chars; store in a password manager)');
 const schema = opt.schema || 'public';

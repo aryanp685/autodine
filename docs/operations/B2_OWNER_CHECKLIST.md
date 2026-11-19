@@ -127,6 +127,15 @@ restore *target* is a different thing entirely (§B3).
 
   The **restore target** is the opposite case and may use either pooler:
   `pg_restore` imports no snapshot.
+
+  **This is now enforced in code, not only written down (2026-11-19).**
+  `scripts/backup/lib-backup-source.mjs` decides the source's fitness before
+  `backup-logical.mjs` creates a directory or opens a connection: a
+  transaction-pooler source is **refused** with a message naming the fix, a
+  pooled host on any other port is refused rather than guessed at, and the
+  refusal never echoes the URL, the user name or the password. The rule was
+  in three runbooks and enforced nowhere — a rule in prose is not a rule.
+  Covered by `scripts/backup/backup-source.test.mjs`.
 - The pipeline opens `begin isolation level repeatable read read only`
   (`scripts/backup/lib-dump.mjs`) and exports the snapshot from that same
   read-only transaction. **The role must be able to read every table in the
