@@ -39,19 +39,30 @@ comfortable.
 
 ### Every Preview this branch produced
 
-Each push to `arena/88c342c2-autodine` produced one **Preview**. They are
-listed so the count is not understated:
+Each push to `arena/88c342c2-autodine` produced one **Preview**. All of
+them are listed, so the count is not understated:
 
-| PR head | Deployment id | Status |
-|---|---|---|
-| `e90ab82` | `6pFExiBEDXx7kooBgt6Puu4ksNE4` | success |
-| `f75107a` | `7mcwf6HSBZ2DKpM2UVEwBKVWVhZL` | success |
-| `bc58a16` | `J9R1nrMpAJN29ofro5muLZytKubf` | success |
+| PR head | Deployment id |
+|---|---|
+| `e90ab82` | `6pFExiBEDXx7kooBgt6Puu4ksNE4` |
+| `f75107a` | `7mcwf6HSBZ2DKpM2UVEwBKVWVhZL` |
+| `bc58a16` | `J9R1nrMpAJN29ofro5muLZytKubf` |
+| `7a4cdf9` | `24aKPVLdsGPvPSYuXtHPuRqifhjS` |
+| `e09c709` | `8JEXnnXtr6MJCmcENvpWh8JmTBLH` |
+| `ca9ac78` | `4b7j59ADnocP2tJHcyPL3eMTMSMT` |
+| `155b659` | `BYb8owMZffZAWG8haHcK5kqLy3Kg` |
+| `21ecaad` | `3qq71VxrnaWLvM7Df6gnqEwTzFfz` |
+| `430c390` | `HodrwsZwvdu3euvCeuDsUmCg4vzq` |
+| `18f0224` | `A4j8sSc4pZ9yUy32TUm21BunZxAA` |
+| `3924371` | `41MAowjmeo7PiCGprTXaj8ZGC7ff` |
 
-All three share the same Preview host — the branch alias
-`new-git-arena-88c342c2-autodine-…`. **None** is a Production deployment,
-and **none** was created, promoted, redeployed or dispatched by this work:
-each is the Vercel GitHub App reacting to a push.
+**Eleven Previews**, one per pushed head. They all share the same Preview
+host — the branch alias `new-git-arena-88c342c2-autodine-…`. **None** is a
+Production deployment, and **none** was created, promoted, redeployed or
+dispatched by this work: each is the Vercel GitHub App reacting to a push.
+
+Each id is the `Vercel` commit status's target URL on that head, so the
+list is the app's own record rather than a reconstruction.
 
 ## Why this is a Preview and not a Production deployment
 

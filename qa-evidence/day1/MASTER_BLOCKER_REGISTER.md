@@ -12,7 +12,7 @@ consolidated view that answers "who moves what, and what closes it").
 code defects**: every code-level prerequisite is implemented and locally
 verified. A row is not a code task unless its status says otherwise.
 
-**Overall decision: NO-GO.** It is NO-GO because eight rows are open, not
+**Overall decision: NO-GO.** It is NO-GO because twelve rows are open, not
 because anything is broken.
 
 ---

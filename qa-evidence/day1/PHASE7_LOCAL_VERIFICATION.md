@@ -27,7 +27,7 @@ and prints a verdict line. It never reports a skip as a pass.
 | 5 | `migrations:verify` | Migration chain integrity | **PASS** | 0.2s |
 | 6 | `verify:release` | Release readiness invariants | **PASS** (28 checks) | 0.2s |
 | 7 | `isolation:verify` | Preview/production isolation self-test | **PASS** | 0.2s |
-| 8 | `test:staging:guards` | Hosted-acceptance and staging guards | **PASS** (65/65) | 28.5s |
+| 8 | `test:staging:guards` | Hosted-acceptance and staging guards | **PASS** (66/66) | 28.5s |
 | 9 | `test:staging:seed-demo-db` | Demo-seed isolation | **PASS** (1/1) | 1.8s |
 | 10 | `test:backup` | Backup pipeline selftest | **PASS** | 1.2s |
 | 11 | `test:dr` | Backup-file and DR objective verifiers | **PASS** (150/150) | 8.8s |

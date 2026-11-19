@@ -152,3 +152,28 @@ test('the closed table records the resolved items with their evidence', () => {
   }
   assert.match(closed, /ff00d38/);
 });
+
+test('the prose count of open rows matches the table it describes', () => {
+  // The register states a number in its prose. A stale number is a
+  // false statement about the launch decision, so the number is
+  // derived from the table rather than trusted.
+  const stated = source.match(/NO-GO because (\w+) rows are open/);
+  assert.ok(stated, 'the register must state how many rows are open');
+
+  const words = {
+    zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6,
+    seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
+    thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,
+  };
+  const word = stated[1].toLowerCase();
+  const count = words[word] ?? Number(word);
+  assert.ok(
+    Number.isInteger(count),
+    `the stated row count must be a number or a number word, found "${stated[1]}"`,
+  );
+  assert.equal(
+    count,
+    rows.length,
+    `the register's prose says "${stated[1]}" rows are open, but the table lists ${rows.length}`,
+  );
+});

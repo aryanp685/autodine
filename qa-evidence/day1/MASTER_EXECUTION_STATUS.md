@@ -72,7 +72,7 @@ absent.
 **150/150**; unit suite **2,553 passed / 223 skipped / 0 failed**;
 PostgreSQL-gated integration **214/214**; embedded replay **209 passed |
 2 skipped (211)**; migration chain **101 files, 101 unique versions**;
-staging guards **65/65**; release verifier **28/28**; logical restore drill
+staging guards **66/66**; release verifier **28/28**; logical restore drill
 **VERIFIED** (101 migrations, 48 tables, 59 policies, 164 functions);
 **17/17** local gates passed.
 
