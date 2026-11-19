@@ -55,10 +55,19 @@ function clientBinary(dir, name, version) {
   chmodSync(file, 0o755);
 }
 
-/** A temporary bin dir populated with the requested client version. */
-function makeBinDir(version = '17.6', { psql = true, pgRestore = true } = {}) {
+/**
+ * A temporary bin dir populated with the requested client version.
+ *
+ * ALL THREE tools are created by default: psql, pg_dump and pg_restore.
+ * pg_dump is the binary that WRITES the archive and pg_restore is the one
+ * that READS it, so the pair that decides whether a backup is restorable
+ * is the writer/reader pair — verifying only psql and pg_restore left the
+ * writer unchecked.
+ */
+function makeBinDir(version = '17.6', { psql = true, pgDump = true, pgRestore = true } = {}) {
   const dir = mkdtempSync(path.join(tmpdir(), 'autodine-pgclient-'));
   if (psql) clientBinary(dir, 'psql', version);
+  if (pgDump) clientBinary(dir, 'pg_dump', version);
   if (pgRestore) clientBinary(dir, 'pg_restore', version);
   return dir;
 }
@@ -91,8 +100,66 @@ test('verify-client.sh accepts the requested major version and publishes the bin
   }
 });
 
+test('verify-client.sh verifies ALL THREE binaries: psql, pg_dump and pg_restore', () => {
+  const binDir = makeBinDir('17.6');
+  try {
+    const result = runVerify({ binDir });
+    assert.equal(result.status, 0, `expected success, got: ${result.stderr}`);
+    for (const tool of ['psql', 'pg_dump', 'pg_restore']) {
+      assert.match(
+        result.stdout,
+        new RegExp(`${tool.replace('_', '\\u005f')}`),
+        `the verification must name ${tool}`,
+      );
+    }
+    // Each of the three must be reported as the requested major version.
+    const verified = result.stdout.match(/is PostgreSQL \d+/g) ?? [];
+    assert.equal(verified.length, 3, `all three binaries must be verified, saw: ${verified.join(', ')}`);
+  } finally {
+    rmSync(binDir, { recursive: true, force: true });
+  }
+});
+
+test('verify-client.sh refuses when pg_dump is missing', () => {
+  // pg_dump is the binary that WRITES the archive. If it is unverified, a
+  // dump can be written in a format the restore side cannot read.
+  const binDir = makeBinDir('17.6', { pgDump: false });
+  try {
+    const result = runVerify({ binDir });
+    assert.notEqual(result.status, 0, 'a missing pg_dump must fail the job');
+    assert.match(result.stderr, /pg_dump is missing or not executable/);
+  } finally {
+    rmSync(binDir, { recursive: true, force: true });
+  }
+});
+
+test('verify-client.sh refuses when pg_dump is a different major version', () => {
+  const binDir = makeBinDir('17.6');
+  try {
+    // Replace only pg_dump with an older client.
+    clientBinary(binDir, 'pg_dump', '16.4');
+    const result = runVerify({ binDir, version: '17' });
+    assert.notEqual(result.status, 0, 'a mismatched pg_dump must fail the job');
+    assert.match(result.stderr, /is PostgreSQL 16, expected 17/);
+  } finally {
+    rmSync(binDir, { recursive: true, force: true });
+  }
+});
+
+test('verify-client.sh refuses when pg_restore is missing', () => {
+  const binDir = makeBinDir('17.6', { pgRestore: false });
+  try {
+    const result = runVerify({ binDir });
+    assert.notEqual(result.status, 0, 'a missing pg_restore must fail the job');
+    assert.match(result.stderr, /pg_restore is missing or not executable/);
+  } finally {
+    rmSync(binDir, { recursive: true, force: true });
+  }
+});
+
 test('verify-client.sh refuses a client that is a different major version', () => {
   const binDir = makeBinDir('16.4');
+  // Every tool in the dir is 16.4, so the very first one is refused.
   try {
     const result = runVerify({ binDir, version: '17' });
     assert.notEqual(result.status, 0, 'a mismatched client must fail the job');
@@ -119,6 +186,64 @@ test('verify-client.sh refuses a client whose version cannot be read', () => {
     const result = runVerify({ binDir });
     assert.notEqual(result.status, 0, 'an unreadable version must fail the job');
     assert.match(result.stderr, /could not read a version/);
+  } finally {
+    rmSync(binDir, { recursive: true, force: true });
+  }
+});
+
+test('verify-client.sh resolves each tool to the verified binary, not a shadow', () => {
+  // The pinned directory is published first, so the binaries that RUN are
+  // the verified ones even when an older client sits earlier on PATH.
+  const binDir = makeBinDir('17.6');
+  const shadow = mkdtempSync(path.join(tmpdir(), 'autodine-pgshadow-'));
+  try {
+    for (const tool of ['psql', 'pg_dump', 'pg_restore']) clientBinary(shadow, tool, '16.4');
+    const result = spawnSync('bash', [VERIFY, '17', binDir], {
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${shadow}:${process.env.PATH}` },
+    });
+    assert.equal(result.status, 0, `expected success, got: ${result.stderr}`);
+    // The resolution proof must name all three tools.
+    for (const tool of ['psql', 'pg_dump', 'pg_restore']) {
+      assert.match(result.stdout, new RegExp(`which -a ${tool}`), `${tool} must be resolved and printed`);
+    }
+  } finally {
+    rmSync(binDir, { recursive: true, force: true });
+    rmSync(shadow, { recursive: true, force: true });
+  }
+});
+
+test('verify-client.sh writes its findings to PG_CLIENT_LOG', () => {
+  // The CI job turns this file into an annotation. A version mismatch that
+  // never reaches the log is a failure nobody can read.
+  const binDir = makeBinDir('16.4');
+  try {
+    const logFile = path.join(binDir, 'pg-client-install.log');
+    const result = runVerify({ binDir, version: '17', env: { PG_CLIENT_LOG: logFile } });
+    assert.notEqual(result.status, 0);
+    const logged = readFileSync(logFile, 'utf8');
+    assert.match(logged, /is PostgreSQL 16, expected 17/, 'the failure must be captured in the log');
+  } finally {
+    rmSync(binDir, { recursive: true, force: true });
+  }
+});
+
+test('the action publishes the pinned directory and version for later steps', () => {
+  // The backup and restore scripts resolve pg_dump / pg_restore by ABSOLUTE
+  // path from PG_CLIENT_BIN_DIR, so PATH shadowing cannot change which
+  // client runs after the action has verified it.
+  const binDir = makeBinDir('17.6');
+  try {
+    const githubEnv = path.join(binDir, '..', 'github-env');
+    writeFileSync(githubEnv, '');
+    const result = spawnSync('bash', [VERIFY, '17', binDir], {
+      encoding: 'utf8',
+      env: { ...process.env, GITHUB_PATH: githubEnv, GITHUB_ENV: githubEnv },
+    });
+    assert.equal(result.status, 0, `expected success, got: ${result.stderr}`);
+    const published = readFileSync(githubEnv, 'utf8');
+    assert.match(published, new RegExp(`PG_CLIENT_BIN_DIR=${binDir}`));
+    assert.match(published, /PG_CLIENT_VERSION=17/);
   } finally {
     rmSync(binDir, { recursive: true, force: true });
   }

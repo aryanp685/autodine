@@ -1,8 +1,8 @@
 name: 'PostgreSQL client tools'
 description: >-
-  Install and verify the PostgreSQL client tools (psql, pg_restore) for one
-  pinned major version, so a backup taken here is restorable with the same
-  toolchain that takes it.
+  Install and verify the PostgreSQL client tools (psql, pg_dump, pg_restore)
+  for one pinned major version, so a backup taken here is restorable with
+  the same toolchain that takes it.
 
 author: 'autodine'
 
@@ -43,9 +43,13 @@ runs:
 
     - name: 'Verify the PostgreSQL client version'
       shell: bash
+      # PG_CLIENT_LOG is passed through so a version mismatch — the failure a
+      # human actually needs to read — lands in the same log file the CI job
+      # turns into an annotation.
       env:
         PG_CLIENT_VERSION: ${{ inputs.version }}
         PG_CLIENT_BIN_DIR: ${{ inputs.bin-dir }}
+        PG_CLIENT_LOG: ${{ env.PG_CLIENT_LOG }}
       run: |
         set -euo pipefail
         "$GITHUB_ACTION_PATH/verify-client.sh" "$PG_CLIENT_VERSION" "$PG_CLIENT_BIN_DIR"

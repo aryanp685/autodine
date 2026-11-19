@@ -23,6 +23,7 @@ import path from 'node:path';
 import pg from 'pg';
 import { decryptBuffer, sha256 } from './lib-crypto.mjs';
 import { restoreTargetDecision } from './lib-restore-target.mjs';
+import { resolvePgClient } from './lib-pg-client.mjs';
 
 const args = process.argv.slice(2);
 const opt = {};
@@ -88,7 +89,16 @@ try {
     try {
       const dumpPath = path.join(tmp, 'restore.dump');
       writeFileSync(dumpPath, plaintext);
-      execFileSync('pg_restore', ['--no-owner', `--schema=${schema}`, '--dbname', targetUrl, dumpPath], { stdio: ['ignore', 'ignore', 'inherit'] });
+      // Resolve pg_restore to the binary that will actually run.
+      //
+      // The reader must be the same major version as the writer: a dump
+      // written by a newer pg_dump carries an archive format an older
+      // pg_restore refuses outright. The runner image ships an older
+      // client that can shadow the pinned one on PATH, so when the
+      // composite action has pinned a directory the absolute path of the
+      // VERIFIED binary is used and the version is re-checked here.
+      const pgRestore = resolvePgClient('pg_restore', { required: true });
+      execFileSync(pgRestore.path, ['--no-owner', `--schema=${schema}`, '--dbname', targetUrl, dumpPath], { stdio: ['ignore', 'ignore', 'inherit'] });
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

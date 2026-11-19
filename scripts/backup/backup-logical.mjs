@@ -33,6 +33,7 @@ import { mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSy
 import path from 'node:path';
 import { encryptBuffer, sha256 } from './lib-crypto.mjs';
 import { dumpDatabase, openBackupSnapshot } from './lib-dump.mjs';
+import { resolvePgClient } from './lib-pg-client.mjs';
 
 const args = process.argv.slice(2);
 const opt = {};
@@ -71,7 +72,19 @@ try {
   const started = Date.now();
   let outFile, manifest;
   const enc = encryptBuffer;
-  const usePgDump = opt['pg-dump'] === '1' || (opt['pg-dump'] === undefined && (() => { try { execFileSync('pg_dump', ['--version'], { stdio: 'ignore' }); return true; } catch { return false; } })());
+  // Resolve pg_dump to the binary that will actually run.
+  //
+  // The runner image ships an older pg_dump that can shadow the pinned one
+  // on PATH, and the tool that WRITES the archive decides its format: a
+  // dump written by a newer pg_dump is refused outright by an older
+  // pg_restore. When the composite action has pinned a directory, the
+  // absolute path of the VERIFIED binary is used, so PATH cannot change
+  // which client runs, and the version is re-checked at the moment of use.
+  const pgDump = resolvePgClient('pg_dump');
+  if (opt['pg-dump'] === '1' && !pgDump) {
+    await fail('--pg-dump was requested but no PostgreSQL client is available');
+  }
+  const usePgDump = opt['pg-dump'] === '1' || (opt['pg-dump'] === undefined && pgDump !== null);
 
   if (usePgDump) {
     // Mode A: pg_dump custom format. Scoped to the same schema Mode B and the
@@ -87,7 +100,7 @@ try {
     let evidence;
     try {
       evidence = await snapshot.collectCounts();
-      execFileSync('pg_dump', ['--format=custom', '--no-owner', `--schema=${schema}`, `--snapshot=${snapshot.snapshotId}`, `--file=${sqlPath}`, sourceUrl], { stdio: ['ignore', 'ignore', 'inherit'] });
+      execFileSync(pgDump.path, ['--format=custom', '--no-owner', `--schema=${schema}`, `--snapshot=${snapshot.snapshotId}`, `--file=${sqlPath}`, sourceUrl], { stdio: ['ignore', 'ignore', 'inherit'] });
     } finally {
       await snapshot.close();
     }

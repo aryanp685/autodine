@@ -111,10 +111,16 @@ function runVerifyStep({ version, binDir }) {
   return { ...result, githubPath };
 }
 
-/** A bin dir holding stand-in client binaries reporting `version`. */
+/**
+ * A bin dir holding stand-in client binaries reporting `version`.
+ *
+ * ALL THREE tools: psql, pg_dump and pg_restore. The verification refuses a
+ * missing one, and pg_dump — the binary that WRITES the archive — is the
+ * one that must never be left unchecked.
+ */
 function makeBinDir(version = '17.6') {
   const dir = mkdtempSync(path.join(tmpdir(), 'autodine-pgwire-'));
-  for (const tool of ['psql', 'pg_restore']) {
+  for (const tool of ['psql', 'pg_dump', 'pg_restore']) {
     const file = path.join(dir, tool);
     writeFileSync(file, `#!/bin/sh\necho "${tool} (PostgreSQL) ${version}"\n`);
     chmodSync(file, 0o755);
@@ -149,4 +155,43 @@ test('the action\'s default bin-dir matches the PGDG package layout', () => {
   const doc = parseYaml(readFileSync(ACTION_YML, 'utf8'));
   assert.equal(doc.inputs['bin-dir'].default, '/usr/lib/postgresql/17/bin');
   assert.equal(doc.inputs.version.default, '17');
+});
+
+test('CI pins the SAME client major version as the two hosted workflows', () => {
+  // Three places install the PostgreSQL client: the CI drill, the hosted
+  // backup and the hosted restore drill. If they disagree, the backup and
+  // the drill stop being the same toolchain — which is the whole point.
+  const ciPath = path.join(ROOT, '.github', 'workflows', 'ci.yml');
+  const doc = parseYaml(readFileSync(ciPath, 'utf8'));
+  const versions = [];
+  for (const job of Object.values(doc.jobs ?? {})) {
+    for (const step of job?.steps ?? []) {
+      if (step?.uses === './.github/actions/postgres-client') versions.push(step.with?.version);
+    }
+  }
+  assert.equal(versions.length, 1, `CI must install the client exactly once, saw: ${versions.join(', ')}`);
+  const hosted = HOSTED_WORKFLOWS.map((p) => actionStep(p)?.step.with?.version);
+  assert.equal(
+    new Set([...versions, ...hosted]).size,
+    1,
+    `CI and the hosted workflows disagree: ${[...versions, ...hosted].join(' vs ')}`,
+  );
+});
+
+test('the verify step captures its findings in the CI log file', () => {
+  // The CI job turns pg-client-install.log into an annotation. A version
+  // mismatch that never reaches that file is a failure nobody can read.
+  const doc = parseYaml(readFileSync(ACTION_YML, 'utf8'));
+  const verify = doc.runs.steps.find((s) => s.name.includes('Verify'));
+  assert.ok(verify.env?.PG_CLIENT_LOG, 'the verify step must pass PG_CLIENT_LOG through the environment');
+});
+
+test('the action publishes the pinned directory so the scripts use absolute paths', () => {
+  // PG_CLIENT_BIN_DIR / PG_CLIENT_VERSION are what let backup-logical.mjs
+  // and restore-logical.mjs resolve pg_dump / pg_restore by absolute path,
+  // so a shadowing PATH entry cannot change which client runs.
+  const body = readFileSync(path.join(ACTION_DIR, 'verify-client.sh'), 'utf8');
+  assert.match(body, /GITHUB_ENV/, 'the verify script must publish to GITHUB_ENV');
+  assert.match(body, /PG_CLIENT_BIN_DIR=/);
+  assert.match(body, /PG_CLIENT_VERSION=/);
 });
