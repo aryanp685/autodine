@@ -72,19 +72,45 @@ function makeBinDir(version = '17.6', { psql = true, pgDump = true, pgRestore = 
   return dir;
 }
 
+/**
+ * A throwaway GITHUB_ENV / GITHUB_PATH pair.
+ *
+ * WHY THIS EXISTS
+ *
+ * The composite action publishes the pinned client directory through
+ * $GITHUB_ENV. A test that inherits the job's real $GITHUB_ENV writes
+ * into it — and the directory it publishes is a temp dir the test then
+ * deletes. So every LATER step in the CI job inherits
+ * PG_CLIENT_BIN_DIR pointing at a directory that no longer exists, and
+ * `resolvePgClient` finds no client there at all.
+ *
+ * That is how a job's later steps start behaving differently from a
+ * clean environment, and it is invisible: the leak shows up as an
+ * unrelated failure much further down the job.
+ *
+ * So every invocation of the verify step gets its own pair of files.
+ */
+function sandboxGithubEnv() {
+  const dir = mkdtempSync(path.join(tmpdir(), 'autodine-github-env-'));
+  const envFile = path.join(dir, 'github-env');
+  const pathFile = path.join(dir, 'github-path');
+  writeFileSync(envFile, '');
+  writeFileSync(pathFile, '');
+  return { dir, envFile, pathFile, env: { GITHUB_ENV: envFile, GITHUB_PATH: pathFile } };
+}
+
 /** Runs the verify step the way the composite action runs it. */
 function runVerify({ binDir, version = '17', env = {} } = {}) {
-  const githubPath = path.join(binDir, '..', 'github-path');
-  writeFileSync(githubPath, '');
+  const sandbox = sandboxGithubEnv();
   const result = spawnSync('bash', [VERIFY, version, binDir], {
     encoding: 'utf8',
     env: {
       ...process.env,
-      GITHUB_PATH: githubPath,
+      ...sandbox.env,
       ...env,
     },
   });
-  return { ...result, githubPath };
+  return { ...result, githubPath: sandbox.pathFile, githubEnv: sandbox.envFile };
 }
 
 test('verify-client.sh accepts the requested major version and publishes the bin dir', () => {
@@ -198,9 +224,10 @@ test('verify-client.sh resolves each tool to the verified binary, not a shadow',
   const shadow = mkdtempSync(path.join(tmpdir(), 'autodine-pgshadow-'));
   try {
     for (const tool of ['psql', 'pg_dump', 'pg_restore']) clientBinary(shadow, tool, '16.4');
+    const sandbox = sandboxGithubEnv();
     const result = spawnSync('bash', [VERIFY, '17', binDir], {
       encoding: 'utf8',
-      env: { ...process.env, PATH: `${shadow}:${process.env.PATH}` },
+      env: { ...process.env, ...sandbox.env, PATH: `${shadow}:${process.env.PATH}` },
     });
     assert.equal(result.status, 0, `expected success, got: ${result.stderr}`);
     // The resolution proof must name all three tools.
@@ -251,7 +278,11 @@ test('the action publishes the pinned directory and version for later steps', ()
 
 test('verify-client.sh refuses an empty or root binary directory', () => {
   for (const bad of ['', '/']) {
-    const result = spawnSync('bash', [VERIFY, '17', bad], { encoding: 'utf8' });
+    const sandbox = sandboxGithubEnv();
+    const result = spawnSync('bash', [VERIFY, '17', bad], {
+      encoding: 'utf8',
+      env: { ...process.env, ...sandbox.env },
+    });
     assert.notEqual(result.status, 0, `binary dir "${bad}" must be refused`);
     assert.match(result.stderr, /refusing an empty or root binary directory/);
   }

@@ -30,7 +30,7 @@ and prints a verdict line. It never reports a skip as a pass.
 | 8 | `test:staging:guards` | Hosted-acceptance and staging guards | **PASS** (65/65) | 28.5s |
 | 9 | `test:staging:seed-demo-db` | Demo-seed isolation | **PASS** (1/1) | 1.8s |
 | 10 | `test:backup` | Backup pipeline selftest | **PASS** | 1.2s |
-| 11 | `test:dr` | Backup-file and DR objective verifiers | **PASS** (149/149) | 8.8s |
+| 11 | `test:dr` | Backup-file and DR objective verifiers | **PASS** (150/150) | 8.8s |
 | 12 | `test:d2` | D2 ACL probe | **PASS** (2/2) | 1.5s |
 | 13 | `test:db:integration` | PostgreSQL-gated integration suites | **PASS** (214/214) | 12.9s |
 | 14 | `test:db:logical-restore` | Logical restore drill | **PASS** | 2.6s |

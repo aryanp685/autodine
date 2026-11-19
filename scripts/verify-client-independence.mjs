@@ -33,15 +33,25 @@ const SUITES = [
 
 let failed = 0;
 
+// The gate is about PATH resolution, so the pinned-directory mechanism
+// is deliberately switched OFF here. It is also removed defensively: a
+// leaked PG_CLIENT_BIN_DIR (pointing at a temp dir a test has since
+// deleted) would make `resolvePgClient` find no client at all, and the
+// suites would take the logical path for the wrong reason - the gate
+// would pass while proving nothing.
+const env = {
+  ...process.env,
+  PATH: `${STUB_DIR}${path.delimiter}${process.env.PATH ?? ''}`,
+};
+delete env.PG_CLIENT_BIN_DIR;
+delete env.PG_CLIENT_VERSION;
+
 for (const [name, args] of SUITES) {
   const run = spawnSync('npm', args, {
     cwd: ROOT,
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
-    env: {
-      ...process.env,
-      PATH: `${STUB_DIR}${path.delimiter}${process.env.PATH ?? ''}`,
-    },
+    env,
   });
   const code = run.status ?? 1;
   if (code !== 0) {

@@ -69,7 +69,7 @@ scoping instead, and keep the strong local check where Chromium really is
 absent.
 
 **Current local counts** (on the merged tree, 2026-11-19): DR suite
-**149/149**; unit suite **2,553 passed / 223 skipped / 0 failed**;
+**150/150**; unit suite **2,553 passed / 223 skipped / 0 failed**;
 PostgreSQL-gated integration **214/214**; embedded replay **209 passed |
 2 skipped (211)**; migration chain **101 files, 101 unique versions**;
 staging guards **65/65**; release verifier **28/28**; logical restore drill
