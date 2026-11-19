@@ -182,7 +182,10 @@ try {
   delete env.DATABASE_URL;
 
   console.log(`Running ${INTEGRATION_SUITES.length} PostgreSQL-gated suites against the disposable database.`);
-  await run(process.execPath, ['node_modules/vitest/vitest.mjs', 'run', ...INTEGRATION_SUITES], env);
+  // These files share this database, and one replays migrations with DDL
+  // locks. Serialize files to avoid inter-suite deadlocks; tests explicitly
+  // exercising concurrency still use multiple clients within each file.
+  await run(process.execPath, ['node_modules/vitest/vitest.mjs', 'run', '--no-file-parallelism', ...INTEGRATION_SUITES], env);
   console.log('All PostgreSQL-gated integration suites passed.');
 } catch (error) {
   console.error(`INTEGRATION-DB FAILURE: ${error instanceof Error ? error.message : error}`);
