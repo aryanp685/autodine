@@ -74,6 +74,7 @@ describe('computeOrderTotals', () => {
   it('is all zeroes for an empty order', () => {
     const t = computeOrderTotals({ lines: [] });
     expect(t).toEqual({
+      mode: 'off',
       subtotalPaise: 0,
       discountPaise: 0,
       taxablePaise: 0,
@@ -89,6 +90,33 @@ describe('computeOrderTotals', () => {
       computeOrderTotals({ lines: SEED_LINES, taxRateBps: SAMPLE_TAX_RATE_BPS }).taxPaise,
     );
     expect(computeOrderTotals({ lines: SEED_LINES, taxRateBps: 1800 }).taxPaise).toBe(13968);
+  });
+
+  it('mirrors the composition rule: no tax, total equals the menu total', () => {
+    const t = computeOrderTotals({ lines: SEED_LINES, mode: 'composition' });
+    expect(t.mode).toBe('composition');
+    expect(t.taxPaise).toBe(0);
+    expect(t.cgstPaise).toBe(0);
+    expect(t.sgstPaise).toBe(0);
+    expect(t.taxablePaise).toBe(77600);
+    expect(t.totalPaise).toBe(77600);
+  });
+
+  it('extracts Regular GST once from the inclusive document total', () => {
+    const five = computeOrderTotals({ lines: SEED_LINES, mode: 'regular', taxRateBps: 500 });
+    expect(five.totalPaise).toBe(77600);
+    expect(five.taxablePaise).toBe(73905);
+    expect(five.taxPaise).toBe(3695);
+    expect(five.cgstPaise + five.sgstPaise).toBe(3695);
+
+    const eighteen = computeOrderTotals({ lines: SEED_LINES, mode: 'regular', taxRateBps: 1800 });
+    expect(eighteen.totalPaise).toBe(77600);
+    expect(eighteen.taxablePaise).toBe(65763);
+    expect(eighteen.taxPaise).toBe(11837);
+  });
+
+  it('fails closed for Regular GST without an explicit profile rate', () => {
+    expect(() => computeOrderTotals({ lines: SEED_LINES, mode: 'regular' })).toThrow(TypeError);
   });
 });
 

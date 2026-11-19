@@ -17,6 +17,15 @@
 
 **Consolidated current evidence:** `docs/AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md`.
 
+## Verification addendum (2026-11-19 UTC, local + read-only edge)
+
+This addendum records checks made after the checkpoint above and does not change the NO-GO decision.
+
+- **Next.js upgrade (local only):** `next` raised from 16.4.2 to 16.4.6 in `package.json`/`package-lock.json`. `npx tsc --noEmit` passed, the hermetic test-mode `next build` succeeded, and the Vitest suite passed **2,502 tests with 223 skipped**. No deployment of this change was made; the hosted build still runs the previously deployed version.
+- **HSTS at the edge (read-only HEAD):** on 2026-11-19, `https://new-alpha-five-43.vercel.app/` (the documented Production alias) returned HTTP/2 200 with `strict-transport-security: max-age=63072000; includeSubDomains; preload`; plain HTTP returned `308 Permanent Redirect` to HTTPS. The branch alias `https://new-git-arena-9b120325-autodine-iamjarvis9896-3988s-projects.vercel.app/` returned the same HSTS header behind its SSO 302. This proves the header at the edge for the currently deployed build only.
+- **Disposable Supabase workflow:** the stale `push.branches` pin (`arena/e9e78732-autodine`) was retargeted to `main` in commit `6f8240d`, which started run `44485869573` on 2026-11-19. The run completed successfully: retained reports show 64/64 hermetic and 49/49 Supabase-backed Playwright tests with 0 skipped, 0 unexpected and 0 flaky, plus 0 failures in 5,000 synthetic sessions and 5,000 orders and in the Kitchen polling workload. Artifacts are under `test-results/supabase-e2e-hosted/44485869573/` and in GitHub for 30 days. The run used `main`'s 98-migration chain, so it does not cover the local 101-migration GST work, and it is a disposable Docker stack, not hosted capacity or a hosted gate clearance.
+- Schema parity, backup/PITR restore, guest→staff E2E, load/soak, and rollback on an authorized hosted non-production environment were **not** run in this session; they still require environment access and explicit authorization.
+
 ## Historical prior-branch infrastructure/security checkpoint (evidence cutoff: 2026-11-06 UTC)
 
 **Branch at that checkpoint:** `arena/fee715c2-autodine` (active then)

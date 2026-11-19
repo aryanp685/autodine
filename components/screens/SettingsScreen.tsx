@@ -460,9 +460,17 @@ export function SettingsScreen({
                   bodyClassName="px-5 py-5"
                 >
                   <p className="m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
-                    The existing per-order tax rate added on top of menu prices. Only the owner can
-                    change this billing setting; AutoDine does not infer a rate.
+                    The per-order rate used while GST is off, added on top of menu prices. Only the
+                    owner can change this billing setting; AutoDine does not infer a rate.
                   </p>
+
+                  {(data?.gst.mode ?? 'off') !== 'off' && (
+                    <Notice tone="due" label="GST billing is active" className="mt-3 mb-0">
+                      {data?.gst.mode === 'regular'
+                        ? 'Regular GST is active: menu prices include GST and this rate is not added to new bills.'
+                        : 'Composition scheme is active: bills of supply charge no GST, and this rate is not added to new bills.'}
+                    </Notice>
+                  )}
 
                   {taxBps === 0 ? (
                     <Notice tone="due" label="Tax is 0%." className="mt-3 mb-0">
@@ -475,16 +483,17 @@ export function SettingsScreen({
                     </Notice>
                   )}
 
-                  <Notice tone="plain" label="GST tax invoices are not enabled" className="mt-3 mb-0">
-                    This bill rate does not activate GST invoicing. GST tax invoices remain unavailable
-                    until approved tax rules are supplied; ordinary receipts and existing billing are unchanged.
+                  <Notice tone="plain" label="This rate is the GST-off rate" className="mt-3 mb-0">
+                    GST invoicing is configured in the GST billing panel below. This rate applies only
+                    while GST is off; once a GST mode is active, that mode&rsquo;s approved rules price
+                    new bills instead.
                   </Notice>
 
                   <form action={saveTaxAction} className="mt-3.5 flex flex-col gap-3">
                     <Field
                       label="Tax rate (%)"
                       htmlFor="settings-tax"
-                      hint={`Up to two decimals, 0 to ${formatTaxPercent(3000)}. Menu prices are treated as tax-exclusive, so tax is added at checkout.`}
+                      hint={`Up to two decimals, 0 to ${formatTaxPercent(3000)}. Used only while GST is off; menu prices are then treated as tax-exclusive and this rate is added at checkout.`}
                     >
                       {/* `w-[180px]!` and not `w-[180px]`: the kit input is
                           `w-full`, and Tailwind sorts `.w-[180px]` BEFORE
@@ -862,7 +871,7 @@ export function SettingsScreen({
               <ul className="m-0 mt-2.5 flex list-none flex-col gap-1.5 p-0">
                 {[
                   'Name and tagline: the top of the guest menu, and the browser tab title.',
-                  'Tax rate: the cart, the checkout total and every order placed from now on.',
+                  'Tax rate: the cart, the checkout total and every GST-off order placed from now on.',
                   'Web address: the QR above and every link to your menu.',
                   'Address, phone and GSTIN: printed on the bill. A bill with either the address or the GSTIN missing says so.',
                 ].map((line) => (

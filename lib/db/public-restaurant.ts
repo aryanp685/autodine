@@ -21,6 +21,7 @@
  */
 
 import type { Restaurant } from './types';
+import { requireTaxRateBps, type GstMode, type GstQuote } from '@/lib/pricing';
 
 export const PUBLIC_RESTAURANT_COLUMNS = [
   'id',
@@ -122,4 +123,51 @@ export async function readPublicRestaurant(
     .maybeSingle();
   if (legacy.error) return { data: null, error: legacy.error };
   return { data: toPublicRestaurantProfile(legacy.data), error: null };
+}
+
+function isGstMode(value: unknown): value is GstMode {
+  return value === 'off' || value === 'composition' || value === 'regular';
+}
+
+/**
+ * The guest quote's pricing half: the approved GST mode and, in Regular
+ * mode, the closed profile's rate. `public_restaurant_gst` (migration
+ * 20261119000300) exposes those two facts and nothing else -- not the GSTIN,
+ * not the legal name, not the configured turnover.
+ *
+ * The legacy restaurant rate still prices GST-off carts, exactly as it did
+ * before the two-mode system. Composition carts charge nothing.
+ */
+export async function readPublicGstQuote(
+  client: PublicRestaurantClient,
+  slug: string | null | undefined,
+  restaurantTaxRateBps: unknown,
+): Promise<GstQuote> {
+  const target = slug?.trim() ?? '';
+  if (!target) {
+    return { mode: 'off', rateBps: requireTaxRateBps(restaurantTaxRateBps) };
+  }
+  const supabase = client as unknown as {
+    rpc(fn: string, args: Record<string, unknown>): { maybeSingle(): QueryResult };
+  };
+
+  const result = await supabase.rpc('public_restaurant_gst', { p_slug: target }).maybeSingle();
+  if (result.error) {
+    // A database from before the two-mode system still prices GST-off carts.
+    if (isMissingProfileFunction(result.error)) {
+      return { mode: 'off', rateBps: requireTaxRateBps(restaurantTaxRateBps) };
+    }
+    throw new Error(`Could not load GST pricing: ${result.error.message}`);
+  }
+
+  const row = result.data as { mode?: unknown; rate_bps?: unknown } | null;
+  const mode = row?.mode;
+  if (!isGstMode(mode)) {
+    throw new TypeError('The restaurant GST mode is unavailable. Please try again.');
+  }
+  if (mode === 'composition') return { mode, rateBps: null };
+  if (mode === 'off') {
+    return { mode, rateBps: requireTaxRateBps(restaurantTaxRateBps) };
+  }
+  return { mode, rateBps: requireTaxRateBps(row?.rate_bps) };
 }
