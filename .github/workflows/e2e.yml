@@ -14,7 +14,7 @@ name: E2E (browser)
 # (Vercel's git integration); this workflow cannot make that happen or stop it.
 #
 # It also needs no Supabase credentials: this job explicitly opts into the
-# hermetic test-build exception and runs only the 64 demo-mode Playwright tests.
+# hermetic test-build exception and runs only the 65 demo-mode Playwright tests.
 # `supabase-e2e-load.yml` runs all 49 integration tests against a disposable
 # local Supabase stack with synthetic users and data.
 
@@ -60,12 +60,12 @@ jobs:
       # Count is asserted, not assumed: a project filter that silently matches
       # no tests would otherwise "pass" and prove nothing. The 49 database-backed
       # tests run separately in supabase-e2e-load.yml and are not skipped here.
-      - name: Expect 64 hermetic tests
+      - name: Expect 65 hermetic tests
         run: |
           projects=(--project=desktop --project=phone --project=guest --project=staff --project=brand --project=responsive)
           listed=$(npx playwright test "${projects[@]}" --list | tail -1)
           echo "$listed"
-          echo "$listed" | grep -q "Total: 64 tests"
+          echo "$listed" | grep -q "Total: 65 tests"
 
       # Two reporters: list for a human reading the log, json for the summary
       # step below. The JSON file is the source of the per-test line.
@@ -142,9 +142,9 @@ jobs:
             }
           '
 
-      - name: Require all 64 hermetic browser tests to pass without skips/retries
+      - name: Require all 65 hermetic browser tests to pass without skips/retries
         if: always()
-        run: node scripts/e2e/assert-playwright-results.mjs playwright-report/results.json 64
+        run: node scripts/e2e/assert-playwright-results.mjs playwright-report/results.json 65
 
       - name: Upload the responsive screenshots
         if: always()
