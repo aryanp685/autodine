@@ -158,6 +158,59 @@ describe('sendEmail', () => {
     expect(result.attempts).toBe(3);
   }, 15000);
 
+  it('reports the provider HTTP status, so an operator can tell a revoked key from an outage', async () => {
+    // "The email failed" is not an answer an operator can act on. A 401 is a
+    // revoked or wrong API key (a configuration fix), a 429 is the daily
+    // quota (wait), a 5xx is the provider having a bad day (retry). The
+    // status has to reach the caller for the incident to carry it.
+    fetchMock.mockResolvedValue({ ok: false, status: 401 });
+    const refused = await sendEmail('staff_invitation', message, BREVO_ENV);
+    expect(refused.outcome).toBe('failed');
+    expect(refused.status).toBe(401);
+
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue({ ok: false, status: 429 });
+    const throttled = await sendEmail('staff_invitation', message, BREVO_ENV);
+    expect(throttled.status).toBe(429);
+
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue({ ok: false, status: 500 });
+    const outage = await sendEmail('staff_invitation', message, BREVO_ENV);
+    expect(outage.status).toBe(500);
+  }, 15000);
+
+  it('reports no status when no request reached the provider', async () => {
+    // No provider configured, and a refused recipient: both answer before
+    // any request, so there is no status to report and none is invented.
+    const unconfigured = await sendEmail('staff_invitation', message, {});
+    expect(unconfigured.outcome).toBe('not_configured');
+    expect(unconfigured.status).toBeUndefined();
+
+    const refused = await sendEmail('staff_invitation', { ...message, to: 'not-an-address' }, BREVO_ENV);
+    expect(refused.outcome).toBe('invalid_recipient');
+    expect(refused.status).toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+  }, 15000);
+
+  it('does not claim attempts it never made when the failure is outside the retry boundary', async () => {
+    // The provider throws BEFORE the retry boundary — here, while minting
+    // the idempotency key. No attempt ever reached the provider, so the
+    // result must not claim the maximum attempt count, and there is no
+    // HTTP status to report.
+    const uuid = vi.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(() => {
+      throw new TypeError('boom');
+    });
+    try {
+      const result = await sendEmail('staff_invitation', message, BREVO_ENV);
+      expect(result.outcome).toBe('failed');
+      expect(result.attempts).toBe(0);
+      expect(result.status).toBeUndefined();
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      uuid.mockRestore();
+    }
+  }, 15000);
+
   it('sends one idempotency key per logical send, stable across its retries', async () => {
     // Two transient failures then acceptance: all three attempts are the
     // SAME send, so Brevo must be able to collapse them into one delivery

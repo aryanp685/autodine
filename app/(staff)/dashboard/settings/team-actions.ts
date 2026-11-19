@@ -154,11 +154,19 @@ export async function createInviteAction(formData: FormData): Promise<void> {
     // unverified domain) would otherwise fail every invitation silently
     // forever. Emit the fixed-vocabulary alert line — no recipient, no
     // address, no tenant id in the line; the dedup key never leaves memory.
+    //
+    // The summary carries the provider's HTTP status and the attempt count,
+    // because "the email failed" is not an answer an operator can act on.
+    // A 401 is a revoked or wrong API key (fix the configuration), a 429 is
+    // the daily quota (wait), a 5xx is the provider having a bad day
+    // (retry). Without the status those three are indistinguishable — which
+    // is exactly the gap that let the Brevo 525 relay rejection sit
+    // unread in production for days.
     const { record, outcome } = operationalIncidents.report({
       key: `staff-invitation-email:${ctx.restaurantId}`,
       kind: 'staff_invitation_email_failed',
       severity: 'warning',
-      summary: 'Staff invitation email delivery failed',
+      summary: `Staff invitation email delivery failed (${delivery.status ? `status ${delivery.status}` : 'transport failure'}, attempts ${delivery.attempts})`,
     });
     console.warn(formatIncidentLogLine(outcome, record));
     done(`Invitation ready for a ${role}, but the email failed to send. Copy the link below and send it yourself — the link always works.`);

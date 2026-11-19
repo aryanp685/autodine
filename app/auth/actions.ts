@@ -62,7 +62,8 @@ type AuthFailureKind =
   | 'password_reset_email_failed'
   | 'password_update_failed'
   | 'signup_workspace_creation_failed'
-  | 'signup_rollback_failed';
+  | 'signup_rollback_failed'
+  | 'sign_in_unavailable';
 
 function reportAuthFailure(kind: AuthFailureKind, status: number | null): void {
   try {
@@ -77,6 +78,8 @@ function reportAuthFailure(kind: AuthFailureKind, status: number | null): void {
             ? 'Signup rollback failed; a partial Auth user may remain'
             : kind === 'password_update_failed'
             ? `Password update failed (status ${status ?? 'transport'})`
+            : kind === 'sign_in_unavailable'
+            ? `Sign-in could not reach Auth (status ${status ?? 'transport'})`
             : `Auth email failed (${kind}, status ${status ?? 'transport'})`,
     });
     console.warn(formatIncidentLogLine(outcome, record));
@@ -355,7 +358,21 @@ export async function signInAction(formData: FormData): Promise<void> {
   const supabase = await createSupabaseServerClient();
   if (!supabase) fail('/login', 'Sign-in is not available yet: the database is not connected.');
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  // A throw here means the request never got an answer from Auth — a
+  // dropped connection or an unreachable endpoint, not a wrong password.
+  // Letting it escape would show the visitor a raw error page and leave
+  // operators with nothing: the same silent failure the incident tracker
+  // exists to prevent. The message names the SITE's health, never the
+  // address, so it cannot become an account oracle.
+  let error: { status?: number; code?: string; message: string } | null = null;
+  try {
+    const result = await supabase.auth.signInWithPassword({ email, password });
+    error = result.error;
+  } catch (thrown) {
+    console.error('[autodine] sign-in could not reach Auth', safeErrorShape(thrown));
+    reportAuthFailure('sign_in_unavailable', safeErrorShape(thrown).status);
+    fail('/login', 'Sign-in is temporarily unavailable. Please try again shortly.');
+  }
   if (error) {
     // Deliberately vague. "Invalid login credentials" is fine to show; telling
     // an attacker which of the two was wrong is not.
@@ -430,9 +447,21 @@ export async function requestPasswordResetAction(formData: FormData): Promise<vo
   redirectTo.searchParams.set('flow', 'recovery');
   redirectTo.searchParams.set('state', recoveryState);
 
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: redirectTo.toString(),
-  });
+  let error: { status?: number; code?: string; message: string } | null = null;
+  try {
+    const result = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: redirectTo.toString(),
+    });
+    error = result.error;
+  } catch (thrown) {
+    // Auth never answered, so no mail was sent and no state changed. Say
+    // the same thing the refusal branch says (the site, not the address)
+    // and open an incident, so an unreachable Auth endpoint cannot leave
+    // password recovery broken with only a stack trace.
+    console.error('[autodine] password reset could not reach Auth', safeErrorShape(thrown));
+    reportAuthFailure('password_reset_email_failed', safeErrorShape(thrown).status);
+    fail('/forgot-password', 'We could not send the email just now. Please try again in a few minutes.');
+  }
 
   if (error) {
     const status = (error as { status?: number }).status;
@@ -507,15 +536,34 @@ export async function updatePasswordAction(formData: FormData): Promise<void> {
   const supabase = await createSupabaseServerClient();
   if (!supabase) fail('/reset-password', 'Password reset is not available yet: the database is not connected.');
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user: { id?: string } | null = null;
+  try {
+    const result = await supabase.auth.getUser();
+    user = result.data?.user ?? null;
+  } catch (thrown) {
+    // The session could not be confirmed. That is not the same as an
+    // expired link, and saying "expired" would send the person away from a
+    // reset that is still perfectly good.
+    console.error('[autodine] password reset session check could not reach Auth', safeErrorShape(thrown));
+    reportAuthFailure('password_update_failed', safeErrorShape(thrown).status);
+    fail('/reset-password', 'We could not check your reset link just now. Please try again in a few minutes.');
+  }
 
   if (!user) {
     fail('/reset-password', 'This reset link has expired. Request a new one.');
   }
 
-  const { error } = await supabase.auth.updateUser({ password });
+  let error: { status?: number; code?: string; message: string } | null = null;
+  try {
+    const result = await supabase.auth.updateUser({ password });
+    error = result.error;
+  } catch (thrown) {
+    // The password was never changed. The permission is NOT spent, so the
+    // person can simply try again with the same link.
+    console.error('[autodine] password update could not reach Auth', safeErrorShape(thrown));
+    reportAuthFailure('password_update_failed', safeErrorShape(thrown).status);
+    fail('/reset-password', 'We could not save the new password. Please try again in a few minutes.');
+  }
 
   if (error) {
     if (/different from the old password/i.test(error.message)) {

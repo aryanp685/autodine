@@ -50,6 +50,18 @@ export type EmailDelivery = {
   outcome: EmailOutcome;
   provider: 'brevo' | 'none';
   attempts: number;
+  /**
+   * The provider's HTTP status, when one was observed.
+   *
+   * This is the difference between "email failed" and an answer an operator
+   * can act on: a 401 is a revoked or wrong API key (a configuration fix), a
+   * 429 is the daily quota or a rate limit (wait), a 5xx is the provider
+   * having a bad day (retry). Without it, every one of those looked
+   * identical on the incident surface. It is absent when no request
+   * reached the provider — no provider configured, a refused recipient, or
+   * a transport failure before any response.
+   */
+  status?: number;
 };
 
 export type EmailSender = {
@@ -218,7 +230,9 @@ class BrevoProvider implements EmailProvider {
     }, { maxAttempts: MAX_ATTEMPTS, baseDelayMs: 300, shouldRetry: isRetryableDeliveryError });
     const outcome: EmailOutcome = result.delivered || duplicateAccepted ? 'delivered' : 'failed';
     logDelivery(kind, outcome, result.attempts, lastStatus);
-    return { outcome, provider: this.name, attempts: result.attempts };
+    // The status travels with the result so the caller's incident can say
+    // WHY the send failed, not only that it did.
+    return { outcome, provider: this.name, attempts: result.attempts, ...(lastStatus ? { status: lastStatus } : {}) };
   }
 }
 
@@ -282,7 +296,10 @@ export async function sendEmail(
   } catch {
     // deliverWithRetry already swallowed provider errors; this guards the
     // unexpected (DNS failure outside the retry boundary, programming error).
-    logDelivery(kind, 'failed', MAX_ATTEMPTS);
-    return { outcome: 'failed', provider: provider.name, attempts: MAX_ATTEMPTS };
+    // The throw happened OUTSIDE the retry boundary, so no attempt was made
+    // and no HTTP status was observed. Reporting MAX_ATTEMPTS here would
+    // claim three attempts against the provider that never happened.
+    logDelivery(kind, 'failed', 0);
+    return { outcome: 'failed', provider: provider.name, attempts: 0 };
   }
 }

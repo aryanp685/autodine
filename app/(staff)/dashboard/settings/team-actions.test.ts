@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { EmailDelivery } from '@/lib/email/provider';
 
 /**
  * The three writes behind Settings → People.
@@ -15,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   redirect: vi.fn(),
   revalidate: vi.fn(),
   cookieSet: vi.fn(),
-  sendEmail: vi.fn(async () => ({ outcome: 'not_configured', provider: 'none', attempts: 0 })),
+  sendEmail: vi.fn(async (): Promise<EmailDelivery> => ({ outcome: 'not_configured', provider: 'none', attempts: 0 })),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -201,6 +202,52 @@ describe('creating an invitation', () => {
       // no invite code and no tenant identifier.
       expect(alert).not.toContain('cook@example.com');
       expect(alert).not.toContain('K7QM-3XPD-9RTW-2HNJ');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('carries the provider HTTP status in the alert line, so the failure is diagnosable', async () => {
+    // "The email failed" is not an answer an operator can act on. A 401 is a
+    // revoked or wrong API key (a configuration fix), a 429 is the daily
+    // quota (wait), a 5xx is the provider having a bad day (retry). The
+    // status has to survive all the way to the alert line.
+    mocks.rpc.mockResolvedValue({ data: 'K7QM-3XPD-9RTW-2HNJ', error: null });
+    mocks.sendEmail.mockResolvedValue({ outcome: 'failed', provider: 'brevo', attempts: 3, status: 401 });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await urlOf(() =>
+        createInviteAction(form({ role: 'kitchen', days: '7', email: 'cook@example.com' })),
+      );
+      const alert = warn.mock.calls
+        .map((call) => String(call[0]))
+        .find((line) => line.includes('[autodine:alert]'));
+      expect(alert).toBeTruthy();
+      expect(alert).toContain('staff_invitation_email_failed');
+      expect(alert).toContain('401');
+      // Still no recipient, no invite code, no tenant identifier.
+      expect(alert).not.toContain('cook@example.com');
+      expect(alert).not.toContain('K7QM-3XPD-9RTW-2HNJ');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('says transport failure when the provider never answered', async () => {
+    // A network drop has no HTTP status. The line must still say something
+    // an operator can act on rather than inventing a status.
+    mocks.rpc.mockResolvedValue({ data: 'K7QM-3XPD-9RTW-2HNJ', error: null });
+    mocks.sendEmail.mockResolvedValue({ outcome: 'failed', provider: 'brevo', attempts: 3 });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await urlOf(() =>
+        createInviteAction(form({ role: 'kitchen', days: '7', email: 'cook@example.com' })),
+      );
+      const alert = warn.mock.calls
+        .map((call) => String(call[0]))
+        .find((line) => line.includes('[autodine:alert]'));
+      expect(alert).toBeTruthy();
+      expect(alert).toContain('transport failure');
     } finally {
       warn.mockRestore();
     }

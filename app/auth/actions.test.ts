@@ -121,6 +121,13 @@ beforeEach(() => {
   });
 });
 
+/** Keep the incident log lines out of the test output. */
+function silenceLogs() {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  return { warn, error, restore: () => { warn.mockRestore(); error.mockRestore(); } };
+}
+
 describe('requestPasswordResetAction', () => {
   it('correlates the PKCE recovery redirect with a short-lived HTTP-only browser cookie', async () => {
     await expect(requestPasswordResetAction(form())).rejects.toThrow(/^REDIRECT:/);
@@ -175,6 +182,57 @@ describe('requestPasswordResetAction', () => {
     const destination = mocks.redirect.mock.calls[0][0] as string;
     expect(new URL(destination, 'https://autodine.example').searchParams.get('error')).toMatch(/too many reset emails/i);
     expect(cookieStore.set).not.toHaveBeenCalled();
+  });
+});
+
+describe('an Auth endpoint that never answers', () => {
+  function resetRequestForm(email = 'owner@example.test'): FormData {
+    const value = new FormData();
+    value.set('email', email);
+    return value;
+  }
+
+  it('turns an unreachable Auth during a reset request into a message, not a raw 500', async () => {
+    mocks.requestOrigin.mockResolvedValue('https://app.test');
+    mocks.resetPasswordForEmail.mockRejectedValueOnce(new TypeError('fetch failed'));
+
+    const logs = silenceLogs();
+    const before = incidentCount('password_reset_email_failed');
+    try {
+      await expect(requestPasswordResetAction(resetRequestForm())).rejects.toThrow(/^REDIRECT:/);
+    } finally {
+      logs.restore();
+    }
+
+    // The message names the SITE, never the address, so it cannot become
+    // an account oracle.
+    const destination = decodeURIComponent(mocks.redirect.mock.calls[0][0] as string);
+    expect(destination).toContain('could not send the email');
+    expect(destination).not.toContain('owner@example.test');
+    // And an operator can see that it happened.
+    expect(incidentCount('password_reset_email_failed')).toBe(before + 1);
+    expect(incidentSummary('password_reset_email_failed')).not.toContain('owner@example.test');
+  });
+
+  it('turns an unreachable Auth during sign-in into a message, not a raw 500', async () => {
+    mocks.signInWithPassword.mockRejectedValueOnce(new TypeError('fetch failed'));
+    const login = form('owner@example.test');
+    login.set('password', 'correct horse');
+
+    const logs = silenceLogs();
+    const before = incidentCount('sign_in_unavailable');
+    try {
+      await expect(signInAction(login)).rejects.toThrow(/^REDIRECT:/);
+    } finally {
+      logs.restore();
+    }
+
+    const destination = decodeURIComponent(mocks.redirect.mock.calls[0][0] as string);
+    expect(destination).toContain('temporarily unavailable');
+    // A wrong password says "incorrect"; an outage says "unavailable".
+    // The outage must never be dressed up as a credential problem.
+    expect(destination).not.toContain('incorrect');
+    expect(incidentCount('sign_in_unavailable')).toBe(before + 1);
   });
 });
 
@@ -426,6 +484,48 @@ describe('password reset completion', () => {
     expect(mocks.updateUser).not.toHaveBeenCalled();
   });
 
+  it('treats an unreachable Auth endpoint as an outage, not as an expired link', async () => {
+    // The session check can throw when Auth never answers. That is NOT the
+    // same as an expired link, and saying "expired" would send the person
+    // away from a reset that is still perfectly good.
+    grantRecoveryCookie();
+    mocks.getUser.mockRejectedValueOnce(new TypeError('fetch failed'));
+
+    const logs = silenceLogs();
+    try {
+      await expect(updatePasswordAction(resetForm())).rejects.toThrow(/^REDIRECT:/);
+    } finally {
+      logs.restore();
+    }
+
+    const destination = mocks.redirect.mock.calls[0][0] as string;
+    expect(decodeURIComponent(destination)).toContain('could not check your reset link');
+    expect(decodeURIComponent(destination)).not.toContain('expired');
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+    // The recovery permission is NOT spent, so the same link still works.
+    expect(cookieStore.delete).not.toHaveBeenCalled();
+  });
+
+  it('does not spend the permission when the password change itself could not reach Auth', async () => {
+    grantRecoveryCookie();
+    mocks.getUser.mockResolvedValueOnce({ data: { user: { id: 'user-1' } } });
+    mocks.updateUser.mockRejectedValueOnce(new TypeError('fetch failed'));
+
+    const logs = silenceLogs();
+    try {
+      await expect(updatePasswordAction(resetForm())).rejects.toThrow(/^REDIRECT:/);
+    } finally {
+      logs.restore();
+    }
+
+    expect(decodeURIComponent(mocks.redirect.mock.calls[0][0] as string)).toContain(
+      'could not save the new password',
+    );
+    // The password was never changed, so the person can simply retry with
+    // the same link.
+    expect(cookieStore.delete).not.toHaveBeenCalled();
+  });
+
   it('sets the password once, spends the permission and signs out everywhere', async () => {
     grantRecoveryCookie();
 
@@ -442,12 +542,6 @@ describe('password reset completion', () => {
 
 describe('operator visibility for silent Auth failures', () => {
   const idle = { status: 'idle' } as const;
-
-  function silenceLogs() {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    return { warn, error, restore: () => { warn.mockRestore(); error.mockRestore(); } };
-  }
 
   it('reports a signup mail/provider rejection as an incident while the visitor sees the same pending page', async () => {
     const logs = silenceLogs();
