@@ -95,6 +95,21 @@ This run used `main`'s 98-migration chain; it does not include the local
 101-migration GST work in this checkout, and it is a disposable Docker stack,
 not hosted capacity.
 
+**Run `44489193816` (2026-11-19, push to `main` at `8c557e0`):** completed
+successfully on the merged 101-migration chain, including
+`20261119000100_restore_receipt_helper_boundary`,
+`20261119000200_new_outlet_tax_default` and
+`20261119000300_public_guest_gst_quote`. Retained JSON reports show **64/64
+hermetic** and **49/49 Supabase-backed** Playwright tests, each with 0 skipped,
+0 unexpected and 0 flaky. The 5,000-guest / 5,000-order synthetic workload
+across 100 restaurants reported 0 failures (order creation p50 312 ms, p95
+1,401 ms at concurrency 128; table sessions p50 83 ms, p95 366 ms), and the
+Kitchen workload observed 1,500/1,500 polling rows across three waves. Artifacts
+are retained in GitHub for 30 days and copied to
+`test-results/supabase-e2e-hosted/44489193816/`. This is still a disposable
+Docker stack — local migrations are not hosted-schema parity evidence, and the
+hosted gates listed above remain open.
+
 Historical run `42609513688` completed before this publication/polling change:
 64 hermetic and 47 Supabase-backed tests passed, and 1,500 Realtime events were
 delivered across its three waves. That is evidence for that earlier run only;
