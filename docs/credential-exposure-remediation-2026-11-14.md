@@ -1,8 +1,13 @@
 # Credential exposure — exact scope and remediation sequence (2026-11-14)
 
-**Status: OPEN — B5 remains CRITICAL until the owner completes §4 and the
-verification in §5.** Redaction of the working tree (commit `1193327`) did not
-remove the values from Git history and does not rotate anything.
+**Status: CLOSED 2026-11-16 — B5 complete (owner §4 + §5 verification
+recorded below).** C1 is inert (deployment gone, 404) and C2 is remediated by
+Option A deletion of all four accounts; the old password is rejected for all
+four and the current staging alias still works. Redaction of the working tree
+(commit `1193327`) did not remove the values from Git history and does not
+rotate anything — closure rests on revocation/deletion, not on redaction.
+History rewrite (§6) was not performed and is not required now that both
+values are useless; it remains optional and owner-gated.
 
 No secret value is printed in this document. Every identifier below is either a
 deployment/file reference or a placeholder.
@@ -135,6 +140,39 @@ review branch shows no READY deployments with share links issued recently;
 (f) CI remains green; (g) staging suite was NOT re-run (no fresh dispatch —
 not required for rotation; a fresh run needs separate authorization).
 
+### 5.1 Closure record (2026-11-16)
+
+Owner-reported (result classes only; no value pasted):
+
+- (a) C1 old share link: **404 / Protected / Revoked** — dead, as expected.
+- (b) C2: **four users deleted** (Option A); old password **rejected for all
+  four**.
+- (c) **Current staging alias: working.**
+
+Arena-verified (read-only, 2026-11-16):
+
+- (d) Tracked-tree scan: **0** matches for a real `_vercel_share=` token
+  pattern; remaining occurrences are placeholders, tests and guards. The
+  full-history audit in §7 (2026-11-14, 40 commits) located both values only
+  in the two redacted docs; the retired values are now useless regardless of
+  history. A fresh full-history grep was not reproducible from this
+  squashed checkout (2 commits) and is not claimed.
+- (e) Vercel API: deployment `dpl_2i2oYjgNje5xQtkD9CzFSoWEmH9U` returns
+  **404 "Deployment not found"**; the latest `arena/9b120325-autodine`
+  deployment (`dpl_Bwo4eXbjQcu9eVxsmLGoJMccchog`, commit `d8d0e52`) is
+  **READY/STAGED** with the branch alias assigned and no alias error.
+- (f) Supabase `autodinetest` (`juwyhslzchjevqkdvwjm`), read-only count:
+  `auth.users` with `%@autodine-review.test` = **0** — deletion independently
+  confirmed. `npm run verify:release` = **28/28 OK**; staging guards =
+  **25/25 pass**.
+- (g) Staging suite was **NOT** re-run; no workflow was dispatched for this
+  closure.
+
+Residual note: anyone who copied the retired values earlier gains nothing
+from them now (deployment gone; accounts gone). If the retired password was
+ever reused elsewhere, §4 step 6 (habit check) still applies to those
+other accounts.
+
 ## 6. History cleanup procedure (OPTIONAL — do not run without explicit approval)
 
 If you decide the historical exposure is unacceptable after rotation:
@@ -207,6 +245,9 @@ found.** This audit does not crawl outside the repository.
 
 ## 8. B5 status tracking
 
-B5 stays **CRITICAL-OPEN** until steps 1–3 are done and §5 verification is
-recorded. On completion, update this file and the owner-action register
-(B5 → done, with date and method).
+**B5: DONE 2026-11-16.** Method: C1 confirmed inert (deployment 404,
+owner-reported old link dead); C2 remediated by Option A — deletion of all
+four `*@autodine-review.test` accounts, old password rejected for all four,
+independently confirmed by a read-only `auth.users` count of 0. Current
+staging alias verified working. See §5.1 for the full closure record.
+History rewrite (§6) not performed; not required after revocation/deletion.

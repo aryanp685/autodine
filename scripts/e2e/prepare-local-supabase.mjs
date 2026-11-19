@@ -82,7 +82,23 @@ try {
     }
     await apply(await readFile(path.join(migrationDir, file), 'utf8'), `supabase/migrations/${file}`);
   }
-  if (migrationFiles.length !== 89) throw new Error(`Expected 89 checked-in migrations, found ${migrationFiles.length}.`);
+  // Keep this exact count synchronized with the migration chain: a lower
+  // bound would allow one or more missing files to be hidden by the current
+  // count, and an added migration must deliberately update this assertion.
+  const expectedRepositoryMigrations = 98;
+  const requiredBoundaryMigrations = [
+    '20261112000500_role_scoped_order_reads.sql',
+    '20261112000600_cap_subscription_history_ceiling.sql',
+    '20261112000700_order_line_edit_boundary.sql',
+    '20261114000100_owner_manager_subscription_reads.sql',
+  ];
+  const missingBoundaryMigrations = requiredBoundaryMigrations.filter((file) => !migrationFiles.includes(file));
+  if (migrationFiles.length !== expectedRepositoryMigrations || missingBoundaryMigrations.length > 0) {
+    throw new Error(
+      `Expected exactly ${expectedRepositoryMigrations} repository migrations, found ${migrationFiles.length}. ` +
+      (missingBoundaryMigrations.length ? `Missing required migrations: ${missingBoundaryMigrations.join(', ')}.` : ''),
+    );
+  }
 
   const required = await client.query(`
     select
@@ -203,7 +219,7 @@ try {
   };
   const lines = Object.entries(envValues).map(([key, value]) => `${key}=${value}`);
   await writeFile(envFile, `${lines.join('\n')}\n`, { mode: 0o600 });
-  console.log(`Seeded only synthetic Supabase Auth/database fixtures for ${slug}; migration chain: ${migrationFiles.length}/89.`);
+  console.log(`Seeded only synthetic Supabase Auth/database fixtures for ${slug}; migration chain: ${migrationFiles.length}/${expectedRepositoryMigrations}.`);
 } finally {
   await client.end();
 }

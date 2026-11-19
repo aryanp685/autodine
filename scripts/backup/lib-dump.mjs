@@ -18,6 +18,85 @@ import pg from 'pg';
 const quoteIdent = (s) => '"' + String(s).replaceAll('"', '""') + '"';
 const quoteLit = (s) => "'" + String(s).replaceAll("'", "''") + "'";
 
+/**
+ * Financial spot-check tables. The manifest contract (see backup-logical.mjs)
+ * records `sum(amount_paise)` for each of these at backup time — or null
+ * when the table (or the column) is absent — and verify-restored-db.mjs
+ * recomputes and compares them after a restore. Expectations are always
+ * measured from the source, never invented at verification time.
+ */
+export const FINANCIAL_SPOT_CHECK_TABLES = ['payments', 'subscription_payments'];
+
+async function financialSpotChecksOn(client, schema, presentTables) {
+  const result = {};
+  for (const table of FINANCIAL_SPOT_CHECK_TABLES) {
+    const key = `${table}_amount_paise`;
+    if (!presentTables.has(table)) { result[key] = null; continue; }
+    const col = await client.query(
+      `select 1 from information_schema.columns where table_schema = $1 and table_name = $2 and column_name = 'amount_paise'`,
+      [schema, table]);
+    if (!col.rows.length) { result[key] = null; continue; }
+    const r = await client.query(`select coalesce(sum(amount_paise), 0)::bigint as s from ${quoteIdent(schema)}.${quoteIdent(table)}`);
+    result[key] = Number(r.rows[0].s);
+  }
+  return result;
+}
+
+/**
+ * The verification-contract counts for one schema, computed on an open
+ * client: tables (relkind 'r'), exact total rows, functions
+ * (prokind 'f'/'p'), RLS policies — the exact definitions lib-dump's
+ * incremental counts and verify-restored-db.mjs both use — plus the
+ * financial spot checks.
+ */
+async function schemaCountsOn(client, schema) {
+  const tableNames = (await client.query(
+    `select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = $1 and c.relkind = 'r' order by c.relname`, [schema])).rows.map((r) => r.relname);
+  let rows = 0;
+  for (const t of tableNames) {
+    const r = await client.query(`select count(*)::bigint as n from ${quoteIdent(schema)}.${quoteIdent(t)}`);
+    rows += Number(r.rows[0].n);
+  }
+  const functions = await client.query(
+    `select count(*)::int as n from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = $1 and p.prokind in ('f','p')`, [schema]);
+  const policies = await client.query(`select count(*)::int as n from pg_policies where schemaname = $1`, [schema]);
+  return {
+    counts: { tables: tableNames.length, rows, functions: functions.rows[0].n, policies: policies.rows[0].n },
+    financialSpotChecks: await financialSpotChecksOn(client, schema, new Set(tableNames)),
+  };
+}
+
+/**
+ * Open one REPEATABLE READ snapshot on the source and export it, so an
+ * external pg_dump can read the IDENTICAL snapshot (`pg_dump --snapshot`).
+ * Returns the snapshot id, a collector for the verification-contract
+ * counts/financials measured inside that snapshot, and a closer. The
+ * snapshot stays open (holding back vacuum, briefly) until close() — keep
+ * it only for the duration of the dump.
+ */
+export async function openBackupSnapshot(connectionString, { schema = 'public' } = {}) {
+  const client = new pg.Client({ connectionString, application_name: 'autodine-backup-snapshot' });
+  await client.connect();
+  try {
+    await client.query('begin isolation level repeatable read read only');
+    await client.query('set local statement_timeout = 0');
+    const { rows } = await client.query('select pg_export_snapshot() as snapshot');
+    return {
+      snapshotId: rows[0].snapshot,
+      collectCounts: () => schemaCountsOn(client, schema),
+      close: async () => {
+        await client.query('commit').catch(() => {});
+        await client.end().catch(() => {});
+      },
+    };
+  } catch (err) {
+    await client.end().catch(() => {});
+    throw err;
+  }
+}
+
 export async function dumpDatabase(connectionString, { schema = 'public', log = () => {} } = {}) {
   // The whole dump is one read-only snapshot; statement_timeout disabled.
   const client = new pg.Client({ connectionString, application_name: 'autodine-logical-backup' });
@@ -283,8 +362,13 @@ export async function dumpDatabase(connectionString, { schema = 'public', log = 
     out.push('');
     out.push('-- end of AutoDine logical backup');
 
+    // Financial spot checks, measured inside this same snapshot so the
+    // manifest's expectations describe exactly the bytes being written.
+    const financialSpotChecks = await financialSpotChecksOn(
+      client, schema, new Set(tables.rows.map((t) => t.relname)));
+
     await client.query('commit');
-    return { sql: out.join('\n') + '\n', counts };
+    return { sql: out.join('\n') + '\n', counts, financialSpotChecks };
   } catch (err) {
     await client.query('rollback').catch(() => {});
     throw err;

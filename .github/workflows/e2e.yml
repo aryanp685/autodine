@@ -55,7 +55,7 @@ jobs:
         run: npm run build
 
       # Count is asserted, not assumed: a project filter that silently matches
-      # no tests would otherwise "pass" and prove nothing. The 47 database-backed
+      # no tests would otherwise "pass" and prove nothing. The 49 database-backed
       # tests run separately in supabase-e2e-load.yml and are not skipped here.
       - name: Expect 64 hermetic tests
         run: |

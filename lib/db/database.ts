@@ -52,15 +52,39 @@ type Table<Row, Rel extends unknown[] = []> = {
 
 export type MemberRole = 'owner' | 'manager' | 'kitchen' | 'cashier';
 
+/** Columns granted to the shared authenticated role on restaurants. */
+type StaffRestaurant = Omit<
+  Restaurant,
+  'plan' | 'plan_status' | 'trial_started_at' | 'plan_started_at' | 'plan_expires_at'
+>;
+
+/** Columns granted to the shared authenticated role on the base order table. */
+type OperationalOrder = Omit<
+  Order,
+  | 'payment_status'
+  | 'subtotal_paise'
+  | 'discount_paise'
+  | 'tax_paise'
+  | 'total_paise'
+  | 'guest_token'
+  | 'cancel_reason'
+  | 'tax_rate_bps_snapshot'
+  | 'confirmed_by'
+  | 'order_session_id'
+>;
+
+/** Line-item facts available to all staff; prices use order_items_finance. */
+type OperationalOrderItem = Omit<OrderItem, 'unit_price_paise'>;
+
 export type Database = {
   public: {
     Tables: {
-      restaurants: Table<Restaurant>;
+      restaurants: Table<StaffRestaurant>;
       /**
        * Migration 20261110001000 (Model C). One subscription per account;
        * every restaurant row points at one through `restaurants.account_id`.
-       * Read-only from the app: subscription state changes only through
-       * public.admin_set_subscription(), which is service-role only.
+       * Direct reads are Owner/Manager-only under accounts_owner_manager_read;
+       * subscription state changes only through service-role paths.
        */
       accounts: Table<{
         id: string;
@@ -282,7 +306,7 @@ export type Database = {
         rotated_at: string;
       }>;
       orders: Table<
-        Order,
+        OperationalOrder,
         [
           {
             foreignKeyName: 'order_items_order_id_fkey';
@@ -293,7 +317,7 @@ export type Database = {
           },
         ]
       >;
-      order_items: Table<OrderItem>;
+      order_items: Table<OperationalOrderItem>;
       /**
        * Migration 20261029000100. Staff invitations.
        *
@@ -384,7 +408,51 @@ export type Database = {
         recorded_at: string | null;
       }>;
     };
-    Views: Record<string, never>;
+    Views: {
+      /** Migration 20261112000500. Owner/Manager/Cashier projection; never contains guest_token. */
+      orders_finance: {
+        Row: {
+          id: string;
+          restaurant_id: string;
+          table_id: string | null;
+          code: string;
+          customer_note: string | null;
+          prep_status: PrepStatus;
+          payment_status: PaymentStatus;
+          subtotal_paise: number;
+          discount_paise: number;
+          tax_paise: number;
+          total_paise: number;
+          placed_at: string;
+          updated_at: string;
+          tax_rate_bps_snapshot: number | null;
+          hold_required: boolean;
+          confirmed_at: string | null;
+          table_session_id: string | null;
+          order_session_id: string | null;
+          kitchen_announcement_status: 'announced' | 'failed' | null;
+          kitchen_announcement_at: string | null;
+          kitchen_announcement_error: string | null;
+        };
+        Relationships: [];
+      };
+      /** Migration 20261112000500. Financial line prices for Owner/Manager/Cashier. */
+      order_items_finance: {
+        Row: {
+          id: string;
+          order_id: string;
+          item_id: string | null;
+          name_snapshot: string;
+          unit_price_paise: number;
+          qty: number;
+          variant_snapshot: string | null;
+          addons_snapshot: string[];
+          is_veg: boolean | null;
+          sort_order: number;
+        };
+        Relationships: [];
+      };
+    };
     Functions: {
       /** Migration 20261110001100. The approved monthly price, in paise. */
       plan_price_paise: {
@@ -434,19 +502,22 @@ export type Database = {
         };
         Returns: Record<string, unknown>;
       };
-      /** The owner's own subscription, membership-checked inside the function. */
+      /** Owner/Manager-only account state, role-checked inside the function. */
       account_subscription_state: {
         Args: { p_restaurant_id: string };
         Returns: Record<string, unknown>;
       };
+      /** Owner/Manager-only subscription event history, capped at 50. */
       account_subscription_history: {
         Args: { p_restaurant_id: string; p_limit?: number };
         Returns: Record<string, unknown>[];
       };
+      /** Owner/Manager-only payment amounts and receipt references, capped at 50. */
       account_payment_history: {
         Args: { p_restaurant_id: string; p_limit?: number };
         Returns: Record<string, unknown>[];
       };
+      /** Owner/Manager-only receipt detail. */
       account_receipt: {
         Args: { p_receipt_id: string };
         Returns: Record<string, unknown>;
@@ -1232,27 +1303,23 @@ export type Database = {
         Returns: string;
       };
       /**
-       * Migration 20261026001200. Plan, trial clock, the write gate and the
-       * feature list in one object. This is what the dashboard's plan line and
-       * every "this plan does not include that" message read. Returns null for
-       * an id the caller cannot resolve through membership (the function is
-       * SECURITY DEFINER but the id always comes from the membership row).
+       * Membership-checked operational entitlement read. Every staff role gets
+       * can_write/read_only/features; only Owner/Manager also receive plan,
+       * trial dates, account id and outlet allowance.
        */
       restaurant_access: {
         Args: { p_restaurant_id: string };
         Returns: {
-          plan: string;
-          status: string;
-          started_at: string;
-          trial_ends_at: string;
-          plan_expires_at: string | null;
-          days_remaining: number;
+          plan?: string;
+          status?: string;
+          trial_ends_at?: string | null;
+          plan_expires_at?: string | null;
+          days_remaining?: number;
           can_write: boolean;
           read_only: boolean;
           features: string[];
-          /** Migration 20261110001000 (Model C). Null only before that migration. */
-          account_id: string | null;
-          outlets: {
+          account_id?: string | null;
+          outlets?: {
             used: number;
             limit: number | null;
             unlimited: boolean;

@@ -1,18 +1,22 @@
-# Production migration manifest — 2026-11-14 (all 92 files accounted for)
+# Production migration manifest — 2026-11-14 (all 93 files accounted for; updated 2026-11-16)
 
-**Generated from `supabase/migrations/` on branch `arena/9b120325-autodine`.**
+**Generated from `supabase/migrations/` on branch `arena/9b120325-autodine`;
+extended 2026-11-16 on `arena/2670dd12-autodine`.**
 Purpose: nothing reaches production without appearing in this table with a
 classification and the probe that confirms (or refutes) its presence. Counts:
 **76 legacy-rollout-scope · 9 branch set (pending owner authorization B1) ·
-7 GST/IRP Phase B (NOT AUTHORIZED)**. Zero duplicate versions (checked
-2026-11-14). The release-prep document
+7 GST/IRP Phase B (NOT AUTHORIZED) · 1 scoped ACL revision
+(`20261116000100`, pending its own authorization)**. Zero duplicate versions
+(checked 2026-11-14; rechecked 2026-11-16, `migrations:verify` 93/93). The
+release-prep document
 (`docs/production-release-prep-2026-11-14.md`) binds this manifest into the
 ordered release sequence.
 
 **Evidence boundary:** "Reported applied" means the 2026-11-12 hand-off report
-records the legacy rollout as completed and production ledger listing ended at
-`20261112000100` (a listing boundary, **not** a completeness proof). Only the
-A1 probe (owner-run, read-only) can confirm at release time. Nothing here
+records the legacy rollout as completed. The A1 ledger + catalog-effect
+probes were executed read-only against production on 2026-11-16 (72/92 repo
+versions present at that time; see the probed rows below) and supersede the
+reported-applied assumption for the flagged files. Nothing here
 authorizes any application. GST/IRP files are not to be applied in any form
 without separate written authorization each.
 
@@ -86,22 +90,26 @@ without separate written authorization each.
 | `20261110000600` | `staff_finance_boundaries` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
 | `20261110000700` | `restaurants_member_only` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 | Batch B — apply only after app deploy |
 | `20261110000800` | `remove_order_submission_caps` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 | removes guest order-submission caps (AGENTS.md) |
-| `20261110000851` | `payment_audit_provider_actor` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
+| `20261110000851` | `payment_audit_provider_actor` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 | **PROBED 2026-11-16 (prod, read-only): EFFECT ABSENT** — `payment_audit_events.actor_id` still NOT NULL, no FK to `profiles`; live settlement defect persists. Apply candidate (before `20261110000950`); pre-apply orphan-`actor_id` data preflight required (file validates FK and fails closed) |
 | `20261110000900` | `converge_qr_verification_attempts` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
-| `20261110000950` | `online_payment_attempt_uniqueness` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
+| `20261110000950` | `online_payment_attempt_uniqueness` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 | **PROBED 2026-11-16: EFFECT PARTIAL** — hosted `begin/settle_online_payment` are older bodies (signatures identical; begin lacks the per-order pending guard, settle lacks the stale-balance guard; bodies 3540/2480 vs repo 4300/3427). `CREATE OR REPLACE` — no duplicate-object risk. Apply candidate after `20261110000851` (settle inserts NULL actor) |
 | `20261110001000` | `account_subscriptions` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
 | `20261110001100` | `subscription_billing` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
-| `20261110001210` | `checkout_outstanding_guard` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
-| `20261110001220` | `revoke_client_bypass_privileges` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
+| `20261110001210` | `checkout_outstanding_guard` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 | **RESOLVED 2026-11-16: EFFECT PRESENT, behaviour-identical.** Full `pg_get_functiondef` diff vs the repo file: signature, `SECURITY DEFINER`, `search_path=public, pg_temp`, volatility, auth/role guards (`owner/manager/cashier`, 42501/P0002), write-gate, both outstanding-balance guards and error texts, close update and receipt call are statement-for-statement identical. Only differences: function COMMENT wording and inline body comments (no behaviour). Grants end-state identical (anon: none; authenticated + service_role: EXECUTE; the repo revoke list does not touch service_role's explicit grant). **No reconciliation migration needed; excluded from the apply batch to avoid a needless production write.** Optional ledger-parity application is owner-discretionary and changes only the comment |
+| `20261110001220` | `revoke_client_bypass_privileges` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 | **PROBED 2026-11-16: EFFECT PARTIAL — DO NOT APPLY VERBATIM.** TRUNCATE/REFERENCES/TRIGGER already revoked on tables, but `MAINTAIN` remains for `anon`+`authenticated` on **17 tables** (D2 confirmed) and in `postgres` default ACLs; `supabase_admin` defaults untouched (owner-operation scope). Two live sequences (`restaurant_invoice_share_audit_id_seq`, `subscription_receipt_seq`) grant client USAGE/SELECT/UPDATE; source verification (2026-11-16) shows both are consumed only inside SECURITY DEFINER functions, so the sequence revoke is safe — but production should apply the scoped revision `20261116000100` (below) instead of this file, which stays in the chain for local/staging parity |
 | `20261112000100` | `schedule_subscription_expiry` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
 | `20261112000200` | `immutable_restaurant_account_link` | Branch set — apply only with B1 (release prep §2) | P0 security — effect absent in prod (D1) |
 | `20261112000300` | `report_sales_export_authorization` | Branch set — apply only with B1 (release prep §2) | staging-applied 2026-11-15; prod unverified |
 | `20261112000400` | `bound_subscription_history` | Branch set — apply only with B1 (release prep §2) |  |
-| `20261112000500` | `serialize_outlet_creation` | Branch set — apply only with B1 (release prep §2) |  |
-| `20261112000600` | `serialize_subscription_payments` | Branch set — apply only with B1 (release prep §2) |  |
-| `20261112000700` | `serialize_subscription_expiry` | Branch set — apply only with B1 (release prep §2) |  |
+| `20261112000500` | `role_scoped_order_reads` | main (PR #191 main-merge reconciliation, 2026-11-16) — staff-access boundary | NOT AUTHORIZED for hosted application by this merge; arrived via main merge |
+| `20261112000501` | `serialize_outlet_creation` | Branch set — apply only with B1 (release prep §2) |  |
+| `20261112000600` | `cap_subscription_history_ceiling` | main (PR #191 main-merge reconciliation, 2026-11-16) — subscription boundary | NOT AUTHORIZED for hosted application by this merge; arrived via main merge |
+| `20261112000601` | `serialize_subscription_payments` | Branch set — apply only with B1 (release prep §2) |  |
+| `20261112000700` | `order_line_edit_boundary` | main (PR #191 main-merge reconciliation, 2026-11-16) — order-line boundary | NOT AUTHORIZED for hosted application by this merge; arrived via main merge |
+| `20261112000701` | `serialize_subscription_expiry` | Branch set — apply only with B1 (release prep §2) |  |
 | `20261113000100` | `gst_two_mode` | GST/IRP Phase B — NOT AUTHORIZED |  |
-| `20261114000100` | `gst_b2b_einvoice_readiness` | GST/IRP Phase B — NOT AUTHORIZED |  |
+| `20261114000100` | `owner_manager_subscription_reads` | main (PR #191 main-merge reconciliation, 2026-11-16) — subscription boundary | NOT AUTHORIZED for hosted application by this merge; arrived via main merge |
+| `20261114000101` | `gst_b2b_einvoice_readiness` | GST/IRP Phase B — NOT AUTHORIZED |  |
 | `20261114000200` | `irp_reconciliation` | GST/IRP Phase B — NOT AUTHORIZED |  |
 | `20261114000300` | `gst_mode_gates` | GST/IRP Phase B — NOT AUTHORIZED |  |
 | `20261114000400` | `restrict_trigger_functions_execute` | GST/IRP Phase B — NOT AUTHORIZED | Phase B5 — EXECUTE revoke; independent hardening, still NOT AUTHORIZED (Phase B) |
@@ -110,6 +118,8 @@ without separate written authorization each.
 | `20261115000100` | `fix_redeem_staff_invite_status_returns` | Branch set — apply only with B1 (release prep §2) | P0 auth — invite single-use fix |
 | `20261115000200` | `owner_billing_configuration_guard` | Branch set — apply only with B1 (release prep §2) | P0 security — owner-only tax/GSTIN trigger (PR #181 content, renumbered) |
 | `20261115000300` | `audit_restaurant_account_reassignment` | Branch set — apply only with B1 (release prep §2) | P0 security — account-reassignment audit ledger |
+| `20261118000100` | `merge_boundary_gst_order_line_edits` | PR #191 main-merge reconciliation (2026-11-16) | Re-asserts main's order-line edit boundary (owner/manager/cashier only; Kitchen 42501) on the GST replacement; NOT AUTHORIZED for hosted application by this merge |
+| `20261116000100` | `revoke_client_maintain_privileges` | Scoped ACL revision — NOT AUTHORIZED (own decision; production substitute for `20261110001220`, see its probed row) | Added 2026-11-16 after production catalog probes: completes the MAINTAIN/default-ACL scope 01220 misses in the production-shaped catalog, with fail-closed post-revoke verification; sequence revokes justified by definer-only consumption (verified in source). Locally replay-tested; never applied to any hosted project |
 
 ## Owner-operation (never applied automatically — separate on purpose)
 

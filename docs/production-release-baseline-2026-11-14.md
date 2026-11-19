@@ -167,6 +167,63 @@ Before **any** write to production, in one sitting, stored out-of-band:
    before step 1 — or an explicit owner waiver in writing. The current runbook
    states this gate is **unmet**; this batch does not waive it.
 
+## 6A. Twelve-file batch execution packet (prepared 2026-11-16; supersedes §7 for this batch)
+
+**Status: packet complete, execution NOT AUTHORIZED.** Exact set, in filename
+order (one transaction per file; stop on first failure):
+
+| # | File | Change class | Rollback |
+|---|---|---|---|
+| 1 | `20261110000851_payment_audit_provider_actor` | `actor_id` DROP NOT NULL + validated FK → `profiles` | Backup restore only (validated FK + possible NULL actors written after apply make in-place reversal unsafe) |
+| 2 | `20261110000950_online_payment_attempt_uniqueness` | Replace `begin_online_payment`, `settle_online_payment` | Re-apply §6-captured prior definitions |
+| 3 | `20261112000200_immutable_restaurant_account_link` | Trigger fn `prevent_restaurant_account_reassignment` + trigger | Forward fix: drop trigger, then function |
+| 4 | `20261112000300_report_sales_export_authorization` | Replace `report_sales` | Prior definition |
+| 5 | `20261112000400_bound_subscription_history` | Replace `account_subscription_history`, `account_payment_history` | Prior definitions |
+| 6 | `20261112000500_serialize_outlet_creation` | Replace `create_outlet`, `create_account_with_restaurant` (locking only) | Prior definitions |
+| 7 | `20261112000600_serialize_subscription_payments` | Replace `record_subscription_payment`, `…_failure`, `…_refund` | Prior definitions |
+| 8 | `20261112000700_serialize_subscription_expiry` | Replace `expire_subscriptions` | Prior definition |
+| 9 | `20261115000100_fix_redeem_staff_invite_status_returns` | Replace `redeem_staff_invite` | Prior definition |
+| 10 | `20261115000200_owner_billing_configuration_guard` | Trigger fn `guard_restaurant_billing_configuration` + trigger; EXECUTE revoked incl. service_role | Forward fix: drop trigger, then function |
+| 11 | `20261115000300_audit_restaurant_account_reassignment` | New table `restaurant_account_link_audit` + audit/immutability triggers (replaces fn from #3) | Forward fix: drop triggers, function, then table |
+| 12 | `20261116000100_revoke_client_maintain_privileges` | ACL/default-ACL revokes; fail-closed self-check inside the file | Re-grant from §6-captured `relacl`/`pg_default_acl` snapshot |
+
+**Explicitly NOT in this batch:** `20261110001210` (effect present,
+behaviour-identical — resolved 2026-11-16, see manifest row),
+`20261110001220` (superseded for production by #12; remains in the repo chain
+for local/staging parity only), the `supabase_admin` owner operation
+(separate, manual), and **all seven GST/IRP files (NOT AUTHORIZED)**.
+
+**Batch-specific preflight (in addition to §6, same sitting, read-only):**
+
+- Identity: `get_project` returns `autodine-production` / `bdbaqpevwmgdvghszjno`
+  / ACTIVE_HEALTHY immediately before the first write and before every
+  verification read.
+- Ledger: the 12 versions absent; the 9 branch-set dependency objects
+  (`account_subscriptions` etc.) present; GST/IRP versions still absent.
+- Rollback capture: `pg_get_functiondef` for every function in rows 2–11 plus
+  `prevent_restaurant_account_reassignment`, and `relacl` + `pg_default_acl`
+  dumps for row 12 — stored out-of-band before file 1 runs.
+- `00851` data preflight: `select count(*) from public.payment_audit_events e
+  where e.actor_id is not null and not exists (select 1 from public.profiles p
+  where p.id = e.actor_id);` must be **0**, or the FK validation aborts the
+  file (fail-closed by design; remediate data only under separate approval).
+- Backup gate: §6 item 8 satisfied (hosted backup/PITR evidence filed) — no
+  waiver is recorded in this packet.
+
+**After each file:** ledger row present; object markers (trigger/table/FK)
+match the manifest row; `/api/health` `ok:true`. **After the batch:** D2
+verifier (`scripts/d2/verify-acl-posture.mjs`) clean for the `postgres`
+grantor; six-function probe shows the three previously-missing functions
+present; synthetic account-reassignment attempt by an authenticated JWT is
+rejected 42501 and the applied-change path writes an audit row.
+
+**Failure criteria:** any file error → stop, do not continue the batch; a
+`20261116000100` self-check exception means its revokes rolled back with the
+file (investigate the surviving grantor before retrying); health not
+`ok:true` after any file → halt and use the per-file rollback column; the
+batch is forward-fix only once file 1 has committed — there is no
+mid-batch restore without the backup gate artifact.
+
 ## 7. Staged execution sequence (when authorized — not today)
 
 | Step | Action | Verify |
@@ -175,7 +232,7 @@ Before **any** write to production, in one sitting, stored out-of-band:
 | 1 | **Batch A (25 files, exact filename order)** — every pre-GST file in `docs/gst-staging-application-plan-2026-11-15.md` §3 Phase A **except** `20261110000700_restaurants_member_only` (that is Batch B). One transaction per file via `create_migration`, manifest updated per file | After each file: object markers; after all: `/api/health` `ok:true`; `count(*)` unchanged except `accounts`/`restaurants.account_id` backfill |
 | 2 | **Application deploy** of the reviewed SHA; confirm storefront loads for a guest **before** Batch B; verify 21-day trial copy | `curl /api/health` `trialDays: 21`; guest QR smoke; staff sign-in smoke |
 | 3 | **Batch B:** `20261110000700_restaurants_member_only` only | Guest menu still loads via QR immediately after |
-| 4 | D1/D2 owner operations: immutability verification probe; `20261110001220` + `supabase_admin` default-ACL revoke; ACL re-probe | Trigger exists; `relacl` no longer grants `TRUNCATE`/`MAINTAIN` to `anon`/`authenticated`/`supabase_admin` |
+| 4 | D1/D2 owner operations: immutability verification probe; ~~`20261110001220`~~ **superseded 2026-11-16 by `20261116000100` (§6A row 12)** + `supabase_admin` default-ACL revoke (owner operation, manual); ACL re-probe | Trigger exists; `relacl` no longer grants `TRUNCATE`/`MAINTAIN` to `anon`/`authenticated`/`supabase_admin` |
 | 5 | PR #181 disposition: renumbered guard merged via normal review, **after** D1 is live; unique version asserted | Guard present in catalog; both guards coexist |
 | 6 | GST/IRP: separate authorization; see `docs/gst-irp-production-readiness-2026-11-14.md` | Phase B markers; **not part of this release unless separately authorized** |
 | 7 | Post-release: re-run read-only probe pack; record ledger; monitor `/api/health` and alert lines for 24–72h; keep previous Vercel deployment READY for rollback of the **app** (DB steps are forward-fix only) | Incident = automatic rollback decision to the previous READY deployment |

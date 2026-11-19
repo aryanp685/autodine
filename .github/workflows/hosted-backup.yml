@@ -1,0 +1,92 @@
+name: Hosted backup (B2)
+
+# First hosted encrypted backup + every scheduled run thereafter.
+#
+#   Manual:  Actions -> "Hosted backup (B2)" -> Run workflow.
+#   Schedule: daily 03:17 UTC (documented in docs/backup-restore-runbook.md).
+#
+# Pipeline: scripts/backup/run-scheduled.mjs --b2
+#   backup (encrypted logical dump) -> verify newest artifact -> DR
+#   objectives -> B2 upload with remote SHA-256 HEAD verification.
+# `uploaded:true, verified:true` is printed by upload-b2.mjs only after the
+# signed HEAD returns the same SHA-256 that the backup manifest records.
+#
+# Required repository secrets (Settings -> Secrets and variables -> Actions):
+#   AUTODINE_BACKUP_SOURCE_URL   production read connection (never printed)
+#   AUTODINE_BACKUP_PASSPHRASE   backup encryption passphrase
+#   B2_REGION                    bucket region, e.g. us-west-004 (or B2_ENDPOINT)
+#   B2_BUCKET                    private backups bucket
+#   B2_ACCESS_KEY_ID             B2 application keyID (S3 access key)
+#   B2_SECRET_ACCESS_KEY         B2 application key (bucket-scoped)
+# The run fails closed, naming any missing secret, before touching anything.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hosted-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: encrypted backup -> verify -> B2 upload (SHA-256 verified)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      AUTODINE_BACKUP_SOURCE_URL: ${{ secrets.AUTODINE_BACKUP_SOURCE_URL }}
+      AUTODINE_BACKUP_PASSPHRASE: ${{ secrets.AUTODINE_BACKUP_PASSPHRASE }}
+      B2_REGION: ${{ secrets.B2_REGION }}
+      B2_BUCKET: ${{ secrets.B2_BUCKET }}
+      B2_ACCESS_KEY_ID: ${{ secrets.B2_ACCESS_KEY_ID }}
+      B2_SECRET_ACCESS_KEY: ${{ secrets.B2_SECRET_ACCESS_KEY }}
+      BACKUP_ALERT_WEBHOOK: ${{ secrets.BACKUP_ALERT_WEBHOOK }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Fail closed when a required secret is missing (names only)
+        run: |
+          missing=""
+          for name in AUTODINE_BACKUP_SOURCE_URL AUTODINE_BACKUP_PASSPHRASE B2_REGION B2_BUCKET B2_ACCESS_KEY_ID B2_SECRET_ACCESS_KEY; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing required repository secrets:$missing — configure them under Settings -> Secrets and variables -> Actions. No backup was attempted."
+            exit 1
+          fi
+          echo "All required backup secrets are present (values are never printed)."
+
+      - name: Scheduled backup with B2 upload + remote SHA-256 verification
+        run: node scripts/backup/run-scheduled.mjs --out-dir "$RUNNER_TEMP/autodine-backups" --rpo-minutes 1440 --b2 --prune-b2
+
+      - name: Preserve the backup manifest as run evidence (counts only, never the artifact)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: backup-manifest-${{ github.run_id }}
+          path: ${{ runner.temp }}/autodine-backups/*.manifest.json
+          if-no-files-found: ignore
+          retention-days: 35
+
+      - name: Run summary
+        if: always()
+        run: |
+          {
+            echo "## Hosted backup (B2)";
+            echo;
+            echo "- Run: ${{ github.run_id }} (${{ github.event_name }})";
+            echo "- Result: ${{ job.status }}";
+            echo "- Remote verification: see the upload-b2 step output — hosted success means it printed uploaded:true, verified:true with the manifest SHA-256.";
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,5 +1,7 @@
 # Verification run — 2026-11-10
 
+> **Historical snapshot.** This run records the pre-boundary account-member billing-read policy on branch `arena/a5344572-autodine`. On active branch `arena/f104d5d8-autodine`, forward migration `20261114000100_owner_manager_subscription_reads.sql` restricts direct account/payment/event/receipt reads and all four billing-read RPCs to Owners and Managers, while preserving Cashier/Kitchen operational write and feature access. It was replayed only on disposable local PostgreSQL; no hosted migration or deployment occurred. Current local evidence and release gates are in [the complete hardening report](AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md).
+
 What was executed, what it produced, and — no less important — what could not
 be executed here and why. Every command below was run on branch
 `arena/a5344572-autodine` against the working tree, in this sandbox.

@@ -55,10 +55,10 @@ export type Restaurant = {
   updated_at: string;
   created_at: string;
   /**
-   * Migration 20261026001100. The trial clock and the plan. Present on every
-   * row; `trial_started_at` is written once by the database and moved by
-   * nobody. These are display inputs -- the authority is
-   * public.restaurant_access(), which the server reads.
+   * Legacy plan/trial fields retained in the database for compatibility.
+   * `trial_started_at` is written once and never moved. Migration
+   * 20261114000100 removes direct SELECT for API roles; Owner/Manager billing
+   * presentation comes from `public.restaurant_access()` instead.
    */
   trial_started_at?: string;
   plan?: 'trial' | 'starter' | 'professional' | 'business';

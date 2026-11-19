@@ -28,7 +28,7 @@ not browser E2E evidence.
 
 On the repository's Linux/Node 22 sandbox, `npm ci` followed by
 `npm run test:db:local` starts an isolated embedded PostgreSQL 17.11 cluster
-under a fresh temporary directory. It replays all 60 checked-in migrations,
+under a fresh temporary directory. It replays all 83 checked-in migrations,
 adds only the already documented local Supabase shim and inferred scaffold,
 checks the resulting objects and SQL regressions in
 `supabase/checks/06_scan_limits.sql`, `07_p8_close_settlement.sql`, and
@@ -37,40 +37,60 @@ destroys the cluster on exit. The same run
 then performs a database-only synthetic workload (default 5,000 distinct
 guests across 100 synthetic restaurants) with a 64-connection pool. This is a
 local SQL throughput smoke, not a 5,000-concurrent-browser test or a forecast
-of hosted Supabase capacity. The latest command used `LOCAL_LOAD_USERS=100`:
-100 sessions and 100 SQL orders were verified; session-open took 307ms and
-order-write took 860ms. Earlier 5,000-row measurements remain historical and
-are not repeated-load evidence. Use a staged provider environment for any
-hosted capacity claim.
+of hosted Supabase capacity. An earlier `LOCAL_LOAD_USERS=100 npm run test:db:local`
+run verified 100 sessions and 100 SQL orders across two synthetic restaurants;
+session-open took 368ms (272/s) and order-write took 978ms (102/s). This was a
+disposable SQL smoke using the local shim and inferred scaffold, not a
+Supabase/PostgREST or browser load test. It used an 82-migration chain and does
+not include the current `20261114000100` migration or replay the current
+83-migration chain. Earlier 5,000-row measurements
+remain historical and are not repeated-load evidence. Use a staged provider
+environment for any hosted capacity claim.
 
 `npm run e2e:demo` builds the hermetic demo-mode app and runs the 64
 non-integration Playwright tests with Chromium from `@sparticuz/chromium`. The
 wrapper extracts Chromium's bundled NSS/NSPR libraries into a fresh temporary
 directory and checks every linked library before launch, so it needs neither
-apt nor a system Chromium installation. The latest hosted browser workflow verified **64 passed,
-0 skipped, 0 failed** for the hermetic project. `npm run e2e:local` remains the
-unfiltered 113-test catalog command; without Supabase it reports 49 integration
-cases as skipped, not verified.
+apt nor a system Chromium installation. A previously recorded hosted workflow reported **64 passed, 0 skipped, 0 failed**
+for the hermetic project; it is not a current-branch rerun. The recorded
+`npm run e2e:local` run built the test-mode app and ran the unfiltered 113-test
+catalog: **VERIFIED for hermetic browser E2E only — test-mode build passed, 64
+Playwright tests passed, 49 Supabase-backed tests skipped, 0 failed**. The 49
+skips are not passes; those integration flows were not verified by this command.
 
 ### Full disposable Supabase suite and realistic load
 
 `.github/workflows/supabase-e2e-load.yml` is the GitHub-hosted full-stack runner. It
 uses the pinned Supabase CLI to start local Postgres 17 plus Auth, Storage,
-Realtime and Studio, applies all 60 checked-in migrations plus only the marked
+Realtime and Studio, applies all 83 checked-in migrations plus only the marked
 inferred local scaffold, creates random synthetic Auth identities and fixtures,
 and builds the app against that loopback stack. It runs the hermetic 64 and the
 49 database-backed Playwright tests in separate stages, so the complete 113-test
 coverage has no skips. It then creates 5,000 synthetic guest sessions and orders
-across 100 restaurants, measures Next.js menu reads, authenticated kitchen
-updates and Realtime fan-out, and saves JSON metrics, test reports, traces and
-screenshots as a 30-day workflow artifact. It uses no hosted project credentials
-or production data and deploys nothing. A workflow definition is not evidence
-until its run finishes; its uploaded per-test reports and `load-report.json` are
-the evidence to retain. Run `42609513688` completed successfully: 64
-hermetic and 47 Supabase-backed tests passed; all 1,500 kitchen events were
-delivered (500 each for preparing, ready and served), with zero load failures.
-That is evidence for this run only; repeat the isolated workload before treating
-delivery as repeatedly verified.
+across 100 restaurants, measures Next.js menu reads, authenticated order-state
+updates, and three waves of 20 concurrent polling requests using the fixture
+Owner's authenticated PostgREST token. Those reads are not Kitchen-role
+verification. It opens no Realtime channel: the current order-read migration removes raw
+`orders` and waiter-call rows from the publication, and Kitchen refreshes through
+role-scoped reads every five seconds. The workflow saves JSON metrics, test
+reports, traces and screenshots as a 30-day artifact. It uses no hosted project
+credentials or production data and deploys nothing. A workflow definition is
+not evidence until its run finishes; retain its per-test reports and
+`load-report.json`.
+
+**Trigger caveat:** the current workflow's `push.branches` filter names only
+`arena/e9e78732-autodine`, while this active checkout is
+`arena/f104d5d8-autodine`; `workflow_dispatch` is also enabled. The grafted
+checkout contains no explanation for the branch pin, so it cannot establish
+whether that restriction is intentional or stale. The trigger has not been
+changed; confirm with the owner before widening or retargeting it. A push to
+the active branch will not automatically start this full-stack workflow.
+
+Historical run `42609513688` completed before this publication/polling change:
+64 hermetic and 47 Supabase-backed tests passed, and 1,500 Realtime events were
+delivered across its three waves. That is evidence for that earlier run only;
+it is not current polling evidence and must not be combined with later test
+counts. No rerun of the updated full-stack workflow is claimed here.
 
 This sandbox has no Docker/Podman daemon or container images and cannot reach
 the container registries, so it cannot truthfully claim to have started the full
@@ -183,7 +203,7 @@ no mounted data volume. If these loopback ports are already occupied, override
 
 The sandbox can run the hermetic 64 with bundled Chromium, but it has no Docker
 engine or image cache. The GitHub-hosted full-stack workflow is the route for
-the 47 Auth/Storage/Realtime integration tests and the API/Realtime workload.
+the 49 Auth/Storage/Realtime integration tests and the API/polling workload.
 Retain and inspect its uploaded JSON/HTML reports and load metrics before
 claiming those tests passed. The separate `throttle-e2e.yml` workflow remains a
 PostgreSQL/PostgREST-only throttle check; it is not full Supabase evidence.

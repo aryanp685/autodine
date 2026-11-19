@@ -109,7 +109,7 @@ export async function recordPaymentAction(input: {
   // restaurant_id is bound explicitly even though RLS already scopes this:
   // it turns the read into an existence check the caller is allowed to make.
   const { data: order, error: orderError } = await supabase
-    .from('orders')
+    .from('orders_finance')
     .select('id, code, total_paise, payment_status, prep_status')
     .eq('id', orderId)
     .eq('restaurant_id', restaurantId)

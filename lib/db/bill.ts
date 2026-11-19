@@ -71,7 +71,7 @@ export async function getBillData(orderId: string): Promise<BillResult> {
   }
 
   const { data: order, error: orderError } = await supabase
-    .from('orders')
+    .from('orders_finance')
     .select(
       'id, code, table_id, customer_note, prep_status, payment_status, subtotal_paise, discount_paise, tax_paise, total_paise, placed_at, tax_rate_bps_snapshot'
     )
@@ -84,7 +84,7 @@ export async function getBillData(orderId: string): Promise<BillResult> {
 
   const [itemsResult, paymentsResult, tableResult] = await Promise.all([
     supabase
-      .from('order_items')
+      .from('order_items_finance')
       .select('id, qty, name_snapshot, variant_snapshot, addons_snapshot, unit_price_paise, is_veg, sort_order')
       .eq('order_id', order.id)
       .order('sort_order', { ascending: true }),
