@@ -272,6 +272,8 @@ export function GlobalAnnouncementProvider({
   const notificationIdsRef = useRef<Set<string>>(new Set());
   // Track event keys that have been spoken to prevent duplicates
   const spokenEventKeysRef = useRef<Set<string>>(new Set());
+  // For latency measurement: eventAt per voiceKey, to compute event-to-audio-completion at onResult
+  const eventAtByVoiceKeyRef = useRef<Map<string, string>>(new Map());
 
   // Initialize speech engine ONCE per restaurant
   useEffect(() => {
@@ -373,6 +375,17 @@ export function GlobalAnnouncementProvider({
           setLastAnnouncement(entry.text);
         },
         onResult(entry, outcome) {
+          // Latency: event-to-audio-completion measured here (only after actual playback via onend/onended)
+          const eventAt = eventAtByVoiceKeyRef.current.get(entry.key);
+          if (eventAt) {
+            const audioLatency = measureLatencyMs(eventAt, Date.now());
+            if (audioLatency >= 0) {
+              // Separate from event-to-notification (measured at claim time); this includes TTS fetch + playback
+              console.log(`[announcement] event-to-audio: ${audioLatency}ms for ${entry.key} status=${outcome.status}`);
+              if (audioLatency > 10000) console.warn(`[announcement] high audio latency: ${audioLatency}ms for ${entry.key}`);
+            }
+            eventAtByVoiceKeyRef.current.delete(entry.key);
+          }
           // For accurate audio confirmation: only 'completed' means audio playback finished
           // 'failed' means either synthesis failed OR playback failed
           if (outcome.status === 'completed') {
@@ -590,14 +603,15 @@ export function GlobalAnnouncementProvider({
           if (claimed) {
             // Only the winner speaks. Track to prevent local duplicates.
             spokenEventKeysRef.current.add(voiceKey);
+            // Track eventAt for event-to-audio latency (measured at onResult after playback)
+            eventAtByVoiceKeyRef.current.set(voiceKey, event.eventAt);
 
-            // Latency measurement
+            // Latency: event-to-notification (poll receipt + claim) — separate from event-to-audio
             const latency = measureLatencyMs(event.eventAt, Date.now());
             if (latency >= 0 && latency > 0) {
-              // Log latency for ops (visible in server logs via provider's onResult)
-              // We store in console for now; could send to analytics
+              console.log(`[announcement] event-to-notification: ${latency}ms for ${voiceKey}`);
               if (latency > 10000) {
-                console.warn(`[announcement] high latency: ${latency}ms for ${voiceKey}`);
+                console.warn(`[announcement] high notification latency: ${latency}ms for ${voiceKey}`);
               }
             }
 

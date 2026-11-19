@@ -67,6 +67,7 @@ import {
   type AnnouncementDialect,
 } from '@/lib/voice-personality';
 import { voiceLabel } from '@/lib/tts-voices';
+import { useInStaffShell } from '@/components/owner/StaffShell';
 
 /* The thresholds live next to the query that computes the age, so the badge
    and the board cannot disagree about what "late" means. */
@@ -292,6 +293,10 @@ export function Kitchen({
   signOut?: boolean;
 }) {
   const router = useRouter();
+  const inShell = useInStaffShell();
+  // When inside StaffShell, the global announcement provider handles all order+waiter announcements.
+  // Local announcement effects become NO-OP to prevent duplicate listeners/voice.
+  const useGlobalAnnouncements = inShell;
 
   const [audio, setAudio] = useState(true);
   const [speaksHere, setSpeaksHere] = useState(true);
@@ -879,9 +884,10 @@ export function Kitchen({
   }, [orders]);
 
   /* ------------------------------------------------------------ what to say */
-
+  // Delegated to GlobalAnnouncementProvider when inside StaffShell (prevents duplicate listeners).
+  // Keep priming for standalone/demo/test renders where there is no global provider.
   useEffect(() => {
-    if (!live) return;
+    if (!live || useGlobalAnnouncements) return;
 
     if (!primedRef.current) {
       primedRef.current = true;
@@ -1004,9 +1010,9 @@ export function Kitchen({
 
   }, [orders, live, restaurantId, speak, settled, voiceState, speakerState, changeMissed]);
 
-  /** One elected kitchen device claims and speaks each new table-service call. */
+  /** One elected kitchen device claims and speaks each new table-service call. Delegated to global provider inside StaffShell. */
   useEffect(() => {
-    if (!live || !restaurantId || !waiterCalls.length || !settled) return;
+    if (!live || !restaurantId || !waiterCalls.length || !settled || useGlobalAnnouncements) return;
     if (voiceState === 'starting' || speakerState === 'claiming') return;
     let cancelled = false;
 
