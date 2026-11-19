@@ -44,6 +44,8 @@ them are listed, so the count is not understated:
 
 | PR head | Deployment id |
 |---|---|
+| `e9b247d` | `FL8jz6dsh4gQrLzvnMBij8MDc2QH` |
+| `e3ad205` | `J3foh5XFqupMLUzoc7SbzdH6vUiY` |
 | `e90ab82` | `6pFExiBEDXx7kooBgt6Puu4ksNE4` |
 | `f75107a` | `7mcwf6HSBZ2DKpM2UVEwBKVWVhZL` |
 | `bc58a16` | `J9R1nrMpAJN29ofro5muLZytKubf` |
@@ -56,9 +58,12 @@ them are listed, so the count is not understated:
 | `18f0224` | `A4j8sSc4pZ9yUy32TUm21BunZxAA` |
 | `3924371` | `41MAowjmeo7PiCGprTXaj8ZGC7ff` |
 | `df6ac0d` | `CXKYpNogy1bKeUb2RYSRBB84ZLoo` |
+| `06a59c3` | `4TAHEGnLaWPaK286PXRN1SYfZbxr` |
+| `69d4b56` | `EnCuJMfCXYa82tgBt3XmmGEZomow` |
+| `bd53357` | `5PKPVD3UpECCJha6dMzRcpxGgbar` |
 
-**Twelve Previews**, one per pushed head, up to and including `df6ac0d` — the
-head this record describes. They all share the same Preview host — the
+**Seventeen Previews**, one per pushed head, up to and including `bd53357` —
+the head this record describes. They all share the same Preview host — the
 branch alias `new-git-arena-88c342c2-autodine-…`. **None** is a Production
 deployment, and **none** was created, promoted, redeployed or dispatched by
 this work: each is the Vercel GitHub App reacting to a push.
@@ -66,7 +71,7 @@ this work: each is the Vercel GitHub App reacting to a push.
 Each id is the `Vercel` commit status's target URL on that head, so the
 list is the app's own record rather than a reconstruction.
 
-**Any head pushed after `df6ac0d` produces one more Preview, by the same
+**Any head pushed after `bd53357` produces one more Preview, by the same
 mechanism.** This record names the heads it was captured against rather
 than claiming to list a Preview that the app has not created yet.
 
