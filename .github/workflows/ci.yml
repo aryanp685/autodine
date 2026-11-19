@@ -89,7 +89,13 @@ jobs:
       # re-runs the backup suites with an OLDER client stubbed in front
       # of PATH, so the runner checks its own independence.
       - name: Backup suites are independent of the host's PostgreSQL client
-        run: npm run test:client-independence
+        run: |
+          set -o pipefail
+          npm run test:client-independence 2>&1 | tee client-independence.log
+
+      - name: Surface client-independence failure as an annotation
+        if: failure()
+        run: node scripts/ci/print-error-annotation.mjs client-independence.log 3500
 
       - name: D2 ACL probe (disposable embedded PostgreSQL)
         run: npm run test:d2

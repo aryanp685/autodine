@@ -63,12 +63,15 @@ test('the backup tool really does pick the stub up when it is on PATH', () => {
   assert.equal(probe.stdout.trim(), '16', 'the stub must be the client the tool resolves');
 });
 
-test('the client-independence check itself passes', () => {
-  const run = spawnSync('npm', ['run', 'test:client-independence'], {
-    cwd: ROOT,
-    encoding: 'utf8',
-    maxBuffer: 64 * 1024 * 1024,
-  });
-  assert.equal(run.status, 0, `the client-independence check failed:\n${run.stdout ?? ''}${run.stderr ?? ''}`);
-  assert.match(`${run.stdout ?? ''}`, /passes with an older PostgreSQL client/);
+test('the client-independence check is wired to a script that exists', () => {
+  // The check itself is NOT run here: it runs `test:dr`, and this file
+  // is part of `test:dr`. Running it would re-enter the suite.
+  const check = path.join(ROOT, 'scripts', 'verify-client-independence.mjs');
+  assert.ok(readFileSync(check, 'utf8').length > 0, 'the check must exist');
+  const scripts = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')).scripts ?? {};
+  assert.match(
+    scripts['test:client-independence'] ?? '',
+    /verify-client-independence\.mjs/,
+    'the check must be reachable as an npm script, or the gate and the CI step cannot run it',
+  );
 });
