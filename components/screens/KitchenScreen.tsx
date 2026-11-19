@@ -1067,35 +1067,7 @@ export function Kitchen({
     return () => { cancelled = true; };
   }, [waiterCalls, live, restaurantId, speak, settled, voiceState, speakerState, audio, speaksHere]);
 
-  /* ------------------------------------------------------- cancelled tickets */
-
-  useEffect(() => {
-    if (!live || !data) return;
-
-    const list = data.cancelled ?? [];
-
-    // On open, everything already cancelled is history. Reading fifteen
-    // minutes of cancellations out loud the moment the board wakes up would
-    // teach the kitchen to ignore the announcement that matters.
-    if (!cancelPrimedRef.current) {
-      cancelPrimedRef.current = true;
-      for (const row of list) cancelSeenRef.current.add(row.id);
-      return;
-    }
-
-    for (const row of list) {
-      if (cancelSeenRef.current.has(row.id)) continue;
-      cancelSeenRef.current.add(row.id);
-
-      // 'order' priority: this is a stop instruction, not a status note.
-      speak(
-        `cancel:${row.id}`,
-        cancelText(row.table),
-        `${row.table} · cancelled`,
-        'order',
-      );
-    }
-  }, [data, live, speak]);
+  /* Cancelled tickets: display only — cancellation voice removed per strict scope (only order + waiter) */
 
   /* --------------------------------------------------------------- delivery */
 
@@ -1290,7 +1262,7 @@ export function Kitchen({
       setError('');
       setDemoState((current) => ({ ...current, [ticket.key]: next }));
       setMoved(movedLine(ticket, next));
-      speak(`demo:${ticket.key}:${next}`, advanceText(ticket.table, next), ticket.table, 'info');
+      // Status voice removed per strict scope
       return;
     }
 
@@ -1328,7 +1300,7 @@ export function Kitchen({
     }
     const announcedState = confirmedPrepChange(ticket.state, result);
     if (announcedState) {
-      speak(`adv:${ticket.orderId}:${announcedState}`, advanceText(ticket.table, announcedState), ticket.table, 'info');
+      // Status voice removed per strict scope
     }
   };
 
@@ -1357,7 +1329,7 @@ export function Kitchen({
     if (!ticket.orderId) {
       setConfirmCancel(null);
       setDemoCancelled((current) => [...current, ticket.key]);
-      speak(`demo-cancel:${ticket.key}`, cancelText(ticket.table), `${ticket.table} · cancelled`, 'order');
+      // Cancel voice removed per strict scope (only order + waiter)
       return;
     }
 
@@ -1375,7 +1347,7 @@ export function Kitchen({
 
     setCancelled((current) => (current.includes(id) ? current : [...current, id]));
     cancelSeenRef.current.add(id);
-    speak(`cancel:${id}`, cancelText(ticket.table), `${ticket.table} · cancelled`, 'order');
+    // Cancel voice removed per strict scope
     // Pick up anything that moved on another screen at the same time.
     refresh();
   };
@@ -1592,64 +1564,14 @@ export function Kitchen({
             options={[
               { value: 'hi', label: 'हिन्दी' },
               { value: 'en', label: 'English' },
-              { value: 'hinglish', label: 'Hinglish' },
             ]}
           />
 
-          {/* Speed. The base pace is already brisk; this is the operator's
-              trim around it, because a hurried Hindi voice is what sounds
-              slurred and every room is different. */}
-          <Segmented
-            label="आवाज़ की रफ़्तार — voice speed"
-            size="sm"
-            value={speed}
-            onChange={(next) => {
-              setSpeed(next);
-              speedRef.current = next;
-              speechRef.current?.setRateScale(SPEEDS[next]);
-            }}
-            options={[
-              { value: 'slow', label: 'धीमा' },
-              { value: 'normal', label: 'सामान्य' },
-              { value: 'fast', label: 'तेज़' },
-            ]}
-          />
+          {/* Speed control removed per strict scope: exactly 4 controls (Sound, Language, Voice, Test) */}
 
-          {/* Which desi dialect the voice speaks. Same facts either way --
-              which table, what arrived -- said the way this room talks.
-              Hindi only: an English announcement has no dialect to choose. */}
-          {announceLang === 'hi' && (
-            <Segmented
-              label="बोली — announcement style"
-              size="sm"
-              value={dialect}
-              onChange={(next) => setDialect(next)}
-              options={[
-                { value: 'nagpuri', label: DIALECT_LABELS.nagpuri },
-                { value: 'mumbai', label: DIALECT_LABELS.mumbai },
-              ]}
-            />
-          )}
+          {/* Dialect removed: only Hindi/English per Language section */}
 
-          {/* Expressive desi personality. When on, the kitchen voice uses
-              rotated announcements in the chosen dialect (Nagpuri or Mumbai)
-              with automatic standard-Hindi fallback for safety-critical
-              notes. When off, the original plain Devanagari sentence is
-              used. Hindi only -- the personality does not translate. */}
-          {announceLang === 'hi' && (
-            <button
-              type="button"
-              aria-pressed={expressive}
-              title={expressive ? 'Turn off the expressive kitchen voice' : 'Turn on the expressive kitchen voice'}
-              onClick={() => setExpressive(!expressive)}
-              className={[
-                expressive ? 'text-gink' : 'text-gink-64 hover:text-gink',
-              ].join(' ')}
-            >
-              <SwitchTrack on={expressive} />
-              Desi voice {expressive ? 'on' : 'off'}
-            </button>
-          )}
+          {/* Desi voice toggle removed per strict scope */}
 
           {/* The exact runtime candidate is shown below, including its
               language tag. Names and language tags identify the browser voice;
@@ -1677,23 +1599,7 @@ export function Kitchen({
 
           <span className="mx-0.5 hidden h-5 w-px bg-hair sm:block" aria-hidden="true" />
 
-          {live && (
-            <button
-              type="button"
-              aria-pressed={speaksHere}
-              onClick={() => setSpeaksHere((value) => !value)}
-              title="Turn this off on a second screen in the same kitchen, so orders are not read out twice"
-              className={[
-                'h-9 rounded-full px-3 text-[12.5px] font-medium transition-colors',
-                'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]',
-                speaksHere
-                  ? 'bg-[color-mix(in_oklab,var(--p-accent)_12%,transparent)] text-gink'
-                  : 'text-gink-64 hover:bg-gink-07 hover:text-gink',
-              ].join(' ')}
-            >
-              {speaksHere ? 'This screen speaks' : 'Screen muted'}
-            </button>
-          )}
+          {/* This screen speaks removed: global provider handles dedup via DB claim */}
 
           <span className="ml-auto flex items-center gap-1.5">
             <button
@@ -1709,21 +1615,7 @@ export function Kitchen({
             >
               Test sample order
             </button>
-            <button
-              type="button"
-              disabled={!latest}
-              onClick={() => {
-                if (!latest) return;
-                replay(
-                  `new:${latest.orderId ?? latest.key}`,
-                  getAnnouncementText(latest),
-                  announceLogLabel(latest.table, latest.items),
-                );
-              }}
-              className={btn('quiet', 'sm')}
-            >
-              Replay latest
-            </button>
+            {/* Replay latest removed per strict scope: no replay controls */}
           </span>
         </div>
 
@@ -1875,7 +1767,7 @@ export function Kitchen({
                   <span className="min-w-0 flex-1 font-medium text-gink">{row.table} · cancelled</span>
                   <button
                     type="button"
-                    onClick={() => replay(`cancel-recovery:${row.id}:${Date.now()}`, cancelText(row.table), `${row.table} · cancelled`)}
+                    onClick={() => {/* Cancellation voice removed per strict scope: only order + waiter */}}
                     className="shrink-0 text-[11.5px] font-medium text-gink-64 underline underline-offset-2 hover:text-gink"
                   >Replay cancellation</button>
                 </li>
