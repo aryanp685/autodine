@@ -5,6 +5,8 @@ import { PrintButton } from '@/components/PrintButton';
 import type { TablesScreenData, TableRow } from '@/lib/db/tables-screen';
 import {
   addTableAction,
+  deleteTableAction,
+  restoreQrAction,
   revokeQrAction,
   rotateQrAction,
   rotateVerificationCodeAction,
@@ -395,16 +397,23 @@ export function TablesScreen({
                           )}
 
                           {t.qr === 'no-code' && (
-                            /* The code is what is missing, so creating one is
-                               the primary action, not an afterthought behind
-                               "Regenerate". */
-                            <SubmitButton
-                              formAction={rotateQrAction}
-                              data-table-action="create"
-                              pendingLabel="Creating…"
-                            >
-                              Create code
-                            </SubmitButton>
+                            <>
+                              <SubmitButton
+                                formAction={rotateQrAction}
+                                data-table-action="create"
+                                pendingLabel="Creating…"
+                              >
+                                Create code
+                              </SubmitButton>
+                              <SubmitButton
+                                formAction={restoreQrAction}
+                                data-table-action="restore"
+                                tone="quiet"
+                                pendingLabel="Restoring…"
+                              >
+                                Restore previous
+                              </SubmitButton>
+                            </>
                           )}
 
                           {t.qr === 'disabled' && (
@@ -480,6 +489,16 @@ export function TablesScreen({
                               New code
                             </SubmitButton>
                           )}
+                          <ConfirmSubmit
+                            formAction={deleteTableAction}
+                            data-table-action="delete"
+                            tone="danger"
+                            question={`Delete ${t.code}? This removes the table${t.orders > 0 ? ' (archived if it has orders)' : ''}.`}
+                            confirmLabel={t.orders > 0 ? 'Archive it' : 'Delete it'}
+                            className="ml-auto"
+                          >
+                            Delete
+                          </ConfirmSubmit>
                         </form>
                       ) : (
                         /* No database, no controls: four dead buttons under

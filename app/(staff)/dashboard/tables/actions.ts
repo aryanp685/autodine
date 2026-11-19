@@ -236,3 +236,34 @@ export async function revokeQrAction(formData: FormData): Promise<void> {
     )}`
   );
 }
+
+export async function restoreQrAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to manage tables.');
+
+  const tableId = String(formData.get('tableId') ?? '').trim();
+  if (!tableId) fail('Missing table.');
+
+  const { error } = await ctx.supabase.rpc('restore_table_qr_code', { p_table_id: tableId });
+  if (error) fail(`Could not restore the code: ${error.message}`);
+
+  revalidatePath(TABLES_PATH);
+  redirect(`${TABLES_PATH}?notice=${encodeURIComponent('Previous code restored. Reprint the card if you had discarded it.')}`);
+}
+
+export async function deleteTableAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to manage tables.');
+
+  const tableId = String(formData.get('tableId') ?? '').trim();
+  if (!tableId) fail('Missing table.');
+
+  const { data, error } = await ctx.supabase.rpc('delete_table_safe', { p_table_id: tableId });
+  if (error) fail(`Could not delete table: ${error.message}`);
+
+  revalidatePath(TABLES_PATH);
+  const msg = data === 'archived'
+    ? 'Table archived — it has order history so it was disabled instead of deleted.'
+    : 'Table deleted.';
+  redirect(`${TABLES_PATH}?notice=${encodeURIComponent(msg)}`);
+}

@@ -986,6 +986,14 @@ export type Database = {
         Args: { p_table_id: string };
         Returns: undefined;
       };
+      restore_table_qr_code: {
+        Args: { p_table_id: string };
+        Returns: string;
+      };
+      delete_table_safe: {
+        Args: { p_table_id: string };
+        Returns: string;
+      };
       /**
        * Migration 0009. Sales aggregates for one restaurant and one range.
        *
