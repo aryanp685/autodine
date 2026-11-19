@@ -51,7 +51,8 @@ jobs:
       B2_BUCKET: ${{ secrets.B2_BUCKET }}
       B2_ACCESS_KEY_ID: ${{ secrets.B2_ACCESS_KEY_ID }}
       B2_SECRET_ACCESS_KEY: ${{ secrets.B2_SECRET_ACCESS_KEY }}
-      DRILL_DIR: ${{ runner.temp }}/restore-drill
+      # Relative to GITHUB_WORKSPACE; runner context is unavailable in job-level env.
+      DRILL_DIR: .restore-drill
     steps:
       - uses: actions/checkout@v7
 
@@ -130,8 +131,8 @@ jobs:
         with:
           name: restore-drill-${{ github.run_id }}
           path: |
-            ${{ runner.temp }}/restore-drill/download-report.json
-            ${{ runner.temp }}/restore-drill/restore-report.json
+            .restore-drill/download-report.json
+            .restore-drill/restore-report.json
           if-no-files-found: ignore
           retention-days: 35
 
