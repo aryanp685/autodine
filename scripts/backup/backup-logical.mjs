@@ -34,6 +34,7 @@ import path from 'node:path';
 import { encryptBuffer, sha256 } from './lib-crypto.mjs';
 import { dumpDatabase, openBackupSnapshot } from './lib-dump.mjs';
 import { backupSourceDecision } from './lib-backup-source.mjs';
+import { selectBackupMode } from './lib-backup-mode.mjs';
 import { resolvePgClient } from './lib-pg-client.mjs';
 
 const args = process.argv.slice(2);
@@ -87,10 +88,11 @@ try {
   // absolute path of the VERIFIED binary is used, so PATH cannot change
   // which client runs, and the version is re-checked at the moment of use.
   const pgDump = resolvePgClient('pg_dump');
-  if (opt['pg-dump'] === '1' && !pgDump) {
+  const mode = selectBackupMode(opt['pg-dump'], pgDump !== null);
+  if (mode === 'missing_client') {
     await fail('--pg-dump was requested but no PostgreSQL client is available');
   }
-  const usePgDump = opt['pg-dump'] === '1' || (opt['pg-dump'] === undefined && pgDump !== null);
+  const usePgDump = mode === 'pg_dump';
 
   if (usePgDump) {
     // Mode A: pg_dump custom format. Scoped to the same schema Mode B and the

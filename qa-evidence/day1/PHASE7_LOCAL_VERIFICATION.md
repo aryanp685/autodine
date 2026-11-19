@@ -30,7 +30,7 @@ and prints a verdict line. It never reports a skip as a pass.
 | 8 | `test:staging:guards` | Hosted-acceptance and staging guards | **PASS** (65/65) | 28.5s |
 | 9 | `test:staging:seed-demo-db` | Demo-seed isolation | **PASS** (1/1) | 1.8s |
 | 10 | `test:backup` | Backup pipeline selftest | **PASS** | 1.2s |
-| 11 | `test:dr` | Backup-file and DR objective verifiers | **PASS** (138/138) | 8.8s |
+| 11 | `test:dr` | Backup-file and DR objective verifiers | **PASS** (144/144) | 8.8s |
 | 12 | `test:d2` | D2 ACL probe | **PASS** (2/2) | 1.5s |
 | 13 | `test:db:integration` | PostgreSQL-gated integration suites | **PASS** (214/214) | 12.9s |
 | 14 | `test:db:logical-restore` | Logical restore drill | **PASS** | 2.6s |
@@ -136,7 +136,7 @@ launch gate depends on.
 | Suite | Status | Why |
 |---|---|---|
 | **Browser (Playwright)** | **BLOCKED — ENVIRONMENT** | Chromium is absent in this workspace and `cdn.playwright.dev` is unreachable. The suite **collects**: `npx playwright test --list` → **113 tests in 16 files**, so every spec parses and every project selector resolves. Runs in CI. Full record: `PHASE5_LOCAL_EVIDENCE.md` §2. |
-| **Mode A restore drill** (`ciCustomFormatDrill: "not-run-locally"`) | **BLOCKED — ENVIRONMENT** | The pure-SQL path (`test:db:logical-restore`) runs green locally. The **custom-format** path needs the `pg_dump`/`pg_restore` binaries; they are installed by the composite action in CI, not on this machine. The local drill says so in its own output rather than claiming the custom-format path ran. |
+| **Mode A restore drill** (`ciCustomFormatDrill: "not-run-here"`) | **BLOCKED — ENVIRONMENT** | The logical path (`test:db:logical-restore`) runs green locally. The **custom-format** path needs the `pg_dump`/`pg_restore` binaries; they are installed by the composite action in CI, not on this machine, and it is the CI `native-database` job (PG 15/17/18) that replays it. The drill says so in its own output rather than claiming the custom-format path ran — and it now takes the **logical** path on every machine, so what it verifies does not depend on which `pg_dump` the machine happens to have. |
 
 ---
 
@@ -173,13 +173,17 @@ owner decisions — `MASTER_BLOCKER_REGISTER.md` B2 and B10.
 $ npm run test:db:logical-restore
 LOCAL_LOGICAL_RESTORE_VERIFIED {"pgVersion":17,"migrations":101,"tables":48,
  "policies":59,"functions":164,"backupFormat":"autodine-logical-1",
- "productionBackupClaim":false,"ciCustomFormatDrill":"not-run-locally"}
+ "productionBackupClaim":false,"ciCustomFormatDrill":"not-run-here — the custom-format path is verified by the native-database job (PG 15/17/18)"}
 ```
 
 The drill replays the full 101-file chain into a disposable database and
 compares the fingerprints. `productionBackupClaim: false` means the run
 makes no claim about any Production backup, and `ciCustomFormatDrill` states
-plainly that the custom-format path did not run here.
+plainly that the custom-format path did not run here. The drill pins the
+logical path explicitly (`--pg-dump 0`), so it proves the same thing on every
+machine: with a system `pg_dump` on PATH it used to take the custom-format
+path instead while still reporting the logical format — and on a CI runner
+shipping a `pg_dump` too old for the server it failed outright.
 
 **A real defect was found and fixed by this phase.** The pure-SQL dump
 emitted every view before every function, and `CREATE VIEW` validates its

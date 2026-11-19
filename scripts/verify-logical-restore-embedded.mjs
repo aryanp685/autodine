@@ -8,10 +8,16 @@
  * recreate it with content, policies, RLS flags and function definitions
  * identical to the source. Exits non-zero on any mismatch.
  *
+ * The backup path is pinned with `--pg-dump 0`, so this drill proves the
+ * LOGICAL path on every machine. It used to depend on the machine: with
+ * a system pg_dump on PATH it took the custom-format path instead, so
+ * the same script verified different things locally and in CI while
+ * reporting the logical format either way.
+ *
  * What it does NOT prove:
- *   - the CI native-database job (custom-format pg_dump/pg_restore). There is
- *     no pg_dump/pg_restore in this environment, and the embedded PG ships
- *     only initdb/pg_ctl/postgres. That drill runs only in CI.
+ *   - the custom-format path (pg_dump/pg_restore). That is the CI
+ *     native-database job, which replays it against real PostgreSQL 15,
+ *     17 and 18.
  *   - anything about the hosted production database. No hosted target is
  *     involved at any point; the cluster is created and destroyed here.
  *   - application-level correctness after a restore (open a restored copy
@@ -91,14 +97,28 @@ const before = await fingerprint(urlFor(source), { schemas: ['public'] });
   console.log(`source fingerprint: ${before.snapshots.length} tables, ${before.policies.length} policies, ${before.functions.length} functions`);
 
   const outDir = path.join(scratch, 'backups');
-  execFileSync(process.execPath, ['scripts/backup/backup-logical.mjs', '--out-dir', outDir], {
+  // `--pg-dump 0` pins the LOGICAL path (Mode B) explicitly.
+  //
+  // This drill proves one thing: that the repository's own snapshot can
+  // dump the migrated schema and replay it identically. Whether it
+  // proved that depended on the machine it ran on — with a system
+  // pg_dump on PATH it silently took the custom-format path instead,
+  // so the same script verified different things locally and in CI, and
+  // reported the logical format either way. On a CI runner shipping a
+  // pg_dump too old for the server, it failed outright with
+  // "aborting because of server version mismatch".
+  //
+  // The custom-format path is verified where it belongs: the CI
+  // `native-database` job replays it with pg_dump/pg_restore against real
+  // PostgreSQL 15, 17 and 18. This drill is the logical one, so it says
+  // so.
+  execFileSync(process.execPath, ['scripts/backup/backup-logical.mjs', '--out-dir', outDir, '--pg-dump', '0'], {
     env: sh({ AUTODINE_BACKUP_SOURCE_URL: urlFor(source), AUTODINE_BACKUP_PASSPHRASE: 'local-drill-passphrase-not-secret-0123456789' }),
     stdio: ['ignore', 'inherit', 'inherit'],
   });
-  // Mode A (system pg_dump present, e.g. CI with PGDG 17) writes a
-  // .dump.enc custom-format artifact; Mode B (no pg_dump, e.g. local) writes
-  // .sql.gz.enc. Accept either; downstream restore picks the matching
-  // pg_restore/replay path from the suffix.
+  // Mode A (pg_dump custom format) writes a .dump.enc artifact; Mode B
+  // (the logical snapshot) writes .sql.gz.enc. Accept either; downstream
+  // restore picks the matching pg_restore/replay path from the suffix.
   const file = readdirSync(outDir).find((f) => f.endsWith('.sql.gz.enc') || f.endsWith('.dump.enc'));
   assert.ok(file, 'backup produced no .sql.gz.enc or .dump.enc artifact');
   const manifest = JSON.parse(readFileSync(path.join(outDir, file.replace(/\.(sql\.gz|dump)\.enc$/, '.manifest.json')), 'utf8'));
@@ -131,7 +151,7 @@ const before = await fingerprint(urlFor(source), { schemas: ['public'] });
     functions: before.functions.length,
     backupFormat: manifest.format,
     productionBackupClaim: false,
-    ciCustomFormatDrill: 'not-run-locally',
+    ciCustomFormatDrill: 'not-run-here — the custom-format path is verified by the native-database job (PG 15/17/18)',
   })}`);
   process.exitCode = 0;
 } catch (error) {
