@@ -218,14 +218,23 @@ node scripts/backup/upload-b2.mjs --file /mnt/backups/autodine/autodine-*.sql.gz
 node scripts/backup/upload-b2.mjs --file <artifact> --dry-run   # local integrity + config check, no network
 ```
 
-**Status (2026-11-16): NOT UPLOADED — no B2 credentials exist** in the repo,
-the operator environment, or any connected tool (checked by variable name /
-presence only). The exact remaining human action: create one private B2
-bucket and a bucket-scoped B2 application key (read/write), then place
-the four variables above in the backup host's secret store (or as the
-GitHub Actions secrets listed below). Cost at AutoDine's scale
-(< 5 GB stored): ≈ $0.01–0.04/month at $6.95/TB/month; the first 10 GB
-are free. **Local drill evidence
+**Current status: real B2 upload and hosted restore remain unverified.**
+The owner reports a bucket and a newly generated replacement key; the key's
+secure configuration, scope, and old-key revocation have not been verified.
+Do not regenerate the replacement unnecessarily or use the exposed old key.
+Use the staging-only Environment procedure in `operations/B2_OWNER_CHECKLIST.md`;
+do not populate scheduled-workflow repository secrets for a staging test.
+Confirm current account-specific pricing and authorize any chargeable action.
+
+Uploads are **not automatically retried**: an interrupted PUT may have
+committed remotely, and repeating it can create another billed B2 version.
+Artifact and manifest PUTs are separate, so a failure can leave a partial
+pair; treat the destination as unverified. An authorized operator must inspect
+the named objects and versions and plan recovery before retrying or deleting.
+Download reads have bounded retry. Neither mock failures nor a HEAD metadata
+check prove a real transfer or version-level idempotency.
+
+**Historical local drill evidence
 (2026-11-16, disposable embedded PostgreSQL, never hosted):** full-chain
 logical restore verified (93 migrations; 48 tables / 59 policies / 162
 functions; schema fingerprint identical); backup selftest ALL CHECKS PASS
@@ -234,7 +243,7 @@ a real artifact + manifest produced from a disposable cluster passed
 `upload-b2 --dry-run` SHA-256/manifest verification and correctly reported
 the four missing config names (B2_ENDPOINT|B2_REGION forms included); disposable cluster and artifacts destroyed
 afterwards. Hosted upload + hosted restore drill remain UNVERIFIED until
-credentials exist.
+the isolated, authorized rehearsal actually succeeds.
 
 ## Remote retention in B2 (implemented 2026-11-16; native lifecycle rules are NOT sufficient)
 
@@ -318,8 +327,14 @@ retention semantics, and none blocks the integrity gate above.
 Residual trust notes: a manifest `createdAt` inside its consistency
 bounds (parseable, not future, not after upload time) is still trusted
 for tier selection — manifests are not cryptographically signed; the
-hash/metadata gate proves the artifact is exactly what the manifest
-describes, and newest-backup protection bounds the blast radius.
+hash/metadata gate checks the artifact against the manifest but does not
+authenticate the manifest itself. An actor able to replace the sidecar can
+alter counts, financial expectations or retention timestamps without
+changing the encrypted artifact. Preserve a trusted, access-controlled
+copy of the original manifest and compare all fields before relying on a
+later restore or retention decision; same-run staging comparison is not a
+cryptographic signature or a substitute for that independent copy.
+Newest-backup protection bounds, but does not eliminate, the blast radius.
 Likewise, an object replaced between its pre-delete HEAD recheck and its
 DELETE (same-key overwrite by a credentialed writer inside that single
 round-trip) cannot be detected by the S3 API available here — S3 offers
@@ -350,7 +365,7 @@ For < 5 GB/month stored: **B2 or R2 ≈ $0.01–0.08/month**. No paid plan is to
 ## Key management
 
 - Passphrase: 20+ random chars from a password manager; never in git, env files committed anywhere, or chat. Rotate yearly; re-encrypt means "take a fresh backup".
-- The manifest is not secret (counts and timestamps only). The `.sql.gz.enc` file is.
+- Manifests contain operational and financial metadata; restrict access and retain a trusted independent copy. The encrypted backup is sensitive too.
 - Restore drills: quarterly; after any schema-migration incident; before declaring a new environment "production-ready".
 
 ## Alerting

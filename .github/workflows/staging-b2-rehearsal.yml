@@ -33,16 +33,6 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 12
-    env:
-      AUTODINE_BACKUP_SOURCE_URL: ${{ secrets.STAGING_AUTODINE_BACKUP_SOURCE_URL }}
-      AUTODINE_BACKUP_PASSPHRASE: ${{ secrets.STAGING_AUTODINE_BACKUP_PASSPHRASE }}
-      B2_REGION: ${{ secrets.STAGING_B2_REGION }}
-      B2_BUCKET: ${{ secrets.STAGING_B2_BUCKET }}
-      B2_ACCESS_KEY_ID: ${{ secrets.STAGING_B2_ACCESS_KEY_ID }}
-      B2_SECRET_ACCESS_KEY: ${{ secrets.STAGING_B2_SECRET_ACCESS_KEY }}
-      AUTODINE_STAGING_PROJECT_REF: ${{ vars.AUTODINE_STAGING_PROJECT_REF }}
-      AUTODINE_STAGING_B2_BUCKET: ${{ vars.AUTODINE_STAGING_B2_BUCKET }}
-      AUTODINE_RESTORE_TARGET_URL: postgresql://postgres:drill-${{ github.run_id }}@127.0.0.1:5432/drill
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -55,19 +45,39 @@ jobs:
           version: '17'
       - run: npm ci
       - name: Refuse undesignated source and bucket before connecting
+        env:
+          AUTODINE_BACKUP_SOURCE_URL: ${{ secrets.STAGING_AUTODINE_BACKUP_SOURCE_URL }}
+          B2_BUCKET: ${{ secrets.STAGING_B2_BUCKET }}
+          AUTODINE_STAGING_PROJECT_REF: ${{ vars.AUTODINE_STAGING_PROJECT_REF }}
+          AUTODINE_STAGING_B2_BUCKET: ${{ vars.AUTODINE_STAGING_B2_BUCKET }}
+          AUTODINE_PRODUCTION_B2_BUCKETS: ${{ vars.AUTODINE_PRODUCTION_B2_BUCKETS }}
+          STAGING_CREDENTIALS_PRESENT: ${{ secrets.STAGING_AUTODINE_BACKUP_PASSPHRASE != '' && secrets.STAGING_B2_REGION != '' && secrets.STAGING_B2_ACCESS_KEY_ID != '' && secrets.STAGING_B2_SECRET_ACCESS_KEY != '' }}
         run: |
-          for name in AUTODINE_BACKUP_SOURCE_URL AUTODINE_BACKUP_PASSPHRASE B2_REGION B2_BUCKET B2_ACCESS_KEY_ID B2_SECRET_ACCESS_KEY AUTODINE_STAGING_PROJECT_REF AUTODINE_STAGING_B2_BUCKET; do
-            if [ -z "${!name}" ]; then echo "::error::Missing required staging configuration name: $name"; exit 1; fi
-          done
+          if [ "$STAGING_CREDENTIALS_PRESENT" != 'true' ]; then echo '::error::Missing required staging credential configuration'; exit 1; fi
           node scripts/backup/validate-staging-source.mjs
       - name: Back up staging, verify locally and upload to B2
+        env:
+          AUTODINE_BACKUP_SOURCE_URL: ${{ secrets.STAGING_AUTODINE_BACKUP_SOURCE_URL }}
+          AUTODINE_BACKUP_PASSPHRASE: ${{ secrets.STAGING_AUTODINE_BACKUP_PASSPHRASE }}
+          B2_REGION: ${{ secrets.STAGING_B2_REGION }}
+          B2_BUCKET: ${{ secrets.STAGING_B2_BUCKET }}
+          B2_ACCESS_KEY_ID: ${{ secrets.STAGING_B2_ACCESS_KEY_ID }}
+          B2_SECRET_ACCESS_KEY: ${{ secrets.STAGING_B2_SECRET_ACCESS_KEY }}
         run: node scripts/backup/run-scheduled.mjs --out-dir "$RUNNER_TEMP/autodine-staging-backup" --rpo-minutes 1440 --b2
       - name: Download newest B2 artifact and verify integrity
+        env:
+          B2_REGION: ${{ secrets.STAGING_B2_REGION }}
+          B2_BUCKET: ${{ secrets.STAGING_B2_BUCKET }}
+          B2_ACCESS_KEY_ID: ${{ secrets.STAGING_B2_ACCESS_KEY_ID }}
+          B2_SECRET_ACCESS_KEY: ${{ secrets.STAGING_B2_SECRET_ACCESS_KEY }}
         run: |
           set -o pipefail
           mkdir -p "$RUNNER_TEMP/autodine-staging-download"
           node scripts/backup/download-b2.mjs --out-dir "$RUNNER_TEMP/autodine-staging-download" | tee "$RUNNER_TEMP/autodine-staging-download/download-report.json"
       - name: Restore and verify in disposable PostgreSQL
+        env:
+          AUTODINE_BACKUP_PASSPHRASE: ${{ secrets.STAGING_AUTODINE_BACKUP_PASSPHRASE }}
+          AUTODINE_RESTORE_TARGET_URL: postgresql://postgres:drill-${{ github.run_id }}@127.0.0.1:5432/drill
         run: |
           set -euo pipefail
           dir="$RUNNER_TEMP/autodine-staging-download"
@@ -77,7 +87,7 @@ jobs:
           manifest="$(printf '%s' "$artifact" | sed -E 's/\.(sql\.gz|dump)\.enc$/.manifest.json/')"
           mapfile -t source_manifests < <(find "$RUNNER_TEMP/autodine-staging-backup" -maxdepth 1 -type f -name '*.manifest.json')
           if [ "${#source_manifests[@]}" -ne 1 ]; then echo '::error::Expected exactly one newly produced manifest'; exit 1; fi
-          node -e 'const fs=require("fs"); const a=JSON.parse(fs.readFileSync(process.argv[1])); const b=JSON.parse(fs.readFileSync(process.argv[2])); if (a.file !== b.file || a.sha256 !== b.sha256) { console.error("download is not this run\x27s backup"); process.exit(1); }' "${source_manifests[0]}" "$manifest"
+          node scripts/backup/compare-rehearsal-manifests.mjs "${source_manifests[0]}" "$manifest"
           node scripts/backup/verify-backup-file.mjs "$artifact" --manifest "$manifest"
           node scripts/backup/prepare-disposable-restore.mjs --confirm-disposable
           start="$(date +%s)"

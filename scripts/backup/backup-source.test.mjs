@@ -128,10 +128,14 @@ test('the constant the rule is built on is the real transaction-pooler port', ()
 test('staging backup requires the designated non-production project and bucket', async () => {
   const { stagingSourceDecision } = await import('./validate-staging-source.mjs');
   const ref = 'abcdefghijklmnopqrst';
-  const base = { sourceUrl: `postgresql://postgres:secret@db.${ref}.supabase.co:5432/postgres`, expectedRef: ref, bucket: 'autodine-stage', expectedBucket: 'autodine-stage' };
+  const base = { sourceUrl: `postgresql://postgres:secret@db.${ref}.supabase.co:5432/postgres`, expectedRef: ref, bucket: 'autodine-stage', expectedBucket: 'autodine-stage', productionBucketsJson: '["autodine-production"]' };
   assert.equal(stagingSourceDecision(base).allowed, true);
+  assert.equal(stagingSourceDecision({ ...base, productionBucketsJson: '[]' }).allowed, true, 'an explicitly attested empty production inventory is accepted');
   for (const change of [
     { expectedRef: '' }, { expectedRef: 'aaaaaaaaaaaaaaaaaaaa' }, { expectedBucket: 'other-bucket' },
+    { productionBucketsJson: undefined }, { productionBucketsJson: '' }, { productionBucketsJson: '{}' },
+    { productionBucketsJson: '["AUTODINE-STAGE"]' }, { productionBucketsJson: '[1]' },
+    { bucket: 'x', expectedBucket: 'x' },
     { sourceUrl: `postgresql://postgres:secret@db.bdbaqpevwmgdvghszjno.supabase.co:5432/postgres`, expectedRef: 'bdbaqpevwmgdvghszjno' },
     { sourceUrl: `postgresql://postgres.${ref}:secret@aws-0-us-east-1.pooler.supabase.com:6543/postgres` },
     { sourceUrl: `${base.sourceUrl}?host=attacker.example` },
@@ -141,4 +145,20 @@ test('staging backup requires the designated non-production project and bucket',
     assert.equal(decision.allowed, false, JSON.stringify(change));
     assert.doesNotMatch(decision.reason, /secret|postgresql:\/\//);
   }
+});
+
+test('staging CLI refuses a production bucket before contact without printing source credentials', () => {
+  const result = spawnSync(process.execPath, [path.join(ROOT, 'scripts/backup/validate-staging-source.mjs')], {
+    encoding: 'utf8', env: {
+      ...process.env,
+      AUTODINE_BACKUP_SOURCE_URL: DIRECT,
+      AUTODINE_STAGING_PROJECT_REF: 'abcdefghijklmnopqrst',
+      B2_BUCKET: 'autodine-stage',
+      AUTODINE_STAGING_B2_BUCKET: 'autodine-stage',
+      AUTODINE_PRODUCTION_B2_BUCKETS: '["autodine-stage"]',
+    },
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /production bucket/);
+  assert.doesNotMatch(result.stderr, /secret|postgresql:\/\//);
 });

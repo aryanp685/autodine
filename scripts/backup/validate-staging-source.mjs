@@ -4,9 +4,21 @@ import { pathToFileURL } from 'node:url';
 import { backupSourceDecision } from './lib-backup-source.mjs';
 import { isLoopbackHost, projectRefOf, restoreTargetDecision } from './lib-restore-target.mjs';
 
-export function stagingSourceDecision({ sourceUrl, expectedRef, bucket, expectedBucket }) {
+export function stagingSourceDecision({ sourceUrl, expectedRef, bucket, expectedBucket, productionBucketsJson }) {
   if (!/^[a-z0-9]{20}$/.test(expectedRef ?? '')) return { allowed: false, reason: 'designated staging project ref missing or malformed' };
   if (!bucket || !expectedBucket || bucket !== expectedBucket) return { allowed: false, reason: 'staging bucket must match the separately designated bucket' };
+  // This list is an owner assertion, not an account discovery mechanism. An
+  // explicit [] is required when no production bucket exists; never infer it.
+  let productionBuckets;
+  try { productionBuckets = JSON.parse(productionBucketsJson); } catch { return { allowed: false, reason: 'production bucket inventory missing or malformed' }; }
+  const bucketName = /^[a-zA-Z0-9][a-zA-Z0-9.-]{5,49}$/;
+  if (!bucketName.test(bucket) || !Array.isArray(productionBuckets) ||
+      productionBuckets.some((name) => typeof name !== 'string' || !bucketName.test(name))) {
+    return { allowed: false, reason: 'production bucket inventory or staging bucket is invalid' };
+  }
+  if (productionBuckets.some((name) => name.toLowerCase() === bucket.toLowerCase())) {
+    return { allowed: false, reason: 'staging bucket matches a production bucket' };
+  }
   let url;
   try { url = new URL(sourceUrl); } catch { return { allowed: false, reason: 'invalid source URL' }; }
   if (isLoopbackHost(url.hostname)) return { allowed: false, reason: 'hosted staging source must be a designated Supabase project' };
@@ -23,6 +35,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     expectedRef: process.env.AUTODINE_STAGING_PROJECT_REF,
     bucket: process.env.B2_BUCKET,
     expectedBucket: process.env.AUTODINE_STAGING_B2_BUCKET,
+    productionBucketsJson: process.env.AUTODINE_PRODUCTION_B2_BUCKETS,
   });
   if (!result.allowed) { console.error(`staging backup: REFUSED: ${result.reason}`); process.exitCode = 1; }
   else console.log('staging backup: designated non-production source and staging bucket accepted');

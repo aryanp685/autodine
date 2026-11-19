@@ -105,14 +105,14 @@ try {
     'x-amz-meta-sha256': actualSha,
   });
   if (!put.ok) {
-    process.stderr.write(`upload-b2: PUT failed with HTTP ${put.status}; artifact NOT uploaded\n`);
+    process.stderr.write(`upload-b2: artifact PUT failed with HTTP ${put.status}; remote state is unverified\n`);
     process.exit(1);
   }
   if (manifest) {
     const manifestBody = Buffer.from(JSON.stringify(manifest, null, 2) + '\n');
     const putManifest = await signedFetch('PUT', manifestKey, manifestBody, { 'content-type': 'application/json' });
     if (!putManifest.ok) {
-      process.stderr.write(`upload-b2: manifest PUT failed with HTTP ${putManifest.status}; artifact uploaded but manifest missing — treat destination as unverified\n`);
+      process.stderr.write(`upload-b2: manifest PUT failed with HTTP ${putManifest.status}; remote pair is unverified and may be partial\n`);
       process.exit(1);
     }
   }

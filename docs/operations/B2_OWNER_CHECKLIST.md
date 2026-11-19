@@ -98,16 +98,29 @@ created a separate private staging B2 bucket, and approved secret changes:
    region, bucket, key ID and key-secret meanings described below, but use
    staging-only values. Enter values directly; never share them in chat.
 2. In that Environment's **variables**, enter `AUTODINE_STAGING_PROJECT_REF`
-   (the explicitly designated staging Supabase ref) and
-   `AUTODINE_STAGING_B2_BUCKET` (exact staging bucket name). The workflow
-   checks both matches, rejects known Production refs, loopback, connection
-   host/user overrides and transaction poolers. It never provisions the
-   source, verifies bucket privacy or assumes the owner has approved it.
+   (the explicitly designated staging Supabase ref),
+   `AUTODINE_STAGING_B2_BUCKET` (exact staging bucket name), and
+   `AUTODINE_PRODUCTION_B2_BUCKETS` (a JSON array containing **all** known
+   Production B2 bucket names, for example `["production-bucket"]`). Enter
+   `[]` only after the owner verifies that no Production B2 bucket exists.
+   The workflow rejects a match against this owner-supplied inventory as well
+   as known Production project refs, loopback, connection host/user overrides
+   and transaction poolers. The inventory is not independent discovery: an
+   incomplete or incorrect inventory cannot establish isolation. Verify the
+   bucket is separate, private and the key is restricted in Backblaze.
+   GitHub can resolve secrets and variables from broader scopes if an
+   Environment value is absent. Verify the `STAGING_*` names are not set at
+   repository/organization scope and the variables above have the intended
+   Environment values. Configure reviewers and allowed deployment branches;
+   workflow YAML cannot prove either protection or secret scope.
 3. After review and integration, request a separate explicit authorization to
    dispatch **Staging B2 backup and disposable restore**. This reads staging
    data and uploads to the private bucket, potentially incurring charges. The
-   workflow downloads the same run's artifact and compares manifest counts and
-   financial totals in disposable PostgreSQL. It does not establish a full row
+   workflow downloads the same run's artifact, checks that every downloaded
+   manifest field matches the local manifest, and compares manifest counts and
+   financial totals in disposable PostgreSQL. This same-run comparison does
+   not cryptographically authenticate a stored manifest for a later restore.
+   It does not establish a full row
    fingerprint, recover Auth/Storage, or demonstrate service RTO. Preserve
    report/run links and investigate mismatches; do not claim success if any
    stage or cleanup fails. Monitor B2 storage usage, including hidden versions.

@@ -212,14 +212,30 @@ test('staging rehearsal is manual, uses distinct protected-environment secrets, 
   assert.deepEqual(Object.keys(doc.on), ['workflow_dispatch']);
   const job = doc.jobs['staging-rehearsal'];
   assert.equal(job.environment, 'backup-staging');
-  for (const name of ['AUTODINE_BACKUP_SOURCE_URL', 'AUTODINE_BACKUP_PASSPHRASE', 'B2_REGION', 'B2_BUCKET', 'B2_ACCESS_KEY_ID', 'B2_SECRET_ACCESS_KEY']) {
-    assert.equal(job.env[name], '${{ secrets.STAGING_' + name + ' }}');
-  }
+  assert.deepEqual(doc.permissions, { contents: 'read' });
+  assert.equal(job.env, undefined, 'credentials must not be exposed to all job steps');
   const steps = job.steps;
+  const named = (name) => steps.find((step) => step.name === name);
+  const backupStep = named('Back up staging, verify locally and upload to B2');
+  const downloadStep = named('Download newest B2 artifact and verify integrity');
+  const restoreStep = named('Restore and verify in disposable PostgreSQL');
+  for (const name of ['AUTODINE_BACKUP_SOURCE_URL', 'AUTODINE_BACKUP_PASSPHRASE', 'B2_REGION', 'B2_BUCKET', 'B2_ACCESS_KEY_ID', 'B2_SECRET_ACCESS_KEY']) {
+    assert.equal(backupStep.env[name], '${{ secrets.STAGING_' + name + ' }}');
+  }
+  assert.deepEqual(Object.keys(downloadStep.env).sort(), ['B2_ACCESS_KEY_ID', 'B2_BUCKET', 'B2_REGION', 'B2_SECRET_ACCESS_KEY']);
+  assert.deepEqual(Object.keys(restoreStep.env).sort(), ['AUTODINE_BACKUP_PASSPHRASE', 'AUTODINE_RESTORE_TARGET_URL']);
+  assert.match(restoreStep.env.AUTODINE_RESTORE_TARGET_URL, /@127\.0\.0\.1:5432\/drill$/);
+  for (const step of steps.filter((s) => s.uses || s.name === 'Evidence summary' || s.name === 'Remove backup material')) {
+    assert.equal(step.env, undefined, `${step.name ?? step.uses} must not receive staging secrets`);
+  }
   const validate = steps.findIndex((s) => s.run?.includes('scripts/backup/validate-staging-source.mjs'));
   const backup = steps.findIndex((s) => s.run?.includes('scripts/backup/run-scheduled.mjs'));
   assert.ok(validate >= 0 && backup > validate);
+  assert.equal(steps[validate].env.AUTODINE_PRODUCTION_B2_BUCKETS, '${{ vars.AUTODINE_PRODUCTION_B2_BUCKETS }}');
   assert.doesNotMatch(steps[backup].run, /--prune-b2/);
+  const compare = restoreStep.run.indexOf('compare-rehearsal-manifests.mjs');
+  const restore = restoreStep.run.indexOf('restore-logical.mjs');
+  assert.ok(compare >= 0 && restore > compare);
   assert.ok(steps.some((s) => s.run?.includes('scripts/backup/verify-restored-db.mjs')));
   assert.ok(steps.some((s) => s.if === 'always()' && s.run?.includes('rm -rf')));
 });

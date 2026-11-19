@@ -50,15 +50,16 @@ try {
 } catch {
   fail(`manifest missing or unreadable: ${manifestPath}`);
 }
-if (manifest.file && path.basename(manifest.file) !== path.basename(file)) {
-  fail(`manifest names ${manifest.file}, not ${path.basename(file)}`);
+if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) fail('manifest is not an object');
+if (manifest.file !== path.basename(file)) {
+  fail('manifest does not name this artifact exactly');
 }
 const actualSha = sha256(bytes);
 if (manifest.sha256 !== actualSha) {
   fail('sha256 mismatch: the backup is not the bytes the manifest recorded');
 }
-if (typeof manifest.bytes === 'number' && manifest.bytes <= 0) {
-  fail('manifest records a zero-length payload');
+if (!Number.isSafeInteger(manifest.bytes) || manifest.bytes <= 0) {
+  fail('manifest has no positive integer payload length');
 }
 
 let plaintext;
@@ -75,6 +76,13 @@ const looksPgCustom = head.subarray(0, 5).equals(Buffer.from('PGDMP'));
 const looksSql = /^(--|create|set|begin|drop|alter|insert|comment|\/\*)/i.test(head.toString('utf8').replace(/^\uFEFF/, ''));
 if (!looksPgCustom && !looksSql) {
   fail('decrypted payload is not a recognisable dump (not SQL, not PGDMP)');
+}
+if (manifest.bytes !== plaintext.length) fail('manifest payload length does not match decrypted bytes');
+if (looksPgCustom && (manifest.format !== 'pg_dump-custom' || !file.endsWith('.dump.enc'))) {
+  fail('manifest format or filename does not match custom dump payload');
+}
+if (!looksPgCustom && (manifest.format !== 'autodine-logical-1' || !file.endsWith('.sql.gz.enc'))) {
+  fail('manifest format or filename does not match logical SQL payload');
 }
 
 const summary = {
