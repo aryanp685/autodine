@@ -309,6 +309,11 @@ reasoned about.
 
 The sequence-A result was then **tested end to end in an isolated worktree**
 at the integrated commit: typecheck, lint, DR 88/88, staging guards 35/35,
+
+   *(That was the figure at the time of that isolated-worktree run. The
+   current local figures, re-verified 2026-11-19, are in
+   `qa-evidence/day1/MASTER_EXECUTION_STATUS.md` and the
+   `MASTER_BLOCKER_REGISTER.md` closed table.)*
 the demo-seed PostgreSQL proof, the release verifier 28/28, the isolation
 self-test, and the full unit suite at 2,527 passed / 221 skipped / 0 failed.
 All four security guards were re-exercised there and all still refuse

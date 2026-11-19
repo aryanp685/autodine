@@ -106,3 +106,6 @@ tts-smoke-artifacts/
 !/docs/gst-irp-production-readiness-2026-11-14.md
 !/docs/external-services-readiness-2026-11-14.md
 !/docs/pitr-verification-procedure-2026-11-14.md
+
+# vitest JSON reporter output
+.vitest/
