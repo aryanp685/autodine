@@ -128,7 +128,7 @@ launch gate depends on.
 
 | Suite | Status | Why |
 |---|---|---|
-| **Browser (Playwright)** | **BLOCKED — ENVIRONMENT** | Chromium is absent and `cdn.playwright.dev` is unreachable. The suite **collects**: `npx playwright test --list` → **113 tests in 16 files**, so every spec parses and every project selector resolves. Runs in CI. Full record: `PHASE5_LOCAL_EVIDENCE.md` §2. |
+| **Browser (Playwright)** | **BLOCKED — ENVIRONMENT** | Chromium is absent in this workspace and `cdn.playwright.dev` is unreachable. The suite **collects**: `npx playwright test --list` → **113 tests in 16 files**, so every spec parses and every project selector resolves. Runs in CI. Full record: `PHASE5_LOCAL_EVIDENCE.md` §2. |
 | **Mode A restore drill** (`ciCustomFormatDrill: "not-run-locally"`) | **BLOCKED — ENVIRONMENT** | The pure-SQL path (`test:db:logical-restore`) runs green locally. The **custom-format** path needs the `pg_dump`/`pg_restore` binaries; they are installed by the composite action in CI, not on this machine. The local drill says so in its own output rather than claiming the custom-format path ran. |
 
 ---
@@ -144,10 +144,17 @@ $ npm run migrations:verify
 and the deployed anchors present and hashable. Reconciled against the Batch
 2 conflict report merged in PR #193
 (`qa-evidence/day1/MIGRATION_CONFLICT_RESOLUTION_BATCH2.md` — present on
-`origin/main`, not yet in this branch): that report
+`main`, not yet in this branch): that report
 finds **no literal same-version file collision**, and confirms that
 `20261112000400` → `20261112000600` → `20261114000100` is the correct
 ordered history, so no combined function body is required.
+
+That citation is checked, not assumed: the drift guard resolves every path
+this record names against the working tree and against every ref the clone
+holds, and the CI job fetches `main`'s tip so its shallow checkout verifies
+the same paths this run does. If neither the working tree nor a known ref
+holds a cited path, the guard fails — it never reports a missing file as
+present.
 
 **No collision was resolved and no migration was applied.** Those remain
 owner decisions — `MASTER_BLOCKER_REGISTER.md` B2 and B10.

@@ -45,6 +45,16 @@ jobs:
       - name: Preview/production isolation self-test
         run: npm run isolation:verify
 
+      # The evidence guards verify the records' cross-branch citations —
+      # files that are merged into `main` but not yet into this branch.
+      # `actions/checkout` fetches one commit by default, so the runner has
+      # no `origin/main` and the guard cannot verify them. This fetches
+      # main's tip: read-only, one commit, the checkout's own credentials.
+      # The guard asserts that this step exists, so the dependency is
+      # stated in code rather than living in a runner's configuration.
+      - name: Fetch main for the evidence guards' cross-branch citations
+        run: git fetch --no-tags --depth=1 "https://github.com/${{ github.repository }}.git" main:refs/remotes/origin/main
+
       - name: Hosted-acceptance and staging guards (offline)
         run: npm run test:staging:guards
 

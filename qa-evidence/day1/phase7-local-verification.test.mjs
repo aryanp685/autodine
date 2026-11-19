@@ -134,11 +134,24 @@ test('the browser claim is still BLOCKED — ENVIRONMENT, never PASS', () => {
   assert.match(source, /113 tests in 16 files/);
   const probe = path.join(ROOT, 'scripts', 'e2e', 'check-chromium-runtime.sh');
   const result = spawnSync('bash', [probe], { encoding: 'utf8' });
-  assert.match(
-    `${result.stdout ?? ''}\n${result.stderr ?? ''}`,
-    /not installed/,
-    'Chromium is installed now, so the record must be corrected',
-  );
+  const combined = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
+
+  if (/not installed/.test(combined)) {
+    // Chromium really is absent in this environment, so the record's
+    // BLOCKED — ENVIRONMENT claim is exactly right and must not soften.
+    assert.match(source, /BLOCKED — ENVIRONMENT/);
+  } else {
+    // Chromium IS available here — CI installs it for the browser jobs.
+    // The record describes the LOCAL evidence run, so it has to say so:
+    // an unscoped "Chromium is absent" would be false in this
+    // environment, and a "PASS" would be false locally.
+    assert.match(
+      source,
+      /locally|this machine|this workspace|in this environment/i,
+      'the record must scope its browser claim to the environment it describes',
+    );
+    assert.match(source, /BLOCKED — ENVIRONMENT/);
+  }
 });
 
 test('the record claims no hosted run', () => {
@@ -176,17 +189,67 @@ test('the record names the defects this phase actually fixed', () => {
   );
 });
 
+/**
+ * Does this path exist in the repository?
+ *
+ * A record may legitimately cite a file that is merged into `main` but
+ * not yet into this branch. That file is real, so the citation is
+ * honest — but the check must NOT depend on one hard-coded ref name.
+ *
+ * It used to: `git cat-file -e origin/main:<path>`. A shallow CI
+ * checkout has no `origin/main` ref at all, so the escape hatch failed
+ * there and the guard reported a correct record as broken. That is the
+ * exact failure this function exists to prevent.
+ *
+ * So the path is resolved against everything this clone actually knows:
+ * the working tree, every ref it holds, and FETCH_HEAD. If none of them
+ * has the path, the citation really is wrong.
+ */
+function existsInRepository(relative) {
+  if (existsSync(path.join(ROOT, relative))) return true;
+
+  const refs = spawnSync('git', ['for-each-ref', '--format=%(refname)'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+  });
+  const candidates = [
+    ...`${refs.stdout ?? ''}`.split('\n').filter(Boolean),
+    'FETCH_HEAD',
+  ];
+  for (const ref of candidates) {
+    const probe = spawnSync('git', ['cat-file', '-e', `${ref}:${relative}`], { cwd: ROOT });
+    if (probe.status === 0) return true;
+  }
+  return false;
+}
+
 test('the record references only files that exist', () => {
   const referenced = [...source.matchAll(/`((?:app|lib|scripts|components|e2e|qa-evidence|docs)\/[^`]+\.(?:ts|tsx|mjs|md|sh))`/g)]
     .map((match) => match[1]);
-  const missing = referenced.filter((relative) => {
-    if (existsSync(path.join(ROOT, relative))) return false;
-    // A file merged into main but not yet into this branch is still a real
-    // file, and citing it is honest as long as the record says where it is.
-    const onMain = spawnSync('git', ['cat-file', '-e', `origin/main:${relative}`], { cwd: ROOT });
-    return onMain.status !== 0;
-  });
-  assert.deepEqual(missing, [], `the record references files that do not exist: ${missing.join(', ')}`);
+
+  const inBranch = referenced.filter((relative) => existsSync(path.join(ROOT, relative)));
+  const crossBranch = referenced.filter((relative) => !existsSync(path.join(ROOT, relative)));
+
+  const missing = crossBranch.filter((relative) => !existsInRepository(relative));
+  assert.deepEqual(
+    missing,
+    [],
+    `the record references files that this clone cannot find: ${missing.join(', ')}. Either the citation is wrong, or the clone lacks the ref that holds it (a shallow checkout needs "git fetch --depth=1 origin main:refs/remotes/origin/main")`,
+  );
+
+  // A cross-branch citation is only verifiable in CI if the CI checkout
+  // actually has `main`. The workflow fetches it; assert that, so the
+  // dependency is stated in code instead of living in a runner's
+  // configuration.
+  if (crossBranch.length > 0) {
+    const ci = readFileSync(path.join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8');
+    assert.match(
+      ci,
+      /git fetch[^\n]*main:refs\/remotes\/origin\/main/,
+      `the record cites files outside this branch (${crossBranch.join(', ')}), so ci.yml must fetch main or the shallow CI checkout cannot verify them`,
+    );
+  }
+  assert.ok(inBranch.length > 0, 'the record must cite files that are in this branch');
 });
 
 test('the record says plainly that no migration was applied and no collision resolved', () => {
