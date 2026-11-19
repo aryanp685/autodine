@@ -50,14 +50,14 @@ export function ResetPasswordScreen({ email, error }: { email: string | null; er
         action={{ prompt: 'Changed your mind?', label: 'Sign in', href: '/login' }}
         notesTitle="Why links expire"
         notes={[
-          <>
+          <span key="expiry">
             <strong>A link is a password in a mailbox.</strong> A short life and a single use keep
             an old email from being a way back into the account months later.
-          </>,
-          <>
+          </span>,
+          <span key="device">
             <strong>A link asked for on another device will not open here.</strong> Ask for a new
             one from this browser.
-          </>,
+          </span>,
         ]}
       >
         {alert}
@@ -87,12 +87,12 @@ export function ResetPasswordScreen({ email, error }: { email: string | null; er
       action={{ prompt: 'Changed your mind?', label: 'Sign in', href: '/login' }}
       notesTitle="Before you save"
       notes={[
-        <>
+        <span key="sessions">
           <strong>Other sessions will end.</strong> If this account is used on a counter or kitchen device, let your team know before saving.
-        </>,
-        <>
+        </span>,
+        <span key="unique">
           <strong>Use a unique password.</strong> Choose a long passphrase or a password-manager-generated password that you do not use for another account.
-        </>,
+        </span>,
       ]}
     >
       {alert}

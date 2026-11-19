@@ -47,15 +47,15 @@ export function SignupConfirmationPendingScreen({
       action={{ prompt: 'Already confirmed?', label: 'Sign in', href: '/login' }}
       notesTitle="If the link does not work"
       notes={[
-        <>
+        <span key="expired">
           <strong>Expired or already used?</strong> Request another confirmation below, then open the new link in the browser where you made the request.
-        </>,
-        <>
+        </span>,
+        <span key="confirmed">
           <strong>Already confirmed?</strong> Return to sign in. This page does not reveal whether an address has an account.
-        </>,
-        <>
+        </span>,
+        <span key="waiting">
           <strong>Still waiting?</strong> Check spam or junk. Auth may apply a sending cooldown; wait a few minutes before requesting again.
-        </>,
+        </span>,
       ]}
     >
       {linkProblem ? (

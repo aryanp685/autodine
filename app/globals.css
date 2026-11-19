@@ -1413,25 +1413,9 @@ p { margin: 0; }
 [data-auth-shell] [role='alert'], [data-auth-shell] [role='status'],
 [data-auth-shell] [data-auth-notes] { overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: no-preference) {
-  [data-auth-card] { animation: auth-enter 650ms cubic-bezier(.2,.65,.3,1) both; }
-  [data-auth-notes] { animation: auth-enter 700ms 100ms cubic-bezier(.2,.65,.3,1) both; }
   [data-auth-shell] input, [data-auth-shell] a, [data-auth-shell] button {
     transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease, transform 180ms ease;
   }
   [data-auth-shell] button[type='submit']:hover { transform: translateY(-1px); }
   [data-auth-shell] button[type='submit']:active { transform: translateY(1px); }
-  @keyframes auth-enter {
-    from { opacity: 0; transform: translateY(14px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-}
-
-/* Login-only polish: content is visible before animation, and without JS. */
-@media (prefers-reduced-motion: no-preference) {
-  [data-auth-enhanced] [data-auth-card] { animation: login-arrive 650ms cubic-bezier(.22,1,.36,1) both; }
-  [data-auth-enhanced] .login-service-node { animation: login-arrive 800ms cubic-bezier(.22,1,.36,1) both; }
-}
-@keyframes login-arrive {
-  from { opacity: .45; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
 }

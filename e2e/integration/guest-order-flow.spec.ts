@@ -121,8 +121,11 @@ test.describe('guest ordering — real database', () => {
     // handle is required, so this runs unchanged on the hosted deployment.
     const dashboard = await signInOwner(context);
     await dashboard.goto(`${BASE}/dashboard`);
+    // Scope to the live app root: a suspended server render can leave a hidden
+    // streamed copy of the same section outside [data-app], and only the
+    // revealed copy is what a person actually sees.
     const session = dashboard
-      .locator('[data-active-session]')
+      .locator('[data-app] [data-active-session]')
       .filter({ hasText: firstCode })
       .filter({ hasText: secondCode });
     await expect(session).toBeVisible({ timeout: 45_000 });

@@ -49,7 +49,7 @@ test.describe('security — real database', () => {
     const page = await context.newPage();
     await page.goto(`${BASE}/login`);
     await page.getByLabel('Work email').fill(OWNER_EMAIL);
-    await page.getByLabel('Password').fill('definitely-not-the-password');
+    await page.getByLabel('Password', { exact: true }).fill('definitely-not-the-password');
     await page.getByRole('button', { name: 'Sign in' }).click();
 
     await expect(page.locator('#app-rail')).toHaveCount(0, { timeout: 15_000 });
@@ -66,7 +66,7 @@ test.describe('security — real database', () => {
     const till = await context.newPage();
     await till.goto(`${BASE}/login`);
     await till.getByLabel('Work email').fill(OWNER_EMAIL);
-    await till.getByLabel('Password').fill(OWNER_PASSWORD);
+    await till.getByLabel('Password', { exact: true }).fill(OWNER_PASSWORD);
     await till.getByRole('button', { name: 'Sign in' }).click();
     await expect(till.locator('#app-rail')).toBeVisible({ timeout: 20_000 });
 
