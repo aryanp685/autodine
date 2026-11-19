@@ -63,7 +63,8 @@ export default async function CheckoutPage({
           tableLabel={access.tableLabel}
           windowMinutes={Math.max(1, Math.round(access.windowSeconds / 60))}
           items={data?.items ?? []}
-          taxRateBps={data?.taxRateBps}
+          taxRateBps={data?.gst.rateBps ?? undefined}
+          gstMode={data?.gst.mode}
         />
       </CartProvider>
     );
@@ -76,7 +77,8 @@ export default async function CheckoutPage({
         slug={s}
         restaurantName={data?.restaurantName ?? (isSupabaseConfigured ? undefined : demoRestaurant.name)}
         tableLabel={access.status === 'verified' ? access.tableLabel : null}
-        taxRateBps={data?.taxRateBps}
+        taxRateBps={data?.gst.rateBps ?? undefined}
+        gstMode={data?.gst.mode}
         // With no database at all, the demo menu is the menu. On a configured
         // deployment an unresolved restaurant still gets no prices at all --
         // prices that came from nowhere are worse than none.

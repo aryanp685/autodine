@@ -1,4 +1,4 @@
-import { computeOrderTotals, type OrderTotals } from './pricing';
+import { computeOrderTotals, type GstQuote, type OrderTotals } from './pricing';
 import type { Paise } from './money';
 import type { StoredLine } from './cart-storage';
 
@@ -154,8 +154,10 @@ export function resolveAddons(
 export function priceCart(
   stored: StoredLine[],
   items: MenuItemPrice[],
-  taxRateBps?: number
+  gst?: GstQuote | number
 ): PricedCart {
+  const quote: GstQuote | undefined =
+    typeof gst === 'number' ? { mode: 'off', rateBps: gst } : gst;
   const byId = new Map(items.map((i) => [i.id, i]));
 
   const lines: PricedLine[] = [];
@@ -227,7 +229,8 @@ export function priceCart(
 
   const totals = computeOrderTotals({
     lines: lines.map((l) => ({ unitPricePaise: l.unitPricePaise, qty: l.qty })),
-    ...(taxRateBps === undefined ? {} : { taxRateBps }),
+    ...(quote?.mode ? { mode: quote.mode } : {}),
+    ...(quote?.rateBps == null ? {} : { taxRateBps: quote.rateBps }),
   });
 
   return {

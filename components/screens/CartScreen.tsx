@@ -11,36 +11,69 @@ import { inr } from '@/lib/demo-data';
 import { VegMark } from '@/components/ui';
 import { paiseToRupees } from '@/lib/money';
 import { priceCart, type MenuItemPrice } from '@/lib/cart-pricing';
-import { gstLabel } from '@/lib/pricing';
+import { gstLabel, type GstMode } from '@/lib/pricing';
 
-function Totals({ subtotalPaise, taxPaise, totalPaise, taxRateBps, compact }: {
+function Totals({ subtotalPaise, taxablePaise, taxPaise, totalPaise, taxRateBps, mode = 'off', compact }: {
   subtotalPaise: number;
+  taxablePaise: number;
   taxPaise: number;
   totalPaise: number;
   /** The restaurant's own rate; absent means the bill is priced at a sample. */
   taxRateBps?: number;
+  /** Which approved GST mode priced this bill. */
+  mode?: GstMode;
   compact?: boolean;
 }) {
+  const regular = mode === 'regular';
+  const composition = mode === 'composition';
+
   return (
     <dl className={compact ? 'text-[13px]' : 'text-[14px]'}>
-      <div className="flex items-baseline justify-between py-1.5 text-gink-64">
-        <dt>Subtotal</dt>
-        <dd className="tnum">{inr(paiseToRupees(subtotalPaise))}</dd>
-      </div>
-      <div className="flex items-baseline justify-between py-1.5 text-gink-64">
-        <dt>{taxRateBps == null ? 'Taxes' : `Taxes (${gstLabel(taxRateBps)})`}</dt>
-        <dd className="tnum">{inr(paiseToRupees(taxPaise))}</dd>
-      </div>
+      {regular ? (
+        <>
+          <div className="flex items-baseline justify-between py-1.5 text-gink-64">
+            <dt>Taxable value</dt>
+            <dd className="tnum">{inr(paiseToRupees(taxablePaise))}</dd>
+          </div>
+          <div className="flex items-baseline justify-between py-1.5 text-gink-64">
+            <dt>{gstLabel(taxRateBps)} included</dt>
+            <dd className="tnum">{inr(paiseToRupees(taxPaise))}</dd>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="flex items-baseline justify-between py-1.5 text-gink-64">
+            <dt>Subtotal</dt>
+            <dd className="tnum">{inr(paiseToRupees(subtotalPaise))}</dd>
+          </div>
+          <div className="flex items-baseline justify-between py-1.5 text-gink-64">
+            <dt>{composition ? 'GST' : taxRateBps == null ? 'Taxes' : `Taxes (${gstLabel(taxRateBps)})`}</dt>
+            <dd className="tnum">
+              {composition ? 'Not charged' : inr(paiseToRupees(taxPaise))}
+            </dd>
+          </div>
+        </>
+      )}
       <div className="mt-1.5 flex items-baseline justify-between border-t border-hair pt-2.5 text-[16px] font-semibold text-gink">
         <dt>Total</dt>
         <dd className="tnum">{inr(paiseToRupees(totalPaise))}</dd>
       </div>
+      {regular && (
+        <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
+          Menu prices include GST. The GST shown is already part of the total, not added on top.
+        </p>
+      )}
+      {composition && (
+        <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
+          Composition scheme: the restaurant issues a Bill of Supply and does not charge GST.
+        </p>
+      )}
       {/* Only when there is no restaurant rate to price against. This note
           used to render for every guest, including one sitting in a real
           restaurant with a real GST rate, and told them the tax they were
           about to pay was a layout sample. On a demo it is true and worth
           saying; on a live menu it is a lie about someone's bill. */}
-      {taxRateBps === undefined && (
+      {!regular && !composition && taxRateBps === undefined && (
         <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
           This menu has no tax rate configured, so the tax above is a sample for layout review rather than a
           rate the restaurant set.
@@ -65,6 +98,7 @@ export function Cart({
   restaurantName,
   tableLabel,
   taxRateBps,
+  gstMode = 'off',
   items,
   placedError,
   placedErrorCode,
@@ -77,6 +111,8 @@ export function Cart({
   tableLabel?: string | null;
   /** The restaurant's own rate. Without it the bill is priced at a sample. */
   taxRateBps?: number;
+  /** The approved GST mode the order RPC will use. Defaults to GST off. */
+  gstMode?: GstMode;
   /**
    * The guest scanned a live card but has not entered the on-site code yet.
    * Said here, once, so the code at checkout is expected rather than a
@@ -110,8 +146,12 @@ export function Cart({
   const motionOn = !reduce;
 
   const withSlug = (path: string) => (slug ? `${path}?s=${encodeURIComponent(slug)}` : path);
-  const priced = priceCart(cart.lines, items, taxRateBps);
-  const { subtotalPaise, taxPaise, totalPaise } = priced.totals;
+  const priced = priceCart(
+    cart.lines,
+    items,
+    gstMode === 'off' ? taxRateBps : { mode: gstMode, rateBps: taxRateBps ?? null }
+  );
+  const { subtotalPaise, taxablePaise, taxPaise, totalPaise } = priced.totals;
 
   const dropped = priced.missingIds.length + priced.unavailableIds.length;
 
@@ -481,9 +521,11 @@ export function Cart({
           <h2 className="g-eyebrow mb-1">Bill summary</h2>
           <Totals
             subtotalPaise={subtotalPaise}
+            taxablePaise={taxablePaise}
             taxPaise={taxPaise}
             totalPaise={totalPaise}
             taxRateBps={taxRateBps}
+            mode={gstMode}
           />
           <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
             Prices are read from the kitchen&rsquo;s menu when you order, so the total you are
