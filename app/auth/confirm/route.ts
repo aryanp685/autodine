@@ -33,6 +33,33 @@ import {
 import { PENDING_SIGNUP_EMAIL_COOKIE } from '@/lib/signup-confirmation';
 import { safeLocalPath } from '@/lib/safe-next-path';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { formatIncidentLogLine } from '@/lib/monitoring-incidents';
+import { operationalIncidents } from '@/lib/incident-registry';
+
+/**
+ * Report a link exchange that never got an answer from Auth.
+ *
+ * The visitor sees a page they can act on, and an operator sees a countable
+ * incident. Without this, a dropped connection to Auth turned every
+ * confirmation and reset link into a raw 500 — the silent failure the
+ * incident tracker exists to prevent, on the one path where the person has
+ * already committed to a password reset.
+ *
+ * Fixed vocabulary, no address, no code, no provider text.
+ */
+function reportLinkFailure(kind: 'auth_link_exchange_failed'): void {
+  try {
+    const { record, outcome } = operationalIncidents.report({
+      key: kind,
+      kind,
+      severity: 'warning',
+      summary: 'An emailed auth link could not be exchanged with Auth (transport failure)',
+    });
+    console.warn(formatIncidentLogLine(outcome, record));
+  } catch {
+    // Reporting must never change what the visitor sees.
+  }
+}
 
 /** Only same-origin paths, so a crafted link cannot bounce someone off-site.
  *  Shared floor: lib/safe-next-path.ts (rejects encoded and backslash forms). */
@@ -122,7 +149,14 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const supabase = await createSupabaseServerClient();
+  let supabase: Awaited<ReturnType<typeof createSupabaseServerClient>> = null;
+  try {
+    supabase = await createSupabaseServerClient();
+  } catch {
+    reportLinkFailure('auth_link_exchange_failed');
+    if (isOwnerSignupConfirmation) return signupLinkProblem(request);
+    return back(request, '/login', 'error', 'We could not check that link just now. Please try again in a few minutes.');
+  }
   if (!supabase) {
     if (isOwnerSignupConfirmation) return signupLinkProblem(request);
     return back(request, '/login', 'error', 'Sign-in is not available yet: the database is not connected.');
@@ -130,9 +164,24 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     const flowId = params.get('sb_flow_id');
-    const exchange = flowId
-      ? await supabase.auth.exchangeCodeForSession(code, { flowId })
-      : await supabase.auth.exchangeCodeForSession(code);
+    let exchange: { error: { status?: number; code?: string; message?: string } | null };
+    try {
+      exchange = flowId
+        ? await supabase.auth.exchangeCodeForSession(code, { flowId })
+        : await supabase.auth.exchangeCodeForSession(code);
+    } catch {
+      // Auth never answered. Say the link did not work, so the person asks
+      // for a new one, and raise an incident so an operator can see that
+      // the Auth endpoint is unreachable.
+      reportLinkFailure('auth_link_exchange_failed');
+      if (isOwnerSignupConfirmation) return signupLinkProblem(request);
+      return back(
+        request,
+        '/forgot-password',
+        'error',
+        'We could not check that link just now. Please try again in a few minutes.',
+      );
+    }
     const { error } = exchange;
     if (error) {
       console.error('[autodine] auth link exchange failed', {
@@ -160,7 +209,22 @@ export async function GET(request: NextRequest) {
   }
 
   if (tokenHash && type && TYPES.includes(type)) {
-    const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: type as EmailOtpType });
+    let verified: { error: { status?: number; code?: string; message?: string } | null };
+    try {
+      verified = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: type as EmailOtpType });
+    } catch {
+      // Same as the PKCE path: Auth never answered, so the link could not
+      // be checked. Do not tell the person their link expired — it did not.
+      reportLinkFailure('auth_link_exchange_failed');
+      if (isOwnerSignupConfirmation) return signupLinkProblem(request);
+      return back(
+        request,
+        '/forgot-password',
+        'error',
+        'We could not check that link just now. Please try again in a few minutes.',
+      );
+    }
+    const { error } = verified;
     if (error) {
       console.error('[autodine] auth token verification failed', {
         status: error.status ?? null,

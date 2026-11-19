@@ -147,6 +147,55 @@ describe('GET /auth/confirm', () => {
     expect(response.headers.get('location')).toBe('https://autodine.example/dashboard');
   });
 
+  it('turns an unreachable Auth during a PKCE exchange into a page, not a raw 500', async () => {
+    // A dropped connection to Auth must not escape the route handler: the
+    // person gets a page they can act on, and an operator gets an incident.
+    mocks.exchangeCodeForSession.mockRejectedValueOnce(new TypeError('fetch failed'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const response = await GET(request('?code=abc&flow=signup'));
+      expect(response.status).toBe(307);
+      const location = response.headers.get('location') ?? '';
+      // It must not claim the link expired — it was never checked.
+      expect(location).not.toContain('expired');
+      const alert = warn.mock.calls.map((call) => String(call[0])).join(' ');
+      expect(alert).toContain('auth_link_exchange_failed');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('turns an unreachable Auth during a token-hash verification into a page, not a raw 500', async () => {
+    mocks.verifyOtp.mockRejectedValueOnce(new TypeError('fetch failed'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const response = await GET(request('?token_hash=hash&type=recovery'));
+      expect(response.status).toBe(307);
+      const location = response.headers.get('location') ?? '';
+      expect(location).not.toContain('expired');
+      const alert = warn.mock.calls.map((call) => String(call[0])).join(' ');
+      expect(alert).toContain('auth_link_exchange_failed');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('does not claim a link expired when Auth never answered', async () => {
+    // The difference matters: telling someone their reset link expired
+    // sends them to request a new one for no reason, and makes the outage
+    // look like a user problem.
+    mocks.exchangeCodeForSession.mockRejectedValueOnce(new TypeError('fetch failed'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const response = await GET(request('?code=abc&flow=recovery&state=' + RECOVERY_STATE, RECOVERY_STATE));
+      const location = decodeURIComponent(response.headers.get('location') ?? '');
+      expect(location).not.toContain('expired');
+      expect(location).not.toContain('not opened in the browser');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('verifies typed token-hash signup links', async () => {
     const response = await GET(
       request('?token_hash=signup-token&type=signup&flow=signup&next=%2Fdashboard'),
