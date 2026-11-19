@@ -8,12 +8,14 @@ Date: 2026-11-19 · Supersedes the narrative blocker lists in
 Tier 1–4 (those remain as the owner's working checklists; **this** is the
 consolidated view that answers "who moves what, and what closes it").
 
-**Every row is an owner action or a hosted run.** There are **zero open P0
-code defects**: every code-level prerequisite is implemented and locally
-verified. A row is not a code task unless its status says otherwise.
+**Every row is an owner action or a hosted run.** Additional technical
+follow-on work is described in `LOCAL_POPULATED_RESTORE_REHEARSAL.md`: the
+branch fixes a bare-container restore failure, Mode B value precision loss,
+and restore URL overrides. Those changes still require review and integration;
+local results do not establish hosted recovery.
 
-**Overall decision: NO-GO.** It is NO-GO because twelve rows are open, not
-because anything is broken.
+**Overall decision: NO-GO because twelve rows are open**, with technical
+follow-on integration also pending.
 
 ---
 
@@ -32,7 +34,7 @@ because anything is broken.
 
 | # | Blocker | Owner | Acceptance condition | Evidence requirement | Status |
 |---|---|---|---|---|---|
-| **B1** | **B2 backup + restore evidence** — no bucket, no key, no secret, no hosted backup, no hosted restore | Owner (Backblaze console → GitHub Settings → two workflow dispatches) | One `Hosted backup (B2)` run prints `uploaded:true, verified:true` **and** one `Hosted restore rehearsal (disposable)` run is green with zero unexplained deltas | The manifest (`counts` + `financialSpotChecks`) and the drill's `restore-report.json` filed under `qa-evidence/day1/`, plus the run URLs | **OPEN** |
+| **B1** | **B2 backup + restore evidence** — bucket and secret state unverified; no hosted backup or restore evidence filed | Owner (Backblaze console → GitHub Settings → two workflow dispatches) | One `Hosted backup (B2)` run prints `uploaded:true, verified:true` **and** one `Hosted restore rehearsal (disposable)` run is green with zero unexplained deltas | The manifest (`counts` + `financialSpotChecks`) and the drill's `restore-report.json` filed under `qa-evidence/day1/`, plus the run URLs | **OPEN** |
 | **B2** | **Migration canonicalization** — colliding live function bodies | Owner (a paper decision per body; never an inferred source edit) | Every colliding body has a written decision naming which version is canonical | The signed decision list filed under `qa-evidence/day1/` | **OPEN** |
 | **B3** | **Email domain + Brevo SMTP** — no domain purchased; branded sending unclaimable; Authorized IPs must be cleared | Owner (Brevo console + a registrar) | A domain is authenticated in Brevo (SPF + DKIM + DMARC published) **and** Supabase Auth mail is delivered to an owner-controlled mailbox | A delivery record (recipient, timestamp, provider event id — no address) in `qa-evidence/day1/BREVO_DOMAINLESS_ACTIVATION_COMPLETION.md`'s successor | **OPEN** |
 | **B4** | **Staging designation (O-B1)** — the test project is a candidate, never designated | Owner (a verbatim written designation) | `autodinetest` (`juwyhslzchjevqkdvwjm`) is designated in writing as the non-production Staging project, **or** a third dedicated Staging project is created and its ref designated | The written designation filed under `qa-evidence/day1/`; if a third project, one repo ref update + `AUTODINE_EXPECTED_PROJECT_REF` re-target | **OPEN** |
@@ -63,9 +65,10 @@ because anything is broken.
 
 **PR #194** (the shared-infrastructure pull request,
 https://github.com/aryanp685/autodine/pull/194) is **open and unmerged**.
-It is not a launch blocker — its code is on the branch and locally verified —
-but merging it is a merge decision, and it will trigger a Vercel
-**Production** deployment as a side effect.
+The branch contains recovery fixes with local evidence that still need review
+and integration before the default-branch hosted drill can use them. Merging
+is a separate decision and will trigger a Vercel **Production** deployment
+as a side effect.
 
 **A Vercel Preview deployment already happened**, produced automatically by
 the Vercel GitHub App when the branch was pushed (deployment
@@ -79,8 +82,8 @@ branch name — and **no Vercel setting was changed**. Full facts:
 
 ## What is deliberately NOT in this register
 
-- **Anything a code change could close.** Those are done and verified; the
-  local suites are the evidence.
+- **Implementation follow-on work.** See `LOCAL_POPULATED_RESTORE_REHEARSAL.md`;
+  local implementation fixes do not close any owner/hosted row.
 - **Any secret value.** Only names, shapes and destinations appear here.
 - **Any action this repository or an agent may take on the owner's behalf.**
   Every row above is something only the owner can do, in their own

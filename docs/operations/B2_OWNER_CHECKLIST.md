@@ -4,10 +4,10 @@ Everything the owner must do, in order, with the exact values, the exact
 permissions, and the exact authorization each step needs — and nothing that
 this repository may do on the owner's behalf.
 
-**Status (2026-11-19): NOT RUN.** No B2 bucket, no application key, no
-repository secret, no hosted backup run and no hosted restore rehearsal
-exists. The implementation is complete and locally verified; only the
-credentials and the authorized runs are missing.
+**Status: hosted evidence NOT FILED.** Bucket, key and repository-secret
+state is unknown without owner confirmation; no successful hosted backup or
+restore report is filed here. A locally tested recovery fix is on this branch
+and must be reviewed and integrated before the hosted drill is dispatched.
 
 **One technical prerequisite was cleared on 2026-11-19:** PR #190 (the
 drill's registration fix) merged, so the restore drill is registered **by
@@ -33,10 +33,10 @@ why every step below was blocked behind it.
 
 | | Status | Detail |
 |---|---|---|
-| **Technical implementation** | ✅ **DONE and locally verified** | `scripts/backup/{backup-logical,upload-b2,download-b2,prune-b2,restore-logical,verify-restored-db,lib-b2,lib-crypto,lib-dump}.mjs`, `.github/workflows/hosted-backup.yml`, `.github/workflows/hosted-restore-drill.yml`, the restore-target guard and the PostgreSQL 17 composite action. |
-| **Owner action (credentials + bucket)** | ❌ **NOT DONE** | Sections A1–A5 below. Only the owner can do these. |
+| **Technical implementation** | **Follow-on fix locally verified; integration pending** | A bare PostgreSQL target lacks platform objects needed by a public-only restore. This branch adds a disposable scaffold, fixes Mode B precision loss, and hardens target URL checks; see `qa-evidence/day1/LOCAL_POPULATED_RESTORE_REHEARSAL.md`. This does not prove hosted recovery. |
+| **Owner action (credentials + bucket)** | **UNVERIFIED** | Sections A1–A5 below. Only the owner can provision or confirm these; inaccessible secret names are UNKNOWN, not proof of absence. |
 | **Hosted verification** | ❌ **NOT RUN** | Sections B1–B4 below. A human must authorize each dispatch. |
-| **Blocking technical prerequisite** | ✅ **CLEARED 2026-11-19** | PR #190 (the drill's registration fix) merged on 2026-11-19, so the drill is registered **by name** and can be dispatched. Nothing else blocks the runs below. |
+| **Workflow registration** | ✅ **CLEARED 2026-11-19** | PR #190 fixed registration by name. The additional disposable-scaffold fix on this branch must be reviewed and merged before dispatch from the default branch. |
 
 **Nothing in the technical column is a substitute for the other two.** A
 green local suite is not a backup; a bucket without a verified restore is not
@@ -236,7 +236,7 @@ fails.
 > project outright — no flag unlocks it.
 
 1. Actions → **Hosted restore rehearsal (disposable)** → **Run workflow** → **Run workflow**.
-2. It downloads the newest artifact (SHA-256 verified against its manifest), restores into the disposable container, verifies the schema fingerprint, row counts and financial sums, and then **always** destroys the downloaded material — the cleanup step runs even when the job fails.
+2. It downloads the newest artifact (SHA-256 verified against its manifest), prepares a **synthetic** Auth/Storage scaffold on the empty loopback container, restores the public schema, verifies schema counts, row counts and financial sums, and then **always** destroys the downloaded material — the cleanup step runs even when the job fails. The scaffold does not restore or verify hosted Auth or Storage data, and this is not a full Supabase recovery rehearsal. The preparation fix on this branch must be merged before dispatching the named workflow from the default branch.
 3. Nothing here can reach Production: the workflow uses no production connection string at all.
 
 > **Prerequisite — CLEARED 2026-11-19:** the drill must be **registered by

@@ -68,7 +68,8 @@ installs Chromium for the browser suites. Both now assert the claim's
 scoping instead, and keep the strong local check where Chromium really is
 absent.
 
-**Current local counts** (on the merged tree, 2026-11-19): DR suite
+**Historical local counts** (on the merged tree, 2026-11-19; see
+`LOCAL_POPULATED_RESTORE_REHEARSAL.md` for later recovery work): DR suite
 **155/155**; unit suite **2,553 passed / 224 skipped / 0 failed**;
 PostgreSQL-gated integration **215/215**; embedded replay **209 passed |
 2 skipped (211)**; migration chain **102 files, 102 unique versions**;

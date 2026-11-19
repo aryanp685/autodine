@@ -2,7 +2,7 @@
 
 The launch decision, the gates behind it, and the exact sequence that closes them.
 
-**Current decision: NO-GO.** Not because of an open code defect — there are **zero open P0 code defects** — but because the hosted evidence and the owner decisions that stand between this codebase and a launch have not been produced yet. Every gate below is a *hosted run* or an *owner action*, not a code change.
+**Current decision: NO-GO.** Hosted evidence and owner decisions are outstanding, and locally tested recovery fixes still need review and integration. See `MASTER_BLOCKER_REGISTER.md` and `LOCAL_POPULATED_RESTORE_REHEARSAL.md`; local tests do not establish hosted recovery.
 
 **Live state, on demand:** `node scripts/hosted-verification/preflight.mjs` (read-only; `--json` for machines). It prints configuration names as SET/UNSET (never values), the live GitHub state, and a per-package verdict. When GitHub refuses a read it answers UNKNOWN — never "absent". **Presence is not validity; validity is not delivery.** A verdict of READY-TO-AUTHORIZE means the inputs are in place and a human must now authorize the run; it never means the run happened.
 
@@ -13,7 +13,7 @@ The launch decision, the gates behind it, and the exact sequence that closes the
 | # | Gate | Verdict source | What is missing |
 |---|------|----------------|-----------------|
 | 1 | B2 backup + artifact verification | preflight `b2-backup` | Bucket + bucket-scoped key, the six repository secret names, then one authorized run whose output shows `uploaded:true, verified:true` |
-| 2 | Disposable hosted restore rehearsal | preflight `restore-rehearsal` | The drill is registered **by name** (PR #190 merged 2026-11-19); it must now be **dispatched** against gate 1's backup |
+| 2 | Disposable hosted restore rehearsal | preflight `restore-rehearsal` | Registered by name; review and integrate the disposable-scaffold fix first, then an owner-authorized dispatch against gate 1's verified backup is still required. See `LOCAL_POPULATED_RESTORE_REHEARSAL.md`. |
 | 3 | PITR / recovery evidence | preflight `pitr` | The owner's PITR-vs-B2 decision plus a completed checklist and a human signature |
 | 4 | Auth email + Brevo deliverability | preflight `email` | The Brevo environment names, the Authorized-IPs setting, and the five controlled observations |
 | 5 | Realtime multi-device verification | preflight `realtime` | A seeded Staging project, three devices, a human watching the fallback |

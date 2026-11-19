@@ -1,5 +1,8 @@
 # AUTODINE — PHASE 7 LOCAL VERIFICATION (every gate, every skip explained)
 
+This is a historical gate snapshot. For the newer populated recovery
+rehearsal and follow-on defects, see `LOCAL_POPULATED_RESTORE_REHEARSAL.md`.
+
 **Date: 2026-11-19.** One record of every gate the CI workflow runs, run
 locally, with **every skip explained**. Re-runnable:
 

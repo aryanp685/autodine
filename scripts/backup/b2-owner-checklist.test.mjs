@@ -104,6 +104,20 @@ test("the checklist claim that the drill needs only five secrets is true", () =>
   );
 });
 
+test('the disposable hosted drill scaffolds loopback before restore and always cleans downloaded material', () => {
+  const { job } = workflowSecrets(DRILL_WORKFLOW);
+  const steps = job.steps;
+  const prepare = steps.findIndex((s) => s.run?.includes('scripts/backup/prepare-disposable-restore.mjs --confirm-disposable'));
+  const restore = steps.findIndex((s) => s.run?.includes('scripts/backup/restore-logical.mjs'));
+  const cleanup = steps.find((s) => s.name === 'Destroy downloaded backup material (always)');
+  assert.ok(prepare >= 0 && restore > prepare);
+  assert.match(steps[prepare].env.AUTODINE_RESTORE_TARGET_URL, /@127\.0\.0\.1:5432\/drill$/);
+  assert.equal(steps[prepare].env.AUTODINE_RESTORE_TARGET_URL, steps[restore].env.AUTODINE_RESTORE_TARGET_URL);
+  assert.equal(cleanup?.if, 'always()');
+  assert.match(cleanup.run, /rm -rf "\$DRILL_DIR"/);
+  assert.ok(checklist.includes('synthetic'));
+});
+
 test('the checklist names the workflows the owner dispatches, by their real titles', () => {
   const backup = parseYaml(readFileSync(BACKUP_WORKFLOW, 'utf8'));
   const drill = parseYaml(readFileSync(DRILL_WORKFLOW, 'utf8'));

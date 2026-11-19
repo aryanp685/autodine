@@ -259,8 +259,12 @@ function buildPackages(context) {
       const drill = workflows.get(REQUIRED_WORKFLOWS.drill);
       const asFile = [...workflows.entries()].find(([name]) => name.endsWith('hosted-restore-drill.yml'));
       if (drill) {
-        verdict = READY;
+        // Registration alone says nothing about the default-branch contents,
+        // required secrets, or whether a usable backup exists. In particular,
+        // the disposable scaffold fix may still be unmerged.
+        verdict = UNKNOWN;
         notes.push(`workflow "${REQUIRED_WORKFLOWS.drill}" is registered by name (${drill})`);
+        notes.push('registration does not verify the default-branch disposable scaffold, secret names, or availability of a verified backup; confirm these before dispatch');
       } else if (asFile) {
         verdict = OWNER;
         notes.push(

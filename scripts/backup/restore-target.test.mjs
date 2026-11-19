@@ -63,6 +63,21 @@ test('a loopback disposable target is allowed with no extra ceremony', () => {
   assert.equal(decision.allowed, true);
 });
 
+test('query options cannot override the host or pooled user checked by the guard', () => {
+  for (const targetUrl of [
+    `${LOOPBACK}?host=db.example.invalid`,
+    `${LOOPBACK}?hostaddr=192.0.2.1`,
+    `${LOOPBACK}?%68ost=db.example.invalid`,
+    `${LOOPBACK}?service=remote`,
+    `postgresql://postgres.${SCRATCH_REF}:pw@aws-0-us-east-1.pooler.supabase.com:5432/postgres?user=postgres.${PRODUCTION_REFS[0]}`,
+  ]) {
+    const decision = restoreTargetDecision({ targetUrl, allowScratch: true, expectedRef: SCRATCH_REF });
+    assert.equal(decision.allowed, false);
+    assert.match(decision.reason, /override/);
+  }
+  assert.equal(restoreTargetDecision({ targetUrl: `${LOOPBACK}?sslmode=require` }).allowed, true);
+});
+
 test('a hosted target is refused without a scratch opt-in', () => {
   const decision = restoreTargetDecision({
     targetUrl: SCRATCH_DIRECT,

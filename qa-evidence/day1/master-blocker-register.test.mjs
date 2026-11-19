@@ -118,7 +118,8 @@ test('a hosted run that needs authorization is labelled BLOCKED, not PASS', () =
 
 test('the register states the launch decision honestly', () => {
   assert.match(source, /NO-GO/);
-  assert.match(source, /zero\s+open P0\s+code defects/i);
+  assert.match(source, /LOCAL_POPULATED_RESTORE_REHEARSAL\.md/);
+  assert.doesNotMatch(source, /zero\s+open P0\s+code defects/i, 'avoid an unqualified claim while recovery fixes are awaiting integration');
   // The decision must not be softened into a pass.
   // "NO-GO" is the decision; a bare "GO" would be a different claim.
   assert.doesNotMatch(source, /\bALL CLEAR\b|\bREADY TO LAUNCH\b/);

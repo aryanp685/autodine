@@ -107,7 +107,8 @@ test('the restore-drill registration defect is reported when it is present', () 
   // described (not fixed). Both are honest; silence is not.
   const byName = report.state.workflows?.some((w) => w.name === 'Hosted restore rehearsal (disposable)');
   if (byName) {
-    assert.equal(drill.verdict, 'READY-TO-AUTHORIZE');
+    assert.equal(drill.verdict, 'UNKNOWN');
+    assert.match(drill.notes.join(' '), /default-branch disposable scaffold/);
   } else {
     assert.match(drill.notes.join(' '), /file path|not registered/);
   }

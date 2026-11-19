@@ -216,7 +216,11 @@ export async function dumpDatabase(connectionString, { schema = 'public', log = 
       const cols = (await client.query(colSql, [t.oid])).rows;
       const colList = cols.map((c) => quoteIdent(c.attname)).join(', ');
       const overriding = cols.some((c) => c.attidentity === 'a') ? ' overriding system value' : '';
-      const data = await client.query(`select * from ${fqn}`);
+      // Fetch PostgreSQL text directly, never JS-decoded values: node-postgres
+      // Date/JSON/float conversions can silently lose precision (including
+      // microseconds and large JSON numbers) before the dump is rendered.
+      const projection = cols.map((c) => `${quoteIdent(c.attname)}::text as ${quoteIdent(c.attname)}`).join(', ');
+      const data = await client.query(`select ${projection} from ${fqn}`);
       let buf = [];
       const flush = () => {
         if (!buf.length) return;
@@ -224,7 +228,7 @@ export async function dumpDatabase(connectionString, { schema = 'public', log = 
         buf = [];
       };
       for (const row of data.rows) {
-        const vals = cols.map((c) => renderValue(row[c.attname], c.type));
+        const vals = cols.map((c) => row[c.attname] === null ? 'null' : `E${quoteLit(row[c.attname].replaceAll('\\', '\\\\'))}::${c.type}`);
         buf.push('  (' + vals.join(', ') + ')');
         if (buf.length >= 200) flush();
       }
@@ -469,30 +473,4 @@ export async function dumpDatabase(connectionString, { schema = 'public', log = 
   } finally {
     await client.end().catch(() => {});
   }
-}
-
-function renderValue(value, type) {
-  if (value === null || value === undefined) return 'null';
-  if (type === 'boolean') return value ? 'true' : 'false';
-  if (/^(smallint|integer|bigint|numeric|real|double precision|oid)/.test(type)) return String(value);
-  if (type.endsWith('[]')) return `${quoteLit(arrayText(value))}::${type}`;
-  if (type === 'json' || type === 'jsonb') return `${quoteLit(JSON.stringify(value))}::${type}`;
-  if (type === 'bytea') return `${quoteLit(Buffer.isBuffer(value) ? '\\x' + value.toString('hex') : String(value))}::bytea`;
-  // everything else round-trips via its text output
-  const text = value instanceof Date ? value.toISOString() : String(value);
-  return `${quoteLit(text)}::${type}`;
-}
-
-function arrayText(value) {
-  // pg driver parses arrays into JS arrays; re-render as Postgres array literal
-  const enc = (v) => {
-    if (v === null) return 'NULL';
-    if (typeof v === 'boolean') return v ? 'true' : 'false';
-    if (typeof v === 'number') return String(v);
-    if (v instanceof Date) return '"' + v.toISOString() + '"';
-    const s = String(v);
-    return '"' + s.replaceAll('\\', '\\\\').replaceAll('"', '\\"') + '"';
-  };
-  const inner = (arr) => '{' + arr.map((item) => (Array.isArray(item) ? inner(item) : enc(item))).join(',') + '}';
-  return Array.isArray(value) ? inner(value) : String(value);
 }

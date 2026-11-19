@@ -150,7 +150,18 @@ export function restoreTargetDecision(input) {
 
   let host = '';
   try {
-    host = new URL(targetUrl).hostname.toLowerCase();
+    const url = new URL(targetUrl);
+    host = url.hostname.toLowerCase();
+    // Both node-postgres and libpq accept connection options in the query.
+    // These can override the host or pooled username that the guard checks.
+    // Refuse rather than making a decision on a different effective target.
+    const unsafe = new Set(['host', 'hostaddr', 'user', 'service']);
+    if ([...url.searchParams.keys()].some((key) => unsafe.has(key.toLowerCase()))) {
+      return { allowed: false, reason: 'target URL contains a host, user, or service override', host, ref: '' };
+    }
+    if (!['postgres:', 'postgresql:'].includes(url.protocol)) {
+      return { allowed: false, reason: 'target URL must use the PostgreSQL protocol', host, ref: '' };
+    }
   } catch {
     return {
       allowed: false,
