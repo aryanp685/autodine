@@ -29,7 +29,7 @@
  * BACKUP_ALERT_WEBHOOK is set).
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { encryptBuffer, sha256 } from './lib-crypto.mjs';
 import { dumpDatabase, openBackupSnapshot } from './lib-dump.mjs';
@@ -98,30 +98,34 @@ try {
     // Mode A: pg_dump custom format. Scoped to the same schema Mode B and the
     // restore target cover — the shim/managed scaffold (auth.*, storage.*,
     // roles) already exists on the restore side and must not be replayed.
-    const sqlPath = path.join(outDir, `${base}.dump`);
-    // The manifest's counts/financial expectations are measured inside the
-    // SAME exported snapshot pg_dump reads, so verification compares the
-    // restored database against exactly what was dumped — concurrent writes
-    // on a live source cannot make a good backup fail its drill (and a bad
-    // one cannot pass: the snapshot is frozen for both readers).
-    const snapshot = await openBackupSnapshot(sourceUrl, { schema });
-    let evidence;
+    // pg_dump must write plaintext briefly. A private directory and file
+    // limit exposure; all ordinary errors remove it, including dump failure.
+    // An uncatchable termination can still leave the directory behind.
+    const tempDir = mkdtempSync(path.join(outDir, '.autodine-plaintext-'));
+    const sqlPath = path.join(tempDir, 'backup.dump');
     try {
-      evidence = await snapshot.collectCounts();
-      execFileSync(pgDump.path, ['--format=custom', '--no-owner', `--schema=${schema}`, `--snapshot=${snapshot.snapshotId}`, `--file=${sqlPath}`, sourceUrl], { stdio: ['ignore', 'ignore', 'inherit'] });
+      writeFileSync(sqlPath, '', { mode: 0o600, flag: 'wx' });
+      // Counts and the dump use the same exported repeatable-read snapshot.
+      const snapshot = await openBackupSnapshot(sourceUrl, { schema });
+      let evidence;
+      try {
+        evidence = await snapshot.collectCounts();
+        execFileSync(pgDump.path, ['--format=custom', '--no-owner', `--schema=${schema}`, `--snapshot=${snapshot.snapshotId}`, `--file=${sqlPath}`, sourceUrl], { stdio: ['ignore', 'ignore', 'inherit'] });
+      } finally {
+        await snapshot.close();
+      }
+      const plaintext = readFileSync(sqlPath);
+      outFile = `${base}.dump.enc`;
+      writeFileSync(path.join(outDir, outFile), enc(plaintext, passphrase), { flag: 'wx', mode: 0o600 });
+      manifest = { format: 'pg_dump-custom', bytes: plaintext.length, sha256: sha256(readFileSync(path.join(outDir, outFile))), counts: evidence.counts, financialSpotChecks: evidence.financialSpotChecks };
     } finally {
-      await snapshot.close();
+      rmSync(tempDir, { recursive: true, force: true });
     }
-    const plaintext = readFileSync(sqlPath);
-    writeFileSync(sqlPath + '.enc', enc(plaintext, passphrase));
-    unlinkSync(sqlPath);
-    outFile = `${base}.dump.enc`;
-    manifest = { format: 'pg_dump-custom', bytes: plaintext.length, sha256: sha256(readFileSync(path.join(outDir, outFile))), counts: evidence.counts, financialSpotChecks: evidence.financialSpotChecks };
   } else {
     // Mode B: built-in consistent snapshot (REPEATABLE READ READ ONLY).
     const { sql, counts, financialSpotChecks } = await dumpDatabase(sourceUrl, { schema, log: (m) => process.stderr.write('  ' + m + '\n') });
     const plaintext = Buffer.from(sql, 'utf8');
-    writeFileSync(path.join(outDir, `${base}.sql.gz.enc`), enc(plaintext, passphrase));
+    writeFileSync(path.join(outDir, `${base}.sql.gz.enc`), enc(plaintext, passphrase), { flag: 'wx', mode: 0o600 });
     outFile = `${base}.sql.gz.enc`;
     manifest = { format: 'autodine-logical-1', bytes: plaintext.length, sha256: sha256(readFileSync(path.join(outDir, outFile))), counts, financialSpotChecks };
   }
@@ -133,7 +137,7 @@ try {
   manifest.schema = schema;
   manifest.retention = { keepDaily, keepWeekly, keepMonthly };
   manifest.notes = 'Logical backup. Does NOT cover: Supabase Auth schema (auth.*), Storage buckets, or platform-managed settings — those rely on the managed provider. Restore target must be empty.';
-  writeFileSync(path.join(outDir, `${base}.manifest.json`), JSON.stringify(manifest, null, 2) + '\n');
+  writeFileSync(path.join(outDir, `${base}.manifest.json`), JSON.stringify(manifest, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
 
   // Retention: bucket own files only.
   const files = readdirSync(outDir).filter((f) => /^autodine-.*\.(sql\.gz\.enc|dump\.enc)$/.test(f)).sort();

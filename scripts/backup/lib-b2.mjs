@@ -51,6 +51,7 @@ export function b2ConfigFromEnv(env) {
   for (const name of B2_ENV_VARS) {
     if (!env[name] || !String(env[name]).trim()) missing.push(name);
   }
+  if (env.B2_BUCKET && !/^[a-zA-Z0-9][a-zA-Z0-9.-]{5,49}$/.test(String(env.B2_BUCKET).trim())) missing.push('B2_BUCKET (malformed)');
   let endpoint = env.B2_ENDPOINT?.trim() || null;
   let region = env.B2_REGION?.trim() || null;
   if (region && !REGION_RE.test(region)) missing.push('B2_REGION (malformed)');
@@ -58,9 +59,18 @@ export function b2ConfigFromEnv(env) {
     endpoint = `https://s3.${region}.backblazeb2.com`;
   }
   if (!endpoint) missing.push('B2_ENDPOINT|B2_REGION');
-  if (endpoint && !region) {
-    try { region = new URL(endpoint).hostname.match(ENDPOINT_REGION_RE)?.[1] ?? null; } catch { region = null; }
-    if (!region) missing.push('B2_REGION (cannot be derived from B2_ENDPOINT)');
+  if (endpoint) {
+    try {
+      const url = new URL(endpoint);
+      const endpointRegion = url.hostname.match(ENDPOINT_REGION_RE)?.[1];
+      if (url.protocol !== 'https:' || !endpointRegion || url.username || url.password || url.port || url.pathname !== '/' || url.search || url.hash) {
+        missing.push('B2_ENDPOINT (must be an official HTTPS B2 S3 endpoint)');
+      } else if (region && endpointRegion !== region) {
+        missing.push('B2_REGION (does not match B2_ENDPOINT)');
+      } else if (!region) {
+        region = endpointRegion;
+      }
+    } catch { missing.push('B2_ENDPOINT (malformed)'); }
   }
   const uniqueMissing = [...new Set(missing)];
   if (uniqueMissing.length > 0) return { ok: false, missing: uniqueMissing };

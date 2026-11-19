@@ -205,3 +205,21 @@ test('the backup and the drill pin the same PostgreSQL major version', () => {
   assert.deepEqual(versions, ['17', '17'], `the two workflows must pin the same version, saw: ${versions.join(' vs ')}`);
   assert.ok(checklist.includes('postgres:17') || checklist.includes('`postgres:17`'));
 });
+
+test('staging rehearsal is manual, uses distinct protected-environment secrets, and never prunes', () => {
+  const file = path.join(ROOT, '.github', 'workflows', 'staging-b2-rehearsal.yml');
+  const doc = parseYaml(readFileSync(file, 'utf8'));
+  assert.deepEqual(Object.keys(doc.on), ['workflow_dispatch']);
+  const job = doc.jobs['staging-rehearsal'];
+  assert.equal(job.environment, 'backup-staging');
+  for (const name of ['AUTODINE_BACKUP_SOURCE_URL', 'AUTODINE_BACKUP_PASSPHRASE', 'B2_REGION', 'B2_BUCKET', 'B2_ACCESS_KEY_ID', 'B2_SECRET_ACCESS_KEY']) {
+    assert.equal(job.env[name], '${{ secrets.STAGING_' + name + ' }}');
+  }
+  const steps = job.steps;
+  const validate = steps.findIndex((s) => s.run?.includes('scripts/backup/validate-staging-source.mjs'));
+  const backup = steps.findIndex((s) => s.run?.includes('scripts/backup/run-scheduled.mjs'));
+  assert.ok(validate >= 0 && backup > validate);
+  assert.doesNotMatch(steps[backup].run, /--prune-b2/);
+  assert.ok(steps.some((s) => s.run?.includes('scripts/backup/verify-restored-db.mjs')));
+  assert.ok(steps.some((s) => s.if === 'always()' && s.run?.includes('rm -rf')));
+});

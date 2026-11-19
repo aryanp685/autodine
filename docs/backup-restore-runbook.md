@@ -279,10 +279,14 @@ error). Deletion itself is artifact-first: an artifact-DELETE failure
 leaves the pair intact for a clean re-run, and a manifest-DELETE failure
 is retried once before the run aborts naming the orphaned manifest.
 
-Optional defense-in-depth (owner, at bucket setup): add a B2 lifecycle
-rule on prefix `autodine-backups/` — hide after 400 days, delete 30 days
-after hiding — as a coarse backstop far beyond the 6-month policy horizon.
-It must never be the only retention mechanism.
+**Versioning and cost:** B2's S3 DELETE without a version ID inserts a
+[delete marker](https://www.backblaze.com/apidocs/s3-delete-object); prior
+versions remain stored and may continue to incur charges. This pruner manages
+visible recovery points, **not verified physical reclamation or secure
+permanent erasure**. Review hidden-version usage and any lifecycle or Object
+Lock policy with the owner before applying it; an age rule can remove a
+recovery point still needed by the 14/8/6 plan. Do not claim storage is
+reclaimed based on a successful name-only DELETE.
 
 ### Remote retention — known limitations (P2 observations, accepted)
 

@@ -24,7 +24,7 @@
  *   - application-level correctness after a restore (open a restored copy
  *     locally and run the app checks against it for that).
  */
-import { mkdtempSync, rmSync, readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { chmodSync, mkdtempSync, mkdirSync, rmSync, readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -100,6 +100,30 @@ try {
           values (v_acc, 'starter', 49900, 'INR', 'succeeded', 'razorpay');
       end $$;`);
     } finally { await client.end(); }
+  }
+  // Inject a failing custom-format writer after it creates partial plaintext.
+  // The writer checks the private file mode; no plaintext may remain after an
+  // ordinary pg_dump failure. This is not a real custom-format restore test.
+  {
+    const binDir = path.join(scratch, 'failing-client');
+    const failedOutput = path.join(scratch, 'failed-backup');
+    mkdirSync(binDir);
+    const writer = path.join(binDir, 'pg_dump');
+    writeFileSync(writer, `#!/usr/bin/env node
+const fs = require('fs');
+if (process.argv[2] === '--version') { console.log('pg_dump (PostgreSQL) 17.1'); process.exit(0); }
+const file = process.argv.find((v) => v.startsWith('--file=')).slice(7);
+if ((fs.statSync(file).mode & 0o777) !== 0o600) process.exit(3);
+fs.writeFileSync(file, 'synthetic partial plaintext');
+process.exit(9);
+`);
+    chmodSync(writer, 0o700);
+    const result = spawnSync(process.execPath, ['scripts/backup/backup-logical.mjs', '--out-dir', failedOutput, '--pg-dump', '1'], {
+      env: sh({ AUTODINE_BACKUP_SOURCE_URL: urlFor(source), AUTODINE_BACKUP_PASSPHRASE: 'local-drill-passphrase-not-secret-0123456789', PG_CLIENT_BIN_DIR: binDir, PG_CLIENT_VERSION: '17', BACKUP_ALERT_WEBHOOK: '' }), encoding: 'utf8',
+    });
+    assert.equal(result.status, 1, 'injected writer failure must fail the backup');
+    assert.match(result.stderr, /backup: FAILED/);
+    assert.deepEqual(readdirSync(failedOutput), [], 'failed writer must leave no plaintext or backup material');
   }
   // Exercise exactly the initializer used by the hosted disposable workflow.
   execFileSync(process.execPath, ['scripts/backup/prepare-disposable-restore.mjs', '--confirm-disposable'], {
@@ -230,7 +254,7 @@ const before = await fingerprint(urlFor(source), { schemas: ['public'] });
     financialSpotChecks: manifest.financialSpotChecks,
     restoreMs,
     artifactSha256: manifest.sha256,
-    negativeChecks: ['bare-target', 'unsafe-target', 'host-override', 'tamper', 'wrong-passphrase', 'financial-mismatch'],
+    negativeChecks: ['failed-pg-dump-cleanup', 'bare-target', 'unsafe-target', 'host-override', 'tamper', 'wrong-passphrase', 'financial-mismatch'],
     productionBackupClaim: false,
     ciCustomFormatDrill: 'not-run-here — the custom-format path is verified by the native-database job (PG 15/17/18)',
   })}`);

@@ -100,3 +100,7 @@ jobs:
             echo "- Result: ${{ job.status }}";
             echo "- Remote verification: see the upload-b2 step output — hosted success means it printed uploaded:true, verified:true with the manifest SHA-256.";
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove runner backup material
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/autodine-backups"

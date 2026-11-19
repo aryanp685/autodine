@@ -1,0 +1,109 @@
+name: Staging B2 backup and disposable restore
+
+# Explicitly dispatched only. Configure the protected `backup-staging`
+# environment before dispatch; never populate it with Production credentials.
+# This workflow creates a real B2 object and reads staging data: dispatch and
+# any resulting cost require explicit owner approval. No remote pruning.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-b2-rehearsal
+  cancel-in-progress: false
+
+jobs:
+  staging-rehearsal:
+    name: staging backup → B2 → disposable restore
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: backup-staging
+    services:
+      drilldb:
+        image: postgres:17
+        env:
+          POSTGRES_DB: drill
+          POSTGRES_PASSWORD: drill-${{ github.run_id }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      AUTODINE_BACKUP_SOURCE_URL: ${{ secrets.STAGING_AUTODINE_BACKUP_SOURCE_URL }}
+      AUTODINE_BACKUP_PASSPHRASE: ${{ secrets.STAGING_AUTODINE_BACKUP_PASSPHRASE }}
+      B2_REGION: ${{ secrets.STAGING_B2_REGION }}
+      B2_BUCKET: ${{ secrets.STAGING_B2_BUCKET }}
+      B2_ACCESS_KEY_ID: ${{ secrets.STAGING_B2_ACCESS_KEY_ID }}
+      B2_SECRET_ACCESS_KEY: ${{ secrets.STAGING_B2_SECRET_ACCESS_KEY }}
+      AUTODINE_STAGING_PROJECT_REF: ${{ vars.AUTODINE_STAGING_PROJECT_REF }}
+      AUTODINE_STAGING_B2_BUCKET: ${{ vars.AUTODINE_STAGING_B2_BUCKET }}
+      AUTODINE_RESTORE_TARGET_URL: postgresql://postgres:drill-${{ github.run_id }}@127.0.0.1:5432/drill
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install PostgreSQL 17 client
+        uses: ./.github/actions/postgres-client
+        with:
+          version: '17'
+      - run: npm ci
+      - name: Refuse undesignated source and bucket before connecting
+        run: |
+          for name in AUTODINE_BACKUP_SOURCE_URL AUTODINE_BACKUP_PASSPHRASE B2_REGION B2_BUCKET B2_ACCESS_KEY_ID B2_SECRET_ACCESS_KEY AUTODINE_STAGING_PROJECT_REF AUTODINE_STAGING_B2_BUCKET; do
+            if [ -z "${!name}" ]; then echo "::error::Missing required staging configuration name: $name"; exit 1; fi
+          done
+          node scripts/backup/validate-staging-source.mjs
+      - name: Back up staging, verify locally and upload to B2
+        run: node scripts/backup/run-scheduled.mjs --out-dir "$RUNNER_TEMP/autodine-staging-backup" --rpo-minutes 1440 --b2
+      - name: Download newest B2 artifact and verify integrity
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/autodine-staging-download"
+          node scripts/backup/download-b2.mjs --out-dir "$RUNNER_TEMP/autodine-staging-download" | tee "$RUNNER_TEMP/autodine-staging-download/download-report.json"
+      - name: Restore and verify in disposable PostgreSQL
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/autodine-staging-download"
+          mapfile -t artifacts < <(find "$dir" -maxdepth 1 -type f -name '*.enc')
+          if [ "${#artifacts[@]}" -ne 1 ]; then echo '::error::Expected exactly one downloaded artifact'; exit 1; fi
+          artifact="${artifacts[0]}"
+          manifest="$(printf '%s' "$artifact" | sed -E 's/\.(sql\.gz|dump)\.enc$/.manifest.json/')"
+          mapfile -t source_manifests < <(find "$RUNNER_TEMP/autodine-staging-backup" -maxdepth 1 -type f -name '*.manifest.json')
+          if [ "${#source_manifests[@]}" -ne 1 ]; then echo '::error::Expected exactly one newly produced manifest'; exit 1; fi
+          node -e 'const fs=require("fs"); const a=JSON.parse(fs.readFileSync(process.argv[1])); const b=JSON.parse(fs.readFileSync(process.argv[2])); if (a.file !== b.file || a.sha256 !== b.sha256) { console.error("download is not this run\x27s backup"); process.exit(1); }' "${source_manifests[0]}" "$manifest"
+          node scripts/backup/verify-backup-file.mjs "$artifact" --manifest "$manifest"
+          node scripts/backup/prepare-disposable-restore.mjs --confirm-disposable
+          start="$(date +%s)"
+          node scripts/backup/restore-logical.mjs --file "$artifact" --confirm-empty-db
+          echo "RESTORE_SECONDS=$(($(date +%s) - start))" >> "$GITHUB_ENV"
+          node scripts/backup/verify-restored-db.mjs --manifest "$manifest" --artifact "$artifact" | tee "$dir/restore-report.json"
+      - name: Evidence summary
+        if: always()
+        run: |
+          {
+            echo '## Staging B2 rehearsal';
+            echo '- Result: ${{ job.status }}';
+            echo '- Restore command duration: '"${RESTORE_SECONDS:-not measured}"' seconds (not end-to-end RTO).';
+            echo '- Synthetic platform scaffold; Auth/Storage and production are not restored.';
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve reports only
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: staging-b2-rehearsal-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/autodine-staging-backup/*.manifest.json
+            ${{ runner.temp }}/autodine-staging-download/download-report.json
+            ${{ runner.temp }}/autodine-staging-download/restore-report.json
+          if-no-files-found: ignore
+          retention-days: 35
+      - name: Remove backup material
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/autodine-staging-backup" "$RUNNER_TEMP/autodine-staging-download"

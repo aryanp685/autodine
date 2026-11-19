@@ -438,7 +438,7 @@ if (isMain) {
   async function signedFetch(method, urlString, body, timeoutMs = 120000) {
     const payloadHash = sha256Hex(body ?? Buffer.alloc(0));
     const headers = signB2Request({ method, url: urlString, payloadHash, ...access, region: config.region });
-    return fetch(urlString, { method, headers, body, signal: AbortSignal.timeout(timeoutMs) });
+    return fetch(urlString, { method, headers, body, redirect: 'error', signal: AbortSignal.timeout(timeoutMs) });
   }
   const headObject = async (key) => {
     const res = await signedFetch('HEAD', objectUrl(key));

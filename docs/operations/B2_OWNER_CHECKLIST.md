@@ -46,6 +46,32 @@ a recovery story.
 
 ## A. Owner action — credentials and bucket
 
+### Account, cost, and staging boundary
+
+Sign up or sign in only at [Backblaze](https://www.backblaze.com/). Complete
+verification privately; never share passwords, OTPs, or key values in chat.
+Backblaze's [pricing](https://www.backblaze.com/cloud-storage/pricing) lists
+10 GB free, storage starting at $6.95/TB/month and free monthly egress up to
+3× average stored data; overages and API pricing may apply. Check current
+account-specific pricing and obtain explicit approval before any billing or
+paid upgrade. Choose the account region deliberately: Backblaze describes an
+account as associated with a single region. Consider the designated staging
+project's region, residency requirements and actual availability; do not
+assume a new bucket can be moved between regions.
+
+For initial acceptance use a designated **staging** source and the separate,
+manual-only `Staging B2 backup and disposable restore` workflow on this branch.
+It uses the `backup-staging` GitHub Environment, uniquely prefixed secrets and
+matching staging project/bucket variables; it refuses Production and never
+prunes B2. **It has not been dispatched or verified.** GitHub registers manual
+workflows from the default branch, so review and integration are required before
+this workflow can normally be dispatched. Configure required reviewers on the
+Environment before adding its secrets. The existing hosted workflow instead
+reads repository secrets and has a daily 03:17 UTC schedule on the default
+branch. Changing repository secrets can affect scheduled runs: do not put a
+production source or live key there without explicit operation and
+secret-change authorization.
+
 ### A1. Create the private bucket
 
 | Property | Required value | Why |
@@ -55,8 +81,36 @@ a recovery story.
 | Region | e.g. `us-west-004` | Must match `^[a-z]{2}-[a-z]+-\d{3}$` — **lowercase, and a three-digit suffix**. `us-west-4` and `ap-south-1` are both rejected; the correct spelling is `us-west-004`. The endpoint is derived as `https://s3.<region>.backblazeb2.com`. Record the exact region string — it becomes `B2_REGION`. |
 | Name | e.g. `autodine-backups` | Must match `^[a-zA-Z0-9][a-zA-Z0-9.-]{5,49}$` (6–50 characters). |
 | Lifecycle rules | **none required** | B2's age-based lifecycle rules cannot express the recovery-point policy; `prune-b2.mjs` enforces it instead. Adding age-based rules on top can delete artifacts the policy still needs. |
-| Versioning | recommended on | Cheap insurance against a bad overwrite; the pipeline writes unique timestamped keys, so it changes nothing in practice. |
+| Versioning | B2 buckets are versioned by default; verify account settings | The pruner's S3 DELETE without a version ID creates a delete marker, **not permanent deletion**. Hidden versions can continue to incur storage charges. The 14/8/6 policy governs visible recovery points, not physical storage reclamation. Do not apply lifecycle deletion or Object Lock without reviewing recoverability, retention behavior and cost with the owner. |
 | Object prefix | `autodine-backups/` | Hard-coded in the pipeline (`BACKUP_PREFIX`). Objects outside it are never written, listed or deleted. |
+
+### Staging-only secure configuration and acceptance
+
+After the owner has explicitly designated a non-production Supabase project,
+created a separate private staging B2 bucket, and approved secret changes:
+
+1. In GitHub Settings → Environments, create `backup-staging` and configure
+   required reviewers. In **Environment secrets** (not repository secrets),
+   enter `STAGING_AUTODINE_BACKUP_SOURCE_URL`,
+   `STAGING_AUTODINE_BACKUP_PASSPHRASE`, `STAGING_B2_REGION`,
+   `STAGING_B2_BUCKET`, `STAGING_B2_ACCESS_KEY_ID`, and
+   `STAGING_B2_SECRET_ACCESS_KEY`. Map them to the same source, passphrase,
+   region, bucket, key ID and key-secret meanings described below, but use
+   staging-only values. Enter values directly; never share them in chat.
+2. In that Environment's **variables**, enter `AUTODINE_STAGING_PROJECT_REF`
+   (the explicitly designated staging Supabase ref) and
+   `AUTODINE_STAGING_B2_BUCKET` (exact staging bucket name). The workflow
+   checks both matches, rejects known Production refs, loopback, connection
+   host/user overrides and transaction poolers. It never provisions the
+   source, verifies bucket privacy or assumes the owner has approved it.
+3. After review and integration, request a separate explicit authorization to
+   dispatch **Staging B2 backup and disposable restore**. This reads staging
+   data and uploads to the private bucket, potentially incurring charges. The
+   workflow downloads the same run's artifact and compares manifest counts and
+   financial totals in disposable PostgreSQL. It does not establish a full row
+   fingerprint, recover Auth/Storage, or demonstrate service RTO. Preserve
+   report/run links and investigate mismatches; do not claim success if any
+   stage or cleanup fails. Monitor B2 storage usage, including hidden versions.
 
 ### A2. Create the scoped application key
 
@@ -162,15 +216,15 @@ a ticket, a commit, or a CI log.
 | 6 | `B2_SECRET_ACCESS_KEY` | §A2 key secret | backup **and** drill |
 
 Optional: `B2_ENDPOINT` (an explicit S3 endpoint) and `BACKUP_ALERT_WEBHOOK`
-(an https endpoint for backup-failure alerts).
+(an https endpoint for backup-failure alerts). The production workflow uses
+repository secrets; configure or change these only with separate explicit
+approval because its daily schedule can run automatically.
 
-> **`B2_ENDPOINT` is not a free-form override.** The S3 *signing* region must
-> be derivable: `lib-b2.mjs` reads it back out of the hostname, and it only
-> recognises the standard B2 form `s3.<region>.backblazeb2.com`. An endpoint
-> on any other hostname (a proxy, a CDN, a custom domain) is rejected with
-> `B2_REGION (cannot be derived from B2_ENDPOINT)` — in that case set
-> **both** `B2_REGION` and `B2_ENDPOINT`. The simplest correct setup is
-> `B2_REGION` alone.
+> **`B2_ENDPOINT` is not a free-form override.** Only the standard HTTPS
+> `s3.<region>.backblazeb2.com` endpoint is accepted, with no userinfo,
+> custom port, path, query or fragment; an explicitly supplied region must
+> match the endpoint. Proxies and custom domains are rejected even if
+> `B2_REGION` is also supplied. The simplest setup is `B2_REGION` alone.
 
 **Optional: `BACKUP_ALERT_WEBHOOK`.** An `https://` endpoint that receives a
 `POST` with `{"text": "AutoDine backup FAILED (...)"}` when a backup run
@@ -272,6 +326,36 @@ opt-in, not the expected ref, not both together. A hosted target whose ref
 cannot be determined also fails closed. Refusals name the host and the
 project ref; they never echo the URL, the user name or the password.
 
+### Monitoring, retries and escalation
+
+- The existing production workflow is scheduled for **03:17 UTC daily**;
+  GitHub may delay or skip scheduled runs. Staging rehearsal is manual-only.
+  Inspect GitHub Actions → **Hosted backup (B2)** for the last successful
+  backup run and its manifest, and **Hosted restore rehearsal (disposable)**
+  or **Staging B2 backup and disposable restore** for the last successful
+  restore report. Until a successful run exists, status is **unverified**.
+- B2 downloads retry interrupted reads and transient 408/429/500/502/503/504
+  responses up to three attempts (1s, then 2s delay); other errors fail closed.
+  The custom-format dump briefly uses a mode-0600 plaintext file in a private
+  temporary directory, removed on ordinary success/failure; an uncatchable
+  process termination may leave it behind. The hosted job has an unconditional
+  runner-directory cleanup step; inspect and securely remove leftovers on a
+  self-hosted runner after a hard kill. Never upload the plaintext file.
+  Upload PUTs are not automatically retried, avoiding silent extra object
+  versions. A failed upload can leave an orphaned object; inspect the bucket
+  and report before any explicitly authorized cleanup or retry.
+- `BACKUP_ALERT_WEBHOOK` is optional for the scheduled production workflow;
+  without a configured sink, only a failed Actions run is visible. It is not
+  proof of delivery, and it cannot independently detect a missing scheduled
+  run. Owner should check the latest success against the 24-hour target and
+  monitor B2's total and hidden-version usage; on missed backup, failed drill,
+  unexpected storage growth or access change, escalate to the repository
+  owner, preserve run links and investigate before any deletion or deployment.
+- The backup is a public-schema database export, not Auth, Storage files,
+  configuration or a traffic cutover. Backup and restore report sums and
+  counts, not full hosted row fingerprints. Restore command duration alone is
+  not an end-to-end service RTO.
+
 ### B4. Measuring the RTO — honestly
 
 **RTO is currently UNMEASURED.** The first successful drill produces the
@@ -282,7 +366,7 @@ not as the restore duration alone:
 |---|---|---|
 | Dispatch → green (the rehearsal RTO) | the run's start and end timestamps in the Actions UI | not the service RTO — it excludes detection, decision, traffic cutover, Auth/Storage/Realtime, DNS and Vercel |
 | Restore duration | `RESTORE_SECONDS`, measured inside the job around the restore step | not the RTO; it excludes download, verification and cleanup |
-| RPO | the daily schedule ⇒ **≤ 24 h of data at risk** | not zero; PITR (Package 3) is what tightens it |
+| RPO target | daily schedule targets 24 h between successful backups | not a guarantee: missed/failed/delayed jobs can exceed 24 h; monitor the latest verified backup independently. PITR (Package 3) is separate. |
 | Drill RPO | newest artifact's `createdAt` vs the run start | this is the honest bound the drill actually proves |
 
 Record all four. Set the launch RTO target **from the measured rehearsal

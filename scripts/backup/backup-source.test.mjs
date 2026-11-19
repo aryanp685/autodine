@@ -124,3 +124,21 @@ test('the runbooks and the code state the same rule', () => {
 test('the constant the rule is built on is the real transaction-pooler port', () => {
   assert.equal(TRANSACTION_POOLER_PORT, '6543');
 });
+
+test('staging backup requires the designated non-production project and bucket', async () => {
+  const { stagingSourceDecision } = await import('./validate-staging-source.mjs');
+  const ref = 'abcdefghijklmnopqrst';
+  const base = { sourceUrl: `postgresql://postgres:secret@db.${ref}.supabase.co:5432/postgres`, expectedRef: ref, bucket: 'autodine-stage', expectedBucket: 'autodine-stage' };
+  assert.equal(stagingSourceDecision(base).allowed, true);
+  for (const change of [
+    { expectedRef: '' }, { expectedRef: 'aaaaaaaaaaaaaaaaaaaa' }, { expectedBucket: 'other-bucket' },
+    { sourceUrl: `postgresql://postgres:secret@db.bdbaqpevwmgdvghszjno.supabase.co:5432/postgres`, expectedRef: 'bdbaqpevwmgdvghszjno' },
+    { sourceUrl: `postgresql://postgres.${ref}:secret@aws-0-us-east-1.pooler.supabase.com:6543/postgres` },
+    { sourceUrl: `${base.sourceUrl}?host=attacker.example` },
+    { sourceUrl: 'postgresql://postgres:secret@127.0.0.1/db' },
+  ]) {
+    const decision = stagingSourceDecision({ ...base, ...change });
+    assert.equal(decision.allowed, false, JSON.stringify(change));
+    assert.doesNotMatch(decision.reason, /secret|postgresql:\/\//);
+  }
+});
