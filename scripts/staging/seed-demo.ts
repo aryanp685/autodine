@@ -26,8 +26,22 @@
  * does not carry over to another, and no standing permission exists to
  * seed any project at any time.
  *
+ * WHY THE DESIGNATED LIST COMES FROM THE ENVIRONMENT
+ *
+ * The list of projects the owner has designated to carry demo data is NOT
+ * in this repository. An earlier revision hard-coded one candidate ref as
+ * "the approved project"; that ref was never owner-designated, and leaving
+ * it in the code meant a project nobody had approved could be seeded by
+ * anyone who could set the phrase. The list is therefore supplied per run
+ * through `AUTODINE_DEMO_SEED_APPROVED_REFS`, and the target must be an
+ * exact member of it. The target ref never authorises itself.
+ *
  * CONFIGURATION (environment only; no value is ever printed)
  *
+ *   AUTODINE_DEMO_SEED_APPROVED_REFS   comma-separated list of the projects
+ *                                       the owner has designated for demo
+ *                                       data (required; the target must be
+ *                                       an exact member)
  *   AUTODINE_DEMO_SEED_TARGET_REF      the project ref to seed (required)
  *   AUTODINE_DEMO_SEED_AUTHORIZATION   must be `seed-demo:<ref>` (required)
  *   AUTODINE_DEMO_SEED_TARGET_URL      optional connection string; when
@@ -38,11 +52,11 @@
  * only); 2 = usage error.
  */
 import {
-  DEMO_SEED_APPROVED_PROJECT_REFS,
   DEMO_SEED_DEFAULT_SLUG,
   checkDemoSeedSqlScope,
   demoSeedAuthorizationPhrase,
   evaluateDemoSeed,
+  parseDemoSeedApprovedRefs,
 } from '../../lib/staging/demo-seed-isolation';
 
 function fail(message: string): never {
@@ -55,15 +69,21 @@ async function main(): Promise<void> {
   const authorization = process.env.AUTODINE_DEMO_SEED_AUTHORIZATION ?? '';
   const targetUrl = process.env.AUTODINE_DEMO_SEED_TARGET_URL ?? '';
   const slug = (process.env.AUTODINE_DEMO_SEED_SLUG ?? DEMO_SEED_DEFAULT_SLUG).trim().toLowerCase();
+  const designated = parseDemoSeedApprovedRefs(process.env.AUTODINE_DEMO_SEED_APPROVED_REFS);
 
   // The guard runs FIRST, before anything that reads the environment for
   // anything else, and before the fixture module is loaded. A refusal must
   // be the only thing the operator sees.
-  const decision = evaluateDemoSeed({ targetRef, authorization, targetUrl, slug });
+  const decision = evaluateDemoSeed({ targetRef, authorization, targetUrl, slug, approvedRefs: designated.refs });
   if (!decision.allowed) {
+    const reasons = [...decision.reasons];
+    // A malformed entry in the designated list is the operator's typo, and
+    // naming the offending shape (never a value) is enough to fix it.
+    if (designated.malformed.length) reasons.push('malformed-designated-project-ref');
     fail(
-      `Demo seed refused: ${decision.reasons.join(', ')}.\n` +
-        `  The approved demo projects are: ${DEMO_SEED_APPROVED_PROJECT_REFS.join(', ')}.\n` +
+      `Demo seed refused: ${[...new Set(reasons)].join(', ')}.\n` +
+        '  The designated demo projects must be supplied by the owner in ' +
+        'AUTODINE_DEMO_SEED_APPROVED_REFS (comma-separated); nothing is authorised by default.\n' +
         `  Authorise this target with AUTODINE_DEMO_SEED_AUTHORIZATION=${demoSeedAuthorizationPhrase(decision.ref || '<ref>')}\n` +
         '  (the phrase names the project, so an authorisation never carries over to another one).',
     );

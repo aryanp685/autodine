@@ -13,7 +13,8 @@
  * So the seed is only ever PRODUCED for a project that is
  *
  *   1. not a Production project,
- *   2. on an explicit allowlist of projects approved to carry demo data, and
+ *   2. named by an EXPLICIT, independently supplied list of projects the owner
+ *      has designated to carry demo data, and
  *   3. authorised for THIS run, by a phrase that names the target.
  *
  * All three are checked here, before any SQL exists. The guard is pure and
@@ -24,7 +25,7 @@
  *
  * A SECOND GUARD, ON THE SQL ITSELF
  *
- * Naming an approved project is not enough: the SQL must not be able to
+ * Naming a designated project is not enough: the SQL must not be able to
  * reach anything else. `checkDemoSeedSqlScope` therefore re-reads the
  * generated seed and refuses it unless every row id it writes belongs to
  * the demo fixture, it touches only `public.` tables, it contains no
@@ -34,12 +35,12 @@
  *
  * HONEST LIMITS
  *
- * The guard proves that the seed targets an approved demo project and that
- * its SQL is confined to the demo fixture's own rows. It cannot prove that
- * an approved demo project contains no real customer — a project becomes
- * real long after it was approved, and only the owner can see that. The
- * per-run authorisation phrase is what makes that a human decision each
- * time rather than a standing permission.
+ * The guard proves that the seed targets a project the owner designated for
+ * demo data and that its SQL is confined to the demo fixture's own rows. It
+ * cannot prove that a designated demo project contains no real customer — a
+ * project becomes real long after it was designated, and only the owner can
+ * see that. The per-run authorisation phrase is what makes that a human
+ * decision each time rather than a standing permission.
  *
  * The slug is checked for shape only, because it cannot hurt: the seed
  * writes one fixed restaurant id, so a slug that already belongs to a
@@ -66,12 +67,57 @@ export const DEMO_SEED_DEFAULT_SLUG = 'saffron-smoke';
 /**
  * The projects the demo seed may target.
  *
- * Hard-coded on purpose: the allowlist is code, so it is reviewed, so it
- * cannot be widened by an environment variable or a stray secret. It is the
- * same approved staging project the acceptance environment and the read-only
- * probe already use (asserted to be, by a test).
+ * EMPTY ON PURPOSE.
+ *
+ * An earlier revision of this file hard-coded one project ref here and
+ * called it "the approved demo project". That ref was only ever a
+ * CANDIDATE — it was never designated by the owner as the Staging target,
+ * and the designation decision (register O-B1) is still open. Hard-coding it
+ * turned a historical candidate into standing authorisation: anyone who
+ * could set the per-run phrase could seed a project nobody had approved.
+ *
+ * The designated list is therefore NOT in the code. It is supplied, per
+ * run, from outside the repository, by whoever the owner has authorised to
+ * run the seed — and the target must be an EXACT member of that list. The
+ * target ref cannot authorise itself: the guard never derives the approved
+ * set from the ref it is checking.
+ *
+ * A test asserts this list stays empty, so a careless edit that re-adds a
+ * ref fails CI rather than silently re-authorising a project.
  */
-export const DEMO_SEED_APPROVED_PROJECT_REFS: readonly string[] = ['juwyhslzchjevqkdvwjm'];
+export const DEMO_SEED_APPROVED_PROJECT_REFS: readonly string[] = [];
+
+/**
+ * Parses the owner-supplied list of designated demo projects.
+ *
+ * Accepts a comma-separated string (the environment form) or an array.
+ * Entries are normalised to lower case; empty entries are dropped.
+ *
+ * Malformed entries are NOT dropped silently: they are returned so the
+ * caller can refuse the whole list. A list that cannot be read exactly is a
+ * list nobody can rely on, and "fail closed on an unreadable allowlist" is
+ * the only safe reading of it.
+ */
+export function parseDemoSeedApprovedRefs(raw: string | readonly string[] | undefined): {
+  refs: string[];
+  malformed: string[];
+} {
+  const entries = Array.isArray(raw)
+    ? raw.map((entry) => String(entry ?? ''))
+    : String(raw ?? '').split(',').map((entry) => String(entry ?? ''));
+  const refs: string[] = [];
+  const malformed: string[] = [];
+  for (const entry of entries) {
+    const ref = entry.trim().toLowerCase();
+    if (!ref) continue;
+    if (!PROJECT_REF_RE.test(ref)) {
+      malformed.push(ref);
+      continue;
+    }
+    if (!refs.includes(ref)) refs.push(ref);
+  }
+  return { refs, malformed };
+}
 
 /**
  * The phrase an operator must present to authorise one specific target.
@@ -93,7 +139,11 @@ export type DemoSeedTarget = {
   authorization?: string;
   /** The demo slug to seed under. */
   slug?: string;
-  /** Overrides the approved refs. Used by tests; never widens Production. */
+  /**
+   * The projects the owner has designated to carry demo data. Supplied from
+   * OUTSIDE the repository, per run. When absent, the (empty) default applies
+   * and nothing is seedable.
+   */
   approvedRefs?: readonly string[];
   /** Extra refs that must never be seeded. */
   productionRefs?: readonly string[];
@@ -128,10 +178,18 @@ function isSupabaseHost(host: string): boolean {
 /**
  * Decides whether the demo seed may be produced for a target.
  *
- * The order matters: the target must first be shown to be a plausible,
- * non-Production, approved project, and only then is the caller asked for
- * an authorisation. A refusal never reveals a secret, and never echoes the
- * connection string.
+ * The order matters:
+ *
+ *   1. the target must be present and shaped like a project ref;
+ *   2. Production is refused outright — before the designated list, before
+ *      any opt-in, and before the URL is even looked at, because no later
+ *      input may unlock it;
+ *   3. the owner-supplied designated list must exist and must be readable
+ *      exactly — an absent or malformed list refuses;
+ *   4. the target must be an EXACT member of that list;
+ *   5. only then is the caller asked for a per-run authorisation.
+ *
+ * A refusal never reveals a secret, and never echoes the connection string.
  */
 export function evaluateDemoSeed(target: DemoSeedTarget): DemoSeedDecision {
   const ref = normaliseRef(target?.targetRef);
@@ -144,7 +202,16 @@ export function evaluateDemoSeed(target: DemoSeedTarget): DemoSeedDecision {
   // Production first, and no option unlocks it.
   if (productionRefsOf(target ?? {}).includes(ref)) return refuse('production-project-ref');
 
-  if (!approvedRefsOf(target ?? {}).includes(ref)) return refuse('unapproved-project-ref');
+  // The designated list must be supplied from outside the repository. With
+  // no list, nothing is seedable — a historical candidate project is not
+  // authorisation.
+  const approved = approvedRefsOf(target ?? {});
+  if (approved.length === 0) return refuse('no-designated-projects');
+  // A list that cannot be read exactly is refused whole: a malformed entry
+  // means the list the operator supplied is not the list they meant.
+  if (approved.some((entry) => !PROJECT_REF_RE.test(entry))) return refuse('malformed-designated-project-ref');
+
+  if (!approved.includes(ref)) return refuse('undesignated-project-ref');
 
   const url = String(target?.targetUrl ?? '').trim();
   if (url) {

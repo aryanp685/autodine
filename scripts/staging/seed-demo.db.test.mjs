@@ -30,8 +30,14 @@ import { join } from 'node:path';
 import pg from 'pg';
 
 const ROOT = process.cwd();
-const APPROVED = 'juwyhslzchjevqkdvwjm';
-const PHRASE = `seed-demo:${APPROVED}`;
+/**
+ * A project the owner has designated for demo data, supplied the way the
+ * CLI requires it: from outside the repository, per run. The database here
+ * is a disposable local cluster, so the ref only has to name the target the
+ * guard checks — it never reaches a hosted project.
+ */
+const DESIGNATED = 'aaaaaaaaaaaaaaaaaaaa';
+const PHRASE = `seed-demo:${DESIGNATED}`;
 const DEMO_RESTAURANT_ID = '00000000-0000-4000-8000-000000000001';
 /** A stand-in for a real customer's restaurant. */
 const OTHER = {
@@ -58,7 +64,8 @@ function seedSql() {
     encoding: 'utf8',
     env: {
       ...process.env,
-      AUTODINE_DEMO_SEED_TARGET_REF: APPROVED,
+      AUTODINE_DEMO_SEED_APPROVED_REFS: DESIGNATED,
+      AUTODINE_DEMO_SEED_TARGET_REF: DESIGNATED,
       AUTODINE_DEMO_SEED_AUTHORIZATION: PHRASE,
     },
   });
