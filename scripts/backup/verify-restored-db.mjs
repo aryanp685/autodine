@@ -59,8 +59,7 @@ if (!targetUrl || !opt.manifest || !opt.artifact) {
   process.stderr.write('verify-restored: set AUTODINE_RESTORE_TARGET_URL and pass --manifest <path> --artifact <path>\n');
   process.exit(2);
 }
-let host;
-try { host = new URL(targetUrl).hostname; } catch {
+try { new URL(targetUrl); } catch {
   process.stderr.write('verify-restored: AUTODINE_RESTORE_TARGET_URL is not a valid URL\n');
   process.exit(2);
 }

@@ -190,7 +190,7 @@ const UNKNOWN = 'UNKNOWN';
  * facts behind it. A package never claims more than it checked.
  */
 function buildPackages(context) {
-  const { repoSecrets, workflows, prs, names } = context;
+  const { workflows, prs, names } = context;
   const packages = [];
 
   /* Package 1 — B2 backup + artifact verification */

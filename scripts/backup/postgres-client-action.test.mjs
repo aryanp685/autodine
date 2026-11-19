@@ -143,12 +143,10 @@ function mockSystem() {
   const bin = path.join(root, 'bin');
   mkdirSync(bin);
 
-  const real = {
-    sudo: realBinary('sudo'),
-    aptGet: realBinary('apt-get'),
-    curl: realBinary('curl'),
-    install: realBinary('install'),
-  };
+  // The real binaries are resolved here so the mocks below can never be
+  // mistaken for them, and so the harness fails loudly if the machine
+  // lacks them.
+  for (const name of ['sudo', 'apt-get', 'curl', 'install']) realBinary(name);
 
   // Mock sudo: run the command it was given. The script is invoked as
   // `sudo <absolute command> <args...>`, so "$@" is already the command —
