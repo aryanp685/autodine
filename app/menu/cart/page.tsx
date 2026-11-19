@@ -61,7 +61,8 @@ export default async function CartPage({
         tableLabel={
           access.status === 'verified' || access.status === 'browse' ? access.tableLabel : null
         }
-        taxRateBps={data?.taxRateBps}
+        taxRateBps={data?.gst.rateBps ?? undefined}
+        gstMode={data?.gst.mode}
         // With no restaurant resolved on a CONFIGURED deployment: show the
         // empty state rather than a menu of prices that came from nowhere.
         // With no database at all, the demo menu is the only menu there is --

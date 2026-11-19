@@ -1,4 +1,4 @@
-# Production migration manifest — 2026-11-14 (all 94 files accounted for; updated 2026-11-19)
+# Production migration manifest — 2026-11-14 (all 102 files accounted for; updated 2026-11-19)
 
 **Generated from `supabase/migrations/` on branch `arena/9b120325-autodine`;
 extended 2026-11-16 on `arena/2670dd12-autodine`; extended 2026-11-19 on
@@ -7,9 +7,13 @@ Purpose: nothing reaches production without appearing in this table with a
 classification and the probe that confirms (or refutes) its presence. Counts:
 **76 legacy-rollout-scope · 10 branch set (pending owner authorization B1) ·
 7 GST/IRP Phase B (NOT AUTHORIZED) · 1 scoped ACL revision
-(`20261116000100`, pending its own authorization)**. Zero duplicate versions
-(checked 2026-11-14; rechecked 2026-11-16, `migrations:verify` 93/93;
-rechecked 2026-11-19, 99/99). The release-prep document
+(`20261116000100`, pending its own authorization)** — plus three local
+remediation migrations added 2026-11-19 (`20261119000100`–`20261119000300`),
+plus one announcement claim-recovery (`20261119000400`), none of the four
+authorized for hosted application except announcement recovery (already
+applied to both hosted projects, see row). Zero duplicate versions (checked
+2026-11-14; rechecked 2026-11-16 at 93/93 and 2026-11-19 at 102/102). The
+release-prep document
 (`docs/production-release-prep-2026-11-14.md`) binds this manifest into the
 ordered release sequence.
 
@@ -121,7 +125,10 @@ without separate written authorization each.
 | `20261115000300` | `audit_restaurant_account_reassignment` | Branch set — apply only with B1 (release prep §2) | P0 security — account-reassignment audit ledger |
 | `20261118000100` | `merge_boundary_gst_order_line_edits` | PR #191 main-merge reconciliation (2026-11-16) | Re-asserts main's order-line edit boundary (owner/manager/cashier only; Kitchen 42501) on the GST replacement; NOT AUTHORIZED for hosted application by this merge |
 | `20261116000100` | `revoke_client_maintain_privileges` | Scoped ACL revision — NOT AUTHORIZED (own decision; production substitute for `20261110001220`, see its probed row) | Added 2026-11-16 after production catalog probes: completes the MAINTAIN/default-ACL scope 01220 misses in the production-shaped catalog, with fail-closed post-revoke verification; sequence revokes justified by definer-only consumption (verified in source). Locally replay-tested; never applied to any hosted project |
-| `20261119000100` | `announcement_claim_recovery` | Branch set — announcement delivery reliability (order claim stale-expiry + waiter-call poll index) | Added 2026-11-19: fixes `claim_kitchen_order_announcement` to expire stale `kitchen_announcement_claims` (>2 min) before INSERT so a crashed device does not hold the announcement forever; mirrors waiter-call API re-queue of `announcement_status='claimed'` >2 min; adds `table_waiter_calls_announcement_claimed_idx` for efficient poll. Applied to hosted autodine-production (20261119101116) and autodinetest (20261119101121). `migrations:verify` 99/99; `sql:check` DDL parses. |
+| `20261119000100` | `restore_receipt_helper_boundary` | Local remediation — NOT AUTHORIZED for hosted application | Restores the P8 boundary loosened by `20261114000101`: revokes EXECUTE on `issue_closed_session_receipt(uuid,jsonb)` from public/anon/authenticated/service_role, so settlement continues to go through `close_order_session_and_issue_receipt`. Verified by `supabase/checks/07_p8_close_settlement.sql` in the local harness |
+| `20261119000200` | `new_outlet_tax_default` | Local remediation — NOT AUTHORIZED for hosted application | Owner decision (2026-11-19): new restaurants start at `tax_rate_bps = 0` instead of the sample 500 bps; existing rows are unchanged and the owner sets a rate explicitly |
+| `20261119000300` | `public_guest_gst_quote` | Local remediation — NOT AUTHORIZED for hosted application | Adds the guest-only `public_restaurant_gst(text)` projection (mode plus the closed Regular profile rate, never tenant identity) so the cart quote matches `place_public_order` in off, composition and regular modes |
+| `20261119000400` | `announcement_claim_recovery` | Branch set — announcement delivery reliability (order claim stale-expiry + waiter-call poll index) | Added 2026-11-19: fixes `claim_kitchen_order_announcement` to expire stale `kitchen_announcement_claims` (>2 min) before INSERT so a crashed device does not hold the announcement forever; mirrors waiter-call API re-queue of `announcement_status='claimed'` >2 min; adds `table_waiter_calls_announcement_claimed_idx` for efficient poll. Applied to hosted autodine-production (20261119101116) and autodinetest (20261119101121). `migrations:verify` 102/102; `sql:check` DDL parses. |
 
 ## Owner-operation (never applied automatically — separate on purpose)
 
@@ -141,9 +148,9 @@ without separate written authorization each.
   boundary. Apply in filename order, only under B1 authorization, per release
   prep §2. `20261112000300_report_sales_export_authorization` is already applied
   on **staging only** (2026-11-15 rehearsal); production presence is unverified.
-  `20261119000100_announcement_claim_recovery` is an in-scope reliability fix
+  `20261119000400_announcement_claim_recovery` is an in-scope reliability fix
   (delivery guarantee, no data exposure) already applied to both hosted projects
-  (see table row); it does not require B1 but is tracked here for 99/99
+  (see row); it does not require B1 but is tracked here for 102/102
   completeness.
 - **GST/IRP Phase B (7):** `20261113000100` → `20261114000600` (B1–B7 in
   `docs/gst-irp-production-readiness-2026-11-14.md`). **NOT AUTHORIZED. Do not

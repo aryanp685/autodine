@@ -339,9 +339,11 @@ describe.skipIf(!URL_VALUE)('Phase 6D restaurant account-link guard', () => {
       )).rows[0].id as string;
       await db.query('reset role');
       const link = (await db.query(
-        'select account_id from public.restaurants where id=$1', [created],
-      )).rows[0].account_id;
-      expect(link).toBeTruthy();
+        'select account_id, tax_rate_bps from public.restaurants where id=$1', [created],
+      )).rows[0];
+      expect(link.account_id).toBeTruthy();
+      // A new outlet starts at 0% until the owner sets the rate.
+      expect(Number(link.tax_rate_bps)).toBe(0);
       expect((await db.query('select count(*)::int n from public.memberships where restaurant_id=$1 and user_id=$2 and role=\'owner\'', [created, signupOwner])).rows[0].n).toBe(1);
     } finally {
       await db.query('rollback');
@@ -358,10 +360,14 @@ describe.skipIf(!URL_VALUE)('Phase 6D restaurant account-link guard', () => {
       const membership = (await db.query(
         "select role from public.memberships where restaurant_id=$1 and user_id=auth.uid()", [id],
       )).rows[0];
-      return { id, account_id: access.account_id, membership: membership.role };
+      const tax = (await db.query(
+        'select tax_rate_bps from public.restaurants where id=$1', [id],
+      )).rows[0].tax_rate_bps;
+      return { id, account_id: access.account_id, membership: membership.role, tax_rate_bps: tax };
     });
     expect(outlet.account_id).toBe(a.target.account);
     expect(outlet.membership).toBe('owner');
+    expect(Number(outlet.tax_rate_bps)).toBe(0);
   });
 
   it('retains the audited entitlement function grants and makes no probe-grant change', async () => {

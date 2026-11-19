@@ -15,7 +15,7 @@ on:
         type: string
   push:
     branches:
-      - arena/e9e78732-autodine
+      - main
 
 permissions:
   contents: read
