@@ -4,10 +4,15 @@ Everything the owner must do, in order, with the exact values, the exact
 permissions, and the exact authorization each step needs — and nothing that
 this repository may do on the owner's behalf.
 
-**Status (2026-11-18): NOT RUN.** No B2 bucket, no application key, no
+**Status (2026-11-19): NOT RUN.** No B2 bucket, no application key, no
 repository secret, no hosted backup run and no hosted restore rehearsal
 exists. The implementation is complete and locally verified; only the
 credentials and the authorized runs are missing.
+
+**One technical prerequisite was cleared on 2026-11-19:** PR #190 (the
+drill's registration fix) merged, so the restore drill is registered **by
+name** and can be dispatched at all. Before that it could not be, which is
+why every step below was blocked behind it.
 
 > **Authority boundary — read this first.**
 > Section A is **owner action**: creating a paid-service account, a private
@@ -31,7 +36,7 @@ credentials and the authorized runs are missing.
 | **Technical implementation** | ✅ **DONE and locally verified** | `scripts/backup/{backup-logical,upload-b2,download-b2,prune-b2,restore-logical,verify-restored-db,lib-b2,lib-crypto,lib-dump}.mjs`, `.github/workflows/hosted-backup.yml`, `.github/workflows/hosted-restore-drill.yml`, the restore-target guard and the PostgreSQL 17 composite action. |
 | **Owner action (credentials + bucket)** | ❌ **NOT DONE** | Sections A1–A5 below. Only the owner can do these. |
 | **Hosted verification** | ❌ **NOT RUN** | Sections B1–B4 below. A human must authorize each dispatch. |
-| **Blocking technical prerequisite** | ❌ **PR #190 unmerged** | The restore drill does not register by name until it merges. One file, +4/−3. |
+| **Blocking technical prerequisite** | ✅ **CLEARED 2026-11-19** | PR #190 (the drill's registration fix) merged on 2026-11-19, so the drill is registered **by name** and can be dispatched. Nothing else blocks the runs below. |
 
 **Nothing in the technical column is a substitute for the other two.** A
 green local suite is not a backup; a bucket without a verified restore is not
@@ -225,12 +230,21 @@ fails.
 2. It downloads the newest artifact (SHA-256 verified against its manifest), restores into the disposable container, verifies the schema fingerprint, row counts and financial sums, and then **always** destroys the downloaded material — the cleanup step runs even when the job fails.
 3. Nothing here can reach Production: the workflow uses no production connection string at all.
 
-> **Prerequisite:** the drill must be **registered by name**. Today it is
-> registered only as a file path, because the job-level `env:` block used
-> the `runner` context, which GitHub Actions does not expose there. Until
-> PR #190 is merged, the drill cannot be dispatched by name at all. Confirm
-> with `gh workflow list` — the drill must appear as a *name*, not as
-> `.github/workflows/hosted-restore-drill.yml`.
+> **Prerequisite — CLEARED 2026-11-19:** the drill must be **registered by
+> name**, and it now is. The defect was real: the job-level `env:` block
+> used the `runner` context, which GitHub Actions does not expose there, so
+> the workflow never registered and appeared only as a file path. PR #190
+> fixed it and merged on 2026-11-19 (merge commit `ff00d38`); the live
+> preflight now reports the drill **by name**
+> (`Hosted restore rehearsal (disposable)`).
+>
+> Confirm before dispatching — it must appear as a *name*, not as
+> `.github/workflows/hosted-restore-drill.yml`:
+>
+> ```
+> npm run hosted:preflight
+> gh workflow list --repo aryanp685/autodine
+> ```
 
 ### B3a. If you restore into a real scratch project instead (manual, optional)
 
@@ -241,7 +255,7 @@ project does engage them, and the project-ref requirements are exact:
 | Variable | Requirement |
 |---|---|
 | `AUTODINE_RESTORE_TARGET_URL` | A connection string for the **scratch** project. Either pooler works: `pg_restore` imports no exported snapshot, so session affinity is not required here (unlike the *source* — see §A4). |
-| `AUTODINE_RESTORE_EXPECTED_REF` | The scratch project's 20-character ref, e.g. `juwyhslzchjevqkdvwjm`. The guard reads the target's **own** ref back out of the URL and refuses unless it equals this one. |
+| `AUTODINE_RESTORE_EXPECTED_REF` | The scratch project's 20-character ref — **the scratch project the owner has actually designated**, e.g. `<your-scratch-project-ref>`. The guard reads the target's **own** ref back out of the URL and refuses unless it equals this one. **Do not reuse a candidate project here:** the acceptance environment's historical candidate ref is not a designated target (register O-B1 is still open), and pointing a restore at it would be an owner decision, not a default. |
 | Scratch opt-in | The guard requires an explicit scratch opt-in **as well as** the ref. The opt-in alone is not enough, and the ref alone is not enough. |
 
 **Production is refused outright and no flag unlocks it** — not the scratch
@@ -319,7 +333,7 @@ every line is still open. Tick a line only when its evidence exists.
 
 | # | Action | Authorization | Accept only if |
 |---|---|---|---|
-| 10 | Merge PR #190 (technical, owner decision) | the owner merges it | the drill registers **by name** in `gh workflow list` |
+| 10 | ~~Merge PR #190~~ — **DONE 2026-11-19** | merged as `ff00d38` | ✅ the drill registers **by name** in `gh workflow list` |
 | 11 | Dispatch **Hosted backup (B2)** | explicit go-ahead for that workflow | output shows `uploaded:true, verified:true`; manifest archived; manifest carries `counts` **and** `financialSpotChecks` |
 | 12 | Dispatch **Hosted restore rehearsal (disposable)** | explicit go-ahead for that workflow | green, zero unexplained deltas, cleanup confirmed, download artifact destroyed |
 | 13 | Record the rehearsal RTO | — | all four quantities from §B4 recorded |

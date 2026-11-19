@@ -35,6 +35,8 @@ import { fileURLToPath } from 'node:url';
 
 const REPO = process.env.AUTODINE_PREFLIGHT_REPO || 'aryanp685/autodine';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+/** The branch whose deployments the preflight reports. */
+const HEAD_REF = process.env.AUTODINE_PREFLIGHT_HEAD || 'arena/88c342c2-autodine';
 
 const argv = process.argv.slice(2);
 const asJson = argv.includes('--json');
@@ -153,6 +155,36 @@ function repoRecentRuns(limit = 5) {
 }
 
 /**
+ * The most recent Vercel commit statuses: the deployment that the push
+ * produced.
+ *
+ * Read-only: the commit-status API for the branch head. This is what makes
+ * "a deployment happened" a reported fact instead of an assumption, and it
+ * distinguishes a Preview (the deployment is reported for a branch head
+ * that is not on the production branch) from a Production deployment.
+ *
+ * null when the read is refused.
+ */
+function repoHeadDeployments() {
+  const out = gh(['api', `repos/${REPO}/commits/${HEAD_REF}/status`]);
+  if (out === null) return null;
+  let parsed;
+  try {
+    parsed = JSON.parse(out);
+  } catch {
+    return null;
+  }
+  return (parsed.statuses ?? [])
+    .filter((status) => /vercel/i.test(String(status.context ?? '')))
+    .map((status) => ({
+      context: status.context ?? '',
+      state: status.state ?? '',
+      description: status.description ?? '',
+      target: status.target_url ?? '',
+    }));
+}
+
+/**
  * The presence of one configuration name.
  *
  * `local`  — is it set in this process's environment?
@@ -233,7 +265,8 @@ function buildPackages(context) {
         verdict = OWNER;
         notes.push(
           `the drill is registered only as a file path ("${asFile[0]}") — it cannot be dispatched by name; ` +
-            'merging the registration fix (PR #190) is what makes it dispatchable',
+            'the registration fix (PR #190) merged on 2026-11-19, so a file-path registration means the fix ' +
+            'is not on main yet',
         );
       } else {
         verdict = OWNER;
@@ -248,7 +281,15 @@ function buildPackages(context) {
     }
     if (prs) {
       const pr190 = prs.get(190);
-      notes.push(pr190 ? `PR #190 is ${pr190.state} (${pr190.head})` : 'PR #190 not found among open PRs');
+      // PR #190 merged on 2026-11-19, so the drill is expected to be
+      // registered by name. The note says what is actually true, rather
+      // than repeating a stale instruction to merge a pull request that
+      // is already merged.
+      notes.push(
+        pr190
+          ? `PR #190 is ${pr190.state} (${pr190.head}) — the registration fix is expected to be on main`
+          : 'PR #190 is not among the open pull requests (it merged on 2026-11-19)',
+      );
     }
     packages.push({
       id: 'restore-rehearsal',
@@ -416,6 +457,17 @@ function renderText(report) {
       lines.push(`    ${run.status}/${run.conclusion}  ${run.name} (${run.ref})`);
     }
   }
+  if (report.state.deployments === null) lines.push('  deployments: UNKNOWN (could not be read)');
+  else if (report.state.deployments.length === 0) lines.push('  deployments: none reported for the branch head');
+  else {
+    lines.push(`  deployments for ${report.headRef}:`);
+    for (const deployment of report.state.deployments) {
+      lines.push(`    ${deployment.state} — ${deployment.description}`);
+      if (deployment.target) lines.push(`      ${deployment.target}`);
+    }
+    lines.push('    (a Preview deployment is produced automatically when a branch is pushed; a Production');
+    lines.push('     deployment is what merging into the production branch produces.)');
+  }
   lines.push('');
   lines.push('PACKAGE VERDICTS (READY-TO-AUTHORIZE means the inputs are in place — not that anything was verified)');
   for (const pkg of report.packages) {
@@ -437,6 +489,7 @@ const repoSecrets = repoSecretNames();
 const workflows = repoWorkflows();
 const prs = repoPullRequests();
 const runs = repoRecentRuns();
+const deployments = repoHeadDeployments();
 
 const names = {
   backup: REQUIRED_NAMES.backup.map((n) => presenceOf(n, repoSecrets)),
@@ -450,6 +503,7 @@ const report = {
   generatedBy: 'scripts/hosted-verification/preflight.mjs',
   readOnly: true,
   repository: REPO,
+  headRef: HEAD_REF,
   names,
   state: {
     workflows: workflows
@@ -459,6 +513,7 @@ const report = {
       ? [...prs.entries()].map(([number, pr]) => ({ number, ...pr }))
       : null,
     runs,
+    deployments,
   },
   packages,
 };

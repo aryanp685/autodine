@@ -5,8 +5,30 @@ reconciles them, so nothing is merged twice, nothing is implemented twice,
 and no two pull requests fight over the same files.
 
 **Branch audited:** `arena/88c342c2-autodine` (head `66d8ad0`), built on
-`main` = `3e17c44` (693 commits). **Nothing has been pushed, merged or
-deployed.** All three pull requests remain open and untouched.
+`main` = `3e17c44` (693 commits).
+
+> **Status update — 2026-11-19.** The sentence this note replaced said
+> "Nothing has been pushed, merged or deployed. All three pull requests
+> remain open and untouched." That was true when the plan was written and
+> is **no longer true**. What has happened since:
+>
+> - **PR #190 merged** (`92c67fb` → merge commit `ff00d38`), after its head,
+>   base, diff, result blob (`793d2a3c`) and all 15 checks were verified.
+> - **PR #187 closed** as superseded by merged PR #188 (the R2 implementation
+>   would have replaced the working B2 pipeline).
+> - **The branch was pushed** (no force; history preserved) and **PR #194
+>   opened** — https://github.com/aryanp685/autodine/pull/194 — carrying this
+>   branch's shared infrastructure plus PR #192's work.
+> - **PR #192 closed** as superseded by PR #194, after every one of its
+>   changes was verified present in PR #194.
+> - **A Vercel Preview deployment was produced automatically** for PR #194's
+>   head commit by the Vercel GitHub App. It is a **Preview**, not
+>   Production; the facts are in `qa-evidence/day1/VERCEL_PREVIEW_DEPLOYMENT_EVIDENCE.md`.
+>   No deployment was created, promoted or triggered by this work.
+>
+> **PR #194 is open and unmerged, and must not be merged without the
+> owner's approval.** The rest of this document is the plan as it was
+> written, and the sequence it recommends is the sequence that was followed.
 
 ---
 

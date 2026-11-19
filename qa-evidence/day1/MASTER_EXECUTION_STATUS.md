@@ -4,9 +4,69 @@ Date: 2026-11-17 · Branch `arena/2670dd12-autodine` (sandbox HEAD `d8d0e52`) ·
 
 ---
 
+## Integration update — 2026-11-19 (PR #194 opened; PR #190 merged)
+
+**The GitHub integration actions were executed.** This section records
+what actually happened, so the dated batches below — which were accurate
+when written — are not left standing as unqualified claims.
+
+### Actions taken
+
+| PR | Action | Detail |
+|---|---|---|
+| **#190** | **MERGED** | head `92c67fbaf6c561f9283f8fd8c462e2a7923c1acd`, base `main`, 1 file +4/−3, result blob `793d2a3c` byte-identical to the reviewed diff; 15/15 checks successful; merge commit `ff00d38d0abe72bfabf85fb84ac4b3423b62b6f6` |
+| **#187** | **CLOSED** | superseded by merged PR #188 — its Cloudflare R2 implementation would have replaced the working, verified B2 pipeline on `main` |
+| **#194** | **OPENED** | `arena/88c342c2-autodine` @ `e90ab824bff191b994a63fb2b83dc461271c0faa` → `main`; 38 files, +4353/−71; pushed without force, history preserved |
+| **#192** | **CLOSED** | superseded by #194 after every one of its changes was verified present there (10 of its 12 files byte-identical; 2 supersets) |
+| **#181, #184, #188** | **untouched** | as required |
+
+### The deployment, stated accurately
+
+**A Vercel Preview deployment was produced automatically** for the PR head
+commit when the branch was pushed — deployment
+`6pFExiBEDXx7kooBgt6Puu4ksNE4`, project `new`, Preview host
+`new-git-arena-88c342c2-autodine-iamjarvis9896-3988s-projects.vercel.app`.
+
+It is a **Preview**, not Production: the commit is not on `main`, the
+hostname carries the branch name, and the check that carries the host is
+Vercel's Preview-comments check. **No deployment was created, promoted or
+dispatched by this work, and no Vercel setting was changed.** Merging
+PR #194 into `main` **will** trigger a Production deployment — Vercel's
+behaviour for the production branch, and a side effect of the merge rather
+than of the code.
+
+Full evidence: `qa-evidence/day1/VERCEL_PREVIEW_DEPLOYMENT_EVIDENCE.md`.
+
+### Still true
+
+**No Production or Staging database access or mutation. No hosted DDL/DML
+or migration. No workflow dispatch that touches a hosted system. No Vercel
+Production deployment or configuration change. No Brevo, Supabase Auth or
+paid-service change. No secret value read, printed or copied. No PR merged
+except the one the owner explicitly approved (#190).** PR #194 is open and
+unmerged.
+
+### Decision unchanged: NO-GO
+
+The launch decision remains **NO-GO**, on hosted evidence and owner
+decisions, with zero open P0 code defects. See
+`MASTER_LAUNCH_READINESS.md`.
+
+---
+
 ## Integration update — 2026-11-18 (PR #192 onto current `main`)
 
-The run narrative below is the 2026-11-17 record and is left exactly as written. This section states what changed since, on branch `arena/88c342c2-autodine` (base `main` = `3e17c44`). Still no push, no PR merge, no deployment, no hosted setting change, no migration, no workflow dispatch.
+The run narrative below is the 2026-11-17 record and is left exactly as written. This section states what changed since, on branch `arena/88c342c2-autodine` (base `main` = `3e17c44`).
+
+> **Superseded by the 2026-11-19 section below.** As of this batch there
+> was no push, no PR merge and no deployment. That is no longer true: the
+> branch was pushed, PR #194 was opened, PR #190 was merged, PRs #187 and
+> #192 were closed, and a Vercel **Preview** deployment was produced
+> automatically for the PR head commit. See the 2026-11-19 section and
+> `qa-evidence/day1/VERCEL_PREVIEW_DEPLOYMENT_EVIDENCE.md`. What remains
+> true of this batch is unchanged: no hosted setting change, no migration,
+> no workflow dispatch, no Production/Staging mutation, no secret value
+> accessed or printed.
 
 **Integrated.** PR #192's operational-incident functionality (`d679a9e`) and its Brevo incident documentation (`e9b247d`, `e3ad205`) are now on top of current `main`, reconciled rather than merged wholesale. All five upstream code blobs are byte-identical to upstream: `app/auth/actions.ts` `142a8fe1`, `app/api/ops/incidents/route.ts` `f2f16c62`, `app/api/ops/incidents/route.test.ts` `a4ab4d66`, `lib/incident-registry.ts` `ae6dc412`, `app/(staff)/dashboard/settings/team-actions.ts` `5fae647d`. `app/auth/actions.test.ts` is the union of main's Auth coverage and PR #192's six operator-visibility tests — 24 tests across 6 describes, all green.
 
@@ -24,7 +84,7 @@ The run narrative below is the 2026-11-17 record and is left exactly as written.
 
 ## Audit & deliverable batch — 2026-11-18 (branch `arena/88c342c2-autodine`)
 
-A read-only audit batch plus three documents. Still **no push, no PR merge, no deployment, no hosted setting change, no migration, no workflow dispatch, no Production/Staging mutation, no secret value accessed or printed**.
+A read-only audit batch plus three documents. At the time of this batch: **no push, no PR merge, no deployment, no hosted setting change, no migration, no workflow dispatch, no Production/Staging mutation, no secret value accessed or printed**. (The push, the PR and the automatic Preview deployment are later events — see the 2026-11-19 section.)
 
 **Branch diff audited against `main` (`3e17c44`, 693 commits), PR #190 and PR #192.** 32 files differ from `main` (27 committed + 5 added here). Every one is attributed: **4** PR #192 implementation files (byte-identical to upstream `e3ad205`), **3** more PR #192 files already in `main` (merged earlier by `ef5f549`/`ab541ee` — byte-identical, so they do not appear in the diff at all), **4** PR #192 documents (also byte-identical to upstream; newer than `main`'s), **1** PR #190 file (`hosted-restore-drill.yml`, its result blob `793d2a3c` carried byte-identically), and **23** shared-infrastructure files that belong to no open PR. Full attribution table: `docs/operations/PR_INTEGRATION_PLAN.md`.
 
@@ -139,6 +199,14 @@ Read-only preparation and validation of the integration plan. **No push, no
 PR creation, no merge, no deployment, no workflow dispatch, no hosted
 database access or mutation, no B2 credential inspection, no Vercel change,
 no GST change.** No PR was closed. Every existing commit is preserved.
+
+> **Superseded by the 2026-11-19 section below.** This batch was
+> read-only; the push, PR #194, the PR #190 merge and the closures of
+> PR #187 and PR #192 happened afterwards. The Vercel change is still
+> accurate in spirit and precise in fact: no Vercel *setting* was ever
+> changed — the only deployment event is the automatic **Preview** build
+> the GitHub App produced for the pushed branch, recorded in
+> `qa-evidence/day1/VERCEL_PREVIEW_DEPLOYMENT_EVIDENCE.md`.
 
 **Branch and ancestry.** HEAD `544355b` (the demo-seed guard), parent
 `280c2d3`, merge-base with `main` `3e17c44` — which is the merge commit of
