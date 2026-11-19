@@ -34,19 +34,19 @@ export function ForgotPasswordScreen({ error, notice }: { error?: string; notice
       action={{ prompt: 'Remembered it?', label: 'Sign in', href: '/login' }}
       notesTitle="What happens next"
       notes={[
-        <>
+        <span key="inbox">
           <strong>Check the inbox</strong> for the address you signed up with, including spam.
-        </>,
-        <>
+        </span>,
+        <span key="open">
           <strong>Open the link</strong> in the same browser you asked from.
-        </>,
-        <>
+        </span>,
+        <span key="choose">
           <strong>Choose a new password</strong> of at least 10 characters. That signs out every
           other device.
-        </>,
-        <>
+        </span>,
+        <span key="none">
           <strong>No email after a few minutes?</strong> Check spam and confirm the address is correct. Requests can be rate-limited; wait a few minutes before trying again. For privacy, this page does not confirm whether an account exists.
-        </>,
+        </span>,
       ]}
     >
       {notice ? (

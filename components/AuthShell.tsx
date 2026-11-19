@@ -1,25 +1,23 @@
+'use client';
+
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { BrandMark } from '@/components/BrandMark';
 
-export const authButtonClass = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-forest px-5 py-3 text-[13px] font-medium text-white hover:bg-forest-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest disabled:cursor-not-allowed disabled:opacity-50';
+export const authButtonClass =
+  'inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-forest px-5 py-3 text-[13.5px] font-medium text-white shadow-[0_10px_26px_-14px_rgba(31,77,58,0.75)] transition-[background-color,transform,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-px hover:bg-forest-strong hover:shadow-[0_16px_32px_-14px_rgba(31,77,58,0.7)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest disabled:cursor-not-allowed disabled:opacity-55 disabled:shadow-none disabled:hover:translate-y-0 motion-reduce:transition-none motion-reduce:hover:translate-y-0';
 
 /**
  * The shell every signed-out account screen wears.
  *
- * Sign in, sign up, forgotten password and the reset form are the only four
- * pages an owner sees before they trust this thing with their restaurant. They
- * used to be the least designed screens in the product: a marketing-era
- * two-column layout, four bordered cards in the aside, and copy written for a
- * preview build that no longer exists.
+ * Sign in, sign up, forgotten password and the reset form are the first pages
+ * an owner trusts with their restaurant, so the surface is quiet: warm paper,
+ * one card, one action. The form is the only thing with contrast; everything
+ * else steps back.
  *
- * So: one column, one card, one action. The status notes are still here — they
- * are the honest part — but they sit under the card as prose rather than in a
- * second column competing with the form.
- *
- * The one flourish is the rule under the title: it turns the card from a box
- * with fields in it into a page with a head, which is what makes a form feel
- * finished rather than assembled.
+ * The visual column is optional and decorative. On a phone it is removed
+ * rather than compressed, and the card takes the full measure of the screen.
  */
 export function AuthShell({
   visual,
@@ -42,21 +40,43 @@ export function AuthShell({
   notes?: ReactNode[];
   notesTitle?: string;
 }) {
+  const reduce = useReducedMotion();
+  const rise = reduce
+    ? {}
+    : {
+        initial: { opacity: 0, y: 18 },
+        animate: { opacity: 1, y: 0 },
+        transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const },
+      };
+
   return (
-    <div data-surface="owner" data-auth-shell className="auth-forest min-h-dvh bg-paper text-gink antialiased">
-      <header className="border-b border-hair bg-white/75">
-        <div className="mx-auto flex h-14 w-full max-w-[1080px] items-center justify-between gap-4 px-5 sm:px-7">
-          <Link href="/" className="inline-flex items-baseline gap-2 text-gink">
-            <BrandMark size={24} className="translate-y-[2px]" tone="auth" />
+    <div
+      data-surface="owner"
+      data-auth-shell
+      className="relative min-h-dvh overflow-hidden bg-paper text-gink antialiased"
+    >
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_50%_at_12%_0%,rgba(31,77,58,0.07),transparent_60%),radial-gradient(50%_40%_at_92%_8%,rgba(185,138,75,0.09),transparent_62%)]"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-[#f3f0e9] to-transparent"
+      />
+
+      <header className="relative z-10 border-b border-hair/80 bg-white/70 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 w-full max-w-[1120px] items-center justify-between gap-4 px-5 sm:px-8">
+          <Link href="/" className="inline-flex items-center gap-2.5 text-gink transition-opacity hover:opacity-75">
+            <BrandMark size={25} className="translate-y-[1px]" tone="auth" />
             <span className="text-[16px] leading-none font-medium tracking-[-0.04em]">autodine</span>
           </Link>
 
           {action ? (
-            <div className="flex items-baseline gap-2 text-[12px]">
+            <div className="flex items-center gap-3 text-[12.5px]">
               <span className="hidden text-gink-46 sm:inline">{action.prompt}</span>
               <Link
                 href={action.href}
-                className="rounded-full bg-[color-mix(in_oklab,var(--p-ink)_7%,transparent)] px-3.5 py-2 font-medium text-gink transition-colors hover:bg-[color-mix(in_oklab,var(--p-ink)_11%,transparent)]"
+                className="inline-flex h-9 items-center rounded-full border border-hair bg-white/70 px-4 font-medium text-gink transition-[background-color,border-color,transform] duration-300 hover:-translate-y-px hover:border-forest/25 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest motion-reduce:transition-none motion-reduce:hover:translate-y-0"
               >
                 {action.label}
               </Link>
@@ -65,33 +85,55 @@ export function AuthShell({
         </div>
       </header>
 
-      <main data-auth-enhanced={visual ? '' : undefined} className={`mx-auto w-full max-w-[1080px] px-5 pt-10 pb-16 sm:px-7 sm:pt-14 ${visual ? 'grid items-start gap-12 lg:grid-cols-[1fr_440px] lg:gap-16 lg:pt-20' : ''}`}>
-        {visual}
-        <div className="mx-auto w-full max-w-[440px]">
-          <section data-auth-card className="rounded-[20px] border border-hair bg-card px-5 py-7 shadow-[0_16px_60px_-30px_rgba(31,77,58,0.18)] sm:px-8 sm:py-8">
-            <p className="text-[10.5px] font-semibold tracking-[0.12em] text-forest uppercase">
+      <main
+        data-auth-enhanced={visual ? '' : undefined}
+        className={`relative z-10 mx-auto grid w-full max-w-[1120px] gap-12 px-5 pt-10 pb-16 sm:px-8 sm:pt-14 lg:items-start lg:gap-16 lg:pt-16 ${
+          visual ? 'lg:grid-cols-[1.04fr_452px]' : 'max-w-[620px]'
+        }`}
+      >
+        {visual ? (
+          <motion.div {...rise} className="hidden min-w-0 lg:block">
+            {visual}
+          </motion.div>
+        ) : null}
+
+        <motion.div
+          {...rise}
+          transition={reduce ? undefined : { duration: 0.6, delay: 0.07, ease: [0.22, 1, 0.36, 1] }}
+          className={`mx-auto w-full ${visual ? 'max-w-[452px]' : 'max-w-[452px]'}`}
+        >
+          <section
+            data-auth-card
+            className="relative overflow-hidden rounded-[26px] border border-white/80 bg-white/90 px-5 py-7 shadow-[0_30px_70px_-44px_rgba(31,77,58,0.45)] backdrop-blur-xl sm:px-8 sm:py-9"
+          >
+            <span
+              aria-hidden="true"
+              className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-forest via-forest/70 to-[#b98a4b]/70"
+            />
+            <p className="flex items-center gap-2.5 text-[10.5px] font-semibold tracking-[0.14em] text-forest uppercase">
+              <span aria-hidden="true" className="h-px w-5 bg-[#b98a4b]" />
               {eyebrow}
             </p>
-            <h1 className="mt-2.5 text-[clamp(1.5rem,3.4vw,1.9rem)] leading-[1.15] font-medium tracking-[-0.04em] text-gink">
+            <h1 className="mt-3 text-[clamp(1.55rem,3.2vw,1.95rem)] leading-[1.12] font-medium tracking-[-0.045em] text-gink">
               {title}
             </h1>
-            <p className="mt-2 border-b border-hair pb-5 text-[13px] leading-[1.55] text-gink-64">
+            <p className="mt-2.5 border-b border-hair pb-5 text-[13px] leading-[1.6] text-gink-64">
               {lede}
             </p>
 
-            <div className="pt-5">{children}</div>
+            <div className="pt-6">{children}</div>
           </section>
 
           {notes && notes.length > 0 ? (
-            <aside data-auth-notes className="mt-6 px-1">
+            <aside data-auth-notes className="mt-7 px-1">
               <p className="text-[10.5px] font-semibold tracking-[0.1em] text-gink-46 uppercase">
                 {notesTitle}
               </p>
-              <ul className="m-0 mt-2.5 flex list-none flex-col gap-2 p-0">
+              <ul className="m-0 mt-3 flex list-none flex-col gap-2.5 p-0">
                 {notes.map((note, index) => (
                   <li
                     key={index}
-                    className="flex gap-2.5 text-[11.5px] leading-[1.55] text-gink-46 [&_strong]:font-medium [&_strong]:text-gink-64"
+                    className="flex gap-2.5 text-[11.5px] leading-[1.6] text-gink-46 [&_strong]:font-medium [&_strong]:text-gink-64"
                   >
                     <span
                       aria-hidden="true"
@@ -103,7 +145,21 @@ export function AuthShell({
               </ul>
             </aside>
           ) : null}
-        </div>
+
+          <nav aria-label="Account pages" className="mt-7 flex flex-wrap items-center justify-between gap-3 px-1 text-[11px] text-gink-46">
+            <span className="inline-flex items-center gap-1.5">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="4" y="10" width="16" height="11" rx="2.5" />
+                <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+              </svg>
+              Secure account access
+            </span>
+            <span className="flex gap-4">
+              <Link href="/privacy" className="transition-colors hover:text-gink">Privacy</Link>
+              <Link href="/terms" className="transition-colors hover:text-gink">Terms</Link>
+            </span>
+          </nav>
+        </motion.div>
       </main>
     </div>
   );
