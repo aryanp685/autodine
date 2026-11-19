@@ -48,11 +48,27 @@ test('the backup tool really does pick the stub up when it is on PATH', () => {
   // If the stub were not selected, the check would prove nothing: the
   // suites would pass with no client in front of them, exactly as they
   // do on a developer machine.
+  //
+  // The probe reports what it actually found, because "the stub must be
+  // the client the tool resolves" is not a diagnosis.
   const probe = spawnSync(
     process.execPath,
-    ['-e', `import { resolvePgClient } from './scripts/backup/lib-pg-client.mjs';
-      const found = resolvePgClient('pg_dump');
-      process.stdout.write(String(found && found.version));`],
+    [
+      '--input-type=module',
+      '-e',
+      `import { execFileSync } from 'node:child_process';
+       import { resolvePgClient } from './scripts/backup/lib-pg-client.mjs';
+       let raw = null; let error = null;
+       try { raw = execFileSync('pg_dump', ['--version'], { encoding: 'utf8' }); }
+       catch (e) { error = String(e && e.message); }
+       const found = resolvePgClient('pg_dump');
+       process.stdout.write(JSON.stringify({
+         raw, error,
+         version: found ? found.version : null,
+         pinnedDir: process.env.PG_CLIENT_BIN_DIR ?? null,
+         firstPathEntry: (process.env.PATH ?? '').split(':')[0],
+       }));`,
+    ],
     {
       cwd: ROOT,
       encoding: 'utf8',
@@ -60,7 +76,18 @@ test('the backup tool really does pick the stub up when it is on PATH', () => {
     },
   );
   assert.equal(probe.status, 0, `the probe failed: ${probe.stderr}`);
-  assert.equal(probe.stdout.trim(), '16', 'the stub must be the client the tool resolves');
+
+  let found;
+  try {
+    found = JSON.parse(probe.stdout);
+  } catch {
+    assert.fail(`the probe produced no usable output: ${probe.stdout} ${probe.stderr}`);
+  }
+  assert.equal(
+    found.version,
+    '16',
+    `the stub must be the client the tool resolves: ${JSON.stringify(found)}`,
+  );
 });
 
 test('the client-independence check is wired to a script that exists', () => {
