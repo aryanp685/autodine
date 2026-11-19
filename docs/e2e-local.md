@@ -28,7 +28,7 @@ not browser E2E evidence.
 
 On the repository's Linux/Node 22 sandbox, `npm ci` followed by
 `npm run test:db:local` starts an isolated embedded PostgreSQL 17.11 cluster
-under a fresh temporary directory. It replays all 83 checked-in migrations,
+under a fresh temporary directory. It replays all 101 checked-in migrations,
 adds only the already documented local Supabase shim and inferred scaffold,
 checks the resulting objects and SQL regressions in
 `supabase/checks/06_scan_limits.sql`, `07_p8_close_settlement.sql`, and
@@ -41,9 +41,8 @@ of hosted Supabase capacity. An earlier `LOCAL_LOAD_USERS=100 npm run test:db:lo
 run verified 100 sessions and 100 SQL orders across two synthetic restaurants;
 session-open took 368ms (272/s) and order-write took 978ms (102/s). This was a
 disposable SQL smoke using the local shim and inferred scaffold, not a
-Supabase/PostgREST or browser load test. It used an 82-migration chain and does
-not include the current `20261114000100` migration or replay the current
-83-migration chain. Earlier 5,000-row measurements
+Supabase/PostgREST or browser load test. It used an 82-migration chain and
+predates the current 101-migration chain. Earlier 5,000-row measurements
 remain historical and are not repeated-load evidence. Use a staged provider
 environment for any hosted capacity claim.
 
@@ -78,13 +77,23 @@ credentials or production data and deploys nothing. A workflow definition is
 not evidence until its run finishes; retain its per-test reports and
 `load-report.json`.
 
-**Trigger caveat:** the current workflow's `push.branches` filter names only
-`arena/e9e78732-autodine`, while this active checkout is
-`arena/f104d5d8-autodine`; `workflow_dispatch` is also enabled. The grafted
-checkout contains no explanation for the branch pin, so it cannot establish
-whether that restriction is intentional or stale. The trigger has not been
-changed; confirm with the owner before widening or retargeting it. A push to
-the active branch will not automatically start this full-stack workflow.
+**Trigger:** the workflow's `push.branches` filter names `main`, retargeted on
+2026-11-19 from the stale `arena/e9e78732-autodine` pin whose tip dated
+2026-11-09. `workflow_dispatch` remains enabled, so a given branch can still be
+dispatched manually because the workflow definition exists on the default
+branch. A push to any branch other than `main` does not start it automatically.
+
+**Run `44485869573` (2026-11-19, push to `main` at `6f8240d`):** completed
+successfully. Its retained JSON reports show **64/64 hermetic** and **49/49
+Supabase-backed** Playwright tests, each with 0 skipped, 0 unexpected and 0
+flaky; the 5,000-guest / 5,000-order synthetic workload across 100 restaurants
+reported 0 failures (order creation p50 445 ms, p95 1,984 ms at concurrency 128),
+and the Kitchen polling workload observed 1,500/1,500 rows across three waves.
+GitHub retains the artifact for 30 days; a copy of the run metadata, JSON
+reports and HTML reports is under `test-results/supabase-e2e-hosted/44485869573/`.
+This run used `main`'s 98-migration chain; it does not include the local
+101-migration GST work in this checkout, and it is a disposable Docker stack,
+not hosted capacity.
 
 Historical run `42609513688` completed before this publication/polling change:
 64 hermetic and 47 Supabase-backed tests passed, and 1,500 Realtime events were

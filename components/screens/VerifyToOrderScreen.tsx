@@ -9,6 +9,7 @@ import { guestBrandStyle, type GuestBrandState } from '@/lib/branding/guest-them
 import { priceCart, type MenuItemPrice } from '@/lib/cart-pricing';
 import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
+import type { GstMode } from '@/lib/pricing';
 
 /**
  * The one moment a guest is asked for the on-site code.
@@ -45,6 +46,7 @@ export function VerifyToOrderScreen({
   windowMinutes,
   items,
   taxRateBps,
+  gstMode = 'off',
   cartCount,
   cartTotalPaise,
 }: {
@@ -57,6 +59,8 @@ export function VerifyToOrderScreen({
   windowMinutes: number;
   items: MenuItemPrice[];
   taxRateBps?: number;
+  /** The approved GST mode the order RPC will use. Defaults to GST off. */
+  gstMode?: GstMode;
   /**
    * The cart as the browser holds it. Used only for the "your cart is safe"
    * line when the priced cart cannot be read on the server -- the bill itself
@@ -67,7 +71,11 @@ export function VerifyToOrderScreen({
 }) {
   const paint = guestBrandStyle(brandState);
   const cart = useCart();
-  const priced = priceCart(cart.lines, items, taxRateBps);
+  const priced = priceCart(
+    cart.lines,
+    items,
+    gstMode === 'off' ? taxRateBps : { mode: gstMode, rateBps: taxRateBps ?? null }
+  );
   const { totalPaise } = priced.totals;
   const qty = priced.lines.reduce((sum, line) => sum + line.qty, 0);
 

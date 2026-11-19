@@ -13,16 +13,20 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import type { MenuItemPrice } from '@/lib/cart-pricing';
-import { requireTaxRateBps } from '@/lib/pricing';
-import { readPublicRestaurant } from '@/lib/db/public-restaurant';
+import type { GstQuote } from '@/lib/pricing';
+import { readPublicGstQuote, readPublicRestaurant } from '@/lib/db/public-restaurant';
 
 const ADDON_PRICING_READ_ERROR = 'Could not load add-on pricing. Please try again.';
 
 export type CartScreenData = {
   slug: string;
   restaurantName: string;
-  /** The restaurant's explicit rate, in basis points; never a demo fallback. */
-  taxRateBps: number;
+  /**
+   * The approved GST mode and its rate, as the order RPC will charge them.
+   * Never a demo fallback: off mode carries the restaurant's explicit rate,
+   * regular carries the closed profile's rate, composition carries none.
+   */
+  gst: GstQuote;
   /**
    * The published brand state (migration 20261103000100). Absent when the
    * restaurant has no brand profile — the screens then paint the product's
@@ -191,10 +195,12 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
       .map(({ id, name, pricePaise }) => ({ id, name, pricePaise }));
   }
 
+  const gst = await readPublicGstQuote(supabase, restaurant.slug as string, restaurant.tax_rate_bps);
+
   return {
     slug: restaurant.slug as string,
     restaurantName: (restaurant.name as string) ?? 'Your table',
-    taxRateBps: requireTaxRateBps(restaurant.tax_rate_bps),
+    gst,
     brandState: {
       brandThemeEnabled: restaurant.brand_theme_enabled === true,
       brandTheme: (restaurant as Record<string, unknown>).brand_theme ?? null,

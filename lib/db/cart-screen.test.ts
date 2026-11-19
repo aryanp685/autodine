@@ -60,12 +60,23 @@ const BASE_RESULTS: TableResults = {
   },
 };
 
-function fakeSupabase(results: TableResults) {
+const GST_RESULTS: Record<string, QueryResult> = {
+  off: { data: { mode: 'off', rate_bps: null }, error: null },
+  composition: { data: { mode: 'composition', rate_bps: null }, error: null },
+  regular: { data: { mode: 'regular', rate_bps: 500 }, error: null },
+};
+
+function fakeSupabase(results: TableResults, gstMode: keyof typeof GST_RESULTS = 'off') {
   const queriedTables: string[] = [];
   const client = {
     rpc(functionName: string) {
-      if (functionName !== 'public_restaurant_profile') throw new Error(`Unexpected RPC: ${functionName}`);
-      return { maybeSingle: () => Promise.resolve({ data: results.restaurants.data, error: results.restaurants.error }) };
+      if (functionName === 'public_restaurant_profile') {
+        return { maybeSingle: () => Promise.resolve({ data: results.restaurants.data, error: results.restaurants.error }) };
+      }
+      if (functionName === 'public_restaurant_gst') {
+        return { maybeSingle: () => Promise.resolve(GST_RESULTS[gstMode]) };
+      }
+      throw new Error(`Unexpected RPC: ${functionName}`);
     },
     from(table: keyof TableResults) {
       queriedTables.push(table);
@@ -85,8 +96,11 @@ function fakeSupabase(results: TableResults) {
   return { client, queriedTables };
 }
 
-function useResults(overrides: Partial<TableResults> = {}) {
-  const fake = fakeSupabase({ ...BASE_RESULTS, ...overrides });
+function useResults(
+  overrides: Partial<TableResults> = {},
+  gstMode: keyof typeof GST_RESULTS = 'off'
+) {
+  const fake = fakeSupabase({ ...BASE_RESULTS, ...overrides }, gstMode);
   mocks.createClient.mockResolvedValue(fake.client);
   return fake;
 }
@@ -110,6 +124,35 @@ describe('cart screen pricing reads', () => {
         maxSelect: 2,
       },
     ]);
+  });
+
+  it('prices an off-mode quote with the restaurant rate', async () => {
+    useResults({
+      restaurants: {
+        data: { ...(BASE_RESULTS.restaurants.data as Record<string, unknown>), tax_rate_bps: 500 },
+        error: null,
+      },
+    }, 'off');
+
+    const data = await getCartScreenData('saffron-smoke');
+
+    expect(data?.gst).toEqual({ mode: 'off', rateBps: 500 });
+  });
+
+  it('prices a composition quote with no rate', async () => {
+    useResults({}, 'composition');
+
+    const data = await getCartScreenData('saffron-smoke');
+
+    expect(data?.gst).toEqual({ mode: 'composition', rateBps: null });
+  });
+
+  it('prices a regular quote with the profile rate from the public projection', async () => {
+    useResults({}, 'regular');
+
+    const data = await getCartScreenData('saffron-smoke');
+
+    expect(data?.gst).toEqual({ mode: 'regular', rateBps: 500 });
   });
 
   it.each(['item_addon_groups', 'item_addons'])(
