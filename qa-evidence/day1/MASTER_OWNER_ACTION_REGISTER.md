@@ -8,7 +8,7 @@ Run `node scripts/hosted-verification/preflight.mjs` before any session — it r
 
 ## Tier 1 — The backup gate (blocks everything downstream)
 
-> **B2 status (owner decision, 2026-11-17):** provider **SELECTED** (Backblaze B2) · local implementation **VERIFIED** · hosted backup **DEFERRED** · hosted restore **DEFERRED**. Deferred, not cancelled: the implementation is complete and parked untouched — full handoff and exact resume instructions in `docs/operations/B2_BACKUP_IMPLEMENTATION_HANDOFF.md`. Items 1.1–1.5 below remain the resume path whenever the owner lifts the deferral; no account, secret, dispatch or paid service is to be created in the meantime.
+> **B2 status (owner decision, 2026-11-17):** provider **SELECTED** (Backblaze B2) · local implementation **VERIFIED** · hosted backup **DEFERRED** · hosted restore **DEFERRED**. Deferred, not cancelled: the implementation is complete and parked untouched — full handoff and exact resume instructions in `docs/operations/B2_BACKUP_IMPLEMENTATION_HANDOFF.md` **[MISSING — see `qa-evidence/day1/MISSING_EVIDENCE_REGISTER.md`]**. Items 1.1–1.5 below remain the resume path whenever the owner lifts the deferral; no account, secret, dispatch or paid service is to be created in the meantime.
 
 | # | Action | Exact step | Closes when |
 |---|---|---|---|
@@ -27,14 +27,14 @@ Run `node scripts/hosted-verification/preflight.mjs` before any session — it r
 | 2.3 | Hosted browser evidence | Dispatch `disposable-supabase-e2e-load` once on a disposable environment | 49 integration specs fully green (Package 6; retries are 0 by design) |
 | 2.4 | Realtime hosted proof | Two-device Staging script (Package 5), can share 2.2's outage | Fallback + single degradation alert + recovery + zero cross-restaurant rows |
 | 2.5 | Cron live proof | With the next authorized Production redeploy: no-header→401, wrong→401, correct→200 from the operator machine (register A4; secrets already configured) | Status codes recorded; daily job listed enabled |
-| 2.6 | **O-B1: Staging designation** (repo guard + evidence complete 2026-11-16) | Decide verbatim (see `STAGING_ISOLATION_COMPLETION.md` §2/§8): “Designate `autodinetest` (`juwyhslzchjevqkdvwjm`) as the official non-production Staging project” OR “Create a third, dedicated Staging project and designate its ref instead.” Test project carries 33 Auth users / 30 restaurants and looser anon grants than production; it is **not** silently designated | Written owner designation; if third project: one repo ref update + `AUTODINE_EXPECTED_PROJECT_REF` re-target |
+| 2.6 | **O-B1: Staging designation** (repo guard + evidence complete 2026-11-16) | Decide verbatim (see `STAGING_ISOLATION_COMPLETION.md` **[MISSING — see `qa-evidence/day1/MISSING_EVIDENCE_REGISTER.md`]**): “Designate `autodinetest` (`juwyhslzchjevqkdvwjm`) as the official non-production Staging project” OR “Create a third, dedicated Staging project and designate its ref instead.” Test project carries 33 Auth users / 30 restaurants and looser anon grants than production; it is **not** silently designated | Written owner designation; if third project: one repo ref update + `AUTODINE_EXPECTED_PROJECT_REF` re-target |
 | 2.7 | **O-B2: Production trusted-project pin** (repo guard complete 2026-11-16) | Vercel project `new` → Settings → Environment Variables → Add `AUTODINE_EXPECTED_PROJECT_REF=bdbaqpevwmgdvghszjno`, target **Production only** → redeploy `main` + one branch → confirm both builds. Without it, production→test rests on config correctness alone (honest gap in `isolation:verify`) | Production build proves pin; `isolation:verify` semantics enforced in build |
 | 2.8 | **O-B3: Auth redirect allow lists** (prepared 2026-11-16) | Supabase → Authentication → URL Configuration: test project add `https://*-iamjarvis9896-3988s-projects.vercel.app/**`; production decide separately whether to remove the team wildcard + `http://localhost:3000/**` (recommended; behavior change, explicit approval) | Preview signup completes; production surface narrowed |
 | 2.9 | **O-B5: Production `mailer_autoconfirm`** (inspected 2026-11-16) | Decide: “Approve setting `mailer_autoconfirm = false` on production (`bdbaqpevwmgdvghszjno`), together with/after Brevo production SMTP (runbook B6); until then the 2 mails/hour fallback ceiling is accepted.” Currently `true` (unverified addresses can become accounts); test project `false` | Setting flipped under B6 sequencing; controlled signup confirms mail + redirect |
 
 ## Tier 3 — Migration decisions (paper decisions now; applications later, separately authorized)
 
-The Batch 1 reconciliation (`qa-evidence/day1/MIGRATION_DRIFT_RECONCILIATION_BATCH1.md`) is the evidence. **No classification in it authorizes applying anything.** Exact decisions needed:
+The Batch 1 reconciliation (`qa-evidence/day1/MIGRATION_DRIFT_RECONCILIATION_BATCH1.md` **[MISSING — see `qa-evidence/day1/MISSING_EVIDENCE_REGISTER.md`]**) is the evidence. **No classification in it authorizes applying anything.** Exact decisions needed:
 
 **3.1 Version collisions — pick the canonical body per version** (applying the wrong twin silently reverts the other):
 
@@ -57,7 +57,7 @@ The Batch 1 reconciliation (`qa-evidence/day1/MIGRATION_DRIFT_RECONCILIATION_BAT
 - B1 nine-file branch set (`20261112000200`→`00300`→`00400`→`00500`→`00600`→`00700`→`20261115000100`→`00200`→`00300`, filename order; `…15000300` supersedes part of `…12000200`): approvable only after Tier 1 closes; staging-first, one file at a time, re-probe between files, forward-only rollback from captured bodies.
 - Four version-absent pre-branch files (`…000851`, `…000950`, `…001210`, `…001220`): effect-level verdicts exist (Batch 1 §: 1 genuinely pending-with-preflight, 2 partial, 1 resolved-equivalent); decide per verdict — **never apply the partials verbatim**.
 - Scoped `20261116000100` (revoke client-maintain privileges): separate authorization naming `bdbaqpevwmgdvghszjno` + this file.
-- Scoped `20261117000100` (revoke public/anon/authenticated on `STORAGE_VIEWS_v2`, guarded no-op where absent): finalized locally 2026-11-16 (`STAGING_ISOLATION_COMPLETION.md` §7); read-only probes show no such view on either hosted project today, so application would be a recorded no-op — same per-file authorization naming project + file when/if the owner wants it applied.
+- Scoped `20261117000100` (revoke public/anon/authenticated on `STORAGE_VIEWS_v2`, guarded no-op where absent): finalized locally 2026-11-16 (`STAGING_ISOLATION_COMPLETION.md` **[MISSING — see `qa-evidence/day1/MISSING_EVIDENCE_REGISTER.md`]**); read-only probes show no such view on either hosted project today, so application would be a recorded no-op — same per-file authorization naming project + file when/if the owner wants it applied.
 
 ## Tier 4 — Commercial & statutory (separately authorized tracks)
 

@@ -205,7 +205,7 @@ is environment-only — `B2_REGION` (e.g. `us-west-004`, endpoint derived as
 `B2_BUCKET`, `B2_ACCESS_KEY_ID` (keyID), `B2_SECRET_ACCESS_KEY`
 (application key) — and no code path
 prints a value; missing configuration reports variable NAMES only
-(`upload-r2.mjs` exit 2, and the offline shape-check in
+(`upload-b2.mjs` exit 2, and the offline shape-check in
 `scripts/verify-external-services-config.mjs`).
 
 ```bash

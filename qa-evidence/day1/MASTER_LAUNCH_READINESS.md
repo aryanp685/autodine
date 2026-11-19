@@ -46,7 +46,7 @@ GitHub Actions does not expose `runner` in job-level `env`. The workflow therefo
 
 ## 3. The blocker register (one line each)
 
-- **Backup gate** — bucket + bucket-scoped key, the six repository secret names, PR #190 merged, one verified backup run, then one verified restore rehearsal.
+- **Backup gate** — bucket + bucket-scoped key, the six repository secret names, PR #190 merged, one verified backup run, then one verified restore rehearsal. *Exact steps: `docs/operations/B2_OWNER_CHECKLIST.md`.*
 - **Migration canonicalization + B1** — 99 checked-in migrations replay green locally, but each collision between two live function bodies is an owner decision, never an inferred source edit.
 - **Email domain / SMTP** — Brevo must allow Supabase Auth egress IPs (else `525 5.7.1`), and no domain is purchased yet, so branded sending is not claimable.
 - **Staging designation + pins** — the staging project's designation is the owner's; it is never silently assumed.
@@ -54,6 +54,28 @@ GitHub Actions does not expose `runner` in job-level `env`. The workflow therefo
 - **Alert sink wiring + cron live proof** — gate 7; the sink is the owner's to point at a human-reachable endpoint.
 - **Production migration per-file authorizations** — each migration file needs its own authorization; none is implied by a green local replay.
 - **Billing provider + GST/IRP tracks** — a separate track with its own approvals; out of scope for this decision.
+- **Demo-seed isolation guard** — the fail-closed guard and `npm run staging:seed-demo` described on 2026-11-16 were never committed: `lib/staging/` does not exist and the npm script is absent. **This is a real open code item, not a stale citation.** Until it exists, no demo seed is protected by the guard the run log claims. See `qa-evidence/day1/MISSING_EVIDENCE_REGISTER.md` §3.
+
+> The eight earlier blockers are all hosted runs or owner decisions. The ninth
+> is the only one that is *also* missing code — and it is small, bounded and
+> does not block the launch gates above; it blocks the claim that staging is
+> demo-safe.
+
+---
+
+## 3a. The open-pull-request topology (why merging order matters)
+
+Full audit in `docs/operations/PR_INTEGRATION_PLAN.md`. The short version:
+
+| PR | Status | Disposition |
+|---|---|---|
+| **#190** | open, one file, `+4/−3` | **Merge first.** It unblocks the restore drill. |
+| **#192** | open, 8 files | **Do not merge alongside this branch** — the code here is byte-identical to it. Merge this branch and close #192, or merge #192 first and rebase. |
+| **#187** | open, 19 files, **Cloudflare R2** | **Close as superseded by #188.** Merging it would replace the owner's approved B2 provider with the superseded R2 implementation. |
+| **#188**, **#189** | merged | The B2 implementation and the restore verification — already in `main`. |
+
+The launch decision does not depend on any of them being merged, except
+that gate 2 cannot pass until PR #190 is.
 
 ---
 

@@ -4,7 +4,7 @@
 
 **Status (2026-11-16): code-ready, hosted activation NOT started.** Every code path below exists and is locally verified. No Resend account, domain, API key, SMTP setting, or deployment env var exists yet — §3 is the exact owner sequence that creates them, §4 proves delivery with real mail. **Nothing in this runbook counts as delivered until the §5 completion criteria are all checked with real evidence.**
 
-Companion evidence: `qa-evidence/day1/EMAIL_DELIVERABILITY_IMPLEMENTATION.md` (inspection + validation record for Master Run 3).
+Companion evidence: `qa-evidence/day1/EMAIL_DELIVERABILITY_IMPLEMENTATION.md` **[MISSING — see `qa-evidence/day1/MISSING_EVIDENCE_REGISTER.md`]** (inspection + validation record for Master Run 3).
 
 ---
 
