@@ -22,8 +22,12 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 /**
  * Each gate mirrors a step in .github/workflows/ci.yml. `why` explains a
  * skip; `skip` marks a gate that cannot run in this environment.
+ *
+ * Exported so the Phase 7 drift guard can check that the record lists
+ * exactly these gates — a record that omits one is not a record of the
+ * sweep.
  */
-const GATES = [
+export const GATES = [
   { name: 'typecheck', command: 'npm', args: ['run', 'typecheck'] },
   { name: 'lint', command: 'npm', args: ['run', 'lint'] },
   { name: 'design:check', command: 'npm', args: ['run', 'design:check'] },
@@ -40,12 +44,23 @@ const GATES = [
   { name: 'test:db:logical-restore', command: 'npm', args: ['run', 'test:db:logical-restore'] },
   { name: 'test:hosted:preflight', command: 'npm', args: ['run', 'test:hosted:preflight'] },
   { name: 'test (unit)', command: 'npm', args: ['test'] },
+  // Not a CI step: the same suites again, with an OLDER PostgreSQL
+  // client stubbed in front of PATH. It reproduces the CI runner's
+  // condition locally, so a suite that depends on the host's client
+  // fails here instead of only on the runner.
+  { name: 'test:client-independence', command: 'npm', args: ['run', 'test:client-independence'] },
 ];
 
+/**
+ * Run the sweep. Kept in a function so this module can be IMPORTED for
+ * its gate list without running every suite — the Phase 7 drift guard
+ * imports it to check that the record lists exactly these gates.
+ */
+export function runGates(gates = GATES) {
 const results = [];
 let failed = 0;
 
-for (const gate of GATES) {
+for (const gate of gates) {
   process.stdout.write(`\n=== ${gate.name} ===\n`);
   const started = Date.now();
   const run = spawnSync(gate.command, gate.args, {
@@ -73,3 +88,10 @@ for (const result of results) {
 }
 process.stdout.write(`\n${results.length - failed}/${results.length} gates passed.\n`);
 process.exitCode = failed === 0 ? 0 : 1;
+}
+
+// Only sweep when this file is the program being run, not when it is
+// imported for its gate list.
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename)) {
+  runGates();
+}

@@ -151,7 +151,13 @@ test('a real dump replays into a real empty database', { skip: !canRunEmbedded()
       }
       await client.end();
 
-      execFileSync(process.execPath, [${JSON.stringify(path.join(ROOT, 'scripts/backup/backup-logical.mjs'))}, '--out-dir', ${JSON.stringify(outDir)}], {
+      // --pg-dump 0 pins the LOGICAL path (Mode B). This suite is about
+      // the pure-SQL dump's object order, so it must exercise that path
+      // and not whatever the host happens to provide. Left unpinned it
+      // took the custom-format path on any machine with a pg_dump on
+      // PATH - and on a CI runner, whose image ships a pg_dump 16 that
+      // cannot dump a PG 17 server, it failed outright.
+      execFileSync(process.execPath, [${JSON.stringify(path.join(ROOT, 'scripts/backup/backup-logical.mjs'))}, '--out-dir', ${JSON.stringify(outDir)}, '--pg-dump', '0'], {
         env: { ...process.env, AUTODINE_BACKUP_SOURCE_URL: url, AUTODINE_BACKUP_PASSPHRASE: 'local-drill-passphrase-not-secret-0123456789' },
         stdio: ['ignore', 'ignore', 'inherit'],
       });

@@ -1,0 +1,26 @@
+#!/bin/sh
+# Stands in for an OLDER PostgreSQL client.
+#
+# ubuntu-24.04 ships a pg_dump 16, and the CI runner's embedded server is
+# PostgreSQL 17 - so on a runner, `pg_dump` reports itself as 16 and then
+# refuses to dump the server with
+#
+#     pg_dump: error: aborting because of server version mismatch
+#
+# A suite that silently takes the custom-format path when a pg_dump
+# happens to be on PATH therefore passes on a developer machine with no
+# client installed and fails on CI. This stub reproduces the runner's
+# client so that difference can be tested locally.
+#
+# It is a stub: it never dumps anything, and it is only ever placed in
+# front of PATH by the client-independence check.
+for argument in "$@"; do
+  case "$argument" in
+    --version|-V)
+      echo "pg_dump (PostgreSQL) 16.4 (Ubuntu 16.4-1ubuntu0.24.04.1)"
+      exit 0
+      ;;
+  esac
+done
+echo "pg_dump: error: aborting because of server version mismatch" >&2
+exit 1

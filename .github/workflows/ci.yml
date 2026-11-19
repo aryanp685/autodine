@@ -82,6 +82,15 @@ jobs:
       - name: Backup-file and DR objective verifiers (fixtures)
         run: npm run test:dr
 
+      # The runner's image ships a pg_dump 16, which cannot dump the PG
+      # 17 server these suites run against. A suite that silently takes
+      # the custom-format path when a pg_dump is on PATH therefore fails
+      # here and passes on a machine with no client installed. This
+      # re-runs the backup suites with an OLDER client stubbed in front
+      # of PATH, so the runner checks its own independence.
+      - name: Backup suites are independent of the host's PostgreSQL client
+        run: npm run test:client-independence
+
       - name: D2 ACL probe (disposable embedded PostgreSQL)
         run: npm run test:d2
 

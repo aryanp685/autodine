@@ -13,7 +13,7 @@ hosted backup or restore.
 
 ---
 
-## 1. The gate sweep — 16/16 passed
+## 1. The gate sweep — 17/17 passed
 
 `scripts/verify-local-gates.mjs` runs each gate, records its real exit code
 and prints a verdict line. It never reports a skip as a pass.
@@ -30,14 +30,31 @@ and prints a verdict line. It never reports a skip as a pass.
 | 8 | `test:staging:guards` | Hosted-acceptance and staging guards | **PASS** (65/65) | 28.5s |
 | 9 | `test:staging:seed-demo-db` | Demo-seed isolation | **PASS** (1/1) | 1.8s |
 | 10 | `test:backup` | Backup pipeline selftest | **PASS** | 1.2s |
-| 11 | `test:dr` | Backup-file and DR objective verifiers | **PASS** (144/144) | 8.8s |
+| 11 | `test:dr` | Backup-file and DR objective verifiers | **PASS** (149/149) | 8.8s |
 | 12 | `test:d2` | D2 ACL probe | **PASS** (2/2) | 1.5s |
 | 13 | `test:db:integration` | PostgreSQL-gated integration suites | **PASS** (214/214) | 12.9s |
 | 14 | `test:db:logical-restore` | Logical restore drill | **PASS** | 2.6s |
 | 15 | `test:hosted:preflight` | Hosted preflight (read-only) | **PASS** (8/8) | 20.0s |
-| 16 | `npm test` | Tests | **PASS** (2,553 / 223 skipped / 0 failed) | 76.4s |
+| 16 | `test (unit)` (`npm test`) | Tests | **PASS** (2,553 / 223 skipped / 0 failed) | 76.4s |
+| 17 | `test:client-independence` | *(not a CI step — the same suites again, with an older PostgreSQL client stubbed in front of `PATH`)* | **PASS** | 11.2s |
 
-**16/16 gates passed.**
+**17/17 gates passed.**
+
+Gate 17 is not a CI step. It re-runs the backup suites with an **older
+PostgreSQL client** stubbed in front of `PATH` — the `pg_dump` 16 that
+the CI runner's image ships, which refuses to dump the PG 17 server the
+suites run against.
+
+It exists because of a failure that only CI could show. The logical
+restore drill and the dump-order suite both intended the repository's
+own logical path, but neither pinned it: with a `pg_dump` on `PATH`
+they silently took the custom-format path instead. On a developer
+machine with no client installed they passed; on the runner they died
+with `pg_dump: error: aborting because of server version mismatch`. The
+same script was verifying different things in different places.
+
+Both now pin the logical path (`--pg-dump 0`), so they prove the same
+thing everywhere — and gate 17 is the proof that they do.
 
 This record describes the **merged** state of the PR — the tree CI
 actually verifies. GitHub's PR checks run the merge of the branch with

@@ -49,6 +49,19 @@ guard, not in the records. Two independent causes, both fixed:
    branch, so the branch and the merge result are the same tree, and every
    count in the records was re-derived on it.
 
+3. Two backup suites depended on the **host's** PostgreSQL client. The
+   logical restore drill and the dump-order suite both intended the
+   repository's own logical path, but neither pinned it: with a `pg_dump`
+   on `PATH` they silently took the custom-format path instead. On a
+   developer machine with no client installed they passed; on the runner,
+   whose image ships a `pg_dump` 16 that cannot dump the PG 17 server
+   they run against, they died with `pg_dump: error: aborting because of
+   server version mismatch`. Both now pin the logical path
+   (`--pg-dump 0`), so they prove the same thing everywhere — and a new
+   gate re-runs them with an **older client stubbed in front of `PATH`**,
+   reproducing the runner's condition locally. The runner now checks its
+   own independence.
+
 The same class of defect was latent in both browser claims — each asserted
 "Chromium is absent", true of the local run and false of a CI job that
 installs Chromium for the browser suites. Both now assert the claim's
@@ -56,12 +69,12 @@ scoping instead, and keep the strong local check where Chromium really is
 absent.
 
 **Current local counts** (on the merged tree, 2026-11-19): DR suite
-**144/144**; unit suite **2,553 passed / 223 skipped / 0 failed**;
+**149/149**; unit suite **2,553 passed / 223 skipped / 0 failed**;
 PostgreSQL-gated integration **214/214**; embedded replay **209 passed |
 2 skipped (211)**; migration chain **101 files, 101 unique versions**;
 staging guards **65/65**; release verifier **28/28**; logical restore drill
 **VERIFIED** (101 migrations, 48 tables, 59 policies, 164 functions);
-**16/16** local gates passed.
+**17/17** local gates passed.
 
 **The deployment, stated accurately**
 

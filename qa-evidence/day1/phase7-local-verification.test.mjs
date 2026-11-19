@@ -22,6 +22,8 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
+import { GATES } from '../../scripts/verify-local-gates.mjs';
+
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const DOC = path.join(ROOT, 'qa-evidence', 'day1', 'PHASE7_LOCAL_VERIFICATION.md');
 const source = readFileSync(DOC, 'utf8');
@@ -154,12 +156,26 @@ test('the browser claim is still BLOCKED — ENVIRONMENT, never PASS', () => {
   }
 });
 
-test('the record claims no hosted run', () => {
+test('the record claims no hosted run, and lists exactly the gates the runner runs', () => {
   assert.match(source, /No hosted system was touched/);
   assert.match(source, /BLOCKED — OWNER AUTHORIZATION REQUIRED/);
   // No gate row may claim a hosted PASS.
   const gateRows = source.split('\n').filter((line) => /^\| \d+ \| `/.test(line));
-  assert.ok(gateRows.length >= 16, `every gate must be listed, saw ${gateRows.length}`);
+
+  // The record must list EVERY gate the runner runs - no more, no less.
+  // A record that silently drops a gate is not a record of the sweep.
+  assert.equal(
+    gateRows.length,
+    GATES.length,
+    `the record must list all ${GATES.length} gates, saw ${gateRows.length}`,
+  );
+  for (const gate of GATES) {
+    assert.ok(
+      gateRows.some((row) => row.includes(`\`${gate.name}\``)),
+      `the record must list the ${gate.name} gate`,
+    );
+  }
+
   for (const row of gateRows) {
     // | # | gate | CI step | result | time |
     const result = row.split('|')[4] ?? '';
