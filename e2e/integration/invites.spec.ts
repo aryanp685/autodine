@@ -71,7 +71,7 @@ async function signIn(context: BrowserContext, email: string, password: string):
   const page = await context.newPage();
   await page.goto(`${BASE}/login`);
   await page.getByLabel('Work email').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
   // The shell only renders for an authenticated staff member; the rail is the
   // proof that the session exists rather than a redirect landing on /login.
@@ -139,7 +139,7 @@ test.describe('a team invitation, clicked through', () => {
     // rather than a silent pass.
     await page.getByLabel('Your name').fill('E2E Invitee');
     await page.getByLabel('Email').fill(`e2e-invite-${Date.now()}@example.com`);
-    await page.getByLabel('Password').fill('E2e-invite-pass-9');
+    await page.getByLabel('Password', { exact: true }).fill('E2e-invite-pass-9');
     await page.getByRole('button', { name: 'Create account and join' }).click();
 
     // Whatever the host does next (a session straight away, or a confirmation
