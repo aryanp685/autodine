@@ -72,25 +72,20 @@ jobs:
       # postgresql-client-17' is the failure signature). The preinstalled
       # pg_dump 16 reports a pgdg24.04 build, so PGDG is the source the
       # image used as well.
+      #
+      # This is the SAME composite action the two hosted workflows use, so
+      # the CI drill, the hosted backup and the hosted restore drill all
+      # pin one PostgreSQL client major version from one implementation.
+      # The action installs the client, verifies the resolved binaries are
+      # really that major version, and puts the PGDG bin directory first on
+      # PATH for every later step — the runner ships a manually installed
+      # pg_dump 16 that can shadow the wrapper.
       - name: Install PostgreSQL 17 client tools (PGDG)
-        run: |
-          set -o pipefail
-          {
-            sudo install -d /usr/share/postgresql-common/pgdg
-            sudo curl --fail --show-error -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
-            echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
-            sudo apt-get update
-            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql-client-17
-            # The runner ships a manually installed pg_dump 16 that shadows
-            # the wrapper in PATH (the drill still saw 16.15 with v17
-            # installed). Put the PGDG v17 bin directory first for every
-            # subsequent step and prove what resolves.
-            echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
-            export PATH="/usr/lib/postgresql/17/bin:$PATH"
-            which -a pg_dump || true
-            pg_dump --version
-            /usr/lib/postgresql/17/bin/pg_dump --version
-          } 2>&1 | tee pg-client-install.log
+        uses: ./.github/actions/postgres-client
+        with:
+          version: '17'
+        env:
+          PG_CLIENT_LOG: pg-client-install.log
 
       - name: Surface PG client install failure as an annotation
         if: failure()

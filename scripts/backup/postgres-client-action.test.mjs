@@ -167,18 +167,22 @@ function mockSystem() {
   );
   chmodSync(path.join(bin, 'apt-get'), 0o755);
 
-  // Mock curl: write a placeholder key file inside the sandbox instead of
-  // downloading anything or writing to a real system path.
+  // Mock curl: write to the path the script actually asked for. The script
+  // downloads the PGDG key to a temporary file, so honouring --output keeps
+  // the flow faithful: the later "install" step must find a real source
+  // file, and would fail if the download never happened.
   writeFileSync(
     path.join(bin, 'curl'),
-    `#!/bin/sh\nprev=""; for arg in "$@"; do case "$prev" in --output) : > "${root}/curl-output";; esac; prev="$arg"; done\necho "curl $*" >> "${log}"\nexit 0\n`,
+    `#!/bin/sh\nprev=""; for arg in "$@"; do case "$prev" in --output) printf 'mock key material\\n' > "$arg" || exit 1;; esac; prev="$arg"; done\necho "curl $*" >> "${log}"\nexit 0\n`,
   );
   chmodSync(path.join(bin, 'curl'), 0o755);
 
-  // Mock install: record the call instead of creating real system paths.
+  // Mock install: record the call, and behave like the real one about its
+  // source file — a missing or empty source is an error, never a silent
+  // success. Never writes to a real system path.
   writeFileSync(
     path.join(bin, 'install'),
-    `#!/bin/sh\nargs=""; for a in "$@"; do args="$args $a"; done; echo "install $args" >> "${log}"\nexit 0\n`,
+    `#!/bin/sh\nargs=""; for a in "$@"; do args="$args $a"; done; echo "install $args" >> "${log}"\npos=""; skip=""; for a in "$@"; do if [ -n "$skip" ]; then skip=""; continue; fi; case "$a" in -m) skip=1; continue;; -*) continue;; esac; pos="$pos $a"; done\ncount=$(echo $pos | wc -w)\nif [ "$count" -ge 2 ]; then src=$(echo $pos | awk '{print $(NF-1)}'); if [ ! -f "$src" ]; then echo "install: cannot stat '$src'" >&2; exit 1; fi; if [ ! -s "$src" ]; then echo "install: '$src' is empty" >&2; exit 1; fi; fi\nexit 0\n`,
   );
   chmodSync(path.join(bin, 'install'), 0o755);
 
@@ -220,6 +224,28 @@ test('install-client.sh honours the requested major version, not a hard-coded on
     const log = readFileSync(system.log, 'utf8');
     assert.match(log, /postgresql-client-16/);
     assert.doesNotMatch(log, /postgresql-client-17/);
+  } finally {
+    rmSync(system.root, { recursive: true, force: true });
+  }
+});
+
+test('the install is non-interactive, so an unattended job cannot hang on a prompt', () => {
+  const body = readFileSync(INSTALL, 'utf8');
+  assert.match(body, /DEBIAN_FRONTEND=noninteractive/);
+});
+
+test('the PGDG signing key is downloaded and then installed with an explicit mode', () => {
+  const system = mockSystem();
+  try {
+    const result = spawnSync('bash', [INSTALL, '17'], {
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${system.bin}:${process.env.PATH}` },
+    });
+    assert.equal(result.status, 0, `expected success, got: ${result.stderr}`);
+    const log = readFileSync(system.log, 'utf8');
+    assert.match(log, /install\s+-m 0644/, 'the key must be installed with an explicit mode');
+    assert.match(log, /apt.postgresql.org.asc/, 'the key must land at the apt keyring path');
+    assert.match(log, /pgdg\.list/, 'the PGDG repository list must be written');
   } finally {
     rmSync(system.root, { recursive: true, force: true });
   }

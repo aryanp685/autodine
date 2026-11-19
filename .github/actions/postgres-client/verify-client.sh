@@ -51,4 +51,16 @@ if [ -n "${GITHUB_PATH:-}" ]; then
   printf '%s\n' "$bin_dir" >> "$GITHUB_PATH"
 fi
 
+# Prove what PATH resolves to from here on. The runner image ships a
+# manually installed pg_dump 16 that can shadow the wrapper in PATH, so
+# "the right version is installed" and "the right version is what runs" are
+# different claims. GITHUB_PATH is prepended by GitHub for every later
+# step, so the PGDG directory wins — this prints the proof either way.
+export PATH="$bin_dir:$PATH"
+echo "verify-client: path resolution for the PostgreSQL client tools:"
+for tool in psql pg_restore; do
+  echo "  which -a $tool:"
+  which -a "$tool" 2>/dev/null | sed 's/^/    /' || echo "    (not found)"
+done
+
 echo "verify-client: PostgreSQL ${version} client verified at ${bin_dir}"

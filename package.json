@@ -40,7 +40,7 @@
     "dr:objectives": "node scripts/backup/check-dr-objectives.mjs",
     "hosted:preflight": "node scripts/hosted-verification/preflight.mjs",
     "test:hosted:preflight": "node --test scripts/hosted-verification/preflight.test.mjs",
-    "test:dr": "node --test scripts/backup/verify-backup-file.test.mjs scripts/backup/check-dr-objectives.test.mjs scripts/backup/run-scheduled.test.mjs scripts/backup/b2-upload.test.mjs scripts/backup/prune-b2.test.mjs scripts/backup/verify-restored-db.test.mjs scripts/backup/postgres-client-action.test.mjs scripts/backup/restore-target.test.mjs",
+    "test:dr": "node --test scripts/backup/verify-backup-file.test.mjs scripts/backup/check-dr-objectives.test.mjs scripts/backup/run-scheduled.test.mjs scripts/backup/b2-upload.test.mjs scripts/backup/prune-b2.test.mjs scripts/backup/verify-restored-db.test.mjs scripts/backup/postgres-client-action.test.mjs scripts/backup/restore-target.test.mjs scripts/backup/postgres-client-wiring.test.mjs",
     "backup:run": "node scripts/backup/run-scheduled.mjs",
     "d2:verify": "node scripts/d2/verify-acl-posture.mjs",
     "test:d2": "node --test scripts/d2/verify-acl-posture.test.mjs",
@@ -80,7 +80,8 @@
     "vitest": "^5.0.5",
     "@types/jsdom": "^30.0.0",
     "jsdom": "^31.0.0",
-    "@types/three": "^0.187.0"
+    "@types/three": "^0.187.0",
+    "yaml": "^2.9.1"
   },
   "engines": {
     "node": ">=22"

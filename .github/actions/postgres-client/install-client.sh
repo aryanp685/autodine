@@ -15,6 +15,13 @@ set -euo pipefail
 
 version="${1:-17}"
 
+# Optional log file: when the caller sets PG_CLIENT_LOG, everything printed
+# here is also written there, so a CI job can surface the tail as an
+# annotation even when the log CDN is unreachable.
+if [ -n "${PG_CLIENT_LOG:-}" ]; then
+  exec > >(tee "$PG_CLIENT_LOG") 2>&1
+fi
+
 # Resolve the real binaries by absolute path. A caller may place a shim
 # earlier on PATH (test harnesses do); resolving through PATH would make the
 # install call itself and recurse.
@@ -46,18 +53,26 @@ as_root() {
   fi
 }
 
+# apt-get must never stop to ask a question: an unattended job would hang
+# instead of failing.
+export DEBIAN_FRONTEND=noninteractive
+
 echo "install-client: installing PostgreSQL ${version} client tools"
 
 as_root "$APT_GET" update
 as_root "$APT_GET" install -y --no-install-recommends ca-certificates curl gnupg
 
 # PGDG signing key + repository, pinned to the requested major version.
+# The key is fetched to a temporary file and then installed with an explicit
+# mode: installing a file onto itself is an error, and curl's default mode
+# is not what apt wants for a keyring.
 as_root "$INSTALL" -d -m 0755 /usr/share/postgresql-common/pgdg
-as_root "$CURL" --fail --silent --show-error --location \
+key_tmp="$(mktemp)"
+trap 'rm -f "$key_tmp"' EXIT
+"$CURL" --fail --silent --show-error --location \
   https://www.postgresql.org/media/keys/ACCC4CF8.asc \
-  --output /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
-as_root "$INSTALL" -m 0644 /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
-  /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+  --output "$key_tmp"
+as_root "$INSTALL" -m 0644 "$key_tmp" /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
 
 . /etc/os-release
 codename="${VERSION_CODENAME:-}"
