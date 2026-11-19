@@ -172,7 +172,7 @@ export function GlobalAnnouncementProvider({
   restaurantId: string | null;
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
+  void usePathname(); // ensure layout stays subscribed to route changes (provider persists across routes)
 
   // If no restaurant (demo / signed-out), just render children without polling
   const isStaffRoute = restaurantId !== null;
@@ -572,12 +572,10 @@ export function GlobalAnnouncementProvider({
           if (!queue) continue;
           if (!settingsRef.current.soundOn) continue; // Sound off → written only
 
-          let claimOk = false;
           let claimed = false;
           try {
             if (event.kind === 'order') {
               const result = await claimKitchenOrderAnnouncementAction(event.orderId);
-              claimOk = result.ok;
               claimed = result.ok && result.claimed;
               if (!result.ok) {
                 // Claim failed (network/auth) → written notification still exists, voice skipped
@@ -590,7 +588,6 @@ export function GlobalAnnouncementProvider({
               }
             } else {
               const result = await claimTableWaiterCallAnnouncementAction(event.callId);
-              claimOk = result.ok;
               claimed = result.ok && result.claimed;
               if (!result.ok || !claimed) continue;
             }

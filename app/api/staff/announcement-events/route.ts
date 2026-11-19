@@ -14,10 +14,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStaffContextDetailed } from '@/lib/db/staff';
 import type { AnnouncementEvent } from '@/lib/announcements/types';
 
+export const dynamic = 'force-dynamic';
+
 /** How far back to look for recent orders that may still need announcing */
 const RECENT_WINDOW_HOURS = 1;
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   const requestAt = new Date().toISOString();
 
   // Authentication & authorization
@@ -78,7 +80,7 @@ export async function GET(request: NextRequest) {
       const orderIds = orderRows.map((r) => (r as Record<string, unknown>).id as string);
 
       // Batch fetch table labels
-      let tableLabelById = new Map<string, string>();
+      const tableLabelById = new Map<string, string>();
       if (tableIds.length > 0) {
         const { data: tables } = await supabase
           .from('dining_tables')
@@ -92,7 +94,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Batch fetch order items
-      let itemsByOrderId = new Map<string, { qty: number; name: string; detail?: string; spoken?: string | null }[]>();
+      const itemsByOrderId = new Map<string, { qty: number; name: string; detail?: string; spoken?: string | null }[]>();
       if (orderIds.length > 0) {
         const { data: orderItems } = await supabase
           .from('order_items')

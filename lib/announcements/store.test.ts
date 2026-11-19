@@ -132,7 +132,7 @@ describe('announcements store — strict scope lock', () => {
     it('updateSeenWithEvents is idempotent', () => {
       const e1 = orderEvent({ orderId: 'o1' });
       const e2 = waiterEvent({ callId: 'w1' });
-      let seen = updateSeenWithEvents(EMPTY_SEEN, [e1, e2]);
+      const seen = updateSeenWithEvents(EMPTY_SEEN, [e1, e2]);
       expect(seen.orderIds).toContain('o1');
       expect(seen.waiterCallIds).toContain('w1');
       const again = updateSeenWithEvents(seen, [e1, e2]);

@@ -35,9 +35,12 @@ import { HeldTableStrip } from '@/components/owner/HeldTableStrip';
 import { cancelStaffOrderAction } from '@/app/orders/actions';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import {
-  advanceText,
+  // advanceText/cancelText retained for backward compat (deprecated, no longer auto-spoken)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  advanceText as _advanceText,
   announceLogLabel,
-  cancelText,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  cancelText as _cancelText,
   createAnnounceQueue,
   newOrderText,
   newOrderTextEn,
@@ -63,7 +66,8 @@ import { createDualSpeech } from '@/lib/dual-speech';
 import {
   buildKitchenAnnouncement,
   DEFAULT_DIALECT,
-  DIALECT_LABELS,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  DIALECT_LABELS as _DIALECT_LABELS,
   type AnnouncementDialect,
 } from '@/lib/voice-personality';
 import { voiceLabel } from '@/lib/tts-voices';
@@ -1400,7 +1404,8 @@ export function Kitchen({
     },
   ];
 
-  const latest = orders.find((order) => order.state !== 'served') ?? orders[0];
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _latest = orders.find((order) => order.state !== 'served') ?? orders[0];
 
   /**
    * Representative sample built with the same formatter as real tickets:
