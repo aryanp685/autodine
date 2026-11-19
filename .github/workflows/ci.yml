@@ -56,7 +56,16 @@ jobs:
         run: git fetch --no-tags --depth=1 "https://github.com/${{ github.repository }}.git" main:refs/remotes/origin/main
 
       - name: Hosted-acceptance and staging guards (offline)
-        run: npm run test:staging:guards
+        run: |
+          set -o pipefail
+          npm run test:staging:guards 2>&1 | tee staging-guards.log
+
+      # The guards' output is the only place the failing assertion is
+      # written. The step log can be unreachable, so the same bytes are
+      # republished as annotations, which the Checks API serves reliably.
+      - name: Surface staging guard failure as an annotation
+        if: failure()
+        run: node scripts/ci/print-error-annotation.mjs staging-guards.log 3500
 
       # The demo-seed guard is proven against a real PostgreSQL: the seed is
       # applied to the repository's own schema on a disposable cluster and
