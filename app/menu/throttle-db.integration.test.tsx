@@ -168,18 +168,32 @@ async function installRpc(db: Client) {
 async function cleanup(db: Client) {
   const restaurantId = '(select id from public.restaurants where slug = $1)';
   // Issued-invoice immutability (migration 20261113000100) refuses DELETE for
-  // every role by design. This is a disposable database, so teardown disables
-  // the guards, removes this suite's rows and re-enables them. The guard is
-  // re-enabled in a finally so a failed cleanup cannot leave it off.
-  await db.query('alter table public.restaurant_invoice_lines disable trigger restaurant_invoice_lines_immutable');
-  await db.query('alter table public.restaurant_invoices disable trigger restaurant_invoices_immutable');
+  // every role by design. This is a disposable database, so the teardown has
+  // to relax that guard to remove its own fixtures.
+  //
+  // THE RELAXATION IS SCOPED TO THIS SESSION, DELIBERATELY.
+  //
+  // `ALTER TABLE ... DISABLE TRIGGER` is a catalog change: it is committed,
+  // every other connection sees it, and it stays off for the whole window.
+  // The ten PostgreSQL-gated suites share ONE disposable database and run in
+  // parallel, so a catalog-level switch-off let a suite that asserts the
+  // invoice-immutability guard observe it switched off — a timing-dependent
+  // failure in a DIFFERENT suite, with nothing to do with the code under
+  // test. It was the real cause of a CI-only failure in the GST suite.
+  //
+  // `SET LOCAL session_replication_role = replica` relaxes triggers for this
+  // session inside this transaction only. No other suite can see it, and it
+  // cannot outlive the transaction.
+  await db.query('begin');
   try {
+    await db.query('set local session_replication_role = replica');
     await db.query(`delete from public.restaurant_invoice_lines where restaurant_id = ${restaurantId}`, [SLUG]);
     await db.query(`delete from public.restaurant_payment_receipts where restaurant_id = ${restaurantId}`, [SLUG]);
     await db.query(`delete from public.restaurant_invoices where restaurant_id = ${restaurantId}`, [SLUG]);
-  } finally {
-    await db.query('alter table public.restaurant_invoices enable trigger restaurant_invoices_immutable');
-    await db.query('alter table public.restaurant_invoice_lines enable trigger restaurant_invoice_lines_immutable');
+    await db.query('commit');
+  } catch (error) {
+    await db.query('rollback').catch(() => undefined);
+    throw error;
   }
   await db.query(`delete from public.restaurant_invoice_series where restaurant_id = ${restaurantId}`, [SLUG]);
   await db.query(`delete from public.payment_audit_events where restaurant_id = ${restaurantId}`, [SLUG]);
@@ -623,4 +637,88 @@ describe.skipIf(!DB)('throttling, against a real PostgreSQL', () => {
       await Promise.all([writerA.end().catch(() => undefined), writerB.end().catch(() => undefined)]);
     }
   }, 60_000);
+  it('its teardown never switches off the invoice-immutability guard for other sessions', async () => {
+    // Issued-invoice immutability is a DATABASE-level guarantee, so the
+    // teardown must relax it for its own session only.
+    //
+    // `ALTER TABLE ... DISABLE TRIGGER` is a catalog change: it is committed,
+    // every other connection sees it, and it stays off for the whole window.
+    // The ten PostgreSQL-gated suites share ONE disposable database and run in
+    // parallel, so a catalog-level switch-off let a suite that asserts the
+    // guard observe it switched off — a timing-dependent failure in a
+    // DIFFERENT suite, with nothing to do with the code under test.
+    //
+    // This pins the opposite behaviour, deterministically. The probe holds
+    // one invoice row, so the teardown parks at its delete; while it is
+    // parked, the catalog must still say the guard is enabled for everyone.
+    const observer = new Client({ connectionString: DB });
+    const teardownConnection = new Client({ connectionString: DB });
+    await observer.connect();
+    await teardownConnection.connect();
+    try {
+      const restaurant = (
+        await db.query('select id from public.restaurants where slug = $1', [SLUG])
+      ).rows[0].id as string;
+      const table = (
+        await db.query('select id from public.dining_tables where restaurant_id = $1 limit 1', [restaurant])
+      ).rows[0].id as string;
+      const session = (
+        await db.query(
+          `insert into public.order_sessions (restaurant_id, table_id, status, closed_at)
+           values ($1, $2, 'closed', now()) returning id`,
+          [restaurant, table],
+        )
+      ).rows[0].id as string;
+      const invoice = (
+        await db.query(
+          `insert into public.restaurant_invoices
+             (restaurant_id, order_session_id, invoice_number, financial_year, sequence_number,
+              document_type, session_opened_at, session_closed_at, seller_snapshot,
+              totals_snapshot, payment_snapshot, source_order_ids)
+           values ($1, $2, 'INV/25-26/900001', '25-26', 900001, 'receipt',
+                   now(), now(), '{"name":"Guard Probe"}', '{}', '{}', '{}')
+           returning id`,
+          [restaurant, session],
+        )
+      ).rows[0].id as string;
+
+      // Hold the probe invoice, so the teardown parks at its delete.
+      await observer.query('begin');
+      await observer.query('select id from public.restaurant_invoices where id = $1 for update', [invoice]);
+
+      const teardownPid = (
+        await teardownConnection.query('select pg_backend_pid() as pid')
+      ).rows[0].pid as number;
+      const teardown = cleanup(teardownConnection);
+
+      // Wait until the teardown is genuinely parked on the lock, so the
+      // reading below is taken while it is inside its relaxed region.
+      let parked = false;
+      const deadline = Date.now() + 10_000;
+      while (Date.now() < deadline) {
+        const activity = await observer.query(
+          'select wait_event_type, wait_event, state from pg_stat_activity where pid = $1',
+          [teardownPid],
+        );
+        if (activity.rows[0]?.wait_event_type === 'Lock') { parked = true; break; }
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+
+      const guard = await observer.query(
+        `select tgenabled from pg_trigger
+          where tgrelid = 'public.restaurant_invoices'::regclass
+            and tgname = 'restaurant_invoices_immutable'`,
+      );
+
+      // Release the teardown and let it finish.
+      await observer.query('rollback').catch(() => undefined);
+      await teardown;
+
+      expect(parked).toBe(true);
+      expect(guard.rows[0]?.tgenabled).toBe('O');
+    } finally {
+      await observer.end().catch(() => undefined);
+      await teardownConnection.end().catch(() => undefined);
+    }
+}, 30_000);
 });

@@ -32,7 +32,7 @@ and prints a verdict line. It never reports a skip as a pass.
 | 10 | `test:backup` | Backup pipeline selftest | **PASS** | 1.2s |
 | 11 | `test:dr` | Backup-file and DR objective verifiers | **PASS** (150/150) | 8.8s |
 | 12 | `test:d2` | D2 ACL probe | **PASS** (2/2) | 1.5s |
-| 13 | `test:db:integration` | PostgreSQL-gated integration suites | **PASS** (214/214) | 12.9s |
+| 13 | `test:db:integration` | PostgreSQL-gated integration suites | **PASS** (215/215) | 12.9s |
 | 14 | `test:db:logical-restore` | Logical restore drill | **PASS** | 2.6s |
 | 15 | `test:hosted:preflight` | Hosted preflight (read-only) | **PASS** (8/8) | 20.0s |
 | 16 | `test (unit)` (`npm test`) | Tests | **PASS** (2,553 / 223 skipped / 0 failed) | 76.4s |
@@ -65,22 +65,22 @@ the same tree, and every number below was re-derived on it.
 
 ---
 
-## 2. The unit suite, and every one of its 223 skips
+## 2. The unit suite, and every one of its 224 skips
 
 ```
 Test Files  225 passed | 11 skipped (236)
-      Tests  2553 passed | 223 skipped (2778)
+      Tests  2553 passed | 224 skipped (2779)
 ```
 
-**All 223 skips are the same thing: tests that need a PostgreSQL server.**
-(225 test cases in total; see the table below for the 2-case difference.)
+**All 224 skips are the same thing: tests that need a PostgreSQL server.**
+(226 test cases in total; see the table below for the 2-case difference.)
 They are not skipped because they are hard, flaky or inconvenient — they
 are skipped because `npm test` alone starts no database, and every one of
 them is executed by a suite that does.
 
 | Skipped file | Test cases | Reported skipped | Executed by | Result |
 |---|---|---|---|---|
-| `app/menu/throttle-db.integration.test.tsx` | 5 | 5 | `test:db:integration` | **PASS** |
+| `app/menu/throttle-db.integration.test.tsx` | 6 | 6 | `test:db:integration` | **PASS** |
 | `lib/db/account-link-audit.integration.test.ts` | 8 | 8 | `test:db:integration` | **PASS** |
 | `lib/db/credit-debit-notes.integration.test.ts` | 11 | 11 | `test:db:integration` | **PASS** |
 | `lib/db/gst-two-mode.integration.test.ts` | 22 | 22 | `test:db:integration` | **PASS** |
@@ -91,7 +91,7 @@ them is executed by a suite that does.
 | `lib/db/report-sales.integration.test.ts` | 26 | 26 | `test:db:integration` | **PASS** |
 | `lib/db/restaurant-account-link.integration.test.ts` | 8 | 8 | `test:db:integration` | **PASS** |
 | `lib/db/subscription-billing.integration.test.ts` | 41 | 41 | `test:db:integration` | **PASS** |
-| **Total** | **225** | **223** | | **223 executed and passed, 2 never executed (see §3)** |
+| **Total** | **226** | **224** | | **224 executed and passed, 2 never executed (see §3)** |
 
 The two columns differ by exactly **2**, and that difference is explained
 rather than hidden: `order-read-boundary` holds 11 cases, 9 of which need
@@ -105,7 +105,7 @@ The whole table is re-derivable in about three seconds:
 ```
 $ npx vitest run <the eleven files>
 Test Files  11 skipped (11)
-      Tests  223 skipped (225)
+      Tests  224 skipped (226)
 ```
 
 The runner is `scripts/local-pg/with-embedded-postgres.mjs`: a **disposable**
@@ -115,7 +115,7 @@ data directory is deleted when the command exits. It reaches nothing hosted.
 ```
 $ npm run test:db:integration
 Test Files  10 passed (10)
-      Tests  214 passed (214)
+      Tests  215 passed (215)
 
 $ npm run test:db:embedded
 Test Files  9 passed (9)
@@ -140,7 +140,7 @@ not only PostgreSQL.
   wired into a vitest invocation. So these two tests are skipped in **CI as
   well**, not only here.
 
-**This is stated rather than hidden: 2 of the repository's 2,770 test cases
+**This is stated rather than hidden: 2 of the repository's 2,779 test cases
 are never executed by any suite, local or CI.** They are not counted as
 passing anywhere. Closing them needs PostgREST installed and `PGRST_BIN`
 wired into `test:db`; that is an available, small piece of work that no

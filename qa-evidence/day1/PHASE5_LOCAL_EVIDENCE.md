@@ -82,7 +82,7 @@ suites.
   PostgreSQL** on a random loopback port with a random password, exports
   `READINESS_PG_ADMIN_URL`, and **deletes the data directory when the
   command exits**. It reaches nothing hosted.
-- `npm run test:db:integration` → **10 files, 214 tests, all passed**
+- `npm run test:db:integration` → **10 files, 215 tests, all passed**
   against a disposable cluster:
   `phase0-security` (25), `readiness` (62), `report-sales` (26),
   `restaurant-account-link` (8), `subscription-billing` (41) and the rest.
@@ -211,7 +211,7 @@ real is `BLOCKED — OWNER AUTHORIZATION REQUIRED` — B9.
   `BLOCKED — OWNER AUTHORIZATION REQUIRED`.
 - The browser suite is not claimed to pass. It could not run here, and the
   reason is recorded in §2.
-- The local **skips** in the unit suite (223 skipped) are the
+- The local **skips** in the unit suite (224 skipped) are the
   PostgreSQL-gated integration files when no database is configured; the
   same files run green under `npm run test:db:integration` against a
   disposable cluster (§3).
