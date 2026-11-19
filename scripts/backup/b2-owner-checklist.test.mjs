@@ -35,7 +35,7 @@ function workflowSecrets(file) {
   const doc = parseYaml(readFileSync(file, 'utf8'));
   const job = Object.values(doc.jobs ?? {})[0];
   const names = new Set();
-  for (const [key, value] of Object.entries(job?.env ?? {})) {
+  for (const value of Object.values(job?.env ?? {})) {
     const match = String(value ?? '').match(/secrets\.([A-Z0-9_]+)/);
     if (match) names.add(match[1]);
   }
