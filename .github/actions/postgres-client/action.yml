@@ -1,0 +1,42 @@
+name: 'PostgreSQL client tools'
+description: >-
+  Install and verify the PostgreSQL client tools (psql, pg_restore) for one
+  pinned major version, so a backup taken here is restorable with the same
+  toolchain that takes it.
+
+author: 'autodine'
+
+inputs:
+  version:
+    description: 'PostgreSQL major version to install and verify.'
+    required: false
+    default: '17'
+  bin-dir:
+    description: >-
+      Directory holding the PostgreSQL client binaries. The default matches
+      the PGDG package layout on the GitHub runner image; override it only
+      when the tools are provided some other way.
+    required: false
+    default: '/usr/lib/postgresql/17/bin'
+  install:
+    description: >-
+      Set to "false" to verify an already-present client without installing
+      one (used by the action's own test suite).
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 'Install the PostgreSQL client tools'
+      if: ${{ inputs.install == 'true' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        "$GITHUB_ACTION_PATH/install-client.sh" '${{ inputs.version }}'
+
+    - name: 'Verify the PostgreSQL client version'
+      shell: bash
+      run: |
+        set -euo pipefail
+        "$GITHUB_ACTION_PATH/verify-client.sh" '${{ inputs.version }}' '${{ inputs.bin-dir }}'

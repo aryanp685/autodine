@@ -31,6 +31,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { restoreTargetDecision } from './lib-restore-target.mjs';
 // NOTE: `pg` is imported lazily, AFTER the loopback refusal below — the
 // production-connection guard must fire even in a bare environment where
 // dependencies were never installed.
@@ -63,8 +64,24 @@ try { host = new URL(targetUrl).hostname; } catch {
   process.stderr.write('verify-restored: AUTODINE_RESTORE_TARGET_URL is not a valid URL\n');
   process.exit(2);
 }
-if (!['127.0.0.1', 'localhost', '::1'].includes(host)) {
-  process.stderr.write(`verify-restored: REFUSING non-disposable target host "${host}" — restores are verified only on loopback drill targets\n`);
+// The same guard the restore itself uses (scripts/backup/lib-restore-target.mjs):
+// loopback only by default, a hosted target needs an explicit scratch opt-in
+// and an approved project ref, and a Production project is refused outright.
+// The message keeps the "REFUSING non-disposable target" wording the drill
+// evidence and its tests rely on.
+const targetDecision = restoreTargetDecision({
+  targetUrl,
+  expectedRef: process.env.AUTODINE_RESTORE_EXPECTED_REF,
+  allowScratch: process.env.AUTODINE_RESTORE_ALLOW_SCRATCH === '1',
+  productionRefs: (process.env.AUTODINE_RESTORE_PRODUCTION_REFS ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean),
+});
+if (!targetDecision.allowed) {
+  process.stderr.write(
+    `verify-restored: REFUSING non-disposable target host "${targetDecision.host}" — ${targetDecision.reason}\n`,
+  );
   process.exit(2);
 }
 

@@ -61,6 +61,15 @@ jobs:
           node-version: 22
           cache: npm
 
+      # The runner image ships an older PostgreSQL client, and pg_restore
+      # refuses an archive format written by a newer pg_dump. The hosted
+      # backup pins PostgreSQL 17 (see hosted-backup.yml), so the drill
+      # pins 17 as well — and the disposable container is postgres:17.
+      - name: Install the PostgreSQL 17 client tools
+        uses: ./.github/actions/postgres-client
+        with:
+          version: '17'
+
       - name: Install
         run: npm ci
 
