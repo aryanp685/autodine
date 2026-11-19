@@ -20,14 +20,14 @@ const check = (name, ok, detail = '') => {
 };
 const read = (p) => readFileSync(join(root, p), 'utf8');
 
-// 1. Migration inventory: exactly 101 files, unique 14-digit versions.
-// 98 at the 2026-11-14 baseline, plus three 2026-11-19 remediation migrations:
-// the receipt-helper ACL restore, the new-outlet 0% tax default, and the
-// guest GST quote projection.
+// 1. Migration inventory: exactly 102 files, unique 14-digit versions.
+// 98 at the 2026-11-14 baseline, plus three 2026-11-19 remediation migrations
+// (receipt-helper ACL restore, new-outlet 0% tax default, guest GST quote
+// projection) plus one announcement claim-recovery (20261119000400).
 const migDir = join(root, 'supabase/migrations');
 const migFiles = readdirSync(migDir).filter((f) => f.endsWith('.sql')).sort();
 const versions = migFiles.map((f) => f.slice(0, 14));
-check('migration_count_101', migFiles.length === 101, `found ${migFiles.length}`);
+check('migration_count_102', migFiles.length === 102, `found ${migFiles.length}`);
 check('migration_versions_unique', new Set(versions).size === versions.length);
 check('migration_versions_14_digit', versions.every((v) => /^[0-9]{14}$/.test(v)));
 
@@ -41,7 +41,7 @@ for (const f of GST_B) check(`gst_irp_present:${f.slice(0,14)}`, migFiles.includ
 const manifest = existsSync(join(root, 'docs/migration-manifest-2026-11-14.md')) ? read('docs/migration-manifest-2026-11-14.md') : '';
 const manifestVersions = new Set([...manifest.matchAll(/`([0-9]{14})`/g)].map((m) => m[1]));
 const actualVersions = new Set(versions);
-check('manifest_tracks_all_101', actualVersions.size === manifestVersions.size && [...actualVersions].every((v) => manifestVersions.has(v)),
+check('manifest_tracks_all_102', actualVersions.size === manifestVersions.size && [...actualVersions].every((v) => manifestVersions.has(v)),
   `manifest ${manifestVersions.size} versions vs actual ${actualVersions.size}`);
 check('manifest_marks_gst_irp_unauthorized', manifest.includes('NOT AUTHORIZED') && manifest.includes('GST/IRP'));
 check('gst_irp_plan_unauthorized', read('docs/gst-irp-production-readiness-2026-11-14.md').includes('NOT AUTHORIZED'));
