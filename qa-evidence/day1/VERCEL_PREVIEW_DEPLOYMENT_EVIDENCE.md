@@ -55,14 +55,20 @@ them are listed, so the count is not understated:
 | `430c390` | `HodrwsZwvdu3euvCeuDsUmCg4vzq` |
 | `18f0224` | `A4j8sSc4pZ9yUy32TUm21BunZxAA` |
 | `3924371` | `41MAowjmeo7PiCGprTXaj8ZGC7ff` |
+| `df6ac0d` | `CXKYpNogy1bKeUb2RYSRBB84ZLoo` |
 
-**Eleven Previews**, one per pushed head. They all share the same Preview
-host — the branch alias `new-git-arena-88c342c2-autodine-…`. **None** is a
-Production deployment, and **none** was created, promoted, redeployed or
-dispatched by this work: each is the Vercel GitHub App reacting to a push.
+**Twelve Previews**, one per pushed head, up to and including `df6ac0d` — the
+head this record describes. They all share the same Preview host — the
+branch alias `new-git-arena-88c342c2-autodine-…`. **None** is a Production
+deployment, and **none** was created, promoted, redeployed or dispatched by
+this work: each is the Vercel GitHub App reacting to a push.
 
 Each id is the `Vercel` commit status's target URL on that head, so the
 list is the app's own record rather than a reconstruction.
+
+**Any head pushed after `df6ac0d` produces one more Preview, by the same
+mechanism.** This record names the heads it was captured against rather
+than claiming to list a Preview that the app has not created yet.
 
 ## Why this is a Preview and not a Production deployment
 
