@@ -48,6 +48,12 @@ GitHub Actions does not expose `runner` in job-level `env`. The workflow therefo
 
 ## 3. The blocker register (one line each)
 
+> **The consolidated register is `qa-evidence/day1/MASTER_BLOCKER_REGISTER.md`.**
+> It gives every open blocker exactly **one owner, one acceptance condition
+> and one evidence requirement**, and it is the authoritative list. The
+> narrative lists in this section and in `MASTER_OWNER_ACTION_REGISTER.md`
+> remain as the owner's working checklists.
+
 - **Backup gate** — bucket + bucket-scoped key, the six repository secret names, **PR #190 merged ✅ (2026-11-19)**, one verified backup run, then one verified restore rehearsal. *Exact steps: `docs/operations/B2_OWNER_CHECKLIST.md`.*
 - **Migration canonicalization + B1** — 98 checked-in migrations (98 unique versions) replay green locally, but each collision between two live function bodies is an owner decision, never an inferred source edit. **Reconciled 2026-11-19** against the Batch 2 conflict report merged in PR #193 (`qa-evidence/day1/MIGRATION_CONFLICT_RESOLUTION_BATCH2.md`): it finds **no literal same-version file collisions**, and it confirms the ordered history `20261112000400` → `20261112000600` → `20261114000100` is already correct, with no combined function body needed.
 - **Email domain / SMTP** — Brevo must allow Supabase Auth egress IPs (else `525 5.7.1`), and no domain is purchased yet, so branded sending is not claimable.
