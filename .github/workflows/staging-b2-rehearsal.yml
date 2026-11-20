@@ -286,17 +286,18 @@ jobs:
           dir="$RUNNER_TEMP/autodine-staging-backup"
           log="$RUNNER_TEMP/autodine-staging-backup.log"
           mkdir -p "$dir"
-          # Configuration failures must be distinguishable from runtime failures,
-          # and both must be readable without an elevated log viewer. Only the
-          # LENGTH of the passphrase is ever printed; the value is never read here.
-          if [ "${#AUTODINE_BACKUP_PASSPHRASE}" -lt 12 ]; then
-            echo "::error title=Staging rehearsal configuration::STAGING_AUTODINE_BACKUP_PASSPHRASE is ${#AUTODINE_BACKUP_PASSPHRASE} characters; backup-logical.mjs requires at least 12. Length only: the value is never read or printed."
-            exit 1
-          fi
+          # Runtime failures must be readable without an elevated log viewer.
+          # Only credential LENGTHS are printed, never values.
+
           node scripts/backup/run-scheduled.mjs --out-dir "$dir" --rpo-minutes 1440 --b2 2>&1 | tee "$log"
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ]; then
-            reason="$(grep -aoE '(backup|run-scheduled|upload-b2|verify-backup-file)[: ].{0,180}' "$log" | head -n 3 | tr '\n' ' ' | sed -E 's#(postgres(ql)?|https?)://[^ ]*#<url-redacted>#g; s/[A-Za-z0-9+/=_-]{40,}/<redacted>/g' | cut -c1-500 || true)"
+            # Relay the tool's own credential-free reason. Also state each
+            # credential's LENGTH, mirroring exactly what the code enforces
+            # (non-empty; 12+ is documentation, not an enforced rule): a short
+            # value that is nonetheless accepted is worth seeing as a finding.
+            lengths="source_url=${#AUTODINE_BACKUP_SOURCE_URL} passphrase=${#AUTODINE_BACKUP_PASSPHRASE} b2_key=${#B2_ACCESS_KEY_ID} b2_secret=${#B2_SECRET_ACCESS_KEY} bucket=${#B2_BUCKET} region=${#B2_REGION}"
+            reason="$(grep -aoE '(backup|run-scheduled|upload-b2|verify-backup-file)[: ].{0,180}' "$log" | head -n 3 | tr '\n' ' ' | sed -E 's#(postgres(ql)?|https?)://[^ ]*#<url-redacted>#g; s/[A-Za-z0-9+/=_-]{40,}/<redacted>/g' | cut -c1-400 || true) lengths: ${lengths}"
             echo "::error title=Staging rehearsal failure::exit ${status}: ${reason:-no credential-free reason line found}"
             {
               echo "STAGING_FAILURE_REASON<<REASON_EOF"
