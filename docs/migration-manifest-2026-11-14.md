@@ -5,19 +5,19 @@ extended 2026-11-16 on `arena/2670dd12-autodine`; extended 2026-11-19 on
 `arena/bbf0f31b-autodine`.**
 Purpose: nothing reaches production without appearing in this table with a
 classification and the probe that confirms (or refutes) its presence. Counts:
-**76 legacy-rollout-scope · 12 branch set (pending owner authorization B1) ·
+**76 legacy-rollout-scope · 12 branch set (B1 authorized 2026-11-20 — includes 3
+QR/reliability migrations now on hosted) ·
 7 GST/IRP Phase B (NOT AUTHORIZED) · 1 scoped ACL revision
 (`20261116000100`, pending its own authorization)** — plus three local
 remediation migrations added 2026-11-19 (`20261119000100`–`20261119000300`),
 plus one announcement claim-recovery (`20261119000400`), plus two QR
 migrations (`20261118002200` staff boundary F-01/F-02/F-03 + `20261118002300`
-owner management restore/delete), none of the six authorized for hosted
-application except announcement recovery (already applied to both hosted
-projects, see row) and QR pair (pending owner confirmation for
-`bdbaqpevwmgdvghszjno`). Zero duplicate versions (checked 2026-11-14;
-rechecked 2026-11-16 at 93/93 and 2026-11-19 at 104/104). The release-prep
-document (`docs/production-release-prep-2026-11-14.md`) binds this manifest
-into the ordered release sequence.
+owner management), three of the six branch set now on hosted (announcement
+recovery + QR pair, see rows). Zero duplicate versions (checked 2026-11-14;
+rechecked 2026-11-16 at 93/93 and 2026-11-19 at 104/104, rechecked 2026-11-20
+post-B1 at 104/104). The release-prep document
+(`docs/production-release-prep-2026-11-14.md`) binds this manifest into the
+ordered release sequence.
 
 **Evidence boundary:** "Reported applied" means the 2026-11-12 hand-off report
 records the legacy rollout as completed. The A1 ledger + catalog-effect
@@ -130,8 +130,8 @@ without separate written authorization each.
 | `20261119000100` | `restore_receipt_helper_boundary` | Local remediation — NOT AUTHORIZED for hosted application | Restores the P8 boundary loosened by `20261114000101`: revokes EXECUTE on `issue_closed_session_receipt(uuid,jsonb)` from public/anon/authenticated/service_role, so settlement continues to go through `close_order_session_and_issue_receipt`. Verified by `supabase/checks/07_p8_close_settlement.sql` in the local harness |
 | `20261119000200` | `new_outlet_tax_default` | Local remediation — NOT AUTHORIZED for hosted application | Owner decision (2026-11-19): new restaurants start at `tax_rate_bps = 0` instead of the sample 500 bps; existing rows are unchanged and the owner sets a rate explicitly |
 | `20261119000300` | `public_guest_gst_quote` | Local remediation — NOT AUTHORIZED for hosted application | Adds the guest-only `public_restaurant_gst(text)` projection (mode plus the closed Regular profile rate, never tenant identity) so the cart quote matches `place_public_order` in off, composition and regular modes |
-| `20261118002200` | `qr_code_staff_boundary` | Branch set — P0 QR security (F-01/F-02/F-03) | Added 2026-11-19 on `arena/bbf0f31b-autodine`: fixes cross-tenant QR token exposure (F-01) and DOS (F-02) by requiring `has_restaurant_role(owner,manager)` + tenant-isolated lookup, and concurrent rotation race (F-03) via `table_qr_codes_one_active_per_table` unique partial index + `pg_advisory_xact_lock` serialization. Heals prior duplicate live codes. Revokes anon access, re-asserts RLS. PRODUCTION STATUS: NOT YET APPLIED to `bdbaqpevwmgdvghszjno` — requires owner confirmation at security gate. Locally verified, `sql:check` DDL parses. |
-| `20261118002300` | `qr_owner_management` | Branch set — QR owner management completeness | Added 2026-11-19 on `arena/bbf0f31b-autodine`: `restore_table_qr_code(uuid)` re-activates most-recent revoked QR only when no live code exists (advisory lock + unique index arbiter; owner/manager only); `delete_table_safe(uuid)` archives (disable) tables with order/session history, hard-deletes only when clean (prevents orphaned QR/session + silent data loss). Both `SECURITY DEFINER`, `search_path` pinned, tenant-isolated. Pending owner gate (`bdbaqpevwmgdvghszjno`). |
+| `20261118002200` | `qr_code_staff_boundary` | Branch set — P0 QR security (F-01/F-02/F-03) | **APPLIED 2026-11-20 via B1:** autodinetest `20261120190508_qr_code_staff_boundary` + autodine-production `20261120190546_qr_code_staff_boundary` — fixes F-01/F-02 via `has_restaurant_role` + `is_member`, F-03 via `table_qr_codes_one_active_per_table` + `pg_advisory_xact_lock`, heals duplicates, re-asserts RLS. Verified: index present, 4 functions present, `is_member` policy active, both projects `ACTIVE_HEALTHY`. |
+| `20261118002300` | `qr_owner_management` | Branch set — QR owner management completeness | **APPLIED 2026-11-20 via B1:** autodinetest `20261120190520_qr_owner_management` + autodine-production `20261120190553_qr_owner_management` — `restore_table_qr_code` + `delete_table_safe` (archive vs delete, owner/manager only, advisory-locked). Verified: both functions present with correct grants, health green. |
 | `20261119000400` | `announcement_claim_recovery` | Branch set — announcement delivery reliability (order claim stale-expiry + waiter-call poll index) | Added 2026-11-19: fixes `claim_kitchen_order_announcement` to expire stale `kitchen_announcement_claims` (>2 min) before INSERT so a crashed device does not hold the announcement forever; mirrors waiter-call API re-queue of `announcement_status='claimed'` >2 min; adds `table_waiter_calls_announcement_claimed_idx` for efficient poll. Applied to hosted autodine-production (20261119101116) and autodinetest (20261119101121). `migrations:verify` 104/104; `sql:check` DDL parses. |
 
 ## Owner-operation (never applied automatically — separate on purpose)
@@ -152,11 +152,9 @@ without separate written authorization each.
   boundary. Apply in filename order, only under B1 authorization, per release
   prep §2. `20261112000300_report_sales_export_authorization` is already applied
   on **staging only** (2026-11-15 rehearsal); production presence is unverified.
-  `20261119000400_announcement_claim_recovery` is an in-scope reliability fix
-  (delivery guarantee, no data exposure) already applied to both hosted projects
-  (see row); `20261118002200_qr_code_staff_boundary` + `20261118002300_qr_owner_management`
-  (F-01/F-02/F-03 + restore/delete) are QR security/management pending production
-  gate — tracked here for 104/104 completeness.
+  `20261119000400_announcement_claim_recovery` + `20261118002200_qr_code_staff_boundary`
+  + `20261118002300_qr_owner_management` are now on both hosted projects as of
+  2026-11-20 B1 (see rows) — tracked here for 104/104 completeness.
 - **GST/IRP Phase B (7):** `20261113000100` → `20261114000600` (B1–B7 in
   `docs/gst-irp-production-readiness-2026-11-14.md`). **NOT AUTHORIZED. Do not
   apply.** Note: B5 (`20261114000400_restrict_trigger_functions_execute`) is
