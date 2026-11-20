@@ -1,82 +1,102 @@
 # Arena A — Staging B2 rehearsal: execution record
 
 Sanitized. No credential value, database URL, key, token or customer record appears here.
-Every credential below is described by **length only**, which is what the workflow emits.
+Credentials are described by **length or result only**, which is what the workflow emits.
 
-## Verdict
+## Verdict: BLOCKED
 
 | Field | Value |
 |---|---|
-| Rehearsal result | **BLOCKED** — the staging source rejected authentication |
-| Blocking step | `9. Back up staging, verify locally and upload to B2` |
-| Failure | `password authentication failed for user "postgres"` (PostgreSQL `28P01`) |
-| Backup produced | none — the dump never started |
-| B2 contact | none — no upload was attempted, so no object exists and none could be deleted |
-| Restore executed | none — dependent steps were skipped |
+| Result | **BLOCKED** — the staging source rejects its own password |
+| Blocking gate | `Authentication check` (new, runs before any backup work) |
+| Safe diagnostic | `psql … FATAL: password authentication failed for user "postgres"` (`28P01`) |
+| Backup / upload / download / restore | none — nothing was attempted past the gate |
+| B2 objects created | none, therefore none deleted |
 
-A real B2 rehearsal did **not** happen. Nothing in this record should be read as a pass.
+No backup, no B2 upload, no restore happened. Nothing here may be read as a pass.
 
-## Identities (verified without printing secrets)
+## Why this is an owner-side gate, not a code defect
 
-| Item | Value | How verified |
+The workflow now proves the credential **before** spending a run. The configured
+`STAGING_AUTODINE_BACKUP_SOURCE_URL` resolves to `aws-0-ap-northeast-2.pooler.supabase.com:5432`
+(session pooler, which is the correct endpoint class for a consistent snapshot), and that
+endpoint rejects the configured password for user `postgres`.
+
+The only fixes are owner-side: set a working password in the environment secret, or reset the
+staging database password in Supabase. This run is **not** authorized to rotate or recover
+credentials, and will not substitute production or another project.
+
+## GitHub run
+
+| # | Run | Gate | Outcome |
+|---|---|---|---|
+| 1 | [44798845545](https://github.com/aryanp685/autodine/actions/runs/44798845545) | PASS | auth step had no connection target (defect, PR #203) |
+| 2 | [44800101568](https://github.com/aryanp685/autodine/actions/runs/44800101568) | PASS | **auth rejected `28P01`** — the real gate |
+
+- Code SHA rehearsed: `26d236e34ae54e248f5215f315c2fd4b17c5ef4e` (44-file manifest, byte for byte).
+- Workflow on `main` at dispatch: `016b03ef7633deaeffe051f372ca2d340cb759d6`.
+
+## Identities
+
+| Item | Value | How established |
 |---|---|---|
-| Default branch at dispatch | `main` | `git rev-parse origin/main` |
-| Code SHA rehearsed | `7a0c4811b5e9d38ab85e78fc2748a0ce97741461` | exact-code gate accepted 44/44 files, byte for byte |
-| Supabase staging project | `juwyhslzchjevqkdvwjm` | `vars.AUTODINE_STAGING_PROJECT_REF` matched by the identity step, which **passed** |
-| Production project | `bdbapevwmgdvghszjno` | not present in the source URL; production denied by construction |
-| B2 bucket | `autodine-staging-db-backups` (ID `d209a0cc2db8f17fac100514`) | identity step passed; bucket variable matched |
-| B2 region / endpoint | `eu-central-003` / `s3.eu-central-003.backblazeb2.com` | region secret present (14 chars); endpoint derived, no override in use |
-| Production bucket exclusion | enforced | `vars.AUTODINE_PRODUCTION_B2_BUCKETS` present, fail-closed check passed |
+| Supabase project | `juwyhslzchjevqkdvwjm` | identity step passed; source ref matched the variable |
+| Production project | `bdbaqpevwmgdvghszjno` | refused **by name** in a negative test; never contacted |
+| B2 bucket / ID | `autodine-staging-db-backups` / `d209a0cc2db8f17fac100514` | identity step passed |
+| B2 region / endpoint | `eu-central-003` / `s3.eu-central-003.backblazeb2.com` | region secret present (14 chars), endpoint derived, no override |
+| Production bucket exclusion | enforced | exclusion variable present, fail-closed check passed |
 
-## Protected-environment configuration, proven by a real protected run
+## Effective credential presence (preflight passed in every run)
 
-The preflight step evaluates `secrets.X != ''` for all six secrets and three variables and fails closed if any is empty. It **passed** in every run, which proves effective availability from the scope GitHub resolves for the `backup-staging` environment (that scope also considers same-name repository secrets — see Limitations).
-
-| Credential | Effective presence | Length observed |
+| Credential | Presence | Length |
 |---|---|---|
 | `STAGING_AUTODINE_BACKUP_SOURCE_URL` | present | 122 |
-| `STAGING_AUTODINE_BACKUP_PASSPHRASE` | present | **8** (code only enforces non-empty; `12+` is advice in its message, not a rule) |
+| `STAGING_AUTODINE_BACKUP_PASSPHRASE` | present | 8 — **below the enforced 12-char minimum** |
 | `STAGING_B2_ACCESS_KEY_ID` | present | 26 |
 | `STAGING_B2_SECRET_ACCESS_KEY` | present | 31 |
 | `STAGING_B2_BUCKET` | present | 27 |
 | `STAGING_B2_REGION` | present | 14 |
-| `AUTODINE_STAGING_PROJECT_REF` | present | not read |
-| `AUTODINE_STAGING_B2_BUCKET` | present | not read |
-| `AUTODINE_PRODUCTION_B2_BUCKETS` | present | not read |
+| `AUTODINE_STAGING_PROJECT_REF`, `AUTODINE_STAGING_B2_BUCKET`, `AUTODINE_PRODUCTION_B2_BUCKETS` | present | not read |
 
-## Runs
+The 8-character passphrase would now be refused **before any connection** by the shared contract; it never
+reached encryption because authentication failed first. It still needs an owner-side update to 16+ characters.
 
-| # | Run | Result | What it established |
-|---|---|---|---|
-| 1 | [44789437003](https://github.com/aryanp685/autodine/actions/runs/44789437003) | gate PASS, rehearsal FAIL | exact-code gate works in real CI; failure reason unreadable |
-| 2 | [44791402579](https://github.com/aryanp685/autodine/actions/runs/44791402579) | FAIL | diagnostic saw no secrets (step-scoped) → false "empty" claim |
-| 3 | [44792714068](https://github.com/aryanp685/autodine/actions/runs/44792714068) | FAIL | passphrase length (8) observed; annotation mis-stated the rule |
-| 4 | [44794052811](https://github.com/aryanp685/autodine/actions/runs/44794052811) | FAIL | handler never ran: `bash -e` aborted before it |
-| 5 | [44795251974](https://github.com/aryanp685/autodine/actions/runs/44795251974) | gate PASS, rehearsal FAIL | **true cause**: source auth rejected (`28P01`) |
+## Passphrase contract (implemented this run)
 
-Defects found and fixed in our own workflow during execution (PRs #197–#201): gate registration; annotation channel that works without log access; step-scoped secret visibility; a duplicated rule that disagreed with the implementation; and the `bash -e` handler that never ran. Each fix is in `main`.
+`lib-crypto.mjs` enforced 12+ characters but only inside `encryptBuffer`, i.e. **after**
+`backup-logical.mjs` had already opened a PostgreSQL snapshot. Now:
 
-## Why the boundary was not crossed
+- `MIN_PASSPHRASE_LENGTH`, `PASSPHRASE_RULE`, `passphraseProblem()` live in `lib-crypto.mjs` — one authority;
+- `backup-logical.mjs` refuses before any connection, snapshot, temp directory or byte;
+- the workflow pre-check mirrors the constant, and a test fails if the two drift;
+- 9 focused tests (`passphrase-contract.test.mjs`): missing, too short, boundary, valid, no-leak (value and length), encrypt guard, ordering, drift, workflow mirror.
 
-The source database is the credential owner's staging project. The authentication failure is a **credential/permission boundary**, not a code defect:
+## Defects found and fixed by executing
 
-- re-dispatching with the same credentials cannot succeed, so repeating it would only add noise (authorized "repeat where safe" does not cover "repeat a known-failing auth");
-- recovering or brute-forcing the staging password is explicitly out of scope (no rotating/creating credentials);
-- no fallback to production, no other database, no local `.env` may be substituted.
+| Run | Defect | Fix |
+|---|---|---|
+| #44795251974 | failure reason unreadable without an elevated log viewer | check-run annotation channel (#198) |
+| #44791402579 | diagnostic saw no secrets (step-scoped) and wrongly claimed one empty | report inside the owning step (#199) |
+| #44792714068 | workflow duplicated a rule and stated it wrongly | code is the single authority (#200) |
+| #44794052811 | handler never ran: `bash -e` aborted first | `set +e` (#201) |
+| #44798845545 | auth step gave `psql` no connection target | `PG*` variables, never the URI (#203) |
 
-Minimum action to proceed: the owner sets `STAGING_AUTODINE_BACKUP_SOURCE_URL` in the `backup-staging` environment so its password authenticates for user `postgres` against the **session/direct** endpoint of `juwyhslzchjevqkdvwjm` (not the transaction pooler), then the same dispatch is repeated — no workflow change needed.
+## Timings
 
-## Limitations that remain unproven
+Not measurable: the gate rejects the credential in seconds, before any dump, upload or restore.
+Reporting a backup/upload/restore duration or an RPO/RTO figure would be fabrication.
 
-- **Repository-level shadow copies**: listing secrets/variables returns HTTP 403 at both repository and environment scope, so "the value came only from the environment" cannot be proven. The preflight proves *effective* availability, which may include same-name repository values.
-- **Environment protection strength**: `backup-staging` has `can_admins_bypass: true`, no required reviewers, and **zero** custom deployment branch policies (`total_count: 0`). Dispatch to `main` worked regardless, so no branch-policy gate is in force.
-- **Workflow log text**: GitHub serves job logs from hosts this environment cannot reach (HTTP 000), so evidence here relies on check-run annotations plus per-step conclusions. Annotations are sufficient for the facts cited.
-- **`actionlint`** was not runnable here (no binary host access, no Go toolchain); CI lint plus `test:dr` 194/194 and `test:staging:guards` 66/66 stand in its place. This is a gap, not a pass.
+## Limitations (unresolved)
+
+- **Repository-level shadow values**: listing secrets returns HTTP 403 at both environment and repository scope, so "environment-only" scope is **unverified**. Preflight proves *effective* availability, which may include same-name repository values. Minimum owner action: confirm in Settings that the six secrets and three variables exist under `backup-staging` and that no same-name repository-level copies exist.
+- **Environment protection**: `can_admins_bypass: true`, no required reviewers, **0** custom deployment branch policies. Dispatch works with no policy gate. Not changed by this execution.
+- **Job logs**: GitHub serves them from hosts unreachable here (HTTP 000); evidence uses check-run annotations and per-step conclusions.
+- **`actionlint`**: not runnable here (no binary host access, no Go). CI lint plus `test:dr` 203/203 and `test:staging:guards` 66/66 stand in its place. A gap, not a pass.
 
 ## Security statements
 
 - No secret value, URL, passphrase or key was printed, logged, artifacted or committed.
-- The workflow emits credential **lengths** only and scrubs URLs and 40+ char token runs before emitting anything.
+- The workflow emits result codes and credential **lengths** only, and scrubs URLs and 40+ char token runs.
 - No B2 object, version, bucket or key was created, modified or deleted.
-- No production database or production bucket was contacted.
-- PR #194 was not merged; no production deployment occurred.
+- No production database or bucket was contacted; production project refused by name in a negative test.
+- PR #194 remains OPEN and unmerged; no production deployment occurred.
