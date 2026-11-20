@@ -129,10 +129,10 @@ function canRunEmbedded() {
 }
 
 test('a real dump replays into a real empty database', { skip: !canRunEmbedded() }, async () => {
-  // The script lives inside the workspace: the embedded-postgres runner
-  // executes it with the workspace as its working directory, and a file
-  // outside the workspace is not executable from there.
-  const script = path.join(ROOT, 'scripts', 'backup', `.tmp-dump-order-${process.pid}.mjs`);
+  // Resolve the pg dependency from the workspace without placing a temporary
+  // file in scripts/backup, where parallel lint and exact-code checks can race.
+  const scriptDir = mkdtempSync(path.join(ROOT, 'node_modules', '.dump-order-'));
+  const script = path.join(scriptDir, 'fixture.mjs');
   const outDir = mkdtempSync(path.join(tmpdir(), 'autodine-dump-order-'));
   try {
     const { writeFileSync } = await import('node:fs');
@@ -203,6 +203,6 @@ test('a real dump replays into a real empty database', { skip: !canRunEmbedded()
     assert.ok(parsed.functions > 0, 'the replayed database must have its functions');
   } finally {
     rmSync(outDir, { recursive: true, force: true });
-    rmSync(script, { force: true });
+    rmSync(scriptDir, { recursive: true, force: true });
   }
 });

@@ -183,3 +183,19 @@ test('the backup and restore scripts resolve the client through this module', ()
     );
   }
 });
+
+test('version probe child does not inherit dynamic loader overrides', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'autodine-pg-loader-test-'));
+  const keys = ['LD_LIBRARY_PATH', 'LD_PRELOAD', 'DYLD_LIBRARY_PATH', 'DYLD_INSERT_LIBRARIES'];
+  const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  try {
+    const file = path.join(dir, 'pg_dump');
+    writeFileSync(file, '#!/bin/sh\n[ -z "$LD_LIBRARY_PATH$LD_PRELOAD$DYLD_LIBRARY_PATH$DYLD_INSERT_LIBRARIES" ] || exit 9\necho "pg_dump (PostgreSQL) 17.6"\n');
+    chmodSync(file, 0o755);
+    for (const key of keys) process.env[key] = '/synthetic-hostile';
+    assert.equal(clientMajorVersion(file), '17');
+  } finally {
+    for (const key of keys) { if (saved[key] === undefined) delete process.env[key]; else process.env[key] = saved[key]; }
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

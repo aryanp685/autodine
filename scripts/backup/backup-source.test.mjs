@@ -127,14 +127,14 @@ test('the constant the rule is built on is the real transaction-pooler port', ()
 
 test('staging backup requires the designated non-production project and bucket', async () => {
   const { stagingSourceDecision } = await import('./validate-staging-source.mjs');
-  const ref = 'abcdefghijklmnopqrst';
-  const base = { sourceUrl: `postgresql://postgres:secret@db.${ref}.supabase.co:5432/postgres`, expectedRef: ref, bucket: 'autodine-stage', expectedBucket: 'autodine-stage', productionBucketsJson: '["autodine-production"]' };
+  const ref = 'juwyhslzchjevqkdvwjm';
+  const base = { sourceUrl: `postgresql://postgres:secret@db.${ref}.supabase.co:5432/postgres`, expectedRef: ref, bucket: 'autodine-staging-db-backups', expectedBucket: 'autodine-staging-db-backups', productionBucketsJson: '["autodine-production"]' };
   assert.equal(stagingSourceDecision(base).allowed, true);
   assert.equal(stagingSourceDecision({ ...base, productionBucketsJson: '[]' }).allowed, true, 'an explicitly attested empty production inventory is accepted');
   for (const change of [
     { expectedRef: '' }, { expectedRef: 'aaaaaaaaaaaaaaaaaaaa' }, { expectedBucket: 'other-bucket' },
     { productionBucketsJson: undefined }, { productionBucketsJson: '' }, { productionBucketsJson: '{}' },
-    { productionBucketsJson: '["AUTODINE-STAGE"]' }, { productionBucketsJson: '[1]' },
+    { productionBucketsJson: '["AUTODINE-STAGING-DB-BACKUPS"]' }, { productionBucketsJson: '[1]' },
     { bucket: 'x', expectedBucket: 'x' },
     { sourceUrl: `postgresql://postgres:secret@db.bdbaqpevwmgdvghszjno.supabase.co:5432/postgres`, expectedRef: 'bdbaqpevwmgdvghszjno' },
     { sourceUrl: `postgresql://postgres.${ref}:secret@aws-0-us-east-1.pooler.supabase.com:6543/postgres` },
@@ -151,14 +151,39 @@ test('staging CLI refuses a production bucket before contact without printing so
   const result = spawnSync(process.execPath, [path.join(ROOT, 'scripts/backup/validate-staging-source.mjs')], {
     encoding: 'utf8', env: {
       ...process.env,
-      AUTODINE_BACKUP_SOURCE_URL: DIRECT,
-      AUTODINE_STAGING_PROJECT_REF: 'abcdefghijklmnopqrst',
-      B2_BUCKET: 'autodine-stage',
-      AUTODINE_STAGING_B2_BUCKET: 'autodine-stage',
-      AUTODINE_PRODUCTION_B2_BUCKETS: '["autodine-stage"]',
+      AUTODINE_BACKUP_SOURCE_URL: 'postgresql://postgres:secret@db.juwyhslzchjevqkdvwjm.supabase.co:5432/postgres',
+      AUTODINE_STAGING_PROJECT_REF: 'juwyhslzchjevqkdvwjm',
+      B2_BUCKET: 'autodine-staging-db-backups',
+      AUTODINE_STAGING_B2_BUCKET: 'autodine-staging-db-backups',
+      AUTODINE_PRODUCTION_B2_BUCKETS: '["autodine-staging-db-backups"]',
     },
   });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /production bucket/);
   assert.doesNotMatch(result.stderr, /secret|postgresql:\/\//);
+});
+
+test('staging B2 provider-scope fixtures require exact identity, exclusion and least privilege', async () => {
+  const { stagingB2ScopeDecision, STAGING_BUCKET_ID, STAGING_BUCKET_NAME } = await import('./validate-staging-source.mjs');
+  const storageApi = { s3ApiUrl: 'https://s3.eu-central-003.backblazeb2.com', allowed: { buckets: [{ id: STAGING_BUCKET_ID, name: STAGING_BUCKET_NAME }], capabilities: ['listFiles', 'readFiles', 'writeFiles'], namePrefix: null } };
+  const fixture = { storageApi, inventoryVerified: true, productionInventory: [{ id: 'prod-id', name: 'prod-bucket' }] };
+  assert.equal(stagingB2ScopeDecision(fixture).allowed, true);
+  for (const change of [
+    { inventoryVerified: false }, { productionInventory: undefined },
+    { productionInventory: [{ id: STAGING_BUCKET_ID, name: 'prod-bucket' }] },
+    { productionInventory: [{ id: 'prod-id', name: STAGING_BUCKET_NAME.toUpperCase() }] },
+    { storageApi: { ...storageApi, s3ApiUrl: 'https://example.com' } },
+    { storageApi: { ...storageApi, allowed: { ...storageApi.allowed, buckets: [{ id: 'wrong', name: STAGING_BUCKET_NAME }] } } },
+    { storageApi: { ...storageApi, allowed: { ...storageApi.allowed, buckets: [] } } },
+    { storageApi: { ...storageApi, allowed: { ...storageApi.allowed, capabilities: ['listFiles', 'readFiles', 'writeFiles', 'deleteFiles'] } } },
+    { storageApi: { ...storageApi, allowed: { ...storageApi.allowed, capabilities: ['readFiles', 'writeFiles'] } } },
+  ]) assert.equal(stagingB2ScopeDecision({ ...fixture, ...change }).allowed, false);
+});
+
+test('disposable restore target fixtures reject production, wrong database and unverified container', async () => {
+  const { stagingDisposableDecision } = await import('./validate-staging-source.mjs');
+  const id = 'a'.repeat(64);
+  const target = { runner: 'github-hosted-ephemeral', host: '127.0.0.1', database: 'drill', serverMajor: 17, emptyPublicSchema: true, service: 'drilldb', containerId: id, inspectedContainerId: id, sameAsSource: false };
+  assert.equal(stagingDisposableDecision(target).allowed, true);
+  for (const change of [{ host: 'db.bdbaqpevwmgdvghszjno.supabase.co' }, { sameAsSource: true }, { database: 'postgres' }, { serverMajor: 18 }, { emptyPublicSchema: false }, { runner: 'self-hosted' }, { inspectedContainerId: 'b'.repeat(64) }]) assert.equal(stagingDisposableDecision({ ...target, ...change }).allowed, false);
 });

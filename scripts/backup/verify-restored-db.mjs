@@ -81,9 +81,8 @@ const targetDecision = restoreTargetDecision({
     .filter(Boolean),
 });
 if (!targetDecision.allowed) {
-  process.stderr.write(
-    `verify-restored: REFUSING non-disposable target host "${targetDecision.host}" — ${targetDecision.reason}\n`,
-  );
+  const reason = targetDecision.reason.startsWith('refusing to restore into the PRODUCTION project ') ? 'PRODUCTION project' : 'target guard did not approve it';
+  process.stderr.write(`verify-restored: REFUSING non-disposable target — ${reason}\n`);
   process.exit(2);
 }
 
@@ -138,7 +137,11 @@ if (artifactSha256 !== manifest.sha256) {
 const { default: pg } = await import('pg');
 
 const client = new pg.Client({ connectionString: targetUrl, application_name: 'autodine-verify-restored' });
-await client.connect();
+try {
+  await client.connect();
+} catch {
+  fail('could not connect to the approved restore target');
+}
 try {
   const one = async (sql, params = []) => (await client.query(sql, params)).rows[0];
   // The same count definitions the backup manifest producers use
@@ -192,8 +195,11 @@ try {
   process.stdout.write(JSON.stringify(report, null, 2) + '\n');
   if (!report.verified) {
     process.stderr.write('verify-restored: MISMATCH against backup manifest (see report above)\n');
-    process.exit(1);
+    process.exitCode = 1;
   }
+} catch {
+  process.stderr.write('verify-restored: FAILED: database verification could not complete\n');
+  process.exitCode = 1;
 } finally {
-  await client.end();
+  await client.end().catch(() => {});
 }

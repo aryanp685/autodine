@@ -24,10 +24,10 @@ name: Staging B2 backup and disposable restore
 # the commit this workflow runs at (for the default-branch registration, the
 # default-branch tip). The `exact-code-gate` job then fetches EXACTLY that
 # commit and refuses to proceed unless the fetched tree carries, byte for
-# byte, the audited V3 staging implementation pinned below (every file
+# byte, the reviewed staging implementation pinned below (every file
 # first-party code would execute, plus package.json / package-lock.json).
 # After the gate passes, the rehearsal job checks out that exact SHA and runs
-# whatever it contains. If the ref does not contain the V3 implementation —
+# whatever it contains. If the ref does not contain the pinned implementation —
 # for example today's `main`, which lacks `validate-staging-source.mjs` and
 # has older backup scripts — the gate fails closed BEFORE any credential is
 # materialized anywhere. The gate job holds no environment, secret or
@@ -76,7 +76,7 @@ name: Staging B2 backup and disposable restore
 # scratch/expected-ref opt-in, or any other environment (exactly one
 # `environment:` declaration exists, `backup-staging`).
 #
-# A 40-character `ref` that does not contain the V3 implementation is the
+# A 40-character `ref` that does not contain the pinned implementation is the
 # ONLY thing this workflow rehearses; see the gate. DO NOT dispatch without
 # explicit owner authorization. The PostgreSQL service is a disposable
 # loopback container; the restore target is loopback-only by guard and the
@@ -86,7 +86,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Full 40-character lowercase hex commit SHA of the audited implementation. Empty = the commit this workflow runs at. Anything else fails closed.'
+        description: 'Full 40-character lowercase hex commit SHA of the reviewed implementation. Empty = the commit this workflow runs at. Anything else fails closed.'
         required: false
         type: string
         default: ''
@@ -128,7 +128,7 @@ jobs:
             exit 1
           fi
           echo "GATE_DIR=$gate_dir" >> "$GITHUB_ENV"
-      - name: Verify the audited V3 staging implementation byte for byte
+      - name: Verify the pinned staging implementation byte for byte
         run: |
           # --- exact-code-gate BEGIN
           set -euo pipefail
@@ -138,54 +138,60 @@ jobs:
           100755 blob 35cfbb3dee583e2b9d87e9a14e23ca65941f2642	.github/actions/postgres-client/install-client.sh
           100755 blob ff890e80ccd94b353e96ef903884d68a589ce78f	.github/actions/postgres-client/verify-client.sh
           100644 blob d7defa59ed60dc1187f348771265c56fd06bddd9	package-lock.json
-          100644 blob 96e1d3d4a4a80943724e8e48c2a5120e1db735c7	package.json
+          100644 blob d192ac2b3e1729dbaaa2272305c7449609d002a3	package.json
           100644 blob cf5326d1ada5681e5b4af4895be3d8da96a2b51d	scripts/backup/b2-owner-checklist.test.mjs
           100644 blob 5b657cc7577aaa63ba0ba8cf284f6d52c51bd7c3	scripts/backup/b2-upload.test.mjs
-          100644 blob 8fce2f5b0a7890174d84660f306c3fc2d0755ccf	scripts/backup/backup-logical.mjs
+          100644 blob b78380e31088bdf90d8714f3e55697111cf655e5	scripts/backup/backup-logical.mjs
           100644 blob 31850aef84926d2e1f161a66312cedfa2134317d	scripts/backup/backup-mode.test.mjs
-          100644 blob 045f016307b163395790fb3dcc1d49c7e762623c	scripts/backup/backup-source.test.mjs
+          100644 blob ae1546c1668e416c0405568e9d17564ebf56f0a7	scripts/backup/backup-source.test.mjs
           100644 blob 7e4e0df3e49f16dfac4103e1fef114342af575de	scripts/backup/check-dr-objectives.mjs
           100644 blob 4094d3fca9da88e65b7c5511a2a2bd0a216d75c5	scripts/backup/check-dr-objectives.test.mjs
           100644 blob 5144b57ed7c8f1164eee9aca6a9a44ecf8af7b57	scripts/backup/compare-rehearsal-manifests.mjs
           100644 blob 9fdcef5533f5f48732bb009822804e2a582f8c0d	scripts/backup/compare-rehearsal-manifests.test.mjs
-          100644 blob 26a4587015e89a7031fc1b8e2d835e59c6699751	scripts/backup/download-b2.mjs
-          100644 blob cb7893470016c166ccb0e906ac7aa6a3d7ed89d0	scripts/backup/dump-order.test.mjs
+          100644 blob c5acb87169f5b35414fe37e494c9564a5756e56f	scripts/backup/download-b2.mjs
+          100644 blob a0ca69f3574b6c77726231ccf46b06b04e3e180a	scripts/backup/dump-order.test.mjs
           100644 blob 56c8cbcfc852b0c8d033030a4cff07e0da85b685	scripts/backup/lib-b2-read.mjs
           100644 blob 644ca4d7fc3b425780436d0f92b75837b39b94da	scripts/backup/lib-b2.mjs
+          100644 blob 7a31acde06336536071059872233d3b81ace5fb1	scripts/backup/lib-backup-error.mjs
+          100644 blob b44c078b436bba02b376c08b61d8b04b8aa7fc4f	scripts/backup/lib-backup-error.test.mjs
           100644 blob aa0899f196e7278a3be10f6a0bd05e63541e7f23	scripts/backup/lib-backup-mode.mjs
           100644 blob b99e1d42f44d9a872d0d72598ed61a28584d72f7	scripts/backup/lib-backup-source.mjs
           100644 blob 8094474fe5d4323013fa76dd0576e58a82201469	scripts/backup/lib-crypto.mjs
           100644 blob 135ea4222048f81ff5924208e249125308e8b9ac	scripts/backup/lib-dump.mjs
-          100644 blob c30afd406a996b289bf3bf0511bf3c96ad6355bf	scripts/backup/lib-pg-client.mjs
-          100644 blob 5b10a49ae6355b516945e4601215723721f8f82f	scripts/backup/lib-pg-client.test.mjs
+          100644 blob 0bb51710a6e80823fe4368dd8e5ddbb246f5a5bf	scripts/backup/lib-pg-client.mjs
+          100644 blob 46475b36af0df4f2ded1a97d6b9c12a9b13cb345	scripts/backup/lib-pg-client.test.mjs
+          100644 blob e421f76a28942cf5818e63693b1a3252a3e9007d	scripts/backup/lib-pg-service.mjs
+          100644 blob b91c4cb3e7773a17fdec8845e7fd32471096c7da	scripts/backup/lib-pg-service.test.mjs
           100644 blob 24049caa0cd1e6b8a6a98f3ee61c47f0ae6c0057	scripts/backup/lib-restore-target.mjs
-          100644 blob 22c8f72f2cb18f9c6197c15035bf341c425b71ba	scripts/backup/lib-schedule.mjs
-          100644 blob 509327306305dc972777f5f77b6e1b19373d10e0	scripts/backup/passphrase-contract.test.mjs
+          100644 blob c647798af0c62ef47b63d80fa9663b62ec7c6609	scripts/backup/lib-schedule.mjs
+          100644 blob 7656a00fb4f7ec74bc215be573c413364cad9591	scripts/backup/passphrase-contract.test.mjs
           100644 blob d091edbb3fa5c2dfe09c1c6ef40f74e8c5d03818	scripts/backup/postgres-client-action.test.mjs
           100644 blob 5450afbaa6db794f11dda52e4b015559439c54bc	scripts/backup/postgres-client-env.test.mjs
           100644 blob 2096f69334b2861b746b3e48bd0ba6f5263912b4	scripts/backup/postgres-client-wiring.test.mjs
           100644 blob 2dd2cdc1a867088ee810c4e77c272f8e6766ff91	scripts/backup/prepare-disposable-restore.mjs
-          100644 blob 1b563be86b5a078611b50e7e2607c5aa4532feff	scripts/backup/prune-b2.mjs
-          100644 blob f278c5bfea0b237f5157e86b7f3b1237cbe5946f	scripts/backup/prune-b2.test.mjs
-          100644 blob fd123b1edbf8b8eee10a859c9981327a741ae58b	scripts/backup/restore-logical.mjs
-          100644 blob 2d16fdd496697751e12f8b60a5449ea54594df1e	scripts/backup/restore-target.test.mjs
-          100644 blob 42bd98327de5fcbb4ef4ed8f921c7f7a4a452228	scripts/backup/run-scheduled.mjs
-          100644 blob 8b562420e36088b4240148e2c09c3e0b82a2bb9f	scripts/backup/run-scheduled.test.mjs
+          100644 blob 96b5dc8e449f8c2892bfa9708f7f32d20ba97067	scripts/backup/prune-b2.mjs
+          100644 blob 030f565abddc847181af1689d26cae4217fd1916	scripts/backup/prune-b2.test.mjs
+          100644 blob 31a1f687fa5aa100e240ce2afb857d4f65d139db	scripts/backup/restore-cleanup.test.mjs
+          100644 blob 2379ade37255f0850bf87e6f95683121b95db217	scripts/backup/restore-logical.mjs
+          100644 blob 946cdc79feb7ee93396c43be32b8e2152c88e974	scripts/backup/restore-target.test.mjs
+          100644 blob 2d870fc897b73f99fa3032dc223bd42c7604404c	scripts/backup/run-scheduled-mocked.test.mjs
+          100644 blob facd45b012b5376e169e111cba546d9b18b7ebc9	scripts/backup/run-scheduled.mjs
+          100644 blob 8b1515620cdfdd34c87c70a6f54f851e6dcbe076	scripts/backup/run-scheduled.test.mjs
           100644 blob 5c559d087c2cd5cf7ca153ef36d2ba8f18bfc4da	scripts/backup/selftest.mjs
-          100644 blob c47793f88fb2dab104ea8bc617e8fbd9e5537db6	scripts/backup/staging-rehearsal-wiring.test.mjs
-          100644 blob 1e0360e48f9e3d159b7592d8678ab5290effc7ad	scripts/backup/upload-b2.mjs
-          100644 blob 365a07fcc17afd57b8276d60b8c88e6bc4f9da68	scripts/backup/validate-staging-source.mjs
+          100644 blob fc55726c5b30654a80656fa0e714c04422854e47	scripts/backup/staging-rehearsal-wiring.test.mjs
+          100644 blob 0c237f05e99127dcff02063ff71a2b33f120f21e	scripts/backup/upload-b2.mjs
+          100644 blob 96d7bffb15b4ca1564dec2c4edfdc9535754d10a	scripts/backup/validate-staging-source.mjs
           100644 blob c6134e56f402d2f9aca0b8dd70de5a8b41a52057	scripts/backup/verify-backup-file.mjs
           100644 blob 305ea6cbc2816c66efa3c786bdb2677cb90c292c	scripts/backup/verify-backup-file.test.mjs
-          100644 blob 5d593f7a77a3b6c1526a72ac0a6dd5d6bfe603dd	scripts/backup/verify-restored-db.mjs
-          100644 blob d185f27eea8210044229e12652ce2ff8a1149b29	scripts/backup/verify-restored-db.test.mjs
+          100644 blob d8b01c9ccc4bf9f69220e237a543e5b6127b506a	scripts/backup/verify-restored-db.mjs
+          100644 blob 102a1839567f812adfd3f85acafefee0791f1a9b	scripts/backup/verify-restored-db.test.mjs
           V3_MANIFEST
           git ls-tree -r FETCH_HEAD -- scripts/backup .github/actions/postgres-client package.json package-lock.json > actual.txt
           if diff -q expected.txt actual.txt >/dev/null; then
-            echo 'exact-code gate: the requested ref carries the audited V3 staging implementation (44 files, byte for byte)'
+            echo 'exact-code gate: the requested ref carries the pinned staging implementation (51 files, byte for byte)'
             exit 0
           fi
-          echo '::error::exact-code gate REFUSED: the requested ref does not contain the audited V3 staging implementation — refusing before any credential is materialized (paths only below; contents are never printed)'
+          echo '::error::exact-code gate REFUSED: the requested ref does not contain the pinned staging implementation — refusing before any credential is materialized (paths only below; contents are never printed)'
           echo '--- missing from the ref:'
           comm -23 <(cut -f2 expected.txt | LC_ALL=C sort) <(cut -f2 actual.txt | LC_ALL=C sort)
           echo '--- unexpected in the ref:'
@@ -215,6 +221,12 @@ jobs:
           --health-timeout 3s
           --health-retries 12
     steps:
+      # Non-overridable until independent staging identity, key-scope and
+      # disposable-target collectors are implemented and reviewed.
+      - name: Stop until hosted isolation is independently verified
+        run: |
+          echo '::error::Hosted rehearsal disabled: independent isolation and credential-scope proof is not implemented.'
+          exit 1
       - uses: actions/checkout@v7
         with:
           # After the exact-code gate passes, this checks out EXACTLY the
@@ -266,56 +278,6 @@ jobs:
             exit 1
           fi
           echo 'backup-staging preflight: all six required staging secrets and three required staging variables are set (values never read by this step).'
-      - name: Authentication check (result only, no URI or password output)
-        env:
-          AUTODINE_BACKUP_SOURCE_URL: ${{ secrets.STAGING_AUTODINE_BACKUP_SOURCE_URL }}
-          AUTODINE_STAGING_PROJECT_REF: ${{ vars.AUTODINE_STAGING_PROJECT_REF }}
-        run: |
-          # Prove the credential authenticates BEFORE a long backup is attempted.
-          # The URI is never passed as an argument (it would surface in `ps` and
-          # in any logged error); it is decomposed into PG* variables instead, and
-          # only the result, the project ref and the server version are printed.
-          set -uo pipefail
-          node --input-type=module -e '
-          const raw = process.env.AUTODINE_BACKUP_SOURCE_URL;
-          const expectedRef = process.env.AUTODINE_STAGING_PROJECT_REF;
-          const fail = (why) => { console.error(`::error title=Staging source authentication::${why}`); process.exit(1); };
-          if (!raw) fail("STAGING_AUTODINE_BACKUP_SOURCE_URL is empty in the protected environment");
-          let u;
-          try { u = new URL(raw); } catch { fail("the configured source URL is not a valid URL"); }
-          if (!/^postgres(ql)?:$/.test(u.protocol)) fail("the configured source is not a PostgreSQL URL");
-          if (u.port === "6543") fail("the configured source is the transaction pooler (port 6543); a consistent snapshot is impossible through it");
-          const ref = (u.hostname.match(/^db\.([a-z0-9]+)\.supabase\.co$/) || u.username.match(/^postgres\.([a-z0-9]+)$/) || [])[1] || null;
-          const projectRef = ref || (u.hostname.split(".")[0] || null);
-          console.log(`source project ref: ${projectRef}`);
-          if (expectedRef && projectRef !== expectedRef) {
-            fail(`source project ref ${projectRef} does not match the designated staging project`);
-          }
-          const { spawnSync } = await import("node:child_process");
-          const env = {
-            ...process.env,
-            PGHOST: u.hostname,
-            PGPORT: u.port || "5432",
-            PGUSER: decodeURIComponent(u.username),
-            PGPASSWORD: decodeURIComponent(u.password),
-            PGDATABASE: decodeURIComponent(u.pathname.replace(/^\//, "")) || "postgres",
-            PGSSLMODE: env0("PGSSLMODE") || "require",
-            PGCONNECT_TIMEOUT: "15",
-          };
-          function env0(k) { return process.env[k]; }
-          const psql = process.env.PG_CLIENT_BIN_DIR ? `${process.env.PG_CLIENT_BIN_DIR}/psql` : "psql";
-          const r = spawnSync(psql, ["-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-c",
-            "select current_database(), current_user, current_setting('"'"'server_version'"'"'), (select count(*) from pg_extension)"], { env, encoding: "utf8" });
-          if (r.error) fail(`psql could not be executed: ${r.error.code || r.error.message}`);
-          if (r.status !== 0) {
-            const msg = String(r.stderr || "").split("\n")
-              .filter((l) => l && !l.includes("postgres://") && !l.includes("postgresql://"))
-              .slice(0, 2).join(" ").slice(0, 300);
-            fail(`authentication or connection failed: ${msg || `exit ${r.status}`}`);
-          }
-          const [db, user, version, exts] = String(r.stdout).trim().split("|");
-          console.log(`authenticated: database=${db} user=${user} server_version=${version} extensions=${exts}`);
-          '
       - name: Refuse undesignated source and bucket before connecting
         env:
           AUTODINE_BACKUP_SOURCE_URL: ${{ secrets.STAGING_AUTODINE_BACKUP_SOURCE_URL }}
@@ -324,6 +286,25 @@ jobs:
           AUTODINE_STAGING_B2_BUCKET: ${{ vars.AUTODINE_STAGING_B2_BUCKET }}
           AUTODINE_PRODUCTION_B2_BUCKETS: ${{ vars.AUTODINE_PRODUCTION_B2_BUCKETS }}
         run: node scripts/backup/validate-staging-source.mjs
+      - name: Authentication check (private libpq service, fixed diagnostics)
+        env:
+          AUTODINE_BACKUP_SOURCE_URL: ${{ secrets.STAGING_AUTODINE_BACKUP_SOURCE_URL }}
+        run: |
+          node --input-type=module <<'AUTH_CHECK'
+          import { spawnSync } from 'node:child_process';
+          import { resolvePgClient } from './scripts/backup/lib-pg-client.mjs';
+          import { withPgService } from './scripts/backup/lib-pg-service.mjs';
+          try {
+            const client = resolvePgClient('psql', { required: true });
+            const result = withPgService(process.env.AUTODINE_BACKUP_SOURCE_URL, ({ env, dbname }) =>
+              spawnSync(client.path, ['-X', '-w', '-q', '-d', dbname, '-c', 'select 1'], { env, stdio: 'ignore', timeout: 15000 }));
+            if (result.status !== 0) throw new Error('authentication failed');
+            console.log('Staging source authentication accepted.');
+          } catch {
+            console.error('Staging source authentication failed; inspect approved configuration without exposing credentials.');
+            process.exitCode = 1;
+          }
+          AUTH_CHECK
       - name: Back up staging, verify locally and upload to B2
         env:
           AUTODINE_BACKUP_SOURCE_URL: ${{ secrets.STAGING_AUTODINE_BACKUP_SOURCE_URL }}
@@ -333,43 +314,14 @@ jobs:
           B2_ACCESS_KEY_ID: ${{ secrets.STAGING_B2_ACCESS_KEY_ID }}
           B2_SECRET_ACCESS_KEY: ${{ secrets.STAGING_B2_SECRET_ACCESS_KEY }}
         run: |
-          # Actions invokes run blocks as `bash -e`, so a failing command aborts
-          # the script immediately. Without an explicit `set +e` the handler
-          # below never runs and the step dies with no reason recorded: that is
-          # exactly what happened in runs #1, #2 and #4.
-          set +e
           set -uo pipefail
           dir="$RUNNER_TEMP/autodine-staging-backup"
-          log="$RUNNER_TEMP/autodine-staging-backup.log"
           mkdir -p "$dir"
-          # Refuse a passphrase that breaks the encryption contract BEFORE the
-          # database or B2 is contacted. The minimum lives in
-          # scripts/backup/lib-crypto.mjs (MIN_PASSPHRASE_LENGTH) and is mirrored
-          # here only as a pre-check: lib-crypto.mjs remains the authority and
-          # refuses the same value later, so the two cannot silently disagree.
-          if [ "${#AUTODINE_BACKUP_PASSPHRASE}" -lt 12 ]; then
-            echo "::error title=Staging rehearsal configuration::STAGING_AUTODINE_BACKUP_PASSPHRASE is shorter than the 12-character minimum enforced by scripts/backup/lib-crypto.mjs. Length only; the value is never read or printed. Nothing was written and no database or B2 connection was attempted."
+          # Never relay child output, provider errors, paths or secret lengths.
+          # A failed publication can leave uncertain remote state; no retry.
+          if ! node scripts/backup/run-scheduled.mjs --out-dir "$dir" --rpo-minutes 1440 --b2 > /dev/null 2>&1; then
+            echo '::error::Staging backup failed; remote state is unknown. Investigate without retry or deletion.'
             exit 1
-          fi
-          # Runtime failures must be readable without an elevated log viewer.
-          # Only credential LENGTHS are printed, never values.
-
-          node scripts/backup/run-scheduled.mjs --out-dir "$dir" --rpo-minutes 1440 --b2 2>&1 | tee "$log"
-          status=${PIPESTATUS[0]}
-          if [ "$status" -ne 0 ]; then
-            # Relay the tool's own credential-free reason. Also state each
-            # credential's LENGTH, mirroring exactly what the code enforces
-            # (non-empty; 12+ is documentation, not an enforced rule): a short
-            # value that is nonetheless accepted is worth seeing as a finding.
-            lengths="source_url=${#AUTODINE_BACKUP_SOURCE_URL} passphrase=${#AUTODINE_BACKUP_PASSPHRASE} b2_key=${#B2_ACCESS_KEY_ID} b2_secret=${#B2_SECRET_ACCESS_KEY} bucket=${#B2_BUCKET} region=${#B2_REGION}"
-            reason="$(grep -aoE '(backup|run-scheduled|upload-b2|verify-backup-file)[: ].{0,180}' "$log" | head -n 3 | tr '\n' ' ' | sed -E 's#(postgres(ql)?|https?)://[^ ]*#<url-redacted>#g; s/[A-Za-z0-9+/=_-]{40,}/<redacted>/g' | cut -c1-400 || true) lengths: ${lengths}"
-            echo "::error title=Staging rehearsal failure::exit ${status}: ${reason:-no credential-free reason line found}"
-            {
-              echo "STAGING_FAILURE_REASON<<REASON_EOF"
-              echo "exit ${status}: ${reason:-unknown}"
-              echo "REASON_EOF"
-            } >> "$GITHUB_ENV"
-            exit "$status"
           fi
       - name: Download newest B2 artifact and verify integrity
         env:
@@ -401,23 +353,10 @@ jobs:
           node scripts/backup/restore-logical.mjs --file "$artifact" --confirm-empty-db
           echo "RESTORE_SECONDS=$(($(date +%s) - start))" >> "$GITHUB_ENV"
           node scripts/backup/verify-restored-db.mjs --manifest "$manifest" --artifact "$artifact" | tee "$dir/restore-report.json"
-      - name: Sanitized failure diagnostic (no secret access, relays propagated codes only)
+      - name: Sanitized failure diagnostic
         if: failure()
         run: |
-          # This step deliberately declares no secrets: step-level secrets are not
-          # inherited, so it CANNOT inspect them. It therefore never claims one is
-          # missing or empty; the step that owns the credential reports its own
-          # scrubbed reason. Here we only relay that pre-scrubbed reason.
-          set -uo pipefail
-          reason="${STAGING_FAILURE_REASON:-no failure code was propagated by the step that owns the credential; see the annotation on that step}"
-          reason="$(printf '%s' "$reason" | tr '\n' ' ' | sed -E 's#(postgres(ql)?|https?)://[^ ]*#<url-redacted>#g; s/[A-Za-z0-9+/=_-]{40,}/<redacted>/g' | cut -c1-600)"
-          {
-            echo '### Failure reason (sanitized)'
-            echo "- ${reason}"
-            echo '- This step holds no secrets, so it never states that a secret is missing; only the owning step can.'
-            echo '- No secret value, database URL or key is included in this annotation.'
-          } >> "$GITHUB_STEP_SUMMARY"
-          echo "::error title=Staging rehearsal failure reason::${reason}"
+          echo '::error::Rehearsal failed or was blocked; inspect authorized evidence without exposing credentials.'
       - name: Evidence summary
         if: always()
         run: |

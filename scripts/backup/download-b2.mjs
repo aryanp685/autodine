@@ -133,7 +133,7 @@ try {
   if (error instanceof SyntaxError) {
     process.stderr.write('download-b2: downloaded manifest is not valid JSON; refusing to use the artifact\n');
   } else {
-    process.stderr.write(`download-b2: transfer failed (${error?.name ?? 'Error'}); no credentials were printed\n`);
+    process.stderr.write('download-b2: transfer failed; inspect network/endpoint configuration\n');
   }
   process.exit(1);
 }

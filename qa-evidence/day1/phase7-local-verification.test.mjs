@@ -45,15 +45,17 @@ test('the record states every gate it claims, and claims no more than it has', (
   }
 });
 
-test('the migration chain claim is the chain that is actually there', () => {
+test('the current migration chain is valid and the historical count remains a snapshot', () => {
   const run = execFileSync('node', ['scripts/verify-migration-chain.mjs'], { cwd: ROOT, encoding: 'utf8' });
   const files = Number(/(\d+) files/.exec(run)?.[1] ?? 0);
   const versions = Number(/(\d+) unique versions/.exec(run)?.[1] ?? 0);
   assert.ok(files > 0 && files === versions, 'the chain must have one version per file');
-  assert.ok(
-    source.includes(`${files} files, ${versions} unique versions`),
-    `the record must quote the real chain (${files} files, ${versions} unique versions)`,
-  );
+  const snapshot = /Historical snapshot: (\d+) files, (\d+) unique versions/.exec(source);
+  assert.ok(snapshot, 'the record must label its historical migration count');
+  assert.ok(Number(snapshot[1]) > 0 && snapshot[1] === snapshot[2], 'the historical count must have unique versions');
+  // The current validator checks today's chain independently. A snapshot is not
+  // rewritten to imply its historical run checked migrations added later.
+  assert.ok(files >= Number(snapshot[1]), 'a shorter current chain needs review');
 });
 
 test('the skipped-test accounting is exactly what vitest reports', () => {

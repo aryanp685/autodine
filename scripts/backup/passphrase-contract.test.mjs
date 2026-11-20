@@ -83,9 +83,10 @@ test('the backup tool refuses a short passphrase before it touches the database'
   }
 });
 
-test('the workflow pre-check mirrors the shared minimum', () => {
+test('the workflow delegates to the backup contract and remains hard-stopped before hosted work', () => {
   const wf = readFileSync(path.join(here, '../../.github/workflows/staging-b2-rehearsal.yml'), 'utf8');
-  assert.match(wf, /\[ "\$\{#AUTODINE_BACKUP_PASSPHRASE\}" -lt \d+ \]/);
-  const n = Number(wf.match(/-lt (\d+) \]/)[1]);
-  assert.equal(n, MIN_PASSPHRASE_LENGTH, 'workflow pre-check must equal the code minimum');
+  const stop = wf.indexOf('Stop until hosted isolation is independently verified');
+  const backup = wf.indexOf('node scripts/backup/run-scheduled.mjs --out-dir');
+  assert.ok(stop >= 0 && backup > stop);
+  assert.doesNotMatch(wf, /\$\{#AUTODINE_BACKUP_PASSPHRASE\}/);
 });

@@ -46,7 +46,22 @@ AUTODINE_BACKUP_PASSPHRASE='<same>' \
 node scripts/backup/restore-logical.mjs --file /mnt/backups/autodine/autodine-*.sql.gz.enc --confirm-empty-db
 ```
 
-Never put either URL on a command line (shell history) — always the environment variables, as shown. Neither command prints the URL.
+Never put either URL or passphrase on a command line or in shell history. The
+illustrative assignments above are placeholders only: load actual values from a
+protected secret store into the process environment. In custom-format mode the
+external PostgreSQL client receives a libpq service name, not the URL or
+password, in its arguments. A temporary service file contains the connection
+and is kept in a 0700 directory with mode 0600 and removed on ordinary success
+or failure. An uncatchable termination or host failure can leave temporary
+files behind; use an isolated ephemeral runner and verify its cleanup. The
+service-file adapter fails closed on ambiguous URL forms, connection overrides,
+control characters, edge whitespace, and values exceeding libpq's service-line
+byte limit; correct those configurations rather than bypassing guards. Libpq
+service values are literal, not shell-quoted: quotes, backslashes, internal
+spaces, `#`, and `=` are retained as data. Client processes receive only a
+small runtime environment allowlist, not general application credentials.
+Environment variables and private files can still be read by privileged or
+same-user processes, so this does not replace runner isolation.
 
 ## Machine-checkable evidence (2026-11-15)
 
@@ -162,8 +177,10 @@ five. `BACKUP_ALERT_WEBHOOK` is optional (failure alerting).
 
 (systemd: a `.timer` invoking the same command with a root-only
 `EnvironmentFile=` for the two variables; Windows: Task Scheduler with a
-stored environment. The wrapper never prints the URL or the passphrase, and
-its failure alert is one capped, redacted line.)
+stored environment. The wrapper suppresses child output and child alerts;
+it reports failures using fixed stage-specific messages and its own alert.
+A successful B2 upload emits a fixed status; the manifest is preserved
+separately. The wrapper never prints the URL or the passphrase.)
 
 A hand-rolled cron line calling `backup-logical.mjs` alone is legal but skips
 verification; if you keep one, add a second line or a monitoring rule on the
@@ -284,9 +301,13 @@ deletions. The pruner never sees the backup passphrase.
 **Pre-delete recheck (per pair):** immediately before each pair's
 DELETEs, a HEAD must still show the verified SHA-256 metadata and byte
 size; any drift aborts the run (pairs already deleted are counted in the
-error). Deletion itself is artifact-first: an artifact-DELETE failure
-leaves the pair intact for a clean re-run, and a manifest-DELETE failure
-is retried once before the run aborts naming the orphaned manifest.
+error). Deletion itself is artifact-first. A failed artifact DELETE stops
+before attempting the manifest, but does not prove that the artifact is still
+present: the server may have acted before a response was lost. A failed
+manifest DELETE is automatically retried once and a second failure aborts.
+Either failure leaves remote state uncertain; the CLI suppresses remote error
+details, so inspect the affected objects and their versions before any
+separately authorized retry or cleanup.
 
 **Versioning and cost:** B2's S3 DELETE without a version ID inserts a
 [delete marker](https://www.backblaze.com/apidocs/s3-delete-object); prior
@@ -312,11 +333,11 @@ retention semantics, and none blocks the integrity gate above.
    shell. Revisit if pruning ever moves off the workflow.
 2. **Orphan manifests after a partial pair deletion.** Each pair deletes
    artifact-then-manifest; if the artifact DELETE succeeds and the
-   manifest DELETE fails, the run stops and reports progress, leaving an
-   orphaned `*.manifest.json`. Orphans match no artifact, are reported as
-   ignored by later runs, and can never become deletion candidates or be
-   mistaken for a backup. Cleanup is a manual, operator-visible action;
-   re-running the pruner is safe and idempotent.
+   manifest DELETE fails, the run stops; the manifest may
+   be orphaned or the request may have succeeded despite a lost response.
+   A confirmed orphan matches no artifact and is ignored by later runs.
+   Inspect object versions and obtain separate authorization before cleanup
+   or retry; retries of name-only DELETE can create additional delete markers.
 3. **Week buckets are day-of-month segments, not ISO weeks.** The pruner
    mirrors the local pipeline exactly (`floor(dayOfMonth / 7)` buckets):
    deterministic, and consistent between local and remote retention so a

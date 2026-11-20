@@ -167,8 +167,10 @@ $ npm run migrations:verify
 102 files, 102 unique versions
 ```
 
-102 files, 102 unique versions, no duplicate version, no out-of-order file,
-and the deployed anchors present and hashable. Reconciled against the Batch
+Historical snapshot: 102 files, 102 unique versions, no duplicate version, no out-of-order file,
+and the deployed anchors present and hashable. This is the count at the time of
+the recorded check, not a claim that later-added migrations were tested by it.
+The current chain is checked independently by `npm run migrations:verify`. Reconciled against the Batch
 2 conflict report merged in PR #193
 (`qa-evidence/day1/MIGRATION_CONFLICT_RESOLUTION_BATCH2.md`): that report
 finds **no literal same-version file collision**, and confirms that

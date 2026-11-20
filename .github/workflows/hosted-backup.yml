@@ -98,7 +98,7 @@ jobs:
             echo;
             echo "- Run: ${{ github.run_id }} (${{ github.event_name }})";
             echo "- Result: ${{ job.status }}";
-            echo "- Remote verification: see the upload-b2 step output — hosted success means it printed uploaded:true, verified:true with the manifest SHA-256.";
+            echo "- Remote verification: see the fixed upload status in the scheduled step; the manifest with its SHA-256 is preserved separately when available.";
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Remove runner backup material

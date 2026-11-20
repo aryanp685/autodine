@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   planRetention, listAllRemoteObjects, buildInventory, executePrune,
@@ -96,7 +98,7 @@ test('listing: pagination completes, truncation without token aborts, repeated t
 
   await assert.rejects(() => listAllRemoteObjects(async () => ({ entries: [], nextToken: null, truncated: true })), /truncated without/);
   await assert.rejects(() => listAllRemoteObjects(async () => ({ entries: [], nextToken: 'loop', truncated: true })), /repeated/);
-  await assert.rejects(() => listAllRemoteObjects(async () => { throw new Error('HTTP 500'); }), /HTTP 500/);
+  await assert.rejects(() => listAllRemoteObjects(async () => { throw new Error('HTTP 500'); }), /listing page could not be read/);
 });
 
 test('listing sizes: parseListSizes extracts per-key byte sizes', () => {
@@ -350,7 +352,7 @@ test('execution: ALL candidates are verified before the first DELETE; one failur
   assert.equal(order.filter((e) => e.startsWith('delete:')).length, 0);
 });
 
-test('execution: a failed artifact DELETE leaves the pair intact and stops the run', async () => {
+test('execution: an uncertain artifact DELETE stops the run before attempting its manifest', async () => {
   const items = [
     item('autodine-a-old.sql.gz.enc', '2026-01-01T00:00:00Z'),
     item('autodine-a-new.sql.gz.enc', '2026-01-02T00:00:00Z'),
@@ -365,60 +367,33 @@ test('execution: a failed artifact DELETE leaves the pair intact and stops the r
       confirm: true,
       policy: { keepDaily: 0, keepWeekly: 0, keepMonthly: 0 },
     }),
-    /DELETE failed for artifact.*pair left intact/,
+    /DELETE failed for artifact.*remote state is uncertain; inspect before retrying/,
   );
   // Exactly one delete attempted (the artifact); its manifest was never
-  // touched, so the pair survives whole for a clean re-run.
+  // touched. A failed request does not prove whether the artifact changed.
   assert.equal(attempted.length, 1);
   assert.ok(attempted[0].endsWith('.sql.gz.enc'));
 });
 
-test('execution: manifest DELETE is retried once; persistent failure names the orphan', async () => {
+test('execution: uncertain manifest DELETE is not retried', async () => {
   const bytes = realArtifact();
   const digest = sha256(bytes);
-  const mkItems = () => [
+  const items = [
     item('autodine-a-old.sql.gz.enc', '2026-01-01T00:00:00Z', { sha256: digest, size: bytes.length }),
     item('autodine-a-new.sql.gz.enc', '2026-01-02T00:00:00Z', { sha256: digest, size: bytes.length }),
   ];
-  const verify = (candidate) => verifyArtifactCandidate(candidate, async () => ({ body: bytes, metadataSha256: digest }));
-  const recheck = (candidate, evidence) => assertArtifactUnchanged(candidate, evidence, async () => ({ metadataSha256: digest, contentLength: bytes.length }));
-  const zeroPolicy = { keepDaily: 0, keepWeekly: 0, keepMonthly: 0 };
-
-  // Transient manifest failure: one retry recovers, pair fully deleted.
-  const deletedTransient = [];
-  let manifestAttempts = 0;
-  const doneTransient = await executePrune({
-    items: mkItems(),
-    verifyCandidate: verify,
-    recheckCandidate: recheck,
-    deleteObject: async (key) => {
-      if (key.endsWith('.manifest.json')) { manifestAttempts += 1; if (manifestAttempts === 1) throw new Error('HTTP 503'); }
-      deletedTransient.push(key);
-    },
+  const attempts = [];
+  await assert.rejects(() => executePrune({
+    items,
+    verifyCandidate: (candidate) => verifyArtifactCandidate(candidate, async () => ({ body: bytes, metadataSha256: digest })),
+    recheckCandidate: (candidate, evidence) => assertArtifactUnchanged(candidate, evidence, async () => ({ metadataSha256: digest, contentLength: bytes.length })),
+    deleteObject: async (key) => { attempts.push(key); if (key.endsWith('.manifest.json')) throw new Error('HTTP 503'); },
     confirm: true,
-    policy: zeroPolicy,
-  });
-  assert.equal(doneTransient.deleted, 1);
-  assert.equal(manifestAttempts, 2);
-  assert.deepEqual(deletedTransient.sort(), ['autodine-backups/autodine-a-old.manifest.json', 'autodine-backups/autodine-a-old.sql.gz.enc'].sort());
-
-  // Persistent manifest failure: artifact is gone, abort names the orphan.
-  const deletedPersistent = [];
-  await assert.rejects(
-    () => executePrune({
-      items: mkItems(),
-      verifyCandidate: verify,
-      recheckCandidate: recheck,
-      deleteObject: async (key) => {
-        if (key.endsWith('.manifest.json')) throw new Error('HTTP 503');
-        deletedPersistent.push(key);
-      },
-      confirm: true,
-      policy: zeroPolicy,
-    }),
-    /orphaned manifest autodine-backups\/autodine-a-old\.manifest\.json remains/,
-  );
-  assert.deepEqual(deletedPersistent, ['autodine-backups/autodine-a-old.sql.gz.enc']);
+    policy: { keepDaily: 0, keepWeekly: 0, keepMonthly: 0 },
+  }), /manifest DELETE failed.*remote state is uncertain/);
+  assert.equal(attempts.length, 2);
+  assert.ok(attempts[0].endsWith('.sql.gz.enc'));
+  assert.ok(attempts[1].endsWith('.manifest.json'));
 });
 
 test('recheck: an object changed since verification is never deleted', async () => {
@@ -477,7 +452,7 @@ test('recheck: an object changed since verification is never deleted', async () 
       confirm: true,
       policy: { keepDaily: 0, keepWeekly: 0, keepMonthly: 0 },
     }),
-    /pre-delete recheck failed for autodine-a-oldest\.sql\.gz\.enc after 1 artifact\(s\) deleted/,
+    /pre-delete recheck failed after 1 artifact\(s\) deleted/,
   );
   assert.deepEqual(deleted.sort(), ['autodine-backups/autodine-a-old.manifest.json', 'autodine-backups/autodine-a-old.sql.gz.enc'].sort());
 });
@@ -526,5 +501,79 @@ test('CLI fails closed with missing-config NAMES only (no B2 contact, no deletio
     assert.match(run.stderr, /B2_BUCKET/);
     assert.ok(!run.stderr.includes('SENTINEL-SECRET-DO-NOT-LEAK'));
     assert.ok(!run.stdout.includes('SENTINEL-SECRET-DO-NOT-LEAK'));
+  }
+});
+
+test('CLI suppresses credential-bearing network exceptions (mock fetch; no B2 operation)', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'autodine-prune-log-test-'));
+  const preload = path.join(dir, 'mock-fetch.mjs');
+  try {
+    writeFileSync(preload, `globalThis.fetch = async () => { throw new Error('synthetic-private ' + process.env.B2_SECRET_ACCESS_KEY + ' ' + process.env.B2_ACCESS_KEY_ID); };\n`);
+    const result = spawnSync(process.execPath, ['--import', preload, path.join(import.meta.dirname, 'prune-b2.mjs')], {
+      encoding: 'utf8', env: { PATH: process.env.PATH, B2_BUCKET: 'staging-bucket', B2_REGION: 'eu-central-003', B2_ACCESS_KEY_ID: 'synthetic-access-private', B2_SECRET_ACCESS_KEY: 'synthetic-secret-private' },
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /ABORTED.*state may be partial/);
+    for (const value of ['synthetic-private', 'synthetic-access-private', 'synthetic-secret-private']) assert.ok(!(result.stdout + result.stderr).includes(value));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('exported retention errors never forward object names or provider details', async () => {
+  const secret = 'synthetic-secret-value';
+  const keySecret = 'synthetic-object-private';
+  const failure = () => { throw new Error(`${secret} ${keySecret} provider response`); };
+  const items = [
+    item(`autodine-${keySecret}-older.sql.gz.enc`, '2025-12-30T00:00:00Z'),
+    item(`autodine-${keySecret}-old.sql.gz.enc`, '2026-01-01T00:00:00Z'),
+    item('autodine-new.sql.gz.enc', '2026-01-02T00:00:00Z'),
+  ];
+  const policy = { keepDaily: 0, keepWeekly: 0, keepMonthly: 0 };
+  const evidence = { sha256: 'd'.repeat(64), bytes: 1 };
+  for (const stage of ['integrity', 'recheck', 'artifact', 'manifest']) {
+    const calls = [];
+    let rechecks = 0;
+    const verifyCandidate = async () => { if (stage === 'integrity') failure(); return evidence; };
+    const recheckCandidate = async () => { rechecks += 1; if (stage === 'recheck' && rechecks === 2) failure(); };
+    const deleteObject = async (key) => {
+      calls.push(key);
+      if (stage === 'artifact' || (stage === 'manifest' && key.endsWith('.manifest.json'))) failure();
+    };
+    await assert.rejects(() => executePrune({ items, verifyCandidate, recheckCandidate, deleteObject, confirm: true, policy }), (error) => {
+      const text = String(error.stack);
+      assert.ok(!text.includes(secret) && !text.includes(keySecret));
+      if (stage === 'integrity') assert.match(text, /integrity verification failed.*before any deletion/);
+      if (stage === 'recheck') assert.match(text, /recheck failed after 1 artifact\(s\) deleted/);
+      if (stage === 'artifact') assert.match(text, /DELETE failed for artifact after 0 artifact\(s\) deleted.*uncertain/);
+      if (stage === 'manifest') assert.match(text, /manifest DELETE failed.*uncertain/);
+      return true;
+    });
+    if (stage === 'integrity') assert.equal(calls.length, 0);
+    if (stage === 'recheck') assert.equal(calls.length, 2);
+    if (stage === 'artifact') assert.equal(calls.length, 1);
+    if (stage === 'manifest') assert.equal(calls.length, 2);
+  }
+  const candidate = items[0];
+  for (const action of [
+    () => listAllRemoteObjects(async () => failure()),
+    () => listAllRemoteObjects(async () => ({ get entries() { failure(); } })),
+    () => verifyArtifactCandidate(candidate, async () => failure()),
+    () => verifyArtifactCandidate(candidate, async () => ({ get body() { failure(); } })),
+    () => verifyArtifactCandidate(candidate, async () => ({ body: (async function* () { failure(); })() })),
+    () => assertArtifactUnchanged(candidate, evidence, async () => failure()),
+    () => assertArtifactUnchanged(candidate, evidence, async () => ({ get metadataSha256() { failure(); } })),
+    () => buildInventory([{ key: keySecret }], async () => failure()),
+    () => buildInventory([{ get key() { failure(); } }], async () => failure()),
+    async () => validateManifestStructure({ get sha256() { failure(); } }, keySecret),
+    async () => planRetention([{ createdAt: { slice: failure } }]),
+    async () => parseListingTruncated({ toString: failure }),
+    async () => parseListSizes({ toString: failure }),
+    () => executePrune({ items: [{ createdAt: { slice: failure } }] }),
+    () => executePrune({ get items() { failure(); } }),
+  ]) {
+    await assert.rejects(action, (error) => {
+      assert.ok(!String(error.stack).includes(secret));
+      assert.ok(!String(error.stack).includes(keySecret));
+      return true;
+    });
   }
 });

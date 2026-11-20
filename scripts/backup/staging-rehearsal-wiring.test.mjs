@@ -253,3 +253,35 @@ test('the gate fetches by exact commit and refuses anything else', () => {
   assert.match(String(fetchStep.run ?? ''), /git init/, 'the gate must work from an empty directory');
   assert.doesNotMatch(stepNames(gate), /checkout/i, 'the gate must not depend on a checked-out tree');
 });
+
+test('hosted rehearsal has a non-overridable stop before checkout and all secret handling', () => {
+  const steps = jobs['staging-rehearsal']?.steps ?? [];
+  const stop = steps.findIndex((s) => /Stop until hosted isolation/.test(String(s.name ?? '')));
+  const checkout = steps.findIndex((s) => String(s.uses ?? '').startsWith('actions/checkout'));
+  assert.equal(stop, 0);
+  assert.ok(checkout > stop);
+  assert.equal(steps[stop].if, undefined, 'the stop must not depend on an opt-in');
+  assert.match(String(steps[stop].run), /(?:^|\n)exit 1(?:\n|$)/);
+  assert.deepEqual(steps[stop].env ?? {}, {});
+});
+
+test('the hosted backup failure diagnostic never relays child output or credential lengths', () => {
+  const step = jobs['staging-rehearsal'].steps.find((s) => /Back up staging/.test(String(s.name ?? '')));
+  assert.ok(step);
+  const run = String(step.run);
+  assert.match(run, /> \/dev\/null 2>&1/);
+  assert.doesNotMatch(run, /\$\{#(?:AUTODINE|B2_)/);
+  assert.doesNotMatch(run, /\b(?:tee|grep|sed|cat)\b/);
+  assert.doesNotMatch(run, /STAGING_FAILURE_REASON/);
+});
+
+test('source authentication uses the private service after source validation', () => {
+  const steps = jobs['staging-rehearsal'].steps;
+  const validate = steps.findIndex((s) => /Refuse undesignated source/.test(String(s.name ?? '')));
+  const auth = steps.findIndex((s) => /Authentication check/.test(String(s.name ?? '')));
+  assert.ok(validate >= 0 && auth > validate);
+  const run = String(steps[auth].run);
+  assert.match(run, /withPgService/);
+  assert.match(run, /stdio: 'ignore'/);
+  assert.doesNotMatch(run, /PGPASSWORD|r\.stderr|r\.error\.message|console\.log\(.*(?:projectRef|password|user|database)/);
+});

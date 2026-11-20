@@ -141,11 +141,25 @@ Backblaze B2 → **App Keys → Add a Key → Restrict Key → Bucket (one bucke
 | `listFiles` / ListBucket | **yes** | the downloader lists the prefix; the pruner lists it too |
 | `readFiles` / GetObject | **yes** | download; the pruner's pre-delete integrity gate re-downloads every candidate |
 | `writeFiles` / PutObject | **yes** | upload of the artifact and its manifest |
-| `deleteFiles` / DeleteObject | **yes** | remote retention (`prune-b2.mjs`) |
+| `deleteFiles` | **no for staging rehearsal** | The staging workflow never prunes; granting version deletion is unnecessary. The current pruner uses name-only DELETE rather than version deletion. |
 | `createBuckets` | **no** | the bucket is created by the owner, out of band |
 | `deleteBuckets` | **no** | the key must never be able to remove the bucket itself |
 | `shareFiles` | **no** | the bucket is private; no public URL is ever used |
 | Other buckets | **no** | restrict the key to this one bucket |
+
+For staging the workflow needs `listFiles`, `readFiles`, and `writeFiles`
+restricted to the one staging bucket (and the `autodine-backups/` prefix).
+The Backblaze console offers bundled **Read and Write**, **Read Only**, or
+**Write Only**; upload plus download requires **Read and Write**. Check the
+actual granted capabilities rather than assuming the console can remove an
+individual capability from that bundle; if it includes `deleteFiles`, that is
+a residual risk, not a least-privilege guarantee. `writeFiles` also permits S3 deletion **by name**, so this is not
+an undeletable backup even without `deleteFiles`. Backblaze says some S3 SDK
+integrations require `listAllBucketNames` for bucket-scoped keys; this pipeline
+uses direct signed requests, so add broad bucket-name listing only if proven
+necessary and approved. A separate Production key and any retention/deletion
+are subject to their own authorization, not implied by staging setup. See
+[Backblaze S3-compatible key capabilities](https://www.backblaze.com/docs/cloud-storage-s3-compatible-app-keys).
 
 The key's S3 access key ID becomes `B2_ACCESS_KEY_ID`; its secret becomes
 `B2_SECRET_ACCESS_KEY`.

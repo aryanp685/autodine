@@ -1,5 +1,7 @@
 # Arena A — staging environment gate and default-branch registration (2026-11-20)
 
+> **Historical snapshot:** main later registered a staging workflow and five subsequent manual runs failed. Its exact-code and name checks do not establish bucket ID or actual credential scope. Do not use this earlier snapshot as a current hosted-safety or recovery claim.
+
 Scope: fixes A (protected `backup-staging` environment secret consumption in the
 staging B2 rehearsal workflow), B (default-branch registration of that workflow)
 and C (the exact-code mismatch between `main`, PR #194 head and the audited V3

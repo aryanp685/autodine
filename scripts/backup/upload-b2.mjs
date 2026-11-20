@@ -135,7 +135,7 @@ try {
     bytes: bytes.length,
     sha256: actualSha,
   }, null, 2) + '\n');
-} catch (error) {
-  process.stderr.write(`upload-b2: transfer failed (${error?.name ?? 'Error'}); see network/endpoint configuration — no credentials were printed\n`);
+} catch {
+  process.stderr.write('upload-b2: transfer failed; see network/endpoint configuration — remote state may be unverified\n');
   process.exit(1);
 }

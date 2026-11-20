@@ -31,6 +31,7 @@
 import { execFileSync } from 'node:child_process';
 import { accessSync, constants, existsSync } from 'node:fs';
 import path from 'node:path';
+import { cleanPgClientEnv } from './lib-pg-service.mjs';
 
 /** The client tools a backup/restore pair needs. */
 export const PG_CLIENT_TOOLS = Object.freeze(['psql', 'pg_dump', 'pg_restore']);
@@ -47,6 +48,7 @@ export function clientMajorVersion(binary) {
     output = execFileSync(binary, ['--version'], {
       stdio: ['ignore', 'pipe', 'ignore'],
       encoding: 'utf8',
+      env: cleanPgClientEnv(),
     });
   } catch {
     return null;

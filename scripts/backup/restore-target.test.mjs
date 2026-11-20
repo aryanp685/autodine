@@ -218,7 +218,9 @@ test('restore-logical.mjs refuses a Production target before decrypting anything
 test('restore-logical.mjs refuses a hosted target without the scratch opt-in', () => {
   const result = runRestore({ targetUrl: SCRATCH_DIRECT });
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /explicit scratch opt-in/);
+  // CLI diagnostics are intentionally generic; pure guard tests cover why.
+  assert.match(result.stderr, /target guard did not approve it/);
+  assert.doesNotMatch(result.stderr, /supabase\.co\/|postgresql:\/\//);
 });
 
 test('restore-logical.mjs accepts a loopback disposable target', () => {
