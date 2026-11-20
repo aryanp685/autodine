@@ -63,11 +63,13 @@ npm run build
 
 The normal browser workflow is demo-mode UI coverage and is not evidence of real database/auth/provider behavior. For the isolated PostgreSQL/PostgREST browser throttle suite, follow [`e2e-local.md`](e2e-local.md). That runner creates synthetic data in a throwaway local database, runs both browser throttle cases and the existing PostgreSQL throttle regressions, then drops the database. Never point it at production.
 
+For the isolated production-build guest-to-receipt rehearsal, run `npm run test:e2e:journey` from a checkout without app `.env` files. It starts embedded PostgreSQL and Chromium with synthetic accounts and a limited loopback API adapter; it is **not** Supabase Auth/PostgREST or hosted acceptance. See the [runner boundaries and command](e2e-local.md#guest-to-receipt-rehearsal-production-build--disposable-postgresql).
+
 For the honest flow-by-flow coverage matrix and remaining non-production integration work, see [`scan-throttle-coverage.md`](scan-throttle-coverage.md) and [`website-readiness-audit.md`](website-readiness-audit.md).
 
 ## 6. Locked operational decisions
 
-- Guest ordering is pay at counter; no gateway checkout or payment-method selector.
+- Guest ordering is pay at the counter; no gateway checkout or guest payment-method selector. Check the table and prepare the saved ticket. The cashier counts cash or checks the terminal/UPI app, then records that exact tender once. If the response is uncertain, reconcile the saved ticket and original recording; do not collect again. Close only after settlement, then print the saved final receipt or use an eligible expiring share. Guest status and payment acknowledgements are not numbered invoices.
 - Do not implement tax rates, inclusive/exclusive defaults, classifications, exemptions, or place-of-supply rules without written adviser approval. Preserve the current safe behavior and fail closed on invalid/missing tax configuration.
 - Preserve RLS, least-privilege grants, server-only secrets, server-side price truth, immutable order/payment snapshots, and idempotency.
 - Use browser/OS printing; do not add hardware integrations without approval.

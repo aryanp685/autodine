@@ -62,6 +62,9 @@ yarn-error.log*
 !/docs/production-only-migrations-2026-11-14.md
 !/docs/backup-restore-runbook.md
 !/docs/gst-two-mode-2026-11-14.md
+!/docs/gst-statutory-workflows-2026-11-18.md
+!/docs/staging-authorization-and-acceptance-2026-11-19.md
+!/docs/migration-authorization-register-2026-11-19.md
 !/docs/verification-2026-11-10.md
 !/docs/subscription-billing-2026-11-10.md
 !/docs/review-deployment-2026-11-11.md

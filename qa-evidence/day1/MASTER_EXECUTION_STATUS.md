@@ -2,6 +2,77 @@
 
 Date: 2026-11-17 · Branch `arena/2670dd12-autodine` (sandbox HEAD `d8d0e52`) · `main` = `b385bf4`, untouched · Consolidates Batches 1–6. Boundaries honored throughout: no Production/Staging mutation, no hosted migration/dispatch/deploy/merge, no real payment/email/provider activation, no secrets in source or chat, GST/IRP migrations NOT AUTHORIZED, no commit/push.
 
+## Release candidate Priority 5 — product-wide E2E verification
+
+[RC verification](RELEASE_CANDIDATE_PRIORITY_5_LOCAL_VERIFICATION.md): the
+118-file chain at unchanged HEAD was exercised end to end — guest journeys A
+and D in Chromium, journeys B and C at the database/API boundary, a new
+5-test cross-module suite, 13-suite native integration, full replay, populated
+upgrade, unit/static gates and a hermetic build. **No product defect was
+demonstrated and no schema or function changed.** Protected predecessors remain
+123/123. The verdict is **LOCAL PASS WITH BLOCKERS**; no hosted access,
+migration, deploy, provider call, commit or push occurred, and Staging,
+Production, pilot and release remain **NO-GO**.
+
+## Operational delivery Priority 4 — active-branch local rehearsal
+
+[Completion evidence](OPERATIONAL_DELIVERY_PRIORITY_4_LOCAL_COMPLETION.md):
+the waiter role and scoped floor, sitting transfer, the guest version edit
+cursor and a coalesced metadata-only outlet revision were exercised against
+disposable PostgreSQL, and a staff screen received a committed change and
+recovered from a dropped socket in a production Next build. The socket is a
+loopback fixture, not hosted Supabase Realtime, and Auth refresh/sign-in are
+still fixture-only. The 118-file local chain adds only
+`20261118002100_operational_realtime.sql`, separately **NOT AUTHORIZED**. No
+hosted access, dispatch, payments, commit or push; **Staging, Production and
+release remain NO-GO**.
+
+## Guest-to-Receipt Priority 3 — active-branch local rehearsal
+
+[Completion evidence](GUEST_TO_RECEIPT_PRIORITY_3_LOCAL_COMPLETION.md): the
+phone/code and desktop/confirm paths, kitchen progression, exact counter
+retry and saved receipt/print/share were exercised through a production
+Next build and disposable PostgreSQL roles. The bridge and staff identities
+are test fixtures, not actual Auth/PostgREST or hosted acceptance. The 117-file chain at that closure added only the checkout wrapper migration, separately
+**NOT AUTHORIZED**; the current repository chain is 118 files after Priority 4. The 26 GST/IRP files, approval state and closed reports
+are unchanged. No hosted access, dispatch, payments, commit or push;
+**Staging, Production and release remain NO-GO**.
+
+## IRP Priority 2 — prior local delivery on this branch
+
+[Completion evidence](IRP_PRIORITY_2_LOCAL_COMPLETION.md): durable synthetic
+routing, dispatch, verification, lookup/cancellation and selected-outlet
+register. No live IRP, legal release or hosted access. All **26 GST/IRP files
+NOT AUTHORIZED**; release and outlet activation remain NO-GO. This does not
+reopen Workstream B's prior GST closure.
+
+## Workstream B — delivered GST baseline
+
+The [Workstream B final local closure](GST_WORKSTREAM_B_FINAL_CLOSURE.md)
+records the 114-file candidate: reviewed Composition SAC, immutable
+recipient particulars, authorized counter flows and clocked India FY
+numbering, private generation-only IRP recovery and exact GST Finance CSV.
+**Hosted GST NOT DONE; 24 GST/IRP files NOT AUTHORIZED; Staging, Production
+and release NO-GO.** No hosted steps were taken and no provider is wired.
+See the [single owner decision register](GST_OWNER_ACTION_REGISTER_2026-11-18.md#current-workstream-b-decisions).
+The Priority 1 checkpoint below is historical.
+
+## 2026-11-19 — Workstream B Priority 1, CA product specification
+
+Active branch `arena/ce32f7c8-autodine`, recovered HEAD
+`7064c912b1b85ab6364f23d1755d855ff4f462ad` (same tree as PR #191 handoff).
+**Local Priority 1 complete; hosted GST NOT DONE.** GST and No-GST (with
+Composition under No-GST), FSSAI and valid premises proof, FY series,
+immutable documents and billing CSV were implemented and locally verified.
+Native PostgreSQL **235/235**, populated **98→104** rehearsal **230 / 2
+optional direct PostgREST skips**, and scoped Chromium **10/10**, not real
+Auth/Data API. See [closure evidence](GST_P1_CLOSURE_2026-11-18.md),
+[owner register](GST_OWNER_ACTION_REGISTER_2026-11-18.md) and
+[live blockers](../../RELEASE-BLOCKER-REPORT.md). CA product confirmation is
+not legal verification, authority/roster sign-off or per-outlet activation.
+No hosted state inspected or changed; all 14 Phase B files **NOT AUTHORIZED**,
+release and Staging **NO-GO**. The status tables below remain historical.
+
 ## The 11 roadmap priorities — status at a glance
 
 The locked roadmap, as tracked across Batches 1–6 and the owner register (wording consolidated here):
@@ -17,7 +88,7 @@ The locked roadmap, as tracked across Batches 1–6 and the owner register (word
 | 7 | Browser & multi-device verification | **VERIFIED (demo)** | Batch 5: +3 multi-context tests; 49 hosted-stack specs await a disposable Supabase (no Docker here) |
 | 8 | Observability & alerting | **VERIFIED (local)** | Fixed-vocabulary incidents, dedupe, ops console across both trackers; sink (drain/webhook) is owner's |
 | 9 | Tenant isolation & security hardening (incl. the owner's Priority 4: Preview/Staging isolation) | **VERIFIED (local) + live-inspected** | Membership-derived context; outlet-switch route tests; preview↔production isolation guard + offline verifier; **live read-only inspection of Supabase/Vercel/GitHub + new committed-automation boundary tests** — `qa-evidence/day1/STAGING_ISOLATION_IMPLEMENTATION.md`; staging *designation* is owner action O-B1 |
-| 10 | Commercial readiness (billing, GST/IRP) | **NOT AUTHORIZED** | Billing webhook locally verified (sandbox); GST three-mode code implemented + unit-tested, migrations locked — §GST below |
+| 10 | Commercial readiness (billing, GST/IRP) | **NOT AUTHORIZED** | Billing webhook locally verified (sandbox); GST two-mode code plus Normal Billing, migrations locked — §GST below |
 | 11 | Launch gating & release governance | **NO-GO (this program)** | `verify:release` 28/28; decision + sequence in `MASTER_LAUNCH_READINESS.md` |
 
 ## What this run changed (implementation, not just paper)
@@ -44,7 +115,7 @@ Changed files this run: `scripts/hosted-verification/preflight.mjs` + the four `
 ## GST and IRP readiness (plan — nothing activated, no rule invented)
 
 **What already exists in source (verified by reading it, all defaulted OFF):**
-- A three-mode model in the NOT-AUTHORIZED migration `20261113000100_gst_two_mode.sql`: `off` (today's behavior, byte-for-byte), `composition` (Bill of Supply, no tax shown, statutory notice), `regular` (GST tax invoice: inclusive-price tax *extraction* at document level with one rounding, CGST/SGST breakdown, place of supply, seller GSTIN). Orders snapshot `gst_mode_snapshot` + config version so a ticket never reprices retroactively; issued documents are immutable except an audited void.
+- Two GST modes plus Normal Billing in the NOT-AUTHORIZED migration `20261113000100_gst_two_mode.sql`: `off` (today's behavior, byte-for-byte), `composition` (Bill of Supply, no tax shown, statutory notice), `regular` (GST tax invoice: inclusive-price tax *extraction* at document level with one rounding, CGST/SGST breakdown, place of supply, seller GSTIN). Orders snapshot `gst_mode_snapshot` + config version so a ticket never reprices retroactively; issued documents are immutable except an audited void.
 - Application library `lib/gst/` — adapter, allocation, composition math, GSTIN validation, place-of-supply, profiles, snapshots, credit/debit notes — **unit-tested** (`gst.test.ts`, `allocate.test.ts`, `notes.test.ts`, `tax-address.test.ts`, `einvoice*.test.ts`, `irp/irp.test.ts`).
 - An **applicability engine** (`lib/gst/applicability.ts`) encoding the rule as cited in-code (Notification No. 10/2023-Central Tax: e-invoicing mandatory above ₹5 crore AATO for B2B/exports; B2C and Bills of Supply never eligible), **failing closed**: unsupported cases surface a reason to the owner rather than a silent "not applicable". B2C documents are issued `IRN: not_required`; a future B2B document for an above-threshold tenant is held at `irp_status='pending'` and must not be presented as a final tax invoice until an IRN exists. IRP plumbing (`lib/gst/irp/`: payload, fingerprint, state machine, sandbox adapter, validation) exists behind that gate.
 

@@ -5,6 +5,17 @@ real throttling works. It was a fair criticism: that URL is something anybody ca
 type, and it bypasses every step between "Postgres refuses" and "the guest reads
 a sentence". This file is the honest map.
 
+## Priority 3 local browser coverage
+
+`npm run test:e2e:journey` checks the actual Next route against disposable
+PostgreSQL: a capped scan leaves the menu and cart available, removes the
+old table session, and cannot create an order or mint another session. A
+separate case reaches the code budget, tries a correct code during the wait,
+and observes neither a session nor a ticket. The tests do not add or
+simulate an **order submission** budget. This runner uses a bounded HTTP
+adapter, not PostgREST/Auth; the PostgREST-specific procedure is separate.
+See [setup and proof boundaries](e2e-local.md#guest-to-receipt-rehearsal-production-build--disposable-postgresql).
+
 ## The chain, and which link each test actually covers
 
 ```

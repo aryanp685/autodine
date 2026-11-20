@@ -1,6 +1,8 @@
 # AutoDine website readiness audit
 
-> **Active-branch warning:** The hosted observations and migration counts below belong to earlier dated reviews and were not rechecked on the current branch. Do not use them as current provider state or authorization. See the [current local hardening report](AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md) for this branch's evidence and open gates; its review made no hosted query or change.
+> **Current local evidence:** On the active branch, the [Priority 3 rehearsal](../qa-evidence/day1/GUEST_TO_RECEIPT_PRIORITY_3_LOCAL_COMPLETION.md) drove the actual app and disposable PostgreSQL from phone QR/code and desktop scan/confirm to kitchen, counter, saved printed copy and eligible share. It verifies persisted business outcomes and retry/role boundaries locally, not genuine Supabase Auth/PostgREST, Realtime, physical devices, log drains or hosted acceptance. Staging, Production, pilot and release remain **NO-GO**; see the [live blocker register](../RELEASE-BLOCKER-REPORT.md).
+>
+> **Historical material below:** Those hosted observations and migration counts belong to earlier dated reviews and were not rechecked on this branch. Do not use them as current provider state or authorization.
 >
 > **Read this first (2026-11-11).** This audit is dated 2026-10-28 and its
 > migration counts are a month out of date. Staging has since received the

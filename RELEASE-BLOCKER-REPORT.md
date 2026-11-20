@@ -1,6 +1,191 @@
 # AutoDine — product completion and release-gate snapshot
 
-## Current active-branch checkpoint
+## Active-branch checkpoint · Priority 5 release-candidate verification
+
+**Local verification only. Staging, Production, pilot and release: NO-GO.** The
+[Priority 5 report](qa-evidence/day1/RELEASE_CANDIDATE_PRIORITY_5_LOCAL_VERIFICATION.md)
+records product-wide E2E evidence at unchanged HEAD `7064c912b1b85ab6364f23d1755d855ff4f462ad`:
+17/17 Chromium journeys, 13 PostgreSQL integration suites (**286 passed / 1
+skipped**), 118-migration replay and populated upgrade (**270 passed / 3
+skipped** each), **2,612 passed / 296 skipped** unit/component tests, all
+static gates, `verify:release` (47 checks), a hermetic 28/28 build, and a new
+5-test cross-module suite covering cross-outlet refusals, kitchen-frozen guest
+edits, retried tender/checkout, issued-document immutability, the no-GST
+receipt and the floor call/transfer lifecycle. No product defect was found and
+no schema, function or grant changed; 123/123 protected digests are unchanged
+and the migration chain remains 118 files. Journeys B (no GST) and C (IRP) are
+proven at the database/API boundary, not in the browser, and the HTTP/socket
+adapters remain fixtures rather than hosted Supabase services. The 26 GST/IRP
+files, `20261118002000` and `20261118002100` remain separately **NOT
+AUTHORIZED**. No hosted action, provider call, payment, commit or push occurred.
+
+## Active-branch checkpoint · Guest-to-Receipt E2E (Priority 3)
+
+**Local browser and database rehearsal only. Staging, Production, pilot and release: NO-GO.** The [Priority 3 evidence](qa-evidence/day1/GUEST_TO_RECEIPT_PRIORITY_3_LOCAL_COMPLETION.md) records phone and desktop ordering through kitchen, exact counter reconciliation, sitting close, saved print and eligible share, with committed rows inspected on disposable PostgreSQL 17. The app ran a production build with synthetic SSR sessions and a bounded loopback database adapter, not genuine Auth, PostgREST or Realtime. No hosted inspection, migration, deployment or provider activity occurred.
+
+The [118-file inventory](docs/migration-manifest-2026-11-14.md) adds `20261118002000_guest_checkout_integrity.sql` and `20261118002100_operational_realtime.sql`, each separately **NOT AUTHORIZED** for any hosted target. All 26 GST/IRP files remain individually **NOT AUTHORIZED**. The realtime file also changes the `supabase_realtime` publication and refuses to run if that publication already carries other tables, so the target project needs an explicit review before it could be approved. The frozen Staging bundle and prior GST/IRP closure evidence are unchanged. Before hosted acceptance: obtain exact target and read-only authorization, reconcile hosted ledgers/catalog/ACLs and Data API behavior, establish verified recovery and a forward repair plan, separately approve exact files and compatible app deployment, then run approved synthetic acceptance with genuine Auth/PostgREST, physical phone/counter/print and tenant/privacy checks. Provider and statutory gates remain distinct and open.
+
+## Prior active-branch checkpoint · IRP / E-Invoicing Priority 2
+
+**Local implementation and synthetic simulation only. Hosted GST and IRP not verified; Staging, Production and release: NO-GO.** All 26 GST/IRP files from the 116-file Priority 2 baseline are **NOT AUTHORIZED**. The [Priority 2 completion report](qa-evidence/day1/IRP_PRIORITY_2_LOCAL_COMPLETION.md) records new evidence at unchanged HEAD `7064c912b1b85ab6364f23d1755d855ff4f462ad`. No hosted reads, migrations, submissions, live keys or legal copy generation occurred. There is no authority adapter, worker grant or approved provider route. A verified simulation keeps the legal hold. Actual outlet applicability, owner/CA decision, independent provider and trust validation, secure operating credentials, recovery/hosted ACL and precise release authorization remain open. See the [operator runbook](docs/gst-irp-production-readiness-2026-11-14.md).
+
+## Pre-Priority 2 checkpoint · Workstream B evidence-based closure
+
+**GO for local review and synthetic rehearsal only. Hosted GST NOT DONE. All 24 GST/IRP migration files NOT AUTHORIZED. Staging, Production and release: NO-GO.** The uncommitted candidate `arena/ce32f7c8-autodine` at `7064c912b1b85ab6364f23d1755d855ff4f462ad` preserves all 112 opening SQL files and three protected artifacts. No hosted target or provider was accessed.
+
+| Check | Current local evidence |
+|---|---|
+| Full Vitest | **2,587 passed / 264 skips**, no failures. |
+| PostgreSQL 17 and India FY | **255/255** in 10 suites (**60 GST-mode / 12 note** cases). Populated **114-file** replay: **250 passed / 2 direct PostgREST HTTP skips**; preserved SAC-less historical BOS, note, share and paid sitting in 112→114 upgrade. Controlled native clock verified issued INV/CN rollover and linked old FY, exact retry/conflict, DN and the outer credit-note cutoff. |
+| Chromium / Next | **20/20** loopback fixture cases. This is HTTP/action-body/saved-copy UI evidence, not genuine Auth, Data API schema cache, hosted RLS or persisted UI writes. |
+| Build and offline guards | Typecheck, lint, design, guarded build, DDL parser and whitespace passed. Chain **114 / 4 anchors**, release **44/44**, staging guards **25/25**, ACL guards **2/2**. Definer audit **123 / 70 heuristic flags**, not hosted clearance. |
+
+This refresh requires saved Composition SAC and original Rule 53 note particulars, shows saved GST/FSSAI data without backfill, proves compatible shared PAN readers, and uses exact signed paise in Finance/CSV. Private synthetic IRP recovery uses DB-age and CAS/lookup evidence without a legal IRN, provider transport, cancellation write, artifact promotion or hold release. See [supported scope, evidence and all 24 digests](qa-evidence/day1/GST_WORKSTREAM_B_FINAL_CLOSURE.md).
+
+**Still blocked:** actual outlet eligibility, operator and external numbering, legacy unpaid/paid/held or incomplete evidence disposition; authorized isolated-target preflight with both ledgers, isolation, schema/RLS/grants/cache; separate verified recovery, exact per-file migration decisions, compatible deploy and genuine Auth/PostgREST/guest-to-staff acceptance. IRP would require approved provider/transport, schema/master/trust, controlled acceptance and eventual cancellation/release authorization. None of the existing general release gates is cleared by this local work. Start with the [owner decision register](qa-evidence/day1/GST_OWNER_ACTION_REGISTER_2026-11-18.md#current-workstream-b-decisions).
+
+## Historical checkpoint — 2026-11-19 UTC · Priority 1 CA product specification
+
+**Workstream B Priority 1 locally complete; hosted GST NOT DONE. Staging,
+Production and release: NO-GO. All 14 GST/IRP Phase B files: NOT AUTHORIZED.**
+Original worktree recovered on `arena/ce32f7c8-autodine`, actual HEAD
+`7064c912b1b85ab6364f23d1755d855ff4f462ad`, identical committed tree to the
+PR #191 handoff. The candidate is uncommitted; no hosted read/write or later
+task was undertaken.
+
+| Local check | Outcome |
+|---|---|
+| Vitest | **2,549 passed / 244 integration-gated skips**, 226 passed / 11 skipped suites. |
+| Disposable PostgreSQL | **235/235** (41 GST, 11 notes), 104 migrations; populated upgrade **230 passed / 2 optional PostgREST skips**. |
+| Scoped Chromium/Next HTTP | **10/10** loopback fixture cases, not hosted Auth, PostgREST or persistence. |
+| Offline checks | Typecheck, lint, design, guarded build and parser-only DDL passed. Migration chain **104 / 4 anchors**, release **34/34**, staging guards **25/25**, ACL guards **2/2**. Definer report **112 / 69 heuristic flags**, not clearance. |
+
+**Implemented locally:** two top-level choices, FSSAI and GSTIN checks,
+5% standalone/nonqualifying hotel and evidence-gated 18% hotel; approved
+TAX INVOICE, BILL OF SUPPLY and RETAIL BILL / CASH MEMO; independent
+INV/BOS/RBL series with old numbers and payments preserved. The populated
+rehearsal found that paid old registered sittings missing evidence safely
+refuse issuance rather than reprice or consume a number. These need a
+cutover disposition. Reviewed No-GST does not inherit the old exclusive
+receipt tax. Billing CSV and links use snapshots; existing holds stand.
+
+**Still needed:** written Owner/Manager authority/roster and per-outlet
+adviser/activation records (including shared GSTIN and external numbering);
+O-B1 and separate read-only authority; fresh exact-target isolation,
+104-file ledger/catalog/cache reconciliation and unresolved-sitting review;
+backup/isolated restore evidence; separately authorized exact apply,
+deployment and synthetic acceptance with genuine Auth and PostgREST.
+No IRP, guest-to-receipt E2E, Realtime or later priority started. No existing
+non-GST release gate was lifted.
+
+See [complete local matrix and inventory](qa-evidence/day1/GST_P1_CLOSURE_2026-11-18.md),
+[owner actions](qa-evidence/day1/GST_OWNER_ACTION_REGISTER_2026-11-18.md) and
+[operator guide](docs/gst-two-mode-2026-11-14.md#2026-11-19--ca-approved-product-specification-local-only).
+
+## Historical checkpoint — 2026-11-18 UTC · Pre-CA GST closure review
+
+**Workstream B Priority 1: implemented and locally verified, not DONE.**
+Active branch `arena/ce32f7c8-autodine`, actual HEAD
+`3e17c44577a5236dca7dea5b4d35a16c0ffc1186` (PR #191); tested work is
+uncommitted. **Release and Staging: NO-GO. GST/IRP Phase B: NOT AUTHORIZED.**
+No hosted database, deployment, payment, or provider action was performed.
+
+| Current local evidence | Outcome |
+|---|---|
+| `npm test` | **2,538 passed, 241 skipped** (226 files passed, 11 skipped). The skipped SQL cases were covered by the union of the disposable runners below. |
+| `npm run test:db:integration` | **232/232**, 10 suites, including **38 GST** and **11 note** cases. PostgreSQL 17: 102 migrations, 51 tables, 136 public functions with the local harness. |
+| `READINESS_GST_UPGRADE=1 npm run test:db:embedded` | **227 passed, 2 PostgREST HTTP skips**, 9 suites. Replayed the 98-file base, seeded old rows through its RPCs, applied the four forward files, and passed populated upgrade assertions. No application-table scaffolds. |
+| Chromium / Next HTTP | **8/8** GST fixture cases, including real native Settings action POSTs and role-gated CSV requests using synthetic sessions. No real Auth/Data API or persistent write in this fixture. Guarded demo build and **64/64** hermetic browser cases passed; **49** real-stack cases skipped without their isolated environment. |
+| Offline gates | Typecheck, lint, design, SQL parser (DDL only), migration chain (102 files/4 anchors), release inventory (32/32), staging guards (25/25), ACL guard tests (2/2), and whitespace. Definer inventory: 111 inspected, 68 heuristic flags, not clearance. Protected staging baseline and 98-file migration history unchanged. |
+
+**Current verified boundaries:** only an entitled outlet Owner may save;
+settings bind outlet **and** version, and PostgreSQL rechecks ownership and
+entitlement after waiting on another write. Own-outlet Managers read only;
+no-membership and cross-tenant/sibling-outlet actors cannot read or mutate
+config/history, even when they own the commercial account. Guest quotes are
+narrow public pricing, not registration. Saved amounts, rounding evidence,
+issue numbers, payments and history survive upgrade. Old final share links
+still work; held links do not expose a document. Old pre-classification menu
+snapshots refuse rollback rather than reclassify a dish. Unclassified legacy
+GST tickets cannot issue and must be reconciled before rollout; Normal
+settlement/receipt behavior is preserved. Credit/debit notes do not refund
+a payment. No IRP path is activated.
+
+**Remaining release blockers:**
+
+1. Owner must confirm **Owner-only GST saves, Manager read-only** and record
+   the decision to activate or defer per tenant/outlet. A qualified GST
+   adviser must sign off the registration, billing profile/date and
+   eligibility, classification, AATO/B2B handling, and corrections. See the
+   [decision checklist](docs/gst-two-mode-2026-11-14.md#owner-and-adviser-decision-record).
+2. Separately authorize read-only isolation, recovery, ledger/catalog/ACL and
+   legacy-data preflight on the exact non-production target. Reconcile both
+   ledgers against the [102-file inventory](docs/migration-manifest-2026-11-14.md);
+   drain or resolve incompatible already-priced sittings and old menu
+   rollback dependencies. Do not fill evidence gaps with guessed data or
+   deploy the new quote/issue/report clients ahead of the reviewed schema.
+3. Only after preflight, explicitly authorize the exact forward files and a
+   synthetic acceptance run on that target. Genuine Auth/JWT, raw PostgREST
+   roles and schema cache, full guest-to-staff-to-receipt flow, and hosted
+   recovery/rollback evidence remain unverified. The pinned PostgREST asset
+   was unavailable in this sandbox. Existing unrelated release gates stay
+   open; no live IRP/GSP or real settlement was tested or approved.
+
+See [closure evidence, exact commands and files](qa-evidence/day1/GST_P1_CLOSURE_2026-11-18.md),
+[operator guide](docs/gst-two-mode-2026-11-14.md#2026-11-18--workstream-b-priority-1-local-checkpoint)
+and [staging preflight](docs/gst-staging-application-plan-2026-11-15.md).
+Everything below this checkpoint is dated historical evidence.
+
+## Earlier 2026-11-18 local implementation checkpoint — historical, before closure verification
+
+**Workstream B, Priority 1 — two-mode GST.** Branch
+`arena/ce32f7c8-autodine`; baseline `3e17c44577a5236dca7dea5b4d35a16c0ffc1186`
+(merged PR #191). This checkpoint is an uncommitted branch change, not a
+release SHA. **Release/Staging: NO-GO. GST/IRP Phase B: NOT AUTHORIZED.**
+No hosted database was queried or changed. No deploy, provider action, real
+payment, staging test, or merge was made by this workstream.
+
+| Evidence | Result and boundary |
+|---|---|
+| `npm test` | **2,531 passed, 237 skipped** (226 files passed, 11 skipped). Skips are not passes. |
+| `npm run test:db:integration` | **228/228 across 10 suites** on disposable PostgreSQL 17, 102 repository migrations / 51 tables / 136 public functions. Includes 34 GST cases and 11 note lifecycle cases. |
+| `npm run test:db:embedded` | Clean replay of 102 without application-table scaffolds; **223 passed, 2 optional PostgREST HTTP tests skipped**. Different suite selection, not additional distinct GST cases. |
+| Targeted Chromium / Next HTTP | **6/6 fixture-backed** on current cart/checkout, shared print-media document amounts and notices, held/void/malformed share refusal, and signed-out GST CSV redirect. Reproduce with `bash scripts/e2e/run-with-bundled-chromium.sh npx playwright test --config=playwright.gst-fixtures.config.ts`. The loopback fixture replaces the API, not the route code; this is not PostgREST or Auth. **4/4** selected legacy demo cart/checkout cases also passed. No payment or guest-to-receipt browser flow was run. |
+| Build and offline gates | Typecheck, lint, guarded CI demo build, design check, parser-only SQL, migration chain (102 unique, 4 anchors), release inventory (32/32), and staging guards (25/25). `audit:definer` inspected 111 definers and flagged 68 for heuristic triage, not blanket clearance. GST-specific execute/row boundaries were exercised under local roles. |
+| Protected bytes | No edits to the existing migration history or `scripts/phase3/staging-baseline.json`; baseline SHA-256 `e986f2ddd48af88e7e887177ffab7f9dadbec96d6d8394f09150da1d9e7f03fb`. |
+
+**Locally verified:** owner/write/version checks and immutable history;
+Composition admission and catalog rollback; 5% and 18% inclusive gross with
+portions and add-ons; no-tax Composition Bill of Supply; historical normal
+receipts; per-ticket settlement, drift refusal, one document-level rounding
+with unchanged collected gross; IRN hold on both new and existing share
+links; audited note and void/reissue boundaries; role-scoped GST report/CSV
+separate from sales and cash. Authorized CSV route handler verification used
+synthetic memberships plus PostgreSQL, not an authenticated hosted download.
+
+**Still blocked / not checked:**
+
+1. Owner confirmation of the narrower **owner-only** GST write authority vs
+   historical Manager editing; written per-tenant/registration decisions and
+   GST adviser sign-off (profile, effective date, AATO, classification and
+   corrections). Local format/rate tests cannot establish eligibility.
+2. Fresh authorized Staging isolation, recovery and catalog/ledger/ACL
+   reconciliation against the [102-file inventory](docs/migration-manifest-2026-11-14.md).
+   Full PostgREST/Auth/schema-cache behavior was **not verified**; this sandbox
+   could not obtain the pinned PostgREST binary. Do not deploy app routes that
+   require the new quote/issue/report contracts ahead of the reconciled schema.
+3. Explicit target/file authorization, synthetic hosted acceptance, and all
+   unrelated release/recovery gates remain open. The full guest-to-receipt
+   E2E and later priorities were not started here. No live IRP/GSP is selected
+   or approved by this work; no valid IRN is claimed. Never treat a held B2B
+   record as a final tax invoice or assume a provider activation is part of GST
+   Phase B application.
+
+Operator instructions: [GST checkpoint](docs/gst-two-mode-2026-11-14.md#2026-11-18--workstream-b-priority-1-local-checkpoint)
+and [staging preflight](docs/gst-staging-application-plan-2026-11-15.md).
+Older reports below are historical, not current hosted evidence.
+
+## Prior active-branch checkpoint — 2026-11-06 UTC
 
 **Verification date:** 2026-11-06 UTC (authoritative task date).
 

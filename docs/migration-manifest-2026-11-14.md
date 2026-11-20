@@ -1,16 +1,19 @@
-# Production migration manifest — 2026-11-14 (all 93 files accounted for; updated 2026-11-16)
+# Production migration inventory — 119 repository files (GST/IRP, guest journey, operational delivery and QR-boundary local inventory)
 
-**Generated from `supabase/migrations/` on branch `arena/9b120325-autodine`;
-extended 2026-11-16 on `arena/2670dd12-autodine`.**
-Purpose: nothing reaches production without appearing in this table with a
-classification and the probe that confirms (or refutes) its presence. Counts:
-**76 legacy-rollout-scope · 9 branch set (pending owner authorization B1) ·
-7 GST/IRP Phase B (NOT AUTHORIZED) · 1 scoped ACL revision
-(`20261116000100`, pending its own authorization)**. Zero duplicate versions
-(checked 2026-11-14; rechecked 2026-11-16, `migrations:verify` 93/93). The
-release-prep document
-(`docs/production-release-prep-2026-11-14.md`) binds this manifest into the
-ordered release sequence.
+**Repository inventory only — not an apply list.** On `arena/ce32f7c8-autodine`,
+the recovered base has the same committed tree as PR #191 (98 files). Six
+recovered GST follow-ups include the CA pair, and ten further forward files
+implement Workstream B locally. Two Priority 2 files add a simulation-only
+IRP execution sidecar and private document projections. One Priority 3 file
+changes the guest checkout wrapper only, and one Priority 4 file adds the
+outlet revision, floor projections and guest-version edit boundary. Counts:
+**76 legacy-rollout scope · 9 Branch set · 4 main-inherited boundary files · 1
+scoped ACL revision · 14 prior GST/IRP Phase B files · 10 GST/IRP Workstream B
+files · 2 GST/IRP Priority 2 files · 1 guest-checkout Priority 3 file · 1
+operational-delivery Priority 4 file**. All 26 GST/IRP files and the separate
+Priority 3 and Priority 4 files remain individually **NOT AUTHORIZED**.
+The separate owner operation is not a migration.
+See the [GST baseline hashes](../qa-evidence/day1/GST_WORKSTREAM_B_FINAL_CLOSURE.md) and the [two Priority 2 hashes](../qa-evidence/day1/IRP_PRIORITY_2_LOCAL_COMPLETION.md#migration-authorization).
 
 **Evidence boundary:** "Reported applied" means the 2026-11-12 hand-off report
 records the legacy rollout as completed. The A1 ledger + catalog-effect
@@ -118,14 +121,35 @@ without separate written authorization each.
 | `20261115000100` | `fix_redeem_staff_invite_status_returns` | Branch set — apply only with B1 (release prep §2) | P0 auth — invite single-use fix |
 | `20261115000200` | `owner_billing_configuration_guard` | Branch set — apply only with B1 (release prep §2) | P0 security — owner-only tax/GSTIN trigger (PR #181 content, renumbered) |
 | `20261115000300` | `audit_restaurant_account_reassignment` | Branch set — apply only with B1 (release prep §2) | P0 security — account-reassignment audit ledger |
-| `20261118000100` | `merge_boundary_gst_order_line_edits` | PR #191 main-merge reconciliation (2026-11-16) | Re-asserts main's order-line edit boundary (owner/manager/cashier only; Kitchen 42501) on the GST replacement; NOT AUTHORIZED for hosted application by this merge |
 | `20261116000100` | `revoke_client_maintain_privileges` | Scoped ACL revision — NOT AUTHORIZED (own decision; production substitute for `20261110001220`, see its probed row) | Added 2026-11-16 after production catalog probes: completes the MAINTAIN/default-ACL scope 01220 misses in the production-shaped catalog, with fail-closed post-revoke verification; sequence revokes justified by definer-only consumption (verified in source). Locally replay-tested; never applied to any hosted project |
+| `20261118000100` | `merge_boundary_gst_order_line_edits` | GST/IRP Phase B dependency — NOT AUTHORIZED | PR #191 main-merge reconciliation (2026-11-16). Re-asserts main's order-line edit boundary (owner/manager/cashier only; Kitchen 42501) on the GST replacement; NOT AUTHORIZED for hosted application by this merge |
+| `20261118000200` | `gst_configuration_boundary` | GST/IRP Phase B follow-up — NOT AUTHORIZED | Owner/write/version checks, role-scoped registration/history, account consistency and Composition admission |
+| `20261118000300` | `gst_pricing_boundary` | GST/IRP Phase B follow-up — NOT AUTHORIZED | Minimal public quote, private pricing, ticket mode/rate/version and immutable classification on new lines |
+| `20261118000400` | `gst_document_integrity` | GST/IRP Phase B follow-up — NOT AUTHORIZED | Validates source and settlement, document rounding, correction guards and IRN sharing hold |
+| `20261118000500` | `gst_document_report` | GST/IRP Phase B follow-up — NOT AUTHORIZED | Owner/manager aggregates from immutable document amounts; not cash or a GST return |
+| `20261118000600` | `gst_ca_onboarding` | GST/IRP Phase B follow-up — NOT AUTHORIZED | Two-mode onboarding, FSSAI, business/SAC and qualifying hotel evidence, legacy preservation and zero-tax reviewed retail pricing |
+| `20261118000700` | `gst_ca_documents` | GST/IRP Phase B follow-up — NOT AUTHORIZED | Immutable identity and SAC, independent India FY series, and billing document aggregates (including retail) |
+| `20261118000800` | `gst_outlet_activation` | GST/IRP Workstream B — NOT AUTHORIZED | Explicit outlet activation, audit and shared-registration series reservations |
+| `20261118000900` | `gst_recipient_documents` | GST/IRP Workstream B — NOT AUTHORIZED | Recipient profiles, immutable snapshots, series and issue-time IRP hold |
+| `20261118001000` | `gst_irp_readiness` | GST/IRP Workstream B — NOT AUTHORIZED | Local INV-01 validation evidence only; no dispatch or legal IRN transition |
+| `20261118001100` | `gst_reconciliation` | GST/IRP Workstream B — NOT AUTHORIZED | Outlet-scoped internal GST document and payment reconciliation |
+| `20261118001200` | `gst_review_lifecycle` | GST/IRP Workstream B — NOT AUTHORIZED | Private versioned deferral; hotel FY review and declaration windows |
+| `20261118001300` | `gst_direct_fulfilment` | GST/IRP Workstream B — NOT AUTHORIZED | Authenticated same-state direct tickets, protected destination and settlement/issue guards |
+| `20261118001400` | `gst_irp_rehearsal_store` | GST/IRP Workstream B — NOT AUTHORIZED | Private synthetic generation CAS and events; in-flight local void guard; no release |
+| `20261118001500` | `gst_finance_scope` | GST/IRP Workstream B — NOT AUTHORIZED | Versioned selected/account ledger with independent payment and document lifecycle evidence |
+| `20261118001600` | `gst_document_particulars` | GST/IRP Workstream B — NOT AUTHORIZED | Reviewed Composition SAC and original note particulars; shared PAN review readers; no backfill |
+| `20261118001700` | `gst_irp_rehearsal_recovery` | GST/IRP Workstream B — NOT AUTHORIZED | Private restart read and conditional generation CAS evidence; durable dispatch age; no artifact promotion |
+| `20261118001800` | `irp_execution` | GST/IRP Priority 2 — NOT AUTHORIZED | Dispatch sidecar, pinned simulation routing, lease/CAS, recovery and cancellation history. No routes or worker grants installed. |
+| `20261118001900` | `irp_document_projection` | GST/IRP Priority 2 — NOT AUTHORIZED | Scoped operational projections and inactive authority-only private-copy boundary. Depends on `01800`. |
+| `20261118002000` | `guest_checkout_integrity` | Guest-to-receipt Priority 3 — NOT AUTHORIZED | Same-table replay and atomic whole-basket validation; no change to GST/IRP, amounts, discount policy or payment grants. |
+| `20261118002100` | `operational_realtime` | Operational delivery Priority 4 — NOT AUTHORIZED | Adds the `waiter` membership role, membership-scoped floor projections, a coalesced metadata-only outlet revision and publication, sitting transfer, waiter acknowledgement and a guest-version edit cursor. No order amounts, GST/IRP, payment grants or hosted routing are changed by it. |
+| `20261118002200` | `qr_code_staff_boundary` | Privileged-function review — NOT AUTHORIZED | Adds the owner/manager membership check to `rotate_table_qr_code`/`retire_table_qr_code` before they touch `table_qr_codes` (findings QR-01/QR-02). Signature, return type, grants and the subscription gate unchanged; no table, policy or data change. |
 
 ## Owner-operation (never applied automatically — separate on purpose)
 
 | File | Status |
 |---|---|
-| `supabase/owner-operations/20261110000501_revoke_supabase_admin_client_defaults.sql` | **OWNER-ONLY OPERATION.** Not part of the 92. Requires the owner to run it deliberately against the chosen project; closes the `supabase_admin` default-privilege residual (baseline drift D6/D7). Not run anywhere as part of this cycle. Verify per §A2 of the closure package after the owner runs it. |
+| `supabase/owner-operations/20261110000501_revoke_supabase_admin_client_defaults.sql` | **OWNER-ONLY OPERATION.** Not part of the 118 migrations. Requires the owner to run it deliberately against the chosen project; closes the `supabase_admin` default-privilege residual (baseline drift D6/D7). Exercised only under the synthetic owner role in disposable PostgreSQL, never applied to a hosted target in this cycle. Verify per §A2 of the closure package after the owner runs it. |
 
 ## Reading the classes
 
@@ -139,10 +163,18 @@ without separate written authorization each.
   boundary. Apply in filename order, only under B1 authorization, per release
   prep §2. `20261112000300_report_sales_export_authorization` is already applied
   on **staging only** (2026-11-15 rehearsal); production presence is unverified.
-- **GST/IRP Phase B (7):** `20261113000100` → `20261114000600` (B1–B7 in
-  `docs/gst-irp-production-readiness-2026-11-14.md`). **NOT AUTHORIZED. Do not
-  apply.** Note: B5 (`20261114000400_restrict_trigger_functions_execute`) is
+- **GST/IRP Phase B (14):** the 7 files listed as B1–B7 in
+  `docs/gst-irp-production-readiness-2026-11-14.md`, plus the seven
+  `20261118000100`–`20261118000700` dependencies/follow-ups identified above.
+  **NOT AUTHORIZED. Do not apply.** Note: B5 (`20261114000400_restrict_trigger_functions_execute`) is
   data-safe privilege hardening and could be authorized separately as a pure
   security item — it is listed as Phase B here because that is its dependency
   grouping in the GST analysis; it must still not be applied without an
   explicit authorization decision.
+
+- **GST/IRP Workstream B (10):** `20261118000800`–`20261118001700`, in forward order after the other GST/IRP files. Local implementation and synthetic tests only. **NOT AUTHORIZED.** No hosted apply, backfill, IRP provider or legal release is enabled by this inventory.
+- **GST/IRP Priority 2 (2):** `20261118001800`–`20261118001900`, after `01700`. Each is **NOT AUTHORIZED**. Applying them alone installs neither routing data nor private worker privileges.
+
+- **Guest-to-receipt Priority 3 (1):** `20261118002000` is local-only and **NOT AUTHORIZED** for hosted application. It must not be appended to the frozen staging upgrade bundle.
+- **Privileged-function review (1):** `20261118002200` is local-only and **NOT AUTHORIZED**. It is a security correction to two already-granted RPCs; applying it cannot weaken any grant, but it still needs its own written decision per target.
+- **Operational delivery Priority 4 (1):** `20261118002100` is local-only and **NOT AUTHORIZED**. Hosted application additionally requires the Realtime publication change to be reviewed on the target project; the migration refuses to alter a publication that already contains other tables.

@@ -12,8 +12,14 @@ was touched while preparing it. GST/IRP migrations remain
 **NOT AUTHORIZED**. The release itself requires explicit owner approval of
 each gate in §5. Executing any step without that approval is out of scope.
 
-Companion documents: `docs/migration-manifest-2026-11-14.md` (all 92 migrations
-accounted for), `docs/owner-closure-package-2026-11-14.md` (every owner action
+**Current notice:** this is the historical release identity and checklist,
+not a plan to ship the current checkout. The inventory now contains 116 files,
+including 26 GST/IRP files that remain **NOT AUTHORIZED**. Do not use
+this sequence as a current executable apply list or ship the current app
+against an unverified schema. Current evidence and gates are in the
+[live blocker register](../RELEASE-BLOCKER-REPORT.md).
+
+Companion documents: `docs/migration-manifest-2026-11-14.md` (current inventory), `docs/owner-closure-package-2026-11-14.md` (every owner action
 with steps + verification), `docs/credential-exposure-remediation-2026-11-14.md`
 (B5 detail). `npm run verify:release` re-checks the repository-side invariants
 offline and fail-closed (CI step "Release readiness invariants").
@@ -64,13 +70,13 @@ file (NOT AUTHORIZED) and classify-then-verify before applying.
 | 8 | `20261115000200_owner_billing_configuration_guard.sql` | P0 security | Owner-only `tax_rate_bps`/`gstin` trigger; revokes EXECUTE from service_role too; body identical to PR #181, renumbered (version `20261112000200` occupied). |
 | 9 | `20261115000300_audit_restaurant_account_reassignment.sql` | P0 security/audit | Append-only audit of applied `account_id` reassignments; closes D1 silently-reassigned gap. Depends on #1. |
 | — | `20261114000400_restrict_trigger_functions_execute.sql` | **GST/IRP Phase B (B5) — NOT AUTHORIZED** | Listed as Phase B5 in `docs/gst-irp-production-readiness-2026-11-14.md` (dependency grouping). Data-safe privilege hardening; may be authorized separately as a pure security item, but **must not be applied without its own authorization decision**. Trigger invocation unaffected (verified locally). |
-| — | `20261113000100_gst_two_mode.sql`, `20261114000100_gst_b2b_einvoice_readiness.sql`, `20261114000200_irp_reconciliation.sql`, `20261114000300_gst_mode_gates.sql`, `20261114000400_restrict_trigger_functions_execute.sql`, `20261114000500_credit_debit_notes.sql`, `20261114000600_einvoice_issuance_profile.sql` | **GST/IRP Phase B (B1–B7) — NOT AUTHORIZED** | Apply NOTHING in this group without separate written owner authorization each. See `docs/gst-irp-production-readiness-2026-11-14.md`. Full accounting of all 92 repo migrations: `docs/migration-manifest-2026-11-14.md`. |
+| — | `20261113000100_gst_two_mode.sql`, `20261114000101_gst_b2b_einvoice_readiness.sql`, `20261114000200_irp_reconciliation.sql`, `20261114000300_gst_mode_gates.sql`, `20261114000400_restrict_trigger_functions_execute.sql`, `20261114000500_credit_debit_notes.sql`, `20261114000600_einvoice_issuance_profile.sql` | **GST/IRP Phase B (B1–B7) — NOT AUTHORIZED** | Apply NOTHING in this group without separate written owner authorization each. See `docs/gst-irp-production-readiness-2026-11-14.md`. Current inventory and separately gated follow-ups: `docs/migration-manifest-2026-11-14.md`. |
 
-All 92 repository migrations are enumerated and classified in
+The current repository inventory is enumerated and classified in
 `docs/migration-manifest-2026-11-14.md` (76 legacy rollout scope · 9 branch set
 above · 7 GST/IRP Phase B). The owner-operation file
 (`supabase/owner-operations/20261110000501_revoke_supabase_admin_client_defaults.sql`)
-is deliberately **not** part of the 92 and is never applied automatically —
+is deliberately **not** part of the repository migration chain and is never applied automatically —
 it is a manual owner operation, recorded there as well.
 
 Plus the legacy 3-step plan ([production-migration-plan-2026-11-11.md]) for

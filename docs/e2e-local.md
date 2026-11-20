@@ -1,4 +1,50 @@
-# Isolated browser E2E: QR scan throttle
+# Isolated browser E2E
+
+## Guest-to-receipt rehearsal (production build + disposable PostgreSQL)
+
+```bash
+npm ci                            # Node 22, Linux
+npm run test:e2e:journey
+npm run test:db:integration
+READINESS_GST_UPGRADE=1 npm run test:db:embedded
+```
+
+Use a checkout without application `.env` files. The journey command
+creates one private `autodine_check_*` database in embedded PostgreSQL 17,
+replays all **118** migrations with the existing local shim, legacy table
+scaffold and separate local owner ACL operation, seeds a synthetic
+menu/outlet/staff setup, builds Next in test deployment mode, and runs
+bundled Chromium at phone and desktop widths. The populated upgrade command
+above separately checks the migration history without application-table
+scaffolds. The journey does not accept a target URL, read app database
+configuration, supply a service key or send test traffic to a hosted app.
+It drops the database when done.
+
+`e2e/journey/` uses a limited loopback HTTP adapter, which switches to the
+real `anon` or `authenticated` database role for each data request. Phone
+and desktop drive the actual Next routes/actions to write tickets, prep
+states, tender, checkout and links; assertions inspect committed rows and
+saved-copy UI. Faults drop selected replies or return bounded synthetic
+errors; they do not fabricate business success. Synthetic SSR cookies do
+not test sign-in or token refresh. An unmodelled API shape fails the run.
+The production build avoids the dev overlay without changing CSP. Kitchen
+speech relay is blocked in the rehearsal. The runner checks selected
+synthetic markers are absent from application logs; this does not certify
+hosting/access logs. See the [Priority 3 evidence](../qa-evidence/day1/GUEST_TO_RECEIPT_PRIORITY_3_LOCAL_COMPLETION.md).
+
+`npm run test:db:integration` includes
+`lib/db/p5-cross-module.integration.test.ts`, which exercises the seams between
+modules (cross-outlet refusals, kitchen-frozen guest edits, retried tender and
+checkout, issued-document immutability, the no-GST receipt, and the floor
+call/transfer lifecycle). See the
+[Priority 5 RC verification](../qa-evidence/day1/RELEASE_CANDIDATE_PRIORITY_5_LOCAL_VERIFICATION.md).
+
+This verifies local browser/application/SQL composition, **not** actual
+PostgREST/Auth/Realtime, physical devices/printers, hosted cookies, proxy
+routing, a provider payment or an approved deployment. Keep the real
+PostgREST throttle runner and isolated-hosted approval gates separate.
+
+## QR scan throttle with local PostgREST
 
 This is the reproducible, production-free setup for the two tests in
 `e2e/integration/throttle.spec.ts`. It exercises the real browser route, the

@@ -25,12 +25,35 @@ These rules apply to every coding agent, developer task, test, and deployment. R
 - GST calculations must follow a formally approved tax policy; do not infer policy from sample/demo values or existing implementation.
 - Until approval, GST-dependent functionality must remain safely gated and fail closed. Preserve existing safe behavior; do not make a tax calculation appear compliant by guessing.
 
-### GST two-mode billing — owner-approved scope (2026-11-14)
+### Workstream B local extension — not hosted approval
 
-The owner approved building the two-mode GST system on 2026-11-14 (decisions quoted from the approval):
-- **Normal receipts (GST off)** — unchanged historical behaviour; the default for every restaurant.
-- **Composition Scheme** — issues a Bill of Supply, never a tax invoice; collects no GST; claims no ITC. Activation requires the GSTIN registration type to be `composition` plus the owner's acknowledgment of the ineligibility list (alcoholic liquor, tobacco, inter-State, e-commerce operator). No CMP-02 evidence reference is required. Statutory notice printed on every Bill of Supply.
-- **Regular GST** — exactly two profiles: 5% (other than specified premises, no ITC; Notification No. 11/2017-CT(Rate), Sl. 7(i), as amended) and 18% (specified premises only, w.e.f. 2025-04-01; Notification No. 05/2025-CT(Rate)). The 18% profile requires the specified-premises attestation. Menu prices are **tax-inclusive**; tax is extracted at document level (one rounding), never per line, and never recalculated after issue. Place of supply for restaurant services is always the outlet's state (CGST+SGST).
+The supported direct-outlet extension is recorded in
+`qa-evidence/day1/GST_WORKSTREAM_B_FINAL_CLOSURE.md`. The Priority 1 text below
+is the baseline, not the latest implementation description of recipient or
+IRP readiness. For new supported Regular documents, record the issue-time
+PAN-wide highest prior FY since FY2017–18, not just the immediately prior
+FY. Never clear unknown applicability; use the saved buyer and actual outlet
+place of supply, not the buyer GSTIN state.
+
+Priority 2 adds a separate local-only IRP execution sidecar. It supports
+owner-requested offline INV-01 preparation, simulation queue, private worker
+verification, lookup, cancellation and an outlet-scoped register. `SIM-`
+artifacts are not legal IRN/ACK/QR and do not release any held invoice or
+note. No live adapter, authority route, worker grant, credential, legal QR
+or hosted operation is approved. Keep bearer and text release restricted;
+never use a synthetically verified outcome to clear documents or to create
+adjustments/refunds. [Local completion / no-go gates](qa-evidence/day1/IRP_PRIORITY_2_LOCAL_COMPLETION.md)
+cover the new chain. All 26 GST/IRP files remain separately **NOT AUTHORIZED**.
+No general tax, payment or release approval follows.
+
+### GST two-mode billing — CA-confirmed specification (local Workstream B Priority 1)
+
+This supersedes the 2026-11-14 treatment choices for reviewed onboarding, not
+any hosted or outlet activation gate. See `docs/gst-two-mode-2026-11-14.md`.
+- **GST:** valid 15-character GSTIN, valid 14-digit FSSAI, business type and service SAC. Standalone restaurant services are 5% without ITC, including dine-in, takeaway and delivery. A hotel restaurant uses 18% with ITC only at Specified Premises: the preceding FY actual room supply value exceeded ₹7,500 per unit per day, **or** a valid opt-in was filed within the applicable adviser-confirmed period. Otherwise it uses 5%. No free rate choice or invented filing deadline. Qualifying evidence, effective date and attestation are recorded for the FY. The **TAX INVOICE** uses inclusive menu prices, one document-level tax extraction and the outlet-state place of supply (CGST + SGST), without re-deriving saved issued amounts.
+- **No-GST (unregistered):** declaration, FSSAI, saved name/address/phone, no GSTIN or tax. Issue **RETAIL BILL / CASH MEMO**. Pre-enrolment legacy plain receipts are not CA-reviewed retail bills; keep their saved amounts and identity, and do not auto-enrol any outlet.
+- **No-GST (Composition):** a subtype, not a third mode. Requires Composition registration, validated GSTIN/FSSAI and the existing eligibility acknowledgment (alcoholic liquor, tobacco, inter-State, e-commerce operator). No CMP-02 reference is required. Issue **BILL OF SUPPLY** with “Composition taxable person, not eligible to collect tax on supplies”; no GST collected or shown, no ITC.
+- **Series:** `INV`, `BOS`, `RBL` counters by outlet and India financial year, transaction-safe, six-digit sequence, maximum 16 allowed characters. Legacy INV records and numbers remain reserved. No reset on mode changes or voids. A registration shared across multiple outlets needs a separately reviewed series allocation before activation.
 - **e-Invoice** — no IRP provider is configured or approved. Applicability is decided at issue time (preceding-FY AATO > ₹5 crore, Notification No. 10/2023-CT as amended; B2C never applicable) and applicable B2B documents are issued `irp_status='pending'` — never presented as final tax invoices until a validated IRN exists; unknown AATO fails closed. B2B recipient capture exists only on Regular GST tax invoices (name/GSTIN/state-code derived/optional address+email); Composition bills and normal receipts refuse buyer details. `lib/gst/irp/` holds the provider-agnostic adapter interface, the deterministic offline sandbox used by tests and rehearsals (not an IRP), structural signed-QR validation and the IRP state machine; the append-only `restaurant_irp_requests` table audits every attempt with hashes only.
 - Restaurant checkout behaviour, IGST for restaurant services, per-item rates, exemptions, discounts (still disabled) and any other rate are all **out of scope** and remain locked. Discounts stay disabled until written financial policy approval exists.
 - GST documents are immutable at the database level; only the audited void transition is permitted. `restaurant_invoices` triggers enforce this for every role.
@@ -39,8 +62,14 @@ The owner approved building the two-mode GST system on 2026-11-14 (decisions quo
 
 - Money is integer paise (`BIGINT` in SQL); never use floating-point money. The database is the source of truth for order pricing; clients do not submit trusted totals.
 - Preserve immutable order/item/payment snapshots and idempotency guarantees. Do not rewrite historical financial records as part of unrelated work.
-- Customer ordering is **pay at the counter only**. Do not turn on a payment gateway in guest checkout or add a payment-mode selector. Staff settlement remains the simple authorized “mark paid” action; “served” and “paid” are separate states.
+- Customer ordering is **pay at the counter only**. Do not turn on a payment gateway in guest checkout or add a payment-mode selector. Authorized staff record already-verified cash/card/UPI at the counter (or the existing staff-manual settlement where appropriate); the app does not process those tenders. “Served” and “paid” are separate states. An unconfirmed recording is reconciled against the original attempt and the saved ledger, never by asking the guest to pay again.
 - One table has one open sitting/session; later guest submissions create separate tickets containing only the newly submitted items. Preserve the session link, guest-token idempotency, and payment ledger rather than merging or duplicating tickets.
+- The guest checkout attempt is scoped to the live outlet/table. It keeps the same UUID, basket and note through uncertain replies; a confirmed response consumes only the matching cart. A confirmation URL is a read, not authority to clear a cart. No safe shared browser storage/locking means order with staff, not a best-effort new key. Migration `20261118002000` is a local-only candidate and needs separate hosted authorization.
+- **Live delivery is an invalidation signal, never business data.** `outlet_live_revisions` holds only an outlet id, an event id, a version and a commit time; operational tables are not published raw. Operational changes coalesce to one revision per committed transaction, and screens re-read persisted rows through the API rather than applying a wire payload. Do not add per-page refresh timers back on top of the shared coordinator. Migration `20261118002100` is local-only and needs separate hosted authorization, including a review of the target's Realtime publication.
+- **The `waiter` role is floor-scoped.** Waiters see the outlet through `list_my_waiter_outlets`, `floor_service_snapshot` (bounded tables/calls with truncation flags) and the `table_waiter_calls` live columns only; broad staff policies keep their previous role list. Never widen a waiter into order, payment or finance reads, and keep acknowledgement separate from the device's speech claim.
+- **A table transfer moves the sitting, not the ticket.** Preserve `orders.table_id`, the guest bearer and the sitting link; revoke both tables' verification proofs and refuse a move that is occupied, held, has an open call, or carries money. Guest calls are bound to the exact displayed verified table label.
+- **Guest edits are version-conditioned.** `get_guest_order_status` returns a minimal status plus `guest_live_version`; `set_guest_order_lines_at_version` refuses a stale version before delegating to the existing authority and pricing core. Do not reintroduce quantity-only client state or unconditional edits.
+- Guest status is not a final, numbered receipt. Close a settled sitting through authorized staff checkout to issue its saved document. Print privately where required; only eligible ordinary receipts may use expiring, revocable share links. Neither a payment acknowledgement nor a shared link releases an IRN hold.
 - Invoice, checkout, and printing behavior must follow the approved Invoice Spec v1.0 and the already-implemented flows. Browser/OS printing is the supported printing model; do not add printer hardware integrations without approval. Kitchen tickets remain screen-first; do not reintroduce KOT print without approval.
 - Kitchen announcements must retain the approved content in this order: order number, table, items, quantities, and guest note. Preserve deduplication and persistence. Call Waiter copy is `टेबल X, वेटर ध्यान दीजिए。` unless the user explicitly changes it.
 - For QR/session throttling, follow `docs/scan-limit-l1.md`: throttle verification/session minting only, never order submission; a refused scan does not create a session or order. Keep the race/idempotency guarantees covered by the database tests.

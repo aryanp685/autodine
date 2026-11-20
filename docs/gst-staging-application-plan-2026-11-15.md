@@ -2,6 +2,77 @@
 
 **Status: PREPARED ONLY. NOT APPLIED. NOT AUTHORIZED.**
 
+## Current checkpoint — re-plan before using the historical sequence
+
+The dated inspection and sequence below predate PR #191 and the Workstream B
+follow-ups. They are **not a current apply list**. No hosted catalog or ledger
+was queried for local closure. No previous authorization carries over. Use
+the [116-file inventory](migration-manifest-2026-11-14.md), [local
+GST closure](../qa-evidence/day1/GST_WORKSTREAM_B_FINAL_CLOSURE.md), and [IRP Priority 2](../qa-evidence/day1/IRP_PRIORITY_2_LOCAL_COMPLETION.md). Obtain fresh
+written authorization for the exact target and files. Staging only after its
+isolation and recovery gates. No Production or IRP activity from this plan.
+
+1. With separate read-only authority, match both staging ledgers, manifest
+   checksums, schema names, affected function bodies/ACLs and RLS policies to
+   the current dependency chain. The B2B file is `20261114000101`; the adjacent
+   `20261114000100` is subscription read hardening. GST notes and audit use
+   `restaurant_notes`, `restaurant_note_events`, `restaurant_note_series`
+   and `restaurant_irp_requests`. The e-invoice issuance profile is columns
+   on the GST config and history, not a separate table. Historical probes
+   for differently named objects are not positive evidence of these markers.
+2. Before any authorized apply, capture and review prior bodies, privileges,
+   protected source snapshots and recovery evidence. Reconcile the original
+   B1–B7 bundle, `20261118000100_merge_boundary_gst_order_line_edits.sql` and
+   `20261118000200`–`20261118001900` in filename/dependency order. All 26 GST/IRP
+   files are **NOT AUTHORIZED**. Check active sittings and historic GST tickets before
+   changing the runtime, including **closed-but-unissued** GST sittings,
+   SAC-less Composition and original recipient/evidence gaps, absent classifications,
+   mismatched mode/version/rate, invalid historic
+   registration or missing reviewed FSSAI/business/SAC/premises evidence, and any expected rollback to a pre-classification menu
+   snapshot. Resolve these with the owner/adviser before cutover; stop on any
+   unresolved GST sitting, do not relabel/reprice/charge again, and preserve
+   issued snapshots, numbers, payments and history. The populated local
+   rehearsal confirms a safe refusal, not automatic repair. Never fill in
+   eligibility, amounts, classifications or GSTINs from guesses. The new cart
+   requires the public quote RPC, even for legacy receipts; plan the app/schema
+   cutover and verified recovery together.
+3. After an authorized transactional staging application, verify schema
+   cache visibility and actual SQL/HTTP denial as well as success: owner
+   versioned save; manager read-only GST config; Kitchen/Cashier/anon and
+   sibling/foreign-outlet config and history denial under real Auth (including
+   no membership, stale forms and read-only entitlement); public quote only
+   by active slug; no execute for `gst_pricing(uuid)`; correct ticket/line
+   snapshots; unchanged guest authority; no submission caps; exact
+   settlement and round-once issue;
+   INV/BOS/RBL series, concurrent issuance and void/replacement; held link denial; Owner/Manager billing report CSV
+   distinct from `report_sales` and recorded cash. In the individually approved
+   isolated fixture, exercise QR → cart/order → authorized counter settlement
+   → close/issue → print/share and CSV for unregistered retail, Composition,
+   Regular 5% and 18%, B2B hold and cross-outlet refusals. Also verify a deferral
+   leaves billing unchanged, supported counter takeaway/delivery and kitchen
+   redaction, delivery payment refusal on changed PAN evidence, selected and
+   authorized account finance/CSV, and private output for identified delivery.
+   Include the new Composition SAC gate and old SAC-less copy, Rule 46
+   saved particulars/review, Rule 53 anonymous/BOS/held refusals without
+   counter changes, signed-negative rounding CSV and supplemental FSSAI.
+   Verify no `load_gst_irp_rehearsal` or rehearsal CAS EXECUTE for API roles;
+   also verify no browser/`service_role` EXECUTE on `claim_irp_dispatch`,
+   `sweep_irp_leases` or `finish_irp_dispatch`, no direct table rights, zero
+   provisioned routes, and no clearance from a synthetic result. There is no
+   hosted dispatch test or provider acceptance in this phase.
+   These are future separately authorized steps, not part of local closure. Compare immutable financial
+   rows and synthetic reruns as separate before/after evidence. No IRP calls
+   or real charges/refunds.
+4. Stop on mismatch, unavailable schema, entitlement drift, stale forms or
+   unexplained money delta. Any already issued documents, notes, numbers and
+   payment records survive. Recover via the separately reviewed forward-fix
+   or restore plan; never reverse ledger data or reuse numbers. Local SQL and
+   fixture-only browser checks are not this hosted verification.
+
+---
+
+## Historical plan (2026-11-15)
+
 No GST/IRP migration has been applied to staging or production from this branch.
 This document is the exact, isolated staging application sequence and test plan
 for when — and only when — the owner issues a separate explicit authorization
@@ -77,7 +148,7 @@ GST/IRP bundle (7):
 
 ```
 20261113000100_gst_two_mode.sql
-20261114000100_gst_b2b_einvoice_readiness.sql
+20261114000101_gst_b2b_einvoice_readiness.sql
 20261114000200_irp_reconciliation.sql
 20261114000300_gst_mode_gates.sql
 20261114000400_restrict_trigger_functions_execute.sql
@@ -161,7 +232,7 @@ Phase A (26 files): `20261108007000` → `20261108008000` → `20261108009000` �
 `20261112000500` → `20261112000600` → `20261112000700`.
 
 Phase B (7 files): `20261113000100_gst_two_mode.sql` →
-`20261114000100_gst_b2b_einvoice_readiness.sql` →
+`20261114000101_gst_b2b_einvoice_readiness.sql` →
 `20261114000200_irp_reconciliation.sql` →
 `20261114000300_gst_mode_gates.sql` →
 `20261114000400_restrict_trigger_functions_execute.sql` →

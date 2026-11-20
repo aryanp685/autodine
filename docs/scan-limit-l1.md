@@ -373,3 +373,14 @@ no database and therefore no way to be throttled by it. The unit tests drive the
 same components with the same props, and the live curl proves the route wiring;
 a Playwright case would need a seeded database in CI, which is a separate
 decision about a second Supabase project and is not taken here.
+
+
+### Priority 3 rehearsal update
+
+The historical proposal above did not mint held sessions when a scan is
+limited. That boundary remains: a limited scan leaves the cart, writes no
+session or ticket, and drops any previously verified different table. The
+supported `scan_confirm` route holds tickets from a **successful** scan
+until authorized confirmation. The [disposable journey suite](e2e-local.md#guest-to-receipt-rehearsal-production-build--disposable-postgresql)
+now covers both paths and the code budget. Order submission remains
+unthrottled.
