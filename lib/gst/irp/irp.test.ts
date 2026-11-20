@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { buildIrpPayload, IrpPayloadError, canonicalPayload } from './payload';
-import { SandboxIrpAdapter, SANDBOX_PROVIDER_ID, SANDBOX_QR_MARKER, SANDBOX_REJECT_BUYER_GSTIN } from './sandbox';
-import { parseSignedQr, isIrn } from './validate';
+import { prepareOfflineIrp } from './sandbox';
+import { isWithinCancellationWindow } from './provider';
+import { parseSignedQr } from './validate';
 import { transitionIrpStatus, isFinalTaxInvoice, IrpStateError } from './irp-state';
 import { evaluateEInvoiceApplicability } from '../applicability';
 
@@ -81,47 +82,22 @@ describe('buildIrpPayload', () => {
   });
 });
 
-describe('SandboxIrpAdapter (offline, deterministic)', () => {
-  const adapter = new SandboxIrpAdapter({ now: () => Date.parse('2026-11-14T10:00:00Z') });
-
-  it('generates a stable IRN and a structurally valid signed QR', async () => {
+describe('offline IRP preflight', () => {
+  it('records a deterministic request without an IRN, acknowledgement or signed artifacts', () => {
     const payload = buildIrpPayload(payloadInput());
-    const first = await adapter.generateIrn(payload);
-    const second = await adapter.generateIrn(payload);
-    expect(first.ok && second.ok).toBe(true);
-    if (first.ok && second.ok) {
-      expect(first.ack.irn).toBe(second.ack.irn); // idempotent replay
-      expect(isIrn(first.ack.irn)).toBe(true);
-      const parsed = parseSignedQr(first.ack.signedQrCode);
-      expect(parsed.ok).toBe(true);
-      if (parsed.ok) {
-        expect(parsed.fields.sellerGstin).toBe(SELLER.gstin);
-        expect(parsed.fields.buyerGstin).toBe(BUYER.gstin);
-        expect(parsed.fields.docNo).toBe(payload.documentNumber);
-        expect(parsed.fields.docTyp).toBe('INV');
-        expect(parsed.fields.irn).toBe(first.ack.irn);
-        expect(Buffer.from(first.ack.signedQrCode, 'base64').toString('utf8')).toContain(SANDBOX_QR_MARKER);
-      }
-    }
-    expect(adapter.providerId).toBe(SANDBOX_PROVIDER_ID);
+    const result = prepareOfflineIrp(payload);
+    expect(result).toEqual(prepareOfflineIrp(payload));
+    expect(result).toMatchObject({ ok: true, request: { Version:'1.1', DocDtls:{ Typ:'INV' } } });
+    expect(JSON.stringify(result)).not.toMatch(/"(Irn|AckNo|SignedQRCode|SignedInvoice)"/);
   });
-
-  it('rejects the well-known reject buyer GSTIN with code 2150', async () => {
-    const payload = buildIrpPayload(payloadInput({ buyer: { ...BUYER, gstin: SANDBOX_REJECT_BUYER_GSTIN, stateCode: '27' } }));
-    const outcome = await adapter.generateIrn(payload);
-    expect(outcome.ok).toBe(false);
-    if (!outcome.ok) expect(outcome.code).toBe('2150');
+  it('does not validate an altered request fingerprint', () => {
+    expect(prepareOfflineIrp({ ...buildIrpPayload(payloadInput()), documentNumber:'CHANGED' }).ok).toBe(false);
   });
-
-  it('cancelIrn enforces the 64-hex IRN shape and the 24h window', async () => {
-    const cancel = new SandboxIrpAdapter({ now: () => Date.parse('2026-11-15T10:00:00Z') });
-    const badIrn = await cancel.cancelIrn({ irn: 'not-hex', reason: '3', remark: 'order cancelled' });
-    expect(badIrn.ok).toBe(false);
-    const tooLate = await cancel.cancelIrn({ irn: 'a'.repeat(64), reason: '3', remark: 'order cancelled', generatedAtIso: '2026-11-13T10:00:00Z' });
-    expect(tooLate.ok).toBe(false);
-    if (!tooLate.ok) expect(tooLate.code).toBe('SANDBOX-WINDOW');
-    const fine = await cancel.cancelIrn({ irn: 'a'.repeat(64), reason: '3', remark: 'order cancelled', generatedAtIso: '2026-11-15T00:00:00Z' });
-    expect(fine.ok).toBe(true);
+  it('applies the cancellation window without generating any artefact', () => {
+    const ack = '2026-11-19T09:00:00+05:30';
+    expect(isWithinCancellationWindow(ack, Date.parse(ack) + 86_399_999)).toBe(true);
+    expect(isWithinCancellationWindow(ack, Date.parse(ack) + 86_400_000)).toBe(false);
+    expect(isWithinCancellationWindow(ack, Date.parse(ack) - 1)).toBe(false);
   });
 });
 

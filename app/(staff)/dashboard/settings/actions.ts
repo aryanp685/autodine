@@ -89,6 +89,9 @@ async function requireEditor() {
  * can make the browser post the form.
  */
 function writeFailure(context: string, error: { code?: string; message: string }): never {
+  if (error.code === 'P0001' && error.message === 'Legacy tax and GSTIN are inactive for this billing configuration.') {
+    fail('This outlet uses its GST billing configuration. Change the applicable billing details there, not in legacy settings.');
+  }
   if (error.code === '23505') {
     fail('That web address is already used by another restaurant. Try a different one.');
   }

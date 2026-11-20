@@ -81,7 +81,7 @@ export function parseInviteFlash(raw: string | null | undefined): InviteFlash | 
   const role = candidate.role;
   const expiresAt = typeof candidate.expiresAt === 'string' ? candidate.expiresAt : '';
   if (!isWellFormedInviteCode(code)) return null;
-  if (role !== 'manager' && role !== 'cashier' && role !== 'kitchen') return null;
+  if (role !== 'manager' && role !== 'cashier' && role !== 'kitchen' && role !== 'waiter') return null;
   if (!expiresAt || Number.isNaN(new Date(expiresAt).getTime())) return null;
   return { code: normaliseInviteCode(code), role, expiresAt };
 }

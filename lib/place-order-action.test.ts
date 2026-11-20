@@ -62,19 +62,16 @@ const { placeOrderAction } = await import('../app/menu/checkout/actions');
 function form(slug = 'kings-of-kings'): FormData {
   const data = new FormData();
   data.set('slug', slug);
+  data.set('table', 'verified-table');
+  data.set('attempt', '9f4b6c1e-2d3a-4b5c-8d7e-0a1b2c3d4e5f');
   data.set('lines', JSON.stringify([{ itemId: 'i1', qty: 1 }]));
   return data;
 }
 
-async function run(action: () => Promise<void>): Promise<string> {
-  try {
-    await action();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : '';
-    if (message.startsWith('redirect:')) return message.slice('redirect:'.length);
-    throw error;
-  }
-  throw new Error('the action returned instead of redirecting');
+async function run(action: () => ReturnType<typeof placeOrderAction>): Promise<string> {
+  const result = await action();
+  if (result.kind === 'unconfirmed') throw new Error('Expected a navigable result');
+  return result.href;
 }
 
 describe('placeOrderAction', () => {
@@ -87,6 +84,7 @@ describe('placeOrderAction', () => {
       status: 'verified',
       slug: 'kings-of-kings',
       tableLabel: 'T2',
+      tableId: 'verified-table',
       session: { token: 'session-token' },
     });
   });
@@ -102,7 +100,8 @@ describe('placeOrderAction', () => {
 
     expect(parsed.pathname).toBe('/menu/cart');
     expect(parsed.searchParams.get('s')).toBe('kings-of-kings');
-    expect(parsed.searchParams.get('error')).toBe('Hara Bhara Kebab is sold out.');
+    expect(parsed.searchParams.get('error')).toMatch(/could not confirm/);
+    expect(url).not.toContain('Hara');
   });
 
   it('tells the guest when the database found more than one match', async () => {
@@ -166,18 +165,14 @@ describe('placeOrderAction', () => {
     expect(parsed.searchParams.get('code')).toBe('KI-ABC12');
   });
 
-  it('marks the confirmation it redirects to as a fresh placement', async () => {
-    // The confirmation screen empties the cart on arrival. That is only correct
-    // for the address this action writes: the guest just tapped "place order".
-    // Browsing an old order from history must leave a half-filled new cart
-    // alone, so the flag rides on this redirect and on no other URL.
+  it('gives only a private lookup URL, without a cart-clearing flag', async () => {
     mocks.rpc.mockResolvedValue({ data: 'KI-FRESH1', error: null });
 
     const url = await run(() => placeOrderAction(form()));
     const parsed = new URL(url, 'https://example.test');
 
     expect(parsed.pathname).toBe('/menu/order');
-    expect(parsed.searchParams.get('placed')).toBe('1');
+    expect(parsed.searchParams.has('placed')).toBe(false);
   });
 
   it('lands on the second retry when the schema cache was still reloading', async () => {
@@ -197,18 +192,15 @@ describe('placeOrderAction', () => {
     expect(parsed.searchParams.get('code')).toBe('KI-ZZZ99');
   });
 
-  it('says the system was busy when even the retries could not reach it', async () => {
+  it('keeps the same attempt when even the retries cannot verify it', async () => {
     mocks.rpc.mockResolvedValue({
       data: null,
       error: { code: 'PGRST003', message: 'pool timeout' },
     });
 
-    const url = await run(() => placeOrderAction(form()));
-    const parsed = new URL(url, 'https://example.test');
-
+    expect(await placeOrderAction(form())).toEqual({ kind: 'unconfirmed' });
     expect(mocks.rpc).toHaveBeenCalledTimes(3);
-    expect(parsed.searchParams.get('error')).toMatch(/system was busy for a moment/i);
-    expect(parsed.searchParams.get('code')).toBe('PGRST003');
+    expect(new Set(mocks.rpc.mock.calls.map(([, args]) => args.p_guest_token)).size).toBe(1);
   });
 
   it('does not retry a refusal the guest has to act on', async () => {
@@ -242,10 +234,7 @@ describe('placeOrderAction', () => {
   it('does not tell a guest to order twice when a double tap duplicated it', async () => {
     mocks.rpc.mockResolvedValue({ data: null, error: { code: '23505', message: 'duplicate key' } });
 
-    const url = await run(() => placeOrderAction(form()));
-    expect(new URL(url, 'https://example.test').searchParams.get('error')).toMatch(
-      /already went through/i
-    );
+    expect(await placeOrderAction(form())).toEqual({ kind: 'unconfirmed' });
   });
 
   it('does not offer "try again" when the ordering function is not deployed', async () => {
@@ -376,18 +365,28 @@ describe('placeOrderAction', () => {
     expect(url).toContain(`t=${attempt}`);
   });
 
-  it('replaces an attempt key that is not a UUID', async () => {
-    mocks.rpc.mockResolvedValue({ data: 'ORD-10', error: null });
-
+  it('does not mint a new attempt key when the supplied one is invalid', async () => {
     const data = form();
-    data.set('attempt', '../../etc/passwd');
+    data.set('attempt', 'invalid-attempt');
+    expect(await placeOrderAction(data)).toMatchObject({ kind: 'refused', keepAttempt: true });
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
 
-    await run(() => placeOrderAction(data));
+  it('refuses a checkout kept open at the previously scanned table', async () => {
+    const data = form();
+    data.set('table', 'previous-table');
+    expect(await placeOrderAction(data)).toMatchObject({ kind: 'refused', keepAttempt: true });
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
 
-    const [, args] = mocks.rpc.mock.calls[0] as [string, { p_guest_token: string }];
-    expect(args.p_guest_token).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-    );
+  it('retains an attempt on transport loss and logs only a controlled reference', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      mocks.rpc.mockResolvedValue({ data: null, error: {code: '', message: 'private body marker', details: 'private session marker'} });
+      expect(await placeOrderAction(form())).toEqual({ kind: 'unconfirmed' });
+      expect(log).toHaveBeenCalledWith('[placeOrderAction] result unavailable or refused', 'unclassified');
+      expect(JSON.stringify(log.mock.calls)).not.toContain('private');
+    } finally { log.mockRestore(); }
   });
 
   it('sends a verified guest to their order, with the table session used', async () => {

@@ -25,7 +25,7 @@ import { readGuestOrderStatus } from '@/lib/db/order-status';
  *
  * WHAT IT NEVER RETURNS
  *
- * - anything but the four status fields (no lines, no totals, no table, no
+ * - anything but the version and status fields (no lines, no totals, no table, no
  *   customer note -- this is a freshness check, not a bill);
  * - the token, in any form;
  * - another restaurant's or another table's order. The database function needs
@@ -46,14 +46,14 @@ function body(input: unknown): { slug: string; code: string; token: string } {
 export async function POST(request: NextRequest) {
   let parsed: unknown;
   try {
-    parsed = await readJsonObject(request);
+    parsed = await readJsonObject(request, 1024);
   } catch (error) {
     return NextResponse.json({ ok: false, reason: 'bad_request' }, { status: error instanceof JsonInputError ? error.status : 400, headers: NO_STORE });
   }
 
   const input = body(parsed);
 
-  if (!input.slug.trim() || !input.code.trim() || !input.token.trim()) {
+  if (!input.slug.trim() || !input.code.trim() || !input.token.trim() || input.slug.length > 128 || input.code.length > 40 || input.token.length > 40) {
     // A request without all three cannot name an order. It is a client bug or a
     // truncated local record, not a network problem, so it is not retried.
     return NextResponse.json({ ok: false, reason: 'bad_request' }, { status: 400, headers: NO_STORE });

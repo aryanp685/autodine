@@ -2,8 +2,7 @@
 /**
  * Offline release-readiness verifier — fail-closed, read-only, no network.
  *
- * Verifies the repository is in the state the 2026-11-14 release preparation
- * documents assume. It does NOT connect to any hosted service, does NOT
+ * Verifies that the current repository inventory and release gates agree. It does NOT connect to any hosted service, does NOT
  * authorize a release, and deliberately fails if the GST/IRP authorization
  * boundary drifts. Exits 0 only when every invariant holds; prints one line
  * per check with a fixed vocabulary. Run: `npm run verify:release`.
@@ -20,14 +19,12 @@ const check = (name, ok, detail = '') => {
 };
 const read = (p) => readFileSync(join(root, p), 'utf8');
 
-// 1. Migration inventory: exactly 98 files, unique 14-digit versions.
-// 93 on the reviewed PR branch + 4 added by main + 1 merge-reconciliation
-// migration (20261118000100); four pre-existing branch files were renumbered
-// past duplicate versions from main during the main-merge reconciliation.
+// 1. Migration inventory: closed GST/IRP checkpoint plus guest checkout integrity.
+const EXPECTED_MIGRATIONS = 119;
 const migDir = join(root, 'supabase/migrations');
 const migFiles = readdirSync(migDir).filter((f) => f.endsWith('.sql')).sort();
 const versions = migFiles.map((f) => f.slice(0, 14));
-check('migration_count_98', migFiles.length === 98, `found ${migFiles.length}`);
+check(`migration_count_${EXPECTED_MIGRATIONS}`, migFiles.length === EXPECTED_MIGRATIONS, `found ${migFiles.length}`);
 check('migration_versions_unique', new Set(versions).size === versions.length);
 check('migration_versions_14_digit', versions.every((v) => /^[0-9]{14}$/.test(v)));
 
@@ -35,15 +32,46 @@ check('migration_versions_14_digit', versions.every((v) => /^[0-9]{14}$/.test(v)
 check('owner_operation_present', existsSync(join(root, 'supabase/owner-operations/20261110000501_revoke_supabase_admin_client_defaults.sql')));
 check('owner_operation_not_in_migrations', !migFiles.includes('20261110000501_revoke_supabase_admin_client_defaults.sql'));
 
-// 3. GST/IRP Phase B (B1–B7) exist and are documented as NOT AUTHORIZED.
-const GST_B = ['20261113000100_gst_two_mode.sql','20261114000101_gst_b2b_einvoice_readiness.sql','20261114000200_irp_reconciliation.sql','20261114000300_gst_mode_gates.sql','20261114000400_restrict_trigger_functions_execute.sql','20261114000500_credit_debit_notes.sql','20261114000600_einvoice_issuance_profile.sql'];
-for (const f of GST_B) check(`gst_irp_present:${f.slice(0,14)}`, migFiles.includes(f));
+// 3. The prior GST/IRP bundle and its follow-ups are NOT AUTHORIZED.
+const GST_B = [
+  '20261113000100_gst_two_mode.sql',
+  '20261114000101_gst_b2b_einvoice_readiness.sql',
+  '20261114000200_irp_reconciliation.sql',
+  '20261114000300_gst_mode_gates.sql',
+  '20261114000400_restrict_trigger_functions_execute.sql',
+  '20261114000500_credit_debit_notes.sql',
+  '20261114000600_einvoice_issuance_profile.sql',
+  '20261118000100_merge_boundary_gst_order_line_edits.sql',
+  '20261118000200_gst_configuration_boundary.sql',
+  '20261118000300_gst_pricing_boundary.sql',
+  '20261118000400_gst_document_integrity.sql',
+  '20261118000500_gst_document_report.sql',
+  '20261118000600_gst_ca_onboarding.sql',
+  '20261118000700_gst_ca_documents.sql',
+  '20261118000800_gst_outlet_activation.sql',
+  '20261118000900_gst_recipient_documents.sql',
+  '20261118001000_gst_irp_readiness.sql',
+  '20261118001100_gst_reconciliation.sql',
+  '20261118001200_gst_review_lifecycle.sql',
+  '20261118001300_gst_direct_fulfilment.sql',
+  '20261118001400_gst_irp_rehearsal_store.sql',
+  '20261118001500_gst_finance_scope.sql',
+  '20261118001600_gst_document_particulars.sql',
+  '20261118001700_gst_irp_rehearsal_recovery.sql',
+  '20261118001800_irp_execution.sql',
+  '20261118001900_irp_document_projection.sql',
+];
 const manifest = existsSync(join(root, 'docs/migration-manifest-2026-11-14.md')) ? read('docs/migration-manifest-2026-11-14.md') : '';
-const manifestVersions = new Set([...manifest.matchAll(/`([0-9]{14})`/g)].map((m) => m[1]));
-const actualVersions = new Set(versions);
-check('manifest_tracks_all_98', actualVersions.size === manifestVersions.size && [...actualVersions].every((v) => manifestVersions.has(v)),
-  `manifest ${manifestVersions.size} versions vs actual ${actualVersions.size}`);
-check('manifest_marks_gst_irp_unauthorized', manifest.includes('NOT AUTHORIZED') && manifest.includes('GST/IRP'));
+const rows = [...manifest.matchAll(/^\| `(\d{14})` \| `([^`]+)` \| (.*)$/gm)];
+const manifestFiles = new Map(rows.map(([, version, name, classification]) => [`${version}_${name}.sql`, classification]));
+check(`manifest_tracks_all_${EXPECTED_MIGRATIONS}`, rows.length === EXPECTED_MIGRATIONS && migFiles.every((file) => manifestFiles.has(file)),
+  `manifest ${rows.length} rows vs actual ${migFiles.length} files`);
+for (const filename of GST_B) {
+  const row = manifestFiles.get(filename);
+  check(`gst_irp_present_and_unauthorized:${filename.slice(0, 14)}`,
+    migFiles.includes(filename) && row?.includes('GST/IRP') && row.includes('NOT AUTHORIZED'));
+}
+check('guest_checkout_migration_unauthorized', manifestFiles.get('20261118002000_guest_checkout_integrity.sql')?.includes('NOT AUTHORIZED'));
 check('gst_irp_plan_unauthorized', read('docs/gst-irp-production-readiness-2026-11-14.md').includes('NOT AUTHORIZED'));
 
 // 4. Staging share-origin gate intact (approved ref + approved origin).
@@ -67,7 +95,7 @@ for (const doc of ['docs/production-release-prep-2026-11-14.md','docs/owner-acti
 }
 check('execution_report_no_go', read('docs/execution-report-2026-11-14.md').includes('NO-GO'));
 
-// 8. No GST/IRP object can appear applied: the e2e/test suites must not reference IRP endpoints as enabled.
+// 8. The readiness plan must still distinguish local replay from hosted application.
 const gates = read('docs/gst-irp-production-readiness-2026-11-14.md');
 check('gst_irp_doc_states_not_applied', /NOT APPLIED/i.test(gates) || /Nothing.*applied/i.test(gates));
 

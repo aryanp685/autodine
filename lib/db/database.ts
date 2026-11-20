@@ -28,6 +28,7 @@ import type {
   OrderItem,
   OrderSession,
   RestaurantInvoice,
+  RestaurantInvoiceSeriesCode,
   RestaurantInvoiceLine,
   RestaurantNote,
   RestaurantNoteEvent,
@@ -37,6 +38,7 @@ import type {
   PrepStatus,
   Restaurant,
   RestaurantGstConfig,
+  RestaurantGstConfigHistory,
   Json,
 } from './types';
 
@@ -50,7 +52,7 @@ type Table<Row, Rel extends unknown[] = []> = {
   Relationships: Rel;
 };
 
-export type MemberRole = 'owner' | 'manager' | 'kitchen' | 'cashier';
+export type MemberRole = 'owner' | 'manager' | 'kitchen' | 'cashier' | 'waiter';
 
 /** Columns granted to the shared authenticated role on restaurants. */
 type StaffRestaurant = Omit<
@@ -247,6 +249,8 @@ export type Database = {
       order_sessions: Table<OrderSession>;
       /** Per-restaurant GST configuration; one live row, mode 'off' by default. */
       restaurant_gst_config: Table<RestaurantGstConfig>;
+      restaurant_gst_buyers: Table<{ id: string; restaurant_id: string; gstin: string; revision: number; details: Json; changed_at: string; changed_by: string }>;
+      restaurant_gst_config_history: Table<RestaurantGstConfigHistory>;
       /** Immutable, sequential customer receipts; rows are written only by RPC. */
       restaurant_invoices: Table<RestaurantInvoice>;
       /** Immutable line snapshots belonging to a receipt. */
@@ -271,11 +275,13 @@ export type Database = {
         access_count: number;
       }>;
       /** Live guest requests for staff to visit a verified table. */
-      table_waiter_calls: Table<TableWaiterCall>;
-      /** Private row-locked receipt counters; no client grants. */
+      table_waiter_calls: Table<Omit<TableWaiterCall, 'request_key' | 'table_session_hash' | 'resolved_by' | 'announcement_claimed_at' | 'announcement_at'> & { acknowledged_at: string | null }>;
+      outlet_live_revisions: Table<{ outlet_id: string; event_id: string; version: number; changed_at: string }>;
+      /** Private row-locked counters by outlet, FY and series; no client grants. */
       restaurant_invoice_series: Table<{
         restaurant_id: string;
         financial_year: string;
+        series_code: RestaurantInvoiceSeriesCode;
         next_number: number;
       }>;
       /**
@@ -433,6 +439,7 @@ export type Database = {
           kitchen_announcement_status: 'announced' | 'failed' | null;
           kitchen_announcement_at: string | null;
           kitchen_announcement_error: string | null;
+          gst_mode_snapshot: RestaurantGstConfig['mode'] | null;
         };
         Relationships: [];
       };
@@ -454,6 +461,16 @@ export type Database = {
       };
     };
     Functions: {
+      read_outlet_live_version: { Args: { p_outlet: string }; Returns: string };
+      get_guest_order_status: { Args: { p_slug: string; p_code: string; p_token: string }; Returns: Json };
+      set_guest_order_lines_at_version: { Args: { p_order_id: string; p_guest_token: string; p_version: string; p_lines: Json }; Returns: 'updated' | 'stale' | 'not_found' };
+      list_my_waiter_outlets: { Args: Record<string, never>; Returns: { id: string; name: string; slug: string; timezone: string | null }[] };
+      floor_service_snapshot: { Args: { p_outlet: string }; Returns: Json };
+      list_order_floor_labels: { Args: { p_outlet: string; p_orders: string[] }; Returns: { order_id: string; table_label: string }[] };
+      acknowledge_waiter_call: { Args: { p_outlet: string; p_call_id: string }; Returns: 'acknowledged' | 'resolved' | 'not_found' };
+      finish_waiter_call: { Args: { p_outlet: string; p_call_id: string }; Returns: 'resolved' | 'not_found' };
+      read_verified_waiter_state: { Args: { p_slug: string; p_table_label: string; p_session_token: string }; Returns: 'idle' | 'waiting' | 'acknowledged' | 'expired' };
+      transfer_open_sitting: { Args: { p_outlet: string; p_sitting: string; p_from: string; p_to: string; p_request: string }; Returns: 'moved' | 'already_recorded' | 'unavailable' | 'occupied' | 'call_open' | 'held_or_paid' };
       /** Migration 20261110001100. The approved monthly price, in paise. */
       plan_price_paise: {
         Args: { p_plan: string };
@@ -605,6 +622,7 @@ export type Database = {
         Args: { p_order_id: string; p_status: 'announced' | 'failed'; p_failure_reason?: string | null };
         Returns: boolean;
       };
+      call_verified_waiter_at: { Args: { p_slug: string; p_table_label: string; p_session_token: string; p_request_key: string }; Returns: string };
       call_waiter: {
         Args: { p_session_token: string; p_request_key: string };
         Returns: string;
@@ -985,6 +1003,61 @@ export type Database = {
       retire_table_qr_code: {
         Args: { p_table_id: string };
         Returns: undefined;
+      };
+      save_restaurant_gst_config: {
+        Args: { p_restaurant_id: string; p_expected_version: number; p_settings: Json };
+        Returns: number;
+      };
+      save_restaurant_gst_buyer: {
+        Args: { p_outlet: string; p_expected_revision: number; p_details: Json };
+        Returns: Json;
+      };
+      record_gst_irp_preflight: {
+        Args: { p_outlet: string; p_document: string; p_kind: string; p_canonical_sha256: string; p_payload: Json };
+        Returns: Json;
+      };
+      choose_irp_route: { Args: { p_outlet: string; p_route: string | null; p_revision: number }; Returns: number };
+      queue_irp_dispatch: { Args: { p_outlet: string; p_preflight: string }; Returns: string };
+      request_irp_dispatch_action: { Args: { p_outlet: string; p_job: string; p_revision: number; p_action: string; p_reason?: string }; Returns: number };
+      report_irp_register: { Args: { p_outlet: string; p_limit?: number; p_from?: string; p_until?: string; p_followup?: boolean; p_offset?: number }; Returns: Json };
+      read_irp_dispatch: { Args: { p_outlet: string; p_job: string }; Returns: Json };
+      read_active_irp_document: { Args: { p_outlet: string; p_document: string; p_kind: string }; Returns: Json };
+      list_gst_irp_preflights: { Args: { p_outlet: string }; Returns: Json };
+      list_gst_direct_destinations: { Args: { p_outlet: string }; Returns: Json };
+      list_gst_direct_prep_routes: { Args: { p_outlet: string; p_orders: string[] }; Returns: { order_id: string; fulfilment_kind: string }[] };
+      place_gst_direct_ticket: { Args: { p_outlet: string; p_attempt: string; p_channel: string; p_lines: Json;
+        p_attested: boolean; p_delivery_state?: string; p_delivery_address?: string }; Returns: string };
+      record_gst_outlet_deferral: { Args: { p_outlet: string; p_expected_version: number; p_reason: string }; Returns: undefined };
+      list_gst_outlet_deferrals: { Args: { p_outlet: string }; Returns: Json };
+      report_gst_finance: { Args: { p_outlet: string; p_from: string; p_until: string; p_fy?: string; p_series?: string;
+        p_audience?: string; p_effective_from?: string; p_reference?: string; p_detail_limit?: number;
+        p_scope?: string; p_profile?: string; p_status?: string }; Returns: Json };
+      report_gst_reconciliation: {
+        Args: { p_outlet: string; p_from: string; p_until: string; p_fy?: string; p_series?: string; p_audience?: string; p_effective_from?: string; p_reference?: string; p_detail_limit?: number };
+        Returns: Json;
+      };
+      report_gst_documents: {
+        Args: { p_restaurant_id: string; p_from: string; p_to: string };
+        Returns: {
+          document_type: 'gst_tax_invoice' | 'bill_of_supply' | 'retail_bill' | 'credit_note' | 'debit_note';
+          financial_year: string;
+          series_code: RestaurantInvoiceSeriesCode | 'CN' | 'DN' | null;
+          document_status: 'issued' | 'voided';
+          rate_bps: number | null;
+          irn_held: boolean;
+          document_count: number;
+          total_paise: number | null;
+          taxable_paise: number | null;
+          cgst_paise: number | null;
+          sgst_paise: number | null;
+          igst_paise: number | null;
+          rounding_delta_paise: number | null;
+          missing_rounding_count: number;
+        }[];
+      };
+      public_order_pricing: {
+        Args: { p_slug: string };
+        Returns: { tax_treatment: string; tax_rate_bps: number }[];
       };
       /**
        * Migration 0009. Sales aggregates for one restaurant and one range.

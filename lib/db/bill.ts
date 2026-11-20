@@ -4,21 +4,18 @@
  * A bill is a record, not a recomputation. Every figure here comes from the
  * order row -- the same numbers the guest was charged -- so printing a bill
  * months later cannot produce a different total because the tax rate or a
- * dish price changed in between. The only thing computed is the CGST/SGST
- * split of a tax figure that is already stored.
+ * dish price changed in between. The ticket is not a GST document.
  *
  * WHO CAN SEE IT
- *
- * Staff only. `orders` and `payments` have no anonymous read policy, and this
- * module deliberately does not add one: a bill carries a name, a phone number
- * and a GSTIN, and a link that opened from a guessed id would leak all three.
- * The guest gets their bill through WhatsApp, which the counter sends.
+ * Finance staff of this outlet only. This reads ticket and payment amounts;
+ * it never pulls the live GST registration onto a historical ticket.
  *
  * A misconfigured or signed-out caller is told apart from a missing order, so
  * the screen can say "sign in" instead of "no such bill".
  */
 
-import { getStaffContextDetailed } from '@/lib/db/staff';
+import { dbErrorReference } from '@/lib/db/error-reference';
+import { CASHIER_ROLES, getStaffContextDetailed } from '@/lib/db/staff';
 import { billLineLabel, billTaxRateBps, type BillData, type BillLine, type BillPayment } from '@/lib/bill';
 
 // The bill's shape and its wording live in lib/bill.ts, which has no server
@@ -56,30 +53,29 @@ export async function getBillData(orderId: string): Promise<BillResult> {
   const staff = await getStaffContextDetailed();
   if (!staff.ok) return { ok: false, reason: staff.reason };
 
-  const { supabase, restaurantId, timezone } = staff.context;
+  const { supabase, restaurantId, timezone, role } = staff.context;
+  if (!CASHIER_ROLES.includes(role)) return { ok: false, reason: 'not-found' };
 
-  // The restaurant row carries what a bill has to print -- address, phone,
-  // GSTIN -- none of which the staff context needs for anything else.
   const { data: restaurant, error: restaurantError } = await supabase
     .from('restaurants')
-    .select('name, address, phone, gstin')
+    .select('name, address, phone')
     .eq('id', restaurantId)
     .maybeSingle();
 
   if (restaurantError) {
-    throw new Error(`Could not load the restaurant: ${restaurantError.message}`);
+    throw new Error(`Could not load the restaurant: ${dbErrorReference(restaurantError)}`);
   }
 
   const { data: order, error: orderError } = await supabase
     .from('orders_finance')
     .select(
-      'id, code, table_id, customer_note, prep_status, payment_status, subtotal_paise, discount_paise, tax_paise, total_paise, placed_at, tax_rate_bps_snapshot'
+      'id, code, table_id, customer_note, prep_status, payment_status, subtotal_paise, discount_paise, tax_paise, total_paise, placed_at, tax_rate_bps_snapshot, gst_mode_snapshot'
     )
     .eq('id', orderId)
     .eq('restaurant_id', restaurantId)
     .maybeSingle();
 
-  if (orderError) throw new Error(`Could not load the order: ${orderError.message}`);
+  if (orderError) throw new Error(`Could not load the order: ${dbErrorReference(orderError)}`);
   if (!order) return { ok: false, reason: 'not-found' };
 
   const [itemsResult, paymentsResult, tableResult] = await Promise.all([
@@ -98,9 +94,9 @@ export async function getBillData(orderId: string): Promise<BillResult> {
       : Promise.resolve({ data: null, error: null }),
   ]);
 
-  if (itemsResult.error) throw new Error(`Could not load the bill lines: ${itemsResult.error.message}`);
-  if (paymentsResult.error) throw new Error(`Could not load payments: ${paymentsResult.error.message}`);
-  if (tableResult.error) throw new Error(`Could not load the table: ${tableResult.error.message}`);
+  if (itemsResult.error) throw new Error(`Could not load the bill lines: ${dbErrorReference(itemsResult.error)}`);
+  if (paymentsResult.error) throw new Error(`Could not load payments: ${dbErrorReference(paymentsResult.error)}`);
+  if (tableResult.error) throw new Error(`Could not load the table: ${dbErrorReference(tableResult.error)}`);
 
   // Only money that actually moved. A failed or refunded attempt is not part
   // of what the guest has paid, and a pending one has not been collected yet.
@@ -135,7 +131,6 @@ export async function getBillData(orderId: string): Promise<BillResult> {
         name: restaurant?.name ?? staff.context.restaurantName,
         address: restaurant?.address ?? null,
         phone: restaurant?.phone ?? null,
-        gstin: restaurant?.gstin ?? null,
       },
       order: {
         id: order.id,
@@ -150,6 +145,7 @@ export async function getBillData(orderId: string): Promise<BillResult> {
         discountPaise: order.discount_paise,
         taxPaise: order.tax_paise,
         totalPaise: order.total_paise,
+        gstMode: order.gst_mode_snapshot ?? 'off',
         // No snapshot means the order predates migration 00600. The bill then
         // says nothing about a rate rather than guessing one -- see
         // billTaxRateBps and how BillScreen renders a null rate.

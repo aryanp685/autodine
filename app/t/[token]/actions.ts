@@ -6,6 +6,8 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { qrProblemReasonForStatus } from '@/lib/qr-problem';
 import { isQrToken, saveTableSession, type TableSession } from '@/lib/table-session';
+import { dbErrorReference } from '@/lib/db/error-reference';
+import { saveCardPass } from '@/lib/table-card';
 import { safeNextPath } from '@/lib/verify-next';
 
 /**
@@ -78,7 +80,7 @@ export async function verifyTableCodeAction(formData: FormData): Promise<void> {
     // The function returns guest-caused failures as statuses, so an error
     // here is ours: a constraint, a permission problem, a database that is
     // not answering. Its message is not for a guest.
-    console.error('[verify_table_qr_with_code] unexpected failure', error);
+    console.error('[verify_table_qr_with_code] unexpected failure', dbErrorReference(error));
     problemReason('failed');
   }
 
@@ -103,7 +105,7 @@ export async function verifyTableCodeAction(formData: FormData): Promise<void> {
   }
 
   if (!row.session_token || !row.restaurant_slug || !row.table_label || !row.expires_at) {
-    console.error('[verify_table_qr_with_code] ok without a session', row);
+    console.error('[verify_table_qr_with_code] ok without a valid session');
     problemReason('failed');
   }
 
@@ -118,6 +120,7 @@ export async function verifyTableCodeAction(formData: FormData): Promise<void> {
   };
 
   await saveTableSession(session);
+  await saveCardPass(token);
 
   /**
    * Back to where they were: the checkout, usually, with the cart untouched in

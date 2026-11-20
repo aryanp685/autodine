@@ -14,6 +14,7 @@ import { InvoiceNotesPanel, type NoteSourceDocument } from './InvoiceNotesPanel'
 import type { InvoiceNoteRow } from '@/lib/db/invoice-notes';
 
 const source: NoteSourceDocument = {
+  irnHeld: false,
   invoiceId: '9c5fbf7d-b990-45d3-88c1-27690f8cd736',
   number: 'TI/26-27/00042',
   documentType: 'gst_tax_invoice',
@@ -64,14 +65,21 @@ describe('InvoiceNotesPanel', () => {
   it('shows an issued note in the ledger with its IRP-pending honesty label', () => {
     const html = renderToStaticMarkup(<InvoiceNotesPanel notes={[liveNote]} sources={[]} />);
     expect(html).toContain('CN/26-27/000007');
-    expect(html).toContain('IRN pending — not a valid e-invoice until generated');
+    expect(html).toContain('IRN pending — not final');
     expect(html).toContain('Against TI/26-27/00042');
     expect(html).toContain('Void note');
   });
 
+  it('does not offer note issuance or a final invoice label for an IRN-held source', () => {
+    const html = renderToStaticMarkup(<InvoiceNotesPanel notes={[]} sources={[{ ...source, irnHeld: true }]} />);
+    expect(html).toContain('Held GST document (not final)');
+    expect(html).toContain('Notes unavailable while source is on IRN hold.');
+    expect(html).not.toMatch(/aria-label="Issue (credit|debit) note/);
+  });
+
   it('explains that no issued GST documents means no notes', () => {
     const html = renderToStaticMarkup(<InvoiceNotesPanel notes={[]} sources={[]} />);
-    expect(html).toContain('No issued GST documents');
+    expect(html).toContain('No supported tax invoice');
   });
 
   it('renders a voided note without a void control', () => {

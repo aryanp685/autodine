@@ -1,15 +1,19 @@
 'use client';
 
 import Link from 'next/link';
+import { gstStateLabel } from '@/lib/gst/onboarding';
 import { useState } from 'react';
 import { createInvoiceShareLinkAction, revokeInvoiceShareLinkAction } from '@/app/(staff)/dashboard/share-actions';
 
+import { InvoiceVoidPanel } from './InvoiceVoidPanel';
+import { VerifiedIrpBlock } from './VerifiedIrpBlock';
 import { PrintButton } from '@/components/PrintButton';
 import { EinvoiceAttemptButton } from '@/components/screens/EinvoiceAttemptButton';
 import { btn } from '@/components/owner/chrome';
 import { formatBillMoney, paymentMethodLabel, whatsAppLink } from '@/lib/bill';
-import { buildReceiptMessage } from '@/lib/invoice';
+import { buildReceiptMessage, hasIrnHold, isRetailBill, issuedDocumentTitle } from '@/lib/invoice';
 import type { ReceiptData } from '@/lib/db/invoice';
+import { COMPOSITION_BILL_NOTICE } from '@/lib/gst/composition';
 
 type Layout = 'a4' | '58mm' | '80mm';
 
@@ -19,22 +23,34 @@ const PAGE: Record<Layout, { size: string; margin: string; label: string }> = {
   '80mm': { size: '80mm auto', margin: '3mm', label: '80 mm' },
 };
 
-export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice: ReceiptData; shared?: boolean; staffRole?: string }) {
+export function InvoiceScreen({ invoice, shared = false, staffRole, canWrite = false, offlineIrp = false }: {
+  invoice: ReceiptData;
+  shared?: boolean;
+  staffRole?: string;
+  canWrite?: boolean;
+  offlineIrp?: boolean;
+}) {
   const [layout, setLayout] = useState<Layout>('a4');
   const [shareLinks, setShareLinks] = useState(invoice.shareLinks ?? []);
   const [createdLink, setCreatedLink] = useState<{ id: string; href: string; expiresAt: string } | null>(null);
   const [shareBusy, setShareBusy] = useState(false);
   const [shareMessage, setShareMessage] = useState('');
   const page = PAGE[layout];
-  const shareText = buildReceiptMessage(invoice);
   const paid = invoice.totals.paymentStatus === 'paid';
   const docType = invoice.documentType;
   const gstDoc = docType !== 'receipt';
-  const docTitle = docType === 'gst_tax_invoice' ? 'Tax invoice' : docType === 'bill_of_supply' ? 'Bill of supply' : 'Receipt';
+  const held = hasIrnHold(invoice);
+  const copy = held ? null : invoice.verifiedIrp;
+  const cancelled = invoice.irpStatus === 'cancelled';
+  const canShare = !held && !copy && !invoice.privateDeliveryCopy && invoice.status === 'issued';
+  const retail = isRetailBill(invoice);
+  const docTitle = issuedDocumentTitle(invoice);
+  const numberLabel = cancelled ? 'Cancelled document' : held ? 'Held document' : docType === 'gst_tax_invoice' ? 'Tax invoice'
+    : docType === 'bill_of_supply' ? 'Bill of supply' : retail ? 'Retail bill' : 'Receipt';
   const pct = (bps: number) => (bps / 100).toFixed(bps % 100 === 0 ? 0 : 2);
 
   async function createSecureLink() {
-    if (shareBusy) return;
+    if (shareBusy || !canShare) return;
     setShareBusy(true);
     setShareMessage('');
     const result = await createInvoiceShareLinkAction(invoice.id);
@@ -78,6 +94,8 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
   }
 
   function shareReceipt() {
+    if (!canShare) return;
+    const shareText = buildReceiptMessage(invoice);
     if (navigator.share) {
       void navigator.share({ title: `Receipt ${invoice.number}`, text: shareText }).catch(() => {});
       return;
@@ -100,7 +118,7 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
             ← Dashboard
           </Link>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-2 text-[11.5px] text-gink-64">
+            {!held && !copy ? <label className="flex items-center gap-2 text-[11.5px] text-gink-64">
               Layout
               <select
                 aria-label="Receipt print layout"
@@ -112,37 +130,36 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
                   <option key={value} value={value}>{choice.label}</option>
                 ))}
               </select>
-            </label>
-            <button type="button" className={btn('ghost', 'sm')} onClick={shareReceipt}>
-              Share receipt text
-            </button>
-            {!shared ? (
+            </label> : null}
+            {canShare ? (
+              <button type="button" className={btn('ghost', 'sm')} onClick={shareReceipt}>Share receipt text</button>
+            ) : null}
+            {!shared && canShare ? (
               <button type="button" className={btn('ghost', 'sm')} onClick={createSecureLink} disabled={shareBusy}>
                 {shareBusy ? 'Working…' : 'Create 24-hour link'}
               </button>
             ) : null}
-            {!shared && (staffRole === 'owner' || staffRole === 'manager') ? (
+            {!shared && held && (staffRole==='owner'||staffRole==='manager') ? <Link href="/dashboard/reports/irp" className={btn('ghost','sm')}>IRP register</Link> : null}
+            {!shared && held && canWrite && offlineIrp && invoice.status === 'issued' && staffRole === 'owner' ? (
               <EinvoiceAttemptButton invoiceId={invoice.id} irpStatus={invoice.irpStatus} />
             ) : null}
-            <PrintButton className={btn('solid', 'sm')}>Print / Save PDF</PrintButton>
+            {!held ? <PrintButton className={btn('solid', 'sm')}>{invoice.status === 'voided' ? 'Print voided copy' : 'Print / Save PDF'}</PrintButton> : null}
           </div>
         </div>
       </div>
 
       <main className="mx-auto w-full max-w-[820px] px-4 py-6 sm:px-6 print:max-w-none print:p-0">
+        {invoice.privateDeliveryCopy ? <p className="mb-3 text-sm print:hidden">Print the complete customer copy privately. Sharing an incomplete delivery invoice is disabled.</p> : null}
+        {held ? <p className="hidden p-4 text-sm font-semibold print:block">{cancelled ? 'IRP cancellation recorded — no printable tax document is available.' : 'IRN hold — no printable tax document is available.'}</p> : null}
         <article
           data-invoice-sheet
           data-layout={layout}
-          className={`mx-auto rounded-[14px] border border-hair bg-card shadow-[0_10px_36px_rgba(30,31,24,.06)] print:rounded-none print:border-0 print:p-0 print:shadow-none ${layoutClass}`}
+          className={`mx-auto rounded-[14px] border border-hair bg-card shadow-[0_10px_36px_rgba(30,31,24,.06)] print:rounded-none print:border-0 print:p-0 print:shadow-none ${held ? 'print:hidden' : ''} ${layoutClass}`}
         >
-          {invoice.irpStatus === 'pending' ? (
+          {held ? (
             <div className="mb-5 border-2 border-[var(--p-due)] px-3 py-2 text-center text-[12.5px] font-semibold text-[var(--p-due)] uppercase">
-              IRN pending — not a final tax invoice until the IRP validates this document
-            </div>
-          ) : null}
-          {invoice.irpStatus === 'failed' ? (
-            <div className="mb-5 border-2 border-[var(--p-due)] px-3 py-2 text-center text-[12.5px] font-semibold text-[var(--p-due)] uppercase">
-              e-Invoice failed — treat as pending and do not supply a copy until resolved
+              {cancelled ? 'IRP cancellation recorded — not a valid tax invoice. Do not reissue this number.'
+                : `${invoice.irpStatus === 'pending' ? 'IRN pending' : 'IRN on hold'} — not a final tax invoice. Do not supply as a tax invoice.`}
             </div>
           ) : null}
           {invoice.status === 'voided' ? (
@@ -162,8 +179,14 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
               <p className="mt-1 max-w-[38ch] whitespace-pre-line text-[12.5px] leading-[1.45] text-gink-64 print:text-[10px]">
                 {invoice.seller.address}
               </p>
+              {invoice.seller.premisesAddress && invoice.seller.premisesAddress !== invoice.seller.address ? (
+                <p className="text-[11.5px] text-gink-64">Service premises: {invoice.seller.premisesAddress}</p>
+              ) : null}
               {invoice.seller.phone ? (
                 <p className="mt-1 text-[11.5px] text-gink-64">Phone {invoice.seller.phone}</p>
+              ) : null}
+              {invoice.seller.fssaiNumber ? (
+                <p className="mt-1 text-[11.5px] text-gink-64">FSSAI <span className="font-mono">{invoice.seller.fssaiNumber}</span></p>
               ) : null}
               {gstDoc && invoice.seller.gstin ? (
                 <div className="mt-1.5 text-[11.5px] leading-[1.5] text-gink-64">
@@ -175,32 +198,36 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
                 </div>
               ) : null}
               <p className="mt-2 text-[10px] font-semibold tracking-[0.08em] uppercase">
-                {docType === 'gst_tax_invoice'
-                  ? 'Tax invoice'
-                  : docType === 'bill_of_supply'
-                    ? 'Bill of supply'
-                    : 'Receipt · Not a GST tax invoice'}
+                {docTitle}
               </p>
+              {docType === 'bill_of_supply' ? <p className="mt-1 text-[10px] font-semibold leading-[1.5]">{invoice.gst?.notice ?? COMPOSITION_BILL_NOTICE}</p> : null}
             </div>
             <div className="shrink-0 text-right">
-              <p className="text-[10px] font-semibold tracking-[0.12em] text-gink-46 uppercase">{docTitle} no.</p>
+              <p className="text-[10px] font-semibold tracking-[0.12em] text-gink-46 uppercase">{numberLabel} no.</p>
               <p className="mt-1 font-mono text-[13.5px] font-semibold tabular-nums">{invoice.number}</p>
               <p className="mt-2 text-[11.5px] text-gink-64">{invoice.issuedAt}</p>
-              <p className="mt-1 text-[11.5px] text-gink-64">{invoice.tableLabel ? `Table ${invoice.tableLabel}` : 'Table'}</p>
+              <p className="mt-1 text-[11.5px] text-gink-64">{invoice.fulfilmentLabel ?? (invoice.tableLabel ? `Table ${invoice.tableLabel}` : 'Table')}</p>
               <p className="mt-1 text-[10px] text-gink-46">Session {invoice.sessionReference.slice(0, 8).toUpperCase()}</p>
             </div>
           </header>
 
-          {invoice.recipient ? (
+          {docType === 'gst_tax_invoice' && invoice.recipient ? (
             <section aria-label="Buyer details" className="mt-4 border border-hair px-3 py-2 text-[11.5px] leading-[1.5] text-gink-64 break-inside-avoid">
               <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gink-46">Bill to (buyer)</p>
               <p className="mt-0.5 font-medium text-gink">{invoice.recipient.name}</p>
-              <p>GSTIN <span className="font-mono">{invoice.recipient.gstin}</span> · State code {invoice.recipient.stateCode}</p>
+              <p>{invoice.recipient.gstin ? <>GSTIN <span className="font-mono">{invoice.recipient.gstin}</span> · </> : 'Unregistered · '}{gstStateLabel(invoice.recipient.stateCode) ?? `State code ${invoice.recipient.stateCode}`}</p>
               {invoice.recipient.address ? <p className="whitespace-pre-line">{invoice.recipient.address}</p> : null}
+              {invoice.recipient.location ? <p>{invoice.recipient.location} {invoice.recipient.pincode}</p> : null}
+              {invoice.recipient.deliveryAddress ? <p>Delivery address: {invoice.recipient.deliveryAddress}</p> : null}
+              {invoice.recipient.phone ? <p>{invoice.recipient.phone}</p> : null}
               {invoice.recipient.email ? <p>{invoice.recipient.email}</p> : null}
             </section>
           ) : null}
 
+          {gstDoc && invoice.gst?.serviceSac ? (
+            <p className="mt-4 text-[11.5px] text-gink-64">Service SAC {invoice.gst.serviceSac}</p>
+          ) : null}
+          {docType === 'bill_of_supply' && !invoice.gst?.serviceSac ? <p className="mt-3 text-sm font-semibold">Historical record — service SAC not recorded. Do not use as a new Bill of Supply.</p> : null}
           <div className="mt-5 overflow-hidden border-y border-hair">
             <table className="w-full border-collapse text-[11.5px] print:text-[10px]">
               <thead>
@@ -248,10 +275,7 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
               </>
             ) : docType === 'bill_of_supply' ? (
               <>
-                <Summary label="Taxable value" value={formatBillMoney(invoice.gst?.taxablePaise ?? invoice.totals.subtotalPaise)} />
-                {invoice.gst?.notice ? (
-                  <p className="mt-2 text-[10px] font-semibold leading-[1.5] text-gink-64 uppercase">{invoice.gst.notice}</p>
-                ) : null}
+                <Summary label="Supply value" value={formatBillMoney(invoice.gst?.taxablePaise ?? invoice.totals.subtotalPaise)} />
               </>
             ) : (
               <>
@@ -264,7 +288,7 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
             {invoice.totals.billDiscountPaise > 0 ? (
               <Summary label="Bill discount" value={`−${formatBillMoney(invoice.totals.billDiscountPaise)}`} />
             ) : null}
-            {docType === 'receipt' && invoice.totals.taxPaise > 0 ? (
+            {docType === 'receipt' && !retail && invoice.totals.taxPaise > 0 ? (
               <Summary label="Tax amount (from ticket records)" value={formatBillMoney(invoice.totals.taxPaise)} />
             ) : null}
             {invoice.totals.otherChargesPaise > 0 ? (
@@ -284,14 +308,19 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
           <footer className="mt-5 border-t border-hair pt-3 text-[10px] text-gink-64">
             {docType === 'gst_tax_invoice' && invoice.gst ? (
               <>
-                <p>Place of supply: {invoice.gst.placeOfSupplyStateCode ?? '—'} · {invoice.gst.interState ? 'IGST (inter-State)' : 'CGST + SGST (intra-State)'} · GSTIN {invoice.seller.gstin}</p>
+                <p>Place of supply: {gstStateLabel(invoice.gst.placeOfSupplyStateCode) ?? invoice.gst.placeOfSupplyStateCode ?? '—'} · {invoice.gst.interState ? 'IGST (inter-State)' : 'CGST + SGST (intra-State)'} · GSTIN {invoice.seller.gstin}</p>
+                {invoice.gst.reverseCharge !== undefined ? <p>Reverse charge: {invoice.gst.reverseCharge ? 'Yes' : 'No'}</p> : null}
                 {invoice.gst.profileNotification ? <p className="mt-1">{invoice.gst.profileNotification}</p> : null}
-                {invoice.irn ? <p className="mt-1">IRN: <span className="font-mono break-all">{invoice.irn}</span></p> : <p className="mt-1">No IRN on this document (B2C supplies are not e-invoice applicable).</p>}
+                {copy ? <VerifiedIrpBlock copy={copy} /> : !held ? <p className="mt-1">IRN not required for this document.</p> : null}
               </>
             ) : null}
             {docType === 'bill_of_supply' && invoice.gst ? (
-              <p>Composition taxable person, not eligible to collect tax on supplies. GSTIN {invoice.seller.gstin} · Place of supply: {invoice.gst.placeOfSupplyStateCode ?? '—'}</p>
+              <p>Place of supply: {gstStateLabel(invoice.gst.placeOfSupplyStateCode) ?? invoice.gst.placeOfSupplyStateCode ?? '—'}</p>
             ) : null}
+            {gstDoc && !held && invoice.status === 'issued' ? <div className="my-3">
+              <p>Supplier or authorized representative signature: ____________________</p>
+              <p className="print:hidden">This system does not sign the document or validate an electronic-signature exception.</p>
+            </div> : null}
             <p>Table session: {invoice.sessionReference}</p>
             <p className="mt-1">Opened {invoice.sessionOpenedAt} · Closed {invoice.sessionClosedAt}</p>
             {invoice.payments.length ? (
@@ -304,7 +333,9 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
               </div>
             ) : null}
             {invoice.supersedesInvoiceId ? (
-              <p className="mt-2">Replacement receipt; previous receipt is voided.</p>
+              <p className="mt-2">Replacement document. {shared ? 'The previous document is voided.' : (
+                <Link className="underline" href={`/invoice/${invoice.supersedesInvoiceId}`}>View the previous voided document.</Link>
+              )}</p>
             ) : null}
             <p className="mt-3 text-center">Thank you.</p>
           </footer>
@@ -314,10 +345,11 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
           <section aria-label="Secure receipt links" className="mx-auto mt-4 max-w-[760px] rounded-[14px] border border-hair bg-card p-5 print:hidden">
             <h2 className="text-[13px] font-semibold">Secure receipt links</h2>
             <p className="mt-1 text-[11.5px] leading-[1.45] text-gink-64">
-              Links show this issued receipt only, expire after 24 hours, and can be revoked. The raw link is shown only when first created.
+              {canShare ? 'Links show this issued receipt only, expire after 24 hours, and can be revoked. The raw link is shown only when first created.'
+                : 'This document cannot be shared. Previously created links to it are unavailable.'}
             </p>
             {shareMessage ? <p role="status" className="mt-2 text-[11.5px] text-gink-64">{shareMessage}</p> : null}
-            {createdLink ? (
+            {canShare && createdLink ? (
               <div className="mt-3 flex flex-wrap gap-2">
                 <input
                   aria-label="New secure receipt link"
@@ -354,6 +386,9 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
             ) : <p className="mt-3 text-[11.5px] text-gink-46">No receipt links have been created.</p>}
           </section>
         ) : null}
+
+        {!shared && canWrite && staffRole === 'owner' && invoice.status === 'issued'
+          && !copy && invoice.irpStatus !== 'generated' && invoice.irpStatus !== 'cancelled' ? <InvoiceVoidPanel id={invoice.id} /> : null}
 
         {invoice.paymentReceipts.length ? (
           <section data-supplemental-payment-receipts className="mx-auto mt-4 max-w-[760px] rounded-[14px] border border-hair bg-card p-5 print:hidden">

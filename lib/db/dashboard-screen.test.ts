@@ -53,7 +53,19 @@ function fakeSupabase(rows: Record<string, Row[]>) {
     };
     return chain;
   };
-  return { from } as never;
+  const rpc = (name: string) => Promise.resolve(name === 'list_order_floor_labels'
+    ? { data: floorLabelRows(rows), error: null }
+    : { data: null, error: { code: '42883', message: 'unexpected rpc' } });
+  return { from, rpc } as never;
+}
+
+
+/** Stands in for list_order_floor_labels: the database resolves labels, not a join here. */
+function floorLabelRows(rows: Record<string, Row[]>) {
+  const tables = rows.dining_tables ?? [];
+  return Object.values(rows).flat()
+    .filter(row => row && typeof row.table_id === 'string')
+    .flatMap(row => { const table = tables.find(t => t.id === row.table_id); return table ? [{ order_id: row.id, table_label: table.label }] : []; });
 }
 
 function signedIn(

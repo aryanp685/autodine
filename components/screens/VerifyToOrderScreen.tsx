@@ -1,14 +1,14 @@
 'use client';
 
+import type { TaxTreatment } from '@/lib/pricing';
+
 import Link from 'next/link';
 import { GuestFlow } from '@/components/GuestFlow';
 import { WhereToFindCode } from '@/components/WhereToFindCode';
 import { VerifyCodeForm } from '@/components/VerifyCodeForm';
 import { useCart } from '@/components/CartProvider';
 import { guestBrandStyle, type GuestBrandState } from '@/lib/branding/guest-theme';
-import { priceCart, type MenuItemPrice } from '@/lib/cart-pricing';
-import { inr } from '@/lib/demo-data';
-import { paiseToRupees } from '@/lib/money';
+import { formatQuoteMoney, priceCart, type MenuItemPrice } from '@/lib/cart-pricing';
 
 /**
  * The one moment a guest is asked for the on-site code.
@@ -45,6 +45,7 @@ export function VerifyToOrderScreen({
   windowMinutes,
   items,
   taxRateBps,
+  taxTreatment,
   cartCount,
   cartTotalPaise,
 }: {
@@ -57,6 +58,7 @@ export function VerifyToOrderScreen({
   windowMinutes: number;
   items: MenuItemPrice[];
   taxRateBps?: number;
+  taxTreatment?: TaxTreatment;
   /**
    * The cart as the browser holds it. Used only for the "your cart is safe"
    * line when the priced cart cannot be read on the server -- the bill itself
@@ -67,7 +69,7 @@ export function VerifyToOrderScreen({
 }) {
   const paint = guestBrandStyle(brandState);
   const cart = useCart();
-  const priced = priceCart(cart.lines, items, taxRateBps);
+  const priced = priceCart(cart.lines, items, taxRateBps, taxTreatment);
   const { totalPaise } = priced.totals;
   const qty = priced.lines.reduce((sum, line) => sum + line.qty, 0);
 
@@ -90,7 +92,7 @@ export function VerifyToOrderScreen({
         <p className="g-eyebrow">One step before the kitchen</p>
         <h1 className="g-display mt-1.5">Confirm your table</h1>
         <p className="g-lede mt-1.5">
-          Table {tableLabel} is confirmed. To send this order to the kitchen, type the six-digit
+          You scanned the card for table {tableLabel}. To verify the table, type the six-digit
           code showing inside {restaurantName ?? 'the restaurant'}. Nothing has been ordered yet.
         </p>
       </header>
@@ -138,18 +140,18 @@ export function VerifyToOrderScreen({
                       ) : null}
                     </span>
                     <span className="tnum shrink-0 text-[13px] font-semibold text-gink">
-                      {inr(paiseToRupees(line.lineTotalPaise))}
+                      {formatQuoteMoney(line.lineTotalPaise, taxTreatment)}
                     </span>
                   </li>
                 ))}
               </ul>
               <div className="mt-2 flex items-baseline justify-between border-t border-hair pt-2.5 text-[15px] font-semibold text-gink">
                 <span>Total payable</span>
-                <span className="tnum">{inr(paiseToRupees(showingTotal))}</span>
+                <span className="tnum">{formatQuoteMoney(showingTotal, taxTreatment)}</span>
               </div>
               <p className="mt-2 mb-0 text-[11.5px] leading-[1.5] text-gink-46">
-                Nothing has been sent to the kitchen and nothing has been charged. The bill is
-                written when you place the order.
+                Nothing has been sent to the kitchen and nothing has been charged. You’ll review
+                the total before sending the order.
               </p>
             </>
           )}
@@ -161,7 +163,7 @@ export function VerifyToOrderScreen({
           token={token}
           windowMinutes={windowMinutes}
           next={next}
-          cta="Place the order"
+          cta="Verify table"
         />
 
         <p className="mt-4 text-[12px] leading-[1.55] text-gink-46">

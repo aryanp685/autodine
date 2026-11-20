@@ -19,23 +19,21 @@ export function allocateIntegerPaise(weights: readonly number[], totalPaise: num
   const count = weights.length;
   if (count === 0) return totalPaise === 0 ? [] : (() => { throw new RangeError('allocateIntegerPaise: no buckets for a non-zero total'); })();
 
-  const safe = weights.map((w) => (Number.isFinite(w) && w > 0 ? w : 0));
+  const safe = weights.map((w) => Number.isSafeInteger(w) && w > 0 ? BigInt(w) : 0n);
   let effective = safe;
-  let weightSum = effective.reduce((acc, w) => acc + w, 0);
-  if (weightSum === 0) {
-    effective = new Array<number>(count).fill(1);
-    weightSum = count;
+  let weightSum = effective.reduce((acc, w) => acc + w, 0n);
+  if (weightSum === 0n) {
+    effective = new Array<bigint>(count).fill(1n);
+    weightSum = BigInt(count);
   }
 
-  const exact = effective.map((w) => (w * totalPaise) / weightSum);
-  const floors = exact.map((value) => Math.floor(value));
+  const scaled = effective.map((w) => w * BigInt(totalPaise));
+  const floors = scaled.map((value) => Number(value / weightSum));
   let remainder = totalPaise - floors.reduce((acc, value) => acc + value, 0);
-
-  const order = exact
-    .map((value, index) => ({ index, fraction: value - Math.floor(value) }))
-    .sort((a, b) => b.fraction - a.fraction || a.index - b.index);
+  const order = scaled.map((value, index) => ({ index, remainder: value % weightSum }))
+    .sort((a, b) => a.remainder === b.remainder ? a.index - b.index : a.remainder > b.remainder ? -1 : 1);
   for (const { index } of order) {
-    if (remainder <= 0) break;
+    if (remainder === 0) break;
     floors[index] += 1;
     remainder -= 1;
   }

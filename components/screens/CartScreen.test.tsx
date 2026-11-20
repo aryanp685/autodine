@@ -69,10 +69,10 @@ describe('the cart bill', () => {
       <Cart slug="maddi" restaurantName="Maddi" taxRateBps={500} items={items} />,
     );
 
-    // 5% GST, named as the rate rather than as "taxes".
-    expect(html).toContain('Taxes (GST 5%)');
+    // An ordinary ticket add-on rate, not presented as GST.
+    expect(html).toContain('Taxes (5%)');
     expect(html).toContain('₹938');
-    expect(html).toContain('₹985');
+    expect(html).toContain('₹984.90');
     // The old copy, and the reason this test exists.
     expect(html).not.toContain('sample values for layout review');
   });
@@ -222,10 +222,10 @@ describe('Cart — a failed order', () => {
     );
 
     expect(html).toContain('data-place-error');
-    expect(html).toContain('That order was not placed');
+    expect(html).toContain('Order not confirmed');
     expect(html).toContain('no longer on this menu');
     // The two facts that turn a dead end into a decision.
-    expect(html).toMatch(/nothing has been charged/i);
+    expect(html).toMatch(/no payment was taken online/i);
     expect(html).toMatch(/cart is still here/i);
   });
 

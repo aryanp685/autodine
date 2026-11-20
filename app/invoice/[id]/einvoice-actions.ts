@@ -1,147 +1,45 @@
 'use server';
 
-/**
- * Attempt e-Invoice (IRP) issuance for one GST tax invoice.
- *
- * The flow is gated three ways, in order:
- *   1. AUTODINE_IRP_PROVIDER must be set — otherwise no provider exists and
- *      nothing is attempted (and nothing is recorded). Today only the
- *      offline 'sandbox' provider is wired.
- *   2. The caller must be an owner or manager of the restaurant.
- *   3. The document must be an issued Regular-GST tax invoice currently
- *      recorded as IRP 'pending' or 'failed', with an applicable recorded
- *      preceding-FY turnover and a complete e-Invoice issuance profile.
- *
- * Every step IS recorded in restaurant_irp_requests through the definer RPC
- * (payload_built → submitted → accepted|rejected|transport_error) — that is
- * the point of the readiness phase. What this action Deliberately does NOT
- * do is flip the document to IRP 'generated': the database has no path for
- * that from application code, so an IRN from the offline sandbox can never
- * present itself as a filed document. Recording a live IRN is the owner's
- * explicit, separately-approved provider integration.
- */
-
 import { getStaffContextDetailed } from '@/lib/db/staff';
-import { getIrpAdapter } from '@/lib/gst/adapter';
+import { getIrpPreflightGate } from '@/lib/gst/adapter';
 import { prepareEinvoicePayload } from '@/lib/gst/einvoice';
-import { loadEinvoiceSources } from '@/lib/gst/einvoice-server';
-import { fingerprint } from '@/lib/gst/irp/fingerprint';
+import { loadEinvoiceSources, localDateInTimeZone } from '@/lib/gst/einvoice-server';
+import { prepareOfflineIrp } from '@/lib/gst/irp/sandbox';
+import { reportingWindow } from '@/lib/gst/applicability';
+import { GST_UUID } from '@/lib/gst/buyer';
 
-export type EinvoiceAttemptResult =
-  | {
-      ok: true;
-      outcome: 'accepted' | 'rejected' | 'transport_error';
-      /** True when the outcome row was written to restaurant_irp_requests. */
-      recorded: boolean;
-      invoiceNumber: string;
-      irn: string | null;
-      message: string;
-    }
-  | { ok: false; error: string };
+export type EinvoiceAttemptResult = { ok: true; duplicate: boolean; message: string } | { ok: false; error: string };
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-export async function attemptEinvoiceAction(invoiceId: string): Promise<EinvoiceAttemptResult> {
-  const id = String(invoiceId ?? '').trim();
-  if (!UUID.test(id)) return { ok: false, error: 'This document is invalid. Refresh and try again.' };
-
-  const gate = getIrpAdapter();
-  if (!gate.ok) return { ok: false, error: gate.error };
-
-  const staff = await getStaffContextDetailed();
-  if (!staff.ok) {
-    if (staff.reason === 'signed-out') return { ok: false, error: 'Sign in to attempt e-invoice issuance.' };
-    return { ok: false, error: 'This account is not a member of any restaurant yet.' };
+export async function attemptEinvoiceAction(documentId: string, kind: 'invoice' | 'note' = 'invoice'): Promise<EinvoiceAttemptResult> {
+  if (typeof documentId !== 'string' || !GST_UUID.test(documentId) || !['invoice','note'].includes(kind)) {
+    return { ok: false, error: 'This document is invalid. Refresh and try again.' };
   }
-  if (staff.context.role !== 'owner' && staff.context.role !== 'manager') {
-    return { ok: false, error: 'Only the owner or a manager can attempt e-invoice issuance.' };
+  const gate = getIrpPreflightGate();
+  if (!gate.ok) return gate;
+  const staff = await getStaffContextDetailed();
+  if (!staff.ok || staff.context.role !== 'owner' || !staff.context.entitlement?.canWrite) {
+    return { ok: false, error: 'Only an entitled owner can record offline IRP preparation.' };
   }
   const { supabase, restaurantId } = staff.context;
-
-  const loaded = await loadEinvoiceSources(supabase, restaurantId, id);
-  if (!loaded.ok) return { ok: false, error: loaded.error };
-
-  const prepared = prepareEinvoicePayload({
-    invoice: loaded.sources.invoice,
-    profile: loaded.sources.profile,
+  const loaded = await loadEinvoiceSources(supabase, restaurantId, documentId, kind);
+  if (!loaded.ok) return loaded;
+  const prepared = prepareEinvoicePayload(loaded.sources);
+  if (!prepared.ok) return prepared;
+  const window = reportingWindow(prepared.payload.issuedDate, localDateInTimeZone(new Date().toISOString(), 'Asia/Kolkata') ?? '',
+    loaded.sources.invoice.irpEvidence?.reportingCategory ?? 'unknown');
+  if (!window.ok) return { ok: false, error: window.code === 'reporting_window_expired'
+    ? `The 30-day IRP reporting window ended on ${window.lastDate}. Reconcile this held document.`
+    : 'The reporting window cannot be verified. This document remains on hold.' };
+  const result = prepareOfflineIrp(prepared.payload);
+  if (!result.ok) return result;
+  const { data, error } = await supabase.rpc('record_gst_irp_preflight', {
+    p_outlet: restaurantId, p_document: documentId, p_kind: kind,
+    p_canonical_sha256: prepared.payload.fingerprintSha256, p_payload: result.request,
   });
-  if (!prepared.ok) return { ok: false, error: prepared.error };
-  const payload = prepared.payload;
-
-  const record = async (
-    status: 'payload_built' | 'submitted' | 'accepted' | 'rejected' | 'transport_error',
-    extra: { requestHash?: string; responseHash?: string | null; errorCode?: string | null; errorMessage?: string | null } = {},
-  ) => {
-    return supabase.rpc('record_restaurant_irp_request', {
-      p_invoice_id: id,
-      p_provider: gate.adapter.providerId,
-      p_payload_version: payload.schemaVersion,
-      p_status: status,
-      p_request_sha256: extra.requestHash ?? payload.fingerprintSha256,
-      p_response_sha256: extra.responseHash ?? null,
-      p_error_code: extra.errorCode ?? null,
-      p_error_message: extra.errorMessage ?? null,
-    });
-  };
-
-  const built = await record('payload_built');
-  if (built.error) {
-    return { ok: false, error: `The attempt could not be recorded before submission: ${built.error.message}` };
+  if (error || !data || typeof data !== 'object' || Array.isArray(data) || data.status !== 'prepared_offline') {
+    return { ok: false, error: 'Offline preparation was not verified. No provider was contacted and the hold is unchanged.' };
   }
-  const submitted = await record('submitted');
-  if (submitted.error) {
-    // Fail closed: no unrecorded submission reaches the provider.
-    return { ok: false, error: `The submission could not be recorded, so no provider was called: ${submitted.error.message}` };
-  }
-
-  let outcome: Awaited<ReturnType<typeof gate.adapter.generateIrn>>;
-  try {
-    outcome = await gate.adapter.generateIrn(payload);
-  } catch (error) {
-    outcome = {
-      ok: false,
-      code: 'ADAPTER-EXCEPTION',
-      message: error instanceof Error ? error.message : String(error),
-    };
-  }
-
-  const isSandbox = gate.adapter.providerId === 'sandbox';
-  const sandboxNote = isSandbox ? ' The offline sandbox is not an IRP: this IRN is not valid anywhere and the document stays marked IRP-pending.' : '';
-
-  if (outcome.ok) {
-    const responseHash = fingerprint(outcome.ack);
-    const recorded = await record('accepted', { responseHash });
-    return {
-      ok: true,
-      outcome: 'accepted',
-      recorded: !recorded.error,
-      invoiceNumber: payload.documentNumber,
-      irn: outcome.ack.irn,
-      message: recorded.error
-        ? `The provider accepted the document, but recording the attempt failed (${recorded.error.message}). Keep the IRN and tell your operator.`
-        : `Provider '${gate.adapter.providerId}' accepted the document. IRN: ${outcome.ack.irn}.${sandboxNote}`,
-    };
-  }
-
-  if (outcome.code === 'ADAPTER-EXCEPTION') {
-    const recorded = await record('transport_error', { errorCode: outcome.code, errorMessage: outcome.message });
-    return {
-      ok: true,
-      outcome: 'transport_error',
-      recorded: !recorded.error,
-      invoiceNumber: payload.documentNumber,
-      irn: null,
-      message: `The provider could not be reached (${outcome.message}). The attempt was recorded as a transport error.${sandboxNote}`,
-    };
-  }
-
-  const recorded = await record('rejected', { errorCode: outcome.code, errorMessage: outcome.message });
-  return {
-    ok: true,
-    outcome: 'rejected',
-    recorded: !recorded.error,
-    invoiceNumber: payload.documentNumber,
-    irn: null,
-    message: `The provider rejected the document (${outcome.code}: ${outcome.message}). The attempt was recorded; fix the cause and retry.${sandboxNote}`,
-  };
+  return { ok: true, duplicate: data.duplicate === true,
+    message: data.duplicate === true ? 'Identical preparation already recorded. Not submitted; the IRN hold remains.'
+      : 'INV-01 payload validated and preparation recorded. Not submitted; the IRN hold remains.' };
 }

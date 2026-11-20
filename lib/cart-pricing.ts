@@ -1,6 +1,14 @@
-import { computeOrderTotals, type OrderTotals } from './pricing';
-import type { Paise } from './money';
+import { computeQuoteTotals, type OrderTotals, type TaxTreatment } from './pricing';
+import { formatBillMoney } from './bill';
+import { paiseToRupees, type Paise } from './money';
 import type { StoredLine } from './cart-storage';
+
+/** Preserve paise when payable, including in legacy/off quotes. */
+export function formatQuoteMoney(paise: Paise, treatment: TaxTreatment = 'exclusive'): string {
+  return treatment === 'exclusive' && paise % 100 === 0
+    ? `₹${paiseToRupees(paise).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+    : formatBillMoney(paise);
+}
 
 /**
  * Joins what the browser remembers (item ids and quantities) with what the
@@ -140,7 +148,7 @@ export function resolveAddons(
 
     const group = addon.groupId ?? addon.id;
     const used = usedPerGroup.get(group) ?? 0;
-    if (used >= (addon.maxSelect ?? 1)) continue;
+    if (used >= (addon.maxSelect ?? 1)) { staleIds.push(id); continue; }
 
     usedPerGroup.set(group, used + 1);
     ids.push(addon.id);
@@ -154,7 +162,8 @@ export function resolveAddons(
 export function priceCart(
   stored: StoredLine[],
   items: MenuItemPrice[],
-  taxRateBps?: number
+  taxRateBps?: number,
+  taxTreatment?: TaxTreatment,
 ): PricedCart {
   const byId = new Map(items.map((i) => [i.id, i]));
 
@@ -225,10 +234,9 @@ export function priceCart(
     });
   }
 
-  const totals = computeOrderTotals({
-    lines: lines.map((l) => ({ unitPricePaise: l.unitPricePaise, qty: l.qty })),
-    ...(taxRateBps === undefined ? {} : { taxRateBps }),
-  });
+  const totals = computeQuoteTotals(
+    lines.map((l) => ({ unitPricePaise: l.unitPricePaise, qty: l.qty })), taxRateBps, taxTreatment,
+  );
 
   return {
     lines,

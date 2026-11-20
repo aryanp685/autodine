@@ -1,8 +1,9 @@
 'use server';
 
+import { dbErrorReference } from '@/lib/db/error-reference';
 import { revalidatePath } from 'next/cache';
-import { CASHIER_ROLES, getStaffContext } from '@/lib/db/staff';
-import { checkGstin } from '@/lib/gst/gstin';
+import { CASHIER_ROLES, getStaffContext, type StaffContext } from '@/lib/db/staff';
+import { normalizeCheckoutRecipient, type CheckoutRecipient } from '@/lib/gst/buyer';
 
 export type MarkSessionPaidResult =
   | { ok: true; paidAt: string }
@@ -13,6 +14,12 @@ export type CheckoutSessionResult =
   | { ok: false; error: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function inSelectedOutlet(staff: StaffContext, id: string): Promise<boolean> {
+  const { data, error } = await staff.supabase.from('order_sessions').select('id')
+    .eq('id', id).eq('restaurant_id', staff.restaurantId).maybeSingle();
+  return !error && data?.id === id;
+}
 
 /**
  * Mark one table's open session paid. The browser sends only the session UUID;
@@ -31,11 +38,17 @@ export async function markSessionPaidAction(
     return { ok: false, error: `Your role (${staff.role}) cannot mark payments. Ask an owner or manager.` };
   }
 
+  if (!await inSelectedOutlet(staff, id)) {
+    return { ok: false, error: 'This table is not in the selected outlet. Reload before recording payment.' };
+  }
   const { data, error } = await staff.supabase.rpc('mark_order_session_paid', {
     p_order_session_id: id,
   });
 
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    console.error('[table-settlement] result not verified', dbErrorReference(error));
+    return { ok: false, error: 'Could not verify settlement. Check the saved ticket and payment ledger before collecting or recording again.' };
+  }
   if (!data) return { ok: false, error: 'The paid status could not be verified. Refresh and check the table.' };
 
   revalidatePath('/dashboard');
@@ -44,48 +57,35 @@ export async function markSessionPaidAction(
   return { ok: true, paidAt: data };
 }
 
-/** Optional B2B buyer details for Regular-GST tax invoices. */
-export type CheckoutRecipient = {
-  name: string;
-  gstin: string;
-  address?: string;
-  email?: string;
-};
-
-const GSTIN_PATTERN = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/;
-
 /** Close a table and issue its immutable final receipt atomically. */
 export async function checkoutSessionAction(sessionId: string, recipient?: CheckoutRecipient): Promise<CheckoutSessionResult> {
   const id = String(sessionId ?? '').trim();
   if (!UUID.test(id)) return { ok: false, error: 'This table session is invalid. Refresh the dashboard.' };
-
-  let pRecipient: { name: string; gstin: string; address?: string; email?: string } | null = null;
-  if (recipient) {
-    const name = String(recipient.name ?? '').trim();
-    const gstin = String(recipient.gstin ?? '').trim().toUpperCase();
-    const address = String(recipient.address ?? '').trim();
-    const email = String(recipient.email ?? '').trim().toLowerCase();
-    // An incomplete buyer block is fail-closed: better to stop the cashier than issue a half-recorded B2B invoice.
-    if (name.length < 2) return { ok: false, error: 'Enter the buyer legal name, or clear the buyer details to issue a B2C invoice.' };
-    if (!GSTIN_PATTERN.test(gstin)) return { ok: false, error: 'The buyer GSTIN does not match the 15-character GSTIN layout.' };
-    const gstinCheck = checkGstin(gstin);
-    if (!gstinCheck.ok) return { ok: false, error: `The buyer GSTIN is not usable: ${gstinCheck.reason}` };
-    if (address && address.length < 5) return { ok: false, error: 'The buyer address must be at least 5 characters, or left blank.' };
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return { ok: false, error: 'The buyer email address does not look usable.' };
-    pRecipient = { name, gstin, ...(address ? { address } : {}), ...(email ? { email } : {}) };
-  }
 
   const staff = await getStaffContext();
   if (!staff) return { ok: false, error: 'Sign in to check out this table.' };
   if (!CASHIER_ROLES.includes(staff.role)) {
     return { ok: false, error: `Your role (${staff.role}) cannot check out tables. Ask an owner or manager.` };
   }
+  const checked = recipient ? normalizeCheckoutRecipient(recipient) : null;
+  if (checked && !checked.ok) return checked;
+  const pRecipient = checked?.data ?? null;
+  if (!await inSelectedOutlet(staff, id)) {
+    return { ok: false, error: 'This table is not in the selected outlet. Reload before issuing a document.' };
+  }
 
   const { data, error } = await staff.supabase.rpc('close_order_session_and_issue_receipt', {
     p_order_session_id: id,
     ...(pRecipient ? { p_recipient: pRecipient } : {}),
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    console.error('[table-close] result not verified', dbErrorReference(error));
+    const reason = error.code === 'P0001' && ['Collect the full outstanding balance before closing this table session.',
+      'Collect the full outstanding balance before issuing this session receipt.',
+      'This table session has no non-cancelled tickets to bill.',
+      'This restaurant is in read-only mode. Restore access before checkout.'].includes(error.message) ? error.message : null;
+    return { ok: false, error: reason ?? 'Could not verify checkout. Check the saved receipt and billing settings before trying again.' };
+  }
   if (typeof data !== 'string' || !UUID.test(data)) {
     return { ok: false, error: 'Checkout could not be verified. Refresh and check the table before trying again.' };
   }

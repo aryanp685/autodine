@@ -73,24 +73,36 @@ try {
   // Realtime publication. Apply only repository migrations plus the marked
   // local-only inferred base-table scaffold, in the repository's tested order.
   const migrationFiles = (await readdir(migrationDir)).filter((file) => file.endsWith('.sql')).sort();
-  for (const file of migrationFiles) {
-    if (file.startsWith('20261021000006')) {
-      await apply(
-        await readFile(path.join(root, 'scripts/local-pg/005_scaffold_missing_tables.sql'), 'utf8'),
-        'scripts/local-pg/005_scaffold_missing_tables.sql (inferred local-only scaffold)',
-      );
-    }
-    await apply(await readFile(path.join(migrationDir, file), 'utf8'), `supabase/migrations/${file}`);
-  }
   // Keep this exact count synchronized with the migration chain: a lower
   // bound would allow one or more missing files to be hidden by the current
   // count, and an added migration must deliberately update this assertion.
-  const expectedRepositoryMigrations = 98;
+  const expectedRepositoryMigrations = 118;
   const requiredBoundaryMigrations = [
     '20261112000500_role_scoped_order_reads.sql',
     '20261112000600_cap_subscription_history_ceiling.sql',
     '20261112000700_order_line_edit_boundary.sql',
     '20261114000100_owner_manager_subscription_reads.sql',
+    '20261118000100_merge_boundary_gst_order_line_edits.sql',
+    '20261118000200_gst_configuration_boundary.sql',
+    '20261118000300_gst_pricing_boundary.sql',
+    '20261118000400_gst_document_integrity.sql',
+    '20261118000500_gst_document_report.sql',
+    '20261118000600_gst_ca_onboarding.sql',
+    '20261118000700_gst_ca_documents.sql',
+    '20261118000800_gst_outlet_activation.sql',
+    '20261118000900_gst_recipient_documents.sql',
+    '20261118001000_gst_irp_readiness.sql',
+    '20261118001100_gst_reconciliation.sql',
+    '20261118001200_gst_review_lifecycle.sql',
+    '20261118001300_gst_direct_fulfilment.sql',
+    '20261118001400_gst_irp_rehearsal_store.sql',
+    '20261118001500_gst_finance_scope.sql',
+    '20261118001600_gst_document_particulars.sql',
+    '20261118001700_gst_irp_rehearsal_recovery.sql',
+    '20261118001800_irp_execution.sql',
+    '20261118001900_irp_document_projection.sql',
+    '20261118002000_guest_checkout_integrity.sql',
+    '20261118002100_operational_realtime.sql',
   ];
   const missingBoundaryMigrations = requiredBoundaryMigrations.filter((file) => !migrationFiles.includes(file));
   if (migrationFiles.length !== expectedRepositoryMigrations || missingBoundaryMigrations.length > 0) {
@@ -100,11 +112,24 @@ try {
     );
   }
 
+  for (const file of migrationFiles) {
+    if (file.startsWith('20261021000006')) {
+      await apply(
+        await readFile(path.join(root, 'scripts/local-pg/005_scaffold_missing_tables.sql'), 'utf8'),
+        'scripts/local-pg/005_scaffold_missing_tables.sql (inferred local-only scaffold)',
+      );
+    }
+    await apply(await readFile(path.join(migrationDir, file), 'utf8'), `supabase/migrations/${file}`);
+  }
+
   const required = await client.query(`
     select
       to_regprocedure('public.open_table_session(text,text)') is not null as open_session,
       to_regprocedure('public.place_public_order(text,jsonb,text,text,uuid,text)') is not null as place_order,
       to_regprocedure('public.public_qr_intro(text)') is not null as qr_intro,
+      to_regprocedure('public.public_order_pricing(text)') is not null as public_order_pricing,
+      to_regprocedure('public.save_restaurant_gst_config(uuid,integer,jsonb)') is not null as save_gst,
+      to_regprocedure('public.report_gst_documents(uuid,timestamptz,timestamptz)') is not null as gst_report,
       to_regprocedure('public.create_staff_invite(uuid,public.member_role,integer)') is not null as staff_invites,
       to_regclass('storage.buckets') is not null as storage_schema,
       exists (select 1 from pg_publication where pubname = 'supabase_realtime') as realtime_publication

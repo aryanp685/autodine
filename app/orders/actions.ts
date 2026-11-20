@@ -23,6 +23,8 @@
 
 'use server';
 
+import { orderRefusal } from '@/lib/db/order-refusals';
+import { dbErrorReference } from '@/lib/db/error-reference';
 import { revalidatePath } from 'next/cache';
 import { CASHIER_ROLES, getStaffContext } from '@/lib/db/staff';
 
@@ -80,8 +82,9 @@ export async function cancelStaffOrderAction(input: {
   });
 
   if (error) {
-    if (error.code === 'P0001') return { ok: false, error: error.message };
-    console.error('[cancelStaffOrderAction] unexpected failure', error);
+    const refusal = orderRefusal(error);
+    if (refusal) return { ok: false, error: refusal };
+    console.error('[cancelStaffOrderAction] unexpected failure', dbErrorReference(error));
     return { ok: false, error: 'We could not cancel that order. Please try again.' };
   }
 

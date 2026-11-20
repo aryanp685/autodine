@@ -32,6 +32,7 @@ const ROUTES: Record<string, { dir: string; key: string }> = {
   settings: { dir: 'app/(staff)/dashboard/settings', key: 'settings' },
   kitchen: { dir: 'app/(staff)/kitchen', key: 'kitchen' },
   counter: { dir: 'app/(staff)/cashier', key: 'counter' },
+  waiter: { dir: 'app/(staff)/waiter', key: 'waiter' },
 };
 
 describe('the staff shell', () => {

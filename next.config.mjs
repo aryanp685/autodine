@@ -7,6 +7,12 @@ assertBuildIsolation(process.env);
 
 const nextConfig = {
   reactStrictMode: true,
+  // Do not print bearer-link paths or their queries in Next's development
+  // request logs. Deployment access logs need separate platform redaction.
+  logging: {
+    incomingRequests: { ignore: [/^\/(?:t\/|receipt-share\/|menu\/order(?:s)?(?:[/?]|$))/] },
+    serverFunctions: false, // Next dev otherwise prints the arguments to actions.
+  },
   // The browser bundle has no VERCEL_ENV. Inline the deployment's environment so
   // the same isolation rule holds on the client (lib/supabase/env.ts).
   env: {
@@ -92,6 +98,10 @@ const nextConfig = {
           },
         ],
       },
+      ...['/menu/order', '/receipt-share/:token', '/t/:path*'].map(source => ({
+        source,
+        headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }],
+      })),
     ];
   },
 };

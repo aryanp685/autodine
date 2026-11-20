@@ -2,7 +2,6 @@ import Link from 'next/link';
 import type { OutletBar } from '@/lib/outlets';
 import { Money, PaymentPill, PrepPill } from '@/components/ui';
 import { SignInPrompt } from '@/components/SignInPrompt';
-import { AutoRefresh } from '@/components/owner/AutoRefresh';
 import { demoReport, resolveRange } from '@/lib/db/reports';
 import type { OrderLedgerRow, OrdersLedgerScreenData } from '@/lib/db/orders-ledger';
 import { dateTimeInZone } from '@/lib/db/time';
@@ -191,9 +190,6 @@ export function OrdersScreen({
 
   return (
     <OwnerPage active="orders" outlet={outlet} wide>
-        {/* New orders land while the ledger is open. Slow, silent, and paused
-            while somebody is typing in the search box. */}
-        <AutoRefresh enabled={live && !blocked} />
       <PageHead
         kicker="Orders"
         title="Order ledger"

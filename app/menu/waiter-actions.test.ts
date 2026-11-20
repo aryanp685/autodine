@@ -25,7 +25,7 @@ describe('callWaiterAction', () => {
   });
 
   it('rejects a malformed idempotency key before reading the session or database', async () => {
-    await expect(callWaiterAction('bad')).resolves.toEqual({
+    await expect(callWaiterAction('bad', 'bistro', 'T1')).resolves.toEqual({
       ok: false,
       error: 'We could not send that request. Please try again.',
     });
@@ -34,13 +34,15 @@ describe('callWaiterAction', () => {
 
   it('requires a table session from the server cookie', async () => {
     mocks.session = null;
-    await expect(callWaiterAction(requestKey)).resolves.toMatchObject({ ok: false });
+    await expect(callWaiterAction(requestKey, 'bistro', 'T1')).resolves.toMatchObject({ ok: false });
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
   it('sends only the cookie token and idempotency key to the database', async () => {
-    await expect(callWaiterAction(requestKey)).resolves.toEqual({ ok: true, state: 'created' });
-    expect(mocks.rpc).toHaveBeenCalledWith('call_waiter', {
+    await expect(callWaiterAction(requestKey, 'bistro', 'T1')).resolves.toEqual({ ok: true, state: 'created' });
+    expect(mocks.rpc).toHaveBeenCalledWith('call_verified_waiter_at', {
+      p_slug: 'bistro',
+      p_table_label: 'T1',
       p_session_token: token,
       p_request_key: requestKey,
     });
@@ -49,12 +51,12 @@ describe('callWaiterAction', () => {
 
   it.each(['already_open', 'already_handled'] as const)('treats %s as a successful idempotent result', async (data) => {
     mocks.rpc.mockResolvedValue({ data, error: null });
-    await expect(callWaiterAction(requestKey)).resolves.toEqual({ ok: true, state: data });
+    await expect(callWaiterAction(requestKey, 'bistro', 'T1')).resolves.toEqual({ ok: true, state: data });
   });
 
   it('explains the table cooldown without disclosing database details', async () => {
     mocks.rpc.mockResolvedValue({ data: 'wait_a_moment', error: null });
-    await expect(callWaiterAction(requestKey)).resolves.toEqual({
+    await expect(callWaiterAction(requestKey, 'bistro', 'T1')).resolves.toEqual({
       ok: false,
       error: 'Please wait a little before calling again.',
     });
@@ -62,10 +64,10 @@ describe('callWaiterAction', () => {
 
   it('passes guest-safe validation messages and hides unexpected SQL errors', async () => {
     mocks.rpc.mockResolvedValueOnce({ data: null, error: { code: 'P0001', message: 'Your table session has expired.' } });
-    await expect(callWaiterAction(requestKey)).resolves.toEqual({ ok: false, error: 'Your table session has expired.' });
+    await expect(callWaiterAction(requestKey, 'bistro', 'T1')).resolves.toEqual({ ok: false, error: 'Your table session has expired. Scan the code on your table again.' });
 
     mocks.rpc.mockResolvedValueOnce({ data: null, error: { code: '42P01', message: 'relation secret not found' } });
-    await expect(callWaiterAction(requestKey)).resolves.toMatchObject({
+    await expect(callWaiterAction(requestKey, 'bistro', 'T1')).resolves.toMatchObject({
       ok: false,
       error: 'We could not reach the restaurant. Please tell a staff member.',
     });

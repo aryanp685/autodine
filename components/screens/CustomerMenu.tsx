@@ -30,12 +30,15 @@ import { GuestFlow } from '@/components/GuestFlow';
 import { MenuIdentity } from '@/components/MenuIdentity';
 import { guestBrandStyle } from '@/lib/branding/guest-theme';
 import { useCart } from '@/components/CartProvider';
-import { priceCart } from '@/lib/cart-pricing';
 import { filterDishes } from '@/lib/guest-search';
-import { inr } from '@/lib/demo-data';
-import { paiseToRupees, rupeesToPaise } from '@/lib/money';
+import { formatQuoteMoney, priceCart } from '@/lib/cart-pricing';
+import { rupeesToPaise } from '@/lib/money';
 import { VegMark } from '@/components/ui';
 import { CallWaiterButton } from '@/components/CallWaiterButton';
+
+// DisplayItem prices are rupees; keep the saved paise visible throughout the
+// menu, item sheet and cart. Whole rupees retain the existing concise label.
+const menuMoney = (rupees: number) => formatQuoteMoney(rupeesToPaise(rupees));
 
 /**
  * Whether this dish has anything to choose.
@@ -355,8 +358,7 @@ export function CustomerMenu({
                   {barCount}
                 </motion.strong>{' '}
                 item
-                {barCount === 1 ? '' : 's'} · <span className="tnum">{inr(paiseToRupees(barSubtotal))}</span> before
-                taxes
+                {barCount === 1 ? '' : 's'} · <span className="tnum">{formatQuoteMoney(barSubtotal)}</span>
               </span>
               <span className="ml-auto flex items-center gap-1.5 text-[13px] font-semibold tracking-[0.01em]">
                 Review order
@@ -392,7 +394,7 @@ export function CustomerMenu({
       />
       {canCallWaiter && table ? (
         <div className="px-5">
-          <CallWaiterButton />
+          <CallWaiterButton key={`${slug}:${table.label}`} slug={slug ?? ''} table={table.label} />
         </div>
       ) : null}
 
@@ -654,7 +656,7 @@ export function CustomerMenu({
                       from
                     </span>
                   )}
-                  <span className="tnum text-[15px] font-semibold text-gink">{inr(fromPrice(i))}</span>
+                  <span className="tnum text-[15px] font-semibold text-gink">{menuMoney(fromPrice(i))}</span>
                 </div>
 
                 <p className="mt-1 line-clamp-2 text-[13px] leading-[1.45] text-gink-64">{i.desc}</p>
@@ -1017,7 +1019,7 @@ export function ItemSheet({
                   <h2 className="truncate text-[15px] font-semibold">{i.name}</h2>
                 </div>
                 <p className="mt-1 line-clamp-2 text-[13px] text-gink-64">{i.desc}</p>
-                <div className="tnum mt-1 text-[13.5px] font-semibold">{inr(i.price)}</div>
+                <div className="tnum mt-1 text-[13.5px] font-semibold">{menuMoney(i.price)}</div>
               </div>
               <DishPhoto src={i.img} name={i.name} size={84} className="size-[84px]" />
             </article>
@@ -1111,7 +1113,7 @@ export function ItemSheet({
                           <ChoiceDot on={on} motionOn={motionOn} />
                         </span>
                         <span className="flex-1 text-[14px] font-medium">{v.name}</span>
-                        <span className="tnum text-[14px] font-semibold">{inr(v.price)}</span>
+                        <span className="tnum text-[14px] font-semibold">{menuMoney(v.price)}</span>
                       </label>
                     );
                   })}
@@ -1163,7 +1165,7 @@ export function ItemSheet({
                             </span>
                             <span className="flex-1 text-[14px] font-medium">{option.name}</span>
                             <span className="tnum text-[13.5px] text-gink-64">
-                              {option.price ? `+ ${inr(option.price)}` : '—'}
+                              {option.price ? `+ ${menuMoney(option.price)}` : '—'}
                             </span>
                           </label>
                         );
@@ -1183,7 +1185,7 @@ export function ItemSheet({
                             className="g-chip transition-transform duration-150 active:scale-[0.94] disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             {option.name}
-                            {option.price ? ` + ${inr(option.price)}` : ''}
+                            {option.price ? ` + ${menuMoney(option.price)}` : ''}
                           </button>
                         );
                       })}
@@ -1279,7 +1281,7 @@ export function ItemSheet({
                         Passing them through paiseToRupees divided an
                         already-rupees number by a hundred, so a Rs 250 plate
                         showed as Rs 3. */}
-                    Add to order · {inr(chosenUnitPrice * addQty)}
+                    Add to order · {menuMoney(chosenUnitPrice * addQty)}
                   </>
                 )}
               </button>

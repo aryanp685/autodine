@@ -1,29 +1,11 @@
-/**
- * One order's live status, as its guest.
- *
- * THE ONLY READ THIS DOES IS get_public_order()
- *
- * That function takes the restaurant slug, the order code and the guest token,
- * and returns a row only when all three match -- so a token for table 4's order
- * can never be pointed at another order, another table, or another restaurant.
- * There is no "status by id" path here on purpose: an endpoint that accepted an
- * id would be an endpoint that answers questions about anybody's order to
- * anybody who has an id.
- *
- * WHY A SEPARATE CALL FROM getOrderScreenData()
- *
- * The full order-screen loader also reads the restaurant row, parses every
- * line item, and computes the controls available for that order. Polling it
- * every ten seconds would repeat that work just to answer one question --
- * "which of five states is it in". This reads the status RPC and returns the
- * small snapshot the refresh component needs.
- */
+/** Minimal persisted status scoped by exact slug + code + order capability. */
 
 import type { Database } from '@/lib/db/database';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { OrderStatusSnapshot } from '@/lib/guest-order-status';
+import { revisionNumber } from '@/lib/realtime-revisions';
 
 /**
  * Order tokens are UUIDs (orders.guest_token is a uuid column).
@@ -49,6 +31,7 @@ type PublicOrderRow = {
   placed_at?: unknown;
   hold_required?: unknown;
   confirmed_at?: unknown;
+  revision?: unknown;
 };
 
 /** Same client shape the read uses; named so a test can pass a fake. */
@@ -69,13 +52,12 @@ export async function readGuestOrderStatus(
   const supabase = client ?? (await createSupabaseServerClient());
   if (!supabase) return { kind: 'unavailable', message: 'No database is connected.' };
 
-  const { data, error } = await supabase.rpc('get_public_order', {
-    p_slug: slug,
-    p_code: code,
-    p_token: token,
-  });
+  const args = { p_slug: slug, p_code: code, p_token: token };
+  const minimal = await supabase.rpc('get_guest_order_status', args);
+  const { data, error } = minimal.error && ['PGRST202', '42883'].includes(minimal.error.code)
+    ? await supabase.rpc('get_public_order', args) : minimal;
 
-  if (error) return { kind: 'unavailable', message: error.message };
+  if (error) return { kind: 'unavailable', message: 'Order status is temporarily unavailable.' };
   if (!data) return { kind: 'not_found' };
 
   const row = data as PublicOrderRow;
@@ -86,6 +68,7 @@ export async function readGuestOrderStatus(
     kind: 'ok',
     snapshot: {
       status: prepStatus,
+      ...(revisionNumber(row.revision) !== null ? { revision: String(row.revision) } : {}),
       // Held for a human to confirm: the guest must not be told cooking started.
       awaitingConfirmation: row.hold_required === true && !row.confirmed_at,
       paymentStatus: typeof row.payment_status === 'string' ? row.payment_status : 'pending',

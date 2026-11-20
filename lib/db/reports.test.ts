@@ -38,6 +38,7 @@ import {
   resolveRange,
   rupees,
   summaryCsv,
+  gstDocumentsCsv,
   toCsv,
   zeroFillBuckets,
 } from './reports';
@@ -58,7 +59,8 @@ function asView(raw: unknown) {
 
 function fakeSupabase(rpc: typeof mocks.rpc) {
   return {
-    rpc: (_fn: string, args: Record<string, unknown>) => {
+    rpc: (fn: string, args: Record<string, unknown>) => {
+      if (fn === 'report_gst_documents') return Promise.resolve({ data: [], error: null });
       rpc.calls.push(args);
       return Promise.resolve({ data: rpc.data, error: rpc.error });
     },
@@ -407,11 +409,11 @@ describe('getReportsScreenData', () => {
     expect((await getReportsScreenData({}, NOON))?.ordersTruncated).toBe(true);
   });
 
-  it('throws with the database message when the RPC fails', async () => {
-    mocks.rpc.error = { message: 'permission denied' };
+  it('preserves only the database error class when the RPC fails', async () => {
+    mocks.rpc.error = { code: '42501', message: 'private report diagnostic' };
     mocks.staff.result = signedIn(fakeSupabase(mocks.rpc));
 
-    await expect(getReportsScreenData({}, NOON)).rejects.toThrow('permission denied');
+    await expect(getReportsScreenData({}, NOON)).rejects.toThrow(/^Could not load the report: 42501$/);
   });
 });
 
@@ -488,4 +490,26 @@ describe('demoReport', () => {
       else expect(order.paidPaise).toBe(0);
     }
   });
+});
+
+
+it('exports held documents with a signed numeric rounding delta, without conflating GST with collections', () => {
+  const range = resolveRange('today', TZ, new Date('2026-11-18T12:00:00Z'));
+  const csv = gstDocumentsCsv([{
+    financial_year: '26-27', series_code: null, document_type: 'gst_tax_invoice', document_status: 'issued', irn_held: true, rate_bps: 500,
+    document_count: 1, total_paise: 21022, taxable_paise: 20021, cgst_paise: 501, sgst_paise: 500,
+    igst_paise: 0, rounding_delta_paise: -1, missing_rounding_count: 0,
+  }], range, TZ);
+  expect(csv).toContain('Regular GST tax invoice,IRN hold · not final,5,1,210.22,200.21,5.01,5.00,0.00,-0.01,0,26-27,INV (legacy)');
+  expect(csv).not.toContain('Collected');
+});
+
+it('exports retail gross and status with series and FY, leaving tax cells blank', () => {
+  const range = resolveRange('today', TZ, new Date('2026-11-18T12:00:00Z'));
+  const csv = gstDocumentsCsv([{
+    financial_year: '26-27', series_code: 'RBL', document_type: 'retail_bill', document_status: 'voided', irn_held: false,
+    rate_bps: null, document_count: 1, total_paise: 10500, taxable_paise: null, cgst_paise: null, sgst_paise: null,
+    igst_paise: null, rounding_delta_paise: null, missing_rounding_count: 0,
+  }], range, TZ);
+  expect(csv).toContain('Retail bill / cash memo,Voided,,1,105.00,,,,,,0,26-27,RBL');
 });

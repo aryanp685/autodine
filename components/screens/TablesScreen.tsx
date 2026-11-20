@@ -308,7 +308,7 @@ export function TablesScreen({
               {tables.map((t) => {
                 const state = STATE[t.qr] ?? { tone: 'neutral' as PillTone, word: t.qr };
                 return (
-                  <li key={t.code}>
+                  <li key={t.code} data-qr-table={t.code}>
                     <Card className="flex h-full flex-col overflow-hidden">
                       <div className="flex items-start justify-between gap-3 px-4 pt-4">
                         <div className="min-w-0">
@@ -317,6 +317,8 @@ export function TablesScreen({
                               {t.code}
                             </span>
                             <Tag tone={state.tone}>{state.word}</Tag>
+                            {live && <Tag tone={t.occupied ? 'work' : 'neutral'}>{t.occupied === undefined ? 'Occupancy unavailable'
+                              : t.occupied ? 'Occupied' : t.qr === 'disabled' ? 'Off floor' : 'Available'}</Tag>}
                           </div>
                           {/* `label` is already "4 seater": printing the seat
                               count after it read "4 seater · 4 seats". */}

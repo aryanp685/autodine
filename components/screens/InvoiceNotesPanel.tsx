@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { formatBillMoney } from '@/lib/bill';
@@ -13,12 +14,14 @@ export type NoteSourceDocument = {
   number: string;
   documentType: 'gst_tax_invoice' | 'bill_of_supply';
   totalPaise: number | null;
+  irnHeld: boolean;
+  activated?: boolean;
 };
 
 const IRP_LABEL: Record<InvoiceNoteRow['irpStatus'], string> = {
-  not_required: 'B2C · no IRN required',
-  pending: 'IRN pending — not a valid e-invoice until generated',
-  generated: 'IRN generated',
+  not_required: 'No IRN required',
+  pending: 'IRN pending — not final',
+  generated: 'IRN on hold — validation not verified here',
   failed: 'IRP failed — never treat as valid',
   cancelled: 'IRN cancelled',
 };
@@ -28,11 +31,10 @@ function kindLabel(kind: NoteDocumentType): string {
 }
 
 /**
- * Credit/debit notes against GST documents, owner/manager only.
+ * Credit/debit notes against supported tax invoices; owner writes on activated profiles.
  *
  * Honest boundaries, deliberate:
- *   * FULL-document notes only — no line-level or partial-amount adjustment;
- *     a partial correction is void + re-issue, same as the rest of AutoDine.
+ *   * FULL-document notes only — no line-level or partial-amount adjustment.
  *   * Only issued GST tax invoices / Bills of Supply admit a note; a plain
  *     receipt never does (the database refuses it too).
  *   * The app invents no GST rate, threshold or liability rule; amounts are
@@ -40,7 +42,9 @@ function kindLabel(kind: NoteDocumentType): string {
  *   * An e-invoice-applicable parent forces its note to `pending` — it is not
  *     valid until an IRN exists. No IRN is ever minted in this build.
  */
-export function InvoiceNotesPanel({ notes, sources }: { notes: InvoiceNoteRow[]; sources: NoteSourceDocument[] }) {
+export function InvoiceNotesPanel({ notes, sources, mayWrite = true, owner = true }: {
+  notes: InvoiceNoteRow[]; sources: NoteSourceDocument[]; mayWrite?: boolean; owner?: boolean;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [issueFor, setIssueFor] = useState<{ invoiceId: string; kind: NoteDocumentType } | null>(null);
@@ -58,7 +62,12 @@ export function InvoiceNotesPanel({ notes, sources }: { notes: InvoiceNoteRow[];
     liveNotes.set(note.invoiceId, set);
   }
 
+  const canIssue = (source: NoteSourceDocument) => mayWrite && !source.irnHeld && (owner || !source.activated);
+  const canVoid = (note: InvoiceNoteRow) => mayWrite && (owner || !note.activated) && note.status === 'issued'
+    && note.irpStatus !== 'generated' && note.irpStatus !== 'cancelled';
+
   const submitIssue = (invoiceId: string, kind: NoteDocumentType) => {
+    if (!sources.some((source) => source.invoiceId === invoiceId && canIssue(source))) return;
     setMessage(null);
     startTransition(async () => {
       const result = await issueInvoiceNoteAction({ invoiceId, documentType: kind, reasonCode, reason });
@@ -75,6 +84,7 @@ export function InvoiceNotesPanel({ notes, sources }: { notes: InvoiceNoteRow[];
   };
 
   const submitVoid = (noteId: string) => {
+    if (!notes.some((note) => note.id === noteId && canVoid(note))) return;
     setMessage(null);
     startTransition(async () => {
       const result = await voidInvoiceNoteAction({ noteId, reason: voidReason });
@@ -94,14 +104,15 @@ export function InvoiceNotesPanel({ notes, sources }: { notes: InvoiceNoteRow[];
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-[13px] font-semibold tracking-[0.02em] text-gink">Credit &amp; debit notes</h2>
         <p className="text-[10.5px] text-gink-46">
-          Full-document adjustments against GST tax invoices / Bills of Supply · owner/manager only
+          Full-document adjustments against GST tax invoices / Bills of Supply · owner approval on activated profiles
         </p>
       </div>
 
       <p className="mt-2 max-w-[72ch] text-[11.5px] leading-[1.5] text-gink-64">
-        A note covers the whole source document; partial corrections are void + re-issue. The app does not
-        decide whether one is legally due — amounts and tax come from the immutable parent snapshot. Notes
-        against e-invoice-applicable documents stay IRN-pending until a provider issues one; none is issued here.
+        A note covers the whole source document. Partial adjustments are not supported. The app does not
+        decide whether one is legally due — amounts and tax come from the immutable parent snapshot.
+        Issuance controls are unavailable for held documents. Existing held notes are shown for review only,
+        not as final GST documents.
       </p>
 
       {message ? (
@@ -113,25 +124,28 @@ export function InvoiceNotesPanel({ notes, sources }: { notes: InvoiceNoteRow[];
 
       {sources.length === 0 ? (
         <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-64">
-          No issued GST documents on this screen yet. Plain receipts never admit a note; once a GST tax
-          invoice or Bill of Supply exists here, notes can be issued against it.
+          No supported tax invoice with original recipient details is shown here. Ask the owner to review anonymous or historical documents and Bill of Supply corrections.
         </p>
       ) : (
         <ul className="mt-3 divide-y divide-hair">
           {sources.map((source) => {
             const live = liveNotes.get(source.invoiceId) ?? new Set<NoteDocumentType>();
-            const open = issueFor?.invoiceId === source.invoiceId ? issueFor : null;
+            const open = canIssue(source) && issueFor?.invoiceId === source.invoiceId ? issueFor : null;
             return (
               <li key={source.invoiceId} className="py-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-mono text-[12px] text-gink">{source.number}</p>
                     <p className="mt-0.5 text-[10.5px] text-gink-46">
-                      {source.documentType === 'gst_tax_invoice' ? 'Tax invoice' : 'Bill of Supply'}
+                      {source.irnHeld ? 'Held GST document (not final)' : source.documentType === 'gst_tax_invoice' ? 'Tax invoice' : 'Bill of Supply'}
                       {source.totalPaise != null ? ` · ${formatBillMoney(source.totalPaise)}` : ''}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  {source.irnHeld ? (
+                    <p className="text-[10.5px] text-gink-46">Notes unavailable while source is on IRN hold.</p>
+                  ) : !canIssue(source) ? (
+                    <p className="text-[10.5px] text-gink-46">{mayWrite ? 'Only the outlet owner can issue this adjustment.' : 'Read-only'}</p>
+                  ) : <div className="flex items-center gap-2">
                     {(['credit_note', 'debit_note'] as const).map((kind) => (
                       <button
                         key={kind}
@@ -144,7 +158,7 @@ export function InvoiceNotesPanel({ notes, sources }: { notes: InvoiceNoteRow[];
                         {live.has(kind) ? `${kind === 'credit_note' ? 'Credit' : 'Debit'} note live` : kind === 'credit_note' ? 'Credit note' : 'Debit note'}
                       </button>
                     ))}
-                  </div>
+                  </div>}
                 </div>
                 {open ? (
                   <form
@@ -205,7 +219,7 @@ export function InvoiceNotesPanel({ notes, sources }: { notes: InvoiceNoteRow[];
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-mono text-[12px] text-gink">
-                      {note.documentNumber}
+                      <Link href={`/dashboard/invoices/notes/${note.id}`} className="underline">{note.documentNumber}</Link>
                       <span className={`ml-2 rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${note.status === 'issued' ? 'bg-grass/10 text-grass' : 'bg-paper-deep text-gink-46'}`}>
                         {note.status}
                       </span>
@@ -218,7 +232,7 @@ export function InvoiceNotesPanel({ notes, sources }: { notes: InvoiceNoteRow[];
                       {note.status === 'voided' && note.voidReason ? ` · voided: ${note.voidReason}` : ''}
                     </p>
                   </div>
-                  {note.status === 'issued' ? (
+                  {canVoid(note) ? (
                     <button
                       type="button"
                       disabled={pending}
@@ -229,7 +243,7 @@ export function InvoiceNotesPanel({ notes, sources }: { notes: InvoiceNoteRow[];
                     </button>
                   ) : null}
                 </div>
-                {voidFor === note.id ? (
+                {voidFor === note.id && canVoid(note) ? (
                   <form
                     className="mt-3 flex flex-col gap-2 rounded-[var(--p-r-control)] border border-hair bg-paper-deep p-3"
                     onSubmit={(event) => { event.preventDefault(); submitVoid(note.id); }}

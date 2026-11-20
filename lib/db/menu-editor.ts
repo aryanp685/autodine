@@ -73,6 +73,7 @@ export type EditorItem = {
   /** Paise. The editor renders rupees and converts back on save. */
   pricePaise: number;
   veg: boolean | null;
+  isAlcoholic?: boolean;
   available: boolean;
   /**
    * Public URL of the dish photo, or null when none has been uploaded.
@@ -223,7 +224,7 @@ export async function getMenuEditorData(): Promise<MenuEditorData | null> {
     supabase
       .from('items')
       .select(
-        'id, category_id, name, description, price_paise, is_veg, is_available, image_url, sort_order, spoken_name'
+        'id, category_id, name, description, price_paise, is_veg, is_available, image_url, sort_order, spoken_name, is_alcoholic'
       )
       .eq('restaurant_id', restaurantId)
       .order('sort_order', { ascending: true })
@@ -408,6 +409,7 @@ export async function getMenuEditorData(): Promise<MenuEditorData | null> {
       desc: (row.description as string | null) ?? '',
       pricePaise: Number(row.price_paise ?? 0),
       veg: row.is_veg,
+      isAlcoholic: row.is_alcoholic === true,
       available: Boolean(row.is_available),
       // Stored as a URL (not a path) because items.image_url predates this
       // feature and three existing readers expect a URL. See

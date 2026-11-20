@@ -1,17 +1,7 @@
-/**
- * Bill arithmetic and wording, with no database and no React.
- *
- * WHY THIS FILE IS PURE
- *
- * A bill is the one screen a restaurant is legally answerable for. The numbers
- * on it are already stored on the order -- this module never prices anything,
- * it only formats what the order says. The functions here are the parts worth
- * testing without a browser or a database: how money is written, how one tax
- * figure becomes CGST + SGST without losing a paisa, how a phone number typed
- * by a cashier becomes a WhatsApp link, and what the message says.
- */
-
-import { BPS_PER_100_PERCENT, splitInHalf, type Paise } from './money';
+/** Ticket summaries. Monetary amounts come from saved orders; the separately
+ * numbered invoice is the only GST document. */
+import { BPS_PER_100_PERCENT, type Paise } from './money';
+import type { GstMode } from './gst/profiles';
 
 /* ---------------------------------------------------------------- the shape
    These types describe one bill. They live in this module, not in the
@@ -42,7 +32,6 @@ export type BillData = {
     name: string;
     address: string | null;
     phone: string | null;
-    gstin: string | null;
   };
   order: {
     id: string;
@@ -60,6 +49,7 @@ export type BillData = {
     totalPaise: number;
     /** The rate this bill was taxed at; null on orders placed before 00600. */
     taxRateBps: number | null;
+    gstMode: GstMode;
   };
   lines: BillLine[];
   payments: BillPayment[];
@@ -71,6 +61,7 @@ const METHOD_LABEL: Record<string, string> = {
   card: 'card',
   upi: 'UPI',
   online: 'online payment',
+  manual: 'manual settlement',
 };
 
 /** How a payment method is worded on a bill. */
@@ -96,35 +87,12 @@ export function formatTaxRate(bps: number): string {
   return `${text}%`;
 }
 
-export type TaxSplit = {
-  /** Total tax as stored on the order. */
-  totalPaise: Paise;
-  /** Central GST; the extra paisa on an odd split lands here. */
-  cgstPaise: Paise;
-  sgstPaise: Paise;
-  /** "18%" -- the rate this bill was taxed at, not today's rate. */
-  rateLabel: string;
-};
-
-/**
- * A GST bill shows the tax twice, as CGST and SGST, each half the total.
- *
- * The halves are derived from the stored total rather than recomputed from the
- * rate, so a bill can never disagree with what was actually charged. If the
- * order has no snapshot (placed before migration 00600) the current rate is
- * used only to label the two lines -- never to change an amount.
- */
-export function billTaxSplit(taxPaise: Paise, rateBps: number | null): TaxSplit | null {
-  if (taxPaise <= 0) return null;
-
-  const [cgst, sgst] = splitInHalf(taxPaise);
-
-  return {
-    totalPaise: taxPaise,
-    cgstPaise: cgst,
-    sgstPaise: sgst,
-    rateLabel: formatTaxRate(Math.max(0, rateBps ?? 0) / 2),
-  };
+/** Labels for the ticket summary and its WhatsApp message. No GST
+ * decomposition or live tax registration is asserted on a ticket. */
+export function ticketTaxLabel(mode: GstMode, rate: number | null): string {
+  if (mode === 'composition') return 'GST collected';
+  const label = mode === 'regular' ? 'GST included in this ticket' : 'Legacy tax';
+  return rate == null ? label : `${label} (${formatTaxRate(rate)})`;
 }
 
 /** A bill line reads as one thing the guest can recognise. */
@@ -164,6 +132,7 @@ export type BillMessageInput = {
   discountPaise?: Paise;
   taxPaise: Paise;
   taxRateBps: number | null;
+  gstMode: GstMode;
   totalPaise: Paise;
   /** "Paid by UPI at the counter" or "Not paid yet". */
   paymentLine: string;
@@ -181,7 +150,7 @@ export function buildBillMessage(input: BillMessageInput): string {
   const lines: string[] = [];
 
   lines.push(`*${input.restaurantName}*`);
-  lines.push(`Bill ${input.code}`);
+  lines.push(`Order ticket ${input.code} — not a GST document`);
   lines.push(`${input.placedAt}${input.tableLabel ? ` · ${input.tableLabel}` : ' · Takeaway'}`);
   lines.push('');
 
@@ -190,20 +159,15 @@ export function buildBillMessage(input: BillMessageInput): string {
   }
 
   lines.push('');
-  lines.push(`Subtotal: ${formatBillMoney(input.subtotalPaise)}`);
+  const regular = input.gstMode === 'regular';
+  lines.push(`${regular ? 'Menu subtotal (GST included)' : 'Subtotal'}: ${formatBillMoney(input.subtotalPaise)}`);
 
   if ((input.discountPaise ?? 0) > 0) {
     lines.push(`Discount: −${formatBillMoney(input.discountPaise ?? 0)}`);
   }
 
-  const tax = billTaxSplit(input.taxPaise, input.taxRateBps);
-  if (tax) {
-    // A rate of null means the order predates the snapshot column. The money
-    // is known and the rate is not, so the message prints the money only --
-    // "CGST 0%" on a bill that charged tax would be a lie.
-    const suffix = input.taxRateBps == null ? '' : ` ${tax.rateLabel}`;
-    lines.push(`CGST${suffix}: ${formatBillMoney(tax.cgstPaise)}`);
-    lines.push(`SGST${suffix}: ${formatBillMoney(tax.sgstPaise)}`);
+  if (input.taxPaise > 0 || input.gstMode !== 'off') {
+    lines.push(`${ticketTaxLabel(input.gstMode, input.taxRateBps)}: ${formatBillMoney(input.taxPaise)}`);
   }
 
   lines.push(`*Total: ${formatBillMoney(input.totalPaise)}*`);

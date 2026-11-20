@@ -33,6 +33,14 @@ type QueryCall = {
   limit?: number;
 };
 
+/** Stands in for list_order_floor_labels: the database resolves labels, not a join here. */
+function floorLabelRows(rows: Record<string, Array<Record<string, unknown>>>) {
+  const tables = rows.dining_tables ?? [];
+  return Object.values(rows).flat()
+    .filter(row => row && typeof row.table_id === 'string')
+    .flatMap(row => { const table = tables.find(t => t.id === row.table_id); return table ? [{ order_id: row.id, table_label: table.label }] : []; });
+}
+
 function fakeSupabase(rows: Record<string, Array<Record<string, unknown>>>) {
   const calls: QueryCall[] = [];
   const from = vi.fn((table: string) => {
@@ -76,7 +84,9 @@ function fakeSupabase(rows: Record<string, Array<Record<string, unknown>>>) {
     };
     return chain;
   });
-  const rpc = vi.fn();
+
+  const rpc = vi.fn(async (name: string) => name === 'list_order_floor_labels'
+    ? { data: floorLabelRows(rows), error: null } : { data: null, error: null });
   return { client: { from, rpc } as never, calls, from, rpc };
 }
 
@@ -168,7 +178,8 @@ describe('getOrdersScreenData', () => {
     expect(ordersQuery?.order).toEqual({ column: 'placed_at', ascending: false });
     expect(ordersQuery?.limit).toBe(REPORT_ORDER_LIMIT + 1);
     expect(fake.calls.map((call) => call.table)).toEqual(['orders', 'dining_tables']);
-    expect(fake.rpc).not.toHaveBeenCalled();
+    // The only permitted RPC is the outlet-scoped label projection; no finance aggregate.
+    expect(fake.rpc.mock.calls.map(([name]) => name)).toEqual(['list_order_floor_labels']);
     expect(mocks.reportLoader).not.toHaveBeenCalled();
   });
 

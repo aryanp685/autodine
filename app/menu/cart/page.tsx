@@ -45,15 +45,14 @@ export default async function CartPage({
     return <TableGateScreen reason="stale" verifyHref={verifyAgainHref(access)} />;
   }
 
-  // One query, not two: the restaurants row carries the brand state too.
-  // A restaurant with no published brand paints the product's own style
-  // (lib/branding/guest-theme.ts) exactly as before.
-  const data = await getCartScreenData(s);
+  const slug = access.status === 'verified' || access.status === 'browse' ? access.slug : s;
+  const data = await getCartScreenData(slug);
+  if (isSupabaseConfigured && !data) return <TableGateScreen reason="unavailable" />;
 
   return (
-    <CartProvider slug={s}>
+    <CartProvider slug={slug}>
       <Cart
-        slug={s}
+        slug={slug}
         brandState={data?.brandState}
         restaurantName={data?.restaurantName ?? (isSupabaseConfigured ? undefined : demoRestaurant.name)}
         // Only a verified session names a table. Demo mode can carry one from
@@ -62,6 +61,7 @@ export default async function CartPage({
           access.status === 'verified' || access.status === 'browse' ? access.tableLabel : null
         }
         taxRateBps={data?.taxRateBps}
+        taxTreatment={data?.taxTreatment}
         // With no restaurant resolved on a CONFIGURED deployment: show the
         // empty state rather than a menu of prices that came from nowhere.
         // With no database at all, the demo menu is the only menu there is --

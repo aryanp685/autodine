@@ -4,6 +4,7 @@ import { TableVerifyScreen } from '@/components/screens/TableVerifyScreen';
 import { isVerifyErrorReason, verifyErrorText } from '@/lib/qr-problem';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { dbErrorReference } from '@/lib/db/error-reference';
 import { loadTableAccess } from '@/lib/table-access';
 import { safeNextPath } from '@/lib/verify-next';
 
@@ -52,7 +53,7 @@ export default async function TableVerifyCodePage({
   });
 
   if (error) {
-    console.error('[public_qr_intro] unexpected failure', error);
+    console.error('[public_qr_intro] unexpected failure', dbErrorReference(error));
     redirect('/t/problem?r=failed');
   }
 
@@ -68,7 +69,7 @@ export default async function TableVerifyCodePage({
   // unexpired proves nothing. Already holding a live session means there is
   // nothing to type.
   const access = await loadTableAccess(row.restaurant_slug);
-  if (access.status === 'verified') redirect(destination);
+  if (access.status === 'verified' && access.tableLabel === row.table_label) redirect(destination);
 
   return (
     <TableVerifyScreen

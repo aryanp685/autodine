@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { InvoiceScreen } from './InvoiceScreen';
 import type { ReceiptData } from '@/lib/db/invoice';
 import { buildReceiptMessage } from '@/lib/invoice';
+import { syntheticGstin } from '@/lib/gst/test-fixtures';
 
 const invoice = (overrides: Partial<ReceiptData> = {}): ReceiptData => ({
   id: 'invoice-1',
@@ -162,7 +163,8 @@ describe('P10 real-world receipt scenarios', () => {
   it('13 — marks voided receipts and preserves the replacement relationship', () => {
     const output = html(invoice({ status: 'voided', voidReason: 'Wrong table', supersedesInvoiceId: 'invoice-previous' }));
     expect(output).toContain('VOID — Wrong table');
-    expect(output).toContain('Replacement receipt; previous receipt is voided.');
+    expect(output).toContain('href="/invoice/invoice-previous"');
+    expect(output).toContain('View the previous voided document.');
   });
 
   it('14 — a counter session without a table label remains printable and identified as a session', () => {
@@ -264,5 +266,121 @@ describe('P10 real-world receipt scenarios', () => {
     const output = html();
     expect(output).toContain('Share receipt');
     expect(output).toContain('Print / Save PDF');
+  });
+});
+
+
+const gstInvoice = (overrides: Partial<ReceiptData> = {}): ReceiptData => invoice({
+  documentType: 'gst_tax_invoice',
+  seller: { ...invoice().seller, gstin: syntheticGstin('27ZZZZZ0000Z1Z'), stateCode: '27', fssaiNumber: '01234567890123' },
+  gst: {
+    mode: 'regular', regularProfile: 'other_than_specified_premises', profileNotification: null, serviceSac: '996331',
+    rateBps: 500, cgstBps: 250, sgstBps: 250, taxablePaise: 10000, cgstPaise: 250, sgstPaise: 250,
+    igstPaise: 0, placeOfSupplyStateCode: '27', interState: false, configVersion: 2, notice: null,
+  },
+  lines: [{ ...invoice().lines[0], amountPaise: 10500, unitPricePaise: 10500, quantity: 1 }],
+  totals: { ...invoice().totals, subtotalPaise: 10500, taxablePaise: 10000, taxPaise: 500, totalPaise: 10500, paidPaise: 10500, outstandingPaise: 0, paymentStatus: 'paid' },
+  ...overrides,
+});
+
+describe('GST document output and IRN hold', () => {
+  it('prints and shares saved Regular GST values when IRN is not required', () => {
+    const data = gstInvoice();
+    expect(html(data)).toContain('>TAX INVOICE</p>');
+    expect(html(data)).toContain('Service SAC 996331');
+    expect(html(data)).toContain('Place of supply: Maharashtra (27)');
+    expect(html(data)).toContain('Supplier or authorized representative signature');
+    expect(html(data)).toContain('01234567890123');
+    expect(buildReceiptMessage(data)).toContain('Service SAC 996331');
+    expect(html(data)).toContain('₹105.00');
+    expect(html(data)).toContain('Print / Save PDF');
+    expect(html(data)).toContain('Create 24-hour link');
+    expect(buildReceiptMessage(data)).toContain('\nTAX INVOICE\n');
+    expect(buildReceiptMessage(data)).toContain('CGST 2.50%: ₹2.50');
+    expect(buildReceiptMessage(data)).toContain('Total payable: ₹105.00');
+  });
+
+  it.each(['pending', 'failed', 'generated'] as const)('keeps %s inside the print sheet as a hold and removes delivery controls', (irpStatus) => {
+    const data = gstInvoice({ irpStatus, irn: 'UNVERIFIED' });
+    const output = html(data);
+    expect(output.slice(output.indexOf('<article'), output.indexOf('</article>'))).toContain('not a final tax invoice');
+    expect(output).not.toMatch(/Print \/ Save PDF|Create 24-hour link|Share receipt text|IRN not required|UNVERIFIED/);
+    const text = buildReceiptMessage(data);
+    expect(text).toContain('IRN HOLD — NOT A FINAL GST TAX INVOICE');
+    expect(text).not.toMatch(/\nTAX INVOICE\n|\nGST tax invoice\.|UNVERIFIED|105\.00|Service SAC/);
+  });
+
+  it('renders a trusted private authority projection for print, never a text or bearer share', () => {
+    const data = gstInvoice({irpStatus:'pending',verifiedIrp:{tier:'authority',reference:'a'.repeat(64),
+      acknowledgement:'9007199254740993123',acknowledgedAt:'2026-11-18T12:00:00Z',qrImage:'data:image/png;base64,AA=='}});
+    const output=html(data);
+    expect(output).toContain('>TAX INVOICE</p>');
+    expect(output).toContain('Verified IRP signed QR code');
+    expect(output).toContain('9007199254740993123');
+    expect(output).toContain('Print / Save PDF');
+    expect(output).not.toMatch(/IRN hold|24-hour link|Share receipt text/);
+    expect(buildReceiptMessage(data)).toBe('Private e-invoice. Use the authorized copy with the signed QR.');
+    expect(html({...data,irpStatus:'cancelled'})).not.toMatch(/Print \/ Save PDF|9007199254740993123/);
+  });
+
+  it('preserves an auditable VOID print sheet but refuses sharing', () => {
+    const data = gstInvoice({ status: 'voided', voidReason: 'Test correction' });
+    expect(html(data)).toContain('VOID — Test correction');
+    expect(html(data)).toContain('Print voided copy');
+    expect(html(data)).not.toMatch(/Create 24-hour link|Share receipt text/);
+    expect(buildReceiptMessage(data)).toContain('VOID — NOT A LIVE DOCUMENT');
+  });
+
+  it('keeps the Composition legend and supply value on print and text with no tax split', () => {
+    const notice = 'Composition taxable person, not eligible to collect tax on supplies.';
+    const data = gstInvoice({
+      documentType: 'bill_of_supply',
+      gst: { ...gstInvoice().gst!, mode: 'composition', regularProfile: null, rateBps: 0, cgstBps: 0, sgstBps: 0, cgstPaise: 0, sgstPaise: 0, taxablePaise: 10500, notice },
+      totals: { ...gstInvoice().totals, taxPaise: 0, taxablePaise: 10500 },
+    });
+    for (const output of [html(data), buildReceiptMessage(data)]) {
+      expect(output).toContain('BILL OF SUPPLY');
+      expect(output).toContain('Service SAC 996331');
+      expect(output).toContain('01234567890123');
+      expect(output).toContain(notice);
+      expect(output).toContain('Supply value');
+      expect(output).not.toMatch(/CGST|SGST|GST Tax Invoice/i);
+    }
+  });
+  it('prints the saved retail identity and never shows a GSTIN or tax breakup on a cash memo', () => {
+    const data = invoice({
+      number: 'RBL/26-27/000001',
+      seller: { ...invoice().seller, name: 'Local Test Outlet', address: 'Local Test Lane', phone: '07120000000', fssaiNumber: '01234567890123' },
+      totals: { ...invoice().totals, taxPaise: 0 },
+    });
+    for (const output of [html(data), buildReceiptMessage(data)]) {
+      expect(output).toContain('RETAIL BILL / CASH MEMO');
+      expect(output).toContain('RBL/26-27/000001');
+      expect(output).toContain('Local Test Lane');
+      expect(output).toContain('07120000000');
+      expect(output).toContain('01234567890123');
+      expect(output).not.toMatch(/GSTIN|CGST|SGST|IGST|Tax amount \(from ticket records\)/);
+    }
+    expect(html(invoice())).not.toContain('RETAIL BILL / CASH MEMO');
+  });
+});
+
+
+describe('private delivery and recorded IRP cancellation output',()=>{
+  it('prints complete identified delivery particulars but does not share them as a link or text',()=>{
+    const data=invoice({documentType:'gst_tax_invoice',fulfilmentLabel:'Direct delivery',privateDeliveryCopy:true,tableLabel:null,
+      recipient:{name:'Synthetic consumer',gstin:null,stateCode:'27',email:null,address:'Synthetic billing lane',deliveryAddress:'Synthetic private ship-to'}});
+    const output=html(data);
+    expect(output).toContain('Synthetic private ship-to');
+    expect(output).toContain('Print / Save PDF');
+    expect(output).not.toMatch(/Create 24-hour link|Share receipt text/);
+    expect(buildReceiptMessage(data)).not.toContain('Synthetic private ship-to');
+  });
+  it('distinguishes recorded cancellation but keeps final print, share and void disabled',()=>{
+    const data=invoice({documentType:'gst_tax_invoice',irpStatus:'cancelled'});
+    const output=html(data);
+    expect(output).toContain('IRP cancellation recorded');
+    expect(output).not.toMatch(/Create 24-hour link|Share receipt text|Print \/ Save PDF|IRN on hold/);
+    expect(buildReceiptMessage(data)).toContain('IRP CANCELLATION RECORDED');
   });
 });

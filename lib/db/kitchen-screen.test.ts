@@ -57,12 +57,22 @@ function fakeSupabase(rows: Record<string, Row[]>, writable: boolean | 'error' =
   // restaurant_can_write is the other half of the update policy. True by
   // default; a test passes false for a read-only plan, or 'error' to simulate
   // the read itself failing.
-  const rpc = () =>
-    writable === 'error'
+  const rpc = (name: string) =>
+    name === 'list_order_floor_labels' ? Promise.resolve({ data: floorLabelRows(rows), error: null })
+    : name === 'list_gst_direct_prep_routes' ? Promise.resolve({data:rows.prep_routes ?? [],error:null}) : writable === 'error'
       ? Promise.resolve({ data: null, error: { message: 'network' } })
       : Promise.resolve({ data: writable, error: null });
 
   return { from, rpc } as never;
+}
+
+
+/** Stands in for list_order_floor_labels: the database resolves labels, not a join here. */
+function floorLabelRows(rows: Record<string, Row[]>) {
+  const tables = rows.dining_tables ?? [];
+  return Object.values(rows).flat()
+    .filter(row => row && typeof row.table_id === 'string')
+    .flatMap(row => { const table = tables.find(t => t.id === row.table_id); return table ? [{ order_id: row.id, table_label: table.label }] : []; });
 }
 
 function signedIn(supabase: unknown, role = 'kitchen') {
@@ -80,6 +90,14 @@ beforeEach(() => {
 });
 
 describe('getKitchenScreenData', () => {
+  it('uses an operational delivery label without a session, price or destination projection', async () => {
+    mocks.staff.result = signedIn(fakeSupabase({
+      orders:[{id:'del-1',code:'DL-1',table_id:null,prep_status:'new',placed_at:iso(2)}],
+      prep_routes:[{order_id:'del-1',fulfilment_kind:'direct_delivery'}],
+    }));
+    expect((await getKitchenScreenData())?.tickets[0]).toMatchObject({code:'DL-1',table:'Direct delivery'});
+  });
+
   it('returns null when Supabase is unconfigured, so the screen uses demo data', async () => {
     mocks.staff.result = { ok: false, reason: 'unconfigured' };
     expect(await getKitchenScreenData()).toBeNull();

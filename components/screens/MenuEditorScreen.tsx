@@ -710,6 +710,9 @@ export function MenuEditorScreen({
                     </SubmitButton>
                   </div>
                 </div>
+                <label className="mt-2 flex items-start gap-2 text-[11.5px] text-gink-64">
+                  <input type="checkbox" name="allAlcoholic" /> All dishes in this batch are alcoholic liquor. For a mixed menu, mark individual dishes in the import review.
+                </label>
               </form>
             ) : live && liveCategories.length > 0 ? (
               <>
@@ -771,6 +774,9 @@ export function MenuEditorScreen({
                       </option>
                     ))}
                   </select>
+                </label>
+                <label className="col-span-2 flex items-center gap-2 text-[12.5px] text-gink-64">
+                  <input type="checkbox" name="alcoholic" /> Alcoholic liquor (cannot be ordered under AutoDine GST)
                 </label>
                 <SubmitButton pendingLabel="Adding…" className="col-span-2 w-full sm:col-span-1 sm:w-auto">
                   Add dish
@@ -1186,6 +1192,11 @@ export function MenuEditorScreen({
                     </select>
                   </Field>
                 </div>
+
+                <input type="hidden" name="alcoholClassification" value="1" />
+                <label className="flex items-center gap-2 text-[12.5px] text-gink-64">
+                  <input type="checkbox" name="alcoholic" defaultChecked={'isAlcoholic' in selected && selected.isAlcoholic === true} /> Alcoholic liquor (cannot be ordered under AutoDine GST)
+                </label>
 
                 <SubmitButton tone="ghost" size="md" pendingLabel="Saving…" className="w-full" disabled={!live}>
                   Save draft

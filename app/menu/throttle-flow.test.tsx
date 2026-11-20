@@ -250,6 +250,7 @@ function visibleText(html: string): string {
 function checkoutForm(overrides: Record<string, string> = {}): FormData {
   const data = new FormData();
   data.set('slug', 'maddi');
+  data.set('table', 'table-3');
   data.set('lines', JSON.stringify([{ itemId: 'i1', qty: 2 }]));
   data.set('attempt', '9f4b6c1e-2d3a-4b5c-8d7e-0a1b2c3d4e5f');
   for (const [key, value] of Object.entries(overrides)) data.set(key, value);
@@ -257,14 +258,9 @@ function checkoutForm(overrides: Record<string, string> = {}): FormData {
 }
 
 async function place(form: FormData): Promise<string> {
-  try {
-    await placeOrderAction(form);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : '';
-    if (message.startsWith('redirect:')) return message.slice('redirect:'.length);
-    throw error;
-  }
-  throw new Error('placeOrderAction returned instead of redirecting');
+  const result = await placeOrderAction(form);
+  if (result.kind === 'unconfirmed') throw new Error('Unexpected unconfirmed result');
+  return result.href;
 }
 
 beforeEach(() => {
@@ -452,7 +448,7 @@ describe('an order the guest already has', () => {
      * one `p_guest_token`, and both land on one order.
      */
     database({
-      session: [{ restaurant_slug: 'maddi', table_label: 'T3', expires_at: LIVE_SESSION.expiresAt }],
+      session: [{ restaurant_slug: 'maddi', table_id: 'table-3', table_label: 'T3', expires_at: LIVE_SESSION.expiresAt }],
       place: () => ({ data: {code:'A-1042',error:null}, error: null }),
     });
     mocks.jar.set('autodine_table', JSON.stringify(LIVE_SESSION));
@@ -479,7 +475,7 @@ describe('an order the guest already has', () => {
     // refused. Their order must not be touched, re-created or lost.
     database({
       open: () => limited(),
-      session: [{ restaurant_slug: 'maddi', table_label: 'T3', expires_at: LIVE_SESSION.expiresAt }],
+      session: [{ restaurant_slug: 'maddi', table_id: 'table-3', table_label: 'T3', expires_at: LIVE_SESSION.expiresAt }],
     });
     mocks.jar.set('autodine_table', JSON.stringify(LIVE_SESSION));
 

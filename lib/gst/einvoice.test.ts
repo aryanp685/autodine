@@ -20,7 +20,7 @@ const B2B_INVOICE: EinvoiceInvoiceInput = {
   issuedLocalDate: '2026-11-14',
   irpStatus: 'pending',
   status: 'issued',
-  documentType: 'gst_tax_invoice',
+  documentType: 'gst_tax_invoice', irpEvidence: { applicability: 'required', reportingCategory: 'under_10cr' },
   gst: {
     rateBps: 500,
     taxablePaise: 10000,
@@ -40,9 +40,9 @@ const B2B_INVOICE: EinvoiceInvoiceInput = {
     name: 'Buyer Foods LLP',
     gstin: '29ABCDE1234F1ZW',
     address: 'Buyer House, MIDC, Pune - 411001',
-    email: 'accounts@buyer.example',
+    email: 'accounts@buyer.example', location: 'Pune', pincode: '411001',
   },
-  lines: [{ itemName: 'Plate', quantity: 2, unitPricePaise: 5000, amountPaise: 10000 }],
+  lines: [{ itemName: 'Plate', quantity: 2, unitPricePaise: 5250, amountPaise: 10500 }],
 };
 
 const prepare = (invoice = B2B_INVOICE, profile = SELLER_PROFILE) =>
@@ -56,15 +56,15 @@ describe('prepareEinvoicePayload — fail-closed guards', () => {
     ['an already generated document is refused', { ...B2B_INVOICE, irpStatus: 'generated' }, SELLER_PROFILE, /generated/i],
     ['a missing GST snapshot is refused', { ...B2B_INVOICE, gst: null }, SELLER_PROFILE, /decomposition/i],
     ['composition mode is refused', B2B_INVOICE, { ...SELLER_PROFILE, mode: 'composition', registrationType: 'composition' }, /Regular-GST/i],
-    ['unknown preceding-FY turnover fails closed', B2B_INVOICE, { ...SELLER_PROFILE, precedingFyTurnoverPaise: null }, /aggregate turnover/i],
-    ['turnover at exactly ₹5 crore is not applicable', B2B_INVOICE, { ...SELLER_PROFILE, precedingFyTurnoverPaise: 5_000_000_000 }, /at or below/i],
+    ['unknown saved full prior-FY turnover fails closed', { ...B2B_INVOICE, irpEvidence: undefined }, SELLER_PROFILE, /PAN-wide/i],
+    ['an issue-time decision of not required cannot be overridden', { ...B2B_INVOICE, irpEvidence: { applicability:'not_required', reportingCategory:'under_10cr' } }, SELLER_PROFILE, /does not require/i],
     ['missing issuance profile fails closed with field names', B2B_INVOICE, { ...SELLER_PROFILE, einvoiceLocation: null, einvoiceHsnSac: '' }, /e-Invoice city.*HSN\/SAC|HSN\/SAC.*e-Invoice city/i],
     ['a non-Indian pincode in the profile is refused', B2B_INVOICE, { ...SELLER_PROFILE, einvoicePincode: '011001' }, /PIN/i],
     ['a seller GSTIN that fails the checksum is refused', B2B_INVOICE, { ...SELLER_PROFILE, gstin: '27AAAAA0000A1Z3' }, /GSTIN/i],
     ['seller state code disagreeing with the GSTIN is refused', B2B_INVOICE, { ...SELLER_PROFILE, stateCode: '29' }, /state code/i],
     ['a seller address longer than 100 characters is refused', B2B_INVOICE, { ...SELLER_PROFILE, address: `Building ${'A'.repeat(120)}, Nagpur` }, /100 characters/i],
     ['a missing buyer address is refused', { ...B2B_INVOICE, recipient: { ...B2B_INVOICE.recipient!, address: null } }, SELLER_PROFILE, /buyer address/i],
-    ['a buyer address without a pincode is refused', { ...B2B_INVOICE, recipient: { ...B2B_INVOICE.recipient!, address: 'Buyer House, MIDC, Pune' } }, SELLER_PROFILE, /PIN/i],
+    ['a buyer address without a pincode is refused', { ...B2B_INVOICE, recipient: { ...B2B_INVOICE.recipient!, address: 'Buyer House, MIDC, Pune', pincode: undefined } }, SELLER_PROFILE, /PIN/i],
     ['a B2B document with no recipient is refused', { ...B2B_INVOICE, recipient: null }, SELLER_PROFILE, /B2B/i],
     ['an IGST document is refused (not supported here)', { ...B2B_INVOICE, gst: { ...B2B_INVOICE.gst!, igstPaise: 500 } }, SELLER_PROFILE, /IGST/i],
   ];
@@ -128,8 +128,8 @@ describe('prepareEinvoicePayload — happy path', () => {
       gst: { ...B2B_INVOICE.gst!, taxablePaise: 10001, cgstPaise: 251, sgstPaise: 251 },
       totals: { subtotalPaise: 10503, taxPaise: 502, totalPaise: 10503 },
       lines: [
-        { itemName: 'Thali', quantity: 3, unitPricePaise: 2334, amountPaise: 7001 },
-        { itemName: 'Lassi', quantity: 1, unitPricePaise: 3000, amountPaise: 3000 },
+        { itemName: 'Thali', quantity: 3, unitPricePaise: 2334, amountPaise: 7352 },
+        { itemName: 'Lassi', quantity: 1, unitPricePaise: 3000, amountPaise: 3151 },
       ],
     };
     const result = prepare(invoice);
@@ -150,8 +150,8 @@ describe('prepareEinvoicePayload — happy path', () => {
     const invoice: EinvoiceInvoiceInput = {
       ...B2B_INVOICE,
       lines: [
-        { itemName: 'A', quantity: 1, unitPricePaise: 5000, amountPaise: 5001 },
-        { itemName: 'B', quantity: 1, unitPricePaise: 5000, amountPaise: 4999 },
+        { itemName: 'A', quantity: 1, unitPricePaise: 5000, amountPaise: 5251 },
+        { itemName: 'B', quantity: 1, unitPricePaise: 5000, amountPaise: 5249 },
       ],
       gst: { ...B2B_INVOICE.gst!, taxablePaise: 10000, cgstPaise: 250, sgstPaise: 250 },
       totals: { subtotalPaise: 10500, taxPaise: 500, totalPaise: 10500 },

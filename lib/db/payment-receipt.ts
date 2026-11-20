@@ -1,3 +1,4 @@
+import { dbErrorReference } from '@/lib/db/error-reference';
 import { getStaffContextDetailed } from '@/lib/db/staff';
 import { publicAssetUrl } from '@/lib/storage/assets';
 import type { RestaurantPaymentReceipt } from '@/lib/db/types';
@@ -9,7 +10,7 @@ export type PaymentReceiptData = {
   reference: string;
   invoiceNumber: string;
   issuedAt: string;
-  seller: { name: string; address: string; phone: string | null; logoUrl: string | null };
+  seller: { name: string; address: string; phone: string | null; fssaiNumber?: string | null; logoUrl: string | null };
   tableLabel: string | null;
   method: string;
   amountPaise: number;
@@ -76,6 +77,7 @@ function parseReceipt(row: RestaurantPaymentReceipt, timezone: string): PaymentR
       name: required(seller.name, 'the restaurant name'),
       address: required(seller.address, 'the restaurant address'),
       phone: typeof seller.phone === 'string' ? seller.phone : null,
+      fssaiNumber: typeof seller.fssai_number === 'string' && /^[0-9]{14}$/.test(seller.fssai_number) ? seller.fssai_number : null,
       logoUrl: publicAssetUrl(typeof seller.logo_path === 'string' ? seller.logo_path : null),
     },
     tableLabel: typeof snapshot.table_label === 'string' ? snapshot.table_label : null,
@@ -100,7 +102,7 @@ export async function getPaymentReceiptData(receiptId: string): Promise<PaymentR
     .eq('id', receiptId)
     .eq('restaurant_id', restaurantId)
     .maybeSingle();
-  if (error) throw new Error(`Could not load the payment receipt: ${error.message}`);
+  if (error) throw new Error(`Could not load the payment receipt: ${dbErrorReference(error)}`);
   if (!data) return { ok: false, reason: 'not-found' };
 
   return {

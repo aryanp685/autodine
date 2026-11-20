@@ -46,12 +46,13 @@ export async function readOrderStatus(input: {
   slug: string;
   code: string;
   token: string;
-}): Promise<unknown> {
+}, signal?: AbortSignal): Promise<unknown> {
   const response = await fetch(STATUS_PATH, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ s: input.slug, code: input.code, t: input.token }),
     cache: 'no-store',
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(5_000)]) : AbortSignal.timeout(5_000),
   });
 
   /* A malformed record is not a network problem: retrying it forever would spin
@@ -61,7 +62,8 @@ export async function readOrderStatus(input: {
   if (!response.ok) throw new Error(`status read failed: ${response.status}`);
 
   const payload = (await response.json()) as { ok?: unknown } & Record<string, unknown>;
-  if (payload?.ok !== true) return null;
+  if (payload?.ok === false && payload.reason === 'not_found') return null;
+  if (payload?.ok !== true) throw new Error('status response unavailable');
   return payload;
 }
 
@@ -102,7 +104,7 @@ export function GuestLiveStatus({
     let alive = true;
 
     const poller = createStatusPoller({
-      request: () => readOrderStatus({ slug, code, token }),
+      request: signal => readOrderStatus({ slug, code, token }, signal),
       onSnapshot: (next) => {
         if (!alive) return;
         const key = guestStatus({
@@ -127,7 +129,7 @@ export function GuestLiveStatus({
         setPhase(state.phase);
         setFailures(state.failures);
       },
-      isHidden: () => typeof document !== 'undefined' && document.visibilityState === 'hidden',
+      isHidden: () => document.hidden || !navigator.onLine,
     });
 
     poller.start();

@@ -44,6 +44,7 @@
 
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { dbErrorReference } from '@/lib/db/error-reference';
 import { readCardPass } from '@/lib/table-card';
 import {
   isExpired,
@@ -58,7 +59,7 @@ export type TableAccess =
    * cookie's: the label and expiry rendered to the guest are the ones the
    * row holds right now.
    */
-  | { status: 'verified'; session: TableSession; slug: string; tableLabel: string }
+  | { status: 'verified'; session: TableSession; slug: string; tableId: string; tableLabel: string }
   /** No database configured: render the demo screens, as before. */
   | { status: 'demo'; tableLabel: string | null }
   /**
@@ -129,7 +130,7 @@ export async function loadTableAccess(slug?: string | null): Promise<TableAccess
     });
 
     if (error) {
-      console.error('[table-access] could not resolve the scanned card', error);
+      console.error('[table-access] could not resolve the scanned card', dbErrorReference(error));
       return { status: 'unavailable' };
     }
 
@@ -162,7 +163,7 @@ export async function loadTableAccess(slug?: string | null): Promise<TableAccess
   if (error) {
     // Deliberately not "stale": a database that cannot answer is not the
     // guest's fault, and sending them to re-verify would fail the same way.
-    console.error('[table-access] could not resolve table session', error);
+    console.error('[table-access] could not resolve table session', dbErrorReference(error));
     return { status: 'unavailable' };
   }
 
@@ -191,6 +192,7 @@ export async function loadTableAccess(slug?: string | null): Promise<TableAccess
     status: 'verified',
     slug: row.restaurant_slug,
     tableLabel: row.table_label,
+    tableId: row.table_id,
     session: {
       token: session.token,
       slug: row.restaurant_slug,

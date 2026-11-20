@@ -46,7 +46,6 @@ function live(over: Partial<DashboardScreenData> = {}): DashboardScreenData {
     topItems: [{ name: 'koko', qty: 2, revenuePaise: 92_000 }],
     activeSessions: [],
     canMarkPaid: true,
-    gstMode: 'off',
     hourlyPaise: [0, 0, 155_760],
     ...over,
   };
@@ -101,7 +100,6 @@ const EMPTY: DashboardScreenData = {
   topItems: [],
   activeSessions: [],
   canMarkPaid: false,
-  gstMode: 'off',
   hourlyPaise: [0, 0, 0],
   access: {
     plan: 'trial',
@@ -421,12 +419,13 @@ describe('Dashboard active table sessions', () => {
     totalPaise: 42000,
     paidPaise: 10000,
     outstandingPaise: 32000,
+    gstMode: 'off' as const,
     paidAt: null,
   };
 
   it('shows one table card with the consolidated balance and a single mark-paid tick', () => {
     const html = renderToStaticMarkup(<Dashboard data={live({ activeSessions: [session] })} />);
-    expect(html).toContain('aria-label="Active table sessions"');
+    expect(html).toContain('aria-label="Active billing sessions"');
     expect(html).toContain('T6');
     expect(html).toContain('A-1001, A-1002');
     expect(html).toContain('Session session-1');

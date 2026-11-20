@@ -71,6 +71,7 @@ export type SettingsScreenData = {
   outletEntitlement?: OutletEntitlement | null;
   /** GST configuration, or ready:false when the GST migration is not applied. */
   gst: GstSettingsData;
+  gstCanWrite?: boolean;
   blocked?: 'signed-out' | 'no-membership';
 };
 
@@ -130,7 +131,7 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
 
   const [menusResult, gst] = await Promise.all([
     supabase.from('menus').select('id, is_published').eq('restaurant_id', restaurantId),
-    loadGstSettings(supabase, restaurantId),
+    role === 'owner' || role === 'manager' ? loadGstSettings(supabase, restaurantId) : Promise.resolve(NOT_READY),
   ]);
 
   if (restaurantResult.error) {
@@ -199,6 +200,7 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
     outlets,
     activeOutletId: restaurantId,
     gst,
+    gstCanWrite: role === 'owner' && staff.context.entitlement?.canWrite === true,
     // The plan lives on the account, so this is the account's allowance and
     // the account's outlet count -- not this outlet's.
     outletEntitlement: staff.context.entitlement?.outlets ?? null,

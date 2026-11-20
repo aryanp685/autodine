@@ -15,6 +15,7 @@
  * to a real guest who is trying to order dinner.
  */
 
+import { dbErrorReference } from '@/lib/db/error-reference';
 import { demoMenu } from './demo-menu';
 import { chooseMenu } from '@/lib/menu-select';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
@@ -53,7 +54,7 @@ export async function getRestaurantMenu(
   // also carries plan, trial and UPI payee data. See lib/db/public-restaurant.ts.
   const { data: restaurant, error: restaurantError } = await readPublicRestaurant(supabase, slug);
 
-  if (restaurantError) throw new Error(`Could not load restaurant: ${restaurantError.message}`);
+  if (restaurantError) throw new Error(`Could not load restaurant: ${dbErrorReference(restaurantError)}`);
   if (!restaurant || !restaurant.is_active) return null;
 
   // Every published menu, so the guest can switch, and the chosen one, so the
@@ -67,7 +68,7 @@ export async function getRestaurantMenu(
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true });
 
-  if (menuError) throw new Error(`Could not load menus: ${menuError.message}`);
+  if (menuError) throw new Error(`Could not load menus: ${dbErrorReference(menuError)}`);
 
   const published = (menuRows ?? []) as Menu[];
   const menu = chooseMenu(published, menuId);
@@ -83,7 +84,7 @@ export async function getRestaurantMenu(
     .eq('menu_id', menu.id)
     .order('sort_order', { ascending: true });
 
-  if (categoriesError) throw new Error(`Could not load categories: ${categoriesError.message}`);
+  if (categoriesError) throw new Error(`Could not load categories: ${dbErrorReference(categoriesError)}`);
 
   const categories = (categoryRows ?? []) as Category[];
   const categoryIds = categories.map((category) => category.id);
@@ -102,7 +103,7 @@ export async function getRestaurantMenu(
         .order('created_at', { ascending: true })
     : { data: [], error: null };
 
-  if (itemsError) throw new Error(`Could not load items: ${itemsError.message}`);
+  if (itemsError) throw new Error(`Could not load items: ${dbErrorReference(itemsError)}`);
 
   const categoriesResult = { data: categories };
   const itemsResult = { data: itemRows ?? [] };
@@ -130,7 +131,7 @@ export async function getRestaurantMenu(
     : { data: [], error: null };
 
   if (addonGroupsError) {
-    console.error(`[menu] could not load add-on groups: ${addonGroupsError.message}`);
+    console.error(`[menu] could not load add-on groups: ${dbErrorReference(addonGroupsError)}`);
   }
 
   const addonGroupIds = (addonGroupRows ?? []).map((row) => row.id as string);
@@ -145,7 +146,7 @@ export async function getRestaurantMenu(
     : { data: [], error: null };
 
   if (addonsError) {
-    console.error(`[menu] could not load add-ons: ${addonsError.message}`);
+    console.error(`[menu] could not load add-ons: ${dbErrorReference(addonsError)}`);
   }
 
   const addonsByGroup = new Map<string, ItemAddon[]>();

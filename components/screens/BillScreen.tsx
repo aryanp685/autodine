@@ -22,7 +22,7 @@ import { PrintButton } from '@/components/PrintButton';
 import { VegMark } from '@/components/ui';
 import { btn, inputClass, Field } from '@/components/owner/chrome';
 import {
-  billTaxSplit,
+  ticketTaxLabel,
   buildBillMessage,
   formatBillMoney,
   paymentMethodLabel,
@@ -36,8 +36,7 @@ export function BillScreen({ bill }: { bill: BillData }) {
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
 
-  const tax = billTaxSplit(order.taxPaise, order.taxRateBps);
-  const taxSuffix = order.taxRateBps == null ? '' : ` ${tax?.rateLabel ?? ''}`;
+  const showTax = order.taxPaise > 0 || order.gstMode !== 'off';
   const paid = payments.reduce((sum, p) => sum + p.amountPaise, 0);
 
   const paymentLine = order.cancelled
@@ -58,6 +57,7 @@ export function BillScreen({ bill }: { bill: BillData }) {
     discountPaise: order.discountPaise,
     taxPaise: order.taxPaise,
     taxRateBps: order.taxRateBps,
+    gstMode: order.gstMode,
     totalPaise: order.totalPaise,
     paymentLine,
   });
@@ -76,7 +76,7 @@ export function BillScreen({ bill }: { bill: BillData }) {
     window.open(whatsAppLink(number, message), '_blank', 'noopener,noreferrer');
   }
 
-  const missingDetails = !restaurant.address || !restaurant.gstin;
+  const missingDetails = !restaurant.address;
 
   /**
    * The number, as far as the button is concerned.
@@ -106,7 +106,7 @@ export function BillScreen({ bill }: { bill: BillData }) {
             <span className="hidden text-[11.5px] text-gink-46 sm:inline">
               One page, nothing else
             </span>
-            <PrintButton className={btn('solid', 'sm')}>Print bill</PrintButton>
+            <PrintButton className={btn('solid', 'sm')}>Print ticket summary</PrintButton>
           </div>
         </div>
       </div>
@@ -131,14 +131,11 @@ export function BillScreen({ bill }: { bill: BillData }) {
               {restaurant.phone ? (
                 <p className="mt-0.5 text-[12.5px] text-gink-46">Phone {restaurant.phone}</p>
               ) : null}
-              {restaurant.gstin ? (
-                <p className="mt-0.5 text-[12.5px] text-gink-46">GSTIN {restaurant.gstin}</p>
-              ) : null}
             </div>
 
             <div className="text-right">
               <div className="text-[10.5px] font-semibold tracking-[0.11em] text-gink-46 uppercase">
-                Bill
+                Order ticket
               </div>
               <div className="mt-1 text-[15px] font-medium tracking-[-0.01em] text-gink tabular-nums">
                 {order.code}
@@ -148,6 +145,9 @@ export function BillScreen({ bill }: { bill: BillData }) {
             </div>
           </header>
 
+          <p className="mt-3 text-[12.5px] text-gink-64">
+            Ticket summary · Not a tax invoice or Bill of Supply. Use the final document for GST.
+          </p>
           {order.cancelled ? (
             <p className="mt-5 rounded-[var(--p-r-control)] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-2.5 text-[11.5px] font-semibold tracking-[0.04em] text-[var(--alert)] uppercase">
               CANCELLED — nothing is chargeable on this bill
@@ -219,17 +219,14 @@ export function BillScreen({ bill }: { bill: BillData }) {
 
           {/* Totals sit right, on one edge, so the eye can add them up. */}
           <div className="mt-5 ml-auto w-full max-w-[300px] text-[12.5px]">
-            <Row label="Subtotal" value={formatBillMoney(order.subtotalPaise)} />
+            <Row label={order.gstMode === 'regular' ? 'Menu subtotal (GST included)' : 'Subtotal'} value={formatBillMoney(order.subtotalPaise)} />
 
             {order.discountPaise > 0 ? (
               <Row label="Discount" value={`−${formatBillMoney(order.discountPaise)}`} />
             ) : null}
 
-            {tax ? (
-              <>
-                <Row label={`CGST${taxSuffix}`} value={formatBillMoney(tax.cgstPaise)} />
-                <Row label={`SGST${taxSuffix}`} value={formatBillMoney(tax.sgstPaise)} />
-              </>
+            {showTax ? (
+              <Row label={ticketTaxLabel(order.gstMode, order.taxRateBps)} value={formatBillMoney(order.taxPaise)} />
             ) : null}
 
             <div className="mt-1 flex items-baseline justify-between gap-4 border-t border-gink py-2.5">
@@ -269,7 +266,7 @@ export function BillScreen({ bill }: { bill: BillData }) {
           className="mt-5 rounded-[var(--p-r-block)] border border-hair bg-card px-5 py-5 print:hidden"
         >
           <h2 id="bill-wa-title" className="text-[13px] font-semibold text-gink">
-            Send this bill on WhatsApp
+            Send this ticket summary on WhatsApp
           </h2>
 
           <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -319,12 +316,12 @@ export function BillScreen({ bill }: { bill: BillData }) {
 
           {missingDetails ? (
             <p className="mt-2 rounded-[var(--p-r-control)] border border-[var(--alert)]/30 bg-[var(--alert)]/8 px-3.5 py-2.5 text-[11.5px] leading-[1.5] text-gink-64">
-              Address or GSTIN is empty, so printed bills go out without them.{' '}
+              The address is empty, so printed tickets go out without it.{' '}
               <Link
                 href="/dashboard/settings"
                 className="font-medium text-gink underline decoration-hair-strong underline-offset-2"
               >
-                Add them in Settings
+                Add it in Settings
               </Link>
               .
             </p>

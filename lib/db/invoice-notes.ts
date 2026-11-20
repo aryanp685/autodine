@@ -1,20 +1,16 @@
 import { getStaffContextDetailed } from '@/lib/db/staff';
-import type { MemberRole } from '@/lib/db/database';
 import type { NoteDocumentType, NoteIrpStatus, NoteReasonCode } from '@/lib/gst/notes';
 
 /**
  * Read side of the credit/debit-note ledger (migration 20261114000500).
  *
- * Owner/manager only, mirroring the issuance/void server actions: cashier
- * roles keep plain invoice history but never see note controls. The database
- * RLS policy lets any member read; the role gate is applied here and again
- * inside both RPCs — the UI never widens it.
+ * Owner/manager read access. Current activated documents require an owner
+ * for adjustments; legacy manager authority is retained.
  */
-
-const NOTE_ROLES: readonly MemberRole[] = ['owner', 'manager'];
 
 export type InvoiceNoteRow = {
   id: string;
+  activated?: boolean;
   invoiceId: string;
   documentType: NoteDocumentType;
   documentNumber: string;
@@ -34,7 +30,7 @@ export type InvoiceNoteRow = {
 };
 
 export type InvoiceNotesResult =
-  | { ok: true; notes: InvoiceNoteRow[] }
+  | { ok: true; notes: InvoiceNoteRow[]; role: 'owner' | 'manager'; canWrite: boolean }
   | { ok: false; reason: 'unconfigured' | 'signed-out' | 'no-membership' | 'role-denied' };
 
 const REASON_CODES: readonly NoteReasonCode[] = [
@@ -48,13 +44,13 @@ export async function getInvoiceNotes(limit = 50): Promise<InvoiceNotesResult> {
   const staff = await getStaffContextDetailed();
   if (!staff.ok) return { ok: false, reason: staff.reason };
   const { supabase, restaurantId, role } = staff.context;
-  if (!(NOTE_ROLES as readonly MemberRole[]).includes(role)) {
+  if (role !== 'owner' && role !== 'manager') {
     return { ok: false, reason: 'role-denied' };
   }
 
   const { data, error } = await supabase
     .from('restaurant_notes')
-    .select('id, invoice_id, document_type, document_number, status, reason_code, reason, taxable_paise, cgst_paise, sgst_paise, igst_paise, total_paise, irp_status, source_document_number, issued_at, voided_at, void_reason')
+    .select('id, invoice_id, document_type, document_number, status, reason_code, reason, taxable_paise, cgst_paise, sgst_paise, igst_paise, total_paise, irp_status, source_document_number, issued_at, voided_at, void_reason, seller_snapshot')
     .eq('restaurant_id', restaurantId)
     .order('issued_at', { ascending: false })
     .limit(Math.min(Math.max(Math.trunc(limit), 1), 100));
@@ -70,6 +66,7 @@ export async function getInvoiceNotes(limit = 50): Promise<InvoiceNotesResult> {
 
   const notes = (data ?? []).map((raw) => ({
     id: raw.id,
+    activated: Boolean((raw.seller_snapshot as { activation_effective_from?: string } | null)?.activation_effective_from),
     invoiceId: raw.invoice_id,
     documentType: (raw.document_type === 'debit_note' ? 'debit_note' : 'credit_note') as NoteDocumentType,
     documentNumber: raw.document_number,
@@ -88,5 +85,5 @@ export async function getInvoiceNotes(limit = 50): Promise<InvoiceNotesResult> {
     voidReason: raw.void_reason,
   }));
 
-  return { ok: true, notes };
+  return { ok: true, notes, role, canWrite: staff.context.entitlement?.canWrite === true };
 }

@@ -21,6 +21,10 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { revisionNumber } from '@/lib/realtime-revisions';
+import { orderRefusal } from '@/lib/db/order-refusals';
+import { isOrderToken } from '@/lib/db/order-status';
+import { dbErrorReference } from '@/lib/db/error-reference';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export type GuestActionResult =
@@ -29,18 +33,11 @@ export type GuestActionResult =
 
 const ORDER_PATH = '/menu/order';
 
-function friendly(message: string): string {
-  // The functions raise P0001 with messages written for a guest -- "The
-  // kitchen has already started this order. Please ask the staff." -- so those
-  // pass through. Everything else is a database detail and is replaced.
-  return message.trim() || 'That did not work. Please ask the staff.';
-}
-
 export async function cancelGuestOrderAction(input: {
   orderId: string;
   token: string;
 }): Promise<GuestActionResult> {
-  if (!input.orderId || !input.token) {
+  if (!isOrderToken(input?.orderId) || !isOrderToken(input?.token)) {
     return { ok: false, error: 'That order could not be found.' };
   }
 
@@ -54,8 +51,9 @@ export async function cancelGuestOrderAction(input: {
   });
 
   if (error) {
-    if (error.code === 'P0001') return { ok: false, error: friendly(error.message) };
-    console.error('[cancelGuestOrderAction] unexpected failure', error);
+    const refusal = orderRefusal(error);
+    if (refusal) return { ok: false, error: refusal };
+    console.error('[cancelGuestOrderAction] unexpected failure', dbErrorReference(error));
     return { ok: false, error: 'We could not cancel that order. Please ask the staff.' };
   }
 
@@ -76,31 +74,42 @@ export async function setGuestOrderLinesAction(input: {
   orderId: string;
   token: string;
   lines: { lineId: string; qty: number }[];
+  revision?: string;
 }): Promise<GuestActionResult> {
-  if (!input.orderId || !input.token) {
+  if (!isOrderToken(input?.orderId) || !isOrderToken(input?.token)) {
     return { ok: false, error: 'That order could not be found.' };
   }
 
-  const lines = input.lines
-    .filter((l) => typeof l.lineId === 'string' && l.lineId !== '')
-    .map((l) => ({ line_id: l.lineId, qty: Math.max(0, Math.min(99, Math.trunc(l.qty))) }));
-
-  if (lines.length === 0) return { ok: false, error: 'There was nothing to change.' };
+  if (!Array.isArray(input.lines) || input.lines.length < 1 || input.lines.length > 100 ||
+      input.lines.some(line => !isOrderToken(line?.lineId) || !Number.isSafeInteger(line.qty) || line.qty < 0 || line.qty > 99)) {
+    return { ok: false, error: 'Review the quantities before trying again.' };
+  }
+  const lines = input.lines.map(line => ({ line_id: line.lineId, qty: line.qty }));
 
   const supabase = await createSupabaseServerClient();
   if (!supabase) return { ok: false, error: 'Ordering is not available right now.' };
 
-  const { error } = await supabase.rpc('set_order_line_quantities', {
+  if (typeof input.revision !== 'string' || revisionNumber(input.revision) === null) {
+    return { ok: false, error: 'Reopen the order to review its latest quantities before editing.' };
+  }
+
+  const { data, error } = await supabase.rpc('set_guest_order_lines_at_version', {
+    p_version: input.revision,
     p_order_id: input.orderId,
     p_lines: lines,
     p_guest_token: input.token,
   });
 
   if (error) {
-    if (error.code === 'P0001') return { ok: false, error: friendly(error.message) };
-    console.error('[setGuestOrderLinesAction] unexpected failure', error);
+    const refusal = orderRefusal(error);
+    if (refusal) return { ok: false, error: refusal };
+    console.error('[setGuestOrderLinesAction] unexpected failure', dbErrorReference(error));
     return { ok: false, error: 'We could not change that order. Please ask the staff.' };
   }
+
+  if (data !== 'updated') return { ok: false, error: data === 'stale'
+    ? 'This order changed on another screen. Review the saved quantities before editing again.'
+    : 'That order could not be found.' };
 
   revalidatePath(ORDER_PATH);
 

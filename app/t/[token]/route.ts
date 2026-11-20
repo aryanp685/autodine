@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { isQrToken, TABLE_SESSION_COOKIE, TABLE_SESSION_COOKIE_OPTIONS } from '@/lib/table-session';
+import { dbErrorReference } from '@/lib/db/error-reference';
 import { loadTableAccess } from '@/lib/table-access';
 import { addressFromHeaders, hashAddress } from '@/lib/ip-hash';
 import { TABLE_CARD_COOKIE, TABLE_CARD_COOKIE_OPTIONS } from '@/lib/table-card';
@@ -86,7 +87,7 @@ export async function GET(
   if (error) {
     // Ours, not the guest's: a constraint, a permission problem, a database
     // that is not answering. Its words are not for a guest.
-    console.error('[table-scan] public_qr_intro failed', error);
+    console.error('[table-scan] public_qr_intro failed', dbErrorReference(error));
     return to('/t/problem?r=failed', request);
   }
 
@@ -95,10 +96,10 @@ export async function GET(
 
   const menuHref = `/menu?s=${encodeURIComponent(row.restaurant_slug)}`;
 
-  // Already verified at this restaurant -- the database says so, not the
-  // cookie -- so a re-scan goes straight back to the menu with no form at all.
+  // The labels in these two DB answers are unique *within the outlet*.
+  // A session for another table in this outlet cannot stand in for this card.
   const access = await loadTableAccess(row.restaurant_slug);
-  if (access.status === 'verified') {
+  if (access.status === 'verified' && access.tableLabel === row.table_label) {
     const response = to(menuHref, request);
     response.cookies.set(TABLE_CARD_COOKIE, token, TABLE_CARD_COOKIE_OPTIONS);
     // Already verified, so an earlier throttle no longer describes this guest.
@@ -146,7 +147,7 @@ export async function GET(
    */
   if (flag) {
     response.cookies.set(THROTTLE_COOKIE, flag, THROTTLE_COOKIE_OPTIONS);
-  } else if (opened) {
+  } else if (opened || request.cookies.has(THROTTLE_COOKIE)) {
     // The ordinary case: this browser just proved it can be given a session, so
     // any stale "you were throttled" note is no longer true.
     response.cookies.set(THROTTLE_COOKIE, '', { ...THROTTLE_COOKIE_OPTIONS, maxAge: 0 });
@@ -170,6 +171,10 @@ export async function GET(
       ...TABLE_SESSION_COOKIE_OPTIONS,
       maxAge: 60 * 59,
     });
+  } else if (request.cookies.has(TABLE_SESSION_COOKIE)) {
+    // The guest scanned a different live table. A code requirement, throttle
+    // or temporary failure must not leave the old table authorized here.
+    response.cookies.set(TABLE_SESSION_COOKIE, '', { ...TABLE_SESSION_COOKIE_OPTIONS, maxAge: 0 });
   }
   return response;
 }
@@ -194,7 +199,7 @@ async function openSessionOnScan(cardToken: string, request: NextRequest) {
   });
 
   if (error) {
-    console.error('[table-scan] open_table_session failed', error);
+    console.error('[table-scan] open_table_session failed', dbErrorReference(error));
     return null;
   }
 

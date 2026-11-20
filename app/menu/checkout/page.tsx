@@ -43,7 +43,9 @@ export default async function CheckoutPage({
     return <TableGateScreen reason="stale" verifyHref={verifyAgainHref(access)} />;
   }
 
-  const data = await getCartScreenData(s);
+  const slug = access.status === 'verified' || access.status === 'browse' ? access.slug : s;
+  const data = await getCartScreenData(slug);
+  if (isSupabaseConfigured && !data) return <TableGateScreen reason="unavailable" />;
 
   /**
    * A live card, no session: show the bill and ask for the code, on one screen.
@@ -54,7 +56,7 @@ export default async function CheckoutPage({
    */
   if (access.status === 'browse') {
     return (
-      <CartProvider slug={s}>
+      <CartProvider slug={slug}>
         <VerifyToOrderScreen
           brandState={data?.brandState}
           slug={access.slug}
@@ -64,19 +66,22 @@ export default async function CheckoutPage({
           windowMinutes={Math.max(1, Math.round(access.windowSeconds / 60))}
           items={data?.items ?? []}
           taxRateBps={data?.taxRateBps}
+          taxTreatment={data?.taxTreatment}
         />
       </CartProvider>
     );
   }
 
   return (
-    <CartProvider slug={s}>
+    <CartProvider slug={slug}>
       <Checkout
         brandState={data?.brandState}
-        slug={s}
+        slug={slug}
         restaurantName={data?.restaurantName ?? (isSupabaseConfigured ? undefined : demoRestaurant.name)}
         tableLabel={access.status === 'verified' ? access.tableLabel : null}
+        tableId={access.status === 'verified' ? access.tableId : undefined}
         taxRateBps={data?.taxRateBps}
+        taxTreatment={data?.taxTreatment}
         // With no database at all, the demo menu is the menu. On a configured
         // deployment an unresolved restaurant still gets no prices at all --
         // prices that came from nowhere are worse than none.

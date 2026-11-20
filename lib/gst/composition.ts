@@ -22,7 +22,7 @@
  */
 
 export const COMPOSITION_BILL_NOTICE =
-  'Composition taxable person, not eligible to collect tax on supplies.';
+  'Composition taxable person, not eligible to collect tax on supplies';
 
 export const COMPOSITION_ACK_TEXT =
   'I confirm this restaurant (a) is registered under the GST Composition Scheme on the GST portal, ' +

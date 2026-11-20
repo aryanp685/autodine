@@ -38,7 +38,7 @@ test.describe('tampered client prices', () => {
 
     // ₹299 × 2, from the menu. Not ₹2, not ₹0.02.
     await expect(page.locator('dl').getByText('₹598')).toBeVisible();
-    await expect(page.locator('dl').getByText('₹628')).toBeVisible(); // + 5% tax
+    await expect(page.locator('dl').getByText('₹627.90')).toBeVisible(); // ₹598 plus the demo's ₹29.90 sample tax
   });
 
   test('the order form posts ids and quantities — never a price', async ({ page }) => {
@@ -46,12 +46,18 @@ test.describe('tampered client prices', () => {
     await page.goto('/menu/checkout');
     await waitForAppReady(page);
 
-    // The hidden input is rendered empty on the server and filled from the
-    // browser's cart after hydration; wait for the real line to land before
-    // reading it.
-    const input = page.locator('form#co-place-order input[name="lines"]');
-    await expect(input).toHaveValue(/it-hara-bhara/);
-    const raw = await input.inputValue();
+    // Checkout snapshots the basket when submitting, not in a hidden input
+    // at render time. Inspect the actual server-action request.
+    const posted = page.waitForRequest(request => request.method() === 'POST' &&
+      new URL(request.url()).pathname === '/menu/checkout');
+    await page.locator('[data-place-order="bill"]').click();
+    const request = await posted;
+    const body = await new Response(new Uint8Array(request.postDataBuffer()!), {
+      headers: { 'Content-Type': (await request.headerValue('content-type'))! },
+    }).formData();
+    const entry = [...body].find(([name]) => name === 'lines' || name.endsWith('_lines'));
+    expect(entry).toBeDefined();
+    const raw = entry![1] as string;
     const lines = JSON.parse(raw) as Array<Record<string, unknown>>;
 
     expect(lines).toHaveLength(1);

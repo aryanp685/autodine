@@ -45,7 +45,7 @@ const PEOPLE_HASH = '#settings-people';
 
 type InvitableRole = Exclude<MemberRole, 'owner'>;
 
-const INVITABLE: InvitableRole[] = ['manager', 'cashier', 'kitchen'];
+const INVITABLE: InvitableRole[] = ['manager', 'cashier', 'kitchen', 'waiter'];
 
 function fail(message: string): never {
   redirect(`${SETTINGS_PATH}?error=${encodeURIComponent(message)}${PEOPLE_HASH}`);

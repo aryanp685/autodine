@@ -46,6 +46,7 @@ const ROLE_TONE = {
   manager: 'work',
   cashier: 'live',
   kitchen: 'neutral',
+  waiter: 'neutral',
 } as const;
 
 function Row({ children }: { children: ReactNode }) {

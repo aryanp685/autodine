@@ -24,10 +24,12 @@
 import { useFormStatus } from 'react-dom';
 export function PlaceOrderButton({
   canOrder,
+  recovery = false,
   form,
   variant,
 }: {
   canOrder: boolean;
+  recovery?: boolean;
   /** The id of the form this button submits, when it is not a descendant. */
   form: string;
   /** `bill` sits in the summary card; `dock` is the pinned bar on a phone. */
@@ -35,13 +37,10 @@ export function PlaceOrderButton({
 }) {
   const { pending } = useFormStatus();
 
-  const label = !canOrder
-    ? 'Add items before checkout'
-    : pending
-      ? 'Placing your order…'
-      : variant === 'dock'
-        ? 'PLACE ORDER & PAY AT COUNTER'
-        : 'PLACE ORDER & PAY AT COUNTER';
+  const label = pending ? 'Placing your order…'
+    : !canOrder ? 'Review your cart before checkout'
+    : recovery ? 'Retry same order'
+    : 'PLACE ORDER & PAY AT COUNTER';
 
   return (
     <button

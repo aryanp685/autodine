@@ -105,6 +105,30 @@ describe('ReportsScreen', () => {
     expect(html).toContain('type=items');
   });
 
+  it('keeps GST snapshots and held status separate from ticket sales and collections', () => {
+    const range = resolveRange('custom', TZ, NOW, { from: '2026-10-01', to: '2026-10-15' });
+    const html = renderToStaticMarkup(<ReportsScreen data={{ ...live(), range, gstDocuments: [{
+      financial_year: '26-27', series_code: 'INV', document_type: 'gst_tax_invoice', document_status: 'issued', rate_bps: 500, irn_held: true,
+      document_count: 2, total_paise: 21022, taxable_paise: 20021, cgst_paise: 501, sgst_paise: 500, igst_paise: 0,
+      rounding_delta_paise: -1, missing_rounding_count: 1,
+    }] }} />);
+    expect(html).toContain('IRN hold · not final');
+    expect(html).toContain('26-27 · INV');
+    expect(html).toContain('without rounding evidence');
+    expect(html).toContain('₹210.22');
+    expect(html).toContain('−₹0.01');
+    expect(html).toContain('not deducted from collections');
+    expect(html).toContain('type=gst&amp;range=custom&amp;from=2026-10-01&amp;to=2026-10-15');
+    expect(html).toContain('type=summary');
+  });
+
+  it('says GST reporting is unavailable rather than offering an empty export', () => {
+    const html = renderToStaticMarkup(<ReportsScreen data={{ ...live(), gstDocuments: null }} />);
+    expect(html).toContain('GST document reporting is unavailable on this database.');
+    expect(html).not.toContain('type=gst');
+    expect(html).toContain('type=summary');
+  });
+
   it('offers the three ranges and marks the active one', () => {
     const html = renderToStaticMarkup(<ReportsScreen data={live()} />);
     expect(html).toContain('Last 7 days');

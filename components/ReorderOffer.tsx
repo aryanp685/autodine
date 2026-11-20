@@ -90,13 +90,10 @@ export function ReorderOffer({
       return;
     }
 
-    // ClearCartOnOrder writes the remembered cart after provider hydration.
-    // Re-read after mount and whenever cart state changes so this offer can
-    // observe that saved snapshot without racing the sibling effect.
-    const timer = window.setTimeout(() => {
-      setLines(readLastCart(browserStorage(), slug));
-    }, 0);
-    return () => window.clearTimeout(timer);
+    const sync = () => setLines(readLastCart(browserStorage(), slug));
+    sync();
+    window.addEventListener('storage', sync);
+    return () => window.removeEventListener('storage', sync);
   }, [enabled, slug, cart?.ready, cart?.count]);
 
   if (!enabled || !slug || !cart || !cart.ready || lines.length === 0) return null;

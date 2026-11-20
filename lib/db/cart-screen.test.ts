@@ -44,6 +44,7 @@ const BASE_RESULTS: TableResults = {
         price_paise: 34900,
         is_veg: true,
         is_available: true,
+        is_alcoholic: false,
         image_url: null,
         item_variants: [],
       },
@@ -60,10 +61,11 @@ const BASE_RESULTS: TableResults = {
   },
 };
 
-function fakeSupabase(results: TableResults) {
+function fakeSupabase(results: TableResults, quote: QueryResult) {
   const queriedTables: string[] = [];
   const client = {
     rpc(functionName: string) {
+      if (functionName === 'public_order_pricing') return { maybeSingle: () => Promise.resolve(quote) };
       if (functionName !== 'public_restaurant_profile') throw new Error(`Unexpected RPC: ${functionName}`);
       return { maybeSingle: () => Promise.resolve({ data: results.restaurants.data, error: results.restaurants.error }) };
     },
@@ -85,8 +87,8 @@ function fakeSupabase(results: TableResults) {
   return { client, queriedTables };
 }
 
-function useResults(overrides: Partial<TableResults> = {}) {
-  const fake = fakeSupabase({ ...BASE_RESULTS, ...overrides });
+function useResults(overrides: Partial<TableResults> = {}, quote: QueryResult = { data: { tax_treatment: 'exclusive', tax_rate_bps: 0 }, error: null }) {
+  const fake = fakeSupabase({ ...BASE_RESULTS, ...overrides }, quote);
   mocks.createClient.mockResolvedValue(fake.client);
   return fake;
 }
@@ -110,6 +112,22 @@ describe('cart screen pricing reads', () => {
         maxSelect: 2,
       },
     ]);
+  });
+
+  it.each([['exclusive', 0, true], ['inclusive', 500, false], ['inclusive', 1800, false], ['none', 0, false]])(
+    'marks availability correctly for an alcoholic item at %s (%i bps)', async (tax_treatment, tax_rate_bps, allowed) => {
+      useResults({ items: { data: [{ id: 'alcohol', name: 'Classified fixture', is_available: true, is_alcoholic: true }], error: null } },
+        { data: { tax_treatment, tax_rate_bps }, error: null });
+      const data = await getCartScreenData('saffron-smoke');
+      expect(data?.taxTreatment).toBe(tax_treatment);
+      expect(data?.items.find((item) => item.id === 'alcohol')?.isAvailable).toBe(allowed);
+    },
+  );
+
+  it('does not substitute a legacy or sample rate for a missing live quote RPC', async () => {
+    const { queriedTables } = useResults({}, { data: null, error: { code: 'PGRST202', message: 'RPC missing' } });
+    await expect(getCartScreenData('saffron-smoke')).rejects.toThrow(/prices could not be loaded/i);
+    expect(queriedTables).toEqual([]);
   });
 
   it.each(['item_addon_groups', 'item_addons'])(

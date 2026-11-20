@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { InvoiceHistoryScreen } from '@/components/screens/InvoiceHistoryScreen';
 import { EinvoiceReconciliationPanel } from '@/components/screens/EinvoiceReconciliationPanel';
 import { InvoiceNotesPanel, type NoteSourceDocument } from '@/components/screens/InvoiceNotesPanel';
-import { getInvoiceHistory } from '@/lib/db/invoice-history';
+import { hasIrnHold } from '@/lib/invoice';
+import { getInvoiceHistory, type InvoiceHistoryRow } from '@/lib/db/invoice-history';
 import { getInvoiceNotes } from '@/lib/db/invoice-notes';
 import { getEinvoiceReconciliation } from '@/lib/db/einvoice-reconciliation';
 import { getOutletBar } from '@/lib/db/outlet-bar';
@@ -13,7 +15,10 @@ export const dynamic = 'force-dynamic';
 export default async function InvoiceHistoryPage() {
   const [result, outlet, reconciliation, notesResult] = await Promise.all([getInvoiceHistory(), getOutletBar(), getEinvoiceReconciliation(), getInvoiceNotes()]);
   const reconciliationPanel =
-    reconciliation.ok && reconciliation.visible ? <EinvoiceReconciliationPanel rows={reconciliation.rows} /> : null;
+    reconciliation.ok && reconciliation.visible ? <>
+      <Link className="mb-3 inline-block text-sm font-semibold underline underline-offset-2" href="/dashboard/reports/irp">Open E-invoice / IRP register</Link>
+      <EinvoiceReconciliationPanel rows={reconciliation.rows} />
+    </> : null;
   if (!result.ok) {
     const message = result.reason === 'role-denied'
       ? 'Invoice history is available only to owner, manager and cashier roles.'
@@ -36,6 +41,8 @@ export default async function InvoiceHistoryPage() {
       <InvoiceNotesPanel
         notes={notesResult.notes}
         sources={noteSources(result.rows)}
+        mayWrite={notesResult.canWrite}
+        owner={notesResult.role === 'owner'}
       />
     )
     : notesResult.reason === 'unconfigured'
@@ -52,20 +59,21 @@ export default async function InvoiceHistoryPage() {
   return <InvoiceHistoryScreen rows={result.rows} outlet={outlet} einvoiceFollowUps={<>{reconciliationPanel}{notesPanel}</>} />;
 }
 
-/** Issued GST documents are the only note-eligible sources. Voided and plain
- * receipts are excluded here AND refused by the database. */
-function noteSources(rows: { invoice: { id: string; number: string; status: 'issued' | 'voided'; totalPaise: number | null; documentType: 'receipt' | 'gst_tax_invoice' | 'bill_of_supply' } | null }[]): NoteSourceDocument[] {
+/** Restrict the picker to saved Rule 53 facts. The issue RPC is authoritative. */
+function noteSources(rows: InvoiceHistoryRow[]): NoteSourceDocument[] {
   const seen = new Map<string, NoteSourceDocument>();
   for (const row of rows) {
     const invoice = row.invoice;
     if (!invoice || invoice.status !== 'issued') continue;
-    if (invoice.documentType !== 'gst_tax_invoice' && invoice.documentType !== 'bill_of_supply') continue;
+    if (invoice.documentType !== 'gst_tax_invoice' || !invoice.noteParticularsRecorded) continue;
     if (!seen.has(invoice.id)) {
       seen.set(invoice.id, {
         invoiceId: invoice.id,
         number: invoice.number,
         documentType: invoice.documentType,
         totalPaise: invoice.totalPaise,
+        irnHeld: hasIrnHold(invoice),
+        activated: invoice.activated,
       });
     }
   }

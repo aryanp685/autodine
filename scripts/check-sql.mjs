@@ -57,7 +57,7 @@ function stripUnsupported(sql) {
   // function pasted out of the live database is stripped too instead of
   // failing the parse of the file around it.
   out = out.replace(
-    /create\s+or\s+replace\s+function[\s\S]*?\$(\w*)\$[\s\S]*?\$\1\$\s*;/gi,
+    /create\s+(?:or\s+replace\s+)?function[\s\S]*?\$(\w*)\$[\s\S]*?\$\1\$\s*;/gi,
     '',
   );
   // create policy ... ;
@@ -98,6 +98,9 @@ function stripUnsupported(sql) {
   // PUBLICATION idempotent. The parser has no plpgsql, so the whole block
   // goes. It is reported as unverified like the functions above.)
   out = out.replace(/^\s*do\s+\$\$[\s\S]*?\$\$\s*;\s*$/gim, '');
+  // alter type ... add value ... ;  (no ALTER TYPE in the parser. Migration
+  // 20261118002100 adds the 'waiter' role this way; native replay validates it.)
+  out = out.replace(/^\s*alter\s+type[\s\S]*?add\s+value[\s\S]*?;\s*$/gim, '');
   // alter publication ... ;  (no such statement in the parser)
   out = out.replace(/^\s*alter\s+publication[\s\S]*?;\s*$/gim, '');
   // alter table ... replica identity ... ;  (not in the parser either)
@@ -129,7 +132,9 @@ for (const file of files) {
   const sql = readFileSync(full, 'utf8');
 
   const stripped = stripUnsupported(sql);
-  const removedFns = (sql.match(/create\s+or\s+replace\s+function/gi) || []).length;
+  // Plain CREATE FUNCTION is equally unverifiable; migration 20261118002100
+  // adds new functions that way rather than replacing an existing signature.
+  const removedFns = (sql.match(/create\s+(?:or\s+replace\s+)?function/gi) || []).length;
   const removedPolicies = (sql.match(/create\s+policy/gi) || []).length;
   const removedDrops = (sql.match(/drop\s+policy/gi) || []).length;
   const removedGrants = (sql.match(/^\s*grant\s/gim) || []).length;
@@ -146,6 +151,7 @@ for (const file of files) {
   const removedPublications = (sql.match(/^\s*alter\s+publication/gim) || []).length;
   const removedReplicaIdentity = (sql.match(/replica\s+identity/gi) || []).length;
   const removedRenames = (sql.match(/^\s*alter\s+function/gim) || []).length;
+  const removedEnumValues = (sql.match(/^\s*alter\s+type[\s\S]*?add\s+value/gim) || []).length;
 
   // Comments are not statements, and the parser understands only one of the
   // two ways of writing them. `--` was enough until migration 20261029000100,
@@ -167,7 +173,8 @@ for (const file of files) {
         `${removedTriggers} trigger(s), ${removedTriggerDrops} trigger drop(s), ` +
         `${removedDoBlocks} do block(s), ${removedPublications} publication change(s), ` +
         `${removedReplicaIdentity} replica identity statement(s), ` +
-        `${removedRenames} function rename(s)`,
+        `${removedRenames} function rename(s), ` +
+        `${removedEnumValues} enum value addition(s)`,
     );
     continue;
   }
@@ -187,7 +194,8 @@ for (const file of files) {
       `${removedTriggers} trigger(s), ${removedTriggerDrops} trigger drop(s)`,
       `${removedDoBlocks} do block(s), ${removedPublications} publication change(s), ` +
         `${removedReplicaIdentity} replica identity statement(s), ` +
-        `${removedRenames} function rename(s)`,
+        `${removedRenames} function rename(s), ` +
+        `${removedEnumValues} enum value addition(s)`,
     ].join(', ');
     console.log(
       `${file}: DDL parses (${ast.length} statements)` +

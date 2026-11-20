@@ -17,7 +17,6 @@ const bill = (over: Partial<BillData> = {}): BillData => ({
     name: 'Maddi',
     address: '12 Baner Road, Pune 411045',
     phone: '9876543210',
-    gstin: '27ABCDE1234F1Z5',
   },
   order: {
     id: 'o-1',
@@ -33,6 +32,7 @@ const bill = (over: Partial<BillData> = {}): BillData => ({
     taxPaise: 9153,
     totalPaise: 110853,
     taxRateBps: 1800,
+    gstMode: 'off',
   },
   lines: [
     {
@@ -51,26 +51,39 @@ const bill = (over: Partial<BillData> = {}): BillData => ({
 });
 
 describe('BillScreen', () => {
-  it('prints the restaurant details a bill is legally expected to carry', () => {
+  it('prints the storefront details without putting a live GSTIN on the ticket', () => {
     const html = renderToStaticMarkup(<BillScreen bill={bill()} />);
     expect(html).toContain('Maddi');
     expect(html).toContain('12 Baner Road, Pune 411045');
-    expect(html).toContain('GSTIN 27ABCDE1234F1Z5');
+    expect(html).not.toContain('GSTIN');
+    expect(html).toContain('Not a tax invoice or Bill of Supply');
     expect(html).toContain('9876543210');
   });
 
-  it('shows the tax split, not one unexplained figure', () => {
+  it('preserves a legacy charge without labeling it CGST or SGST', () => {
     const html = renderToStaticMarkup(<BillScreen bill={bill()} />);
-    expect(html).toContain('CGST 9%');
-    expect(html).toContain('SGST 9%');
-    expect(html).toContain('₹45.77');
-    expect(html).toContain('₹45.76');
+    expect(html).toContain('Legacy tax (18%)');
+    expect(html).toContain('₹1,108.53');
+    expect(html).not.toContain('CGST');
   });
 
-  it('adds up: the two tax halves make the stored tax', () => {
-    const html = renderToStaticMarkup(<BillScreen bill={bill()} />);
-    // 4577 + 4576 = 9153, and the total is subtotal + that tax.
-    expect(html).toContain('₹1,108.53');
+  it('uses inclusive ticket amounts for Regular without pretending to be a tax invoice', () => {
+    const html = renderToStaticMarkup(<BillScreen bill={bill({
+      order: { ...bill().order, gstMode: 'regular', subtotalPaise: 10500, totalPaise: 10500, taxPaise: 500, taxRateBps: 500 },
+    })} />);
+    expect(html).toContain('Menu subtotal (GST included)');
+    expect(html).toContain('GST included in this ticket (5%)');
+    expect(html).toContain('₹105.00');
+    expect(html).not.toContain('CGST');
+  });
+
+  it('does not add tax to a Composition ticket', () => {
+    const html = renderToStaticMarkup(<BillScreen bill={bill({
+      order: { ...bill().order, gstMode: 'composition', subtotalPaise: 10500, totalPaise: 10500, taxPaise: 0, taxRateBps: 0 },
+    })} />);
+    expect(html).toContain('GST collected');
+    expect(html).toContain('₹0.00');
+    expect(html).not.toContain('SGST');
   });
 
   it('keeps portion and add-ons with the dish they were charged for', () => {
@@ -129,13 +142,13 @@ describe('BillScreen', () => {
     const html = renderToStaticMarkup(
       <BillScreen bill={bill({ order: { ...bill().order, taxRateBps: null } })} />
     );
-    expect(html).toContain('CGST');
-    expect(html).not.toContain('CGST 0%');
+    expect(html).toContain('Legacy tax');
+    expect(html).not.toContain('Legacy tax (');
   });
 
   it('offers WhatsApp, and says plainly that nothing is sent for you', () => {
     const html = renderToStaticMarkup(<BillScreen bill={bill()} />);
-    expect(html).toContain('Send this bill on WhatsApp');
+    expect(html).toContain('Send this ticket summary on WhatsApp');
     // The sentence explains the hand-off, and the button it belongs to does
     // not pretend to be live before a number is typed.
     expect(html).toContain('you still press send');
@@ -147,11 +160,11 @@ describe('BillScreen', () => {
     const html = renderToStaticMarkup(
       <BillScreen
         bill={bill({
-          restaurant: { name: 'Maddi', address: null, phone: null, gstin: null },
+          restaurant: { name: 'Maddi', address: null, phone: null },
         })}
       />
     );
-    expect(html).toContain('Address or GSTIN is empty');
+    expect(html).toContain('The address is empty');
     expect(html).toContain('/dashboard/settings');
   });
 
@@ -161,7 +174,7 @@ describe('BillScreen', () => {
     const html = renderToStaticMarkup(<BillScreen bill={bill()} />);
     expect(html).toContain('data-print-chrome="toolbar"');
     expect(html).toContain('data-print-chrome="whatsapp"');
-    expect(html).toContain('Print bill');
+    expect(html).toContain('Print ticket summary');
 
     // Both are actually hidden on paper, not merely labelled.
     const chrome = [...html.matchAll(/data-print-chrome="[a-z]+"[^>]*class="([^"]*)"/g)];

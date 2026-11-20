@@ -1,41 +1,5 @@
-/**
- * The engine that keeps a guest's order status fresh.
- *
- * WHY NOT SUPABASE REALTIME
- *
- * Realtime needs a browser client holding the anon key and a read policy on
- * public.orders for that role. There is deliberately no such policy: a guest is
- * not signed in, and the only way they may read an order is through
- * get_public_order(), which requires the order's own unguessable token. Opening
- * `orders` to `anon` so a subscription can work would mean any visitor can
- * subscribe to every restaurant's feed -- a tenant-isolation hole traded for a
- * few seconds of latency. So this polls, and the polling is designed to be
- * cheap and honest instead.
- *
- * WHAT IT GUARANTEES
- *
- *   - ONE request at a time. A poll that is already in flight is not doubled by
- *     a visibility change or a second mount.
- *   - NOTHING while the tab is hidden: an order page left open on a locked
- *     phone does not spend the restaurant's database.
- *   - An immediate read when the guest comes back, because that is the moment
- *     they are looking again.
- *   - SLOWING DOWN when the network is failing (2s, 5s, 10s, 20s, 30s, then a
- *     minute), and an immediate retry when the browser says it is online again.
- *     A tight retry loop on a dead connection is how a guest's battery dies and
- *     how a small restaurant's free-tier quota does.
- *   - STOPPING at a terminal status. Served and cancelled will not change, and
- *     a page that keeps asking is a page that keeps paying for the answer.
- *
- * WHY IT IS NOT A REACT HOOK
- *
- * Timers and visibility are the parts that actually go wrong, and a hook can
- * only be tested with a browser. This is a plain factory with its clock, timer
- * and fetch injected, so every one of the behaviours above has a test that runs
- * in a second without one. components/GuestLiveStatus.tsx is the thin React
- * wrapper, and holds no scheduling logic of its own.
- */
-
+/** One visibility-aware scoped status read at a time, with bounded retries. */
+import { revisionNumber } from '@/lib/realtime-revisions';
 import {
   guestStatus,
   parseOrderStatusSnapshot,
@@ -70,19 +34,14 @@ export type PollIntervals = {
   backoff: readonly number[];
 };
 
-/**
- * Ten seconds while a meal is being cooked is fast enough to feel live and slow
- * enough that a hundred open tabs are not a hundred queries a second. The
- * kitchen board itself polls at five.
- */
 export const DEFAULT_INTERVALS: PollIntervals = {
-  active: 10_000,
+  active: 3_000,
   backoff: [2_000, 5_000, 10_000, 20_000, 30_000, 60_000],
 };
 
 export type PollerDeps = {
   /** One read. Resolves null when the server says the order does not exist. */
-  request: () => Promise<unknown>;
+  request: (signal: AbortSignal) => Promise<unknown>;
   /** Injectable clock, so tests do not wait. */
   now?: () => number;
   setTimer?: (fn: () => void, ms: number) => unknown;
@@ -90,6 +49,10 @@ export type PollerDeps = {
   /** True while the tab is hidden. */
   isHidden?: () => boolean;
   onSnapshot: (snapshot: OrderStatusSnapshot) => void;
+  /** On the bill, served is not settled. Prep-only views can stop at served. */
+  watchPayment?: boolean;
+  /** Detail view must retry even a terminal invalidation until props catch up. */
+  stopAtTerminal?: boolean;
   /** The server answered, and the order is not there (any more). */
   onMissing?: () => void;
   onState?: (state: PollerState) => void;
@@ -114,7 +77,8 @@ export function createStatusPoller(deps: PollerDeps): StatusPoller {
   const intervals: PollIntervals = { ...DEFAULT_INTERVALS, ...deps.intervals };
 
   let running = false;
-  let inFlight = false;
+  let inFlight: AbortController | null = null;
+  let observed: bigint | null = null;
   let timer: unknown = null;
   let state: PollerState = { phase: 'idle', failures: 0, lastOkAt: null };
 
@@ -157,13 +121,15 @@ export function createStatusPoller(deps: PollerDeps): StatusPoller {
     // One request at a time. The in-flight read will schedule the next.
     if (inFlight) return;
 
-    inFlight = true;
+    const controller = new AbortController();
+    inFlight = controller;
     emit({
       phase: state.lastOkAt === null && state.failures === 0 ? 'checking' : 'live',
     });
 
     try {
-      const raw = await deps.request();
+      const raw = await deps.request(controller.signal);
+      if (!running || controller.signal.aborted) return;
       const snapshot = parseOrderStatusSnapshot(raw);
 
       if (raw === null) {
@@ -181,10 +147,17 @@ export function createStatusPoller(deps: PollerDeps): StatusPoller {
         throw new Error('unreadable status payload');
       }
 
+      const version = revisionNumber(snapshot.revision);
+      if (observed !== null && (version === null || version < observed)) {
+        schedule(intervals.active);
+        return;
+      }
+      observed = version;
       deps.onSnapshot(snapshot);
       emit({ phase: 'live', failures: 0, lastOkAt: Date.parse(snapshot.checkedAt) || now() });
 
-      if (guestStatus({ prepStatus: snapshot.status, awaitingConfirmation: snapshot.awaitingConfirmation }).terminal) {
+      const status = guestStatus({ prepStatus: snapshot.status, awaitingConfirmation: snapshot.awaitingConfirmation });
+      if (deps.stopAtTerminal !== false && status.terminal && !(deps.watchPayment && status.key === 'served' && snapshot.paymentStatus === 'pending')) {
         running = false;
         clear();
         emit({ phase: 'stopped' });
@@ -193,11 +166,12 @@ export function createStatusPoller(deps: PollerDeps): StatusPoller {
 
       schedule(intervals.active);
     } catch {
+      if (!running || controller.signal.aborted) return;
       const failures = state.failures + 1;
       emit({ phase: 'reconnecting', failures });
       schedule(failureDelay(failures));
     } finally {
-      inFlight = false;
+      if (inFlight === controller) inFlight = null;
     }
   }
 
@@ -211,6 +185,8 @@ export function createStatusPoller(deps: PollerDeps): StatusPoller {
     stop() {
       running = false;
       clear();
+      inFlight?.abort();
+      inFlight = null;
       emit({ phase: 'stopped' });
     },
     pollNow() {

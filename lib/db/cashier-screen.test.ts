@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/db/staff', () => ({
+  CASHIER_ROLES: ['owner','manager','cashier'],
   getStaffContextDetailed: () => Promise.resolve(mocks.staff.result),
 }));
 
@@ -64,6 +65,15 @@ function order(overrides: Record<string, unknown> = {}) {
     placed_at: iso(12),
     ...overrides,
   };
+}
+
+
+/** Stands in for list_order_floor_labels: the database resolves labels, not a join here. */
+function floorLabelRows(rows: Record<string, Row[]>) {
+  const tables = rows.dining_tables ?? [];
+  return Object.values(rows).flat()
+    .filter(row => row && typeof row.table_id === 'string')
+    .flatMap(row => { const table = tables.find(t => t.id === row.table_id); return table ? [{ order_id: row.id, table_label: table.label }] : []; });
 }
 
 beforeEach(() => {
@@ -180,6 +190,14 @@ describe('getCashierScreenData', () => {
     });
   });
 
+  it('offers direct ticket entry only to writable counter staff', async () => {
+    const base = signedIn(fakeSupabase({orders_finance:[]}));
+    for (const [role,canWrite,expected] of [['cashier',true,true],['owner',false,false],['kitchen',true,false]] as const) {
+      mocks.staff.result = {...base, context:{...base.context,role,entitlement:{canWrite}}};
+      expect((await getCashierScreenData())?.canPlaceDirect).toBe(expected);
+    }
+  });
+
   it('converts paise to rupees', async () => {
     mocks.staff.result = signedIn(
       fakeSupabase({ orders_finance: [order()], order_items: [], dining_tables: [{ id: 't-3', label: 'T3' }] })
@@ -241,6 +259,12 @@ describe('getCashierScreenData', () => {
       fakeSupabase({ orders_finance: [order({ table_id: null })], order_items: [] })
     );
     expect((await getCashierScreenData())?.queue[0].table).toBe('Takeaway');
+  });
+
+  it('uses saved direct fulfilment rather than a missing table to label a delivery', async () => {
+    mocks.staff.result = signedIn(fakeSupabase({orders_finance:[order({table_id:null,order_session_id:'s-1'})],order_items:[],
+      order_sessions:[{id:'s-1',fulfilment_kind:'direct_delivery'}]}));
+    expect((await getCashierScreenData())?.queue[0]?.table).toBe('Direct delivery');
   });
 
   it('skips the tables query entirely when no order has a table', async () => {

@@ -327,11 +327,8 @@ describe.skipIf(!DB)('throttling, against a real PostgreSQL', () => {
 
     const redirects: string[] = [];
     for (let i = 0; i < 2; i += 1) {
-      try {
-        await placeOrderAction(form);
-      } catch (error) {
-        redirects.push(error instanceof Error ? error.message.replace('redirect:', '') : '');
-      }
+      const result = await placeOrderAction(form);
+      if (result.kind !== 'unconfirmed') redirects.push(result.href);
     }
 
     expect(redirects).toHaveLength(2);
@@ -369,12 +366,10 @@ describe.skipIf(!DB)('throttling, against a real PostgreSQL', () => {
     form.set('lines', JSON.stringify([{ itemId, qty: 2 }]));
     form.set('attempt', '0f4b6c1e-2d3a-4b5c-8d7e-0a1b2c3d4e5a');
 
-    let target = '';
-    try {
-      await placeOrderAction(form);
-    } catch (error) {
-      target = error instanceof Error ? error.message.replace('redirect:', '') : '';
-    }
+    const { rows: [table] } = await db.query('select table_id from table_qr_codes where public_token=$1', [CARD]);
+    form.set('table', table.table_id);
+    const result = await placeOrderAction(form);
+    const target = result.kind === 'placed' ? result.href : '';
 
     // A real order, written by the real function, with a real code.
     expect(target).toContain('/menu/order?');

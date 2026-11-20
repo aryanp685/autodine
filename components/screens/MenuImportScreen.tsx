@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useCallback, useState, useTransition } from 'react';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { attachImportPhotosAction, type CropUpload } from '@/app/(staff)/dashboard/menus/import-actions';
 import { createImportPairAction } from '@/app/(staff)/dashboard/menus/brand-actions';
@@ -111,6 +111,11 @@ export function MenuImportScreen({
   const [menuFile, setMenuFile] = useState<File | null>(null);
   const [brandState, setBrandState] = useState<BrandReviewState | null>(null);
   const [photoDraft, setPhotoDraft] = useState<PhotoDraft | null>(null);
+  const [alcoholic, setAlcoholic] = useState<Record<string, boolean>>({});
+  const reviewDraft = useCallback((draft: PhotoDraft | null) => {
+    setPhotoDraft(draft);
+    setAlcoholic({});
+  }, []);
   /**
    * The chosen storefront design — step 3. Optional on purpose: with no pick
    * the save keeps the extracted style exactly as it always has.
@@ -160,7 +165,14 @@ export function MenuImportScreen({
           ? { ...(brand ?? { importId }), theme: chosenDesign.theme }
           : (brand ?? { importId });
         const result = await createImportPairAction({
-          menu: { ...photoDraft.payload, importId },
+          menu: {
+            ...photoDraft.payload,
+            importId,
+            categories: photoDraft.payload.categories.map((category, section) => ({
+              ...category,
+              items: category.items.map((item, row) => ({ ...item, isAlcoholic: alcoholic[`${section}:${row}`] === true })),
+            })),
+          },
           brand: brandDraft,
         });
         if (!result.ok) {
@@ -321,9 +333,9 @@ export function MenuImportScreen({
       {blocked && <SignInPrompt reason={blocked} screen="menu import" />}
 
       {!blocked && visionEnabled && (
-        <PhotoImportPanel canWrite={canWrite} onFileChange={setMenuFile} onDraftChange={setPhotoDraft} />
+        <PhotoImportPanel canWrite={canWrite} onFileChange={setMenuFile} onDraftChange={reviewDraft} />
       )}
-      {!blocked && <TextImportPanel canWrite={canWrite} onDraftChange={setPhotoDraft} />}
+      {!blocked && <TextImportPanel canWrite={canWrite} onDraftChange={reviewDraft} />}
 
       {error && (
         <p
@@ -374,6 +386,24 @@ export function MenuImportScreen({
               {chosenDesign ? ` (${chosenDesign.name})` : ''}. Your live menu is untouched.
             </p>
           </div>
+          <details className="mx-4 mt-3 rounded-lg border border-hair px-3 py-2 text-[12.5px] sm:mx-5">
+            <summary className="cursor-pointer font-medium">Mark alcoholic liquor, if any</summary>
+            <p className="my-2 text-gink-64">AutoDine does not infer this from dish names. Composition cannot include alcoholic items, even in drafts. Marked items cannot be ordered in Regular GST.</p>
+            <ul className="m-0 flex max-h-64 list-none flex-col gap-1 overflow-auto p-0">
+              {photoDraft.payload.categories.flatMap((category, section) => category.items.map((item, row) => {
+                const key = `${section}:${row}`;
+                return (
+                  <li key={key}>
+                    <label className="flex items-center gap-2 py-1">
+                      <input type="checkbox" checked={alcoholic[key] === true} disabled={writing}
+                        onChange={(event) => setAlcoholic({ ...alcoholic, [key]: event.currentTarget.checked })} />
+                      {item.name} · {category.name}
+                    </label>
+                  </li>
+                );
+              }))}
+            </ul>
+          </details>
           <div className="flex flex-wrap items-center justify-end gap-2 px-4 py-4 sm:px-5">
             <button type="button" className={btn('solid')} onClick={saveImport} disabled={writing}>
               {writing ? 'Saving…' : `Save ${saveCount} dish${saveCount === 1 ? '' : 'es'} as a draft`}

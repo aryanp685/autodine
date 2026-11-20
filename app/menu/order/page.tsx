@@ -1,14 +1,12 @@
 import type { Metadata } from 'next';
 import { CartProvider } from '@/components/CartProvider';
-import { ClearCartOnOrder } from '@/components/ClearCartOnOrder';
-import { RememberOrder } from '@/components/RememberOrder';
 import { OrderPlacedScreen } from '@/components/screens/OrderPlacedScreen';
 import { getOrderScreenData } from '@/lib/db/order-screen';
 import { loadTableAccess } from '@/lib/table-access';
 
 // Not "Order placed": this page also renders the state of a link that could
 // not be opened, and a tab promising an order that is not there is a small lie.
-export const metadata: Metadata = { title: 'Your order · AutoDine' };
+export const metadata: Metadata = { title: 'Your order · AutoDine', robots: { index: false, follow: false }, referrer: 'no-referrer' };
 
 // This page is keyed by a guest credential and contains a private bill plus
 // the current kitchen state. Never cache it across order requests; a stale
@@ -32,46 +30,21 @@ export const revalidate = 0;
 export default async function OrderPage({
   searchParams,
 }: {
-  searchParams: Promise<{ s?: string; code?: string; t?: string; placed?: string }>;
+  searchParams: Promise<{ s?: string; code?: string; t?: string }>;
 }) {
-  const { s, code, t, placed: justPlaced } = await searchParams;
+  const { s, code, t } = await searchParams;
   const [data, access] = await Promise.all([
     getOrderScreenData(s, code, t),
     loadTableAccess(s),
   ]);
 
-  // The cart provider is mounted here for one reason: the order in it has just
-  // become a real order, and the cart must not survive that. See
-  // ClearCartOnOrder -- the cart used to stay full after ordering, so the next
-  // visit to the menu offered to place the same meal again.
-  /*
-   * Clearing the cart is right on the redirect that follows an order and wrong
-   * on every other visit: a guest who has started a second order and then opens
-   * an old one from their history would lose the new cart to it.
-   *
-   * `placed=1` is written by the order action and by nothing else, so this is
-   * "the button sent me here", not "this order exists".
-   */
-  const placed = Boolean(data) && data?.prepStatus !== 'cancelled' && justPlaced === '1';
-
   return (
     <CartProvider slug={s}>
-      <ClearCartOnOrder clear={placed} slug={s} />
-      {/* Only a real, non-cancelled order is remembered: a cancelled one is not
-          something to offer back from the Orders tab. */}
-      <RememberOrder
-        slug={s}
-        code={data?.code}
-        token={t}
-        placedAt={data?.placedAt}
-        enabled={placed}
-      />
       <OrderPlacedScreen
         data={data}
         token={t}
         slug={s}
-        canCallWaiter={access.status === 'verified'}
-        cartClearing={placed}
+        canCallWaiter={access.status === 'verified' && access.tableLabel === data?.tableLabel}
         brandState={data?.brandState}
       />
     </CartProvider>

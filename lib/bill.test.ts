@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   billLineLabel,
   billTaxRateBps,
-  billTaxSplit,
+  ticketTaxLabel,
   buildBillMessage,
   deriveTaxRateBps,
   formatBillMoney,
@@ -42,25 +42,11 @@ describe('formatTaxRate', () => {
   });
 });
 
-describe('billTaxSplit', () => {
-  it('shows nothing when no tax was charged', () => {
-    expect(billTaxSplit(0, 500)).toBeNull();
-  });
-
-  it('splits one tax figure into CGST and SGST that add back exactly', () => {
-    const split = billTaxSplit(9001, 1800);
-    expect(split?.cgstPaise).toBe(4501);
-    expect(split?.sgstPaise).toBe(4500);
-    expect((split?.cgstPaise ?? 0) + (split?.sgstPaise ?? 0)).toBe(9001);
-  });
-
-  it('labels the halves with half the rate', () => {
-    // A bill taxed at 18% prints CGST 9% and SGST 9%, never 18% twice.
-    expect(billTaxSplit(9000, 1800)?.rateLabel).toBe('9%');
-  });
-
-  it('does not invent a rate on an order that has no snapshot', () => {
-    expect(billTaxSplit(5000, null)?.rateLabel).toBe('0%');
+describe('ticketTaxLabel', () => {
+  it('keeps all three ticket labels and does not guess a legacy rate', () => {
+    expect(ticketTaxLabel('composition', 0)).toBe('GST collected');
+    expect(ticketTaxLabel('regular', 1800)).toBe('GST included in this ticket (18%)');
+    expect(ticketTaxLabel('off', null)).toBe('Legacy tax');
   });
 });
 
@@ -117,6 +103,7 @@ describe('buildBillMessage', () => {
     subtotalPaise: 101700,
     taxPaise: 9153,
     taxRateBps: 1800,
+    gstMode: 'off' as const,
     totalPaise: 110853,
     paymentLine: 'Paid by UPI at the counter.',
   };
@@ -124,7 +111,7 @@ describe('buildBillMessage', () => {
   it('starts with the restaurant and the reference, not a code block', () => {
     const message = buildBillMessage(base);
     expect(message.split('\n')[0]).toBe('*Maddi*');
-    expect(message).toContain('Bill MA-4F2K1');
+    expect(message).toContain('Order ticket MA-4F2K1 — not a GST document');
     expect(message).toContain('· T3');
   });
 
@@ -132,16 +119,16 @@ describe('buildBillMessage', () => {
     expect(buildBillMessage(base)).toContain('2 × Butter Chicken — ₹938.00');
   });
 
-  it('shows the tax split and the total last', () => {
+  it('shows the legacy add-on without inventing a GST split', () => {
     const message = buildBillMessage(base);
-    expect(message).toContain('CGST 9%: ₹45.77');
-    expect(message).toContain('SGST 9%: ₹45.76');
+    expect(message).toContain('Legacy tax (18%): ₹91.53');
+    expect(message).not.toContain('CGST');
     expect(message).toContain('*Total: ₹1,108.53*');
   });
 
   it('prints no tax lines when no tax was charged', () => {
     const message = buildBillMessage({ ...base, taxPaise: 0, taxRateBps: 0, totalPaise: 101700 });
-    expect(message).not.toContain('CGST');
+    expect(message).not.toContain('Legacy tax');
     expect(message).toContain('*Total: ₹1,017.00*');
   });
 

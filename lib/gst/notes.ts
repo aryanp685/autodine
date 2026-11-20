@@ -10,6 +10,8 @@
  */
 
 import type { IrpDocumentKind } from './irp/types';
+import { gstStateLabel } from './onboarding';
+import { checkGstin } from './gstin';
 
 export type NoteDocumentType = 'credit_note' | 'debit_note';
 export type NoteIrpStatus = 'not_required' | 'pending' | 'generated' | 'failed' | 'cancelled';
@@ -124,12 +126,32 @@ export function canIssueNoteAgainst(input: {
   if (input.sourceStatus !== 'issued') {
     return { ok: false, error: 'A voided document cannot be noted. Issue the replacement document instead.' };
   }
-  if (input.sourceDocumentType === 'receipt') {
-    return { ok: false, error: 'Notes exist only against GST documents. Correct a plain receipt with void and re-issue.' };
+  if (input.sourceDocumentType !== 'gst_tax_invoice') {
+    return { ok: false, error: 'This workflow needs an original tax invoice. Ask the owner to review a receipt or Bill of Supply correction.' };
   }
   const live = input.liveNotes.some((note) => note.document_type === input.requestedKind && note.status === 'issued');
   if (live) {
     return { ok: false, error: 'This document already has a live note of that kind. Void it before issuing a replacement.' };
   }
   return { ok: true };
+}
+
+/** Rule 53 particulars only, not an eligibility or signature determination. */
+export function snapshotText(snapshot: unknown, key: string): string {
+  if (!snapshot || typeof snapshot !== 'object') return '';
+  const value = (snapshot as Record<string, unknown>)[key];
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+export function noteParticulars(sourceType: string, seller: unknown, buyer: unknown, gst: unknown) {
+  if (sourceType !== 'gst_tax_invoice' || !snapshotText(seller, 'gstin')
+      || !(snapshotText(seller, 'legal_name') || snapshotText(seller, 'name')) || !snapshotText(seller, 'address')) return null;
+  const rate = gst && typeof gst === 'object' ? (gst as Record<string, unknown>).rate_bps : null;
+  if (typeof rate !== 'number' || !Number.isInteger(rate) || rate < 0) return null;
+  const name = snapshotText(buyer, 'name'), address = snapshotText(buyer, 'address');
+  const gstin = snapshotText(buyer, 'gstin'), deliveryAddress = snapshotText(buyer, 'delivery_address');
+  const code = snapshotText(buyer, 'state_code'), state = gstStateLabel(code);
+  if (!name || !address || (gstin ? !checkGstin(gstin).ok
+    : snapshotText(buyer, 'recipient_type') !== 'consumer' || !state || ['25','28'].includes(code) || !deliveryAddress)) return null;
+  return { name, address, gstin, state, deliveryAddress, rateBps: rate };
 }

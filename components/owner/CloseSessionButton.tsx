@@ -5,29 +5,36 @@ import { useRouter } from 'next/navigation';
 
 import { checkoutSessionAction } from '@/app/(staff)/dashboard/actions';
 import { btn } from '@/components/owner/chrome';
+import { GstBuyerFields } from './GstBuyerFields';
+import type { CheckoutRecipient } from '@/lib/gst/buyer';
 
 export function CloseSessionButton({
   sessionId,
   table,
   outstandingPaise,
   gstMode = 'off',
+  identifiedRequired = false,
+  outletId,
+  canSaveBuyer,
 }: {
   sessionId: string;
   table: string;
   outstandingPaise: number;
+  identifiedRequired?: boolean;
+  outletId?: string;
+  canSaveBuyer?: boolean;
   /** 'regular' enables the optional B2B buyer block (GST tax invoice). */
   gstMode?: 'off' | 'regular' | 'composition';
 }) {
   const router = useRouter();
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState('');
-  const [buyerOpen, setBuyerOpen] = useState(false);
-  const [buyer, setBuyer] = useState({ name: '', gstin: '', address: '', email: '' });
+  const [buyerOpen, setBuyerOpen] = useState(identifiedRequired);
+  const [buyer, setBuyer] = useState<CheckoutRecipient>();
   const [pending, startTransition] = useTransition();
   const inFlight = useRef(false);
 
-  const buyerActive =
-    buyer.name.trim() !== '' || buyer.gstin.trim() !== '' || buyer.address.trim() !== '' || buyer.email.trim() !== '';
+  const buyerActive = gstMode === 'regular' && buyerOpen && Boolean(buyer);
 
   if (outstandingPaise > 0) {
     return (
@@ -39,6 +46,11 @@ export function CloseSessionButton({
 
   function checkout() {
     if (inFlight.current) return;
+    if (gstMode === 'regular' && (buyerOpen || identifiedRequired) && !buyer) {
+      setBuyerOpen(true);
+      setError(identifiedRequired ? 'Enter buyer details for this amount.' : 'Complete the buyer details, or clear them for walk-in billing.');
+      return;
+    }
     if (!confirm) {
       setConfirm(true);
       setError('');
@@ -47,50 +59,33 @@ export function CloseSessionButton({
     inFlight.current = true;
     setError('');
     startTransition(async () => {
-      const result = await checkoutSessionAction(
-        sessionId,
-        buyerActive
-          ? { name: buyer.name, gstin: buyer.gstin, address: buyer.address, email: buyer.email }
-          : undefined,
-      );
-      inFlight.current = false;
-      if (!result.ok) {
-        setError(result.error);
+      try {
+        const result = await checkoutSessionAction(sessionId, buyerActive ? buyer : undefined);
+        if (!result.ok) { setError(result.error); setConfirm(false); return; }
+        router.push(result.invoiceUrl);
+      } catch {
+        setError('Could not verify checkout. Reload the table before trying again.');
         setConfirm(false);
-        return;
-      }
-      router.push(result.invoiceUrl);
+      } finally { inFlight.current = false; }
     });
   }
 
   const buyerBlock = gstMode === 'regular' && buyerOpen ? (
-    <fieldset aria-label="B2B buyer details (optional)" className="mb-2 w-full rounded-[var(--p-r-control)] border border-hair bg-paper-deep px-2.5 py-2 text-left">
-      <legend className="px-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-gink-46">Buyer (B2B, optional)</legend>
-      <label className="block text-[10px] text-gink-46">Legal name
-        <input className="mt-0.5 w-full rounded-[var(--p-r-control)] border border-hair bg-card px-1.5 py-1 text-[11.5px] text-gink" value={buyer.name} autoComplete="organization" onChange={(e) => setBuyer({ ...buyer, name: e.target.value })} placeholder="Buyer Pvt Ltd" />
-      </label>
-      <label className="mt-1 block text-[10px] text-gink-46">GSTIN
-        <input className="mt-0.5 w-full rounded-[var(--p-r-control)] border border-hair bg-card px-1.5 py-1 font-mono text-[11.5px] uppercase text-gink" value={buyer.gstin} autoComplete="off" maxLength={15} spellCheck={false} onChange={(e) => setBuyer({ ...buyer, gstin: e.target.value.toUpperCase() })} placeholder="27ABCDE1234F1Z5" />
-      </label>
-      <label className="mt-1 block text-[10px] text-gink-46">Billing address (optional)
-        <input className="mt-0.5 w-full rounded-[var(--p-r-control)] border border-hair bg-card px-1.5 py-1 text-[11.5px] text-gink" value={buyer.address} autoComplete="street-address" onChange={(e) => setBuyer({ ...buyer, address: e.target.value })} placeholder="Registered office, City" />
-      </label>
-      <label className="mt-1 block text-[10px] text-gink-46">Email (optional)
-        <input className="mt-0.5 w-full rounded-[var(--p-r-control)] border border-hair bg-card px-1.5 py-1 text-[11.5px] text-gink" type="email" value={buyer.email} autoComplete="email" onChange={(e) => setBuyer({ ...buyer, email: e.target.value })} placeholder="accounts@buyer.example" />
-      </label>
-    </fieldset>
+    <div hidden={confirm} className="w-full"><GstBuyerFields onChange={setBuyer} outletId={outletId} canSave={canSaveBuyer} identifiedRequired={identifiedRequired} /></div>
   ) : null;
 
-  const buyerToggle = gstMode === 'regular' ? (
-    <button type="button" className="mb-1 text-[10px] font-medium text-gink-46 underline underline-offset-2" onClick={() => setBuyerOpen((open) => !open)} aria-expanded={buyerOpen}>
-      {buyerOpen ? 'Hide buyer details' : 'Business buyer? Add GSTIN'}
+  const buyerToggle = gstMode === 'regular' && !identifiedRequired ? (
+    <button type="button" className="mb-1 text-[10px] font-medium text-gink-46 underline underline-offset-2"
+      onClick={() => { setBuyerOpen(!buyerOpen); setBuyer(undefined); }} aria-expanded={buyerOpen}>
+      {buyerOpen ? 'Clear buyer details' : 'Add buyer details or GSTIN'}
     </button>
   ) : null;
 
   const toggle = confirm ? (
     <div role="group" aria-label={`Confirm checkout for ${table}`} className="max-w-[260px] rounded-[var(--p-r-control)] border border-hair bg-paper-deep px-3 py-2 text-right">
       <p className="text-[11.5px] leading-[1.45] text-gink-64">
-        Close {table} and issue the final receipt? The receipt snapshots all tickets and payments.
+        Close {table} and save the {gstMode === 'regular' ? 'GST document' : gstMode === 'composition' ? 'Bill of Supply' : 'final receipt'}? All tickets and payments are saved in the document.
+        {buyerActive ? ' If IRN validation is required, the document stays on hold and cannot be shared as a tax invoice.' : null}
       </p>
       <div className="mt-2 flex justify-end gap-2">
         <button type="button" className={btn('quiet', 'sm')} onClick={() => setConfirm(false)} disabled={pending}>Keep open</button>
@@ -102,12 +97,13 @@ export function CloseSessionButton({
   ) : (
     <>
       {buyerToggle}
+      {gstMode === 'composition' ? <p className="text-right text-[10px] text-gink-64">For a registered buyer requesting a Bill of Supply, stop and ask the owner. This checkout cannot capture that registration.</p> : null}
       <button
         type="button"
         className={btn('ghost', 'sm')}
         onClick={checkout}
         disabled={pending}
-        aria-label={`Close ${table} and issue final receipt`}
+        aria-label={`Close ${table} and ${gstMode === 'off' ? 'issue final receipt' : 'save billing document'}`}
         data-checkout-session={sessionId}
       >
         Close & invoice

@@ -1,3 +1,7 @@
+import { readOrderFloorLabels } from './floor-service';
+import { dbErrorReference } from '@/lib/db/error-reference';
+import { directFulfilmentLabel } from '@/lib/gst/place-of-supply';
+import { extractInclusiveTax } from '@/lib/gst/money-gst';
 import { readAllRows, readRowsForIds } from '@/lib/db/paged-read';
 /**
  * Load the owner-facing dashboard overview from the real database.
@@ -29,7 +33,7 @@ import type { RestaurantAccess } from '@/lib/access';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from './database';
 import { CASHIER_ROLES, getStaffContextDetailed } from './staff';
-import { loadGstMode, type GstMode } from './gst-settings';
+import type { GstMode } from '@/lib/gst/profiles';
 import { hourInZone, RESTAURANT_TIME_ZONE, startOfDayUtc } from './time';
 
 
@@ -62,6 +66,7 @@ export type DashboardActiveSessionItem = {
 export type DashboardActiveSession = {
   id: string;
   table: string;
+  deliveryAddress?: string | null;
   openedAt: string;
   orderCount: number;
   orderCodes: string[];
@@ -71,6 +76,9 @@ export type DashboardActiveSession = {
   outstandingPaise: number;
   /** Only shown when no balance remains. */
   paidAt: string | null;
+  /** B2B details are captured for Regular tickets only, not the live settings. */
+  gstMode: GstMode;
+  gstRecipientParticularsRequired?: boolean;
 };
 
 export type DashboardTopItem = {
@@ -91,6 +99,7 @@ export type DashboardStats = {
 };
 
 export type DashboardScreenData = {
+  gstBuyerOwnerOutletId?: string;
   restaurantName: string;
   /** IANA zone of the restaurant, so a placed-at time is its time, not UTC's. */
   timezone: string;
@@ -105,11 +114,6 @@ export type DashboardScreenData = {
   activeSessions: DashboardActiveSession[];
   /** The signed-in role can mark sessions paid only while write access is live. */
   canMarkPaid: boolean;
-  /**
-   * Billing mode for this outlet's final documents. Regular mode lets the
-   * checkout capture optional B2B buyer details on the tax invoice.
-   */
-  gstMode: GstMode;
   /**
    * Revenue per elapsed hour of the business day. Length is
    * hours elapsed + 1, not 24: a chart that ran to midnight every morning
@@ -151,35 +155,45 @@ async function loadActiveSessions(
 ): Promise<DashboardActiveSession[]> {
   const sessionsResult = await supabase
     .from('order_sessions')
-    .select('id, table_id, opened_at, paid_at')
+    .select('id, table_id, fulfilment_kind, opened_at, paid_at')
     .eq('restaurant_id', restaurantId)
     .eq('status', 'open')
     .order('opened_at', { ascending: false });
 
   if (sessionsResult.error) {
-    throw new Error(`Could not load active table sessions: ${sessionsResult.error.message}`);
+    throw new Error(`Could not load active table sessions: ${dbErrorReference(sessionsResult.error)}`);
   }
 
   const sessions = sessionsResult.data ?? [];
   if (sessions.length === 0) return [];
 
+  const deliveryAddresses = new Map<string,string>();
+  if (sessions.some(session => session.fulfilment_kind === 'direct_delivery')) {
+    const { data, error } = await supabase.rpc('list_gst_direct_destinations',{p_outlet:restaurantId});
+    if (error) throw new Error('Could not load the authorized direct delivery destinations.');
+    if (Array.isArray(data)) for (const row of data) {
+      if (row && typeof row === 'object' && !Array.isArray(row) && typeof row.session_id === 'string' && typeof row.delivery_address === 'string') {
+        deliveryAddresses.set(row.session_id,row.delivery_address);
+      }
+    }
+  }
   const sessionIds = sessions.map((session) => session.id);
   const { data: orders, error: ordersError } = await supabase
     .from('orders_finance')
-    .select('id, code, order_session_id, table_id, total_paise, prep_status')
+    .select('id, code, order_session_id, table_id, total_paise, prep_status, gst_mode_snapshot, tax_rate_bps_snapshot')
     .eq('restaurant_id', restaurantId)
     .in('order_session_id', sessionIds)
     .neq('prep_status', 'cancelled');
 
   if (ordersError) {
-    throw new Error(`Could not load session tickets: ${ordersError.message}`);
+    throw new Error(`Could not load session tickets: ${dbErrorReference(ordersError)}`);
   }
 
   const orderRows = orders ?? [];
   if (orderRows.length === 0) return [];
 
   const orderIds = orderRows.map((order) => order.id);
-  const tableIds = [...new Set(sessions.map((session) => session.table_id))];
+  const tableIds = [...new Set(sessions.flatMap((session) => session.table_id ? [session.table_id] : []))];
   const [paymentsResult, tablesResult, itemsResult] = await Promise.all([
     supabase
       .from('payments')
@@ -196,13 +210,13 @@ async function loadActiveSessions(
   ]);
 
   if (paymentsResult.error) {
-    throw new Error(`Could not load session payments: ${paymentsResult.error.message}`);
+    throw new Error(`Could not load session payments: ${dbErrorReference(paymentsResult.error)}`);
   }
   if (tablesResult.error) {
-    throw new Error(`Could not load session tables: ${tablesResult.error.message}`);
+    throw new Error(`Could not load session tables: ${dbErrorReference(tablesResult.error)}`);
   }
   if (itemsResult.error) {
-    throw new Error(`Could not load session ticket items: ${itemsResult.error.message}`);
+    throw new Error(`Could not load session ticket items: ${dbErrorReference(itemsResult.error)}`);
   }
 
   const paidByOrder = new Map<string, number>();
@@ -267,9 +281,13 @@ async function loadActiveSessions(
       if (paidAt && (!latestRecordedAt || paidAt > latestRecordedAt)) latestRecordedAt = paidAt;
     }
 
+    const regular = tickets.every((ticket) => ticket.gst_mode_snapshot === 'regular');
+    const rate = tickets[0]?.tax_rate_bps_snapshot;
+    const knownRate = (rate === 500 || rate === 1800) && tickets.every((ticket) => ticket.tax_rate_bps_snapshot === rate);
     return [{
       id: session.id,
-      table: labelByTable.get(session.table_id) ?? 'Table',
+      table: session.table_id ? labelByTable.get(session.table_id) ?? 'Table' : directFulfilmentLabel(session.fulfilment_kind) ?? 'Off-table session',
+      ...(session.fulfilment_kind === 'direct_delivery' ? {deliveryAddress:deliveryAddresses.get(session.id) ?? null} : {}),
       openedAt: session.opened_at,
       orderCount: tickets.length,
       orderCodes: tickets.map((order) => order.code),
@@ -277,6 +295,9 @@ async function loadActiveSessions(
       totalPaise,
       paidPaise,
       outstandingPaise,
+      gstRecipientParticularsRequired: regular && knownRate && extractInclusiveTax(totalPaise, rate).taxablePaise >= 5_000_000,
+      gstMode: regular
+        ? 'regular' : tickets.every((ticket) => ticket.gst_mode_snapshot === 'composition') ? 'composition' : 'off',
       paidAt:
         outstandingPaise === 0
           ? session.paid_at ?? latestRecordedAt
@@ -302,7 +323,6 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
       topItems: [],
       activeSessions: [],
       canMarkPaid: false,
-      gstMode: 'off',
       hourlyPaise: [],
       blocked: staff.reason,
       access: null,
@@ -316,11 +336,10 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
   const dayStart = startOfDayUtc(timezone, now);
   const dayStartIso = dayStart.toISOString();
 
-  const gstMode = await loadGstMode(supabase, restaurantId).catch(() => 'off' as GstMode);
   const [ordersResult, paymentsResult, activeSessions] = await Promise.all([
     readAllRows((from, to) => supabase
       .from('orders_finance')
-      .select('id, code, table_id, prep_status, payment_status, total_paise, placed_at')
+      .select('id, code, table_id, order_session_id, prep_status, payment_status, total_paise, placed_at')
       .eq('restaurant_id', restaurantId)
       .neq('prep_status', 'cancelled')
       .gte('placed_at', dayStartIso)
@@ -334,10 +353,10 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
   ]);
 
   if (ordersResult.error) {
-    throw new Error(`Could not load orders: ${ordersResult.error.message}`);
+    throw new Error(`Could not load orders: ${dbErrorReference(ordersResult.error)}`);
   }
   if (paymentsResult.error) {
-    throw new Error(`Could not load payments: ${paymentsResult.error.message}`);
+    throw new Error(`Could not load payments: ${dbErrorReference(paymentsResult.error)}`);
   }
 
   const rows = ordersResult.data ?? [];
@@ -379,6 +398,7 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
   // .in() with an empty id list and a join that can only return nothing.
   if (rows.length === 0) {
     return {
+      gstBuyerOwnerOutletId: role === 'owner' && entitlement?.canWrite ? restaurantId : undefined,
       restaurantName,
       timezone,
       tagline: staff.context.tagline,
@@ -387,7 +407,6 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
       topItems: [],
       activeSessions,
       canMarkPaid,
-      gstMode,
       hourlyPaise,
       access: staff.context.access,
     };
@@ -399,7 +418,8 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
   // Separate queries rather than embedded selects: lib/db/database.ts is
   // hand-written and does not declare every relationship, so an embed such as
   // dining_tables(label) resolves to a SelectQueryError and will not compile.
-  const [itemsResult, tablesResult] = await Promise.all([
+  const offTableIds = [...new Set(rows.slice(0,RECENT_ORDER_LIMIT).flatMap(row => !row.table_id && row.order_session_id ? [row.order_session_id] : []))];
+  const [itemsResult, tablesResult, routes, floorLabels] = await Promise.all([
     readRowsForIds(orderIds, (ids, from, to) => supabase
       .from('order_items_finance')
       .select('order_id, name_snapshot, qty, unit_price_paise')
@@ -407,13 +427,17 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
     tableIds.length
       ? supabase.from('dining_tables').select('id, label').in('id', tableIds)
       : Promise.resolve({ data: [], error: null }),
+    offTableIds.length ? supabase.from('order_sessions').select('id, fulfilment_kind').eq('restaurant_id',restaurantId).in('id',offTableIds)
+      : Promise.resolve({ data: [], error: null }),
+    readOrderFloorLabels(supabase, restaurantId, rows.slice(0, RECENT_ORDER_LIMIT).filter(row => row.table_id).map(row => row.id)),
   ]);
+  const routeBySession = new Map((routes.data ?? []).map(s => [s.id,directFulfilmentLabel(s.fulfilment_kind)]));
 
   if (itemsResult.error) {
-    throw new Error(`Could not load order items: ${itemsResult.error.message}`);
+    throw new Error(`Could not load order items: ${dbErrorReference(itemsResult.error)}`);
   }
   if (tablesResult.error) {
-    throw new Error(`Could not load tables: ${tablesResult.error.message}`);
+    throw new Error(`Could not load tables: ${dbErrorReference(tablesResult.error)}`);
   }
 
   const labelById = new Map<string, string>();
@@ -437,6 +461,7 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
   }
 
   return {
+    gstBuyerOwnerOutletId: role === 'owner' && entitlement?.canWrite ? restaurantId : undefined,
     restaurantName,
     timezone,
     tagline: staff.context.tagline,
@@ -444,7 +469,8 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
     orders: rows.slice(0, RECENT_ORDER_LIMIT).map((row) => ({
       id: row.id,
       code: row.code,
-      table: row.table_id ? (labelById.get(row.table_id) ?? '—') : 'Takeaway',
+      table: row.table_id ? (floorLabels.get(row.id) ?? labelById.get(row.table_id) ?? '—')
+        : row.order_session_id ? routeBySession.get(row.order_session_id) ?? 'Off-table ticket' : 'Takeaway',
       placedAt: row.placed_at,
       paymentStatus: row.payment_status,
       prepStatus: row.prep_status,
@@ -455,7 +481,6 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
       .slice(0, TOP_ITEM_LIMIT),
     activeSessions,
     canMarkPaid,
-    gstMode,
     hourlyPaise,
     access: staff.context.access,
   };

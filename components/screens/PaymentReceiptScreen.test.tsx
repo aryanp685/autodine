@@ -15,6 +15,7 @@ const receipt: PaymentReceiptData = {
     name: 'Maddi',
     address: '12 Baner Road, Pune 411045',
     phone: '9876543210',
+    fssaiNumber: '01234567890123',
     logoUrl: null,
   },
   tableLabel: 'T3',
@@ -32,6 +33,9 @@ describe('PaymentReceiptScreen', () => {
     expect(html).toContain('PR/26-27/000001-01');
     expect(html).toContain('INV/26-27/000001');
     expect(html).toContain('Payment receipt');
+    expect(html).toContain('FSSAI 01234567890123');
+    const history = renderToStaticMarkup(<PaymentReceiptScreen receipt={{...receipt,seller:{...receipt.seller,fssaiNumber:null}}} />);
+    expect(history).not.toContain('FSSAI');
     expect(html).toContain('UPI');
     expect(html).toContain('₹500.00');
     expect(html).toContain('₹608.53');

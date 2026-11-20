@@ -10,6 +10,7 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
  *   npx supabase gen types typescript --local > lib/db/types.ts
  */
 
+import type { GstActivation, GstBusinessType, GstPremisesEvidence } from '@/lib/gst/onboarding';
 import type { TranslationMap } from '@/lib/i18n/translations';
 
 export type Restaurant = {
@@ -175,7 +176,8 @@ export type DiningTable = {
 export type OrderSession = {
   id: string;
   restaurant_id: string;
-  table_id: string;
+  table_id: string | null;
+  fulfilment_kind?: 'takeaway' | 'direct_delivery' | null;
   opened_at: string;
   closed_at: string | null;
   closed_by: string | null;
@@ -184,6 +186,8 @@ export type OrderSession = {
   status: 'open' | 'closed';
 };
 
+export type RestaurantInvoiceSeriesCode = 'INV' | 'BOS' | 'RBL';
+
 export type RestaurantInvoice = {
   id: string;
   restaurant_id: string;
@@ -191,6 +195,8 @@ export type RestaurantInvoice = {
   invoice_number: string;
   financial_year: string;
   sequence_number: number;
+  /** Null for legacy INV documents. */
+  series_code: RestaurantInvoiceSeriesCode | null;
   /** Migration 20261113000100 adds 'bill_of_supply'. */
   document_type: 'receipt' | 'gst_tax_invoice' | 'bill_of_supply';
   /** e-Invoice state; 'not_required' in this build (no IRP provider). */
@@ -267,8 +273,8 @@ export type RestaurantNoteEvent = {
 };
 
 /**
- * Migration 20261113000100. One live row per restaurant; mode 'off' is the
- * default and means the historical non-GST receipt behaviour.
+ * One live row per outlet. The two No-GST situations use 'off' and
+ * 'composition'. Missing FSSAI identifies a legacy, unreviewed row.
  */
 export type RestaurantGstConfig = {
   restaurant_id: string;
@@ -280,17 +286,34 @@ export type RestaurantGstConfig = {
   address: string | null;
   state_code: string | null;
   pan: string | null;
-  registration_type: 'regular' | 'composition';
+  registration_type: 'regular' | 'composition' | 'unregistered';
+  fssai_number: string | null;
+  business_type: GstBusinessType | null;
+  service_sac: string | null;
+  premises_evidence: GstPremisesEvidence | null;
+  retail_phone: string | null;
+  activation: GstActivation | null;
   composition_acknowledged: boolean;
   specified_premises_attested: boolean;
   specified_premises_effective_from: string;
   off_declared: boolean;
   off_declared_at: string | null;
   preceding_fy_turnover_paise: number | null;
+  einvoice_location: string | null;
+  einvoice_pincode: string | null;
+  einvoice_hsn_sac: string | null;
   config_version: number;
   created_at: string;
   updated_at: string;
   updated_by: string | null;
+};
+
+export type RestaurantGstConfigHistory = Omit<RestaurantGstConfig,
+  'created_at' | 'updated_at' | 'updated_by' | 'off_declared' | 'specified_premises_effective_from'> & {
+  off_declared: boolean | null;
+  specified_premises_effective_from: string | null;
+  changed_at: string;
+  changed_by: string | null;
 };
 
 export type RestaurantInvoiceLine = {

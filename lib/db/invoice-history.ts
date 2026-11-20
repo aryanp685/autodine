@@ -1,3 +1,5 @@
+import { noteParticulars, snapshotText } from '@/lib/gst/notes';
+import { directFulfilmentLabel } from '@/lib/gst/place-of-supply';
 import { CASHIER_ROLES, getStaffContextDetailed } from '@/lib/db/staff';
 import type { MemberRole } from '@/lib/db/database';
 import type { OrderSession, RestaurantInvoice } from '@/lib/db/types';
@@ -10,11 +12,15 @@ type TotalsSnapshot = {
 export type InvoiceHistoryRow = {
   sessionId: string;
   tableLabel: string | null;
+  fulfilmentLabel?: string | null;
   openedAt: string;
   closedAt: string;
   invoice: null | {
     id: string;
     number: string;
+    retailBill?: boolean;
+    activated?: boolean;
+    noteParticularsRecorded?: boolean;
     status: 'issued' | 'voided';
     issuedAt: string;
     totalPaise: number | null;
@@ -43,11 +49,16 @@ function toHistoryRow(
   return {
     sessionId: session.id,
     tableLabel,
+    ...(session.fulfilment_kind ? {fulfilmentLabel:directFulfilmentLabel(session.fulfilment_kind)} : {}),
     openedAt: session.opened_at,
     closedAt: session.closed_at ?? session.opened_at,
     invoice: invoice ? {
       id: invoice.id,
       number: invoice.invoice_number,
+      retailBill: (invoice.seller_snapshot as { retail_bill?: boolean } | null)?.retail_bill === true,
+      activated: Boolean((invoice.seller_snapshot as { activation_effective_from?: string } | null)?.activation_effective_from),
+      noteParticularsRecorded: Boolean(snapshotText(invoice.gst_snapshot,'supply_date') &&
+        noteParticulars(invoice.document_type,invoice.seller_snapshot,invoice.customer_snapshot,invoice.gst_snapshot)),
       status: invoice.status,
       issuedAt: invoice.issued_at,
       totalPaise,
@@ -75,7 +86,7 @@ export async function getInvoiceHistory(): Promise<InvoiceHistoryResult> {
 
   const { data: sessions, error: sessionsError } = await supabase
     .from('order_sessions')
-    .select('id, restaurant_id, table_id, opened_at, closed_at, closed_by, paid_at, paid_by, status')
+    .select('id, restaurant_id, table_id, fulfilment_kind, opened_at, closed_at, closed_by, paid_at, paid_by, status')
     .eq('restaurant_id', restaurantId)
     .eq('status', 'closed')
     .order('closed_at', { ascending: false })
@@ -86,12 +97,12 @@ export async function getInvoiceHistory(): Promise<InvoiceHistoryResult> {
   if (!sessionRows.length) return { ok: true, rows: [] };
 
   const sessionIds = sessionRows.map((session) => session.id);
-  const tableIds = [...new Set(sessionRows.map((session) => session.table_id))];
+  const tableIds = [...new Set(sessionRows.flatMap((session) => session.table_id ? [session.table_id] : []))];
   const [tablesResult, invoicesResult] = await Promise.all([
-    supabase.from('dining_tables').select('id, label').eq('restaurant_id', restaurantId).in('id', tableIds),
+    tableIds.length ? supabase.from('dining_tables').select('id, label').eq('restaurant_id', restaurantId).in('id', tableIds) : Promise.resolve({ data: [], error: null }),
     supabase
       .from('restaurant_invoices')
-      .select('id, restaurant_id, order_session_id, invoice_number, financial_year, sequence_number, document_type, irp_status, status, issued_at, issued_by, table_label_snapshot, session_opened_at, session_closed_at, seller_snapshot, customer_snapshot, totals_snapshot, payment_snapshot, source_order_ids, supersedes_invoice_id, voided_at, voided_by, void_reason, created_at')
+      .select('id, restaurant_id, order_session_id, invoice_number, financial_year, sequence_number, document_type, irp_status, status, issued_at, issued_by, table_label_snapshot, session_opened_at, session_closed_at, seller_snapshot, customer_snapshot, gst_snapshot, totals_snapshot, payment_snapshot, source_order_ids, supersedes_invoice_id, voided_at, voided_by, void_reason, created_at')
       .eq('restaurant_id', restaurantId)
       .in('order_session_id', sessionIds)
       .order('issued_at', { ascending: false }),
@@ -110,7 +121,7 @@ export async function getInvoiceHistory(): Promise<InvoiceHistoryResult> {
   return {
     ok: true,
     rows: sessionRows.map((session) =>
-      toHistoryRow(session, labels.get(session.table_id) ?? null, invoices.get(session.id)),
+      toHistoryRow(session, session.table_id ? labels.get(session.table_id) ?? null : null, invoices.get(session.id)),
     ),
   };
 }

@@ -50,6 +50,8 @@
  */
 
 import { getStaffContextDetailed } from './staff';
+import { readAllRows } from './paged-read';
+import { dbErrorReference } from './error-reference';
 import { qrSvg, siteOrigin, tableScanUrl } from '../qr';
 
 /**
@@ -80,6 +82,7 @@ export type TableRow = {
   /** Humanised time of the most recent order at this table, or '—'. */
   lastScan: string;
   orders: number;
+  occupied?: boolean;
   /**
    * The code this table scans with. Shown to staff in full, because they have
    * to be able to reprint a card, and they are already inside the
@@ -167,7 +170,7 @@ export async function getTablesScreenData(): Promise<TablesScreenData | null> {
 
   const { supabase, restaurantId, restaurantName } = staff.context;
 
-  const [tablesResult, tokensResult, ordersResult, codeResult] = await Promise.all([
+  const [tablesResult, tokensResult, ordersResult, codeResult, sittingResult] = await Promise.all([
     supabase
       .from('dining_tables')
       .select('id, label, seats, is_active')
@@ -183,6 +186,8 @@ export async function getTablesScreenData(): Promise<TablesScreenData | null> {
     // this cannot be pointed at another restaurant by passing an id from the
     // browser -- restaurantId here came from the caller's own membership row.
     supabase.rpc('current_verification_code', { p_restaurant_id: restaurantId }),
+    readAllRows((from, to) => supabase.from('order_sessions').select('table_id').eq('restaurant_id', restaurantId)
+      .eq('status', 'open').order('id').range(from, to)),
   ]);
 
   if (tablesResult.error) {
@@ -209,7 +214,7 @@ export async function getTablesScreenData(): Promise<TablesScreenData | null> {
       : null;
 
   if (codeResult.error) {
-    console.error('[tables-screen] could not read verification code', codeResult.error);
+    console.error('[tables-screen] could not read verification code', dbErrorReference(codeResult.error));
   }
 
   // One live code per table. The query already excludes revoked rows, and the
@@ -241,6 +246,7 @@ export async function getTablesScreenData(): Promise<TablesScreenData | null> {
     statsByTable.set(row.table_id, { orders: Number(row.order_count), last: row.last_order_at });
   }
 
+  const occupied = new Set((sittingResult.data ?? []).map(row => row.table_id));
   const tables: TableRow[] = (tablesResult.data ?? []).map((row) => {
     const token = liveCodeByTable.get(row.id) ?? null;
     const stats = statsByTable.get(row.id);
@@ -253,6 +259,7 @@ export async function getTablesScreenData(): Promise<TablesScreenData | null> {
       qr: !row.is_active ? 'disabled' : token ? 'active' : 'no-code',
       lastScan: ago(stats?.last ?? null),
       orders: stats?.orders ?? 0,
+      occupied: sittingResult.error ? undefined : occupied.has(row.id),
       token,
       scanUrl: token ? tableScanUrl(origin, token) : null,
       qrSvg: token ? (svgByToken.get(token) ?? null) : null,

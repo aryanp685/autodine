@@ -1,39 +1,11 @@
-/**
- * e-Invoice issuance — the provider-independent half.
- *
- * This module is PURE: it takes the immutable invoice snapshot, the recorded
- * GST configuration and (implicitly) the recorded applicability state, and
- * either produces a deterministic IRP payload or refuses with an owner-
- * actionable reason. It never reads the network, a database, the clock or
- * the environment — the server action (app/invoice/[id]/einvoice-actions.ts)
- * supplies all three.
- *
- * What this deliberately does NOT do:
- *   - call any IRP/GSP. The only adapter in the tree is the offline sandbox
- *     (lib/gst/irp/sandbox.ts); wiring a live provider is an owner decision.
- *   - mark the document generated. The database has no path to flip
- *     irp_status to 'generated' from application code, so a sandbox "accept"
- *     can never masquerade as a real IRN on a legal document. Every attempt
- *     IS recorded (payload_built → submitted → accepted|rejected|transport_error)
- *     in restaurant_irp_requests through the owner/manager definer RPC.
- *
- * Line decomposition: the snapshot stores tax-inclusive prices and only
- * document-level GST figures. Per line we allocate the document totals by
- * line weight (largest remainder, lib/gst/allocate.ts), so line values sum
- * EXACTLY to the document snapshot — no paisa is invented and the payload's
- * own invariants (taxable = gross − discount; total = taxable + taxes) hold.
- * The tax-exclusive unit price is the allocated line value divided by
- * quantity, floored to whole paise; for quantities > 1 the NIC-side rate×qty
- * product may differ from the line total by less than one paise per unit.
- * Document totals are always exact.
- */
-
+/** Pure projection of immutable issued invoice/adjustment evidence into the
+ * canonical integer-paise IRP contract. No active configuration lookup. */
 import { allocateIntegerPaise } from './allocate';
-import { EINVOICE_TURNOVER_THRESHOLD_PAISE } from './applicability';
+import type { IrpMandate } from './applicability';
+import type { ReportingCategory } from './onboarding';
 import { checkGstin } from './gstin';
 import { buildIrpPayload, IrpPayloadError, type IrpInput } from './irp/payload';
 import type { IrpPayloadV1 } from './irp/types';
-import { parseTaxAddress } from './tax-address';
 
 export type EinvoiceInvoiceInput = {
   /** INV/26-27/000001 — must satisfy the payload's 1–16 char rule. */
@@ -43,6 +15,8 @@ export type EinvoiceInvoiceInput = {
   irpStatus: string;
   status: string;
   documentType: string;
+  irpEvidence?: { applicability: IrpMandate; reportingCategory: ReportingCategory };
+  originalInvoice?: IrpInput['originalInvoice'];
   gst: {
     rateBps: number;
     taxablePaise: number | null;
@@ -67,6 +41,9 @@ export type EinvoiceInvoiceInput = {
     gstin: string;
     address: string | null;
     email: string | null;
+    location?: string;
+    pincode?: string;
+    phone?: string | null;
   } | null;
   lines: Array<{
     itemName: string;
@@ -104,12 +81,11 @@ export function prepareEinvoicePayload(input: {
   if (invoice.status !== 'issued') {
     return fail('Only an issued document can be prepared for e-invoicing. This one is voided.');
   }
-  if (invoice.documentType !== 'gst_tax_invoice') {
-    return fail('Only a Regular-GST tax invoice is e-invoice eligible. Bills of Supply and ordinary receipts are not.');
-  }
+  const kind = invoice.documentType === 'gst_tax_invoice' ? 'INV' : invoice.documentType === 'credit_note' ? 'CRN' : invoice.documentType === 'debit_note' ? 'DBN' : null;
+  if (!kind) return fail('Only a Regular GST tax invoice or an eligible linked note can be prepared.');
   if (invoice.irpStatus !== 'pending' && invoice.irpStatus !== 'failed') {
     return fail(
-      `This document is recorded as IRP status '${invoice.irpStatus}'. Only 'pending' or 'failed' documents can be submitted.`,
+      `This document is recorded as IRP status '${invoice.irpStatus}'. Only 'pending' or 'failed' documents can be prepared offline.`,
     );
   }
   if (!invoice.gst) {
@@ -121,15 +97,8 @@ export function prepareEinvoicePayload(input: {
   if (profile.mode !== 'regular' || profile.registrationType !== 'regular') {
     return fail('E-invoicing applies to Regular-GST tax invoices only. Check the GST settings for this restaurant.');
   }
-  const turnover = profile.precedingFyTurnoverPaise;
-  if (turnover === null || turnover === undefined) {
-    return fail('The preceding-financial-year aggregate turnover is not recorded. Add it in GST settings — applicability cannot be ruled out without it.');
-  }
-  if (!Number.isFinite(turnover)) {
-    return fail('The recorded preceding-financial-year turnover is unreadable. Re-save the GST settings.');
-  }
-  if (turnover <= EINVOICE_TURNOVER_THRESHOLD_PAISE) {
-    return fail('The recorded turnover is at or below ₹5 crore, so a B2B document is not e-invoice applicable. This document is marked pending — reconcile the GST settings before attempting.');
+  if (invoice.irpEvidence?.applicability !== 'required') {
+    return fail('Required issue-time PAN-wide IRP evidence is missing or does not require an IRN. Reconcile the saved document; do not use today’s settings.');
   }
 
   const missing: string[] = [];
@@ -143,10 +112,10 @@ export function prepareEinvoicePayload(input: {
   const sellerPincode = profile.einvoicePincode!.trim();
   const hsnSac = profile.einvoiceHsnSac!.trim();
   if (!/^[1-9][0-9]{5}$/.test(sellerPincode)) {
-    return fail('The e-Invoice PIN code in GST settings is not a valid 6-digit Indian PIN. Fix it and try again.');
+    return fail('The e-Invoice PIN code in GST settings is not a valid 6-digit Indian PIN. Reconcile the saved document.');
   }
   if (!/^[0-9]{4,8}$/.test(hsnSac)) {
-    return fail('The e-Invoice HSN/SAC in GST settings must be 4–8 digits. Fix it and try again.');
+    return fail('The e-Invoice HSN/SAC in GST settings must be 4–8 digits. Reconcile the saved document.');
   }
 
   const sellerCheck = checkGstin(profile.gstin ?? '');
@@ -159,14 +128,14 @@ export function prepareEinvoicePayload(input: {
   }
   const sellerAddress = (profile.address ?? '').trim().replace(/\s+/g, ' ');
   if (sellerAddress.length < 5) {
-    return fail('The registered address on the GST configuration is too short. Fix it in GST settings.');
+    return fail('The registered address on the GST configuration is too short. Reconcile the saved seller evidence.');
   }
   if (sellerAddress.length > 100) {
     return fail('The registered address is longer than 100 characters, which the e-Invoice format cannot carry. Shorten it in GST settings.');
   }
   const legalName = (profile.legalName ?? '').trim();
   if (legalName.length < 2) {
-    return fail('The legal name on the GST configuration is missing. Fix it in GST settings.');
+    return fail('The legal name on the GST configuration is missing. Reconcile the saved seller evidence.');
   }
 
   const recipient = invoice.recipient;
@@ -181,16 +150,22 @@ export function prepareEinvoicePayload(input: {
   if (buyerName.length < 2) {
     return fail('The buyer legal name on this document is missing or too short.');
   }
-  const buyerAddress = parseTaxAddress(recipient.address);
-  if (!buyerAddress.ok) {
-    return fail(`The buyer address on this document cannot feed an e-Invoice: ${buyerAddress.reason}`);
+  const buyerAddress = recipient.address?.trim().replace(/\s+/g, ' ') ?? '';
+  if (buyerAddress.length < 5 || buyerAddress.length > 200 || !recipient.location || !/^[1-9][0-9]{5}$/.test(recipient.pincode ?? '')) {
+    return fail('The saved B2B buyer address, city and PIN do not fit the IRP contract. Do not infer address fields.');
   }
-
-  const docTaxable = invoice.gst.taxablePaise ?? Math.max(invoice.totals.subtotalPaise - invoice.totals.taxPaise, 0);
-  if (!Number.isSafeInteger(docTaxable) || docTaxable < 0) {
-    return fail('The saved taxable value is unreadable. This document cannot be prepared.');
+  const docTaxable = invoice.gst.taxablePaise;
+  if (docTaxable === null || !Number.isSafeInteger(docTaxable) || docTaxable < 0
+    || invoice.gst.placeOfSupplyStateCode !== sellerState
+    || docTaxable + invoice.gst.cgstPaise + invoice.gst.sgstPaise !== invoice.totals.totalPaise
+    || invoice.gst.cgstPaise + invoice.gst.sgstPaise !== invoice.totals.taxPaise) {
+    return fail('The saved GST values or place of supply do not reconcile.');
   }
   const weights = invoice.lines.map((line) => line.amountPaise);
+  if (!weights.length || weights.some((n) => !Number.isSafeInteger(n) || n < 0)
+      || weights.reduce((sum, n) => sum + n, 0) !== invoice.totals.totalPaise) {
+    return fail('Saved line amounts do not reconcile to the document.');
+  }
   const lineTaxable = allocateIntegerPaise(weights, docTaxable);
   const lineCgst = allocateIntegerPaise(lineTaxable, invoice.gst.cgstPaise);
   const lineSgst = allocateIntegerPaise(lineTaxable, invoice.gst.sgstPaise);
@@ -219,7 +194,8 @@ export function prepareEinvoicePayload(input: {
   });
 
   const payloadInput: IrpInput = {
-    documentType: 'INV',
+    documentType: kind,
+    ...(invoice.originalInvoice ? { originalInvoice: invoice.originalInvoice } : {}),
     documentNumber: invoice.invoiceNumber,
     issuedDate: invoice.issuedLocalDate,
     seller: {
@@ -237,13 +213,13 @@ export function prepareEinvoicePayload(input: {
     buyer: {
       gstin: recipient.gstin.trim().toUpperCase(),
       legalName: buyerName,
-      address1: buyerAddress.address.address1,
-      address2: null,
-      location: buyerAddress.address.location,
-      pincode: buyerAddress.address.pincode,
+      address1: buyerAddress.slice(0,100),
+      address2: buyerAddress.slice(100) || null,
+      location: recipient.location,
+      pincode: recipient.pincode!,
       stateCode: buyerCheck.parts.stateCode,
       email: recipient.email?.trim() || null,
-      phone: null,
+      phone: recipient.phone ?? null,
       placeOfSupplyStateCode: sellerState,
     },
     // Place of supply for restaurant services is the outlet's state, for both parties.

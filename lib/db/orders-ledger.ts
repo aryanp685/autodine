@@ -1,3 +1,4 @@
+import { readOrderFloorLabels } from './floor-service';
 /**
  * The staff order ledger.
  *
@@ -8,6 +9,7 @@
  * turning it into a second finance surface.
  */
 
+import { dbErrorReference } from '@/lib/db/error-reference';
 import { getStaffContextDetailed } from './staff';
 import {
   getReportsScreenDataForStaff,
@@ -90,10 +92,11 @@ export async function getOrdersScreenData(
   const { context } = staff;
   if (context.role === 'owner' || context.role === 'manager') {
     const report = await getReportsScreenDataForStaff(context, params, now);
+    const floorLabels = await readOrderFloorLabels(context.supabase, context.restaurantId, report.report.orders.map(order => order.id));
     return {
       timezone: report.timezone,
       range: report.range,
-      orders: report.report.orders,
+      orders: report.report.orders.map(order => ({ ...order, tableLabel: floorLabels.get(order.id) ?? order.tableLabel })),
       ordersTruncated: report.ordersTruncated,
       canViewFinance: true,
       canExport: true,
@@ -125,7 +128,7 @@ export async function getOrdersScreenData(
     .order('placed_at', { ascending: false })
     .limit(REPORT_ORDER_LIMIT + 1);
 
-  if (error) throw new Error(`Could not load the order ledger: ${error.message}`);
+  if (error) throw new Error(`Could not load the order ledger: ${dbErrorReference(error)}`);
 
   const candidates = data ?? [];
   const selected = candidates.slice(0, REPORT_ORDER_LIMIT);
@@ -139,10 +142,11 @@ export async function getOrdersScreenData(
       .eq('restaurant_id', restaurantId)
       .in('id', tableIds);
 
-    if (tablesError) throw new Error(`Could not load order table labels: ${tablesError.message}`);
+    if (tablesError) throw new Error(`Could not load order table labels: ${dbErrorReference(tablesError)}`);
     for (const table of tables ?? []) tableLabels.set(table.id, table.label);
   }
 
+  const floorLabels = await readOrderFloorLabels(supabase, restaurantId, selected.filter(order => order.table_id).map(order => order.id));
   return {
     timezone,
     range,
@@ -151,7 +155,7 @@ export async function getOrdersScreenData(
       code: order.code,
       placedAt: order.placed_at,
       prepStatus: order.prep_status,
-      tableLabel: order.table_id ? (tableLabels.get(order.table_id) ?? null) : null,
+      tableLabel: order.table_id ? (floorLabels.get(order.id) ?? tableLabels.get(order.table_id) ?? null) : null,
     })),
     ordersTruncated: candidates.length > REPORT_ORDER_LIMIT,
     canViewFinance: false,

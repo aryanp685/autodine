@@ -338,7 +338,7 @@ export async function deleteItemAction(formData: FormData): Promise<void> {
   // is taken from the row, not from anything the form claimed about it.
   const { data: row, error: readError } = await ctx.supabase
     .from('items')
-    .select('id, name, description, price_paise, is_veg, is_available, category_id, sort_order')
+    .select('id, name, description, price_paise, is_veg, is_available, category_id, sort_order, is_alcoholic')
     .eq('id', itemId)
     .eq('restaurant_id', ctx.restaurantId)
     .maybeSingle();
@@ -363,6 +363,7 @@ export async function deleteItemAction(formData: FormData): Promise<void> {
     pricePaise: Number(row.price_paise ?? 0),
     isVeg: row.is_veg === true ? true : row.is_veg === false ? false : null,
     isAvailable: Boolean(row.is_available),
+    isAlcoholic: row.is_alcoholic === true,
     categoryId: (row.category_id as string | null) ?? null,
     sortOrder: Number(row.sort_order ?? 0),
   };
@@ -412,6 +413,7 @@ export async function restoreItemAction(formData: FormData): Promise<void> {
     price_paise: item.pricePaise,
     is_veg: item.isVeg,
     is_available: item.isAvailable,
+    is_alcoholic: item.isAlcoholic === true,
     sort_order: item.sortOrder,
   });
 
@@ -451,6 +453,9 @@ export async function saveItemAction(formData: FormData): Promise<void> {
       spoken_name: spokenName || null,
       price_paise: rupeesToPaise(rupees),
       is_veg: veg,
+      // Old cached forms did not send this field; never clear a stored flag
+      // when such a form is submitted.
+      ...(formData.has('alcoholClassification') ? { is_alcoholic: formData.get('alcoholic') === 'on' } : {}),
       ...(categoryId ? { category_id: categoryId } : {}),
     })
     .eq('id', itemId)
@@ -498,6 +503,7 @@ export async function addItemAction(formData: FormData): Promise<void> {
     description: null,
     price_paise: rupeesToPaise(safePrice),
     is_veg: isVeg,
+    is_alcoholic: formData.get('alcoholic') === 'on',
     is_available: true,
     sort_order: 0,
   });
@@ -1092,6 +1098,7 @@ export async function bulkAddItemsAction(formData: FormData): Promise<void> {
         description: item.description ?? null,
         price_paise: item.pricePaise,
         is_veg: item.isVeg,
+        is_alcoholic: formData.get('allAlcoholic') === 'on',
         is_available: true,
         sort_order: startOrder + index,
       })),

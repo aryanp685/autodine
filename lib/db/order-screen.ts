@@ -19,6 +19,7 @@
  * else's bill to anyone who guesses five characters.
  */
 
+import { dbErrorReference } from '@/lib/db/error-reference';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { readPublicRestaurant } from '@/lib/db/public-restaurant';
@@ -63,6 +64,7 @@ export type OrderScreenData = {
    */
   tableLabel: string | null;
   prepStatus: string;
+  revision?: string;
   paymentStatus: string;
   /**
    * Migration 20261028000900. The order arrived in a scan-mode restaurant and
@@ -158,15 +160,15 @@ export async function getOrderScreenData(
   ]);
 
   if (restaurantResult.error) {
-    throw new Error(`Could not load restaurant: ${restaurantResult.error.message}`);
+    throw new Error(`Could not load restaurant: ${dbErrorReference(restaurantResult.error)}`);
   }
   if (orderResult.error) {
-    throw new Error(`Could not load the order: ${orderResult.error.message}`);
+    throw new Error(`Could not load the order: ${dbErrorReference(orderResult.error)}`);
   }
 
   if (!orderResult.data) return null;
 
-  const order = orderResult.data as PublicOrderPayload;
+  const order = orderResult.data as PublicOrderPayload & { revision?: unknown };
   const id = text(order.id);
   if (!id) return null;
 
@@ -188,6 +190,7 @@ export async function getOrderScreenData(
     },
     tableLabel: text(order.table_label) || null,
     prepStatus,
+    ...(typeof order.revision === 'string' ? { revision: order.revision } : {}),
     paymentStatus,
     awaitingConfirmation: order.hold_required === true && !order.confirmed_at,
     subtotalPaise: num(order.subtotal_paise),

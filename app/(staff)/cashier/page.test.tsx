@@ -6,14 +6,10 @@ import { renderToStaticMarkup } from 'react-dom/server';
  *
  * WHAT IS BEING PINNED
  *
- * A guest pays at the counter, so the queue has to move on its own. The only
- * refresh this screen ever had was the one it triggered after settling a bill
- * -- which meant the NEXT guest's ticket stayed invisible until somebody
- * reloaded. That is a cashier staring at an empty queue while a person waits.
- *
- * So: the page must mount the (already tested) refresh loop, it must be faster
- * than the owner dashboard's, and it must not run when there is no database to
- * read.
+ * A guest pays at the counter, so the queue has to move on its own. That is now
+ * the staff shell's job: one coordinator subscribes to the outlet's committed
+ * revision and asks the router to re-read. A second per-page timer would be two
+ * refresh loops racing each other, so this page must NOT mount one.
  */
 
 const mocks = vi.hoisted(() => ({
@@ -39,12 +35,6 @@ vi.mock('@/components/DashboardBar', () => ({
   DashboardBar: () => <div data-bar />,
 }));
 
-vi.mock('@/components/owner/AutoRefresh', () => ({
-  AutoRefresh: ({ enabled, seconds }: { enabled: boolean; seconds?: number }) => (
-    <div data-auto-refresh data-enabled={String(enabled)} data-seconds={String(seconds ?? '')} />
-  ),
-}));
-
 import CashierPage from './page';
 
 async function render(searchParams: Record<string, string> = {}) {
@@ -58,32 +48,14 @@ beforeEach(() => {
 });
 
 describe('the counter refreshes itself', () => {
-  it('mounts the refresh loop at twenty seconds', async () => {
+  it('leaves the refresh loop to the one shared coordinator', async () => {
     const html = await render();
-
-    expect(html).toContain('data-auto-refresh');
-    expect(html).toContain('data-enabled="true"');
-    expect(html).toContain('data-seconds="20"');
-  });
-
-  it('does not refresh a screen with nothing behind it', async () => {
-    // A demo or signed-out counter has no queue to poll; a timer there is a
-    // request per interval for an answer that cannot change.
-    const html = await render();
-    expect(html).toContain('data-enabled="true"');
-
-    mocks.data = { restaurantName: '', queue: [], blocked: 'signed-out' };
-    const blocked = await render();
-    expect(blocked).toContain('data-enabled="false"');
+    expect(html).toContain('data-cashier');
+    expect(html).not.toContain('data-auto-refresh');
   });
 
   it('still opens the ticket a ledger row asked for', async () => {
-    mocks.data = { restaurantName: 'Maddi', queue: [] };
     const html = await render({ order: 'order-1' });
-    // The focus prop is threaded through to the screen; the screen is mocked
-    // here, so the assertion is that the page resolved and rendered at all
-    // with a query string -- the failure this guards is a page that throws on
-    // an unexpected searchParams shape.
     expect(html).toContain('data-cashier');
   });
 });

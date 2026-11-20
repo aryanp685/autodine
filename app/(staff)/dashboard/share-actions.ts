@@ -1,6 +1,7 @@
 'use server';
 
 import { createHash, randomBytes } from 'node:crypto';
+import { dbErrorReference } from '@/lib/db/error-reference';
 import { revalidatePath } from 'next/cache';
 import { CASHIER_ROLES, getStaffContext } from '@/lib/db/staff';
 
@@ -29,7 +30,8 @@ export async function createInvoiceShareLinkAction(invoiceId: string): Promise<I
   });
   const created = data?.[0];
   if (error || !created?.share_link_id || !created.expires_at) {
-    return { ok: false, error: error?.message ?? 'The receipt link could not be verified. Try again.' };
+    console.error('[receipt-share] creation not verified', dbErrorReference(error));
+    return { ok: false, error: 'Could not verify a share link for this receipt. Check its status and active links before trying again.' };
   }
 
   revalidatePath(`/invoice/${id}`);
@@ -56,7 +58,8 @@ export async function revokeInvoiceShareLinkAction(shareLinkId: string): Promise
     p_share_link_id: id,
   });
   if (error || data !== true) {
-    return { ok: false, error: error?.message ?? 'The receipt link was not found in this restaurant.' };
+    console.error('[receipt-share] revocation not verified', dbErrorReference(error));
+    return { ok: false, error: 'Could not verify revocation. Reload the receipt and check the link.' };
   }
   revalidatePath('/dashboard/invoices');
   return { ok: true, id };

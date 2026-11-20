@@ -7,33 +7,32 @@ import { GuestFlow } from '@/components/GuestFlow';
 import { GuestTabs } from '@/components/GuestTabs';
 import { guestBrandStyle, type GuestBrandState } from '@/lib/branding/guest-theme';
 import { useCart } from '@/components/CartProvider';
-import { inr } from '@/lib/demo-data';
 import { VegMark } from '@/components/ui';
-import { paiseToRupees } from '@/lib/money';
-import { priceCart, type MenuItemPrice } from '@/lib/cart-pricing';
-import { gstLabel } from '@/lib/pricing';
+import { formatQuoteMoney, priceCart, type MenuItemPrice } from '@/lib/cart-pricing';
+import { quoteTaxLabel, type TaxTreatment } from '@/lib/pricing';
 
-function Totals({ subtotalPaise, taxPaise, totalPaise, taxRateBps, compact }: {
+function Totals({ subtotalPaise, taxPaise, totalPaise, taxRateBps, taxTreatment, compact }: {
   subtotalPaise: number;
   taxPaise: number;
   totalPaise: number;
   /** The restaurant's own rate; absent means the bill is priced at a sample. */
   taxRateBps?: number;
+  taxTreatment?: TaxTreatment;
   compact?: boolean;
 }) {
   return (
     <dl className={compact ? 'text-[13px]' : 'text-[14px]'}>
       <div className="flex items-baseline justify-between py-1.5 text-gink-64">
-        <dt>Subtotal</dt>
-        <dd className="tnum">{inr(paiseToRupees(subtotalPaise))}</dd>
+        <dt>{taxTreatment === 'inclusive' ? 'Before GST' : 'Subtotal'}</dt>
+        <dd className="tnum">{formatQuoteMoney(subtotalPaise, taxTreatment)}</dd>
       </div>
       <div className="flex items-baseline justify-between py-1.5 text-gink-64">
-        <dt>{taxRateBps == null ? 'Taxes' : `Taxes (${gstLabel(taxRateBps)})`}</dt>
-        <dd className="tnum">{inr(paiseToRupees(taxPaise))}</dd>
+        <dt>{quoteTaxLabel(taxTreatment ?? 'exclusive', taxRateBps)}</dt>
+        <dd className="tnum">{formatQuoteMoney(taxPaise, taxTreatment)}</dd>
       </div>
       <div className="mt-1.5 flex items-baseline justify-between border-t border-hair pt-2.5 text-[16px] font-semibold text-gink">
         <dt>Total</dt>
-        <dd className="tnum">{inr(paiseToRupees(totalPaise))}</dd>
+        <dd className="tnum">{formatQuoteMoney(totalPaise, taxTreatment)}</dd>
       </div>
       {/* Only when there is no restaurant rate to price against. This note
           used to render for every guest, including one sitting in a real
@@ -65,6 +64,7 @@ export function Cart({
   restaurantName,
   tableLabel,
   taxRateBps,
+  taxTreatment,
   items,
   placedError,
   placedErrorCode,
@@ -77,6 +77,7 @@ export function Cart({
   tableLabel?: string | null;
   /** The restaurant's own rate. Without it the bill is priced at a sample. */
   taxRateBps?: number;
+  taxTreatment?: TaxTreatment;
   /**
    * The guest scanned a live card but has not entered the on-site code yet.
    * Said here, once, so the code at checkout is expected rather than a
@@ -110,7 +111,7 @@ export function Cart({
   const motionOn = !reduce;
 
   const withSlug = (path: string) => (slug ? `${path}?s=${encodeURIComponent(slug)}` : path);
-  const priced = priceCart(cart.lines, items, taxRateBps);
+  const priced = priceCart(cart.lines, items, taxRateBps, taxTreatment);
   const { subtotalPaise, taxPaise, totalPaise } = priced.totals;
 
   const dropped = priced.missingIds.length + priced.unavailableIds.length;
@@ -169,7 +170,7 @@ export function Cart({
                 animate={motionOn ? { scale: 1, y: 0 } : undefined}
                 transition={{ type: 'spring', stiffness: 520, damping: 20 }}
               >
-                {inr(paiseToRupees(totalPaise))}
+                {formatQuoteMoney(totalPaise, taxTreatment)}
               </motion.strong>
             </span>
             <Link
@@ -245,14 +246,14 @@ export function Cart({
               </span>
               <div className="min-w-0">
                 <strong className="block text-[13px] font-semibold text-gink">
-                  That order was not placed
+                  Order not confirmed
                 </strong>
                 <p className="mt-0.5 text-[12.5px] leading-[1.55] text-gink-64">{placedError}</p>
                 {/* The one thing a guest actually wants to know at this point.
-                    Nothing was charged, and the cart is still here -- saying it
-                    turns a dead end back into a decision. */}
+                    No online payment is taken and the cart remains, even if
+                    the request's outcome could not be confirmed. */}
                 <p className="mt-1 text-[11.5px] leading-[1.5] text-gink-46">
-                  Nothing has been charged, and your cart is still here.
+                  No payment was taken online. Your cart is still here.
                 </p>
                 {placedErrorCode ? (
                   <p className="mt-1 text-[10.5px] leading-[1.45] text-gink-46">
@@ -326,7 +327,7 @@ export function Cart({
 
                     <div className="tnum mt-0.5 text-[12.5px] text-gink-46">
                       {l.variantName ? `${l.variantName} · ` : ''}
-                      {inr(paiseToRupees(l.unitPricePaise))} each
+                      {formatQuoteMoney(l.unitPricePaise, taxTreatment)} each
                     </div>
 
                     {/* The add-ons the guest picked, named. A line total that
@@ -335,7 +336,7 @@ export function Cart({
                     {l.addonNames && l.addonNames.length > 0 && (
                       <div className="mt-0.5 text-[12px] leading-[1.45] text-gink-64">
                         + {l.addonNames.join(' · ')}
-                        {l.addonPaise ? ` (${inr(paiseToRupees(l.addonPaise))} each)` : ' (free)'}
+                        {l.addonPaise ? ` (${formatQuoteMoney(l.addonPaise, taxTreatment)} each)` : ' (free)'}
                       </div>
                     )}
 
@@ -372,7 +373,7 @@ export function Cart({
                       </div>
 
                       <span className="tnum ml-auto text-[14px] font-semibold text-gink">
-                        {inr(paiseToRupees(l.lineTotalPaise))}
+                        {formatQuoteMoney(l.lineTotalPaise, taxTreatment)}
                       </span>
 
                       {/* Visible text stays "Remove"; the accessible name says
@@ -444,7 +445,7 @@ export function Cart({
                     ? 'One add-on you picked is'
                     : `${priced.staleAddonIds.length} add-ons you picked are`}{' '}
                   no longer on the menu, so {priced.staleAddonIds.length === 1 ? 'it is' : 'they are'}{' '}
-                  not on the bill.
+                  not on the bill. Remove the affected line and add it again from the menu.
                 </div>
               )}
 
@@ -453,7 +454,7 @@ export function Cart({
                   The portion you picked for{' '}
                   {priced.staleVariantIds.length === 1 ? 'one dish is' : 'some dishes is'} no
                   longer on the menu, so {priced.staleVariantIds.length === 1 ? 'it is' : 'they are'}{' '}
-                  priced at the menu price. Please check the bill before paying.
+                  priced at the menu price in this preview. Remove the affected line and add it again from the menu before ordering.
                 </div>
               )}
             </>
@@ -484,6 +485,7 @@ export function Cart({
             taxPaise={taxPaise}
             totalPaise={totalPaise}
             taxRateBps={taxRateBps}
+            taxTreatment={taxTreatment}
           />
           <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
             Prices are read from the kitchen&rsquo;s menu when you order, so the total you are

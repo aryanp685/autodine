@@ -17,6 +17,15 @@ describe('sanitiseDraft', () => {
     ],
   };
 
+  it('keeps only explicit staff alcohol classification, never parses it from dish names', () => {
+    const draft = sanitiseDraft({ categories: [{ name: 'Synthetic menu', items: [
+      { name: 'Marked item', pricePaise: 1200, isAlcoholic: true },
+      { name: 'Explicit non-alcoholic', pricePaise: 1200, isAlcoholic: false },
+      { name: 'Synthetic whisky', pricePaise: 1200, isAlcoholic: 'true' },
+    ] }] });
+    expect(draft.categories[0].items.map((item) => item.isAlcoholic)).toEqual([true, false, undefined]);
+  });
+
   it('accepts a draft the review screen posted back', () => {
     const draft = sanitiseDraft({ categories: [valid] });
 

@@ -1,24 +1,5 @@
-/**
- * Kitchen board actions.
- *
- * The only mutation is advancing a ticket's prep_status, and the NEXT state
- * IS NEVER TAKEN FROM THE CLIENT. The form posts an order id and nothing
- * else; the action reads the ticket's current state from the database and
- * derives the next one from PREP_TRANSITIONS.
- *
- * Why: if the browser could post 'served' directly, a single click could skip
- * a ticket from 'new' to 'served'. Nothing would crash and no policy would
- * fire -- the kitchen would simply never cook the food. That is exactly the
- * class of bug that is invisible in testing and expensive in a real service.
- *
- * Reverting is deliberately not offered. There is no 'served' -> 'ready'
- * transition, so a mis-tap cannot be silently undone and there is no way to
- * make a ticket disappear from the board without serving it.
- *
- * Authorisation is RLS plus an explicit membership check: the update is
- * filtered by the caller's restaurant through lib/db/staff.ts, so a forged
- * order id belonging to another restaurant affects zero rows.
- */
+/** Kitchen moves are compare-and-set from the displayed stage. Database
+ * RLS, the restaurant write gate and the forward-only trigger still apply. */
 
 'use server';
 
@@ -30,7 +11,7 @@ import type { KitchenPrepState } from '@/lib/db/kitchen-screen';
 const KITCHEN_PATH = '/kitchen';
 
 export type AdvanceResult =
-  | { ok: true; state: KitchenPrepState | null }
+  | { ok: true; state: KitchenPrepState | null; changed?: false }
   | { ok: false; error: string };
 
 /**
@@ -150,9 +131,11 @@ export async function resolveTableWaiterCallAction(callId: string): Promise<{ ok
  * away the board's scroll position and audio state on every tap.
  */
 export async function advanceOrderAction(
-  orderId: string
+  orderId: string,
+  displayedState: KitchenPrepState,
 ): Promise<AdvanceResult> {
   if (!orderId) return { ok: false, error: 'Missing order.' };
+  if (!['new', 'preparing', 'ready', 'served'].includes(displayedState)) return { ok: false, error: 'Refresh the board before moving this ticket.' };
 
   const staff = await getStaffContext();
   if (!staff) {
@@ -184,12 +167,16 @@ export async function advanceOrderAction(
     .maybeSingle();
 
   if (readError) {
-    return { ok: false, error: `Could not read the ticket: ${readError.message}` };
+    return { ok: false, error: 'Could not read the ticket. Check the board again.' };
   }
   if (!order) {
     // Either it does not exist or it belongs to another restaurant. Same
     // answer either way: never confirm which.
     return { ok: false, error: 'That ticket is no longer on the board.' };
+  }
+
+  if (order.prep_status !== displayedState) {
+    return { ok: true, state: null, changed: false };
   }
 
   // Derived from the value in the DATABASE, never from the request. See
@@ -242,14 +229,11 @@ export async function advanceOrderAction(
         error: 'This restaurant is read-only right now, so tickets cannot be moved. The account can view orders, menus and reports until a plan is active.',
       };
     }
-    return { ok: false, error: `Could not update the ticket: ${updateError.message}` };
+    return { ok: false, error: 'Could not update the ticket. Check the board again.' };
   }
 
   if (!updated || updated.length === 0) {
-    return {
-      ok: false,
-      error: 'The ticket did not change. It may have been moved or cancelled on another screen — the board will catch up on the next refresh.',
-    };
+    return { ok: true, state: null, changed: false };
   }
 
   revalidatePath(KITCHEN_PATH);

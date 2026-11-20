@@ -1,14 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useRef, useState, useTransition, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { counterQueue, inr, restaurant } from '@/lib/demo-data';
+import { counterQueue, restaurant } from '@/lib/demo-data';
+import { formatBillMoney } from '@/lib/bill';
+import { rupeesToPaise } from '@/lib/money';
 import type { CashierScreenData, CounterOrder } from '@/lib/db/cashier-screen';
 // Value import, so it comes from the database-free module. Importing
 // COUNTER_METHODS from lib/db/cashier-screen would pull lib/supabase/server
 // into the browser bundle -- type-only imports there are fine, this is not.
 import { COUNTER_METHODS, COUNTER_METHOD_LABEL, type CounterMethod } from '@/lib/payment-methods';
+import { counterAttemptKey, COUNTER_ID, readCounterAttempt, type CounterAttempt } from '@/lib/counter-attempt';
 import { recordPaymentAction } from '@/app/(staff)/cashier/actions';
 import { cancelStaffOrderAction } from '@/app/orders/actions';
 import { SignInPrompt } from '@/components/SignInPrompt';
@@ -26,6 +29,9 @@ import {
   Notice,
   Segmented,
 } from '@/components/owner/chrome';
+
+/** The queue's display shape uses rupees; never round away the saved paise at the till. */
+const counterMoney = (rupees: number) => formatBillMoney(rupeesToPaise(rupees)).replace(/\.00$/, '');
 
 /** One row in the queue, in the shape the locked markup renders. */
 type QueueRow = {
@@ -73,21 +79,6 @@ function fromLive(order: CounterOrder): QueueRow {
     items: order.items,
     pendingOnline: order.pendingOnline === true,
   };
-}
-
-/**
- * Random UUID, with a fallback for browsers that gate crypto.randomUUID to
- * secure contexts. The key only needs to be unique per attempt, not
- * cryptographic -- its job is to let the database recognise a retry, not to
- * be unguessable. Any collision would have to happen between two attempts on
- * the same order within seconds.
- */
-function newIdempotencyKey(): string {
-  const c = globalThis.crypto;
-  if (c && typeof c.randomUUID === 'function') return c.randomUUID();
-  return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}-${Math.random()
-    .toString(16)
-    .slice(2)}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`;
 }
 
 /* ============================================================================
@@ -148,6 +139,7 @@ export function Cashier({
   const [method, setMethod] = useState<CounterMethod>('cash');
   const [message, setMessage] = useState('');
   const [paymentReceiptUrl, setPaymentReceiptUrl] = useState<string | null>(null);
+  const [checkTicketUrl, setCheckTicketUrl] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [settling, setSettling] = useState<string[]>([]);
   /** Orders settled or cancelled locally, in demo mode only. */
@@ -156,27 +148,19 @@ export function Cashier({
   const [selectedKey, setSelectedKey] = useState<string | null>(focus?.trim() || null);
   /** Has the cashier dismissed the note about a bill that is no longer waiting? */
   const [focusDismissed, setFocusDismissed] = useState(false);
+  // Preserve the screen through a refresh after pinning a payment, but
+  // follow an explicit new focus (for example, Collect from the ledger).
+  useEffect(() => {
+    setSelectedKey(focus?.trim() || null);
+    setFocusDismissed(false);
+  }, [focus]);
   /** The order the cashier has asked to cancel, before they confirm. */
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  /**
-   * One key per order in flight, reused if the same attempt is retried. Kept
-   * in a ref rather than state: it is an implementation detail of talking to
-   * the database, and changing it must never re-render the queue.
-   */
-  const keys = useRef<Record<string, string>>({});
-
-  /**
-   * Tickets with a payment write in flight.
-   *
-   * `isPending` is a render flag: two taps inside the same frame both read
-   * `false` and both start a transition. The idempotency key makes the second
-   * one harmless at the database, but "harmless" still means a second round
-   * trip and a second voice in the room saying it worked. A ref is read at the
-   * moment of the tap, which is the only place a double tap can be stopped.
-   */
+  const [stored, setStored] = useState<{ key: string; attempt?: CounterAttempt | null } | null>(null);
+  // An immediate guard, independent of React's render schedule.
   const paying = useRef<Set<string>>(new Set());
 
   const live = Boolean(data);
@@ -187,90 +171,116 @@ export function Cashier({
         .map(fromDemo)
         .filter((row) => !demoDone.includes(row.key));
 
-  // A row being paid disappears at once: the cashier has the money in hand
-  // and must not be able to take it twice. If the write fails the id comes
-  // back off this list and the row returns with the error shown.
+  // Only verified writes remove rows optimistically. If the selected ticket
+  // leaves the queue, no other ticket may inherit its payment button.
   const visible = queue.filter((row) => !settling.includes(row.key));
-  // The selection follows the queue: when the chosen ticket is settled it
-  // leaves, and the panel falls back to the oldest one still waiting, which
-  // is where a cashier's attention goes next anyway.
-  const order = visible.find((row) => row.key === selectedKey) ?? visible[0];
-  /**
-   * A bill can leave the queue between the ledger being drawn and the tap:
-   * somebody at the counter settles it, or the kitchen cancels it.
-   *
-   * The panel still has to show something, so it falls back to the oldest
-   * ticket -- but silently, that would look like the link went to the wrong
-   * order, and at a real counter it could mean taking the wrong table's money.
-   * So the fallback says out loud that it is a fallback.
-   */
-  const wanted = focus?.trim() || null;
-  const focusMissing = Boolean(
-    wanted &&
-      !focusDismissed &&
-      !visible.some((row) => row.key === wanted || row.code === wanted),
-  );
+  const wanted = selectedKey ?? (focusDismissed ? null : focus?.trim() || null);
+  const selected = visible.find(row => row.key === wanted || (!live && row.code === wanted));
+  const order = selected ?? visible[0];
+  const focusMissing = Boolean(wanted && !selected);
+  const recordingId = focusMissing ? wanted : order?.orderId;
+  const key = data?.outletId && data.canPlaceDirect && recordingId && COUNTER_ID.test(recordingId)
+    ? counterAttemptKey(data.outletId, recordingId) : null;
+  const activeStorage = stored?.key === key ? stored : null;
+  const savedAttempt = activeStorage?.attempt;
+  useEffect(() => {
+    if (!key) return;
+    const sync = () => {
+      try {
+        if (!navigator.locks || !crypto.randomUUID) throw new Error('Counter recording needs safe browser storage');
+        setStored({ key, attempt: readCounterAttempt(window.localStorage, key) });
+      } catch { setStored({ key }); }
+    };
+    sync();
+    window.addEventListener('storage', sync);
+    window.addEventListener('pageshow', sync);
+    return () => { window.removeEventListener('storage', sync); window.removeEventListener('pageshow', sync); };
+  }, [key]);
+
   const outstanding = useMemo(
     () => visible.reduce((sum, item) => sum + item.outstanding, 0),
     [visible],
   );
 
-  const recordPayment = () => {
-    if (!order) return;
-    if (paying.current.has(order.key)) return;
-    paying.current.add(order.key);
-    // Released in every exit path below; the sample path is synchronous, the
-    // live one releases when the write answers.
-    const release = () => paying.current.delete(order.key);
+  const recordPayment = (reconcileOnly = false) => {
+    if (!live) {
+      if (!order || focusMissing) return;
+      setDemoDone(current => [...current, order.key]);
+      setSelectedKey(null);
+      setFocusDismissed(true);
+      setMessage(`${order.code} marked paid in this preview. Nothing was recorded and no money changed hands.`);
+      return;
+    }
+    if (!recordingId || !key || savedAttempt === undefined || (focusMissing && !reconcileOnly)) return;
+    if (paying.current.has(recordingId)) return;
+    paying.current.add(recordingId);
+    const storageKey = key;
+    const ticketId = recordingId;
+    setSelectedKey(ticketId);
     setError('');
     setMessage('');
     setPaymentReceiptUrl(null);
-
-    // No database row means nothing can be written. In a preview that is
-    // expected, so the row is settled in this browser only and the screen
-    // says exactly that -- a disabled button with no explanation is how a
-    // demo reads as broken.
-    if (!order.orderId) {
-      release();
-      if (!live) {
-        setDemoDone((current) => [...current, order.key]);
-        setMessage(
-          `${order.code} marked paid in this preview. Nothing was recorded and no money changed hands.`,
-        );
-        return;
-      }
-      setError('This ticket has no database id, so a payment cannot be recorded against it.');
-      return;
-    }
-
-    const paidId = order.orderId;
-
-    // Reuse the key if this exact attempt failed before, so a retry is
-    // recognised as a retry instead of starting a second payment.
-    if (!keys.current[paidId]) keys.current[paidId] = newIdempotencyKey();
-
-    setSettling((current) => [...current, paidId]);
+    setCheckTicketUrl(null);
 
     startTransition(async () => {
-      const result = await recordPaymentAction({
-        orderId: paidId,
-        method,
-        idempotencyKey: keys.current[paidId],
-      });
-
-      release();
-
-      if (!result.ok) {
-        setSettling((current) => current.filter((id) => id !== paidId));
-        setError(result.error);
-        return;
-      }
-
-      // Success: the key has done its job, so the next order gets a fresh one.
-      delete keys.current[paidId];
-      setSettling((current) => current.filter((id) => id !== paidId));
-      setMessage(result.message);
-      setPaymentReceiptUrl(result.paymentReceiptUrl ?? null);
+      const checkTicket = () => { setCheckTicketUrl(`/bill/${ticketId}`); router.refresh(); };
+      const send = async () => {
+        const storage = window.localStorage;
+        const prior = readCounterAttempt(storage, storageKey);
+        if (prior?.idempotencyKey !== savedAttempt?.idempotencyKey ||
+            prior?.method !== savedAttempt?.method || prior?.amountPaise !== savedAttempt?.amountPaise) {
+          setStored({ key: storageKey, attempt: prior });
+          setError('The saved recording changed in another tab. Check the terminal or cash and saved ticket before continuing.');
+          checkTicket();
+          return;
+        }
+        const amountPaise = order ? rupeesToPaise(order.outstanding) : 0;
+        if (!prior && (reconcileOnly || !order || amountPaise <= 0)) return;
+        const attempt = prior ?? { method, amountPaise, idempotencyKey: crypto.randomUUID() };
+        if (!prior) {
+          storage.setItem(storageKey, JSON.stringify(attempt));
+          if (readCounterAttempt(storage, storageKey)?.idempotencyKey !== attempt.idempotencyKey) {
+            throw new Error('Could not retain a recording key');
+          }
+        }
+        // An unacknowledged payment may already remove this ticket from the
+        // queue. Reload or Back must still lead to this exact recording.
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('order') !== ticketId) {
+          url.searchParams.set('order', ticketId);
+          window.history.replaceState(null, '', url);
+        }
+        setStored({ key: storageKey, attempt });
+        const checkOnly = reconcileOnly || amountPaise !== attempt.amountPaise || order?.pendingOnline;
+        const result = await recordPaymentAction({ orderId: ticketId, ...attempt, checkOnly });
+        if (!result.ok) {
+          // Even if the write was refused, tender may already have moved
+          // outside the app. Keep the original attempt across reloads.
+          setError(result.error);
+          checkTicket();
+          return;
+        }
+        try { storage.removeItem(storageKey); } catch { /* the saved payment was verified */ }
+        setStored({ key: storageKey, attempt: null });
+        setSettling(current => [...current, ticketId]);
+        setMessage(result.message);
+        setPaymentReceiptUrl(result.paymentReceiptUrl ?? null);
+        router.refresh();
+      };
+      try {
+        if (!navigator.locks) throw new Error('Counter recording needs safe browser storage');
+        await navigator.locks.request(storageKey, { ifAvailable: true }, async lock => {
+          if (!lock) {
+            setError('Another tab is checking this ticket. Do not collect again; check the saved ticket before continuing.');
+            checkTicket();
+            return;
+          }
+          await send();
+        });
+      } catch {
+        setError('Recording could not be verified. Check the saved ticket and the terminal or cash. Do not collect again until reconciled.');
+        checkTicket();
+      } finally { paying.current.delete(ticketId); }
     });
   };
 
@@ -286,7 +296,7 @@ export function Cashier({
    * never arrive is the worst outcome this screen can produce.
    */
   const cancelOrder = async () => {
-    if (!order) return;
+    if (!order || focusMissing || (live && (!activeStorage || savedAttempt !== null))) return;
 
     /* Two taps for EVERY ticket, sample rows included.
      *
@@ -307,6 +317,8 @@ export function Cashier({
     if (!order.orderId) {
       if (!live) {
         setDemoDone((current) => [...current, order.key]);
+        setSelectedKey(null);
+        setFocusDismissed(true);
         setConfirmCancel(null);
         setMessage(`${order.code} cancelled in this preview. Nothing was recorded.`);
         return;
@@ -375,20 +387,45 @@ export function Cashier({
                 <>
                   {outstandingNote}
                   <span className="mx-2 text-gink-28">·</span>
-                  <span className="text-gink tabular-nums">{inr(outstanding)}</span> outstanding
+                  <span className="text-gink tabular-nums">{counterMoney(outstanding)}</span> outstanding
                 </>
               )
             }
             actions={
               !blocked ? (
+                <>
+                  {data?.canPlaceDirect && <BtnLink href="/dashboard/direct-order" tone="ghost" size="sm">New takeaway or delivery</BtnLink>}
                 <BtnLink href="/dashboard/orders" tone="ghost" size="sm">
                   The ledger
                 </BtnLink>
+                </>
               ) : null
             }
           />
 
+          {!blocked && data?.floor && <p data-counter-floor className="mb-3 text-[12.5px] text-gink-64">
+            {data.floor.occupied} occupied · {data.floor.openCalls} open waiter calls{data.floor.truncated ? ' (partial floor)' : ''}{' '}
+            <Link className="underline underline-offset-2" href="/waiter">View floor service</Link>
+          </p>}
           {blocked && <SignInPrompt reason={blocked} screen="counter" />}
+
+          {!blocked && message ? <Notice role="status" tone="live" className="mb-3">
+            {message}
+            {paymentReceiptUrl ? <Link href={paymentReceiptUrl} className="ml-2 font-medium underline underline-offset-2">View payment receipt</Link> : null}
+          </Notice> : null}
+          {!blocked && error ? <Notice role="alert" tone="due" className="mb-3">
+            {error}
+            {checkTicketUrl ? <Link href={checkTicketUrl} className="ml-2 font-medium underline underline-offset-2">Check saved ticket</Link> : null}
+          </Notice> : null}
+
+          {!blocked && focusMissing && wanted && COUNTER_ID.test(wanted) ? (
+            <Notice className="mb-3">This ticket is no longer in the counter queue.{' '}
+              <Link href={`/bill/${wanted}`} className="font-medium underline underline-offset-2">Check saved ticket</Link>
+              {savedAttempt && <button type="button" className={`${btn('quiet', 'sm')} ml-2`} disabled={isPending} onClick={() => recordPayment(true)}>
+                Check original recording
+              </button>}
+            </Notice>
+          ) : null}
 
           {!blocked && (
             <div className="grid gap-5 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)] lg:items-start lg:gap-6">
@@ -409,7 +446,8 @@ export function Cashier({
                             data-counter-ticket
                             data-selected={selected ? 'true' : 'false'}
                             aria-pressed={selected}
-                            aria-label={`Select ${item.code} at ${item.table}, ${inr(item.outstanding)} outstanding`}
+                            disabled={isPending}
+                            aria-label={`Select ${item.code} at ${item.table}, ${counterMoney(item.outstanding)} outstanding`}
                             onClick={() => {
                               setSelectedKey(item.key);
                               setConfirmCancel(null);
@@ -445,10 +483,10 @@ export function Cashier({
                                 {/* Outstanding, not total: what the till actually
                                     wants, at the size a cashier reads across a
                                     counter. It was 13.5px next to a 13.5px code. */}
-                                {inr(item.outstanding)}
+                                {counterMoney(item.outstanding)}
                                 {item.paid > 0 && (
                                   <span className="ml-1 text-[11.5px] font-normal text-gink-46">
-                                    of {inr(item.total)}
+                                    of {counterMoney(item.total)}
                                   </span>
                                 )}
                               </span>
@@ -505,8 +543,8 @@ export function Cashier({
                         </button>
                       }
                     >
-                      The bill you came for is not waiting any more — it was settled or cancelled
-                      just now. This is the oldest ticket still open.
+                      The bill you came for is not waiting any more. Check its saved ticket before collecting payment.
+                      {' '}This is the oldest ticket still open.
                     </Notice>
                   ) : null}
 
@@ -532,7 +570,7 @@ export function Cashier({
                           id="cashier-order-title"
                           className="mt-1.5 text-[clamp(2rem,3.4vw,2.6rem)] leading-none font-medium tracking-[-0.045em] text-gink tabular-nums"
                         >
-                          {inr(order.outstanding)}
+                          {counterMoney(order.outstanding)}
                         </h2>
                       </div>
                       <div className="flex flex-col items-end gap-1.5">
@@ -544,23 +582,26 @@ export function Cashier({
                     <div className="px-5 py-4">
                       {order.paid > 0 && (
                         <p className="mb-3 text-[12.5px] leading-[1.5] text-gink-64">
-                          {inr(order.paid)} already recorded on this order, against a bill of{' '}
-                          {inr(order.total)}. Take the remaining {inr(order.outstanding)}.
+                          {counterMoney(order.paid)} already recorded on this order, against a bill of{' '}
+                          {counterMoney(order.total)}. Take the remaining {counterMoney(order.outstanding)}.
                         </p>
                       )}
 
                       <ul className="m-0 flex list-none flex-col gap-2 p-0">
                         <li className="flex items-baseline justify-between gap-4 text-[13px] text-gink-64">
                           <span className="min-w-0">{order.items}</span>
-                          <span className="shrink-0 tabular-nums">{inr(order.total)}</span>
+                          <span className="shrink-0 tabular-nums">{counterMoney(order.total)}</span>
                         </li>
                       </ul>
                       <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-hair pt-3 text-[13px]">
                         <span className="font-medium text-gink">Outstanding</span>
-                        <strong className="tabular-nums text-gink">{inr(order.outstanding)}</strong>
+                        <strong className="tabular-nums text-gink">{counterMoney(order.outstanding)}</strong>
                       </div>
 
-                      <div className="mt-5">
+                      {savedAttempt && !focusMissing ? (
+                        <Notice className="mt-5">This device saved a {COUNTER_METHOD_LABEL[savedAttempt.method]} recording for {formatBillMoney(savedAttempt.amountPaise)}.
+                          Do not collect again. Check the saved ticket and the terminal or cash before retrying the original recording.</Notice>
+                      ) : <div className="mt-5">
                         <div className="mb-1.5 text-[12.5px] font-medium text-gink-64">
                           Payment method
                         </div>
@@ -573,48 +614,34 @@ export function Cashier({
                             label: COUNTER_METHOD_LABEL[value],
                           }))}
                         />
-                      </div>
+                      </div>}
 
                       <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
-                        This records a counter payment. Nothing is charged here &mdash; the guest
-                        pays on the terminal or by scanning the shop&rsquo;s code, and this writes
-                        down that it happened.
+                        Record only after counting the cash or verifying the exact amount on your terminal or UPI app.
+                        Nothing is charged or verified by a provider here.
                       </p>
-
-                      {error && (
-                        <Notice
-                          role="alert"
-                          tone="due"
-                          className="mt-3 mb-0"
-                          label={
-                            <strong className="text-[12.5px] font-semibold text-gink">
-                              Could not record the payment.
-                            </strong>
-                          }
-                        >
-                          {error}
-                        </Notice>
-                      )}
 
                       <button
                         type="button"
                         data-counter-cta
                         className={`${btn('primary')} mt-4 w-full`}
-                        disabled={isPending || order.pendingOnline || Boolean(live && !order.orderId)}
+                        disabled={isPending || focusMissing || order.pendingOnline || Boolean(live && savedAttempt === undefined)}
                         aria-busy={isPending}
-                        onClick={recordPayment}
+                        onClick={() => recordPayment()}
                       >
                         {isPending
                           ? 'Recording…'
-                          : `Record ${method === 'cash' ? 'cash' : method.toUpperCase()} ${inr(order.outstanding)}`}
+                          : savedAttempt && !focusMissing
+                            ? (rupeesToPaise(order.outstanding) === savedAttempt.amountPaise ? 'Retry original recording' : 'Check original recording')
+                            : `Record ${method === 'cash' ? 'cash' : method.toUpperCase()} ${counterMoney(order.outstanding)}`}
                       </button>
                       {/* A disabled button with no reason is the failure this
                           screen has already had once. If the ticket cannot be
                           paid, the screen says so under the button. */}
-                      {live && !order.orderId && (
+                      {live && !focusMissing && savedAttempt === undefined && (
                         <p className="mt-2 text-[11.5px] leading-[1.5] text-gink-46">
-                          This ticket arrived without an id, so no payment can be recorded against
-                          it. Ask the kitchen to re-send the order.
+                          {!order.orderId ? 'This ticket arrived without an id. It cannot accept a recording.'
+                            : 'Counter access and available browser storage are required to record payment. If a recording is unresolved, check with a manager before collecting.'}
                         </p>
                       )}
 
@@ -635,7 +662,7 @@ export function Cashier({
                             <button
                               type="button"
                               className={btn('danger', 'sm')}
-                              disabled={order.pendingOnline || cancelling === order.orderId}
+                              disabled={order.pendingOnline || cancelling === order.orderId || Boolean(live && savedAttempt !== null)}
                               onClick={cancelOrder}
                             >
                               {cancelling === order.orderId ? 'Cancelling…' : 'Yes, cancel it'}
@@ -653,23 +680,13 @@ export function Cashier({
                         <button
                           type="button"
                           className={`${btn('quiet', 'sm')} mt-1`}
-                          disabled={isPending || order.pendingOnline || Boolean(live && !order.orderId)}
+                          disabled={isPending || focusMissing || order.pendingOnline || Boolean(live && savedAttempt !== null)}
                           onClick={cancelOrder}
                         >
                           Cancel this order
                         </button>
                       )}
 
-                      {message && (
-                        <Notice role="status" tone="live" className="mt-3 mb-0" label={<span className="text-[11.5px] font-semibold text-[var(--p-live)]">Recorded</span>}>
-                          {message}
-                          {paymentReceiptUrl ? (
-                            <Link href={paymentReceiptUrl} className="ml-2 font-medium underline decoration-hair-strong underline-offset-2">
-                              View payment receipt
-                            </Link>
-                          ) : null}
-                        </Notice>
-                      )}
                       {/* One footnote, not two saying the same thing: the
                           paragraph above already says nothing is charged. */}
                       <p className="mt-2 text-[11.5px] leading-[1.5] text-gink-46">
@@ -685,22 +702,10 @@ export function Cashier({
                   <Panel title="Queue clear" meta={live ? 'all settled' : 'preview'}>
                     <p className="m-0 text-[13px] leading-[1.55] text-gink-64">
                       {live
-                        ? 'Every order from the last day has been settled.'
+                        ? 'No tickets are waiting for recording in this queue. Check the saved ticket to verify an earlier payment.'
                         : 'Every demo order in this preview has been settled.'}
                     </p>
-                    {message && (
-                      <p role="status" className="mt-3 text-[12.5px] leading-[1.5] text-gink-64">
-                        {message}
-                      </p>
-                    )}
-                    {error && (
-                      <div
-                        role="alert"
-                        className="mt-3 rounded-[var(--p-r-control)] border border-[var(--p-due)]/30 bg-[var(--p-due)]/8 px-3.5 py-3 text-[12.5px] text-[var(--p-due)]"
-                      >
-                        {error}
-                      </div>
-                    )}
+
                     {!live && demoDone.length > 0 && (
                       <button
                         type="button"

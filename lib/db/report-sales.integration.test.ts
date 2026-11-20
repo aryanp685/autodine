@@ -97,6 +97,9 @@ vi.mock('@/lib/supabase/server', () => {
         if (name === 'restaurant_access') {
           sql = 'select public.restaurant_access($1::uuid) as value';
           values = [args.p_restaurant_id];
+        } else if (name === 'report_gst_documents') {
+          sql = 'select * from public.report_gst_documents($1::uuid, $2::timestamptz, $3::timestamptz)';
+          values = [args.p_restaurant_id, args.p_from, args.p_to];
         } else if (name === 'report_sales') {
           sql = `select public.report_sales(
                    $1::uuid, $2::timestamptz, $3::timestamptz, $4::text,
@@ -117,7 +120,7 @@ vi.mock('@/lib/supabase/server', () => {
 
         try {
           const result = await withAuthenticated((db) => db.query(sql, values));
-          return { data: result.rows[0]?.value ?? null, error: null };
+          return { data: name === 'report_gst_documents' ? result.rows : result.rows[0]?.value ?? null, error: null };
         } catch (error) {
           return { data: null, error: errorValue(error) };
         }
@@ -474,13 +477,39 @@ describe.skipIf(!URL_VALUE)('report_sales role and export-limit boundary (dispos
   });
 
   describe('actual report-export Route Handler with synthetic memberships', () => {
-    async function requestAs(userId: string | null) {
+    async function requestAs(userId: string | null, type = 'orders') {
       exportTestRuntime.userId = userId;
       exportTestRuntime.rpcCalls.length = 0;
       return exportGet(new Request(
-        'http://localhost/dashboard/reports/export?type=orders&range=custom&from=2000-01-01&to=2000-01-01',
+        `http://localhost/dashboard/reports/export?type=${type}&range=custom&from=2000-01-01&to=2000-01-01&restaurant_id=${f.foreignRestaurant}`,
       ));
     }
+
+    it('exports the distinct GST ledger through the same owner/manager and no-cache boundary', async () => {
+      const response = await requestAs(f.manager, 'gst');
+      expect(response.status).toBe(200);
+      expect(response.headers.get('cache-control')).toBe('no-store, max-age=0');
+      expect(response.headers.get('content-disposition')).toContain('autodine-gst-2000-01-01.csv');
+      expect(await response.text()).toContain('Credit and debit notes are document adjustments, not payments or refunds.');
+      expect(exportTestRuntime.rpcCalls).toContain('report_gst_documents');
+      expect(exportTestRuntime.rpcCalls).not.toContain('report_sales');
+      for (const actor of [f.cashier, f.kitchen, null]) {
+        expect((await requestAs(actor, 'gst')).status).toBe(actor === null ? 401 : 403);
+        expect(exportTestRuntime.rpcCalls).not.toContain('report_gst_documents');
+      }
+    });
+
+    it('denies direct GST RPC reads for foreign/operational staff and bounds the date range', async () => {
+      const query = (outlet: string, from = f.from, to = f.to) => db.query(
+        'select * from public.report_gst_documents($1,$2,$3)', [outlet, from, to],
+      );
+      for (const actor of [f.cashier, f.kitchen]) {
+        await expect(asStaff(actor, () => query(f.restaurant))).rejects.toMatchObject({ code: '42501' });
+      }
+      await expect(asStaff(f.manager, () => query(f.foreignRestaurant))).rejects.toMatchObject({ code: '42501' });
+      await expect(asStaff(f.owner, () => query(f.restaurant, f.from, 'infinity'))).rejects.toMatchObject({ code: '22023' });
+      await expect(asStaff(f.owner, () => query(f.restaurant, f.from, '2020-01-01'))).rejects.toMatchObject({ code: '22023' });
+    });
 
     it('denies an unauthenticated direct export request', async () => {
       const response = await requestAs(null);

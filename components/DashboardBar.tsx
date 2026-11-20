@@ -461,6 +461,11 @@ const ICONS: Record<DashboardSection, ReactNode> = {
       <path d="M4.5 13h15M6 13v4.5M18 13v4.5" strokeLinecap="round" />
     </svg>
   ),
+  waiter: (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M4 8h16M6 8v10M18 8v10M8 5h8" strokeLinecap="round" />
+    </svg>
+  ),
   counter: (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6">
       <path d="M4 7h16v10H4z" strokeLinejoin="round" />

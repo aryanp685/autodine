@@ -76,7 +76,7 @@ export async function readCardPass(): Promise<string | null> {
   return parseCardPass(raw);
 }
 
-/** Written by the scan handler only -- see app/t/[token]/route.ts. */
+/** Remember the live card after successful code verification. */
 export async function saveCardPass(qrToken: string): Promise<void> {
   if (!isQrToken(qrToken)) return;
   (await cookies()).set(TABLE_CARD_COOKIE, qrToken, TABLE_CARD_COOKIE_OPTIONS);

@@ -1,3 +1,4 @@
+import { formatBillMoney } from '@/lib/bill';
 import { rupeesToPaise } from '@/lib/money';
 import type { OutletBar } from '@/lib/outlets';
 import Link from 'next/link';
@@ -6,7 +7,6 @@ import { dashboardStats, recentOrders, restaurant, sparkline, topItems } from '@
 import { Money, PaymentPill, PrepPill, Sparkline } from '@/components/ui';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { ChartMotion } from '@/components/owner/ChartMotion';
-import { AutoRefresh } from '@/components/owner/AutoRefresh';
 import {
   BtnLink,
   Empty,
@@ -147,16 +147,13 @@ export function Dashboard({
 
   return (
     <OwnerPage active="overview" outlet={outlet} signOut={!blocked}>
-        {/* The overview is a read of the database, so it is only as true as the
-            last render. This re-renders it on a slow timer while the tab is
-            visible and nobody is typing -- see components/owner/AutoRefresh. */}
-        <AutoRefresh enabled={live && !blocked} />
       <PageHead
         kicker={live ? 'Overview · today, restaurant time' : 'Sample dashboard · fictional data'}
         title={venueName || 'Restaurant overview'}
         meta={venueMeta || undefined}
         actions={
           <>
+            {data?.canMarkPaid && <BtnLink href="/dashboard/direct-order" tone="ghost">New takeaway or delivery</BtnLink>}
             <BtnLink href="/cashier" tone="ghost">
               Open the counter
             </BtnLink>
@@ -396,9 +393,9 @@ export function Dashboard({
           comparison the heading promises, and it is drawn from the figure
           printed beside it, so the bar and the number cannot disagree. */}
       {live && data && !blocked ? (
-        <section aria-label="Active table sessions" className="mt-6">
+        <section aria-label="Active billing sessions" className="mt-6">
           <SectionHead
-            title="Active tables"
+            title="Active billing sessions"
             meta={`${data.activeSessions.length} open session${data.activeSessions.length === 1 ? '' : 's'}`}
           />
           {data.activeSessions.length > 0 ? (
@@ -410,6 +407,7 @@ export function Dashboard({
                     key={session.id}
                     className="rounded-[var(--p-r-card)] border border-hair bg-card p-4 shadow-[var(--p-shadow-1)]"
                     data-active-session={session.id}
+                    id={`session-${session.id}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -420,6 +418,7 @@ export function Dashboard({
                           {session.orderCount} ticket{session.orderCount === 1 ? '' : 's'}
                           {session.orderCodes.length ? ` · ${session.orderCodes.join(', ')}` : ''}
                         </p>
+                        {session.deliveryAddress !== undefined && <p className="mt-1 text-[12.5px] text-gink-64">{session.deliveryAddress ? `Deliver to ${session.deliveryAddress}` : 'Destination unavailable; check before dispatch.'}</p>}
                         <p className="mt-1 break-all text-[10px] text-gink-46">
                           Session {session.id} · opened {clockTimeInZone(timezone, session.openedAt)}
                         </p>
@@ -449,10 +448,10 @@ export function Dashboard({
                       <div>
                         <p className="text-[10.5px] text-gink-46">Session total</p>
                         <p data-session-total className="mt-0.5 text-[18px] font-semibold tracking-[-0.025em] text-gink tabular-nums">
-                          <Money value={session.totalPaise} />
+                          {formatBillMoney(session.totalPaise)}
                         </p>
                         <p className="mt-1 text-[10.5px] text-gink-46">
-                          Paid <Money value={session.paidPaise} /> · Outstanding <Money value={session.outstandingPaise} />
+                          Paid {formatBillMoney(session.paidPaise)} · Outstanding {formatBillMoney(session.outstandingPaise)}
                         </p>
                         {!unpaid && session.paidAt ? (
                           <p className="mt-1 text-[10.5px] text-gink-46">
@@ -467,7 +466,10 @@ export function Dashboard({
                             sessionId={session.id}
                             table={session.table}
                             outstandingPaise={session.outstandingPaise}
-                            gstMode={data.gstMode}
+                            gstMode={session.gstMode}
+                            identifiedRequired={session.gstRecipientParticularsRequired}
+                            outletId={data.gstBuyerOwnerOutletId}
+                            canSaveBuyer={Boolean(data.gstBuyerOwnerOutletId)}
                           />
                         </div>
                       ) : null}
@@ -477,7 +479,7 @@ export function Dashboard({
               })}
             </ul>
           ) : (
-            <Empty>No open table sessions. New table orders will appear here.</Empty>
+            <Empty>No open billing sessions. New table and direct tickets will appear here.</Empty>
           )}
         </section>
       ) : null}

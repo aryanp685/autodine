@@ -30,6 +30,14 @@ describe('InvoiceHistoryScreen', () => {
     expect(html).toContain('T-4');
   });
 
+  it('identifies an issued or voided retail number without current settings', () => {
+    const html = renderToStaticMarkup(<InvoiceHistoryScreen rows={[{...row,
+      invoice: {...row.invoice, number: 'RBL/26-27/000001', status: 'voided'},
+    }]} outlet={null} />);
+    expect(html).toContain('RBL/26-27/000001 · voided');
+    expect(html).toContain('RETAIL BILL / CASH MEMO');
+  });
+
   it('keeps closed sessions visible when receipt issuance was blocked', () => {
     const html = renderToStaticMarkup(
       <InvoiceHistoryScreen rows={[{ ...row, invoice: null }]} outlet={null} />,

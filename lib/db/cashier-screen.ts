@@ -1,3 +1,6 @@
+import { readFloorService, readOrderFloorLabels } from './floor-service';
+import { dbErrorReference } from '@/lib/db/error-reference';
+import { directFulfilmentLabel } from '@/lib/gst/place-of-supply';
 /**
  * Load the counter queue: orders still awaiting payment.
  *
@@ -24,7 +27,7 @@
  * rupee float against an integer paise total.
  */
 
-import { getStaffContextDetailed } from '@/lib/db/staff';
+import { CASHIER_ROLES, getStaffContextDetailed } from '@/lib/db/staff';
 import { clockTimeInZone } from './time';
 
 // Re-exported rather than redefined: the constant lives in a module with no
@@ -63,7 +66,10 @@ export type CounterOrder = {
 
 export type CashierScreenData = {
   restaurantName: string;
+  canPlaceDirect?: boolean;
+  outletId?: string;
   queue: CounterOrder[];
+  floor?: { occupied: number; openCalls: number; truncated: boolean };
   /** Set when the caller has no restaurant to show. See lib/db/staff.ts. */
   blocked?: 'signed-out' | 'no-membership';
 };
@@ -90,12 +96,13 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
     return { restaurantName: '', queue: [], blocked: staff.reason };
   }
 
-  const { supabase, restaurantId, restaurantName, timezone } = staff.context;
+  const { supabase, restaurantId, restaurantName, timezone, role, entitlement } = staff.context;
+  const canPlaceDirect = Boolean(entitlement?.canWrite && CASHIER_ROLES.includes(role));
   const cutoff = new Date(Date.now() - QUEUE_WINDOW_HOURS * 3_600_000).toISOString();
 
   const { data: orders, error: ordersError } = await supabase
     .from('orders_finance')
-    .select('id, code, table_id, prep_status, total_paise, placed_at')
+    .select('id, code, table_id, order_session_id, prep_status, total_paise, placed_at')
     .eq('restaurant_id', restaurantId)
     .eq('payment_status', 'pending')
     .neq('prep_status', 'cancelled')
@@ -103,11 +110,17 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
     .order('placed_at', { ascending: true });
 
   if (ordersError) {
-    throw new Error(`Could not load orders: ${ordersError.message}`);
+    throw new Error(`Could not load orders: ${dbErrorReference(ordersError)}`);
   }
 
   const rows = orders ?? [];
-  if (rows.length === 0) return { restaurantName, queue: [] };
+  const service = await readFloorService(staff.context);
+  // A partial or older projection must never make the summary lie about an empty floor.
+  const floor = service && Array.isArray(service.tables) && Array.isArray(service.calls)
+    ? { occupied: service.tables.filter(table => table.sitting).length, openCalls: service.calls.length,
+        truncated: Boolean(service.callsTruncated || service.tablesTruncated) }
+    : undefined;
+  if (rows.length === 0) return { restaurantName, queue: [], canPlaceDirect, outletId: restaurantId, floor };
 
   const orderIds = rows.map((row) => row.id);
   const tableIds = [...new Set(rows.map((r) => r.table_id).filter(Boolean))] as string[];
@@ -117,7 +130,8 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
   // recorded against it, and record_cash_payment will only accept the exact
   // outstanding balance -- so showing the full total would be a lie that
   // fails at the till.
-  const [itemsResult, tablesResult, paymentsResult] = await Promise.all([
+  const offTableIds = [...new Set(rows.flatMap(row => !row.table_id && row.order_session_id ? [row.order_session_id] : []))];
+  const [itemsResult, tablesResult, paymentsResult, routes, floorLabels] = await Promise.all([
     supabase
       .from('order_items')
       .select('order_id, qty, name_snapshot, sort_order')
@@ -127,16 +141,20 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
       ? supabase.from('dining_tables').select('id, label').in('id', tableIds)
       : Promise.resolve({ data: [], error: null }),
     supabase.from('payments').select('order_id, amount_paise, status, method').in('order_id', orderIds),
+    offTableIds.length ? supabase.from('order_sessions').select('id, fulfilment_kind').eq('restaurant_id',restaurantId).in('id',offTableIds)
+      : Promise.resolve({ data: [], error: null }),
+    readOrderFloorLabels(supabase, restaurantId, rows.filter(row => row.table_id).map(row => row.id)),
   ]);
+  const routeBySession = new Map((routes.data ?? []).map(s => [s.id,directFulfilmentLabel(s.fulfilment_kind)]));
 
   if (itemsResult.error) {
-    throw new Error(`Could not load order items: ${itemsResult.error.message}`);
+    throw new Error(`Could not load order items: ${dbErrorReference(itemsResult.error)}`);
   }
   if (tablesResult.error) {
-    throw new Error(`Could not load tables: ${tablesResult.error.message}`);
+    throw new Error(`Could not load tables: ${dbErrorReference(tablesResult.error)}`);
   }
   if (paymentsResult.error) {
-    throw new Error(`Could not load payments: ${paymentsResult.error.message}`);
+    throw new Error(`Could not load payments: ${dbErrorReference(paymentsResult.error)}`);
   }
 
   // Only 'recorded' money counts. A failed or refunded attempt did not move
@@ -146,7 +164,7 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
   for (const p of paymentsResult.data ?? []) {
     if (p.status === 'pending' && p.method === 'online') pendingOnlineByOrder.add(p.order_id);
     if (p.status !== 'recorded') continue;
-    paidByOrder.set(p.order_id, (paidByOrder.get(p.order_id) ?? 0) + p.amount_paise);
+    paidByOrder.set(p.order_id, (paidByOrder.get(p.order_id) ?? 0) + Number(p.amount_paise));
   }
 
   const itemsByOrder = new Map<string, typeof itemsResult.data>();
@@ -169,7 +187,8 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
     return {
       id: row.id,
       code: row.code,
-      table: (row.table_id && labelByTable.get(row.table_id)) || NO_TABLE,
+      table: row.table_id ? floorLabels.get(row.id) ?? labelByTable.get(row.table_id) ?? NO_TABLE
+        : row.order_session_id ? routeBySession.get(row.order_session_id) ?? 'Off-table ticket' : NO_TABLE,
       at: clockTimeInZone(timezone, row.placed_at),
       state: PREP_LABEL[row.prep_status] ?? row.prep_status,
       total: paiseToRupees(row.total_paise),
@@ -182,5 +201,5 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
     };
   });
 
-  return { restaurantName, queue };
+  return { restaurantName, queue, canPlaceDirect, outletId: restaurantId, floor };
 }

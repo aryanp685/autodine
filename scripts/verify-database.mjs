@@ -2,6 +2,7 @@
 /** Disposable native PostgreSQL verification. Never accepts a remote server.
  * Usage: READINESS_PG_ADMIN_URL=postgres://postgres@127.0.0.1:5432/postgres npm run test:db
  * Creates/drops only its own randomly named database; no app environment is read. */
+import assert from 'node:assert/strict';
 import { Client } from 'pg';
 import { readFile, readdir } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
@@ -9,6 +10,7 @@ import { spawnSync } from 'node:child_process';
 import { verifyRestore } from './verify-restore.mjs';
 import { seedLegacyFinancialFixture, snapshotFinancialUpgrade, checkFinancialUpgrade } from './verify-financial-upgrade.mjs';
 import { proveAccountLinkWasClientMutable } from './verify-account-link-guard.mjs';
+import { seedPreClassificationPublish, seedGstUpgrade, seedClosedLegacyGst, checkClosedLegacyGst, checkGstUpgrade, seedGstWorkstreamUpgrade, checkGstWorkstreamUpgrade, seedGstClosureUpgrade, checkGstClosureUpgrade, seedGstParticularsUpgrade, checkGstParticularsUpgrade, checkGstFiscalRollover, seedIrpExecutionUpgrade, checkIrpExecutionUpgrade } from './verify-gst-upgrade.mjs';
 // Last migration of the recorded financial baseline. Legacy-flow fixture rows are
 // seeded immediately after it, before any later migration can forbid that flow.
 const FINANCIAL_BASELINE = '20261108006000_restore_public_order_session_attach.sql';
@@ -113,7 +115,60 @@ try {
     for (const file of bundled) alreadyApplied.add(file);
   }
   if (process.env.READINESS_FINANCIAL_UPGRADE === '1' && (alreadyApplied.size || process.env.READINESS_STAGING_BUNDLE === '1')) throw new Error('Financial upgrade drill requires clean repository history');
+  const gstUpgrade = process.env.READINESS_GST_UPGRADE === '1';
+  if (gstUpgrade && (alreadyApplied.size || process.env.READINESS_STAGING_BUNDLE === '1')) throw new Error('GST upgrade drill requires clean repository history');
+  let preClassificationCatalog;
+  let gstBefore;
+  let closedGstBefore;
+  let workstreamGstBefore;
+  let closureGstBefore;
+  let particularsGstBefore;
+  let irpExecutionBefore;
+  let guestCheckoutBefore;
+  let realtimeBefore;
+  const guestMigration = '20261118002000_guest_checkout_integrity.sql';
+  const realtimeMigration = '20261118002100_operational_realtime.sql';
+  const apiCatalog = async () => (await db.query(`select p.oid::regprocedure::text signature, p.proacl::text acl,
+      p.proowner::regrole::text owner, p.prosecdef, p.proconfig,
+      case when p.proname <> 'place_public_order_attempt' then pg_get_functiondef(p.oid) end body
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.prokind = 'f' order by 1`)).rows;
   for (const file of migrations.filter(file => !alreadyApplied.has(file))) {
+    if (gstUpgrade && file === '20261114000101_gst_b2b_einvoice_readiness.sql') {
+      preClassificationCatalog = await seedPreClassificationPublish(db);
+      console.log(`SEEDED legacy publish under migration history preceding ${file}`);
+    }
+    if (gstUpgrade && file === '20261118000200_gst_configuration_boundary.sql') {
+      gstBefore = await seedGstUpgrade(db, preClassificationCatalog);
+      console.log(`SEEDED populated GST fixture after 20261118000100 and before ${file}`);
+    }
+    if (gstUpgrade && file === '20261118000600_gst_ca_onboarding.sql') {
+      closedGstBefore = await seedClosedLegacyGst(db);
+      console.log(`SEEDED closed-unissued GST fixture after 20261118000500 and before ${file}`);
+    }
+    if (gstUpgrade && file === '20261118000800_gst_outlet_activation.sql') {
+      workstreamGstBefore = await seedGstWorkstreamUpgrade(db);
+      console.log(`SEEDED CA-profile INV/RBL/CN fixture before ${file}`);
+    }
+    if (gstUpgrade && file === '20261118001200_gst_review_lifecycle.sql') {
+      closureGstBefore = await seedGstClosureUpgrade(db);
+      console.log(`SEEDED populated activation, buyer, held preflight, paid sittings and share before ${file}`);
+    }
+    if (gstUpgrade && file === '20261118001600_gst_document_particulars.sql') {
+      particularsGstBefore = await seedGstParticularsUpgrade(db);
+      console.log(`SEEDED populated SAC-less Composition BOS/note/share and paid open sitting before ${file}`);
+    }
+    if (gstUpgrade && file === '20261118001800_irp_execution.sql') {
+      irpExecutionBefore = await seedIrpExecutionUpgrade(db);
+      console.log(`SEEDED 114-migration predecessor with an offline preflight and private rehearsal before ${file}`);
+    }
+    if (gstUpgrade && file === guestMigration) {
+      await checkIrpExecutionUpgrade(db, irpExecutionBefore);
+      guestCheckoutBefore = { rows: await irpExecutionBefore.capture(), functions: await apiCatalog() };
+    }
+    if (gstUpgrade && file === realtimeMigration) {
+      realtimeBefore = { rows: await irpExecutionBefore.capture(), functions: await apiCatalog() };
+    }
     if (financialBefore && file === '20261110000300_shared_wifi_scan_limits.sql') {
       await checkFinancialUpgrade(db, financialBefore);
       financialChecked = true;
@@ -151,14 +206,46 @@ try {
     if (!financialBefore) throw new Error('Financial upgrade boundary was not reached');
     if (!financialChecked) await checkFinancialUpgrade(db, financialBefore);
   }
+  if (gstUpgrade) {
+    assert.ok(guestCheckoutBefore, 'Guest checkout migration not replayed');
+    // Compare 116 → 117 at the 117 boundary itself; later migrations may add
+    // functions or replace one on purpose, and are checked on their own below.
+    assert.ok(realtimeBefore, 'Operationally realtime migration not replayed');
+    assert.deepEqual(realtimeBefore.rows, guestCheckoutBefore.rows, '116 → 117 must preserve full financial and IRP rows');
+    assert.deepEqual(realtimeBefore.functions, guestCheckoutBefore.functions, '116 → 117 must not change any function ACL or other body');
+    console.log('Guest checkout 116 → 117 populated replay: 22 tables byte-preserved, public function bodies/grants unchanged except the checkout wrapper body.');
+    assert.deepEqual(await irpExecutionBefore.capture(), realtimeBefore.rows, '117 → 118 must byte-preserve every populated financial, GST and IRP row');
+    // The candidate adds functions and replaces these four on purpose. Any
+    // other existing signature changing body, ACL or owner is a failure.
+    const intentional = new Set(['get_public_order(text,text,uuid)', 'resolve_table_waiter_call(uuid)',
+      'current_restaurant_ids()', 'is_member(uuid)']);
+    const before = new Map(realtimeBefore.functions.map(fn => [fn.signature, fn]));
+    const changed = (await apiCatalog()).filter(fn => before.has(fn.signature)
+      && JSON.stringify(fn) !== JSON.stringify(before.get(fn.signature)) && !intentional.has(fn.signature));
+    assert.deepEqual(changed, [], '117 → 118 changed an unintended existing function');
+    console.log('Operational realtime 117 → 118 populated replay: all populated rows preserved; only the four documented function replacements changed.');
+    await checkGstUpgrade(db, gstBefore);
+    await checkClosedLegacyGst(db, closedGstBefore);
+    await checkGstWorkstreamUpgrade(db, workstreamGstBefore);
+    await checkGstClosureUpgrade(db, closureGstBefore);
+    await checkGstParticularsUpgrade(db, particularsGstBefore);
+  }
   console.log(alreadyApplied.size ? `Verified forward upgrade to ${migrations.length} repository migrations from observed staging baseline.` : `Replayed ${migrations.length} migrations without application-table scaffolds.`);
   await db.end(); db = null;
-  const result = spawnSync('npx', ['vitest', 'run', 'lib/db/gst-two-mode.integration.test.ts', 'lib/db/readiness.integration.test.ts', 'lib/db/report-sales.integration.test.ts', 'lib/db/phase0-security.integration.test.ts', 'lib/db/subscription-billing.integration.test.ts', 'lib/db/restaurant-account-link.integration.test.ts', 'lib/db/credit-debit-notes.integration.test.ts', 'lib/db/order-read-boundary.integration.test.ts', 'app/menu/throttle-db.integration.test.tsx'], {
-    stdio: 'inherit', env: { ...process.env, READINESS_DB_URL: url.href, THROTTLE_DB_URL: url.href },
-  });
-  if (result.error) throw result.error;
-  process.exitCode = result.status ?? 1;
-  if (result.status === 0 && process.env.READINESS_VERIFY_RESTORE === '1') await verifyRestore(url.href, admin);
+  if (process.env.READINESS_GST_FISCAL_CLOCK_ONLY === '1') {
+    if (alreadyApplied.size || gstUpgrade || !process.env.FAKETIME_TIMESTAMP_FILE) {
+      throw new Error('Fiscal clock-only drill requires a fresh disposable replay and a controlled native clock.');
+    }
+    db = new Client({ connectionString: url.href }); await db.connect();
+    await checkGstFiscalRollover(db, process.env.FAKETIME_TIMESTAMP_FILE);
+  } else {
+    const result = spawnSync('npx', ['vitest', 'run', 'lib/db/gst-two-mode.integration.test.ts', 'lib/db/irp-execution.integration.test.ts', 'lib/db/readiness.integration.test.ts', 'lib/db/report-sales.integration.test.ts', 'lib/db/phase0-security.integration.test.ts', 'lib/db/subscription-billing.integration.test.ts', 'lib/db/restaurant-account-link.integration.test.ts', 'lib/db/credit-debit-notes.integration.test.ts', 'lib/db/order-read-boundary.integration.test.ts', 'app/menu/throttle-db.integration.test.tsx'], {
+      stdio: 'inherit', env: { ...process.env, READINESS_DB_URL: url.href, THROTTLE_DB_URL: url.href },
+    });
+    if (result.error) throw result.error;
+    process.exitCode = result.status ?? 1;
+    if (result.status === 0 && process.env.READINESS_VERIFY_RESTORE === '1') await verifyRestore(url.href, admin);
+  }
 } finally {
   if (db) await db.end();
   await admin.query(`drop database if exists "${name}"`);

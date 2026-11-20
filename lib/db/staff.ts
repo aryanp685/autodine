@@ -35,6 +35,7 @@
  * that care should use getStaffContextDetailed() below.
  */
 
+import { dbErrorReference } from '@/lib/db/error-reference';
 import { cookies } from 'next/headers';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { OUTLET_COOKIE, pickOutlet, type OutletOption } from '@/lib/outlets';
@@ -90,6 +91,8 @@ export type StaffContext = {
 };
 
 /** Roles allowed to take money at the counter. Mirrors record_cash_payment. */
+export const FLOOR_ROLES: MemberRole[] = ['owner', 'manager', 'cashier', 'kitchen', 'waiter'];
+
 export const CASHIER_ROLES: MemberRole[] = ['owner', 'manager', 'cashier'];
 
 /**
@@ -178,6 +181,11 @@ export async function getStaffContextDetailed(): Promise<StaffContextResult> {
     })
     .filter((row): row is NonNullable<typeof row> => row !== null);
 
+  if (membershipRows.some(row => row.role === 'waiter')) {
+    const { data } = await supabase.rpc('list_my_waiter_outlets', {});
+    for (const row of data ?? []) rows.push({ ...row, role: 'waiter', tagline: null });
+  }
+
   if (rows.length === 0) return { ok: false, reason: 'no-membership' };
 
   const cookieStore = await cookies();
@@ -230,7 +238,7 @@ async function loadAccess(
 
   if (error || !data) {
     if (error && !/does not exist|schema cache/i.test(error.message)) {
-      console.error('[staff] restaurant_access failed', error.message);
+      console.error('[staff] restaurant_access failed', dbErrorReference(error));
     }
     return null;
   }

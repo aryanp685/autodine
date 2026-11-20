@@ -13,7 +13,7 @@ export function EinvoiceReconciliationPanel({ rows }: { rows: EinvoiceReconcilia
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-[13px] font-semibold tracking-[0.02em] text-gink">e-Invoice follow-ups</h2>
         <p className="text-[10.5px] text-gink-46">
-          B2B documents not valid until an IRP issues the IRN · attempting records the result in the e-invoice audit
+          Held documents are not final tax invoices. Offline payload validation does not contact an IRP.
         </p>
       </div>
       {rows.length === 0 ? (
@@ -28,6 +28,7 @@ export function EinvoiceReconciliationPanel({ rows }: { rows: EinvoiceReconcilia
                   {row.documentType === 'gst_tax_invoice' ? 'Tax invoice' : row.documentType}
                   {row.isB2b ? ' · B2B' : ''} · issued {row.issuedAt ? new Date(row.issuedAt).toLocaleDateString('en-IN') : '—'} ·{' '}
                   {row.attemptCount === 0 ? 'never attempted' : `${row.attemptCount} attempt${row.attemptCount === 1 ? '' : 's'}`}
+                  {row.preparedAt ? ' · Payload prepared offline; not submitted' : ''}
                   {row.lastAttemptAt ? ` · last ${new Date(row.lastAttemptAt).toLocaleString('en-IN')}` : ''}
                 </p>
               </div>

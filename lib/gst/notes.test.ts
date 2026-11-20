@@ -70,7 +70,7 @@ describe('canIssueNoteAgainst', () => {
   it('refuses notes against plain receipts or voided documents', () => {
     expect(canIssueNoteAgainst({ sourceDocumentType: 'receipt', sourceStatus: 'issued', liveNotes: none, requestedKind: 'credit_note' }).ok).toBe(false);
     expect(canIssueNoteAgainst({ sourceDocumentType: 'gst_tax_invoice', sourceStatus: 'voided', liveNotes: none, requestedKind: 'credit_note' }).ok).toBe(false);
-    expect(canIssueNoteAgainst({ sourceDocumentType: 'bill_of_supply', sourceStatus: 'issued', liveNotes: none, requestedKind: 'debit_note' }).ok).toBe(true);
+    expect(canIssueNoteAgainst({ sourceDocumentType: 'bill_of_supply', sourceStatus: 'issued', liveNotes: none, requestedKind: 'debit_note' }).ok).toBe(false);
   });
 
   it('refuses a second live note of the same kind but allows the other kind', () => {

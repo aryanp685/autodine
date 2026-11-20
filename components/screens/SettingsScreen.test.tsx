@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/app/(staff)/dashboard/settings/gst-actions', () => ({
   saveGstAction: mocks.action('saveGstAction'),
+  deferGstAction: mocks.action('deferGstAction'),
 }));
 
 vi.mock('@/app/(staff)/dashboard/settings/actions', () => ({
@@ -37,6 +38,7 @@ function data(over: Partial<SettingsScreenData> = {}): SettingsScreenData {
   return {
     role: 'owner',
     canEdit: true,
+    gstCanWrite: true,
     details: {
       name: 'Maddi',
       tagline: 'Bombay street food',
@@ -65,6 +67,7 @@ function data(over: Partial<SettingsScreenData> = {}): SettingsScreenData {
       stateCode: '',
       pan: '',
       registrationType: 'regular',
+      fssaiNumber: '', businessType: '', serviceSac: '', premisesEvidence: null,
       compositionAcknowledged: false,
       specifiedPremisesAttested: false,
       specifiedPremisesEffectiveFrom: '2025-04-01',
@@ -82,6 +85,13 @@ function data(over: Partial<SettingsScreenData> = {}): SettingsScreenData {
 }
 
 describe('SettingsScreen', () => {
+  it('binds the GST form to the rendered outlet and version', () => {
+    const html = renderToStaticMarkup(<SettingsScreen data={data({ activeOutletId: 'outlet-b' })} />);
+    expect(html).toContain('name="gstOutletId" value="outlet-b"');
+    expect(html).toContain('name="configVersion" value="0"');
+    expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*>Save GST configuration/);
+  });
+
   it('shows the saved values and the tax example the bill would charge', () => {
     const html = renderToStaticMarkup(<SettingsScreen data={data()} />);
 
@@ -298,13 +308,11 @@ describe('Settings, the redesign', () => {
     expect(html).toContain('Account');
   });
 
-  it('gives every form the same commit button', () => {
-    // Five forms, five saves, one appearance: the accent fill at the same size,
-    // so "which control commits this card" is answered the same way every time.
-    // The last is the guest-verification choice (migration 20261028000900);
-    // the GST card (migration 20261113000100) is one more save, same appearance.
+  it('uses the same commit-button design for the five saves and the separate pre-activation deferral', () => {
     const html = renderToStaticMarkup(<SettingsScreen data={data()} />);
-    expect(count(html, 'bg-grass text-cream')).toBe(5);
+    expect(count(html, 'bg-grass text-cream')).toBe(6);
+    expect(count(html, '>Record deferral<')).toBe(1);
+    expect(count(html, '>Save GST configuration and activate<')).toBe(1);
   });
 
   it('draws no hand-made alert boxes any more', () => {

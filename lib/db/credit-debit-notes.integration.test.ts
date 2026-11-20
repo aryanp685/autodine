@@ -10,6 +10,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Client } from 'pg';
+import { syntheticGstin, SYNTHETIC_BUYER, SYNTHETIC_FSSAI, SYNTHETIC_SERVICE_SAC } from '@/lib/gst/test-fixtures';
 const URL_VALUE = process.env.READINESS_DB_URL || '';
 if (URL_VALUE) {
   const url = new URL(URL_VALUE);
@@ -25,7 +26,7 @@ function nextGstin(): { gstin: string; pan: string } {
   const letters = Array.from({ length: 5 }, (_, i) => String.fromCharCode(65 + (Math.floor(n / 26 ** (4 - i)) % 26))).join('');
   const anchor = String.fromCharCode(65 + (n % 26));
   const pan = `${letters}0000${anchor}`;
-  const gstin = `27${pan}1Z${String.fromCharCode(65 + ((n * 7 + 1) % 26))}`;
+  const gstin = syntheticGstin(`27${pan}1Z`);
   return { gstin, pan };
 }
 
@@ -55,6 +56,11 @@ async function placeOrder(slug: string, item: string, qty: number) {
 }
 
 async function setGstConfig(restaurant: string, config: Record<string, unknown>) {
+  const today = (await db.query("select ((now() at time zone 'Asia/Kolkata')::date)::text as day")).rows[0].day;
+  config = { fssai_number: SYNTHETIC_FSSAI, service_sac: SYNTHETIC_SERVICE_SAC,
+    ...(config.mode === 'regular' ? { business_type: 'standalone', activation: {
+      effective_from: today, premises_address: '1 Disposable Note Test Lane', premises_state_code: '27', invoice_phone: '07120000000',
+    } } : {}), ...config };
   const cols = Object.keys(config);
   const values = Object.values(config);
   const placeholders = cols.map((_, i) => `$${i + 2}`).join(',');
@@ -71,12 +77,14 @@ const REGULAR_CONFIG = (gstin: string, pan: string) => ({
   registration_type: 'regular', preceding_fy_turnover_paise: 1_000_000_000,
 });
 
-async function issueRegularGSTDocument(user: string, slug: string, item: string, qty = 2): Promise<string> {
+const CONSUMER = { recipient_type: 'consumer', name: 'Synthetic Note Recipient', address: '1 Disposable Billing Lane', state_code: '29' };
+async function issueRegularGSTDocument(user: string, slug: string, item: string, qty = 2, identified = true): Promise<string> {
   const { sitting } = await placeOrder(slug, item, qty);
-  await db.query("update order_sessions set status='closed', closed_at=statement_timestamp(), closed_by=$2 where id=$1", [sitting, user]);
+  const cfg = (await db.query('select c.mode from restaurant_gst_config c join restaurants r on r.id=c.restaurant_id where r.slug=$1',[slug])).rows[0];
   await db.query("select set_config('request.jwt.claim.sub',$1,false)", [user]);
+  await db.query('select mark_order_session_paid($1)', [sitting]);
   try {
-    return (await db.query('select issue_closed_session_receipt($1) id', [sitting])).rows[0].id;
+    return (await db.query('select close_order_session_and_issue_receipt($1,$2) id', [sitting, identified && cfg?.mode === 'regular' ? CONSUMER : null])).rows[0].id;
   } finally {
     await db.query("select set_config('request.jwt.claim.sub','',false)");
   }
@@ -144,10 +152,10 @@ describe.skipIf(!URL_VALUE)('Credit/debit notes (disposable PostgreSQL)', () => 
     await expect(db.query(`
       insert into restaurant_notes (restaurant_id, invoice_id, document_type, document_number, financial_year,
         sequence_number, reason_code, reason, taxable_paise, cgst_paise, sgst_paise, igst_paise, total_paise,
-        gst_snapshot, seller_snapshot, totals_snapshot, source_document_number, source_issued_at)
+        gst_snapshot, seller_snapshot, customer_snapshot, totals_snapshot, source_document_number, source_issued_at)
       select restaurant_id, invoice_id, 'credit_note', 'CN/' || financial_year || '/999998', financial_year,
              999998, 'other', 'Direct insert backstop', taxable_paise, cgst_paise, sgst_paise, igst_paise, total_paise,
-             gst_snapshot, seller_snapshot, totals_snapshot, source_document_number, source_issued_at
+             gst_snapshot, seller_snapshot, customer_snapshot, totals_snapshot, source_document_number, source_issued_at
         from restaurant_notes where invoice_id = $1 and document_type = 'credit_note'`, [invoiceId]))
       .rejects.toMatchObject({ code: '23505' });
   }, 20000);
@@ -168,24 +176,37 @@ describe.skipIf(!URL_VALUE)('Credit/debit notes (disposable PostgreSQL)', () => 
     await expect(issueNote(user, invoiceId, 'credit_note', 'other', 'Attempt against a voided document')).rejects.toMatchObject({ code: 'P0001' });
   }, 20000);
 
-  it('notes against a composition Bill of Supply carry tax-free amounts and no IRP routing', async () => {
+  it('refuses a new tax note against a tax-free Bill of Supply without consuming a note number', async () => {
     const user = randomUUID(); const slug = `${slugBase}-comp-${randomUUID().slice(0,4)}`;
     const { restaurant, item, gstin, pan } = await makeRestaurant(slug, user);
     await setGstConfig(restaurant, {
-      mode: 'composition', gstin, legal_name: 'Composition Kitchen LLP', trade_name: 'Composition',
-      address: 'Registered office, Test Lane, Nagpur', state_code: '27', pan,
-      registration_type: 'composition', composition_acknowledged: true,
+      mode: 'composition', gstin, legal_name: 'Composition Kitchen LLP', address: 'Registered office, Test Lane',
+      state_code: '27', pan, registration_type: 'composition', composition_acknowledged: true,
     });
     const invoiceId = await issueRegularGSTDocument(user, slug, item, 1);
-    const docType = (await db.query('select document_type from restaurant_invoices where id=$1', [invoiceId])).rows[0].document_type;
-    expect(docType).toBe('bill_of_supply');
-    const noteId = (await issueNote(user, invoiceId, 'debit_note', 'rate_difference', 'Composition price uplift') as { rows: Array<{ id: string }> }).rows[0].id;
-    const note = (await db.query('select document_number, taxable_paise, cgst_paise, sgst_paise, igst_paise, total_paise, irp_status from restaurant_notes where id=$1', [noteId])).rows[0];
-    expect(note.document_number).toMatch(/^DN\/[0-9]{2}-[0-9]{2}\/000001$/);
-    expect(Number(note.cgst_paise) + Number(note.sgst_paise) + Number(note.igst_paise)).toBe(0);
-    expect(Number(note.taxable_paise)).toBe(Number(note.total_paise));
-    expect(note.irp_status).toBe('not_required');
-  }, 20000);
+    await expect(issueNote(user, invoiceId, 'debit_note', 'rate_difference', 'Composition price uplift'))
+      .rejects.toMatchObject({ code: '23514', message: expect.stringMatching(/Bill of Supply corrections/) });
+    expect((await db.query('select count(*)::int n from restaurant_note_series where restaurant_id=$1',[restaurant])).rows[0].n).toBe(0);
+    expect((await db.query('select count(*)::int n from restaurant_notes where invoice_id=$1',[invoiceId])).rows[0].n).toBe(0);
+  });
+
+  it('refuses to invent an anonymous original buyer and freezes the identified original on both note kinds', async () => {
+    const user = randomUUID(); const slug = `${slugBase}-recipient-${randomUUID().slice(0,4)}`;
+    const { restaurant, item, gstin, pan } = await makeRestaurant(slug, user);
+    await setGstConfig(restaurant, REGULAR_CONFIG(gstin, pan));
+    const anonymous = await issueRegularGSTDocument(user, slug, item, 1, false);
+    for (const kind of ['credit_note','debit_note']) {
+      await expect(issueNote(user, anonymous, kind, 'other', 'Anonymous original cannot be amended here'))
+        .rejects.toMatchObject({code:'23514', message:expect.stringMatching(/Rule 53/)});
+    }
+    const identified = await issueRegularGSTDocument(user,slug,item,1);
+    for (const kind of ['credit_note','debit_note']) await issueNote(user,identified,kind,'other','Synthetic identified original');
+    const notes = (await db.query(`select n.sequence_number,n.customer_snapshot,n.gst_snapshot->'rate_bps' rate,
+      n.source_document_number=i.invoice_number and n.source_issued_at=i.issued_at source_matches
+      from restaurant_notes n join restaurant_invoices i on i.id=n.invoice_id where n.invoice_id=$1`,[identified])).rows;
+    expect(notes).toEqual(Array.from({length:2},()=>({sequence_number:1,rate:500,source_matches:true,
+      customer_snapshot:{...CONSUMER,delivery_address:'1 Disposable Note Test Lane'}})));
+  });
 
   it('cashier, kitchen and outsiders cannot issue or void notes; the unauthenticated role is refused', async () => {
     const user = randomUUID(); const cashier = randomUUID(); const kitchen = randomUUID(); const outsider = randomUUID();
@@ -251,23 +272,23 @@ describe.skipIf(!URL_VALUE)('Credit/debit notes (disposable PostgreSQL)', () => 
     await expect(asActor(user, () => db.query("select record_note_irp_request($1,'sandbox','autodine.irp.v1','payload_built')", [randomUUID()]))).rejects.toMatchObject({ code: 'P0002' });
   }, 20000);
 
-  it('an e-invoice-pending B2B parent forces its note to pending (fail closed)', async () => {
+  it('an e-invoice-pending B2B parent cannot acquire a new adjustment (fail closed)', async () => {
     const user = randomUUID(); const slug = `${slugBase}-einv-${randomUUID().slice(0,4)}`;
     const { restaurant, item, gstin, pan } = await makeRestaurant(slug, user);
     await setGstConfig(restaurant, { ...REGULAR_CONFIG(gstin, pan), preceding_fy_turnover_paise: 6_000_000_000_00 });
     const { sitting } = await placeOrder(slug, item, 1);
-    await db.query("update order_sessions set status='closed', closed_at=statement_timestamp(), closed_by=$2 where id=$1", [sitting, user]);
     await db.query("select set_config('request.jwt.claim.sub',$1,false)", [user]);
+    await db.query('select mark_order_session_paid($1)', [sitting]);
     let invoiceId: string;
     try {
-      invoiceId = (await db.query('select issue_closed_session_receipt($1,$2::jsonb) id',
-        [sitting, JSON.stringify({ name: 'Buyer Foods LLP', gstin: '27AAICA9305C1Z9', address: 'Buyer House, MIDC, Pune' })])).rows[0].id;
+      invoiceId = (await db.query('select close_order_session_and_issue_receipt($1,$2::jsonb) id',
+        [sitting, JSON.stringify({ name: 'Buyer Foods LLP', gstin: SYNTHETIC_BUYER, location: 'Synthetic City', pincode: '560001', address: 'Buyer House, MIDC, Pune' })])).rows[0].id;
     } finally {
       await db.query("select set_config('request.jwt.claim.sub','',false)");
     }
     expect((await db.query('select irp_status from restaurant_invoices where id=$1', [invoiceId])).rows[0].irp_status).toBe('pending');
-    const noteId = (await issueNote(user, invoiceId, 'credit_note', 'returned_supply', 'Buyer returned 100 percent of supply') as { rows: Array<{ id: string }> }).rows[0].id;
-    expect((await db.query('select irp_status from restaurant_notes where id=$1', [noteId])).rows[0].irp_status).toBe('pending');
+    await expect(issueNote(user, invoiceId, 'credit_note', 'returned_supply', 'Buyer returned 100 percent of supply'))
+      .rejects.toMatchObject({code:'P0001',message:expect.stringMatching(/original.*held/i)});
   }, 20000);
 
   it('staff of another outlet cannot read the notes (RLS boundary)', async () => {

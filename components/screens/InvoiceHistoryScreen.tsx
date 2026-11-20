@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { OwnerPage, PageHead } from '@/components/owner/chrome';
 import type { InvoiceHistoryRow } from '@/lib/db/invoice-history';
 import { formatBillMoney } from '@/lib/bill';
+import { issuedDocumentTitle } from '@/lib/invoice';
 import type { OutletBar } from '@/lib/outlets';
 
 function when(value: string) {
@@ -18,22 +19,22 @@ export function InvoiceHistoryScreen({ rows, outlet, einvoiceFollowUps }: { rows
       <PageHead
         kicker="Service · closed table sessions"
         title="Invoice history"
-        meta="The latest 100 closed sessions for this restaurant. Receipt snapshots are immutable; a missing receipt means issuance did not complete."
+        meta="The latest 100 closed sessions for this restaurant. Issued documents are immutable; a missing document means issuance did not complete."
       />
 
       {einvoiceFollowUps}
       {!rows.length ? (
         <section className="rounded-[14px] border border-hair bg-card p-6" aria-label="No closed sessions">
           <h2 className="text-[15px] font-semibold">No closed table sessions yet</h2>
-          <p className="mt-2 text-[12.5px] text-gink-64">Closed sittings and their receipts will appear here.</p>
+          <p className="mt-2 text-[12.5px] text-gink-64">Closed sittings and their billing documents will appear here.</p>
         </section>
       ) : (
         <div className="overflow-x-auto rounded-[14px] border border-hair bg-card">
           <table className="w-full min-w-[760px] border-collapse text-left text-[12.5px]">
             <thead className="border-b border-hair text-[10px] font-semibold tracking-[0.1em] text-gink-46 uppercase">
               <tr>
-                <th className="px-4 py-3">Receipt</th>
-                <th className="px-4 py-3">Table</th>
+                <th className="px-4 py-3">Document</th>
+                <th className="px-4 py-3">Fulfilment</th>
                 <th className="px-4 py-3">Opened</th>
                 <th className="px-4 py-3">Closed</th>
                 <th className="px-4 py-3 text-right">Final total</th>
@@ -59,10 +60,13 @@ function HistoryRow({ row }: { row: InvoiceHistoryRow }) {
     <tr className="border-b border-hair last:border-0">
       <td className="px-4 py-3 font-medium">
         {row.invoice
-          ? <Link className="underline decoration-hair-strong underline-offset-2" href={`/invoice/${row.invoice.id}`}>{receiptLabel}</Link>
+          ? <>
+            <Link className="underline decoration-hair-strong underline-offset-2" href={`/invoice/${row.invoice.id}`}>{receiptLabel}</Link>
+            <span className="mt-0.5 block text-[11.5px] text-gink-64">{issuedDocumentTitle(row.invoice)}</span>
+          </>
           : receiptLabel}
       </td>
-      <td className="px-4 py-3">{row.tableLabel ? `Table ${row.tableLabel}` : 'Table (label unavailable)'}</td>
+      <td className="px-4 py-3">{row.fulfilmentLabel ?? (row.tableLabel ? `Table ${row.tableLabel}` : 'Table (label unavailable)')}</td>
       <td className="px-4 py-3 text-gink-64">{when(row.openedAt)}</td>
       <td className="px-4 py-3 text-gink-64">{when(row.closedAt)}</td>
       <td className="px-4 py-3 text-right tabular-nums">

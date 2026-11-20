@@ -19,6 +19,8 @@ export type ImportedItem = {
   description: string | null;
   /** true/false = the source marked it. null = the source never said. */
   isVeg: boolean | null;
+  /** Marked expressly by staff in review, never inferred by an importer. */
+  isAlcoholic?: boolean;
   /**
    * Portions the menu printed beside one dish ("Half 240 / Full 420").
    * Absent for dishes sold one way — a dish is never assumed to have
@@ -90,6 +92,7 @@ export function sanitiseDraft(input: unknown): MenuImportDraft {
         pricePaise?: unknown;
         description?: unknown;
         isVeg?: unknown;
+        isAlcoholic?: unknown;
         variants?: unknown;
       };
       const itemName = typeof item.name === 'string' ? item.name.trim().slice(0, 120) : '';
@@ -120,6 +123,7 @@ export function sanitiseDraft(input: unknown): MenuImportDraft {
         // Three states survive the round trip. Anything that is not an
         // explicit true/false is unmarked -- never a silent veg default.
         isVeg: item.isVeg === true ? true : item.isVeg === false ? false : null,
+        ...(typeof item.isAlcoholic === 'boolean' ? { isAlcoholic: item.isAlcoholic } : {}),
         ...(variants.length > 0 ? { variants } : {}),
       });
       items += 1;

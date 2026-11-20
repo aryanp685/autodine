@@ -773,6 +773,79 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
     expect((await db.query('select count(*) n from orders where guest_token=$1', [key])).rows[0].n).toBe('1');
   });
 
+  it('recovers an attempt only at its live original table, including after re-verification', async () => {
+    const f = await fixture();
+    const secondTable = (await db.query(`insert into dining_tables(restaurant_id,label) values($1,'T2') returning id`, [f.restaurant])).rows[0].id;
+    const open = async (table: string, ip: string) => (await db.query(`select s.* from table_qr_codes q
+      cross join lateral open_table_session(q.public_token,$2) s where q.table_id=$1 and q.revoked_at is null limit 1`, [table, ip.repeat(64)])).rows[0].session_token;
+    const freshOriginal = await open(f.table, 'b');
+    const otherTable = await open(secondTable, 'c');
+    const key = randomUUID();
+    const order = async (token: string, slug = f.slug, lines = [{ itemId: f.item, qty: 3 }]) => (await db.query(
+      `select place_public_order_attempt($1,$2,'No chilli',$3,$4) result`, [slug, JSON.stringify(lines), token, key],
+    )).rows[0].result;
+    await db.query('set role anon');
+    try {
+      const original = await order(f.sessionToken);
+      expect(original).toMatchObject({ code: expect.any(String), error: null });
+      expect(await order(freshOriginal)).toEqual(original);
+      // A changed payload cannot turn an acknowledged key into a new order.
+      expect(await order(freshOriginal, f.slug, [{ itemId: f.item, qty: 99 }])).toEqual(original);
+      expect(await order(otherTable)).toMatchObject({ code: null, error: { hint: 'attempt-mismatch' } });
+      expect(await order(b.sessionToken, b.slug)).toMatchObject({ code: null, error: { hint: 'attempt-mismatch' } });
+      expect(await order(freshOriginal, b.slug)).toMatchObject({ code: null, error: { hint: 'table-session' } });
+    } finally { await db.query('reset role'); }
+    await db.query("update table_verification_sessions set expires_at=now()-interval '1 second' where table_id=$1", [f.table]);
+    expect(await order(f.sessionToken)).toMatchObject({ code: null, error: { hint: 'table-session' } });
+    const saved = (await db.query('select table_id,order_session_id,customer_note,total_paise::int from orders where guest_token=$1', [key])).rows;
+    expect(saved).toEqual([{ table_id: f.table, order_session_id: f.sitting, customer_note: 'No chilli', total_paise: 37500 }]);
+    expect((await db.query('select count(*)::int n from order_sessions where table_id=$1', [secondTable])).rows[0].n).toBe(0);
+  });
+
+  it('rolls back every line and a new sitting on a partial basket; preserves exact options and ordering', async () => {
+    const f = await fixture();
+    const table = (await db.query(`insert into dining_tables(restaurant_id,label) values($1,'T2') returning id`, [f.restaurant])).rows[0].id;
+    const token = (await db.query(`select s.session_token from table_qr_codes q cross join lateral open_table_session(q.public_token,$2) s
+      where q.table_id=$1`, [table, 'b'.repeat(64)])).rows[0].session_token;
+    const variant = (await db.query("insert into item_variants(item_id,name,price_paise) values($1,'Large',17031) returning id", [f.item])).rows[0].id;
+    const group = (await db.query("insert into item_addon_groups(item_id,name,min_select,max_select) values($1,'Extras',0,1) returning id", [f.item])).rows[0].id;
+    const extras = (await db.query("insert into item_addons(group_id,name,price_paise) values($1,'Extra one',107),($1,'Extra two',175) returning id", [group])).rows.map(r => r.id);
+    const late = (await db.query(`insert into items(restaurant_id, category_id, name, price_paise, is_available)
+      select restaurant_id, category_id, 'Late sold-out dish', 5911, true from items where id=$1 returning id`, [f.item])).rows[0].id;
+    await db.query('update items set is_available=false where id=$1', [late]);
+    const key = randomUUID();
+    const configured = { itemId: f.item, qty: 2, variantId: variant, addonIds: extras.slice(0,1), unitPricePaise: 1 };
+    const attempt = async (lines: unknown, guest: string | null = key) => (await db.query('select place_public_order_attempt($1,$2,null,$3,$4) result',
+      [f.slug, JSON.stringify(lines), token, guest])).rows[0].result;
+    await db.query('set role anon');
+    try {
+      for (const lines of [
+        [configured, { itemId: b.item, qty: 1 }],
+        [configured, { itemId: late, qty: 1 }],
+        Array.from({ length: 101 }, () => configured),
+        [{ ...configured, qty: 1.25 }],
+        [{ ...configured, variantId: randomUUID() }],
+        [{ ...configured, addonIds: Array.from({ length: 21 }, () => extras[0]) }],
+        [{ ...configured, addonIds: [extras[0], extras[0]] }],
+        [{ ...configured, addonIds: extras }],
+        [{ ...configured, addonIds: [randomUUID()] }],
+        [{ ...configured, qty: 100 }],
+      ]) expect(await attempt(lines)).toMatchObject({ code: null, error: { hint: 'basket-refused' } });
+      expect(await attempt([configured], null)).toMatchObject({ code: null, error: { code: 'P0001' } });
+    } finally { await db.query('reset role'); }
+    expect((await db.query('select count(*)::int n from orders where table_id=$1', [table])).rows[0].n).toBe(0);
+    expect((await db.query('select count(*)::int n from order_sessions where table_id=$1', [table])).rows[0].n).toBe(0);
+    await db.query('set role anon');
+    try { expect(await attempt([configured, { itemId: f.item, qty: 1 }])).toMatchObject({ code: expect.any(String), error: null }); }
+    finally { await db.query('reset role'); }
+    const rows = (await db.query(`select i.qty,i.sort_order,i.variant_snapshot,i.addons_snapshot,i.unit_price_paise::int
+      from order_items i join orders o on o.id=i.order_id where o.guest_token=$1 order by i.sort_order`, [key])).rows;
+    expect(rows).toEqual([
+      { qty:2, sort_order:1, variant_snapshot:'Large', addons_snapshot:['Extra one'], unit_price_paise:17138 },
+      { qty:1, sort_order:2, variant_snapshot:null, addons_snapshot:[], unit_price_paise:12500 },
+    ]);
+  });
+
   it('places concurrent guest orders without losing or duplicating one', async () => {
     const f = await fixture();
     const clients = Array.from({ length: 8 }, () => new Client({ connectionString: URL_VALUE }));

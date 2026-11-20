@@ -119,7 +119,7 @@ describe('who may move a ticket', () => {
   it('refuses a waiter before it reads anything', async () => {
     asRole('waiter', { read: { data: { id: 'o-1', prep_status: 'new' } } });
 
-    const result = await advanceOrderAction('o-1');
+    const result = await advanceOrderAction('o-1', 'new');
 
     expect(result).toMatchObject({ ok: false });
     if (!result.ok) expect(result.error).toMatch(/waiter/);
@@ -129,7 +129,7 @@ describe('who may move a ticket', () => {
 
   it('refuses a signed-out or unconnected caller without a database error', async () => {
     mocks.staff.result = null;
-    const result = await advanceOrderAction('o-1');
+    const result = await advanceOrderAction('o-1', 'new');
     expect(result.ok).toBe(false);
     expect(mocks.queries).toHaveLength(0);
   });
@@ -141,7 +141,7 @@ describe('who may move a ticket', () => {
         read: { data: { id: 'o-1', prep_status: 'new' } },
         write: { data: [{ id: 'o-1', prep_status: 'preparing' }] },
       });
-      const result = await advanceOrderAction('o-1');
+      const result = await advanceOrderAction('o-1', 'new');
       expect(result, role).toEqual({ ok: true, state: 'preparing' });
     }
   });
@@ -154,7 +154,7 @@ describe('the next state', () => {
       write: { data: [{ id: 'o-1', prep_status: 'preparing' }] },
     });
 
-    await advanceOrderAction('o-1');
+    await advanceOrderAction('o-1', 'new');
 
     const update = mocks.queries.find((query) => query.kind === 'update');
     // One stage, never a jump: 'served' is three taps away and there is no
@@ -168,16 +168,15 @@ describe('the next state', () => {
       write: { data: [{ id: 'o-1', prep_status: 'ready' }] },
     });
 
-    // The action takes an id and nothing else -- there is no parameter to
-    // abuse. This asserts the signature by asserting the effect.
-    await advanceOrderAction('o-1');
+    // Even with a displayed 'preparing' state, the server chooses only 'ready'.
+    await advanceOrderAction('o-1', 'preparing');
     expect(mocks.queries.find((q) => q.kind === 'update')?.update).toEqual({ prep_status: 'ready' });
   });
 
   it('treats an already-served ticket as settled instead of writing', async () => {
     asRole('kitchen', { read: { data: { id: 'o-1', prep_status: 'served' } } });
 
-    const result = await advanceOrderAction('o-1');
+    const result = await advanceOrderAction('o-1', 'served');
 
     expect(result).toEqual({ ok: true, state: 'served' });
     expect(mocks.queries.some((query) => query.kind === 'update')).toBe(false);
@@ -186,13 +185,19 @@ describe('the next state', () => {
 });
 
 describe('two screens at once', () => {
+  it('does not advance from a state the second operator never saw', async () => {
+    asRole('kitchen', { read: { data: { id: 'o-1', prep_status: 'preparing' } } });
+    expect(await advanceOrderAction('o-1', 'new')).toEqual({ ok: true, state: null, changed: false });
+    expect(mocks.queries.some(query => query.kind === 'update')).toBe(false);
+  });
+
   it('writes only over the state it read', async () => {
     asRole('kitchen', {
       read: { data: { id: 'o-1', prep_status: 'preparing' } },
       write: { data: [{ id: 'o-1', prep_status: 'ready' }] },
     });
 
-    await advanceOrderAction('o-1');
+    await advanceOrderAction('o-1', 'preparing');
 
     const update = mocks.queries.find((query) => query.kind === 'update');
     // id, restaurant, AND the prep state that was read. Without the last one a
@@ -211,10 +216,9 @@ describe('two screens at once', () => {
       write: { data: [] },
     });
 
-    const result = await advanceOrderAction('o-1');
+    const result = await advanceOrderAction('o-1', 'preparing');
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/another screen/i);
+    expect(result).toEqual({ ok: true, state: null, changed: false });
     expect(mocks.revalidate).not.toHaveBeenCalled();
   });
 });
@@ -223,7 +227,7 @@ describe('a ticket that is not this restaurant’s', () => {
   it('answers the same way as a ticket that does not exist', async () => {
     asRole('kitchen', { read: { data: null } });
 
-    const result = await advanceOrderAction('3f1c9f52-8f0e-4a5f-9a6b-2c1d4e5f6a7b');
+    const result = await advanceOrderAction('3f1c9f52-8f0e-4a5f-9a6b-2c1d4e5f6a7b', 'new');
 
     expect(result).toEqual({ ok: false, error: 'That ticket is no longer on the board.' });
     expect(mocks.queries.some((query) => query.kind === 'update')).toBe(false);
@@ -231,7 +235,7 @@ describe('a ticket that is not this restaurant’s', () => {
 
   it('binds the restaurant into the read as well as the write', async () => {
     asRole('kitchen', { read: { data: null } });
-    await advanceOrderAction('o-1');
+    await advanceOrderAction('o-1', 'new');
     expect(mocks.queries[0].filters).toEqual([
       ['id', 'o-1'],
       ['restaurant_id', 'r-1'],
@@ -246,7 +250,7 @@ describe('when the database says no', () => {
       write: { data: null, error: { message: 'permission denied for table orders', code: '42501' } },
     });
 
-    const result = await advanceOrderAction('o-1');
+    const result = await advanceOrderAction('o-1', 'new');
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -261,7 +265,7 @@ describe('when the database says no', () => {
       write: { data: null, error: { message: 'connection reset' } },
     });
 
-    const result = await advanceOrderAction('o-1');
+    const result = await advanceOrderAction('o-1', 'new');
     expect(result.ok).toBe(false);
     expect(mocks.revalidate).not.toHaveBeenCalled();
   });

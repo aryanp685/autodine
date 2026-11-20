@@ -5,14 +5,14 @@
  * restaurant rate. The database remains authoritative: it revalidates the
  * cart, calculates, and stores the order total independently.
  *
- * Tax limitations: a restaurant supplies one basis-point rate, and this
- * helper treats menu prices as tax-exclusive. It does not model per-item
- * rates or interstate IGST. The sample default below is for demos and tests;
+ * One outlet supplies one rate and one treatment; there are no per-item
+ * rates or interstate IGST in the supported restaurant-service profiles. The sample default below is for demos and tests;
  * live cart loaders require an explicit restaurant rate and never substitute
  * that sample. This is implementation behavior, not tax advice or a claim of
  * GST compliance.
  */
 
+import { extractInclusiveTax } from './gst/money-gst';
 import { assertValidMoney, applyRate, lineTotal, splitInHalf, type Bps, type Paise } from './money';
 
 /** SAMPLE ONLY — see the tax status note above. 500 bps = 5.00%. */
@@ -28,6 +28,27 @@ export function requireTaxRateBps(value: unknown): Bps {
     throw new TypeError('The restaurant tax rate is unavailable. Please try again.');
   }
   return value;
+}
+
+export type TaxTreatment = 'exclusive' | 'inclusive' | 'none';
+
+export function quoteTaxLabel(treatment: TaxTreatment, rate?: number): string {
+  if (treatment === 'none') return 'GST collected';
+  if (treatment === 'inclusive') return `${gstLabel(rate)} included`;
+  // Legacy ordinary receipts can have an add-on tax; it is not a GST document.
+  if (rate == null || rate === 0) return 'Taxes';
+  return `Taxes (${rate / 100}%)`;
+}
+
+/** A quote does not settle or issue an invoice. Compose the menu sum once. */
+export function computeQuoteTotals(lines: PriceableLine[], taxRateBps?: Bps, treatment: TaxTreatment = 'exclusive'): OrderTotals {
+  if (treatment === 'exclusive') return computeOrderTotals({ lines, taxRateBps });
+  const gross = computeSubtotal(lines);
+  const { taxablePaise, taxPaise } = treatment === 'inclusive'
+    ? extractInclusiveTax(gross, requireTaxRateBps(taxRateBps))
+    : { taxablePaise: gross, taxPaise: 0 };
+  const [cgstPaise, sgstPaise] = splitInHalf(taxPaise);
+  return { subtotalPaise: taxablePaise, discountPaise: 0, taxablePaise, taxPaise, cgstPaise, sgstPaise, totalPaise: gross };
 }
 
 /**

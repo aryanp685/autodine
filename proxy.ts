@@ -32,7 +32,7 @@ export async function proxy(request: NextRequest) {
   request.headers.set('x-nonce', nonce);
   request.headers.set('Content-Security-Policy', csp);
 
-  const staffPath = /^\/(dashboard|kitchen|cashier|bill)(\/|$)/.test(request.nextUrl.pathname);
+  const staffPath = /^\/(dashboard|kitchen|cashier|waiter|bill)(\/|$)/.test(request.nextUrl.pathname);
 
   const finish = (response: NextResponse): NextResponse => {
     response.headers.set('Content-Security-Policy', csp);

@@ -1104,10 +1104,6 @@ export function Kitchen({
     router.refresh();
   }, [router]);
 
-  // Order and waiter-call updates are fetched through their role-scoped server
-  // reads. Their raw rows are not sent through Postgres Changes or Realtime.
-  useAutoRefresh(live, 5, refresh);
-
   /* ------------------------------------------------------------------ unlock */
 
   /**
@@ -1278,6 +1274,14 @@ export function Kitchen({
     advancingRef.current.add(lockKey);
     try {
       await advanceOnce(ticket, next);
+    } catch {
+      setPending((current) => {
+        const copy = { ...current };
+        delete copy[lockKey];
+        return copy;
+      });
+      setError('Could not verify the kitchen update. Check this ticket before moving it again.');
+      router.refresh();
     } finally {
       advancingRef.current.delete(lockKey);
     }
@@ -1297,7 +1301,7 @@ export function Kitchen({
     setError('');
     setPending((current) => ({ ...current, [ticket.orderId!]: next }));
 
-    const result = await advanceOrderAction(ticket.orderId);
+    const result = await advanceOrderAction(ticket.orderId, ticket.state);
 
     setPending((current) => {
       const copy = { ...current };
@@ -1312,20 +1316,11 @@ export function Kitchen({
       setError(result.error);
       return;
     }
-    // The server's own answer, not the guess we drew optimistically. If they
-    // disagree the board is already corrected by the overlay above; the note
-    // only ever repeats what the database said.
-    setMoved(movedLine(ticket, result.state ?? next));
-    if (result.state) {
-      setPending((current) => ({ ...current, [ticket.orderId!]: result.state! }));
-      setTimeout(() => {
-        setPending((current) => {
-          const copy = { ...current };
-          delete copy[ticket.orderId!];
-          return copy;
-        });
-      }, 0);
+    if (result.changed === false) {
+      refresh();
+      return;
     }
+    setMoved(movedLine(ticket, result.state ?? next));
     const announcedState = confirmedPrepChange(ticket.state, result);
     if (announcedState) {
       speak(`adv:${ticket.orderId}:${announcedState}`, advanceText(ticket.table, announcedState), ticket.table, 'info');
@@ -1486,7 +1481,7 @@ export function Kitchen({
         title={live ? data?.restaurantName || 'Kitchen' : restaurant.name}
         meta={
           live
-            ? 'Tickets and waiter calls refresh every five seconds.'
+            ? 'Tickets and waiter calls update from the restaurant.'
             : 'A rehearsal board: nothing here reaches a kitchen.'
         }
         actions={
@@ -1495,7 +1490,7 @@ export function Kitchen({
                 source tables are not published as Realtime row streams. */}
             <Tag tone="neutral">
               <Dot tone="idle" />
-              {live ? '5s polling' : 'Demo board · local only'}
+              {live ? 'Kitchen queue' : 'Demo board · local only'}
             </Tag>
             {waiting > 0 && <Tag tone="work">{waiting} waiting</Tag>}
           </div>
@@ -2181,6 +2176,7 @@ export function Kitchen({
                            put it at the edge, half under a thumb, on the
                            narrowest screen in the product. */
                         className={`${kbBtn('solid')} max-lg:w-full`}
+                        disabled={Boolean(o.orderId && pending[o.orderId])}
                         onClick={() => advance(o)}
                       >
                         Start preparing
@@ -2195,6 +2191,7 @@ export function Kitchen({
                            put it at the edge, half under a thumb, on the
                            narrowest screen in the product. */
                         className={`${kbBtn('solid')} max-lg:w-full`}
+                        disabled={Boolean(o.orderId && pending[o.orderId])}
                         onClick={() => advance(o)}
                       >
                         Mark ready
@@ -2209,6 +2206,7 @@ export function Kitchen({
                            put it at the edge, half under a thumb, on the
                            narrowest screen in the product. */
                         className={`${kbBtn('solid')} max-lg:w-full`}
+                        disabled={Boolean(o.orderId && pending[o.orderId])}
                         onClick={() => advance(o)}
                       >
                         Mark served
@@ -2391,31 +2389,4 @@ function writeSeen(restaurantId: string | null, ids: string[]): void {
   } catch {
     /* private mode or quota: the in-memory set still works */
   }
-}
-
-/**
- * A kitchen display is a wall-mounted screen nobody clicks: it has to pull,
- * not wait to be pushed.
- *
- * Tickets and waiter calls are fetched through role-scoped Server Component
- * reads every five seconds; neither source table is published as a Realtime
- * row stream. The timer remains scheduled in a hidden tab, but `refresh` skips
- * those ticks; the visibility listener refreshes immediately when the tab returns.
- *
- * router.refresh() re-runs the Server Component and patches the tree in place,
- * so the audio toggle, the announcement log and the scroll position all
- * survive. A full reload would lose them several times a minute.
- */
-function useAutoRefresh(enabled: boolean, seconds: number, refresh: () => void) {
-  useEffect(() => {
-    if (!enabled) return;
-
-    const timer = setInterval(refresh, seconds * 1000);
-    document.addEventListener('visibilitychange', refresh);
-
-    return () => {
-      clearInterval(timer);
-      document.removeEventListener('visibilitychange', refresh);
-    };
-  }, [enabled, seconds, refresh]);
 }

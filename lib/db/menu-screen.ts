@@ -47,14 +47,6 @@ export async function getMenuScreenData(
   const target = slug?.trim() ?? '';
   if (!target) return null;
 
-  try {
-    const data = await getRestaurantMenu(target, menuId);
-    return data ? toDisplayMenu(data) : null;
-  } catch (error) {
-    console.error(
-      `[autodine] failed to load menu for "${target}":`,
-      error instanceof Error ? error.message : error
-    );
-    throw error;
-  }
+  const data = await getRestaurantMenu(target, menuId);
+  return data ? toDisplayMenu(data) : null;
 }

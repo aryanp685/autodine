@@ -24,7 +24,10 @@
  * these carries the definition next to it.
  */
 
+import { dbErrorReference } from '@/lib/db/error-reference';
 import { getStaffContextDetailed, type StaffContext } from './staff';
+import type { Database } from './database';
+import { paiseToRupees } from '@/lib/money';
 import {
   RESTAURANT_TIME_ZONE,
   hourInZone,
@@ -460,14 +463,24 @@ export function zeroFillBuckets(
  *   - neutralise a leading = + - @ so an item an owner typed as "-Dal" (or a
  *     planted "=HYPERLINK(...)") is data, not a formula Excel will run.
  */
-export function csvCell(value: string | number): string {
+type ExactCsvDecimal = { decimal: string };
+
+/** Numeric cell for paise already formatted as exact decimal rupees. The
+ * narrow grammar prevents arbitrary strings becoming spreadsheet formulas. */
+export function csvDecimal(decimal: string): ExactCsvDecimal {
+  if (!/^-?[0-9]+\.[0-9]{2}$/.test(decimal)) throw new Error('Invalid exact CSV decimal.');
+  return { decimal };
+}
+
+export function csvCell(value: string | number | ExactCsvDecimal): string {
+  if (typeof value === 'object') return csvDecimal(value.decimal).decimal;
   let s = String(value);
-  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  if (typeof value === 'string' && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
   if (/["\n\r,]/.test(s)) s = `"${s.replace(/"/g, '""')}"`;
   return s;
 }
 
-export function toCsv(rows: Array<Array<string | number>>): string {
+export function toCsv(rows: Array<Array<string | number | ExactCsvDecimal>>): string {
   // CRLF and a trailing newline: Excel on Windows is the main consumer.
   return `${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`;
 }
@@ -508,7 +521,7 @@ export function ordersCsv(report: ReportView, timeZone: string): string {
     'Payment',
     'Subtotal',
     'Discount',
-    'Tax',
+    'Ticket tax',
     'Total',
     'Paid',
     'Refunded',
@@ -576,7 +589,7 @@ export function summaryCsv(report: ReportView, range: ReportRange, timeZone: str
     ['Collected', rupees(t.collectedPaise)],
     ['Outstanding', rupees(t.unpaidPaise)],
     ['Refunded', rupees(t.refundedPaise)],
-    ['GST on bills', rupees(t.taxPaise)],
+    ['Tax on tickets (not issued-document GST)', rupees(t.taxPaise)],
     ['Discounts', rupees(t.discountPaise)],
     ['Average bill', rupees(t.averageBillPaise)],
     [],
@@ -598,12 +611,64 @@ export function summaryCsv(report: ReportView, range: ReportRange, timeZone: str
 
 /* ====================================================================== loader */
 
+export type GstDocumentRow = Database['public']['Functions']['report_gst_documents']['Returns'][number];
+
+export const GST_DOCUMENT_LABEL: Record<GstDocumentRow['document_type'], string> = {
+  gst_tax_invoice: 'Regular GST tax invoice',
+  bill_of_supply: 'Composition Bill of Supply',
+  retail_bill: 'Retail bill / cash memo',
+  credit_note: 'Credit note',
+  debit_note: 'Debit note',
+};
+
+export function gstDocumentStatus(row: GstDocumentRow): string {
+  if (row.document_status === 'voided') return row.irn_held ? 'Voided · IRN hold' : 'Voided';
+  return row.irn_held ? 'IRN hold · not final' : 'Issued';
+}
+
+export function gstDocumentSeries(row: GstDocumentRow): string {
+  return row.series_code ?? (row.financial_year ? 'INV (legacy)' : '—');
+}
+
+export function gstDocumentsCsv(documents: GstDocumentRow[] | null, range: ReportRange, timeZone: string): string {
+  const amount = (paise: number | null) => paise == null ? '' : rupees(Number(paise));
+  return toCsv([
+    ['Billing documents by issue date (current status, not a GST return)'],
+    ['Range', range.label],
+    ['Time zone', timeZone],
+    ['Credit and debit notes are document adjustments, not payments or refunds.'],
+    [],
+    ...(documents === null ? [['GST document reporting is unavailable on this database.']] : [
+      ['Document type', 'Status', 'GST rate (%)', 'Count', 'Total', 'Taxable value', 'CGST', 'SGST', 'IGST (historical)', 'Known rounding delta', 'Invoices without rounding evidence', 'Financial year', 'Series'],
+      ...documents.map((row) => [GST_DOCUMENT_LABEL[row.document_type], gstDocumentStatus(row),
+        row.rate_bps == null ? '' : row.rate_bps / 100, row.document_count, amount(row.total_paise),
+        amount(row.taxable_paise), amount(row.cgst_paise), amount(row.sgst_paise), amount(row.igst_paise),
+        row.rounding_delta_paise == null ? '' : paiseToRupees(Number(row.rounding_delta_paise)), row.missing_rounding_count, row.financial_year, gstDocumentSeries(row)]),
+    ]),
+  ]);
+}
+
+/** Called only for the authorized GST document view/export. No identity data. */
+export async function getGstDocumentsForStaff(context: StaffContext, range: ReportRange): Promise<GstDocumentRow[] | null> {
+  if (context.role !== 'owner' && context.role !== 'manager') return null;
+  const { data, error } = await context.supabase.rpc('report_gst_documents', {
+    p_restaurant_id: context.restaurantId, p_from: range.fromIso, p_to: range.toIso,
+  });
+  if (error) {
+    if (error.code === 'PGRST202' || error.code === '42883') return null;
+    throw new Error('Could not load the GST document report.');
+  }
+  if (!Array.isArray(data)) throw new Error('The GST document report did not return a ledger.');
+  return data;
+}
+
 export type ReportsScreenData = {
   restaurantName: string;
   tagline: string | null;
   timezone: string;
   range: ReportRange;
   report: ReportView;
+  gstDocuments?: GstDocumentRow[] | null;
   /** True when the range holds more bills than the table lists. */
   ordersTruncated: boolean;
   blocked?: 'signed-out' | 'no-membership';
@@ -649,7 +714,7 @@ export async function getReportsScreenDataForStaff(
     p_include_lines: params.includeLines ?? false,
   });
 
-  if (error) throw new Error(`Could not load the report: ${error.message}`);
+  if (error) throw new Error(`Could not load the report: ${dbErrorReference(error)}`);
 
   const report = parseReportPayload(data);
 
@@ -689,7 +754,8 @@ export async function getReportsScreenData(
     };
   }
 
-  return getReportsScreenDataForStaff(staff.context, params, now);
+  const data = await getReportsScreenDataForStaff(staff.context, params, now);
+  return { ...data, gstDocuments: await getGstDocumentsForStaff(staff.context, data.range) };
 }
 
 export function emptyPayload(): ReportPayload {

@@ -16,6 +16,8 @@
  * HTTP/PostgREST test. Requires the disposable autodine_check_* database.
  */
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Client } from 'pg';
 
@@ -148,6 +150,57 @@ describe.skipIf(!URL_VALUE)('Owner billing configuration guard (disposable Postg
     await expect(staff(f.owner, () => db.query(
       "update public.restaurants set gstin=$1 where id=$2", ['NOT-A-GSTIN', f.restaurant],
     ))).rejects.toMatchObject({ code: '23514' });
+  });
+
+  it('leaves the stored billing configuration byte-identical after a refused attempt', async () => {
+    // A refused billing edit must be a no-op, not a partial write: the money
+    // columns stay exactly as they were, so a retried or racing attempt can
+    // never leave a half-applied tax change behind.
+    const before = (await db.query(
+      'select tax_rate_bps, gstin from public.restaurants where id=$1', [f.restaurant],
+    )).rows[0];
+    await expect(staff(f.manager, () => db.query(
+      'update public.restaurants set tax_rate_bps=$1, gstin=$2 where id=$3',
+      [1800, '27ABCDE1234F1Z5', f.restaurant],
+    ))).rejects.toMatchObject({ code: '42501' });
+    const after = (await db.query(
+      'select tax_rate_bps, gstin from public.restaurants where id=$1', [f.restaurant],
+    )).rows[0];
+    expect(after).toEqual(before);
+  });
+
+  it('is idempotent — re-applying the migration reproduces one trigger and no grants', async () => {
+    // Retries and re-runs are the normal case for a forward-only migration
+    // track. Applying the file a second time must neither stack a duplicate
+    // trigger nor restore EXECUTE to a runtime role.
+    const sql = readFileSync(
+      join(process.cwd(), 'supabase/migrations/20261115000200_owner_billing_configuration_guard.sql'),
+      'utf8',
+    );
+    await db.query(sql);
+    await db.query(sql);
+    const triggers = (await db.query(`
+      select count(*)::int n from pg_trigger
+       where tgrelid = 'public.restaurants'::regclass
+         and tgname = 'restaurants_billing_configuration_guard'
+         and not tgisinternal
+    `)).rows[0].n;
+    expect(triggers).toBe(1);
+    const grants = (await db.query(`
+      select count(*)::int n from aclexplode(
+        (select proacl from pg_proc
+          where proname = 'guard_restaurant_billing_configuration'
+            and pronamespace = 'public'::regnamespace)
+      ) acl
+      where acl.grantee in (0, (select oid from pg_roles where rolname='anon'),
+                            (select oid from pg_roles where rolname='authenticated'),
+                            (select oid from pg_roles where rolname='service_role'))
+    `)).rows[0].n;
+    expect(grants).toBe(0);
+    // The boundary still holds after the re-runs.
+    await expect(staff(f.manager, () => db.query(
+      'update public.restaurants set tax_rate_bps=$1 where id=$2', [900, f.restaurant],
+    ))).rejects.toMatchObject({ code: '42501' });
   });
 
   it('ships the guard as an enabled, SECURITY DEFINER trigger executable by nobody', async () => {

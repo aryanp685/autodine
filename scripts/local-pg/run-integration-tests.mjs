@@ -1,5 +1,5 @@
 /**
- * Disposable-cluster runner for the ten PostgreSQL-gated vitest suites.
+ * Disposable-cluster runner for the PostgreSQL-gated vitest suites.
  *
  * Before this runner existed, the GST / credit-note / subscription / report-
  * sales / readiness / RLS integration suites could only run when somebody had
@@ -19,8 +19,15 @@ import path from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
-import EmbeddedPostgres from 'embedded-postgres';
 
+const args = process.argv.slice(2);
+if (args.length && (args.length !== 1 || !['--irp', '--journey', '--irp-browser'].includes(args[0]))) {
+  console.error('Usage: run-integration-tests.mjs [--irp|--journey|--irp-browser]. The rehearsal accepts no database URL.');
+  process.exit(2);
+}
+const { default: EmbeddedPostgres } = await import('embedded-postgres');
+const irpOnly = args[0]==='--irp';
+const irpSuite = 'lib/db/irp-execution.integration.test.ts';
 const root = process.cwd();
 const dataDir = await mkdtemp(path.join(tmpdir(), 'autodine-pg-integration-'));
 const password = `local-${randomUUID().replaceAll('-', '')}`;
@@ -45,6 +52,7 @@ const postgres = new EmbeddedPostgres({
   user: 'postgres',
   password,
   persistent: false,
+  postgresFlags: ['-c', 'listen_addresses=127.0.0.1'],
   onLog: (message) => process.env.LOCAL_PG_VERBOSE && process.stderr.write(message),
   onError: (error) => process.stderr.write(`${error.message}\n`),
 });
@@ -64,11 +72,14 @@ const INTEGRATION_SUITES = [
   'app/menu/throttle-db.integration.test.tsx',
   'lib/db/credit-debit-notes.integration.test.ts',
   'lib/db/gst-two-mode.integration.test.ts',
+  irpSuite,
   'lib/db/phase0-security.integration.test.ts',
   'lib/db/readiness.integration.test.ts',
   'lib/db/report-sales.integration.test.ts',
   'lib/db/account-link-audit.integration.test.ts',
   'lib/db/owner-billing-guard.integration.test.ts',
+  'lib/db/operational-realtime.integration.test.ts',
+  'lib/db/p5-cross-module.integration.test.ts',
   'lib/db/restaurant-account-link.integration.test.ts',
   'lib/db/subscription-billing.integration.test.ts',
 ];
@@ -173,17 +184,25 @@ try {
   admin = undefined;
 
   const connectionString = `postgresql://postgres:${password}@127.0.0.1:${port}/${dbName}`;
-  const env = {
-    ...process.env,
-    READINESS_DB_URL: connectionString,
-    THROTTLE_DB_URL: connectionString,
-    CI: 'true',
-  };
-  delete env.DATABASE_URL;
+  if (args[0] === '--journey' || args[0] === '--irp-browser') {
+    const { runJourney } = await import('../../e2e/journey/run.mjs');
+    await runJourney(connectionString, { irp: args[0] === '--irp-browser' });
+  } else {
+    const env = {
+      ...process.env,
+      READINESS_DB_URL: connectionString,
+      THROTTLE_DB_URL: connectionString,
+      CI: 'true',
+    };
+    delete env.AUTODINE_IRP_REHEARSAL_TRACE;
+    if (irpOnly) env.AUTODINE_IRP_REHEARSAL_TRACE = '1';
+    delete env.DATABASE_URL;
 
-  console.log(`Running ${INTEGRATION_SUITES.length} PostgreSQL-gated suites against the disposable database.`);
-  await run(process.execPath, ['node_modules/vitest/vitest.mjs', 'run', ...INTEGRATION_SUITES], env);
-  console.log('All PostgreSQL-gated integration suites passed.');
+    const suites = irpOnly || process.env.READINESS_IRP_CLOCK_ONLY==='1' ? [irpSuite] : INTEGRATION_SUITES;
+    console.log(`Running ${suites.length} PostgreSQL-gated suites against the disposable database.`);
+    await run(process.execPath, ['node_modules/vitest/vitest.mjs', 'run', ...suites], env);
+    console.log('All PostgreSQL-gated integration suites passed.');
+  }
 } catch (error) {
   console.error(`INTEGRATION-DB FAILURE: ${error instanceof Error ? error.message : error}`);
   process.exitCode = 1;

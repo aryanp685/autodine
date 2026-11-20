@@ -16,6 +16,7 @@ type Timer = { fn: () => void; ms: number; id: number };
 function harness(options: {
   answers: Array<unknown | Error>;
   hidden?: boolean;
+  watchPayment?: boolean;
 }) {
   const timers: Timer[] = [];
   let nextId = 1;
@@ -35,7 +36,7 @@ function harness(options: {
   });
 
   const poller = createStatusPoller({
-    request,
+    request, watchPayment: options.watchPayment,
     setTimer: (fn, ms) => {
       const id = nextId++;
       timers.push({ fn, ms, id });
@@ -278,4 +279,16 @@ describe('stopping', () => {
     expect(h.timers).toHaveLength(0);
     expect(h.lastState.phase).toBe('stopped');
   });
+});
+
+
+it('keeps watching a served order while payment is pending, then stops at recorded payment', async () => {
+  const h = harness({ watchPayment: true, answers: [snapshot('served'), { ...snapshot('served'), paymentStatus: 'paid' }] });
+  h.poller.start();
+  await h.fire();
+  expect(h.lastState.phase).toBe('live');
+  await h.fire();
+  expect(h.snapshots.map(s => s.paymentStatus)).toEqual(['pending', 'paid']);
+  expect(h.lastState.phase).toBe('stopped');
+  expect(h.timers).toHaveLength(0);
 });

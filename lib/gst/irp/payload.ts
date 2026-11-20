@@ -9,6 +9,7 @@
  */
 
 import { checkGstin, GST_STATE_CODES } from '../gstin';
+import { validIndianBillingDate } from '../onboarding';
 import type { IrpDocumentKind, IrpLine, IrpPayloadV1, IrpPosKind, IrpRecipientType, IrpSeller, IrpSupplyType } from './types';
 import { fingerprint, canonicalJson } from './fingerprint';
 
@@ -56,7 +57,6 @@ export type IrpPayloadErrorCode =
   | 'line_amounts_invalid'
   | 'values_mismatch'
   | 'place_of_supply_invalid'
-  | 'values_mismatch'
   | 'original_invoice_required'
   | 'original_invoice_invalid'
   | 'original_invoice_not_permitted';
@@ -70,7 +70,6 @@ export class IrpPayloadError extends Error {
   }
 }
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DOC_RE = /^[A-Za-z0-9/-]{1,16}$/;
 
 export function buildIrpPayload(input: IrpInput): IrpPayloadV1 {
@@ -87,7 +86,7 @@ export function buildIrpPayload(input: IrpInput): IrpPayloadV1 {
   if (!input.documentNumber.trim()) {
     throw new IrpPayloadError('document_number_required', 'Invoice number is required.');
   }
-  if (!DATE_RE.test(input.issuedDate) || Number.isNaN(Date.parse(input.issuedDate))) {
+  if (!validIndianBillingDate(input.issuedDate)) {
     throw new IrpPayloadError('issued_date_format', 'Issue date must be YYYY-MM-DD.');
   }
   if (!GST_STATE_CODES.has(input.placeOfSupplyStateCode)) {
@@ -105,14 +104,14 @@ export function buildIrpPayload(input: IrpInput): IrpPayloadV1 {
     if (!original.documentNumber || !DOC_RE.test(original.documentNumber)) {
       throw new IrpPayloadError('original_invoice_invalid', 'The original invoice number must be 1–16 alphanumerics, / or -.');
     }
-    if (!DATE_RE.test(original.issuedDate) || Number.isNaN(Date.parse(original.issuedDate))) {
+    if (!validIndianBillingDate(original.issuedDate) || original.issuedDate > input.issuedDate) {
       throw new IrpPayloadError('original_invoice_invalid', 'The original invoice date must be YYYY-MM-DD.');
     }
   } else if (input.originalInvoice) {
     throw new IrpPayloadError('original_invoice_not_permitted', 'An invoice payload must not reference an original document.');
   }
   const lines: IrpLine[] = input.lines.map((line, index) => {
-    if (!Number.isFinite(line.quantity) || line.quantity <= 0) {
+    if (!Number.isSafeInteger(line.quantity) || line.quantity <= 0) {
       throw new IrpPayloadError('line_qty_invalid', `Line ${index + 1}: quantity must be positive.`);
     }
     const ints = [line.unitPricePaise, line.grossAmountPaise, line.discountPaise, line.taxablePaise, line.cgstPaise, line.sgstPaise, line.igstPaise, line.totalItemValuePaise];

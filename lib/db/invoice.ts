@@ -1,4 +1,9 @@
+import { dbErrorReference } from '@/lib/db/error-reference';
+import { directFulfilmentLabel } from '@/lib/gst/place-of-supply';
+import { readPrivateIrpCopy } from './irp-document';
+import type { VerifiedIrpCopy } from '@/lib/gst/irp/execution/presentation';
 import { getStaffContextDetailed } from '@/lib/db/staff';
+import { RESTAURANT_TIME_ZONE } from '@/lib/db/time';
 import { publicAssetUrl } from '@/lib/storage/assets';
 import type { RestaurantInvoice, RestaurantInvoiceLine, RestaurantPaymentReceipt } from '@/lib/db/types';
 
@@ -6,6 +11,7 @@ export type GstSnapshotData = {
   mode: 'regular' | 'composition';
   regularProfile: 'other_than_specified_premises' | 'specified_premises' | null;
   profileNotification: string | null;
+  serviceSac?: string | null;
   rateBps: number;
   cgstBps: number;
   sgstBps: number;
@@ -15,6 +21,7 @@ export type GstSnapshotData = {
   igstPaise: number;
   placeOfSupplyStateCode: string | null;
   interState: boolean;
+  reverseCharge?: boolean;
   configVersion: number;
   notice: string | null;
 };
@@ -60,17 +67,23 @@ export type ReceiptData = {
   restaurantId: string;
   number: string;
   financialYear: string;
+  retailBill?: boolean;
   documentType: 'receipt' | 'gst_tax_invoice' | 'bill_of_supply';
   /** e-Invoice state. B2C documents in this build are always 'not_required'. */
   irpStatus: GstIrnStatus;
   irn: string | null;
+  verifiedIrp?: VerifiedIrpCopy | null;
   /** B2B buyer details, present only on regular GST tax invoices issued for a business customer. */
   recipient: {
     name: string;
-    gstin: string;
+    gstin: string | null;
     stateCode: string;
     address: string | null;
     email: string | null;
+    location?: string | null;
+    pincode?: string | null;
+    phone?: string | null;
+    deliveryAddress?: string | null;
   } | null;
   /** Immutable GST decomposition; null for non-GST receipts. */
   gst: GstSnapshotData | null;
@@ -80,6 +93,8 @@ export type ReceiptData = {
   supersedesInvoiceId: string | null;
   voidReason: string | null;
   tableLabel: string | null;
+  fulfilmentLabel?: string | null;
+  privateDeliveryCopy?: boolean;
   sessionReference: string;
   sessionOpenedAt: string;
   sessionClosedAt: string;
@@ -93,6 +108,8 @@ export type ReceiptData = {
     legalName: string | null;
     tradeName: string | null;
     stateCode: string | null;
+    fssaiNumber?: string | null;
+    premisesAddress?: string | null;
   };
   totals: {
     subtotalPaise: number;
@@ -113,7 +130,7 @@ export type ReceiptData = {
 };
 
 export type InvoiceResult =
-  | { ok: true; invoice: ReceiptData; /** Staff role of the viewer (drives UI affordances; the server re-checks). */ role: string }
+  | { ok: true; invoice: ReceiptData; /** Staff role of the viewer (drives UI affordances; the server re-checks). */ role: string; canWrite?: boolean }
   | { ok: false; reason: 'unconfigured' | 'signed-out' | 'no-membership' | 'not-found' };
 
 type JsonObject = Record<string, unknown>;
@@ -196,6 +213,7 @@ function parseGstSnapshot(value: unknown): GstSnapshotData | null {
     mode,
     regularProfile: regularProfile ?? null,
     profileNotification: nullableText(snap.profile_notification),
+    serviceSac: nullableText(snap.service_sac),
     rateBps: integer(snap.rate_bps),
     cgstBps: integer(snap.cgst_bps),
     sgstBps: integer(snap.sgst_bps),
@@ -205,6 +223,7 @@ function parseGstSnapshot(value: unknown): GstSnapshotData | null {
     igstPaise: integer(snap.igst_paise),
     placeOfSupplyStateCode: nullableText(snap.place_of_supply_state_code),
     interState: snap.inter_state === true,
+    ...(typeof snap.reverse_charge === 'boolean' ? { reverseCharge: snap.reverse_charge } : {}),
     configVersion: integer(snap.config_version),
     notice: nullableText(snap.notice),
   };
@@ -234,13 +253,25 @@ function parsePaymentReceipt(row: RestaurantPaymentReceipt, timezone: string): I
   };
 }
 
+/** The token-scoped and staff reads use the same immutable payload parser.
+ * The formatted number already identifies the series, including legacy INV.
+ */
+export type InvoiceSnapshot = Pick<RestaurantInvoice,
+  'id' | 'restaurant_id' | 'order_session_id' | 'invoice_number' | 'financial_year' | 'document_type'
+  | 'irp_status' | 'gst_snapshot' | 'status' | 'issued_at' | 'issued_by' | 'table_label_snapshot'
+  | 'session_opened_at' | 'session_closed_at' | 'seller_snapshot' | 'customer_snapshot' | 'totals_snapshot'
+  | 'payment_snapshot' | 'supersedes_invoice_id' | 'void_reason'>;
+
 export function parseInvoice(
-  row: RestaurantInvoice,
+  row: InvoiceSnapshot,
   rows: RestaurantInvoiceLine[],
   paymentReceiptRows: RestaurantPaymentReceipt[],
   timezone: string,
 ): ReceiptData {
   const seller = object(row.seller_snapshot);
+  const fssaiNumber = nullableText(seller.fssai_number);
+  // Reviewed numbers use the India FY even if an outlet's display zone changes.
+  const documentZone = fssaiNumber ? RESTAURANT_TIME_ZONE : timezone;
   const totals = object(row.totals_snapshot);
   const payments = Array.isArray(row.payment_snapshot)
     ? row.payment_snapshot
@@ -249,16 +280,19 @@ export function parseInvoice(
     : [];
   const lineData = rows.map(parseLine);
 
-  const irpStatus = IRP_STATUSES.includes(row.irp_status) ? row.irp_status : 'not_required';
+  const irpStatus = IRP_STATUSES.includes(row.irp_status) ? row.irp_status
+    : row.document_type === 'gst_tax_invoice' ? 'pending' : 'not_required';
   const customer = object(row.customer_snapshot);
-  const recipientGstin = nullableText(customer.gstin);
-  const recipient = recipientGstin
+  const recipientGstin = row.document_type === 'gst_tax_invoice' ? nullableText(customer.gstin) : null;
+  const recipient = recipientGstin || (row.document_type === 'gst_tax_invoice' && customer.recipient_type === 'consumer')
     ? {
         name: requiredText(customer.name, 'the buyer legal name'),
         gstin: recipientGstin,
-        stateCode: nullableText(customer.state_code) ?? recipientGstin.slice(0, 2),
+        stateCode: nullableText(customer.state_code) ?? recipientGstin?.slice(0, 2) ?? '',
         address: nullableText(customer.address),
         email: nullableText(customer.email),
+        ...(customer.location ? { location: nullableText(customer.location), pincode: nullableText(customer.pincode), phone: nullableText(customer.phone) } : {}),
+        ...(customer.delivery_address ? { deliveryAddress: nullableText(customer.delivery_address) } : {}),
       }
     : null;
   return {
@@ -266,26 +300,31 @@ export function parseInvoice(
     restaurantId: row.restaurant_id,
     number: row.invoice_number,
     financialYear: row.financial_year,
+    ...(seller.retail_bill === true ? { retailBill:true } : {}),
     documentType: row.document_type,
     irpStatus,
-    irn: nullableText(row.irn),
+    irn: null, // a legacy string is not evidence
     recipient,
     gst: parseGstSnapshot(row.gst_snapshot),
     status: row.status,
-    issuedAt: formatWhen(row.issued_at, timezone),
+    issuedAt: formatWhen(row.issued_at, documentZone),
     issuedBy: row.issued_by,
     supersedesInvoiceId: row.supersedes_invoice_id,
     voidReason: row.void_reason,
     tableLabel: row.table_label_snapshot,
+    ...(seller.fulfilment_kind ? {fulfilmentLabel: directFulfilmentLabel(seller.fulfilment_kind),
+      ...(seller.fulfilment_kind === 'direct_delivery' && customer.recipient_type === 'consumer' ? {privateDeliveryCopy:true} : {})} : {}),
     sessionReference: row.order_session_id,
-    sessionOpenedAt: formatWhen(row.session_opened_at, timezone),
-    sessionClosedAt: formatWhen(row.session_closed_at, timezone),
+    sessionOpenedAt: formatWhen(row.session_opened_at, documentZone),
+    sessionClosedAt: formatWhen(row.session_closed_at, documentZone),
     seller: {
       name: requiredText(seller.name, 'the restaurant name'),
       address: requiredText(seller.address, 'the restaurant address'),
       phone: nullableText(seller.phone),
       logoUrl: publicAssetUrl(nullableText(seller.logo_path)),
-      gstin: nullableText(seller.gstin),
+      gstin: row.document_type === 'receipt' ? null : nullableText(seller.gstin),
+      fssaiNumber,
+      ...(seller.premises_address ? { premisesAddress: nullableText(seller.premises_address) } : {}),
       legalName: nullableText(seller.legal_name),
       tradeName: nullableText(seller.trade_name),
       stateCode: nullableText(seller.state_code),
@@ -317,13 +356,13 @@ export async function getInvoiceData(invoiceId: string): Promise<InvoiceResult> 
   const { data: invoice, error } = await supabase
     .from('restaurant_invoices')
     .select(
-      'id, restaurant_id, order_session_id, invoice_number, financial_year, sequence_number, document_type, status, issued_at, issued_by, table_label_snapshot, session_opened_at, session_closed_at, seller_snapshot, customer_snapshot, totals_snapshot, payment_snapshot, source_order_ids, supersedes_invoice_id, voided_at, voided_by, void_reason, created_at, gst_snapshot, irn, irp_status'
+      'id, restaurant_id, order_session_id, invoice_number, financial_year, sequence_number, document_type, status, issued_at, issued_by, table_label_snapshot, session_opened_at, session_closed_at, seller_snapshot, customer_snapshot, totals_snapshot, payment_snapshot, source_order_ids, supersedes_invoice_id, voided_at, voided_by, void_reason, created_at, gst_snapshot, irp_status'
     )
     .eq('id', invoiceId)
     .eq('restaurant_id', restaurantId)
     .maybeSingle();
 
-  if (error) throw new Error(`Could not load the receipt: ${error.message}`);
+  if (error) throw new Error(`Could not load the receipt: ${dbErrorReference(error)}`);
   if (!invoice) return { ok: false, reason: 'not-found' };
 
   const { data: lines, error: linesError } = await supabase
@@ -332,7 +371,7 @@ export async function getInvoiceData(invoiceId: string): Promise<InvoiceResult> 
     .eq('invoice_id', invoice.id)
     .eq('restaurant_id', restaurantId)
     .order('line_number', { ascending: true });
-  if (linesError) throw new Error(`Could not load receipt items: ${linesError.message}`);
+  if (linesError) throw new Error(`Could not load receipt items: ${dbErrorReference(linesError)}`);
 
   const { data: paymentReceipts, error: paymentReceiptsError } = await supabase
     .from('restaurant_payment_receipts')
@@ -340,7 +379,7 @@ export async function getInvoiceData(invoiceId: string): Promise<InvoiceResult> 
     .eq('invoice_id', invoice.id)
     .eq('restaurant_id', restaurantId)
     .order('sequence_number', { ascending: true });
-  if (paymentReceiptsError) throw new Error(`Could not load supplemental payment receipts: ${paymentReceiptsError.message}`);
+  if (paymentReceiptsError) throw new Error(`Could not load supplemental payment receipts: ${dbErrorReference(paymentReceiptsError)}`);
 
   // Older non-production stacks may not have the share-link migration yet.
   // Receipt viewing must continue to work there; create/revoke actions will
@@ -357,9 +396,12 @@ export async function getInvoiceData(invoiceId: string): Promise<InvoiceResult> 
     accessCount: Number(link.access_count),
   }));
 
+  const copy = invoice.status==='issued' && invoice.document_type==='gst_tax_invoice' && ['pending','failed','generated'].includes(invoice.irp_status)
+    ? await readPrivateIrpCopy(staff.context, invoice.id,'invoice') : null;
   return {
     ok: true,
     role: staff.context.role,
+    canWrite: staff.context.entitlement?.canWrite === true,
     invoice: {
       ...parseInvoice(
         invoice as unknown as RestaurantInvoice,
@@ -368,6 +410,7 @@ export async function getInvoiceData(invoiceId: string): Promise<InvoiceResult> 
         timezone,
       ),
       shareLinks,
+      ...(copy ? {verifiedIrp:copy,irn:copy.reference} : {}),
     },
   };
 }

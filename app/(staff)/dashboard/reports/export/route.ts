@@ -14,6 +14,10 @@ import { NextResponse } from 'next/server';
 import { getStaffContextDetailed, type StaffContextResult } from '@/lib/db/staff';
 import {
   getReportsScreenDataForStaff,
+  getGstDocumentsForStaff,
+  gstDocumentsCsv,
+  isReportRangeKey,
+  resolveRange,
   itemsCsv,
   ordersCsv,
   summaryCsv,
@@ -24,10 +28,10 @@ import { localDateKey } from '@/lib/db/time';
 export const dynamic = 'force-dynamic';
 
 const NO_STORE = { 'Cache-Control': 'no-store, max-age=0' };
-type ExportType = 'summary' | 'orders' | 'items';
+type ExportType = 'summary' | 'orders' | 'items' | 'gst';
 
 function isExportType(value: string | null): value is ExportType {
-  return value === 'summary' || value === 'orders' || value === 'items';
+  return value === 'summary' || value === 'orders' || value === 'items' || value === 'gst';
 }
 
 function jsonError(error: string, status: number) {
@@ -68,7 +72,22 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const type = url.searchParams.get('type');
   if (!isExportType(type)) {
-    return jsonError('type must be summary, orders or items', 400);
+    return jsonError('type must be summary, orders, items or gst', 400);
+  }
+
+  if (type === 'gst') {
+    const { timezone } = staff.context;
+    const key = url.searchParams.get('range');
+    const range = resolveRange(isReportRangeKey(key) ? key : 'today', timezone, new Date(), {
+      from: url.searchParams.get('from') ?? undefined, to: url.searchParams.get('to') ?? undefined,
+    });
+    try {
+      const documents = await getGstDocumentsForStaff(staff.context, range);
+      if (!documents) return jsonError('GST document reporting is unavailable on this database.', 503);
+      return csvResponse(gstDocumentsCsv(documents, range, timezone), type, range.fromIso, timezone);
+    } catch {
+      return jsonError('The GST report could not be exported. Please try again.', 503);
+    }
   }
 
   let data: ReportsScreenData;
@@ -95,10 +114,14 @@ export async function GET(request: Request) {
         ? itemsCsv(data.report, data.timezone)
         : summaryCsv(data.report, data.range, data.timezone);
 
+  return csvResponse(body, type, data.range.fromIso, data.timezone);
+}
+
+function csvResponse(body: string, type: ExportType, fromIso: string, timeZone: string) {
   return new NextResponse(`\uFEFF${body}`, {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="${filename(type, data.range.fromIso, data.timezone)}"`,
+      'Content-Disposition': `attachment; filename="${filename(type, fromIso, timeZone)}"`,
       // Takings are not public and must not sit in a shared cache.
       ...NO_STORE,
     },

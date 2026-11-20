@@ -16,6 +16,7 @@ export type UndoItem = {
   description: string | null;
   pricePaise: number;
   isVeg: boolean | null;
+  isAlcoholic?: boolean;
   isAvailable: boolean;
   categoryId: string | null;
   sortOrder: number;
@@ -58,6 +59,7 @@ export function readUndoItem(value: unknown): UndoItem | null {
     // happen; money is stored in paise and stays an integer.
     pricePaise: Number.isFinite(price) && price >= 0 ? Math.round(price) : 0,
     isVeg: v.isVeg === true ? true : v.isVeg === false ? false : null,
+    ...(typeof v.isAlcoholic === 'boolean' ? { isAlcoholic: v.isAlcoholic } : {}),
     isAvailable: v.isAvailable !== false,
     categoryId,
     sortOrder: Number.isFinite(sort) ? Math.round(sort) : 0,

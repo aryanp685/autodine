@@ -1,4 +1,7 @@
+import { readOrderFloorLabels } from './floor-service';
+import { dbErrorReference } from '@/lib/db/error-reference';
 import { readAllRows, readRowsForIds } from '@/lib/db/paged-read';
+import { directFulfilmentLabel } from '@/lib/gst/place-of-supply';
 /**
  * Load the kitchen board.
  *
@@ -199,7 +202,7 @@ export const BOARD_WINDOW_HOURS = 6;
 /** How long a cancellation stays worth announcing. Minutes. */
 export const CANCELLED_WINDOW_MIN = 15;
 
-/** Table label shown when an order has no table (takeaway, delivery). */
+/** Legacy label for a tableless order with no recorded direct route. */
 const NO_TABLE = 'Takeaway';
 
 function minutesSince(iso: string, now: number): number {
@@ -256,7 +259,7 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
     });
 
     if (writeCheckError) {
-      console.error(`[kitchen] could not read the write state: ${writeCheckError.message}`);
+      console.error(`[kitchen] could not read the write state: ${dbErrorReference(writeCheckError)}`);
     } else if (writable === false) {
       canAdvance = false;
       canResolveWaiterCalls = false;
@@ -325,10 +328,10 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
   ]);
 
   if (ordersResult.error) {
-    throw new Error(`Could not load orders: ${ordersResult.error.message}`);
+    throw new Error(`Could not load orders: ${dbErrorReference(ordersResult.error)}`);
   }
   if (cancelledResult.error) {
-    throw new Error(`Could not load cancellations: ${cancelledResult.error.message}`);
+    throw new Error(`Could not load cancellations: ${dbErrorReference(cancelledResult.error)}`);
   }
 
   const rows = ordersResult.data ?? [];
@@ -346,7 +349,8 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
   // an embed like dining_tables(label) resolves to SelectQueryError and will
   // not compile. Joining in JS also lets us order items by sort_order, which
   // is the sequence the kitchen wants them plated in.
-  const [itemsResult, tablesResult, waiterCallsResult] = await Promise.all([
+  const offTableIds = [...new Set([...rows, ...cancelledRows].filter(row => !row.table_id).map(row => row.id))];
+  const [itemsResult, tablesResult, waiterCallsResult, routes, floorLabels] = await Promise.all([
     // An empty .in() list is a wasted round trip on a board that refreshes
     // every thirty seconds, so it is skipped rather than sent.
     orderIds.length
@@ -367,18 +371,20 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
       .eq('restaurant_id', restaurantId)
       .eq('status', 'open')
       .order('created_at', { ascending: true }),
+    readRowsForIds(offTableIds, ids => supabase.rpc('list_gst_direct_prep_routes', {p_outlet:restaurantId,p_orders:ids})),
+    readOrderFloorLabels(supabase, restaurantId, [...rows, ...cancelledRows].filter(row => row.table_id).map(row => row.id)),
   ]);
 
   if (itemsResult.error) {
-    throw new Error(`Could not load order items: ${itemsResult.error.message}`);
+    throw new Error(`Could not load order items: ${dbErrorReference(itemsResult.error)}`);
   }
   if (tablesResult.error) {
-    throw new Error(`Could not load tables: ${tablesResult.error.message}`);
+    throw new Error(`Could not load tables: ${dbErrorReference(tablesResult.error)}`);
   }
   const waiterCallsUnavailable = waiterCallsResult.error?.code === '42P01'
     || waiterCallsResult.error?.code === 'PGRST205';
   if (waiterCallsResult.error && !waiterCallsUnavailable) {
-    throw new Error(`Could not load waiter calls: ${waiterCallsResult.error.message}`);
+    throw new Error(`Could not load waiter calls: ${dbErrorReference(waiterCallsResult.error)}`);
   }
 
   // Announcements use the order-time name/variant/add-on snapshots above. The
@@ -398,9 +404,20 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
     labelByTable.set(table.id, table.label);
   }
 
+  const routeUnavailable = routes.error && ['42883','PGRST202'].includes(routes.error.code ?? '');
+  if (routes.error && !routeUnavailable) throw new Error('Could not load direct ticket prep labels.');
+  const routeByOrder = new Map<string,string>();
+  if (Array.isArray(routes.data)) for (const {order_id,fulfilment_kind} of routes.data) {
+    const label = directFulfilmentLabel(fulfilment_kind);
+    if (label) routeByOrder.set(order_id,label);
+  }
+  const tableOrRoute = (row:{id:string;table_id:string | null}) => row.table_id
+    ? floorLabels.get(row.id) ?? labelByTable.get(row.table_id) ?? NO_TABLE
+    : routeByOrder.get(row.id) ?? (routeUnavailable ? 'Off-table ticket' : NO_TABLE);
+
   const cancelled: CancelledTicket[] = cancelledRows.map((row) => ({
     id: row.id,
-    table: (row.table_id && labelByTable.get(row.table_id)) || NO_TABLE,
+    table: tableOrRoute(row),
     at: row.updated_at,
   }));
 
@@ -445,7 +462,7 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
       const newest = group[group.length - 1]!;
       return {
         sessionId: first.table_session_id ?? null,
-        table: (first.table_id && labelByTable.get(first.table_id)) || NO_TABLE,
+        table: tableOrRoute(first),
         placedAt: clockTimeInZone(timezone, first.placed_at),
         placedAtIso: first.placed_at,
         ageMin: minutesSince(first.placed_at, now),
@@ -482,7 +499,7 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
     return {
       id: row.id,
       code: row.code,
-      table: (row.table_id && labelByTable.get(row.table_id)) || NO_TABLE,
+      table: tableOrRoute(row),
       placedAt: clockTimeInZone(timezone, row.placed_at),
       placedAtIso: row.placed_at,
       ageMin: minutesSince(row.placed_at, now),

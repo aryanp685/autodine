@@ -20,8 +20,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 
-import { inr } from '@/lib/demo-data';
-import { paiseToRupees } from '@/lib/money';
+import { formatQuoteMoney } from '@/lib/cart-pricing';
 import { VegMark } from '@/components/ui';
 import type { OrderLine } from '@/lib/db/order-screen';
 import { cancelGuestOrderAction, setGuestOrderLinesAction } from '@/app/menu/order/actions';
@@ -29,6 +28,7 @@ import { cancelGuestOrderAction, setGuestOrderLinesAction } from '@/app/menu/ord
 type Props = {
   orderId: string;
   token: string;
+  revision?: string;
   lines: OrderLine[];
   /** prep 'new', unpaid, and inside the ten minute window. */
   canEdit: boolean;
@@ -40,6 +40,7 @@ type Props = {
 export function GuestOrderEditor({
   orderId,
   token,
+  revision,
   lines,
   canEdit,
   lockedReason,
@@ -47,9 +48,9 @@ export function GuestOrderEditor({
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [qty, setQty] = useState<Record<string, number>>(() =>
-    Object.fromEntries(lines.map((l) => [l.id, l.qty])),
-  );
+  const [draft, setDraft] = useState<{ revision?: string; quantities: Record<string, number> }>({ revision, quantities: {} });
+  const qty = draft.revision === revision ? draft.quantities : {};
+  const superseded = draft.revision !== revision && Object.keys(draft.quantities).length > 0;
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [confirming, setConfirming] = useState(false);
@@ -66,9 +67,10 @@ export function GuestOrderEditor({
   function step(line: OrderLine, delta: number) {
     setError('');
     setNotice('');
-    setQty((current) => {
-      const now = current[line.id] ?? line.qty;
-      return { ...current, [line.id]: Math.max(0, Math.min(99, now + delta)) };
+    setDraft(current => {
+      const quantities = current.revision === revision ? current.quantities : {};
+      const now = quantities[line.id] ?? line.qty;
+      return { revision, quantities: { ...quantities, [line.id]: Math.max(0, Math.min(99, now + delta)) } };
     });
   }
 
@@ -79,11 +81,13 @@ export function GuestOrderEditor({
       const result = await setGuestOrderLinesAction({
         orderId,
         token,
+        revision,
         lines: lines.map((l) => ({ lineId: l.id, qty: qty[l.id] ?? l.qty })),
       });
 
       if (!result.ok) {
         setError(result.error);
+        router.refresh();
         return;
       }
 
@@ -149,7 +153,7 @@ export function GuestOrderEditor({
                   <div className="mt-0.5 text-[12px] leading-[1.45] text-gink-64">+ {l.addons.join(', ')}</div>
                 ) : null}
                 <div className="tnum mt-0.5 text-[12.5px] text-gink-46">
-                  {inr(paiseToRupees(l.unitPricePaise))} each
+                  {formatQuoteMoney(l.unitPricePaise)} each
                   {removed ? ' · will be removed' : ''}
                 </div>
               </div>
@@ -187,7 +191,7 @@ export function GuestOrderEditor({
                 animate={motionOn ? { scale: 1 } : undefined}
                 transition={{ type: 'spring', stiffness: 520, damping: 20 }}
               >
-                {removed ? '—' : inr(paiseToRupees(l.unitPricePaise * now))}
+                {removed ? '—' : formatQuoteMoney(l.unitPricePaise * now)}
               </motion.span>
             </motion.div>
           );
@@ -207,8 +211,8 @@ export function GuestOrderEditor({
         <div className="mt-3">
           {dirty ? (
             <p className="text-[12px] leading-[1.55] text-gink-64">
-              New subtotal {inr(paiseToRupees(nextSubtotal))}
-              {nextSubtotal !== subtotalPaise ? ` (was ${inr(paiseToRupees(subtotalPaise))})` : ''}
+              New subtotal {formatQuoteMoney(nextSubtotal)}
+              {nextSubtotal !== subtotalPaise ? ` (was ${formatQuoteMoney(subtotalPaise)})` : ''}
               . Taxes and the total are recalculated when you save.
               {remaining === 0 ? ' At least one dish has to stay on the order.' : ''}
             </p>

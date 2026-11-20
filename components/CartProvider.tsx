@@ -54,6 +54,8 @@ type CartApi = {
   removeItems: (itemIds: string[]) => void;
   setQty: (itemId: string, qty: number, variantId?: string, addonIds?: string[]) => void;
   clear: () => void;
+  /** Adopt an atomic checkout/storage update without writing it a second time. */
+  sync: () => void;
   /**
    * Replace the cart with a known list, in one write.
    *
@@ -73,6 +75,7 @@ type CartApi = {
   ready: boolean;
 };
 
+const CART_UPDATE = 'autodine:cart-update';
 const Ctx = createContext<CartApi | null>(null);
 
 export function CartProvider({
@@ -90,53 +93,69 @@ export function CartProvider({
 
   // Read after mount, not during render: the server has no localStorage, and
   // reading it while rendering would produce markup that cannot match.
-  useEffect(() => {
-    setReady(false);
-    try {
-      setLines(parseCart(window.localStorage.getItem(key)));
-    } catch {
-      // Private browsing and disabled storage both throw here. An empty cart
-      // is the right answer -- the order can still be placed, it just will not
-      // survive a reload.
-      setLines([]);
-    }
+  const sync = useCallback(() => {
+    try { setLines(parseCart(window.localStorage.getItem(key))); }
+    catch { setLines([]); }
     setReady(true);
   }, [key]);
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => { if (event.key === key || event.key === null) sync(); };
+    const onCartUpdate = (event: Event) => { if ((event as CustomEvent<string>).detail === key) sync(); };
+    sync();
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('pageshow', sync);
+    window.addEventListener(CART_UPDATE, onCartUpdate);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('pageshow', sync);
+      window.removeEventListener(CART_UPDATE, onCartUpdate);
+    };
+  }, [key, sync]);
 
   // Write on change, but not before the first read, or the stored cart would
   // be overwritten by the empty one rendered on the server.
   const persist = useCallback(
-    (next: StoredLine[]) => {
-      setLines(next);
-      try {
-        if (next.length === 0) window.localStorage.removeItem(key);
-        else window.localStorage.setItem(key, serialiseCart(next));
-      } catch {
-        // Nothing useful to do. The cart still works for this page view.
-      }
+    (update: (current: StoredLine[]) => StoredLine[]) => {
+      const write = () => {
+        let current = lines;
+        try { current = parseCart(window.localStorage.getItem(key)); } catch { /* use the visible cart */ }
+        const next = update(current);
+        setLines(next);
+        try {
+          if (next.length === 0) window.localStorage.removeItem(key);
+          else window.localStorage.setItem(key, serialiseCart(next));
+          window.dispatchEvent(new CustomEvent(CART_UPDATE, { detail: key }));
+        } catch { /* the cart still works for this page view */ }
+      };
+      // Share the short read/edit/write lock with acknowledged checkout. Do
+      // not hold this lock while waiting on an order request, so other tabs
+      // can still build a cart. Browsing works even without Web Locks.
+      if (navigator.locks) void navigator.locks.request(key, write).catch(() => sync());
+      else write();
     },
-    [key]
+    [key, lines, sync]
   );
 
   const api = useMemo<CartApi>(
     () => ({
       lines,
       ready,
+      sync,
       add: (itemId, by = 1, variantId, addonIds) =>
-        persist(addLine(lines, itemId, by, variantId, addonIds)),
+        persist(current => addLine(current, itemId, by, variantId, addonIds)),
       remove: (itemId, variantId, addonIds) =>
-        persist(removeLine(lines, itemId, variantId, addonIds)),
+        persist(current => removeLine(current, itemId, variantId, addonIds)),
       removeItems: (itemIds) => {
         const gone = new Set(itemIds);
-        persist(lines.filter((line) => !gone.has(line.itemId)));
+        persist(current => current.filter((line) => !gone.has(line.itemId)));
       },
       setQty: (itemId, qty, variantId, addonIds) =>
-        persist(setLineQty(lines, itemId, qty, variantId, addonIds)),
-      clear: () => persist([]),
-      restore: (next) => persist(parseCart(serialiseCart(next))),
+        persist(current => setLineQty(current, itemId, qty, variantId, addonIds)),
+      clear: () => persist(() => []),
+      restore: (next) => persist(() => parseCart(serialiseCart(next))),
       count: totalQty(lines),
     }),
-    [lines, ready, persist]
+    [lines, ready, sync, persist]
   );
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;

@@ -21,8 +21,12 @@ import {
   Tr,
   inputClass,
 } from '@/components/owner/chrome';
+import { formatBillMoney } from '@/lib/bill';
 import {
   demoReport,
+  GST_DOCUMENT_LABEL,
+  gstDocumentStatus,
+  gstDocumentSeries,
   type ReportView,
   type ReportRange,
   type ReportRangeKey,
@@ -94,7 +98,7 @@ function rangeHref(key: ReportRangeKey): string {
  * a slightly different window a second later, and a custom range must come
  * back as the days the owner picked.
  */
-function exportHref(type: 'summary' | 'orders' | 'items', range: ReportRange, timeZone: string): string {
+function exportHref(type: 'summary' | 'orders' | 'items' | 'gst', range: ReportRange, timeZone: string): string {
   const params = new URLSearchParams({ type, range: range.key });
 
   if (range.key === 'custom') {
@@ -551,6 +555,56 @@ export function ReportsScreen({
             </Panel>
           </div>
 
+          {data?.gstDocuments !== undefined ? (
+            <section className="mt-4" aria-labelledby="report-gst-documents">
+              <SectionHead title={<span id="report-gst-documents">Billing documents</span>} meta="By issue date · current status" />
+              <Card className="overflow-hidden">
+                <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                  <p className="max-w-[72ch] text-[12.5px] text-gink-64">
+                    These amounts come from saved documents, not the ticket tax or payment ledger.
+                    Notes are shown separately, not deducted from collections. IRN holds are not final invoices.
+                  </p>
+                  <a className={btn('ghost', 'sm')} href="/dashboard/reports/gst">GST reconciliation &amp; document search</a>
+                  {data.gstDocuments !== null ? (
+                    <a className={btn('ghost', 'sm')} href={exportHref('gst', range, timezone)} download>Billing documents CSV</a>
+                  ) : null}
+                </div>
+                {data.gstDocuments?.length ? (
+                  <TableWrap>
+                    <table className={tableClass}>
+                      <thead><tr>
+                        <Th>Document</Th><Th>FY · Series</Th><Th>Status</Th><Th>Count</Th><Th>Total</Th><Th>Taxable value</Th>
+                        <Th>CGST</Th><Th>SGST</Th><Th>Known rounding difference</Th>
+                      </tr></thead>
+                      <tbody>
+                        {data.gstDocuments.map((row) => (
+                          <Tr key={[row.document_type, row.document_status, row.rate_bps, row.irn_held, row.financial_year, row.series_code].join(':')}>
+                            <Td>{GST_DOCUMENT_LABEL[row.document_type]}{row.rate_bps ? ` · ${row.rate_bps / 100}%` : ''}</Td>
+                            <Td>{row.financial_year ? `${row.financial_year} · ${gstDocumentSeries(row)}` : '—'}</Td>
+                            <Td>{gstDocumentStatus(row)}</Td>
+                            <Td>{row.document_count}</Td>
+                            <Td>{row.total_paise == null ? '—' : formatBillMoney(Number(row.total_paise))}</Td>
+                            <Td>{row.taxable_paise == null ? '—' : formatBillMoney(Number(row.taxable_paise))}</Td>
+                            <Td>{row.cgst_paise == null ? '—' : formatBillMoney(Number(row.cgst_paise))}</Td>
+                            <Td>{row.sgst_paise == null ? '—' : formatBillMoney(Number(row.sgst_paise))}</Td>
+                            <Td>
+                              {row.rounding_delta_paise == null ? '—' : formatBillMoney(Number(row.rounding_delta_paise))}
+                              {row.missing_rounding_count ? ` · ${row.missing_rounding_count} without rounding evidence` : ''}
+                            </Td>
+                          </Tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </TableWrap>
+                ) : (
+                  <div className="px-4 pb-4"><Empty>{data.gstDocuments === null
+                    ? 'GST document reporting is unavailable on this database.'
+                    : 'No GST invoices, bills of supply, retail bills or notes were issued in this range.'}</Empty></div>
+                )}
+              </Card>
+            </section>
+          ) : null}
+
           {/* --------------------------------------------------------- the ledger */}
           <section className="mt-4" aria-labelledby="report-ledger">
             <SectionHead
@@ -652,8 +706,8 @@ export function ReportsScreen({
               is the figure to chase. They are separate on purpose — most tables settle at the
               counter on the way out.
             </Notice>
-            <Notice tone="plain" label="GST on bills" className="mb-0">
-              <Money value={totals.taxPaise} /> charged across {totals.bills} bill
+            <Notice tone="plain" label="Tax on tickets (not issued-document GST)" className="mb-0">
+              <Money value={totals.taxPaise} /> on {totals.bills} ticket
               {totals.bills === 1 ? '' : 's'}
               {totals.discountPaise > 0 && (
                 <>

@@ -1,13 +1,26 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { getStaffContext } from '@/lib/db/staff';
+import { getStaffContext, type StaffContext } from '@/lib/db/staff';
 import { isNoteDocumentType, isNoteReasonCode, validateNoteReason, type NoteDocumentType, type NoteReasonCode } from '@/lib/gst/notes';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Mirrors the database: only owner/manager may issue or void notes. */
+/** Owner/Manager access; activated document writes are owner-only. */
 const NOTE_ROLES = ['owner', 'manager'] as const;
+
+async function checkNoteWrite(staff: StaffContext, table: 'restaurant_invoices' | 'restaurant_notes', id: string) {
+  if (!staff.entitlement?.canWrite) return 'This outlet is read-only.';
+  const { data, error } = await staff.supabase.from(table).select('status,irp_status,seller_snapshot')
+    .eq('id', id).eq('restaurant_id', staff.restaurantId).maybeSingle();
+  if (error || data?.status !== 'issued') return 'The issued document is unavailable in the selected outlet.';
+  if ((data.seller_snapshot as { activation_effective_from?: string } | null)?.activation_effective_from && staff.role !== 'owner') {
+    return 'Only the outlet owner can change an adjustment under an activated billing configuration.';
+  }
+  const blocked = table === 'restaurant_invoices' ? data.irp_status !== 'not_required'
+    : data.irp_status === 'generated' || data.irp_status === 'cancelled';
+  return blocked ? 'Reconcile the IRP status before recording this adjustment.' : null;
+}
 
 export type NoteActionResult = { ok: true; id: string } | { ok: false; error: string };
 
@@ -21,8 +34,7 @@ export type IssueInvoiceNoteInput = {
 /**
  * Issue an immutable credit/debit note covering the full source GST document.
  * The database owns numbering, snapshot amounts and the one-live-note rule;
- * this action only validates shape and enforces the owner/manager gate
- * before the call, so kitchen/cashier staff never reach it.
+ * this action independently checks the selected outlet, role and hold.
  */
 export async function issueInvoiceNoteAction(input: IssueInvoiceNoteInput): Promise<NoteActionResult> {
   const invoiceId = String(input?.invoiceId ?? '').trim();
@@ -42,6 +54,8 @@ export async function issueInvoiceNoteAction(input: IssueInvoiceNoteInput): Prom
     return { ok: false, error: 'Only an owner or manager can issue a credit or debit note.' };
   }
 
+  const failure = await checkNoteWrite(staff, 'restaurant_invoices', invoiceId);
+  if (failure) return { ok: false, error: failure };
   const { data, error } = await staff.supabase.rpc('issue_invoice_note', {
     p_invoice_id: invoiceId,
     p_document_type: input.documentType as NoteDocumentType,
@@ -52,6 +66,7 @@ export async function issueInvoiceNoteAction(input: IssueInvoiceNoteInput): Prom
     return { ok: false, error: error.message ?? 'The note could not be issued.' };
   }
   revalidatePath('/dashboard/invoices');
+  revalidatePath('/dashboard/reports/gst');
   return { ok: true, id: String(data ?? '') };
 }
 
@@ -70,6 +85,8 @@ export async function voidInvoiceNoteAction(input: VoidInvoiceNoteInput): Promis
     return { ok: false, error: 'Only an owner or manager can void a credit or debit note.' };
   }
 
+  const failure = await checkNoteWrite(staff, 'restaurant_notes', noteId);
+  if (failure) return { ok: false, error: failure };
   const { error } = await staff.supabase.rpc('void_invoice_note', {
     p_note_id: noteId,
     p_reason: reason.reason,
@@ -78,5 +95,7 @@ export async function voidInvoiceNoteAction(input: VoidInvoiceNoteInput): Promis
     return { ok: false, error: error.message ?? 'The note could not be voided.' };
   }
   revalidatePath('/dashboard/invoices');
+  revalidatePath('/dashboard/reports/gst');
+  revalidatePath(`/dashboard/invoices/notes/${noteId}`);
   return { ok: true, id: noteId };
 }

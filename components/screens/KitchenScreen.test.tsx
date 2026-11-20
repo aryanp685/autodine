@@ -469,10 +469,10 @@ describe('Kitchen board, the redesign', () => {
     expect(html.slice(at, html.indexOf('</button>', at))).toContain('<svg');
   });
 
-  it('labels both order tickets and waiter calls as five-second polling', () => {
+  it('does not label the board with a polling interval it no longer runs', () => {
     const html = live();
-    expect(html).toContain('Tickets and waiter calls refresh every five seconds.');
-    expect(html).toContain('5s polling');
+    expect(html).toContain('Kitchen queue');
+    expect(html).not.toContain('refresh every five seconds');
     expect(html).not.toContain('calls live');
   });
 

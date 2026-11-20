@@ -20,6 +20,7 @@ export function PaymentReceiptScreen({ receipt }: { receipt: PaymentReceiptData 
   const page = PAGE[layout];
   const message = [
     receipt.seller.name,
+    ...(receipt.seller.fssaiNumber ? [`FSSAI ${receipt.seller.fssaiNumber}`] : []),
     'PAYMENT RECEIPT',
     `Reference ${receipt.reference}`,
     `For invoice ${receipt.invoiceNumber}`,
@@ -75,6 +76,7 @@ export function PaymentReceiptScreen({ receipt }: { receipt: PaymentReceiptData 
             <h1 className="text-[20px] font-semibold tracking-[-0.02em]">{receipt.seller.name}</h1>
             <p className="mt-1 text-[12.5px] text-gink-64">{receipt.seller.address}</p>
             {receipt.seller.phone ? <p className="mt-0.5 text-[11.5px] text-gink-64">Phone {receipt.seller.phone}</p> : null}
+            {receipt.seller.fssaiNumber ? <p className="mt-0.5 text-[11.5px] text-gink-64">FSSAI {receipt.seller.fssaiNumber}</p> : null}
             <p className="mt-4 text-[12.5px] font-semibold tracking-[0.1em] uppercase">Payment receipt</p>
             <p className="mt-1 font-mono text-[13px] font-semibold">{receipt.reference}</p>
           </header>

@@ -7,9 +7,9 @@
  * audit. The function is SECURITY INVOKER and RLS scopes the rows, so a
  * restaurant can never see another's documents.
  *
- * Owner/manager only — attempting issuance is their job. Cashiers and
- * kitchen roles get `visible: false` (no RPC call, no error) so the invoice
- * history page stays available to them unchanged.
+ * Owner/manager read access, restricted to the selected outlet. A separate
+ * metadata projection labels any local preparation, never an IRP submission.
+ * Cashiers do not query the follow-up list.
  */
 
 import { getStaffContextDetailed } from '@/lib/db/staff';
@@ -23,6 +23,7 @@ export type EinvoiceReconciliationRow = {
   issuedAt: string;
   lastAttemptAt: string | null;
   attemptCount: number;
+  preparedAt?: string;
 };
 
 export type EinvoiceReconciliationResult =
@@ -38,10 +39,19 @@ export async function getEinvoiceReconciliation(): Promise<EinvoiceReconciliatio
   const role = staff.context.role;
   if (role !== 'owner' && role !== 'manager') return { ok: true, visible: false };
 
-  const { data, error } = await staff.context.supabase.rpc('list_restaurant_irp_reconciliation');
+  const [{ data, error }, prep] = await Promise.all([
+    staff.context.supabase.rpc('list_restaurant_irp_reconciliation'),
+    staff.context.supabase.rpc('list_gst_irp_preflights', { p_outlet: staff.context.restaurantId }),
+  ]);
+  const preparations = new Map<string,string>();
+  if (!prep.error && Array.isArray(prep.data)) for (const row of prep.data) {
+    if (row && typeof row === 'object' && !Array.isArray(row) && typeof row.invoice_id === 'string' && typeof row.created_at === 'string') {
+      preparations.set(row.invoice_id,row.created_at);
+    }
+  }
   if (error) return { ok: false, reason: 'unavailable' };
 
-  const rows: EinvoiceReconciliationRow[] = (data ?? []).map((row) => ({
+  const rows: EinvoiceReconciliationRow[] = (data ?? []).filter((row) => row.restaurant_id === staff.context.restaurantId).map((row) => ({
     invoiceId: String(row.invoice_id),
     invoiceNumber: String(row.invoice_number),
     documentType: String(row.document_type),
@@ -49,6 +59,7 @@ export async function getEinvoiceReconciliation(): Promise<EinvoiceReconciliatio
     isB2b: row.is_b2b === true,
     issuedAt: typeof row.issued_at === 'string' ? row.issued_at : '',
     lastAttemptAt: typeof row.last_attempt_at === 'string' ? row.last_attempt_at : null,
+    preparedAt: preparations.get(row.invoice_id),
     attemptCount: Number.isFinite(Number(row.attempt_count)) ? Number(row.attempt_count) : 0,
   }));
   return { ok: true, visible: true, rows };

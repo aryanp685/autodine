@@ -376,6 +376,126 @@ describe.skipIf(!URL_VALUE)('Phase 0 database security boundaries', () => {
     });
   });
 
+  describe('table QR lifecycle', () => {
+    const tableOf = async (token: string) => (await db.query(
+      'select table_id from table_qr_codes where public_token = $1', [token])).rows[0].table_id as string;
+    const liveCodes = async (table: string) => (await db.query(
+      'select count(*)::int n from table_qr_codes where table_id = $1 and revoked_at is null', [table])).rows[0].n as number;
+
+    it("refuses to rotate or retire another outlet's table code", async () => {
+      const target = await tableOf(a.freshQrToken);
+      for (const intruder of [a.outsider, b.owner]) {
+        // Both hold a real account: a signed-in stranger, and the owner of a
+        // different restaurant. Neither is a member of a.
+        await expect(staff(intruder, () => db.query('select rotate_table_qr_code($1)', [target])))
+          .rejects.toMatchObject({ code: '42501' });
+        await expect(staff(intruder, () => db.query('select retire_table_qr_code($1)', [target])))
+          .rejects.toMatchObject({ code: '42501' });
+      }
+      // The card still works: a refused attempt revoked nothing, so a guest can
+      // still open a session with the token printed on that table.
+      const opened = await guest(async () => (await db.query(
+        'select status from open_table_session($1,$2)', [a.freshQrToken, 'b'.repeat(64)])).rows[0].status);
+      expect(opened).toBe('opened');
+    });
+
+    it('refuses guests at the function boundary', async () => {
+      const target = await tableOf(a.freshQrToken);
+      // `anon` holds no EXECUTE on either RPC: the app never calls them for a
+      // guest, and a scanner cannot rotate the card it just read.
+      await expect(guest(() => db.query('select rotate_table_qr_code($1)', [target])))
+        .rejects.toMatchObject({ code: '42501' });
+      await expect(guest(() => db.query('select retire_table_qr_code($1)', [target])))
+        .rejects.toMatchObject({ code: '42501' });
+    });
+
+    it('rejects a missing or unknown table identifier', async () => {
+      // 22023 for a missing id, P0002 for an id that names no table: neither
+      // path may fall through to a write.
+      await expect(staff(a.owner, () => db.query('select rotate_table_qr_code($1::uuid)', [null])))
+        .rejects.toMatchObject({ code: '22023' });
+      const unknown = randomUUID();
+      await expect(staff(a.owner, () => db.query('select rotate_table_qr_code($1)', [unknown])))
+        .rejects.toMatchObject({ code: 'P0002' });
+      await expect(staff(a.owner, () => db.query('select retire_table_qr_code($1)', [unknown])))
+        .rejects.toMatchObject({ code: 'P0002' });
+    });
+
+    it('lets an outlet manager rotate, and refuses cashier and kitchen staff', async () => {
+      const manager = randomUUID();
+      await db.query('insert into profiles(id) values ($1)', [manager]);
+      await db.query("insert into memberships(restaurant_id,user_id,role) values ($1,$2,'manager')", [a.restaurant, manager]);
+      const target = await tableOf(a.freshQrToken);
+
+      const issued = await staff(manager, async () =>
+        (await db.query('select rotate_table_qr_code($1) token', [target])).rows[0].token as string);
+      expect(issued).toMatch(/^[A-Za-z0-9_-]{8,128}$/);
+      expect(issued).not.toBe(a.freshQrToken);
+
+      // Membership is not the same as authority: a cashier and a kitchen
+      // account belong to the outlet and still may not manage its cards.
+      for (const denied of [a.cashier, a.kitchen]) {
+        await expect(staff(denied, () => db.query('select rotate_table_qr_code($1)', [target])))
+          .rejects.toMatchObject({ code: '42501' });
+        await expect(staff(denied, () => db.query('select retire_table_qr_code($1)', [target])))
+          .rejects.toMatchObject({ code: '42501' });
+      }
+    });
+
+    it('replaces the old card, and two rotations leave exactly one live card', async () => {
+      const target = await tableOf(b.freshQrToken);
+      const outcome = await staff(b.owner, async () => {
+        const first = (await db.query('select rotate_table_qr_code($1) token', [target])).rows[0].token as string;
+        // A guest holding the replaced card is told it is revoked, not "unknown".
+        await db.query('set local role anon');
+        const replaced = (await db.query('select status from open_table_session($1,$2)',
+          [b.freshQrToken, 'c'.repeat(64)])).rows[0].status as string;
+        await db.query('set local role authenticated');
+        const second = (await db.query('select rotate_table_qr_code($1) token', [target])).rows[0].token as string;
+        return { first, second, replaced, live: await liveCodes(target) };
+      });
+      expect(outcome.first).not.toBe(b.freshQrToken);
+      expect(outcome.second).not.toBe(outcome.first);
+      expect(outcome.replaced).toBe('revoked');
+      // The invariant the printed card relies on: one live code per table.
+      expect(outcome.live).toBe(1);
+    });
+
+    it('accepts the replacement card and makes rotation idempotent under repeats', async () => {
+      const target = await tableOf(b.freshQrToken);
+      const outcome = await staff(b.owner, async () => {
+        const token = (await db.query('select rotate_table_qr_code($1) token', [target])).rows[0].token as string;
+        await db.query('set local role anon');
+        const opened = (await db.query('select status from open_table_session($1,$2)',
+          [token, 'd'.repeat(64)])).rows[0].status as string;
+        await db.query('set local role authenticated');
+        // Retiring twice is a no-op the second time, not an error: staff may
+        // press it again after a timeout and must not see a scary failure.
+        await db.query('select retire_table_qr_code($1)', [target]);
+        await db.query('select retire_table_qr_code($1)', [target]);
+        return { opened, live: await liveCodes(target) };
+      });
+      expect(outcome.opened).toBe('opened');
+      expect(outcome.live).toBe(0);
+    });
+
+    it("lets the outlet's owner rotate and retire its own code", async () => {
+      const target = await tableOf(b.freshQrToken);
+      const outcome = await staff(b.owner, async () => {
+        const token = (await db.query('select rotate_table_qr_code($1) token', [target])).rows[0].token as string;
+        const afterRotate = await liveCodes(target);
+        await db.query('select retire_table_qr_code($1)', [target]);
+        return { token, afterRotate, afterRetire: await liveCodes(target) };
+      });
+      expect(outcome.token).toMatch(/^[A-Za-z0-9_-]{8,128}$/);
+      expect(outcome.token).not.toBe(b.freshQrToken);
+      // Rotate revokes the old cards and installs exactly one new code; retire
+      // leaves none.
+      expect(outcome.afterRotate).toBe(1);
+      expect(outcome.afterRetire).toBe(0);
+    });
+  });
+
   describe('SECURITY DEFINER trigger functions', () => {
     it('grants EXECUTE on no trigger function to any runtime role', async () => {
       // PostgreSQL does not consult EXECUTE for trigger-fired functions

@@ -49,7 +49,7 @@ export default function StaffError({
       </h1>
       <p className="mt-3 text-[13.5px] leading-[1.6] text-gink-64">
         This page could not be loaded. The navigation on the left is unaffected, so you can open
-        another screen, or try this one again. Nothing was saved by the attempt that failed.
+        another screen, or try loading this one again. If you just recorded money or issued a receipt, check the saved record before retrying.
       </p>
 
       <div className="mt-5 flex flex-wrap items-center gap-2">

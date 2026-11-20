@@ -29,6 +29,11 @@ describe('readUndoItem', () => {
     expect(readUndoItem(valid)).toEqual(valid);
   });
 
+  it('retains a deleted item’s explicit alcoholic flag', () => {
+    expect(readUndoItem({ ...valid, isAlcoholic: true })?.isAlcoholic).toBe(true);
+    expect(readUndoItem({ ...valid, isAlcoholic: 'true' })?.isAlcoholic).toBeUndefined();
+  });
+
   it('rejects anything that is not an object', () => {
     for (const bad of [null, undefined, 'x', 42, true, []]) {
       expect(readUndoItem(bad)).toBeNull();

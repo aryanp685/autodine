@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { parseInvoice, type ReceiptData } from '@/lib/db/invoice';
-import type { RestaurantInvoice, RestaurantInvoiceLine } from '@/lib/db/types';
+import { parseInvoice, type InvoiceSnapshot, type ReceiptData } from '@/lib/db/invoice';
+import type { RestaurantInvoiceLine } from '@/lib/db/types';
 
 type JsonObject = Record<string, unknown>;
 const object = (value: unknown): JsonObject =>
@@ -24,43 +24,40 @@ export async function getSharedInvoiceData(token: string): Promise<ReceiptData |
   const rawInvoice = object(payload.invoice);
   const invoiceId = text(rawInvoice.id);
   const issuedAt = text(rawInvoice.issued_at);
-  if (!invoiceId || !issuedAt) return null;
+  // Treat data from a pre-upgrade API the same as the current RPC. A valid
+  // bearer link does not lift an IRN hold or turn a voided document live.
+  if (!invoiceId || !issuedAt || rawInvoice.status !== 'issued'
+      || (rawInvoice.document_type === 'gst_tax_invoice' && rawInvoice.irp_status !== 'not_required')) return null;
 
-  const invoice = {
+  // A rolling upgrade may still see the earlier RPC projection. Do not
+  // pass optional buyer contact or master metadata to the browser.
+  const customer = object(rawInvoice.customer_snapshot);
+  const { name, gstin, address, state_code, recipient_type, location, pincode, delivery_address } = customer;
+  const invoice: InvoiceSnapshot = {
     id: invoiceId,
     restaurant_id: '',
     order_session_id: text(rawInvoice.order_session_id),
     invoice_number: text(rawInvoice.invoice_number),
     financial_year: text(rawInvoice.financial_year),
-    sequence_number: 0,
     document_type:
       rawInvoice.document_type === 'gst_tax_invoice' ? 'gst_tax_invoice'
       : rawInvoice.document_type === 'bill_of_supply' ? 'bill_of_supply'
       : 'receipt',
-    irp_status:
-      rawInvoice.irp_status === 'pending' || rawInvoice.irp_status === 'generated'
-      || rawInvoice.irp_status === 'failed' || rawInvoice.irp_status === 'cancelled'
-        ? rawInvoice.irp_status
-        : 'not_required',
-    irn: nullableText(rawInvoice.irn),
+    irp_status: 'not_required',
     gst_snapshot: rawInvoice.gst_snapshot ?? null,
-    status: rawInvoice.status === 'voided' ? 'voided' : 'issued',
+    status: 'issued',
     issued_at: issuedAt,
     issued_by: null,
     table_label_snapshot: nullableText(rawInvoice.table_label_snapshot),
     session_opened_at: text(rawInvoice.session_opened_at),
     session_closed_at: text(rawInvoice.session_closed_at),
     seller_snapshot: rawInvoice.seller_snapshot,
-    customer_snapshot: rawInvoice.customer_snapshot ?? null,
+    customer_snapshot: { name, gstin, address, state_code, recipient_type, location, pincode, delivery_address },
     totals_snapshot: rawInvoice.totals_snapshot,
     payment_snapshot: rawInvoice.payment_snapshot,
-    source_order_ids: [],
     supersedes_invoice_id: nullableText(rawInvoice.supersedes_invoice_id),
-    voided_at: null,
-    voided_by: null,
     void_reason: nullableText(rawInvoice.void_reason),
-    created_at: issuedAt,
-  } as RestaurantInvoice;
+  };
 
   const lines = Array.isArray(payload.lines)
     ? payload.lines.map((value, index) => {

@@ -40,7 +40,7 @@ export const MAX_OUTLETS_PER_OWNER = 5;
 export type OutletOption = {
   id: string;
   name: string;
-  /** owner | manager | cashier | kitchen, as the memberships row says. */
+  /** owner | manager | cashier | kitchen | waiter, as the memberships row says. */
   role: string;
 };
 

@@ -148,11 +148,11 @@ test.describe('totals recomputed from the menu', () => {
     await expect(summary.getByText('₹598')).toBeVisible();
     await expect(summary.getByText('Taxes', { exact: true })).toBeVisible();
     await expect(page.getByText(/no tax rate configured/)).toBeVisible();
-    await expect(summary.getByText('₹30')).toBeVisible();
+    await expect(summary.getByText('₹29.90')).toBeVisible();
     // Exact: "Subtotal" also contains "Total", and two matches is a strict-
     // mode failure waiting to happen.
     await expect(summary.getByText('Total', { exact: true })).toBeVisible();
-    await expect(summary.getByText('₹628')).toBeVisible();
+    await expect(summary.getByText('₹627.90')).toBeVisible();
   });
 });
 
@@ -182,9 +182,9 @@ test.describe('submitting an order', () => {
     await page.locator('[data-place-order]').first().click();
     await expect(page).toHaveURL(/\/menu\/cart\?error=/);
 
-    await expect(page.getByText('That order was not placed')).toBeVisible();
+    await expect(page.getByText('Order not confirmed')).toBeVisible();
     await expect(page.getByText('Ordering is not available right now.')).toBeVisible();
-    await expect(page.getByText('Nothing has been charged, and your cart is still here.')).toBeVisible();
+    await expect(page.getByText('No payment was taken online. Your cart is still here.')).toBeVisible();
     await expect(page.getByText('Hara Bhara Kebab').first()).toBeVisible();
   });
 
@@ -231,7 +231,7 @@ test.describe('submitting an order', () => {
     // Exactly one submission went out, and the honest demo failure is the
     // outcome it reached.
     await expect(page).toHaveURL(/\/menu\/cart\?error=/);
-    await expect(page.getByText('That order was not placed')).toBeVisible();
+    await expect(page.getByText('Order not confirmed')).toBeVisible();
   });
 });
 

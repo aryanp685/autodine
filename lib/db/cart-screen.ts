@@ -10,10 +10,11 @@
  * other screens use, and when there is no active restaurant at the slug.
  */
 
+import { dbErrorReference } from '@/lib/db/error-reference';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import type { MenuItemPrice } from '@/lib/cart-pricing';
-import { requireTaxRateBps } from '@/lib/pricing';
+import { requireTaxRateBps, type TaxTreatment } from '@/lib/pricing';
 import { readPublicRestaurant } from '@/lib/db/public-restaurant';
 
 const ADDON_PRICING_READ_ERROR = 'Could not load add-on pricing. Please try again.';
@@ -23,13 +24,14 @@ export type CartScreenData = {
   restaurantName: string;
   /** The restaurant's explicit rate, in basis points; never a demo fallback. */
   taxRateBps: number;
+  taxTreatment: TaxTreatment;
   /**
    * The published brand state (migration 20261103000100). Absent when the
    * restaurant has no brand profile — the screens then paint the product's
    * own style through lib/branding/guest-theme.ts.
    */
   brandState?: { brandThemeEnabled?: boolean | null; brandTheme?: unknown | null } | null;
-  /** Only items a diner can actually order right now. */
+  /** Published items and their availability under the outlet’s billing mode. */
   items: MenuItemPrice[];
 };
 
@@ -42,8 +44,19 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
 
   const { data: restaurant, error: restaurantError } = await readPublicRestaurant(supabase, slug);
 
-  if (restaurantError) throw new Error(`Could not load restaurant: ${restaurantError.message}`);
+  if (restaurantError) throw new Error(`Could not load restaurant: ${dbErrorReference(restaurantError)}`);
   if (!restaurant || !restaurant.is_active) return null;
+
+  // Do not fall back to a legacy charge if this RPC is missing or fails:
+  // the database may be pricing the same outlet under a GST profile.
+  const { data: quote, error: quoteError } = await supabase.rpc('public_order_pricing', { p_slug: restaurant.slug }).maybeSingle();
+  if (quoteError || !quote) throw new Error('This outlet’s prices could not be loaded. Please try again or ask staff.');
+  const taxRateBps = requireTaxRateBps(quote.tax_rate_bps);
+  const taxTreatment = quote.tax_treatment;
+  if (!(taxTreatment === 'exclusive' || (taxTreatment === 'none' && taxRateBps === 0)
+    || (taxTreatment === 'inclusive' && (taxRateBps === 500 || taxRateBps === 1800)))) {
+    throw new Error('This outlet’s prices could not be loaded. Please try again or ask staff.');
+  }
 
   /**
    * Only dishes on a PUBLISHED menu are priced here.
@@ -64,7 +77,7 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
     .eq('restaurant_id', restaurant.id)
     .eq('is_published', true);
 
-  if (menusError) throw new Error(`Could not load the menus: ${menusError.message}`);
+  if (menusError) throw new Error(`Could not load the menus: ${dbErrorReference(menusError)}`);
 
   const menuIds = (menuRows ?? []).map((row) => row.id as string);
 
@@ -76,12 +89,12 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
         .in('menu_id', menuIds)
     : { data: [], error: null };
 
-  if (categoriesError) throw new Error(`Could not load the menus: ${categoriesError.message}`);
+  if (categoriesError) throw new Error(`Could not load the menus: ${dbErrorReference(categoriesError)}`);
 
   const categoryIds = (categoryRows ?? []).map((row) => row.id as string);
 
-  // Sold-out items are left out entirely. A dish a diner cannot order should
-  // not be priced on a bill they are about to be asked to pay.
+  // Keep a sold-out or blocked dish so an existing cart can explain what is
+  // unavailable. The cart never prices unavailable items.
   //
   // Portions come along with each item, in the same query. They have to: a
   // cart line names a portion, and a bill that cannot resolve it falls back
@@ -91,13 +104,14 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
   const { data: rows, error } = categoryIds.length
     ? await supabase
         .from('items')
-        .select('id, name, price_paise, is_veg, is_available, image_url, item_variants(id, name, price_paise, sort_order)')
+        .select('id, name, price_paise, is_veg, is_available, is_alcoholic, image_url, item_variants(id, name, price_paise, sort_order)')
+        .eq('restaurant_id', restaurant.id)
         .in('category_id', categoryIds)
         .eq('is_available', true)
         .order('sort_order', { ascending: true })
     : { data: [], error: null };
 
-  if (error) throw new Error(`Could not load the menu: ${error.message}`);
+  if (error) throw new Error(`Could not load the menu: ${dbErrorReference(error)}`);
 
   /**
    * Add-ons, with their prices and their group limits.
@@ -194,7 +208,8 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
   return {
     slug: restaurant.slug as string,
     restaurantName: (restaurant.name as string) ?? 'Your table',
-    taxRateBps: requireTaxRateBps(restaurant.tax_rate_bps),
+    taxRateBps,
+    taxTreatment,
     brandState: {
       brandThemeEnabled: restaurant.brand_theme_enabled === true,
       brandTheme: (restaurant as Record<string, unknown>).brand_theme ?? null,
@@ -209,7 +224,7 @@ export async function getCartScreenData(slug?: string): Promise<CartScreenData |
         ...(typeof img === 'string' && img ? { img } : {}),
         pricePaise: Number(r.price_paise ?? 0),
         isVeg: r.is_veg === true ? true : r.is_veg === false ? false : null,
-        isAvailable: Boolean(r.is_available),
+        isAvailable: Boolean(r.is_available) && (taxTreatment === 'exclusive' || r.is_alcoholic === false),
         ...(variants.length ? { variants } : {}),
         ...(addons.length ? { addons } : {}),
       };
@@ -238,7 +253,7 @@ export async function getRestaurantName(slug?: string | null): Promise<string | 
 
   const { data, error } = await readPublicRestaurant(supabase, slug);
 
-  if (error) throw new Error(`Could not load restaurant: ${error.message}`);
+  if (error) throw new Error(`Could not load restaurant: ${dbErrorReference(error)}`);
   if (!data || !data.is_active) return null;
 
   const name = (data as { name?: string | null }).name;

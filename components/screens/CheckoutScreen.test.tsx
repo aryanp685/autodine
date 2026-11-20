@@ -35,6 +35,8 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
+vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn() }) }));
+
 vi.mock('@/components/CartProvider', () => ({
   useCart: () => mocks.cart,
 }));
@@ -73,6 +75,16 @@ describe('checkout payment step', () => {
     expect(html).not.toContain('GST 5% · sample');
   });
 
+  it.each([['inclusive', 500, 'GST 5% included'], ['inclusive', 1800, 'GST 18% included'], ['none', 0, 'GST collected']] as const)(
+    'shows menu gross unchanged for %s at %i bps without adding a payment choice', (taxTreatment, taxRateBps, label) => {
+      const html = renderToStaticMarkup(<Checkout slug="maddi" taxTreatment={taxTreatment} taxRateBps={taxRateBps} items={[{ ...items[0], pricePaise: 46901 }]} />);
+      expect(html).toContain(label);
+      expect(html).toMatch(/<dt>Total payable<\/dt><dd[^>]*>₹938\.02<\/dd>/);
+      expect(html).toContain('At the counter');
+      expect(html).not.toMatch(/Pay online|Choose a payment method/i);
+    },
+  );
+
   it('states one way to pay instead of offering two dead buttons', () => {
     const html = render();
 
@@ -86,7 +98,7 @@ describe('checkout payment step', () => {
 
   it('says what happens to the order while the bill is unpaid', () => {
     const html = render();
-    expect(html).toContain('goes to the kitchen straight away');
+    expect(html).toContain('staff confirmation');
     expect(html).toContain('marked payment pending');
   });
 
@@ -111,7 +123,7 @@ describe('checkout action bar', () => {
     expect(html).toContain('form="co-place-order"');
     // The total appears in the bar as well as the bill, so the guest deciding
     // at the bottom of a long order sees the number they are agreeing to.
-    expect(html).toMatch(/data-co-bar[\s\S]*?₹985/);
+    expect(html).toMatch(/data-co-bar[\s\S]*?₹984\.90/);
   });
 
   it('is not rendered when there is nothing to order', () => {
@@ -163,7 +175,7 @@ describe('checkout action bar', () => {
         />,
       );
 
-      expect(html).toContain('has sold out since you added it');
+      expect(html).toContain('is no longer available to order');
       expect(html).toContain('/menu/cart');
       expect(html).toContain('Nothing to order yet');
     } finally {
@@ -213,7 +225,7 @@ describe('checkout shows what fell off the bill', () => {
     const html = renderWith(soldOut);
     mocks.cart.lines = [{ itemId: 'i1', qty: 2 }];
 
-    expect(html).toContain('sold out');
+    expect(html).toContain('no longer available to order');
     expect(html).not.toContain('no longer on the menu');
   });
 });

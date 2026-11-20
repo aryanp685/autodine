@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { Cashier } from '@/components/screens/CashierScreen';
 import { DashboardBar } from '@/components/DashboardBar';
-import { AutoRefresh } from '@/components/owner/AutoRefresh';
 import { getCashierScreenData } from '@/lib/db/cashier-screen';
 import { getOutletBar } from '@/lib/db/outlet-bar';
 
@@ -49,19 +48,8 @@ export default async function CashierPage({
    */
   return (
     <>
-      {/*
-        A guest pays at the counter, so the counter has to see the bill without
-        anybody pressing reload. Until now the queue only moved when a cashier
-        settled something (that path refreshes itself) or a person reloaded the
-        page -- which meant a ticket could sit unseen while its guest waited.
-
-        Twenty seconds, not the dashboard's forty-five: this is money walking
-        towards a till, not an overview. AutoRefresh refuses to fire while the
-        tab is hidden, while somebody is typing, or in demo mode, so a counter
-        left open overnight does not query a database for no one.
-      */}
-      <AutoRefresh enabled={Boolean(data) && !data?.blocked} seconds={20} />
       <Cashier
+        key={data?.outletId ?? 'none'}
         data={data ?? undefined}
         focus={focus}
         nav={

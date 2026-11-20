@@ -48,7 +48,7 @@ describe('reading a status', () => {
       supabase,
     );
 
-    expect(supabase.rpc).toHaveBeenCalledWith('get_public_order', {
+    expect(supabase.rpc).toHaveBeenCalledWith('get_guest_order_status', {
       p_slug: 'kings-of-kings',
       p_code: 'KI-ABC12',
       p_token: TOKEN,

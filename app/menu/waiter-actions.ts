@@ -15,8 +15,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * The browser supplies only an idempotency key; the database resolves the
  * restaurant/table from the bearer token and makes double taps harmless.
  */
-export async function callWaiterAction(requestKey: string): Promise<CallWaiterResult> {
-  if (!UUID.test(requestKey)) {
+export async function callWaiterAction(requestKey: string, slug: string, table: string): Promise<CallWaiterResult> {
+  if (!UUID.test(requestKey) || typeof slug !== 'string' || typeof table !== 'string' || !slug || !table || slug.length > 128 || table.length > 128) {
     return { ok: false, error: 'We could not send that request. Please try again.' };
   }
 
@@ -31,13 +31,15 @@ export async function callWaiterAction(requestKey: string): Promise<CallWaiterRe
       return { ok: false, error: 'The restaurant could not be reached. Please tell a staff member.' };
     }
 
-    const { data, error } = await supabase.rpc('call_waiter', {
+    const { data, error } = await supabase.rpc('call_verified_waiter_at', {
+      p_slug: slug,
+      p_table_label: table,
       p_session_token: session.token,
       p_request_key: requestKey,
     });
 
     if (error) {
-      if (error.code === 'P0001') return { ok: false, error: error.message };
+      if (error.code === 'P0001') return { ok: false, error: 'Your table session has expired. Scan the code on your table again.' };
       console.error('[callWaiterAction] request failed', { code: error.code });
       return { ok: false, error: 'We could not reach the restaurant. Please tell a staff member.' };
     }

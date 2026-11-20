@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { DashboardBar } from '@/components/DashboardBar';
 import { isWideSection, sectionForPathname } from '@/components/shell-links';
 import type { OutletBar } from '@/lib/outlets';
+import { OperationalRealtime, type LiveSurface } from '@/components/owner/OperationalRealtime';
 import { PageMotion } from '@/components/owner/PageMotion';
 
 /**
@@ -58,6 +59,15 @@ export function useInStaffShell(): boolean {
   return useContext(StaffShellContext);
 }
 
+const LIVE_SURFACES: Record<string, { surface: LiveSurface; roles?: string[] }> = {
+  '/kitchen': { surface: 'kitchen', roles: ['kitchen', 'manager', 'owner'] },
+  '/cashier': { surface: 'counter', roles: ['cashier', 'manager', 'owner'] },
+  '/waiter': { surface: 'floor' },
+  '/dashboard/tables': { surface: 'floor', roles: ['manager', 'owner'] },
+  '/dashboard': { surface: 'owner', roles: ['manager', 'owner'] },
+  '/dashboard/orders': { surface: 'owner', roles: ['cashier', 'manager', 'owner'] },
+};
+
 export function StaffShell({
   outlet,
   signOut = true,
@@ -70,6 +80,8 @@ export function StaffShell({
 }) {
   const pathname = usePathname();
   const wide = isWideSection(pathname);
+  const membership = outlet?.outlets.find(row => row.id === outlet.activeId);
+  const live = LIVE_SURFACES[pathname];
 
   return (
     <StaffShellContext.Provider value={true}>
@@ -96,6 +108,9 @@ export function StaffShell({
              * is alive, so a blocked bundle leaves a visible page rather than
              * an invisible one.
              */}
+            {membership && live && (!live.roles || live.roles.includes(membership.role)) && (
+              <OperationalRealtime key={`${membership.id}:${pathname}`} outletId={membership.id} surface={live.surface} />
+            )}
             <PageMotion>{children}</PageMotion>
           </main>
         </div>

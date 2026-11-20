@@ -61,7 +61,7 @@ describe('VerifyToOrderScreen', () => {
 
     expect(html).toContain('Paneer Tikka');
     expect(html).toContain('Total payable');
-    expect(html).toContain('Table T3');
+    expect(html).toContain('T3');
   });
 
   it('says exactly where to find the code', () => {

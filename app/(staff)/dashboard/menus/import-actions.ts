@@ -160,6 +160,7 @@ export async function createImportedMenuAction(payload: unknown): Promise<Import
             description: item.description,
             price_paise: item.pricePaise,
             is_veg: item.isVeg,
+            is_alcoholic: item.isAlcoholic === true,
             is_available: true,
             sort_order: order,
           })),

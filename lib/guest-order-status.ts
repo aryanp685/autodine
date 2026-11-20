@@ -1,3 +1,5 @@
+import { revisionNumber } from './realtime-revisions';
+
 /**
  * What a guest is told about their order, in one place.
  *
@@ -215,6 +217,7 @@ export type OrderStatusSnapshot = {
   paymentStatus: string;
   placedAt: string;
   checkedAt: string;
+  revision?: string;
 };
 
 /**
@@ -237,6 +240,7 @@ export function parseOrderStatusSnapshot(value: unknown): OrderStatusSnapshot | 
 
   return {
     status,
+    ...(revisionNumber(row.revision) !== null ? { revision: String(row.revision) } : {}),
     awaitingConfirmation: row.awaitingConfirmation === true,
     paymentStatus: typeof row.paymentStatus === 'string' ? row.paymentStatus : 'pending',
     placedAt: typeof row.placedAt === 'string' ? row.placedAt : '',

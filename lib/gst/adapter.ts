@@ -1,35 +1,36 @@
-/**
- * Adapter selection for e-Invoice (IRP) issuance.
- *
- * The environment is the ONLY place a provider is selected, and it is
- * fail-closed: without AUTODINE_IRP_PROVIDER explicitly set, no adapter
- * exists and every attempt refuses before touching the database. Today the
- * only implementation is the offline sandbox (provider id 'sandbox',
- * credential-free, no network). Naming any other provider is an explicit
- * error, not a fallback — wiring a live NIC/GSP adapter is an owner decision
- * and must ship as its own reviewed change.
- */
+/** Current application does not resolve a network adapter from environment
+ * variables, even if someone sets a provider name or a credential. */
+/** The hermetic CI rehearsal builds the app in production mode (a development
+ * server cannot run under the strict CSP) but is explicitly not a deployment:
+ * same flags as the demo build, a loopback data origin and an opt-in
+ * simulation switch. No real project URL can qualify. */
+export function isHermeticIrpRehearsal(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (!(env.GITHUB_ACTIONS === 'true' && env.CI === 'true' && env.AUTODINE_TEST_DEMO_BUILD === 'true'
+    && env.VERCEL_ENV === 'test')) return false;
+  try {
+    return ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(env.NEXT_PUBLIC_SUPABASE_URL ?? '').hostname);
+  } catch { return false; }
+}
 
-import { SandboxIrpAdapter, SANDBOX_PROVIDER_ID } from './irp/sandbox';
-import type { IrpAdapter } from './irp/types';
-
-export type IrpAdapterResolution =
-  | { ok: true; adapter: IrpAdapter }
-  | { ok: false; error: string };
-
-export function getIrpAdapter(env: NodeJS.ProcessEnv = process.env): IrpAdapterResolution {
-  const provider = env.AUTODINE_IRP_PROVIDER?.trim();
-  if (!provider) {
-    return {
-      ok: false,
-      error: 'E-invoicing is not enabled on this deployment (AUTODINE_IRP_PROVIDER is unset). Nothing was attempted.',
-    };
+export function getIrpPreflightGate(env: NodeJS.ProcessEnv = process.env): { ok: true } | { ok: false; error: string } {
+  if (env.AUTODINE_IRP_PROVIDER !== 'sandbox'
+    || ['production', 'preview'].includes(env.VERCEL_ENV ?? '')) {
+    return { ok: false, error: 'Offline IRP preflight is disabled for this deployment. No provider was contacted.' };
   }
-  if (provider === SANDBOX_PROVIDER_ID) {
-    return { ok: true, adapter: new SandboxIrpAdapter() };
+  const localOnly = ['development', 'test'].includes(env.NODE_ENV ?? '')
+    || (env.NODE_ENV === 'production' && env.AUTODINE_IRP_SIMULATION === 'true' && isHermeticIrpRehearsal(env));
+  if (!localOnly) {
+    return { ok: false, error: 'Offline IRP preflight is disabled for this deployment. No provider was contacted.' };
   }
-  return {
-    ok: false,
-    error: `Provider '${provider}' is not wired into this build. Only 'sandbox' (offline, credential-free) exists; a live NIC/GSP adapter needs the owner's explicit approval and reviewed code.`,
-  };
+  return { ok: true };
+}
+
+/** Synthetic queue controls are not enabled merely by selecting the old
+ * preflight flag. A local database and explicit simulation opt-in are needed. */
+export function isLocalIrpSimulation(env: NodeJS.ProcessEnv=process.env): boolean {
+  if (!getIrpPreflightGate(env).ok || env.AUTODINE_IRP_SIMULATION!=='true') return false;
+  try {
+    const base=new URL(env.NEXT_PUBLIC_SUPABASE_URL??'');
+    return ['127.0.0.1','localhost','[::1]'].includes(base.hostname) && ['http:','https:'].includes(base.protocol);
+  } catch { return false; }
 }

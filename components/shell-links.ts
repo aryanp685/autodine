@@ -24,6 +24,7 @@ export type DashboardSection =
   | 'invoices'
   | 'kitchen'
   | 'counter'
+  | 'waiter'
   | 'reports'
   | 'subscription'
   | 'settings';
@@ -61,6 +62,7 @@ export const DASHBOARD_LINKS: ReadonlyArray<ShellLink> = [
   { key: 'invoices', label: 'Invoices', href: '/dashboard/invoices', group: 'Service', roles: COUNTER },
   { key: 'kitchen', label: 'Kitchen', href: '/kitchen', group: 'Service', roles: KITCHEN },
   { key: 'counter', label: 'Counter', href: '/cashier', group: 'Service', roles: COUNTER },
+  { key: 'waiter', label: 'Floor service', href: '/waiter', group: 'Service', roles: ['owner', 'manager', 'cashier', 'kitchen', 'waiter'] },
 
   { key: 'menus', label: 'Menus', href: '/dashboard/menus', group: 'Menu', roles: MANAGE },
   { key: 'branding', label: 'Branding', href: '/dashboard/branding', group: 'Menu', roles: MANAGE },

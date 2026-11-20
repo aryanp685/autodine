@@ -1,6 +1,5 @@
 import Link from 'next/link';
-import { inr } from '@/lib/demo-data';
-import { paiseToRupees } from '@/lib/money';
+import { formatQuoteMoney } from '@/lib/cart-pricing';
 import { FadeUp, FadeUpItem, PopIn, SpringUp } from '@/components/MotionBits';
 import { GuestOrderEditor } from '@/components/screens/GuestOrderEditor';
 import { OrderMoreLink } from '@/components/OrderMoreLink';
@@ -184,7 +183,6 @@ export function OrderPlacedScreen({
   token,
   slug,
   canCallWaiter = false,
-  cartClearing = false,
 }: {
   brandState?: GuestBrandState | null;
   data: OrderScreenData | null;
@@ -195,7 +193,6 @@ export function OrderPlacedScreen({
   /** Only a current verified table session may request a waiter. */
   canCallWaiter?: boolean;
   /** The just-placed cart must finish clearing before the next-round CTA navigates. */
-  cartClearing?: boolean;
 }) {
   const paint = guestBrandStyle(brandState);
   if (!data) {
@@ -240,8 +237,8 @@ export function OrderPlacedScreen({
            screen used to offer no way back to the menu at all. */
         <SpringUp className="w-full">
           <div className="grid gap-1.5">
-            {canCallWaiter && data.tableLabel ? <CallWaiterButton /> : null}
-            <OrderMoreLink href={menuHref} waitForEmptyCart={cartClearing} />
+            {canCallWaiter && data.tableLabel ? <CallWaiterButton key={`${slug}:${data.tableLabel}`} slug={slug ?? ''} table={data.tableLabel} /> : null}
+            <OrderMoreLink href={menuHref} />
           </div>
         </SpringUp>
       }
@@ -333,9 +330,9 @@ export function OrderPlacedScreen({
         ) : (
           <>
             <OrderTrack prepStatus={data.prepStatus} />
-            {slug && token ? <OrderStatusRefresh slug={slug} code={data.code} token={token}
+            {slug && token && !(data.prepStatus === 'served' && data.paymentStatus !== 'pending') ? <OrderStatusRefresh slug={slug} code={data.code} token={token}
               status={data.prepStatus} awaitingConfirmation={data.awaitingConfirmation}
-              paymentStatus={data.paymentStatus} /> : null}
+              paymentStatus={data.paymentStatus} revision={data.revision} /> : null}
           </>
         )}
       </header>
@@ -350,6 +347,7 @@ export function OrderPlacedScreen({
         */}
         <GuestOrderEditor
           orderId={data.id}
+          revision={data.revision}
           token={token ?? ''}
           lines={data.lines}
           canEdit={Boolean(token) && data.canGuestChange}
@@ -390,15 +388,15 @@ export function OrderPlacedScreen({
           <dl className="text-[13.5px]">
             <div className="flex items-baseline justify-between py-1 text-gink-64">
               <dt>Subtotal</dt>
-              <dd className="tnum">{inr(paiseToRupees(data.subtotalPaise))}</dd>
+              <dd className="tnum">{formatQuoteMoney(data.subtotalPaise)}</dd>
             </div>
             <div className="flex items-baseline justify-between py-1 text-gink-64">
-              <dt>Taxes</dt>
-              <dd className="tnum">{inr(paiseToRupees(data.taxPaise))}</dd>
+              <dt>{data.taxPaise > 0 && data.totalPaise === data.subtotalPaise ? 'Included tax' : 'Taxes'}</dt>
+              <dd className="tnum">{formatQuoteMoney(data.taxPaise)}</dd>
             </div>
             <div className="mt-1.5 flex items-baseline justify-between border-t border-hair pt-2.5 text-[16px] font-semibold text-gink">
               <dt>Total</dt>
-              <dd className="tnum">{inr(paiseToRupees(data.totalPaise))}</dd>
+              <dd className="tnum">{formatQuoteMoney(data.totalPaise)}</dd>
             </div>
           </dl>
 
@@ -422,7 +420,9 @@ export function OrderPlacedScreen({
               </p>
             </>
           ) : (
-            <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">Paid. Thank you.</p>
+            <p className="mt-2.5 text-[11.5px] leading-[1.5] text-gink-46">
+              {data.paymentStatus === 'paid' ? <><span>Paid. Thank you.</span> Ask staff for your final receipt.</> : 'Payment is not confirmed here. Please check with staff.'}
+            </p>
           )}
           </section>
         </FadeUp>

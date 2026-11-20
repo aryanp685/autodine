@@ -22,6 +22,7 @@ import {
   saveGuestVerificationAction,
   saveTaxAction,
 } from '@/app/(staff)/dashboard/settings/actions';
+import { NOT_READY } from '@/lib/db/gst-settings';
 import { GstSettingsPanel } from '@/components/screens/GstSettingsPanel';
 import { inr } from '@/lib/demo-data';
 import { paiseToRupees } from '@/lib/money';
@@ -235,6 +236,9 @@ export function SettingsScreen({
   };
   const taxBps = data?.taxRateBps ?? 0;
   const example = taxExamplePaise(taxBps);
+  const gst = data?.gst ?? NOT_READY;
+  const gstOutletId = data?.activeOutletId ?? '';
+  const legacyTaxActive = gst.mode === 'off' && !gst.fssaiNumber;
   const disabled = !live || !canEdit;
   const noPublishedMenu = live && (data?.publishedMenus ?? 0) === 0;
 
@@ -376,10 +380,11 @@ export function SettingsScreen({
                       />
                     </Field>
 
+                    {legacyTaxActive ? (
                     <Field
-                      label="GSTIN"
+                      label="Legacy GSTIN"
                       htmlFor="settings-gstin"
-                      hint="Owner-only billing detail. The 15-character format is checked here; saving a GSTIN does not enable GST tax invoices."
+                      hint="Not used by GST billing. Saving this historical field does not enable GST tax invoices."
                     >
                       <input
                         id="settings-gstin"
@@ -393,6 +398,7 @@ export function SettingsScreen({
                         placeholder="22AAAAA0000A1Z5"
                       />
                     </Field>
+                    ) : null}
                   </div>
                   </FieldGroup>
 
@@ -455,16 +461,20 @@ export function SettingsScreen({
 
               <div className="flex flex-col gap-4">
                 <Panel
-                  title="Tax"
-                  meta={taxBps === 0 ? '0% — nothing added' : `${formatTaxPercent(taxBps)}%`}
+                  title="Legacy receipt tax"
+                  meta={!legacyTaxActive ? 'Inactive after GST onboarding' : taxBps === 0 ? '0% — nothing added' : `${formatTaxPercent(taxBps)}%`}
                   bodyClassName="px-5 py-5"
                 >
                   <p className="m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
-                    The existing per-order tax rate added on top of menu prices. Only the owner can
-                    change this billing setting; AutoDine does not infer a rate.
+                    The existing per-order rate applies only to legacy billing, not to any reviewed GST or No-GST profile.
+                    It does not configure a GST profile.
                   </p>
 
-                  {taxBps === 0 ? (
+                  {!legacyTaxActive ? (
+                    <Notice tone="plain" label="GST controls pricing" className="mt-3 mb-0">
+                      This stored legacy rate is not used for GST tax invoices, unregistered retail bills or Composition bills.
+                    </Notice>
+                  ) : taxBps === 0 ? (
                     <Notice tone="due" label="Tax is 0%." className="mt-3 mb-0">
                       New orders currently use the menu price with no tax.
                     </Notice>
@@ -474,11 +484,6 @@ export function SettingsScreen({
                       — {inr(100)} plus {inr(paiseToRupees(example.taxPaise))} tax.
                     </Notice>
                   )}
-
-                  <Notice tone="plain" label="GST tax invoices are not enabled" className="mt-3 mb-0">
-                    This bill rate does not activate GST invoicing. GST tax invoices remain unavailable
-                    until approved tax rules are supplied; ordinary receipts and existing billing are unchanged.
-                  </Notice>
 
                   <form action={saveTaxAction} className="mt-3.5 flex flex-col gap-3">
                     <Field
@@ -501,27 +506,30 @@ export function SettingsScreen({
                         title="Enter a percentage from 0 to 30 with up to two decimal places."
                         maxLength={7}
                         defaultValue={formatTaxPercent(taxBps)}
-                        disabled={disabled || data?.role !== 'owner'}
+                        disabled={disabled || data?.role !== 'owner' || !legacyTaxActive}
                         required
                       />
                     </Field>
 
                     <div>
-                      <SubmitButton pendingLabel="Saving rate…" disabled={disabled || data?.role !== 'owner'} tone="solid">
+                      <SubmitButton pendingLabel="Saving rate…" disabled={disabled || data?.role !== 'owner' || !legacyTaxActive} tone="solid">
                         Save tax rate
                       </SubmitButton>
                     </div>
                   </form>
 
                   <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
-                    Orders already placed keep the tax they were charged — a bill is a record of the
-                    rate at that moment, not a live calculation. New orders use the new rate
-                    immediately.
+                    Orders already placed keep the tax they were charged. A change here affects only new legacy orders.
                   </p>
                 </Panel>
 
                 {/* ------------------------------------------------------ GST billing */}
-                <GstSettingsPanel gst={data?.gst ?? { ready: false, mode: 'off', regularProfile: 'other_than_specified_premises', gstin: '', legalName: '', tradeName: '', address: '', stateCode: '', pan: '', registrationType: 'regular', compositionAcknowledged: false, specifiedPremisesAttested: false, specifiedPremisesEffectiveFrom: '2025-04-01', offDeclared: false, offDeclaredAt: null, precedingFyTurnoverRupees: '', einvoiceLocation: '', einvoicePincode: '', einvoiceHsnSac: '', configVersion: 0, updatedAt: null }} disabled={disabled} />
+                <GstSettingsPanel
+                  key={`${gstOutletId}:${gst.configVersion}`}
+                  gst={gst}
+                  outletId={gstOutletId}
+                  disabled={disabled || data?.role !== 'owner' || data.gstCanWrite !== true}
+                />
 
                 {/* ------------------------------------------- how guests verify */}
                 <Panel

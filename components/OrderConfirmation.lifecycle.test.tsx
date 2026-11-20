@@ -11,7 +11,7 @@ vi.mock('@/lib/order-status-poller', () => ({ createStatusPoller: (deps: PollerD
   return { start: vi.fn(), stop: mocks.stop, pollNow: vi.fn() };
 } }));
 import { CartProvider } from './CartProvider';
-import { ClearCartOnOrder } from './ClearCartOnOrder';
+import { checkoutAttemptKey, finishCheckoutAttempt, saveCheckoutAttempt } from '@/lib/checkout-attempt';
 import { ReorderOffer } from './ReorderOffer';
 import { OrderStatusRefresh } from './OrderStatusRefresh';
 import { cartKey } from '@/lib/cart-storage';
@@ -28,10 +28,12 @@ afterEach(async () => { await act(async () => root.unmount()); host.remove(); })
 
 describe('order confirmation lifecycle', () => {
   it('offers the newly saved cart without requiring a reload and restores quantities', async () => {
-    localStorage.setItem(cartKey('test'), JSON.stringify([{ itemId: 'dish-1', qty: 2 }]));
-    await act(async () => root.render(<CartProvider slug="test"><ClearCartOnOrder clear slug="test" /><ReorderOffer slug="test" /></CartProvider>));
-    // ReorderOffer defers its localStorage re-read one task so it observes the
-    // sibling's remembered-cart write after the clear effect has committed.
+    const attempt = { token: '9f4b6c1e-2d3a-4b5c-8d7e-0a1b2c3d4e5f', lines: [{ itemId: 'dish-1', qty: 2 }], note: '' };
+    const key = checkoutAttemptKey('test', 'table');
+    localStorage.setItem(cartKey('test'), JSON.stringify(attempt.lines));
+    saveCheckoutAttempt(localStorage, key, attempt);
+    expect(finishCheckoutAttempt(localStorage, 'test', key, attempt, 'TE-ABC12')).toBe(true);
+    await act(async () => root.render(<CartProvider slug="test"><ReorderOffer slug="test" /></CartProvider>));
     await act(async () => new Promise<void>((resolve) => window.setTimeout(resolve, 0)));
     expect(localStorage.getItem(cartKey('test'))).toBeNull();
     expect(readLastCart(localStorage, 'test')).toEqual([{ itemId: 'dish-1', qty: 2 }]);
@@ -45,7 +47,7 @@ describe('order confirmation lifecycle', () => {
   it('does not clear a new cart while opening historical orders', async () => {
     const raw = JSON.stringify([{ itemId: 'dish-2', qty: 1 }]);
     localStorage.setItem(cartKey('test'), raw);
-    await act(async () => root.render(<CartProvider slug="test"><ClearCartOnOrder clear={false} slug="test" /><ReorderOffer slug="test" /></CartProvider>));
+    await act(async () => root.render(<CartProvider slug="test"><ReorderOffer slug="test" /></CartProvider>));
     expect(localStorage.getItem(cartKey('test'))).toBe(raw);
     expect(host.querySelector('[data-reorder-button]')).toBeNull();
   });

@@ -1,55 +1,66 @@
 'use client';
 
-/** Refresh only when the server's order state changes. An unchanged status
- * must not replace props under unsaved guest edits. New/editable orders still
- * need polling: the kitchen can start or cancel them at any moment. */
-
-import { useEffect } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { createStatusPoller } from '@/lib/order-status-poller';
 import { readOrderStatus } from '@/components/GuestLiveStatus';
-import type { OrderStatusSnapshot } from '@/lib/guest-order-status';
+import { guestStatus, mayReplaceStatus } from '@/lib/guest-order-status';
+import { revisionNumber } from '@/lib/realtime-revisions';
 
-export function OrderStatusRefresh({ slug, code, token, status, awaitingConfirmation, paymentStatus }: {
+/** An unchanged version never interrupts the editor. A failed RSC refresh
+ * doesn't acknowledge the revision: retry until the page has actually caught up. */
+export function OrderStatusRefresh({ slug, code, token, status, awaitingConfirmation, paymentStatus, revision }: {
   slug: string; code: string; token: string;
-  status: OrderStatusSnapshot['status']; awaitingConfirmation: boolean;
-  paymentStatus: OrderStatusSnapshot['paymentStatus'];
+  status: string; awaitingConfirmation: boolean; paymentStatus: string; revision?: string;
 }) {
   const router = useRouter();
+  const [, startTransition] = useTransition();
+  const [degraded, setDegraded] = useState(false);
   useEffect(() => {
     let alive = true;
-    let refreshing = false;
+    let lastRequest = -Infinity;
+    const refresh = () => {
+      if (!alive || performance.now() - lastRequest < 4_000) return;
+      lastRequest = performance.now();
+      startTransition(() => router.refresh());
+    };
     const poller = createStatusPoller({
-      request: () => readOrderStatus({ slug, code, token }),
-      isHidden: () => document.visibilityState === 'hidden',
+      watchPayment: true, stopAtTerminal: false,
+      request: signal => readOrderStatus({ slug, code, token }, signal),
+      isHidden: () => document.hidden || !navigator.onLine,
       onSnapshot: next => {
-        if (!alive || refreshing) return;
-        if (next.status !== status || next.awaitingConfirmation !== awaitingConfirmation || next.paymentStatus !== paymentStatus) {
-          refreshing = true;
-          router.refresh();
+        const current = revisionNumber(revision);
+        const received = revisionNumber(next.revision);
+        if (current !== null && received !== null) {
+          if (received > current) refresh();
+          return;
         }
+        const before = guestStatus({ prepStatus: status, awaitingConfirmation }).key;
+        const after = guestStatus({ prepStatus: next.status, awaitingConfirmation: next.awaitingConfirmation }).key;
+        if (mayReplaceStatus(before, after) && (before !== after || next.paymentStatus !== paymentStatus)) refresh();
       },
+      onMissing: refresh,
+      onState: state => { if (alive) setDegraded(state.failures > 0); },
     });
-    const onVisible = () => { if (document.visibilityState === 'visible') poller.pollNow(); };
-    const onOnline = () => poller.pollNow();
+    const onVisible = () => { if (!document.hidden) poller.pollNow(); };
+    const onOffline = () => setDegraded(true);
     poller.start();
     document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('online', onOnline);
+    window.addEventListener('online', onVisible);
+    window.addEventListener('offline', onOffline);
     return () => {
       alive = false;
       poller.stop();
       document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('online', onOnline);
+      window.removeEventListener('online', onVisible);
+      window.removeEventListener('offline', onOffline);
     };
-  }, [router, slug, code, token, status, awaitingConfirmation, paymentStatus]);
+  }, [router, slug, code, token, status, awaitingConfirmation, paymentStatus, revision, startTransition]);
 
   return (
-    <p className="inline-flex items-center gap-1.5 text-[11.5px] text-gink-46">
-      <span
-        aria-hidden="true"
-        className="size-1.5 rounded-full bg-grass [animation:gbar_260ms_ease-out_both] motion-reduce:animate-none"
-      />
-      Status updates on its own — no need to reload
+    <p role="status" className="inline-flex items-center gap-1.5 text-[11.5px] text-gink-46">
+      <span aria-hidden="true" className={`size-1.5 rounded-full ${degraded ? 'bg-gink-28' : 'bg-grass'}`} />
+      {degraded ? 'Showing the last received status — checking again' : 'Status updates on its own — no need to reload'}
     </p>
   );
 }
