@@ -272,34 +272,49 @@ jobs:
           AUTODINE_STAGING_PROJECT_REF: ${{ vars.AUTODINE_STAGING_PROJECT_REF }}
         run: |
           # Prove the credential authenticates BEFORE a long backup is attempted.
-          # Only success/failure, the project ref and the server version are
-          # printed: never the URI, password, host or user.
+          # The URI is never passed as an argument (it would surface in `ps` and
+          # in any logged error); it is decomposed into PG* variables instead, and
+          # only the result, the project ref and the server version are printed.
           set -uo pipefail
           node --input-type=module -e '
-          const url = process.env.AUTODINE_BACKUP_SOURCE_URL;
+          const raw = process.env.AUTODINE_BACKUP_SOURCE_URL;
           const expectedRef = process.env.AUTODINE_STAGING_PROJECT_REF;
           const fail = (why) => { console.error(`::error title=Staging source authentication::${why}`); process.exit(1); };
-          if (!url) fail("STAGING_AUTODINE_BACKUP_SOURCE_URL is empty in the protected environment");
-          let parsed;
-          try { parsed = new URL(url); } catch { fail("the configured source URL is not a valid URL"); }
-          if (!/^postgres(ql)?:$/.test(parsed.protocol)) fail("the configured source is not a PostgreSQL URL");
-          if (/pooler\.supabase\.com$/.test(parsed.hostname) && /:6543$/.test(`:${parsed.port}`)) {
-            fail("the configured source is the transaction pooler (port 6543), which cannot give a consistent snapshot");
-          }
-          const ref = (parsed.hostname.match(/^db\.([a-z0-9]+)\.supabase\.co$/) || parsed.username.match(/^postgres\.([a-z0-9]+)$/) || [])[1] || null;
-          const projectRef = ref || (parsed.hostname.split(".")[0] || null);
+          if (!raw) fail("STAGING_AUTODINE_BACKUP_SOURCE_URL is empty in the protected environment");
+          let u;
+          try { u = new URL(raw); } catch { fail("the configured source URL is not a valid URL"); }
+          if (!/^postgres(ql)?:$/.test(u.protocol)) fail("the configured source is not a PostgreSQL URL");
+          if (u.port === "6543") fail("the configured source is the transaction pooler (port 6543); a consistent snapshot is impossible through it");
+          const ref = (u.hostname.match(/^db\.([a-z0-9]+)\.supabase\.co$/) || u.username.match(/^postgres\.([a-z0-9]+)$/) || [])[1] || null;
+          const projectRef = ref || (u.hostname.split(".")[0] || null);
           console.log(`source project ref: ${projectRef}`);
-          if (expectedRef && projectRef !== expectedRef) fail(`source project ref ${projectRef} does not match the designated staging project`);
+          if (expectedRef && projectRef !== expectedRef) {
+            fail(`source project ref ${projectRef} does not match the designated staging project`);
+          }
           const { spawnSync } = await import("node:child_process");
-          const env = { ...process.env };
+          const env = {
+            ...process.env,
+            PGHOST: u.hostname,
+            PGPORT: u.port || "5432",
+            PGUSER: decodeURIComponent(u.username),
+            PGPASSWORD: decodeURIComponent(u.password),
+            PGDATABASE: decodeURIComponent(u.pathname.replace(/^\//, "")) || "postgres",
+            PGSSLMODE: env0("PGSSLMODE") || "require",
+            PGCONNECT_TIMEOUT: "15",
+          };
+          function env0(k) { return process.env[k]; }
           const psql = process.env.PG_CLIENT_BIN_DIR ? `${process.env.PG_CLIENT_BIN_DIR}/psql` : "psql";
-          const r = spawnSync(psql, ["-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-c", "select current_database(), current_user, current_setting('"'"'server_version'"'"'), exists(select 1 from pg_extension where extname = '"'"'pgcrypto'"'"')"], { env, encoding: "utf8" });
+          const r = spawnSync(psql, ["-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-c",
+            "select current_database(), current_user, current_setting('"'"'server_version'"'"'), (select count(*) from pg_extension)"], { env, encoding: "utf8" });
+          if (r.error) fail(`psql could not be executed: ${r.error.code || r.error.message}`);
           if (r.status !== 0) {
-            const msg = String(r.stderr || "").split("\n").filter((l) => l && !l.includes("postgres://")).slice(0, 2).join(" ").slice(0, 300);
+            const msg = String(r.stderr || "").split("\n")
+              .filter((l) => l && !l.includes("postgres://") && !l.includes("postgresql://"))
+              .slice(0, 2).join(" ").slice(0, 300);
             fail(`authentication or connection failed: ${msg || `exit ${r.status}`}`);
           }
-          const [db, user, version, pgcrypto] = String(r.stdout).trim().split("|");
-          console.log(`authenticated: database=${db} user=${user} server_version=${version} pgcrypto=${pgcrypto}`);
+          const [db, user, version, exts] = String(r.stdout).trim().split("|");
+          console.log(`authenticated: database=${db} user=${user} server_version=${version} extensions=${exts}`);
           '
       - name: Refuse undesignated source and bucket before connecting
         env:
