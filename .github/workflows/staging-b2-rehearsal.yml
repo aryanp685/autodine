@@ -282,6 +282,11 @@ jobs:
           B2_ACCESS_KEY_ID: ${{ secrets.STAGING_B2_ACCESS_KEY_ID }}
           B2_SECRET_ACCESS_KEY: ${{ secrets.STAGING_B2_SECRET_ACCESS_KEY }}
         run: |
+          # Actions invokes run blocks as `bash -e`, so a failing command aborts
+          # the script immediately. Without an explicit `set +e` the handler
+          # below never runs and the step dies with no reason recorded: that is
+          # exactly what happened in runs #1, #2 and #4.
+          set +e
           set -uo pipefail
           dir="$RUNNER_TEMP/autodine-staging-backup"
           log="$RUNNER_TEMP/autodine-staging-backup.log"
