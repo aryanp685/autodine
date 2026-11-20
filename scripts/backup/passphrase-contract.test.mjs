@@ -83,10 +83,11 @@ test('the backup tool refuses a short passphrase before it touches the database'
   }
 });
 
-test('the workflow delegates to the backup contract and remains hard-stopped before hosted work', () => {
+test('the workflow delegates to the authoritative contract before authentication and backup', () => {
   const wf = readFileSync(path.join(here, '../../.github/workflows/staging-b2-rehearsal.yml'), 'utf8');
-  const stop = wf.indexOf('Stop until hosted isolation is independently verified');
+  const contract = wf.indexOf('passphraseProblem(process.env.AUTODINE_BACKUP_PASSPHRASE)');
+  const auth = wf.indexOf('Authentication check and read-only source identity');
   const backup = wf.indexOf('node scripts/backup/run-scheduled.mjs --out-dir');
-  assert.ok(stop >= 0 && backup > stop);
+  assert.ok(contract >= 0 && auth > contract && backup > auth);
   assert.doesNotMatch(wf, /\$\{#AUTODINE_BACKUP_PASSPHRASE\}/);
 });

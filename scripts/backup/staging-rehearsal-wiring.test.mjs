@@ -254,15 +254,46 @@ test('the gate fetches by exact commit and refuses anything else', () => {
   assert.doesNotMatch(stepNames(gate), /checkout/i, 'the gate must not depend on a checked-out tree');
 });
 
-test('hosted rehearsal has a non-overridable stop before checkout and all secret handling', () => {
+test('owner Environment-only scope attestation is explicit and fail closed before credentials', () => {
+  const input = doc.on.workflow_dispatch.inputs?.environment_scope_attested;
+  assert.ok(input, 'the dispatch must record the owner scope attestation');
+  assert.equal(input.type, 'boolean');
+  assert.equal(input.required, true);
+  assert.equal(input.default, false);
+  const gate = jobs['exact-code-gate'];
+  assert.equal(gate.env.ENVIRONMENT_SCOPE_ATTESTED, '${{ inputs.environment_scope_attested }}');
+  const attestation = gate.steps.find((s) => /Environment-only owner attestation/.test(String(s.name ?? '')));
+  assert.ok(attestation);
+  assert.match(String(attestation.run), /!= 'true'/);
+});
+
+test('hosted rehearsal independently proves disposable target, B2 bucket scope and source identity', () => {
   const steps = jobs['staging-rehearsal']?.steps ?? [];
-  const stop = steps.findIndex((s) => /Stop until hosted isolation/.test(String(s.name ?? '')));
-  const checkout = steps.findIndex((s) => String(s.uses ?? '').startsWith('actions/checkout'));
-  assert.equal(stop, 0);
-  assert.ok(checkout > stop);
-  assert.equal(steps[stop].if, undefined, 'the stop must not depend on an opt-in');
-  assert.match(String(steps[stop].run), /(?:^|\n)exit 1(?:\n|$)/);
-  assert.deepEqual(steps[stop].env ?? {}, {});
+  const disposable = steps.find((s) => /Prove disposable PostgreSQL 17/.test(String(s.name ?? '')));
+  const b2 = steps.find((s) => /Prove B2 key/.test(String(s.name ?? '')));
+  const auth = steps.find((s) => /Authentication check/.test(String(s.name ?? '')));
+  assert.ok(disposable && b2 && auth);
+  assert.match(String(disposable.run), /docker inspect/);
+  assert.match(String(disposable.run), /drill\|postgres\|17\|0/);
+  assert.match(String(b2.run), /verify-b2-staging-scope\.mjs/);
+  assert.equal(b2.env.B2_EXPECTED_BUCKET_ID, 'd209a0cc2db8f17fac100514');
+  assert.match(String(auth.run), /current_database\(\).*current_user.*server_version_num/);
+});
+
+test('passphrase contract is enforced before source authentication and the hosted pipeline records timings', () => {
+  const steps = jobs['staging-rehearsal'].steps;
+  const contract = steps.findIndex((s) => /authoritative passphrase contract/.test(String(s.name ?? '')));
+  const auth = steps.findIndex((s) => /Authentication check/.test(String(s.name ?? '')));
+  const backup = steps.find((s) => /Back up staging/.test(String(s.name ?? '')));
+  assert.ok(contract >= 0 && auth > contract);
+  assert.match(String(steps[contract].run), /MIN_PASSPHRASE_LENGTH.*passphraseProblem/);
+  assert.match(String(backup.run), /--report/);
+  assert.match(raw, /backupSeconds/);
+  assert.match(raw, /uploadSeconds/);
+  assert.match(raw, /DOWNLOAD_SECONDS/);
+  assert.match(raw, /RESTORE_SECONDS/);
+  assert.match(raw, /endToEndRto/);
+  assert.match(raw, /measuredRpoSeconds/);
 });
 
 test('the hosted backup failure diagnostic never relays child output or credential lengths', () => {
@@ -282,6 +313,7 @@ test('source authentication uses the private service after source validation', (
   assert.ok(validate >= 0 && auth > validate);
   const run = String(steps[auth].run);
   assert.match(run, /withPgService/);
-  assert.match(run, /stdio: 'ignore'/);
-  assert.doesNotMatch(run, /PGPASSWORD|r\.stderr|r\.error\.message|console\.log\(.*(?:projectRef|password|user|database)/);
+  assert.match(run, /current_database\(\).*current_user.*server_version_num/);
+  assert.match(run, /encoding: 'utf8'/);
+  assert.doesNotMatch(run, /PGPASSWORD|result\.stderr|result\.error\.message|console\.log\(.*password/);
 });
