@@ -141,3 +141,27 @@ Reporting a backup/upload/restore duration or an RPO/RTO figure would be fabrica
 - No B2 object, version, bucket or key was created, modified or deleted.
 - No production database or bucket was contacted; production project refused by name in a negative test.
 - PR #194 remains OPEN and unmerged; no production deployment occurred.
+
+## Measured facts about the two histories (for the owner decision)
+
+| Fact | Value |
+|---|---|
+| Files conflicting in `merge --allow-unrelated-histories` | **78** (including `ci.yml`, `hosted-backup.yml`, `hosted-restore-drill.yml`, `.gitignore`, auth and team actions) |
+| Migrations on `main` | 104 |
+| Migrations on PR #194 | 102 |
+| Migrations after the merge | 104, chain valid (`102 + 2` from `main`, no duplicates) |
+| PR-branch CI check `typecheck · lint · design · test · build` | **fails** on the PR branch |
+| Cause of that CI failure | CI evaluates the *merged* tree: `qa-evidence/day1/PHASE7_LOCAL_VERIFICATION.md` documents "102 files, 102 unique versions", but the merged tree has 104. The assertion is correct and the record is stale. |
+| Same check on PR #197–#203 (branched from `main`) | pass |
+
+So the PR branch's red check is a **stale cross-history record**, not a code regression: it cannot
+turn green while the PR stands alone, because its own documented counts describe the pre-merge tree.
+
+## Exact-code gate against the final PR head
+
+Verified locally against `c0f8477ae5aedebb13e3b51add08630c69a30d75`:
+`exact-code gate: the requested ref carries the audited V3 staging implementation (44 files, byte for byte)`.
+
+Note the count: the gate pins **44** files and the manifest carries **45** entries — the extra entry is
+`package-lock.json`, which git reports outside the enumerated `scripts/backup/**` + action paths. This
+discrepancy is cosmetic in the message only; verification is bytewise over all 45 pinned entries.
