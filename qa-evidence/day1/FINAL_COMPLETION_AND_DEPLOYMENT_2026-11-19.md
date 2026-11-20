@@ -45,9 +45,10 @@ READY = code and evidence. BLOCKED = target, authorization, schema parity.
 |---|---|
 | Branch | `arena/ce32f7c8-autodine` (branched from `arena/2670dd12-autodine` @ `7064c91`) |
 | Starting HEAD | `7064c912b1b85ab6364f23d1755d855ff4f462ad` |
-| Final HEAD | `7064c91` + 2 commits: **`c61f98a`** (product, migrations, tests — 272 files, +20,673/−3,158) and **this docs/evidence commit** (38 files) |
-| Working tree | **clean** — everything that was uncommitted is now in those two commits |
-| Branch pushed | **not pushed** at time of writing; the push is the owner's call (see §10) |
+| Final HEAD | `f1a6400` — `7064c91` + three commits: **`c61f98a`** (product, migrations, tests — 272 files, +20,673/−3,158), **`352bc2e`** (evidence/docs — 38 files), **`f1a6400`** (CI: adopt main's valid `hosted-restore-drill.yml`) |
+| Working tree | **clean** |
+| Branch pushed | **yes** — `origin/arena/ce32f7c8-autodine` (owner-authorized commit + push, 2026-11-20) |
+| CI at `f1a6400` | **CI success** (typecheck·lint·design·test·build + SQL boundaries on PG 15/17/18, run `44805475066`) · **E2E (browser) success** (`44805474933`) · **Throttle browser E2E success** (`44805475067`) |
 | Merged main | `0468d3a` — merge of PR #195 |
 | Divergence from main | 42 files, 4 of them migrations (`20261119000100…21190400`) |
 
@@ -251,6 +252,9 @@ Run at HEAD `7064c91` with the working tree as described in §2.
 | Integration (disposable PG) | `npm run test:db:integration` | **295 passed / 1 skipped**, 13 files | **+2 passed** = the two new billing tests |
 | Embedded replay | `npm run test:db:embedded` | **277 passed / 3 skipped**, 10 files | same |
 | Journeys (real server + browser) | `npm run test:e2e:journey` | **20 passed** (1.9 min) | same |
+| GitHub CI (pushed head `f1a6400`) | `ci.yml` run `44805475066` | **success** — typecheck · lint · design · test · build, plus migration/SQL-boundary jobs on PG 15, 17 and 18 | first CI run on this branch |
+| GitHub E2E (pushed head `f1a6400`) | `e2e.yml` run `44805474933` | **success** — staff shell · kitchen · back/forward · 390 px drawer | first |
+| GitHub throttle E2E (pushed head `f1a6400`) | `throttle-e2e.yml` run `44805475067` | **success** | first |
 | Release invariants | `npm run verify:release` | **47/47 OK** | same |
 | Migration chain | `npm run migrations:verify` | **119 files, 119 unique versions, 4 anchors** | same |
 | Definer audit | `npm run audit:definer` | **148 functions / 80 flagged** | same |
@@ -428,12 +432,25 @@ option.
 
 ---
 
+### Branch hygiene fix made during the commit
+
+The branch carried a stale copy of `.github/workflows/hosted-restore-drill.yml`
+that used `${{ runner.temp }}` in **job-level** `env`, where the runner context
+does not exist. GitHub rejected the file and published a zero-job "workflow file
+issue" failure on **every** push (the same red X appears on earlier `main` and
+`arena/2670dd12-autodine` pushes). Main has since fixed it by using a
+workspace-relative directory; commit `f1a6400` adopts that exact file, so the
+branch no longer publishes an invalid workflow. No drill behaviour changed and
+the drill remains dispatch-only.
+
 ### What was *not* done, deliberately
 
 No migration applied to any hosted project · no staging or production schema
 change · no Vercel deployment, alias or env change · no provider/billing change ·
 no restore, clone or destructive operation · no customer row read · no secret
-value read or requested · no commit, push, merge or PR approval.
+value read or requested · no merge and no PR approval. The commit and push of
+this branch were explicitly authorized by the owner; nothing was merged and
+nothing was deployed.
 
 Every statement above is reproducible from the commands and queries in
 §5–§9; nothing is inferred from an approval that was not given.
