@@ -71,6 +71,47 @@ reached encryption because authentication failed first. It still needs an owner-
 - the workflow pre-check mirrors the constant, and a test fails if the two drift;
 - 9 focused tests (`passphrase-contract.test.mjs`): missing, too short, boundary, valid, no-leak (value and length), encrypt guard, ordering, drift, workflow mirror.
 
+
+## Structural finding: PR #194 is a separate history, not a branch of `main`
+
+Discovered while validating the merge path. This is the deepest blocker and it is **not** a code defect.
+
+| Check | Result |
+|---|---|
+| Common ancestor of PR #194 head and `main` | **none** (`git merge-base` reports no common ancestor) |
+| Shared commits | **0** |
+| Root commit of PR #194 | `55dfc429…` (the branch root is itself a grafted root) |
+| Root commit of `main` | `5b07e24f…` |
+| `git merge main` on the PR branch | `fatal: refusing to merge unrelated histories` |
+| V3 implementation on `main` | absent — e.g. `scripts/backup/lib-b2-read.mjs`, `scripts/backup/validate-staging-source.mjs`, `.github/actions/postgres-client/action.yml` all missing |
+| `main`'s `test:dr` | does not run the staging wiring test, so the gate refuses `main` too |
+
+### Operational consequence
+
+The exact-code gate accepts only a commit that contains the audited 45-file implementation. That
+implementation exists **only** in PR #194's history. `main` cannot contain it without importing
+that history, and the two histories cannot be merged by an ordinary merge.
+
+So the rehearsal cannot be unblocked by fixing credentials alone. Two gates stand in order:
+
+1. **Import PR #194's history into `main`** (see below) — a repository-architecture decision.
+2. **Repair the staging source password** (`28P01`).
+
+Both are owner-side. Neither is authorized to this execution, and neither was bypassed.
+
+### Minimum action for gate 1 (owner decision required)
+
+Either:
+
+- **(a) adopt PR #194's tree as the line of development** — merge `arena/88c342c2-autodine` into `main`
+  with `--allow-unrelated-histories`, reviewing the resulting diff, then re-point future work at it; or
+- **(b) graft deliberately** — keep `main` as the trunk and import the implementation as a single
+  reviewed commit produced from PR #194's tree (a true "subtree import"), accepting that PR #194's
+  individual commits are not preserved as ancestry.
+
+Option (a) is the faithful one and preserves history; option (b) rewrites lineage. Both are product
+decisions about which line owns the repository, so this execution stops and asks rather than choosing.
+
 ## Defects found and fixed by executing
 
 | Run | Defect | Fix |
