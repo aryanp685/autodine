@@ -31,7 +31,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { encryptBuffer, sha256 } from './lib-crypto.mjs';
+import { encryptBuffer, passphraseProblem, sha256 } from './lib-crypto.mjs';
 import { dumpDatabase, openBackupSnapshot } from './lib-dump.mjs';
 import { backupSourceDecision } from './lib-backup-source.mjs';
 import { selectBackupMode } from './lib-backup-mode.mjs';
@@ -64,7 +64,11 @@ if (!sourceUrl) fail('set AUTODINE_BACKUP_SOURCE_URL (never pass the URL on the 
 const sourceDecision = backupSourceDecision(sourceUrl);
 if (!sourceDecision.allowed) fail(sourceDecision.reason);
 const passphrase = process.env.AUTODINE_BACKUP_PASSPHRASE;
-if (!passphrase) fail('set AUTODINE_BACKUP_PASSPHRASE (12+ chars; store in a password manager)');
+// Refuse a passphrase that violates the encryption contract before any
+// connection is opened or any byte is written: failing here costs nothing,
+// failing after a long dump costs a whole run and teaches an operator nothing.
+const passphraseProblemText = passphraseProblem(passphrase);
+if (passphraseProblemText) fail(passphraseProblemText);
 const schema = opt.schema || 'public';
 const keepDaily = Number(opt['keep-daily'] ?? 14);
 const keepWeekly = Number(opt['keep-weekly'] ?? 8);

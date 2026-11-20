@@ -1,0 +1,846 @@
+diff --git a/.github/workflows/staging-b2-rehearsal.yml b/.github/workflows/staging-b2-rehearsal.yml
+index 4c57adf..38c33c1 100644
+--- a/.github/workflows/staging-b2-rehearsal.yml
++++ b/.github/workflows/staging-b2-rehearsal.yml
+@@ -1,11 +1,95 @@
+ name: Staging B2 backup and disposable restore
+ 
+-# Explicitly dispatched only. Configure the protected `backup-staging`
+-# environment before dispatch; never populate it with Production credentials.
+-# This workflow creates a real B2 object and reads staging data: dispatch and
+-# any resulting cost require explicit owner approval. No remote pruning.
++# Manually dispatched, staging-only rehearsal of the backup path:
++#
++#   disposable PostgreSQL 17  <-  decrypt + restore + verify
++#        ^                                   |
++#        |                          download newest object
++#   Backblaze B2 (bucket, region: environment-designated)
++#        ^
++#   encrypted backup taken from the designated STAGING Supabase project
++#
++# Registration and dispatch
++# ------------------------
++# GitHub registers manual workflows from the DEFAULT BRANCH. Until this file
++# is merged to `main`, it is dispatchable only when a registration patch that
++# adds this exact file is applied to `main`. Dispatching requires explicit
++# owner authorization; dispatching reads STAGING data, creates a real B2
++# object and may incur charges. No remote pruning is ever performed here.
++#
++# Exact-code / ref validation
++# ---------------------------
++# The `ref` input accepts a full 40-character lowercase hex commit SHA only
++# (branch names, tags and short SHAs are refused). When empty, it resolves to
++# the commit this workflow runs at (for the default-branch registration, the
++# default-branch tip). The `exact-code-gate` job then fetches EXACTLY that
++# commit and refuses to proceed unless the fetched tree carries, byte for
++# byte, the audited V3 staging implementation pinned below (every file
++# first-party code would execute, plus package.json / package-lock.json).
++# After the gate passes, the rehearsal job checks out that exact SHA and runs
++# whatever it contains. If the ref does not contain the V3 implementation —
++# for example today's `main`, which lacks `validate-staging-source.mjs` and
++# has older backup scripts — the gate fails closed BEFORE any credential is
++# materialized anywhere. The gate job holds no environment, secret or
++# variable.
++#
++# When the pinned implementation changes, the manifest below (and the
++# `staging-rehearsal-wiring.test.mjs` guard that re-derives it from the tree)
++# must be regenerated in the SAME change. Never edit the manifest by hand.
++#
++# Environment gate and secrets
++# ----------------------------
++# The rehearsal job binds the protected `backup-staging` GitHub Environment
++# and consumes ONLY these environment secrets:
++#
++#   STAGING_AUTODINE_BACKUP_SOURCE_URL   designated staging read connection
++#   STAGING_AUTODINE_BACKUP_PASSPHRASE   backup encryption passphrase
++#   STAGING_B2_REGION                    staging bucket region
++#   STAGING_B2_BUCKET                    staging bucket (never a production one)
++#   STAGING_B2_ACCESS_KEY_ID             staging B2 application keyID
++#   STAGING_B2_SECRET_ACCESS_KEY         staging B2 application key
++#
++# and ONLY these environment variables:
++#
++#   AUTODINE_STAGING_PROJECT_REF         20-char ref of the designated staging project
++#   AUTODINE_STAGING_B2_BUCKET           the same staging bucket name, designated again
++#   AUTODINE_PRODUCTION_B2_BUCKETS       JSON array of production bucket names (refusal list)
++#
++# No production secret name is referenced, `secrets: inherit` is never used,
++# and no value is printed, artifacted or passed to a step that does not need
++# it. The preflight step checks PRESENCE with GitHub boolean expressions —
++# the secret or variable VALUES never enter that step at all; it reports the
++# NAMES of anything missing and fails closed. The semantic check
++# (validate-staging-source.mjs) then proves the source URL targets the
++# designated staging project and the staging bucket, is not loopback, and is
++# not a production bucket — failing closed otherwise.
++#
++# Fallback posture (verified, with limits): GitHub falls back to a
++# repository-scoped secret/variable of the SAME NAME when the environment
++# does not define one. The names are uniquely STAGING_-prefixed and the
++# owner must not create repository copies; presence checks cannot distinguish
++# the two scopes, so the semantic validator and the production-bucket
++# refusal list are the second, independent layer. The workflow does NOT fall
++# back to: any unprefixed/production secret name, `.env` files (no backup
++# script loads one — guarded by test), a B2 endpoint override (not wired;
++# only official backblazeb2.com endpoints are accepted by the client), a
++# scratch/expected-ref opt-in, or any other environment (exactly one
++# `environment:` declaration exists, `backup-staging`).
++#
++# A 40-character `ref` that does not contain the V3 implementation is the
++# ONLY thing this workflow rehearses; see the gate. DO NOT dispatch without
++# explicit owner authorization. The PostgreSQL service is a disposable
++# loopback container; the restore target is loopback-only by guard and the
++# restore scripts refuse anything else.
++
+ on:
+   workflow_dispatch:
++    inputs:
++      ref:
++        description: 'Full 40-character lowercase hex commit SHA of the audited implementation. Empty = the commit this workflow runs at. Anything else fails closed.'
++        required: false
++        type: string
++        default: ''
+ 
+ permissions:
+   contents: read
+@@ -15,8 +99,104 @@ concurrency:
+   cancel-in-progress: false
+ 
+ jobs:
++  exact-code-gate:
++    name: exact-code gate (fail closed, no credentials)
++    runs-on: ubuntu-24.04
++    timeout-minutes: 10
++    env:
++      REF: ${{ inputs.ref || github.sha }}
++    steps:
++      - name: Require a full lowercase commit SHA
++        run: |
++          if ! [[ "$REF" =~ ^[0-9a-f]{40}$ ]]; then
++            echo "::error::inputs.ref must be a full 40-character lowercase hex commit SHA — branch names, tags and short SHAs are refused"
++            exit 1
++          fi
++      - name: Fetch the requested commit (no tags, depth 1)
++        run: |
++          set -euo pipefail
++          gate_dir="$RUNNER_TEMP/exact-code-gate"
++          rm -rf "$gate_dir"
++          mkdir -p "$gate_dir"
++          cd "$gate_dir"
++          git init -q .
++          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
++          git fetch --no-tags --depth=1 origin "$REF"
++          fetched="$(git rev-parse FETCH_HEAD)"
++          if [ "$fetched" != "$REF" ]; then
++            echo '::error::the fetch returned a different commit than requested — refusing to proceed'
++            exit 1
++          fi
++          echo "GATE_DIR=$gate_dir" >> "$GITHUB_ENV"
++      - name: Verify the audited V3 staging implementation byte for byte
++        run: |
++          # --- exact-code-gate BEGIN
++          set -euo pipefail
++          cd "$GATE_DIR"
++          cat > expected.txt <<'V3_MANIFEST'
++          100644 blob bd40bdf9b1a64b367b76ea7676af05f25fd6a887	.github/actions/postgres-client/action.yml
++          100755 blob 35cfbb3dee583e2b9d87e9a14e23ca65941f2642	.github/actions/postgres-client/install-client.sh
++          100755 blob ff890e80ccd94b353e96ef903884d68a589ce78f	.github/actions/postgres-client/verify-client.sh
++          100644 blob d7defa59ed60dc1187f348771265c56fd06bddd9	package-lock.json
++          100644 blob 1cf262bf36b1c06cc23ee050b4037625288db145	package.json
++          100644 blob cf5326d1ada5681e5b4af4895be3d8da96a2b51d	scripts/backup/b2-owner-checklist.test.mjs
++          100644 blob 5b657cc7577aaa63ba0ba8cf284f6d52c51bd7c3	scripts/backup/b2-upload.test.mjs
++          100644 blob 4d929c91276bdf9b69041d2cc6f537617b6e5fdf	scripts/backup/backup-logical.mjs
++          100644 blob 31850aef84926d2e1f161a66312cedfa2134317d	scripts/backup/backup-mode.test.mjs
++          100644 blob 045f016307b163395790fb3dcc1d49c7e762623c	scripts/backup/backup-source.test.mjs
++          100644 blob 7e4e0df3e49f16dfac4103e1fef114342af575de	scripts/backup/check-dr-objectives.mjs
++          100644 blob 4094d3fca9da88e65b7c5511a2a2bd0a216d75c5	scripts/backup/check-dr-objectives.test.mjs
++          100644 blob 5144b57ed7c8f1164eee9aca6a9a44ecf8af7b57	scripts/backup/compare-rehearsal-manifests.mjs
++          100644 blob 9fdcef5533f5f48732bb009822804e2a582f8c0d	scripts/backup/compare-rehearsal-manifests.test.mjs
++          100644 blob 26a4587015e89a7031fc1b8e2d835e59c6699751	scripts/backup/download-b2.mjs
++          100644 blob cb7893470016c166ccb0e906ac7aa6a3d7ed89d0	scripts/backup/dump-order.test.mjs
++          100644 blob 56c8cbcfc852b0c8d033030a4cff07e0da85b685	scripts/backup/lib-b2-read.mjs
++          100644 blob 644ca4d7fc3b425780436d0f92b75837b39b94da	scripts/backup/lib-b2.mjs
++          100644 blob aa0899f196e7278a3be10f6a0bd05e63541e7f23	scripts/backup/lib-backup-mode.mjs
++          100644 blob b99e1d42f44d9a872d0d72598ed61a28584d72f7	scripts/backup/lib-backup-source.mjs
++          100644 blob 90d8e9128941addd812be2acb4094b6e0b3c2951	scripts/backup/lib-crypto.mjs
++          100644 blob 135ea4222048f81ff5924208e249125308e8b9ac	scripts/backup/lib-dump.mjs
++          100644 blob c30afd406a996b289bf3bf0511bf3c96ad6355bf	scripts/backup/lib-pg-client.mjs
++          100644 blob 5b10a49ae6355b516945e4601215723721f8f82f	scripts/backup/lib-pg-client.test.mjs
++          100644 blob 24049caa0cd1e6b8a6a98f3ee61c47f0ae6c0057	scripts/backup/lib-restore-target.mjs
++          100644 blob 22c8f72f2cb18f9c6197c15035bf341c425b71ba	scripts/backup/lib-schedule.mjs
++          100644 blob d091edbb3fa5c2dfe09c1c6ef40f74e8c5d03818	scripts/backup/postgres-client-action.test.mjs
++          100644 blob 5450afbaa6db794f11dda52e4b015559439c54bc	scripts/backup/postgres-client-env.test.mjs
++          100644 blob 2096f69334b2861b746b3e48bd0ba6f5263912b4	scripts/backup/postgres-client-wiring.test.mjs
++          100644 blob 2dd2cdc1a867088ee810c4e77c272f8e6766ff91	scripts/backup/prepare-disposable-restore.mjs
++          100644 blob 1b563be86b5a078611b50e7e2607c5aa4532feff	scripts/backup/prune-b2.mjs
++          100644 blob f278c5bfea0b237f5157e86b7f3b1237cbe5946f	scripts/backup/prune-b2.test.mjs
++          100644 blob fd123b1edbf8b8eee10a859c9981327a741ae58b	scripts/backup/restore-logical.mjs
++          100644 blob 2d16fdd496697751e12f8b60a5449ea54594df1e	scripts/backup/restore-target.test.mjs
++          100644 blob 42bd98327de5fcbb4ef4ed8f921c7f7a4a452228	scripts/backup/run-scheduled.mjs
++          100644 blob 8b562420e36088b4240148e2c09c3e0b82a2bb9f	scripts/backup/run-scheduled.test.mjs
++          100644 blob 5c559d087c2cd5cf7ca153ef36d2ba8f18bfc4da	scripts/backup/selftest.mjs
++          100644 blob c47793f88fb2dab104ea8bc617e8fbd9e5537db6	scripts/backup/staging-rehearsal-wiring.test.mjs
++          100644 blob 1e0360e48f9e3d159b7592d8678ab5290effc7ad	scripts/backup/upload-b2.mjs
++          100644 blob 365a07fcc17afd57b8276d60b8c88e6bc4f9da68	scripts/backup/validate-staging-source.mjs
++          100644 blob c6134e56f402d2f9aca0b8dd70de5a8b41a52057	scripts/backup/verify-backup-file.mjs
++          100644 blob 305ea6cbc2816c66efa3c786bdb2677cb90c292c	scripts/backup/verify-backup-file.test.mjs
++          100644 blob 5d593f7a77a3b6c1526a72ac0a6dd5d6bfe603dd	scripts/backup/verify-restored-db.mjs
++          100644 blob d185f27eea8210044229e12652ce2ff8a1149b29	scripts/backup/verify-restored-db.test.mjs
++          V3_MANIFEST
++          git ls-tree -r FETCH_HEAD -- scripts/backup .github/actions/postgres-client package.json package-lock.json > actual.txt
++          if diff -q expected.txt actual.txt >/dev/null; then
++            echo 'exact-code gate: the requested ref carries the audited V3 staging implementation (44 files, byte for byte)'
++            exit 0
++          fi
++          echo '::error::exact-code gate REFUSED: the requested ref does not contain the audited V3 staging implementation — refusing before any credential is materialized (paths only below; contents are never printed)'
++          echo '--- missing from the ref:'
++          comm -23 <(cut -f2 expected.txt | LC_ALL=C sort) <(cut -f2 actual.txt | LC_ALL=C sort)
++          echo '--- unexpected in the ref:'
++          comm -13 <(cut -f2 expected.txt | LC_ALL=C sort) <(cut -f2 actual.txt | LC_ALL=C sort)
++          echo '--- changed relative to the audit:'
++          awk -F'\t' 'NR==FNR { e[$2]=$1; next } ($2 in e) && e[$2] != $1 { print "changed: " $2 }' expected.txt actual.txt
++          exit 1
++          # --- exact-code-gate END
++
+   staging-rehearsal:
+     name: staging backup → B2 → disposable restore
++    needs: exact-code-gate
+     runs-on: ubuntu-24.04
+     timeout-minutes: 60
+     environment: backup-staging
+@@ -35,6 +215,12 @@ jobs:
+           --health-retries 12
+     steps:
+       - uses: actions/checkout@v7
++        with:
++          # After the exact-code gate passes, this checks out EXACTLY the
++          # verified commit — the rehearsal never runs anything the gate did
++          # not pin. Empty input resolves to the commit the workflow runs at.
++          ref: ${{ inputs.ref || github.sha }}
++          fetch-depth: 1
+       - uses: actions/setup-node@v7
+         with:
+           node-version: 22
+@@ -43,7 +229,42 @@ jobs:
+         uses: ./.github/actions/postgres-client
+         with:
+           version: '17'
+-      - run: npm ci
++      - name: Install dependencies
++        run: npm ci
++      - name: Preflight — backup-staging presence check, names only (values never read)
++        env:
++          STAGING_SECRET_STAGING_AUTODINE_BACKUP_PASSPHRASE_SET: ${{ secrets.STAGING_AUTODINE_BACKUP_PASSPHRASE != '' }}
++          STAGING_SECRET_STAGING_AUTODINE_BACKUP_SOURCE_URL_SET: ${{ secrets.STAGING_AUTODINE_BACKUP_SOURCE_URL != '' }}
++          STAGING_SECRET_STAGING_B2_ACCESS_KEY_ID_SET: ${{ secrets.STAGING_B2_ACCESS_KEY_ID != '' }}
++          STAGING_SECRET_STAGING_B2_REGION_SET: ${{ secrets.STAGING_B2_REGION != '' }}
++          STAGING_SECRET_STAGING_B2_SECRET_ACCESS_KEY_SET: ${{ secrets.STAGING_B2_SECRET_ACCESS_KEY != '' }}
++          STAGING_SECRET_STAGING_B2_BUCKET_SET: ${{ secrets.STAGING_B2_BUCKET != '' }}
++          STAGING_VAR_AUTODINE_PRODUCTION_B2_BUCKETS_SET: ${{ vars.AUTODINE_PRODUCTION_B2_BUCKETS != '' }}
++          STAGING_VAR_AUTODINE_STAGING_B2_BUCKET_SET: ${{ vars.AUTODINE_STAGING_B2_BUCKET != '' }}
++          STAGING_VAR_AUTODINE_STAGING_PROJECT_REF_SET: ${{ vars.AUTODINE_STAGING_PROJECT_REF != '' }}
++        run: |
++          set -euo pipefail
++          missing=''
++          for pair in \
++            "STAGING_AUTODINE_BACKUP_PASSPHRASE:${STAGING_SECRET_STAGING_AUTODINE_BACKUP_PASSPHRASE_SET}" \
++            "STAGING_AUTODINE_BACKUP_SOURCE_URL:${STAGING_SECRET_STAGING_AUTODINE_BACKUP_SOURCE_URL_SET}" \
++            "STAGING_B2_ACCESS_KEY_ID:${STAGING_SECRET_STAGING_B2_ACCESS_KEY_ID_SET}" \
++            "STAGING_B2_REGION:${STAGING_SECRET_STAGING_B2_REGION_SET}" \
++            "STAGING_B2_SECRET_ACCESS_KEY:${STAGING_SECRET_STAGING_B2_SECRET_ACCESS_KEY_SET}" \
++            "STAGING_B2_BUCKET:${STAGING_SECRET_STAGING_B2_BUCKET_SET}" \
++            "AUTODINE_PRODUCTION_B2_BUCKETS:${STAGING_VAR_AUTODINE_PRODUCTION_B2_BUCKETS_SET}" \
++            "AUTODINE_STAGING_B2_BUCKET:${STAGING_VAR_AUTODINE_STAGING_B2_BUCKET_SET}" \
++            "AUTODINE_STAGING_PROJECT_REF:${STAGING_VAR_AUTODINE_STAGING_PROJECT_REF_SET}" \
++          ; do
++            name="${pair%%:*}"
++            flag="${pair##*:}"
++            if [ "$flag" != 'true' ]; then missing="${missing} ${name}"; fi
++          done
++          if [ -n "$missing" ]; then
++            echo "::error::backup-staging is missing required configuration:${missing} (values are never printed; nothing was attempted)"
++            exit 1
++          fi
++          echo 'backup-staging preflight: all six required staging secrets and three required staging variables are set (values never read by this step).'
+       - name: Refuse undesignated source and bucket before connecting
+         env:
+           AUTODINE_BACKUP_SOURCE_URL: ${{ secrets.STAGING_AUTODINE_BACKUP_SOURCE_URL }}
+@@ -51,10 +272,7 @@ jobs:
+           AUTODINE_STAGING_PROJECT_REF: ${{ vars.AUTODINE_STAGING_PROJECT_REF }}
+           AUTODINE_STAGING_B2_BUCKET: ${{ vars.AUTODINE_STAGING_B2_BUCKET }}
+           AUTODINE_PRODUCTION_B2_BUCKETS: ${{ vars.AUTODINE_PRODUCTION_B2_BUCKETS }}
+-          STAGING_CREDENTIALS_PRESENT: ${{ secrets.STAGING_AUTODINE_BACKUP_PASSPHRASE != '' && secrets.STAGING_B2_REGION != '' && secrets.STAGING_B2_ACCESS_KEY_ID != '' && secrets.STAGING_B2_SECRET_ACCESS_KEY != '' }}
+-        run: |
+-          if [ "$STAGING_CREDENTIALS_PRESENT" != 'true' ]; then echo '::error::Missing required staging credential configuration'; exit 1; fi
+-          node scripts/backup/validate-staging-source.mjs
++        run: node scripts/backup/validate-staging-source.mjs
+       - name: Back up staging, verify locally and upload to B2
+         env:
+           AUTODINE_BACKUP_SOURCE_URL: ${{ secrets.STAGING_AUTODINE_BACKUP_SOURCE_URL }}
+@@ -100,6 +318,7 @@ jobs:
+           {
+             echo '## Staging B2 rehearsal';
+             echo '- Result: ${{ job.status }}';
++            echo '- Implementation: the exact-code-gated commit checked out by this run';
+             echo '- Restore command duration: '"${RESTORE_SECONDS:-not measured}"' seconds (not end-to-end RTO).';
+             echo '- Synthetic platform scaffold; Auth/Storage and production are not restored.';
+           } >> "$GITHUB_STEP_SUMMARY"
+diff --git a/package.json b/package.json
+index 37ff1cc..1cf262b 100644
+--- a/package.json
++++ b/package.json
+@@ -43,7 +43,7 @@
+     "hosted:preflight": "node scripts/hosted-verification/preflight.mjs",
+     "test:hosted:preflight": "node --test scripts/hosted-verification/preflight.test.mjs",
+     "verify:local-gates": "node scripts/verify-local-gates.mjs",
+-    "test:dr": "node --test scripts/backup/verify-backup-file.test.mjs scripts/backup/check-dr-objectives.test.mjs scripts/backup/run-scheduled.test.mjs scripts/backup/b2-upload.test.mjs scripts/backup/prune-b2.test.mjs scripts/backup/verify-restored-db.test.mjs scripts/backup/postgres-client-action.test.mjs scripts/backup/lib-pg-client.test.mjs scripts/backup/restore-target.test.mjs scripts/backup/postgres-client-wiring.test.mjs scripts/backup/b2-owner-checklist.test.mjs scripts/backup/dump-order.test.mjs scripts/backup/backup-source.test.mjs scripts/ci/print-test-failure-annotation.test.mjs scripts/backup/backup-mode.test.mjs scripts/ci/client-independence.test.mjs scripts/backup/postgres-client-env.test.mjs scripts/ci/install-chromium.test.mjs scripts/local-pg/integration-runner-wiring.test.mjs scripts/backup/compare-rehearsal-manifests.test.mjs scripts/ci/hermetic-browser-count.test.mjs",
++    "test:dr": "node --test scripts/backup/verify-backup-file.test.mjs scripts/backup/check-dr-objectives.test.mjs scripts/backup/run-scheduled.test.mjs scripts/backup/b2-upload.test.mjs scripts/backup/prune-b2.test.mjs scripts/backup/verify-restored-db.test.mjs scripts/backup/postgres-client-action.test.mjs scripts/backup/lib-pg-client.test.mjs scripts/backup/restore-target.test.mjs scripts/backup/postgres-client-wiring.test.mjs scripts/backup/b2-owner-checklist.test.mjs scripts/backup/dump-order.test.mjs scripts/backup/backup-source.test.mjs scripts/ci/print-test-failure-annotation.test.mjs scripts/backup/backup-mode.test.mjs scripts/ci/client-independence.test.mjs scripts/backup/postgres-client-env.test.mjs scripts/ci/install-chromium.test.mjs scripts/local-pg/integration-runner-wiring.test.mjs scripts/backup/compare-rehearsal-manifests.test.mjs scripts/ci/hermetic-browser-count.test.mjs scripts/backup/staging-rehearsal-wiring.test.mjs",
+     "backup:run": "node scripts/backup/run-scheduled.mjs",
+     "d2:verify": "node scripts/d2/verify-acl-posture.mjs",
+     "test:d2": "node --test scripts/d2/verify-acl-posture.test.mjs",
+diff --git a/qa-evidence/day1/ARENA_A_ENVIRONMENT_AND_REGISTRATION.md b/qa-evidence/day1/ARENA_A_ENVIRONMENT_AND_REGISTRATION.md
+new file mode 100644
+index 0000000..904d393
+--- /dev/null
++++ b/qa-evidence/day1/ARENA_A_ENVIRONMENT_AND_REGISTRATION.md
+@@ -0,0 +1,280 @@
++# Arena A — staging environment gate and default-branch registration (2026-11-20)
++
++Scope: fixes A (protected `backup-staging` environment secret consumption in the
++staging B2 rehearsal workflow), B (default-branch registration of that workflow)
++and C (the exact-code mismatch between `main`, PR #194 head and the audited V3
++staging implementation). No hosted service was touched: no dispatch, no B2
++access, no database connection, no environment or secret was created, modified
++or read. The PostgreSQL 17.11 custom-format local DR test was **not** repeated
++(it had already passed, per instruction).
++
++Nothing in this record authorizes a run. Launch remains **NO-GO**.
++
++## Baselines recorded
++
++| Ref | SHA |
++|---|---|
++| `origin/main` (default branch, fetched 2026-11-20) | `5b07e24f884128ffec86e45b2142fe171259c86f` |
++| PR #194 head (`arena/88c342c2-autodine`) = this branch's base | `55dfc42932e937ab3c176ff2cd74a288551e70ee` |
++| Merge base of the two | `0468d3acc0ba7a66add9cfd154ce9099f40b8a82` |
++| This working branch (`arena/88c90663-autodine`) | `55dfc42932e937ab3c176ff2cd74a288551e70ee` (+ uncommitted fix set) |
++
++PR #194 is open, `MERGEABLE`, `mergeStateStatus: CLEAN`, 46 commits. `main` adds
++9 commits on top of the merge base, all confined to `.github/workflows/supabase-e2e-load.yml`
++and the premium landing/auth redesign (`app/globals.css`, `components/**`,
++`e2e/integration/**`, `e2e/kitchen-workflow.spec.ts`, `scripts/e2e/prepare-local-supabase.mjs`).
++No file the V3 staging implementation pins was touched by `main`. A local
++three-way merge (main into the PR head) auto-resolves `e2e/kitchen-workflow.spec.ts`
++with no conflicts; 101 paths change; the pinned backup set is identical before
++and after.
++
++## A — protected `backup-staging` environment: what changed and what did not
++
++### Verified live (read-only API)
++
++- `backup-staging` exists (environment id `27886607474`, created 2026-11-19),
++  `can_admins_bypass: true`, one protection rule of type `branch_policy`, and
++  **zero** custom deployment branch policies configured
++  (`deployment-branch-policies` returns `total_count: 0`).
++- The environment endpoint lists **no required-reviewer protection rule**.
++- Listing environment secrets (`/environments/backup-staging/secrets`) and
++  environment variables (`/environments/backup-staging/variables`) returns
++  **HTTP 403 "Resource not accessible by integration"**, as does listing
++  *repository* secrets and variables (`/actions/secrets`, `/actions/variables`).
++  This is a permissions limitation of the connected GitHub integration — it has
++  no Actions secrets/variables read permission at all — **not** evidence that
++  any secret is absent. Secret or variable **values** were never requested,
++  printed, or handled. No secret was created (part 7: not attempted; the owner
++  must enter them directly).
++- `gh workflow list` does not show a `Staging B2 backup and disposable restore`
++  entry; querying `actions/workflows/staging-b2-rehearsal.yml` returns **HTTP 404**.
++  The workflow is not registered on the default branch (see part B).
++
++### Workflow changes (`.github/workflows/staging-b2-rehearsal.yml`)
++
++1. The rehearsal job explicitly binds `environment: backup-staging` (exactly one
++   occurrence in the file). The new `exact-code-gate` job deliberately has **no**
++   environment, secret or variable — it runs before any credential exists.
++2. Six environment secrets, exactly these names, materialized only in the steps
++   that need them and nowhere else:
++   `STAGING_AUTODINE_BACKUP_SOURCE_URL`, `STAGING_AUTODINE_BACKUP_PASSPHRASE`,
++   `STAGING_B2_REGION`, `STAGING_B2_BUCKET`, `STAGING_B2_ACCESS_KEY_ID`,
++   `STAGING_B2_SECRET_ACCESS_KEY`.
++3. Three environment variables, exactly these, in the source-validation step and
++   in the preflight presence check only: `AUTODINE_STAGING_PROJECT_REF`,
++   `AUTODINE_STAGING_B2_BUCKET`, `AUTODINE_PRODUCTION_B2_BUCKETS`.
++4. A new **fail-closed preflight** (`Preflight — backup-staging presence check`)
++   runs before any connection: each secret/variable is tested for presence via
++   GitHub boolean expressions (`secrets.X != ''`), so the VALUES never enter
++   that step; it names only the missing entries and exits 1. The semantic gate
++   (`validate-staging-source.mjs`) then proves the source URL targets the
++   designated 20-char staging project ref, the bucket equals the designated
++   staging bucket, the production bucket inventory parses and does not contain
++   the bucket, and the host is not loopback.
++5. Secrets are never printed, artifacted (only manifests/reports are uploaded),
++   or written to step output; no `secrets: inherit`; no OIDC `id-token`
++   permission (`contents: read` only); no B2 endpoint override is wired (the
++   client accepts only official `s3.<region>.backblazeb2.com` HTTPS endpoints);
++   `--prune-b2` is never passed (guarded by test); every PostgreSQL connection
++   string is loopback-only (guarded by test); no backup script loads `.env` or
++   `dotenv` (guarded by test).
++6. **Fallback posture — stated precisely, not overstated.** GitHub falls back
++   to a repository-scoped secret or variable of the SAME NAME when the
++   environment does not define one; presence checks cannot distinguish the
++   scopes. The names are uniquely `STAGING_`-prefixed and the repository must
++   not hold same-name copies — the owner must confirm that in Settings, since
++   the integration cannot list repository secrets (403). The second,
++   independent layer is the semantic validator plus the production-bucket
++   refusal list: even a same-name repository value would have to be the
++   designated staging source (exact 20-char ref match), the designated staging
++   bucket, absent from the production inventory, pointed at a non-loopback
++   designated Supabase project, and signed for that bucket's region — a
++   production target fails at least one of those checks. The workflow cannot
++   fall back to: any unprefixed/production secret name (none is referenced),
++   `.env` files (none are loaded), a B2 endpoint override (none is wired), a
++   scratch-project opt-in (none is used), or any other environment (exactly
++   one `environment:` declaration exists).
++7. No secret was created, rotated or inspected. The owner enters values
++   directly in the environment; this record never carried them.
++
++### Residual risk the YAML cannot remove (owner verification)
++
++- Required reviewers on `backup-staging`: **none configured** (only a
++  `branch_policy` rule with **zero** policies, meaning deployments from no
++  branch may be permitted — the owner should decide the policy deliberately;
++  this was not modified).
++- `can_admins_bypass: true` remains.
++- Staging source/bucket designation, B2 key scope, bucket privacy, revocation
++  of the previously exposed credential — all unverified (registry:
++  `qa-evidence/day1/MASTER_BLOCKER_REGISTER.md`).
++
++## B — default-branch workflow registration (patch reconstructed)
++
++**The previously prepared registration patch `pr194-arena-a-workflow-registration.patch`
++was NOT found** — not in this branch, not in `origin/main`, not in PR #194's
++files or comments, not anywhere under the workspace (searches: filesystem-wide
++name search, `git log --grep=registration`, reflog, `git fsck --lost-found`).
++Per the task, it was **reconstructed** from the documented requirements against
++the current default-branch HEAD (`5b07e24`), not the old PR base. It is a new,
++standalone artifact — it did not survive from the earlier execution and must be
++reviewed as such.
++
++Reconstruction design (self-contained; fails closed; no weaker alternate):
++
++- Adds exactly one file: `.github/workflows/staging-b2-rehearsal.yml` — the
++  byte-identical twin of the hardened PR file (SHA-256 `see patch table below`).
++- `on: workflow_dispatch` only, with an optional `ref` input (empty = the
++  commit the workflow runs at; a full 40-char lowercase hex SHA otherwise).
++- New `exact-code-gate` job: validates the SHA format, fetches ONLY that
++  commit (`git init` + `git fetch --no-tags --depth=1`, no tags), proves
++  `rev-parse FETCH_HEAD` equals the request, then byte-compares the fetched
++  tree's `scripts/backup/**`, `.github/actions/postgres-client/**`,
++  `package.json`, `package-lock.json` (mode + blob id, exactly 44 entries)
++  against a manifest pinned in the workflow. On any drift it prints ONLY the
++  offending paths (missing / unexpected / changed) and fails closed BEFORE any
++  credential is materialized. The gate job holds no environment, secret or
++  variable.
++- The rehearsal job has `needs: exact-code-gate` and checks out exactly the
++  gated SHA, so the code that runs after the gate is precisely the code the
++  gate verified.
++- After PR #194 (with the hardening patch) is merged, `main` contains the same
++  bytes; dispatching with an empty `ref` then rehearses `main` itself and the
++  gate accepts it (proven in part C).
++
++Verified for the reconstruction (all on this machine, read-only network to
++`github.com` only):
++
++- YAML parse of every workflow file and the composite action: 14/14 + action OK.
++- `git apply --check` of the registration patch against pristine `origin/main`
++  (throwaway worktree, later removed): applies cleanly; the applied file
++  parses; `workflow_dispatch` present; exactly one `environment: backup-staging`.
++- The gate executed end-to-end (steps extracted from the YAML): `5b07e24f…`
++  → REFUSED (22 missing + 17 changed, paths printed, none read); `55dfc429…`
++  → REFUSED (fails closed: the current PR head predates this patch set — after
++  this set is committed and pushed, its tree passes); a non-existent SHA →
++  fetch refused; `notasharef` → refused at the format check.
++- A tamper of one pinned file (`lib-b2.mjs`) in a scratch merged-tree probe →
++  REFUSED and named.
++- actionlint **could not be run** in this sandbox: the release binary host is
++  unreachable and no Go toolchain is installed; the PyPI `actionlint-py` sdist
++  cannot fetch its embedded binary (its download host is also blocked). The
++  patch was instead checked with full YAML parsing, a 16-test wiring guard
++  (`scripts/backup/staging-rehearsal-wiring.test.mjs`), `node --test` suites,
++  `tsc --noEmit`, `eslint .`, and a manual pass confirming the only expression
++  spliced into shell text is `${{ job.status }}` (GitHub-controlled), no
++  `github.event.inputs.*` ever reaches `run:`, and no user-controlled value
++  reaches a shell unquoted. actionlint must be re-run wherever it is
++  available (e.g. CI) before merge.
++
++## C — the exact-code mismatch, precisely
++
++`main` and the PR agree on the merge base (`0468d3a`); `main` then diverged
++(9 commits; landing/auth redesign + Supabase CLI pin; only
++`.github/workflows/supabase-e2e-load.yml`, `app/globals.css`, `components/**`,
++`e2e/**`, `scripts/e2e/prepare-local-supabase.mjs`). The backup/staging
++implementation in `main` is the OLDER one.
++
++Files differing (git blob id) between `origin/main` and the V3 working tree:
++
++| Set | Files |
++|---|---|
++| Missing on `main` (V3-only, 22) | `.github/actions/postgres-client/{action.yml,install-client.sh,verify-client.sh}`; `scripts/backup/{b2-owner-checklist.test.mjs, backup-mode.test.mjs, backup-source.test.mjs, compare-rehearsal-manifests.mjs, compare-rehearsal-manifests.test.mjs, dump-order.test.mjs, lib-b2-read.mjs, lib-backup-mode.mjs, lib-backup-source.mjs, lib-pg-client.mjs, lib-pg-client.test.mjs, lib-restore-target.mjs, postgres-client-action.test.mjs, postgres-client-env.test.mjs, postgres-client-wiring.test.mjs, prepare-disposable-restore.mjs, restore-target.test.mjs, staging-rehearsal-wiring.test.mjs, validate-staging-source.mjs}` |
++| Changed relative to `main` (17) | `package.json`, `package-lock.json`, `scripts/backup/{b2-upload.test.mjs, backup-logical.mjs, check-dr-objectives.mjs, check-dr-objectives.test.mjs, download-b2.mjs, lib-b2.mjs, lib-dump.mjs, prune-b2.mjs, prune-b2.test.mjs, restore-logical.mjs, upload-b2.mjs, verify-backup-file.mjs, verify-backup-file.test.mjs, verify-restored-db.mjs, verify-restored-db.test.mjs}` |
++| Identical (27) | remaining `scripts/backup` files, `docs/backup-restore-runbook.md` refresh is PR-side, untouched-by-main files |
++
++The "mismatch" is therefore definitional: a workflow registered on `main` that
++checked out `main` would run pre-V3 code (or fail to find
++`validate-staging-source.mjs` outright) — fail-closed by accident, not by a
++controlled gate. The reconstruction makes it fail-closed **by design** and,
++after merge, fail-closed if and only if the dispatched ref is not the audited
++V3 tree.
++
++Minimal integration patch (`pr194-arena-a-staging-rehearsal-hardening.patch`):
++
++1. `.github/workflows/staging-b2-rehearsal.yml` — the hardened unified file
++   above (byte-identical to the file the registration patch adds to `main`,
++   so the later merge sees identical add/add content, not a conflict);
++2. `scripts/backup/staging-rehearsal-wiring.test.mjs` — NEW 16-test wiring
++   guard (registered in `test:dr`);
++3. `package.json` — registers the guard in `test:dr`;
++4. this evidence record.
++
++`main` was NOT modified locally at any point; no `main` file was replaced by an
++older PR-base copy. No merge was performed. The V3 manifest was re-derived
++from the post-patch tree; the wiring guard fails CI on any drift.
++
++## D — verification evidence
++
++| Requirement | Result |
++|---|---|
++| Workflow references `backup-staging` | ✅ exactly one declaration, on the rehearsal job; gate job binds none |
++| Six required secrets referenced by name, values never read by preflight/gate | ✅ wiring test + grep audit: exactly the six names exist and no others (`staging-rehearsal-wiring.test.mjs`, test 6/11/12/13) |
++| Three required variables checked | ✅ preflight presence booleans + `validate-staging-source.mjs` semantics (test 7/11/12) |
++| No production fallback | ✅ no unprefixed secret name referenced; `secrets: inherit` absent; no `B2_ENDPOINT`; no `--prune-b2`; loopback-only PG URLs; ≤ one environment; `.env`/dotenv absence guarded |
++| Default-branch workflow file contains `workflow_dispatch` | ✅ after applying the registration patch to a pristine `main` worktree (parse-verified); **not on `main` until the owner publishes it** |
++| Exact-code gate accepts only the intended V3 implementation | ✅ accepts the simulated post-merge tree (tree `f23f6d8c254e78e86521da784272811bf30fced0`, compare-block exit 0); REFUSED `main`, REFUSED current PR head (pre-push), REFUSED a tampered file, REFUSED a nonexistent SHA and a branch name |
++| YAML / actionlint / tests pass | YAML: all parse. actionlint: **unavailable in sandbox** (see B). `npm run test:dr` **194/194** (incl. new guard); `test:staging:guards` **66/66**; `tsc --noEmit` clean; `eslint .` clean; `verify:release` OK (28 checks); `verify:local-gates` not re-run (would repeat the PG17 DR pass deliberately not repeated) |
++| SHAs recorded | main `5b07e24f884128ffec86e45b2142fe171259c86f`; PR head `55dfc42932e937ab3c176ff2cd74a288551e70ee`; merge base `0468d3acc0ba7a66add9cfd154ce9099f40b8a82`; merged-probe tree `f23f6d8c254e78e86521da784272811bf30fced0`; patch SHA-256s in the patch table below |
++
++Environment secret/variable availability: **NOT verified — awaiting a protected
++run or owner attestation.** The connected integration lacks Actions
++secrets/variables read permission (HTTP 403 on environment AND repository
++listings). This prevents independent listing; it does not prove the six
++secrets and three variables are absent, and this record does not claim they
++are. The first dispatch (only after owner authorization) is the verification.
++
++## Status — stated plainly
++
++1. **Workflow code fixed and tested** (hardening + registration reconstruction);
++   YAML valid; wiring guard green; not yet on the default branch.
++2. **Registration on `main`: still awaiting authorized publication.** The patch
++   exists and applies to `main`; applying/merging/pushing it is owner action.
++   Until then `gh workflow list` shows no such workflow and dispatch returns 404.
++3. **Environment secret REFERENCES wired** exactly as required; presence
++   preflight fails closed; values never handled.
++4. **Actual protected-workflow secret AVAILABILITY: unverified.** 403 prevents
++   independent listing. Only a protected `workflow_dispatch` run (or the owner's
++   UI attestation) can establish it. Do not infer absence from the 403.
++
++## Owner actions required (in order)
++
++1. Review both patches (below). Commit the hardening patch to PR #194 (with the
++   owner's approval), push, and let CI re-run (including the new guard).
++2. Decide and configure `backup-staging` protection deliberately: required
++   reviewers; branch policy (currently zero custom policies); whether
++   `can_admins_bypass` should stay true. Enter the six secrets and confirm the
++   three variables + no same-name repository copies exist.
++3. Apply the registration patch to `main` (it adds only the workflow file),
++   verify `gh workflow list` shows it by name, and merge PR #194.
++4. Only with explicit authorization: dispatch `Staging B2 backup and disposable
++   restore` with `ref` = the merged SHA (or empty on `main`). Watch for the
++   gate line in the log. A refusal there is the gate working, not a defect.
++5. Regenerate the V3 manifest in the same change whenever the pinned
++   implementation changes — never edit it by hand; the wiring guard enforces
++   the match.
++6. Revoke and replace the previously exposed B2 credential if not yet done;
++   verify bucket privacy/scope; keep the production backup workflow and its
++   schedule untouched.
++
++## Patch artifacts (repository root, uncommitted)
++
++| File | Base | Contents | SHA-256 |
++|---|---|---|---|
++| `pr194-arena-a-workflow-registration.patch` | `5b07e24f884128ffec86e45b2142fe171259c86f` | NEW `.github/workflows/staging-b2-rehearsal.yml` (registration twin); 344 lines, 20,659 bytes | `e6c7dc8baa026e703cf747a35e8f84d3e9e4f882abe0807f571390653615a7fe` |
++| `pr194-arena-a-staging-rehearsal-hardening.patch` | `55dfc42932e937ab3c176ff2cd74a288551e70ee` | Workflow hardening (same bytes, SHA-256 `5529bde29e0242af70f03b07acb3dfab8a6d74e37b94f293cb4ffe8b4d228685`), `scripts/backup/staging-rehearsal-wiring.test.mjs`, `test:dr` registration, this record | embeds this document — its SHA-256 is recorded only in the closing report, not in itself |
++
++Both patches were applied to throwaway worktrees of their respective bases and
++re-verified: the registration patch applies cleanly on `origin/main` (applied
++file parses; `workflow_dispatch` present; one `environment: backup-staging`;
++bytes identical to the PR version); the hardening patch applies cleanly on the
++PR head and its 16-test wiring guard passes there.
++
++The two patches carry the same workflow bytes by design; apply the hardening
++patch to the PR branch and the registration patch to `main`. If only one is
++applied, `main` ends up with the workflow but the PR's CI will cover the guard;
++both are required for the end state described above.
++
++Not done, by instruction and by boundary: dispatch, staging DB connection, B2
++connection, hosted resource/secret/variable/bucket changes, commit, push,
++merge, deploy. PR #194 remains open. `scripts/phase3/staging-baseline.json`
++was not touched.
+diff --git a/scripts/backup/staging-rehearsal-wiring.test.mjs b/scripts/backup/staging-rehearsal-wiring.test.mjs
+new file mode 100644
+index 0000000..c47793f
+--- /dev/null
++++ b/scripts/backup/staging-rehearsal-wiring.test.mjs
+@@ -0,0 +1,255 @@
++#!/usr/bin/env node
++/**
++ * Wiring guard for the STAGING B2 rehearsal workflow
++ * (`.github/workflows/staging-b2-rehearsal.yml`).
++ *
++ * The staging rehearsal is the only workflow in this repository that can read
++ * staging backup data and write to a B2 bucket. It must fail closed at every
++ * boundary; this suite proves the boundaries are wired, offline and without
++ * credentials:
++ *
++ *   - only `workflow_dispatch` (manual) can trigger it — no schedule, no push;
++ *   - the exact-code gate job carries NO secret, variable or environment and
++ *     runs before any credential-consuming job;
++ *   - the rehearsal job requires the gate, and references exactly one
++ *     environment: `backup-staging`;
++ *   - exactly the six designated environment secret names appear, exactly the
++ *     three designated variable names appear, and nothing else;
++ *   - no repository-secret fallback name, no `secrets: inherit`, no B2
++ *     endpoint override, no pruning flag, no production secret names;
++ *   - every PostgreSQL connection string in the workflow is loopback-only;
++ *   - the exact-code gate's pinned manifest is byte-identical to this
++ *     working tree's implementation (scripts/backup, the postgres-client
++ *     composite action, package.json, package-lock.json) — drift here fails
++ *     the build, it does not silently re-pin.
++ *
++ * Exit 0 = every check passed.
++ */
++import assert from 'node:assert/strict';
++import { execFileSync } from 'node:child_process';
++import { readdirSync, readFileSync, statSync } from 'node:fs';
++import path from 'node:path';
++import test from 'node:test';
++import { parse as parseYaml } from 'yaml';
++
++const ROOT = path.resolve(import.meta.dirname, '..', '..');
++const WF = path.join(ROOT, '.github', 'workflows', 'staging-b2-rehearsal.yml');
++const PINNED_PATHS = ['scripts/backup', '.github/actions/postgres-client', 'package.json', 'package-lock.json'];
++const SIX_SECRETS = [
++  'STAGING_AUTODINE_BACKUP_PASSPHRASE',
++  'STAGING_AUTODINE_BACKUP_SOURCE_URL',
++  'STAGING_B2_ACCESS_KEY_ID',
++  'STAGING_B2_REGION',
++  'STAGING_B2_SECRET_ACCESS_KEY',
++  'STAGING_B2_BUCKET',
++];
++const THREE_VARS = [
++  'AUTODINE_PRODUCTION_B2_BUCKETS',
++  'AUTODINE_STAGING_B2_BUCKET',
++  'AUTODINE_STAGING_PROJECT_REF',
++];
++
++const raw = readFileSync(WF, 'utf8');
++const doc = parseYaml(raw);
++const jobs = doc?.jobs ?? {};
++
++function stepNames(job) {
++  return (job?.steps ?? []).map((s) => String(s.name ?? s.run ?? '')).join('\n');
++}
++function allStepSecretRefs(job) {
++  const refs = [];
++  for (const step of job?.steps ?? []) {
++    for (const value of Object.values(step.env ?? {})) refs.push(String(value));
++    if (step.with) for (const value of Object.values(step.with)) refs.push(String(value));
++    refs.push(String(step.run ?? ''));
++    refs.push(String(step.uses ?? ''));
++  }
++  return refs.join('\n');
++}
++
++test('the workflow triggers on workflow_dispatch only — never on schedule or push', () => {
++  assert.deepEqual(Object.keys(doc.on ?? {}).sort(), ['workflow_dispatch']);
++  assert.ok(doc.on.workflow_dispatch !== undefined, 'workflow_dispatch must be declared');
++  // The ref input is optional and constrained to a full commit SHA by the gate.
++  const ref = doc.on.workflow_dispatch.inputs?.ref;
++  assert.ok(ref, 'the dispatch must expose the exact-implementation ref input');
++  assert.equal(ref.type, 'string');
++  assert.notEqual(ref.required, true, 'ref defaults to the commit the workflow runs at');
++  assert.doesNotMatch(raw, /^\s*schedule\s*:/m);
++});
++
++test('permissions are exactly contents:read and concurrency never cancels in flight', () => {
++  assert.deepEqual(doc.permissions, { contents: 'read' });
++  assert.equal(doc.concurrency?.group, 'staging-b2-rehearsal');
++  assert.equal(doc.concurrency?.['cancel-in-progress'], false);
++});
++
++test('workflow-level structure is exactly the gate job and the rehearsal job', () => {
++  assert.deepEqual(Object.keys(jobs).sort(), ['exact-code-gate', 'staging-rehearsal']);
++  for (const job of Object.values(jobs)) {
++    assert.equal(job.runs_on, undefined, 'JS keys in YAML keep underscores only where written');
++    assert.ok(job['timeout-minutes'] > 0, 'every job must have a timeout');
++  }
++});
++
++test('the gate job carries no environment, secret or variable reference', () => {
++  const gate = jobs['exact-code-gate'];
++  assert.ok(gate, 'the exact-code gate job must exist');
++  assert.equal(gate.environment, undefined, 'the gate must not bind the protected environment');
++  const gateText = allStepSecretRefs(gate) + JSON.stringify(gate.env ?? {});
++  assert.doesNotMatch(gateText, /secrets\./, 'the gate must not read any secret');
++  assert.doesNotMatch(gateText, /vars\./, 'the gate must not read any variable');
++});
++
++test('the rehearsal job needs the gate and binds exactly the backup-staging environment', () => {
++  const rehearsal = jobs['staging-rehearsal'];
++  assert.ok(rehearsal, 'the rehearsal job must exist');
++  assert.equal(rehearsal.needs, 'exact-code-gate');
++  assert.equal(rehearsal.environment, 'backup-staging');
++  assert.equal(rehearsal.services?.drilldb?.image, 'postgres:17');
++  const occurrences = (raw.match(/environment:\s*backup-staging/g) ?? []).length;
++  assert.equal(occurrences, 1, 'backup-staging must be declared exactly once');
++});
++
++test('exactly the six designated staging secrets appear, and nothing else', () => {
++  const refs = [...raw.matchAll(/secrets\.([A-Z0-9_]+)/g)].map((m) => m[1]);
++  assert.deepEqual([...new Set(refs)].sort(), [...SIX_SECRETS].sort());
++  assert.doesNotMatch(raw, /^\s*secrets:\s*inherit(\s|$)/m, 'blanket secret inheritance is forbidden');
++  assert.doesNotMatch(raw, /secrets\.(AUTODINE_BACKUP|AUTODINE_RESTORE|B2_|BACKUP_ALERT)/, 'no production or unprefixed secret name may appear');
++  assert.doesNotMatch(raw, /permissions:[\s\S]*id-token/, 'no OIDC token permission');
++});
++
++test('exactly the three designated staging variables appear, and nothing else', () => {
++  const refs = [...raw.matchAll(/vars\.([A-Z0-9_]+)/g)].map((m) => m[1]);
++  assert.deepEqual([...new Set(refs)].sort(), [...THREE_VARS].sort());
++});
++
++test('no endpoint override, no pruning flag, no artifact of raw backup material', () => {
++  assert.doesNotMatch(raw, /B2_ENDPOINT/, 'the endpoint override must never be wired');
++  assert.doesNotMatch(raw, /--prune-b2/, 'the rehearsal must never prune');
++  for (const step of jobs['staging-rehearsal']?.steps ?? []) {
++    const p = String(step.with?.path ?? '');
++    if (p) assert.doesNotMatch(p, /\.enc|backup-logical/, 'only reports may be uploaded as artifacts');
++  }
++});
++
++test('every PostgreSQL connection string in the workflow is loopback-only', () => {
++  const urls = [...raw.matchAll(/postgresql:\/\/[^\n]*?@([A-Za-z0-9._-]+)/g)].map((m) => m[1]);
++  assert.ok(urls.length >= 1, 'the restore target must be spelled out');
++  for (const host of urls) assert.equal(host, '127.0.0.1', `non-loopback restore target host: ${host}`);
++});
++
++test('the checkout, validation and consuming steps run in fail-closed order', () => {
++  const steps = jobs['staging-rehearsal']?.steps ?? [];
++  const order = steps.map((s) => String(s.name ?? s.uses ?? s.run ?? ''));
++  const idx = (pattern) => order.findIndex((name) => pattern.test(name));
++  const seq = [
++    idx(/checkout/i),
++    idx(/PostgreSQL 17 client/),
++    idx(/Install dependencies/),
++    idx(/preflight/i),
++    idx(/Refuse undesignated source/),
++    idx(/Back up staging/),
++    idx(/Download newest B2 artifact/),
++    idx(/Restore and verify/),
++    idx(/Evidence summary/),
++    idx(/Preserve reports only/),
++    idx(/Remove backup material/),
++  ];
++  for (const [i, value] of seq.entries()) assert.ok(value >= 0, `step ${i} must exist`);
++  for (let i = 1; i < seq.length; i += 1) {
++    assert.ok(seq[i] > seq[i - 1], `step order broken at position ${i}: ${order.join(' -> ')}`);
++  }
++});
++
++test('the preflight step checks presence of all six secrets and three variables without reading values', () => {
++  const steps = jobs['staging-rehearsal']?.steps ?? [];
++  const preflight = steps.find((s) => /preflight/i.test(String(s.name ?? '')));
++  assert.ok(preflight, 'a preflight step must exist');
++  const env = preflight.env ?? {};
++  for (const name of SIX_SECRETS) {
++    assert.equal(env[`STAGING_SECRET_${name}_SET`], `\${{ secrets.${name} != '' }}`, `preflight must check ${name} presence as a boolean`);
++  }
++  for (const name of THREE_VARS) {
++    assert.equal(env[`STAGING_VAR_${name}_SET`], `\${{ vars.${name} != '' }}`, `preflight must check ${name} presence as a boolean`);
++  }
++  assert.doesNotMatch(String(preflight.run ?? ''), /secrets\.|vars\./, 'the preflight body consumes only precomputed booleans — values never materialize here');
++  assert.doesNotMatch(String(preflight.run ?? ''), /env\b.*echo.*\$/, 'the preflight must not echo environment contents');
++});
++
++test('the source/bucket validation step runs the staging validator before any credential is consumed', () => {
++  const steps = jobs['staging-rehearsal']?.steps ?? [];
++  const validate = steps.find((s) => /Refuse undesignated source/.test(String(s.name ?? '')));
++  assert.ok(validate, 'the staging source validator step must exist');
++  assert.match(String(validate.run ?? ''), /validate-staging-source\.mjs/);
++  const backup = steps.find((s) => /Back up staging/.test(String(s.name ?? '')));
++  assert.ok(backup, 'the backup step must exist');
++  assert.match(String(backup.run ?? ''), /run-scheduled\.mjs.*--b2/);
++  assert.doesNotMatch(String(backup.run ?? ''), /--prune-b2/);
++});
++
++test('the exact-code gate pins a 40-hex SHA and the checkout uses the same ref', () => {
++  const gate = jobs['exact-code-gate'];
++  const gateRun = (gate.steps ?? []).map((s) => String(s.run ?? '')).join('\n');
++  assert.match(gateRun, /\^\[0-9a-f\]\{40\}\$/, 'the gate must demand a full lowercase commit SHA');
++  assert.match(gateRun, /rev-parse FETCH_HEAD/, 'the gate must prove the fetched commit equals the request');
++  const rehearsal = jobs['staging-rehearsal'];
++  const checkout = (rehearsal.steps ?? []).find((s) => String(s.uses ?? '').startsWith('actions/checkout'));
++  assert.equal(checkout?.with?.ref, '${{ inputs.ref || github.sha }}', 'the checkout must use the exact gated ref');
++});
++
++test('the gate heredoc manifest is byte-identical to this working tree', () => {
++  const gate = jobs['exact-code-gate'];
++  const verify = (gate.steps ?? []).find((s) => /byte for byte/i.test(String(s.name ?? '')));
++  assert.ok(verify, 'the manifest verification step must exist');
++  const body = String(verify.run ?? '');
++  const match = body.match(/<<'V3_MANIFEST'\n([\s\S]*?)\nV3_MANIFEST/);
++  assert.ok(match, 'the gate must embed the pinned manifest as a heredoc');
++  const embedded = match[1].split('\n').filter(Boolean);
++  // Recompute the manifest from the working tree: same enumeration and modes
++  // git ls-tree would report for a commit of this tree.
++  const files = [];
++  const walk = (rel) => {
++    const abs = path.join(ROOT, rel);
++    for (const entry of readdirSync(abs, { withFileTypes: true })) {
++      const relPath = `${rel}/${entry.name}`;
++      if (entry.isDirectory()) walk(relPath);
++      else if (entry.isFile()) files.push(relPath);
++      else throw new Error(`unexpected entry in pinned set: ${relPath}`);
++    }
++  };
++  for (const rel of PINNED_PATHS) {
++    if (statSync(path.join(ROOT, rel)).isDirectory()) walk(rel);
++    else files.push(rel);
++  }
++  const actual = files
++    .map((rel) => {
++      const abs = path.join(ROOT, rel);
++      const oid = execFileSync('git', ['hash-object', abs], { encoding: 'utf8' }).trim();
++      const mode = (statSync(abs).mode & 0o111) !== 0 ? '100755' : '100644';
++      return `${mode} blob ${oid}\t${rel}`;
++    })
++    .sort((a, b) => Buffer.compare(Buffer.from(a.split('\t')[1]), Buffer.from(b.split('\t')[1])));
++  const embeddedSorted = [...embedded].sort((a, b) => Buffer.compare(Buffer.from(a.split('\t')[1]), Buffer.from(b.split('\t')[1])));
++  assert.deepEqual(embeddedSorted, actual,
++    'the embedded manifest drifted from the implementation — regenerate it in the same change, never by hand');
++  assert.deepEqual(embedded, actual, 'the embedded manifest must be in git ls-tree order (path, byte sort)');
++});
++
++test('the backup implementation never loads a .env file or dotenv', () => {
++  for (const file of readdirSync(path.join(ROOT, 'scripts', 'backup'))) {
++    if (!file.endsWith('.mjs')) continue;
++    const body = readFileSync(path.join(ROOT, 'scripts', 'backup', file), 'utf8');
++    assert.doesNotMatch(body, /from\s+['"]dotenv['"]|import\s*\(\s*['"]dotenv['"]|require\(\s*['"]dotenv['"]/, `${file} must not import dotenv`);
++    assert.doesNotMatch(body, /['"`][^'"`]*\.env['"`]/, `${file} must not read a .env file`);
++  }
++});
++
++test('the gate fetches by exact commit and refuses anything else', () => {
++  const gate = jobs['exact-code-gate'];
++  const fetchStep = (gate.steps ?? []).find((s) => /Fetch the requested commit/i.test(String(s.name ?? '')));
++  assert.ok(fetchStep, 'the fetch step must exist');
++  assert.match(String(fetchStep.run ?? ''), /git fetch --no-tags --depth=1 origin/);
++  assert.match(String(fetchStep.run ?? ''), /git init/, 'the gate must work from an empty directory');
++  assert.doesNotMatch(stepNames(gate), /checkout/i, 'the gate must not depend on a checked-out tree');
++});

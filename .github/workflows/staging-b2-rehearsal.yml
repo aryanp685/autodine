@@ -138,10 +138,10 @@ jobs:
           100755 blob 35cfbb3dee583e2b9d87e9a14e23ca65941f2642	.github/actions/postgres-client/install-client.sh
           100755 blob ff890e80ccd94b353e96ef903884d68a589ce78f	.github/actions/postgres-client/verify-client.sh
           100644 blob d7defa59ed60dc1187f348771265c56fd06bddd9	package-lock.json
-          100644 blob 1cf262bf36b1c06cc23ee050b4037625288db145	package.json
+          100644 blob 96e1d3d4a4a80943724e8e48c2a5120e1db735c7	package.json
           100644 blob cf5326d1ada5681e5b4af4895be3d8da96a2b51d	scripts/backup/b2-owner-checklist.test.mjs
           100644 blob 5b657cc7577aaa63ba0ba8cf284f6d52c51bd7c3	scripts/backup/b2-upload.test.mjs
-          100644 blob 4d929c91276bdf9b69041d2cc6f537617b6e5fdf	scripts/backup/backup-logical.mjs
+          100644 blob 8fce2f5b0a7890174d84660f306c3fc2d0755ccf	scripts/backup/backup-logical.mjs
           100644 blob 31850aef84926d2e1f161a66312cedfa2134317d	scripts/backup/backup-mode.test.mjs
           100644 blob 045f016307b163395790fb3dcc1d49c7e762623c	scripts/backup/backup-source.test.mjs
           100644 blob 7e4e0df3e49f16dfac4103e1fef114342af575de	scripts/backup/check-dr-objectives.mjs
@@ -154,12 +154,13 @@ jobs:
           100644 blob 644ca4d7fc3b425780436d0f92b75837b39b94da	scripts/backup/lib-b2.mjs
           100644 blob aa0899f196e7278a3be10f6a0bd05e63541e7f23	scripts/backup/lib-backup-mode.mjs
           100644 blob b99e1d42f44d9a872d0d72598ed61a28584d72f7	scripts/backup/lib-backup-source.mjs
-          100644 blob 90d8e9128941addd812be2acb4094b6e0b3c2951	scripts/backup/lib-crypto.mjs
+          100644 blob 8094474fe5d4323013fa76dd0576e58a82201469	scripts/backup/lib-crypto.mjs
           100644 blob 135ea4222048f81ff5924208e249125308e8b9ac	scripts/backup/lib-dump.mjs
           100644 blob c30afd406a996b289bf3bf0511bf3c96ad6355bf	scripts/backup/lib-pg-client.mjs
           100644 blob 5b10a49ae6355b516945e4601215723721f8f82f	scripts/backup/lib-pg-client.test.mjs
           100644 blob 24049caa0cd1e6b8a6a98f3ee61c47f0ae6c0057	scripts/backup/lib-restore-target.mjs
           100644 blob 22c8f72f2cb18f9c6197c15035bf341c425b71ba	scripts/backup/lib-schedule.mjs
+          100644 blob 509327306305dc972777f5f77b6e1b19373d10e0	scripts/backup/passphrase-contract.test.mjs
           100644 blob d091edbb3fa5c2dfe09c1c6ef40f74e8c5d03818	scripts/backup/postgres-client-action.test.mjs
           100644 blob 5450afbaa6db794f11dda52e4b015559439c54bc	scripts/backup/postgres-client-env.test.mjs
           100644 blob 2096f69334b2861b746b3e48bd0ba6f5263912b4	scripts/backup/postgres-client-wiring.test.mjs
@@ -291,6 +292,15 @@ jobs:
           dir="$RUNNER_TEMP/autodine-staging-backup"
           log="$RUNNER_TEMP/autodine-staging-backup.log"
           mkdir -p "$dir"
+          # Refuse a passphrase that breaks the encryption contract BEFORE the
+          # database or B2 is contacted. The minimum lives in
+          # scripts/backup/lib-crypto.mjs (MIN_PASSPHRASE_LENGTH) and is mirrored
+          # here only as a pre-check: lib-crypto.mjs remains the authority and
+          # refuses the same value later, so the two cannot silently disagree.
+          if [ "${#AUTODINE_BACKUP_PASSPHRASE}" -lt 12 ]; then
+            echo "::error title=Staging rehearsal configuration::STAGING_AUTODINE_BACKUP_PASSPHRASE is shorter than the 12-character minimum enforced by scripts/backup/lib-crypto.mjs. Length only; the value is never read or printed. Nothing was written and no database or B2 connection was attempted."
+            exit 1
+          fi
           # Runtime failures must be readable without an elevated log viewer.
           # Only credential LENGTHS are printed, never values.
 
