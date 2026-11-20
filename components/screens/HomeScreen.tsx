@@ -6,6 +6,8 @@ import { ProductScene } from '@/components/ProductScene';
 import { SiteMotion } from '@/components/SiteMotion';
 import { HomeNav } from '@/components/HomeNav';
 import { BrandLockup } from '@/components/BrandMark';
+import { HeroTableScene } from '@/components/marketing/HeroTableScene';
+import { HeroVisualMotion, PhoneFloat } from '@/components/marketing/HeroVisualMotion';
 import { BRAND_GREEN } from '@/lib/brand';
 import { TRIAL_DAYS } from '@/lib/trial';
 
@@ -142,13 +144,17 @@ function Hero() {
         aria-hidden="true"
       />
 
-      <div className="mx-auto grid max-w-[1180px] gap-14 px-5 pb-24 pt-20 sm:px-8 sm:pt-28 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:pb-32">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-forest" data-hero-step>
+      <div className="mx-auto grid max-w-[1180px] gap-14 px-5 pb-20 pt-16 sm:px-8 sm:pt-24 lg:grid-cols-[1.02fr_0.98fr] lg:items-center lg:pb-28 lg:pt-24">
+        <div className="relative">
+          <p
+            className="inline-flex items-center gap-2.5 rounded-full border border-forest/15 bg-white/70 px-3.5 py-1.5 text-[10.5px] font-semibold tracking-[0.16em] text-forest uppercase shadow-[0_1px_0_rgba(255,255,255,0.9)_inset] backdrop-blur"
+            data-hero-step
+          >
+            <span aria-hidden="true" className="size-1.5 rounded-full bg-forest" />
             Restaurant technology
           </p>
 
-          <h1 className="mt-6 text-[clamp(2.35rem,6.2vw,4.6rem)] font-medium leading-[0.98] tracking-[-0.045em] text-cream">
+          <h1 className="mt-7 text-[clamp(2.4rem,6.2vw,4.6rem)] font-medium leading-[0.98] tracking-[-0.045em] text-cream">
             <span className="block overflow-hidden">
               <span className="block" data-line>Every table,</span>
             </span>
@@ -160,29 +166,58 @@ function Hero() {
             </span>
           </h1>
 
-          <p className="mt-7 max-w-[48ch] text-[15px] leading-[1.6] text-mute" data-hero-step>
-            Scan the table card. Order on the phone. Keep the table and kitchen connected.
+          <p className="mt-7 max-w-[48ch] text-[15px] leading-[1.65] text-mute" data-hero-step>
+            Scan the table card. Order on the phone. Keep the table and kitchen connected — with the
+            menu, the pass and the bill in one calm place.
           </p>
 
           <div className="mt-9 flex flex-wrap items-center gap-3" data-hero-step>
             <Link
               href="/signup"
-              className="inline-flex h-12 items-center gap-2 rounded-full bg-forest px-6 text-[14px] font-medium text-white transition-colors hover:bg-forest-strong"
+              className="group inline-flex h-12 items-center gap-2.5 rounded-full bg-forest px-6 text-[14px] font-medium text-white shadow-[0_10px_30px_-12px_rgba(31,77,58,0.55)] transition-[background-color,transform,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-forest-strong hover:shadow-[0_16px_36px_-12px_rgba(31,77,58,0.55)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
               Start the {TRIAL_DAYS}-day trial
-              <span aria-hidden="true">→</span>
+              <span aria-hidden="true" className="transition-transform duration-300 group-hover:translate-x-0.5 motion-reduce:transition-none">→</span>
             </Link>
             <Link
               href="#how"
-              className="inline-flex h-12 items-center gap-2 rounded-full border border-cream/15 px-6 text-[14px] text-cream transition-colors hover:border-cream/30 hover:bg-ink-soft"
+              className="inline-flex h-12 items-center gap-2 rounded-full border border-gink-12 bg-white/65 px-6 text-[14px] text-cream backdrop-blur transition-[background-color,border-color,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:border-forest/25 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
               See how it works
             </Link>
-            <span className="text-[12px] text-mute-dim">No card. Nothing charged during preview.</span>
           </div>
+          <p className="mt-4 text-[12px] text-mute-dim" data-hero-step>
+            No card. Nothing charged during preview.
+          </p>
         </div>
 
-        <PhoneMockup />
+        <div className="relative mx-auto w-full max-w-[560px] lg:mx-0 lg:ml-auto" data-hero-step>
+          <HeroVisualMotion className="relative">
+            <div className="relative aspect-[10/14] w-full overflow-hidden rounded-[38px] border border-white/70 bg-[radial-gradient(120%_100%_at_72%_8%,#fffdf8_0%,#f6efe1_52%,#eee4d2_100%)] shadow-[0_36px_80px_-48px_rgba(31,77,58,0.35)] sm:aspect-[5/4.5] lg:aspect-[5/4.25]">
+              <div
+                aria-hidden="true"
+                className="absolute inset-0 bg-[radial-gradient(60%_45%_at_18%_12%,rgba(31,77,58,0.07),transparent_62%)]"
+              />
+              <HeroTableScene />
+              <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#eee4d2]/70 to-transparent" aria-hidden="true" />
+
+              <PhoneFloat className="absolute left-1/2 top-1/2 w-[212px] -translate-x-1/2 -translate-y-1/2 sm:left-auto sm:right-3 sm:w-[248px] sm:translate-x-0 sm:-translate-y-[53%]">
+                <PhoneMockup />
+              </PhoneFloat>
+            </div>
+          </HeroVisualMotion>
+
+          <div
+            aria-hidden="true"
+            className="absolute -left-3 bottom-6 hidden items-center gap-2.5 rounded-2xl border border-white/80 bg-white/85 px-3.5 py-2.5 shadow-[0_14px_36px_-20px_rgba(31,77,58,0.35)] backdrop-blur sm:flex"
+          >
+            <span className="grid size-8 place-items-center rounded-full bg-forest-soft text-[13px] text-forest">✓</span>
+            <span>
+              <span className="block text-[11px] font-medium text-cream">Order sent to the kitchen</span>
+              <span className="block text-[10px] text-mute-dim">Table 05 · no app to install</span>
+            </span>
+          </div>
+        </div>
       </div>
 
       <div className="relative border-t border-cream/10">
@@ -220,14 +255,12 @@ function PhoneMockup() {
   ];
 
   return (
-    <div className="relative mx-auto w-full max-w-[330px] lg:mx-0 lg:ml-auto" data-hero-step>
-      <div className="absolute -inset-8 -z-10 rounded-[48px] bg-[radial-gradient(60%_50%_at_50%_40%,rgba(31,77,58,0.10),transparent_70%)] blur-2xl" aria-hidden="true" />
-
-      <div data-phone-float className="rounded-[34px] border border-cream/15 bg-ink-soft p-2.5 shadow-[0_40px_80px_-40px_rgba(28,27,24,0.22)]">
-        <div className="overflow-hidden rounded-[26px] bg-ink">
+    <div className="relative mx-auto w-full" data-hero-step>
+      <div data-phone-float className="rounded-[34px] border border-white/80 bg-white/90 p-2 shadow-[0_36px_70px_-32px_rgba(31,77,58,0.35)] backdrop-blur">
+        <div className="overflow-hidden rounded-[27px] bg-ink ring-1 ring-gink-07">
           <div className="flex items-center justify-between px-4 pt-3 text-[10px] text-mute-dim">
             <span>9:41</span>
-            <span className="h-1.5 w-16 rounded-full bg-cream/25" />
+            <span className="h-1.5 w-16 rounded-full bg-gink-12" />
             <span>5G</span>
           </div>
 
@@ -240,14 +273,14 @@ function PhoneMockup() {
             <span className="grid h-8 w-8 place-items-center rounded-full bg-ink-soft text-mute">✕</span>
           </div>
 
-          <div className="flex gap-1.5 px-4 pb-4 text-[10px]">
+          <div className="flex gap-1 overflow-hidden px-4 pb-4 text-[9px]">
             {['All', 'Starters', 'Mains', 'Desserts'].map((tab, i) => (
               <span
                 key={tab}
                 className={
                   i === 0
-                    ? 'rounded-full bg-forest px-3 py-1 font-medium text-white'
-                    : 'rounded-full bg-ink-soft px-3 py-1 text-mute'
+                    ? 'whitespace-nowrap rounded-full bg-forest px-2 py-1 font-medium text-white'
+                    : 'whitespace-nowrap rounded-full bg-ink-soft px-2 py-1 text-mute'
                 }
               >
                 {tab}
@@ -258,12 +291,12 @@ function PhoneMockup() {
           <ul className="space-y-2 px-3 pb-4">
             {dishes.map((dish) => (
               <li key={dish.name} className="flex gap-3 rounded-2xl border border-hair bg-white p-2.5">
-                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl">
-                  <Image src={dish.img} alt="" fill sizes="80px" className="object-cover" />
+                <div className="relative h-[70px] w-[70px] shrink-0 overflow-hidden rounded-xl">
+                  <Image src={dish.img} alt="" fill sizes="70px" className="object-cover" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-medium">{dish.name}</p>
-                  <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-mute-dim">
+                  <p className="text-[12.5px] font-medium">{dish.name}</p>
+                  <p className="mt-0.5 line-clamp-2 text-[9.5px] leading-snug text-mute-dim">
                     Cooked in rich tomato gravy with butter
                   </p>
                   <div className="mt-1.5 flex items-center justify-between">
@@ -278,8 +311,8 @@ function PhoneMockup() {
       </div>
 
       {/* The table card, because the whole product starts with one. */}
-      <div className="absolute -bottom-6 -left-4 hidden rounded-2xl border border-cream/15 bg-ink-card p-3 sm:block">
-        <div className="grid h-16 w-16 place-items-center rounded-lg bg-ink">
+      <div className="absolute -bottom-5 -left-4 hidden rounded-2xl border border-white/80 bg-white/90 p-3 shadow-[0_18px_36px_-24px_rgba(31,77,58,0.4)] backdrop-blur sm:block">
+        <div className="grid h-14 w-14 place-items-center rounded-lg bg-ink ring-1 ring-gink-07">
           <div className="grid grid-cols-5 gap-0.5" aria-hidden="true">
             {Array.from({ length: 25 }).map((_, i) => (
               <span key={i} className={`h-1.5 w-1.5 ${i % 3 === 0 || i % 7 === 0 ? 'bg-cream' : 'bg-transparent'}`} />
