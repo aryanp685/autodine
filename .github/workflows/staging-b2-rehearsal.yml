@@ -312,6 +312,32 @@ jobs:
           node scripts/backup/restore-logical.mjs --file "$artifact" --confirm-empty-db
           echo "RESTORE_SECONDS=$(($(date +%s) - start))" >> "$GITHUB_ENV"
           node scripts/backup/verify-restored-db.mjs --manifest "$manifest" --artifact "$artifact" | tee "$dir/restore-report.json"
+      - name: Sanitized failure diagnostic (names, codes and lengths only)
+        if: failure()
+        run: |
+          # A fail-closed job that cannot say WHY it failed is unusable inside a
+          # protected environment, where the raw log needs an elevated viewer.
+          # Emit a scrubbed reason as a check annotation, readable with the
+          # standard API. Only fixed vocabulary, exit codes and credential
+          # LENGTHS are ever printed: no value, URL or key reaches this output.
+          set -uo pipefail
+          reason='unspecified'
+          if [ -n "${AUTODINE_BACKUP_PASSPHRASE:-}" ] && [ "${#AUTODINE_BACKUP_PASSPHRASE}" -lt 12 ]; then
+            reason="STAGING_AUTODINE_BACKUP_PASSPHRASE is ${#AUTODINE_BACKUP_PASSPHRASE} chars; backup-logical.mjs refuses anything under 12 (length only, value never read)"
+          elif [ -z "${AUTODINE_BACKUP_SOURCE_URL:-}" ]; then
+            reason='STAGING_AUTODINE_BACKUP_SOURCE_URL was empty inside the protected environment'
+          elif [ -z "${B2_ACCESS_KEY_ID:-}" ] || [ -z "${B2_SECRET_ACCESS_KEY:-}" ] || [ -z "${B2_BUCKET:-}" ] || [ -z "${B2_REGION:-}" ]; then
+            reason='a required B2 credential, bucket or region was empty inside the protected environment'
+          else
+            reason='all six secrets are non-empty and the passphrase meets the length rule; the failing component reported its credential-free reason in the step above (pg_dump, DNS/TLS to the staging host, or B2 upload signing)'
+          fi
+          reason="$(printf '%s' "$reason" | tr '\n' ' ' | sed -E 's#(postgres(ql)?|https?)://[^ ]*#<url-redacted>#g; s/[A-Za-z0-9+/=_-]{40,}/<redacted>/g' | cut -c1-600)"
+          echo "::error title=Staging rehearsal failure reason::${reason}"
+          {
+            echo '### Failure reason (sanitized)';
+            echo "- ${reason}";
+            echo '- No secret value, database URL or key is included in this annotation.';
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Evidence summary
         if: always()
         run: |
