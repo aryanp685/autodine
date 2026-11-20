@@ -45,10 +45,10 @@ READY = code and evidence. BLOCKED = target, authorization, schema parity.
 |---|---|
 | Branch | `arena/ce32f7c8-autodine` (branched from `arena/2670dd12-autodine` @ `7064c91`) |
 | Starting HEAD | `7064c912b1b85ab6364f23d1755d855ff4f462ad` |
-| Final HEAD | `f1a6400` — `7064c91` + three commits: **`c61f98a`** (product, migrations, tests — 272 files, +20,673/−3,158), **`352bc2e`** (evidence/docs — 38 files), **`f1a6400`** (CI: adopt main's valid `hosted-restore-drill.yml`) |
+| Final HEAD | `362158a` — `7064c91` + five commits: **`c61f98a`** (product, migrations, tests — 272 files, +20,673/−3,158), **`352bc2e`** (evidence/docs — 38 files), **`f1a6400`** (CI: adopt main's valid `hosted-restore-drill.yml`), **`9053721`** (this record updated), **`362158a`** (test: deadlock retry in the overload-DDL case) |
 | Working tree | **clean** |
 | Branch pushed | **yes** — `origin/arena/ce32f7c8-autodine` (owner-authorized commit + push, 2026-11-20) |
-| CI at `f1a6400` | **CI success** (typecheck·lint·design·test·build + SQL boundaries on PG 15/17/18, run `44805475066`) · **E2E (browser) success** (`44805474933`) · **Throttle browser E2E success** (`44805475067`) |
+| CI | **success** at `f1a6400` (run `44805475066`) and at `362158a` (run `44806687567`, all four jobs: typecheck·lint·design·test·build and SQL boundaries on PG 15/17/18) · **E2E (browser) success** at `f1a6400` (`44805474933`) · **Throttle browser E2E success** (`44805475067`) |
 | Merged main | `0468d3a` — merge of PR #195 |
 | Divergence from main | 42 files, 4 of them migrations (`20261119000100…21190400`) |
 
@@ -431,6 +431,18 @@ option.
   accepts an unmeasured RTO.
 
 ---
+
+### CI failure found and fixed while committing
+
+The first CI run of the pushed branch (`9053721`) failed in the PG 18 job with
+`deadlock detected` (`40P01`) at `lib/db/readiness.integration.test.ts` — the one
+case that drops and recreates `place_order`, which needs an `ACCESS EXCLUSIVE`
+lock on a function another suite, running in parallel against the same
+disposable database, was holding. The same commit passed on re-run, so it is a
+scheduling artefact rather than a product signal. `362158a` sets a 5 s
+`lock_timeout` and retries that transaction up to four times on `40P01`/`55P03`
+only; every assertion inside the attempt still has to pass, and any other error
+still fails the test. CI at `362158a` is green.
 
 ### Branch hygiene fix made during the commit
 
