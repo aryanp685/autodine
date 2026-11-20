@@ -45,7 +45,7 @@ READY = code and evidence. BLOCKED = target, authorization, schema parity.
 |---|---|
 | Branch | `arena/ce32f7c8-autodine` (branched from `arena/2670dd12-autodine` @ `7064c91`) |
 | Starting HEAD | `7064c912b1b85ab6364f23d1755d855ff4f462ad` |
-| Final HEAD | `362158a` — `7064c91` + five commits: **`c61f98a`** (product, migrations, tests — 272 files, +20,673/−3,158), **`352bc2e`** (evidence/docs — 38 files), **`f1a6400`** (CI: adopt main's valid `hosted-restore-drill.yml`), **`9053721`** (this record updated), **`362158a`** (test: deadlock retry in the overload-DDL case) |
+| Final HEAD | six commits on `7064c91`: product **`c61f98a`** (272 files, +20,673/−3,158), evidence **`352bc2e`**, workflow fix **`f1a6400`**, CI record **`9053721`**, deadlock retry **`362158a`**, plus the documentation-only commits that follow. Last fully verified head: **`e8f6b49`** — every later commit is documentation only, so the code tree it describes is unchanged |
 | Working tree | **clean** |
 | Branch pushed | **yes** — `origin/arena/ce32f7c8-autodine` (owner-authorized commit + push, 2026-11-20) |
 | CI | **success** at `f1a6400` (run `44805475066`) and at `362158a` (run `44806687567`, all four jobs: typecheck·lint·design·test·build and SQL boundaries on PG 15/17/18) · **E2E (browser) success** at `f1a6400` (`44805474933`) · **Throttle browser E2E success** (`44805475067`) |
