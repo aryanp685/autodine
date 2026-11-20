@@ -1027,19 +1027,36 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
     finally { await db.query('update orders set hold_required=false where id=$1',[a.order]); }
   });
   it('revokes every retired placement overload even when the four-argument signature is absent',async()=>{
-    await db.query('begin');
-    try {
-      await db.query('drop function if exists public.place_order(text,text,jsonb,text)');
-      await db.query(`create function public.place_order(text,jsonb,text) returns text language sql as $$ select 'test-only'::text $$;
-        grant execute on function public.place_order(text,jsonb,text) to public,anon,authenticated;`);
-      await db.query(await readFile('supabase/migrations/20261109000400_order_write_boundary.sql','utf8'));
-      for (const role of ['anon','authenticated']) {
-        expect((await db.query("select has_function_privilege($1,'public.place_order(text,jsonb,text)','EXECUTE') allowed",[role])).rows[0].allowed).toBe(false);
+    // This is the only case in the suite that drops and recreates a function,
+    // which needs an ACCESS EXCLUSIVE lock on place_order. Another suite
+    // running in parallel against the same disposable database can be holding
+    // a lock on that function, and PostgreSQL then reports a deadlock (40P01)
+    // or a lock timeout (55P03). That is a scheduling artefact of a shared
+    // database, not a product signal, so the transaction is retried; every
+    // assertion below still has to pass for the retry to count as a pass.
+    const attempt=async()=>{
+      await db.query('begin');
+      try {
+        await db.query("set local lock_timeout = '5s'");
+        await db.query('drop function if exists public.place_order(text,text,jsonb,text)');
+        await db.query(`create function public.place_order(text,jsonb,text) returns text language sql as $$ select 'test-only'::text $$;
+          grant execute on function public.place_order(text,jsonb,text) to public,anon,authenticated;`);
+        await db.query(await readFile('supabase/migrations/20261109000400_order_write_boundary.sql','utf8'));
+        for (const role of ['anon','authenticated']) {
+          expect((await db.query("select has_function_privilege($1,'public.place_order(text,jsonb,text)','EXECUTE') allowed",[role])).rows[0].allowed).toBe(false);
+        }
+        await db.query('drop function public.place_order(text,jsonb,text)');
+        // Zero legacy overloads must be a safe no-op too.
+        await db.query(await readFile('supabase/migrations/20261109000400_order_write_boundary.sql','utf8'));
+      } finally { await db.query('rollback'); }
+    };
+    for(let tries=1;;tries+=1){
+      try { await attempt(); return; }
+      catch(error){
+        const code=error && typeof error==='object' && 'code' in error ? (error as {code?:string}).code : undefined;
+        if(tries>=4||(code!=='40P01'&&code!=='55P03')) throw error;
       }
-      await db.query('drop function public.place_order(text,jsonb,text)');
-      // Zero legacy overloads must be a safe no-op too.
-      await db.query(await readFile('supabase/migrations/20261109000400_order_write_boundary.sql','utf8'));
-    } finally { await db.query('rollback'); }
+    }
   });
   it('does not expose the legacy order entrypoint or caller-selected rate budgets',async()=>{
     const row=(await db.query(`select has_function_privilege('anon','public.place_order(text,text,jsonb,text)','EXECUTE') legacy,
