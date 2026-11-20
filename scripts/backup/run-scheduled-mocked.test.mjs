@@ -78,7 +78,8 @@ globalThis.fetch = async (_url, options) => {
     }
     writeFileSync(alerts, '');
     const out = path.join(dir, secret);
-    const success = spawnSync(process.execPath, ['--import', preload, script, '--out-dir', out, '--b2', '--prune-b2', '--skip-verify', '--skip-dr-objectives'], {
+    const reportPath = path.join(dir, 'timings.json');
+    const success = spawnSync(process.execPath, ['--import', preload, script, '--out-dir', out, '--b2', '--prune-b2', '--skip-verify', '--skip-dr-objectives', '--report', reportPath], {
       encoding: 'utf8', timeout: 10000,
       env: { PATH: process.env.PATH, HOME: process.env.HOME, MOCK_DIR: out, MOCK_STAGE: 'success', MOCK_HTTP: 'ok', MOCK_SECRET: secret, MOCK_ALERTS: alerts },
     });
@@ -86,6 +87,14 @@ globalThis.fetch = async (_url, options) => {
     assert.match(success.stdout, /"uploaded":true,"verified":true/);
     assert.match(success.stdout, /backup verification skipped, DR objectives skipped/);
     assert.ok(!(success.stdout + success.stderr).includes(secret));
+    const report = JSON.parse(readFileSync(reportPath, 'utf8'));
+    assert.equal(report.completed, true);
+    assert.equal(report.uploaded, true);
+    assert.equal(report.remotelyVerified, true);
+    assert.equal(typeof report.timings.backupSeconds, 'number');
+    assert.equal(typeof report.timings.uploadSeconds, 'number');
+    assert.equal(report.timings.verificationSeconds, null);
+    assert.equal(report.timings.objectivesSeconds, null);
     assert.equal(readFileSync(alerts, 'utf8'), '');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

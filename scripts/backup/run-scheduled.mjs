@@ -39,7 +39,7 @@
  * are printed as skipped — they are never a silent pass.
  */
 import { spawnSync } from 'node:child_process';
-import { readdirSync, statSync } from 'node:fs';
+import { readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { selectNewestBackup, formatBackupAlert, scheduledFailure, BACKUP_NAME_RE } from './lib-schedule.mjs';
@@ -68,6 +68,15 @@ const skipVerify = opt['skip-verify'] === '1';
 const skipObjectives = opt['skip-dr-objectives'] === '1';
 const uploadB2 = opt['b2'] === '1';
 const pruneB2 = opt['prune-b2'] === '1';
+const reportPath = opt.report ?? null;
+const pipelineStarted = Date.now();
+const timings = {};
+const timedChild = (name, childArgs) => {
+  const started = Date.now();
+  const result = runChild(childArgs);
+  timings[`${name}Seconds`] = Math.max(0, (Date.now() - started) / 1000);
+  return result;
+};
 
 const alertHook = process.env.BACKUP_ALERT_WEBHOOK || process.env.DR_ALERT_WEBHOOK || null;
 const alert = async (stage, reason, exitCode) => {
@@ -105,7 +114,7 @@ const backupArgs = [path.join(scriptDir, 'backup-logical.mjs'), '--out-dir', out
 for (const key of ['keep-daily', 'keep-weekly', 'keep-monthly']) {
   if (opt[key]) backupArgs.push(`--${key}`, String(opt[key]));
 }
-const backup = runChild(backupArgs);
+const backup = timedChild('backup', backupArgs);
 if (backup.status !== 0) {
   await die('backup', 'child', backup.status);
 }
@@ -130,7 +139,7 @@ if (skipVerify) {
   if (!newest) {
     await die('verify', 'missing');
   }
-  const verify = runChild([path.join(scriptDir, 'verify-backup-file.mjs'), path.join(outDir, newest.name)]);
+  const verify = timedChild('verification', [path.join(scriptDir, 'verify-backup-file.mjs'), path.join(outDir, newest.name)]);
   if (verify.status !== 0) {
     await die('verify', 'child', verify.status);
   }
@@ -145,7 +154,7 @@ if (skipObjectives) {
   const objectiveArgs = [path.join(scriptDir, 'check-dr-objectives.mjs'), '--backup-dir', outDir, '--rpo-minutes', String(rpoMinutes)];
   if (rtoMinutes !== null) objectiveArgs.push('--rto-minutes', String(rtoMinutes));
   if (restoreReport) objectiveArgs.push('--restore-report', restoreReport);
-  const objectives = runChild(objectiveArgs);
+  const objectives = timedChild('objectives', objectiveArgs);
   if (objectives.status !== 0) {
     await die('objectives', 'child', objectives.status);
   }
@@ -170,7 +179,7 @@ if (uploadB2) {
   if (!newest) {
     await die('upload', 'missing');
   }
-  const upload = runChild([path.join(scriptDir, 'upload-b2.mjs'), '--file', path.join(outDir, newest.name)]);
+  const upload = timedChild('upload', [path.join(scriptDir, 'upload-b2.mjs'), '--file', path.join(outDir, newest.name)]);
   if (upload.status !== 0) {
     await die('upload', 'child', upload.status);
   }
@@ -193,4 +202,21 @@ if (pruneB2) {
 
 const verifySummary = skipVerify ? 'backup verification skipped' : 'newest artifact verified';
 const objectivesSummary = skipObjectives ? 'DR objectives skipped' : 'DR objectives checked';
+if (reportPath) {
+  const report = {
+    completed: true,
+    uploaded: uploadB2,
+    remotelyVerified: uploadB2,
+    timings: {
+      backupSeconds: timings.backupSeconds,
+      verificationSeconds: timings.verificationSeconds ?? null,
+      objectivesSeconds: timings.objectivesSeconds ?? null,
+      uploadSeconds: timings.uploadSeconds ?? null,
+      totalSeconds: Math.max(0, (Date.now() - pipelineStarted) / 1000),
+    },
+  };
+  const temporary = `${reportPath}.tmp-${process.pid}`;
+  writeFileSync(temporary, JSON.stringify(report, null, 2) + '\n', { mode: 0o600 });
+  renameSync(temporary, reportPath);
+}
 process.stdout.write(`run-scheduled: OK — backup taken, ${verifySummary}, ${objectivesSummary}${uploadB2 ? ', B2 upload remotely verified' : ''}.\n`);
