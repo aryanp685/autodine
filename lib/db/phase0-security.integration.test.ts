@@ -49,8 +49,7 @@ async function fixture(): Promise<Fixture> {
   const tokens: string[] = [];
   for (const label of ['T1', 'T2']) {
     const table = (await db.query(`insert into dining_tables(restaurant_id,label) values($1,$2) returning id`, [restaurant, label])).rows[0].id;
-    const token = randomUUID().replaceAll('-', '') + randomUUID().replaceAll('-', '');
-    await db.query('insert into table_qr_codes(restaurant_id,table_id,public_token) values($1,$2,$3)', [restaurant, table, token]);
+    const token = (await db.query('select public_token from table_qr_codes where table_id=$1 and revoked_at is null', [table])).rows[0].public_token as string;
     tokens.push(token);
   }
   const sessionToken = (await db.query('select * from open_table_session($1,$2)', [tokens[0], 'a'.repeat(64)])).rows[0].session_token;
@@ -479,6 +478,51 @@ describe.skipIf(!URL_VALUE)('Phase 0 database security boundaries', () => {
       expect(outcome.live).toBe(0);
     });
 
+    it('refuses a second live card for one table at the database level', async () => {
+      // The invariant that makes a printed card unambiguous. It is enforced by
+      // table_qr_codes_one_active_per_table, so it holds even for a writer that
+      // never calls rotate_table_qr_code (20261122000200).
+      const table = (await db.query(
+        "insert into dining_tables(restaurant_id,label) values($1,'invariant') returning id",
+        [a.restaurant])).rows[0].id as string;
+      const live = (await db.query(
+        'select public_token from table_qr_codes where table_id=$1 and revoked_at is null', [table])).rows[0].public_token;
+      expect(live).toBeTruthy();
+      await expect(db.query('insert into table_qr_codes(restaurant_id,table_id,public_token) values($1,$2,$3)',
+        [a.restaurant, table, randomUUID().replaceAll('-', '')])).rejects.toMatchObject({ code: '23505' });
+      // Once the live card is revoked the slot is free again, so rotation and
+      // replacement still work.
+      await db.query('update table_qr_codes set revoked_at=now() where table_id=$1 and revoked_at is null', [table]);
+      await db.query('insert into table_qr_codes(restaurant_id,table_id,public_token) values($1,$2,$3)',
+        [a.restaurant, table, randomUUID().replaceAll('-', '')]);
+      expect(await liveCodes(table)).toBe(1);
+    });
+
+    it('serialises concurrent rotations so a table never ends with two live cards', async () => {
+      const table = (await db.query(
+        "insert into dining_tables(restaurant_id,label) values($1,'race') returning id",
+        [a.restaurant])).rows[0].id as string;
+      const rotate = async (client: Client) => {
+        await client.query('begin');
+        await client.query("select set_config('request.jwt.claim.sub',$1,true)", [a.owner]);
+        await client.query('set local role authenticated');
+        const { rows } = await client.query('select rotate_table_qr_code($1) token', [table]);
+        await client.query('commit');
+        return rows[0].token as string;
+      };
+      const one = new Client({ connectionString: URL_VALUE });
+      const two = new Client({ connectionString: URL_VALUE });
+      await one.connect(); await two.connect();
+      try {
+        const [first, second] = await Promise.all([rotate(one), rotate(two)]);
+        expect(first).not.toBe(second);
+        // Both rotations committed. Whatever the interleaving, the table has
+        // exactly one live card afterwards: the advisory lock and the unique
+        // index agree.
+        expect(await liveCodes(table)).toBe(1);
+      } finally { await one.end(); await two.end(); }
+    });
+
     it("lets the outlet's owner rotate and retire its own code", async () => {
       const target = await tableOf(b.freshQrToken);
       const outcome = await staff(b.owner, async () => {
@@ -493,6 +537,56 @@ describe.skipIf(!URL_VALUE)('Phase 0 database security boundaries', () => {
       // leaves none.
       expect(outcome.afterRotate).toBe(1);
       expect(outcome.afterRetire).toBe(0);
+    });
+  });
+
+  describe('kitchen announcement claims', () => {
+    // These two need committed state, so they switch role for the session
+    // instead of using the rollback wrapper.
+    const asCommitted = async <T>(user: string, work: () => Promise<T>): Promise<T> => {
+      await db.query("select set_config('request.jwt.claim.sub',$1,false)", [user]);
+      await db.query('set role authenticated');
+      try { return await work(); } finally {
+        await db.query('reset role');
+        await db.query("select set_config('request.jwt.claim.sub','',false)");
+      }
+    };
+
+    it('hands a stale claim to another device and keeps a fresh one', async () => {
+      const order = (await db.query(
+        `insert into orders(restaurant_id,code,prep_status,subtotal_paise,total_paise)
+         values($1,$2,'new',12500,12500) returning id`,
+        [a.restaurant, 'CLAIM' + randomUUID().slice(0, 8)])).rows[0].id as string;
+      const second = randomUUID();
+      await db.query('insert into profiles(id) values ($1)', [second]);
+      await db.query("insert into memberships(restaurant_id,user_id,role) values ($1,$2,'kitchen')", [a.restaurant, second]);
+
+      const claim = (user: string) => asCommitted(user, async () => (await db.query(
+        'select claim_kitchen_order_announcement($1) c', [order])).rows[0].c as boolean);
+
+      expect(await claim(a.kitchen)).toBe(true);
+      // A device that crashed holds the claim: without the two-minute expiry
+      // this call would return false forever and the ticket would never be
+      // announced (20261122000100).
+      expect(await claim(second)).toBe(false);
+      await db.query(
+        "update kitchen_announcement_claims set claimed_at = statement_timestamp() - interval '3 minutes' where order_id=$1",
+        [order]);
+      expect(await claim(second)).toBe(true);
+      expect((await db.query('select claimed_by from kitchen_announcement_claims where order_id=$1', [order])).rows[0].claimed_by).toBe(second);
+      // Still exactly one claim row per order, so the board cannot double-announce.
+      expect((await db.query('select count(*)::int n from kitchen_announcement_claims where order_id=$1', [order])).rows[0].n).toBe(1);
+    });
+
+    it('keeps the claim gate closed to non-kitchen staff and to guests', async () => {
+      const order = (await db.query(
+        `insert into orders(restaurant_id,code,prep_status,subtotal_paise,total_paise)
+         values($1,$2,'new',12500,12500) returning id`,
+        [a.restaurant, 'GATE' + randomUUID().slice(0, 8)])).rows[0].id as string;
+      await expect(asCommitted(a.cashier, async () => db.query(
+        'select claim_kitchen_order_announcement($1)', [order]))).rejects.toMatchObject({ code: '42501' });
+      await expect(guest(() => db.query('select claim_kitchen_order_announcement($1)', [order])))
+        .rejects.toMatchObject({ code: '42501' });
     });
   });
 

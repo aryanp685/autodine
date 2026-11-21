@@ -85,10 +85,48 @@ try {
     }
   }
 
+  // Data, not only catalog. The local harness seed is reused verbatim so the
+  // drill recovers the same synthetic tenant the checks read: one restaurant,
+  // one table with its card, one order. A catalog-only comparison cannot tell a
+  // real restore from an empty one.
+  const ROW_TABLES = ['restaurants', 'menus', 'dining_tables', 'table_qr_codes', 'orders'];
+  const countRows = async (url) => {
+    const client = new pg.Client({ connectionString: url });
+    await client.connect();
+    try {
+      const counts = {};
+      for (const table of ROW_TABLES) {
+        counts[table] = (await client.query(`select count(*)::int n from public.${table}`)).rows[0].n;
+      }
+      counts.restaurant_slug = (await client.query(
+        "select slug from public.restaurants where slug = 'kings-of-kings'")).rows[0]?.slug ?? null;
+      counts.first_order_code = (await client.query(
+        'select code from public.orders order by placed_at limit 1')).rows[0]?.code ?? null;
+      return counts;
+    } finally {
+      await client.end();
+    }
+  };
+  {
+    const client = new pg.Client({ connectionString: urlFor(source) });
+    await client.connect();
+    try {
+      await client.query(readFileSync('scripts/local-pg/900_local_seed.sql', 'utf8'));
+    } finally {
+      await client.end();
+    }
+  }
+  const rowsBefore = await countRows(urlFor(source));
+  assert.ok(rowsBefore.restaurants > 0 && rowsBefore.orders > 0,
+    `the drill needs data before it can prove data recovery: ${JSON.stringify(rowsBefore)}`);
+  console.log(`source rows: ${JSON.stringify(rowsBefore)}`);
+
   // The logical dump covers the public schema only; auth/storage belong to the
-// platform. Compare the same scope.
+  // platform. Compare the same scope, after the seed, so the fingerprint's row
+  // counts and checksums describe the source state that is actually dumped.
 const before = await fingerprint(urlFor(source), { schemas: ['public'] });
   console.log(`source fingerprint: ${before.snapshots.length} tables, ${before.policies.length} policies, ${before.functions.length} functions`);
+
 
   const outDir = path.join(scratch, 'backups');
   execFileSync(process.execPath, ['scripts/backup/backup-logical.mjs', '--out-dir', outDir], {
@@ -122,7 +160,35 @@ const before = await fingerprint(urlFor(source), { schemas: ['public'] });
       for (const x of as) if (!bs.has(x)) diff.push(`only-in-restored ${key}: ${x}`);
     } else if (JSON.stringify(a) !== JSON.stringify(b)) diff.push(`value ${key}: ${JSON.stringify(b)} -> ${JSON.stringify(a)}`);
   }
-  if (diff.length) { console.error('DIVERGENCE REPORT:\n' + diff.slice(0, 20).join('\n')); throw new Error(`restored catalog diverged from the source (${diff.length} entries)`); }
+  if (diff.length) {
+    // Both sides of each differing table, so a failure names the difference
+    // instead of only reporting that one exists.
+    const pick = (list, table) => list.find((x) => x.table === table);
+    const rowText = async (url, table) => {
+      const client = new pg.Client({ connectionString: url });
+      await client.connect();
+      try {
+        return (await client.query(`select to_jsonb(t)::text j from ${table} t order by 1`)).rows.map((r) => r.j);
+      } finally { await client.end(); }
+    };
+    for (const entry of diff) {
+      const table = JSON.parse(entry.split(': ').slice(1).join(': '))?.table;
+      if (!table) continue;
+      const [srcRows, dstRows] = await Promise.all([rowText(urlFor(source), table), rowText(urlFor(restored), table)]);
+      const src = srcRows.find((row) => !dstRows.includes(row)) ?? srcRows[0];
+      const dst = dstRows.find((row) => !srcRows.includes(row)) ?? dstRows[0];
+      console.error(`  ${table}: source=${JSON.stringify(pick(before.snapshots, table))} restored=${JSON.stringify(pick(after.snapshots, table))}`);
+      console.error(`    first differing row source: ${String(src).slice(0, 400)}`);
+      console.error(`    first differing row restored: ${String(dst).slice(0, 400)}`);
+    }
+    console.error('DIVERGENCE REPORT:\n' + diff.slice(0, 20).join('\n'));
+    throw new Error(`restored catalog diverged from the source (${diff.length} entries)`);
+  }
+  // Data recovery is a separate assertion from catalog equality.
+  const rowsAfter = await countRows(urlFor(restored));
+  assert.deepEqual(rowsAfter, rowsBefore,
+    `restored rows differ from the source: ${JSON.stringify({ before: rowsBefore, after: rowsAfter })}`);
+  console.log(`restored rows match the source: ${JSON.stringify(rowsAfter)}`);
   console.log(`LOCAL_LOGICAL_RESTORE_VERIFIED ${JSON.stringify({
     pgVersion: 17,
     migrations: migrationCount,
@@ -130,6 +196,8 @@ const before = await fingerprint(urlFor(source), { schemas: ['public'] });
     policies: before.policies.length,
     functions: before.functions.length,
     backupFormat: manifest.format,
+    rows: rowsAfter,
+    dataRestoreVerified: true,
     productionBackupClaim: false,
     ciCustomFormatDrill: 'not-run-locally',
   })}`);

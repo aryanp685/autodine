@@ -1,14 +1,14 @@
-# Migration authorization register — 120 files, 2026-11-19
+# Migration authorization register — 122 files, 2026-11-19
 
 **Generated file — do not edit by hand.** `npm run register:migrations`
 rewrites it from `docs/migration-manifest-2026-11-14.md` and the files on
 disk. A row here is repository evidence, never authorization: nothing is
 applied by generating or reading it, and `NOT AUTHORIZED` means exactly that.
 
-- Files on disk: **120**
-- Manifest rows: **120**
+- Files on disk: **122**
+- Manifest rows: **122**
 - Ordering / uniqueness / coverage problems: **0**
-- Files containing DROP/TRUNCATE/DELETE statements: **59** (inventory below)
+- Files containing DROP/TRUNCATE/DELETE statements: **60** (inventory below)
 
 ## Per-file register
 
@@ -133,7 +133,9 @@ applied by generating or reading it, and `NOT AUTHORIZED` means exactly that.
 | 117 | `20261118002000` | `20261118002000_guest_checkout_integrity.sql` | Guest-to-receipt Priority 3 — NOT AUTHORIZED | NOT AUTHORIZED | Same-table replay and atomic whole-basket validation; no change to GST/IRP, amounts, discount policy or payment grants. |
 | 118 | `20261118002100` | `20261118002100_operational_realtime.sql` | Operational delivery Priority 4 — NOT AUTHORIZED | NOT AUTHORIZED | Adds the `waiter` membership role, membership-scoped floor projections, a coalesced metadata-only outlet revision and publication, sitting transfer, waiter acknowledgement and a guest-version edit cursor. No order amounts, GST/IRP, payment grants or hosted routing are changed by it. |
 | 119 | `20261118002200` | `20261118002200_qr_code_staff_boundary.sql` | Privileged-function review — NOT AUTHORIZED | NOT AUTHORIZED | Adds the owner/manager membership check to `rotate_table_qr_code`/`retire_table_qr_code` before they touch `table_qr_codes` (findings QR-01/QR-02). Signature, return type, grants and the subscription gate unchanged; no table, policy or data change. |
-| 120 | `20261119000100` | `20261119000100_restore_receipt_helper_boundary.sql` | Main-inherited security correction — NOT AUTHORIZED | NOT AUTHORIZED | Revokes `EXECUTE` on `issue_closed_session_receipt(uuid, jsonb)` from `public`, `anon`, `authenticated` and `service_role`. `20261114000101` granted it to `authenticated`, which let a signed-in client issue a document for an already-closed sitting and skip the settlement wrapper's outstanding-balance check (local check `supabase/checks/07_p8_close_settlement.sql` fails without it). Forward-only; no data, policy or signature change. |
+| 120 | `20261122000100` | `20261122000100_announcement_claim_recovery.sql` | Hosted correction brought into the repository — NOT AUTHORIZED | NOT AUTHORIZED | `claim_kitchen_order_announcement(uuid)` expires a claim older than two minutes before inserting, so a crashed device no longer holds an order announcement forever (the insert is `on conflict do nothing`). Ported from production `20261119101116` and candidate `20261119101121`, which had no repository file. Same signature, gate and grants; plus the waiter-board partial index on `table_waiter_calls(announcement_claimed_at)`. |
+| 121 | `20261122000200` | `20261122000200_qr_one_active_per_table.sql` | Hosted correction brought into the repository — NOT AUTHORIZED | NOT AUTHORIZED | `20261118002200` added the QR membership gates but no database invariant. This collapses duplicate live cards, creates `table_qr_codes_one_active_per_table` (unique partial index, `table_id` where `revoked_at is null`) and re-creates rotate/retire with `pg_advisory_xact_lock(hashtext(table_id))` in addition to the row lock. Ported from production `20261120190546` and candidate `20261120190508`. Newer than every hosted ledger row, so a push ends on these bodies. |
+| 122 | `20261119000100` | `20261119000100_restore_receipt_helper_boundary.sql` | Main-inherited security correction — NOT AUTHORIZED | NOT AUTHORIZED | Revokes `EXECUTE` on `issue_closed_session_receipt(uuid, jsonb)` from `public`, `anon`, `authenticated` and `service_role`. `20261114000101` granted it to `authenticated`, which let a signed-in client issue a document for an already-closed sitting and skip the settlement wrapper's outstanding-balance check (local check `supabase/checks/07_p8_close_settlement.sql` fails without it). Forward-only; no data, policy or signature change. |
 
 ## Destructive or broad statements (review list, not authorization)
 
@@ -468,6 +470,9 @@ confirm that rather than trust it.
 
 ### `20261118002100_operational_realtime.sql`
 - `drop policy order_sessions_staff on public.order_sessions`
+
+### `20261122000100_announcement_claim_recovery.sql`
+- `delete from public.kitchen_announcement_claims where order_id = p_order_id and claimed_at < statement_timestamp() - interval '2 minutes'`
 
 ## Authorization rules
 

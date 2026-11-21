@@ -244,17 +244,20 @@ describe.skipIf(!DB)('throttling, against a real PostgreSQL', () => {
       `insert into public.dining_tables (restaurant_id, label, is_active) values ($1, 'T1', true) returning id`,
       [restaurantId],
     );
+    // The dining_tables trigger already provisioned this table's single live
+    // card, and table_qr_codes_one_active_per_table forbids a second one; take
+    // the deterministic token this suite scans instead of inserting a new card.
     await db.query(
-      `insert into public.table_qr_codes (restaurant_id, table_id, public_token) values ($1, $2, $3)`,
-      [restaurantId, table.rows[0].id, 'throttleit000000000000000000000000000000000000000000000000001'],
+      `update public.table_qr_codes set public_token = $2 where table_id = $1 and revoked_at is null`,
+      [table.rows[0].id, CARD],
     );
     const secondTable = await db.query(
       `insert into public.dining_tables (restaurant_id, label, is_active) values ($1, 'T2', true) returning id`,
       [restaurantId],
     );
     await db.query(
-      `insert into public.table_qr_codes (restaurant_id, table_id, public_token) values ($1, $2, $3)`,
-      [restaurantId, secondTable.rows[0].id, CARD2],
+      `update public.table_qr_codes set public_token = $2 where table_id = $1 and revoked_at is null`,
+      [secondTable.rows[0].id, CARD2],
     );
   }, 30_000);
 

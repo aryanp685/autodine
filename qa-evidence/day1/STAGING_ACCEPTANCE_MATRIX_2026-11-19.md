@@ -9,6 +9,22 @@ is demonstrated on a disposable PostgreSQL 17 cluster or a locally built
 application against synthetic data. It does **not** mean the behaviour is proven
 on a hosted project, and it is never a substitute for the hosted run.
 
+> **Refreshed 2026-11-21 (local only).** The scores below were re-measured at
+> branch head after the QR/announcement migrations and the fixture rework:
+> `test:db:embedded` **281 passed + 3 skipped** (was 272+3), `test:db:integration`
+> **299 passed + 1 skipped** (was 293), `test:e2e:journey` **20 passed**, and the
+> repository now holds **122** migration files (was 119). Hosted scores are
+> unchanged — nothing was applied to any hosted project.
+>
+> The ledger reality also moved: the candidate (`juwyhslzchjevqkdvwjm`) now holds
+> **15** rows and production (`bdbaqpevwmgdvghszjno`) **124**, including three
+> migrations that exist on no branch (`20261119101116`/`20261119101121`
+> announcement claim recovery, `20261120190546`/`20261120190508` QR staff boundary,
+> `20261120190553`/`20261120190520` QR owner management). The repository now carries
+> equivalent forward migrations (`20261122000100`, `20261122000200`), which is why
+> point 2 below is scored on mapping rather than equality. See
+> [`../../docs/remediation-report-2026-11-21.md`](../../docs/remediation-report-2026-11-21.md).
+
 | Legend | Meaning |
 |---|---|
 | **PASS (local)** | Demonstrated on a disposable cluster / local build, with the command and result recorded |
@@ -21,9 +37,9 @@ on a hosted project, and it is never a substitute for the hosted run.
 | # | Point | Local | Hosted | Evidence | Exact command | Owner decision | Needs hosted authorization |
 |---|---|---|---|---|---|---|---|
 | 1 | Identity and target | **BLOCKED** | **BLOCKED** | Candidate metadata read 2026-11-19: `autodinetest`, `juwyhslzchjevqkdvwjm`, ap-northeast-2, PG 17.11.0.018, ACTIVE_HEALTHY (Report A §1). No project is *designated* Staging | Project settings; `select version()` | **A3** — designate a target or create one | Read-only metadata; application: no |
-| 2 | Ledger parity | **PASS** (candidate, 2026-11-19) | **PASS** (as of this date) | 13 ledger rows, all mapped: 6 repository files verified statement-for-statement, scaffold, content-addressed bundle, probe, 3 owner migrations, 1 third-workstream file. One renamed table now proven (Report A §2, §4.1) | `select version, name, created_by from supabase_migrations.schema_migrations order by version` | Confirm the 2026-11-19 entry (A1) | Read-only |
-| 3 | Authorized replay only | **PASS (local)** / **BLOCKED** (hosted) | **BLOCKED** | Full chain replays clean from 119 migrations: 272 passed / 3 skipped, 10 files. Nothing has been applied anywhere from this branch | `npm run test:db:embedded` | Authorize the exact file set | **Yes** |
-| 4 | Role / RLS matrix | **PASS (local)** | **BLOCKED** | 13 integration suites / 293 tests replayed from the repository migrations, each acting as `anon` / `authenticated` / member / other-tenant owner, including the 6 new QR-lifecycle tests | `npm run test:db:integration` | — | **Yes** (hosted run) |
+| 2 | Ledger parity | **PASS** (candidate, 2026-11-19) | **PASS** (as of this date) | 15 candidate rows (124 on production), mapped: 6 repository files verified statement-for-statement, scaffold, content-addressed bundle, probe, 3 owner migrations, 1 third-workstream file. One renamed table now proven (Report A §2, §4.1) | `select version, name, created_by from supabase_migrations.schema_migrations order by version` | Confirm the 2026-11-19 entry (A1) | Read-only |
+| 3 | Authorized replay only | **PASS (local)** / **BLOCKED** (hosted) | **BLOCKED** | Full chain replays clean from 122 migrations: 281 passed / 3 skipped, 10 files. Nothing has been applied anywhere from this branch | `npm run test:db:embedded` | Authorize the exact file set | **Yes** |
+| 4 | Role / RLS matrix | **PASS (local)** | **BLOCKED** | 13 integration suites / 299 tests replayed from the repository migrations, each acting as `anon` / `authenticated` / member / other-tenant owner, including the 6 new QR-lifecycle tests | `npm run test:db:integration` | — | **Yes** (hosted run) |
 | 5 | Auth round-trip | **BLOCKED** | **BLOCKED** | `scripts/staging/auth-acceptance.mjs` exists and needs a hosted URL + a synthetic account; no hosted call made | `node scripts/staging/auth-acceptance.mjs <url>` | Provide the target and a synthetic account | **Yes** |
 | 6 | Guest journey | **PASS (local)** | **BLOCKED** | Journey suite **20/20 passed** (2.7 min, exit 0) on a production build: QR scan → menu → order → kitchen → checkout → receipt | `npm run test:e2e:journey` | — | **Yes** |
 | 7 | Unregistered receipt | **PASS (local)** | **BLOCKED** | `e2e/journey/nogst.desktop.spec.ts` → *"unregistered: retail receipt, no GSTIN or tax breakup, retry keeps one order"* | `npm run test:e2e:journey` | — | **Yes** |

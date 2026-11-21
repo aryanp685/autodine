@@ -50,7 +50,6 @@ export function GuestOrderEditor({
   const [pending, startTransition] = useTransition();
   const [draft, setDraft] = useState<{ revision?: string; quantities: Record<string, number> }>({ revision, quantities: {} });
   const qty = draft.revision === revision ? draft.quantities : {};
-  const superseded = draft.revision !== revision && Object.keys(draft.quantities).length > 0;
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [confirming, setConfirming] = useState(false);

@@ -33,8 +33,7 @@ async function outlet(slug: string, tables = 2): Promise<Outlet> {
   let session = '';
   for (let index = 0; index < tables; index += 1) {
     const tableId = (await db.query('insert into dining_tables(restaurant_id,label) values($1,$2) returning id', [id, `T${index + 1}`])).rows[0].id;
-    const publicToken = randomUUID().replaceAll('-', '') + randomUUID().replaceAll('-', '');
-    await db.query('insert into table_qr_codes(restaurant_id,table_id,public_token) values($1,$2,$3)', [id, tableId, publicToken]);
+    const publicToken = (await db.query('select public_token from table_qr_codes where table_id=$1 and revoked_at is null', [tableId])).rows[0].public_token as string;
     const opened = (await db.query('select * from open_table_session($1,$2)', [publicToken, 'a'.repeat(64)])).rows[0];
     if (index === 0) session = opened.session_token;
     built.push({ id: tableId, card: publicToken, session: opened.session_token });

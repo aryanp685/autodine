@@ -253,7 +253,7 @@ try {
     await readFile(path.join(root, 'supabase/checks/06_scan_limits.sql'), 'utf8'),
     'supabase/checks/06_scan_limits.sql (transaction rolls back its synthetic checks)',
   );
-  for (const name of ['07_p8_close_settlement.sql', '08_p3_incremental_tickets.sql']) {
+  for (const name of ['07_p8_close_settlement.sql', '08_p3_incremental_tickets.sql', '09_rpc_overloads.sql']) {
     await apply(
       client,
       await readFile(path.join(root, 'supabase/checks', name), 'utf8'),

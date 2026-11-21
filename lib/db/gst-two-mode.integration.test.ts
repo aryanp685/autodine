@@ -50,7 +50,8 @@ async function makeRestaurant(slug: string, user: string, account: string | null
   // ₹105.00 inclusive at 5% -> ₹100.00 taxable + ₹5.00 GST, exactly.
   const item = (await db.query(`insert into items(restaurant_id,category_id,name,price_paise,is_available) values($1,$2,'Plate',10500,true) returning id`,[restaurant,category])).rows[0].id;
   const table = (await db.query(`insert into dining_tables(restaurant_id,label) values($1,'G1') returning id`,[restaurant])).rows[0].id;
-  await db.query(`insert into table_qr_codes(restaurant_id,table_id,public_token) values($1,$2,$3)`,[restaurant,table,randomUUID().replaceAll('-','') + randomUUID().replaceAll('-','')]);
+  // dining_tables' trigger provisions the single live card the index allows.
+  expect((await db.query('select count(*)::int n from table_qr_codes where table_id=$1 and revoked_at is null',[table])).rows[0].n).toBe(1);
   return { restaurant, item, gstin, pan };
 }
 
@@ -1204,7 +1205,7 @@ describe.skipIf(!URL_VALUE)('GST two-mode (disposable PostgreSQL)', () => {
     await asRole(owner, (c) => c.query('update restaurants set tax_rate_bps=1200 where id=$1', [restaurant]));
     const table = (await db.query("insert into dining_tables(restaurant_id,label) values($1,'G2') returning id", [restaurant])).rows[0].id;
     const tableToken = randomBytes(32).toString('hex');
-    await db.query('insert into table_qr_codes(restaurant_id,table_id,public_token) values($1,$2,$3)', [restaurant, table, tableToken]);
+    await db.query('update table_qr_codes set public_token=$2 where table_id=$1 and revoked_at is null', [table, tableToken]);
     const numberRe = /^[A-Z0-9/-]{1,16}$/;
     const readInvoice = async (id: string) => (await db.query('select * from restaurant_invoices where id=$1', [id])).rows[0];
     const write = (v: number, cfg: Record<string, unknown>) => asRole(owner, (c) => save(c, restaurant, v, cfg));

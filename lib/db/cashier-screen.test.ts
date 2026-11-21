@@ -68,14 +68,6 @@ function order(overrides: Record<string, unknown> = {}) {
 }
 
 
-/** Stands in for list_order_floor_labels: the database resolves labels, not a join here. */
-function floorLabelRows(rows: Record<string, Row[]>) {
-  const tables = rows.dining_tables ?? [];
-  return Object.values(rows).flat()
-    .filter(row => row && typeof row.table_id === 'string')
-    .flatMap(row => { const table = tables.find(t => t.id === row.table_id); return table ? [{ order_id: row.id, table_label: table.label }] : []; });
-}
-
 beforeEach(() => {
   mocks.staff.result = null;
 });

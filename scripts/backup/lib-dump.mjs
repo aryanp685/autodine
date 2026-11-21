@@ -15,6 +15,27 @@
  */
 import pg from 'pg';
 
+/**
+ * Date/time values are dumped as PostgreSQL's own text, not as JS Dates.
+ *
+ * The driver parses `timestamptz` into a Date, which carries milliseconds only;
+ * a row written at 20:49:52.657403 would be restored as 20:49:52.657, so a
+ * restored table would not be byte-identical to its source (found by the
+ * populated logical-restore drill, 2026-11-21). Asking the driver for the text
+ * representation keeps microseconds, the session time zone offset and anything
+ * else the server chose to print.
+ */
+const RAW_TEXT_OIDS = new Set([
+  1082, 1083, 1114, 1184, 1186, 1266, // date, time, timestamp, timestamptz, interval, timetz
+  1115, 1182, 1185, 1187, 1270,       // the array forms of the same types
+]);
+const rawTimeTypes = {
+  getTypeParser(oid, format) {
+    if (format === 'text' && RAW_TEXT_OIDS.has(oid)) return (value) => value;
+    return pg.types.getTypeParser(oid, format);
+  },
+};
+
 const quoteIdent = (s) => '"' + String(s).replaceAll('"', '""') + '"';
 const quoteLit = (s) => "'" + String(s).replaceAll("'", "''") + "'";
 
@@ -99,7 +120,7 @@ export async function openBackupSnapshot(connectionString, { schema = 'public' }
 
 export async function dumpDatabase(connectionString, { schema = 'public', log = () => {} } = {}) {
   // The whole dump is one read-only snapshot; statement_timeout disabled.
-  const client = new pg.Client({ connectionString, application_name: 'autodine-logical-backup' });
+  const client = new pg.Client({ connectionString, application_name: 'autodine-logical-backup', types: rawTimeTypes });
   await client.connect();
   const out = [];
   const counts = { tables: 0, rows: 0, functions: 0, triggers: 0, policies: 0, indexes: 0, constraints: 0, views: 0, types: 0 };
@@ -109,7 +130,7 @@ export async function dumpDatabase(connectionString, { schema = 'public', log = 
     const meta = await client.query('select version() as version, current_database() as db, now() as taken_at');
     out.push('-- AutoDine logical backup v1');
     out.push(`-- database: ${meta.rows[0].db}`);
-    out.push(`-- taken_at: ${meta.rows[0].taken_at.toISOString()}`);
+    out.push(`-- taken_at: ${meta.rows[0].taken_at instanceof Date ? meta.rows[0].taken_at.toISOString() : String(meta.rows[0].taken_at)}`);
     out.push(`-- server: ${meta.rows[0].version.split(' on ')[0]}`);
     out.push('-- restore into an EMPTY database; never over a live one.');
     out.push('');

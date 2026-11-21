@@ -17,8 +17,12 @@ begin
   insert into public.dining_tables (restaurant_id, label, is_active)
   values (v_rid, 'T1', true) returning id into v_tid;
 
-  insert into public.table_qr_codes (restaurant_id, table_id, public_token)
-  values (v_rid, v_tid, 'localcard0000000000000000000000000000000000000000000000000001')
+  -- dining_tables' trigger provisions this table's single live card
+  -- (table_qr_codes_one_active_per_table); the seed takes that card over with a
+  -- deterministic token instead of inserting a second live one.
+  update public.table_qr_codes
+     set public_token = 'localcard0000000000000000000000000000000000000000000000000001'
+   where table_id = v_tid and revoked_at is null
   returning id into v_qr;
 
   insert into public.orders (restaurant_id, code, prep_status, payment_status,

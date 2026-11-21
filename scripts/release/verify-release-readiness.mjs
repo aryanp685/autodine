@@ -20,7 +20,7 @@ const check = (name, ok, detail = '') => {
 const read = (p) => readFileSync(join(root, p), 'utf8');
 
 // 1. Migration inventory: closed GST/IRP checkpoint plus guest checkout integrity.
-const EXPECTED_MIGRATIONS = 120;
+const EXPECTED_MIGRATIONS = 122;
 const migDir = join(root, 'supabase/migrations');
 const migFiles = readdirSync(migDir).filter((f) => f.endsWith('.sql')).sort();
 const versions = migFiles.map((f) => f.slice(0, 14));

@@ -25,7 +25,12 @@ Full file-by-file detail: `qa-evidence/day1/FINAL_COMPLETION_AND_DEPLOYMENT_2026
 
 ## 2. P0 — production hazards (blocking any deploy or push)
 
-**P0-1. The repository's QR migration is weaker than production's, and applying it
+**P0-1 — FIXED 2026-11-21.** Superseded by `20261122000200_qr_one_active_per_table.sql`
+(unique index + advisory lock, newer than every hosted ledger row) and
+`20261122000100_announcement_claim_recovery.sql`. See
+`docs/remediation-report-2026-11-21.md` §D1. Original finding, kept for the record:
+
+**P0-1 (original). The repository's QR migration is weaker than production's, and applying it
 would downgrade production.** `20261118002200_qr_code_staff_boundary.sql` (this
 branch only) has no `pg_advisory_xact_lock` and no
 `table_qr_codes_one_active_per_table` unique index; production's
@@ -55,16 +60,23 @@ stays **NO** (§4).
 
 ## 3. P1 — repository ↔ reality divergence found today
 
-**P1-1. The F-03 invariant exists only in production.** Adding
+**P1-1 — FIXED 2026-11-21.** The index is in the repository
+(`20261122000200`), the 12 fixture sites were reworked to use the trigger-provisioned
+card, and `test:db:embedded` is 281 passed / 3 skipped. Original finding:
+
+**P1-1 (original). The F-03 invariant exists only in production.** Adding
 `create unique index if not exists table_qr_codes_one_active_per_table` to the
-repository makes **72 of 280** embedded tests fail: the `after insert` trigger
+repository made **72 of 280** embedded tests fail: the `after insert` trigger
 `ensure_table_qr_code()` already provisions one live card per table, and 12
 fixture sites in 7 files then insert a second live card. The migration experiment
 was **reverted** (branch is 120 files again, `verify:release` 47/47). Remedy:
 fixtures read the trigger-provisioned token; file:line list in the drift document
 §5.
 
-**P1-2. Acceptance matrix is stale.** `qa-evidence/day1/STAGING_ACCEPTANCE_MATRIX_2026-11-19.md`
+**P1-2 — FIXED 2026-11-21.** The matrix carries a refreshed local scoreboard and the
+current ledger counts. Original finding:
+
+**P1-2 (original). Acceptance matrix is stale.** `qa-evidence/day1/STAGING_ACCEPTANCE_MATRIX_2026-11-19.md`
 records "13 ledger rows, all mapped" for the candidate; today it has **15** rows
 and production has **124** with **3 unmapped**. Its local scores (e.g.
 `test:db:embedded` 272/3) also lag today's 277/3.
@@ -74,9 +86,11 @@ and production has **124** with **3 unmapped**. Its local scores (e.g.
 repository migrations have no hosted ledger record" — i.e. hosted state is not
 provable from the repository. Exit 1 on those findings is by design, not a crash.
 
-**P1-4. Hosted ledger parity for this branch is unproven.** 120 repository files
-vs 124 production rows vs 15 candidate rows; no mapping table exists for the 3
-production-only entries.
+**P1-4 — ANSWERED 2026-11-21.** 122 repository files vs 124 production rows vs 15
+candidate rows; the three production-only entries are mapped to repository
+equivalents in `docs/remediation-report-2026-11-21.md` §D3, and the 50 files that
+are still pending on production are enumerated there. Hosted parity remains
+**unproven** until those files are applied.
 
 ## 4. P1 — main-branch integration (unchanged)
 
@@ -112,7 +126,10 @@ instruction — flagged in the manifest as "Main-inherited security correction".
 
 Proven (read-only, earlier turns): archiving is on for production —
 `archive_mode=on`, `wal_level=logical`, 6,334 segments, 0 failures, RPO ≈ 2 min.
-Local only: logical restore (`F1`), cold physical recovery
+Local only: logical restore with **data-level** verification (row counts and row
+content identical, including microsecond timestamps — the driver was truncating
+`timestamptz` to milliseconds until `lib-dump.mjs` was given raw text types), cold
+physical recovery
 (`LOCAL_COLD_RECOVERY_VERIFIED {migrations:120, tables:68, orders:121}`), backup
 selftest, `test:dr`.
 
@@ -147,11 +164,15 @@ restore.
 ## 8. P2 — access and tooling limits
 
 * **Vercel connector is `limited: true`** — project, deployment and build state are
-  invisible here; no deploy can be verified from this session.
+  invisible through it. The public endpoint was probed read-only instead:
+  `GET https://new-alpha-five-43.vercel.app/api/health` → `ok:true`,
+  `credentials:"accepted"`, all probed schema flags `applied` (2026-11-21T20:52Z).
+  A deployment is live; **which commit** is deployed remains unverifiable.
 * GitHub secrets API returns 403 (used earlier for staging secrets) — accept the
   owner's statement instead of probing again.
 * Local `env:check` exits 1 (missing local-only variables) — sandbox artefact.
-* `lint` = 0 errors, **2 warnings** (unresolved to zero on purpose).
+* `lint` = **0 problems** (the two `no-unused-vars` warnings were removed on
+  2026-11-21).
 * Non-zero **by design** without their inputs: `pitr:check` (usage),
   `dr:objectives` (needs `--backup-dir`), `backup:run` (usage), `d2:verify`
   (needs `AUTODINE_D2_VERIFY_URL`), `email:test-send` (needs a recipient; sends
@@ -202,5 +223,29 @@ restore.
 6. **D6** Fix `main`'s six failing jobs (separate workstream; needs the branch
    permission above).
 7. **D7** Provide Vercel access or accept "deployment unverified" for this cycle.
+
+## 12. Closed on 2026-11-21 (second pass)
+
+Full detail and evidence: [`remediation-report-2026-11-21.md`](remediation-report-2026-11-21.md).
+
+| Item | Outcome |
+|---|---|
+| P0-1 / D1 QR downgrade hazard | Fixed — `20261122000200` adds the unique index + advisory lock, newer than every hosted row |
+| P0-2 missing repository files | Fixed for the three production-only corrections (`20261122000100`, `20261122000200`) |
+| P1-1 F-03 invariant | In the repository; 12 fixture sites + the local seed reworked; embedded 281/3 |
+| P1-2 stale matrix | Refreshed local scoreboard and ledger counts |
+| P1-4 ledger mapping | Answered in §D3 (50 pending files enumerated, collision audit clean) |
+| D2 fixtures | Done |
+| D3 production apply | **Prepared and proven safe, not applied** — 50 files, 0 object/column collisions |
+| D4 recovery evidence | Upgraded to data-level; found and fixed a real microsecond-truncation defect in the dumper |
+| D5 PR #194 port | Assessed; bounded port attempted and **reverted** (15/127 test failures without their docs/CI wiring) |
+| D6 main red jobs | Diagnosed to root cause (duplicate `record_counter_payment` overload from main's `20261121000200`); guard added here; main repair needs branch permission |
+| D7 deployment visibility | Solved read-only — production health endpoint live and healthy |
+| Lint warnings | 0 problems |
+| New guard | `supabase/checks/09_rpc_overloads.sql` runs in every replay |
+
+Still open, in one line each: **D3** apply authorization · **D4** hosted rehearsal
+authorization · **D5** dedicated port pass · **D6** main repair · B2 staging setup
+(owner-reported, deliberately not re-verified here).
 
 Status: **deployment BLOCKED · DR NOT READY · no merge, no PR, no deploy.**

@@ -43,7 +43,9 @@ async function makeRestaurant(slug: string, user: string): Promise<{ restaurant:
   const category = (await db.query(`insert into categories(restaurant_id,menu_id,name) values($1,$2,'Mains') returning id`,[restaurant,menu])).rows[0].id;
   const item = (await db.query(`insert into items(restaurant_id,category_id,name,price_paise,is_available) values($1,$2,'Plate',10500,true) returning id`,[restaurant,category])).rows[0].id;
   const table = (await db.query(`insert into dining_tables(restaurant_id,label) values($1,'N1') returning id`,[restaurant])).rows[0].id;
-  await db.query(`insert into table_qr_codes(restaurant_id,table_id,public_token) values($1,$2,$3)`,[restaurant,table,randomUUID().replaceAll('-','') + randomUUID().replaceAll('-','')]);
+  // dining_tables' trigger provisions the table's single live card; the unique
+  // partial index means a hand-inserted second card is not a legal state.
+  expect((await db.query('select count(*)::int n from table_qr_codes where table_id=$1 and revoked_at is null',[table])).rows[0].n).toBe(1);
   return { restaurant, item, gstin, pan };
 }
 

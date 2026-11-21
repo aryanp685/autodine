@@ -59,8 +59,8 @@ async function fixture(): Promise<Fixture> {
   const tables = [];
   for (const label of ['T1', 'T2', 'T3']) {
     const id = (await db.query('insert into dining_tables(restaurant_id,label) values($1,$2) returning id', [restaurant, label])).rows[0].id;
-    const token = randomUUID().replaceAll('-', '') + randomUUID().replaceAll('-', '');
-    await db.query('insert into table_qr_codes(restaurant_id,table_id,public_token) values($1,$2,$3)', [restaurant, id, token]);
+    // The trigger on dining_tables provisions the table's single live card.
+    const token = (await db.query('select public_token from table_qr_codes where table_id=$1 and revoked_at is null', [id])).rows[0].public_token as string;
     const session = (await db.query('select * from open_table_session($1,$2)', [token, 'a'.repeat(64)])).rows[0].session_token;
     tables.push({ id, token, session });
   }
@@ -227,8 +227,7 @@ describe.skipIf(!URL_VALUE)('operational delivery and floor authority', () => {
 
     // Occupied destination, open call, and money already attached all refuse.
     const t4 = (await db.query("insert into dining_tables(restaurant_id,label) values($1,'T4') returning id", [f.restaurant])).rows[0].id;
-    const t4Token = randomUUID().replaceAll('-', '') + randomUUID().replaceAll('-', '');
-    await db.query('insert into table_qr_codes(restaurant_id,table_id,public_token) values($1,$2,$3)', [f.restaurant, t4, t4Token]);
+    const t4Token = (await db.query('select public_token from table_qr_codes where table_id=$1 and revoked_at is null', [t4])).rows[0].public_token as string;
     const t4Session = (await db.query('select * from open_table_session($1,$2)', [t4Token, 'b'.repeat(64)])).rows[0].session_token;
     // Occupancy is a sitting, and a sitting begins with its first ticket.
     await db.query('select place_public_order($1,$2::jsonb,null,$3,$4::uuid,null)',
@@ -239,6 +238,9 @@ describe.skipIf(!URL_VALUE)('operational delivery and floor authority', () => {
 
     const freshToken = randomUUID().replaceAll('-', '') + randomUUID().replaceAll('-', '');
     const t2 = f.tables[2].id;
+    // A replacement card is a rotation: revoke the live one first, exactly as
+    // rotate_table_qr_code does, so the one-live-card invariant holds.
+    await db.query('update table_qr_codes set revoked_at=now() where table_id=$1 and revoked_at is null', [t2]);
     await db.query('insert into table_qr_codes(restaurant_id,table_id,public_token) values($1,$2,$3)', [f.restaurant, t2, freshToken]);
     const freshSession = (await db.query('select * from open_table_session($1,$2)', [freshToken, 'c'.repeat(64)])).rows[0].session_token;
     const label = (await db.query('select label from dining_tables where id=$1', [t2])).rows[0].label;
