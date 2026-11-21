@@ -1,0 +1,145 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  check:
+    name: typecheck · lint · design · test · build
+    runs-on: ubuntu-24.04
+    env:
+      CI: 'true'
+      AUTODINE_TEST_DEMO_BUILD: 'true'
+      VERCEL_ENV: 'test'
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Design system guard
+        run: npm run design:check
+
+      - name: Migration syntax check
+        run: npm run sql:check
+
+      - name: Migration chain integrity (ordering, duplicates, deployed anchors)
+        run: npm run migrations:verify
+
+      - name: Release readiness invariants (offline, fail-closed)
+        run: npm run verify:release
+
+      - name: Preview/production isolation self-test
+        run: npm run isolation:verify
+
+      - name: Hosted-acceptance and staging guards (offline)
+        run: npm run test:staging:guards
+
+      - name: Backup pipeline selftest (disposable embedded PostgreSQL)
+        run: npm run test:backup
+
+      - name: Backup-file and DR objective verifiers (fixtures)
+        run: npm run test:dr
+
+      - name: D2 ACL probe (disposable embedded PostgreSQL)
+        run: npm run test:d2
+
+      # The PostgreSQL-gated vitest suites (GST, credit/debit notes,
+      # subscriptions, report_sales ACLs, RLS boundaries, readiness) replay the
+      # full migration chain on a disposable embedded PG 17 and run against a
+      # throwaway autodine_check_* database. No hosted project involved.
+      - name: PostgreSQL-gated integration suites (disposable embedded PostgreSQL)
+        run: npm run test:db:integration
+
+      # The drill's Mode A path shells out to the *system* pg_dump. The
+      # embedded server is PG 17, and ubuntu-24.04 ships pg_dump 16, which
+      # refuses to dump a PG 17 server — so the PGDG apt repository has to
+      # be registered explicitly (the runner's index carries only the
+      # stock Ubuntu noble + Microsoft sources; 'Unable to locate package
+      # postgresql-client-17' is the failure signature). The preinstalled
+      # pg_dump 16 reports a pgdg24.04 build, so PGDG is the source the
+      # image used as well.
+      - name: Install PostgreSQL 17 client tools (PGDG)
+        run: |
+          set -o pipefail
+          {
+            sudo install -d /usr/share/postgresql-common/pgdg
+            sudo curl --fail --show-error -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+            echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+            sudo apt-get update
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql-client-17
+            # The runner ships a manually installed pg_dump 16 that shadows
+            # the wrapper in PATH (the drill still saw 16.15 with v17
+            # installed). Put the PGDG v17 bin directory first for every
+            # subsequent step and prove what resolves.
+            echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+            export PATH="/usr/lib/postgresql/17/bin:$PATH"
+            which -a pg_dump || true
+            pg_dump --version
+            /usr/lib/postgresql/17/bin/pg_dump --version
+          } 2>&1 | tee pg-client-install.log
+
+      - name: Surface PG client install failure as an annotation
+        if: failure()
+        run: node scripts/ci/print-error-annotation.mjs pg-client-install.log 3500
+
+      - name: Logical restore drill (full migration chain, disposable embedded PostgreSQL)
+        run: |
+          set -o pipefail
+          npm run test:db:logical-restore 2>&1 | tee restore-drill.log
+
+      - name: Surface restore drill failure as an annotation
+        if: failure()
+        run: node scripts/ci/print-error-annotation.mjs restore-drill.log 3500
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  native-database:
+    name: clean migrations · SQL boundaries (PG ${{ matrix.postgres }})
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        postgres: ['15', '17', '18']
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_PASSWORD: disposable-ci-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Replay, populated financial upgrade, native SQL and restore
+        run: npm run test:db
+        env:
+          READINESS_PG_ADMIN_URL: postgres://postgres:disposable-ci-password@127.0.0.1:5432/postgres
+          READINESS_VERIFY_RESTORE: '1'
+          READINESS_FINANCIAL_UPGRADE: '1'
+          READINESS_PG_CONTAINER: ${{ job.services.postgres.id }}

@@ -1,0 +1,64 @@
+# CI probe for the Microsoft Read Aloud TTS service that the kitchen
+# announcement voice depends on.
+#
+# Runs scripts/tts-smoke.ts on a plain ubuntu runner: (1) a plain HTTPS
+# fetch of the public Read Aloud voices list, which also asserts the
+# shipped hi-IN catalogue matches the live service, and (2) the shipped
+# msedge-tts synthesis path for BOTH kitchen characters -- Madhur (male)
+# and Swara (female) -- at their own natural pitches. The synthesized MP3s
+# are uploaded as workflow artifacts so a human can listen to exactly what
+# production would say.
+#
+# Why a real probe instead of a unit test: the failure mode this guards
+# against is a network or DRM change on Microsoft's side (previously seen
+# as a Sec-MS-GEC rejection at the WebSocket upgrade). No local mock can
+# detect that; only a live call can. The job is informational -- a failure
+# must not block unrelated development -- but it is the honest signal that
+# the kitchen voice can actually speak.
+#
+# Secrets required: none -- the trusted client token is a public constant
+# shared by every Read Aloud browser extension.
+
+name: TTS Smoke
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: tts-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Edge TTS live probe
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run TTS smoke
+        run: npx tsx scripts/tts-smoke.ts
+
+      - name: Upload synthesized announcements
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: tts-announcements
+          path: tts-smoke-artifacts/
+          if-no-files-found: ignore
+          retention-days: 14

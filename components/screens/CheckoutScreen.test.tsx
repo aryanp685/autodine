@@ -1,0 +1,219 @@
+import { describe, expect, it, vi } from 'vitest';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { Checkout } from './CheckoutScreen';
+
+/**
+ * The checkout, as the server renders it.
+ *
+ * WHAT THIS GUARDS
+ *
+ * The payment step used to be a pair of cards -- "Pay at counter" already
+ * selected and unclickable, beside "Pay online" greyed out. Two dead controls
+ * at the moment of paying read as a page that does not work, and a guest taps
+ * the second one and gives up. There is no method to choose here (an order has
+ * to exist before it can be paid for), so the screen states the one thing that
+ * will happen.
+ *
+ * Also pinned: the phone-only action bar carries the total and submits the
+ * same form, because on a narrow screen the bill sits below the order.
+ */
+
+const mocks = vi.hoisted(() => ({
+  cart: {
+    lines: [{ itemId: 'i1', qty: 2, variantId: undefined, addonIds: [] }] as {
+      itemId: string;
+      qty: number;
+      variantId?: string;
+      addonIds?: string[];
+    }[],
+    count: 2,
+    ready: true,
+    add: () => {},
+    remove: () => {},
+    setQty: () => {},
+    clear: () => {},
+  },
+}));
+
+vi.mock('@/components/CartProvider', () => ({
+  useCart: () => mocks.cart,
+}));
+
+// A server action: importing the real module would pull in the Supabase server
+// client and the `server-only` marker, neither of which this test is about.
+vi.mock('@/app/menu/checkout/actions', () => ({
+  placeOrderAction: () => Promise.resolve(),
+}));
+
+const items = [
+  {
+    id: 'i1',
+    name: 'Butter Chicken',
+    pricePaise: 46900,
+    isVeg: false,
+    isAvailable: true,
+  },
+];
+
+const render = () =>
+  renderToStaticMarkup(
+    <Checkout
+      slug="maddi"
+      restaurantName="Maddi"
+      taxRateBps={500}
+      items={items}
+    />,
+  );
+
+describe('checkout payment step', () => {
+  it('does not present the demo fallback rate as restaurant tax information', () => {
+    const html = renderToStaticMarkup(<Checkout slug="maddi" items={items} />);
+
+    expect(html).toContain('<dt>Taxes</dt>');
+    expect(html).not.toContain('GST 5% · sample');
+  });
+
+  it('states one way to pay instead of offering two dead buttons', () => {
+    const html = render();
+
+    expect(html).toContain('How you will pay');
+    expect(html).toContain('At the counter');
+    // Nothing here is a control the guest could try and fail to use.
+    expect(html).not.toContain('aria-disabled');
+    expect(html).not.toContain('Not available here');
+    expect(html).toMatch(/data-co-pay/);
+  });
+
+  it('says what happens to the order while the bill is unpaid', () => {
+    const html = render();
+    expect(html).toContain('goes to the kitchen straight away');
+    expect(html).toContain('marked payment pending');
+  });
+
+  it('offers pay at counter only: no online payment is mentioned anywhere', () => {
+    const html = render();
+    expect(html).not.toContain('online, on the order page');
+    expect(html).not.toContain('Pay online');
+    expect(html).not.toContain('card/UPI on the next screen');
+  });
+
+  it('confirms with the mandated uppercase button: PLACE ORDER & PAY AT COUNTER', () => {
+    const html = render();
+    expect(html).toContain('PLACE ORDER &amp; PAY AT COUNTER');
+  });
+});
+
+describe('checkout action bar', () => {
+  it('carries the total and submits the same order form', () => {
+    const html = render();
+
+    expect(html).toContain('data-co-bar');
+    expect(html).toContain('form="co-place-order"');
+    // The total appears in the bar as well as the bill, so the guest deciding
+    // at the bottom of a long order sees the number they are agreeing to.
+    expect(html).toMatch(/data-co-bar[\s\S]*?₹985/);
+  });
+
+  it('is not rendered when there is nothing to order', () => {
+    mocks.cart = { ...mocks.cart, lines: [], count: 0 };
+    const html = render();
+    expect(html).not.toContain('data-co-bar');
+
+    // Restore for any later test in this file.
+    mocks.cart = {
+      ...mocks.cart,
+      lines: [{ itemId: 'i1', qty: 2, variantId: undefined, addonIds: [] }],
+      count: 2,
+    };
+  });
+
+  it('keeps both Place order buttons inside the one form', () => {
+    // They have to share the form for useFormStatus to make them agree about
+    // being busy. Two independent submits meant a second tap could write a
+    // second order while the first was still being priced.
+    const html = renderToStaticMarkup(<Checkout slug="maddi" items={items} taxRateBps={500} />);
+    const formOpen = html.indexOf('<form id="co-place-order"');
+    const dock = html.indexOf('data-co-bar');
+    const formClose = html.lastIndexOf('</form>');
+
+    expect(formOpen).toBeGreaterThan(-1);
+    expect(dock).toBeGreaterThan(formOpen);
+    expect(formClose).toBeGreaterThan(dock);
+    expect(html.match(/form="co-place-order"/g)?.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('shows the step the guest is on, not just the word checkout', () => {
+    const html = renderToStaticMarkup(<Checkout slug="maddi" items={items} taxRateBps={500} />);
+    expect(html).toContain('data-flow-steps');
+    expect(html).toMatch(/data-flow-step="now"[^>]*aria-current="step"[^>]*>\s*<span class="sr-only">Pay/);
+  });
+
+  it('says a dish sold out instead of quietly shrinking the bill', () => {
+    // priceCart drops an unavailable dish because it cannot be ordered. On the
+    // last screen before the money, dropping it in silence left the guest
+    // looking at a total that had got smaller for no stated reason.
+    mocks.cart.lines = [{ itemId: 'i1', qty: 1, variantId: undefined, addonIds: [] }];
+    mocks.cart.count = 1;
+    try {
+      const html = renderToStaticMarkup(
+        <Checkout
+          slug="maddi"
+          taxRateBps={500}
+          items={[{ ...items[0], isAvailable: false }]}
+        />,
+      );
+
+      expect(html).toContain('has sold out since you added it');
+      expect(html).toContain('/menu/cart');
+      expect(html).toContain('Nothing to order yet');
+    } finally {
+      mocks.cart.lines = [{ itemId: 'i1', qty: 2, variantId: undefined, addonIds: [] }];
+      mocks.cart.count = 2;
+    }
+  });
+});
+
+/**
+ * Dishes that leave the bill before it is placed.
+ *
+ * priceCart drops a sold-out dish, a dish deleted from the menu, and a portion
+ * that no longer exists. The cart screen names all three. This screen named
+ * only the first two, so a guest who came back to a checkout tab after the
+ * owner deleted a dish paid for a shorter order without a word about the row
+ * that vanished.
+ */
+describe('checkout shows what fell off the bill', () => {
+  type Lines = (typeof mocks.cart.lines)[number][];
+  const renderWith = (catalogue = items) =>
+    renderToStaticMarkup(
+      <Checkout slug="maddi" restaurantName="Maddi" taxRateBps={500} items={catalogue} />,
+    );
+
+  it('names a dish that is no longer on the menu', () => {
+    const lines: Lines = [
+      { itemId: 'i1', qty: 1 },
+      { itemId: 'deleted-dish', qty: 1 },
+    ];
+    mocks.cart.lines = lines;
+    const html = renderWith();
+    mocks.cart.lines = [{ itemId: 'i1', qty: 2 }];
+
+    expect(html).toContain('no longer on the menu');
+    expect(html).toContain('not in this bill');
+    expect(html).toContain('Review your order');
+  });
+
+  it('names a dish that sold out too, and counts them separately in words', () => {
+    const lines: Lines = [
+      { itemId: 'i1', qty: 1 },
+      { itemId: 'sold-out', qty: 1 },
+    ];
+    mocks.cart.lines = lines;
+    const soldOut = [...items, { id: 'sold-out', name: 'Laal Maas', pricePaise: 52000, isVeg: false, isAvailable: false }];
+    const html = renderWith(soldOut);
+    mocks.cart.lines = [{ itemId: 'i1', qty: 2 }];
+
+    expect(html).toContain('sold out');
+    expect(html).not.toContain('no longer on the menu');
+  });
+});

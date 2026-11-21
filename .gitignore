@@ -1,0 +1,108 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# local env files - NEVER commit secrets
+.env
+.env*.local
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+
+# Internal planning notes stay local; publish only the canonical operator/test docs.
+/docs/*.md
+!/docs/SETUP.md
+!/docs/e2e-local.md
+!/docs/scan-throttle-coverage.md
+!/docs/website-readiness-audit.md
+!/docs/production-saas-readiness-audit.md
+!/docs/preview-isolation.md
+!/docs/preview-isolation-verification-2026-11-14.md
+!/docs/programme-status-2026-11-14.md
+!/docs/d1-account-link-remediation-2026-11-15.md
+!/docs/d2-postgres-acl-remediation-2026-11-15.md
+!/docs/p0-remediation-2026-11-15.md
+!/docs/email-monitoring-readiness-2026-11-15.md
+!/docs/monitoring-readiness-2026-11-14.md
+!/docs/resend-auth-readiness-2026-11-14.md
+!/docs/hosted-synthetic-acceptance-2026-11-14.md
+!/docs/report-sales-staging-rehearsal-2026-11-14.md
+!/docs/report-sales-staging-rehearsal-2026-11-15-result.md
+!/docs/hosted-synthetic-acceptance-2026-11-15-result.md
+!/docs/final-hosted-acceptance-2026-11-15.md
+!/docs/final-hosted-acceptance-retry-2026-11-15.md
+!/docs/gst-staging-application-plan-2026-11-15.md
+!/docs/device-acceptance-2026-11-14.md
+!/docs/migration-reconciliation.md
+!/docs/production-only-migrations-2026-11-14.md
+!/docs/backup-restore-runbook.md
+!/docs/gst-two-mode-2026-11-14.md
+!/docs/verification-2026-11-10.md
+!/docs/subscription-billing-2026-11-10.md
+!/docs/review-deployment-2026-11-11.md
+!/docs/production-migration-plan-2026-11-11.md
+!/docs/production-operator-setup-2026-11-11.md
+!/docs/autodine-handoff-report-2026-11-12.md
+!/docs/infrastructure-architecture.md
+!/docs/edge-security-runbook.md
+!/docs/AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md
+
+# scratch scripts
+_shot.mjs
+_qrcheck.mjs
+_opt.mjs
+_h*.mjs
+
+# playwright
+/playwright-report
+/test-results
+/responsive-artifacts
+/blob-report
+/.playwright
+
+# Local TTS smoke output (uploaded as CI artifacts, never committed)
+tts-smoke-artifacts/
+/images
+
+# Private staging auth state, fixture credentials and raw browser reports
+/.staging-private/
+!/docs/report-sales-staging-rehearsal-2026-11-14.md
+!/docs/report-sales-staging-rehearsal-2026-11-15-result.md
+!/docs/hosted-synthetic-acceptance-2026-11-15-result.md
+!/docs/final-hosted-acceptance-2026-11-15.md
+!/docs/final-hosted-acceptance-retry-2026-11-15.md
+!/docs/gst-staging-application-plan-2026-11-15.md
+!/docs/resend-auth-readiness-2026-11-14.md
+!/docs/monitoring-readiness-2026-11-14.md
+!/docs/device-acceptance-2026-11-14.md
+!/docs/hosted-synthetic-acceptance-2026-11-14.md
+!/docs/programme-status-2026-11-14.md
+!/docs/production-release-baseline-2026-11-14.md
+!/docs/gst-irp-production-readiness-2026-11-14.md
+!/docs/external-services-readiness-2026-11-14.md
+!/docs/pitr-verification-procedure-2026-11-14.md

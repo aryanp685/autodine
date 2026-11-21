@@ -1,0 +1,446 @@
+/**
+ * Importing a menu that already exists on paper.
+ *
+ * THE SHAPE OF THE FLOW
+ *
+ *   preview  paste -> draft (nothing written)
+ *   create   draft -> a new DRAFT menu, categories, dishes
+ *
+ * Nothing is written until the owner presses the second button, and what is
+ * written is a draft menu: a half-checked import that goes live immediately
+ * would be a menu guests see, and the owner would not know which tap did it.
+ *
+ * THE DRAFT COMES BACK FROM THE BROWSER
+ *
+ * So it is user input like any form field: sanitiseDraft() re-checks every
+ * name, price and count before an insert. This file never trusts the shape it
+ * is handed, even though this morning it produced that shape itself.
+ *
+ * Restaurant id, again, comes from the membership row through the shared staff
+ * context -- never from the payload.
+ */
+
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
+import { getStaffContextDetailed } from '@/lib/db/staff';
+import { EDITOR_MENU_COOKIE } from '@/lib/db/menu-editor';
+import {
+  extractMenuFromImage,
+  validateMenuCapture,
+  visionConfigured,
+  type VisionDraft,
+} from '@/lib/ai/menu-vision';
+import { ASSET_BUCKET, dishAssetPath, publicAssetUrl } from '@/lib/storage/assets';
+import { sanitiseDraft, type MenuImportDraft } from '@/lib/menu-import';
+import { MAX_IMPORT_TEXT, parseMenuText } from '@/lib/menus/bulk-parse';
+
+const MENUS_PATH = '/dashboard/menus';
+
+export type ImportResult =
+  | { ok: true; menuId: string; items: number; existing?: boolean }
+  | { ok: false; error: string };
+
+const IMPORT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Write the draft as a new draft menu.
+ *
+ * Cleanup on failure is deliberate: categories and dishes inserted under a
+ * menu that then failed to save would be orphaned rows the owner can neither
+ * see nor delete.
+ *
+ * When the payload carries a valid `importId` (the Brand Studio's stable
+ * import identifier), the write is IDEMPOTENT: a menu already created for
+ * that import is returned as-is (`existing: true`) instead of a second draft
+ * appearing. Without an importId the behaviour is exactly as before — a new
+ * menu every time. The id is stored on menus.import_id (migration
+ * 20261103000100) and never influences anything else.
+ */
+export async function createImportedMenuAction(payload: unknown): Promise<ImportResult> {
+  const draft = sanitiseDraft(payload);
+  if (draft.categories.length === 0) {
+    return { ok: false, error: 'There is nothing to import. Go back and read the menu again.' };
+  }
+
+  const rawImportId =
+    payload && typeof payload === 'object'
+      ? (payload as { importId?: unknown }).importId
+      : undefined;
+  const importId =
+    typeof rawImportId === 'string' && IMPORT_ID_RE.test(rawImportId.trim())
+      ? rawImportId.trim().toLowerCase()
+      : null;
+
+  const staff = await getStaffContextDetailed();
+  if (!staff.ok) {
+    if (staff.reason === 'unconfigured') return { ok: false, error: 'The database is not connected.' };
+    return { ok: false, error: 'You need to be signed in to import a menu.' };
+  }
+
+  const { supabase, restaurantId } = staff.context;
+
+  if (importId) {
+    const { data: already, error: alreadyError } = await supabase
+      .from('menus')
+      .select('id')
+      .eq('restaurant_id', restaurantId)
+      .eq('import_id', importId)
+      .maybeSingle();
+    if (alreadyError) return { ok: false, error: `Could not read your menus: ${alreadyError.message}` };
+    if (already) {
+      const { count } = await supabase
+        .from('items')
+        .select('id', { count: 'exact', head: true })
+        .in(
+          'category_id',
+          (
+            await supabase.from('categories').select('id').eq('menu_id', String(already.id))
+          ).data?.map((c) => String(c.id)) ?? [],
+        );
+      return { ok: true, menuId: String(already.id), items: count ?? 0, existing: true };
+    }
+  }
+
+  const { data: existing, error: listError } = await supabase
+    .from('menus')
+    .select('id, name, sort_order')
+    .eq('restaurant_id', restaurantId);
+
+  if (listError) return { ok: false, error: `Could not read your menus: ${listError.message}` };
+
+  // A name that does not collide with an existing menu, so an import twice in
+  // a row does not fail on a duplicate.
+  const used = new Set((existing ?? []).map((row) => String(row.name ?? '').toLowerCase()));
+  let name = 'Imported menu';
+  for (let i = 2; used.has(name.toLowerCase()) && i < 50; i += 1) name = `Imported menu ${i}`;
+
+  const nextOrder = (existing ?? []).reduce((max, row) => Math.max(max, Number(row.sort_order ?? 0)), 0) + 1;
+
+  const { data: menu, error: menuError } = await supabase
+    .from('menus')
+    .insert({ restaurant_id: restaurantId, name, is_published: false, sort_order: nextOrder, import_id: importId })
+    .select('id')
+    .maybeSingle();
+
+  if (menuError || !menu) {
+    return { ok: false, error: describeWriteError(menuError?.message, 'create the menu') };
+  }
+
+  const menuId = String(menu.id);
+
+  const createdCategoryIds: string[] = [];
+  let itemCount = 0;
+
+  try {
+    for (let index = 0; index < draft.categories.length; index += 1) {
+      const category = draft.categories[index];
+
+      const { data: createdCategory, error: categoryError } = await supabase
+        .from('categories')
+        .insert({ restaurant_id: restaurantId, menu_id: menuId, name: category.name, sort_order: index })
+        .select('id')
+        .maybeSingle();
+
+      if (categoryError || !createdCategory) {
+        throw new Error(describeWriteError(categoryError?.message, `add the section "${category.name}"`));
+      }
+
+      const categoryId = String(createdCategory.id);
+      createdCategoryIds.push(categoryId);
+
+      const { data: createdItems, error: itemsError } = await supabase
+        .from('items')
+        .insert(
+          category.items.map((item, order) => ({
+            restaurant_id: restaurantId,
+            category_id: categoryId,
+            name: item.name,
+            description: item.description,
+            price_paise: item.pricePaise,
+            is_veg: item.isVeg,
+            is_available: true,
+            sort_order: order,
+          })),
+        )
+        .select('id');
+
+      if (itemsError || !createdItems || createdItems.length !== category.items.length) {
+        throw new Error(describeWriteError(itemsError?.message, `add the dishes in "${category.name}"`));
+      }
+      itemCount += category.items.length;
+
+      // Portions ("Half 240 / Full 420") become real rows, not a note the
+      // owner has to re-type in the editor. The parent item holds the entry
+      // price; each variant replaces it when chosen, exactly like portions
+      // created by hand.
+      const variantRows = category.items.flatMap((item, itemIndex) =>
+        (item.variants ?? []).map((variant, variantOrder) => ({
+          item_id: String(createdItems[itemIndex].id),
+          name: variant.name,
+          price_paise: variant.pricePaise,
+          sort_order: variantOrder,
+        })),
+      );
+      if (variantRows.length > 0) {
+        const { error: variantsError } = await supabase.from('item_variants').insert(variantRows);
+        if (variantsError) {
+          throw new Error(describeWriteError(variantsError.message, 'add the portions'));
+        }
+      }
+    }
+  } catch (error) {
+    // Undo what this import created. Deleted in dependency order: dishes need
+    // their category, categories need their menu.
+    const message = error instanceof Error ? error.message : 'The import failed.';
+
+    if (createdCategoryIds.length > 0) {
+      await supabase.from('items').delete().in('category_id', createdCategoryIds);
+      await supabase.from('categories').delete().in('id', createdCategoryIds);
+    }
+    await supabase.from('menus').delete().eq('id', menuId);
+
+    console.error('[autodine] menu import rolled back:', message);
+    return { ok: false, error: `${message} Nothing was imported.` };
+  }
+
+  // Open the new menu in the editor, exactly as creating one by hand does.
+  (await cookies()).set(EDITOR_MENU_COOKIE, menuId, {
+    path: MENUS_PATH,
+    sameSite: 'lax',
+    httpOnly: true,
+    maxAge: 60 * 60 * 24 * 180,
+  });
+
+  revalidatePath(MENUS_PATH);
+  return { ok: true, menuId, items: itemCount };
+}
+
+/** Parse pasted text locally on the server. This is deterministic and never calls a model. */
+export async function previewTextMenuImportAction(
+  value: unknown,
+): Promise<{ ok: true; draft: MenuImportDraft } | { ok: false; error: string }> {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return { ok: false, error: 'Paste the menu text first.' };
+  }
+  if (value.length > MAX_IMPORT_TEXT) {
+    return { ok: false, error: `That paste is over ${MAX_IMPORT_TEXT.toLocaleString()} characters. Split it into smaller parts.` };
+  }
+
+  const draft = parseMenuText(value);
+  if (draft.categories.every((category) => category.items.length === 0)) {
+    return { ok: false, error: 'No priced dishes found. Add a section heading and a dish with its printed price.' };
+  }
+  return { ok: true, draft };
+}
+
+/**
+ * Read a photographed (or scanned) menu. Writes nothing.
+ *
+ * Separate from previewMenuImportAction because the input is different: this
+ * one takes bytes, sends them to Gemini, and returns a draft whose uncertain
+ * fields are EMPTY rather than guessed. The response also says which dishes
+ * have their own printed photo, with a box, so the review step can offer to
+ * crop them out of the same upload.
+ *
+ * Every failure is a sentence the owner can act on: no key, wrong file, too
+ * big, busy, timed out, or simply not a menu. None of them is a stack trace.
+ */
+export async function extractMenuFromPhotoAction(formData: FormData): Promise<PhotoPreview> {
+  if (!visionConfigured()) {
+    return {
+      ok: false,
+      code: 'not-configured',
+      error: 'Reading photos is not switched on for this deployment. Add dishes by hand, or paste the text.',
+    };
+  }
+
+  const staff = await getStaffContextDetailed();
+  if (!staff.ok) {
+    return {
+      ok: false,
+      code: 'not-signed-in',
+      error:
+        staff.reason === 'unconfigured'
+          ? 'The database is not connected, so there is nowhere to save an import.'
+          : 'You need to be signed in to import a menu.',
+    };
+  }
+  if (staff.context.role !== 'owner' && staff.context.role !== 'manager') {
+    return { ok: false, code: 'not-allowed', error: 'Only an owner or manager can import a menu.' };
+  }
+
+  const file = formData.get('photo');
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, code: 'bad-file', error: 'Choose a photo of your menu first.' };
+  }
+
+  const checked = validateMenuCapture(file);
+  if (!checked.ok) return { ok: false, code: checked.code, error: checked.reason };
+
+  const result = await extractMenuFromImage(await file.arrayBuffer(), checked.mimeType);
+  if (!result.ok) return { ok: false, code: result.code, error: result.reason };
+
+  return { ok: true, draft: result.draft };
+}
+
+export type PhotoPreview =
+  | { ok: true; draft: VisionDraft }
+  | { ok: false; error: string; code: string };
+
+/** One cropped dish photo, as the browser produced it. */
+export type CropUpload = {
+  /** Which category / dish in the draft this crop belongs to. */
+  categoryIndex: number;
+  itemIndex: number;
+  /** A data URL: image/jpeg base64. Produced by canvas, never by the model. */
+  dataUrl: string;
+};
+
+/**
+ * Attach crops the owner accepted, after the menu exists.
+ *
+ * Cropping happens in the browser (canvas, no server image library, no native
+ * dependency) and lands here as bytes. Each crop is validated, uploaded, and
+ * written to the item's image_url.
+ *
+ * Failure is never fatal: a menu with text and no photos is a perfectly good
+ * import, so a bad crop is counted and reported rather than rolling back the
+ * whole import.
+ */
+export async function attachImportPhotosAction(
+  menuId: string,
+  crops: CropUpload[],
+): Promise<{ ok: true; attached: number; skipped: number; skippedNames: string[] } | { ok: false; error: string }> {
+  const staff = await getStaffContextDetailed();
+  if (!staff.ok) return { ok: false, error: 'You need to be signed in to add photos.' };
+  if (staff.context.role !== 'owner' && staff.context.role !== 'manager') {
+    return { ok: false, error: 'Only an owner or manager can change the menu.' };
+  }
+
+  const { supabase, restaurantId } = staff.context;
+
+  // The menu must belong to this restaurant: a forged id must not let an
+  // import write photos onto somebody else's dishes.
+  const { data: menu } = await supabase
+    .from('menus')
+    .select('id')
+    .eq('id', menuId)
+    .eq('restaurant_id', restaurantId)
+    .maybeSingle();
+  if (!menu) return { ok: false, error: 'That menu is not on your account.' };
+
+  const { data: items } = await supabase
+    .from('items')
+    .select('id, category_id, name, sort_order')
+    .eq('restaurant_id', restaurantId);
+
+  if (!items) return { ok: false, error: 'Could not read the imported dishes.' };
+
+  const byCategory = new Map<string, { id: string; name: string; sortOrder: number }[]>();
+  for (const row of items) {
+    const key = String(row.category_id ?? '');
+    if (!byCategory.has(key)) byCategory.set(key, []);
+    byCategory.get(key)!.push({
+      id: String(row.id),
+      name: String(row.name ?? ''),
+      sortOrder: Number(row.sort_order ?? 0),
+    });
+  }
+
+  const { data: categories } = await supabase
+    .from('categories')
+    .select('id, name, sort_order')
+    .eq('restaurant_id', restaurantId)
+    .eq('menu_id', menuId)
+    .order('sort_order', { ascending: true });
+
+  if (!categories) return { ok: false, error: 'Could not read the imported sections.' };
+
+  let attached = 0;
+  let skipped = 0;
+  // Dish names that lost their photo, capped: enough to act on, short enough
+  // for one notice line. An unnameable failure (a lost index) counts but
+  // cannot be named.
+  const skippedNames: string[] = [];
+  const noteSkipped = (name?: string) => {
+    skipped += 1;
+    if (name && skippedNames.length < 3) skippedNames.push(name);
+  };
+
+  for (const crop of crops.slice(0, 60)) {
+    const category = categories[crop.categoryIndex];
+    if (!category) {
+      noteSkipped();
+      continue;
+    }
+
+    const bucketItems = (byCategory.get(String(category.id)) ?? []).slice().sort((a, b) => a.sortOrder - b.sortOrder);
+    const item = bucketItems[crop.itemIndex];
+    if (!item) {
+      noteSkipped();
+      continue;
+    }
+
+    const decoded = decodeDataUrl(crop.dataUrl);
+    // 600 KB per crop, 2 MB is impossible after client-side scaling, and this
+    // is the guard for a hand-crafted request.
+    if (!decoded || decoded.bytes.byteLength === 0 || decoded.bytes.byteLength > 600_000) {
+      noteSkipped(item.name);
+      continue;
+    }
+
+    const path = dishAssetPath(restaurantId, item.id, 'jpg');
+    const { error: uploadError } = await supabase.storage
+      .from(ASSET_BUCKET)
+      .upload(path, decoded.bytes, { contentType: 'image/jpeg', upsert: false, cacheControl: '31536000' });
+
+    if (uploadError) {
+      console.error('[autodine] crop upload failed', uploadError);
+      noteSkipped(item.name);
+      continue;
+    }
+
+    const { error: updateError } = await supabase
+      .from('items')
+      .update({ image_url: publicAssetUrl(path) })
+      .eq('id', item.id)
+      .eq('restaurant_id', restaurantId);
+
+    if (updateError) {
+      console.error('[autodine] crop not saved to item', updateError);
+      noteSkipped(item.name);
+      continue;
+    }
+
+    attached += 1;
+  }
+
+  return { ok: true, attached, skipped, skippedNames };
+}
+
+/** `data:image/jpeg;base64,...` -> bytes. Returns null for anything else. */
+function decodeDataUrl(dataUrl: string): { bytes: Buffer } | null {
+  const match = /^data:image\/(jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=]+)$/i.exec(dataUrl);
+  if (!match) return null;
+  try {
+    const bytes = Buffer.from(match[2], 'base64');
+    return bytes.byteLength > 0 ? { bytes } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Turn Postgres's answer into something an owner can act on. */
+function describeWriteError(message: string | undefined, action: string): string {
+  const detail = message ?? 'unknown error';
+
+  if (/row-level security|permission denied/i.test(detail)) {
+    return 'Only an owner or manager can change the menu, and the trial must still be running.';
+  }
+  if (/duplicate key/i.test(detail)) {
+    return `Could not ${action}: something with that name already exists.`;
+  }
+  return `Could not ${action}: ${detail}`;
+}

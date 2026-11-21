@@ -1,0 +1,816 @@
+[
+ {
+  "sig": "account_can_write(uuid)",
+  "productionMd5": "9b2edc2d5c4e94ee8ef7b40006fc63b9",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "aa688b0708c7c06d894c1e57b35fc74b",
+  "firstCreatedBy": "20261110001000_account_subscriptions.sql"
+ },
+ {
+  "sig": "account_outlet_limit(text)",
+  "productionMd5": "b9bdc02607bc181f7c096ddcc675630d",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "565e989baf395589a8db58ded3111c86",
+  "firstCreatedBy": "20261110001000_account_subscriptions.sql"
+ },
+ {
+  "sig": "admin_set_subscription(text,text,integer,integer)",
+  "productionMd5": "412e0dcb70dbfe73b707b2375d3601ae",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "bb515acb1e51f648d2675ce70ab54d4a",
+  "firstCreatedBy": "20261110001000_account_subscriptions.sql"
+ },
+ {
+  "sig": "begin_online_payment(text,text,text,uuid,uuid,bigint)",
+  "productionMd5": "cc8c20745da2c2cb9b37df198cd80fbb",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "50aff4927542045475c798833d08f349",
+  "firstCreatedBy": "20261022000800_online_payments.sql"
+ },
+ {
+  "sig": "cancel_order(uuid,uuid,text)",
+  "productionMd5": "50de4a0f6f6e36f832bd48970bbaee53",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "36e750db7028b4e6c3bab5538dafa394",
+  "firstCreatedBy": "20261021000600_cancel_and_change_order.sql"
+ },
+ {
+  "sig": "close_order_session_and_issue_receipt(uuid)",
+  "productionMd5": "a054a8bec53bfc759e135c575e492d63",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "850f1d881d3595320b802e1d25317d87",
+  "firstCreatedBy": "20261108003000_session_checkout_payment_receipts.sql"
+ },
+ {
+  "sig": "confirm_subscription_cancellation(text,text,text)",
+  "productionMd5": "ae110426cf66cbfff3643d6cd11e60f8",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "6d612ad536749a9c5db19f8a99ebbe10",
+  "firstCreatedBy": "20261110001100_subscription_billing.sql"
+ },
+ {
+  "sig": "create_account_with_restaurant(text,text,text,uuid)",
+  "productionMd5": "f6490cc15081ef12bc176ea24c0ec40d",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "52858357ac277da383fb29327154a1c6",
+  "firstCreatedBy": "20261110001000_account_subscriptions.sql"
+ },
+ {
+  "sig": "create_outlet(text,text)",
+  "productionMd5": "9e18e15be73bc0f065af939934687f21",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "24b38810f5985f1b7c2a8a1629d6f15d",
+  "firstCreatedBy": "20261022000700_multi_outlet.sql"
+ },
+ {
+  "sig": "create_staff_invite(uuid,member_role,integer)",
+  "productionMd5": "ce90bfba667bf2b9cccea35383ae62de",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "1d293d5f1fcb1ab1f3d8b07fd30a1266",
+  "firstCreatedBy": "20261029000100_staff_invites.sql"
+ },
+ {
+  "sig": "current_verification_code(uuid)",
+  "productionMd5": "df9f35949a200a199f393b64b1e9b301",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "16b393a79a9367f0fe572117f6962591",
+  "firstCreatedBy": "20261023000900_table_verification_code.sql"
+ },
+ {
+  "sig": "ensure_table_qr_code()",
+  "productionMd5": "40417f6949fc2899cecda815a2cdcc34",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "5e248dc13fdca8491b2292ccc104a6eb",
+  "firstCreatedBy": "20261021000007_table_qr_provisioning.sql"
+ },
+ {
+  "sig": "expire_subscriptions()",
+  "productionMd5": "e09c1c7a849dfbc05353631c62278d9b",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "97c567098b66a1f40b3d74da36a10682",
+  "firstCreatedBy": "20261110001100_subscription_billing.sql"
+ },
+ {
+  "sig": "issue_closed_session_receipt(uuid)",
+  "productionMd5": "94df1d94ae92b217763590193f65b200",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "48f31e77a564135ef8114c511baf887e",
+  "firstCreatedBy": "20261108002000_invoice_receipts.sql"
+ },
+ {
+  "sig": "issue_payment_receipt_after_invoice_payment()",
+  "productionMd5": "b77ca6fa9c8d8fa51333031ec36f9707",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "5d6a73a085c8ff5a0fdb283cf5e6a681",
+  "firstCreatedBy": "20261108003000_session_checkout_payment_receipts.sql"
+ },
+ {
+  "sig": "list_staff_members(uuid)",
+  "productionMd5": "7688202a5809f54a49c74afb33b9b4d4",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "2706756b174aa356ad7fca5f4e49d8d0",
+  "firstCreatedBy": "20261029000100_staff_invites.sql"
+ },
+ {
+  "sig": "mark_order_session_paid(uuid)",
+  "productionMd5": "e1069d5707d3d4badffbca5ec0c745af",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "28f6871a8b47ff659b17a35fb967a4d8",
+  "firstCreatedBy": "20261107082936_session_manual_payment_p4.sql"
+ },
+ {
+  "sig": "new_invite_code()",
+  "productionMd5": "5e680806ac5706a718c86c68162c2a8d",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "7174d0b650c37662b6a901560898cb71",
+  "firstCreatedBy": "20261029000100_staff_invites.sql"
+ },
+ {
+  "sig": "open_table_session(text,text)",
+  "productionMd5": "51b162d16ad287f2b22b8de01f07ab2f",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "d35a99704752d96afdb0a312930517c8",
+  "firstCreatedBy": "20261028000900_guest_scan_confirm.sql"
+ },
+ {
+  "sig": "place_public_order_attempt(text,jsonb,text,text,uuid,text)",
+  "productionMd5": "2c3132616ced793ee95670f345e29658",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "cd9cc0348072eaeb9ece9d280354fb4a",
+  "firstCreatedBy": "20261110000400_durable_order_attempt_budget.sql"
+ },
+ {
+  "sig": "place_public_order_core(text,jsonb,text,text)",
+  "productionMd5": "ff5d1ff54c782a9ac70bfb892c5c15e6",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "90d454c16b62f691f68b76ed51137b21",
+  "firstCreatedBy": "20261021000600_cancel_and_change_order.sql"
+ },
+ {
+  "sig": "place_public_order(text,jsonb,text,text,uuid,text)",
+  "productionMd5": "0e921b1802f5d5cf9e85e451c51e34cd",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "ac23abffcb5a75341f6e0bf4beaeb533",
+  "firstCreatedBy": "20261107074545_order_sessions.sql"
+ },
+ {
+  "sig": "plan_price_paise(text)",
+  "productionMd5": "2981d26989344fcedc27d47d8a2c3b78",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "a6f3330ded17b07bdaff97e08e78b124",
+  "firstCreatedBy": "20261110001100_subscription_billing.sql"
+ },
+ {
+  "sig": "protect_account_plan()",
+  "productionMd5": "4bd2d1155263408ee2e136f8837af13b",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "88ba26f52e9f252365a1d9928cfb37a4",
+  "firstCreatedBy": "20261110001000_account_subscriptions.sql"
+ },
+ {
+  "sig": "publish_menu_brand_pair(uuid,uuid)",
+  "productionMd5": "f1892423aa4597d0726c6cf9e9ab713f",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "2354a38064c6726134510ed4196b7cc8",
+  "firstCreatedBy": "20261103000100_brand_studio.sql"
+ },
+ {
+  "sig": "record_counter_payment(text,uuid,text,bigint,uuid)",
+  "productionMd5": "5595d00670f3c5807e06ffb4837cd8c2",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "8a3e418931766b2f9a658d9bf9c6b111",
+  "firstCreatedBy": "20261020000004_counter_payment.sql"
+ },
+ {
+  "sig": "record_subscription_payment_failure(text,text,text,text,bigint,text,timestamp with time zone)",
+  "productionMd5": "cd366fc6d9e9843166dba7591f855b3a",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "6a4565ad7445c5abf9cd046e456c2c8d",
+  "firstCreatedBy": "20261110001100_subscription_billing.sql"
+ },
+ {
+  "sig": "record_subscription_payment(text,text,text,text,bigint,text,integer,timestamp with time zone)",
+  "productionMd5": "bbf28804ed4d41fbc51ca5ea41a3417e",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "d3565a7e9de3d92aecfdb6816edb2234",
+  "firstCreatedBy": "20261110001100_subscription_billing.sql"
+ },
+ {
+  "sig": "record_verification_failure(uuid)",
+  "productionMd5": "3efddbd7317dbdebcbb4ee72f4f97982",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "3dd6e82c285a24b757b39c726c667882",
+  "firstCreatedBy": "20261023000900_table_verification_code.sql"
+ },
+ {
+  "sig": "redeem_staff_invite(text)",
+  "productionMd5": "f1beae307be9ddbff70fbb5e91c2dd6e",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "ffe8feac3b09d982c38da65691de2590",
+  "firstCreatedBy": "20261029000100_staff_invites.sql"
+ },
+ {
+  "sig": "reject_table_orders(uuid,text)",
+  "productionMd5": "fd70ab30ced8084d0ed605557630cc66",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "875900851ab991e65a34f0df78514084",
+  "firstCreatedBy": "20261028000900_guest_scan_confirm.sql"
+ },
+ {
+  "sig": "remove_staff_member(uuid)",
+  "productionMd5": "d2140f198adeb55ae00282fd95c23fe2",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "057ad9d0b0a7b21c6fa1ed062bac5650",
+  "firstCreatedBy": "20261029000100_staff_invites.sql"
+ },
+ {
+  "sig": "report_sales(uuid,timestamp with time zone,timestamp with time zone,text,text,integer,boolean)",
+  "productionMd5": "b9bd3928d5e9be5ead7a8de1a3b014f8",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "eab7538009ade8eeb2ff3bb53004fd73",
+  "firstCreatedBy": "20261021000009_report_sales.sql"
+ },
+ {
+  "sig": "request_subscription_cancellation(uuid)",
+  "productionMd5": "8f56f65aa47b3c8e66e52d78a5dcb58a",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "029f8ceb3d9ea134c0095d07aab81316",
+  "firstCreatedBy": "20261110001100_subscription_billing.sql"
+ },
+ {
+  "sig": "restaurant_access(uuid)",
+  "productionMd5": "c6c442f76602246f3737bc8fb8471f93",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "bab870f3e0602f850d6f93cee2df31cd",
+  "firstCreatedBy": "20261026001100_trial_plans_and_write_gate.sql"
+ },
+ {
+  "sig": "restaurant_can_write(uuid)",
+  "productionMd5": "36761a83d3297d1e5073acc5d88a5843",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "53614643809686caf0969d79c6f52cc0",
+  "firstCreatedBy": "20261026001100_trial_plans_and_write_gate.sql"
+ },
+ {
+  "sig": "retire_table_qr_code(uuid)",
+  "productionMd5": "89a21650a29a771c2ab56dc30545cf94",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "26a03a8aa952fca2f1070671e0a333b2",
+  "firstCreatedBy": "20261021000007_table_qr_provisioning.sql"
+ },
+ {
+  "sig": "revoke_staff_invite(uuid)",
+  "productionMd5": "7f87ee557e230656cad46e9a8534c113",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "7a7eda549b9a1faf985a86c8ab91af29",
+  "firstCreatedBy": "20261029000100_staff_invites.sql"
+ },
+ {
+  "sig": "rollback_last_publish(uuid)",
+  "productionMd5": "204b7ddabfb6a6da9c74eb23593e8919",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "600e44cb37940ee50bd0c6df77430ddb",
+  "firstCreatedBy": "20261103000100_brand_studio.sql"
+ },
+ {
+  "sig": "rotate_table_qr_code(uuid)",
+  "productionMd5": "cda5e6453a9e60e7734ebef06520202a",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "9297a68c9a722644b8ce7cce1dcbe432",
+  "firstCreatedBy": "20261021000007_table_qr_provisioning.sql"
+ },
+ {
+  "sig": "rotate_verification_code(uuid)",
+  "productionMd5": "c5bf2f556eef929b477f7cc16973f418",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "6534b69b91f87802ac81839781c25e7b",
+  "firstCreatedBy": "20261023000900_table_verification_code.sql"
+ },
+ {
+  "sig": "set_order_line_quantities(uuid,jsonb,uuid)",
+  "productionMd5": "f6755fdd8980e552579dda228d46201b",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "8e027dd1baa2cdb22e4b4a5e3c23bf06",
+  "firstCreatedBy": "20261021000600_cancel_and_change_order.sql"
+ },
+ {
+  "sig": "settle_online_payment(text,text,text,bigint)",
+  "productionMd5": "888fc83de05e08a852c19fd6c78333b3",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "f501efc23dbbbac883bc3e820bd9bd11",
+  "firstCreatedBy": "20261022000800_online_payments.sql"
+ },
+ {
+  "sig": "staff_email(uuid)",
+  "productionMd5": "77574b263ffb54d45cee7b50f6ebfd28",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "918377886a0028a80da1836d393706ee",
+  "firstCreatedBy": "20261029000100_staff_invites.sql"
+ },
+ {
+  "sig": "stamp_guest_verification(text,uuid,text)",
+  "productionMd5": "66fbdf30b437c0353e5d7c85476b6323",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "5d5806cfe1045a039466f48f0d3f0022",
+  "firstCreatedBy": "20261028000900_guest_scan_confirm.sql"
+ },
+ {
+  "sig": "verification_code_for(text,bigint)",
+  "productionMd5": "2e2d182babf47da6bb036083d8ee83de",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "a2949f86d908a49d2dfd4377468710d4",
+  "firstCreatedBy": "20261023000900_table_verification_code.sql"
+ },
+ {
+  "sig": "verify_table_qr_with_code(text,text,text)",
+  "productionMd5": "c888e60e7d42e34f6022573a93038d75",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "ecadb86ad78c26568e1cb2fd6a856615",
+  "firstCreatedBy": "20261023000900_table_verification_code.sql"
+ },
+ {
+  "sig": "withdraw_subscription_cancellation(uuid)",
+  "productionMd5": "6f877cf71d46aec8dabc1d311ae388a7",
+  "verdict": "MATCHES-NO-REPOSITORY-STATE",
+  "repositoryFinalMd5": "cbc77f3df485739fa9e2d5249ee047c1",
+  "firstCreatedBy": "20261110001100_subscription_billing.sql"
+ },
+ {
+  "sig": "cleanup_expired_qr_verification_attempts()",
+  "productionMd5": "6a2395ef87d3d7821f98fd9d3f9055c9",
+  "verdict": "NOT-IN-REPOSITORY"
+ },
+ {
+  "sig": "has_restaurant_role(uuid,member_role[])",
+  "productionMd5": "26a490b542bd706654f50d7005e2d2e3",
+  "verdict": "NOT-IN-REPOSITORY"
+ },
+ {
+  "sig": "issue_table_qr_code(uuid,uuid,text,uuid)",
+  "productionMd5": "ab7a582c2fbabbc8a02ef39a4bcaa9da",
+  "verdict": "NOT-IN-REPOSITORY"
+ },
+ {
+  "sig": "place_counter_order(text,jsonb,text)",
+  "productionMd5": "4843f6e8d53ccc1d3f0c9cfa35259554",
+  "verdict": "NOT-IN-REPOSITORY"
+ },
+ {
+  "sig": "place_order_idempotent(text,jsonb,text,uuid)",
+  "productionMd5": "d2cb76605d174ee11e7a3b906fe53792",
+  "verdict": "NOT-IN-REPOSITORY"
+ },
+ {
+  "sig": "place_order(text,jsonb,text)",
+  "productionMd5": "4f08177e234b8ee811b5142bb28fdee2",
+  "verdict": "NOT-IN-REPOSITORY"
+ },
+ {
+  "sig": "record_cash_payment(text,uuid,bigint,uuid)",
+  "productionMd5": "918b5db885a60a11a213db842536afa3",
+  "verdict": "NOT-IN-REPOSITORY"
+ },
+ {
+  "sig": "record_qr_verification_failure(uuid,text)",
+  "productionMd5": "e8392baf3124f664b2e70f18b32f4d98",
+  "verdict": "NOT-IN-REPOSITORY"
+ },
+ {
+  "sig": "revoke_sessions_for_ineligible_target()",
+  "productionMd5": "92b14af911f3ff8ad9605c4b46fb17b4",
+  "verdict": "NOT-IN-REPOSITORY"
+ },
+ {
+  "sig": "revoke_sessions_on_qr_revocation()",
+  "productionMd5": "6721dcfbfe43839db84d2b3d18ac8705",
+  "verdict": "NOT-IN-REPOSITORY"
+ },
+ {
+  "sig": "revoke_table_qr_code(uuid,uuid)",
+  "productionMd5": "94338a543665e214d33f4deb4ab67134",
+  "verdict": "NOT-IN-REPOSITORY"
+ },
+ {
+  "sig": "rotate_restaurant_verification_code(uuid,uuid)",
+  "productionMd5": "82e4093b3d448832e1d4b3b20683ee1e",
+  "verdict": "NOT-IN-REPOSITORY"
+ },
+ {
+  "sig": "set_restaurant_tax_rate(uuid,integer)",
+  "productionMd5": "2a6749ca8234e81b039c69c2218d3918",
+  "verdict": "NOT-IN-REPOSITORY"
+ },
+ {
+  "sig": "account_outlet_count(uuid)",
+  "productionMd5": "99b1cf7b844e8d42814f1d405e8352cc",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261110001000_account_subscriptions.sql",
+  "lastAt": "20261110001000_account_subscriptions.sql"
+ },
+ {
+  "sig": "account_payment_history(uuid,integer)",
+  "productionMd5": "594f1927f7a7c020ada2f51be83ef34f",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261110001100_subscription_billing.sql",
+  "lastAt": "20261110001100_subscription_billing.sql"
+ },
+ {
+  "sig": "account_receipt(uuid)",
+  "productionMd5": "250eb64d211d5d33f7490efbfac737f2",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261110001100_subscription_billing.sql",
+  "lastAt": "20261110001100_subscription_billing.sql"
+ },
+ {
+  "sig": "account_subscription_history(uuid,integer)",
+  "productionMd5": "86572db7258f7d0755017554809046a8",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261110001100_subscription_billing.sql",
+  "lastAt": "20261110001100_subscription_billing.sql"
+ },
+ {
+  "sig": "account_subscription_state(uuid)",
+  "productionMd5": "bc597fec23ab401078d190e412c8f3e7",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261110001100_subscription_billing.sql",
+  "lastAt": "20261110001100_subscription_billing.sql"
+ },
+ {
+  "sig": "account_trial_ends_at(uuid)",
+  "productionMd5": "b466adff62c80efaf5e60f928ae8e3ac",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261110001000_account_subscriptions.sql",
+  "lastAt": "20261110001000_account_subscriptions.sql"
+ },
+ {
+  "sig": "audit_staff_invite_change()",
+  "productionMd5": "609b5fb77f77a8ca567e6571e5f2455d",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261108005000_p9_security_hardening.sql",
+  "lastAt": "20261108005000_p9_security_hardening.sql"
+ },
+ {
+  "sig": "audit_staff_membership_change()",
+  "productionMd5": "71970b691f25e6cdb37ca923c13f49dc",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261108005000_p9_security_hardening.sql",
+  "lastAt": "20261108005000_p9_security_hardening.sql"
+ },
+ {
+  "sig": "call_waiter(text,uuid)",
+  "productionMd5": "cc3734761a586e22f5c31749fcce2daa",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261107104440_p5_voice_waiter.sql",
+  "lastAt": "20261107104440_p5_voice_waiter.sql"
+ },
+ {
+  "sig": "can_manage_restaurant(uuid)",
+  "productionMd5": "a09fb086d9e7bb29ac1ffd65e3fc40ea",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261021000500_restaurant_settings.sql",
+  "lastAt": "20261021000500_restaurant_settings.sql"
+ },
+ {
+  "sig": "claim_account_trial(uuid)",
+  "productionMd5": "600827b4f0e2fb666ed2721a9071eb52",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261110001100_subscription_billing.sql",
+  "lastAt": "20261110001100_subscription_billing.sql"
+ },
+ {
+  "sig": "claim_kitchen_order_announcement(uuid)",
+  "productionMd5": "8892349e266b63c9ca31296af3f4cd4a",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261108001000_order_code_and_kitchen_announce_guard.sql",
+  "lastAt": "20261108001000_order_code_and_kitchen_announce_guard.sql"
+ },
+ {
+  "sig": "claim_table_waiter_call_announcement(uuid)",
+  "productionMd5": "b024c19edd0673fba996d65f5372fceb",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261107104440_p5_voice_waiter.sql",
+  "lastAt": "20261107104440_p5_voice_waiter.sql"
+ },
+ {
+  "sig": "claim_upi_payment(text,text,uuid)",
+  "productionMd5": "493cce7c768925cf05b37237508f59f0",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261026001300_restaurant_upi.sql",
+  "lastAt": "20261026001300_restaurant_upi.sql"
+ },
+ {
+  "sig": "clear_qr_verification_attempts(uuid,text)",
+  "productionMd5": "011f7dcad2978e5a7acab48bec19e0d1",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261108000200_drift_reconcile.sql",
+  "lastAt": "20261108000200_drift_reconcile.sql"
+ },
+ {
+  "sig": "confirm_table_orders(uuid)",
+  "productionMd5": "9ff4196ecb12b736a319e62f30600f5f",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261028000900_guest_scan_confirm.sql",
+  "lastAt": "20261028000900_guest_scan_confirm.sql"
+ },
+ {
+  "sig": "counter_claims(uuid)",
+  "productionMd5": "f50d7ccc65207f1e0685fd1304479039",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261026001300_restaurant_upi.sql",
+  "lastAt": "20261026001300_restaurant_upi.sql"
+ },
+ {
+  "sig": "create_restaurant_invoice_share_link(uuid,text)",
+  "productionMd5": "7aad9da501fe7a9d6e41a6219a9edcce",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261108010000_invoice_share_links.sql",
+  "lastAt": "20261108010000_invoice_share_links.sql"
+ },
+ {
+  "sig": "current_restaurant_ids()",
+  "productionMd5": "5e5e98dddfa9a08790d08153cfc14f43",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261019000001_init.sql",
+  "lastAt": "20261019000001_init.sql"
+ },
+ {
+  "sig": "current_table_session(text)",
+  "productionMd5": "6632c8c6e5303638567cbed92ea135f8",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261023000900_table_verification_code.sql",
+  "lastAt": "20261023000900_table_verification_code.sql"
+ },
+ {
+  "sig": "get_public_order(text,text,uuid)",
+  "productionMd5": "7cdad323a455631000df05d5ce8ac946",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261109000100_restore_hold_fields.sql",
+  "lastAt": "20261109000100_restore_hold_fields.sql"
+ },
+ {
+  "sig": "guard_direct_order_progress()",
+  "productionMd5": "501ba5e0a039b56d1e7d00d30f4e36ac",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261109000400_order_write_boundary.sql",
+  "lastAt": "20261109000400_order_write_boundary.sql"
+ },
+ {
+  "sig": "guard_finalized_order_source()",
+  "productionMd5": "19702474d5804d79702f2a0438d1d575",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261109000600_finalized_source_guard.sql",
+  "lastAt": "20261109000600_finalized_source_guard.sql"
+ },
+ {
+  "sig": "has_restaurant_role(uuid,text[])",
+  "productionMd5": "0980c44d441e61aad72da2582f3d72b9",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261026001100_trial_plans_and_write_gate.sql",
+  "lastAt": "20261026001100_trial_plans_and_write_gate.sql"
+ },
+ {
+  "sig": "hash_invite_code(text)",
+  "productionMd5": "7b39e1a003db99a72868bbfd86fcab8d",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261029000100_staff_invites.sql",
+  "lastAt": "20261029000100_staff_invites.sql"
+ },
+ {
+  "sig": "hit_rate_limit(text,integer,integer)",
+  "productionMd5": "cc00091038dc5e2c753a1249cf7b9e0b",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261108000000_guest_rate_limits.sql",
+  "lastAt": "20261108000000_guest_rate_limits.sql"
+ },
+ {
+  "sig": "is_member(uuid)",
+  "productionMd5": "8046a7a9b83b1f917134218f6dc7eb9e",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261019000001_init.sql",
+  "lastAt": "20261019000001_init.sql"
+ },
+ {
+  "sig": "list_restaurant_invoice_share_links(uuid)",
+  "productionMd5": "9c1ee59cda0788b88d461c23c5c7bf53",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261108010000_invoice_share_links.sql",
+  "lastAt": "20261108010000_invoice_share_links.sql"
+ },
+ {
+  "sig": "list_staff_security_audit(uuid,integer)",
+  "productionMd5": "6adabbd491dbb7690f81dfa242b074c1",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261108005000_p9_security_hardening.sql",
+  "lastAt": "20261108005000_p9_security_hardening.sql"
+ },
+ {
+  "sig": "new_qr_public_token()",
+  "productionMd5": "9bdd24237ed661a3f4e33e4439a631d6",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261021000007_table_qr_provisioning.sql",
+  "lastAt": "20261021000007_table_qr_provisioning.sql"
+ },
+ {
+  "sig": "new_verification_secret()",
+  "productionMd5": "bc63a5eaa7e0d2ed65f8adc9b33dd8a1",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261023000900_table_verification_code.sql",
+  "lastAt": "20261023000900_table_verification_code.sql"
+ },
+ {
+  "sig": "normalise_invite_code(text)",
+  "productionMd5": "5132af7f7c77cc13d0943744b741b402",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261029000100_staff_invites.sql",
+  "lastAt": "20261029000100_staff_invites.sql"
+ },
+ {
+  "sig": "operational_schema_readiness()",
+  "productionMd5": "89b894cf36b36d582f4b0d8f1e999e5c",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261110000400_durable_order_attempt_budget.sql",
+  "lastAt": "20261110000400_durable_order_attempt_budget.sql"
+ },
+ {
+  "sig": "place_public_order_core_with_code_retry(text,jsonb,text,text)",
+  "productionMd5": "a82a88410778dd9b42dc897b0bb7633f",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261108001000_order_code_and_kitchen_announce_guard.sql",
+  "lastAt": "20261108001000_order_code_and_kitchen_announce_guard.sql"
+ },
+ {
+  "sig": "plan_features(text)",
+  "productionMd5": "c6f8dfab071035e1642ba16f14001ab5",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261110001000_account_subscriptions.sql",
+  "lastAt": "20261110001000_account_subscriptions.sql"
+ },
+ {
+  "sig": "preview_staff_invite(text)",
+  "productionMd5": "ea90632540c6488cc3d2be459299b8f3",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261108005000_p9_security_hardening.sql",
+  "lastAt": "20261108005000_p9_security_hardening.sql"
+ },
+ {
+  "sig": "protect_billing_history()",
+  "productionMd5": "a0fe9b0973d6434d07f552c93f89cf01",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261110001100_subscription_billing.sql",
+  "lastAt": "20261110001100_subscription_billing.sql"
+ },
+ {
+  "sig": "protect_restaurant_plan()",
+  "productionMd5": "7da3e90eb9e054d60f9eb1285e0724d0",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261026001100_trial_plans_and_write_gate.sql",
+  "lastAt": "20261026001100_trial_plans_and_write_gate.sql"
+ },
+ {
+  "sig": "protect_webhook_evidence()",
+  "productionMd5": "b6020e250b527669025837550f36d59d",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261110001100_subscription_billing.sql",
+  "lastAt": "20261110001100_subscription_billing.sql"
+ },
+ {
+  "sig": "public_online_due(text,text,uuid)",
+  "productionMd5": "ac982eb95a1feab2b8da45351313723a",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261107000000_storefront_settings.sql",
+  "lastAt": "20261107000000_storefront_settings.sql"
+ },
+ {
+  "sig": "public_qr_intro(text)",
+  "productionMd5": "7c949886cb4f94a432af91b2e85cf689",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261023000900_table_verification_code.sql",
+  "lastAt": "20261023000900_table_verification_code.sql"
+ },
+ {
+  "sig": "public_restaurant_profile(text)",
+  "productionMd5": "cddeeb166a31d3918e38c65c21f5d623",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261110000500_public_restaurant_profile.sql",
+  "lastAt": "20261110000500_public_restaurant_profile.sql"
+ },
+ {
+  "sig": "public_upi_details(text,text,uuid)",
+  "productionMd5": "ff6e2e9f3d9c1312d07e3d8d4628e100",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261026001300_restaurant_upi.sql",
+  "lastAt": "20261026001300_restaurant_upi.sql"
+ },
+ {
+  "sig": "read_shared_restaurant_invoice(text)",
+  "productionMd5": "cb112e9143b974306eb780fbf8dcef6c",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261108010000_invoice_share_links.sql",
+  "lastAt": "20261108010000_invoice_share_links.sql"
+ },
+ {
+  "sig": "record_kitchen_announcement_result(uuid,text,text)",
+  "productionMd5": "7ae2d824deb73066fd271818244f4618",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261107104440_p5_voice_waiter.sql",
+  "lastAt": "20261107104440_p5_voice_waiter.sql"
+ },
+ {
+  "sig": "record_subscription_refund(text,text,text,text,timestamp with time zone)",
+  "productionMd5": "20b50b7a50f80b5e7508df240eb5cbde",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261110001100_subscription_billing.sql",
+  "lastAt": "20261110001100_subscription_billing.sql"
+ },
+ {
+  "sig": "record_table_waiter_call_announcement(uuid,text,text)",
+  "productionMd5": "13870f70a3f2d49afb35075d7677029c",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261107104440_p5_voice_waiter.sql",
+  "lastAt": "20261107104440_p5_voice_waiter.sql"
+ },
+ {
+  "sig": "reject_staff_security_audit_mutation()",
+  "productionMd5": "34d74486aea11f990658995907b9381d",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261108005000_p9_security_hardening.sql",
+  "lastAt": "20261108005000_p9_security_hardening.sql"
+ },
+ {
+  "sig": "reserve_qr_verification_attempt(uuid,text)",
+  "productionMd5": "912633b881c286965a58d0e86951b1e7",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261108000200_drift_reconcile.sql",
+  "lastAt": "20261108000200_drift_reconcile.sql"
+ },
+ {
+  "sig": "reserve_staff_tts_attempt(uuid)",
+  "productionMd5": "a706eed667e38341dfc75bbdc67f65d0",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261109000900_staff_tts_budget.sql",
+  "lastAt": "20261109000900_staff_tts_budget.sql"
+ },
+ {
+  "sig": "resolve_table_waiter_call(uuid)",
+  "productionMd5": "06cadd6413c69cbb8d49e35f3a4b7316",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261107104440_p5_voice_waiter.sql",
+  "lastAt": "20261107104440_p5_voice_waiter.sql"
+ },
+ {
+  "sig": "restaurant_features(uuid)",
+  "productionMd5": "eeaa981a9985bec2b89958227da3350a",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261110001000_account_subscriptions.sql",
+  "lastAt": "20261110001000_account_subscriptions.sql"
+ },
+ {
+  "sig": "restaurant_has_feature(uuid,text)",
+  "productionMd5": "39e5a6a0659f74b0eca0eb4cde2ce75a",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261026001200_plan_entitlements.sql",
+  "lastAt": "20261026001200_plan_entitlements.sql"
+ },
+ {
+  "sig": "restaurant_is_active(uuid)",
+  "productionMd5": "484efd706cc93d1c9cfcdb1129484efa",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261019000002_public_read.sql",
+  "lastAt": "20261019000002_public_read.sql"
+ },
+ {
+  "sig": "restaurant_trial_ends_at(uuid)",
+  "productionMd5": "6d421c53928c18fe1efe6ebaf8b6a2d4",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261110001000_account_subscriptions.sql",
+  "lastAt": "20261110001000_account_subscriptions.sql"
+ },
+ {
+  "sig": "revoke_restaurant_invoice_share_link(uuid)",
+  "productionMd5": "e974827e202105452c26e2628e689d5c",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261108010000_invoice_share_links.sql",
+  "lastAt": "20261108010000_invoice_share_links.sql"
+ },
+ {
+  "sig": "stamp_payment_recorded_at()",
+  "productionMd5": "0467736c6c755daa703e5d163e3569aa",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261108003000_session_checkout_payment_receipts.sql",
+  "lastAt": "20261108003000_session_checkout_payment_receipts.sql"
+ },
+ {
+  "sig": "table_order_activity(uuid)",
+  "productionMd5": "8daffb357e4b5fe53f423d35e7c1add0",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261109000800_table_activity_summary.sql",
+  "lastAt": "20261109000800_table_activity_summary.sql"
+ },
+ {
+  "sig": "void_restaurant_invoice(uuid,text)",
+  "productionMd5": "4ac005d6bafff60eb774e3aecb39e2dd",
+  "verdict": "MATCHES-REPOSITORY",
+  "firstAt": "20261108002000_invoice_receipts.sql",
+  "lastAt": "20261108002000_invoice_receipts.sql"
+ }
+]

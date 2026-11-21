@@ -1,0 +1,262 @@
+/**
+ * The one place that talks to Gemini.
+ *
+ * WHY THIS MODULE EXISTS
+ *
+ * menu-vision and brand-vision each carried their own copy of the same fetch:
+ * same key lookup, same request shape, same 45-second patience. Two copies
+ * meant two places to learn the same lesson twice. When Google stopped
+ * serving `gemini-2.5-flash` to new keys (404 "no longer available to new
+ * users") and when the free tier answered 503 under load, both readers failed
+ * with one misleading sentence -- "The reader could not be reached" -- and
+ * neither retried, so a temporary overload looked like a broken feature.
+ *
+ * WHAT THIS GUARANTEES
+ *
+ * - one documented request shape (inline_data, JSON responseMimeType,
+ *   temperature 0);
+ * - busy is retried before it is reported: 429 and 503 get two more tries
+ *   with backoff, inside the same overall patience budget;
+ * - a 404 on the primary model falls back to GEMINI_FALLBACK_MODEL once --
+ *   how a deployment survives a model Google has retired, without a deploy;
+ * - failures come back as a code plus a sentence the CALLER supplies, because
+ *   the two readers offer different manual fallbacks ("add dishes by hand"
+ *   vs "set your logo and colour by hand"). Owners get actions, never stack
+ *   traces or model names.
+ *
+ * Server-only: the key never leaves this process.
+ */
+
+import { callGroqJson, groqConfigured } from './groq';
+
+/** The failure codes shared by both readers. */
+export type GeminiFailureCode = 'not-configured' | 'rate-limited' | 'timeout' | 'upstream';
+
+export type GeminiJsonResult =
+  | { ok: true; model: string; text: string }
+  | { ok: false; code: GeminiFailureCode; reason: string };
+
+/** Sentences the caller owns, because the manual fallback differs per reader. */
+export type GeminiFailureCopy = {
+  /** Shown when the service stays busy after every retry. */
+  busyReason: string;
+  /** Shown when the service errors or the network fails. */
+  unreachableReason: string;
+  /** Shown when the whole patience budget expires. */
+  timeoutReason: string;
+  /** Shown when the model itself is gone and no fallback is configured. */
+  modelMissingReason: string;
+};
+
+function apiKey(): string {
+  return (process.env.GEMINI_API_KEY ?? process.env.MENU_VISION_API_KEY ?? '').trim();
+}
+
+export function geminiConfigured(): boolean {
+  return apiKey() !== '';
+}
+
+/**
+ * The model both readers ask for first.
+ *
+ * `GEMINI_MODEL` overrides without a deploy. The default is 3.8-flash because
+ * Google stopped serving `gemini-2.5-flash` to accounts created after the
+ * 2026 hand-off: it still lists in `models`, it still 404s on generateContent,
+ * and "The reader could not be reached" is the worst possible way to say so.
+ */
+export function primaryModel(): string {
+  return (process.env.GEMINI_MODEL ?? 'gemini-3.8-flash').trim();
+}
+
+/**
+ * A second model tried ONLY when the first is gone (404), never when it is
+ * busy -- busy means the model exists and the fallback would be busy too.
+ * Empty (the default) means no fallback.
+ */
+function fallbackModel(): string {
+  return (process.env.GEMINI_FALLBACK_MODEL ?? '').trim();
+}
+
+const GENERATE_URL = (model: string) =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+
+/**
+ * Ask Gemini for JSON over one image (or PDF pages) and one prompt.
+ *
+ * `text` is the joined candidate text; parsing it into a draft is the
+ * caller's business -- the two readers want different shapes and keep their
+ * own never-guess rules there.
+ */
+export async function callGeminiJson(
+  args: {
+    prompt: string;
+    /** Absent = text-only: no photo is attached to the prompt. */
+    bytes?: ArrayBuffer;
+    mimeType?: string;
+    maxOutputTokens: number;
+    /** Overall patience, retries included. Default 45s. */
+    timeoutMs?: number;
+    /** Backoff between busy retries. Injectable for tests. */
+    retryDelaysMs?: number[];
+    /** Injectable for tests. */
+    sleep?: (ms: number) => Promise<void>;
+  } & GeminiFailureCopy
+): Promise<GeminiJsonResult> {
+  const key = apiKey();
+  if (!key) {
+    return {
+      ok: false,
+      code: 'not-configured',
+      reason: 'Reading is not switched on for this deployment.',
+    };
+  }
+
+  const sleep = args.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const retryDelaysMs = args.retryDelaysMs ?? [1500, 3000];
+
+  const base64 = args.bytes ? Buffer.from(args.bytes).toString('base64') : null;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), args.timeoutMs ?? 45_000);
+
+  const candidates = [primaryModel()];
+  const fallback = fallbackModel();
+  if (fallback && fallback !== candidates[0]) candidates.push(fallback);
+
+  try {
+    for (let m = 0; m < candidates.length; m += 1) {
+      const model = candidates[m];
+      const isLastModel = m === candidates.length - 1;
+
+      for (let attempt = 0; ; attempt += 1) {
+        const response = await fetch(GENERATE_URL(model), {
+          method: 'POST',
+          signal: controller.signal,
+          headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: 'user',
+                parts:
+                  base64 && args.mimeType
+                    ? [{ text: args.prompt }, { inline_data: { mime_type: args.mimeType, data: base64 } }]
+                    : [{ text: args.prompt }],
+              },
+            ],
+            generationConfig: {
+              temperature: 0,
+              responseMimeType: 'application/json',
+              maxOutputTokens: args.maxOutputTokens,
+            },
+          }),
+        });
+
+        if (response.ok) {
+          const payload = (await response.json()) as {
+            candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+          };
+          const text = payload.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
+          return { ok: true, model, text };
+        }
+
+        // Busy is temporary by definition: retry it before telling the owner
+        // anything. 429 is quota, 503 is capacity -- same human sentence.
+        if (response.status === 429 || response.status === 503) {
+          if (attempt < retryDelaysMs.length) {
+            await sleep(retryDelaysMs[attempt]);
+            continue;
+          }
+          return { ok: false, code: 'rate-limited', reason: args.busyReason };
+        }
+
+        // The model is gone. The next candidate (if any) gets a clean try;
+        // this is the error class that once cost an afternoon.
+        if (response.status === 404 && !isLastModel) break;
+
+        const detail = await response.text().catch(() => '');
+        console.error('[autodine] gemini call failed:', model, response.status, detail.slice(0, 300));
+        if (response.status === 404) {
+          return { ok: false, code: 'upstream', reason: args.modelMissingReason };
+        }
+        return { ok: false, code: 'upstream', reason: args.unreachableReason };
+      }
+    }
+    // Unreachable: the loop either returns or breaks into the next model.
+    return { ok: false, code: 'upstream', reason: args.unreachableReason };
+  } catch (error) {
+    const aborted = error instanceof Error && error.name === 'AbortError';
+    console.error('[autodine] gemini call threw:', error);
+    return {
+      ok: false,
+      code: aborted ? 'timeout' : 'upstream',
+      reason: aborted ? args.timeoutReason : args.unreachableReason,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
+ * The reader both screens actually use: Gemini first, Groq when Gemini is
+ * busy or gone.
+ *
+ * The free Gemini tier answers 503 "high demand" for hours at a stretch, and
+ * an owner staring at "the reader is busy" cannot import a menu. The budget
+ * is split deliberately: Gemini gets the first stretch (retries included) but
+ * cannot starve the fallback, and any failure -- busy, gone model, even a
+ * missing Gemini key -- hands the same prompt and photo to Llama 4 Scout
+ * before the owner is told anything. Only a budget that has run out ends the
+ * attempt: the owner waited already, and a second provider is cheaper than a
+ * retry-the-page instruction.
+ */
+export async function callVisionJson(
+  args: {
+    prompt: string;
+    bytes: ArrayBuffer;
+    mimeType: string;
+    maxOutputTokens: number;
+    /** Overall patience, both providers and all retries. Default 120s. */
+    timeoutMs?: number;
+    retryDelaysMs?: number[];
+    sleep?: (ms: number) => Promise<void>;
+  } & GeminiFailureCopy
+): Promise<GeminiJsonResult> {
+  const budgetMs = args.timeoutMs ?? 120_000;
+  const deadline = Date.now() + budgetMs;
+
+  // Gemini's phase is capped at 75s so a thrashing provider cannot eat the
+  // whole budget before the fallback gets a chance.
+  const gemini = await callGeminiJson({ ...args, timeoutMs: Math.min(budgetMs, 75_000) });
+  if (gemini.ok) return gemini;
+
+  const remaining = deadline - Date.now();
+  if (remaining < 5_000 || !groqConfigured()) return gemini;
+
+  return callGroqJson({ ...args, timeoutMs: remaining });
+}
+
+/**
+ * The same provider split for a prompt with no photo attached: the
+ * description writer talks to the dish by name alone. Gemini first, Groq
+ * when Gemini is busy or gone -- identical budgeting to callVisionJson so
+ * both doors of the AI Menu Studio behave the same under load.
+ */
+export async function callTextJson(
+  args: {
+    prompt: string;
+    maxOutputTokens: number;
+    timeoutMs?: number;
+    retryDelaysMs?: number[];
+    sleep?: (ms: number) => Promise<void>;
+  } & GeminiFailureCopy
+): Promise<GeminiJsonResult> {
+  const budgetMs = args.timeoutMs ?? 60_000;
+  const deadline = Date.now() + budgetMs;
+
+  const gemini = await callGeminiJson({ ...args, timeoutMs: Math.min(budgetMs, 40_000) });
+  if (gemini.ok) return gemini;
+
+  const remaining = deadline - Date.now();
+  if (remaining < 5_000 || !groqConfigured()) return gemini;
+
+  return callGroqJson({ ...args, timeoutMs: remaining });
+}

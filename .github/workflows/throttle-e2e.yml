@@ -1,0 +1,112 @@
+name: Throttle browser E2E (isolated local database)
+
+# Unlike the demo-mode browser workflow, this job builds a throwaway PostgreSQL
+# database, a local PostgREST API, and a local Next.js app. It has no production
+# URLs or secrets and destroys the test database when the job exits.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: throttle-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  throttle-browser:
+    name: scan throttle · real browser + disposable PostgreSQL
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17.11-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: autodine-local-only-e2e
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install application and Playwright dependencies
+        run: npm ci
+
+      - name: Provision Chromium and its Linux runtime libraries
+        run: |
+          npx playwright install --with-deps chromium
+          ./scripts/e2e/check-chromium-runtime.sh | tee test-results-chromium-runtime.log
+
+      - name: Ensure PostgreSQL client tools are present
+        run: |
+          if ! command -v psql >/dev/null 2>&1 || ! command -v createdb >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes postgresql-client
+          fi
+
+      - name: Create a one-run local JWT key
+        run: echo "LOCAL_E2E_JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
+      - name: Run both browser tests against isolated local services
+        id: throttle-e2e
+        run: |
+          set +e
+          npm run test:e2e:throttle 2>&1 | tee "$RUNNER_TEMP/throttle-e2e-console.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ]; then
+            {
+              echo '## Isolated throttle E2E failure details'
+              echo 'The full logs are in the uploaded artifact; this is the console tail for quick diagnosis.'
+              tail -n 100 "$RUNNER_TEMP/throttle-e2e-console.log"
+            } >> "$GITHUB_STEP_SUMMARY"
+            detail="$(tail -n 25 "$RUNNER_TEMP/throttle-e2e-console.log" | tr '\n' ' ' | head -c 3000)"
+            echo "::error title=Throttle E2E failure details::$detail"
+            services=''
+            for log in test-results/throttle-e2e/api-preflight.log test-results/throttle-e2e/next-build.log test-results/throttle-e2e/next-start.log test-results/throttle-e2e/postgrest.log test-results/throttle-e2e/postgrest-proxy.log; do
+              if [ -f "$log" ]; then
+                services+=" $log: $(tail -n 20 "$log" | tr '\n' ' ')"
+              fi
+            done
+            for context in $(find test-results -name error-context.md -type f | head -n 2); do
+              services+=" $context: $(tail -n 20 "$context" | tr '\n' ' ')"
+            done
+            if [ -n "$services" ]; then
+              echo "::error title=Local service diagnostics::${services:0:3000}"
+            fi
+          fi
+          exit "$status"
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: autodine-local-only-e2e
+          PGBIN: /usr/bin
+          E2E_ARTIFACTS_DIR: test-results/throttle-e2e
+          PGRST_VERSION: v16.5
+
+      - name: Upload test logs, database replay, and per-test evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: throttle-browser-e2e-evidence
+          path: |
+            test-results/throttle-e2e/
+            test-results-chromium-runtime.log
+          if-no-files-found: warn
+          retention-days: 30

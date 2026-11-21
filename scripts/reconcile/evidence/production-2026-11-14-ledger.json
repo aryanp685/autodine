@@ -1,0 +1,486 @@
+[
+{
+"version": "20261019000001",
+"name": "init"
+},
+{
+"version": "20261019000002",
+"name": "public_read"
+},
+{
+"version": "20261020000004",
+"name": "counter_payment"
+},
+{
+"version": "20261020084033",
+"name": "initial_schema"
+},
+{
+"version": "20261020084047",
+"name": "public_menu_read"
+},
+{
+"version": "20261020084121",
+"name": "trial_entitlements"
+},
+{
+"version": "20261020084141",
+"name": "counter_orders"
+},
+{
+"version": "20261020084157",
+"name": "cash_collection"
+},
+{
+"version": "20261020084237",
+"name": "qr_verification_sessions"
+},
+{
+"version": "20261020084251",
+"name": "qr_attempt_cleanup_schedule"
+},
+{
+"version": "20261020084942",
+"name": "security_hardening"
+},
+{
+"version": "20261020162513",
+"name": "security_regressions"
+},
+{
+"version": "20261020170906",
+"name": "counter_payment"
+},
+{
+"version": "20261020192531",
+"name": "guest_order_idempotency"
+},
+{
+"version": "20261020193839",
+"name": "guest_order_crypto_search_path"
+},
+{
+"version": "20261020205436",
+"name": "owner_optional_tax_settings"
+},
+{
+"version": "20261021000004",
+"name": null
+},
+{
+"version": "20261021000005",
+"name": "public_place_order"
+},
+{
+"version": "20261021000006",
+"name": "table_qr_verification"
+},
+{
+"version": "20261021000007",
+"name": "table_qr_provisioning"
+},
+{
+"version": "20261021000008",
+"name": "charge_for_portions"
+},
+{
+"version": "20261021000009",
+"name": "report_sales"
+},
+{
+"version": "20261021000010",
+"name": "realtime_orders"
+},
+{
+"version": "20261021000200",
+"name": "item_spoken_name"
+},
+{
+"version": "20261021000300",
+"name": "item_addons"
+},
+{
+"version": "20261021000400",
+"name": "multiple_menus"
+},
+{
+"version": "20261021000500",
+"name": "restaurant_settings"
+},
+{
+"version": "20261021000600",
+"name": "cancel_and_change_order"
+},
+{
+"version": "20261021090335",
+"name": "public_place_order"
+},
+{
+"version": "20261021091340",
+"name": "public_place_order_fix_tax_rate"
+},
+{
+"version": "20261021095656",
+"name": "table_qr_verification"
+},
+{
+"version": "20261021095749",
+"name": "place_public_order_with_table"
+},
+{
+"version": "20261021095927",
+"name": "verify_table_qr_token_fix"
+},
+{
+"version": "20261021100133",
+"name": "verify_table_qr_sha256_builtin"
+},
+{
+"version": "20261021100241",
+"name": "verify_table_qr_ttl_fix"
+},
+{
+"version": "20261021100450",
+"name": "place_public_order_sha256_fix"
+},
+{
+"version": "20261021112803",
+"name": "charge_for_portions"
+},
+{
+"version": "20261021124307",
+"name": "report_sales"
+},
+{
+"version": "20261021140306",
+"name": "enforce_trial_on_workspace_writes"
+},
+{
+"version": "20261021145052",
+"name": "allow_emergency_qr_revocation"
+},
+{
+"version": "20261021163522",
+"name": "item_spoken_name"
+},
+{
+"version": "20261021180021",
+"name": "item_addons"
+},
+{
+"version": "20261021180132",
+"name": "drop_unpriced_addon_guard"
+},
+{
+"version": "20261021201633",
+"name": "qr_on_site_code_core"
+},
+{
+"version": "20261021201651",
+"name": "qr_verify_with_code"
+},
+{
+"version": "20261021201746",
+"name": "qr_public_order_requires_session"
+},
+{
+"version": "20261021202029",
+"name": "qr_drop_old_scan"
+},
+{
+"version": "20261022000700",
+"name": "multi_outlet"
+},
+{
+"version": "20261022000800",
+"name": "online_payments"
+},
+{
+"version": "20261023000900",
+"name": "table_verification_code"
+},
+{
+"version": "20261023051744",
+"name": "restaurant_branding"
+},
+{
+"version": "20261024000900",
+"name": "drop_old_qr_scan"
+},
+{
+"version": "20261024081441",
+"name": "idempotent_guest_orders"
+},
+{
+"version": "20261025001000",
+"name": "restaurant_branding"
+},
+{
+"version": "20261026001100",
+"name": "trial_plans_and_write_gate"
+},
+{
+"version": "20261026001200",
+"name": "plan_entitlements"
+},
+{
+"version": "20261026001300",
+"name": "restaurant_upi"
+},
+{
+"version": "20261026001400",
+"name": "default_accent"
+},
+{
+"version": "20261026001500",
+"name": "place_order_addon_pricing_where"
+},
+{
+"version": "20261027000900",
+"name": "idempotent_guest_orders"
+},
+{
+"version": "20261028000100",
+"name": "renew_the_king_trial"
+},
+{
+"version": "20261028000900",
+"name": "guest_scan_confirm"
+},
+{
+"version": "20261029000100",
+"name": "staff_invites"
+},
+{
+"version": "20261103000100",
+"name": "brand_studio"
+},
+{
+"version": "20261103185425",
+"name": "brand_studio"
+},
+{
+"version": "20261104050204",
+"name": "brand_studio"
+},
+{
+"version": "20261105000100",
+"name": "veg_tri_state"
+},
+{
+"version": "20261105072639",
+"name": "veg_tri_state"
+},
+{
+"version": "20261105191326",
+"name": "menu_translations"
+},
+{
+"version": "20261106000000",
+"name": "menu_translations"
+},
+{
+"version": "20261106062054",
+"name": "storefront_settings"
+},
+{
+"version": "20261106102042",
+"name": "guest_rate_limits"
+},
+{
+"version": "20261106121751",
+"name": "qr_attempt_budget"
+},
+{
+"version": "20261106121839",
+"name": "guest_scan_confirm_catchup"
+},
+{
+"version": "20261106121900",
+"name": "place_public_order_stamp"
+},
+{
+"version": "20261106122418",
+"name": "publish_menu_snapshot"
+},
+{
+"version": "20261107000000",
+"name": "storefront_settings"
+},
+{
+"version": "20261107074545",
+"name": "order_sessions"
+},
+{
+"version": "20261107080000",
+"name": null
+},
+{
+"version": "20261107082936",
+"name": "session_manual_payment_p4"
+},
+{
+"version": "20261107100043",
+"name": "invoice_receipts"
+},
+{
+"version": "20261107100107",
+"name": "session_checkout_payment_receipts"
+},
+{
+"version": "20261107104440",
+"name": "p5_voice_waiter"
+},
+{
+"version": "20261107112126",
+"name": "p9_security_hardening"
+},
+{
+"version": "20261107114638",
+"name": "order_code_and_kitchen_announce_guard"
+},
+{
+"version": "20261107123437",
+"name": "restore_public_order_session_attach"
+},
+{
+"version": "20261108000000",
+"name": "guest_rate_limits"
+},
+{
+"version": "20261108000200",
+"name": "drift_reconcile"
+},
+{
+"version": "20261108000300",
+"name": null
+},
+{
+"version": "20261108000500",
+"name": null
+},
+{
+"version": "20261108001000",
+"name": null
+},
+{
+"version": "20261108002000",
+"name": null
+},
+{
+"version": "20261108003000",
+"name": null
+},
+{
+"version": "20261108005000",
+"name": null
+},
+{
+"version": "20261108006000",
+"name": null
+},
+{
+"version": "20261108007000",
+"name": null
+},
+{
+"version": "20261108008000",
+"name": null
+},
+{
+"version": "20261108009000",
+"name": null
+},
+{
+"version": "20261108010000",
+"name": null
+},
+{
+"version": "20261109000100",
+"name": null
+},
+{
+"version": "20261109000200",
+"name": null
+},
+{
+"version": "20261109000300",
+"name": null
+},
+{
+"version": "20261109000400",
+"name": null
+},
+{
+"version": "20261109000500",
+"name": null
+},
+{
+"version": "20261109000600",
+"name": null
+},
+{
+"version": "20261109000700",
+"name": null
+},
+{
+"version": "20261109000800",
+"name": null
+},
+{
+"version": "20261109000900",
+"name": null
+},
+{
+"version": "20261109001000",
+"name": null
+},
+{
+"version": "20261110000100",
+"name": null
+},
+{
+"version": "20261110000200",
+"name": null
+},
+{
+"version": "20261110000300",
+"name": null
+},
+{
+"version": "20261110000400",
+"name": null
+},
+{
+"version": "20261110000500",
+"name": null
+},
+{
+"version": "20261110000600",
+"name": null
+},
+{
+"version": "20261110000700",
+"name": null
+},
+{
+"version": "20261110000800",
+"name": null
+},
+{
+"version": "20261110000900",
+"name": null
+},
+{
+"version": "20261110001000",
+"name": null
+},
+{
+"version": "20261110001100",
+"name": null
+},
+{
+"version": "20261112000100",
+"name": null
+}
+]

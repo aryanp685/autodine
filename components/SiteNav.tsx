@@ -1,0 +1,202 @@
+'use client';
+
+/**
+ * The site bar, and the one bit of state it needs.
+ *
+ * WHY A CLIENT COMPONENT FOR A HEADER
+ *
+ * Only for the scroll state. Everything it renders is static markup; the sole
+ * reason this file ships JavaScript is to add `.is-scrolled` when the page
+ * moves, which turns the transparent overlay into a translucent surface.
+ *
+ * WHY NOT A SCROLL LISTENER ON EVERY PIXEL
+ *
+ * scrollY is read at most once per animation frame and the class is written
+ * only when the boolean actually changes, so a long scroll costs one write per
+ * threshold crossing. The listener is passive: it never calls preventDefault
+ * and cannot delay the scroll itself.
+ *
+ * If JavaScript never runs, the bar keeps its resting look. Nothing is hidden
+ * and nothing is unreachable -- the scrolled state is an enhancement.
+ */
+
+import Link from 'next/link';
+import { BrandLockup } from '@/components/BrandMark';
+import { BRAND_GREEN } from '@/lib/brand';
+import { useEffect, useState } from 'react';
+
+export type SiteNavLink = { label: string; href: string; active?: boolean };
+
+/** A few pixels, not zero: the hero's top edge should not flicker the bar. */
+const SCROLLED_AFTER_PX = 12;
+
+export function SiteNav({
+  links,
+  onImage = false,
+}: {
+  links: SiteNavLink[];
+  /**
+   * True on a page whose top is a dark photograph or a dark ground: the bar
+   * starts transparent with light type, then takes a surface underneath.
+   *
+   * On a paper page the same bar is dark type on paper, because light type on
+   * near-white is not a style, it is a blank space where the navigation should
+   * be.
+   */
+  onImage?: boolean;
+}) {
+  /* Phone navigation. The desktop bar is untouched: the links simply gain a
+     phone-only disclosure, so nothing important is unreachable on a small
+     screen (a strict requirement of the responsive pass). */
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const nav = document.querySelector<HTMLElement>('[data-site-nav]');
+    if (!nav) return;
+
+    let frame = 0;
+    let scrolled = false;
+
+    const apply = () => {
+      frame = 0;
+      const next = window.scrollY > SCROLLED_AFTER_PX;
+      if (next === scrolled) return;
+      scrolled = next;
+      /* A data attribute, not a class: the surface is written in utilities, and
+         a utility that depends on a class this component invents is exactly
+         the coupling the migration is removing. */
+      nav.dataset.scrolled = next ? 'true' : 'false';
+    };
+
+    const onScroll = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(apply);
+    };
+
+    // A refresh halfway down the page restores a scroll position; read once so
+    // the bar matches the page before the first scroll event arrives.
+    apply();
+    window.addEventListener('scroll', onScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (frame) window.cancelAnimationFrame(frame);
+      delete nav.dataset.scrolled;
+    };
+  }, []);
+
+  const surface = onImage
+    ? 'data-[scrolled=true]:border-cream/[0.12] data-[scrolled=true]:bg-ink/80 data-[scrolled=true]:backdrop-blur-xl'
+    : 'border-b border-cream/15 bg-ink/85 backdrop-blur-xl';
+
+  return (
+    <header
+      data-site-nav=""
+      className={[
+        'sticky top-0 z-50 border-b border-transparent transition-colors duration-300',
+        surface,
+      ].join(' ')}
+    >
+      <div className="mx-auto flex h-16 w-full max-w-[1180px] items-center gap-8 px-5 sm:px-8">
+        <Link
+          href="/"
+          aria-label="AutoDine home"
+          className={onImage ? 'shrink-0 text-cream' : 'shrink-0 text-cream'}
+        >
+          <BrandLockup size={21} ink="currentColor" dot={BRAND_GREEN} />
+        </Link>
+
+        <nav aria-label="Primary" className="hidden flex-1 md:block">
+          <ul
+            className={[
+              'flex items-center gap-7 text-[13px]',
+              onImage ? 'text-mute' : 'text-cream/60',
+            ].join(' ')}
+          >
+            {links.map((link) => (
+              <li key={link.href}>
+                <Link
+                  href={link.href}
+                  aria-current={link.active ? 'page' : undefined}
+                  className={[
+                    'transition-colors',
+                    onImage ? 'hover:text-cream' : 'hover:text-cream',
+                    link.active ? 'text-cream' : '',
+                  ].join(' ')}
+                >
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <div className="ml-auto flex items-center gap-3">
+          <Link
+            href="/login"
+            className={[
+              'hidden text-[13px] transition-colors sm:block',
+              onImage ? 'text-mute hover:text-cream' : 'text-cream/60 hover:text-cream',
+            ].join(' ')}
+          >
+            Sign in
+          </Link>
+          <Link
+            href="/signup"
+            className="inline-flex h-10 items-center rounded-full bg-grass px-5 text-[13px] font-medium text-cream transition-colors hover:bg-grass-strong"
+          >
+            Create account
+          </Link>
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-controls="site-nav-menu"
+            aria-label={open ? 'Close menu' : 'Open menu'}
+            onClick={() => setOpen((v) => !v)}
+            className="grid size-11 place-items-center rounded-full border border-cream/15 text-cream transition-colors hover:bg-cream/[0.06] md:hidden"
+          >
+            <span aria-hidden="true" className="text-[15px] leading-none">
+              {open ? '✕' : '☰'}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* The phone menu: the same links, one column, under the bar. */}
+      {open ? (
+        <nav
+          id="site-nav-menu"
+          aria-label="Primary (mobile)"
+          className="border-t border-cream/12 bg-ink px-5 pb-4 pt-2 md:hidden"
+        >
+          <ul className="flex flex-col gap-1">
+            {links.map((link) => (
+              <li key={link.href}>
+                <Link
+                  href={link.href}
+                  aria-current={link.active ? 'page' : undefined}
+                  onClick={() => setOpen(false)}
+                  className={[
+                    'block rounded-[10px] px-3 py-2.5 text-[14px] transition-colors',
+                    link.active ? 'bg-cream/[0.06] text-cream' : 'text-cream/75 hover:bg-cream/[0.05]',
+                  ].join(' ')}
+                >
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+            <li>
+              <Link
+                href="/login"
+                onClick={() => setOpen(false)}
+                className="block rounded-[10px] px-3 py-2.5 text-[14px] text-cream/75 transition-colors hover:bg-cream/[0.05] sm:hidden"
+              >
+                Sign in
+              </Link>
+            </li>
+          </ul>
+        </nav>
+      ) : null}
+    </header>
+  );
+}

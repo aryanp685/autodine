@@ -1,0 +1,111 @@
+'use client';
+
+/**
+ * Admin: trial renewal page.
+ *
+ * Lets an administrator renew a restaurant's trial by entering
+ * the restaurant name and clicking the button. The renewal is
+ * server-side only — the Supabase admin client (service role) is
+ * used, which bypasses RLS. The write reaches `accounts` through
+ * `public.admin_set_subscription()`, and the `protect_account_plan()`
+ * trigger allows it because auth.uid() is null (service role).
+ *
+ * This page is NOT linked from the main navigation. It is an
+ * operational tool for specific situations (e.g. a restaurant whose
+ * trial expired and needs a fresh term).
+ *
+ * THE ADMIN SECRET
+ *
+ * The renewal is a privileged write, so the operator types the server's
+ * admin secret into this form with each use. It is verified server-side
+ * (inside the action, not here), travels only in the request body over
+ * TLS, and is kept in component state alone — never localStorage,
+ * sessionStorage, a query parameter, or the page's HTML.
+ */
+
+import { useState } from 'react';
+import { renewTrialAction } from './actions';
+
+export default function RenewTrialPage() {
+  const [restaurantName, setRestaurantName] = useState('');
+  const [adminSecret, setAdminSecret] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<null | { ok: boolean; message: string }>(null);
+
+  async function handleRenew() {
+    if (!restaurantName.trim() || !adminSecret) return;
+    setLoading(true);
+    setResult(null);
+    const res = await renewTrialAction(restaurantName.trim(), adminSecret);
+    if (res.ok && res.restaurantName && res.trialEndsAt) {
+      setResult({
+        ok: true,
+        message: `Trial renewed for "${res.restaurantName}". New trial ends at ${new Date(res.trialEndsAt).toLocaleString('en-IN')}.`,
+      });
+    } else {
+      setResult({ ok: false, message: res.error ?? 'Unknown error' });
+    }
+    setLoading(false);
+  }
+
+  return (
+    <main className="mx-auto w-full max-w-[620px] flex-1 px-5 py-12">
+      <p className="g-eyebrow">Admin</p>
+      <h1 className="g-display mt-2.5 text-[30px]">Renew trial</h1>
+      <div className="mt-4 text-[14.5px] leading-[1.6] text-gink-64">
+        <p className="max-w-[54ch]">
+          Renew the trial of the account that owns a restaurant. The trial
+          clock is server-side (<code className="text-gink-80">accounts.trial_ends_at</code>),
+          and one subscription covers every outlet the account owns, so this
+          must be done from the server. Enter the exact restaurant name and
+          click renew.
+        </p>
+      </div>
+
+      <div className="mt-6 flex flex-col gap-3">
+        <label className="text-[12.5px] font-semibold tracking-[0.16em] text-gink uppercase">
+          Restaurant name
+        </label>
+        <input
+          type="text"
+          value={restaurantName}
+          onChange={(e) => setRestaurantName(e.target.value)}
+          placeholder="The King"
+          className="w-full rounded-[var(--p-r-card)] border border-hair bg-card px-4 py-3 text-[15px] text-gink outline-none focus:border-gink-40"
+        />
+
+        <label className="text-[12.5px] font-semibold tracking-[0.16em] text-gink uppercase">
+          Admin secret
+        </label>
+        <input
+          type="password"
+          value={adminSecret}
+          onChange={(e) => setAdminSecret(e.target.value)}
+          placeholder="Server ADMIN_SECRET"
+          autoComplete="off"
+          className="w-full rounded-[var(--p-r-card)] border border-hair bg-card px-4 py-3 text-[15px] text-gink outline-none focus:border-gink-40"
+        />
+
+        <button
+          onClick={handleRenew}
+          disabled={loading || !restaurantName.trim() || !adminSecret}
+          className="mt-2 inline-flex h-11 items-center justify-center rounded-full px-5 text-[13px] font-semibold transition active:scale-[0.99] g-primary disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {loading ? 'Renewing…' : 'Renew trial'}
+        </button>
+
+        {result && (
+          <div
+            className={`mt-4 rounded-[var(--p-r-card)] border px-4 py-3 text-[14px] leading-[1.5] ${
+              result.ok
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-80'
+                : 'border-red-200 bg-red-50 text-red-70'
+            }`}
+          >
+            {result.message}
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}

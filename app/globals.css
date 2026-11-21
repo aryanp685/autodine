@@ -1,0 +1,1647 @@
+/* LAYER ORDER, DECLARED BEFORE ANYTHING IS IN IT.
+ *
+ * Tailwind's own entry stylesheet starts with this line, and this project does
+ * not import that file -- it imports theme.css and utilities.css separately, so
+ * the ordering statement was missing. Without it, a layer's position is decided
+ * by where its first rule appears, and `@layer base` sits FURTHER DOWN this file
+ * than the two imports. Base therefore came last, which means it won.
+ *
+ * The cost of that was not theoretical. `a { color: inherit }` in base beat
+ * `text-onink` in utilities, so a black pill with a white label rendered its
+ * label in black -- a button with no visible text, which was reported twice
+ * from a phone and once from the owner dashboard.
+ *
+ * This line is the fix: lowest priority first. base < components < utilities,
+ * which is what every className in this repository already assumes.
+ */
+@layer theme, base, components, utilities;
+
+/* Tailwind, imported WITHOUT its preflight.
+ *
+ * Preflight is a global reset: it zeroes margins, rewrites border styles and
+ * changes heading sizes for the whole document. This app already has its own
+ * reset and a locked design system across twenty screens that are being
+ * migrated one at a time -- dropping a second reset underneath them would move
+ * every existing page on the day it landed.
+ *
+ * So only the theme and the utility layer are imported. New screens use
+ * utilities; old screens keep their class names until they are rewritten. */
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+/* Inter, self-hosted from npm rather than fetched from Google Fonts.
+ *
+ * Two reasons. First, a third-party font request costs a round trip to a
+ * domain the user has not visited and leaks their IP to it; self-hosting
+ * removes that and works offline. Second, the build has no egress to
+ * fonts.googleapis.com here, so next/font/google would fail outright.
+ *
+ * Latin subset only, and only the four weights the locked design actually
+ * uses (400/500/600/700). The full package declares nine weights across
+ * seven subsets.
+ */
+@import '@fontsource/inter/latin-400.css';
+@import '@fontsource/inter/latin-500.css';
+@import '@fontsource/inter/latin-600.css';
+@import '@fontsource/inter/latin-700.css';
+
+/* The marketing layer. It also carries the product's default (warm) token
+   values, which is why it is still shipped with the app rather than to the
+   public pages alone. */
+@import '../styles/premium.css';
+
+/* THE PRODUCT IS TAILWIND
+ *
+ * There used to be four more stylesheets here -- design-system, app, guest and
+ * owner -- holding about 9,000 lines of class-based CSS that every screen
+ * depended on. Screen by screen those screens moved to utilities, and the
+ * stylesheets became a second, invisible design system that no longer matched
+ * any markup: `.kb__ticket`, `.dash__stat`, `.cart__bar`, `.ui-table`. They are
+ * gone. What survives from them is the owner palette below, because a token is
+ * the one thing a utility cannot express on its own.
+ */
+
+/* =========================================================================
+   AutoDine — global base
+   Shared reset, neutral component skeletons, and the locked design tokens.
+   All product styling lives in styles/design-system.css, scoped to [data-app].
+   ========================================================================= */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+:root {
+  /* Baseline brief palette (Part 5.4) — directions may re-weight, not replace. */
+  --ink: #16140f;
+  --warm-white: #f7f4ed;
+  --muted-sage: #66735a;
+  --sand: #ede6d8;
+  --alert: #C75B50;
+
+  --ink-70: rgba(22, 20, 15, 0.7);
+  --ink-55: rgba(22, 20, 15, 0.55);
+  --ink-40: rgba(22, 20, 15, 0.4);
+  --ink-14: rgba(22, 20, 15, 0.14);
+  --ink-08: rgba(22, 20, 15, 0.08);
+
+  /* -apple-system first, deliberately. On Apple hardware that resolves to SF
+     Pro -- Apple's own typeface, which is what "Apple-like" means literally,
+     and it is already installed so there is nothing to download. Inter, the
+     closest freely licensed match, is loaded for everything else.
+
+     Inter used to be first but was never imported, so the name resolved to
+     nothing and every platform silently fell through to Segoe UI or Arial. */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI',
+    Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 16px;
+
+  /* THE EASING TOKEN, which was missing.
+   *
+   * Every `transition: … var(--p-ease)` in this file resolved to nothing,
+   * because the variable was never declared. An invalid var() in a shorthand
+   * invalidates the whole declaration at computed-value time, so `transition`
+   * fell back to its initial value and NOTHING on the surface was animated --
+   * not a hover state, not the file picker, not the guest's glass. It looked
+   * like a design decision, which is why it survived: the product simply felt
+   * abrupt. Declared once here; both surfaces read it, and the owner's own
+   * `--o-ease` is an alias so the two can never disagree. */
+  --p-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  /* Overridden per direction */
+  --page-bg: var(--warm-white);
+  --surface: #ffffff;
+  --border: var(--ink-14);
+  --text: var(--ink);
+  --accent: var(--muted-sage);
+}
+
+body {
+  background: #eae6dd;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+
+  /* Let a variable font pick the optical size that suits the current px
+     size, instead of rendering the same outlines at 11px and 76px. */
+  font-optical-sizing: auto;
+  /* Never let the browser synthesise a fake bold or oblique from the roman
+     cut. A real 500/600/700 is loaded for every weight the design uses, so
+     a synthesised one would only look worse. */
+  font-synthesis: none;
+  /* Inter's contextual alternates: single-storey 'a' off, better colon and
+     punctuation spacing, and proportional old-style figures where they read
+     better in running text. */
+  font-feature-settings: 'cv05' 1, 'cv11' 1, 'ss01' 1;
+  font-variant-ligatures: contextual;
+}
+
+/* ------------------------------------------------------- animation staging
+
+   Hidden only while .motion is present, which the inline script in
+   app/layout.tsx adds before first paint and only when the visitor has not
+   asked for reduced motion. Without that class -- JavaScript off, or reduced
+   motion requested -- these rules do not apply and the page renders whole.
+
+   This is the one place where content is hidden by default, so it is worth
+   being explicit about why it is safe: the hiding and the animating are
+   decided by the same condition, and the animation always ends at opacity 1.
+*/
+.motion [data-anim],
+.motion [data-anim-group] > * {
+  opacity: 0;
+  will-change: opacity, transform;
+}
+/* Element resets live in a LAYER, not loose at the top level.
+ *
+ * This is not tidying. An unlayered rule beats every layered one regardless of
+ * specificity, and Tailwind's utilities are layered. So `a { color: inherit }`
+ * silently won against `text-onink` on a link -- and the button that lost was
+ * a black pill with black text on it, which is to say no text at all. It was
+ * reported as "the button looks empty"; the label was rendering the whole time,
+ * in the colour of the surface behind it.
+ *
+ * @layer base sits before utilities in Tailwind's order, so a utility can now
+ * override a reset, which is what everybody writing `className` already
+ * assumes happens.
+ */
+@layer base {
+  /* Element resets that a utility must be able to override. Kept here for the
+     same reason the comment below records: unlayered beats layered no matter
+     the specificity, so a loose `p { margin: 0 }` silently killed every
+     `mt-*` on a paragraph in the landing page. */
+  h1, h2, h3, h4, h5 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
+  p { margin: 0; }
+  a { color: inherit; text-decoration: none; }
+  ul, ol { margin: 0; padding: 0; list-style: none; }
+  /* THE BUTTON RESET IS FOUR PROPERTIES AND ONE OF THEM WAS MISSING.
+   *
+   * `background: transparent` was here because a <button> with no background
+   * class kept the user agent's `buttonface` grey box. What it did NOT reset is
+   * the border and the native appearance -- so every button whose look comes
+   * from spacing and type alone (the quiet "Regenerate" / "Disable" pair on
+   * Tables, the availability switch on Menus) still painted the platform's own
+   * 1px grey outline around itself, and the pill inside it looked like a
+   * control that had been dropped into a second, older control.
+   *
+   * `appearance: none` also fixes the search field: a native `searchfield`
+   * ignores `outline: none` on some engines and draws its own black focus
+   * rectangle inside whatever rounded box it is sitting in.
+   *
+   * `padding: 0` and `border: 0` are safe because every button in the product
+   * declares its own geometry in the class string; the kit's `btn()` carries
+   * the height and the horizontal padding, and a bare button carries its own. */
+  button {
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  /* The same for a text field: a `type="search"` control is the one input the
+     platform still decorates, and the decoration is the black box. */
+  input[type='search'] { -webkit-appearance: none; appearance: none; }
+  img { display: block; max-width: 100%; }
+}
+
+/*
+ * THE FOCUS RING, IN THE BASE LAYER.
+ *
+ * This was unlayered, and an unlayered rule beats every utility -- including
+ * `focus:outline-none`. So a text field that a component had deliberately
+ * smoothed (a search box inside a bordered pill, an input whose wrapper draws
+ * the ring) still painted a hard 2px near-black rectangle INSIDE its own
+ * rounded border. On the "Go to…" control that produced a black box floating
+ * in a white pill: the single most broken-looking thing on the shell, on every
+ * screen, and invisible in the markup because both rules are correct on their
+ * own.
+ *
+ * In @layer base the ring is a DEFAULT: everything still gets one -- which is
+ * what a keyboard user needs -- and a component that draws a better one can
+ * say so. Nothing is lost by the move, and nothing is won by leaving it.
+ *
+ * Two things changed after the light pass. The ring is the ACCENT, not the
+ * ink: a near-black rectangle is the platform's ring, not this product's, and
+ * on a white sheet it read as a rendering fault. And `border-radius: 4px` is
+ * gone from this rule -- it was setting the RADIUS of whatever got focused, so
+ * tabbing to a pill turned it into a small rounded rectangle for as long as it
+ * held focus. An outline already follows the element's own radius; this rule
+ * never needed to say anything about shape.
+ */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--p-accent);
+    outline-offset: 2px;
+  }
+}
+
+.money { font-variant-numeric: tabular-nums; }
+.tnum { font-variant-numeric: tabular-nums; }
+
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.ui-badge--sage { background: rgba(102, 115, 90, 0.15); color: #46523b; }
+.ui-badge--outline { border-color: var(--ink-14); color: var(--ink-70); background: transparent; }
+
+.ui-field { display: flex; flex-direction: column; gap: 6px; }
+.ui-label { font-size: 13px; font-weight: 600; color: var(--ink-70); }
+.ui-input, .ui-select {
+  font: inherit;
+  font-size: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  width: 100%;
+  transition: border-color var(--dur-1) linear, background-color var(--dur-1) linear;
+}
+/* Focus is a state, not an animation: it arrives instantly so a keyboard user
+   is never chasing a moving outline. */
+.ui-input:hover:not(:focus), .ui-select:hover:not(:focus) { border-color: var(--ink-40); }
+.ui-input::placeholder { color: var(--ink-40); }
+.ui-hint { font-size: 12px; color: var(--ink-55); }
+
+.ui-check { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.ui-check input { width: 16px; height: 16px; accent-color: var(--ink); }
+
+.ui-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.ui-table th {
+  text-align: left;
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-55);
+  font-weight: 600;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.ui-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--ink-08);
+  vertical-align: middle;
+}
+.ui-table tr:last-child td { border-bottom: 0; }
+.ui-table tbody tr:hover { background: var(--ink-08); }
+
+.ui-avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 11.5px; font-weight: 600;
+  background: var(--sand); color: #4a4438;
+  flex: 0 0 auto;
+}
+.ui-veg {
+  width: 14px; height: 14px;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+.ui-veg--veg { color: #2f7a3f; }
+.ui-veg--non { color: #a33a2f; border-radius: 2px; transform: rotate(45deg); }
+.ui-veg i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: block; }
+.ui-veg--non i { border-radius: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }}
+
+[data-app] [data-surface='owner'] {
+  /* ---- the palette, in one place ---------------------------------------
+     QUIET LIGHT, WARM. A porcelain room, espresso type, one plum.
+
+     Read the brief literally: "premium like Apple" is not a colour, it is a
+     decision about how many colours there are. Apple's own surfaces are a
+     near-white field, one graphite ink, one grey for the things that are not
+     the point, and exactly one hue that means "this is the action". Nothing
+     else is allowed to be a colour, so the one that is reads as deliberate.
+
+     That is the whole system here:
+
+       field   the room the screens sit in -- a warm porcelain, not a cream
+       sheet   the cards: pure white, one step above the field
+       ink     espresso, not black -- black on white is a printout
+       plum    the action: a filled plum control, the current row, the focus
+               ring, a 18px mark. One hue, spent only where something is
+               being pressed or where the eye should land.
+       live    the only two saturated colours in the product, and they mean
+       due     settled and outstanding, never decoration
+
+     Every value below is a measured pair, not a taste: the ratio sits in the
+     comment on each group.
+
+     WHY PLUM AND NOT THE GREEN THE BRIEF ASKS FOR. This product already owns
+     two greens and both of them MEAN something: `--p-live` is settled and
+     `--p-brass` is the brand mark. A green Save button would spend the colour
+     the kitchen reads as "done" on a form submit, and green-as-brand was
+     rejected once already for exactly that reason. So green stays on state,
+     and the action colour is the only other hue in the room. If that call is
+     reversed, it is ONE token -- `--p-accent` -- and nothing else moves. */
+
+  /* ---- surfaces --------------------------------------------------------
+     WARM PORCELAIN. The field is an off-white with warmth in it -- not a grey
+     room, and deliberately not the full cream the guest flow uses -- and the
+     sheet stays pure white so a number on a card is still read against white.
+     The step between them is small: the sheet is separated by its hairline and
+     its shadow, not by being a loud rectangle. */
+  --p-paper: #fbf6ee;
+  --p-paper-deep: #f4ecdf;
+  /* A quiet wash for a well inside a card. Nothing paints over a wash. */
+  --p-paper-veil: rgba(64, 44, 24, 0.022);
+  --p-surface: #ffffff;
+  --p-card: #ffffff;
+  --p-glass: rgba(253, 250, 244, 0.9);
+
+  /* ---- ink -------------------------------------------------------------
+     Espresso, not black -- warm enough to sit on porcelain without going
+     muddy. The ramp below it is the same ink at four opacities, so every quiet
+     thing on the surface is the same colour, quieter. */
+  --p-ink: #211a15;
+  --p-ink-80: rgba(33, 26, 21, 0.86);
+  --p-ink-64: rgba(33, 26, 21, 0.72);
+  /* Meta lines, table cells, notes: 4.8:1 on a sheet. Quieter than the ink,
+     still readable -- at 0.44 this was 3.1:1 and read as switched off. */
+  --p-ink-46: rgba(33, 26, 21, 0.62);
+  /* Placeholders and resting rules. 2.4:1: present, plainly not content. */
+  --p-ink-28: rgba(33, 26, 21, 0.38);
+  --p-ink-12: rgba(33, 26, 21, 0.14);
+  --p-ink-07: rgba(33, 26, 21, 0.07);
+  /* What sits ON a filled control. White on the plum fill is 8.6:1, so a
+     button label is readable at 12.5px without a heavier weight. */
+  --p-on-ink: #ffffff;
+  --p-on-ink-64: rgba(255, 255, 255, 0.74);
+  --p-on-ink-40: rgba(255, 255, 255, 0.52);
+
+  /* ---- accent ----------------------------------------------------------
+     ONE PLUM. A dining-room colour rather than a dashboard blue: aubergine on
+     porcelain is what a menu, a table cloth and a wine list already are.
+     8.6:1 as a fill behind white and 7.3:1 as a label on its own soft tint, so
+     the same token can be a button and a piece of type. `--p-accent-strong` is
+     the pressed state -- one step darker, because the surface is light -- and
+     the 10.5px tracked-out uppercase, which needs the extra weight.
+     `--p-brass` is not a colour of its own: it is the brand mark's dot on the
+     pale rail, and it carries the brand green so the mark stays the mark. */
+  --p-accent: #7d2b6b;
+  --p-accent-strong: #631f55;
+  --p-accent-soft: #f4e9f1;
+  --p-accent-wash: rgba(125, 43, 107, 0.05);
+  --p-brass: #2f7d4f;
+
+  /* ---- status ----------------------------------------------------------
+     Two meanings, never borrowed for decoration: a deep leaf for
+     settled/ready/paid, a brick for money to chase. Both carry a matching
+     wash so a tag can be one token instead of a colour-mix at every call
+     site. */
+  --p-live: #1b7a45;
+  --p-live-soft: #e8f4ec;
+  --p-due: #a82d21;
+  --p-due-soft: #fbeae7;
+
+  /* ---- the rail --------------------------------------------------------
+     PALE, not dark. A warm white column on a porcelain room: the lightest
+     surface on screen, which is what stops the product reading as a console.
+     The current row is a 10% plum tint, and the type on it is the same
+     espresso. */
+  --p-rail: #fffdf9;
+  --p-rail-raised: #ffffff;
+  --p-rail-ink: #211a15;
+  --p-rail-ink-64: rgba(33, 26, 21, 0.72);
+  --p-rail-ink-40: rgba(33, 26, 21, 0.64);
+  --p-rail-line: rgba(33, 26, 21, 0.09);
+  --p-rail-active: rgba(125, 43, 107, 0.1);
+
+  /* ---- lines -----------------------------------------------------------
+     Warm hairlines. On a white surface an edge is a drawn line, not a shadow;
+     `--p-line-soft` is the quieter one for dividers INSIDE a card. */
+  --p-line: rgba(33, 26, 21, 0.1);
+  --p-line-soft: rgba(33, 26, 21, 0.06);
+  --p-line-strong: rgba(33, 26, 21, 0.18);
+  --p-line-on-ink: rgba(255, 255, 255, 0.24);
+
+  /* ---- geometry --------------------------------------------------------
+     One radius per kind of object, so nothing is rounded by feel: a card is
+     16, an inner block is 12, a control is 10, a small chip or a key cap is 8,
+     and anything that carries a STATE is a pill.
+
+     The 6/7/8/9px literals that used to be scattered across fourteen call
+     sites were four names for the same idea, which is how a surface ends up
+     looking hand-made: every one of them is this token now. */
+  --p-r-card: 16px;
+  --p-r-block: 12px;
+  --p-r-control: 10px;
+  --p-r-chip: 8px;
+
+  /* ---- elevation -------------------------------------------------------
+     Wide, low and almost invisible -- Apple's cards are separated by a
+     hairline and a shadow you have to look for. Each step carries a lit top
+     edge, which is what says the sheet is above the field rather than cut into
+     it. */
+  --p-shadow-1: inset 0 1px 0 rgba(255, 255, 255, 1), 0 1px 2px rgba(58, 38, 20, 0.05),
+    0 6px 16px -12px rgba(58, 38, 20, 0.16);
+  --p-shadow-2: inset 0 1px 0 rgba(255, 255, 255, 1), 0 2px 6px rgba(58, 38, 20, 0.06),
+    0 18px 36px -22px rgba(58, 38, 20, 0.2);
+  --p-shadow-3: inset 0 1px 0 rgba(255, 255, 255, 1), 0 8px 18px rgba(58, 38, 20, 0.07),
+    0 36px 64px -34px rgba(58, 38, 20, 0.24);
+
+  /* The page paints its own surface with utilities; these two are the last
+     resort for content that has not been wrapped yet. */
+  background: var(--p-paper);
+  color: var(--p-ink);
+}
+
+/* =========================================================================
+   THE OWNER MOTION CONTRACT
+
+   Three utilities and one rule. The rule: nothing on this surface may animate
+   anything that a click depends on, and nothing may START hidden -- the server
+   sends the final state, so a blocked bundle leaves a readable page. Every
+   animation below is transform/opacity only, so it composites and cannot move
+   a target out from under a finger.
+
+   `--o-ease` is the one curve the surface uses for arrivals, and `--o-spring`
+   is the one it uses for a control that follows the pointer. Two curves, not
+   nine.
+   ========================================================================= */
+[data-app] [data-surface='owner'] {
+  --o-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --o-spring: cubic-bezier(0.34, 1.28, 0.64, 1);
+}
+
+/* A card that opens something lifts, and lifts by one pixel: 1px is a surface
+   acknowledging the pointer; 6px is a toy. The shadow is the half of the cue
+   that works on a touch screen, where there is no hover at all. */
+[data-app] .o-lift {
+  transition:
+    transform 180ms var(--o-ease),
+    box-shadow 180ms var(--o-ease),
+    border-color 180ms var(--o-ease);
+}
+@media (hover: hover) {
+  [data-app] .o-lift:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--p-shadow-2);
+    border-color: var(--p-line-strong);
+  }
+}
+[data-app] .o-lift:active {
+  transform: translateY(0);
+}
+
+/* The press. Every button on the surface already has it; this is the one the
+   kit's own class string cannot express without repeating eight utilities. */
+[data-app] .o-press:active {
+  transform: translateY(1px) scale(0.995);
+}
+
+/* A hairline that fades out at both ends, used under section heads. */
+[data-app] .o-rule {
+  height: 1px;
+  background: linear-gradient(to right, var(--p-line), transparent);
+}
+
+/* =========================================================================
+   THE GUEST FLOW — one design system, built out of glass
+
+   A guest is on a phone, in a restaurant, at arm's length. They are not
+   reading a website; they are deciding what to eat. Every screen in the flow
+   (menu, dish sheet, cart, pay, placed, orders) is therefore built from the
+   same five objects and nothing else:
+
+     .g-card      a frosted panel that holds content
+     .g-panel     the same, denser -- bills and sheets, where numbers are read
+     .g-primary   the one action on a screen
+     .g-quiet     a secondary action that must not compete with it
+     .g-chip      a filter, a menu switch, a state
+
+   WHY THE ACCENT IS NO LONGER THE PAGE
+
+   The first version of this surface tinted the whole page with the
+   restaurant's accent. On a green restaurant that meant a green haze behind
+   every dish, and green is a colour that reads as "system message" next to
+   food photography. The accent now appears only where it MEANS something --
+   the table you are at, the course you have chosen, the dish you just added --
+   and at 12-26% strength in the wash, never as a field.
+
+   The page itself is warm neutral: oat, cream, one amber bloom for light.
+
+   WHY GLASS AND NOT FLAT WHITE
+
+   Solid white cards on flat cream read as a printout: nothing sits above
+   anything. A translucent panel over a wash, with a hairline highlight along
+   its top edge, reads as something laid on the page. That is the whole of the
+   glassmorphism here -- translucency, a light border, a soft shadow. No
+   backdrop-filter on the cards: they sit on a smooth gradient with nothing
+   moving behind them, so a blur pass per dish would cost a phone's GPU and
+   change nothing an eye can see. The blur is kept for the three surfaces that
+   really do have content scrolling underneath: the header, the dock and the
+   tabs.
+
+   SCOPED, SO THE OWNER'S SCREENS DO NOT MOVE
+
+   Everything below is under [data-flow-root]. The owner surface is pinned to
+   opaque white by the design guard, and a restaurateur reading a report is
+   not a diner choosing a biryani. The two surfaces share tokens and nothing
+   else.
+   ========================================================================= */
+
+[data-flow-root] {
+  /* ---- geometry ---------------------------------------------------------
+     Five radii, one per kind of object, so nothing on the flow is rounded by
+     feel. A chip is a pill; a card is 22; a sheet is 28. */
+  --g-r-sm: 12px;
+  --g-r: 16px;
+  --g-r-lg: 22px;
+  --g-r-xl: 28px;
+  --g-pill: 999px;
+
+  /* ---- surfaces ---------------------------------------------------------
+     Cards are 64% white over the wash. Below ~55% the text starts to lose
+     its footing on the amber bloom; above 75% the glass stops reading as
+     glass and the page goes flat again. */
+  --p-surface: rgba(255, 255, 255, 0.64);
+  --p-paper: #f7f2e9;
+  --p-paper-deep: #efe8dc;
+
+  /* A denser white for the two places money is read: the bill and the sheet. */
+  --g-panel: rgba(255, 255, 255, 0.84);
+  --g-panel-solid: #fffdf9;
+
+  /* Lines: one hairline for a resting edge, one for an edge that is doing
+     something (a selected chip, a focused field). */
+  --p-line: rgba(28, 22, 16, 0.08);
+  --p-line-strong: rgba(28, 22, 16, 0.14);
+  --g-line-light: rgba(255, 255, 255, 0.7);
+
+  /* ---- elevation -------------------------------------------------------
+     Two steps. The first is contact -- a card on a page. The second is lift,
+     for the dock, the tabs and the sheet, which float over content. */
+  --p-shadow-1: 0 1px 2px rgba(46, 33, 20, 0.05), 0 10px 26px -18px rgba(46, 33, 20, 0.22);
+  --p-shadow-2: 0 2px 10px rgba(46, 33, 20, 0.06), 0 34px 64px -34px rgba(46, 33, 20, 0.3);
+
+  /* ---- the wash --------------------------------------------------------
+     Three sources: the restaurant's accent at the top-left, warm amber at the
+     top-right, and the page's own cream. Fixed, so it does not slide under
+     the content while a thumb scrolls -- a background that moves with the
+     page stops reading as a surface and starts reading as a very slow
+     animation. */
+  background:
+    radial-gradient(58% 42% at 6% -6%, color-mix(in oklab, var(--p-accent) 22%, transparent), transparent 74%),
+    radial-gradient(52% 38% at 98% 2%, rgba(214, 158, 88, 0.26), transparent 72%),
+    radial-gradient(90% 55% at 50% 108%, rgba(255, 255, 255, 0.9), transparent 68%),
+    var(--p-paper);
+  background-attachment: fixed;
+  color: var(--p-ink);
+}
+
+/* ---- type ---------------------------------------------------------------
+   Four roles, so a heading is a heading on every screen. The sizes are the
+   ones the flow already used; naming them is what stops a fifth screen from
+   inventing a 26px title. */
+[data-flow-root] .g-eyebrow {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--p-ink-46);
+}
+[data-flow-root] .g-display {
+  font-size: 29px;
+  line-height: 1.08;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--p-ink);
+  text-wrap: balance;
+}
+[data-flow-root] .g-title {
+  font-size: 21px;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  color: var(--p-ink);
+}
+[data-flow-root] .g-lede {
+  font-size: 13.5px;
+  line-height: 1.58;
+  color: var(--p-ink-64);
+  max-width: 52ch;
+}
+[data-flow-root] .g-meta {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--p-ink-46);
+}
+
+/* ---- card ---------------------------------------------------------------
+   The one panel. A hairline highlight along the top edge is what gives a
+   translucent surface an edge under a light source; without it the panel's
+   top disappears into the wash and the card looks like a smudge. */
+[data-flow-root] .g-card {
+  background: var(--p-surface);
+  border: 1px solid var(--g-line-light);
+  border-radius: var(--g-r-lg);
+  box-shadow: var(--p-shadow-1), inset 0 1px 0 var(--g-line-light);
+}
+
+/* The bill, the sheet, the "how you will pay" block: denser, because a number
+   read against a wash is a number read twice. */
+[data-flow-root] .g-panel {
+  background: var(--g-panel);
+  border: 1px solid var(--g-line-light);
+  border-radius: var(--g-r-lg);
+  box-shadow: var(--p-shadow-1), inset 0 1px 0 var(--g-line-light);
+}
+
+/* The accent-washed variant, for a notice that belongs to this restaurant --
+   "one dish has sold out", "prices here are yours". It is a modifier rather
+   than a Tailwind `bg-` utility because .g-card sets a background of its own,
+   and an unlayered component class beats a layered utility every time. */
+[data-flow-root] .g-card.g-soft {
+  background: color-mix(in oklab, var(--p-accent-soft) 76%, white);
+  border-color: color-mix(in oklab, var(--p-accent) 16%, white);
+}
+
+/* A card that can be tapped gets a lift rather than a colour change: the
+   whole row is a target, and tinting the whole row on hover made the menu
+   flash as a finger passed over it. */
+[data-flow-root] .g-card--tappable {
+  transition: box-shadow 220ms var(--p-ease), transform 220ms var(--p-ease);
+}
+@media (hover: hover) {
+  [data-flow-root] .g-card--tappable:hover {
+    box-shadow: var(--p-shadow-2), inset 0 1px 0 var(--g-line-light);
+    transform: translateY(-1px);
+  }
+}
+
+/* ---- actions ------------------------------------------------------------
+   The primary action is the restaurant's accent, lit from above: a white
+   gradient over the fill plus an inset highlight, which is what separates a
+   coloured button from a coloured rectangle. Contrast for white-on-accent is
+   guaranteed by lib/branding/palette.test.ts, which refuses any accent below
+   4.5:1. */
+[data-flow-root] .g-primary {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0)),
+    var(--p-accent);
+  color: var(--p-on-ink);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 8px 20px -12px color-mix(in oklab, var(--p-accent) 70%, transparent);
+  transition: filter 180ms var(--p-ease), transform 180ms var(--p-ease), opacity 180ms linear;
+}
+@media (hover: hover) {
+  [data-flow-root] .g-primary:hover { filter: brightness(1.07); }
+}
+[data-flow-root] .g-primary:active { transform: scale(0.985); }
+[data-flow-root] .g-primary:disabled { filter: grayscale(0.4); opacity: 0.5; }
+
+/* ---- brand theme (opt-in, migration 20261103000100) ----------------------
+   A restaurant that published a brand profile carries data-brand on its flow
+   root (lib/branding/guest-theme.ts). Everything below FALLS BACK to the
+   current value, and the [data-brand]-scoped rules do not match at all
+   without the attribute — so the hundreds of restaurants that never opt in
+   render exactly as they did before this block existed. The fill on
+   .g-primary is the only rule that applies always, and it is identical
+   without a theme: var(--brand-primary, var(--p-accent)) resolves to the
+   same accent it always did. */
+[data-flow-root] .g-primary {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0)),
+    var(--brand-primary, var(--p-accent));
+  color: var(--brand-primary-ink, var(--p-on-ink));
+}
+[data-flow-root][data-brand] {
+  font-family: var(--brand-font, inherit);
+}
+[data-flow-root][data-brand] .g-card,
+[data-flow-root][data-brand] .g-panel {
+  padding: var(--brand-space, 1rem);
+}
+[data-flow-root][data-brand] .g-card {
+  border-width: var(--brand-border, 1px);
+  box-shadow: var(--brand-elevation), inset 0 1px 0 var(--g-line-light);
+}
+[data-flow-root][data-brand] .g-panel {
+  border-width: var(--brand-border, 1px);
+}
+/* ---- motifs: small printed-menu decorations, chosen per brand ---------- */
+[data-flow-root][data-motif='rule-double'] .g-eyebrow {
+  border-bottom: 3px double var(--p-line-strong);
+  padding-bottom: 4px;
+}
+[data-flow-root][data-motif='divider-swirl'] .g-eyebrow::after {
+  content: ' ❧';
+  opacity: 0.55;
+}
+[data-flow-root][data-motif='dot-separator'] .g-eyebrow::after {
+  content: ' ···';
+  letter-spacing: 0.18em;
+  opacity: 0.55;
+}
+[data-flow-root][data-motif='corner-ornament'] .g-card {
+  outline: 1px solid var(--p-line);
+  outline-offset: -5px;
+}
+
+/* Secondary: glass, not ink. A second dark button next to the primary is two
+   primary actions, and the guest has to guess which one is the way forward. */
+[data-flow-root] .g-quiet {
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--p-ink);
+  border: 1px solid var(--p-line-strong);
+  transition: background-color 180ms var(--p-ease);
+}
+@media (hover: hover) {
+  [data-flow-root] .g-quiet:hover { background: rgba(255, 255, 255, 0.78); }
+}
+
+/* ---- chips --------------------------------------------------------------
+   One chip, three states. Pressed is the accent; the accent-soft wash was
+   tested for dark text and is not strong enough to carry white, so a pressed
+   chip is a solid accent with white type. */
+[data-flow-root] .g-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--g-pill);
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--p-ink-64);
+  /* An ink hairline, not a white one: these pills sit INSIDE the frosted rail,
+     where a white edge on a white pill has nothing to be seen against. */
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid var(--p-line);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transition: background-color 160ms var(--p-ease), color 160ms var(--p-ease);
+}
+@media (hover: hover) {
+  [data-flow-root] .g-chip:hover { color: var(--p-ink); background: rgba(255, 255, 255, 0.85); }
+}
+[data-flow-root] .g-chip[aria-pressed='true'],
+[data-flow-root] .g-chip[data-chip-on='true'] {
+  background: var(--p-accent);
+  border-color: transparent;
+  color: var(--p-on-ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* A state badge: "Table 3", "Veg", "Sold out". Never a button. */
+[data-flow-root] .g-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: var(--g-pill);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--p-accent-soft);
+  color: var(--p-accent);
+}
+
+/* Horizontal rails on a phone: a visible scrollbar under a row of chips is
+   8px of grey under a 28px control, and it makes the row look like a mistake.
+   Hidden on the rail only, never on a page: a page that hides its scrollbar on
+   a desktop is a page somebody cannot tell is scrollable. */
+[data-flow-root] .scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+[data-flow-root] .scrollbar-none::-webkit-scrollbar { display: none; }
+
+/* ---- choice rows --------------------------------------------------------
+   A portion, a required add-on: a row you pick from. Selected is an accent
+   edge plus a whisper of accent behind it -- not a filled accent field, which
+   at four rows on a sheet turns the sheet into a colour block. */
+[data-flow-root] .g-choice {
+  border: 1px solid var(--g-line-light);
+  border-radius: var(--g-r);
+  background: rgba(255, 255, 255, 0.6);
+  transition: border-color 160ms var(--p-ease), background-color 160ms var(--p-ease);
+}
+[data-flow-root] .g-choice[data-choice='on'] {
+  border-color: color-mix(in oklab, var(--p-accent) 55%, transparent);
+  background: color-mix(in oklab, var(--p-accent-soft) 72%, white);
+}
+@media (hover: hover) {
+  [data-flow-root] .g-choice[data-choice='off']:hover {
+    border-color: var(--p-line-strong);
+    background: rgba(255, 255, 255, 0.82);
+  }
+}
+
+/* ---- fields -------------------------------------------------------------
+   The search box. Inset rather than outlined: a field that sits slightly
+   below the surface reads as somewhere to type, where an outlined box on
+   glass reads as another button. */
+[data-flow-root] .g-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--g-r);
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid var(--p-line);
+  transition: border-color 160ms var(--p-ease), background-color 160ms var(--p-ease);
+}
+[data-flow-root] .g-field:focus-within {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: color-mix(in oklab, var(--p-accent) 45%, transparent);
+}
+[data-flow-root] .g-field input {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  font-size: 14px;
+  color: var(--p-ink);
+  outline: none;
+}
+[data-flow-root] .g-field input::placeholder { color: var(--p-ink-46); }
+
+/* ---- removal / void -----------------------------------------------------
+   A line the guest has taken off the order stays on screen, dashed, so the
+   change is visible before it is saved. Dashed has to be set here rather than
+   with Tailwind's border-dashed, because .g-card's border shorthand is
+   unlayered and would win. */
+[data-flow-root] .g-card.g-void {
+  border-style: dashed;
+  border-color: var(--p-line-strong);
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* ---- the chrome ---------------------------------------------------------
+   Header and shelf. These are the only two surfaces with a real
+   backdrop-filter, because these are the only two with content scrolling
+   underneath them.
+
+   THE SHELF
+
+   The bottom of the guest screen used to be two floating islands: a cart bar
+   inset 12px from the edges, then a tab bar inset 12px again below it, each
+   with its own radius, blur and shadow, and a strip of page visible in the
+   three gaps. On a phone that is 160px of stacked glass with four hard edges
+   inside it, and it reads as two notifications rather than one place to stand.
+
+   It is now one shelf: full-bleed, docked to the bottom edge, rounded only at
+   the top, carrying the cart row and the tabs on a single sheet. That is how a
+   native app does it, and it buys back the two gaps plus a shadow -- most of a
+   dish card on a 700px viewport. */
+[data-flow-root] [data-flow-chrome] {
+  background: rgba(250, 246, 238, 0.74);
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.66);
+  border-radius: var(--g-r-lg);
+  box-shadow: var(--p-shadow-2);
+}
+
+/* The header is docked to the top edge, so it is only rounded underneath -- a
+   floating pill at the top of the page leaves two slivers of wash above it and
+   reads as a card that has slipped. */
+[data-flow-root] [data-flow-chrome='header'] {
+  border-radius: 0 0 var(--g-r-lg) var(--g-r-lg);
+  border-top: 0;
+  box-shadow: var(--p-shadow-1);
+}
+
+/* ---- the shelf ---------------------------------------------------------
+   One sheet, two rows. Opaque enough (84%) that a dish scrolling under it is a
+   suggestion of colour rather than a competitor to the total, and blurred more
+   than the cards because this is the one surface that always has something
+   moving underneath it. The safe-area padding lives here, once, so neither row
+   has to know about the home indicator. */
+[data-flow-root] [data-flow-chrome='shelf'] {
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: var(--g-r-lg) var(--g-r-lg) 0 0;
+  background: rgba(250, 246, 238, 0.84);
+  backdrop-filter: blur(26px) saturate(170%);
+  -webkit-backdrop-filter: blur(26px) saturate(170%);
+  box-shadow:
+    0 -1px 0 rgba(16, 24, 40, 0.05),
+    0 -26px 48px -32px rgba(16, 24, 40, 0.32);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* A hairline only when the shelf really has two rows under it. A single-row
+   shelf (the checkout bar) otherwise gets a line across empty glass. */
+[data-flow-root] [data-flow-chrome='shelf'] [data-shelf-divider] {
+  border-top: 1px solid var(--p-line);
+}
+
+/* The cart row sits ON the sheet, so it must not paint a second surface. */
+[data-flow-root] [data-flow-chrome='shelf'] [data-flow-chrome='dock'] {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ---- the rail -----------------------------------------------------------
+   A row of course chips is wider than a phone, so it scrolls sideways. Two
+   things make that obvious rather than broken: the row softens at both edges
+   so a cut-off chip reads as "there is more", and it snaps, so the row settles
+   on a chip instead of between two.
+
+   The mask is written with rgb() rather than a hex so it stays inside the
+   design guard's colour budget -- it is an alpha ramp, not a colour. */
+[data-flow-root] [data-rail] {
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 12px;
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    rgb(0 0 0) 10px,
+    rgb(0 0 0) calc(100% - 22px),
+    transparent 100%
+  );
+}
+[data-flow-root] [data-rail] > * {
+  scroll-snap-align: start;
+}
+
+/* ---- motion -------------------------------------------------------------
+   One entry animation for a whole card list, staggered by index, and nothing
+   else. Anything longer than 260ms on a menu is a menu that feels slow. */
+@keyframes g-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+[data-flow-root] .g-rise {
+  animation: g-rise 260ms var(--p-ease) both;
+}
+
+/* The one looping mark on the guest surface: a dot that says "this is live".
+   A loop is right here and nowhere else on a menu -- it is attached to a fact
+   that is changing on the server, so movement carries meaning rather than
+   decorating. Opacity only: a scaling dot in the corner of the eye is a dot
+   that nags, and it costs a layout-free composite either way. */
+@keyframes g-live {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+[data-flow-root] .g-live-dot {
+  animation: g-live 2.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-flow-root] .g-live-dot { animation: none; }
+}
+
+/* =========================================================================
+   THE OWNER SURFACE — the rules that cannot live in a class string
+
+   Everything about this surface's COLOUR and GEOMETRY is declared in the one
+   token block above (`[data-app] [data-surface='owner']`): paper, ink, copper,
+   the rail, three radii and three shadows. This section is only the handful of
+   rules that a Tailwind class list cannot express — a state that depends on a
+   real DOM condition (`:valid`), a card rule that has to apply to cards the
+   screens draw by hand, and an override that must beat a utility.
+
+   WHAT WAS HERE BEFORE, AND WHY IT IS GONE
+
+   The previous owner block declared a SECOND copy of --p-surface, --p-line,
+   --p-shadow-1/2 and --o-r -- with the old ink (rgba(25,20,17,…)) and the old
+   geometry (18px). It sat 500 lines below the first one, so it won: every
+   token this pass changed was quietly reverted except where a utility happened
+   to override it. That is why the surface could be restyled and still look
+   unchanged, and it is not a thing to leave in place a second time: one surface
+   now has ONE token block, and this section declares no colours of its own.
+
+   Two rules were also deleted rather than retuned:
+
+   - `backdrop-filter: blur(24px)` on the rail. The rail is opaque (`--p-rail`,
+     the palest surface on the page); a blur behind an opaque box is a full-screen GPU pass
+     that composites nothing. It cost battery on the tablets these run on.
+   - `table thead th { background: … }`. It was an unlayered rule, so it beat
+     the `bg-…` utility the kit's `TableHead` sets — the header band could not
+     be changed from the component. The kit owns it now.
+   ========================================================================= */
+
+/* The wash: barely there, on purpose.
+   A white bloom at the top left, the accent at the top right, and a neutral
+   breath under it, all far below the contrast at which the eye reads a
+   gradient -- 5% at the strongest -- so the room has a top and a bottom
+   without gaining a second colour. The point is not decoration -- it is that a 1440px field of
+   one flat cream reads as a screenshot of a colour, and a 5% bloom gives it a
+   top and a bottom without ever becoming a band. Fixed, so scrolling a long
+   table does not slide the light up the screen.
+
+   THE THIRD LAYER USED TO BE BLUE. It was written against the previous accent
+   and left behind when the accent changed, so a careful eye could find a cold
+   corner in the top right of an otherwise warm room -- the exact kind of
+   leftover that makes a palette feel accidental. It is a colour-mix of the
+   accent token now, so the room follows the accent instead of remembering an
+   older one. */
+[data-surface='owner'] {
+  background-image:
+    radial-gradient(70% 46% at 8% -18%, rgba(255, 255, 255, 0.85), transparent 68%),
+    radial-gradient(64% 46% at 100% -6%, color-mix(in oklab, var(--p-accent) 5%, transparent), transparent 72%),
+    radial-gradient(58% 40% at 100% 8%, rgba(180, 122, 62, 0.055), transparent 70%);
+  background-attachment: fixed;
+}
+
+/* ---- the card ---------------------------------------------------------
+   Applied to `bg-card` rather than to a new class, so a screen that draws a
+   card by hand cannot end up on a different surface from its neighbours: one
+   edge, one elevation, one radius, tokens only.
+
+   IT LIVES IN `@layer components`, AND THAT IS THE POINT.
+
+   This rule used to be unlayered, and an unlayered rule beats every utility.
+   So `shadow-[var(--p-shadow-2)]` on a stat that lifts, and the tone washes on
+   the cards that carry a state (a due figure's red, an open order's copper),
+   were all silently replaced by this one white card with one flat shadow. The
+   markup said one thing and the screen said another, and no test could see it.
+
+   In the components layer the base card is a DEFAULT rather than an override:
+   a screen that adds a shadow or a wash gets it, and a screen that does not
+   still gets the card. */
+@layer components {
+  [data-surface='owner'] .bg-card {
+    background: var(--p-card);
+    border-color: var(--p-line);
+    box-shadow: var(--p-shadow-1);
+  }
+}
+
+/* ---- the grain ---------------------------------------------------------
+   A 140px tile of fractal noise at 3.5%, painted over the whole surface.
+
+   This is the difference between "a stylesheet with a warm background" and
+   "paper". A flat colour at this size -- a 1440px monitor, 200 square
+   centimetres of one value -- reads as a screenshot of a colour. A texture an
+   order of magnitude below the eye's contrast threshold does two things at
+   once: it stops the large empty areas (the space beside a 620px form) from
+   looking like a rendering failure, and it makes the warm shadows sit on
+   something instead of floating over nothing.
+
+   Three rules kept it from being a performance problem:
+   - It is INLINE (a data URI), so it is one cached image and no request.
+   - It is `position: fixed` on a single pseudo-element, not a background on
+     forty cards: the browser rasterises 140x140 once and repeats it.
+   - It has NO `mix-blend-mode`. A blended full-screen layer makes the compositor
+     re-blend the whole page on every scroll frame, which is exactly the kind of
+     "premium" detail that makes a laptop fan spin up. Plain low-opacity paint
+     costs nothing.
+   It is `pointer-events: none` and `aria-hidden` by construction (pseudo-element),
+   so no target moves and nothing is announced. */
+[data-surface='owner']::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.02;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 140px 140px;
+}
+
+/* Paper grain is a SCREEN effect: on a printed bill it would be a grey haze
+   over the ink and a wasted toner cartridge. */
+@media print {
+  [data-surface='owner']::before {
+    display: none;
+  }
+
+  /* Print keeps the surface's own light tokens: the sheet is already white
+     with graphite type, so a QR card prints as a QR card. Only the grain goes
+     -- on a printed page it is a grey haze over the ink and a wasted toner
+     cartridge. */
+}
+
+/* The grain is deliberately painted OVER the content, at 2%: that is what
+   paper grain does on a printed page, and at this opacity it reads as texture
+   rather than as a veil. It costs nothing to keep it there -- the alternative,
+   lifting every screen into its own stacking context, means one `position:
+   relative` per child and one chance per child to break the `sticky` header. */
+
+/* The focus ring has to survive a warm paper surface: the default outline is
+   the same value as the page, and the accent is not. Keyboard users spend the
+   whole shift on this surface.
+
+   `@layer base` for the same reason as the global ring above: unlayered, this
+   beat `focus:outline-none` and every component that draws its own. */
+@layer base {
+  [data-surface='owner'] :focus-visible {
+    outline: 2px solid var(--p-accent);
+    outline-offset: 2px;
+  }
+}
+
+/* ---- the search field --------------------------------------------------
+   ONE CONTROL THAT HAS TO OPT OUT AT THE ROOT.
+
+   "Go to…" is an `<input type="search">` inside a pill. On some engines that
+   control still paints its own focus rectangle INSIDE the pill -- a hard black
+   box, two pixels, square corners -- and no `outline: none` utility clears it,
+   because the decoration comes from the native `searchfield` appearance rather
+   than from the outline property.
+
+   So the reset lives here, unlayered, on a class of its own: an unlayered rule
+   beats every layered utility, so no future change to a class string can bring
+   the box back. The wrapper draws the focus state (a tint and a soft ring), and
+   this element is only ever the text inside it. */
+.shell-field {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  outline: none;
+  outline-offset: 0;
+}
+.shell-field:focus,
+.shell-field:focus-visible,
+.shell-field::-webkit-search-decoration,
+.shell-field::-webkit-search-cancel-button {
+  outline: none;
+  box-shadow: none;
+}
+.shell-field::-webkit-search-decoration { display: none; }
+
+/* ---- a file picker -----------------------------------------------------
+   Picking a file and sending it are two steps, but they must not look like two
+   competing buttons. The upload control is in the DOM from the first paint (so
+   it works with JavaScript blocked) and is only SHOWN once the browser itself
+   considers the file input valid -- `:valid` on a required file input is true
+   the moment a file is chosen, with no script involved. */
+[data-surface='owner'] .o-pick:not(:has(input[type='file']:valid)) .o-pick-go {
+  display: none;
+}
+
+/* ---- a choice row -------------------------------------------------------
+   A list of orders to pick from on the counter screen. It cannot be `.bg-card`:
+   the rule above sets the edge of every card unconditionally, and being
+   unlayered it beats any `bg-…` utility a selected state could add. So the
+   selectable thing gets its own object with its own three states, and they are
+   the same three the kit's controls use. */
+[data-surface='owner'] .o-choice {
+  background: var(--p-card);
+  border: 1px solid var(--p-line);
+  box-shadow: var(--p-shadow-1);
+  transition:
+    border-color 160ms var(--o-ease),
+    background-color 160ms var(--o-ease),
+    box-shadow 160ms var(--o-ease);
+}
+[data-surface='owner'] .o-choice[aria-pressed='true'] {
+  background: color-mix(in oklab, var(--p-accent-soft) 74%, white);
+  border-color: color-mix(in oklab, var(--p-accent) 46%, transparent);
+  box-shadow: var(--p-shadow-2);
+}
+@media (hover: hover) {
+  [data-surface='owner'] .o-choice[aria-pressed='false']:hover {
+    background: var(--p-surface);
+    border-color: var(--p-line-strong);
+  }
+}
+
+/* =========================================================================
+   Design tokens for Tailwind utilities.
+
+   These are the same values the product already uses: warm near-black for the
+   dark surfaces, a single gold for action, the brand green for "this is
+   alive". Declared once here so a utility like `text-gold` and a hand-written
+   rgba() can never drift apart.
+   ========================================================================= */
+@theme {
+  /* LIGHT WARM PORCELAIN (flipped 2026-11-03 — the dark premium surface was
+     retired at the owner's request; same system, same geometry, daylight).
+     `ink` is now the room, `cream` is now the type: the class names kept
+     their meaning ("the surface", "the text on it") and swapped their hues. */
+  --color-ink: #fbfaf7;
+  --color-ink-soft: #f3f0e9;
+  --color-ink-card: #ffffff;
+  --color-ink-line: #e8e3da;
+
+  /* The public-site accent: deep forest, with a soft wash and a brass
+     highlight. The product's own owner/guest screens keep their olive
+     accent; these tokens are for the marketing and auth surfaces only. */
+  --color-forest: #1f4d3a;
+  --color-forest-strong: #163a2b;
+  --color-forest-soft: #e9f0ea;
+  --color-brass: #b98a4b;
+
+  /* ONE PLUM, per the finalized brief: the action hue of the product
+     (the same aubergine as --p-accent) carried onto the marketing surface.
+     Green stays state, never decoration. */
+  --color-plum: #7d2b6b;
+  --color-plum-strong: #631f55;
+  --color-plum-soft: #f4e9f1;
+
+  /* The action colour the owner chose: a light grass green on the buttons.
+     Espresso sits on it (10:1); white does not. */
+  --color-grass: #1fd655;
+  --color-grass-strong: #17b84a;
+
+  --color-brand: #207030;
+  --color-brand-soft: #2c8a3f;
+
+  --color-cream: #211a15;
+  --color-mute: #5f584e;
+  --color-mute-dim: #7a7266;
+
+  /* The same stack as the root, so `font-sans` cannot disagree with the body.
+     -apple-system resolves to SF Pro on Apple hardware -- the typeface the
+     brief is asking for, already installed, nothing to download -- and Inter
+     (self-hosted, four weights) is the closest freely licensed match
+     everywhere else. */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+
+  /* The editorial voice of the public pages. No download: the serif is the
+     one the operating system already has, and the stack is ordered so macOS
+     gets Iowan Old Style, Windows gets Palatino/Georgia, everything else
+     falls back to the platform serif. Used in italic for the one accented
+     word in a headline -- never for body text. */
+  --font-display: 'Iowan Old Style', 'Palatino Linotype', Palatino,
+    'Book Antiqua', 'New York', Georgia, ui-serif, serif;
+
+  --radius-card: 18px;
+  --radius-panel: 24px;
+}
+
+/* The guest flow's own palette, inlined rather than copied.
+ *
+ * These are the same values the product already uses, but they live on
+ * [data-app] and change per surface -- warm paper for a guest, white for the
+ * owner. `inline` keeps the var() reference intact so a utility resolves
+ * against whichever surface the element is actually sitting on, instead of
+ * freezing one surface's values at :root. */
+@theme inline {
+  --color-paper: var(--p-paper);
+  --color-paper-deep: var(--p-paper-deep);
+  --color-card: var(--p-surface);
+
+  --color-gink: var(--p-ink);
+  --color-gink-80: var(--p-ink-80);
+  --color-gink-64: var(--p-ink-64);
+  --color-gink-46: var(--p-ink-46);
+  --color-gink-28: var(--p-ink-28);
+  --color-gink-12: var(--p-ink-12);
+  --color-gink-07: var(--p-ink-07);
+
+  --color-onink: var(--p-on-ink);
+  --color-onink-64: var(--p-on-ink-64);
+
+  --color-accent: var(--p-accent);
+  --color-accent-soft: var(--p-accent-soft);
+
+  /* The rail's own palette. Mapped here so the shell can use `bg-rail` and
+     `text-rail-ink` instead of hand-written rgba values that the hex ratchet
+     would (rightly) refuse. */
+  --color-rail: var(--p-rail);
+  --color-rail-raised: var(--p-rail-raised);
+  --color-rail-ink: var(--p-rail-ink);
+  --color-rail-ink-64: var(--p-rail-ink-64);
+  --color-rail-ink-40: var(--p-rail-ink-40);
+  --color-rail-line: var(--p-rail-line);
+
+  /* The rail's own brand dot reads `var(--p-brass)` directly (DashboardBar),
+     so the public brass token above is left intact. */
+  --color-accent-wash: var(--p-accent-wash);
+
+  --color-hair: var(--p-line);
+  --color-hair-strong: var(--p-line-strong);
+
+  --color-live: var(--p-live);
+  --color-due: var(--p-due);
+
+  --radius-g: var(--p-r);
+  --radius-g-lg: var(--p-r-lg);
+
+  --shadow-g1: var(--p-shadow-1);
+  --shadow-g2: var(--p-shadow-2);
+}
+
+/* The cart bar's entrance. Only transform and opacity, 260ms, and it is
+ * decoration: the bar is already in the DOM and already readable when this
+ * never runs. */
+@keyframes gbar {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[gbar_260ms_cubic-bezier\(0\.22\,1\,0\.36\,1\)\] { animation: none !important; }
+}
+
+/* The skeleton's pulse: opacity only, on a flat fill. No shimmer sweep -- it
+ * costs paint on a mid-range phone and does not read as meaning anything. */
+/* Every route arrives: lib/template.tsx puts this animation on its wrapper and
+ * nothing else. Opacity only -- an ancestor with a transform would become the
+ * containing block for the guest's fixed action bars and slide them. */
+@keyframes routein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes skelpulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.95; }
+}
+
+/* A ticket landing on the kitchen board. Transform and opacity only, and it is
+ * decoration: the card is readable the moment it exists, whether or not this
+ * plays. */
+@keyframes kbrise {
+  from { opacity: 0; transform: translateY(-6px) scale(0.99); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Staff page arrival (components/owner/PageMotion.tsx adds .pm-enter after
+ * mount, so a page whose JavaScript never ran is simply visible). CSS, not
+ * inline styles, because React streams and hydrates the page in segments: an
+ * effect writing a transform onto a child that had not hydrated yet showed up
+ * as a hydration mismatch on every dashboard route. A child transform is safe
+ * here -- these steps live inside the content column, never a fixed bar. */
+@keyframes pm-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pm-enter > * { animation: pm-rise 320ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards; }
+  .pm-enter > *:nth-child(2) { animation-delay: 38ms; }
+  .pm-enter > *:nth-child(3) { animation-delay: 76ms; }
+  .pm-enter > *:nth-child(4) { animation-delay: 114ms; }
+  .pm-enter > *:nth-child(5) { animation-delay: 152ms; }
+  /* Past six steps everything shares the sixth's delay: a 12-card floor is
+   * not a queue. */
+  .pm-enter > *:nth-child(n + 6) { animation-delay: 190ms; }
+}
+
+/* ---------------------------------------------------------------- public
+   The landing's own polish, kept to four primitives so the page stays
+   Tailwind-first. Colours come from the tokens; nothing here writes a hex. */
+
+/* How much of the page has been read. Decoration only: drawn by SiteMotion
+   and invisible when JavaScript never runs (scaleX(0)). */
+.page-progress {
+  position: fixed;
+  inset-inline: 0;
+  top: 0;
+  z-index: 60;
+  height: 2px;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, var(--color-forest), var(--color-brass));
+  pointer-events: none;
+}
+
+/* The hero composition leans a few degrees towards the pointer. The angle is
+   written to two custom properties by HeroVisualMotion; with reduced motion
+   the transform is dropped entirely and the still is the whole experience. */
+.hero-tilt {
+  transform: perspective(1200px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+  transform-style: preserve-3d;
+  transition: transform 600ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-tilt { transform: none; transition: none; }
+}
+
+/* A hairline that draws itself when its heading enters. */
+.rule-draw {
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, var(--color-forest), var(--color-brass));
+}
+
+/* Anchor navigation glides instead of jumping. Programmatic scrolling and
+   in-page links only; nothing about the layout moves because of this. */
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+
+/* The serif italic accent word in a headline keeps a brass underline that
+   draws itself once the line has landed. Decorative only -- the word is
+   already legible before the underline exists. */
+.hero-accent {
+  background-image: linear-gradient(90deg, var(--color-brass), transparent);
+  background-repeat: no-repeat;
+  /* The serif inline box is taller than the masked headline line, so the rule
+     sits at 78% -- just under the baseline -- rather than at the box bottom,
+     where the line mask would clip it. */
+  background-position: 0 78%;
+  background-size: 100% 2px;
+  padding-bottom: 0.05em;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero-accent {
+    background-size: 0% 2px;
+    animation: hero-accent-in 1.1s cubic-bezier(0.22, 1, 0.36, 1) 1s forwards;
+  }
+  @keyframes hero-accent-in {
+    to { background-size: 100% 2px; }
+  }
+}
+
+/* The quiet "scroll" cue under the hero copy: a hairline that keeps drawing
+   itself downwards. Hidden for reduced motion, where a still line remains. */
+.scroll-cue-line {
+  display: block;
+  width: 1px;
+  height: 38px;
+  transform-origin: 50% 0;
+  background: linear-gradient(to bottom, var(--color-forest), transparent);
+  opacity: 0.55;
+}
+/* The service loop pins at desktop widths and carries one ticket between the
+   three stations. `is-live` is only added by SiteMotion at 1024px and above,
+   so a phone, reduced motion or a missing script keeps the same content in
+   normal flow: the ticket sits above the stations and nothing is hidden. */
+.loop.is-live {
+  height: 240vh;
+}
+.loop.is-live .loop-stage {
+  position: sticky;
+  top: 0;
+  display: flex;
+  min-height: 100dvh;
+  align-items: center;
+  padding-block: 2.5rem;
+}
+.loop.is-live .loop-grid {
+  padding-top: 12.5rem;
+}
+.loop.is-live .loop-ticket {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
+}
+.loop-station {
+  transition: opacity 400ms ease, border-color 400ms ease, background-color 400ms ease;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .loop.is-live .loop-station {
+    opacity: 0.45;
+  }
+  .loop.is-live .loop-station.is-on {
+    opacity: 1;
+    border-color: color-mix(in oklab, white 38%, transparent);
+    background-color: color-mix(in oklab, white 10%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .scroll-cue-line { animation: scroll-cue 2.6s ease-in-out infinite; }
+  @keyframes scroll-cue {
+    0% { transform: scaleY(0.15); opacity: 0; }
+    35% { opacity: 0.7; }
+    100% { transform: scaleY(1); opacity: 0; }
+  }
+}
+
+/* Public landing: tactile controls and a gentle, independent phone drift.
+   Content remains visible without JavaScript; motion is opt-in by OS setting. */
+.public-landing section[id] { scroll-margin-top: 5.5rem; }
+.public-landing a:focus-visible,
+.public-landing button:focus-visible {
+  outline: 2px solid var(--color-forest);
+  outline-offset: 4px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .public-landing a, .public-landing button {
+    transition: transform 200ms ease, background-color 200ms ease, color 200ms ease, box-shadow 200ms ease;
+  }
+  .public-landing a:active, .public-landing button:active { transform: translateY(1px) scale(0.98); }
+  .public-landing .public-card { transition: transform 300ms ease, box-shadow 300ms ease; }
+  .public-landing .public-card:hover { transform: translateY(-5px); box-shadow: var(--p-shadow-2); }
+}
+
+/* Only signed-out account pages inherit the landing palette. Staff screens
+   retain their own tokens; authentication actions and validation are unchanged. */
+[data-surface='owner'][data-auth-shell] {
+  --p-paper: #fbfaf7;
+  --p-paper-deep: #f3f0e9;
+  --p-ink: #1c1b18;
+  --p-accent: #1f4d3a;
+  --p-accent-strong: #163a2b;
+  --p-accent-soft: #e9f0ea;
+  --p-accent-wash: rgba(31,77,58,.05);
+  --p-line: #e8e3da;
+  background: radial-gradient(ellipse at 10% 8%, rgba(31,77,58,.05), transparent 45%), var(--p-paper);
+}
+[data-auth-shell] input { min-width: 0; font-size: 16px; }
+[data-auth-shell] input:focus-visible {
+  outline: 2px solid var(--color-forest);
+  outline-offset: 2px;
+  border-color: var(--p-accent);
+}
+[data-auth-shell] a:focus-visible, [data-auth-shell] button:focus-visible {
+  outline: 2px solid var(--color-forest);
+  outline-offset: 4px;
+}
+[data-auth-shell] button[type='submit'] { min-height: 44px; }
+[data-auth-shell] [role='alert'], [data-auth-shell] [role='status'],
+[data-auth-shell] [data-auth-notes] { overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: no-preference) {
+  [data-auth-shell] input, [data-auth-shell] a, [data-auth-shell] button {
+    transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease, transform 180ms ease;
+  }
+  [data-auth-shell] button[type='submit']:hover { transform: translateY(-1px); }
+  [data-auth-shell] button[type='submit']:active { transform: translateY(1px); }
+}
+
+/* The account columns rise into place. Content is visible by default; only
+   visitors who allow motion get the entrance, so a reduced-motion or
+   JS-less visit can never leave the card hidden at opacity 0. */
+@media (prefers-reduced-motion: no-preference) {
+  .auth-rise { animation: auth-rise-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .auth-rise-delay { animation-delay: 70ms; }
+  @keyframes auth-rise-in {
+    from { opacity: 0; transform: translateY(18px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+/* Account pages: a 3px read-only progress hairline while a form is submitting,
+   plus a sheen inside the submit button. Both are decoration -- the button's
+   disabled state and aria-busy carry the actual meaning. */
+.auth-pending-bar {
+  position: fixed;
+  inset-inline: 0;
+  top: 0;
+  z-index: 80;
+  height: 3px;
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, var(--color-forest), var(--color-brass));
+  pointer-events: none;
+}
+.auth-sheen {
+  display: none;
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 38%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, white 22%, transparent),
+    transparent
+  );
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .auth-pending-bar { animation: auth-pending 1.15s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+  @keyframes auth-pending {
+    0% { transform: scaleX(0); opacity: 1; }
+    55% { transform: scaleX(0.82); opacity: 1; }
+    100% { transform: scaleX(1); opacity: 0; }
+  }
+  .auth-sheen {
+    display: block;
+    animation: auth-sheen 1.35s ease-in-out infinite;
+  }
+  @keyframes auth-sheen {
+    from { transform: translateX(-120%); }
+    to { transform: translateX(320%); }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-pending-bar { transform: scaleX(1); opacity: 0.7; }
+}
+
+/* A quiet status pulse for the live-service board on the sign-in visual. */
+.auth-live-dot { position: relative; }
+.auth-live-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: var(--color-forest);
+  opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .auth-live-dot::after { animation: auth-live-pulse 2.6s ease-out infinite; }
+  @keyframes auth-live-pulse {
+    0% { transform: scale(1); opacity: 0.35; }
+    70%, 100% { transform: scale(2.8); opacity: 0; }
+  }
+}

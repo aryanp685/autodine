@@ -1,0 +1,97 @@
+# No push trigger by design. A previous revision ran automatically on pushes
+# to the stale branch arena/3711df6a-autodine, which would re-provision
+# staging fixtures for an unrelated line of development. Staging writes now
+# happen only through this explicit manual dispatch, with the secrets gate
+# below as the second factor. Restoring any automatic trigger requires the
+# owner's explicit approval plus a fresh acceptance run.
+name: Staging E2E (explicit secrets, nonproduction only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: isolated-staging-e2e
+  cancel-in-progress: false
+jobs:
+  staging-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      STAGING_BASE_URL: https://new-git-arena-9b120325-autodine-iamjarvis9896-3988s-projects.vercel.app
+      STAGING_SUPABASE_URL: https://juwyhslzchjevqkdvwjm.supabase.co
+      STAGING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.AUTODINE_STAGING_SERVICE_ROLE_KEY }}
+      STAGING_SHARE_URL: ${{ secrets.AUTODINE_STAGING_SHARE_URL }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Require secrets before accessing services or writing fixtures
+        shell: bash
+        run: |
+          if [[ -z "$STAGING_SUPABASE_SERVICE_ROLE_KEY" || -z "$STAGING_SHARE_URL" ]]; then
+            echo '::error::Staging setup blocked: configure AUTODINE_STAGING_SERVICE_ROLE_KEY and AUTODINE_STAGING_SHARE_URL as repository Actions secrets. Do not put them in workflow inputs or code.'
+            exit 1
+          fi
+      # Zero-write gate using the runner's system node (no npm install needed).
+      # Fails closed with rule ids only; nothing else runs on a mismatch.
+      - name: Verify share origin matches the approved base (no writes)
+        run: node scripts/staging/verify-share-origin.mjs
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      # The runner prints only generic, pre-redacted diagnostics (no secret
+      # values) by design; tee them to a file and re-emit as an annotation on
+      # failure so the Checks API can carry them when the log CDN is not
+      # reachable from the operator environment. This changes no behavior.
+      - name: Provision uniquely namespaced fixtures (no email, no existing-data reset)
+        run: |
+          set -o pipefail
+          node scripts/staging/provision-e2e.mjs 2>&1 | tee "$RUNNER_TEMP/staging-provision.log"
+
+      - name: Surface fixture-provision failure as an annotation
+        if: failure()
+        run: node scripts/ci/print-error-annotation.mjs "$RUNNER_TEMP/staging-provision.log" 2500 12
+
+      # Non-blocking: mints and age-shifts ONE synthetic cashier invitation so
+      # invites.spec.ts can prove an expired link is refused. Exits 0 on any
+      # failure and exports nothing, so the spec then reports that one test as
+      # skipped — honest, never green.
+      - name: Mint aged synthetic invitation (non-blocking)
+        if: success()
+        run: |
+          set -o pipefail
+          node scripts/staging/invite-mint.mjs 2>&1 | tee "$RUNNER_TEMP/staging-invite-mint.log"
+
+      - name: Real staging browser workflows
+        run: |
+          set -o pipefail
+          npx playwright test --config playwright.staging.config.ts 2>&1 | tee "$RUNNER_TEMP/staging-browser.log"
+
+      - name: Surface staging browser failure as an annotation
+        if: failure()
+        run: node scripts/ci/print-error-annotation.mjs "$RUNNER_TEMP/staging-browser.log" 2500 12
+
+      # Hosted Auth/RBAC/monitoring probes through the real application paths.
+      # Runs even if the browser suites failed (provisioned fixtures are what
+      # matter here). Hard-fails on any failed check: a hosted defect must
+      # surface. Publishes counts only, never values.
+      - name: Hosted Auth/RBAC/monitoring acceptance probes (synthetic)
+        if: always()
+        run: |
+          set -o pipefail
+          if [ ! -d node_modules/@supabase/supabase-js ]; then
+            echo 'auth-acceptance: SKIP (dependencies not installed — an earlier step failed closed)'
+            exit 0
+          fi
+          node scripts/staging/auth-acceptance.mjs 2>&1 | tee "$RUNNER_TEMP/staging-auth-acceptance.log"
+
+      - name: Surface acceptance probe failure as an annotation
+        if: failure()
+        run: node scripts/ci/print-error-annotation.mjs "$RUNNER_TEMP/staging-auth-acceptance.log" 2500 12
+
+      - name: Publish counts only (no traces, URLs, credentials or raw reports)
+        if: always()
+        shell: bash
+        run: |
+          node scripts/staging/report-e2e.mjs

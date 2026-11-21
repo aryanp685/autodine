@@ -1,0 +1,277 @@
+import { HomeNav } from '@/components/HomeNav';
+import { SiteMotion } from '@/components/SiteMotion';
+import { AuthHandoffLink } from '@/components/AuthHandoffLink';
+import { SiteFooter } from '@/components/SiteFooter';
+import { inr } from '@/lib/demo-data';
+import { BILLING, CAPABILITIES, LIVE, PLANS, outletLimitLabel, planHasFeature } from '@/lib/plans';
+
+const FAQS = [
+  { q: 'Can I purchase a plan now?', a: 'Not yet. These are indicative monthly prices, not an offer to purchase. Final pricing and applicable taxes will be confirmed before plans go on sale.' },
+  { q: 'What happens after the trial?', a: `The current trial lasts ${BILLING.trialDays} days. When access expires, the restaurant becomes read-only until access is extended. Creating an account does not purchase or activate a paid subscription.` },
+  { q: 'What happens to my data if I don’t continue?', a: 'Nothing is deleted when the trial ends. The account becomes read-only, and the rows stay where they are. A restaurant can ask for its account to be closed; the privacy note explains what that means.' },
+  { q: 'Are these prices final, and are taxes included?', a: 'Not yet. They are planning figures, not a quotation. Final pricing and applicable taxes will be confirmed before plans go on sale.' },
+  { q: 'Do I need special hardware?', a: 'Use a phone for guest ordering and a compatible browser on a laptop or tablet for staff. Table cards can be printed on ordinary paper. Receipt printing depends on your browser and printer setup.' },
+  {
+    q: 'Can one account run more than one outlet?',
+    a: `One subscription covers the account, not each outlet. During the trial an account can add up to five. The proposed plan limits are ${PLANS.map((plan) => `${plan.name}: ${outletLimitLabel(plan.outlets)}`).join(' · ')}.`,
+  },
+];
+
+/**
+ * The comparison table is the same catalog the product enforces: the labels
+ * come from CAPABILITIES, the ticks from planHasFeature(), and the outlet row
+ * from the plan itself. Nothing here is typed twice by hand.
+ */
+const MATRIX_GROUPS = [
+  { id: 'core', label: 'In every plan', rows: ['menus', 'qr', 'ordering', 'kitchen', 'cashier', 'reports'] },
+  { id: 'growth', label: 'As you grow', rows: ['outlets', 'roles', 'import', 'support'] },
+] as const;
+
+const FEATURE_LABEL: Record<string, string> = Object.fromEntries(
+  CAPABILITIES.map((capability) => [capability.id, capability.label]),
+);
+
+const TIMELINE = [
+  {
+    when: 'Day 0',
+    title: 'The trial starts',
+    body: 'The account opens with every feature switched on — menu, QR cards, kitchen and counter.',
+  },
+  {
+    when: `Days 1–${BILLING.trialDays}`,
+    title: 'Run the whole product',
+    body: 'Sample content is replaced by yours. No card is asked for and no subscription is created.',
+  },
+  {
+    when: `Day ${BILLING.trialDays + 1}`,
+    title: 'Read-only, not deleted',
+    body: 'If access is not extended, writes stop. Every row stays, and nothing is charged.',
+  },
+];
+
+const CAPABILITY_COPY: Record<string, string> = {
+  menus: 'Organise dishes, portions, add-ons and prices. Publish updates from the dashboard.',
+  qr: 'Give each table a QR card, with short-lived guest sessions for ordering.',
+  ordering: 'Guests browse, customise and place an order from their phone. No app to install.',
+  kitchen: 'Track tickets and preparation stages. Voice announcements depend on the device and sound settings.',
+  cashier: 'Review the bill and record cash, card or UPI at the counter. Print from a compatible browser.',
+  reports: 'Review daily sales and item performance, with CSV exports.',
+};
+
+const FOCUS = {
+  starter: ['A straightforward setup', 'For a single-room restaurant or café: one outlet, everything switched on.'],
+  professional: ['A busier service', 'For a full floor with a kitchen team, and up to five outlets on one subscription.'],
+  business: ['A larger operation', 'For teams running service across several rooms, with no outlet ceiling.'],
+};
+
+/** Public pricing is informational, not a checkout or an entitlement promise.
+ * Keep anchors used by the landing page; do not imply unlimited capacity,
+ * recommend an unpurchasable tier, or promise an indefinite free account. */
+export function PricingScreen({
+  address,
+  phone,
+}: {
+  address?: string;
+  phone?: string;
+} = {}) {
+  return (
+    <div className="public-landing min-h-screen bg-ink text-cream antialiased">
+      <HomeNav activePricing />
+      <main id="pricing-content">
+        <header className="relative overflow-hidden border-b border-cream/10 px-5 pt-14 pb-12 sm:px-8 sm:pt-20 sm:pb-16">
+          <div aria-hidden="true" className="pointer-events-none absolute -top-40 right-[-10%] size-[550px] rounded-full bg-forest/[0.05] blur-3xl" />
+          <div className="relative mx-auto max-w-[1116px]">
+            <p className="text-[11px] font-semibold tracking-[0.2em] text-forest uppercase">Pricing</p>
+            <div className="mt-6 grid gap-7 md:grid-cols-[1.2fr_0.8fr] md:items-end md:gap-16">
+              <div>
+                <h1 data-reveal className="max-w-[15ch] text-[clamp(42px,6vw,76px)] leading-[1.02] font-semibold tracking-[-0.055em] text-balance">Good service.<br />A clearer price.</h1>
+                <p className="mt-6 max-w-[42ch] text-[16px] leading-relaxed text-mute">From the first scan to the final bill. Explore the planned pricing for your restaurant.</p>
+              </div>
+              <div data-reveal className="rounded-2xl border border-forest/15 bg-forest-soft p-6">
+                <p className="flex items-center gap-2 text-[12px] font-semibold text-forest"><span aria-hidden="true" className="size-1.5 rounded-full bg-forest" />Plans are not on sale yet</p>
+                <p className="mt-3 text-[14px] leading-relaxed text-mute">You can create an account for a {BILLING.trialDays}-day trial. No subscription is purchased when you sign up.</p>
+                <AuthHandoffLink href="/signup" className="mt-5 inline-flex min-h-11 items-center gap-3 rounded-full bg-forest px-5 text-[13px] font-medium text-white hover:bg-forest-strong">Start your trial <span aria-hidden="true">↗</span></AuthHandoffLink>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <section id="plans" aria-labelledby="plans-heading" className="px-5 py-12 sm:px-8 sm:py-16">
+          <div className="mx-auto max-w-[1116px]">
+            <div className="mb-7 flex flex-wrap items-end justify-between gap-3">
+              <h2 id="plans-heading" className="text-[25px] font-semibold tracking-[-0.03em] sm:text-[30px]">One product. Room to grow.</h2>
+              <p className="text-[12px] text-mute">Indicative prices · one subscription per account, not per outlet</p>
+            </div>
+            <div data-pricing-grid className="grid gap-4 md:grid-cols-3">
+              {PLANS.map((plan, index) => (
+                <article id={`plan-${plan.id}`} data-pricing-card data-plan-id={plan.id} key={plan.id} className="public-card motion-safe:transition-[box-shadow,border-color] motion-safe:duration-300 hover:border-forest/25 hover:shadow-[0_16px_40px_rgba(31,77,58,0.07)] scroll-mt-24 rounded-[22px] border border-cream/10 bg-white p-6 sm:p-7">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-[16px] font-semibold tracking-[-0.02em]">{plan.name}</h3>
+                    <span aria-hidden="true" className="tnum text-[11px] text-mute-dim">0{index + 1}</span>
+                  </div>
+                  <p className="mt-2 min-h-12 text-[13px] leading-relaxed text-mute">{plan.fit}</p>
+                  <p className="mt-7 flex flex-wrap items-baseline gap-2"><span className="tnum text-[42px] leading-none font-semibold tracking-[-0.05em]">{inr(plan.price)}</span><span className="text-[12px] text-mute">/ month</span></p>
+                  <p data-plan-outlets className="mt-2 text-[12.5px] font-medium text-forest">
+                    {plan.outlets === null
+                      ? 'Unlimited outlets'
+                      : `${plan.outlets} ${plan.outlets === 1 ? 'outlet' : 'outlets'}`}
+                  </p>
+                  <div data-draw aria-hidden="true" className="my-7 h-px origin-left bg-gradient-to-r from-forest/35 via-[#B98A4B]/40 to-transparent" />
+                  <p className="text-[13px] font-medium text-forest">{FOCUS[plan.id][0]}</p>
+                  <p className="mt-2 min-h-12 text-[13px] leading-relaxed text-mute">{FOCUS[plan.id][1]}</p>
+                  <p className="mt-6 text-[10px] font-medium tracking-[0.12em] text-mute uppercase">Planned · not on sale</p>
+                </article>
+              ))}
+            </div>
+            <p className="mt-5 max-w-[70ch] text-[12px] leading-relaxed text-mute">These are proposed plans, not selectable packages. Final features, limits and taxes will be confirmed before purchase is available.</p>
+          </div>
+        </section>
+
+        <section id="compare" aria-labelledby="compare-heading" className="border-t border-cream/10 px-5 py-12 sm:px-8 sm:py-16">
+          <div className="mx-auto max-w-[1116px]">
+            <div className="grid gap-6 md:grid-cols-[0.8fr_1.2fr] md:items-end md:gap-16">
+              <div>
+                <p className="text-[11px] font-semibold tracking-[0.18em] text-forest uppercase">Compare</p>
+                <h2 id="compare-heading" className="mt-4 max-w-[16ch] text-[clamp(30px,4vw,42px)] leading-[1.08] font-semibold tracking-[-0.04em]">The same core.<br /><em className="font-display font-normal italic">Room to grow.</em></h2>
+              </div>
+              <p className="max-w-[46ch] text-[14px] leading-relaxed text-mute">Every plan runs the same ordering, kitchen and counter workflow. The difference is how many rooms, roles and tools sit around it.</p>
+            </div>
+
+            <div className="mt-9 hidden md:block">
+              <table className="w-full table-fixed border-collapse text-left">
+                <caption className="sr-only">Planned features and limits by plan</caption>
+                <colgroup>
+                  <col />
+                  {PLANS.map((plan) => <col key={plan.id} className="w-[18%]" />)}
+                </colgroup>
+                <thead className="sticky top-[64px] z-10">
+                  <tr>
+                    <th scope="col" className="border-b border-cream/15 bg-ink py-3 pr-4 align-bottom text-[10px] font-medium tracking-[0.16em] text-mute uppercase">Included</th>
+                    {PLANS.map((plan) => (
+                      <th key={plan.id} scope="col" data-matrix-plan={plan.id} className="border-b border-cream/15 bg-ink px-3 py-3 text-center">
+                        <span className="block text-[13.5px] font-semibold">{plan.name}</span>
+                        <span className="mt-0.5 block text-[11px] font-normal text-mute">{inr(plan.price)} / month</span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                {MATRIX_GROUPS.map((group) => (
+                  <tbody key={group.id}>
+                    <tr>
+                      <th scope="rowgroup" colSpan={4} className="pt-6 pb-2 text-[10px] font-semibold tracking-[0.16em] text-forest uppercase">{group.label}</th>
+                    </tr>
+                    {group.rows.map((row) => (
+                      <tr key={row} data-matrix-row className="border-t border-cream/10">
+                        <th scope="row" className="py-3.5 pr-4 text-[13px] leading-snug font-medium">
+                          {row === 'outlets' ? 'Outlets on one account' : FEATURE_LABEL[row]}
+                        </th>
+                        {PLANS.map((plan) => {
+                          if (row === 'outlets') {
+                            const limit = plan.outlets;
+                            return (
+                              <td key={plan.id} className="px-3 py-3.5 text-center text-[12.5px] font-medium">
+                                <span aria-hidden="true">{limit === null ? 'Unlimited' : limit}</span>
+                                <span className="sr-only">{outletLimitLabel(limit)}</span>
+                              </td>
+                            );
+                          }
+                          const included = planHasFeature(plan.id, row);
+                          return (
+                            <td key={plan.id} className="px-3 py-3.5 text-center">
+                              {included ? (
+                                <>
+                                  <span aria-hidden="true" className="text-[13px] text-forest">✓</span>
+                                  <span className="sr-only">Included</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span aria-hidden="true" className="text-[13px] text-mute-dim">—</span>
+                                  <span className="sr-only">Not included</span>
+                                </>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                ))}
+              </table>
+            </div>
+
+            <div className="mt-8 md:hidden">
+              <p className="text-[10px] font-semibold tracking-[0.16em] text-forest uppercase">Where the plans differ</p>
+              <ul className="mt-3 divide-y divide-cream/10 border-y border-cream/10">
+                {(['outlets', 'roles', 'import', 'support'] as const).map((row) => {
+                  const value = row === 'outlets'
+                    ? PLANS.map((plan) => `${plan.name} ${plan.outlets === null ? 'unlimited' : plan.outlets}`).join(' · ')
+                    : PLANS.filter((plan) => planHasFeature(plan.id, row)).map((plan) => plan.name).join(' · ');
+                  return (
+                    <li key={row} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-3.5">
+                      <span className="text-[12.5px] font-medium">{row === 'outlets' ? 'Outlets on one account' : FEATURE_LABEL[row]}</span>
+                      <span className="text-[12px] text-mute">{value}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="mt-3 text-[11.5px] leading-relaxed text-mute-dim">
+                All other features — {LIVE.map((capability) => capability.label.toLowerCase()).join(', ')} — are in every plan.
+              </p>
+            </div>
+            <p className="mt-5 max-w-[70ch] text-[12px] leading-relaxed text-mute">Features and outlet limits are read from the same catalog the product uses. They are proposed limits, not an offer; final limits will be confirmed before purchase is available.</p>
+
+            <section aria-labelledby="trial-heading" className="mt-10 rounded-[24px] border border-forest/15 bg-forest-soft p-6 sm:mt-12 sm:p-8">
+              <div className="grid gap-7 lg:grid-cols-[0.75fr_1.25fr] lg:items-start lg:gap-14">
+                <div>
+                  <p className="text-[11px] font-semibold tracking-[0.18em] text-forest uppercase">After signup</p>
+                  <h3 id="trial-heading" className="mt-3 max-w-[17ch] text-[clamp(22px,2.6vw,30px)] leading-[1.1] font-semibold tracking-[-0.035em]">What the {BILLING.trialDays} days look like.</h3>
+                  <p className="mt-3 max-w-[34ch] text-[13.5px] leading-relaxed text-mute">Every feature is on during the trial. No card, no automatic subscription, nothing to cancel.</p>
+                  <AuthHandoffLink href="/signup" className="mt-5 inline-flex min-h-11 items-center gap-3 rounded-full bg-forest px-5 text-[13px] font-medium text-white hover:bg-forest-strong focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">Start the trial <span aria-hidden="true">↗</span></AuthHandoffLink>
+                </div>
+                <ol className="grid gap-6 sm:grid-cols-3 sm:gap-4">
+                  {TIMELINE.map((step) => (
+                    <li key={step.when} className="border-t-2 border-forest/20 pt-4">
+                      <span className="font-display text-[12px] italic text-forest">{step.when}</span>
+                      <h4 className="mt-2 text-[14px] font-semibold">{step.title}</h4>
+                      <p className="mt-1.5 text-[12.5px] leading-relaxed text-mute">{step.body}</p>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section aria-labelledby="included-heading" className="border-y border-cream/10 bg-ink-soft px-5 py-12 sm:px-8 sm:py-16">
+          <div className="mx-auto grid max-w-[1116px] gap-9 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20">
+            <div data-reveal>
+              <p className="text-[11px] font-semibold tracking-[0.18em] text-forest uppercase">The essentials</p>
+              <h2 id="included-heading" className="mt-4 max-w-[15ch] text-[clamp(30px,4vw,42px)] leading-[1.1] font-semibold tracking-[-0.04em]">Built around your service.</h2>
+              <p className="mt-4 max-w-[35ch] text-[14px] leading-relaxed text-mute">Explore the core workflow during your trial, from setting up your menu to recording payments.</p>
+            </div>
+            <div data-stagger className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
+              {LIVE.map(capability => <div key={capability.id} className="border-t border-cream/15 pt-4"><h3 className="flex items-center gap-2 text-[14px] font-semibold"><span aria-hidden="true" className="text-forest">↗</span>{capability.label}</h3><p className="mt-2 text-[13px] leading-relaxed text-mute">{CAPABILITY_COPY[capability.id]}</p></div>)}
+            </div>
+          </div>
+        </section>
+
+        <section aria-labelledby="questions-heading" className="px-5 py-12 sm:px-8 sm:py-16">
+          <div className="mx-auto grid max-w-[1116px] gap-8 md:grid-cols-[0.8fr_1.2fr] md:gap-20">
+            <h2 id="questions-heading" data-reveal className="text-[32px] leading-tight font-semibold tracking-[-0.04em]">Before you start.</h2>
+            <div className="divide-y divide-cream/10 border-y border-cream/10">
+              {FAQS.map(item => <details name="pricing-faq" key={item.q} className="group py-5"><summary className="flex min-h-6 cursor-pointer list-none items-center justify-between gap-5 text-[14px] font-medium transition-colors hover:text-forest marker:hidden focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest">{item.q}<span aria-hidden="true" className="text-xl text-forest motion-safe:transition-transform group-open:rotate-45">+</span></summary><p className="mt-3 max-w-[58ch] text-[13px] leading-relaxed text-mute">{item.a}</p></details>)}
+            </div>
+          </div>
+        </section>
+        <section className="px-5 pb-12 sm:px-8 sm:pb-16">
+          <div className="mx-auto flex max-w-[1116px] flex-col items-start justify-between gap-6 rounded-[24px] bg-forest px-7 py-9 text-white sm:flex-row sm:items-center sm:px-10">
+            <div><h2 className="text-[clamp(26px,3vw,36px)] font-semibold tracking-[-0.035em]">See how it fits your restaurant.</h2><p className="mt-2 text-[14px] leading-relaxed text-white/75">Start with a {BILLING.trialDays}-day trial. No automatic subscription purchase.</p></div>
+            <AuthHandoffLink href="/signup" className="inline-flex min-h-12 shrink-0 items-center gap-4 rounded-full bg-white px-6 text-[13px] font-semibold text-forest hover:bg-white/90">Create account <span aria-hidden="true">↗</span></AuthHandoffLink>
+          </div>
+        </section>
+      </main>
+      <SiteFooter note="Table QR ordering and restaurant operations." scope="Planned pricing. Paid plans are not currently available." fineRight="Made for restaurant service" address={address} phone={phone} />
+      <SiteMotion />
+    </div>
+  );
+}

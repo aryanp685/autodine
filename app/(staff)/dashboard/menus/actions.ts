@@ -1,0 +1,1620 @@
+/**
+ * Menu editing: save an item, add one, flip availability, publish the menu.
+ *
+ * Same security shape as the table actions: the restaurant id comes from the
+ * session's membership row, never from the form, so a forged payload cannot
+ * reach another tenant's rows even though RLS would already block it.
+ *
+ * Prices are accepted in RUPEES because that is what the locked editor shows,
+ * and converted to paise here, at the boundary. Storing a float rupee amount
+ * would reintroduce the rounding bug that lib/money.ts exists to prevent.
+ *
+ * Publishing is deliberately separate from saving. An owner can save drafts
+ * all day without diners seeing them; is_published is the single switch that
+ * makes a menu public, and it is the one write this file treats as sensitive.
+ */
+
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { getStaffContextDetailed } from '@/lib/db/staff';
+import { rupeesToPaise } from '@/lib/money';
+import { PRESET_CATEGORIES, normaliseCategoryName } from '@/lib/menu-presets';
+import { movedOrder, renumber } from '@/lib/menus/reorder';
+import {
+  MAX_IMPORT_TEXT,
+  MAX_MENU_FILE_BYTES,
+  parseMenuCsv,
+  parseMenuText,
+  parseMenuXlsx,
+} from '@/lib/menus/bulk-parse';
+import type { ImportedItem, MenuImportDraft } from '@/lib/menu-import';
+import { generateDescriptions, type DescribeResult, type DescribeTarget } from '@/lib/ai/describe';
+import { translateBatch, type TranslateResult, type TranslateTarget } from '@/lib/ai/translate';
+import {
+  sourceHash,
+  type LanguageCode,
+  type TranslationEntry,
+  type TranslationMap,
+} from '@/lib/i18n/translations';
+import { EDITOR_MENU_COOKIE } from '@/lib/db/menu-editor';
+import { getDraftForMenu, publishPair } from '@/lib/branding/brand-data';
+import { readUndoItem } from '@/lib/menu-undo';
+import type { UndoItem } from '@/lib/menu-undo';
+import {
+  ASSET_BUCKET,
+  bucketPathFromUrl,
+  checkSize,
+  dishAssetPath,
+  publicAssetUrl,
+  validateImage,
+} from '@/lib/storage/assets';
+
+const MENUS_PATH = '/dashboard/menus';
+
+function fail(message: string): never {
+  redirect(`${MENUS_PATH}?error=${encodeURIComponent(message)}`);
+}
+
+async function currentRestaurant() {
+  // One resolver, cookie included: with several outlets on one account an
+  // `.limit(1)` here would write into the lowest restaurant id while the
+  // screen was showing another -- a silent write into the wrong tenant.
+  const staff = await getStaffContextDetailed();
+  if (!staff.ok) return null;
+
+  return {
+    supabase: staff.context.supabase,
+    restaurantId: staff.context.restaurantId,
+    role: staff.context.role,
+  };
+}
+
+function ok(message: string): never {
+  revalidatePath(MENUS_PATH);
+  redirect(`${MENUS_PATH}?notice=${encodeURIComponent(message)}`);
+}
+
+type Ctx = NonNullable<Awaited<ReturnType<typeof currentRestaurant>>>;
+
+/**
+ * Confirm a category id submitted by the editor belongs to this restaurant.
+ *
+ * RLS already blocks a foreign id -- categories_staff_insert and _update both
+ * carry a WITH CHECK on has_restaurant_role() -- but it fails as a generic
+ * "new row violates row-level security policy", which tells an owner nothing.
+ * Checking first turns a forged or stale id into a message they can act on.
+ *
+ * Returns null when the editor sent no category at all, which is a different
+ * situation from sending a bad one: no category means "leave it alone".
+ */
+async function resolveCategoryId(ctx: Ctx, raw: FormDataEntryValue | null): Promise<string | null> {
+  const id = String(raw ?? '').trim();
+  if (!id) return null;
+
+  const { data, error } = await ctx.supabase
+    .from('categories')
+    .select('id')
+    .eq('id', id)
+    .eq('restaurant_id', ctx.restaurantId)
+    .maybeSingle();
+
+  if (error || !data) {
+    fail('That category is no longer on your menu. Reload the page and try again.');
+  }
+  return data.id as string;
+}
+
+/**
+ * Remember which menu the owner is editing.
+ *
+ * A menu is chosen far more often than it is created, and the choice has to
+ * survive every save on the screen. A cookie does that without threading a
+ * menu id through the twenty-odd forms below -- and a form that forgot it
+ * would save into the wrong menu, which is the bug this whole change is about.
+ */
+export async function selectMenuAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const menuId = String(formData.get('menuId') ?? '').trim();
+  if (!menuId) fail('No menu was chosen.');
+
+  const { data: menu, error } = await ctx.supabase
+    .from('menus')
+    .select('id')
+    .eq('id', menuId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .maybeSingle();
+
+  if (error || !menu) fail('That menu is not on your account.');
+
+  (await cookies()).set(EDITOR_MENU_COOKIE, menuId, {
+    path: MENUS_PATH,
+    sameSite: 'lax',
+    httpOnly: true,
+    maxAge: 60 * 60 * 24 * 180,
+  });
+
+  revalidatePath(MENUS_PATH);
+  redirect(MENUS_PATH);
+}
+
+/**
+ * A second menu -- breakfast, a festival card, the evening a-la-carte.
+ *
+ * Created as a draft, deliberately. A half-built menu that goes live the
+ * moment it is named is a menu guests see empty, and the owner has no idea
+ * which button did that.
+ */
+export async function createMenuAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to add a menu.');
+
+  const name = String(formData.get('name') ?? '').trim();
+  if (!name) fail('A menu needs a name.');
+  if (name.length > 40) fail('That menu name is too long.');
+
+  const { data: existing, error: listError } = await ctx.supabase
+    .from('menus')
+    .select('id, name, sort_order')
+    .eq('restaurant_id', ctx.restaurantId);
+
+  if (listError) fail(`Could not add the menu: ${listError.message}`);
+
+  const taken = (existing ?? []).some(
+    (row) => String(row.name ?? '').trim().toLowerCase() === name.toLowerCase(),
+  );
+  if (taken) fail(`You already have a menu called "${name}".`);
+
+  const nextOrder =
+    (existing ?? []).reduce((max, row) => Math.max(max, Number(row.sort_order ?? 0)), 0) + 1;
+
+  const { data: created, error } = await ctx.supabase
+    .from('menus')
+    .insert({
+      restaurant_id: ctx.restaurantId,
+      name,
+      is_published: false,
+      sort_order: nextOrder,
+    })
+    .select('id')
+    .maybeSingle();
+
+  if (error || !created) fail(`Could not add the menu: ${error?.message ?? 'unknown error'}`);
+
+  // Open the new menu straight away. Creating one and then leaving the owner
+  // on the old one reads as if nothing happened.
+  (await cookies()).set(EDITOR_MENU_COOKIE, created.id as string, {
+    path: MENUS_PATH,
+    sameSite: 'lax',
+    httpOnly: true,
+    maxAge: 60 * 60 * 24 * 180,
+  });
+
+  ok(`Menu "${name}" added as a draft. Add its categories, then publish it.`);
+}
+
+export async function addCategoryAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const name = String(formData.get('name') ?? '').trim();
+  const menuId = String(formData.get('menuId') ?? '').trim();
+
+  if (!name) fail('A category needs a name.');
+  if (name.length > 60) fail('That category name is too long.');
+  if (!menuId) fail('There is no menu to add this category to.');
+
+  // The menu matters as much as the name. A category whose menu_id is NULL is
+  // unreachable from items_public, so every item put in it would be invisible
+  // to diners -- the exact failure this whole action exists to prevent.
+  const { data: menu, error: menuError } = await ctx.supabase
+    .from('menus')
+    .select('id')
+    .eq('id', menuId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .maybeSingle();
+
+  if (menuError || !menu) fail('That menu is not on your account.');
+
+  const { count } = await ctx.supabase
+    .from('categories')
+    .select('id', { count: 'exact', head: true })
+    .eq('restaurant_id', ctx.restaurantId);
+
+  const { error } = await ctx.supabase.from('categories').insert({
+    restaurant_id: ctx.restaurantId,
+    menu_id: menuId,
+    name,
+    sort_order: count ?? 0,
+  });
+
+  if (error) fail(`Could not add the category: ${error.message}`);
+
+  ok(`Category "${name}" added.`);
+}
+
+/**
+ * Seed the categories nearly every Indian restaurant uses, in one action.
+ *
+ * Without this, going from an empty menu to a first item meant typing each
+ * category name by hand first. The chips add one at a time, but the common
+ * case is wanting all of them, so that is one press.
+ *
+ * Names already present are skipped, so pressing it twice changes nothing
+ * rather than creating duplicates.
+ */
+export async function addPresetCategoriesAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const menuId = String(formData.get('menuId') ?? '').trim();
+  if (!menuId) fail('There is no menu to add categories to.');
+
+  const { data: menu, error: menuError } = await ctx.supabase
+    .from('menus')
+    .select('id')
+    .eq('id', menuId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .maybeSingle();
+
+  if (menuError || !menu) fail('That menu is not on your account.');
+
+  const { data: existing } = await ctx.supabase
+    .from('categories')
+    .select('name')
+    .eq('restaurant_id', ctx.restaurantId);
+
+  const have = new Set((existing ?? []).map((c) => normaliseCategoryName(c.name)));
+  const missing = PRESET_CATEGORIES.filter((n) => !have.has(normaliseCategoryName(n)));
+
+  if (missing.length === 0) {
+    ok('Those categories are already on your menu.');
+  }
+
+  const { count } = await ctx.supabase
+    .from('categories')
+    .select('id', { count: 'exact', head: true })
+    .eq('restaurant_id', ctx.restaurantId);
+
+  const { error } = await ctx.supabase.from('categories').insert(
+    missing.map((name, i) => ({
+      restaurant_id: ctx.restaurantId,
+      menu_id: menuId,
+      name,
+      sort_order: (count ?? 0) + i,
+    }))
+  );
+
+  if (error) fail(`Could not add the categories: ${error.message}`);
+
+  ok(`Added ${missing.length} categor${missing.length === 1 ? 'y' : 'ies'}.`);
+}
+
+export async function deleteCategoryAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const categoryId = String(formData.get('categoryId') ?? '').trim();
+  if (!categoryId) fail('No category selected.');
+
+  // Refuse rather than orphan. Deleting a category that still holds items
+  // would either fail on a foreign key or, worse, silently strand those items
+  // in a state where they exist but can never be shown to a diner.
+  const { count, error: countError } = await ctx.supabase
+    .from('items')
+    .select('id', { count: 'exact', head: true })
+    .eq('category_id', categoryId)
+    .eq('restaurant_id', ctx.restaurantId);
+
+  if (countError) fail(`Could not check that category: ${countError.message}`);
+  if ((count ?? 0) > 0) {
+    fail('Move or delete the items in this category first.');
+  }
+
+  const { error } = await ctx.supabase
+    .from('categories')
+    .delete()
+    .eq('id', categoryId)
+    .eq('restaurant_id', ctx.restaurantId);
+
+  if (error) fail(`Could not delete the category: ${error.message}`);
+
+  ok('Category deleted.');
+}
+
+export async function deleteItemAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const itemId = String(formData.get('itemId') ?? '').trim();
+  if (!itemId) fail('No item selected.');
+
+  // Read it back before deleting. The undo has to be able to put the row back
+  // exactly as it was -- same id, same category, same price -- so the snapshot
+  // is taken from the row, not from anything the form claimed about it.
+  const { data: row, error: readError } = await ctx.supabase
+    .from('items')
+    .select('id, name, description, price_paise, is_veg, is_available, category_id, sort_order')
+    .eq('id', itemId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .maybeSingle();
+
+  if (readError || !row) fail('That item is no longer on your menu.');
+
+  const { error } = await ctx.supabase
+    .from('items')
+    .delete()
+    .eq('id', itemId)
+    .eq('restaurant_id', ctx.restaurantId);
+
+  if (error) fail(`Could not delete the item: ${error.message}`);
+
+  // Past orders are safe. order_items.item_id is ON DELETE SET NULL and every
+  // order item keeps its own snapshot of the name and price, so removing an
+  // item from the menu does not rewrite what a customer was already served.
+  const undo: UndoItem = {
+    id: row.id as string,
+    name: row.name as string,
+    description: (row.description as string | null) ?? null,
+    pricePaise: Number(row.price_paise ?? 0),
+    isVeg: row.is_veg === true ? true : row.is_veg === false ? false : null,
+    isAvailable: Boolean(row.is_available),
+    categoryId: (row.category_id as string | null) ?? null,
+    sortOrder: Number(row.sort_order ?? 0),
+  };
+
+  revalidatePath(MENUS_PATH);
+  redirect(
+    `${MENUS_PATH}?notice=${encodeURIComponent(`"${undo.name}" deleted.`)}` +
+      `&undo=${encodeURIComponent(JSON.stringify(undo))}`
+  );
+}
+
+export async function restoreItemAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const raw = String(formData.get('undo') ?? '').trim();
+  if (!raw) fail('Nothing to undo.');
+
+  // JSON.parse throws on anything that is not JSON, and a stale or hand-edited
+  // link is the common case here rather than an exceptional one.
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    fail('That undo has expired. Add the item again if you still want it.');
+  }
+
+  const item = readUndoItem(parsed);
+  if (!item) fail('That undo has expired. Add the item again if you still want it.');
+
+  // Already back -- a double press, or the owner re-added it by hand. Inserting
+  // again would collide on the primary key and surface as a raw database error.
+  const { data: existing } = await ctx.supabase
+    .from('items')
+    .select('id')
+    .eq('id', item.id)
+    .maybeSingle();
+
+  if (existing) ok(`"${item.name}" is already back on the menu.`);
+
+  const { error } = await ctx.supabase.from('items').insert({
+    id: item.id,
+    restaurant_id: ctx.restaurantId,
+    category_id: item.categoryId,
+    name: item.name,
+    description: item.description,
+    price_paise: item.pricePaise,
+    is_veg: item.isVeg,
+    is_available: item.isAvailable,
+    sort_order: item.sortOrder,
+  });
+
+  if (error) fail(`Could not put the item back: ${error.message}`);
+
+  ok(`"${item.name}" is back.`);
+}
+
+export async function saveItemAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const itemId = String(formData.get('itemId') ?? '').trim();
+  const name = String(formData.get('name') ?? '').trim();
+  const desc = String(formData.get('description') ?? '').trim();
+  const vegRaw = String(formData.get('veg') ?? '').trim();
+  const veg = vegRaw === 'veg' ? true : vegRaw === 'non' ? false : null;
+  const spokenName = String(formData.get('spokenName') ?? '').trim();
+  const rawPrice = String(formData.get('price') ?? '').trim();
+  const categoryId = await resolveCategoryId(ctx, formData.get('categoryId'));
+
+  if (!itemId) fail('No item selected.');
+  if (!name) fail('An item needs a name.');
+  if (spokenName.length > 120) fail('That spoken name is too long to say in one breath.');
+
+  const rupees = Number(rawPrice);
+  if (!Number.isFinite(rupees) || rupees < 0) fail('Price must be a number.');
+  if (rupees > 100000) fail('That price looks wrong. Please check it.');
+
+  const { error } = await ctx.supabase
+    .from('items')
+    .update({
+      name,
+      description: desc || null,
+      // Empty means "say the name": the board generates the pronunciation
+      // itself, and storing '' would be a pronunciation of nothing.
+      spoken_name: spokenName || null,
+      price_paise: rupeesToPaise(rupees),
+      is_veg: veg,
+      ...(categoryId ? { category_id: categoryId } : {}),
+    })
+    .eq('id', itemId)
+    .eq('restaurant_id', ctx.restaurantId);
+
+  if (error) fail(`Could not save the item: ${error.message}`);
+
+  ok('Draft saved. Diners will not see it until you publish.');
+}
+
+export async function addItemAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  // No placeholder fallback. Defaulting to "New item" at zero rupees meant
+  // every press created a blank row the owner then had to reopen and retype,
+  // so a few quick clicks left a table of identical rows that differed only
+  // by id. The form now carries the real values, so an empty name is an
+  // error rather than something to fill in later.
+  const name = String(formData.get('name') ?? '').trim();
+  if (!name) fail('Give the item a name.');
+  if (name.length > 120) fail('That item name is too long.');
+
+  const rupees = Number(String(formData.get('price') ?? '0').trim());
+  const safePrice = Number.isFinite(rupees) && rupees >= 0 ? rupees : 0;
+
+  const vegRaw = String(formData.get('veg') ?? '').trim();
+  const isVeg = vegRaw === 'veg' ? true : vegRaw === 'non' ? false : null;
+
+  // Required, not optional. categories_id is the join that makes an item
+  // visible to diners: the items_public RLS policy reaches an item only
+  // through its category and that category's published menu. An item saved
+  // with a NULL category would sit in the editor looking saved and correct
+  // while being invisible on the customer menu -- and the owner would have no
+  // way to see why.
+  const categoryId = await resolveCategoryId(ctx, formData.get('categoryId'));
+  if (!categoryId) {
+    fail('Add a category first. Diners see items through their category.');
+  }
+
+  const { error } = await ctx.supabase.from('items').insert({
+    restaurant_id: ctx.restaurantId,
+    category_id: categoryId,
+    name,
+    description: null,
+    price_paise: rupeesToPaise(safePrice),
+    is_veg: isVeg,
+    is_available: true,
+    sort_order: 0,
+  });
+
+  if (error) fail(`Could not add the item: ${error.message}`);
+
+  ok(`"${name}" added.`);
+}
+
+export async function setAllAvailabilityAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const available = formData.get('available') === 'true';
+
+  const { error } = await ctx.supabase
+    .from('items')
+    .update({ is_available: available })
+    .eq('restaurant_id', ctx.restaurantId);
+
+  if (error) fail(`Could not update availability: ${error.message}`);
+
+  ok(
+    available
+      ? 'Every item is now available.'
+      : 'Every item is now marked unavailable. Diners will see an empty menu.'
+  );
+}
+
+export async function publishMenuAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to publish the menu.');
+
+  const menuId = String(formData.get('menuId') ?? '').trim();
+  if (!menuId) fail('No menu to publish.');
+
+  // Publishing used to be one-way. An owner whose menu was already live saw a
+  // disabled button labelled "Published" and no way to take it down, which
+  // read as broken. One flag, both directions.
+  const published = String(formData.get('published') ?? 'true').trim() !== 'false';
+
+  if (published) {
+    /*
+     * A menu that carries a brand draft from the Brand Studio publishes the
+     * PAIR, in one transaction (publish_menu_brand_pair, migration
+     * 20261103000100): a new menu with the wrong branding around it is
+     * exactly what must never go live. The critical validations run here
+     * first — an unconfirmed name or an unresolved brand question refuses
+     * the publish with a sentence, and the live pair stays as it was.
+     *
+     * A menu with no brand draft — every menu created outside the Studio —
+     * publishes through the plain flag update below, unchanged.
+     */
+    const draftResult = await getDraftForMenu(menuId);
+    const linked = draftResult.ok ? draftResult.value : null;
+    if (linked) {
+      const draft = linked.draft;
+      if (draft && draft.name !== null && !draft.nameConfirmed) {
+        fail('Confirm the restaurant name in the brand review before publishing.');
+      }
+      if (draft && draft.conflicts.length > 0) {
+        fail('Some brand questions are still open. Answer them in the brand review, then publish.');
+      }
+      const result = await publishPair(menuId, linked.id);
+      if (!result.ok) fail(result.error);
+      revalidatePath('/menu');
+      ok('Menu and brand published. Diners can see them now.');
+      return;
+    }
+  }
+
+  const { error } = await ctx.supabase
+    .from('menus')
+    .update({ is_published: published })
+    .eq('id', menuId)
+    .eq('restaurant_id', ctx.restaurantId);
+
+  if (error) fail(`Could not ${published ? 'publish' : 'unpublish'}: ${error.message}`);
+
+  ok(
+    published
+      ? 'Menu published. Diners can see it now.'
+      : 'Menu unpublished. Diners see a closed menu.'
+  );
+}
+
+/* ============================================================================
+   Portions
+   ========================================================================== */
+
+/**
+ * Confirm an item id submitted by the editor belongs to this restaurant.
+ *
+ * Same reasoning as resolveCategoryId: RLS would block a foreign id, but it
+ * fails as a generic policy violation that tells the owner nothing. Checking
+ * first turns a stale or forged id into a sentence they can act on.
+ */
+async function requireOwnItem(ctx: Ctx, raw: FormDataEntryValue | null): Promise<string> {
+  const itemId = String(raw ?? '').trim();
+  if (!itemId) fail('No item selected.');
+
+  const { data, error } = await ctx.supabase
+    .from('items')
+    .select('id')
+    .eq('id', itemId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .maybeSingle();
+
+  if (error || !data) {
+    fail('That item is not on your menu. Reload the page and try again.');
+  }
+  return data.id as string;
+}
+
+/**
+ * Add a portion to a dish.
+ *
+ * A portion is a name and a price. The name has to be short: it is printed on
+ * the kitchen ticket and shown on the bill after the dish name, so "Half
+ * (suitable for one, served with rice)" is not a portion name, it is a
+ * description in the wrong field.
+ */
+export async function addVariantAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const itemId = await requireOwnItem(ctx, formData.get('itemId'));
+
+  const name = String(formData.get('variantName') ?? '').trim();
+  if (!name) fail('Give the portion a name, such as Half or Full.');
+  if (name.length > 40) fail('That portion name is too long. Keep it to 40 characters.');
+
+  const rupees = Number(String(formData.get('variantPrice') ?? '').trim());
+  if (!Number.isFinite(rupees) || rupees < 0) fail('The portion price must be a number.');
+  if (rupees > 100000) fail('That price looks wrong. Please check it.');
+
+  // Appended at the end, so the order the owner adds portions in is the order
+  // diners see them in.
+  const { data: existing, error: readError } = await ctx.supabase
+    .from('item_variants')
+    .select('sort_order')
+    .eq('item_id', itemId)
+    .order('sort_order', { ascending: false })
+    .limit(1);
+
+  if (readError) fail(`Could not read the portions: ${readError.message}`);
+
+  const nextOrder = ((existing?.[0]?.sort_order as number | undefined) ?? 0) + 1;
+
+  const { error } = await ctx.supabase.from('item_variants').insert({
+    item_id: itemId,
+    name,
+    price_paise: rupeesToPaise(rupees),
+    sort_order: nextOrder,
+  });
+
+  if (error) fail(`Could not add the portion: ${error.message}`);
+
+  ok(`"${name}" added at ₹${rupees}. Publish the menu and diners will see it.`);
+}
+
+/**
+ * Remove a portion.
+ *
+ * A hard delete, like an item delete, and for the same reason: a portion that
+ * is visible in the editor but not on the menu is a state the owner cannot
+ * explain. Orders already placed are unaffected -- order_items carries a
+ * snapshot of the portion name and its price at the time of the order, so a
+ * past bill still reads correctly after this.
+ */
+export async function deleteVariantAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const variantId = String(formData.get('variantId') ?? '').trim();
+  if (!variantId) fail('No portion selected.');
+
+  // Resolve the portion's dish, then prove the dish is ours. A direct delete
+  // scoped by id alone would rely on the RLS policy to reject a foreign id,
+  // and the failure would be a policy violation the owner cannot interpret.
+  const { data: variant, error: readError } = await ctx.supabase
+    .from('item_variants')
+    .select('id, item_id, name')
+    .eq('id', variantId)
+    .maybeSingle();
+
+  if (readError) fail(`Could not read that portion: ${readError.message}`);
+  if (!variant) fail('That portion is already gone.');
+
+  const itemId = await requireOwnItem(ctx, variant.item_id as string);
+
+  const { error } = await ctx.supabase
+    .from('item_variants')
+    .delete()
+    .eq('id', variantId)
+    .eq('item_id', itemId);
+
+  if (error) fail(`Could not remove the portion: ${error.message}`);
+
+  ok(`"${variant.name as string}" removed. Past orders keep their own record of it.`);
+}
+
+/* ============================================================================
+   Add-ons
+   ========================================================================== */
+
+/**
+ * Add a group of choices to a dish -- "Add a little extra", "Jain / no onion".
+ *
+ * A group is the unit because the limit lives there: three sauces sharing
+ * "pick up to 2" is one decision, not three. Making options required is done
+ * by saying so here rather than by hiding the skip button in the UI, because
+ * the guest sheet and the kitchen both read this row.
+ */
+export async function addAddonGroupAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const itemId = await requireOwnItem(ctx, formData.get('itemId'));
+
+  const name = String(formData.get('groupName') ?? '').trim();
+  if (!name) fail('Give the add-on group a name, such as "Add a little extra".');
+  if (name.length > 60) fail('That group name is too long. Keep it to 60 characters.');
+
+  // Anything other than an explicit "yes" means the guest may skip it, which
+  // is both the common case and the safe default: a group nobody can skip is
+  // a way to lose an order.
+  const required = formData.get('required') === 'yes';
+  const minSelect = required ? 1 : 0;
+
+  const rawMax = Number(String(formData.get('maxSelect') ?? '1').trim());
+  const maxSelect = Number.isFinite(rawMax) ? Math.min(Math.max(Math.round(rawMax), 1), 10) : 1;
+
+  const { data: existing, error: readError } = await ctx.supabase
+    .from('item_addon_groups')
+    .select('sort_order')
+    .eq('item_id', itemId)
+    .order('sort_order', { ascending: false })
+    .limit(1);
+
+  if (readError) fail(`Could not read the add-on groups: ${readError.message}`);
+
+  const nextOrder = ((existing?.[0]?.sort_order as number | undefined) ?? 0) + 1;
+
+  const { error } = await ctx.supabase.from('item_addon_groups').insert({
+    item_id: itemId,
+    name,
+    min_select: minSelect,
+    max_select: maxSelect,
+    sort_order: nextOrder,
+  });
+
+  if (error) fail(`Could not add the group: ${error.message}`);
+
+  ok(`"${name}" added. Now give it its choices.`);
+}
+
+/**
+ * Remove a group, and every choice in it.
+ *
+ * A hard delete like a portion, and for the same reason: a group that shows
+ * in the editor but not on the menu is a state the owner cannot explain.
+ * Orders already placed keep the names they were sold with, because
+ * order_items stores its own snapshot.
+ */
+export async function deleteAddonGroupAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const groupId = String(formData.get('groupId') ?? '').trim();
+  if (!groupId) fail('No add-on group selected.');
+
+  const { data: group, error: readError } = await ctx.supabase
+    .from('item_addon_groups')
+    .select('id, item_id, name')
+    .eq('id', groupId)
+    .maybeSingle();
+
+  if (readError) fail(`Could not read that group: ${readError.message}`);
+  if (!group) fail('That add-on group is already gone.');
+
+  await requireOwnItem(ctx, group.item_id as string);
+
+  const { error } = await ctx.supabase
+    .from('item_addon_groups')
+    .delete()
+    .eq('id', groupId)
+    .eq('item_id', group.item_id as string);
+
+  if (error) fail(`Could not remove the group: ${error.message}`);
+
+  ok(`"${group.name as string}" removed. Past orders keep their own record of it.`);
+}
+
+/** Add one choice to a group: a name and what it costs per plate. */
+export async function addAddonAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const groupId = String(formData.get('groupId') ?? '').trim();
+  if (!groupId) fail('No add-on group selected.');
+
+  const { data: group, error: groupError } = await ctx.supabase
+    .from('item_addon_groups')
+    .select('id, item_id')
+    .eq('id', groupId)
+    .maybeSingle();
+
+  if (groupError) fail(`Could not read that group: ${groupError.message}`);
+  if (!group) fail('That add-on group is no longer on this dish.');
+
+  await requireOwnItem(ctx, group.item_id as string);
+
+  const name = String(formData.get('addonName') ?? '').trim();
+  if (!name) fail('Give the add-on a name, such as "Extra cheese".');
+  if (name.length > 40) fail('That add-on name is too long. Keep it to 40 characters.');
+
+  // A blank price means free, not unknown. "Jain" is the case: an instruction
+  // the kitchen must see that costs nothing.
+  const rawPrice = String(formData.get('addonPrice') ?? '').trim();
+  const rupees = rawPrice === '' ? 0 : Number(rawPrice);
+  if (!Number.isFinite(rupees) || rupees < 0) fail('The add-on price must be a number.');
+  if (rupees > 100000) fail('That price looks wrong. Please check it.');
+
+  const { data: existing, error: readError } = await ctx.supabase
+    .from('item_addons')
+    .select('sort_order')
+    .eq('group_id', groupId)
+    .order('sort_order', { ascending: false })
+    .limit(1);
+
+  if (readError) fail(`Could not read the add-ons: ${readError.message}`);
+
+  const nextOrder = ((existing?.[0]?.sort_order as number | undefined) ?? 0) + 1;
+
+  const { error } = await ctx.supabase.from('item_addons').insert({
+    group_id: groupId,
+    name,
+    price_paise: rupeesToPaise(rupees),
+    sort_order: nextOrder,
+  });
+
+  if (error) fail(`Could not add the choice: ${error.message}`);
+
+  ok(
+    `"${name}" ${rupees > 0 ? `at ₹${rupees}` : 'at no charge'} added. ` +
+      'Diners see it once the menu is published.'
+  );
+}
+
+/** Remove one choice. Past orders keep the copy they were sold with. */
+export async function deleteAddonAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const addonId = String(formData.get('addonId') ?? '').trim();
+  if (!addonId) fail('No add-on selected.');
+
+  const { data: addon, error: readError } = await ctx.supabase
+    .from('item_addons')
+    .select('id, group_id, name')
+    .eq('id', addonId)
+    .maybeSingle();
+
+  if (readError) fail(`Could not read that add-on: ${readError.message}`);
+  if (!addon) fail('That add-on is already gone.');
+
+  // Prove the group -- and through it the dish -- is ours before deleting.
+  const { data: group } = await ctx.supabase
+    .from('item_addon_groups')
+    .select('id, item_id')
+    .eq('id', addon.group_id as string)
+    .maybeSingle();
+
+  if (!group) fail('That add-on group is no longer on your menu.');
+  await requireOwnItem(ctx, group.item_id as string);
+
+  const { error } = await ctx.supabase
+    .from('item_addons')
+    .delete()
+    .eq('id', addonId)
+    .eq('group_id', addon.group_id as string);
+
+  if (error) fail(`Could not remove the add-on: ${error.message}`);
+
+  ok(`"${addon.name as string}" removed. Past orders keep their own record of it.`);
+}
+
+/* ============================================================================
+   Ordering: where a dish sits in its category, where a category sits in its menu
+   ========================================================================== */
+
+/**
+ * Move a category one place in its menu's order.
+ *
+ * The whole group is renumbered after the move. That is what keeps the order
+ * stable when categories share a sort_order of 0 — every category added by
+ * hand starts there — and it repairs any older ties on the first press.
+ */
+export async function moveCategoryAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const categoryId = String(formData.get('categoryId') ?? '').trim();
+  const direction = String(formData.get('direction') ?? '').trim();
+  if (!categoryId) fail('No category selected.');
+  if (direction !== 'up' && direction !== 'down') fail('That move is not one I can make.');
+
+  const { data: category, error: categoryError } = await ctx.supabase
+    .from('categories')
+    .select('id, menu_id')
+    .eq('id', categoryId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .maybeSingle();
+
+  if (categoryError || !category) fail('That category is not on your account.');
+
+  const { data: siblings, error: siblingsError } = await ctx.supabase
+    .from('categories')
+    .select('id, sort_order')
+    .eq('restaurant_id', ctx.restaurantId)
+    .eq('menu_id', category.menu_id as string)
+    .order('sort_order', { ascending: true })
+    .order('id', { ascending: true });
+
+  if (siblingsError) fail(`Could not read the categories: ${siblingsError.message}`);
+
+  const moved = movedOrder(siblings ?? [], categoryId, direction);
+  if (!moved) {
+    fail(direction === 'up' ? 'That category is already first.' : 'That category is already last.');
+  }
+
+  for (const change of renumber(moved, (row) => Number(row.sort_order ?? 0))) {
+    const { error } = await ctx.supabase
+      .from('categories')
+      .update({ sort_order: change.sortOrder })
+      .eq('id', change.id)
+      .eq('restaurant_id', ctx.restaurantId);
+    if (error) fail(`Could not reorder the categories: ${error.message}`);
+  }
+
+  ok('Category order saved.');
+}
+
+/**
+ * Move a dish one place within its category.
+ *
+ * Within its category — the order guests see inside a section of the menu —
+ * not in the editor's flat table, where the neighbouring row can belong to a
+ * different category and a swap would change nothing a guest can see. As with
+ * categories, the group is renumbered after the move so hand-added dishes
+ * (all at sort_order 0) become a stable sequence on the first press.
+ */
+export async function moveItemAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const itemId = String(formData.get('itemId') ?? '').trim();
+  const direction = String(formData.get('direction') ?? '').trim();
+  if (!itemId) fail('No dish selected.');
+  if (direction !== 'up' && direction !== 'down') fail('That move is not one I can make.');
+
+  const { data: item, error: itemError } = await ctx.supabase
+    .from('items')
+    .select('id, category_id')
+    .eq('id', itemId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .maybeSingle();
+
+  if (itemError || !item) fail('That dish is not on your account.');
+
+  const categoryId = (item.category_id as string | null) ?? null;
+
+  // The group is the dish's own category (or the uncategorised shelf). The
+  // query mirrors lib/db/menu.ts so the move happens in the order guests see.
+  const groupQuery = ctx.supabase
+    .from('items')
+    .select('id, sort_order')
+    .eq('restaurant_id', ctx.restaurantId)
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true });
+  const { data: siblings, error: siblingsError } = categoryId
+    ? await groupQuery.eq('category_id', categoryId)
+    : await groupQuery.is('category_id', null);
+
+  if (siblingsError) fail(`Could not read the dishes: ${siblingsError.message}`);
+
+  const moved = movedOrder(siblings ?? [], itemId, direction);
+  if (!moved) {
+    fail(direction === 'up' ? 'That dish is already first in its category.' : 'That dish is already last in its category.');
+  }
+
+  for (const change of renumber(moved, (row) => Number(row.sort_order ?? 0))) {
+    const { error } = await ctx.supabase
+      .from('items')
+      .update({ sort_order: change.sortOrder })
+      .eq('id', change.id)
+      .eq('restaurant_id', ctx.restaurantId);
+    if (error) fail(`Could not reorder the dishes: ${error.message}`);
+  }
+
+  ok('Dish order saved.');
+}
+
+/* ============================================================================
+   Adding many dishes at once
+   ========================================================================== */
+
+/**
+ * Bulk add: a pasted list, a CSV, or an Excel file, into one chosen category.
+ *
+ * The editor's single-dish form is right for one correction and wrong for
+ * twenty dishes. This action takes a list through the same deterministic
+ * parsers the import screen used to use -- never a guessed price, never an
+ * invented veg mark -- and files every dish under the category the owner
+ * picked, at the end of it. Lines that cannot become a dish are reported in
+ * the outcome, never silently dropped.
+ */
+export async function bulkAddItemsAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const categoryId = await resolveCategoryId(ctx, formData.get('categoryId'));
+  if (!categoryId) fail('Add a category first. Diners see dishes through their category.');
+
+  const file = formData.get('file');
+  const text = String(formData.get('text') ?? '');
+
+  let draft: MenuImportDraft;
+  if (file instanceof File && file.size > 0) {
+    if (file.size > MAX_MENU_FILE_BYTES) {
+      fail('That file is over 5 MB. Export a smaller one and try again.');
+    }
+    const lower = file.name.toLowerCase();
+    if (lower.endsWith('.csv')) {
+      draft = parseMenuCsv(await file.text());
+    } else if (lower.endsWith('.xlsx')) {
+      draft = await parseMenuXlsx(Buffer.from(await file.arrayBuffer()));
+    } else {
+      fail('Save the file as .csv or .xlsx — those are the two I can read.');
+    }
+  } else if (text.trim() !== '') {
+    if (text.length > MAX_IMPORT_TEXT) {
+      fail('That paste is over 20,000 characters. Split it into smaller parts.');
+    }
+    draft = parseMenuText(text);
+  } else {
+    fail('Paste your dish list or attach a CSV or Excel file.');
+  }
+
+  // One category was chosen, so the parsers' own sections (a heading in the
+  // text, a category column in the file) do not survive as categories -- the
+  // dishes do. Two sections naming the same dish would land twice without
+  // this second pass over the flattened list.
+  const flattened = draft.categories.flatMap((category) => category.items);
+  const seen = new Set<string>();
+  const items: ImportedItem[] = [];
+  let duplicates = draft.duplicates;
+  for (const item of flattened) {
+    const key = `${item.name.toLowerCase()}::${item.pricePaise}`;
+    if (seen.has(key)) {
+      duplicates += 1;
+      continue;
+    }
+    seen.add(key);
+    items.push(item);
+  }
+
+  if (items.length === 0) {
+    const first = draft.issues[0];
+    fail(first ? `Nothing was added — ${first.reason.toLowerCase()}` : 'No dishes were found in that list.');
+  }
+
+  // New dishes go at the end of the category: the place the move arrows
+  // would drag them to anyway.
+  const { data: lastRows } = await ctx.supabase
+    .from('items')
+    .select('sort_order')
+    .eq('restaurant_id', ctx.restaurantId)
+    .eq('category_id', categoryId)
+    .order('sort_order', { ascending: false })
+    .limit(1);
+  const startOrder = Number(lastRows?.[0]?.sort_order ?? -1) + 1;
+
+  const { data: created, error } = await ctx.supabase
+    .from('items')
+    .insert(
+      items.map((item, index) => ({
+        restaurant_id: ctx.restaurantId,
+        category_id: categoryId,
+        name: item.name,
+        description: item.description ?? null,
+        price_paise: item.pricePaise,
+        is_veg: item.isVeg,
+        is_available: true,
+        sort_order: startOrder + index,
+      })),
+    )
+    .select('id');
+
+  if (error || !created || created.length !== items.length) {
+    fail(`Could not add the dishes: ${error?.message ?? 'the write did not come back whole.'}`);
+  }
+
+  // Portions ("Half 240 / Full 420") become real rows, exactly like portions
+  // created by hand. The parent dish holds the entry price (the smallest
+  // portion) and each variant replaces it when chosen.
+  const variantRows = items.flatMap((item, itemIndex) =>
+    (item.variants ?? []).map((variant, variantOrder) => ({
+      item_id: String(created[itemIndex].id),
+      name: variant.name,
+      price_paise: variant.pricePaise,
+      sort_order: variantOrder,
+    })),
+  );
+  if (variantRows.length > 0) {
+    const { error: variantsError } = await ctx.supabase.from('item_variants').insert(variantRows);
+    if (variantsError) {
+      fail(`The dishes were added, but their portions were not: ${variantsError.message}`);
+    }
+  }
+
+  const parts = [`Added ${items.length} ${items.length === 1 ? 'dish' : 'dishes'}.`];
+  if (duplicates > 0) parts.push(`${duplicates} duplicate${duplicates === 1 ? '' : 's'} skipped.`);
+  if (draft.issues.length > 0) {
+    parts.push(`${draft.issues.length} line${draft.issues.length === 1 ? '' : 's'} skipped — ${draft.issues[0].reason.toLowerCase()}`);
+  }
+  ok(parts.join(' '));
+}
+
+/* ============================================================================
+   The description writer
+   ========================================================================== */
+
+/**
+ * Generate descriptions for dishes — writes NOTHING to the database.
+ *
+ * Called from the editor's client panels (the per-dish "Write with AI"
+ * button and the bulk "Enhance menu" review). Generation is deliberately
+ * separate from saving: the owner sees the text, edits it if they want, and
+ * only a Save writes it. The server re-reads each dish itself so the model
+ * is told the real name and section, and only this restaurant's dishes are
+ * ever described.
+ *
+ * A data-returning action (like extractMenuFromPhotoAction): the panel
+ * needs the results in hand, not a redirect.
+ */
+export async function generateDescriptionsAction(
+  payload: { id: string; existing?: string; detail?: string }[]
+): Promise<DescribeResult[]> {
+  const ctx = await currentRestaurant();
+  const clean = (value: unknown): string => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, 300);
+  const entries = (payload ?? [])
+    .map((entry) => ({
+      id: String(entry?.id ?? '').trim(),
+      existing: clean(entry?.existing),
+      detail: clean(entry?.detail),
+    }))
+    .filter((entry) => entry.id !== '')
+    .slice(0, 50);
+  if (!ctx) {
+    return entries.map((entry) => ({
+      id: entry.id,
+      ok: false as const,
+      reason: 'You need to be signed in to edit the menu.',
+    }));
+  }
+  if (ctx.role !== 'owner' && ctx.role !== 'manager') {
+    return entries.map((entry) => ({
+      id: entry.id,
+      ok: false as const,
+      reason: 'Only an owner or manager can generate menu content.',
+    }));
+  }
+  if (entries.length === 0) return [];
+
+  const { data, error } = await ctx.supabase
+    .from('items')
+    .select('id, name, category_id, categories ( name )')
+    .eq('restaurant_id', ctx.restaurantId)
+    .in('id', entries.map((entry) => entry.id));
+
+  if (error) {
+    return entries.map((entry) => ({
+      id: entry.id,
+      ok: false as const,
+      reason: `Could not read your dishes: ${error.message}`,
+    }));
+  }
+
+  const byId = new Map((data ?? []).map((row) => [row.id as string, row]));
+  const targets: DescribeTarget[] = [];
+  const results: DescribeResult[] = [];
+
+  for (const entry of entries) {
+    const row = byId.get(entry.id);
+    if (!row) {
+      results.push({ id: entry.id, ok: false, reason: 'That dish is not on your account.' });
+      continue;
+    }
+    const category = row.categories as { name?: string } | null;
+    targets.push({
+      id: entry.id,
+      name: row.name as string,
+      category: category?.name ?? '',
+      ...(entry.existing !== '' ? { existing: entry.existing } : {}),
+      ...(entry.detail !== '' ? { detail: entry.detail } : {}),
+    });
+  }
+
+  results.push(...(await generateDescriptions(targets)));
+  return results;
+}
+
+/**
+ * Save accepted descriptions in one press.
+ *
+ * The bulk review writes only what the owner accepted, and only over rows
+ * that still have no description: a dish filled in the meantime (another
+ * tab, a co-owner) is left alone and counted in the outcome. "Existing
+ * descriptions stay untouched" is enforced by the write itself, not by
+ * good manners in the UI.
+ */
+export async function saveDescriptionsAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  let rows: { id: string; description: string }[] = [];
+  try {
+    const parsed = JSON.parse(String(formData.get('rows') ?? '[]'));
+    if (!Array.isArray(parsed)) throw new Error('not a list');
+    rows = parsed
+      .map((row: { id?: unknown; description?: unknown }) => ({
+        id: String(row?.id ?? '').trim(),
+        description: String(row?.description ?? '').trim(),
+      }))
+      .filter((row) => row.id !== '' && row.description !== '')
+      .slice(0, 50);
+  } catch {
+    fail('That batch of descriptions could not be read. Try again.');
+  }
+
+  if (rows.length === 0) fail('No descriptions to save.');
+
+  let saved = 0;
+  let skipped = 0;
+  for (const row of rows) {
+    const { data, error } = await ctx.supabase
+      .from('items')
+      .update({ description: row.description.slice(0, 300) })
+      .eq('id', row.id)
+      .eq('restaurant_id', ctx.restaurantId)
+      .is('description', null)
+      .select('id');
+    if (error) fail(`Could not save the descriptions: ${error.message}`);
+    if (data && data.length > 0) saved += 1;
+    else skipped += 1;
+  }
+
+  ok(
+    `Saved ${saved} ${saved === 1 ? 'description' : 'descriptions'}.` +
+      (skipped > 0 ? ` ${skipped} left untouched — they already had one.` : '')
+  );
+}
+
+/* ============================================================================
+   The translator
+   ========================================================================== */
+
+/**
+ * Translate rows into हिन्दी or मराठी — writes NOTHING to the database.
+ *
+ * Called from the translator's review panel. The server re-reads each row
+ * itself (name + description) so the model translates the real source text
+ * and only this restaurant's rows; the owner reviews, edits and saves in a
+ * separate step. Generation is never a save — same rule as the description
+ * writer.
+ */
+export async function generateTranslationsAction(payload: {
+  language: LanguageCode;
+  targets: { id: string; kind: 'item' | 'category' }[];
+}): Promise<TranslateResult[]> {
+  const ctx = await currentRestaurant();
+  const language: LanguageCode = payload?.language === 'gu' ? 'gu' : payload?.language === 'ta' ? 'ta' : payload?.language === 'te' ? 'te' : payload?.language === 'mr' ? 'mr' : 'hi';
+  const wanted = (payload?.targets ?? [])
+    .map((entry) => ({
+      id: String(entry?.id ?? '').trim(),
+      kind: entry?.kind === 'category' ? ('category' as const) : ('item' as const),
+    }))
+    .filter((entry) => entry.id !== '')
+    .slice(0, 50);
+  if (!ctx) {
+    return wanted.map((entry) => ({
+      id: entry.id,
+      ok: false as const,
+      reason: 'You need to be signed in to edit the menu.',
+    }));
+  }
+  if (ctx.role !== 'owner' && ctx.role !== 'manager') {
+    return wanted.map((entry) => ({
+      id: entry.id,
+      ok: false as const,
+      reason: 'Only an owner or manager can generate menu content.',
+    }));
+  }
+  if (wanted.length === 0) return [];
+
+  const itemIds = wanted.filter((entry) => entry.kind === 'item').map((entry) => entry.id);
+  const categoryIds = wanted.filter((entry) => entry.kind === 'category').map((entry) => entry.id);
+
+  const [itemsResult, categoriesResult] = await Promise.all([
+    itemIds.length > 0
+      ? ctx.supabase
+          .from('items')
+          .select('id, name, description')
+          .eq('restaurant_id', ctx.restaurantId)
+          .in('id', itemIds)
+      : Promise.resolve({ data: [], error: null }),
+    categoryIds.length > 0
+      ? ctx.supabase
+          .from('categories')
+          .select('id, name')
+          .eq('restaurant_id', ctx.restaurantId)
+          .in('id', categoryIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (itemsResult.error || categoriesResult.error) {
+    const reason = `Could not read your menu: ${(itemsResult.error ?? categoriesResult.error)?.message ?? ''}`;
+    return wanted.map((entry) => ({ id: entry.id, ok: false as const, reason }));
+  }
+
+  const itemById = new Map((itemsResult.data ?? []).map((row) => [row.id as string, row]));
+  const categoryById = new Map((categoriesResult.data ?? []).map((row) => [row.id as string, row]));
+
+  const targets: TranslateTarget[] = [];
+  const results: TranslateResult[] = [];
+
+  for (const entry of wanted) {
+    if (entry.kind === 'item') {
+      const row = itemById.get(entry.id);
+      if (!row) {
+        results.push({ id: entry.id, ok: false, reason: 'That dish is not on your account.' });
+        continue;
+      }
+      targets.push({
+        id: entry.id,
+        name: row.name as string,
+        description: (row.description as string | null) ?? '',
+      });
+    } else {
+      const row = categoryById.get(entry.id);
+      if (!row) {
+        results.push({ id: entry.id, ok: false, reason: 'That category is not on your account.' });
+        continue;
+      }
+      targets.push({ id: entry.id, name: row.name as string, description: '' });
+    }
+  }
+
+  results.push(...(await translateBatch(targets, language)));
+  return results;
+}
+
+/**
+ * Save accepted translations — the only way a translation becomes visible
+ * to guests. The source hash is computed HERE from the current name and
+ * description, so a translation saved today stops showing the moment the
+ * dish changes, without any other code path remembering to mark it.
+ */
+export async function saveTranslationsAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const raw = String(formData.get('language') ?? '');
+  const language: LanguageCode = raw === 'gu' ? 'gu' : raw === 'ta' ? 'ta' : raw === 'te' ? 'te' : raw === 'mr' ? 'mr' : 'hi';
+
+  let rows: { id: string; kind: 'item' | 'category'; name: string; description: string }[] = [];
+  try {
+    const parsed = JSON.parse(String(formData.get('rows') ?? '[]'));
+    if (!Array.isArray(parsed)) throw new Error('not a list');
+    rows = parsed
+      .map((row: { id?: unknown; kind?: unknown; name?: unknown; description?: unknown }) => ({
+        id: String(row?.id ?? '').trim(),
+        kind: row?.kind === 'category' ? ('category' as const) : ('item' as const),
+        name: String(row?.name ?? '').replace(/\s+/g, ' ').trim().slice(0, 120),
+        description: String(row?.description ?? '').replace(/\s+/g, ' ').trim().slice(0, 300),
+      }))
+      .filter((row) => row.id !== '' && row.name !== '')
+      .slice(0, 50);
+  } catch {
+    fail('That batch of translations could not be read. Try again.');
+  }
+
+  if (rows.length === 0) fail('No translations to save.');
+
+  // The hash must come from the CURRENT source text — re-read, never trusted
+  // from the browser, or a stale page could approve a translation against a
+  // description that has since changed.
+  const itemIds = rows.filter((row) => row.kind === 'item').map((row) => row.id);
+  const categoryIds = rows.filter((row) => row.kind === 'category').map((row) => row.id);
+  const [itemsResult, categoriesResult] = await Promise.all([
+    itemIds.length > 0
+      ? ctx.supabase
+          .from('items')
+          .select('id, name, description, translations')
+          .eq('restaurant_id', ctx.restaurantId)
+          .in('id', itemIds)
+      : Promise.resolve({ data: [], error: null }),
+    categoryIds.length > 0
+      ? ctx.supabase
+          .from('categories')
+          .select('id, name, translations')
+          .eq('restaurant_id', ctx.restaurantId)
+          .in('id', categoryIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (itemsResult.error || categoriesResult.error) {
+    fail(`Could not read your menu: ${(itemsResult.error ?? categoriesResult.error)?.message ?? ''}`);
+  }
+
+  const itemById = new Map((itemsResult.data ?? []).map((row) => [row.id as string, row]));
+  const categoryById = new Map((categoriesResult.data ?? []).map((row) => [row.id as string, row]));
+
+  let saved = 0;
+  let skipped = 0;
+  for (const row of rows) {
+    const source =
+      row.kind === 'item' ? itemById.get(row.id) : categoryById.get(row.id);
+    if (!source) {
+      skipped += 1;
+      continue;
+    }
+    const entry: TranslationEntry = {
+      name: row.name,
+      description: row.description,
+      approved: true,
+      sourceHash: sourceHash(source.name as string, (source as { description?: string | null }).description ?? ''),
+    };
+    const existing = ((source.translations as TranslationMap | null) ?? {});
+    const { error } = await ctx.supabase
+      .from(row.kind === 'item' ? 'items' : 'categories')
+      .update({ translations: { ...existing, [language]: entry } })
+      .eq('id', row.id)
+      .eq('restaurant_id', ctx.restaurantId);
+    if (error) fail(`Could not save the translations: ${error.message}`);
+    saved += 1;
+  }
+
+  ok(
+    `Saved ${saved} ${saved === 1 ? 'translation' : 'translations'} in ${language === 'gu' ? 'Gujarati' : language === 'ta' ? 'Tamil' : language === 'te' ? 'Telugu' : language === 'mr' ? 'Marathi' : 'Hindi'}.` +
+      (skipped > 0 ? ` ${skipped} skipped — not on your menu any more.` : '')
+  );
+}
+
+/* ============================================================================
+   Dish photos and per-dish availability
+   ========================================================================== */
+
+/**
+ * Sold out, one dish at a time.
+ *
+ * Until now the only availability control was two bulk buttons ("Mark all sold
+ * out" / "Mark all available"), which is the wrong instrument for the common
+ * case: one dish runs out at 9pm. An owner had to either take the whole menu
+ * down or leave a dish on sale that the kitchen cannot cook.
+ *
+ * The item id is confirmed against THIS restaurant first. RLS would refuse a
+ * foreign id anyway, but it would surface as a generic policy error, and an
+ * owner pressing "sold out" deserves a sentence they can act on.
+ */
+export async function setItemAvailabilityAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const itemId = String(formData.get('itemId') ?? '').trim();
+  const available = formData.get('available') === 'true';
+  if (!itemId) fail('No dish selected.');
+
+  const { data: row, error: readError } = await ctx.supabase
+    .from('items')
+    .select('id, name')
+    .eq('id', itemId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .maybeSingle();
+
+  if (readError || !row) fail('That dish is no longer on your menu.');
+
+  const { data: saved, error } = await ctx.supabase
+    .from('items')
+    .update({ is_available: available })
+    .eq('id', itemId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .select('id');
+
+  if (error || !saved || saved.length === 0) fail('Could not change availability. Nothing was changed.');
+
+  const name = String((row as { name?: string }).name ?? 'That dish');
+  ok(available ? `"${name}" is back on sale.` : `"${name}" is marked sold out. Guests see it greyed.`);
+}
+
+/**
+ * Upload or replace a dish photo.
+ *
+ * Stores the PUBLIC URL in items.image_url, because that column is a URL with
+ * three existing readers including the demo rows that point at /img/dishes.
+ * Changing its meaning to a path would have broken all of them.
+ *
+ * Same three-step order as branding: upload, point the row, then delete the
+ * old object. A failure at step two removes the just-uploaded object so the
+ * bucket does not accumulate files nothing references.
+ */
+export async function uploadDishPhotoAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const itemId = String(formData.get('itemId') ?? '').trim();
+  if (!itemId) fail('No dish selected.');
+
+  const file = formData.get('photo');
+  if (!(file instanceof File) || file.size === 0) fail('Choose a photo first.');
+
+  const checked = validateImage(file);
+  if (!checked.ok) fail(checked.message);
+
+  const sized = checkSize('dish', file.size, checked.extension);
+  if (!sized.ok) fail(sized.message);
+
+  const { data: row, error: readError } = await ctx.supabase
+    .from('items')
+    .select('id, name, image_url')
+    .eq('id', itemId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .maybeSingle();
+
+  if (readError || !row) fail('That dish is no longer on your menu.');
+
+  const path = dishAssetPath(ctx.restaurantId, itemId, checked.extension);
+
+  const { error: uploadError } = await ctx.supabase.storage
+    .from(ASSET_BUCKET)
+    .upload(path, await file.arrayBuffer(), {
+      contentType: checked.contentType,
+      upsert: false,
+      cacheControl: '31536000',
+    });
+
+  if (uploadError) {
+    console.error('[menu] dish photo upload failed', uploadError);
+    fail(
+      /row-level security|permission/i.test(uploadError.message)
+        ? 'The database refused that upload for this account. Nothing was changed.'
+        : 'That photo did not upload. Nothing was changed — please try again.'
+    );
+  }
+
+  const url = publicAssetUrl(path);
+  const { data: saved, error } = await ctx.supabase
+    .from('items')
+    .update({ image_url: url })
+    .eq('id', itemId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .select('id');
+
+  if (error || !saved || saved.length === 0) {
+    await ctx.supabase.storage.from(ASSET_BUCKET).remove([path]);
+    fail('Could not save that photo. Nothing was changed.');
+  }
+
+  // Only delete a previous file we own; a demo row's /img/... path is not in
+  // the bucket and must never be handed to the Storage API.
+  const previousUrl = (row as { image_url?: string | null }).image_url ?? null;
+  const previousPath = bucketPathFromUrl(previousUrl);
+  if (previousPath) {
+    const { error: removeError } = await ctx.supabase.storage.from(ASSET_BUCKET).remove([previousPath]);
+    if (removeError) console.error('[menu] previous dish photo not deleted', removeError);
+  }
+
+  ok(`Photo updated for "${String((row as { name?: string }).name ?? 'this dish')}".`);
+}
+
+/** Remove a dish photo. The dish stays; its initials tile comes back. */
+export async function removeDishPhotoAction(formData: FormData): Promise<void> {
+  const ctx = await currentRestaurant();
+  if (!ctx) fail('You need to be signed in to edit the menu.');
+
+  const itemId = String(formData.get('itemId') ?? '').trim();
+  if (!itemId) fail('No dish selected.');
+
+  const { data: row, error: readError } = await ctx.supabase
+    .from('items')
+    .select('id, image_url')
+    .eq('id', itemId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .maybeSingle();
+
+  if (readError || !row) fail('That dish is no longer on your menu.');
+
+  const previousUrl = (row as { image_url?: string | null }).image_url ?? null;
+
+  // Clear the column first: the page becomes correct even if the object
+  // delete fails, and a stray object is recoverable while a broken image on a
+  // diner's phone is not.
+  const { data: saved, error } = await ctx.supabase
+    .from('items')
+    .update({ image_url: null })
+    .eq('id', itemId)
+    .eq('restaurant_id', ctx.restaurantId)
+    .select('id');
+
+  if (error || !saved || saved.length === 0) fail('Could not remove that photo. Nothing was changed.');
+
+  const previousPath = bucketPathFromUrl(previousUrl);
+  if (previousPath) {
+    const { error: removeError } = await ctx.supabase.storage.from(ASSET_BUCKET).remove([previousPath]);
+    if (removeError) console.error('[menu] dish photo not deleted', removeError);
+  }
+
+  ok('Photo removed. Guests see the dish’s initials until you add another.');
+}

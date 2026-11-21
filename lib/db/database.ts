@@ -1,0 +1,1351 @@
+/**
+ * Supabase `Database` type.
+ *
+ * `supabase gen types typescript` normally generates this from the live
+ * database. It cannot run here (no network to Supabase, no local Postgres),
+ * so it is hand-written to match supabase/migrations/20261019000001_init.sql.
+ *
+ * REGENERATE as soon as you can:
+ *   npx supabase gen types typescript --project-id <ref> > lib/db/database.ts
+ *
+ * KNOWN WEAKNESS: `Insert` and `Update` are declared as `Partial<Row>`, which
+ * is more permissive than the real generated types. Supabase's generator marks
+ * columns with defaults as optional and everything else as required. That
+ * means TypeScript will NOT stop you from inserting a row that is missing a
+ * required column — the database will. Treat this as row-shape documentation
+ * with real select-side typing, not as a compile-time guarantee on writes.
+ */
+
+import type {
+  Category,
+  DiningTable,
+  Item,
+  ItemAddon,
+  ItemAddonGroup,
+  ItemVariant,
+  Menu,
+  Order,
+  OrderItem,
+  OrderSession,
+  RestaurantInvoice,
+  RestaurantInvoiceLine,
+  RestaurantNote,
+  RestaurantNoteEvent,
+  RestaurantPaymentReceipt,
+  TableWaiterCall,
+  PaymentStatus,
+  PrepStatus,
+  Restaurant,
+  RestaurantGstConfig,
+  Json,
+} from './types';
+
+type Table<Row, Rel extends unknown[] = []> = {
+  Row: Row;
+  Insert: Partial<Row>;
+  Update: Partial<Row>;
+  // supabase-js v2.5x+ requires this key, and uses it to type embedded
+  // selects like .select('*, item_variants(*)'). Without an entry here the
+  // embed resolves to SelectQueryError instead of the related rows.
+  Relationships: Rel;
+};
+
+export type MemberRole = 'owner' | 'manager' | 'kitchen' | 'cashier';
+
+/** Columns granted to the shared authenticated role on restaurants. */
+type StaffRestaurant = Omit<
+  Restaurant,
+  'plan' | 'plan_status' | 'trial_started_at' | 'plan_started_at' | 'plan_expires_at'
+>;
+
+/** Columns granted to the shared authenticated role on the base order table. */
+type OperationalOrder = Omit<
+  Order,
+  | 'payment_status'
+  | 'subtotal_paise'
+  | 'discount_paise'
+  | 'tax_paise'
+  | 'total_paise'
+  | 'guest_token'
+  | 'cancel_reason'
+  | 'tax_rate_bps_snapshot'
+  | 'confirmed_by'
+  | 'order_session_id'
+>;
+
+/** Line-item facts available to all staff; prices use order_items_finance. */
+type OperationalOrderItem = Omit<OrderItem, 'unit_price_paise'>;
+
+export type Database = {
+  public: {
+    Tables: {
+      restaurants: Table<StaffRestaurant>;
+      /**
+       * Migration 20261110001000 (Model C). One subscription per account;
+       * every restaurant row points at one through `restaurants.account_id`.
+       * Direct reads are Owner/Manager-only under accounts_owner_manager_read;
+       * subscription state changes only through service-role paths.
+       */
+      accounts: Table<{
+        id: string;
+        owner_id: string | null;
+        plan: 'trial' | 'starter' | 'professional' | 'business';
+        /**
+         * 'past_due' is a failed payment inside a period that has not ended;
+         * 'cancel_requested' is an owner's cancellation that still runs to the
+         * end of what was paid for. Neither is read-only on its own: the gate
+         * is the period, not the label (migration 20261110001100).
+         */
+        plan_status: 'trialing' | 'active' | 'past_due' | 'cancel_requested' | 'expired' | 'cancelled';
+        trial_started_at: string;
+        /** Materialised: never recomputed from a bare interval. */
+        trial_ends_at: string | null;
+        plan_started_at: string | null;
+        plan_expires_at: string | null;
+        /** Migration 20261110001100. Set by request_subscription_cancellation(). */
+        cancel_requested_at: string | null;
+        /** The end of what was already paid for. Never earlier. */
+        cancel_effective_at: string | null;
+        created_at: string;
+        updated_at: string;
+      }>;
+      profiles: Table<{ id: string; full_name: string | null; phone: string | null; created_at: string }>;
+
+      /**
+       * Migration 20261110001100. Money received or refused for a subscription.
+       * Append-only in the database (a trigger refuses UPDATE and DELETE), so a
+       * retry or a refund is a new row and never a rewritten one.
+       */
+      subscription_payments: Table<{
+        id: string;
+        account_id: string;
+        plan: 'starter' | 'professional' | 'business';
+        /** Integer paise. Never a float. */
+        amount_paise: number;
+        currency: string;
+        status: 'pending' | 'succeeded' | 'failed' | 'refunded';
+        period_start: string | null;
+        period_end: string | null;
+        provider: string;
+        /** The replay key: one provider event, one payment. */
+        provider_event_id: string | null;
+        provider_reference: string | null;
+        failure_reason: string | null;
+        occurred_at: string;
+        recorded_at: string;
+      }>;
+
+      /**
+       * Migration 20261110001100. An immutable receipt for one succeeded
+       * payment. Not a GST tax invoice, and every surface says so.
+       */
+      subscription_receipts: Table<{
+        id: string;
+        receipt_number: string;
+        account_id: string;
+        payment_id: string;
+        plan: string;
+        plan_label: string;
+        amount_paise: number;
+        currency: string;
+        period_start: string | null;
+        period_end: string | null;
+        paid_at: string;
+        provider: string;
+        issued_at: string;
+      }>;
+
+      /**
+       * Migration 20261110001100. The story of one subscription: trial granted,
+       * plan changed, renewed, payment failed, cancellation requested and
+       * confirmed, expired. Read by the owner dashboard; never an authority.
+       */
+      subscription_events: Table<{
+        id: string;
+        account_id: string;
+        kind:
+          | 'trial_granted'
+          | 'trial_denied'
+          | 'trial_extended'
+          | 'plan_changed'
+          | 'renewed'
+          | 'payment_succeeded'
+          | 'payment_failed'
+          | 'cancellation_requested'
+          | 'cancellation_confirmed'
+          | 'expired'
+          | 'provider_unavailable';
+        from_plan: string | null;
+        to_plan: string | null;
+        amount_paise: number | null;
+        currency: string | null;
+        provider: string | null;
+        actor: 'system' | 'owner' | 'provider' | 'admin';
+        note: string | null;
+        occurred_at: string;
+      }>;
+
+      /**
+       * Migration 20261110001100. One row per person who has ever had a trial,
+       * so a trial cannot be issued twice by creating another account.
+       */
+      trial_grants: Table<{
+        owner_id: string;
+        account_id: string;
+        source: string;
+        granted_at: string;
+      }>;
+
+      /**
+       * Migration 20261110001100. Every billing webhook that arrived and what
+       * we did with it. The unique (provider, event id) key is the replay
+       * protection; the evidence columns cannot be rewritten.
+       */
+      billing_webhook_events: Table<{
+        id: string;
+        provider: string;
+        provider_event_id: string;
+        event_type: string | null;
+        payload_digest: string;
+        signature_ok: boolean;
+        outcome: string;
+        received_at: string;
+      }>;
+      memberships: Table<{
+        id: string;
+        restaurant_id: string;
+        user_id: string;
+        role: MemberRole;
+        created_at: string;
+      }>;
+      menus: Table<Menu>;
+      categories: Table<Category>;
+      items: Table<
+        Item,
+        [
+          {
+            foreignKeyName: 'item_variants_item_id_fkey';
+            columns: ['id'];
+            isOneToOne: false;
+            referencedRelation: 'item_variants';
+            referencedColumns: ['item_id'];
+          },
+          {
+            foreignKeyName: 'items_category_id_fkey';
+            columns: ['category_id'];
+            isOneToOne: false;
+            referencedRelation: 'categories';
+            referencedColumns: ['id'];
+          },
+        ]
+      >;
+      item_variants: Table<ItemVariant>;
+      item_addon_groups: Table<ItemAddonGroup>;
+      item_addons: Table<ItemAddon>;
+      dining_tables: Table<DiningTable>;
+      /** The sitting represented by the consolidated table bill. */
+      order_sessions: Table<OrderSession>;
+      /** Per-restaurant GST configuration; one live row, mode 'off' by default. */
+      restaurant_gst_config: Table<RestaurantGstConfig>;
+      /** Immutable, sequential customer receipts; rows are written only by RPC. */
+      restaurant_invoices: Table<RestaurantInvoice>;
+      /** Immutable line snapshots belonging to a receipt. */
+      restaurant_invoice_lines: Table<RestaurantInvoiceLine>;
+      /** Immutable supplemental receipts for payments received after invoicing. */
+      restaurant_payment_receipts: Table<RestaurantPaymentReceipt>;
+      /** Full-document credit/debit notes against GST documents (20261114000500). */
+      restaurant_notes: Table<RestaurantNote>;
+      /** Append-only issuance/void audit for notes (20261114000500). */
+      restaurant_note_events: Table<RestaurantNoteEvent>;
+      /** Opaque hashed credentials for bounded public receipt links. */
+      restaurant_invoice_share_links: Table<{
+        id: string;
+        restaurant_id: string;
+        invoice_id: string;
+        token_hash: string;
+        created_by: string;
+        created_at: string;
+        expires_at: string;
+        revoked_at: string | null;
+        last_accessed_at: string | null;
+        access_count: number;
+      }>;
+      /** Live guest requests for staff to visit a verified table. */
+      table_waiter_calls: Table<TableWaiterCall>;
+      /** Private row-locked receipt counters; no client grants. */
+      restaurant_invoice_series: Table<{
+        restaurant_id: string;
+        financial_year: string;
+        next_number: number;
+      }>;
+      /**
+       * The printed card's code. This is the scheme scanning uses.
+       *
+       * qr_tokens, defined below it, is the older twelve-hour rotating
+       * scheme. Nothing writes to it any more and nothing reads it. It is
+       * still typed because table_qr_codes.source_qr_token_id references it
+       * and dropping the type would mean the column could not be described.
+       * If you are deciding which of the two to use: this one.
+       */
+      table_qr_codes: Table<{
+        id: string;
+        restaurant_id: string;
+        table_id: string;
+        public_token: string;
+        source_qr_token_id: string | null;
+        created_at: string;
+        created_by: string | null;
+        revoked_at: string | null;
+      }>;
+      qr_tokens: Table<{
+        id: string;
+        restaurant_id: string;
+        table_id: string;
+        token: string;
+        expires_at: string;
+        rotated_at: string;
+      }>;
+      orders: Table<
+        OperationalOrder,
+        [
+          {
+            foreignKeyName: 'order_items_order_id_fkey';
+            columns: ['id'];
+            isOneToOne: false;
+            referencedRelation: 'order_items';
+            referencedColumns: ['order_id'];
+          },
+        ]
+      >;
+      order_items: Table<OperationalOrderItem>;
+      /**
+       * Migration 20261029000100. Staff invitations.
+       *
+       * `code_hash` is NOT in this type on purpose: the column is granted to
+       * nobody, so a client select that named it would fail. If you find
+       * yourself wanting it here, the answer is a new RPC, not a wider grant.
+       */
+      restaurant_invites: Table<{
+        id: string;
+        restaurant_id: string;
+        role: Exclude<MemberRole, 'owner'>;
+        created_by: string;
+        created_at: string;
+        expires_at: string;
+        redeemed_at: string | null;
+        revoked_at: string | null;
+      }>;
+      /**
+       * Migration 20261103000100 (brand studio). Ownership + metadata for
+       * every brand asset. Bytes live in Storage; the path CHECK and the
+       * unique (id, restaurant_id) pair exist so no row and no composite FK
+       * can point at another tenant's folder or asset.
+       */
+      restaurant_brand_assets: Table<{
+        id: string;
+        restaurant_id: string;
+        kind: 'logo' | 'banner' | 'reference' | 'menu-photo' | 'crop';
+        bucket: 'restaurant-assets' | 'restaurant-brand-source';
+        path: string;
+        mime_type: string;
+        byte_size: number;
+        width: number | null;
+        height: number | null;
+        checksum: string;
+        source: 'upload' | 'extract';
+        created_by: string | null;
+        created_at: string;
+      }>;
+      /**
+       * Migration 20261103000100. Brand drafts and published versions.
+       * Guests never read this table: publish_menu_brand_pair copies the
+       * approved values onto restaurants.
+       */
+      restaurant_brand_profiles: Table<{
+        id: string;
+        restaurant_id: string;
+        import_id: string;
+        status: 'draft' | 'published' | 'archived';
+        version: number;
+        name: string | null;
+        logo_asset_id: string | null;
+        banner_asset_id: string | null;
+        theme: unknown;
+        source: unknown;
+        menu_id: string | null;
+        created_by: string | null;
+        created_at: string;
+        updated_at: string;
+        published_at: string | null;
+        published_by: string | null;
+      }>;
+      /** Migration 20261103000100. Append-only publish/rollback log. */
+      restaurant_publish_history: Table<{
+        id: string;
+        restaurant_id: string;
+        action: 'publish' | 'rollback';
+        menu_id: string | null;
+        brand_profile_id: string | null;
+        snapshot: unknown;
+        actor: string | null;
+        created_at: string;
+      }>;
+      payments: Table<{
+        id: string;
+        order_id: string;
+        restaurant_id: string;
+        /** `manual` is internal-only for the table-level Mark Paid action. */
+        method: 'cash' | 'card' | 'upi' | 'online' | 'manual';
+        amount_paise: number;
+        status: 'pending' | 'recorded' | 'failed' | 'refunded';
+        provider: string | null;
+        /** The provider's id for the attempt, e.g. Razorpay order_... */
+        provider_ref: string | null;
+        /** The provider's id for the money, e.g. Razorpay pay_.... Migration 00800. */
+        provider_payment_ref: string | null;
+        idempotency_key: string | null;
+        created_at: string;
+        recorded_at: string | null;
+      }>;
+    };
+    Views: {
+      /** Migration 20261112000500. Owner/Manager/Cashier projection; never contains guest_token. */
+      orders_finance: {
+        Row: {
+          id: string;
+          restaurant_id: string;
+          table_id: string | null;
+          code: string;
+          customer_note: string | null;
+          prep_status: PrepStatus;
+          payment_status: PaymentStatus;
+          subtotal_paise: number;
+          discount_paise: number;
+          tax_paise: number;
+          total_paise: number;
+          placed_at: string;
+          updated_at: string;
+          tax_rate_bps_snapshot: number | null;
+          hold_required: boolean;
+          confirmed_at: string | null;
+          table_session_id: string | null;
+          order_session_id: string | null;
+          kitchen_announcement_status: 'announced' | 'failed' | null;
+          kitchen_announcement_at: string | null;
+          kitchen_announcement_error: string | null;
+        };
+        Relationships: [];
+      };
+      /** Migration 20261112000500. Financial line prices for Owner/Manager/Cashier. */
+      order_items_finance: {
+        Row: {
+          id: string;
+          order_id: string;
+          item_id: string | null;
+          name_snapshot: string;
+          unit_price_paise: number;
+          qty: number;
+          variant_snapshot: string | null;
+          addons_snapshot: string[];
+          is_veg: boolean | null;
+          sort_order: number;
+        };
+        Relationships: [];
+      };
+    };
+    Functions: {
+      /** Migration 20261110001100. The approved monthly price, in paise. */
+      plan_price_paise: {
+        Args: { p_plan: string };
+        Returns: number;
+      };
+      /** One trial per person. Service role only. */
+      claim_account_trial: {
+        Args: { p_account_id: string };
+        Returns: boolean;
+      };
+      /** Record a succeeded payment and extend the period. Service role only. */
+      record_subscription_payment: {
+        Args: {
+          p_restaurant_name: string;
+          p_provider: string;
+          p_provider_event_id: string;
+          p_plan: string;
+          p_amount_paise: number;
+          p_currency?: string;
+          p_months?: number;
+          p_occurred_at?: string;
+        };
+        Returns: Record<string, unknown>;
+      };
+      /** Record a failed payment: the account goes past due, nothing is lost. */
+      record_subscription_payment_failure: {
+        Args: {
+          p_restaurant_name: string;
+          p_provider: string;
+          p_provider_event_id: string;
+          p_plan?: string;
+          p_amount_paise?: number;
+          p_reason?: string;
+          p_occurred_at?: string;
+        };
+        Returns: Record<string, unknown>;
+      };
+      /** Record a refund as its own event. Never edits the original payment. */
+      record_subscription_refund: {
+        Args: {
+          p_restaurant_name: string;
+          p_provider: string;
+          p_provider_event_id: string;
+          p_reference?: string;
+          p_occurred_at?: string;
+        };
+        Returns: Record<string, unknown>;
+      };
+      /** Owner/Manager-only account state, role-checked inside the function. */
+      account_subscription_state: {
+        Args: { p_restaurant_id: string };
+        Returns: Record<string, unknown>;
+      };
+      /** Owner/Manager-only subscription event history, capped at 50. */
+      account_subscription_history: {
+        Args: { p_restaurant_id: string; p_limit?: number };
+        Returns: Record<string, unknown>[];
+      };
+      /** Owner/Manager-only payment amounts and receipt references, capped at 50. */
+      account_payment_history: {
+        Args: { p_restaurant_id: string; p_limit?: number };
+        Returns: Record<string, unknown>[];
+      };
+      /** Owner/Manager-only receipt detail. */
+      account_receipt: {
+        Args: { p_receipt_id: string };
+        Returns: Record<string, unknown>;
+      };
+      /** Owner: ask for the subscription to stop at the end of the period. */
+      request_subscription_cancellation: {
+        Args: { p_restaurant_id: string };
+        Returns: Record<string, unknown>;
+      };
+      withdraw_subscription_cancellation: {
+        Args: { p_restaurant_id: string };
+        Returns: boolean;
+      };
+      /** Provider or operator: the cancellation is a fact now. */
+      confirm_subscription_cancellation: {
+        Args: {
+          p_restaurant_name: string;
+          p_provider?: string;
+          p_provider_event_id?: string;
+        };
+        Returns: Record<string, unknown>;
+      };
+      /** Run on a schedule: end-of-period accounts become read-only. */
+      expire_subscriptions: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
+      create_restaurant_invoice_share_link: {
+        Args: { p_invoice_id: string; p_token_hash: string };
+        Returns: { share_link_id: string; expires_at: string }[];
+      };
+      revoke_restaurant_invoice_share_link: {
+        Args: { p_share_link_id: string };
+        Returns: boolean;
+      };
+      list_restaurant_invoice_share_links: {
+        Args: { p_invoice_id: string };
+        Returns: {
+          id: string;
+          created_at: string;
+          expires_at: string;
+          revoked_at: string | null;
+          last_accessed_at: string | null;
+          access_count: number;
+        }[];
+      };
+      read_shared_restaurant_invoice: {
+        Args: { p_token_hash: string };
+        Returns: unknown;
+      };
+      operational_schema_readiness: { Args: Record<string, never>; Returns: Record<string, boolean> };
+      list_restaurant_irp_reconciliation: {
+        Args: Record<string, never>;
+        Returns: {
+          invoice_id: string;
+          restaurant_id: string;
+          invoice_number: string;
+          document_type: string;
+          irp_status: string;
+          is_b2b: boolean;
+          issued_at: string;
+          last_attempt_at: string | null;
+          attempt_count: number;
+        }[];
+      };
+      reserve_staff_tts_attempt: {
+        Args: { p_restaurant_id: string };
+        Returns: { allowed: boolean; retry_after_seconds: number }[];
+      };
+      table_order_activity: {
+        Args: { p_restaurant_id: string };
+        Returns: { table_id: string; order_count: number; last_order_at: string | null }[];
+      };
+      /** Atomic shared rate-limit counter; service role only. */
+      hit_rate_limit: {
+        Args: { p_key: string; p_limit: number; p_window_seconds: number };
+        Returns: { allowed: boolean; retry_after_seconds: number }[];
+      };
+      /** One cross-device winner for a kitchen announcement; staff role is checked in SQL. */
+      claim_kitchen_order_announcement: {
+        Args: { p_order_id: string };
+        Returns: boolean;
+      };
+      record_kitchen_announcement_result: {
+        Args: { p_order_id: string; p_status: 'announced' | 'failed'; p_failure_reason?: string | null };
+        Returns: boolean;
+      };
+      call_waiter: {
+        Args: { p_session_token: string; p_request_key: string };
+        Returns: string;
+      };
+      claim_table_waiter_call_announcement: {
+        Args: { p_call_id: string };
+        Returns: boolean;
+      };
+      record_table_waiter_call_announcement: {
+        Args: { p_call_id: string; p_status: 'announced' | 'failed'; p_failure_reason?: string | null };
+        Returns: boolean;
+      };
+      resolve_table_waiter_call: {
+        Args: { p_call_id: string };
+        Returns: boolean;
+      };
+      /**
+       * Migration 20261103000100. Publish the menu + brand pair in ONE
+       * transaction: the restaurants row is only ever rewritten from here, so
+       * a half-published version is not representable. Idempotent — a repeat
+       * call on the same pair returns { ok, already: true } with no second
+       * history row. Returns a status object instead of raising for guest
+       * causes, the same convention as verify_table_qr_with_code.
+       */
+      publish_menu_brand_pair: {
+        Args: { p_menu_id: string; p_brand_profile_id: string };
+        Returns: { ok: boolean; already: boolean; reason?: string };
+      };
+      /**
+       * Migration 20261103000100. Restore the previous live menu+brand pair
+       * from the snapshot in restaurant_publish_history. Idempotent: a second
+       * call with nothing newer to undo returns { ok, already: true }.
+       */
+      rollback_last_publish: {
+        Args: { p_restaurant_id: string };
+        Returns: { ok: boolean; already: boolean; reason?: string };
+      };
+      /**
+       * Migration 20261028000900. Mints a table session from a scanned card,
+       * for restaurants whose guest_verification_mode is 'scan_confirm' or
+       * 'scan'. Refuses in 'code' mode, which is the default -- so a client
+       * calling this unconditionally is harmless.
+       *
+       * Returns a status word rather than raising, for the same reason
+       * verify_table_qr_with_code does: a refused scan is a normal answer, not
+       * an error the guest should see a stack trace for.
+       *
+       * 'opened' is the only success. Everything else is a reason to fall
+       * through to the menu and let the order path decide.
+       */
+      open_table_session: {
+        Args: { p_public_token: string; p_ip_hash: string };
+        Returns: {
+          status: 'opened' | 'code' | 'revoked' | 'notserving' | 'nomenu' | 'limited' | 'unreadable';
+          session_token: string | null;
+          restaurant_slug: string | null;
+          table_label: string | null;
+          expires_at: string | null;
+        }[];
+      };
+      /**
+       * Migration 20261028000900. Accept every held ticket in one table
+       * sitting, in one statement, and report how many were actually changed.
+       *
+       * Idempotent by construction: the UPDATE matches only rows with
+       * confirmed_at is null, so a second tap from a second tablet changes
+       * zero rows and returns zero. Callers must treat 0 as "already
+       * confirmed", not as a failure.
+       */
+      confirm_table_orders: {
+        Args: { p_table_session_id: string };
+        Returns: number;
+      };
+      /**
+       * Migration 20261028000900. Cancel held tickets for a sitting that staff
+       * say is not theirs. Only unconfirmed, still-open rows are touched.
+       */
+      reject_table_orders: {
+        Args: { p_table_session_id: string; p_reason?: string | null };
+        Returns: number;
+      };
+      /**
+       * Whether writes are allowed for this restaurant right now.
+       *
+       * False once a trial has ended with no active subscription. Every write
+       * policy on the staff tables is written as
+       * `has_restaurant_role(...) and restaurant_can_write(restaurant_id)`, so
+       * this is the single question a screen has to ask before offering a
+       * button that writes. Signature checked against the live database.
+       */
+      restaurant_can_write: {
+        Args: { p_restaurant_id: string };
+        Returns: boolean;
+      };
+      /**
+       * Migration 20261029000100. Mint a staff invitation and return the code
+       * ONCE. The database keeps only its sha256; there is no way to read it
+       * back, so a screen that loses this value must mint a new one.
+       *
+       * Raises for an owner role, for a manager inviting a manager, and for a
+       * caller who is not owner/manager of that restaurant.
+       */
+      create_staff_invite: {
+        Args: { p_restaurant_id: string; p_role: Exclude<MemberRole, 'owner'>; p_days?: number };
+        Returns: string;
+      };
+      /**
+       * Migration 20261029000100. What a link is, without consuming it.
+       * Requires a signed-in caller, so an anonymous holder of a guessed link
+       * learns nothing -- not even whether it exists.
+       */
+      preview_staff_invite: {
+        Args: { p_code: string };
+        Returns: Array<{
+          status: 'ok' | 'already_member' | 'used' | 'expired' | 'revoked' | 'closed' | 'not_found' | 'rate_limited';
+          restaurant_id: string | null;
+          restaurant_name: string | null;
+          role: MemberRole | null;
+          expires_at: string | null;
+        }>;
+      };
+      /** Migration 20261029000100. Single use, single transaction, race-safe. */
+      redeem_staff_invite: {
+        Args: { p_code: string };
+        Returns: Array<{
+          status: 'ok' | 'already_member' | 'used' | 'expired' | 'revoked' | 'closed' | 'not_found' | 'rate_limited';
+          restaurant_id: string | null;
+          restaurant_name: string | null;
+          role: MemberRole | null;
+        }>;
+      };
+      /** Owner/manager-only, read-only staff security audit history. */
+      list_staff_security_audit: {
+        Args: { p_restaurant_id: string; p_limit?: number };
+        Returns: Array<{
+          id: string;
+          actor_id: string | null;
+          event_type: string;
+          target_type: 'staff_invite' | 'membership';
+          target_id: string;
+          metadata: Record<string, unknown>;
+          created_at: string;
+        }>;
+      };
+      /** Migration 20261029000100. Returns 'revoked' | 'used' | 'not_found'. */
+      revoke_staff_invite: {
+        Args: { p_invite_id: string };
+        Returns: string;
+      };
+      /** Migration 20261029000100. Owner only; refuses to remove the last owner. */
+      remove_staff_member: {
+        Args: { p_membership_id: string };
+        Returns: string;
+      };
+      /**
+       * Migration 20261029000100. The People screen's only read of the team.
+       * A definer function rather than a wider profiles policy, so a
+       * co-worker's phone number is never exposed to the team list.
+       */
+      list_staff_members: {
+        Args: { p_restaurant_id: string };
+        Returns: Array<{
+          membership_id: string;
+          user_id: string;
+          role: MemberRole;
+          full_name: string | null;
+          email: string | null;
+          joined_at: string;
+          is_self: boolean;
+        }>;
+      };
+      /**
+       * Signature verified against the live database on 2026-10-20. It takes
+       * a table-verification SESSION token, not a restaurant slug and a table
+       * token as this file previously claimed -- the QR flow was reworked into
+       * table_verification_sessions after migration 0001 was written.
+       */
+      place_order: {
+        Args: {
+          p_session_token: string;
+          p_items: unknown; // jsonb: [{item_id, qty, variant_id?, addons?}]
+          p_note?: string | null;
+        };
+        Returns: string; // new order id (uuid)
+      };
+      /** Counter order that is never tied to a table: takeaway / walk-in. */
+      place_counter_order: {
+        Args: {
+          p_restaurant_slug: string;
+          p_items: unknown; // jsonb
+          p_note?: string | null;
+        };
+        Returns: string; // new order id (uuid)
+      };
+      /**
+       * The ONLY way money is taken at the counter. Atomic: inserts the
+       * payment, settles the order and writes an audit event in one
+       * transaction.
+       *
+       * Three things it enforces that the application must not duplicate:
+       *   - the caller must be owner, manager or cashier
+       *   - p_amount_paise must EXACTLY equal the outstanding balance, so
+       *     there is no "amount received" and no change to compute
+       *   - p_idempotency_key makes a retry return the original payment
+       *     instead of charging twice. Generate it ONCE per attempt, on the
+       *     client, and reuse it if the call is retried.
+       *
+       * CASH ONLY. The payments table allows card/upi/online, but this
+       * function hardcodes method = 'cash'. See app/cashier/actions.ts.
+       */
+      /**
+       * Migration 20261023000900. What a scanned card is for, before anything
+       * is proved: restaurant name, table label, and how often the on-site
+       * code changes.
+       *
+       * Returns NO ROW rather than an error for a token that is unknown,
+       * revoked, or belongs to a table that is out of service -- the
+       * verification screen needs to distinguish "not a table" from "you
+       * typed the code wrong", and a raised exception would collapse both
+       * into one.
+       *
+       * Creates nothing and grants nothing.
+       */
+      public_qr_intro: {
+        Args: { p_public_token: string };
+        Returns: {
+          restaurant_slug: string;
+          restaurant_name: string;
+          table_label: string;
+          window_seconds: number;
+        }[];
+      };
+      /**
+       * Migration 20261023000900. THE ONLY WAY a table session is minted.
+       *
+       * Replaces verify_table_qr, which this migration drops: that function
+       * took a scanned token as sufficient proof, so a photograph of a card
+       * ordered from anywhere. This one also requires the short code showing
+       * on a screen inside the restaurant.
+       *
+       * The token in the URL is printed on the table and is not a secret.
+       * What comes back on success is: 64 hex characters, generated inside
+       * the database, handed over once and stored there only as a SHA-256
+       * hash. It expires after 59 minutes, and revoking the QR code revokes
+       * every session issued against it.
+       *
+       * FAILURES COME BACK AS A STATUS, NOT AS AN ERROR
+       *
+       * An earlier version raised P0001, which rolled back the rate-limit
+       * attempt it had just recorded -- so a wrong code left no trace and the
+       * limiter could never fire. This one returns a row every time.
+       *
+       *   ok          session_token etc. are set
+       *   unreadable  not a card token
+       *   revoked     card or table out of service
+       *   notserving  restaurant paused or read-only
+       *   nomenu      nothing published
+       *   nosetup     the restaurant has no on-site code yet
+       *   limited     too many attempts from this address
+       *   wrong       digits did not match; code_rotated says whether that
+       *               wrong code was the one that replaced the secret
+       *
+       * p_ip_hash must be 64 hex characters -- sha256 of the caller's
+       * address, salted with the token. Rate limited per code and per IP
+       * hash: five attempts in fifteen minutes, then a fifteen minute block.
+       * A wrong code also counts against the restaurant: twenty inside one
+       * code window rotates the secret, which is what stops a guesser with
+       * many addresses from working through a million combinations.
+       *
+       * Anything that is not a guest-caused failure (a constraint, a
+       * permission error) still raises, and the caller turns that into one
+       * fixed sentence.
+       */
+      verify_table_qr_with_code: {
+        Args: {
+          p_public_token: string;
+          p_code: string;
+          p_ip_hash: string;
+        };
+        Returns: {
+          /** See the list above. Kept as string: a status added later must
+           *  not break the build, it must fall through to the failure page. */
+          status: string;
+          session_token: string | null;
+          restaurant_slug: string | null;
+          table_label: string | null;
+          expires_at: string | null;
+          retry_after_seconds: number | null;
+          code_rotated: boolean | null;
+        }[];
+      };
+      /**
+       * Migration 20261023000900. The read gate.
+       *
+       * Resolves a cookie's token against the live database -- expiry,
+       * revocation, table still active, card still live, restaurant still
+       * open. Returns no row for anything that does not hold, which is why
+       * every guest page asks this instead of trusting the cookie.
+       *
+       * Granted to anon: a guest has no account, and the token itself is the
+       * only credential it will ever have.
+       */
+      current_table_session: {
+        Args: { p_token: string };
+        Returns: {
+          restaurant_id: string;
+          restaurant_slug: string;
+          table_id: string;
+          table_label: string;
+          expires_at: string;
+        }[];
+      };
+      /**
+       * Migration 20261023000900. The six digits showing on the screen inside
+       * the restaurant, for staff to read out or point at.
+       *
+       * Granted to authenticated only, and SECURITY DEFINER with a membership
+       * check in the body: under definer rights RLS is suspended, so the body
+       * is the only thing between a signed-in caller and another restaurant's
+       * secret. A guest must never be able to call this -- if they could, the
+       * code would prove nothing.
+       *
+       * Creates the restaurant's secret on first call, so a restaurant that
+       * has never opened this screen can still show a code.
+       */
+      current_verification_code: {
+        Args: { p_restaurant_id: string };
+        Returns: {
+          code: string;
+          expires_at: string;
+          window_seconds: number;
+        }[];
+      };
+      /**
+       * Migration 20261023000900. A new secret, therefore a new code, without
+       * waiting for the window to roll. Owner and manager only -- it is the
+       * way a code that leaked (someone read it out over the phone) is taken
+       * out of service.
+       *
+       * Rotating does not revoke sessions already issued: the guest at that
+       * table has proved presence and keeps their hour.
+       */
+      rotate_verification_code: {
+        Args: { p_restaurant_id: string };
+        Returns: {
+          code: string;
+          expires_at: string;
+          window_seconds: number;
+        }[];
+      };
+      /**
+       * Migration 0007. Replace a table's printed code, and take one out of
+       * service.
+       *
+       * Both are SECURITY DEFINER and both check membership against the
+       * session before touching anything, which is the only thing that makes
+       * them safe to grant: under SECURITY DEFINER, RLS is suspended inside
+       * the function body, so a missing check would let any signed-in user
+       * rotate -- and read back -- the live code for any table anywhere.
+       *
+       * Neither is granted to anon. A guest scans codes; only staff issue
+       * them.
+       *
+       * Rotation revokes the old code before inserting the new one, in one
+       * transaction. Split across two client writes, a failure between them
+       * would leave the table with no live code at all.
+       *
+       * Both raise 42501 'You do not manage this restaurant.' and P0002
+       * 'That table does not exist.' -- staff-facing, unlike the guest path,
+       * which returns status words and never raises for anything a guest can
+       * cause.
+       */
+      rotate_table_qr_code: {
+        Args: { p_table_id: string };
+        /** The new public token, so the caller can re-render the card. */
+        Returns: string;
+      };
+      retire_table_qr_code: {
+        Args: { p_table_id: string };
+        Returns: undefined;
+      };
+      /**
+       * Migration 0009. Sales aggregates for one restaurant and one range.
+       *
+       * Returns jsonb rather than a row set because the shape is nested:
+       * totals, a bucket series, item and category rankings, payment methods
+       * and the order ledger all in one round trip. Fetching those separately
+       * would be a join the app has to do by hand, chunking order ids into
+       * `.in()` lists -- and a long range would silently truncate.
+       *
+       * SECURITY DEFINER with `is_member()` inside, because RLS is suspended
+       * in the body. Granted to authenticated only; anon gets 42501.
+       *
+       * `p_bucket` is 'hour' or 'day'. `p_include_lines` adds every order line
+       * in the range, which is only wanted for the CSV export -- it is a much
+       * bigger payload than the screen needs.
+       */
+      report_sales: {
+        Args: {
+          p_restaurant_id: string;
+          p_from: string;
+          p_to: string;
+          p_timezone?: string;
+          p_bucket?: 'hour' | 'day';
+          p_order_limit?: number;
+          p_include_lines?: boolean;
+        };
+        Returns: unknown; // jsonb; parsed by lib/db/reports.ts
+      };
+      /**
+       * Migration 0005. The only way a signed-out diner places an order.
+       *
+       * The orders and order_items tables have NO insert policy for anon --
+       * under RLS a missing policy means denied, and a permissive one would
+       * let a guest name their own unit_price_paise or attach lines to
+       * somebody else's order. So the write goes through here instead.
+       *
+       * What makes it safe to expose to anon:
+       *   - it takes dish ids and quantities, never prices or totals
+       *   - every price is read from items, scoped to this restaurant's
+       *     published menu, so a dish from another kitchen cannot be ordered
+       *   - tax is restaurants.tax_rate_bps, the same column
+       *     place_counter_order reads -- 5% is only the fallback
+       *   - order and lines commit in one transaction, so a ticket can never
+       *     reach the kitchen pass with nothing on it
+       *   - it rejects a restaurant in read-only mode
+       *
+       * Raises P0001 with a customer-readable message for the failures a
+       * customer can cause (no items, sold out, unknown restaurant), so the
+       * action passes those through and logs everything else.
+       *
+       * Returns the human-facing code, e.g. 'MA-K3F9Q'.
+       *
+       * Migration 0006 adds p_session_token. Pass the token from
+       * verify_table_qr_with_code and the order is stamped with that table,
+       * which is what lets the kitchen board say which table a ticket belongs
+       * to. Migration 20261023000900 makes it REQUIRED here: this is the
+       * signed-out guest path, and a guest who has not proved they are in the
+       * restaurant has no business creating an order. Staff counter orders go
+       * through place_counter_order, which needs no table session and is
+       * untouched. The token decides the restaurant, and the slug is only
+       * checked for agreement.
+       */
+      /**
+       * P6: issues the immutable non-GST receipt for a closed table session.
+       * The database reads ticket/payment rows and allocates its own number.
+       */
+      issue_closed_session_receipt: {
+        Args: { p_order_session_id: string; p_recipient?: Json | null };
+        Returns: string;
+      };
+      /** P8: closes a table and issues/returns its receipt in one transaction. */
+      close_order_session_and_issue_receipt: {
+        Args: { p_order_session_id: string; p_recipient?: Json | null };
+        Returns: string;
+      };
+      /** P6: owner/manager-only void that preserves the number and snapshot. */
+      void_restaurant_invoice: {
+        Args: { p_invoice_id: string; p_reason: string };
+        Returns: undefined;
+      };
+      /**
+       * Migration 20261114000500. Credit/debit notes against GST documents.
+       * Owner/manager only; immutable; one live note of each kind per source
+       * document; CN/DN number series allocated transactionally.
+       */
+      issue_invoice_note: {
+        Args: { p_invoice_id: string; p_document_type: 'credit_note' | 'debit_note'; p_reason_code: 'returned_supply' | 'quantity_difference' | 'rate_difference' | 'post_supply_change' | 'other'; p_reason: string };
+        Returns: string;
+      };
+      void_invoice_note: {
+        Args: { p_note_id: string; p_reason: string };
+        Returns: undefined;
+      };
+      record_restaurant_irp_request: {
+        Args: { p_invoice_id: string; p_provider: string; p_payload_version: string; p_status: 'payload_built' | 'submitted' | 'accepted' | 'rejected' | 'transport_error'; p_request_sha256?: string | null; p_response_sha256?: string | null; p_error_code?: string | null; p_error_message?: string | null };
+        Returns: string;
+      };
+      record_note_irp_request: {
+        Args: { p_note_id: string; p_provider: string; p_payload_version: string; p_status: 'payload_built' | 'submitted' | 'accepted' | 'rejected' | 'transport_error'; p_request_sha256?: string | null; p_response_sha256?: string | null; p_error_code?: string | null; p_error_message?: string | null };
+        Returns: string;
+      };
+      /**
+       * P4: one authenticated staff tick settles every remaining order in an
+       * open table session. No amount, method, restaurant or actor comes from
+       * the browser; the function derives all of them and stores a manual
+       * ledger/audit entry transactionally.
+       */
+      mark_order_session_paid: {
+        Args: { p_order_session_id: string };
+        Returns: string;
+      };
+      place_public_order_attempt: {
+        Args: { p_slug: string; p_lines: unknown; p_note?: string | null; p_session_token?: string | null; p_guest_token?: string | null; p_ip_hash?: string | null };
+        Returns: unknown;
+      };
+      place_public_order: {
+        Args: {
+          p_slug: string;
+          p_lines: unknown; // jsonb: [{item_id, qty}]
+          p_note?: string | null;
+          p_session_token?: string | null;
+          /**
+           * Migration 00600. The guest's own credential for the order, made by
+           * the caller and stored on the row. Without it the order is created
+           * but the guest cannot read, change or cancel it afterwards.
+           */
+          p_guest_token?: string | null;
+        };
+        Returns: string; // order code
+      };
+      /**
+       * Migration 20261022000800. What this guest still owes, and whether the
+       * restaurant has switched online payment on.
+       *
+       * SECURITY DEFINER, granted to service_role only: the browser reaches it
+       * through a server action. The guest token is the credential; a wrong
+       * token returns null, never an error that distinguishes the two cases.
+       */
+      public_online_due: {
+        Args: { p_slug: string; p_code: string; p_token: string };
+        Returns: unknown;
+      };
+      /**
+       * Migration 20261022000800. Record an online attempt as pending, after
+       * the provider has issued its own order id.
+       *
+       * The amount must equal the outstanding balance computed here, so a
+       * provider order created for a stale amount cannot be attached.
+       * Idempotent on (provider, provider_order_ref).
+       */
+      begin_online_payment: {
+        Args: {
+          p_provider: string;
+          p_provider_order_ref: string;
+          p_slug: string;
+          p_order_id: string;
+          p_guest_token: string;
+          p_amount_paise: number;
+        };
+        Returns: string; // payment id
+      };
+      /**
+       * Migration 20261022000800. Settle: the money is real.
+       *
+       * Called only after a signature has been verified — the checkout
+       * callback with the key secret, the webhook with the webhook secret.
+       * Idempotent on the provider order id, because both fire for the same
+       * payment and only the first one should move anything.
+       *
+       * A null p_amount_paise means "the attempt's own amount" and is what the
+       * checkout callback sends; the webhook sends the provider's number and
+       * is held to it.
+       */
+      settle_online_payment: {
+        Args: {
+          p_provider: string;
+          p_provider_order_ref: string;
+          p_provider_payment_ref: string;
+          p_amount_paise?: number | null;
+        };
+        Returns: string; // payment id
+      };
+      /**
+       * Migration 00600. One order, for its guest.
+       *
+       * SECURITY DEFINER and gated on the token: the guest has no session, so
+       * the token is the credential. Returns null when the token does not
+       * match, which is also what a wrong code returns -- never confirm which.
+       *
+       * jsonb rather than a row set, so the lines arrive with the order in one
+       * round trip. The shape is described by PublicOrderPayload in
+       * lib/db/order-screen.ts.
+       */
+      get_public_order: {
+        Args: { p_slug: string; p_code: string; p_token: string };
+        Returns: unknown;
+      };
+      /**
+       * Migration 00600. Cancel, as the guest (token) or as staff (session).
+       *
+       * Refuses a paid order for everyone: undoing money is a refund, and this
+       * build has none. Refuses a guest outside ten minutes or after the
+       * kitchen has started. Cancelling twice returns already = true rather
+       * than raising, because two people press the same button.
+       */
+      cancel_order: {
+        Args: {
+          p_order_id: string;
+          p_guest_token?: string | null;
+          p_reason?: string | null;
+        };
+        Returns: unknown;
+      };
+      /**
+       * Migration 00600. Change quantities on a ticket the kitchen has not
+       * started. Pure arithmetic on the order's own snapshots: no menu is read
+       * and no price comes from the caller.
+       */
+      set_order_line_quantities: {
+        Args: {
+          p_order_id: string;
+          p_lines: unknown; // jsonb: [{line_id, qty}] -- qty 0 removes the line
+          p_guest_token?: string | null;
+        };
+        Returns: unknown;
+      };
+      record_cash_payment: {
+        Args: {
+          p_restaurant_slug: string;
+          p_order_id: string;
+          p_amount_paise: number;
+          p_idempotency_key: string;
+        };
+        Returns: string; // payment id (uuid)
+      };
+      /**
+       * Migration 0004. The one the counter actually uses: same guarantees as
+       * record_cash_payment but takes a method, so card and UPI work too.
+       *
+       *   - caller must be owner, manager or cashier
+       *   - p_amount_paise must EXACTLY equal the outstanding balance
+       *   - p_idempotency_key makes a retry return the original payment
+       *     instead of charging twice. Generate it ONCE per attempt, on the
+       *     client, and reuse it if the call is retried.
+       *   - p_method is part of the idempotency key, so a cash attempt and a
+       *     card attempt cannot be answered with each other's payment.
+       *
+       * 'online' is rejected here on purpose. An online payment is initiated
+       * by the guest through a provider and arrives by webhook with a
+       * provider reference; a cashier must not be able to record one.
+       */
+      record_counter_payment: {
+        Args: {
+          p_restaurant_slug: string;
+          p_order_id: string;
+          p_method: 'cash' | 'card' | 'upi';
+          p_amount_paise: number;
+          p_idempotency_key: string;
+        };
+        Returns: string; // payment id (uuid)
+      };
+      /**
+       * Migration 00700, re-declared by 20261110001000 (Model C).
+       *
+       * Open a second, third ... outlet on the same account.
+       *
+       * SECURITY DEFINER because there is no INSERT policy on restaurants: the
+       * function creates the restaurant, an owner membership and a starter
+       * menu in one transaction, validates the name and slug itself, and
+       * attaches the outlet to the caller's ACCOUNT. Since Model C the cap is
+       * the account plan's outlet limit (Starter 1, Professional 5, Business
+       * unlimited), enforced at creation time only -- a plan change never
+       * removes an outlet that already exists.
+       */
+      create_outlet: {
+        Args: {
+          p_name: string;
+          p_slug: string;
+        };
+        Returns: string; // new restaurant id (uuid)
+      };
+      /**
+       * Migration 20261110001000. Manual activation: there is no payment
+       * provider in this deployment, so an operator with the service role
+       * records a subscription arranged off-line. Service role only.
+       */
+      admin_set_subscription: {
+        Args: {
+          p_restaurant_name: string;
+          p_plan: string;
+          p_days?: number | null;
+          p_months?: number | null;
+        };
+        Returns: {
+          account_id: string;
+          plan: string;
+          plan_status: string;
+          trial_ends_at: string | null;
+          plan_expires_at: string | null;
+          outlets: number;
+        } | null;
+      };
+      /**
+       * Migration 20261110001000. Signup: account + first outlet + owner
+       * membership + starter menu in one transaction. Service role only, so a
+       * guest cannot mint a subscription by calling it.
+       */
+      create_account_with_restaurant: {
+        Args: {
+          p_name: string;
+          p_slug: string;
+          p_timezone?: string | null;
+          p_owner?: string | null;
+        };
+        Returns: string;
+      };
+      /**
+       * Membership-checked operational entitlement read. Every staff role gets
+       * can_write/read_only/features; only Owner/Manager also receive plan,
+       * trial dates, account id and outlet allowance.
+       */
+      restaurant_access: {
+        Args: { p_restaurant_id: string };
+        Returns: {
+          plan?: string;
+          status?: string;
+          trial_ends_at?: string | null;
+          plan_expires_at?: string | null;
+          days_remaining?: number;
+          can_write: boolean;
+          read_only: boolean;
+          features: string[];
+          account_id?: string | null;
+          outlets?: {
+            used: number;
+            limit: number | null;
+            unlimited: boolean;
+            remaining: number | null;
+          } | null;
+        } | null;
+      };
+      /** Migration 20261026001200. The entitlement matrix for one plan. */
+      plan_features: {
+        Args: { p_plan: string };
+        Returns: string[];
+      };
+      restaurant_features: {
+        Args: { p_restaurant_id: string };
+        Returns: string[];
+      };
+      restaurant_has_feature: {
+        Args: { p_restaurant_id: string; p_feature: string };
+        Returns: boolean;
+      };
+    };
+    Enums: {
+      member_role: MemberRole;
+      prep_status: PrepStatus;
+      payment_status: PaymentStatus;
+    };
+    CompositeTypes: Record<string, never>;
+  };
+};

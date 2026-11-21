@@ -1,0 +1,20 @@
+{
+  "captured_at": "2026-11-15",
+  "project_ref": "juwyhslzchjevqkdvwjm",
+  "target": "staging (autodinetest) \u2014 NOT production (bdbaqpevwmgdvghszjno), never touched",
+  "purpose": "Pre-apply rollback artifact for S4 of the report_sales rehearsal (docs/report-sales-staging-rehearsal-2026-11-14.md)",
+  "signature": "report_sales(uuid,timestamp with time zone,timestamp with time zone,text,text,integer,boolean)",
+  "result_type": "jsonb",
+  "security_definer": true,
+  "volatility": "s",
+  "runtime_config": [
+    "search_path=public"
+  ],
+  "owner": "postgres",
+  "body_md5": "8f3c9ddd35b47c1ce6b966c675e1e843",
+  "comment": "Aggregated sales for one restaurant and one time range. Members only. Billed and collected are reported separately on purpose.",
+  "execute_grantees": "authenticated, postgres, service_role",
+  "repo_verified_identical_source": "supabase/migrations/20261021000009_report_sales.sql replays to body_md5 8f3c9ddd35b47c1ce6b966c675e1e843; use it (not this transcription) as the byte-exact rollback source; re-verify body_md5 after any rollback",
+  "pre_fix_ledger_note": "staging schema_migrations held 10 entries at capture time (six documented baselines plus operational_readiness_catalog_probe 2026-11-09 and owner_billing_configuration_guard 2026-11-13); neither touched report_sales \u2014 md5 matches the pre-fix repository body byte-exactly",
+  "capture_query": "pg_get_functiondef scoped to public.report_sales via Supabase execute_query connector (read-only)"
+}

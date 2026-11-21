@@ -1,0 +1,87 @@
+import Link from 'next/link';
+import { GuestNote, GuestNoteActions, GuestNoteCta, GuestNoteGhost, GuestNoteText } from '@/components/GuestNote';
+
+/**
+ * Shown instead of a menu when the guest has not proved they are at a table.
+ *
+ * WHY A SCREEN AND NOT A 404
+ *
+ * This used to be no screen at all: /menu rendered the real menu for anyone
+ * who opened the link, and only the table badge depended on the session. A
+ * forwarded link worked, so the menu was a public web page with an ordering
+ * form attached and nothing saying otherwise.
+ *
+ * The menu now needs a verified table, which means the ordinary case -- a
+ * guest pasting a link, or opening one from a message -- has to be told
+ * something true and useful. "Not found" would be a lie: the restaurant is
+ * right there. It is the table that is missing.
+ *
+ * Three states, three sentences:
+ *
+ *   none         never scanned. The fix is the QR code on the table.
+ *   stale        had a session, it has ended or was never for this table.
+ *                Offer the code form again when we still know which card.
+ *   unavailable  the database could not be asked. Not the guest's fault, and
+ *                re-scanning would fail the same way, so say "try again".
+ */
+export type TableGateReason = 'none' | 'stale' | 'unavailable';
+
+const COPY: Record<TableGateReason, { title: string; detail: string }> = {
+  none: {
+    title: 'Open this menu from your table',
+    detail:
+      'Scan the QR code on your table to see the menu and order. The menu opens straight away — the six-digit code from inside the restaurant is only asked for when you place the order.',
+  },
+  stale: {
+    title: 'Your table session has ended',
+    detail:
+      'Sessions last about an hour so a table cannot be ordered from after the guests have left. Scan the QR code on your table again — the menu opens straight away, and the current code is asked for when you place an order.',
+  },
+  unavailable: {
+    title: 'We could not check your table',
+    detail:
+      'Something on our side did not answer. Please try again in a moment, or order with staff — the kitchen is still open.',
+  },
+};
+
+export function TableGateScreen({
+  reason,
+  verifyHref,
+}: {
+  reason: TableGateReason;
+  /** Back to /t/<card token>, when the session still remembers which card it was. */
+  verifyHref?: string | null;
+}) {
+  const copy = COPY[reason];
+
+  // Where this screen sits in the three steps. A guest who never scanned is on
+  // step one; one whose session ended still has their card, so the next thing
+  // they do is enter the code (or scan again, which the copy also says).
+  return (
+    <GuestNote
+      eyebrow="Table access"
+      title={copy.title}
+      steps={reason === 'none' ? 'scan' : 'code'}
+      foot={
+        <>
+          Behind the counter? Your own menu lives in the{' '}
+          <Link href="/dashboard/menus">dashboard</Link>.
+        </>
+      }
+    >
+      <GuestNoteText>{copy.detail}</GuestNoteText>
+
+      <GuestNoteActions>
+        {/* The only thing a guest can DO here is re-enter the code, and only
+            when we still know which card they scanned. The dashboard used to
+            be the primary button on this screen, which handed a guest whose
+            code had expired the least useful action available. It stays in
+            the footnote, where staff look for it. */}
+        {verifyHref ? <GuestNoteCta href={verifyHref}>Enter the code again</GuestNoteCta> : null}
+        {/* Not able to scan? There is still something to look at, and it is
+            labelled as a sample rather than as this restaurant's menu. */}
+        <GuestNoteGhost href="/demo/menu">See what a menu looks like</GuestNoteGhost>
+      </GuestNoteActions>
+    </GuestNote>
+  );
+}

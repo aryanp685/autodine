@@ -1,0 +1,74 @@
+{
+  "description": "Point-in-time evidence about the hosted production project, used as a fixture by scripts/reconcile/reconcile-migrations.mjs. That script never connects to a hosted database. Nothing here proves the current live schema: every item is a dated observation and must be re-confirmed by an authorised read-only probe before any rollout. The companion catalog snapshot scripts/reconcile/evidence/production-2026-11-14-catalog-probe.json (read-only queries, 2026-11-14) supersedes catalogFacts for `classify`.",
+  "project": "autodine-production",
+  "capturedOn": "2026-11-14",
+  "ledgerSummary": {
+    "source": "Supabase migration-history metadata, read once on 2026-11-14 via the read-only list_migrations connector call (project bdbaqpevwmgdvghszjno).",
+    "entries": 121,
+    "firstEntry": "20261019000001 init",
+    "lastEntry": "20261112000100 (no name recorded)",
+    "fullListRetained": false,
+    "observations": [
+      "35 ledger entries were added between 2026-11-10 (86 entries, last 20261108000200) and 2026-11-14 (121 entries, last 20261112000100).",
+      "All entries from 20261108000300 onward carry no name, so name matching is impossible for them; matching is by version only.",
+      "Many entries still carry console-generated versions and repeated names, and some names do not exist in the repository (for example initial_schema, trial_entitlements, counter_orders, cash_collection).",
+      "Because production SQL was applied under other names and versions, 'no same-named entry' does not prove a file's SQL was never run."
+    ]
+  },
+  "lastRecordedVersion": "20261112000100",
+  "catalogFacts": {
+    "source": "UNCHANGED from the 2026-11-10 fixture (Phase 2 read-only catalog inspection). NOT re-observed for the function bodies listed here; the 2026-11-14 catalog probe supersedes these facts for classification purposes.",
+    "functionSourceMd5": {
+      "cancel_order": "c985a21c24240de3b1c7386bbd01a5aa",
+      "open_table_session": "1e28252b1852ad094c636198f2168d0e",
+      "place_public_order": "96950f08e083e35e8e7f0ece7e1692f5",
+      "record_counter_payment": "8fe311e536fc3737be9b9b2d9ae16ed8",
+      "set_order_line_quantities": "369c4e7615aa47188763223c65315da8",
+      "settle_online_payment": "5005ec641a11ca6b6b08d8dcf9761bcb"
+    },
+    "functionsAbsent": [
+      "operational_schema_readiness",
+      "place_public_order_attempt"
+    ],
+    "functionsPresent": [
+      "hit_rate_limit(text,integer,integer)",
+      "current_table_session(text)",
+      "place_order(text,jsonb,text)",
+      "place_public_order with six arguments, executable by anon"
+    ],
+    "columnsPresent": [
+      "orders.hold_required",
+      "orders.confirmed_at",
+      "orders.order_session_id",
+      "order_sessions.paid_at",
+      "restaurant_invoices.invoice_number",
+      "restaurant_payment_receipts.snapshot",
+      "kitchen_announcement_claims.order_id"
+    ],
+    "notes": [
+      "Function-body hashes above are Phase 2 observations; the 2026-11-14 probe re-observes md5(prosrc) for every public function and is the current authority for drift detection.",
+      "The Phase 2 document reports a user-run restore of a production dump that accepted the 14 files 20261109000100..20261110000400 in one transaction after the place_order overload fix. That rehearsal was not observed by any agent and did not include the four 202611080070..10 files."
+    ]
+  },
+  "capturedThroughRepositoryVersion": "20261112000100",
+  "repositoryFilesWithoutSameNamedEntry": {
+    "method": "Each repository file version was compared with the versions in the 121-entry ledger read on 2026-11-14. Files with a null-named ledger entry at the same version are counted as recorded.",
+    "olderThanLastRecordedVersion": [
+      "20261021000004_missing_qr_tables.sql",
+      "20261107080000_payment_audit_ledger.sql"
+    ],
+    "newerThanLastRecordedVersion": [
+      "20261110000851_payment_audit_provider_actor.sql",
+      "20261110000950_online_payment_attempt_uniqueness.sql",
+      "20261110001210_checkout_outstanding_guard.sql",
+      "20261110001220_revoke_client_bypass_privileges.sql",
+      "20261112000200_immutable_restaurant_account_link.sql",
+      "20261112000300_report_sales_export_authorization.sql",
+      "20261112000400_bound_subscription_history.sql",
+      "20261112000500_serialize_outlet_creation.sql",
+      "20261112000600_serialize_subscription_payments.sql",
+      "20261112000700_serialize_subscription_expiry.sql"
+    ],
+    "note": "20261021000004 and 20261107080000 exist in the ledger with null names, so name matching is impossible and they are listed as unrecorded legacy observations, not as pending."
+  }
+}

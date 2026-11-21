@@ -1,0 +1,86 @@
+import type { Metadata } from 'next';
+import { CartProvider } from '@/components/CartProvider';
+import { Cart } from '@/components/screens/CartScreen';
+import { TableGateScreen } from '@/components/screens/TableGateScreen';
+import { getCartScreenData } from '@/lib/db/cart-screen';
+import { menuPriceItems, restaurant as demoRestaurant } from '@/lib/demo-data';
+import { isSupabaseConfigured } from '@/lib/supabase/env';
+import { loadTableAccess, verifyAgainHref } from '@/lib/table-access';
+
+export const metadata: Metadata = { title: 'Your order · AutoDine' };
+
+/**
+ * ?s=<slug> names the restaurant.
+ *
+ * The cart is mounted here rather than at the root because it is keyed by
+ * restaurant: one cart spanning two kitchens would put a dish from one on
+ * another's bill.
+ *
+ * GATED LIKE /menu -- AND NO STRICTER
+ *
+ * The cart holds the things a guest is about to order, and the button on it
+ * posts to the checkout action. An open cart page was therefore a working step
+ * of the ordering flow for somebody who never scanned anything. The database
+ * refuses a sessionless order, and the action refuses one too -- but a page
+ * that renders a "Place order" button and then fails is worse than a page that
+ * says where to scan.
+ *
+ * A guest who scanned a live card (`browse`) sees their own cart. That is not a
+ * weakening: the cart is their own browser's localStorage, the page does not
+ * write anything, and the next screen asks for the code before a single row
+ * reaches a kitchen.
+ */
+export default async function CartPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ s?: string; error?: string; code?: string }>;
+}) {
+  const { s, error, code } = await searchParams;
+
+  const access = await loadTableAccess(s);
+
+  if (access.status === 'none') return <TableGateScreen reason="none" />;
+  if (access.status === 'unavailable') return <TableGateScreen reason="unavailable" />;
+  if (access.status === 'stale') {
+    return <TableGateScreen reason="stale" verifyHref={verifyAgainHref(access)} />;
+  }
+
+  // One query, not two: the restaurants row carries the brand state too.
+  // A restaurant with no published brand paints the product's own style
+  // (lib/branding/guest-theme.ts) exactly as before.
+  const data = await getCartScreenData(s);
+
+  return (
+    <CartProvider slug={s}>
+      <Cart
+        slug={s}
+        brandState={data?.brandState}
+        restaurantName={data?.restaurantName ?? (isSupabaseConfigured ? undefined : demoRestaurant.name)}
+        // Only a verified session names a table. Demo mode can carry one from
+        // the sample cookie; a real database read decides it above.
+        tableLabel={
+          access.status === 'verified' || access.status === 'browse' ? access.tableLabel : null
+        }
+        taxRateBps={data?.gst.rateBps ?? undefined}
+        gstMode={data?.gst.mode}
+        // With no restaurant resolved on a CONFIGURED deployment: show the
+        // empty state rather than a menu of prices that came from nowhere.
+        // With no database at all, the demo menu is the only menu there is --
+        // pricing against an empty list called every dish in the guest's own
+        // cart "no longer available" and never rendered the order button.
+        items={!isSupabaseConfigured ? menuPriceItems : (data?.items ?? [])}
+        // The action redirects back here with ?error=…, so this is where the
+        // guest learns why. It renders inside the screen, under the order it
+        // is about, rather than as a banner over the guest's own header.
+        placedError={error}
+        // The class of the failure, when the action could classify it. Shown as
+        // a small reference so a failure nobody has seen before can be named
+        // from a screenshot instead of reproduced.
+        placedErrorCode={code}
+        // Browsing on a scanned card: say now that the code is coming, rather
+        // than at the last tap.
+        needsCode={access.status === 'browse'}
+      />
+    </CartProvider>
+  );
+}

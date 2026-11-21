@@ -1,0 +1,962 @@
+import Link from 'next/link';
+import type { ReactNode } from 'react';
+import { OwnerFrame } from '@/components/owner/OwnerFrame';
+import type { DashboardSection } from '@/components/shell-links';
+import type { OutletBar } from '@/lib/outlets';
+import { RouteSkeleton } from '@/components/RouteSkeleton';
+
+/**
+ * The staff-side kit.
+ *
+ * WHY A KIT AND NOT CLASS NAMES IN EVERY SCREEN
+ *
+ * Fifteen screens share one visual contract: a page frame, a hairline card, a
+ * table that holds numbers in columns, a button that is black when it is the
+ * action and a hairline when it is not. Written screen by screen, that contract
+ * drifts by the third screen -- a 13px button here, a 12px one there, one card
+ * with a shadow and nine without. Every screen before this one had its own
+ * slightly different copy of the same four things.
+ *
+ * So the shapes live here once, in Tailwind, and the screens compose them.
+ *
+ * THE SURFACE
+ *
+ * Warm paper, espresso ink, one copper. The paper is a real value
+ * (`--p-paper`) and every card is LIGHTER than it by one step, so a panel is
+ * a lit sheet lying on the page rather than a white rectangle drawn on beige.
+ * Copper means exactly two things -- "this is where you are" and "this control
+ * is on" -- and the action colour is ink, so a screen never has two objects
+ * competing for the same emphasis.
+ *
+ * The tokens come from `[data-surface='owner']` in app/globals.css, so
+ * `bg-paper` is warm here and a deeper cream on the guest flow: same utility,
+ * different surface, and the two palettes cannot leak into each other.
+ *
+ * A kit component expresses no colour, radius or shadow of its own. Every one
+ * of them reads a token, which is what lets the whole surface be retuned from
+ * one block -- and what stops the thirteenth screen from inventing its own
+ * card.
+ *
+ * WIDTH
+ *
+ * 1240px for a form, 1380px for a report. Wide enough for six table columns
+ * without horizontal scroll on a 1280 laptop, narrow enough that a line of
+ * text does not run 140 characters.
+ */
+
+/* --------------------------------------------------------------- the frame */
+
+export function OwnerPage({
+  active,
+  outlet,
+  signOut,
+  children,
+  wide = false,
+}: {
+  active?: DashboardSection;
+  outlet?: OutletBar | null;
+  signOut?: boolean;
+  children: ReactNode;
+  /** Report tables need the full width; a settings form does not. */
+  wide?: boolean;
+}) {
+  /*
+   * WHOSE JOB IS THE FRAME
+   *
+   * Since the staff layout renders `StaffShell` once, a page that renders the
+   * rail itself would draw two. `OwnerFrame` decides at render time whether
+   * this call is inside that shell (passthrough) or on its own (the whole
+   * frame, exactly as before), so a screen does not have to know where it is
+   * being mounted -- which is what keeps every screen in this product unchanged
+   * by the layout move.
+   */
+  return (
+    <OwnerFrame active={active} outlet={outlet} signOut={signOut} wide={wide}>
+      {children}
+    </OwnerFrame>
+  );
+}
+
+/**
+ * Kicker, title, one line of context, and the actions for this page.
+ *
+ * The actions sit on the same baseline as the title on a wide screen and wrap
+ * under it on a phone. They are never in both places: a screen with its
+ * primary action at the top and again at the bottom is a screen that has not
+ * decided where the action is.
+ */
+export function PageHead({
+  kicker,
+  title,
+  meta,
+  actions,
+}: {
+  kicker?: ReactNode;
+  title: ReactNode;
+  meta?: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <header className="mb-7 flex flex-col gap-5 sm:mb-8 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0">
+        {kicker ? (
+          /* A rule, then the kicker. The 18px copper dash is what turns a
+             tracked-out label into a masthead: without it the eye reads the
+             kicker as the first line of the sentence below it. */
+          /* Graphite label, blue rule. The blue in this product means "this
+             is the action", so a blue kicker would spend it on a label that
+             is not a control. The rule keeps the mark. */
+          <p className="flex items-center gap-2 text-[10.5px] font-semibold tracking-[0.18em] text-gink-46 uppercase">
+            <span aria-hidden="true" className="h-px w-[18px] bg-grass" />
+            {kicker}
+          </p>
+        ) : null}
+        {/* The one display size on a staff screen. The tracking is -0.028em,
+            not -0.045: the tighter figure was tuned for a face with a small
+            x-height and it made Inter look cramped at 44px. This is the
+            setting SF Pro Display uses at the same size, so the two agree on
+            Apple hardware and off it. */}
+        <h1 className="mt-3 text-[clamp(2rem,3vw,2.75rem)] leading-[1.05] font-semibold tracking-[-0.028em] text-balance text-gink">
+          {title}
+        </h1>
+        {meta ? (
+          <p className="mt-3 max-w-[64ch] text-[13.5px] leading-[1.6] text-gink-64">{meta}</p>
+        ) : null}
+      </div>
+      {actions ? (
+        <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:pb-1">{actions}</div>
+      ) : null}
+      {/* A rule under the masthead, fading out to the right. It is the cheapest
+          way to make a page feel composed: the header gets an edge, the content
+          begins below it, and the eye is told where one ends and the other
+          starts without a second box being drawn. */}
+      <div aria-hidden="true" className="o-rule mt-6" />
+    </header>
+  );
+}
+
+/** A section heading inside a page, above a card or a row of cards. */
+export function SectionHead({
+  title,
+  meta,
+  action,
+  className = '',
+}: {
+  title: ReactNode;
+  meta?: ReactNode;
+  action?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={['mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1', className].join(' ')}>
+      <div className="flex items-baseline gap-2.5">
+        <h2 className="text-[13.5px] font-semibold tracking-[-0.012em] text-gink">{title}</h2>
+        {meta ? <span className="text-[12.5px] text-gink-46">{meta}</span> : null}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------------- surfaces */
+
+/**
+ * The panel every staff screen is built from.
+ *
+ * A translucent surface with an inset highlight and one contact shadow -- see
+ * the owner section of app/globals.css for the tokens. It used to be a flat
+ * white card with no shadow, on the argument that a shadow on white is a
+ * smudge; on a wash, the absence of an edge is what makes a page of cards look
+ * like a page of rectangles.
+ *
+ * `lift` is for a card that opens something. A card that only changes its
+ * border on hover says nothing about being clickable.
+ */
+export function Card({
+  children,
+  className = '',
+  style,
+  lift = false,
+}: {
+  children: ReactNode;
+  className?: string;
+  /** For the one card that carries a preview's accent variables. */
+  style?: React.CSSProperties;
+  /** Set on a card that is itself a link target. */
+  lift?: boolean;
+}) {
+  /*
+   * EVERY CARD CARRIES ITS OWN LIGHT.
+   *
+   * A hairline on paper says "there is an edge here"; it does not say the card
+   * is above the page. The surface now stacks: page (deep) -> card (light) ->
+   * inset block (deeper again), and each step gets a warm contact shadow plus a
+   * 1px lit top edge, both of which live in `--p-shadow-1`.
+   *
+   * It is one shadow token, not a hand-written one per card, so the guard still
+   * holds and every panel in the product is lit from the same angle.
+   */
+  return (
+    <div
+      className={[
+        /* A slightly warm white, not pure white: on sand, #fff is a hole.
+           `--p-card` is the paper's own white and it carries the sheet. */
+        'min-w-0 rounded-[var(--p-r-card)] border border-hair bg-card shadow-[var(--p-shadow-1)]',
+        lift ? 'o-lift' : '',
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      style={style}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** A card with a heading row, for anything that is a titled block. */
+export function Panel({
+  title,
+  meta,
+  action,
+  children,
+  className = '',
+  bodyClassName = 'px-5 py-5',
+}: {
+  title: ReactNode;
+  meta?: ReactNode;
+  action?: ReactNode;
+  children: ReactNode;
+  className?: string;
+  bodyClassName?: string;
+}) {
+  return (
+    <Card className={className}>
+      {/* The header is a BAND: a warm tint one step off the card, a hairline
+          under it, a copper tick at the left edge, and the title at 13.5
+          semibold. The tick is what makes a panel read as a titled object at a
+          glance -- it is the same 2px copper mark the rail uses for "you are
+          here", so the surface has one way of saying "this is a something". */}
+      <div className="relative flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-t-[calc(var(--p-r-card)-1px)] border-b border-hair bg-[color-mix(in_oklab,var(--p-accent-wash)_60%,transparent)] px-5 py-4">
+        <span
+          aria-hidden="true"
+          className="absolute top-1/2 left-0 h-[18px] w-[3px] -translate-y-1/2 rounded-r-full bg-grass"
+        />
+        <div className="flex items-baseline gap-2.5">
+          <h2 className="text-[13.5px] font-semibold tracking-[-0.014em] text-gink">{title}</h2>
+          {meta ? <span className="text-[12.5px] text-gink-46">{meta}</span> : null}
+        </div>
+        {action}
+      </div>
+      <div className={bodyClassName}>{children}</div>
+    </Card>
+  );
+}
+
+/**
+ * A number and what it means.
+ *
+ * The figure is the one large thing on the row, set in tabular figures so a
+ * column of them does not shiver as the numbers change. The label above it is
+ * small and wide-tracked; the note below says what the number counts, because
+ * "Revenue today" over a total that excludes pending payments is a question
+ * the owner should not have to ask.
+ */
+export function Stat({
+  label,
+  value,
+  meta,
+  tone = 'plain',
+  lead = false,
+}: {
+  label: string;
+  value: ReactNode;
+  meta?: ReactNode;
+  /**
+   * `live` tints the card green: in use right now, not just a figure.
+   * `due` tints it with the alert colour: a number somebody has to act on,
+   * such as money still outstanding. Green on an unpaid total told the owner
+   * the opposite of what the figure meant.
+   */
+  tone?: 'plain' | 'live' | 'due';
+  /**
+   * The one figure the screen is about, drawn larger than its neighbours.
+   *
+   * Four equal cards is not a hierarchy; it is a grid. On the overview the
+   * day's takings are the number an owner opens the screen for, so it gets the
+   * width, the size and the only warm wash on the row. Everything else stays
+   * the same object at the same weight as its siblings.
+   */
+  lead?: boolean;
+}) {
+  return (
+    <div
+      className={[
+        'relative overflow-hidden rounded-[var(--p-r-card)] border shadow-[var(--p-shadow-1)] transition-shadow duration-200',
+        lead ? 'p-5 sm:p-6' : 'p-4 sm:p-5',
+        'sm:hover:shadow-[var(--p-shadow-2)]',
+        tone === 'live'
+          ? 'border-[color-mix(in_oklab,var(--p-accent)_26%,transparent)] bg-[color-mix(in_oklab,var(--p-accent-soft)_62%,var(--p-card))]'
+          : tone === 'due'
+            ? 'border-[color-mix(in_oklab,var(--p-due)_22%,transparent)] bg-[color-mix(in_oklab,var(--p-due)_5%,var(--p-card))]'
+            : lead
+              ? 'border-[color-mix(in_oklab,var(--p-accent)_20%,transparent)] bg-card'
+              : 'border-hair bg-card',
+      ].join(' ')}
+    >
+      {/* The lead card carries a terracotta hairline along its top edge. It is
+          one pixel and it does more than a larger number: it is the only warm
+          line on the row, so the eye lands on it before it has read a digit. */}
+      {lead ? (
+        <span
+          aria-hidden="true"
+          className="absolute inset-x-0 top-0 h-[2px] bg-[linear-gradient(to_right,var(--p-accent),color-mix(in_oklab,var(--p-accent)_18%,transparent))]"
+        />
+      ) : null}
+      {/* The lead card is the only one on the row with a warm FILL, and it is
+          a real value rather than a radial blur. The old version painted a
+          160px soft circle into the corner of the card; on a card this size it
+          did not read as light, it read as a smudge on the screenshot, and it
+          is the single thing that made the row look unfinished. */}
+      {lead ? (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-[var(--p-accent-wash)]"
+        />
+      ) : null}
+      <div
+        className={[
+          'relative',
+          lead
+            ? 'text-[10.5px] font-semibold tracking-[0.16em] text-gink-46 uppercase'
+            : 'text-[12.5px] font-medium tracking-[0.005em] text-gink-64',
+        ].join(' ')}
+      >
+        {label}
+      </div>
+      <div
+        className={[
+          'relative leading-[0.92] font-semibold tracking-[-0.055em] tabular-nums',
+          lead
+            ? 'mt-3 text-[clamp(1.9rem,4.6vw,3.3rem)]'
+            : 'mt-2.5 text-[clamp(1.6rem,2.6vw,2.2rem)]',
+          tone === 'due' ? 'text-[var(--p-due)]' : 'text-gink',
+        ].join(' ')}
+      >
+        {value}
+      </div>
+      {meta ? (
+        <div className="relative mt-2 text-[11.5px] leading-[1.45] text-gink-46">{meta}</div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * A strip that states a fact about the workspace.
+ *
+ * The overview grew three of these, each drawn by hand: the plan line, the
+ * preview notice and the "no orders yet" nudge. They had three different
+ * radii, three paddings and three ways of ending in a link, which made a screen
+ * that says at most one important thing look like an error log. This is that
+ * shape, once: a hairline card, a small marker in the tone's colour, a short
+ * bold lead, the sentence, and at most one quiet action pinned right.
+ */
+export function Notice({
+  tone = 'plain',
+  label,
+  children,
+  action,
+  /* The bottom margin is the default HERE, not in the class string below.
+     Baked into the base it could not be changed: `.mb-0` and `.mb-3` sort
+     before `.mb-4` in Tailwind's output, so nine call sites asking for no
+     margin at the end of a stack were silently given 16px. */
+  className = 'mb-4',
+  ...rest
+}: {
+  tone?: 'plain' | 'live' | 'due' | 'accent';
+  /** A short lead, bold: two or three words, or a status tag. Named `label`
+      rather than `title` so it does not shadow the div's own title attribute. */
+  label?: ReactNode;
+  children: ReactNode;
+  action?: ReactNode;
+  className?: string;
+} & Omit<React.ComponentProps<'div'>, 'children' | 'className' | 'title'>) {
+  /* A 22px disc with a glyph, not a 6px dot. On a strip that carries the plan,
+     the sample-data warning and the "no orders yet" nudge, a dot is a bullet
+     point; a mark is a status. The glyph differs per tone so the strip can be
+     read without the sentence -- and it stays aria-hidden, because the words
+     already say it. */
+  const marks = {
+    plain: 'bg-paper-deep text-gink-64',
+    live: 'bg-[var(--p-live-soft)] text-[var(--p-live)]',
+    due: 'bg-[var(--p-due-soft)] text-[var(--p-due)]',
+    accent: 'bg-[var(--p-accent-soft)] text-[var(--p-accent-strong)]',
+  } as const;
+  const glyphs = {
+    plain: <circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none" />,
+    live: <path d="m7.5 12.4 3 3 6-6.6" strokeLinecap="round" strokeLinejoin="round" />,
+    due: <path d="M12 7.5v5.5M12 16.4v.1" strokeLinecap="round" />,
+    accent: <path d="M12 7v10M7 12h10" strokeLinecap="round" />,
+  } as const;
+  const rules = {
+    plain: 'border-hair',
+    live: 'border-[color-mix(in_oklab,var(--p-live)_22%,transparent)]',
+    due: 'border-[color-mix(in_oklab,var(--p-due)_24%,transparent)]',
+    accent: 'border-[color-mix(in_oklab,var(--p-accent)_24%,transparent)]',
+  } as const;
+  return (
+    <div
+      {...rest}
+      className={[
+        'flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--p-r-block)] border bg-card px-4 py-3.5 shadow-[var(--p-shadow-1)]',
+        rules[tone],
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
+      <span
+        aria-hidden="true"
+        className={['grid size-[22px] shrink-0 place-items-center rounded-full', marks[tone]].join(' ')}
+      >
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2">
+          {glyphs[tone]}
+        </svg>
+      </span>
+      {label ? <span className="text-[12.5px] font-medium text-gink">{label}</span> : null}
+      <span className="min-w-0 text-[12.5px] leading-[1.5] text-gink-64">{children}</span>
+      {action ? <span className="ml-auto shrink-0">{action}</span> : null}
+    </div>
+  );
+}
+
+/**
+ * Nothing to show, said plainly.
+ *
+ * The dashed border is gone. A dashed rectangle is the visual grammar of a
+ * placeholder -- a box waiting for content that has not arrived yet -- and this
+ * product put one under every empty chart, every empty list and every empty
+ * report. On a screen with four of them, the page read as unfinished rather
+ * than as quiet, which is the opposite of what an empty day at a restaurant
+ * means.
+ *
+ * What replaces it: a solid hairline on the same surface as the card it sits
+ * in, a minimum height so a row of them lines up, and the message set at the
+ * same size as the body text around it instead of a shade smaller.
+ */
+/**
+ * A panel with nothing in it yet.
+ *
+ * This is the most-seen object on a new restaurant's dashboard: two of these
+ * are on the first screen until the first order lands, and a third on the
+ * counter. It used to be a 112px grey box with one line of text in the middle
+ * -- which on a warm surface read as a panel that had failed to load rather
+ * than a panel waiting for something.
+ *
+ * So it gets a MARK. A quiet line glyph in a soft terracotta disc, then the
+ * sentence, then nothing else: the empty state names what will appear here, it
+ * does not apologise for being empty and it does not invent a chart.
+ */
+export function Empty({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return (
+    <div
+      className={[
+        'grid min-h-[132px] place-items-center rounded-[var(--p-r-block)] border border-hair bg-[var(--p-paper-veil)] px-5 py-8 text-center',
+        className,
+      ].join(' ')}
+    >
+      <div className="max-w-[46ch]">
+        <span
+          aria-hidden="true"
+          className="mx-auto mb-2.5 grid size-9 place-items-center rounded-full bg-paper-deep text-gink-46"
+        >
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6">
+            <path d="M4 19V9M9.5 19V5M15 19v-7M20.5 19v-4" strokeLinecap="round" />
+          </svg>
+        </span>
+        <p className="m-0 text-[12.5px] leading-[1.6] text-gink-46">{children}</p>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ buttons */
+
+export type BtnTone = 'solid' | 'primary' | 'ghost' | 'quiet' | 'danger' | 'forest';
+export type BtnSize = 'sm' | 'md';
+
+/**
+ * The class string for a button or a link that looks like one.
+ *
+ * A string rather than a component because these appear as `<button>`,
+ * `<a>`, next/link and `<input type=submit>` across fifteen screens, and a
+ * wrapper that renders one of those four would need a prop for each. What
+ * matters is that they are identical, which the string guarantees.
+ */
+export function btn(tone: BtnTone = 'solid', size: BtnSize = 'md'): string {
+  /*
+   * PILLS, LIKE APPLE'S OWN BUTTONS.
+   *
+   * An earlier pass made actions rectangles on the argument that a pill should
+   * mean "status, not control". That was a rule about a design nobody wanted:
+   * on a white surface a rectangular action with a grey border is the shape of
+   * a form control from 2010, and a screen with four of them reads as a form,
+   * not as a product. Apple's web buttons are pills -- "Buy", "Learn more",
+   * "Get started" -- and the pill reads as a thing you press.
+   *
+   * So the geometry is 999px, the height is 36 (sm) or 44 (md), and the
+   * difference between the tones is FILL and WEIGHT, not outline:
+   *
+   *   solid    accent fill, white label -- the default action
+   *   primary  the same fill, for the one action a screen exists for
+   *   ghost    a pale grey fill, no border -- a secondary action
+   *   quiet    no fill at all, accent label -- a text button
+   *   danger   no fill, alert label, a red wash on hover
+   *
+   * NONE of them draws a border. That is the point: the platform's own 1px
+   * button border used to survive under every class string in the product (see
+   * the button reset in app/globals.css), and the fix is to have nothing to
+   * override -- a fill or a colour, never an outline.
+   *
+   * The press is still 1px of travel and the shadow still lifts, because a
+   * control that does nothing when a finger lands on it reads as disabled.
+   */
+  const base =
+    'relative inline-flex items-center justify-center gap-2 rounded-full font-medium whitespace-nowrap transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-[var(--o-ease)] before:absolute before:-inset-1 before:rounded-full before:content-[\'\'] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0 disabled:active:scale-100 active:translate-y-px active:scale-[0.98]';
+  const box = size === 'sm' ? 'h-9 px-4 text-[12.5px]' : 'h-11 px-5 text-[13px]';
+  const tones: Record<BtnTone, string> = {
+    /* ONE FILLED COLOUR IN THE PRODUCT.
+       There used to be a second filled tone -- the ink -- and it was the thing
+       that made a page look assembled from two systems: "Enable" on a table
+       card was a black pill sitting in a row of blue text actions, so the row
+       had two hierarchies and neither was obvious. A filled action is the
+       accent, full stop; the ink is for type and for the rail's scrim. */
+    solid:
+      'bg-grass text-cream hover:bg-grass-strong active:bg-grass-strong',
+    primary:
+      'bg-grass text-cream hover:bg-grass-strong active:bg-grass-strong',
+    /* The public-site action: deep forest with a white label. The product's
+       owner screens keep the grass tone; the marketing and auth surfaces use
+       this one so the premium white palette has a single, calm action colour. */
+    forest:
+      'bg-forest text-white hover:bg-forest-strong active:bg-forest-strong',
+    ghost:
+      'bg-[color-mix(in_oklab,var(--p-ink)_7%,transparent)] text-gink hover:bg-[color-mix(in_oklab,var(--p-ink)_11%,transparent)]',
+    quiet:
+      'text-[var(--p-accent)] hover:bg-[color-mix(in_oklab,var(--p-accent)_10%,transparent)]',
+    danger:
+      'text-[var(--p-due)] hover:bg-[color-mix(in_oklab,var(--p-due)_10%,transparent)]',
+  };
+  return `${base} ${box} ${tones[tone]}`;
+}
+
+/** A button that is a link. */
+export function BtnLink({
+  href,
+  tone = 'solid',
+  size = 'md',
+  children,
+  className = '',
+  ...rest
+}: {
+  href: string;
+  tone?: BtnTone;
+  size?: BtnSize;
+  children: ReactNode;
+  className?: string;
+} & Omit<React.ComponentProps<typeof Link>, 'href' | 'className' | 'children'>) {
+  return (
+    <Link href={href} className={`${btn(tone, size)} ${className}`} {...rest}>
+      {children}
+    </Link>
+  );
+}
+
+/**
+ * A single-select row of pills: the payment method, the voice speed, how to
+ * import a menu.
+ *
+ * WHY THIS IS ONE COMPONENT NOW
+ *
+ * Three screens had written this by hand -- one with `bg-paper-deep` and 12px
+ * labels, one with a bare border and 11.5px labels, one announcing itself as a
+ * tablist with no tabpanels to point at. All three meant the same thing: pick
+ * exactly one of these. Written three times, they also had three different
+ * heights, three focus rings, and one of them told a screen reader it was a tab
+ * strip.
+ *
+ * `aria-pressed` on a group of toggle buttons is the honest description of
+ * "one of these is the current choice". A tablist claim requires tabpanels,
+ * arrow-key roving and `aria-controls`; a control that switches a panel it
+ * cannot name is not a tab strip.
+ *
+ * The buttons are real buttons, so keyboard order is left to right, Enter and
+ * Space both work, and the height matches `btn('sm')` so a segmented control
+ * can sit beside a button without a step.
+ */
+export type SegmentedOption<T extends string> = {
+  value: T;
+  label: ReactNode;
+  title?: string;
+  /** Extra data attributes, for a test that needs to name one item. */
+  data?: Record<string, string>;
+};
+
+export function Segmented<T extends string>({
+  label,
+  value,
+  onChange,
+  options,
+  size = 'md',
+  fill = false,
+  className = '',
+}: {
+  /** Names the group. A group of three buttons with no name is three buttons. */
+  label: string;
+  value: T;
+  onChange: (next: T) => void;
+  options: ReadonlyArray<SegmentedOption<T>>;
+  size?: 'sm' | 'md';
+  /**
+   * Stretch to the container with equal-width items. For a control that is
+   * the screen's only navigation on a phone, where three pills huddled at the
+   * left edge are three small targets instead of one row.
+   */
+  fill?: boolean;
+  className?: string;
+}) {
+  const box = size === 'sm' ? 'h-9' : 'h-11';
+  /* Filled mode stretches across the screen, so its buttons must fit inside
+     it: tighter padding and a tighter label gap, or a three-tab switcher with
+     a long label ("Ready / Served") pushes the page sideways on a 320px
+     phone. The compact geometry applies to filled tracks only — the inline
+     segments keep their air. */
+  const item = fill
+    ? `min-w-0 flex-1 px-2 gap-1 ${size === 'sm' ? 'h-7 text-[11.5px]' : 'h-9 text-[12.5px]'}`
+    : size === 'sm'
+      ? 'h-7 px-2.5 text-[11.5px]'
+      : 'h-9 px-3.5 text-[12.5px]';
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      className={[
+        /* iOS segmented control: a grey track with a white thumb, no border.
+           The border was doing the work the fill does better, and on a white
+           card it drew a second rectangle inside the card's own rectangle. */
+        'items-center rounded-[11px] bg-[color-mix(in_oklab,var(--p-ink)_7%,transparent)] p-1',
+        fill ? 'flex w-full' : 'inline-flex',
+        box,
+        className,
+      ].join(' ')}
+    >
+      {options.map((option) => {
+        const on = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={on}
+            title={option.title}
+            onClick={() => onChange(option.value)}
+            {...option.data}
+            className={[
+              'rounded-[var(--p-r-chip)] font-medium whitespace-nowrap transition-[background-color,color,box-shadow] duration-150',
+              'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]',
+              fill ? 'flex items-center justify-center' : '',
+              item,
+              on
+                ? 'bg-card text-gink shadow-[0_1px_3px_rgba(29,29,31,0.12),0_1px_1px_rgba(29,29,31,0.04)]'
+                : 'text-gink-64 hover:text-gink',
+            ].join(' ')}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * The chip look, as a class, for a control that must be a link.
+ *
+ * Segmenteds are buttons because they change what is on the page. A time range
+ * and an order filter are not: they are places, with a URL somebody can send to
+ * a colleague, so they have to stay <Link> and cannot use the component. They
+ * should still look and behave identically -- same height, same radius, same
+ * pressed state -- and the keyboard must be able to see where it is, which the
+ * hand-written copy on the orders screen did not do.
+ */
+export function chipClass(active: boolean): string {
+  /*
+   * A filter chip is a pill too, and it carries NO border in either state.
+   *
+   * The old chip was a bordered rectangle that switched its border colour when
+   * picked, which meant the resting state was already an outlined box -- three
+   * of them in a row looked like a form. A pill with a fill reads as a filter,
+   * and the selected one is the accent itself: "these rows" is a state, and
+   * the accent is what this surface uses for a state.
+   *
+   * Both states keep the same height and the same horizontal padding, so
+   * picking one does not resize the row it sits in.
+   */
+  return [
+    'inline-flex h-9 items-center rounded-full px-4 text-[12.5px] font-medium whitespace-nowrap',
+    'transition-[background-color,color,box-shadow] duration-150 ease-[var(--o-ease)]',
+    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]',
+    active
+      ? 'bg-grass text-cream'
+      : 'bg-[color-mix(in_oklab,var(--p-ink)_6%,transparent)] text-gink-64 hover:bg-[color-mix(in_oklab,var(--p-ink)_9%,transparent)] hover:text-gink',
+  ].join(' ');
+}
+
+/* -------------------------------------------------------------------- forms */
+
+/** A labelled field. The label is always visible -- a placeholder is not one. */
+export function Field({
+  label,
+  hint,
+  error,
+  htmlFor,
+  children,
+  className = '',
+}: {
+  label: ReactNode;
+  hint?: ReactNode;
+  error?: ReactNode;
+  htmlFor?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <label htmlFor={htmlFor} className="mb-1.5 block text-[12.5px] font-medium text-gink-64">
+        {label}
+      </label>
+      {children}
+      {error ? (
+        <p className="mt-1.5 text-[11.5px] leading-[1.45] text-[var(--p-due)]">{error}</p>
+      ) : hint ? (
+        <p className="mt-1.5 text-[11.5px] leading-[1.5] text-gink-46">{hint}</p>
+      ) : null}
+    </div>
+  );
+}
+
+/*
+ * A field is a white sheet on paper, with a warm hairline and a copper focus
+ * ring. It was a 60%-white box that turned greyer as the page behind it got
+ * lighter -- on paper, translucent inputs look like holes.
+ *
+ * OVERRIDING THESE STRINGS: USE THE `!` SUFFIX
+ *
+ * `inputClass` already carries a height, a width and a font size. Appending a
+ * SMALLER value does NOT override them, because Tailwind decides by stylesheet
+ * order and sorts by value -- `.h-8` is emitted before `.h-11`, `.w-[142px]`
+ * before `.w-full`, `.text-[12.5px]` before `.text-[13.5px]`. Measured in the
+ * built CSS on 2026-10-24, after three call sites had silently shipped
+ * full-width, 44px-tall "compact" fields.
+ *
+ * The deterministic override is Tailwind v4's important suffix:
+ *
+ *   className={`${inputClass} w-[142px]! h-9! text-[12.5px]!`}
+ *
+ * A test in components/live-controls.test.tsx fails on the unmarked form.
+ */
+const control =
+  'w-full rounded-[var(--p-r-control)] border border-hair-strong bg-card px-3.5 text-[13.5px] text-gink transition-[border-color,box-shadow] duration-150 ease-[var(--o-ease)] placeholder:text-gink-28 hover:border-gink-28 focus:border-[var(--p-accent)] focus:ring-[3px] focus:ring-[color-mix(in_oklab,var(--p-accent)_20%,transparent)] focus:outline-none disabled:cursor-not-allowed disabled:bg-gink-07 disabled:text-gink-46';
+
+export const inputClass = `${control} h-11`;
+export const textareaClass = `${control} resize-y py-3 leading-[1.55]`;
+export const selectClass = `${control} h-11 pr-8`;
+
+/* ------------------------------------------------------------------- tables */
+
+/** The scroll container. A table that overflows its card scrolls inside it. */
+export function TableWrap({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return (
+    <div
+      className={['-mx-4 min-w-0 max-w-full overflow-x-auto sm:mx-0', className].join(' ')}
+      style={{ minWidth: 0, maxWidth: 'calc(100vw - 0.5rem)', overflowX: 'auto', contain: 'layout paint' }}
+    >
+      {children}
+    </div>
+  );
+}
+
+export const tableClass = 'w-full border-collapse text-[13px]';
+
+/**
+ * A header cell. Numbers are right-aligned from the header down, so a column
+ * of figures has one edge instead of ten.
+ */
+export function Th({
+  children,
+  align = 'left',
+  className = '',
+  ...rest
+}: { children?: ReactNode; align?: 'left' | 'right' } & React.ComponentProps<'th'>) {
+  return (
+    <th
+      scope="col"
+      className={[
+        'border-b border-hair-strong bg-[rgba(29,29,31,0.025)] px-4 py-2.5 text-[10.5px] font-semibold tracking-[0.11em] whitespace-nowrap text-gink-46 uppercase',
+        align === 'right' ? 'text-right' : 'text-left',
+        className,
+      ].join(' ')}
+      {...rest}
+    >
+      {children}
+    </th>
+  );
+}
+
+export function Td({
+  children,
+  align = 'left',
+  className = '',
+  ...rest
+}: { children?: ReactNode; align?: 'left' | 'right' } & React.ComponentProps<'td'>) {
+  return (
+    <td
+      className={[
+        'border-b border-hair px-4 py-3.5 align-middle text-gink first:border-l-0',
+        align === 'right' ? 'text-right tabular-nums' : 'text-left',
+        className,
+      ].join(' ')}
+      {...rest}
+    >
+      {children}
+    </td>
+  );
+}
+
+/** A table row. The tint on hover is the whole interaction budget for a row. */
+export function Tr({ children, className = '', ...rest }: React.ComponentProps<'tr'>) {
+  return (
+    <tr className={['transition-colors hover:bg-[color-mix(in_oklab,var(--p-ink)_3%,transparent)]', className].join(' ')} {...rest}>
+      {children}
+    </tr>
+  );
+}
+
+/* -------------------------------------------------------------------- pills */
+
+export type PillTone = 'live' | 'due' | 'failed' | 'neutral' | 'ink' | 'work';
+
+/**
+ * A status pill.
+ *
+ * Colour is never the only signal: each tone carries its word. A green dot
+ * that means "ready" and a red one that means "ready but late" would be
+ * indistinguishable to a colour-blind cook, and this product is read standing
+ * up.
+ */
+export function Tag({ tone = 'neutral', children }: { tone?: PillTone; children: ReactNode }) {
+  /*
+   * Status, not button. A tag keeps the pill shape -- that is the one place a
+   * pill still means something -- but loses the ring it used to carry, which
+   * on a warm card read as a second border around a word.
+   *
+   * `live` is mint because it means "settled / ready"; blue is the accent and
+   * is reserved for position and on-states.
+   */
+  const tones: Record<PillTone, string> = {
+    live: 'bg-[var(--p-live-soft)] text-[var(--p-live)]',
+    work: 'bg-[var(--p-accent-soft)] text-[var(--p-accent-strong)]',
+    due: 'bg-[var(--p-due-soft)] text-[var(--p-due)]',
+    failed: 'bg-[var(--p-due-soft)] text-[var(--p-due)]',
+    neutral: 'bg-paper-deep text-gink-64',
+    ink: 'bg-grass text-cream',
+  };
+  return (
+    <span
+      className={[
+        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-[3px] text-[11.5px] font-semibold tracking-[0.01em] whitespace-nowrap ring-1 ring-inset ring-black/[0.05]',
+        tones[tone],
+      ].join(' ')}
+    >
+      {children}
+    </span>
+  );
+}
+
+/**
+ * The track and knob of a switch, without owning the control.
+ *
+ * Two screens draw a switch and they cannot share the control: the menu editor
+ * submits a form (so it works with JavaScript off) and the kitchen toggles a
+ * client-side preference. What they must share is the drawing -- 38x22 track,
+ * 16px knob, no border -- or the product ends up with two switches that differ
+ * by two pixels and look like two different ideas.
+ *
+ * `aria-hidden`: the state is announced by the control around it.
+ */
+export function SwitchTrack({ on, className = '' }: { on: boolean; className?: string }) {
+  /*
+   * The iOS switch, at its real size: a 51x31 track with a 27px knob.
+   *
+   * It used to be 38x22 with a 16px knob, which at arm's length on a tablet is
+   * a grey capsule with a dot in it -- the state is legible only if you look
+   * for the knob's position. The platform's own switch is 51x31 for the same
+   * reason: the travel is what makes the state readable at a glance, and a
+   * thumb sliding half its own width is not a movement you can see out of the
+   * corner of your eye.
+   *
+   * Off is a neutral grey track, on is the accent -- no border, no outline
+   * around it: the switch IS the control, and the label beside it names it.
+   */
+  return (
+    <span
+      aria-hidden="true"
+      className={[
+        'relative inline-flex h-[31px] w-[51px] shrink-0 items-center rounded-full transition-colors duration-200 ease-[var(--o-ease)]',
+        on ? 'bg-grass' : 'bg-[color-mix(in_oklab,var(--p-ink)_16%,transparent)]',
+        className,
+      ].join(' ')}
+    >
+      <span
+        className={[
+          'absolute size-[27px] rounded-full bg-white shadow-[0_2px_4px_rgba(29,29,31,0.18),0_1px_1px_rgba(29,29,31,0.1)] transition-[left] duration-200 ease-[var(--o-ease)]',
+          on ? 'left-[22px]' : 'left-[2px]',
+        ].join(' ')}
+      />
+    </span>
+  );
+}
+
+/** A dot, for a status that is stated in words next to it. */
+export function Dot({ tone = 'live' }: { tone?: 'live' | 'idle' | 'alert' }) {
+  const tones = {
+    live: 'bg-grass',
+    idle: 'bg-gink-28',
+    alert: 'bg-[var(--p-due)]',
+  } as const;
+  return <span aria-hidden="true" className={['size-1.5 shrink-0 rounded-full', tones[tone]].join(' ')} />;
+}
+
+/**
+ * What a staff screen shows while it is being fetched.
+ *
+ * The bar is part of the skeleton on purpose: the navigation is the one thing
+ * that must never blink out between two staff screens, and without it the whole
+ * top of the page disappears for the length of the round trip. `active` is
+ * omitted by callers that do not know which screen is arriving -- claiming
+ * "Overview" during a fetch to Reports is a lie told while somebody is waiting
+ * to find out where they are.
+ */
+export function OwnerLoading({
+  active,
+  variant = 'dashboard',
+}: {
+  active?: DashboardSection;
+  variant?: 'page' | 'rows' | 'board' | 'dashboard';
+}) {
+  return (
+    <OwnerPage active={active}>
+      <RouteSkeleton variant={variant} />
+    </OwnerPage>
+  );
+}
