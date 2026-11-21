@@ -600,8 +600,21 @@ describe.skipIf(!URL_VALUE)('GST two-mode (disposable PostgreSQL)', () => {
     expect(shared.invoice.customer_snapshot?.name).toBe('Share Buyer LLP');
     await asRole(user, (c) => c.query("select void_restaurant_invoice($1,'Synthetic void for replacement')", [invoiceId]));
     expect(await read()).toBeNull();
-    const next = (await asRole(user, (c) => c.query('select issue_closed_session_receipt($1,$2) id',
-      [sitting, JSON.stringify({ ...BUYER, name: 'Share Buyer LLP' })]))).rows[0].id;
+    // The receipt helper is not a client entry point: EXECUTE is revoked from
+    // authenticated/service_role (20261119000100), so a reissue for an already
+    // closed sitting is performed by the database owner, exactly as the
+    // settlement wrapper does internally.
+    let next: string;
+    try {
+      // Owner identity on the claim, but not the `authenticated` role: the grant
+      // to authenticated is revoked (20261119000100), while the helper's own
+      // membership check still judges the actor.
+      await db.query("select set_config('request.jwt.claim.sub',$1,false)", [user]);
+      next = (await db.query('select issue_closed_session_receipt($1,$2) id',
+        [sitting, JSON.stringify({ ...BUYER, name: 'Share Buyer LLP' })])).rows[0].id;
+    } finally {
+      await db.query("select set_config('request.jwt.claim.sub','',false)");
+    }
     expect(next).not.toBe(invoiceId);
     const documents = (await db.query('select id, status, sequence_number, totals_snapshot, supersedes_invoice_id from restaurant_invoices where order_session_id=$1 order by sequence_number', [sitting])).rows;
     expect(documents.map((d) => [d.id, d.status, d.sequence_number, d.supersedes_invoice_id]))
@@ -955,7 +968,13 @@ describe.skipIf(!URL_VALUE)('GST two-mode (disposable PostgreSQL)', () => {
     await expect(checkout()).rejects.toThrow(/outstanding balance/i);
     // Only simulating an older writer that already closed the sitting.
     await db.query("update order_sessions set status='closed',closed_at=now() where id=$1", [first.sitting]);
-    await expect(asRole(owner, (c) => c.query('select issue_closed_session_receipt($1)', [first.sitting]))).rejects.toThrow(/outstanding balance/i);
+    // An owner can no longer reach the helper directly at all — the grant is
+    // gone (20261119000100) — which is a stricter boundary than the settlement
+    // check the helper used to perform for callers it admitted.
+    await expect(asRole(owner, (c) => c.query('select issue_closed_session_receipt($1)', [first.sitting])))
+      .rejects.toThrow(/permission denied for function issue_closed_session_receipt/i);
+    // The settlement gate itself is unchanged and still refuses through the wrapper.
+    await expect(checkout()).rejects.toThrow(/outstanding balance/i);
     expect((await db.query('select count(*)::int n from restaurant_invoice_series where restaurant_id=$1', [restaurant])).rows[0].n).toBe(0);
     expect((await db.query('select order_id,amount_paise from payments where restaurant_id=$1', [restaurant])).rows).toEqual([{ order_id: first.order, amount_paise: '21000' }]);
   });

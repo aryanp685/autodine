@@ -1,4 +1,4 @@
-# Production migration inventory — 119 repository files (GST/IRP, guest journey, operational delivery and QR-boundary local inventory)
+# Production migration inventory — 120 repository files (GST/IRP, guest journey, operational delivery and QR-boundary local inventory)
 
 **Repository inventory only — not an apply list.** On `arena/ce32f7c8-autodine`,
 the recovered base has the same committed tree as PR #191 (98 files). Six
@@ -144,6 +144,7 @@ without separate written authorization each.
 | `20261118002000` | `guest_checkout_integrity` | Guest-to-receipt Priority 3 — NOT AUTHORIZED | Same-table replay and atomic whole-basket validation; no change to GST/IRP, amounts, discount policy or payment grants. |
 | `20261118002100` | `operational_realtime` | Operational delivery Priority 4 — NOT AUTHORIZED | Adds the `waiter` membership role, membership-scoped floor projections, a coalesced metadata-only outlet revision and publication, sitting transfer, waiter acknowledgement and a guest-version edit cursor. No order amounts, GST/IRP, payment grants or hosted routing are changed by it. |
 | `20261118002200` | `qr_code_staff_boundary` | Privileged-function review — NOT AUTHORIZED | Adds the owner/manager membership check to `rotate_table_qr_code`/`retire_table_qr_code` before they touch `table_qr_codes` (findings QR-01/QR-02). Signature, return type, grants and the subscription gate unchanged; no table, policy or data change. |
+| `20261119000100` | `restore_receipt_helper_boundary` | Main-inherited security correction — NOT AUTHORIZED | Revokes `EXECUTE` on `issue_closed_session_receipt(uuid, jsonb)` from `public`, `anon`, `authenticated` and `service_role`. `20261114000101` granted it to `authenticated`, which let a signed-in client issue a document for an already-closed sitting and skip the settlement wrapper's outstanding-balance check (local check `supabase/checks/07_p8_close_settlement.sql` fails without it). Forward-only; no data, policy or signature change. |
 
 ## Owner-operation (never applied automatically — separate on purpose)
 
