@@ -77,8 +77,14 @@ The Environment presence gate proves the passphrase secret is non-empty. The nex
 - No B2 authorization, listing, read, write, upload, or download occurred in those runs.
 - No existing B2 object, version, bucket, or key was deleted, pruned, rotated, or modified.
 - No database password was reset and no credential was guessed.
-- No production deployment occurred; PR #194 remains unmerged.
+- During the rehearsal executions, no production deployment was initiated by the agent and PR #194 remained unmerged. Afterward, the owner independently force-pushed `main`; Vercel production status could not be verified because the connected Vercel token returned access denied.
 
-## Single gate preventing completion
+## Subsequent live repository state
+
+After the evidence-only follow-up checks passed, owner `aryanp685` independently closed PR #194 at `2026-11-21T07:25:25Z` and force-pushed `main` one second later. Live `main` became `89fa6848bcb90d0a1b3dde138ed0d9f1acc1343a`, a new two-commit history that does not contain the audited rehearsal implementation. PR #194 is **CLOSED, UNMERGED** (`mergedAt: null`); no agent merge was attempted.
+
+The sanitized evidence commit remains on the former PR branch at merge commit `8e9a7010a264229af6a0072e0cbf846ac5f5afb4`, but it is not on the force-pushed `main`.
+
+## Acceptance gate preventing completion
 
 The effective `backup-staging` Environment value for `STAGING_AUTODINE_BACKUP_PASSPHRASE` remains missing-or-short according to the authoritative code contract despite owner reports that it was replaced. GitHub does not expose the value and the API token cannot list secret metadata (HTTP 403), so the agent cannot correct or independently inspect it without violating secret-handling rules. Repeating unchanged dispatches is prohibited.
