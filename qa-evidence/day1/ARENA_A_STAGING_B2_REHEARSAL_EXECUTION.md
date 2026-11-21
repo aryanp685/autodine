@@ -1,70 +1,84 @@
-# Arena A — staging B2 rehearsal: sanitized execution record
+# Arena A — staging B2 disaster-recovery rehearsal
 
-## Verdict: BLOCKED
+Sanitized execution evidence. No database URI, password, passphrase, B2 key, token, customer data, provider response body, or credential length is recorded here.
 
-No successful hosted staging backup, B2 round trip, disposable restore, or
-recovery measurement is established. Seven prior failed runs are recorded
-below; none was initiated by this local correction. Job logs could not be
-retrieved here. Conclusions rely on GitHub step results, available annotations,
-and earlier execution notes, not an independent inspection of every log.
+## Final verdict: BLOCKED
 
-| Run | Recorded outcome |
+The real hosted B2 rehearsal did **not** start. The protected `backup-staging` Environment supplied a non-empty passphrase that failed the authoritative minimum contract in three fresh runs, including twice after owner confirmation and once after owner-confirmed deletion/recreation of the Environment secret.
+
+The passphrase gate runs before B2 authorization, source authentication, backup, upload, download, or restore. Therefore no B2 object was created and no staging database connection was opened by these runs.
+
+## Audited code and pull request
+
+| Item | Result |
 |---|---|
-| [44789437003](https://github.com/aryanp685/autodine/actions/runs/44789437003) | Exact-code gate passed; rehearsal failed; failure reason unavailable. |
-| [44791402579](https://github.com/aryanp685/autodine/actions/runs/44791402579) | Failure; earlier diagnostic incorrectly claimed missing values due to step scope. |
-| [44792714068](https://github.com/aryanp685/autodine/actions/runs/44792714068) | Failure; historical notes describe a weak passphrase and inaccurate rule annotation. |
-| [44794052811](https://github.com/aryanp685/autodine/actions/runs/44794052811) | Failure; historical notes attribute missing diagnostics to shell error handling. |
-| [44795251974](https://github.com/aryanp685/autodine/actions/runs/44795251974) | Exact-code gate passed; combined backup/upload failed with authentication annotation `28P01`; download and restore skipped. |
-| [44798845545](https://github.com/aryanp685/autodine/actions/runs/44798845545) | Exact-code gate passed; authentication check failed before backup; historical notes describe a missing connection-target defect. |
-| [44800101568](https://github.com/aryanp685/autodine/actions/runs/44800101568) | Exact-code gate passed; authentication check failed with `28P01` annotation; backup and restore skipped. |
+| PR | [#194](https://github.com/aryanp685/autodine/pull/194) |
+| Audited head | `093f0814fb0c8ae40299ee9e42e3d8d6cb80b7a7` |
+| PR state at evidence capture | OPEN, CLEAN, MERGEABLE, unmerged |
+| Changed-file inventory | 119 files |
+| Exact-code manifest | PASS — 53 pinned files, byte for byte |
+| Environment-scope attestation | Owner explicitly attested six secrets and three variables are Environment-only with no repository-level shadows; API metadata listing remains HTTP 403 |
 
-The latest run used PR code `26d236e34ae54e248f5215f315c2fd4b17c5ef4e`;
-the historical record states its 44-file code gate passed and main was at
-`016b03ef7633deaeffe051f372ca2d340cb759d6`. That does not validate the later
-local patch. Previous workflow fixes are documented in PRs #197–#201 and #203.
-Raw historical narratives remain in Git at commits `26d236e` and `1f8fe19`;
-their broader security assertions should not be treated as independently
-verified. Do not copy credentials, credential lengths, connection strings, or
-untrusted provider errors into new records.
+Required hardening ancestry is present:
 
-## Identity and isolation limits
+- `add8df23f1b46d9ec66e13e8c314c12f5bf5af5b`
+- `9a06cfb82cd1ea845ace4be45697962caf9242ff`
+- `26d236e34ae54e248f5215f315c2fd4b17c5ef4e`
+- `fe074f6513cd56361fcf70ea4b4d561c7e5bce90`
 
-The owner designated staging project `juwyhslzchjevqkdvwjm`, bucket
-`autodine-staging-db-backups` with ID `d209a0cc2db8f17fac100514`, and endpoint
-`s3.eu-central-003.backblazeb2.com`. A passing configured name/URL guard does
-**not** independently establish bucket ID, a complete production inventory,
-source credential provenance, or actual bucket-restricted key capabilities.
-A protected-environment presence check does not distinguish same-name repository
-fallback values and does not prove credential scope. Prior metadata inspection
-found zero custom branch policies and reported no required reviewers; access to
-secret/variable metadata was denied, not proof those entries are absent.
+The final implementation also contains `e116a5b533f7496975ec06fbd4c2b868cd90346e` via helper merge `093f0814fb0c8ae40299ee9e42e3d8d6cb80b7a7`. It independently proves the disposable PostgreSQL target and B2 bucket/key scope before use, records owner scope attestation, performs sanitized source identity checks, and captures separate DR timings when the credential gates pass.
 
-The combined backup/upload failure does not independently establish whether any
-remote object exists. Do not retry an uncertain upload, delete objects or
-versions, or prune. Investigate only under separately authorized read-only
-staging scope after identity, production exclusion, and key scope are established.
-No production operation is authorized. No RPO/RTO is measurable from these runs.
+## Runs
 
-The owner should privately verify the staging source credentials and passphrase,
-the absence of conflicting repository-level shadow values, the protected
-environment policy, isolated source and B2 key scopes, bucket identity, and a
-provably disposable restore target. Any new hosted test needs separate explicit
-authorization. Local synthetic tests are not hosted recovery evidence.
+| Run | Exact-code | Safe preflights | Outcome |
+|---|---|---|---|
+| [44810230258](https://github.com/aryanp685/autodine/actions/runs/44810230258) | REFUSED | not started | Default-branch registration still pinned the earlier implementation; no credentials materialized. |
+| [44812396871](https://github.com/aryanp685/autodine/actions/runs/44812396871) | PASS | Disposable PG17, configuration presence and source/bucket designation PASS | Passphrase contract FAIL; no source/B2 access. |
+| [44812887667](https://github.com/aryanp685/autodine/actions/runs/44812887667) | PASS | Same preflights PASS | Passphrase contract FAIL after first owner re-save; no source/B2 access. |
+| [44879670508](https://github.com/aryanp685/autodine/actions/runs/44879670508) | PASS | Same preflights PASS | Passphrase contract FAIL after owner-confirmed delete/recreate; no source/B2 access. |
 
-## Review of later structural finding
+The Environment presence gate proves the passphrase secret is non-empty. The next step imports `passphraseProblem()` from `lib-crypto.mjs`; failure means the effective Environment value does not satisfy `MIN_PASSPHRASE_LENGTH`. No value or length was emitted.
 
-Later notes in `fe074f6` reported unrelated histories and 78 conflicts. This
-checkout is shallow, so ancestry conclusions from a missing merge base can be
-misleading. In the reviewing checkout, `git merge-base` found
-`0468d3acc0ba7a66add9cfd154ce9099f40b8a82`, and a read-only `git merge-tree`
-for PR `fe074f6513cd56361fcf70ea4b4d561c7e5bce90` and main
-`016b03ef7633deaeffe051f372ca2d340cb759d6` completed without conflicts. GitHub
-also reported the PR mergeable. These observations supersede the earlier
-unrelated-history conclusion for these tips; they do not imply an actual merge,
-verified ancestry in every shallow clone, passing CI, or permission to merge.
-The earlier notes remain in Git history.
+## Acceptance matrix
 
-The later notes also record a failing merged-tree CI check related to the
-historical migration-count assertion. The current chain needs independent
-validation; the Phase 7 count is a historical snapshot and must not be
-rewritten to claim it checked later-added migrations.
+| Requirement | Status | Evidence |
+|---|---|---|
+| Normal main/PR ancestry | PASS | `main` is the merge base of the reconciled PR branch; no unrelated-history operation used |
+| Required hardening commits | PASS | full SHA ancestry above |
+| Exact audited code | PASS | gate passed on `093f081…` |
+| Six secrets + three variables available | PASS (presence) | protected Environment preflight |
+| Environment-only scope | OWNER-ATTESTED | explicit owner attestation input; API inspection still 403 |
+| Disposable PostgreSQL 17 target | PASS | ephemeral Actions service container, loopback endpoint, empty `drill` database |
+| Source and bucket configured designation | PASS | staging validator |
+| Passphrase contract | **FAIL** | three fresh hosted runs |
+| B2 key restricted to bucket ID `d209a0cc2db8f17fac100514` | BLOCKED | step intentionally follows passphrase gate and did not run |
+| PostgreSQL 17 staging authentication and read-only identity | BLOCKED | step intentionally follows passphrase gate and did not run |
+| Backup/archive validation/encryption | BLOCKED | not started |
+| B2 upload and metadata verification | BLOCKED | not started |
+| Download and SHA-256/manifest verification | BLOCKED | not started |
+| Isolated restore and schema/data/invariant verification | BLOCKED | not started |
+| Real backup/upload/download/restore timings | NOT MEASURABLE | no backup started |
+| Measured RPO/RTO | NOT MEASURABLE | no recovery run completed |
+| PR #194 merge | BLOCKED | real B2 rehearsal has not passed |
+
+## Local and pull-request checks
+
+- `npm run test:dr`: 241/241 tests passed.
+- `npm run test:staging:guards`: 66/66 tests passed.
+- TypeScript and ESLint passed.
+- Hermetic CI-mode production build passed.
+- `verify:release`: 28 checks passed (not release authorization).
+- PR checks on audited head: CI, PostgreSQL 15/17/18 migration boundaries, browser E2E, throttle E2E, Edge TTS and Vercel Preview checks passed.
+
+## Security and side-effect confirmation
+
+- No production database or B2 resource was accessed or modified.
+- No staging source database connection was opened by the three final runs.
+- No B2 authorization, listing, read, write, upload, or download occurred in those runs.
+- No existing B2 object, version, bucket, or key was deleted, pruned, rotated, or modified.
+- No database password was reset and no credential was guessed.
+- No production deployment occurred; PR #194 remains unmerged.
+
+## Single gate preventing completion
+
+The effective `backup-staging` Environment value for `STAGING_AUTODINE_BACKUP_PASSPHRASE` remains missing-or-short according to the authoritative code contract despite owner reports that it was replaced. GitHub does not expose the value and the API token cannot list secret metadata (HTTP 403), so the agent cannot correct or independently inspect it without violating secret-handling rules. Repeating unchanged dispatches is prohibited.
