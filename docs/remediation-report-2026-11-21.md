@@ -6,7 +6,7 @@ setting, bucket or secret was written. The only production interaction was
 read-only SQL through the Supabase connector plus one read-only HTTPS GET to the
 public health endpoint.
 
-Head before this batch: `2ecb12e`. Migration inventory: **122 files** (was 120).
+Head before this batch: `2ecb12e`. Migration inventory: **123 files** (was 120).
 
 ---
 
@@ -24,11 +24,26 @@ push ends on them:
 
 | File | What it does |
 |---|---|
-| `20261122000200_qr_one_active_per_table.sql` | Collapses duplicate live cards, creates `table_qr_codes_one_active_per_table` (unique partial index on `table_id where revoked_at is null`), and re-creates `rotate_table_qr_code` / `retire_table_qr_code` with `pg_advisory_xact_lock(hashtext(table_id))` on top of the existing row lock. Idempotent: `DO` cleanup, `IF NOT EXISTS`, `CREATE OR REPLACE`. |
+| `20261122000200_qr_one_active_cleanup.sql` | Collapses duplicate live cards, keeping the newest. Separate file on purpose — see the 55006 note below. |
+| `20261122000300_qr_one_active_per_table.sql` | Creates `table_qr_codes_one_active_per_table` (unique partial index on `table_id where revoked_at is null`) and re-creates `rotate_table_qr_code` / `retire_table_qr_code` with `pg_advisory_xact_lock(hashtext(table_id))` on top of the existing row lock. Idempotent: `IF NOT EXISTS`, `CREATE OR REPLACE`. |
 | `20261122000100_announcement_claim_recovery.sql` | `claim_kitchen_order_announcement` now deletes a claim older than two minutes before inserting, so a device that claims and crashes no longer holds an order announcement forever (`ON CONFLICT DO NOTHING` made the claim permanent). Adds the waiter-board partial index on `table_waiter_calls(announcement_claimed_at)`. |
 
-Both are marked **NOT AUTHORIZED** in the manifest: they are repository corrections,
-not applied anywhere by this session.
+All three are marked **NOT AUTHORIZED** in the manifest: they are repository
+corrections, not applied anywhere by this session.
+
+**Cleanup and index are two files because of a real failure.** Replaying the whole
+chain in one session (`READINESS_FINANCIAL_UPGRADE=1 node scripts/verify-database.mjs`,
+the native-database CI job) first failed with
+
+```
+error: cannot CREATE INDEX "table_qr_codes" because it has pending trigger events   (55006)
+```
+
+The cleanup `UPDATE` fires `revoke_sessions_on_qr_revocation`, whose AFTER-trigger
+events stay pending until commit, and PostgreSQL refuses `CREATE INDEX` on a table in
+that state. One file per transaction flushes them. That exact command now replays the
+chain, seeds the legacy financial fixture, upgrades it and runs all ten integration
+suites: **281 passed / 3 skipped**.
 
 **Tests added (real database, disposable PostgreSQL 17):**
 
@@ -273,6 +288,7 @@ this branch's migrations are not applied to production (D3).
 | Command | Result |
 |---|---|
 | `npm run test:db:embedded` | **281 passed / 3 skipped** |
+| `READINESS_FINANCIAL_UPGRADE=1 node scripts/verify-database.mjs` (on an embedded cluster) | 281 passed / 3 skipped — the closed-loop replay the CI job runs |
 | `npm run test:db:integration` | **299 passed / 1 skipped** (13 files) |
 | `npm run test:db:local` | pass — schema, checks (incl. the new overload check), 5 gated suites, 5,000-guest load |
 | `npm run test:db:logical-restore` | `LOCAL_LOGICAL_RESTORE_VERIFIED`, data rows identical |
@@ -280,7 +296,7 @@ this branch's migrations are not applied to production (D3).
 | `npx vitest run` | 2,614 passed / 309 skipped (2,925) |
 | `npm run test:e2e:journey` | 20 passed |
 | `npm run test:dr` · `test:backup` · `test:d2` · `test:staging:guards` | exit 0 |
-| `npm run migrations:verify` | 122 files, 122 unique versions, 4 anchors |
+| `npm run migrations:verify` | 123 files, 123 unique versions, 4 anchors |
 | `npm run verify:release` | 47 checks OK |
 | `npm run lint` | **0 problems** |
 | `npx tsc --noEmit` | clean |

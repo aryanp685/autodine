@@ -1,44 +1,21 @@
--- One live table QR at the database level, and serialised rotation.
+-- One live table QR at the database level, step 2: the invariant and the bodies.
 --
 -- Ported from the hosted applications of the same correction (production ledger
 -- 20261120190546_qr_code_staff_boundary, candidate 20261120190508) which had no
 -- repository file. 20261118002200 added the membership gates but relied on a
--- `for update` row lock alone; this migration adds the invariant that survives
--- a writer which never takes that lock, and the advisory lock that serialises
+-- `for update` row lock alone; this migration adds the invariant that survives a
+-- writer which never takes that lock, and the advisory lock that serialises
 -- rotation on the table id.
 --
--- Ordering note: this version is newer than every hosted ledger row, so a push
--- of this directory ends on these bodies. That matters because
--- 20261118002200 is still missing from both hosted ledgers and a push would run
--- it after their newer rows.
+-- Ordering note: this version is newer than every hosted ledger row, so a push of
+-- this directory ends on these bodies. That matters because 20261118002200 is
+-- still missing from both hosted ledgers and a push would run it after their
+-- newer rows.
 --
--- Re-running is safe: the cleanup is idempotent, the index is IF NOT EXISTS and
--- both functions are CREATE OR REPLACE.
---
--- 1. Collapse any duplicate live cards first, keeping the newest, so the unique
---    index can be created on a database that already drifted.
-do $$
-declare
-  t uuid;
-begin
-  for t in
-    select table_id
-    from public.table_qr_codes
-    where revoked_at is null
-    group by table_id
-    having count(*) > 1
-  loop
-    update public.table_qr_codes
-       set revoked_at = now()
-     where id in (
-       select id from public.table_qr_codes
-       where table_id = t and revoked_at is null
-       order by created_at desc
-       offset 1
-     );
-  end loop;
-end;
-$$;
+-- Re-running is safe: the index is IF NOT EXISTS and both functions are
+-- CREATE OR REPLACE. Duplicate live cards are collapsed by the previous file
+-- (20261122000200), which is a separate transaction so its trigger events have
+-- flushed before this CREATE INDEX runs.
 
 create unique index if not exists table_qr_codes_one_active_per_table
   on public.table_qr_codes (table_id)

@@ -25,7 +25,7 @@ Full file-by-file detail: `qa-evidence/day1/FINAL_COMPLETION_AND_DEPLOYMENT_2026
 
 ## 2. P0 — production hazards (blocking any deploy or push)
 
-**P0-1 — FIXED 2026-11-21.** Superseded by `20261122000200_qr_one_active_per_table.sql`
+**P0-1 — FIXED 2026-11-21.** Superseded by `20261122000200_qr_one_active_cleanup.sql` + `20261122000300_qr_one_active_per_table.sql`
 (unique index + advisory lock, newer than every hosted ledger row) and
 `20261122000100_announcement_claim_recovery.sql`. See
 `docs/remediation-report-2026-11-21.md` §D1. Original finding, kept for the record:
@@ -230,8 +230,8 @@ Full detail and evidence: [`remediation-report-2026-11-21.md`](remediation-repor
 
 | Item | Outcome |
 |---|---|
-| P0-1 / D1 QR downgrade hazard | Fixed — `20261122000200` adds the unique index + advisory lock, newer than every hosted row |
-| P0-2 missing repository files | Fixed for the three production-only corrections (`20261122000100`, `20261122000200`) |
+| P0-1 / D1 QR downgrade hazard | Fixed — `20261122000300` adds the unique index + advisory lock, newer than every hosted row |
+| P0-2 missing repository files | Fixed for the three production-only corrections (`20261122000100`, `20261122000200`, `20261122000300`) |
 | P1-1 F-03 invariant | In the repository; 12 fixture sites + the local seed reworked; embedded 281/3 |
 | P1-2 stale matrix | Refreshed local scoreboard and ledger counts |
 | P1-4 ledger mapping | Answered in §D3 (50 pending files enumerated, collision audit clean) |
