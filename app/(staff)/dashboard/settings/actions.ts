@@ -43,6 +43,7 @@ import { getStaffContextDetailed } from '@/lib/db/staff';
 import {
   canEditSettings,
   formatTaxPercent,
+  parseBillingDefaults,
   parseTaxPercent,
   validateDetails,
 } from '@/lib/settings-input';
@@ -142,6 +143,8 @@ export async function saveDetailsAction(formData: FormData): Promise<void> {
     address: formData.get('address'),
     phone: formData.get('phone'),
     gstin: postedGstin ?? current.gstin ?? '',
+    fssaiNumber: formData.get('fssaiNumber'),
+    billFooterNote: formData.get('billFooterNote'),
     slug: formData.get('slug'),
   });
 
@@ -175,14 +178,32 @@ export async function saveDetailsAction(formData: FormData): Promise<void> {
     address: parsed.value.address,
     phone: parsed.value.phone,
     gstin: role === 'owner' ? parsed.value.gstin : current.gstin,
+    fssai_number: parsed.value.fssaiNumber,
+    bill_footer_note: parsed.value.billFooterNote,
     ...(slugChanged ? { slug: parsed.value.slug } : {}),
   };
 
-  const { data: saved, error } = await supabase
+  let { data: saved, error } = await supabase
     .from('restaurants')
     .update(patch)
     .eq('id', restaurantId)
     .select('id');
+
+  if (error?.code === '42703' || error?.code === 'PGRST204') {
+    const legacyPatch = {
+      name: parsed.value.name,
+      tagline: parsed.value.tagline,
+      address: parsed.value.address,
+      phone: parsed.value.phone,
+      gstin: role === 'owner' ? parsed.value.gstin : current.gstin,
+      ...(slugChanged ? { slug: parsed.value.slug } : {}),
+    };
+    ({ data: saved, error } = await supabase
+      .from('restaurants')
+      .update(legacyPatch)
+      .eq('id', restaurantId)
+      .select('id'));
+  }
 
   if (error) writeFailure('saving restaurant details', error);
 
@@ -277,5 +298,37 @@ export async function saveTaxAction(formData: FormData): Promise<void> {
       ? 'Tax set to 0%. Bills will now show no tax at all — set a rate here before you start billing.'
       : `Tax set to ${formatTaxPercent(parsed.bps)}%. New orders are billed at this rate; orders already placed keep the tax they were charged.`
   );
+}
+
+export async function saveBillingDefaultsAction(formData: FormData): Promise<void> {
+  const { supabase, restaurantId, role } = await requireEditor();
+  if (role !== 'owner') fail('Only the owner can change default bill charges or rounding.');
+
+  const parsed = parseBillingDefaults({
+    serviceChargePercent: formData.get('serviceChargePercent'),
+    packagingChargeRupees: formData.get('packagingChargeRupees'),
+    deliveryChargeRupees: formData.get('deliveryChargeRupees'),
+    roundOffEnabled: formData.get('roundOffEnabled'),
+  });
+  if (!parsed.ok) fail(parsed.message);
+
+  const { data: saved, error } = await supabase
+    .from('restaurants')
+    .update({
+      default_service_charge_bps: parsed.value.serviceChargeBps,
+      default_packaging_charge_paise: parsed.value.packagingChargePaise,
+      default_delivery_charge_paise: parsed.value.deliveryChargePaise,
+      round_off_enabled: parsed.value.roundOffEnabled,
+    })
+    .eq('id', restaurantId)
+    .select('id');
+
+  if (error) writeFailure('saving default bill charges', error);
+  if (!saved || saved.length === 0) {
+    fail('Nothing was saved. Your account can see this restaurant but is not allowed to change it.');
+  }
+
+  for (const path of AFFECTED_PATHS) revalidatePath(path);
+  done('Saved default charges and rounding preferences for new counter bills.');
 }
 

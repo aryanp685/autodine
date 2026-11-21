@@ -8,8 +8,22 @@ import type { CashierScreenData, CounterOrder } from '@/lib/db/cashier-screen';
 // Value import, so it comes from the database-free module. Importing
 // COUNTER_METHODS from lib/db/cashier-screen would pull lib/supabase/server
 // into the browser bundle -- type-only imports there are fine, this is not.
-import { COUNTER_METHODS, COUNTER_METHOD_LABEL, type CounterMethod } from '@/lib/payment-methods';
-import { recordPaymentAction } from '@/app/(staff)/cashier/actions';
+import {
+  COUNTER_METHODS,
+  COUNTER_METHOD_LABEL,
+  SPLIT_METHODS,
+  SPLIT_METHOD_LABEL,
+  type CounterMethod,
+  type SplitMethod,
+} from '@/lib/payment-methods';
+import {
+  applyBillingAdjustmentAction,
+  createCounterOrderAction,
+  recordPaymentAction,
+  recordRefundAction,
+  recordSplitPaymentAction,
+} from '@/app/(staff)/cashier/actions';
+import { paiseToRupees } from '@/lib/money';
 import { cancelStaffOrderAction } from '@/app/orders/actions';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import { useInStaffShell } from '@/components/owner/StaffShell';
@@ -41,6 +55,18 @@ type QueueRow = {
   paid: number;
   items: string;
   pendingOnline: boolean;
+  channel?: string;
+  subtotalPaise?: number;
+  discountPaise?: number;
+  discountReason?: string | null;
+  isComplimentary?: boolean;
+  serviceChargePaise?: number;
+  packagingChargePaise?: number;
+  deliveryChargePaise?: number;
+  roundOffPaise?: number;
+  taxPaise?: number;
+  totalPaise?: number;
+  paidPaise?: number;
 };
 
 function fromDemo(order: (typeof counterQueue)[number]): QueueRow {
@@ -72,6 +98,18 @@ function fromLive(order: CounterOrder): QueueRow {
     paid: order.paid,
     items: order.items,
     pendingOnline: order.pendingOnline === true,
+    channel: order.channel,
+    subtotalPaise: order.subtotalPaise,
+    discountPaise: order.discountPaise,
+    discountReason: order.discountReason,
+    isComplimentary: order.isComplimentary,
+    serviceChargePaise: order.serviceChargePaise,
+    packagingChargePaise: order.packagingChargePaise,
+    deliveryChargePaise: order.deliveryChargePaise,
+    roundOffPaise: order.roundOffPaise,
+    taxPaise: order.taxPaise,
+    totalPaise: order.totalPaise,
+    paidPaise: order.paidPaise,
   };
 }
 
@@ -160,6 +198,38 @@ export function Cashier({
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  // Billing Spec v2.0 counter POS panels
+  const [showNewOrder, setShowNewOrder] = useState(false);
+  const [newChannel, setNewChannel] = useState<'dine_in' | 'takeaway' | 'delivery'>('dine_in');
+  const [newTableId, setNewTableId] = useState(data?.tables?.[0]?.id ?? '');
+  const [newLines, setNewLines] = useState<Array<{ itemId: string; variantId?: string; qty: number }>>([]);
+  const [newCustomerName, setNewCustomerName] = useState('');
+  const [newCustomerPhone, setNewCustomerPhone] = useState('');
+  const [newNote, setNewNote] = useState('');
+  const [creatingOrder, setCreatingOrder] = useState(false);
+
+  const [showAdjust, setShowAdjust] = useState(false);
+  const [adjDiscount, setAdjDiscount] = useState('');
+  const [adjDiscountReason, setAdjDiscountReason] = useState('');
+  const [adjService, setAdjService] = useState('');
+  const [adjPackaging, setAdjPackaging] = useState('');
+  const [adjDelivery, setAdjDelivery] = useState('');
+  const [adjRoundOff, setAdjRoundOff] = useState(false);
+  const [adjComplimentary, setAdjComplimentary] = useState(false);
+  const [adjCompReason, setAdjCompReason] = useState('');
+  const [savingAdjust, setSavingAdjust] = useState(false);
+
+  const [splitMode, setSplitMode] = useState(false);
+  const [splits, setSplits] = useState<Array<{ method: SplitMethod; amountRupees: string; splitLabel: string }>>([
+    { method: 'cash', amountRupees: '', splitLabel: '' },
+    { method: 'upi', amountRupees: '', splitLabel: '' },
+  ]);
+
+  const [refundPaymentId, setRefundPaymentId] = useState(data?.refundablePayments?.[0]?.paymentId ?? '');
+  const [refundAmount, setRefundAmount] = useState('');
+  const [refundReason, setRefundReason] = useState('');
+  const [refundBusy, setRefundBusy] = useState(false);
 
   /**
    * One key per order in flight, reused if the same attempt is retried. Kept
@@ -337,6 +407,127 @@ export function Cashier({
     router.refresh();
   };
 
+  const canManageRefunds = data?.role === 'owner' || data?.role === 'manager';
+
+  const openAdjustForOrder = () => {
+    if (!order) return;
+    setAdjDiscount(order.discountPaise ? String(paiseToRupees(order.discountPaise)) : '');
+    setAdjDiscountReason(order.discountReason ?? '');
+    setAdjService(order.serviceChargePaise ? String(paiseToRupees(order.serviceChargePaise)) : '');
+    setAdjPackaging(order.packagingChargePaise ? String(paiseToRupees(order.packagingChargePaise)) : '');
+    setAdjDelivery(order.deliveryChargePaise ? String(paiseToRupees(order.deliveryChargePaise)) : '');
+    setAdjRoundOff(Boolean(order.roundOffPaise));
+    setAdjComplimentary(Boolean(order.isComplimentary));
+    setAdjCompReason('');
+    setShowAdjust((prev) => !prev);
+  };
+
+  const submitCounterOrder = async () => {
+    if (creatingOrder) return;
+    setError('');
+    setMessage('');
+    setCreatingOrder(true);
+    const res = await createCounterOrderAction({
+      channel: newChannel,
+      tableId: newChannel === 'dine_in' ? newTableId : null,
+      lines: newLines,
+      note: newNote,
+      customerName: newCustomerName,
+      customerPhone: newCustomerPhone,
+    });
+    setCreatingOrder(false);
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    setMessage(res.message);
+    setNewLines([]);
+    setNewNote('');
+    setNewCustomerName('');
+    setNewCustomerPhone('');
+    setShowNewOrder(false);
+    if (res.orderId) setSelectedKey(res.orderId);
+    router.refresh();
+  };
+
+  const submitAdjustments = async () => {
+    if (!order?.orderId || savingAdjust) return;
+    setError('');
+    setMessage('');
+    setSavingAdjust(true);
+    const res = await applyBillingAdjustmentAction({
+      orderId: order.orderId,
+      discountRupees: adjDiscount || '0',
+      discountReason: adjDiscountReason,
+      serviceChargeRupees: adjService || '0',
+      packagingChargeRupees: adjPackaging || '0',
+      deliveryChargeRupees: adjDelivery || '0',
+      roundOff: adjRoundOff,
+      isComplimentary: adjComplimentary,
+      complimentaryReason: adjCompReason,
+    });
+    setSavingAdjust(false);
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    setMessage(res.message);
+    setShowAdjust(false);
+    router.refresh();
+  };
+
+  const submitSplitPayment = () => {
+    if (!order?.orderId) return;
+    if (paying.current.has(order.key)) return;
+    paying.current.add(order.key);
+    const release = () => paying.current.delete(order.key);
+    setError('');
+    setMessage('');
+    setPaymentReceiptUrl(null);
+
+    const paidId = order.orderId;
+    if (!keys.current[paidId]) keys.current[paidId] = newIdempotencyKey();
+
+    startTransition(async () => {
+      const res = await recordSplitPaymentAction({
+        orderId: paidId,
+        splits,
+        idempotencyKey: keys.current[paidId],
+      });
+      release();
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      delete keys.current[paidId];
+      setMessage(res.message);
+      setSplitMode(false);
+      router.refresh();
+    });
+  };
+
+  const submitRefund = async () => {
+    if (refundBusy || !refundPaymentId) return;
+    setError('');
+    setMessage('');
+    setRefundBusy(true);
+    const res = await recordRefundAction({
+      paymentId: refundPaymentId,
+      amountRupees: refundAmount,
+      reason: refundReason,
+      idempotencyKey: newIdempotencyKey(),
+    });
+    setRefundBusy(false);
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    setMessage(res.message);
+    setRefundAmount('');
+    setRefundReason('');
+    router.refresh();
+  };
+
   const outstandingNote =
     visible.length === 1 ? '1 ticket awaiting payment' : `${visible.length} tickets awaiting payment`;
 
@@ -381,14 +572,141 @@ export function Cashier({
             }
             actions={
               !blocked ? (
-                <BtnLink href="/dashboard/orders" tone="ghost" size="sm">
-                  The ledger
-                </BtnLink>
+                <div className="flex flex-wrap items-center gap-2">
+                  {live && (data?.menuItems?.length ?? 0) > 0 ? (
+                    <button
+                      type="button"
+                      className={btn(showNewOrder ? 'solid' : 'ghost', 'sm')}
+                      onClick={() => setShowNewOrder((prev) => !prev)}
+                    >
+                      {showNewOrder ? 'Close counter entry' : '+ New counter order'}
+                    </button>
+                  ) : null}
+                  <BtnLink href="/dashboard/orders" tone="ghost" size="sm">
+                    The ledger
+                  </BtnLink>
+                </div>
               ) : null
             }
           />
 
           {blocked && <SignInPrompt reason={blocked} screen="counter" />}
+
+          {!blocked && live && showNewOrder && (data?.menuItems?.length ?? 0) > 0 ? (
+            <Panel title="New counter order" meta="Dine-in · Takeaway · Delivery" className="mb-5">
+              <div className="flex flex-wrap gap-2">
+                {(['dine_in', 'takeaway', 'delivery'] as const).map((ch) => (
+                  <button
+                    key={ch}
+                    type="button"
+                    onClick={() => setNewChannel(ch)}
+                    className={btn(newChannel === ch ? 'solid' : 'ghost', 'sm')}
+                  >
+                    {ch === 'dine_in' ? 'Dine-in' : ch === 'takeaway' ? 'Takeaway' : 'Delivery'}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                {newChannel === 'dine_in' ? (
+                  <label className="text-[12.5px] text-gink-64">
+                    Table
+                    <select
+                      value={newTableId}
+                      onChange={(e) => setNewTableId(e.target.value)}
+                      className="mt-1 w-full rounded-[var(--p-r-control)] border border-hair bg-paper px-2.5 py-2 text-[13px] text-gink"
+                    >
+                      {(data?.tables ?? []).map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <>
+                    <label className="text-[12.5px] text-gink-64">
+                      Customer name (optional)
+                      <input
+                        value={newCustomerName}
+                        onChange={(e) => setNewCustomerName(e.target.value)}
+                        className="mt-1 w-full rounded-[var(--p-r-control)] border border-hair bg-paper px-2.5 py-2 text-[13px] text-gink"
+                        placeholder="Guest name"
+                      />
+                    </label>
+                    <label className="text-[12.5px] text-gink-64">
+                      Phone (optional)
+                      <input
+                        value={newCustomerPhone}
+                        onChange={(e) => setNewCustomerPhone(e.target.value)}
+                        className="mt-1 w-full rounded-[var(--p-r-control)] border border-hair bg-paper px-2.5 py-2 text-[13px] text-gink"
+                        placeholder="10-digit mobile"
+                      />
+                    </label>
+                  </>
+                )}
+                <label className="text-[12.5px] text-gink-64">
+                  Kitchen / counter note (optional)
+                  <input
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    className="mt-1 w-full rounded-[var(--p-r-control)] border border-hair bg-paper px-2.5 py-2 text-[13px] text-gink"
+                    placeholder="Extra spicy, pack separate…"
+                  />
+                </label>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {(data?.menuItems ?? []).slice(0, 24).map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() =>
+                      setNewLines((prev) => {
+                        const existing = prev.find((l) => l.itemId === item.id && !l.variantId);
+                        if (existing) {
+                          return prev.map((l) =>
+                            l.itemId === item.id && !l.variantId ? { ...l, qty: l.qty + 1 } : l,
+                          );
+                        }
+                        return [...prev, { itemId: item.id, qty: 1 }];
+                      })
+                    }
+                    className="rounded-full border border-hair bg-paper px-3 py-1 text-[12.5px] text-gink hover:border-hair-strong"
+                  >
+                    + {item.name} ({inr(paiseToRupees(item.pricePaise))})
+                  </button>
+                ))}
+              </div>
+              {newLines.length > 0 ? (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-hair pt-3">
+                  <div className="flex flex-wrap gap-2 text-[12.5px] text-gink">
+                    {newLines.map((line) => {
+                      const item = data?.menuItems?.find((m) => m.id === line.itemId);
+                      return (
+                        <span key={line.itemId} className="inline-flex items-center gap-1.5 rounded bg-paper-deep px-2 py-1">
+                          {line.qty} × {item?.name ?? 'Item'}
+                          <button
+                            type="button"
+                            className="text-gink-46 hover:text-gink"
+                            onClick={() => setNewLines((prev) => prev.filter((l) => l.itemId !== line.itemId))}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <button
+                    type="button"
+                    className={btn('primary', 'sm')}
+                    disabled={creatingOrder}
+                    onClick={submitCounterOrder}
+                  >
+                    {creatingOrder ? 'Creating…' : 'Create counter order'}
+                  </button>
+                </div>
+              ) : null}
+            </Panel>
+          ) : null}
 
           {!blocked && (
             <div className="grid gap-5 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)] lg:items-start lg:gap-6">
@@ -552,27 +870,268 @@ export function Cashier({
                       <ul className="m-0 flex list-none flex-col gap-2 p-0">
                         <li className="flex items-baseline justify-between gap-4 text-[13px] text-gink-64">
                           <span className="min-w-0">{order.items}</span>
-                          <span className="shrink-0 tabular-nums">{inr(order.total)}</span>
+                          <span className="shrink-0 tabular-nums">
+                            {inr(paiseToRupees(order.subtotalPaise ?? Math.round(order.total * 100)))}
+                          </span>
                         </li>
+                        {(order.discountPaise ?? 0) > 0 ? (
+                          <li className="flex items-baseline justify-between gap-4 text-[12.5px] text-gink-64">
+                            <span>
+                              Discount {order.discountReason ? `(${order.discountReason})` : ''}
+                            </span>
+                            <span className="tabular-nums">−{inr(paiseToRupees(order.discountPaise ?? 0))}</span>
+                          </li>
+                        ) : null}
+                        {(order.serviceChargePaise ?? 0) > 0 ? (
+                          <li className="flex items-baseline justify-between gap-4 text-[12.5px] text-gink-64">
+                            <span>Service charge</span>
+                            <span className="tabular-nums">{inr(paiseToRupees(order.serviceChargePaise ?? 0))}</span>
+                          </li>
+                        ) : null}
+                        {(order.packagingChargePaise ?? 0) > 0 ? (
+                          <li className="flex items-baseline justify-between gap-4 text-[12.5px] text-gink-64">
+                            <span>Packaging charge</span>
+                            <span className="tabular-nums">{inr(paiseToRupees(order.packagingChargePaise ?? 0))}</span>
+                          </li>
+                        ) : null}
+                        {(order.deliveryChargePaise ?? 0) > 0 ? (
+                          <li className="flex items-baseline justify-between gap-4 text-[12.5px] text-gink-64">
+                            <span>Delivery charge</span>
+                            <span className="tabular-nums">{inr(paiseToRupees(order.deliveryChargePaise ?? 0))}</span>
+                          </li>
+                        ) : null}
+                        {(order.roundOffPaise ?? 0) !== 0 ? (
+                          <li className="flex items-baseline justify-between gap-4 text-[12.5px] text-gink-64">
+                            <span>Round-off</span>
+                            <span className="tabular-nums">
+                              {(order.roundOffPaise ?? 0) > 0 ? '+' : '−'}
+                              {inr(paiseToRupees(Math.abs(order.roundOffPaise ?? 0)))}
+                            </span>
+                          </li>
+                        ) : null}
                       </ul>
                       <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-hair pt-3 text-[13px]">
                         <span className="font-medium text-gink">Outstanding</span>
                         <strong className="tabular-nums text-gink">{inr(order.outstanding)}</strong>
                       </div>
 
-                      <div className="mt-5">
-                        <div className="mb-1.5 text-[12.5px] font-medium text-gink-64">
-                          Payment method
+                      {live && order.orderId && order.paid === 0 ? (
+                        <div className="mt-3">
+                          <button
+                            type="button"
+                            className={btn('ghost', 'sm')}
+                            onClick={openAdjustForOrder}
+                          >
+                            {showAdjust ? 'Hide bill adjustments' : 'Discount / charges / complimentary'}
+                          </button>
+                          {showAdjust ? (
+                            <div className="mt-2.5 grid gap-2.5 rounded-[var(--p-r-control)] border border-hair bg-paper-deep p-3 sm:grid-cols-2">
+                              <label className="text-[11.5px] text-gink-64">
+                                Discount (₹)
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step="1"
+                                  value={adjDiscount}
+                                  onChange={(e) => setAdjDiscount(e.target.value)}
+                                  className="mt-1 w-full rounded border border-hair bg-paper px-2 py-1.5 text-[12.5px] text-gink"
+                                />
+                              </label>
+                              <label className="text-[11.5px] text-gink-64">
+                                Discount reason
+                                <input
+                                  type="text"
+                                  value={adjDiscountReason}
+                                  onChange={(e) => setAdjDiscountReason(e.target.value)}
+                                  placeholder="e.g. Regular guest 10%"
+                                  className="mt-1 w-full rounded border border-hair bg-paper px-2 py-1.5 text-[12.5px] text-gink"
+                                />
+                              </label>
+                              <label className="text-[11.5px] text-gink-64">
+                                Service charge (₹)
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step="1"
+                                  value={adjService}
+                                  onChange={(e) => setAdjService(e.target.value)}
+                                  className="mt-1 w-full rounded border border-hair bg-paper px-2 py-1.5 text-[12.5px] text-gink"
+                                />
+                              </label>
+                              <label className="text-[11.5px] text-gink-64">
+                                Packaging (₹)
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step="1"
+                                  value={adjPackaging}
+                                  onChange={(e) => setAdjPackaging(e.target.value)}
+                                  className="mt-1 w-full rounded border border-hair bg-paper px-2 py-1.5 text-[12.5px] text-gink"
+                                />
+                              </label>
+                              <label className="text-[11.5px] text-gink-64">
+                                Delivery (₹)
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step="1"
+                                  value={adjDelivery}
+                                  onChange={(e) => setAdjDelivery(e.target.value)}
+                                  className="mt-1 w-full rounded border border-hair bg-paper px-2 py-1.5 text-[12.5px] text-gink"
+                                />
+                              </label>
+                              <label className="flex items-center gap-2 self-end pb-1.5 text-[12.5px] text-gink">
+                                <input
+                                  type="checkbox"
+                                  checked={adjRoundOff}
+                                  onChange={(e) => setAdjRoundOff(e.target.checked)}
+                                />
+                                Auto round-off to ₹1
+                              </label>
+                              {canManageRefunds ? (
+                                <div className="sm:col-span-2 flex flex-wrap items-center gap-2 border-t border-hair pt-2">
+                                  <label className="flex items-center gap-2 text-[12.5px] text-gink">
+                                    <input
+                                      type="checkbox"
+                                      checked={adjComplimentary}
+                                      onChange={(e) => setAdjComplimentary(e.target.checked)}
+                                    />
+                                    Mark complimentary (₹0)
+                                  </label>
+                                  {adjComplimentary ? (
+                                    <input
+                                      type="text"
+                                      value={adjCompReason}
+                                      onChange={(e) => setAdjCompReason(e.target.value)}
+                                      placeholder="Reason (required)"
+                                      className="flex-1 rounded border border-hair bg-paper px-2 py-1 text-[12.5px] text-gink"
+                                    />
+                                  ) : null}
+                                </div>
+                              ) : null}
+                              <div className="sm:col-span-2">
+                                <button
+                                  type="button"
+                                  className={btn('solid', 'sm')}
+                                  disabled={savingAdjust}
+                                  onClick={submitAdjustments}
+                                >
+                                  {savingAdjust ? 'Applying…' : 'Apply adjustments'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
-                        <Segmented
-                          label="Payment method"
-                          value={method}
-                          onChange={setMethod}
-                          options={COUNTER_METHODS.map((value) => ({
-                            value,
-                            label: COUNTER_METHOD_LABEL[value],
-                          }))}
-                        />
+                      ) : null}
+
+                      <div className="mt-5">
+                        <div className="mb-1.5 flex items-center justify-between gap-2">
+                          <span className="text-[12.5px] font-medium text-gink-64">Payment method</span>
+                          {live && order.orderId ? (
+                            <button
+                              type="button"
+                              className="text-[11.5px] font-medium text-gink underline decoration-hair-strong underline-offset-2"
+                              onClick={() => setSplitMode((prev) => !prev)}
+                            >
+                              {splitMode ? 'Single full payment' : 'Split / partial pay'}
+                            </button>
+                          ) : null}
+                        </div>
+                        {!splitMode ? (
+                          <Segmented
+                            label="Payment method"
+                            value={method}
+                            onChange={setMethod}
+                            options={COUNTER_METHODS.map((value) => ({
+                              value,
+                              label: COUNTER_METHOD_LABEL[value],
+                            }))}
+                          />
+                        ) : (
+                          <div className="flex flex-col gap-2 rounded-[var(--p-r-control)] border border-hair bg-paper-deep p-3">
+                            {splits.map((s, idx) => (
+                              <div key={idx} className="flex flex-wrap items-center gap-2">
+                                <select
+                                  value={s.method}
+                                  onChange={(e) =>
+                                    setSplits((prev) =>
+                                      prev.map((row, i) =>
+                                        i === idx ? { ...row, method: e.target.value as SplitMethod } : row,
+                                      ),
+                                    )
+                                  }
+                                  className="rounded border border-hair bg-paper px-2 py-1.5 text-[12.5px] text-gink"
+                                >
+                                  {SPLIT_METHODS.map((m) => (
+                                    <option key={m} value={m}>
+                                      {SPLIT_METHOD_LABEL[m]}
+                                    </option>
+                                  ))}
+                                </select>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  step="0.01"
+                                  placeholder="₹ amount"
+                                  value={s.amountRupees}
+                                  onChange={(e) =>
+                                    setSplits((prev) =>
+                                      prev.map((row, i) =>
+                                        i === idx ? { ...row, amountRupees: e.target.value } : row,
+                                      ),
+                                    )
+                                  }
+                                  className="w-28 rounded border border-hair bg-paper px-2 py-1.5 text-[12.5px] text-gink tabular-nums"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Label (e.g. Guest A)"
+                                  value={s.splitLabel}
+                                  onChange={(e) =>
+                                    setSplits((prev) =>
+                                      prev.map((row, i) =>
+                                        i === idx ? { ...row, splitLabel: e.target.value } : row,
+                                      ),
+                                    )
+                                  }
+                                  className="min-w-0 flex-1 rounded border border-hair bg-paper px-2 py-1.5 text-[12.5px] text-gink"
+                                />
+                                {splits.length > 1 ? (
+                                  <button
+                                    type="button"
+                                    className="text-[12.5px] text-gink-46 hover:text-gink"
+                                    onClick={() => setSplits((prev) => prev.filter((_, i) => i !== idx))}
+                                  >
+                                    ×
+                                  </button>
+                                ) : null}
+                              </div>
+                            ))}
+                            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                              <button
+                                type="button"
+                                className={btn('ghost', 'sm')}
+                                onClick={() =>
+                                  setSplits((prev) =>
+                                    prev.length < 10
+                                      ? [...prev, { method: 'cash', amountRupees: '', splitLabel: '' }]
+                                      : prev,
+                                  )
+                                }
+                              >
+                                + Add split
+                              </button>
+                              <button
+                                type="button"
+                                className={btn('primary', 'sm')}
+                                disabled={isPending}
+                                onClick={submitSplitPayment}
+                              >
+                                {isPending ? 'Recording…' : 'Record split / partial payment'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
@@ -719,6 +1278,59 @@ export function Cashier({
               )}
             </div>
           )}
+
+          {!blocked && live && canManageRefunds && (data?.refundablePayments?.length ?? 0) > 0 ? (
+            <Panel title="Refunds (owner / manager)" meta="last 24h" className="mt-6">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="text-[12.5px] text-gink-64">
+                  Settled payment
+                  <select
+                    value={refundPaymentId}
+                    onChange={(e) => setRefundPaymentId(e.target.value)}
+                    className="mt-1 w-full rounded-[var(--p-r-control)] border border-hair bg-paper px-2.5 py-2 text-[12.5px] text-gink"
+                  >
+                    {(data?.refundablePayments ?? []).map((p) => (
+                      <option key={p.paymentId} value={p.paymentId}>
+                        {p.orderCode} ({p.table}) · {p.method.toUpperCase()} {inr(paiseToRupees(p.refundablePaise))}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-[12.5px] text-gink-64">
+                  Refund amount (₹)
+                  <input
+                    type="number"
+                    min={1}
+                    step="0.01"
+                    value={refundAmount}
+                    onChange={(e) => setRefundAmount(e.target.value)}
+                    placeholder="e.g. 120"
+                    className="mt-1 w-full rounded-[var(--p-r-control)] border border-hair bg-paper px-2.5 py-2 text-[12.5px] text-gink tabular-nums"
+                  />
+                </label>
+                <label className="text-[12.5px] text-gink-64">
+                  Refund reason
+                  <input
+                    type="text"
+                    value={refundReason}
+                    onChange={(e) => setRefundReason(e.target.value)}
+                    placeholder="Item out of stock / customer dispute"
+                    className="mt-1 w-full rounded-[var(--p-r-control)] border border-hair bg-paper px-2.5 py-2 text-[12.5px] text-gink"
+                  />
+                </label>
+              </div>
+              <div className="mt-3">
+                <button
+                  type="button"
+                  className={btn('danger', 'sm')}
+                  disabled={refundBusy}
+                  onClick={submitRefund}
+                >
+                  {refundBusy ? 'Recording refund…' : 'Record audited refund'}
+                </button>
+              </div>
+            </Panel>
+          ) : null}
     </div>
   );
 

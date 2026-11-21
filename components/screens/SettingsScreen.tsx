@@ -18,6 +18,7 @@ import { PeoplePanel } from '@/components/owner/PeoplePanel';
 import { OperationsPanel } from '@/components/owner/OperationsPanel';
 import { formatTaxPercent, taxExamplePaise } from '@/lib/settings-input';
 import {
+  saveBillingDefaultsAction,
   saveDetailsAction,
   saveGuestVerificationAction,
   saveTaxAction,
@@ -394,6 +395,43 @@ export function SettingsScreen({
                       />
                     </Field>
                   </div>
+
+                  <div className="grid gap-3.5 sm:grid-cols-2">
+                    <Field
+                      label="FSSAI license number (optional)"
+                      htmlFor="settings-fssai"
+                      hint="14-digit FSSAI registration number printed on customer bills, tax invoices and PDFs when set."
+                    >
+                      <input
+                        id="settings-fssai"
+                        className={`${inputClass} tabular-nums`}
+                        name="fssaiNumber"
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={14}
+                        defaultValue={details.fssaiNumber ?? ''}
+                        disabled={disabled}
+                        placeholder="11524001000123"
+                      />
+                    </Field>
+
+                    <Field
+                      label="Bill footer / thank-you note (optional)"
+                      htmlFor="settings-bill-footer"
+                      hint="Short message printed at the bottom of 58mm, 80mm, A4 and shared bills (max 240 chars)."
+                    >
+                      <input
+                        id="settings-bill-footer"
+                        className={inputClass}
+                        name="billFooterNote"
+                        type="text"
+                        maxLength={240}
+                        defaultValue={details.billFooterNote ?? ''}
+                        disabled={disabled}
+                        placeholder="Thank you for dining with us! Visit again."
+                      />
+                    </Field>
+                  </div>
                   </FieldGroup>
 
                   <FieldGroup title="The link guests open" hint="One address, one restaurant. It is what the QR below encodes.">
@@ -531,6 +569,79 @@ export function SettingsScreen({
 
                 {/* ------------------------------------------------------ GST billing */}
                 <GstSettingsPanel gst={data?.gst ?? { ready: false, mode: 'off', regularProfile: 'other_than_specified_premises', gstin: '', legalName: '', tradeName: '', address: '', stateCode: '', pan: '', registrationType: 'regular', compositionAcknowledged: false, specifiedPremisesAttested: false, specifiedPremisesEffectiveFrom: '2025-04-01', offDeclared: false, offDeclaredAt: null, precedingFyTurnoverRupees: '', einvoiceLocation: '', einvoicePincode: '', einvoiceHsnSac: '', configVersion: 0, updatedAt: null }} disabled={disabled} />
+
+                {/* ------------------------------------ Default charges & round-off */}
+                <Panel
+                  title="Bill charges & round-off"
+                  meta={data?.billingDefaults?.roundOffEnabled ? 'Auto round-off ON' : 'Defaults'}
+                  bodyClassName="px-5 py-5"
+                >
+                  <p className="m-0 max-w-[62ch] text-[12.5px] leading-[1.5] text-gink-46">
+                    Optional default charges applied to new counter orders (cashier can override per
+                    bill) and automatic integer-rupee round-off. Owner-only.
+                  </p>
+                  <form action={saveBillingDefaultsAction} className="mt-4 flex flex-col gap-3.5">
+                    <div className="grid gap-3.5 sm:grid-cols-3">
+                      <Field label="Service charge (%)" htmlFor="settings-svc-charge" hint="Optional dine-in charge (0–20%).">
+                        <input
+                          id="settings-svc-charge"
+                          name="serviceChargePercent"
+                          type="text"
+                          inputMode="decimal"
+                          defaultValue={formatTaxPercent(data?.billingDefaults?.serviceChargeBps ?? 0)}
+                          disabled={disabled || data?.role !== 'owner'}
+                          className={`${inputClass} tabular-nums`}
+                        />
+                      </Field>
+                      <Field label="Packaging charge (₹)" htmlFor="settings-pkg-charge" hint="Default for takeaway & delivery.">
+                        <input
+                          id="settings-pkg-charge"
+                          name="packagingChargeRupees"
+                          type="number"
+                          min={0}
+                          max={500}
+                          step="1"
+                          defaultValue={paiseToRupees(data?.billingDefaults?.packagingChargePaise ?? 0)}
+                          disabled={disabled || data?.role !== 'owner'}
+                          className={`${inputClass} tabular-nums`}
+                        />
+                      </Field>
+                      <Field label="Delivery charge (₹)" htmlFor="settings-del-charge" hint="Default for delivery orders.">
+                        <input
+                          id="settings-del-charge"
+                          name="deliveryChargeRupees"
+                          type="number"
+                          min={0}
+                          max={1000}
+                          step="1"
+                          defaultValue={paiseToRupees(data?.billingDefaults?.deliveryChargePaise ?? 0)}
+                          disabled={disabled || data?.role !== 'owner'}
+                          className={`${inputClass} tabular-nums`}
+                        />
+                      </Field>
+                    </div>
+                    <label className="flex items-start gap-2.5 rounded-[var(--p-r-control)] border border-hair bg-paper-deep px-3 py-2.5 text-[12.5px] leading-[1.5]">
+                      <input
+                        type="checkbox"
+                        name="roundOffEnabled"
+                        defaultChecked={data?.billingDefaults?.roundOffEnabled ?? false}
+                        disabled={disabled || data?.role !== 'owner'}
+                        className="mt-0.5"
+                      />
+                      <span>
+                        <span className="font-medium text-gink">Auto round-off net bill to nearest ₹1</span>
+                        <span className="mt-0.5 block text-[11.5px] text-gink-46">
+                          Round-off (−₹0.50 to +₹0.50) is printed as a separate line on bills and invoices.
+                        </span>
+                      </span>
+                    </label>
+                    <div>
+                      <SubmitButton pendingLabel="Saving defaults…" disabled={disabled || data?.role !== 'owner'} tone="solid">
+                        Save charges &amp; rounding
+                      </SubmitButton>
+                    </div>
+                  </form>
+                </Panel>
 
                 {/* ------------------------------------------- how guests verify */}
                 <Panel

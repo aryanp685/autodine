@@ -20,6 +20,13 @@ export type Restaurant = {
   address: string | null;
   phone: string | null;
   gstin: string | null;
+  /** Migration 20261121000100 (Billing Spec v2.0). */
+  fssai_number?: string | null;
+  bill_footer_note?: string | null;
+  default_service_charge_bps?: number;
+  default_packaging_charge_paise?: number;
+  default_delivery_charge_paise?: number;
+  round_off_enabled?: boolean;
   timezone: string;
   tax_rate_bps: number;
   is_active: boolean;
@@ -171,17 +178,32 @@ export type DiningTable = {
   is_active: boolean;
 };
 
+export type OrderChannel = 'dine_in' | 'takeaway' | 'delivery';
+
 /** One guest sitting; independent of the short-lived QR verification session. */
 export type OrderSession = {
   id: string;
   restaurant_id: string;
-  table_id: string;
+  table_id: string | null;
+  order_channel?: OrderChannel;
+  customer_name?: string | null;
+  customer_phone?: string | null;
   opened_at: string;
   closed_at: string | null;
   closed_by: string | null;
   paid_at?: string | null;
   paid_by?: string | null;
   status: 'open' | 'closed';
+};
+
+export type RestaurantInvoiceReprint = {
+  id: string;
+  restaurant_id: string;
+  invoice_id: string;
+  copy_number: number;
+  format: '58mm' | '80mm' | 'a4' | 'pdf' | 'escpos';
+  reprinted_by: string | null;
+  reprinted_at: string;
 };
 
 export type RestaurantInvoice = {
@@ -365,6 +387,15 @@ export type Order = {
   kitchen_announcement_status?: 'announced' | 'failed' | null;
   kitchen_announcement_at?: string | null;
   kitchen_announcement_error?: string | null;
+  /** Migration 20261121000100 (Billing Spec v2.0). */
+  order_channel?: OrderChannel;
+  discount_reason?: string | null;
+  is_complimentary?: boolean;
+  complimentary_reason?: string | null;
+  service_charge_paise?: number;
+  packaging_charge_paise?: number;
+  delivery_charge_paise?: number;
+  round_off_paise?: number;
 };
 
 /** A guest's open request for a staff member to visit their table. */

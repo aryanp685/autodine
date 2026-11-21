@@ -25,10 +25,12 @@ import type {
   ItemVariant,
   Menu,
   Order,
+  OrderChannel,
   OrderItem,
   OrderSession,
   RestaurantInvoice,
   RestaurantInvoiceLine,
+  RestaurantInvoiceReprint,
   RestaurantNote,
   RestaurantNoteEvent,
   RestaurantPaymentReceipt,
@@ -71,6 +73,13 @@ type OperationalOrder = Omit<
   | 'tax_rate_bps_snapshot'
   | 'confirmed_by'
   | 'order_session_id'
+  | 'discount_reason'
+  | 'is_complimentary'
+  | 'complimentary_reason'
+  | 'service_charge_paise'
+  | 'packaging_charge_paise'
+  | 'delivery_charge_paise'
+  | 'round_off_paise'
 >;
 
 /** Line-item facts available to all staff; prices use order_items_finance. */
@@ -253,6 +262,8 @@ export type Database = {
       restaurant_invoice_lines: Table<RestaurantInvoiceLine>;
       /** Immutable supplemental receipts for payments received after invoicing. */
       restaurant_payment_receipts: Table<RestaurantPaymentReceipt>;
+      /** Immutable audit log of invoice reprints (20261121000100). */
+      restaurant_invoice_reprints: Table<RestaurantInvoiceReprint>;
       /** Full-document credit/debit notes against GST documents (20261114000500). */
       restaurant_notes: Table<RestaurantNote>;
       /** Append-only issuance/void audit for notes (20261114000500). */
@@ -395,7 +406,7 @@ export type Database = {
         order_id: string;
         restaurant_id: string;
         /** `manual` is internal-only for the table-level Mark Paid action. */
-        method: 'cash' | 'card' | 'upi' | 'online' | 'manual';
+        method: 'cash' | 'card' | 'upi' | 'online' | 'manual' | 'other';
         amount_paise: number;
         status: 'pending' | 'recorded' | 'failed' | 'refunded';
         provider: string | null;
@@ -404,12 +415,15 @@ export type Database = {
         /** The provider's id for the money, e.g. Razorpay pay_.... Migration 00800. */
         provider_payment_ref: string | null;
         idempotency_key: string | null;
+        refund_of_payment_id?: string | null;
+        refund_reason?: string | null;
+        split_label?: string | null;
         created_at: string;
         recorded_at: string | null;
       }>;
     };
     Views: {
-      /** Migration 20261112000500. Owner/Manager/Cashier projection; never contains guest_token. */
+      /** Migration 20261112000500 + 20261121000100. Owner/Manager/Cashier projection; never contains guest_token. */
       orders_finance: {
         Row: {
           id: string;
@@ -433,6 +447,14 @@ export type Database = {
           kitchen_announcement_status: 'announced' | 'failed' | null;
           kitchen_announcement_at: string | null;
           kitchen_announcement_error: string | null;
+          order_channel: OrderChannel;
+          discount_reason: string | null;
+          is_complimentary: boolean;
+          complimentary_reason: string | null;
+          service_charge_paise: number;
+          packaging_charge_paise: number;
+          delivery_charge_paise: number;
+          round_off_paise: number;
         };
         Relationships: [];
       };
@@ -1347,6 +1369,74 @@ export type Database = {
       restaurant_has_feature: {
         Args: { p_restaurant_id: string; p_feature: string };
         Returns: boolean;
+      };
+      /** Migration 20261121000100 (Billing Spec v2.0). */
+      create_counter_order: {
+        Args: {
+          p_restaurant_id: string;
+          p_channel: string;
+          p_table_id?: string | null;
+          p_lines?: unknown;
+          p_note?: string | null;
+          p_customer_name?: string | null;
+          p_customer_phone?: string | null;
+        };
+        Returns: Json;
+      };
+      apply_order_billing_adjustment: {
+        Args: {
+          p_order_id: string;
+          p_discount_paise?: number | null;
+          p_discount_reason?: string | null;
+          p_service_charge_paise?: number | null;
+          p_packaging_charge_paise?: number | null;
+          p_delivery_charge_paise?: number | null;
+          p_round_off?: boolean | null;
+          p_is_complimentary?: boolean | null;
+          p_complimentary_reason?: string | null;
+        };
+        Returns: Json;
+      };
+      record_split_counter_payments: {
+        Args: {
+          p_order_id: string;
+          p_splits: unknown;
+          p_idempotency_key: string;
+        };
+        Returns: Json;
+      };
+      record_counter_refund: {
+        Args: {
+          p_payment_id: string;
+          p_amount_paise: number;
+          p_reason: string;
+          p_idempotency_key: string;
+        };
+        Returns: Json;
+      };
+      record_invoice_reprint: {
+        Args: {
+          p_invoice_id: string;
+          p_format?: string;
+        };
+        Returns: Json;
+      };
+      report_billing_summary: {
+        Args: {
+          p_restaurant_id: string;
+          p_from: string;
+          p_to: string;
+          p_timezone?: string;
+        };
+        Returns: Json;
+      };
+      report_day_end_closing: {
+        Args: {
+          p_restaurant_id: string;
+          p_date?: string;
+          p_timezone?: string;
+        };
+        Returns: Json;
       };
     };
     Enums: {

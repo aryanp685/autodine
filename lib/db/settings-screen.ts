@@ -30,7 +30,16 @@ export type SettingsRestaurant = {
   address: string;
   phone: string;
   gstin: string;
+  fssaiNumber?: string;
+  billFooterNote?: string;
   slug: string;
+};
+
+export type BillingDefaultsSettings = {
+  serviceChargeBps: number;
+  packagingChargePaise: number;
+  deliveryChargePaise: number;
+  roundOffEnabled: boolean;
 };
 
 export type SettingsScreenData = {
@@ -39,6 +48,7 @@ export type SettingsScreenData = {
   canEdit: boolean;
   details: SettingsRestaurant;
   taxRateBps: number;
+  billingDefaults?: BillingDefaultsSettings;
   /**
    * Migration 20261028000900. How a guest proves they are at a table.
    *
@@ -109,6 +119,8 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
    * defaulting to 'code', which is what an unmigrated database enforces anyway.
    */
   const restaurantColumns =
+    'name, tagline, address, phone, gstin, fssai_number, bill_footer_note, slug, timezone, tax_rate_bps, guest_verification_mode, default_service_charge_bps, default_packaging_charge_paise, default_delivery_charge_paise, round_off_enabled';
+  const restaurantColumnsPreV2 =
     'name, tagline, address, phone, gstin, slug, timezone, tax_rate_bps, guest_verification_mode';
   const restaurantColumnsLegacy =
     'name, tagline, address, phone, gstin, slug, timezone, tax_rate_bps';
@@ -119,14 +131,23 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
     .eq('id', restaurantId)
     .maybeSingle();
 
-  const restaurantResult =
+  const secondRestaurantResult =
     firstRestaurantResult.error?.code === '42703'
+      ? await supabase
+          .from('restaurants')
+          .select(restaurantColumnsPreV2)
+          .eq('id', restaurantId)
+          .maybeSingle()
+      : firstRestaurantResult;
+
+  const restaurantResult =
+    secondRestaurantResult.error?.code === '42703'
       ? await supabase
           .from('restaurants')
           .select(restaurantColumnsLegacy)
           .eq('id', restaurantId)
           .maybeSingle()
-      : firstRestaurantResult;
+      : secondRestaurantResult;
 
   const [menusResult, gst] = await Promise.all([
     supabase.from('menus').select('id, is_published').eq('restaurant_id', restaurantId),
@@ -179,7 +200,15 @@ export async function getSettingsScreenData(): Promise<SettingsScreenData | null
       address: String(row.address ?? ''),
       phone: String(row.phone ?? ''),
       gstin: String(row.gstin ?? ''),
+      fssaiNumber: String((row as { fssai_number?: string | null }).fssai_number ?? ''),
+      billFooterNote: String((row as { bill_footer_note?: string | null }).bill_footer_note ?? ''),
       slug,
+    },
+    billingDefaults: {
+      serviceChargeBps: Number((row as { default_service_charge_bps?: number | null }).default_service_charge_bps ?? 0),
+      packagingChargePaise: Number((row as { default_packaging_charge_paise?: number | null }).default_packaging_charge_paise ?? 0),
+      deliveryChargePaise: Number((row as { default_delivery_charge_paise?: number | null }).default_delivery_charge_paise ?? 0),
+      roundOffEnabled: (row as { round_off_enabled?: boolean | null }).round_off_enabled === true,
     },
     // A database with no rate at all is read as 0, not as the sample 5% in
     // lib/pricing.ts. The sample is a layout number; charging it would be

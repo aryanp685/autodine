@@ -93,11 +93,18 @@ export type ReceiptData = {
     legalName: string | null;
     tradeName: string | null;
     stateCode: string | null;
+    fssaiNumber?: string | null;
+    billFooterNote?: string | null;
+    orderChannel?: string | null;
   };
   totals: {
     subtotalPaise: number;
     ticketDiscountPaise: number;
     billDiscountPaise: number;
+    serviceChargePaise?: number;
+    packagingChargePaise?: number;
+    deliveryChargePaise?: number;
+    roundOffPaise?: number;
     taxablePaise: number | null;
     taxPaise: number;
     otherChargesPaise: number;
@@ -106,6 +113,7 @@ export type ReceiptData = {
     outstandingPaise: number;
     paymentStatus: 'paid' | 'unpaid';
   };
+  printCount?: number;
   payments: InvoicePaymentData[];
   paymentReceipts: InvoicePaymentReceiptData[];
   shareLinks?: InvoiceShareLinkData[];
@@ -134,6 +142,14 @@ const integer = (value: unknown): number => {
 };
 const nullableInteger = (value: unknown): number | null =>
   value == null ? null : integer(value);
+const signedInteger = (value: unknown): number => {
+  if (value == null) return 0;
+  const parsed = typeof value === 'number' ? value : Number(value);
+  if (!Number.isSafeInteger(parsed)) {
+    throw new Error('The saved receipt contains an invalid round-off value.');
+  }
+  return parsed;
+};
 const requiredText = (value: unknown, field: string): string => {
   const parsed = text(value).trim();
   if (!parsed) throw new Error(`The saved receipt is missing ${field}.`);
@@ -289,11 +305,18 @@ export function parseInvoice(
       legalName: nullableText(seller.legal_name),
       tradeName: nullableText(seller.trade_name),
       stateCode: nullableText(seller.state_code),
+      fssaiNumber: nullableText(seller.fssai_number),
+      billFooterNote: nullableText(seller.bill_footer_note),
+      orderChannel: nullableText(seller.order_channel),
     },
     totals: {
       subtotalPaise: integer(totals.subtotal_paise),
       ticketDiscountPaise: integer(totals.ticket_discount_paise),
       billDiscountPaise: integer(totals.bill_discount_paise),
+      serviceChargePaise: totals.service_charge_paise != null ? integer(totals.service_charge_paise) : 0,
+      packagingChargePaise: totals.packaging_charge_paise != null ? integer(totals.packaging_charge_paise) : 0,
+      deliveryChargePaise: totals.delivery_charge_paise != null ? integer(totals.delivery_charge_paise) : 0,
+      roundOffPaise: signedInteger(totals.round_off_paise),
       taxablePaise: nullableInteger(totals.taxable_paise),
       taxPaise: integer(totals.tax_paise),
       otherChargesPaise: integer(totals.other_charges_paise),
@@ -357,6 +380,14 @@ export async function getInvoiceData(invoiceId: string): Promise<InvoiceResult> 
     accessCount: Number(link.access_count),
   }));
 
+  const reprintResult = await supabase
+    .from('restaurant_invoice_reprints')
+    .select('copy_number')
+    .eq('invoice_id', invoice.id)
+    .order('copy_number', { ascending: false })
+    .limit(1);
+  const printCount = reprintResult.error ? 0 : Number(reprintResult.data?.[0]?.copy_number ?? 0);
+
   return {
     ok: true,
     role: staff.context.role,
@@ -368,6 +399,7 @@ export async function getInvoiceData(invoiceId: string): Promise<InvoiceResult> 
         timezone,
       ),
       shareLinks,
+      printCount,
     },
   };
 }

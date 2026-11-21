@@ -179,7 +179,7 @@ async function loadActiveSessions(
   if (orderRows.length === 0) return [];
 
   const orderIds = orderRows.map((order) => order.id);
-  const tableIds = [...new Set(sessions.map((session) => session.table_id))];
+  const tableIds = [...new Set(sessions.map((session) => session.table_id).filter((id): id is string => Boolean(id)))];
   const [paymentsResult, tablesResult, itemsResult] = await Promise.all([
     supabase
       .from('payments')
@@ -269,7 +269,7 @@ async function loadActiveSessions(
 
     return [{
       id: session.id,
-      table: labelByTable.get(session.table_id) ?? 'Table',
+      table: (session.table_id ? labelByTable.get(session.table_id) : null) ?? 'Counter',
       openedAt: session.opened_at,
       orderCount: tickets.length,
       orderCodes: tickets.map((order) => order.code),

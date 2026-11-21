@@ -25,6 +25,7 @@ vi.mock('@/app/(staff)/dashboard/settings/gst-actions', () => ({
 vi.mock('@/app/(staff)/dashboard/settings/actions', () => ({
   saveDetailsAction: mocks.action('saveDetailsAction'),
   saveTaxAction: mocks.action('saveTaxAction'),
+  saveBillingDefaultsAction: mocks.action('saveBillingDefaultsAction'),
   saveOnlinePaymentsAction: mocks.action('saveOnlinePaymentsAction'),
   saveUpiAction: mocks.action('saveUpiAction'),
   saveGuestVerificationAction: mocks.action('saveGuestVerificationAction'),
@@ -299,12 +300,15 @@ describe('Settings, the redesign', () => {
   });
 
   it('gives every form the same commit button', () => {
-    // Five forms, five saves, one appearance: the accent fill at the same size,
-    // so "which control commits this card" is answered the same way every time.
-    // The last is the guest-verification choice (migration 20261028000900);
-    // the GST card (migration 20261113000100) is one more save, same appearance.
+    // Six forms, six saves, one appearance: Details, Tax, GST Billing,
+    // Bill charges & round-off, Guest verification, and Menu QR/UPI/etc.
     const html = renderToStaticMarkup(<SettingsScreen data={data()} />);
-    expect(count(html, 'bg-grass text-cream')).toBe(5);
+    expect(count(html, 'bg-grass text-cream')).toBe(6);
+    expect(html).toContain('Mode 1 · Normal Billing (GST Disabled)');
+    expect(html).toContain('Mode 2 · GST Billing (GST Enabled)');
+    expect(html).toContain('FSSAI license number');
+    expect(html).toContain('Bill footer / thank-you note');
+    expect(html).toContain('Bill charges &amp; round-off');
   });
 
   it('draws no hand-made alert boxes any more', () => {

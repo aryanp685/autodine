@@ -21,7 +21,6 @@ import type { CancelledTicket, KitchenScreenData, KitchenTicket, KitchenWaiterCa
 import { claimKitchenSpeaker, type KitchenSpeakerState } from '@/lib/kitchen-speaker-lock';
 import { readMissedOrderIds, writeMissedOrderIds } from '@/lib/kitchen-missed';
 import { clockTimeInZone } from '@/lib/db/time';
-import { printKitchenKot } from '@/lib/kot-print';
 import { confirmedPrepChange, LATE_AFTER_MIN, WARN_AFTER_MIN, nextPrepState, type PrepState } from '@/lib/db/prep';
 import {
   advanceOrderAction,
@@ -2101,38 +2100,6 @@ export function Kitchen({
                   )}
 
                   <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-hair pt-2.5">
-                    {o.orderId ? (
-                      <button
-                        type="button"
-                        className={btn('ghost', 'sm')}
-                        title="Open this kitchen ticket in browser print"
-                        aria-label={`Print KOT for order ${o.code}`}
-                        data-print-kot={o.orderId}
-                        onClick={() => {
-                          setError('');
-                          const opened = printKitchenKot({
-                            restaurantName: data?.restaurantName ?? restaurant.name,
-                            ticketCode: o.code,
-                            table: o.table,
-                            placedAt: o.placedAt,
-                            note: o.note ?? null,
-                            items: o.items.map((item) => {
-                              const detailParts = item.detail?.split(' · ').filter(Boolean) ?? [];
-                              return {
-                                quantity: item.qty,
-                                name: item.name,
-                                portion: item.portion ?? null,
-                                addons: item.addons ?? detailParts.filter((part) => part !== item.portion),
-                              };
-                            }),
-                          });
-                          if (!opened) setError('The print window was blocked. Allow pop-ups for this site, then print the KOT again.');
-                        }}
-                      >
-                        Print KOT
-                      </button>
-                    ) : null}
-
                     {interactive && o.state === 'new' && (
                       <button
                         type="button"

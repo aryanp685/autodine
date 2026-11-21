@@ -85,7 +85,7 @@ try {
   // Keep this exact count synchronized with the migration chain: a lower
   // bound would allow one or more missing files to be hidden by the current
   // count, and an added migration must deliberately update this assertion.
-  const expectedRepositoryMigrations = 104;
+  const expectedRepositoryMigrations = 105;
   const requiredBoundaryMigrations = [
     '20261112000500_role_scoped_order_reads.sql',
     '20261112000600_cap_subscription_history_ceiling.sql',
@@ -94,6 +94,7 @@ try {
     '20261118002200_qr_code_staff_boundary.sql',
     '20261118002300_qr_owner_management.sql',
     '20261119000400_announcement_claim_recovery.sql',
+    '20261121000100_billing_v2_foundation.sql',
   ];
   const missingBoundaryMigrations = requiredBoundaryMigrations.filter((file) => !migrationFiles.includes(file));
   if (migrationFiles.length !== expectedRepositoryMigrations || missingBoundaryMigrations.length > 0) {

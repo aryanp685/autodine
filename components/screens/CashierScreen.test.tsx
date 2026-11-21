@@ -8,7 +8,13 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => {}, push:
 
 /* The server actions reach lib/supabase/admin.ts through the action module.
    These tests render markup; they never call one. */
-vi.mock('@/app/(staff)/cashier/actions', () => ({ recordPaymentAction: async () => ({ ok: true }) }));
+vi.mock('@/app/(staff)/cashier/actions', () => ({
+  recordPaymentAction: async () => ({ ok: true }),
+  createCounterOrderAction: async () => ({ ok: true }),
+  applyBillingAdjustmentAction: async () => ({ ok: true }),
+  recordSplitPaymentAction: async () => ({ ok: true }),
+  recordRefundAction: async () => ({ ok: true }),
+}));
 vi.mock('@/app/orders/actions', () => ({ cancelStaffOrderAction: async () => ({ ok: true }) }));
 
 /**
@@ -182,5 +188,54 @@ describe('Counter, the redesign', () => {
     const opening = doc.slice(from, doc.indexOf('>', from) + 1);
     expect(opening).toContain('rounded-[var(--p-r-block)]');
     expect(opening).not.toContain('rounded-full');
+  });
+
+  it('shows counter order entry, bill adjustments, split pay, and role-gated refunds in live mode', () => {
+    const liveData = {
+      restaurantName: 'Kabir',
+      role: 'manager' as const,
+      tables: [{ id: 't-1', label: 'T1' }],
+      menuItems: [{ id: 'i-1', name: 'Masala Chai', pricePaise: 4000, variants: [] }],
+      refundablePayments: [
+        {
+          paymentId: 'p-1',
+          orderId: 'o-0',
+          orderCode: 'KA-10001',
+          table: 'T2',
+          method: 'cash',
+          amountPaise: 12000,
+          refundedPaise: 0,
+          refundablePaise: 12000,
+          at: '7:30 pm',
+        },
+      ],
+      queue: [
+        {
+          id: 'o-1',
+          code: 'KA-10002',
+          table: 'T1',
+          at: '8:00 pm',
+          state: 'Ready',
+          total: 250,
+          outstanding: 250,
+          paid: 0,
+          items: '2 × Paneer Tikka',
+          pendingOnline: false,
+          subtotalPaise: 25000,
+          serviceChargePaise: 1250,
+        },
+      ],
+    };
+
+    const managerHtml = renderToStaticMarkup(<Cashier nav={nav} data={liveData} />);
+    expect(managerHtml).toContain('+ New counter order');
+    expect(managerHtml).toContain('Discount / charges / complimentary');
+    expect(managerHtml).toContain('Split / partial pay');
+    expect(managerHtml).toContain('Refunds (owner / manager)');
+
+    const cashierHtml = renderToStaticMarkup(
+      <Cashier nav={nav} data={{ ...liveData, role: 'cashier' }} />,
+    );
+    expect(cashierHtml).not.toContain('Refunds (owner / manager)');
   });
 });

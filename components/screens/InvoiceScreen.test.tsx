@@ -264,5 +264,41 @@ describe('P10 real-world receipt scenarios', () => {
     const output = html();
     expect(output).toContain('Share receipt');
     expect(output).toContain('Print / Save PDF');
+    expect(output).toContain('ESC/POS bridge');
+  });
+
+  it('prints FSSAI, bill footer note, itemized charges, round-off, and DUPLICATE copy # when reprinted', () => {
+    const data = invoice({
+      printCount: 3,
+      seller: {
+        ...invoice().seller,
+        fssaiNumber: '11524001000123',
+        billFooterNote: 'Visit again soon!',
+        orderChannel: 'delivery',
+      },
+      tableLabel: 'Delivery',
+      totals: {
+        ...invoice().totals,
+        serviceChargePaise: 500,
+        packagingChargePaise: 1500,
+        deliveryChargePaise: 3000,
+        roundOffPaise: -40,
+        otherChargesPaise: 5000,
+        totalPaise: 104_960,
+        outstandingPaise: 104_960,
+      },
+    });
+    const output = html(data);
+    const shared = buildReceiptMessage(data);
+
+    expect(output).toContain('DUPLICATE COPY #3');
+    expect(output).toContain('FSSAI Lic. No. 11524001000123');
+    expect(output).toContain('Visit again soon!');
+    expect(output).toContain('Service charge');
+    expect(output).toContain('Packaging charge');
+    expect(output).toContain('Delivery charge');
+    expect(output).toContain('Round-off');
+    expect(shared).toContain('FSSAI Lic. No. 11524001000123');
+    expect(shared).toContain('Visit again soon!');
   });
 });

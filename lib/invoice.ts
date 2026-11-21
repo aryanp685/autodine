@@ -1,7 +1,13 @@
 import { formatBillMoney } from '@/lib/bill';
 
 type ShareReceiptInput = {
-  seller: { name: string; gstin?: string | null; stateCode?: string | null };
+  seller: {
+    name: string;
+    gstin?: string | null;
+    stateCode?: string | null;
+    fssaiNumber?: string | null;
+    billFooterNote?: string | null;
+  };
   number: string;
   issuedAt: string;
   documentType?: 'receipt' | 'gst_tax_invoice' | 'bill_of_supply';
@@ -30,6 +36,10 @@ type ShareReceiptInput = {
     subtotalPaise: number;
     ticketDiscountPaise: number;
     billDiscountPaise: number;
+    serviceChargePaise?: number;
+    packagingChargePaise?: number;
+    deliveryChargePaise?: number;
+    roundOffPaise?: number;
     taxPaise: number;
     otherChargesPaise: number;
     totalPaise: number;
@@ -59,6 +69,9 @@ export function buildReceiptMessage(invoice: ShareReceiptInput): string {
   ];
   if (docType !== 'receipt' && invoice.seller.gstin) {
     lines.push(`GSTIN ${invoice.seller.gstin}${invoice.gst?.placeOfSupplyStateCode ? ` · Place of supply ${invoice.gst.placeOfSupplyStateCode}` : ''}`);
+  }
+  if (invoice.seller.fssaiNumber) {
+    lines.push(`FSSAI Lic. No. ${invoice.seller.fssaiNumber}`);
   }
   if (docType === 'bill_of_supply' && invoice.gst?.notice) {
     lines.push(invoice.gst.notice);
@@ -94,8 +107,26 @@ export function buildReceiptMessage(invoice: ShareReceiptInput): string {
   if (invoice.totals.billDiscountPaise > 0) {
     lines.push(`Bill discount: −${formatBillMoney(invoice.totals.billDiscountPaise)}`);
   }
-  if (invoice.totals.otherChargesPaise > 0) {
+  const itemizedCharges =
+    (invoice.totals.serviceChargePaise ?? 0) +
+    (invoice.totals.packagingChargePaise ?? 0) +
+    (invoice.totals.deliveryChargePaise ?? 0);
+  if (itemizedCharges > 0) {
+    if ((invoice.totals.serviceChargePaise ?? 0) > 0) {
+      lines.push(`Service charge: ${formatBillMoney(invoice.totals.serviceChargePaise ?? 0)}`);
+    }
+    if ((invoice.totals.packagingChargePaise ?? 0) > 0) {
+      lines.push(`Packaging charge: ${formatBillMoney(invoice.totals.packagingChargePaise ?? 0)}`);
+    }
+    if ((invoice.totals.deliveryChargePaise ?? 0) > 0) {
+      lines.push(`Delivery charge: ${formatBillMoney(invoice.totals.deliveryChargePaise ?? 0)}`);
+    }
+  } else if (invoice.totals.otherChargesPaise > 0) {
     lines.push(`Other charges: ${formatBillMoney(invoice.totals.otherChargesPaise)}`);
+  }
+  if ((invoice.totals.roundOffPaise ?? 0) !== 0) {
+    const ro = invoice.totals.roundOffPaise ?? 0;
+    lines.push(`Round-off: ${ro > 0 ? '+' : '−'}${formatBillMoney(Math.abs(ro))}`);
   }
   lines.push(
     `Total payable: ${formatBillMoney(invoice.totals.totalPaise)}`,
@@ -107,6 +138,7 @@ export function buildReceiptMessage(invoice: ShareReceiptInput): string {
       : docType === 'bill_of_supply'
         ? ['Bill of Supply. Composition taxable person.']
         : ['GST tax invoice. Place of supply as shown above.']),
+    ...(invoice.seller.billFooterNote ? [invoice.seller.billFooterNote] : []),
   );
   return lines.join('\n');
 }

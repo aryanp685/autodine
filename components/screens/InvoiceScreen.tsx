@@ -3,12 +3,16 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { createInvoiceShareLinkAction, revokeInvoiceShareLinkAction } from '@/app/(staff)/dashboard/share-actions';
-
-import { PrintButton } from '@/components/PrintButton';
+import { recordInvoiceReprintAction } from '@/app/(staff)/dashboard/invoice-print-actions';
 import { EinvoiceAttemptButton } from '@/components/screens/EinvoiceAttemptButton';
 import { btn } from '@/components/owner/chrome';
 import { formatBillMoney, paymentMethodLabel, whatsAppLink } from '@/lib/bill';
 import { buildReceiptMessage } from '@/lib/invoice';
+import {
+  PRINT_BRIDGE_STORAGE_KEY,
+  getConfiguredPrintBridgeUrl,
+  sendToLocalPrintBridge,
+} from '@/lib/print-bridge';
 import type { ReceiptData } from '@/lib/db/invoice';
 
 type Layout = 'a4' | '58mm' | '80mm';
@@ -25,7 +29,13 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
   const [createdLink, setCreatedLink] = useState<{ id: string; href: string; expiresAt: string } | null>(null);
   const [shareBusy, setShareBusy] = useState(false);
   const [shareMessage, setShareMessage] = useState('');
+  const [printCount, setPrintCount] = useState<number>(invoice.printCount ?? 0);
+  const [printBusy, setPrintBusy] = useState(false);
+  const [bridgeUrl, setBridgeUrl] = useState<string>(() => getConfiguredPrintBridgeUrl() ?? '');
+  const [showBridgeConfig, setShowBridgeConfig] = useState(false);
+  const [printNotice, setPrintNotice] = useState('');
   const page = PAGE[layout];
+  const isDuplicate = printCount > 1;
   const shareText = buildReceiptMessage(invoice);
   const paid = invoice.totals.paymentStatus === 'paid';
   const docType = invoice.documentType;
@@ -85,6 +95,79 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
     window.open(whatsAppLink('', shareText), '_blank', 'noopener,noreferrer');
   }
 
+  async function handlePrint() {
+    if (printBusy) return;
+    setPrintNotice('');
+    if (!shared) {
+      setPrintBusy(true);
+      const res = await recordInvoiceReprintAction(invoice.id, layout);
+      setPrintBusy(false);
+      if (res.ok) {
+        setPrintCount(res.copyNumber);
+      }
+    }
+    window.print();
+  }
+
+  async function handleThermalBridge() {
+    if (printBusy) return;
+    setPrintNotice('');
+    const widthMm: 58 | 80 = layout === '58mm' ? 58 : 80;
+    const savedUrl = bridgeUrl.trim();
+    if (savedUrl && typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(PRINT_BRIDGE_STORAGE_KEY, savedUrl);
+      } catch {
+        // Ignore storage errors in private mode.
+      }
+    }
+    let nextCopy = printCount;
+    if (!shared) {
+      setPrintBusy(true);
+      const rep = await recordInvoiceReprintAction(invoice.id, 'escpos');
+      setPrintBusy(false);
+      if (rep.ok) {
+        nextCopy = rep.copyNumber;
+        setPrintCount(rep.copyNumber);
+      }
+    }
+    const result = await sendToLocalPrintBridge(
+      {
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.number,
+        widthMm,
+        isDuplicate: nextCopy > 1,
+        copyNumber: Math.max(1, nextCopy),
+        sellerName: invoice.seller.name,
+        sellerAddress: invoice.seller.address,
+        gstin: invoice.seller.gstin,
+        fssaiNumber: invoice.seller.fssaiNumber,
+        issuedAt: invoice.issuedAt,
+        tableLabel: invoice.tableLabel,
+        lines: invoice.lines.map((l) => ({
+          qty: l.quantity,
+          name: l.itemName,
+          variant: l.variant,
+          addons: l.addons,
+          amountPaise: l.amountPaise,
+        })),
+        totals: {
+          subtotalPaise: invoice.totals.subtotalPaise,
+          discountPaise: invoice.totals.ticketDiscountPaise + invoice.totals.billDiscountPaise,
+          serviceChargePaise: invoice.totals.serviceChargePaise ?? 0,
+          packagingChargePaise: invoice.totals.packagingChargePaise ?? 0,
+          deliveryChargePaise: invoice.totals.deliveryChargePaise ?? 0,
+          roundOffPaise: invoice.totals.roundOffPaise ?? 0,
+          taxPaise: invoice.totals.taxPaise,
+          totalPaise: invoice.totals.totalPaise,
+        },
+        footerNote: invoice.seller.billFooterNote,
+      },
+      savedUrl || undefined,
+    );
+    setPrintNotice(result.ok ? result.message : result.error);
+  }
+
   const layoutClass = layout === 'a4'
     ? 'max-w-[760px] p-6'
     : layout === '58mm'
@@ -124,9 +207,50 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
             {!shared && (staffRole === 'owner' || staffRole === 'manager') ? (
               <EinvoiceAttemptButton invoiceId={invoice.id} irpStatus={invoice.irpStatus} />
             ) : null}
-            <PrintButton className={btn('solid', 'sm')}>Print / Save PDF</PrintButton>
+            {!shared ? (
+              <button
+                type="button"
+                className={btn('ghost', 'sm')}
+                onClick={() => setShowBridgeConfig((prev) => !prev)}
+              >
+                ESC/POS bridge
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className={btn('solid', 'sm')}
+              disabled={printBusy}
+              onClick={() => void handlePrint()}
+            >
+              {printBusy ? 'Preparing…' : 'Print / Save PDF'}
+            </button>
           </div>
         </div>
+        {!shared && showBridgeConfig ? (
+          <div className="mx-auto mt-2.5 flex max-w-[820px] flex-wrap items-center gap-2 border-t border-hair pt-2.5 text-[11.5px]">
+            <input
+              type="url"
+              aria-label="ESC/POS Print Bridge URL"
+              value={bridgeUrl}
+              onChange={(e) => setBridgeUrl(e.target.value)}
+              placeholder="Local Print Bridge URL (optional)"
+              className="min-w-[220px] flex-1 rounded border border-hair bg-card px-2.5 py-1 text-gink"
+            />
+            <button
+              type="button"
+              className={btn('ghost', 'sm')}
+              disabled={printBusy}
+              onClick={() => void handleThermalBridge()}
+            >
+              Send {layout === '58mm' ? '58 mm' : '80 mm'} ESC/POS
+            </button>
+          </div>
+        ) : null}
+        {printNotice ? (
+          <p role="status" className="mx-auto mt-2 max-w-[820px] text-[11.5px] text-gink-64">
+            {printNotice}
+          </p>
+        ) : null}
       </div>
 
       <main className="mx-auto w-full max-w-[820px] px-4 py-6 sm:px-6 print:max-w-none print:p-0">
@@ -150,6 +274,14 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
               VOID — {invoice.voidReason}
             </div>
           ) : null}
+          {isDuplicate ? (
+            <div
+              data-invoice-duplicate
+              className="mb-4 border border-hair-strong bg-paper-deep px-3 py-1.5 text-center text-[11.5px] font-bold tracking-[0.16em] text-gink uppercase"
+            >
+              DUPLICATE COPY #{printCount}
+            </div>
+          ) : null}
 
           <header className="flex items-start justify-between gap-4">
             <div className="min-w-0">
@@ -164,6 +296,11 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
               </p>
               {invoice.seller.phone ? (
                 <p className="mt-1 text-[11.5px] text-gink-64">Phone {invoice.seller.phone}</p>
+              ) : null}
+              {invoice.seller.fssaiNumber ? (
+                <p className="mt-0.5 text-[11.5px] text-gink-64 tabular-nums">
+                  FSSAI Lic. No. {invoice.seller.fssaiNumber}
+                </p>
               ) : null}
               {gstDoc && invoice.seller.gstin ? (
                 <div className="mt-1.5 text-[11.5px] leading-[1.5] text-gink-64">
@@ -186,7 +323,13 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
               <p className="text-[10px] font-semibold tracking-[0.12em] text-gink-46 uppercase">{docTitle} no.</p>
               <p className="mt-1 font-mono text-[13.5px] font-semibold tabular-nums">{invoice.number}</p>
               <p className="mt-2 text-[11.5px] text-gink-64">{invoice.issuedAt}</p>
-              <p className="mt-1 text-[11.5px] text-gink-64">{invoice.tableLabel ? `Table ${invoice.tableLabel}` : 'Table'}</p>
+              <p className="mt-1 text-[11.5px] text-gink-64">
+                {invoice.tableLabel
+                  ? invoice.seller.orderChannel === 'takeaway' || invoice.seller.orderChannel === 'delivery'
+                    ? invoice.tableLabel
+                    : `Table ${invoice.tableLabel}`
+                  : 'Table'}
+              </p>
               <p className="mt-1 text-[10px] text-gink-46">Session {invoice.sessionReference.slice(0, 8).toUpperCase()}</p>
             </div>
           </header>
@@ -267,8 +410,26 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
             {docType === 'receipt' && invoice.totals.taxPaise > 0 ? (
               <Summary label="Tax amount (from ticket records)" value={formatBillMoney(invoice.totals.taxPaise)} />
             ) : null}
-            {invoice.totals.otherChargesPaise > 0 ? (
+            {(invoice.totals.serviceChargePaise ?? 0) > 0 ? (
+              <Summary label="Service charge" value={formatBillMoney(invoice.totals.serviceChargePaise ?? 0)} />
+            ) : null}
+            {(invoice.totals.packagingChargePaise ?? 0) > 0 ? (
+              <Summary label="Packaging charge" value={formatBillMoney(invoice.totals.packagingChargePaise ?? 0)} />
+            ) : null}
+            {(invoice.totals.deliveryChargePaise ?? 0) > 0 ? (
+              <Summary label="Delivery charge" value={formatBillMoney(invoice.totals.deliveryChargePaise ?? 0)} />
+            ) : null}
+            {invoice.totals.otherChargesPaise > 0 &&
+            (invoice.totals.serviceChargePaise ?? 0) === 0 &&
+            (invoice.totals.packagingChargePaise ?? 0) === 0 &&
+            (invoice.totals.deliveryChargePaise ?? 0) === 0 ? (
               <Summary label="Other charges" value={formatBillMoney(invoice.totals.otherChargesPaise)} />
+            ) : null}
+            {(invoice.totals.roundOffPaise ?? 0) !== 0 ? (
+              <Summary
+                label="Round-off"
+                value={`${(invoice.totals.roundOffPaise ?? 0) > 0 ? '+' : '−'}${formatBillMoney(Math.abs(invoice.totals.roundOffPaise ?? 0))}`}
+              />
             ) : null}
             <div className="mt-1 flex justify-between gap-3 border-t border-gink py-2 font-semibold">
               <span>Total payable</span>
@@ -306,7 +467,7 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
             {invoice.supersedesInvoiceId ? (
               <p className="mt-2">Replacement receipt; previous receipt is voided.</p>
             ) : null}
-            <p className="mt-3 text-center">Thank you.</p>
+            <p className="mt-3 text-center">{invoice.seller.billFooterNote || 'Thank you.'}</p>
           </footer>
         </article>
 
