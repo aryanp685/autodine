@@ -505,3 +505,64 @@ Order matters and is now encoded: `20261122000400` (heal) → `20261118002200` (
 `20261122000500` (index + bodies). `02200` collapses duplicates and builds the index in one
 transaction; PostgreSQL refuses `CREATE INDEX` after the collapse leaves pending trigger
 events, which is exactly why the hosted correction split it.
+
+## 20. The 44 `main`-only files, measured: 34 are features, 9 are tests, 3 need code back
+
+Measured by reconstructing `main`'s tree over this branch in a scratch worktree and running
+the real gates — not by reading imports.
+
+```
+group A: 34 non-test files restored      -> tsc 1 error, 0 after one fix, lint clean,
+                                            build OK, vitest 2,616 passed
+group B:  9 test files restored          -> 6 pass as-is, 3 fail against APIs we changed
+group C:  1 file, supabase/.temp/cli-latest -> local CLI scratch, never restore
+```
+
+**The one type error is a real gap, not incompatibility.** `components/auth/AuthField.tsx` and
+5 others came back clean, but `app/api/staff/announcement-events/route.ts` selects
+`announcement_claimed_at`, and `lib/db/database.ts` here deliberately omits that column from
+`table_waiter_calls`:
+
+```
+- table_waiter_calls: Table<TableWaiterCall>;
++ table_waiter_calls: Table<Omit<TableWaiterCall, 'request_key' | 'table_session_hash'
++   | 'resolved_by' | 'announcement_claimed_at' | 'announcement_at'> & { acknowledged_at: string | null }>;
+```
+
+The column **exists** in the deployed schema (`announcement_claimed_at` is in the live replay)
+and the same authenticated role can select it — `20261107104440_p5_voice_waiter.sql:158` grants
+`select` on the whole table and no later migration narrows it to columns. So the omission in the
+type is stale, and restoring the event route requires deleting `'announcement_claimed_at' | 'announcement_at'`
+from that `Omit<>`. With that one-line change: **tsc 0, lint 0, build OK.**
+
+**The 3 failing test files assert component APIs this branch does not have.** They are not
+regressions and not failures of the feature work — they are tests for `main`'s versions of
+components:
+
+| Test | Why it fails here |
+|---|---|
+| `components/SiteFooter.test.tsx` | props `address`/`phone` were removed in favour of `note`/`scope`/`fineLeft`/`fineRight`; no current caller passes them |
+| `components/ui.dietary.test.tsx` | `JainMark` and `AllergenBadge` do not exist anywhere in this tree |
+| `components/owner/OperationsPanel.test.tsx` | `OperationsPanel` here takes no props; `disabled` and the `Not available here` state exist only in `main`'s version (60 changed lines there) |
+
+So "re-apply the 44" splits into three different jobs, and only the first is mechanical:
+
+1. **34 feature files** — restore verbatim, plus the one-line `Omit<>` fix. Proven to typecheck,
+   lint, test and build. Onboarding wizard, announcement inbox/provider/settings, auth helpers,
+   sitemap/robots, analytics, marketing heroes.
+2. **6 test files** — restore verbatim; they pass (`sitemap`, `auth/AuthField`, `analytics`,
+   `announcements/store`, `db/upi-ref-migration`, `onboarding`).
+3. **3 test files + `main`'s `OperationsPanel`** — this is a product decision, not a merge step.
+   Either take `main`'s component versions along with their tests, or drop the tests. Restoring
+   tests without the components they describe would just be red.
+
+**Build evidence, both trees, exact CI env** (`CI=true GITHUB_ACTIONS=true
+AUTODINE_TEST_DEMO_BUILD=true VERCEL_ENV=test`):
+
+```
+this branch, no restored files   -> next build OK
+this branch + group A            -> next build OK, tsc 0, lint 0, vitest 2,616 passed
+```
+
+The other full-suite run reported the same 2,616 on this branch alone, so restoring group A
+neither fixed nor broke a test — it is additive.
