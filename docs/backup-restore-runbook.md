@@ -47,7 +47,7 @@ Never put either URL on a command line (shell history) — always the environmen
 ## Machine-checkable evidence (2026-11-15)
 
 `npm run pitr:check` validates a filled PITR/restore evidence file (see
-`docs/pitr-verification-procedure-2026-11-14.md` addendum): template emission, per-field schema
+`docs/pitr-verification-procedure-2026-11-14.md` addendum (removed in the 2026-11-21 cleanup): template emission, per-field schema
 validation, PITR-chosen consistency rules (p4 measured RPO/RTO, copy destroyed), and SHA-256
 re-verification of an accessible `p3.backup_file`. It never touches a database or the network.
 

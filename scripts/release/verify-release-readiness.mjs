@@ -3,10 +3,21 @@
  * Offline release-readiness verifier — fail-closed, read-only, no network.
  *
  * Verifies the repository is in the state the 2026-11-14 release preparation
- * documents assume. It does NOT connect to any hosted service, does NOT
+ * documents assumed. It does NOT connect to any hosted service, does NOT
  * authorize a release, and deliberately fails if the GST/IRP authorization
  * boundary drifts. Exits 0 only when every invariant holds; prints one line
  * per check with a fixed vocabulary. Run: `npm run verify:release`.
+ *
+ * 2026-11-21 cleanup note: the 2026-11-14 release-preparation documents this
+ * verifier reads (docs/migration-manifest-2026-11-14.md,
+ * docs/gst-irp-production-readiness-2026-11-14.md,
+ * docs/production-release-prep-2026-11-14.md, docs/owner-action-register-2026-11-14.md,
+ * docs/owner-closure-package-2026-11-14.md, docs/credential-exposure-remediation-2026-11-14.md,
+ * docs/execution-report-2026-11-14.md) were removed in the 2026-11-21 cleanup.
+ * Missing documents now surface as named FAIL lines (exit 1) instead of an
+ * unhandled exception — the gate fails closed by design and is NOT cleared by
+ * editing this script. Restoring the evidence (or formally re-drawing the
+ * release boundary) is an owner decision.
  */
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -18,7 +29,15 @@ const check = (name, ok, detail = '') => {
   if (ok) notes.push(`ok ${name}`);
   else problems.push(`FAIL ${name}${detail ? ': ' + detail : ''}`);
 };
-const read = (p) => readFileSync(join(root, p), 'utf8');
+// Missing documents yield '' (every content assertion below then fails
+// closed with a named FAIL line) rather than an unhandled exception.
+const read = (p) => {
+  try {
+    return readFileSync(join(root, p), 'utf8');
+  } catch {
+    return '';
+  }
+};
 
 // 1. Migration inventory: exactly 113 files, unique 14-digit versions.
 // 98 at the 2026-11-14 baseline, plus three 2026-11-19 remediation migrations

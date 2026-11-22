@@ -2,7 +2,7 @@
 
 How to find out what a database still needs from `supabase/migrations/` without trusting its migration ledger.
 
-This file describes a local method and what it has established so far. It authorises nothing. Steps that touch a hosted project stay in `PHASE-3-HOSTED-BASELINE.md` and `PRODUCTION-BACKUP-RUNBOOK.md`, and each needs the owner's approval.
+This file describes a local method and what it has established so far. It authorises nothing. Steps that touch a hosted project stay in `PHASE-3-HOSTED-BASELINE.md` (removed in the 2026-11-21 cleanup) and `PRODUCTION-BACKUP-RUNBOOK.md`, and each needs the owner's approval.
 
 ## Active-branch order and subscription-boundary update — 2026-11-06
 
@@ -12,7 +12,7 @@ This file describes a local method and what it has established so far. It author
 
 This checkout includes forward migrations `20261112000500_role_scoped_order_reads.sql`, `20261112000600_cap_subscription_history_ceiling.sql`, `20261112000700_order_line_edit_boundary.sql`, and `20261114000100_owner_manager_subscription_reads.sql`. All `20261112` and `20261114` versions are future-dated relative to the historical cutoff. They are source artifacts replayed locally, not hosted apply dates or release approval. The order migrations bound reads and edits by role/tenant, remove sensitive order tables from the local Realtime publication, and restore the restaurant write gate. The subscription migration narrows direct account/event/payment/receipt RLS and all four billing-read RPCs to Owners and Managers, closes direct legacy restaurant plan/trial-column access, keeps Owner/Manager plan presentation in `restaurant_access()`, and preserves the Cashier/Kitchen operational `can_write`/`read_only`/`features` projection. The history RPCs remain capped at 50 rows.
 
-The latest embedded replay applied **83 repository migrations** on disposable PostgreSQL; the SQL integration suite reported **157 passed, 2 optional PostgREST HTTP tests skipped across 7 files**. The skipped HTTP checks do not turn SQL `SET ROLE` tests into PostgREST verification. `npm run sql:check` parses supported DDL only and does not validate function bodies, grants, RLS behavior, publication semantics, or migration replay. No hosted migration, catalog query, or provider change occurred. See `docs/AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md` for current local evidence and open release gates.
+The latest embedded replay applied **83 repository migrations** on disposable PostgreSQL; the SQL integration suite reported **157 passed, 2 optional PostgREST HTTP tests skipped across 7 files**. The skipped HTTP checks do not turn SQL `SET ROLE` tests into PostgREST verification. `npm run sql:check` parses supported DDL only and does not validate function bodies, grants, RLS behavior, publication semantics, or migration replay. No hosted migration, catalog query, or provider change occurred. See `docs/AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md` (removed in the 2026-11-21 cleanup) for current local evidence and open release gates.
 
 The earlier 77-migration / 130-test Phase 6D count below is a dated prior-checkpoint result, not the count for this active branch.
 
@@ -238,7 +238,7 @@ Read-only re-verification of Production (`bdbaqpevwmgdvghszjno`), no DDL/DML, no
 **Decisions this forces (not made here).**
 
 1. Do not apply any repository migration to Production on the strength of the ledger; the drift above must be read first. In particular the three 2026-11-12 serialization migrations read REVIEW/drift against production — they were verified only on disposable local PostgreSQL, and whether production carries the same function bodies must be established (read-only body capture) before they are applied or reworded.
-2. The two `APPLY` verdicts (`20261112000200`, `20261112000400`) are candidates to apply, in version order, once the rollout gates in `PHASE-3-HOSTED-BASELINE.md` / `PRODUCTION-BACKUP-RUNBOOK.md` are satisfied and the owner explicitly authorises the target.
+2. The two `APPLY` verdicts (`20261112000200`, `20261112000400`) are candidates to apply, in version order, once the rollout gates in `PHASE-3-HOSTED-BASELINE.md` (removed in the 2026-11-21 cleanup) / `PRODUCTION-BACKUP-RUNBOOK.md` are satisfied and the owner explicitly authorises the target.
 3. `classify` exits non-zero while 176 drift findings are unacknowledged. `--ack-drift` was deliberately **not** passed: each finding still needs a migration-safety decision (a converging forward migration, or a recorded reason to leave it).
 4. Production contains a subscription/verification schema direction that conflicts with the repository's account-subscription design. Reconciling or retiring it is a product decision, not something to settle by editing migrations.
 
@@ -248,7 +248,7 @@ Nothing was applied, committed or acknowledged as part of this verification.
 
 Method: replay every repository migration on disposable local PostgreSQL and record `md5(prosrc)` per public function after each step; fetch production's per-function `md5(prosrc)` (and a comment/whitespace-normalized variant) read-only; compare. This separates "production applied the same code written slightly differently" from "production runs code the repository never contained".
 
-Cross-check artifacts: `scripts/reconcile/evidence/prosrc-comparison.json` (raw hash per production function vs repository replay history), `normalized-comparison.json` (comment/whitespace-normalized hash vs the repository's final replayed state), `production-2026-11-14-prosrc.json` (raw hashes). Repository bodies are regenerable by replay; nothing from production beyond hashes and the few bodies quoted here is stored.
+Cross-check artifacts: `scripts/reconcile/evidence/prosrc-comparison-2026-11-14.json` (raw hash per production function vs repository replay history), `normalized-comparison-2026-11-14.json` (comment/whitespace-normalized hash vs the repository's final replayed state), `production-2026-11-14-prosrc.json` (raw hashes). Repository bodies are regenerable by replay; nothing from production beyond hashes and the few bodies quoted here is stored.
 
 **Headline.** Of 120 production functions:
 
@@ -350,5 +350,5 @@ None is referenced by application code in this repository (the only mentions are
 - Differences from the server itself. CI replays on PostgreSQL 15, 17 and 18; production reported 17.11.
 - Whether a **hosted** backup restores. A local round trip has been run: `pg_dump -Fc` and `pg_restore` (PostgreSQL 16.2,
   from the `pgserver` wheel) over the full 70-migration chain, with byte-identical schema dumps and unchanged row counts
-  (see `docs/verification-2026-11-10.md`). That says nothing about the hosted 17.11 database, whose dump has never been
+  (see `docs/verification-2026-11-10.md`, removed in the 2026-11-21 cleanup). That says nothing about the hosted 17.11 database, whose dump has never been
   taken here. Step 7 of the procedure is still a real step.
