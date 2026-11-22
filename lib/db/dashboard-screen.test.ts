@@ -99,6 +99,8 @@ const payment = (orderId: string, amountPaise: number, status = 'recorded') => (
   order_id: orderId,
   amount_paise: amountPaise,
   status,
+  recorded_at: earlierToday(),
+  created_at: earlierToday(),
 });
 
 beforeEach(() => {
@@ -259,13 +261,41 @@ describe('getDashboardScreenData', () => {
     expect(kolkata).toBe(11);
   });
 
+  it.each(['Asia/Kolkata', 'UTC'])('charts collections by payment time in %s, including older orders', async (timezone) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-22T10:00:00Z'));
+    try {
+      const midnight = startOfDayUtc(timezone, new Date()).toISOString();
+      const collectedAt = '2026-11-22T06:00:00Z';
+      mocks.staff.result = signedIn(fakeSupabase({
+        orders_finance: [order('1', { placed_at: midnight })],
+        payments: [
+          { ...payment('1', 7000), recorded_at: collectedAt, created_at: midnight },
+          { ...payment('older-order', 3000), recorded_at: collectedAt, created_at: '2026-11-20T06:00:00Z' },
+          { ...payment('legacy-order', 2000), recorded_at: null, created_at: midnight },
+          { ...payment('1', 4000, 'pending'), recorded_at: collectedAt, created_at: midnight },
+          { ...payment('old-payment', 5000), recorded_at: '2026-11-20T06:00:00Z', created_at: midnight },
+          { ...payment('future-payment', 6000), recorded_at: '2026-11-22T10:00:01Z', created_at: midnight },
+        ],
+      }), timezone);
+
+      const data = await getDashboardScreenData();
+      expect(data?.hourlyPaise[0]).toBe(2000);
+      expect(data?.hourlyPaise[hourInZone(timezone, new Date(collectedAt))]).toBe(10000);
+      expect(data?.stats.revenueTodayPaise).toBe(12000);
+      expect(data?.hourlyPaise.reduce((sum, amount) => sum + amount, 0)).toBe(12000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('sizes the hourly series to the elapsed day, not to a full 24 hours', async () => {
     mocks.staff.result = signedIn(fakeSupabase({ orders_finance: [], payments: [] }));
     const data = await getDashboardScreenData();
     expect(data?.hourlyPaise.length).toBe(hourInZone(RESTAURANT_TIME_ZONE, new Date()) + 1);
   });
 
-  it('books each order into the hour it was placed, in the restaurant zone', async () => {
+  it('books each payment into the hour it was recorded, in the restaurant zone', async () => {
     mocks.staff.result = signedIn(
       fakeSupabase({
         orders_finance: [order('1')],

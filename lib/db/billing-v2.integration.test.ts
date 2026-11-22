@@ -120,6 +120,20 @@ describe.skipIf(!URL_VALUE)('Billing Spec v2.0 (disposable PostgreSQL)', () => {
     await db.query("select set_config('request.jwt.claim.sub', '', false)");
   });
 
+  it('allows staff to read billing settings only for their own restaurant without exposing account billing', async () => {
+    const { ownerId, managerId, cashierId, restaurantId } = await seedFixture();
+    const other = await seedFixture();
+    const columns = 'id, fssai_number, bill_footer_note, default_service_charge_bps, default_packaging_charge_paise, default_delivery_charge_paise, round_off_enabled';
+    for (const userId of [ownerId, managerId, cashierId]) {
+      const rows = await asUser(userId, () => db.query(`select ${columns} from restaurants`));
+      expect(rows.rows).toHaveLength(1);
+      expect(rows.rows[0]).toMatchObject({ id: restaurantId, fssai_number: '11524001000123' });
+      expect(rows.rows.some((row) => row.id === other.restaurantId)).toBe(false);
+      await expect(asUser(userId, () => db.query('select account_id, plan from restaurants')))
+        .rejects.toThrow(/permission denied/);
+    }
+  });
+
   it('creates dine-in, takeaway, and delivery counter orders with default charges and concurrent null-table sessions', async () => {
     const { cashierId, restaurantId, itemId, tableId } = await seedFixture();
 

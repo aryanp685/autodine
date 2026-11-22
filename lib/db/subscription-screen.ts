@@ -209,6 +209,14 @@ export async function getSubscriptionScreenData(
     supabase.rpc('account_payment_history', { p_restaurant_id: restaurantId, p_limit: 50 }),
   ]);
 
+  for (const [label, result] of [
+    ['subscription state', stateResult],
+    ['subscription history', historyResult],
+    ['payment history', paymentsResult],
+  ] as const) {
+    if (result.error) throw new Error(`Could not load ${label}: ${result.error.message}`);
+  }
+
   const history: SubscriptionEventRow[] = Array.isArray(historyResult.data)
     ? (historyResult.data as Record<string, unknown>[]).map((row) => ({
         id: String(row.id ?? ''),

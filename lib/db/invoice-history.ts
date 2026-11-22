@@ -29,6 +29,7 @@ export type InvoiceHistoryResult =
   | { ok: false; reason: 'unconfigured' | 'signed-out' | 'no-membership' | 'role-denied' };
 
 function positiveMoney(value: unknown): number | null {
+  if (typeof value !== 'number' && (typeof value !== 'string' || !value.trim())) return null;
   const parsed = typeof value === 'number' ? value : Number(value);
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
 }
@@ -42,7 +43,7 @@ function toHistoryRow(
   const totalPaise = positiveMoney(totals.total_paise);
   return {
     sessionId: session.id,
-    tableLabel,
+    tableLabel: invoice?.table_label_snapshot ?? tableLabel,
     openedAt: session.opened_at,
     closedAt: session.closed_at ?? session.opened_at,
     invoice: invoice ? {

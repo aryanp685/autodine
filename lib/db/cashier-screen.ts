@@ -180,6 +180,15 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
       supabase.from('item_variants').select('id, item_id, name, price_paise').order('sort_order', { ascending: true }),
     ]);
 
+    for (const [label, result] of [
+      ['waiter orders', waiterOrdersRes],
+      ['counter tables', tablesAllResult],
+      ['counter menu', itemsCatalogResult],
+      ['counter variants', variantsResult],
+    ] as const) {
+      if (result.error) throw new Error(`Could not load ${label}: ${result.error.message}`);
+    }
+
     const tables: CounterTableOption[] = (tablesAllResult.data ?? []).map((t) => ({ id: t.id, label: t.label }));
     const labelByTable = new Map<string, string>(tables.map((t) => [t.id, t.label]));
     const variantsByItem = new Map<string, Array<{ id: string; name: string; pricePaise: number }>>();
@@ -202,7 +211,8 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
           .select('order_id, qty, name_snapshot, sort_order')
           .in('order_id', wOrderIds)
           .order('sort_order', { ascending: true })
-      : { data: [] as Array<{ order_id: string; qty: number; name_snapshot: string; sort_order: number }> };
+      : { data: [] as Array<{ order_id: string; qty: number; name_snapshot: string; sort_order: number }>, error: null };
+    if (wItemsRes.error) throw new Error(`Could not load waiter order items: ${wItemsRes.error.message}`);
     const itemsByOrder = new Map<string, string[]>();
     for (const item of wItemsRes.data ?? []) {
       const list = itemsByOrder.get(item.order_id) ?? [];
@@ -310,25 +320,27 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
         .order('sort_order', { ascending: true })
         .limit(120),
       supabase.from('item_variants').select('id, item_id, name, price_paise').order('sort_order', { ascending: true }),
-      Promise.resolve(
-        supabase.from('restaurant_gst_config').select('mode').eq('restaurant_id', restaurantId).maybeSingle(),
-      ).catch(() => ({ data: null, error: null })),
-      Promise.resolve(
-        supabase
-          .from('restaurant_coupons')
-          .select('code, description, discount_type, discount_value, min_order_paise')
-          .eq('restaurant_id', restaurantId)
-          .eq('is_active', true)
-          .order('code', { ascending: true }),
-      ).catch(() => ({ data: [], error: null })),
-      Promise.resolve(
-        supabase
-          .from('order_sessions')
-          .select('id, table_id, order_channel, split_label')
-          .eq('restaurant_id', restaurantId)
-          .eq('status', 'open'),
-      ).catch(() => ({ data: [], error: null })),
+      supabase.from('restaurant_gst_config').select('mode').eq('restaurant_id', restaurantId).maybeSingle(),
+      supabase
+        .from('restaurant_coupons')
+        .select('code, description, discount_type, discount_value, min_order_paise')
+        .eq('restaurant_id', restaurantId)
+        .eq('is_active', true)
+        .order('code', { ascending: true }),
+      supabase
+        .from('order_sessions')
+        .select('id, table_id, order_channel, split_label')
+        .eq('restaurant_id', restaurantId)
+        .eq('status', 'open'),
     ]);
+
+  for (const [label, result] of [
+    ['counter tax configuration', gstConfigRes],
+    ['counter coupons', couponsRes],
+    ['counter sessions', openSessionsRes],
+  ] as const) {
+    if (result.error) throw new Error(`Could not load ${label}: ${result.error.message}`);
+  }
 
   const rawGstMode = (gstConfigRes as { data?: { mode?: string } | null }).data?.mode;
   const gstMode: 'off' | 'regular' | 'composition' =
@@ -351,6 +363,14 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
     discountValue: Number(c.discount_value ?? 0),
     minOrderPaise: Number(c.min_order_paise ?? 0),
   }));
+
+  for (const [label, result] of [
+    ['counter tables', tablesAllResult],
+    ['counter menu', itemsCatalogResult],
+    ['counter variants', variantsResult],
+  ] as const) {
+    if (result.error) throw new Error(`Could not load ${label}: ${result.error.message}`);
+  }
 
   const tables: CounterTableOption[] = (tablesAllResult.data ?? []).map((t) => ({
     id: t.id,
@@ -382,6 +402,7 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
       .gte('placed_at', cutoff)
       .order('placed_at', { ascending: false })
       .limit(30);
+    if (paidOrdersRes.error) throw new Error(`Could not load refund orders: ${paidOrdersRes.error.message}`);
     const paidOrders = paidOrdersRes.data ?? [];
     if (paidOrders.length > 0) {
       const paidOrderIds = paidOrders.map((o) => o.id);
@@ -391,7 +412,8 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
         .select('id, order_id, method, amount_paise, status, created_at, refund_of_payment_id')
         .in('order_id', paidOrderIds)
         .order('created_at', { ascending: false });
-      if (!payRes.error) {
+      if (payRes.error) throw new Error(`Could not load refundable payments: ${payRes.error.message}`);
+      {
         const payRows = (payRes.data ?? []) as Array<{
           id: string;
           order_id: string;
@@ -455,14 +477,15 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
   const openSessionIds = openSessions.map((s) => s.id);
   const sessionOrderCountById = new Map<string, number>();
   if (openSessionIds.length > 0) {
-    const sessOrdersRes = await Promise.resolve(
-      supabase
-        .from('orders_finance')
-        .select('id, order_session_id, payment_status, prep_status, total_paise')
-        .eq('restaurant_id', restaurantId)
-        .in('order_session_id', openSessionIds)
-        .neq('prep_status', 'cancelled'),
-    ).catch(() => ({ data: [], error: null }));
+    const sessOrdersRes = await supabase
+      .from('orders_finance')
+      .select('id, order_session_id, payment_status, prep_status, total_paise')
+      .eq('restaurant_id', restaurantId)
+      .in('order_session_id', openSessionIds)
+      .neq('prep_status', 'cancelled');
+    if (sessOrdersRes.error) {
+      throw new Error(`Could not load counter session orders: ${sessOrdersRes.error.message}`);
+    }
 
     const grouped = new Map<string, Array<{ payment_status: string; total_paise: number }>>();
     for (const o of (sessOrdersRes as {
@@ -491,9 +514,13 @@ export async function getCashierScreenData(): Promise<CashierScreenData | null> 
   }
 
   if (rows.length === 0) {
+    const printers = await loadRestaurantPrinters(supabase, restaurantId);
     return {
       restaurantName,
+      restaurantId,
+      printers,
       role,
+      ...modeAProps,
       gstMode,
       queue: [],
       tables,

@@ -153,7 +153,7 @@ export function browserStorage(): StorageLike | null {
  * WHY IT IS NOT READ FROM THE ORDER
  *
  * The order page is served from `get_public_order`, which returns what the
- * kitchen prints — names, quantities, prices at the time — and deliberately
+ * order snapshot contains — names, quantities, prices at the time — and deliberately
  * not the menu ids, because a price on a page must come from the database, not
  * from a link. Rebuilding a cart needs ids, and the cart is the one thing this
  * browser legitimately owns. So the cart is remembered as it was, with ids

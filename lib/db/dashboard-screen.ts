@@ -332,7 +332,7 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
       .order('placed_at', { ascending: false }).order('id').range(from, to)),
     readAllRows((from, to) => supabase
       .from('payments')
-      .select('order_id, amount_paise, status')
+      .select('order_id, amount_paise, status, recorded_at, created_at')
       .eq('restaurant_id', restaurantId)
       .or(`recorded_at.gte.${dayStartIso},and(recorded_at.is.null,created_at.gte.${dayStartIso})`).order('id').range(from, to)),
     loadActiveSessions(supabase, restaurantId),
@@ -347,17 +347,17 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
 
   const rows = ordersResult.data ?? [];
 
-  // Revenue is the sum of settled payments, not of order totals: an order with
-  // payment_status 'pending' is money the restaurant does not have yet, and
-  // counting it would flatter the day's takings.
-  const recordedByOrder = new Map<string, number>();
+  const hourlyPaise = Array.from({ length: hourInZone(timezone, now) + 1 }, () => 0);
   let revenueTodayPaise = 0;
   for (const payment of paymentsResult.data ?? []) {
     if (payment.status !== RECORDED) continue;
+    const collected = new Date(payment.recorded_at ?? payment.created_at);
+    if (Number.isNaN(collected.getTime()) || collected < dayStart || collected > now) continue;
+    const bucket = hourInZone(timezone, collected);
+    if (bucket >= hourlyPaise.length) continue;
     const amount = Number(payment.amount_paise ?? 0);
     revenueTodayPaise += amount;
-    const previous = recordedByOrder.get(payment.order_id) ?? 0;
-    recordedByOrder.set(payment.order_id, previous + amount);
+    hourlyPaise[bucket] += amount;
   }
 
   const ordersToday = rows.length;
@@ -368,17 +368,6 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
   // average bill nor the average collection.
   const billedTodayPaise = rows.reduce((sum, row) => sum + Number(row.total_paise ?? 0), 0);
   const averageTicketPaise = ordersToday > 0 ? Math.round(billedTodayPaise / ordersToday) : 0;
-
-  const hourlyPaise = Array.from({ length: hourInZone(timezone, now) + 1 }, () => 0);
-  for (const row of rows) {
-    const placed = new Date(row.placed_at);
-    if (Number.isNaN(placed.getTime())) continue;
-    if (placed < dayStart) continue;
-
-    const bucket = hourInZone(timezone, placed);
-    if (bucket >= hourlyPaise.length) continue;
-    hourlyPaise[bucket] += Number(recordedByOrder.get(row.id) ?? 0);
-  }
 
   // Empty day: skip the follow-up queries entirely rather than firing an
   // .in() with an empty id list and a join that can only return nothing.

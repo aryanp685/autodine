@@ -105,30 +105,42 @@ export async function getOrdersScreenData(
   const modeA = context.operatingMode === 'mode_a';
   if (context.role === 'owner' || context.role === 'manager') {
     const report = await getReportsScreenDataForStaff(context, params, now);
-    const orderIds = modeA ? report.report.orders.map((o) => o.id) : [];
-    const handoffMap = new Map<string, { status: KotHandoffStatus; ref: string | null }>();
-    if (modeA && orderIds.length > 0) {
-      const { data: handoffRows } = await context.supabase
+    const orderIds = report.report.orders.map((o) => o.id);
+    const operationalState = new Map<string, Partial<OrderLedgerSafeRow>>();
+    const columns = 'id, updated_at, hold_required, confirmed_at, kitchen_announcement_status';
+    for (let offset = 0; offset < orderIds.length; offset += 100) {
+      const { data, error } = await context.supabase
         .from('orders')
-        .select('id, kot_handoff_status, kot_handoff_ref')
+        .select(modeA ? `${columns}, kot_handoff_status, kot_handoff_ref` : columns)
         .eq('restaurant_id', context.restaurantId)
-        .in('id', orderIds);
-      for (const row of handoffRows ?? []) {
-        handoffMap.set(row.id, {
-          status: normalizeKotHandoffStatus(row.kot_handoff_status),
-          ref: row.kot_handoff_ref ?? null,
+        .in('id', orderIds.slice(offset, offset + 100));
+      if (error) throw new Error(`Could not load order operational state: ${error.message}`);
+      const rows = (data ?? []) as unknown as Array<{
+        id: string;
+        updated_at: string | null;
+        hold_required: boolean;
+        confirmed_at: string | null;
+        kitchen_announcement_status: string | null;
+        kot_handoff_status?: string | null;
+        kot_handoff_ref?: string | null;
+      }>;
+      for (const row of rows) {
+        operationalState.set(row.id, {
+          updatedAt: row.updated_at,
+          holdRequired: row.hold_required,
+          confirmedAt: row.confirmed_at,
+          kitchenAnnouncementStatus: row.kitchen_announcement_status,
+          ...(modeA ? {
+            kotHandoffStatus: normalizeKotHandoffStatus(row.kot_handoff_status),
+            kotHandoffRef: row.kot_handoff_ref ?? null,
+          } : {}),
         });
       }
     }
     return {
       timezone: report.timezone,
       range: report.range,
-      orders: report.report.orders.map((order) => {
-        const handoff = handoffMap.get(order.id);
-        return handoff
-          ? { ...order, kotHandoffStatus: handoff.status, kotHandoffRef: handoff.ref }
-          : order;
-      }),
+      orders: report.report.orders.map((order) => ({ ...order, ...operationalState.get(order.id) })),
       ordersTruncated: report.ordersTruncated,
       canViewFinance: true,
       canExport: true,

@@ -151,6 +151,17 @@ export async function getBrandingScreenData(): Promise<BrandingScreenData | null
       .maybeSingle(),
   ]);
 
+  for (const [label, result] of [
+    ['restaurant branding', restaurant],
+    ['published menus', menus],
+    ['sample dishes', dishes],
+    ['publish history', history],
+    ['dish categories', dishCategories],
+    ['brand draft', draft],
+  ] as const) {
+    if (result.error) throw new Error(`Could not load ${label}: ${result.error.message}`);
+  }
+
   const row = (restaurant.data ?? {}) as {
     logo_path?: string | null;
     banner_path?: string | null;
@@ -185,6 +196,8 @@ export async function getBrandingScreenData(): Promise<BrandingScreenData | null
       .order('name', { ascending: true }),
     supabase.from('menus').select('restaurant_id, is_published').in('restaurant_id', outletIds),
   ]);
+  if (outletRows.error) throw new Error(`Could not load storefronts: ${outletRows.error.message}`);
+  if (outletMenus.error) throw new Error(`Could not load storefront menus: ${outletMenus.error.message}`);
   const publishedOutletIds = new Set(
     ((outletMenus.data ?? []) as { restaurant_id: string; is_published: boolean | null }[])
       .filter((m) => m.is_published === true)
