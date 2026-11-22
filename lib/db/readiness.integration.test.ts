@@ -442,6 +442,20 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
     expect((await db.query('select count(*)::int n from payment_audit_events where order_id=$1',[f.order])).rows[0].n).toBe(0);
   });
 
+  it('keeps exactly one record_counter_payment, authenticated-only, with the session lock and pending-online guard', async () => {
+    const fns=(await db.query(`select pg_get_function_identity_arguments(p.oid) args, pg_get_functiondef(p.oid) def,
+        has_function_privilege('anon',p.oid,'EXECUTE') anon_execute,
+        has_function_privilege('authenticated',p.oid,'EXECUTE') authenticated_execute
+      from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+      where n.nspname='public' and p.proname='record_counter_payment'`)).rows;
+    expect(fns).toHaveLength(1);
+    expect(fns[0]).toMatchObject({anon_execute:false,authenticated_execute:true});
+    expect(fns[0].args).toMatch(/p_upi_ref text/);
+    expect(fns[0].def).toMatch(/for update of s/);
+    expect(fns[0].def).toMatch(/An online payment is in progress for this order/);
+    expect(fns[0].def).toMatch(/UPI transaction reference is required/);
+  });
+
   it('keeps online intent and settlement executable only by the service role, not guests or staff', async () => {
     for(const signature of [
       'public.begin_online_payment(text,text,text,uuid,uuid,bigint)',
@@ -1028,7 +1042,7 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
 
     const invoice=await withActor(c.user,async()=>{
       await db.query('select record_counter_payment($1,$2,$3,$4,$5)',[c.slug,c.order,'cash',25000,randomUUID()]);
-      await db.query('select record_counter_payment($1,$2,$3,$4,$5)',[c.slug,secondOrder,'upi',12500,randomUUID()]);
+      await db.query('select record_counter_payment($1,$2,$3,$4,$5,$6)',[c.slug,secondOrder,'upi',12500,randomUUID(),'UPI-TRN-0001']);
       return (await db.query('select close_order_session_and_issue_receipt($1) id',[c.sitting])).rows[0].id as string;
     });
     const snapshot=(await db.query('select totals_snapshot from restaurant_invoices where id=$1',[invoice])).rows[0].totals_snapshot;
