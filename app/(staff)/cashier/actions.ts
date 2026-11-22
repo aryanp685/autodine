@@ -87,6 +87,12 @@ export async function recordPaymentAction(input: {
    * the error the cashier sees is ours, not Postgres's.
    */
   idempotencyKey: string;
+  /**
+   * UPI transaction reference (UPI TRN / transaction ID). Required when
+   * method is 'upi'; the database rejects a blank or missing ref for UPI.
+   * Null for cash/card. The action forwards it; validation lives in the RPC.
+   */
+  upiRef?: string;
 }): Promise<RecordPaymentResult> {
   const orderId = input?.orderId;
   if (!orderId) return { ok: false, error: 'Missing order.' };
@@ -172,6 +178,7 @@ export async function recordPaymentAction(input: {
     p_method: method,
     p_amount_paise: outstanding,
     p_idempotency_key: key,
+    p_upi_ref: input.upiRef ?? null,
   });
 
   if (error) {

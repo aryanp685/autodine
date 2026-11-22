@@ -202,6 +202,9 @@ export function Cashier({
 }) {
   const router = useRouter();
   const [method, setMethod] = useState<CounterMethod>('cash');
+  const [upiRef, setUpiRef] = useState('');
+  // A UPI reference only matters while UPI is selected; switching methods
+  // discards it so a stale ref is never forwarded by mistake.
   const [message, setMessage] = useState('');
   const [paymentReceiptUrl, setPaymentReceiptUrl] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -266,6 +269,10 @@ export function Cashier({
    * the database, and changing it must never re-render the queue.
    */
   const keys = useRef<Record<string, string>>({});
+
+  useEffect(() => {
+    setUpiRef('');
+  }, [method]);
 
   /**
    * Tickets with a payment write in flight.
@@ -361,6 +368,7 @@ export function Cashier({
         orderId: paidId,
         method,
         idempotencyKey: keys.current[paidId],
+        upiRef: method === 'upi' ? upiRef : undefined,
       });
 
       release();
@@ -1552,7 +1560,27 @@ export function Cashier({
                         )}
                       </div>
 
-                      <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
+                      {method === 'upi' && (
+                        <div className="mt-5">
+                          <div className="mb-1.5 text-[12.5px] font-medium text-gink-64">
+                            UPI transaction reference
+                          </div>
+                          <input
+                            id="cashier-upi-ref"
+                            type="text"
+                            value={upiRef}
+                            onChange={(e) => setUpiRef(e.target.value.trim())}
+                            placeholder="UPI TRN / transaction ID"
+                            className="w-full rounded-[var(--p-r-control)] border border-hair bg-card px-1.5 py-1 text-[11.5px] text-gink"
+                            autoComplete="off"
+                            spellCheck={false}
+                          />
+                          <p className="mt-1 text-[11.5px] leading-[1.4] text-gink-46">
+                            Required when paying by UPI — used to match this settlement to the
+                            guest&rsquo;s app transaction.
+                          </p>
+                        </div>
+                      )}<p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
                         This records a counter payment. Nothing is charged here &mdash; the guest
                         pays on the terminal or by scanning the shop&rsquo;s code, and this writes
                         down that it happened.
@@ -1577,7 +1605,7 @@ export function Cashier({
                         type="button"
                         data-counter-cta
                         className={`${btn('primary')} mt-4 w-full`}
-                        disabled={isPending || order.pendingOnline || Boolean(live && !order.orderId)}
+                        disabled={isPending || order.pendingOnline || Boolean(live && !order.orderId) || (method === 'upi' && !upiRef)}
                         aria-busy={isPending}
                         onClick={recordPayment}
                       >
@@ -1630,7 +1658,7 @@ export function Cashier({
                         <button
                           type="button"
                           className={`${btn('quiet', 'sm')} mt-1`}
-                          disabled={isPending || order.pendingOnline || Boolean(live && !order.orderId)}
+                          disabled={isPending || order.pendingOnline || Boolean(live && !order.orderId) || (method === 'upi' && !upiRef)}
                           onClick={cancelOrder}
                         >
                           Cancel this order

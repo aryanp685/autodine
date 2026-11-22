@@ -244,7 +244,7 @@ export async function getStaffContext(): Promise<StaffContext | null> {
  * presentation fields. A missing RPC remains non-fatal: the actual write gate
  * is enforced by PostgreSQL and never depends on this display read.
  */
-async function loadAccess(
+export async function loadAccess(
   supabase: SupabaseClient<Database>,
   restaurantId: string,
   role: MemberRole,

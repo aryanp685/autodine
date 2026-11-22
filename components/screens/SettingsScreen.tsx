@@ -1050,7 +1050,7 @@ export function SettingsScreen({
               title="Operations"
               meta="Live incidents on this instance — acknowledge, resolve, escalate"
             >
-              <OperationsPanel />
+              <OperationsPanel disabled={!live} />
             </PageSection>
           </div>
 

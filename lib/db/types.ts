@@ -110,6 +110,8 @@ export type Item = {
   /** Paise. Always paise. */
   price_paise: number;
   is_veg: boolean | null;
+  is_jain: boolean | null;
+  allergens: string[] | null;
   is_available: boolean;
   image_url: string | null;
   sort_order: number;
