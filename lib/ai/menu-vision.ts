@@ -3,9 +3,9 @@
  *
  * WHAT THIS IS AND IS NOT
  *
- * The existing import path (lib/ai/menu-extract.ts) takes TEXT and is
- * OpenAI-compatible. It cannot see an image. This module takes a photo or a
- * PDF and returns a draft. Gemini is used here only, and only on the server:
+ * The bulk text import path (lib/menus/bulk-parse.ts) parses pasted text,
+ * CSV and Excel deterministically. It cannot see an image. This module takes
+ * a photo or a PDF and returns a draft. Gemini is used here only, and only on the server:
  * the key never reaches the browser, and the browser never calls Google.
  *
  * THE RULE THAT MATTERS MORE THAN THE MODEL

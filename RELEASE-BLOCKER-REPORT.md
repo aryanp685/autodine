@@ -1,5 +1,7 @@
 # AutoDine — product completion and release-gate snapshot
 
+> **2026-11-21 cleanup note:** the 2026-11-21 cleanup commit removed the historical phase/audit/verification reports that were referenced throughout this register (for example `PHASE-*.md`, `AUDIT-REPORT.md`, `SECURITY-REMEDIATION-REGISTER.md`, `SMTP-CONFIGURATION-AND-AUTH-READINESS.md`, `docs/AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md`, `docs/website-readiness-audit.md`, `docs/scan-limit-l1.md`, `docs/verification-2026-11-10.md`, `docs/pitr-verification-procedure-2026-11-14.md`, `FEATURE-INVENTORY.md`). Occurrences below are annotated "(removed in the 2026-11-21 cleanup)". Those annotations mark a file's absence; they do not revalidate or supersede the dated evidence in the historical sections, and this register remains the live index of open release gates. This file itself was not otherwise rewritten.
+
 ## Current active-branch checkpoint
 
 **Verification date:** 2026-11-06 UTC (authoritative task date).
@@ -15,7 +17,7 @@
 - The protected `scripts/phase3/staging-baseline.json` matches its `AGENTS.md` expected SHA-256 in the worktree and `HEAD` (the branch base): `e986f2ddd48af88e7e887177ffab7f9dadbec96d6d8394f09150da1d9e7f03fb`; it has no diff.
 - Git metadata (`2026-11-14T11:56:45+05:30`) and migration filenames beginning `20261112` / `20261114` conflict with the authoritative 2026-11-06 task date; chronology remains unresolved. Local replay does not establish a hosted apply date or authorization.
 
-**Consolidated current evidence:** `docs/AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md`.
+**Consolidated current evidence:** `docs/AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md` (removed in the 2026-11-21 cleanup).
 
 ## Verification addendum (2026-11-19 UTC, local + read-only edge)
 
@@ -33,13 +35,13 @@ This addendum records checks made after the checkpoint above and does not change
 
 **Decision:** overall release **NO-GO**; Staging **NO-GO**; Production remains read-only. No deployment, hosted migration, configuration change, DML, or customer/staff message was made. Read-only Production catalog queries checked table/column privileges and RLS policy metadata only; no application rows were queried.
 
-- Read-only Production catalog checks confirm `public.orders` has RLS enabled (`relrowsecurity=true`, not forced); `authenticated` has table/column SELECT on all 25 columns, including finance amounts and the guest bearer `guest_token`, while `orders_staff_read` is membership-scoped through `current_restaurant_ids()` and does not filter staff role. `anon` also has table/column SELECT ACLs, but no SELECT policy and no RLS bypass were found, so no anonymous row access was demonstrated. `authenticated` has only a `prep_status` column UPDATE grant and no table-level INSERT/UPDATE/DELETE. No order row or token was read or used. Cashier UI projection is **not** a database finance or guest-token boundary. Full evidence, source grant intent, and compatibility implications are in `docs/AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md`.
+- Read-only Production catalog checks confirm `public.orders` has RLS enabled (`relrowsecurity=true`, not forced); `authenticated` has table/column SELECT on all 25 columns, including finance amounts and the guest bearer `guest_token`, while `orders_staff_read` is membership-scoped through `current_restaurant_ids()` and does not filter staff role. `anon` also has table/column SELECT ACLs, but no SELECT policy and no RLS bypass were found, so no anonymous row access was demonstrated. `authenticated` has only a `prep_status` column UPDATE grant and no table-level INSERT/UPDATE/DELETE. No order row or token was read or used. Cashier UI projection is **not** a database finance or guest-token boundary. Full evidence, source grant intent, and compatibility implications are in `docs/AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md` (removed in the 2026-11-21 cleanup).
 - The source hardening delta includes Owner/Manager checks on the report-export handler and `report_sales()` RPC (with a server-side 10,000-order detail cap), menu AI Server Actions, owner-only subscription actions, an Owner/Manager subscription route gate, malformed guest-order UUID rejection before RPC, and forward migrations that bound report details and apply subscription-history `p_limit` before JSON aggregation. These are source changes only; migrations were replayed only on disposable local PostgreSQL.
 - Fresh local checks: focused authorization/order suite (**111 passed across 9 files**); `npm test -- --reporter=dot` (**2,185 passed, 148 skipped**; 194 files passed, 6 skipped); `npm run test:db:embedded` (**148 passed across 6 files; 79 migrations replayed on disposable PostgreSQL**); typecheck, lint, SQL syntax check, design check, and final `git diff --check` passed. The SQL check is DDL/parser-only; local migration replay is the database execution evidence. No browser E2E, production runtime, restore, or live-header test was run.
 - Date reconciliation: 2026-11-06 remains the authoritative evidence cutoff. Vercel/PR #184 provider timestamps dated 2026-11-13, the hand-off document dated 2026-11-12, and the local migration filenames dated 2026-11-12 are anomalous future-dated observations, not newer readiness evidence. PR #184's returned OPEN/draft/mergeable status is not asserted as its state at the cutoff; the underlying chronology remains unresolved.
 - Still unresolved: Vercel Firewall/WAF/DDoS/bot/rate-limit configuration and traffic baseline; ingress/trusted-proxy configuration; the intended database role boundary for orders finance fields and guest bearer tokens (including whether to revoke the unused-by-policy `anon` SELECT ACL); account-member subscription-read scope; guest bearer-token URL exposure; a future provider-compatible webhook body cap; Realtime health discrepancy; backup/PITR and numeric RPO/RTO; full release acceptance.
 - The protected `scripts/phase3/staging-baseline.json` SHA-256 remains `e986f2ddd48af88e7e887177ffab7f9dadbec96d6d8394f09150da1d9e7f03fb`.
-- Consolidated evidence and recommendations: `docs/AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md`.
+- Consolidated evidence and recommendations: `docs/AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md` (removed in the 2026-11-21 cleanup).
 
 ## Historical Phase 1 Vercel edge-security discovery snapshot (2026-11-06 UTC)
 
@@ -53,7 +55,7 @@ This is the read-only Phase 1 checkpoint at base `b80ab3c…`; it is not a descr
 - The team/project plan label is Hobby/legacy. Exact entitlements and current state for Firewall rules, WAF, DDoS protection, bot protection, and Vercel rate limiting remain **UNVERIFIED** because the connected Vercel tools do not expose those dashboard controls or rule/analytics inventories. No feature is assumed enabled or disabled.
 - Repository security headers are source-configured, but live Production/Preview response headers and request/traffic analytics remain unverified. No routes, thresholds, or Firewall policies were changed or tested; Phase 2+ was not started.
 - Source-only review requires owner/security decisions on report export/RPC role boundaries, menu AI Server Action authorization/cost controls, subscription-history query bounds, account-member billing visibility, guest bearer-token URL exposure, and a compatible webhook-body bound before any future billing-provider enablement. These are not demonstrated hosted exploits and were not changed in Phase 1.
-- The requested `docs/infrastructure-architecture.md` and `docs/edge-security-runbook.md` are absent from the checkout. Full read-only findings and connector evidence boundary: `PHASE-1-VERCEL-EDGE-SECURITY-DISCOVERY.md`.
+- The requested `docs/infrastructure-architecture.md` and `docs/edge-security-runbook.md` are absent from the checkout. Full read-only findings and connector evidence boundary: `PHASE-1-VERCEL-EDGE-SECURITY-DISCOVERY.md` (removed in the 2026-11-21 cleanup).
 - Vercel metadata timestamps correspond to 2026-11-13 UTC, seven days after Arena's authoritative task date. The chronology discrepancy remains unresolved.
 
 ## Historical Phase 6D continuation record (different branch; 2026-11-06 UTC)
@@ -66,7 +68,7 @@ This is the read-only Phase 1 checkpoint at base `b80ab3c…`; it is not a descr
 - On fresh disposable PostgreSQL 17.11, the runner first reproduced the pre-migration owner detachment/legacy-gate bypass and manager reassignment/account-RLS effect, rolling back both synthetic mutations. It then replayed **77 migrations** and passed the combined DB integration suite: **5 files / 130 tests passed**. The tests use direct SQL with the actual `authenticated`, `anon`, and `service_role` roles plus simulated JWT subjects. This is **not** HTTP/PostgREST validation.
 - Full local app checks passed: `npm test -- --reporter=dot` (**188 files passed, 5 skipped; 2,152 tests passed, 130 skipped**; skipped tests are not passes), `npm run typecheck`, `npm run lint`, `npm run sql:check`, `npm run design:check`, and the guarded optimized build (`GITHUB_ACTIONS=true CI=true AUTODINE_TEST_DEMO_BUILD=true VERCEL_ENV=test npm run build`).
 - No hosted Staging/Production connection, Auth setting, secret, email, payment, database migration, operator contact, or deployment was accessed or changed at that checkpoint. The public entitlement-probe grants remained unchanged pending a separate compatibility decision; pending owner-signup lifecycle choices are documented in the Phase 6D report.
-- Full Phase 6D report: `PHASE-6D-ACCOUNT-ENTITLEMENT-SECURITY.md`. Security follow-ups: `SECURITY-REMEDIATION-REGISTER.md`. Migration sequencing/evidence: `docs/migration-reconciliation.md`.
+- Full Phase 6D report: `PHASE-6D-ACCOUNT-ENTITLEMENT-SECURITY.md` (removed in the 2026-11-21 cleanup). Security follow-ups: `SECURITY-REMEDIATION-REGISTER.md` (removed in the 2026-11-21 cleanup). Migration sequencing/evidence: `docs/migration-reconciliation.md`.
 
 ## Historical Phase 6C continuation record (2026-11-06 UTC)
 
@@ -92,7 +94,7 @@ At the Phase 6C checkpoint, this was the then-current status and superseded the 
 - For linked restaurants, `restaurant_can_write` follows account billing state and does not check `restaurants.is_active`; public menu/item and order/session admission check active state separately. Treat `is_active` as storefront status, not a full write lock. Owner/manager settings and branding repair paths intentionally remain writable after billing expiry.
 - The retained `anon` execute privilege is a current dependency of the guest menu RLS shape: local-only full migration replay showed public menu/category/item reads fail when execute is revoked, even though guest session/order SECURITY DEFINER RPCs still work. Any approved reduction in this boolean exposure must first refactor the gate-bearing `FOR ALL` policies; see the current caller/dependency audit above.
 
-Detailed Phase 6C and SMTP evidence is in `PHASE-6C-AUTH-LIFECYCLE-HARDENING.md` and `SMTP-CONFIGURATION-AND-AUTH-READINESS.md`. The historical sections below are preserved and are not current branch status or release authorization.
+Detailed Phase 6C and SMTP evidence is in `PHASE-6C-AUTH-LIFECYCLE-HARDENING.md` (removed in the 2026-11-21 cleanup) and `SMTP-CONFIGURATION-AND-AUTH-READINESS.md` (removed in the 2026-11-21 cleanup). The historical sections below are preserved and are not current branch status or release authorization.
 
 ## Historical continuation record (prior branch / PR #177 snapshot)
 

@@ -128,7 +128,7 @@ for (const token of [
 /*
  * This used to assert a literal `--p-paper: #ffffff`, which stopped being the
  * design on 2026-10-24: the owner surface moved to warm paper with a dark rail
- * (docs/owner-audit.md). The rule was never about the value -- it was about the
+ * (the owner-audit record, removed in the 2026-11-21 cleanup). The rule was never about the value -- it was about the
  * owner surface having its OWN palette so it cannot silently inherit the guest
  * flow's warm tokens. That is what is checked now: the block must declare the
  * four tokens every staff screen depends on.

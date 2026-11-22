@@ -2,8 +2,8 @@
 
 **Evidence and review date:** 2026-11-06 UTC on active branch `arena/f104d5d8-autodine`, based on `b866601d5b0441b49b1c5aa7c9eb7d26b664d06c` (`main`).
 **Status:** review-only guidance; no Vercel Firewall/WAF rule is recommended, created, or changed. This document does not authorize a Production or Preview configuration change. Release remains **NO-GO**; Production is read-only and Staging is **NO-GO** under `AGENTS.md`.
-**Chronology:** migration versions beginning `20261112` or `20261114` and retained provider metadata dated 2026-11-13 are later than the historical cutoff. They are source/local or timestamped historical observations, not proof of hosted application or database state; see the [complete report](AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md).
-**Related:** [Infrastructure architecture](infrastructure-architecture.md), [complete hardening report](AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md), [Feature inventory](../FEATURE-INVENTORY.md), [`AGENTS.md`](../AGENTS.md)
+**Chronology:** migration versions beginning `20261112` or `20261114` and retained provider metadata dated 2026-11-13 are later than the historical cutoff. They are source/local or timestamped historical observations, not proof of hosted application or database state; see the complete hardening report (removed in the 2026-11-21 cleanup; its dated evidence is summarised in `../RELEASE-BLOCKER-REPORT.md`).
+**Related:** [Infrastructure architecture](infrastructure-architecture.md), the complete hardening report (removed in the 2026-11-21 cleanup), the feature inventory (removed in the 2026-11-21 cleanup), [`AGENTS.md`](../AGENTS.md)
 
 ## 1. Current position
 
@@ -96,4 +96,4 @@ Before recording a future edge change as complete, attach sanitized evidence for
 - [ ] Named rollback owner and exact rollback procedure.
 - [ ] No customer data, secret, request body, or bearer token copied into the report.
 
-Current result: none of these change-acceptance checks has been completed for a custom Vercel Firewall/WAF rule. See the [complete infrastructure hardening report](AUTODINE-COMPLETE-INFRASTRUCTURE-HARDENING-REPORT.md) for all release blockers and evidence limits.
+Current result: none of these change-acceptance checks has been completed for a custom Vercel Firewall/WAF rule. See [`../RELEASE-BLOCKER-REPORT.md`](../RELEASE-BLOCKER-REPORT.md) for all release blockers and evidence limits (the linked consolidated hardening report was removed in the 2026-11-21 cleanup).

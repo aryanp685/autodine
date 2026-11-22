@@ -49,7 +49,7 @@ and per-test evidence for 30 days. Reproduction instructions are in
 This was **not** a production clone. Missing live-schema objects use explicitly
 marked, inferred local scaffolds, so the run proves the repository SQL and local
 compatibility stack, not exact production-schema parity. No production services
-or data were used. See the C4 follow-up in `AUDIT-REPORT.md`.
+or data were used. See the C4 follow-up in `AUDIT-REPORT.md` (removed in the 2026-11-21 cleanup).
 
 CI uses no production Supabase environment or secrets. The dedicated workflow
 starts its own PostgreSQL database and local PostgREST service; the normal

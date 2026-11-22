@@ -63,7 +63,7 @@ npm run build
 
 The normal browser workflow is demo-mode UI coverage and is not evidence of real database/auth/provider behavior. For the isolated PostgreSQL/PostgREST browser throttle suite, follow [`e2e-local.md`](e2e-local.md). That runner creates synthetic data in a throwaway local database, runs both browser throttle cases and the existing PostgreSQL throttle regressions, then drops the database. Never point it at production.
 
-For the honest flow-by-flow coverage matrix and remaining non-production integration work, see [`scan-throttle-coverage.md`](scan-throttle-coverage.md) and [`website-readiness-audit.md`](website-readiness-audit.md).
+For the honest flow-by-flow coverage matrix and remaining non-production integration work, see [`scan-throttle-coverage.md`](scan-throttle-coverage.md) and [`../RELEASE-BLOCKER-REPORT.md`](../RELEASE-BLOCKER-REPORT.md).
 
 ## 6. Locked operational decisions
 

@@ -20,7 +20,8 @@
  *
  * The proposed L1 behaviour — reuse a live session instead of minting a new one,
  * and hold the first order of a throttled sitting for one staff tap rather than
- * refusing it — is a DATABASE change (`docs/scan-limit-l1.md`). This module is
+ * refusing it — is a DATABASE change (see `docs/scan-throttle-coverage.md`; the
+ * former `docs/scan-limit-l1.md` proposal was removed in the 2026-11-21 cleanup). This module is
  * written to the status set that change will produce (`reused`, `held`) so the
  * handler is already correct when it lands, but nothing here mints, holds or
  * counts anything: it only decides what the response to a given answer is.
