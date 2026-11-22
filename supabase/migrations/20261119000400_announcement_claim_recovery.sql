@@ -1,16 +1,9 @@
--- Kitchen announcement claim recovery (order and waiter calls).
---
--- Ported from the two hosted applications of the same correction
--- (production ledger 20261119101116_announcement_claim_recovery, candidate
--- 20261119101121_announcement_claim_recovery) which had no repository file.
--- Without it a device that claims an order announcement and then crashes keeps
--- the claim forever: the insert below is ON CONFLICT DO NOTHING, so every later
--- claim by another device returns false and the ticket is never announced.
---
--- The fix expires a claim after two minutes before inserting, so any device can
--- re-claim a claim that nobody is working on. Everything else about the RPC is
--- unchanged: same signature, same SECURITY DEFINER, same search_path pin, same
--- kitchen membership gate, same grants.
+-- Announcement claim recovery for BOTH order and waiter calls
+-- Existing waiter-call recovery already handles stale 'claimed' via API polling (announcement-events re-queues claimed>2min).
+-- Orders lacked DB-level recovery: a device that claimed then crashed held the claim forever (ON CONFLICT DO NOTHING).
+-- This migration adds stale-claim expiry to the order claim RPC so any device can re-claim after 2 minutes.
+
+-- Allow recovery of order claims older than 2 minutes
 create or replace function public.claim_kitchen_order_announcement(p_order_id uuid)
 returns boolean
 language plpgsql
@@ -32,10 +25,14 @@ begin
      and o.prep_status = 'new'
      and not (o.hold_required and o.confirmed_at is null)
    for update;
-  if not found then return false; end if;
+
+  if not found then
+    return false;
+  end if;
 
   if not exists (
-    select 1 from public.memberships m
+    select 1
+      from public.memberships m
      where m.restaurant_id = v_restaurant_id
        and m.user_id = v_actor
        and m.role in ('owner', 'manager', 'kitchen')
@@ -43,8 +40,9 @@ begin
     raise exception 'Only kitchen staff may claim an announcement.' using errcode = '42501';
   end if;
 
-  -- Release claims whose holder stopped reporting. statement_timestamp() keeps
-  -- the window relative to the caller's statement, not the transaction.
+  -- Stale-claim recovery: a claim held longer than 2 minutes is considered abandoned (crash/network loss)
+  -- and is reclaimed here so the announcement is not lost. This mirrors the waiter-call path where
+  -- announcement-events re-queues claimed>2min as pending.
   delete from public.kitchen_announcement_claims
    where order_id = p_order_id
      and claimed_at < statement_timestamp() - interval '2 minutes';
@@ -52,6 +50,7 @@ begin
   insert into public.kitchen_announcement_claims (order_id, restaurant_id, claimed_by)
   values (p_order_id, v_restaurant_id, v_actor)
   on conflict (order_id) do nothing;
+
   get diagnostics v_rows = row_count;
   return v_rows = 1;
 end;
@@ -60,8 +59,8 @@ $$;
 revoke all on function public.claim_kitchen_order_announcement(uuid) from public, anon;
 grant execute on function public.claim_kitchen_order_announcement(uuid) to authenticated;
 
--- The waiter board polls claimed announcements; without this the poll is a
--- sequential scan on table_waiter_calls.
+-- Waiter-call claim already enforces pending-only; stale recovery is handled in the API layer
+-- (announcement-events re-queues claimed with announcement_claimed_at >2min ago).
+-- No DDL change needed for waiter calls, but we ensure the read index exists for efficient polling:
 create index if not exists table_waiter_calls_announcement_claimed_idx
-  on public.table_waiter_calls (announcement_claimed_at)
-  where announcement_status = 'claimed';
+  on public.table_waiter_calls (announcement_claimed_at) where announcement_status = 'claimed';

@@ -1,6 +1,6 @@
-# Production migration inventory — 123 repository files (GST/IRP, guest journey, operational delivery and QR-boundary local inventory)
+# Production migration inventory — 130 repository files (GST/IRP, guest journey, operational delivery and QR-boundary local inventory)
 
-**Repository inventory only — not an apply list.** On `arena/ce32f7c8-autodine`,
+**Repository inventory only — not an apply list.** Since 2026-11-21 the inventory is aligned with `main` at 3b1ca5b: eight `main` migrations were ported in, the locally-authored duplicate of the announcement-claim correction was removed in favour of `main`’s file, and two colliding version prefixes were renumbered (`20261122000400`/`20261122000500`). On `arena/ce32f7c8-autodine`,
 the recovered base has the same committed tree as PR #191 (98 files). Six
 recovered GST follow-ups include the CA pair, and ten further forward files
 implement Workstream B locally. Two Priority 2 files add a simulation-only
@@ -25,6 +25,41 @@ without separate written authorization each.
 
 | Version | Migration | Classification | Note |
 |---|---|---|---|
+
+## Owner-operation (never applied automatically — separate on purpose)
+
+| File | Status |
+|---|---|
+| `supabase/owner-operations/20261110000501_revoke_supabase_admin_client_defaults.sql` | **OWNER-ONLY OPERATION.** Not part of the 118 migrations. Requires the owner to run it deliberately against the chosen project; closes the `supabase_admin` default-privilege residual (baseline drift D6/D7). Exercised only under the synthetic owner role in disposable PostgreSQL, never applied to a hosted target in this cycle. Verify per §A2 of the closure package after the owner runs it. |
+
+## Reading the classes
+
+- **Legacy rollout scope (76):** everything from the repository baseline
+  through `20261112000100_schedule_subscription_expiry.sql`. Production exposure
+  is plausible (hand-off, 2026-11-12) but **unproven at this SHA** — this is
+  exactly what A1 re-probes. Two of these carry release-critical behaviour:
+  `20261109001000_operational_readiness` (health goes green) and
+  `20261110000700_restaurants_member_only` (Batch B; only after app deploy).
+- **Branch set (9):** the forward migrations this cycle adds on top of the
+  boundary. Apply in filename order, only under B1 authorization, per release
+  prep §2. `20261112000300_report_sales_export_authorization` is already applied
+  on **staging only** (2026-11-15 rehearsal); production presence is unverified.
+- **GST/IRP Phase B (14):** the 7 files listed as B1–B7 in
+  `docs/gst-irp-production-readiness-2026-11-14.md`, plus the seven
+  `20261118000100`–`20261118000700` dependencies/follow-ups identified above.
+  **NOT AUTHORIZED. Do not apply.** Note: B5 (`20261114000400_restrict_trigger_functions_execute`) is
+  data-safe privilege hardening and could be authorized separately as a pure
+  security item — it is listed as Phase B here because that is its dependency
+  grouping in the GST analysis; it must still not be applied without an
+  explicit authorization decision.
+
+- **GST/IRP Workstream B (10):** `20261118000800`–`20261118001700`, in forward order after the other GST/IRP files. Local implementation and synthetic tests only. **NOT AUTHORIZED.** No hosted apply, backfill, IRP provider or legal release is enabled by this inventory.
+- **GST/IRP Priority 2 (2):** `20261118001800`–`20261118001900`, after `01700`. Each is **NOT AUTHORIZED**. Applying them alone installs neither routing data nor private worker privileges.
+
+- **Guest-to-receipt Priority 3 (1):** `20261118002000` is local-only and **NOT AUTHORIZED** for hosted application. It must not be appended to the frozen staging upgrade bundle.
+- **Privileged-function review (1):** `20261118002200` is local-only and **NOT AUTHORIZED**. It is a security correction to two already-granted RPCs; applying it cannot weaken any grant, but it still needs its own written decision per target.
+- **Operational delivery Priority 4 (1):** `20261118002100` is local-only and **NOT AUTHORIZED**. Hosted application additionally requires the Realtime publication change to be reviewed on the target project; the migration refuses to alter a publication that already contains other tables.
+
 | `20261019000001` | `init` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
 | `20261019000002` | `public_read` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
 | `20261020000004` | `counter_payment` | Legacy rollout scope — reported applied 2026-11-12; re-probe via A1 |  |
@@ -144,41 +179,14 @@ without separate written authorization each.
 | `20261118002000` | `guest_checkout_integrity` | Guest-to-receipt Priority 3 — NOT AUTHORIZED | Same-table replay and atomic whole-basket validation; no change to GST/IRP, amounts, discount policy or payment grants. |
 | `20261118002100` | `operational_realtime` | Operational delivery Priority 4 — NOT AUTHORIZED | Adds the `waiter` membership role, membership-scoped floor projections, a coalesced metadata-only outlet revision and publication, sitting transfer, waiter acknowledgement and a guest-version edit cursor. No order amounts, GST/IRP, payment grants or hosted routing are changed by it. |
 | `20261118002200` | `qr_code_staff_boundary` | Privileged-function review — NOT AUTHORIZED | Adds the owner/manager membership check to `rotate_table_qr_code`/`retire_table_qr_code` before they touch `table_qr_codes` (findings QR-01/QR-02). Signature, return type, grants and the subscription gate unchanged; no table, policy or data change. |
-| `20261122000100` | `announcement_claim_recovery` | Hosted correction brought into the repository — NOT AUTHORIZED | `claim_kitchen_order_announcement(uuid)` expires a claim older than two minutes before inserting, so a crashed device no longer holds an order announcement forever (the insert is `on conflict do nothing`). Ported from production `20261119101116` and candidate `20261119101121`, which had no repository file. Same signature, gate and grants; plus the waiter-board partial index on `table_waiter_calls(announcement_claimed_at)`. |
-| `20261122000200` | `qr_one_active_cleanup` | Hosted correction brought into the repository — NOT AUTHORIZED | Collapses duplicate live cards (keeping the newest) so the unique index can be created on a database that drifted. A separate file from the index on purpose: the UPDATE fires `revoke_sessions_on_qr_revocation`, which leaves pending trigger events until commit, and PostgreSQL refuses `CREATE INDEX` on such a table (55006) — the whole-chain replay in `scripts/verify-database.mjs` failed exactly there on 2026-11-21. |
-| `20261122000300` | `qr_one_active_per_table` | Hosted correction brought into the repository — NOT AUTHORIZED | `20261118002200` added the QR membership gates but no database invariant. Creates `table_qr_codes_one_active_per_table` (unique partial index, `table_id` where `revoked_at is null`) and re-creates rotate/retire with `pg_advisory_xact_lock(hashtext(table_id))` in addition to the row lock. Ported from production `20261120190546` and candidate `20261120190508`. Newer than every hosted ledger row, so a push ends on these bodies. |
+| `20261118002300` | `qr_owner_management` | Ported from `main` (3b1ca5b) so both lineages share one inventory — NOT AUTHORIZED | Owner-side QR management on top of the membership boundary: rotate/retire through the staff RPCs with an owner gate, and the `table_qr_codes` write policy narrowed to the owning restaurant. |
 | `20261119000100` | `restore_receipt_helper_boundary` | Main-inherited security correction — NOT AUTHORIZED | Revokes `EXECUTE` on `issue_closed_session_receipt(uuid, jsonb)` from `public`, `anon`, `authenticated` and `service_role`. `20261114000101` granted it to `authenticated`, which let a signed-in client issue a document for an already-closed sitting and skip the settlement wrapper's outstanding-balance check (local check `supabase/checks/07_p8_close_settlement.sql` fails without it). Forward-only; no data, policy or signature change. |
-
-## Owner-operation (never applied automatically — separate on purpose)
-
-| File | Status |
-|---|---|
-| `supabase/owner-operations/20261110000501_revoke_supabase_admin_client_defaults.sql` | **OWNER-ONLY OPERATION.** Not part of the 118 migrations. Requires the owner to run it deliberately against the chosen project; closes the `supabase_admin` default-privilege residual (baseline drift D6/D7). Exercised only under the synthetic owner role in disposable PostgreSQL, never applied to a hosted target in this cycle. Verify per §A2 of the closure package after the owner runs it. |
-
-## Reading the classes
-
-- **Legacy rollout scope (76):** everything from the repository baseline
-  through `20261112000100_schedule_subscription_expiry.sql`. Production exposure
-  is plausible (hand-off, 2026-11-12) but **unproven at this SHA** — this is
-  exactly what A1 re-probes. Two of these carry release-critical behaviour:
-  `20261109001000_operational_readiness` (health goes green) and
-  `20261110000700_restaurants_member_only` (Batch B; only after app deploy).
-- **Branch set (9):** the forward migrations this cycle adds on top of the
-  boundary. Apply in filename order, only under B1 authorization, per release
-  prep §2. `20261112000300_report_sales_export_authorization` is already applied
-  on **staging only** (2026-11-15 rehearsal); production presence is unverified.
-- **GST/IRP Phase B (14):** the 7 files listed as B1–B7 in
-  `docs/gst-irp-production-readiness-2026-11-14.md`, plus the seven
-  `20261118000100`–`20261118000700` dependencies/follow-ups identified above.
-  **NOT AUTHORIZED. Do not apply.** Note: B5 (`20261114000400_restrict_trigger_functions_execute`) is
-  data-safe privilege hardening and could be authorized separately as a pure
-  security item — it is listed as Phase B here because that is its dependency
-  grouping in the GST analysis; it must still not be applied without an
-  explicit authorization decision.
-
-- **GST/IRP Workstream B (10):** `20261118000800`–`20261118001700`, in forward order after the other GST/IRP files. Local implementation and synthetic tests only. **NOT AUTHORIZED.** No hosted apply, backfill, IRP provider or legal release is enabled by this inventory.
-- **GST/IRP Priority 2 (2):** `20261118001800`–`20261118001900`, after `01700`. Each is **NOT AUTHORIZED**. Applying them alone installs neither routing data nor private worker privileges.
-
-- **Guest-to-receipt Priority 3 (1):** `20261118002000` is local-only and **NOT AUTHORIZED** for hosted application. It must not be appended to the frozen staging upgrade bundle.
-- **Privileged-function review (1):** `20261118002200` is local-only and **NOT AUTHORIZED**. It is a security correction to two already-granted RPCs; applying it cannot weaken any grant, but it still needs its own written decision per target.
-- **Operational delivery Priority 4 (1):** `20261118002100` is local-only and **NOT AUTHORIZED**. Hosted application additionally requires the Realtime publication change to be reviewed on the target project; the migration refuses to alter a publication that already contains other tables.
+| `20261119000200` | `new_outlet_tax_default` | Ported from `main` (3b1ca5b) so both lineages share one inventory — NOT AUTHORIZED | A new outlet starts with the account’s tax mode rather than an empty one, so the first bill cannot be issued without a tax decision. |
+| `20261119000300` | `public_guest_gst_quote` | Ported from `main` (3b1ca5b) so both lineages share one inventory — NOT AUTHORIZED | Guest-facing GST quote RPC: the storefront shows the same tax split the invoice will carry, computed in SQL from the restaurant’s mode. |
+| `20261119000400` | `announcement_claim_recovery` | Ported from `main` (3b1ca5b) so both lineages share one inventory — NOT AUTHORIZED; supersedes the locally-authored `20261122000100` | `claim_kitchen_order_announcement(uuid)` expires a claim older than two minutes before inserting, so a crashed device no longer holds an order announcement forever. This is `main`’s repository file for the hosted correction (`20261119101116`), so the locally-authored duplicate was removed. |
+| `20261121000100` | `item_allergens_jain` | Ported from `main` (3b1ca5b) so both lineages share one inventory — NOT AUTHORIZED | Additive menu metadata: allergen list and a Jain flag per item, surfaced on the guest menu only when set. |
+| `20261121000200` | `upi_ref_at_mark_paid` | Ported from `main` (3b1ca5b) so both lineages share one inventory — NOT AUTHORIZED | Adds `payments.upi_ref` and requires it when a counter payment is recorded with method `upi` — a UPI settlement with no TRN cannot be reconciled. Cash and card stay nullable. |
+| `20261122000100` | `single_counter_payment_function` | Ported from `main` (3b1ca5b) so both lineages share one inventory — NOT AUTHORIZED | Drops the superseded five-argument `record_counter_payment` and defines the six-argument one with `p_upi_ref default null`, so five- and six-argument calls both resolve. Without it every `unknown`-typed PostgREST call fails with 42725 "function is not unique". |
+| `20261122000200` | `announcement_claim_and_table_delete_fixes` | Ported from `main` (3b1ca5b) so both lineages share one inventory — NOT AUTHORIZED | Announcement claim and table-delete corrections: the table delete path releases live QR cards first, and the claim RPCs return a typed result instead of null. |
+| `20261122000400` | `qr_one_active_cleanup` | Hosted correction brought into the repository — NOT AUTHORIZED | Collapses duplicate live cards (keeping the newest) so the unique index can be created on a database that drifted. A separate file from the index on purpose: the UPDATE fires `revoke_sessions_on_qr_revocation`, which leaves pending trigger events until commit, and PostgreSQL refuses `CREATE INDEX` on such a table (55006) — the whole-chain replay in `scripts/verify-database.mjs` failed exactly there on 2026-11-21. |
+| `20261122000500` | `qr_one_active_per_table` | Hosted correction brought into the repository — NOT AUTHORIZED | `20261118002200` added the QR membership gates but no database invariant. Creates `table_qr_codes_one_active_per_table` (unique partial index, `table_id` where `revoked_at is null`) and re-creates rotate/retire with `pg_advisory_xact_lock(hashtext(table_id))` in addition to the row lock. Ported from production `20261120190546` and candidate `20261120190508`. Newer than every hosted ledger row, so a push ends on these bodies. |

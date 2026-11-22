@@ -21,6 +21,12 @@ import { COUNTER_ID } from '@/lib/counter-attempt';
 
 const CASHIER_PATH = '/cashier';
 
+/**
+ * Shape of a UPI transaction reference: letters, digits and dashes. UPI apps
+ * print 12-digit RRNs and banks print alphanumeric TRNs; both fit.
+ */
+const UPI_REF = /^[A-Za-z0-9-]{6,40}$/;
+
 export type RecordPaymentResult =
   | { ok: true; message: string; paymentReceiptUrl?: string }
   | { ok: false; error: string; unconfirmed?: true };
@@ -49,6 +55,13 @@ export async function recordPaymentAction(input: {
   idempotencyKey: string;
   /** Reconcile an attempt for a ticket no longer in the queue; never record. */
   checkOnly?: boolean;
+  /**
+   * The UPI transaction reference (the UPI app's TRN / RRN). Migration
+   * 20261121000200 makes it mandatory for method 'upi': a UPI settlement with
+   * nothing to reconcile against is unreconcilable if the guest disputes it.
+   * Ignored for cash and card.
+   */
+  upiRef?: string;
 }): Promise<RecordPaymentResult> {
   const orderId = input?.orderId;
   if (!orderId) return { ok: false, error: 'Missing order.' };
@@ -66,6 +79,13 @@ export async function recordPaymentAction(input: {
   const key = String(input?.idempotencyKey ?? '').trim();
   if (!COUNTER_ID.test(key) || !COUNTER_ID.test(orderId)) {
     return { ok: false, error: 'This payment attempt is malformed. Refresh the queue and try again.' };
+  }
+
+  // Rejected here as well as inside the RPC so the cashier reads a sentence,
+  // not a Postgres error. The database is still the authority.
+  const upiRef = String(input?.upiRef ?? '').trim();
+  if (method === 'upi' && !UPI_REF.test(upiRef)) {
+    return { ok: false, error: 'Enter the UPI transaction reference (the TRN/RRN shown in the UPI app) before recording a UPI payment.' };
   }
 
   const staff = await getStaffContext();
@@ -134,6 +154,9 @@ export async function recordPaymentAction(input: {
         p_method: method,
         p_amount_paise: amountPaise,
         p_idempotency_key: key,
+        // The RPC requires it for 'upi' and ignores it otherwise; sending null
+        // for cash/card keeps one call shape for every method.
+        p_upi_ref: method === 'upi' ? upiRef : null,
       }).then(v => v, () => null);
       if (typeof result?.data === 'string' && COUNTER_ID.test(result.data) && !result.error) {
         paymentId = result.data;

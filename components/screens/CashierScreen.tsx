@@ -137,6 +137,10 @@ export function Cashier({
 }) {
   const router = useRouter();
   const [method, setMethod] = useState<CounterMethod>('cash');
+  // The UPI transaction reference. Mandatory for UPI at the database, so the
+  // button stays disabled until it is entered rather than failing after the
+  // cashier has already taken the money.
+  const [upiRef, setUpiRef] = useState('');
   const [message, setMessage] = useState('');
   const [paymentReceiptUrl, setPaymentReceiptUrl] = useState<string | null>(null);
   const [checkTicketUrl, setCheckTicketUrl] = useState<string | null>(null);
@@ -252,7 +256,10 @@ export function Cashier({
         }
         setStored({ key: storageKey, attempt });
         const checkOnly = reconcileOnly || amountPaise !== attempt.amountPaise || order?.pendingOnline;
-        const result = await recordPaymentAction({ orderId: ticketId, ...attempt, checkOnly });
+        const result = await recordPaymentAction({
+          orderId: ticketId, ...attempt, checkOnly,
+          upiRef: attempt.method === 'upi' ? upiRef : undefined,
+        });
         if (!result.ok) {
           // Even if the write was refused, tender may already have moved
           // outside the app. Keep the original attempt across reloads.
@@ -614,6 +621,28 @@ export function Cashier({
                             label: COUNTER_METHOD_LABEL[value],
                           }))}
                         />
+                        {method === 'upi' && (
+                          <div className="mt-3">
+                            <label htmlFor="cashier-upi-ref" className="mb-1.5 block text-[12.5px] font-medium text-gink-64">
+                              UPI transaction reference
+                            </label>
+                            <input
+                              id="cashier-upi-ref"
+                              name="upi-ref"
+                              type="text"
+                              inputMode="text"
+                              autoComplete="off"
+                              spellCheck={false}
+                              className="w-full rounded-lg border border-hair bg-paper px-3 py-2 text-[13px] tabular-nums text-gink"
+                              placeholder="TRN / RRN from the UPI app"
+                              value={upiRef}
+                              onChange={(event) => setUpiRef(event.target.value)}
+                            />
+                            <p className="mt-1.5 text-[11.5px] leading-[1.5] text-gink-46">
+                              Required for UPI: without it a disputed settlement cannot be reconciled.
+                            </p>
+                          </div>
+                        )}
                       </div>}
 
                       <p className="mt-3 text-[11.5px] leading-[1.5] text-gink-46">
@@ -625,7 +654,8 @@ export function Cashier({
                         type="button"
                         data-counter-cta
                         className={`${btn('primary')} mt-4 w-full`}
-                        disabled={isPending || focusMissing || order.pendingOnline || Boolean(live && savedAttempt === undefined)}
+                        disabled={isPending || focusMissing || order.pendingOnline || Boolean(live && savedAttempt === undefined) ||
+                          (savedAttempt === undefined && method === 'upi' && upiRef.trim().length < 6)}
                         aria-busy={isPending}
                         onClick={() => recordPayment()}
                       >

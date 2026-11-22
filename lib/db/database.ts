@@ -1317,6 +1317,11 @@ export type Database = {
           p_method: 'cash' | 'card' | 'upi';
           p_amount_paise: number;
           p_idempotency_key: string;
+          /**
+           * Migration 20261121000200: required when p_method = 'upi' (a UPI
+           * settlement with no TRN cannot be reconciled), ignored otherwise.
+           */
+          p_upi_ref?: string | null;
         };
         Returns: string; // payment id (uuid)
       };

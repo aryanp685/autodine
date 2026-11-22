@@ -47,7 +47,29 @@ describe('verified counter recording', () => {
     expect(JSON.stringify(result)).not.toContain('row-detail marker');
     expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith('record_counter_payment', {
       p_restaurant_slug: 'test-outlet', p_order_id: ORDER, p_method: 'card', p_amount_paise: 10511, p_idempotency_key: KEY,
+      // null, not undefined: one call shape for every method; the RPC ignores
+      // it unless the method is UPI.
+      p_upi_ref: null,
     });
+  });
+
+  it('refuses a UPI recording with no transaction reference, and never calls the RPC', async () => {
+    const { recordPaymentAction: act } = await import('./actions');
+    void act;
+    const upi = { ...input, method: 'upi' };
+    expect(await recordPaymentAction(upi)).toEqual({
+      ok: false,
+      error: 'Enter the UPI transaction reference (the TRN/RRN shown in the UPI app) before recording a UPI payment.',
+    });
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it('sends the UPI reference through to the RPC for a UPI recording', async () => {
+    const result = await recordPaymentAction({ ...input, method: 'upi', upiRef: '412345678901' });
+    expect(result).toMatchObject({ ok: true });
+    expect(mocks.rpc).toHaveBeenCalledWith('record_counter_payment', expect.objectContaining({
+      p_method: 'upi', p_upi_ref: '412345678901',
+    }));
   });
 
   it('returns the exact recorded tender even after the ticket became paid', async () => {

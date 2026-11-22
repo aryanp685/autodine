@@ -1114,7 +1114,7 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
 
     const invoice=await withActor(c.user,async()=>{
       await db.query('select record_counter_payment($1,$2,$3,$4,$5)',[c.slug,c.order,'cash',25000,randomUUID()]);
-      await db.query('select record_counter_payment($1,$2,$3,$4,$5)',[c.slug,secondOrder,'upi',12500,randomUUID()]);
+      await db.query('select record_counter_payment($1,$2,$3,$4,$5,$6)',[c.slug,secondOrder,'upi',12500,randomUUID(),'412345678901']);
       return (await db.query('select close_order_session_and_issue_receipt($1) id',[c.sitting])).rows[0].id as string;
     });
     const snapshot=(await db.query('select totals_snapshot from restaurant_invoices where id=$1',[invoice])).rows[0].totals_snapshot;
