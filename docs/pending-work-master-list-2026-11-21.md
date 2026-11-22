@@ -410,6 +410,46 @@ So `main`'s migration set is a strict subset of ours, and the single real conten
 divergence was that one file — which turned out to be the important one, because production
 applied **main's** body. See §19.
 
+**A third divergence, found by CI, that the bytes comparison alone would not have shown.**
+`02200` builds the unique index in the *same transaction* as the duplicate-collapsing
+`DO` block above it. Collapsing writes to `table_qr_codes`, and that table carries
+`operational_cards_changed` — a `DEFERRABLE INITIALLY DEFERRED` constraint trigger added by
+`20261118002100` — so the updates sit as pending trigger events until commit. PostgreSQL then
+refuses the `CREATE INDEX`:
+
+```
+cannot CREATE INDEX "table_qr_codes" because it has pending trigger events
+```
+
+The failure depends on the **data**, not the schema: it fires only on a database that actually
+had a duplicate live card to collapse.
+
+| Database state | main's `02200` |
+|---|---|
+| clean replay, no live cards before it | applies |
+| one table with two live cards (what production-side drift looks like) | **fails** |
+| after `20261122000400` has healed duplicates in its own transaction | applies |
+
+CI is what surfaced it: PG 17/18 were cancelled when PG 15 failed here, and
+`test:db:embedded` with `READINESS_FINANCIAL_UPGRADE=1` reproduces it, because that drill
+seeds a QR attempt fixture that leaves a second live card before the file runs. This branch's
+original `02200` never had the problem — it carried the gates only, which is why the index
+lived in `20261122000500`.
+
+**Resolution, and it is an improvement rather than a compromise:** `02200` is main's body with
+the index and its comment removed (a note in place says where it went and why). The invariant
+is created by `20261122000500`, after `20261122000400` has healed in its own transaction. The
+result is that the *whole* chain now applies to a database with duplicates, which no version of
+main's file could:
+
+```
+FULL CHAIN over 130 files, starting from a table with 2 live cards
+  -> OK · healed to 1 live card · index present · 2 advisory-locked functions
+```
+
+That is the only part of main's body that is not byte-identical, and `git diff main` says so
+in one hunk.
+
 **Recommended route (a history rewrite is not needed and is not proposed):**
 
 1. Land `main`'s content where it is authoritative — the 44 files `main` has that this

@@ -91,12 +91,20 @@ begin
 end;
 $$;
 
-create unique index if not exists table_qr_codes_one_active_per_table
-  on public.table_qr_codes (table_id)
-  where revoked_at is null;
-
-comment on index public.table_qr_codes_one_active_per_table is
-  'F-03: at most one live QR per table. Concurrent rotation cannot create a second live card.';
+-- The unique index is built by 20261122000500, not here.
+--
+-- The collapse above updates table_qr_codes, and this table carries
+-- operational_cards_changed (a DEFERRABLE INITIALLY DEFERRED constraint trigger,
+-- 20261118002100), so those row updates stay as pending trigger events until this
+-- transaction commits. PostgreSQL refuses CREATE INDEX on a table with pending
+-- trigger events (CheckTableNotInUse), so a database that actually had a duplicate
+-- live card fails here with
+--   cannot CREATE INDEX "table_qr_codes" because it has pending trigger events
+-- while one that had none passes silently. Depending on whether a row was healed
+-- is not an acceptable failure mode for a migration, so the index is created in
+-- its own transaction one file later, after these events have flushed. Nothing is
+-- lost: the function bodies below do not rely on the index, and no code path runs
+-- between this file and that one.
 
 -- 2. Rotate — tenant-isolated, role-gated, race-safe
 create or replace function public.rotate_table_qr_code(p_table_id uuid)
