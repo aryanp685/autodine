@@ -85,44 +85,40 @@ Result: `npm run test:db:embedded` **281 passed / 3 skipped**.
 
 ## D3 — production upgrade package (prepared and proven safe; not applied)
 
-Production's ledger holds **124** rows; the repository holds **122** files; **50**
+Production's ledger holds **124** rows; the repository holds **123** files; **51**
 repository files are not in production's ledger. That is the real size of the gap —
 the earlier "29 missing RPCs" was the symptom, not the cause.
 
-Ordered apply list (50 files, chronological):
+Ordered apply list (**51 files**, chronological — regenerate rather than copy, it is
+derived: `npm run release:apply-plan -- --ledger <ledger-dump.txt>`):
 
 ```
-20261110000851_payment_audit_provider_actor          20261118000600_gst_ca_onboarding
-20261110000950_online_payment_attempt_uniqueness     20261118000700_gst_ca_documents
-20261110001210_checkout_outstanding_guard            20261118000800_gst_outlet_activation
-20261110001220_revoke_client_bypass_privileges       20261118000900_gst_recipient_documents
-20261112000200_immutable_restaurant_account_link     20261118001000_gst_irp_readiness
-20261112000300_report_sales_export_authorization     20261118001100_gst_reconciliation
-20261112000400_bound_subscription_history            20261118001200_gst_review_lifecycle
-20261112000500_role_scoped_order_reads               20261118001300_gst_direct_fulfilment
-20261112000501_serialize_outlet_creation             20261118001400_gst_irp_rehearsal_store
-20261112000600_cap_subscription_history_ceiling      20261118001500_gst_finance_scope
-20261112000601_serialize_subscription_payments       20261118001600_gst_document_particulars
-20261112000700_order_line_edit_boundary              20261118001700_gst_irp_rehearsal_recovery
-20261112000701_serialize_subscription_expiry         20261118001800_irp_execution
-20261113000100_gst_two_mode                          20261118001900_irp_document_projection
-20261114000100_owner_manager_subscription_reads      20261118002000_guest_checkout_integrity
-20261114000101_gst_b2b_einvoice_readiness            20261118002100_operational_realtime
-20261114000200_irp_reconciliation                    20261118002200_qr_code_staff_boundary
-20261114000300_gst_mode_gates                        20261119000100_restore_receipt_helper_boundary
-20261114000400_restrict_trigger_functions_execute    20261122000100_announcement_claim_recovery
-20261114000500_credit_debit_notes                    20261122000200_qr_one_active_per_table
-20261114000600_einvoice_issuance_profile
-20261115000100_fix_redeem_staff_invite_status_returns
-20261115000200_owner_billing_configuration_guard
-20261115000300_audit_restaurant_account_reassignment
-20261116000100_revoke_client_maintain_privileges
-20261118000100_merge_boundary_gst_order_line_edits
-20261118000200_gst_configuration_boundary
-20261118000300_gst_pricing_boundary
-20261118000400_gst_document_integrity
-20261118000500_gst_document_report
+20261110000851_payment_audit_provider_actor            20261114000300_gst_mode_gates                          20261118001000_gst_irp_readiness
+20261110000950_online_payment_attempt_uniqueness       20261114000400_restrict_trigger_functions_execute      20261118001100_gst_reconciliation
+20261110001210_checkout_outstanding_guard              20261114000500_credit_debit_notes                      20261118001200_gst_review_lifecycle
+20261110001220_revoke_client_bypass_privileges         20261114000600_einvoice_issuance_profile               20261118001300_gst_direct_fulfilment
+20261112000200_immutable_restaurant_account_link       20261115000100_fix_redeem_staff_invite_status_returns  20261118001400_gst_irp_rehearsal_store
+20261112000300_report_sales_export_authorization       20261115000200_owner_billing_configuration_guard       20261118001500_gst_finance_scope
+20261112000400_bound_subscription_history              20261115000300_audit_restaurant_account_reassignment   20261118001600_gst_document_particulars
+20261112000500_role_scoped_order_reads                 20261116000100_revoke_client_maintain_privileges       20261118001700_gst_irp_rehearsal_recovery
+20261112000501_serialize_outlet_creation               20261118000100_merge_boundary_gst_order_line_edits     20261118001800_irp_execution
+20261112000600_cap_subscription_history_ceiling        20261118000200_gst_configuration_boundary              20261118001900_irp_document_projection
+20261112000601_serialize_subscription_payments         20261118000300_gst_pricing_boundary                    20261118002000_guest_checkout_integrity
+20261112000700_order_line_edit_boundary                20261118000400_gst_document_integrity                  20261118002100_operational_realtime
+20261112000701_serialize_subscription_expiry           20261118000500_gst_document_report                     20261118002200_qr_code_staff_boundary
+20261113000100_gst_two_mode                            20261118000600_gst_ca_onboarding                       20261119000100_restore_receipt_helper_boundary
+20261114000100_owner_manager_subscription_reads        20261118000700_gst_ca_documents                        20261122000100_announcement_claim_recovery
+20261114000101_gst_b2b_einvoice_readiness              20261118000800_gst_outlet_activation                   20261122000200_qr_one_active_cleanup
+20261114000200_irp_reconciliation                      20261118000900_gst_recipient_documents                 20261122000300_qr_one_active_per_table
 ```
+
+The tool reads a ledger dump (pipe-separated versions, or JSON with `name`) and emits
+this list plus the before/after verification SQL; `--json` is machine-readable and
+`--check` exits 1 while anything is pending, so a release gate can use it. It also
+reports the **52** production ledger rows that have no same-version repository file —
+those were applied by an earlier ad-hoc path and are why ledger-vs-file parity was
+never provable. They are listed, never silently absorbed.
+
 
 **Collision audit (read-only, against production's catalog).** Every object those
 files create without `IF NOT EXISTS` was probed on production:
@@ -135,7 +131,7 @@ So the batch is structurally applicable; it is **not** applied, because a produc
 schema change is a deploy and this session has no authorization for one.
 
 **Before applying, the owner should:** take a logical backup (the drill in this
-branch now proves that artifact restores with data), run the 50 files in this order,
+branch now proves that artifact restores with data), run the 51 files in this order,
 then verify with the queries below, then re-run `GET /api/health` and compare the
 `schema` / `operational` flags.
 
@@ -192,6 +188,27 @@ LOCAL_LOGICAL_RESTORE_VERIFIED {… "migrations":122, "dataRestoreVerified":true
 
 The drill also prints both sides of a divergence now, so a future failure names the
 row instead of only reporting a count.
+
+**Second pass, same day — the drill now asks the restored database the questions the
+product asks, and that caught a fifth dumper defect.** Comparing catalogs is not
+enough: a database can carry every table, row, policy and function and still be
+unusable. The drill now connects to the restored database, inserts one profile and one
+membership, and asks, as PostgREST would:
+
+```
+restored policies still enforce tenant isolation:
+  {"memberRows":1,"strangerRows":0,"anonDenied":true}
+```
+
+The first run of that probe failed with `permission denied for table table_qr_codes`
+for a legitimate member. Root cause: `lib-dump.mjs` emitted function EXECUTE ACLs but
+**never table or sequence privileges** — a restore produced a database where RLS would
+allow the read but the role had no `GRANT`. On Supabase the target's *default*
+privileges would have made it worse in the other direction, handing `anon` and
+`authenticated` everything. The dump now emits, per relation, an explicit
+`revoke all … from public, anon, authenticated, service_role` followed by the exact
+`GRANT` list read from `relacl`. The drill asserts member=1 / stranger=0 / anon=42501
+on the restored database, and reports `securityRestoreVerified` in its JSON.
 
 Still missing for DR READY (unchanged, and it is the only thing that can change it):
 a **hosted** restore rehearsal against an authorized target (P3–P5 of
@@ -291,11 +308,12 @@ this branch's migrations are not applied to production (D3).
 | `READINESS_FINANCIAL_UPGRADE=1 node scripts/verify-database.mjs` (on an embedded cluster) | 281 passed / 3 skipped — the closed-loop replay the CI job runs |
 | `npm run test:db:integration` | **299 passed / 1 skipped** (13 files) |
 | `npm run test:db:local` | pass — schema, checks (incl. the new overload check), 5 gated suites, 5,000-guest load |
-| `npm run test:db:logical-restore` | `LOCAL_LOGICAL_RESTORE_VERIFIED`, data rows identical |
+| `npm run test:db:logical-restore` | `LOCAL_LOGICAL_RESTORE_VERIFIED` — 123 migrations, 64 tables, 63 policies, 236 functions, data rows identical, `securityRestoreVerified {memberRows:1,strangerRows:0,anonDenied:true}` |
 | `npm run test:recovery:cold` | `LOCAL_COLD_RECOVERY_VERIFIED` |
 | `npx vitest run` | 2,614 passed / 309 skipped (2,925) |
 | `npm run test:e2e:journey` | 20 passed |
-| `npm run test:dr` · `test:backup` · `test:d2` · `test:staging:guards` | exit 0 |
+| `npm run test:dr` · `test:backup` · `test:d2` · `test:staging:guards` | exit 0 (`test:dr` is now 58 assertions, incl. the apply-plan suite) |
+| `npm run release:apply-plan -- --ledger <prod ledger>` | 123 repo files vs 124 ledger rows → **51 pending**, 72 applied, 52 ledger rows with no repository file |
 | `npm run migrations:verify` | 123 files, 123 unique versions, 4 anchors |
 | `npm run verify:release` | 47 checks OK |
 | `npm run lint` | **0 problems** |

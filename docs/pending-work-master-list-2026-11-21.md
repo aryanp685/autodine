@@ -88,7 +88,7 @@ provable from the repository. Exit 1 on those findings is by design, not a crash
 
 **P1-4 — ANSWERED 2026-11-21.** 122 repository files vs 124 production rows vs 15
 candidate rows; the three production-only entries are mapped to repository
-equivalents in `docs/remediation-report-2026-11-21.md` §D3, and the 50 files that
+equivalents in `docs/remediation-report-2026-11-21.md` §D3, and the 51 files that
 are still pending on production are enumerated there. Hosted parity remains
 **unproven** until those files are applied.
 
@@ -234,9 +234,9 @@ Full detail and evidence: [`remediation-report-2026-11-21.md`](remediation-repor
 | P0-2 missing repository files | Fixed for the three production-only corrections (`20261122000100`, `20261122000200`, `20261122000300`) |
 | P1-1 F-03 invariant | In the repository; 12 fixture sites + the local seed reworked; embedded 281/3 |
 | P1-2 stale matrix | Refreshed local scoreboard and ledger counts |
-| P1-4 ledger mapping | Answered in §D3 (50 pending files enumerated, collision audit clean) |
+| P1-4 ledger mapping | Answered in §D3 (51 pending files, enumerated by `release:apply-plan`, collision audit clean) |
 | D2 fixtures | Done |
-| D3 production apply | **Prepared and proven safe, not applied** — 50 files, 0 object/column collisions |
+| D3 production apply | **Prepared and proven safe, not applied** — 51 files, 0 object/column collisions |
 | D4 recovery evidence | Upgraded to data-level; found and fixed a real microsecond-truncation defect in the dumper |
 | D5 PR #194 port | Assessed; bounded port attempted and **reverted** (15/127 test failures without their docs/CI wiring) |
 | D6 main red jobs | Diagnosed to root cause (duplicate `record_counter_payment` overload from main's `20261121000200`); guard added here; main repair needs branch permission |
@@ -249,3 +249,16 @@ authorization · **D5** dedicated port pass · **D6** main repair · B2 staging 
 (owner-reported, deliberately not re-verified here).
 
 Status: **deployment BLOCKED · DR NOT READY · no merge, no PR, no deploy.**
+
+## 13. Closed on 2026-11-21 (third pass)
+
+Two of these are not paperwork: the second one is a **real restore defect** that the
+previous passes could not see because they only compared catalogs.
+
+| Item | Outcome | Evidence |
+|---|---|---|
+| D3 apply list made reproducible | `scripts/release/production-apply-plan.mjs` + `npm run release:apply-plan` — reads a ledger dump, prints the pending list in apply order with before/after verification SQL, `--json` for machines, `--check` exits 1 while anything is pending | `npm run release:apply-plan -- --ledger <dump>` → `pending: 51`, `applied: 72`, `52` ledger rows with no repository file (reported, never absorbed) |
+| Restore fidelity: table/sequence privileges | **Fixed** — `lib-dump.mjs` never emitted `relacl`, so a restore produced a database where every application role got `permission denied for table …`. It now emits an explicit `revoke all … from public, anon, authenticated, service_role` plus the exact `GRANT` list per relation | `test:db:logical-restore` → `securityRestoreVerified {"memberRows":1,"strangerRows":0,"anonDenied":true}` |
+| The drill asks the product's questions after a restore | Added: connect to the restored database, insert a profile + membership, then read as member / non-member / `anon` | member 1 row, stranger 0 rows, `anon` refused `42501` |
+| That suite cannot rot | `scripts/release/production-apply-plan.test.mjs` (8 tests: pipe + JSON ledgers, empty ledger refused, pending set, out-of-band reporting, real inventory ordering/uniqueness, CLI exit codes) wired into `test:dr` | `npm run test:dr` → 58 passed / 0 failed |
+| Docs | `docs/backup-restore-runbook.md` (relacl in "what is covered", 123-migration drill numbers, the fifth dumper defect), D3 list regenerated at 51 files, D4 section extended | — |

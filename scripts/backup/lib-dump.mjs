@@ -123,7 +123,7 @@ export async function dumpDatabase(connectionString, { schema = 'public', log = 
   const client = new pg.Client({ connectionString, application_name: 'autodine-logical-backup', types: rawTimeTypes });
   await client.connect();
   const out = [];
-  const counts = { tables: 0, rows: 0, functions: 0, triggers: 0, policies: 0, indexes: 0, constraints: 0, views: 0, types: 0 };
+  const counts = { tables: 0, rows: 0, functions: 0, triggers: 0, policies: 0, indexes: 0, constraints: 0, views: 0, types: 0, grants: 0 };
   try {
     await client.query('begin isolation level repeatable read read only');
     await client.query('set local statement_timeout = 0');
@@ -404,6 +404,49 @@ export async function dumpDatabase(connectionString, { schema = 'public', log = 
       if (p.with_check) def += ` with check (${p.with_check})`;
       out.push(def + ';'); counts.policies += 1;
     }
+    // Table, view and sequence privileges.
+    //
+    // Without this section a restored database has the schema, the rows and the
+    // RLS policies but the application roles cannot read anything
+    // ("permission denied for table …"), and on a Supabase target the platform
+    // default privileges would instead hand anon/authenticated far more than the
+    // live project allows. Found by the security probe added to the logical-restore
+    // drill on 2026-11-21, which asked the restored database the three questions
+    // the product depends on and got 42501 for a legitimate member.
+    //
+    // Only the roles this dump manages are named, so an ACL entry for the owner or
+    // for supabase_admin never turns into a spurious grant. The four roles exist on
+    // every Supabase target (and in the local shim); a plain PostgreSQL target that
+    // lacks them will refuse these statements, which is why the runbook targets a
+    // scratch Supabase project.
+    const relAcls = await client.query(
+      `select c.relname,
+              c.relkind,
+              coalesce((select jsonb_agg(jsonb_build_object(
+                          'grantee', case when a.grantee = 0 then 'public' else pg_get_userbyid(a.grantee) end,
+                          'priv', a.privilege_type,
+                          'grantable', a.is_grantable)
+                        order by 1)
+                        from aclexplode(c.relacl) a), '[]'::jsonb) as acl
+         from pg_class c
+         join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = $1 and c.relkind in ('r','p','v','m','S')
+        order by 1`, [schema]);
+    const MANAGED_ROLES = new Set(['public', 'anon', 'authenticated', 'service_role']);
+    for (const rel of relAcls.rows) {
+      const kind = rel.relkind === 'S' ? 'sequence' : 'table';
+      const target = `${quoteIdent(schema)}.${quoteIdent(rel.relname)}`;
+      const grants = (Array.isArray(rel.acl) ? rel.acl : []).filter((g) => MANAGED_ROLES.has(g.grantee));
+      if (!grants.length) continue;
+      out.push(`revoke all on ${kind} ${target} from public, anon, authenticated, service_role;`);
+      for (const grant of grants) {
+        const who = grant.grantee === 'public' ? 'public' : quoteIdent(grant.grantee);
+        out.push(`grant ${String(grant.priv).toLowerCase()} on ${kind} ${target} to ${who}${grant.grantable ? ' with grant option' : ''};`);
+      }
+      counts.grants += 1;
+    }
+    if (relAcls.rows.length) out.push('');
+
     for (const t of tables.rows) {
       if (t.relrowsecurity) out.push(`alter table ${quoteIdent(schema)}.${quoteIdent(t.relname)} enable row level security;`);
       if (t.relforcerowsecurity) out.push(`alter table ${quoteIdent(schema)}.${quoteIdent(t.relname)} force row level security;`);

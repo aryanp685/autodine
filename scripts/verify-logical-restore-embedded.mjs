@@ -189,6 +189,52 @@ const before = await fingerprint(urlFor(source), { schemas: ['public'] });
   assert.deepEqual(rowsAfter, rowsBefore,
     `restored rows differ from the source: ${JSON.stringify({ before: rowsBefore, after: rowsAfter })}`);
   console.log(`restored rows match the source: ${JSON.stringify(rowsAfter)}`);
+
+  // Security after restore: a dump that restores rows but not the policies would
+  // pass every check above and be catastrophic. Ask the restored database the
+  // three questions the product depends on, as PostgREST would.
+  const securityProbe = async (url) => {
+    const client = new pg.Client({ connectionString: url });
+    await client.connect();
+    const member = '00000000-0000-4000-8000-000000000001';
+    const stranger = '00000000-0000-4000-8000-000000000002';
+    try {
+      await client.query('insert into public.profiles (id) values ($1), ($2) on conflict do nothing', [member, stranger]);
+      await client.query(
+        `insert into public.memberships (restaurant_id, user_id, role)
+         select id, $1, 'owner' from public.restaurants where slug = 'kings-of-kings'
+         on conflict do nothing`, [member]);
+      const asUser = async (userId, work) => {
+        await client.query("select set_config('request.jwt.claim.sub',$1,false)", [userId]);
+        await client.query('set role authenticated');
+        try { return await work(); } finally {
+          await client.query('reset role');
+          await client.query("select set_config('request.jwt.claim.sub','',false)");
+        }
+      };
+      const memberRows = await asUser(member, async () =>
+        (await client.query('select count(*)::int n from public.table_qr_codes')).rows[0].n);
+      const strangerRows = await asUser(stranger, async () =>
+        (await client.query('select count(*)::int n from public.table_qr_codes')).rows[0].n);
+      let anonDenied = false;
+      await client.query('set role anon');
+      try {
+        await client.query('select count(*) from public.table_qr_codes');
+      } catch (error) {
+        anonDenied = error.code === '42501';
+      } finally {
+        await client.query('reset role');
+      }
+      return { memberRows, strangerRows, anonDenied };
+    } finally {
+      await client.end();
+    }
+  };
+  const security = await securityProbe(urlFor(restored));
+  assert.equal(security.memberRows, 1, `member must see the restored card: ${JSON.stringify(security)}`);
+  assert.equal(security.strangerRows, 0, `a non-member must see nothing: ${JSON.stringify(security)}`);
+  assert.equal(security.anonDenied, true, `anon must be refused outright: ${JSON.stringify(security)}`);
+  console.log(`restored policies still enforce tenant isolation: ${JSON.stringify(security)}`);
   console.log(`LOCAL_LOGICAL_RESTORE_VERIFIED ${JSON.stringify({
     pgVersion: 17,
     migrations: migrationCount,
@@ -198,6 +244,7 @@ const before = await fingerprint(urlFor(source), { schemas: ['public'] });
     backupFormat: manifest.format,
     rows: rowsAfter,
     dataRestoreVerified: true,
+    securityRestoreVerified: security,
     productionBackupClaim: false,
     ciCustomFormatDrill: 'not-run-locally',
   })}`);
