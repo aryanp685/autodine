@@ -334,7 +334,15 @@ everywhere:
 | Why not applied from here? | No credential path. `Hosted backup (B2)` dispatched → `Missing required repository secrets: AUTODINE_BACKUP_SOURCE_URL` (fails closed). The Supabase connector can run SQL but cannot carry ~250 KB of DDL; hand-copying that into a production console was refused on purpose. |
 | Hosted restore rehearsal? | Blocked by the same secret, plus `branching_limit` (`Pro plan or above`) when a schema clone of production was attempted. Both are owner actions, not code. |
 
-One owner action unblocks both: set `AUTODINE_BACKUP_SOURCE_URL` (production read
+### The three refusals, verbatim (2026-11-21, from this session)
+
+| Attempt | Result |
+|---|---|
+| `gh workflow run hosted-backup.yml` (production, read-only) | run 44998836032 failed in 40 s: `Missing required repository secrets: AUTODINE_BACKUP_SOURCE_URL` — before any connection, by design. The preceding step, `Install the PostgreSQL 17 client tools`, **succeeded** on the runner. |
+| `create_branch` on production (a schema clone for the rehearsal) | `entitlement_required` — `Branching is supported only on the Pro plan or above`. |
+| `gh workflow run staging-b2-rehearsal.yml -f ref=<sha>` | run 44999512751 stopped at the exact-code gate's attestation input: `Owner Environment-only scope attestation is required; API denial is not proof of absence.` That input is a human statement about secret scope, and the secret list returns 403 to this token, so it was not asserted on the owner's behalf. |
+
+One owner action unblocks the production pair: set `AUTODINE_BACKUP_SOURCE_URL` (production read
 connection), `AUTODINE_BACKUP_PASSPHRASE`, `B2_REGION`, `B2_BUCKET`,
 `B2_ACCESS_KEY_ID`, `B2_SECRET_ACCESS_KEY` as repository secrets, then run
 **Hosted backup (B2)** and **Hosted restore rehearsal (disposable)**. For the schema
