@@ -456,6 +456,17 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
     expect(fns[0].def).toMatch(/UPI transaction reference is required/);
   });
 
+  it('gates safe table delete on write access and waiter-call history, and keeps announcement claims recoverable but final', async () => {
+    const def=async(sig:string)=>(await db.query('select pg_get_functiondef(to_regprocedure($1)) d',[sig])).rows[0].d as string;
+    const del=await def('public.delete_table_safe(uuid)');
+    expect(del).toMatch(/restaurant_can_write\(v_restaurant_id\)/);
+    expect(del).toMatch(/from public\.table_waiter_calls c where c\.table_id = p_table_id/);
+    const kitchen=await def('public.claim_kitchen_order_announcement(uuid)');
+    expect(kitchen).toMatch(/kitchen_announcement_status = 'announced'/);
+    const waiter=await def('public.claim_table_waiter_call_announcement(uuid)');
+    expect(waiter.match(/announcement_claimed_at < statement_timestamp\(\) - interval '2 minutes'/g)).toHaveLength(2);
+  });
+
   it('keeps online intent and settlement executable only by the service role, not guests or staff', async () => {
     for(const signature of [
       'public.begin_online_payment(text,text,text,uuid,uuid,bigint)',

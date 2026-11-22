@@ -136,6 +136,7 @@ without separate written authorization each.
 | `20261121000100` | `item_allergens_jain` | Rewritten-main snapshot — menu item allergen/Jain flags | Added with the 2026-11-21 main rewrite. Hosted presence **not verified** in this cycle. |
 | `20261121000200` | `upi_ref_at_mark_paid` | Rewritten-main snapshot — required UPI reference at Mark Paid | Added with the 2026-11-21 main rewrite. Its six-argument `record_counter_payment` left the five-argument overload in place (42725 "not unique"); fixed forward by `20261122000100`. Hosted presence **not verified**. |
 | `20261122000100` | `single_counter_payment_function` | Fix — drop the five-argument overload and restore the session-lock and pending-online guards in the six-argument `record_counter_payment` | Forward-only; apply immediately after `20261121000200`. **Not applied** to any hosted project. |
+| `20261122000200` | `announcement_claim_and_table_delete_fixes` | Fix — `delete_table_safe` write gate + waiter-call history; no re-claim of announced orders; stale waiter-call claim recovery | Forward-only function redefinitions. **Not applied** to any hosted project. |
 
 ## Owner-operation (never applied automatically — separate on purpose)
 
