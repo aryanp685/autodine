@@ -264,5 +264,192 @@ describe('P10 real-world receipt scenarios', () => {
     const output = html();
     expect(output).toContain('Share receipt');
     expect(output).toContain('Print / Save PDF');
+    expect(output).toContain('ESC/POS bridge');
+  });
+
+  it('prints FSSAI, bill footer note, itemized charges, round-off, and DUPLICATE copy # when reprinted', () => {
+    const data = invoice({
+      printCount: 3,
+      seller: {
+        ...invoice().seller,
+        fssaiNumber: '11524001000123',
+        billFooterNote: 'Visit again soon!',
+        orderChannel: 'delivery',
+      },
+      tableLabel: 'Delivery',
+      totals: {
+        ...invoice().totals,
+        serviceChargePaise: 500,
+        packagingChargePaise: 1500,
+        deliveryChargePaise: 3000,
+        roundOffPaise: -40,
+        otherChargesPaise: 5000,
+        totalPaise: 104_960,
+        outstandingPaise: 104_960,
+      },
+    });
+    const output = html(data);
+    const shared = buildReceiptMessage(data);
+
+    expect(output).toContain('DUPLICATE COPY #3');
+    expect(output).toContain('FSSAI Lic. No. 11524001000123');
+    expect(output).toContain('Visit again soon!');
+    expect(output).toContain('Service charge');
+    expect(output).toContain('Packaging charge');
+    expect(output).toContain('Delivery charge');
+    expect(output).toContain('Round-off');
+    expect(shared).toContain('FSSAI Lic. No. 11524001000123');
+    expect(shared).toContain('Visit again soon!');
+  });
+
+  it('links owner/manager GST documents to Credit / Debit notes', () => {
+    const gstHtml = renderToStaticMarkup(
+      <InvoiceScreen
+        staffRole="manager"
+        invoice={invoice({
+          documentType: 'gst_tax_invoice',
+          seller: { ...invoice().seller, gstin: '27ABCDE1234F1Z5', stateCode: '27' },
+          gst: {
+            mode: 'regular',
+            regularProfile: 'other_than_specified_premises',
+            profileNotification: null,
+            rateBps: 500,
+            cgstBps: 250,
+            sgstBps: 250,
+            taxablePaise: 9524,
+            cgstPaise: 238,
+            sgstPaise: 238,
+            igstPaise: 0,
+            placeOfSupplyStateCode: '27',
+            interState: false,
+            configVersion: 1,
+            notice: null,
+          },
+        })}
+      />,
+    );
+    expect(gstHtml).toContain('href="/dashboard/invoices#credit-debit-notes"');
+    expect(gstHtml).toContain('Credit / Debit note');
+
+    const cashierGstHtml = renderToStaticMarkup(
+      <InvoiceScreen
+        staffRole="cashier"
+        invoice={invoice({ documentType: 'gst_tax_invoice' })}
+      />,
+    );
+    expect(cashierGstHtml).not.toContain('Credit / Debit note');
+  });
+
+  it('reconciles GST-inclusive line items, discount, service charge, taxable value, CGST/SGST, and round-off in auditable order', () => {
+    // 58000 items (incl. 5% GST) - 5800 discount + 2610 service charge = 54810 net bill (incl. GST)
+    // Taxable value = 52200, CGST 2.5% = 1305, SGST 2.5% = 1305, Total tax = 2610, Round-off = -10 -> Total = 54800
+    const gstDoc = invoice({
+      documentType: 'gst_tax_invoice',
+      seller: { ...invoice().seller, gstin: '27ABCDE1234F1Z5', stateCode: '27' },
+      gst: {
+        mode: 'regular',
+        regularProfile: 'other_than_specified_premises',
+        profileNotification: null,
+        rateBps: 500,
+        cgstBps: 250,
+        sgstBps: 250,
+        taxablePaise: 52_200,
+        cgstPaise: 1_305,
+        sgstPaise: 1_305,
+        igstPaise: 0,
+        placeOfSupplyStateCode: '27',
+        interState: false,
+        configVersion: 1,
+        notice: null,
+      },
+      totals: {
+        subtotalPaise: 58_000,
+        ticketDiscountPaise: 5_800,
+        billDiscountPaise: 0,
+        serviceChargePaise: 2_610,
+        packagingChargePaise: 0,
+        deliveryChargePaise: 0,
+        roundOffPaise: -10,
+        taxablePaise: 52_200,
+        taxPaise: 2_610,
+        otherChargesPaise: 2_610,
+        totalPaise: 54_800,
+        paidPaise: 54_800,
+        outstandingPaise: 0,
+        paymentStatus: 'paid',
+      },
+    });
+    const rendered = html(gstDoc);
+    const shared = buildReceiptMessage(gstDoc);
+
+    const expectedOrder = [
+      'Items total (GST-incl.)',
+      'Ticket discounts (as recorded)',
+      'Service charge',
+      'Net bill (incl. GST)',
+      'Taxable value (excl. GST)',
+      'CGST @ 2.50%',
+      'SGST @ 2.50%',
+      'Total tax',
+      'Round-off',
+      'Total payable',
+    ];
+    let lastPos = -1;
+    for (const label of expectedOrder) {
+      const pos = rendered.indexOf(label);
+      expect(pos).toBeGreaterThan(lastPos);
+      lastPos = pos;
+    }
+    expect(rendered).toContain('₹580.00');
+    expect(rendered).toContain('−₹58.00');
+    expect(rendered).toContain('₹548.10');
+    expect(rendered).toContain('₹522.00');
+    expect(rendered).toContain('₹13.05');
+    expect(rendered).toContain('₹26.10');
+    expect(rendered).toContain('−₹0.10');
+    expect(rendered).toContain('₹548.00');
+
+    expect(shared).toContain('Items total (GST-incl.): ₹580.00');
+    expect(shared).toContain('Net bill (incl. GST): ₹548.10');
+    expect(shared).toContain('Taxable value (excl. GST): ₹522.00');
+    expect(shared).toContain('Total tax: ₹26.10');
+    expect(shared).toContain('Round-off: −₹0.10');
+    expect(shared).toContain('Total payable: ₹548.00');
+  });
+
+  it('renders registered IRN, Ack No, Ack Date, and genuine signed QR SVG on B2B GST tax invoices', () => {
+    const b2b = invoice({
+      documentType: 'gst_tax_invoice',
+      irpStatus: 'generated',
+      irn: 'c'.repeat(64),
+      ackNo: '112233445566',
+      ackDate: '21 Nov 2026, 8:45 pm',
+      signedQrPayload: 'eyJTZWxsZXJHc3RpbiI6IjI3QUJDREUxMjM0RjFaNSJ9',
+      signedQrSvg: '<svg role="img" aria-label="Signed QR"></svg>',
+      seller: { ...invoice().seller, gstin: '27ABCDE1234F1Z5', stateCode: '27' },
+      gst: {
+        mode: 'regular',
+        regularProfile: 'other_than_specified_premises',
+        profileNotification: null,
+        rateBps: 500,
+        cgstBps: 250,
+        sgstBps: 250,
+        taxablePaise: 100_000,
+        cgstPaise: 2_500,
+        sgstPaise: 2_500,
+        igstPaise: 0,
+        placeOfSupplyStateCode: '27',
+        interState: false,
+        configVersion: 1,
+        notice: null,
+      },
+    });
+    const rendered = html(b2b);
+    expect(rendered).toContain('e-Invoice Registered');
+    expect(rendered).toContain('c'.repeat(64));
+    expect(rendered).toContain('112233445566');
+    expect(rendered).toContain('21 Nov 2026, 8:45 pm');
+    expect(rendered).toContain('data-einvoice-qr');
+    expect(rendered).toContain('aria-label="Signed QR"');
   });
 });

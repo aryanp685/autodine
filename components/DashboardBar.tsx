@@ -142,7 +142,8 @@ export function DashboardBar({
      another -- see lib/outlets.ts. With no outlet (demo, signed out) every
      link is drawn, which is the behaviour every screen had before this. */
   const role = outlet?.outlets.find((entry) => entry.id === outlet.activeId)?.role ?? null;
-  const groups = groupsForRole(role);
+  const operatingMode = outlet?.operatingMode ?? 'mode_b';
+  const groups = groupsForRole(role, operatingMode);
 
   const activeLink = DASHBOARD_LINKS.find((link) => link.key === activeSection);
   const activeOutlet =
@@ -320,6 +321,7 @@ export function DashboardBar({
                 </span>
                 <span className="block truncate text-[11.5px] text-rail-ink-40 capitalize">
                   {activeOutlet?.role ?? 'Staff'}
+                  {operatingMode === 'mode_a' ? ' · Mode A' : ''}
                 </span>
               </span>
             </div>
@@ -410,8 +412,22 @@ export function DashboardBar({
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            {operatingMode === 'mode_a' && (
+              <Link
+                href="/dashboard/settings#settings-operating-mode"
+                className="hidden rounded-full border border-hair bg-paper px-2.5 py-1 text-[11.5px] font-medium text-gink-62 transition-colors hover:text-gink md:inline-flex"
+              >
+                {outlet?.posIntegrationName
+                  ? `Alongside ${outlet.posIntegrationName}`
+                  : 'Mode A · Alongside POS'}
+              </Link>
+            )}
             {children}
-            <ShellSearch onLaunch={() => setOpen(false)} />
+            <ShellSearch
+              onLaunch={() => setOpen(false)}
+              role={role}
+              operatingMode={operatingMode}
+            />
           </div>
         </div>
       </header>

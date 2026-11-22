@@ -59,27 +59,43 @@ export function GstSettingsPanel({
       ) : null}
 
       <form action={saveGstAction} className="mt-4 flex flex-col gap-4">
+        <input type="hidden" name="mode" value={mode} />
         <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 text-[12.5px] font-medium text-gink-64">Billing mode</legend>
+          <legend className="mb-1 text-[12.5px] font-medium text-gink-64">Billing mode (2 modes)</legend>
           <ModeRadio
-            name="mode" value="off" checked={mode === 'off'} onChange={() => setMode('off')}
-            title="Normal receipts (no GST)"
-            body="What this restaurant has always issued. Format and numbering are unchanged; no GST appears on any document."
+            name="billingTopMode" value="normal" checked={mode === 'off'} onChange={() => setMode('off')}
+            title="Mode 1 · Normal Billing (GST Disabled)"
+            body="Issues a Bill / Cash Memo with no GST collected or printed. Ideal for unregistered outlets or ordinary non-GST receipts."
             disabled={formDisabled}
           />
           <ModeRadio
-            name="mode" value="composition" checked={mode === 'composition'} onChange={() => setMode('composition')}
-            title="Composition Scheme — Bill of Supply"
-            body="For restaurants registered on the composition scheme. No GST is collected, no ITC can be claimed, and every document prints the statutory composition notice."
-            disabled={formDisabled}
-          />
-          <ModeRadio
-            name="mode" value="regular" checked={mode === 'regular'} onChange={() => setMode('regular')}
-            title="Regular GST — tax invoice"
-            body="GST tax invoices with CGST/SGST breakdown, seller GSTIN and place of supply. Menu prices are the bill; tax is extracted from them at document level."
+            name="billingTopMode"
+            value="gst"
+            checked={mode !== 'off'}
+            onChange={() => setMode((prev) => (prev === 'off' ? 'regular' : prev))}
+            title="Mode 2 · GST Billing (GST Enabled)"
+            body="Issues compliant GST Tax Invoices (Regular 5% or 18% Specified Premises) or Bills of Supply (Composition Scheme) with atomic FY numbering."
             disabled={formDisabled}
           />
         </fieldset>
+
+        {mode !== 'off' ? (
+          <fieldset className="flex flex-col gap-2 rounded-[12px] border border-hair bg-paper-deep p-3">
+            <legend className="px-1 text-[12.5px] font-medium text-gink-64">GST registration scheme</legend>
+            <ModeRadio
+              name="gstScheme" value="regular" checked={mode === 'regular'} onChange={() => setMode('regular')}
+              title="Regular GST — Tax Invoice"
+              body="CGST + SGST breakdown, seller GSTIN and place of supply. Menu prices are tax-inclusive and tax is extracted at document level."
+              disabled={formDisabled}
+            />
+            <ModeRadio
+              name="gstScheme" value="composition" checked={mode === 'composition'} onChange={() => setMode('composition')}
+              title="Composition Scheme — Bill of Supply"
+              body="For composition-registered outlets. ₹0 GST collected on guest bills, no ITC claimed, and statutory composition notice printed."
+              disabled={formDisabled}
+            />
+          </fieldset>
+        ) : null}
 
         {mode === 'off' ? (
           <fieldset className="flex flex-col gap-2">

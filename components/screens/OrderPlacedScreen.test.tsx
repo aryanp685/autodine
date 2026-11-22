@@ -350,4 +350,12 @@ describe('OrderPlacedScreen, a held order', () => {
     expect(html).not.toContain('Waiting for the restaurant.');
     expect(html).toContain('Sent to the kitchen');
   });
+
+  it('displays explicit server confirmation and unique server order id', () => {
+    const html = renderToStaticMarkup(
+      <OrderPlacedScreen data={order({ id: 'a1b2c3d4-0000-4000-8000-111122223333' })} />,
+    );
+    expect(html).toContain('Server ID A1B2C3D4');
+    expect(html).toContain('Server confirmed');
+  });
 });

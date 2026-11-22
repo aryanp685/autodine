@@ -23,6 +23,7 @@
  */
 
 import { BILLING_CURRENCY } from './catalog';
+import { CASHFREE_PROVIDER_ID, createCashfreeBillingProvider } from './cashfree';
 import { createSandboxBillingProvider, SANDBOX_PROVIDER_ID } from './sandbox';
 
 /** How the deployment names the provider it has approved. */
@@ -133,15 +134,15 @@ export function getBillingProvider(
     return createSandboxBillingProvider(env);
   }
 
+  if (name === CASHFREE_PROVIDER_ID) {
+    return createCashfreeBillingProvider(env);
+  }
+
   // All three, or nothing. A provider named without credentials is a
   // deployment mistake, and the safe reading of a mistake is "not configured".
   if (!name || name === 'none' || !apiKey || !webhookSecret) return null;
 
-  // Even fully configured, there is still nothing to return for a live
-  // provider: no live adapter is approved or written. This is not an oversight
-  // to be filled in by returning something — it is the whole of the "no
-  // provider" guarantee, and it stays null until a real adapter is written
-  // for a real approved provider.
+  // Unapproved providers (e.g. razorpay) remain fail-closed null.
   return null;
 }
 

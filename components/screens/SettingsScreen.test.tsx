@@ -22,12 +22,22 @@ vi.mock('@/app/(staff)/dashboard/settings/gst-actions', () => ({
   saveGstAction: mocks.action('saveGstAction'),
 }));
 
+vi.mock('@/app/(staff)/dashboard/settings/printer-actions', () => ({
+  savePrinterAction: mocks.action('savePrinterAction'),
+  deletePrinterAction: mocks.action('deletePrinterAction'),
+  reportPrinterStatusAction: mocks.action('reportPrinterStatusAction'),
+}));
+
 vi.mock('@/app/(staff)/dashboard/settings/actions', () => ({
   saveDetailsAction: mocks.action('saveDetailsAction'),
   saveTaxAction: mocks.action('saveTaxAction'),
+  saveBillingDefaultsAction: mocks.action('saveBillingDefaultsAction'),
+  saveCouponAction: mocks.action('saveCouponAction'),
+  toggleCouponAction: mocks.action('toggleCouponAction'),
   saveOnlinePaymentsAction: mocks.action('saveOnlinePaymentsAction'),
   saveUpiAction: mocks.action('saveUpiAction'),
   saveGuestVerificationAction: mocks.action('saveGuestVerificationAction'),
+  saveOperatingModeAction: mocks.action('saveOperatingModeAction'),
 }));
 
 import { SettingsScreen } from './SettingsScreen';
@@ -282,10 +292,13 @@ describe('Settings, the redesign', () => {
     const anchors = [...html.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]);
     const ids = new Set([...html.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]));
 
-    // Six since Operations arrived: an index entry that scrolls nowhere is how
+    // Nine since Operating path & POS arrived: an index entry that scrolls nowhere is how
     // a long page stops being navigable.
-    expect(anchors).toHaveLength(6);
+    expect(anchors).toHaveLength(9);
     expect(anchors).toContain('settings-people');
+    expect(anchors).toContain('settings-coupons');
+    expect(anchors).toContain('settings-printers');
+    expect(anchors).toContain('settings-operating-mode');
     expect(anchors).toContain('settings-operations');
     for (const anchor of anchors) expect(ids.has(anchor)).toBe(true);
   });
@@ -299,12 +312,21 @@ describe('Settings, the redesign', () => {
   });
 
   it('gives every form the same commit button', () => {
-    // Five forms, five saves, one appearance: the accent fill at the same size,
-    // so "which control commits this card" is answered the same way every time.
-    // The last is the guest-verification choice (migration 20261028000900);
-    // the GST card (migration 20261113000100) is one more save, same appearance.
+    // Nine commit buttons: Restaurant details, Tax, GST mode, Add outlet,
+    // Bill charges & round-off, Guest verification, Save promo code, Save printer,
+    // and Save operating mode.
     const html = renderToStaticMarkup(<SettingsScreen data={data()} />);
-    expect(count(html, 'bg-grass text-cream')).toBe(5);
+    expect(count(html, 'bg-grass text-cream')).toBe(9);
+    expect(html).toContain('Save operating mode');
+    expect(html).toContain('Mode A · Alongside an existing POS');
+    expect(html).toContain('Mode B · Primary operating system');
+    expect(html).toContain('Save printer');
+    expect(html).toContain('Save promo code');
+    expect(html).toContain('Mode 1 · Normal Billing (GST Disabled)');
+    expect(html).toContain('Mode 2 · GST Billing (GST Enabled)');
+    expect(html).toContain('FSSAI license number');
+    expect(html).toContain('Bill footer / thank-you note');
+    expect(html).toContain('Bill charges &amp; round-off');
   });
 
   it('draws no hand-made alert boxes any more', () => {

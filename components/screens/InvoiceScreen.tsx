@@ -3,12 +3,19 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { createInvoiceShareLinkAction, revokeInvoiceShareLinkAction } from '@/app/(staff)/dashboard/share-actions';
-
-import { PrintButton } from '@/components/PrintButton';
+import { recordInvoiceReprintAction } from '@/app/(staff)/dashboard/invoice-print-actions';
 import { EinvoiceAttemptButton } from '@/components/screens/EinvoiceAttemptButton';
 import { btn } from '@/components/owner/chrome';
 import { formatBillMoney, paymentMethodLabel, whatsAppLink } from '@/lib/bill';
 import { buildReceiptMessage } from '@/lib/invoice';
+import {
+  DEFAULT_BRIDGE_URL,
+  PRINT_BRIDGE_STORAGE_KEY,
+  buildThermalPrintJob,
+  getConfiguredPrintBridgeUrl,
+  readLocalBridgeConfig,
+  sendToLocalPrintBridge,
+} from '@/lib/print-bridge';
 import type { ReceiptData } from '@/lib/db/invoice';
 
 type Layout = 'a4' | '58mm' | '80mm';
@@ -23,9 +30,17 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
   const [layout, setLayout] = useState<Layout>('a4');
   const [shareLinks, setShareLinks] = useState(invoice.shareLinks ?? []);
   const [createdLink, setCreatedLink] = useState<{ id: string; href: string; expiresAt: string } | null>(null);
+  const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
   const [shareMessage, setShareMessage] = useState('');
+  const [printCount, setPrintCount] = useState<number>(invoice.printCount ?? 0);
+  const [printBusy, setPrintBusy] = useState(false);
+  const [bridgeUrl, setBridgeUrl] = useState<string>(() => getConfiguredPrintBridgeUrl() ?? '');
+  const [showBridgeConfig, setShowBridgeConfig] = useState(false);
+  const [printNotice, setPrintNotice] = useState('');
   const page = PAGE[layout];
+  const isDuplicate = printCount > 1;
   const shareText = buildReceiptMessage(invoice);
   const paid = invoice.totals.paymentStatus === 'paid';
   const docType = invoice.documentType;
@@ -33,7 +48,15 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
   const docTitle = docType === 'gst_tax_invoice' ? 'Tax invoice' : docType === 'bill_of_supply' ? 'Bill of supply' : 'Receipt';
   const pct = (bps: number) => (bps / 100).toFixed(bps % 100 === 0 ? 0 : 2);
 
-  async function createSecureLink() {
+  async function openShareSheet() {
+    setShareCopied(false);
+    setShareSheetOpen(true);
+    if (!shared && !createdLink && !shareBusy) {
+      await createSecureLink({ copyToClipboard: false });
+    }
+  }
+
+  async function createSecureLink(options: { copyToClipboard?: boolean } = {}) {
     if (shareBusy) return;
     setShareBusy(true);
     setShareMessage('');
@@ -53,11 +76,13 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
       lastAccessedAt: null,
       accessCount: 0,
     }, ...current]);
-    try {
-      await navigator.clipboard.writeText(href);
-      setShareMessage('Secure receipt link copied. It expires in 24 hours.');
-    } catch {
-      setShareMessage('Secure link created. Copy it from the field below; it expires in 24 hours.');
+    if (options.copyToClipboard !== false) {
+      try {
+        await navigator.clipboard.writeText(href);
+        setShareMessage('Secure receipt link copied. It expires in 24 hours.');
+      } catch {
+        setShareMessage('Secure link created. Copy it from the field below; it expires in 24 hours.');
+      }
     }
   }
 
@@ -77,12 +102,82 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
     setShareMessage('Receipt link revoked.');
   }
 
-  function shareReceipt() {
-    if (navigator.share) {
-      void navigator.share({ title: `Receipt ${invoice.number}`, text: shareText }).catch(() => {});
-      return;
+  const activeShareUrl = createdLink?.href ?? (shared && typeof window !== 'undefined' ? window.location.href : '');
+  const fullShareMessage = activeShareUrl ? `${shareText}\n\nView bill: ${activeShareUrl}` : shareText;
+
+  async function copyShareUrl() {
+    const textToCopy = activeShareUrl || fullShareMessage;
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      setShareCopied(true);
+      setShareMessage(activeShareUrl ? 'Receipt link copied.' : 'Receipt summary copied.');
+    } catch {
+      setShareMessage('Copy from the share field below.');
     }
-    window.open(whatsAppLink('', shareText), '_blank', 'noopener,noreferrer');
+  }
+
+  function triggerNativeShare() {
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      void navigator
+        .share({
+          title: `${docTitle} ${invoice.number}`,
+          text: shareText,
+          ...(activeShareUrl ? { url: activeShareUrl } : {}),
+        })
+        .catch(() => {});
+    }
+  }
+
+  async function handlePrint() {
+    if (printBusy) return;
+    setPrintNotice('');
+    if (!shared) {
+      setPrintBusy(true);
+      const res = await recordInvoiceReprintAction(invoice.id, layout);
+      setPrintBusy(false);
+      if (res.ok) {
+        setPrintCount(res.copyNumber);
+      }
+    }
+    window.print();
+  }
+
+  async function handleThermalBridge() {
+    if (printBusy) return;
+    setPrintNotice('');
+    const widthMm: 58 | 80 = layout === '58mm' ? 58 : 80;
+    const savedUrl = bridgeUrl.trim();
+    if (savedUrl && typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(PRINT_BRIDGE_STORAGE_KEY, savedUrl);
+      } catch {
+        // Ignore storage errors in private mode.
+      }
+    }
+    let nextCopy = printCount;
+    if (!shared) {
+      setPrintBusy(true);
+      const rep = await recordInvoiceReprintAction(invoice.id, 'escpos');
+      setPrintBusy(false);
+      if (rep.ok) {
+        nextCopy = rep.copyNumber;
+        setPrintCount(rep.copyNumber);
+      }
+    }
+    const cfg = readLocalBridgeConfig();
+    const targetUrl = savedUrl || cfg.url || DEFAULT_BRIDGE_URL;
+    const job = buildThermalPrintJob(invoice, {
+      widthMm,
+      copyNumber: Math.max(1, nextCopy),
+      printerTarget: cfg.preferredPrinterName
+        ? { printerName: cfg.preferredPrinterName, bridgePrinterName: cfg.preferredPrinterName, connectionType: 'windows_bridge' }
+        : undefined,
+    });
+    const result = await sendToLocalPrintBridge(job, {
+      endpoint: targetUrl,
+      token: cfg.token,
+    });
+    setPrintNotice(result.ok ? result.message : result.error);
   }
 
   const layoutClass = layout === 'a4'
@@ -113,20 +208,66 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
                 ))}
               </select>
             </label>
-            <button type="button" className={btn('ghost', 'sm')} onClick={shareReceipt}>
-              Share receipt text
+            <button type="button" className={btn('ghost', 'sm')} onClick={() => void openShareSheet()}>
+              Share receipt
             </button>
             {!shared ? (
-              <button type="button" className={btn('ghost', 'sm')} onClick={createSecureLink} disabled={shareBusy}>
+              <button type="button" className={btn('ghost', 'sm')} onClick={() => void createSecureLink()} disabled={shareBusy}>
                 {shareBusy ? 'Working…' : 'Create 24-hour link'}
               </button>
+            ) : null}
+            {!shared && gstDoc && invoice.status === 'issued' && (staffRole === 'owner' || staffRole === 'manager') ? (
+              <Link href="/dashboard/invoices#credit-debit-notes" className={btn('ghost', 'sm')}>
+                Credit / Debit note
+              </Link>
             ) : null}
             {!shared && (staffRole === 'owner' || staffRole === 'manager') ? (
               <EinvoiceAttemptButton invoiceId={invoice.id} irpStatus={invoice.irpStatus} />
             ) : null}
-            <PrintButton className={btn('solid', 'sm')}>Print / Save PDF</PrintButton>
+            {!shared ? (
+              <button
+                type="button"
+                className={btn('ghost', 'sm')}
+                onClick={() => setShowBridgeConfig((prev) => !prev)}
+              >
+                ESC/POS bridge
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className={btn('solid', 'sm')}
+              disabled={printBusy}
+              onClick={() => void handlePrint()}
+            >
+              {printBusy ? 'Preparing…' : 'Print / Save PDF'}
+            </button>
           </div>
         </div>
+        {!shared && showBridgeConfig ? (
+          <div className="mx-auto mt-2.5 flex max-w-[820px] flex-wrap items-center gap-2 border-t border-hair pt-2.5 text-[11.5px]">
+            <input
+              type="url"
+              aria-label="ESC/POS Print Bridge URL"
+              value={bridgeUrl}
+              onChange={(e) => setBridgeUrl(e.target.value)}
+              placeholder="Local Print Bridge URL (optional)"
+              className="min-w-[220px] flex-1 rounded border border-hair bg-card px-2.5 py-1 text-gink"
+            />
+            <button
+              type="button"
+              className={btn('ghost', 'sm')}
+              disabled={printBusy}
+              onClick={() => void handleThermalBridge()}
+            >
+              Send {layout === '58mm' ? '58 mm' : '80 mm'} ESC/POS
+            </button>
+          </div>
+        ) : null}
+        {printNotice ? (
+          <p role="status" className="mx-auto mt-2 max-w-[820px] text-[11.5px] text-gink-64">
+            {printNotice}
+          </p>
+        ) : null}
       </div>
 
       <main className="mx-auto w-full max-w-[820px] px-4 py-6 sm:px-6 print:max-w-none print:p-0">
@@ -145,9 +286,23 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
               e-Invoice failed — treat as pending and do not supply a copy until resolved
             </div>
           ) : null}
+          {invoice.irpStatus === 'cancelled' ? (
+            <div className="mb-5 border-2 border-[var(--alert)] px-3 py-2 text-center text-[12.5px] font-semibold text-[var(--alert)] uppercase">
+              e-Invoice IRN cancelled {invoice.irpCancelledAt ? `(${invoice.irpCancelledAt})` : ''}
+              {invoice.irpCancelReason ? ` — ${invoice.irpCancelReason}` : ''}
+            </div>
+          ) : null}
           {invoice.status === 'voided' ? (
             <div className="mb-5 border-2 border-[var(--alert)] px-3 py-2 text-center text-[13px] font-bold tracking-[0.18em] text-[var(--alert)] uppercase">
               VOID — {invoice.voidReason}
+            </div>
+          ) : null}
+          {isDuplicate ? (
+            <div
+              data-invoice-duplicate
+              className="mb-4 border border-hair-strong bg-paper-deep px-3 py-1.5 text-center text-[11.5px] font-bold tracking-[0.16em] text-gink uppercase"
+            >
+              DUPLICATE COPY #{printCount}
             </div>
           ) : null}
 
@@ -164,6 +319,11 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
               </p>
               {invoice.seller.phone ? (
                 <p className="mt-1 text-[11.5px] text-gink-64">Phone {invoice.seller.phone}</p>
+              ) : null}
+              {invoice.seller.fssaiNumber ? (
+                <p className="mt-0.5 text-[11.5px] text-gink-64 tabular-nums">
+                  FSSAI Lic. No. {invoice.seller.fssaiNumber}
+                </p>
               ) : null}
               {gstDoc && invoice.seller.gstin ? (
                 <div className="mt-1.5 text-[11.5px] leading-[1.5] text-gink-64">
@@ -186,7 +346,13 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
               <p className="text-[10px] font-semibold tracking-[0.12em] text-gink-46 uppercase">{docTitle} no.</p>
               <p className="mt-1 font-mono text-[13.5px] font-semibold tabular-nums">{invoice.number}</p>
               <p className="mt-2 text-[11.5px] text-gink-64">{invoice.issuedAt}</p>
-              <p className="mt-1 text-[11.5px] text-gink-64">{invoice.tableLabel ? `Table ${invoice.tableLabel}` : 'Table'}</p>
+              <p className="mt-1 text-[11.5px] text-gink-64">
+                {invoice.tableLabel
+                  ? invoice.seller.orderChannel === 'takeaway' || invoice.seller.orderChannel === 'delivery'
+                    ? invoice.tableLabel
+                    : `Table ${invoice.tableLabel}`
+                  : 'Table'}
+              </p>
               <p className="mt-1 text-[10px] text-gink-46">Session {invoice.sessionReference.slice(0, 8).toUpperCase()}</p>
             </div>
           </header>
@@ -233,42 +399,78 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
           </div>
 
           <section className="ml-auto mt-4 w-full max-w-[310px] text-[11.5px] print:text-[10px]">
-            {docType === 'gst_tax_invoice' && invoice.gst ? (
-              <>
-                <Summary label="Taxable value" value={formatBillMoney(invoice.gst.taxablePaise)} />
-                {invoice.gst.igstPaise > 0 ? (
-                  <Summary label={`IGST @ ${pct(invoice.gst.rateBps)}%`} value={formatBillMoney(invoice.gst.igstPaise)} />
-                ) : (
-                  <>
-                    <Summary label={`CGST @ ${pct(invoice.gst.cgstBps)}%`} value={formatBillMoney(invoice.gst.cgstPaise)} />
-                    <Summary label={`SGST @ ${pct(invoice.gst.sgstBps)}%`} value={formatBillMoney(invoice.gst.sgstPaise)} />
-                  </>
-                )}
-                <Summary label="Total tax" value={formatBillMoney(invoice.totals.taxPaise)} />
-              </>
-            ) : docType === 'bill_of_supply' ? (
-              <>
-                <Summary label="Taxable value" value={formatBillMoney(invoice.gst?.taxablePaise ?? invoice.totals.subtotalPaise)} />
-                {invoice.gst?.notice ? (
-                  <p className="mt-2 text-[10px] font-semibold leading-[1.5] text-gink-64 uppercase">{invoice.gst.notice}</p>
-                ) : null}
-              </>
-            ) : (
-              <>
-                <Summary label="Subtotal" value={formatBillMoney(invoice.totals.subtotalPaise)} />
-              </>
-            )}
+            <Summary
+              label={docType === 'gst_tax_invoice' ? 'Items total (GST-incl.)' : 'Subtotal'}
+              value={formatBillMoney(invoice.totals.subtotalPaise)}
+            />
             {invoice.totals.ticketDiscountPaise > 0 ? (
               <Summary label="Ticket discounts (as recorded)" value={`−${formatBillMoney(invoice.totals.ticketDiscountPaise)}`} />
             ) : null}
             {invoice.totals.billDiscountPaise > 0 ? (
               <Summary label="Bill discount" value={`−${formatBillMoney(invoice.totals.billDiscountPaise)}`} />
             ) : null}
-            {docType === 'receipt' && invoice.totals.taxPaise > 0 ? (
-              <Summary label="Tax amount (from ticket records)" value={formatBillMoney(invoice.totals.taxPaise)} />
+            {(invoice.totals.serviceChargePaise ?? 0) > 0 ? (
+              <Summary label="Service charge" value={formatBillMoney(invoice.totals.serviceChargePaise ?? 0)} />
             ) : null}
-            {invoice.totals.otherChargesPaise > 0 ? (
+            {(invoice.totals.packagingChargePaise ?? 0) > 0 ? (
+              <Summary label="Packaging charge" value={formatBillMoney(invoice.totals.packagingChargePaise ?? 0)} />
+            ) : null}
+            {(invoice.totals.deliveryChargePaise ?? 0) > 0 ? (
+              <Summary label="Delivery charge" value={formatBillMoney(invoice.totals.deliveryChargePaise ?? 0)} />
+            ) : null}
+            {invoice.totals.otherChargesPaise > 0 &&
+            (invoice.totals.serviceChargePaise ?? 0) === 0 &&
+            (invoice.totals.packagingChargePaise ?? 0) === 0 &&
+            (invoice.totals.deliveryChargePaise ?? 0) === 0 ? (
               <Summary label="Other charges" value={formatBillMoney(invoice.totals.otherChargesPaise)} />
+            ) : null}
+            {docType === 'gst_tax_invoice' && invoice.gst ? (
+              <>
+                {(invoice.totals.ticketDiscountPaise > 0 ||
+                  invoice.totals.billDiscountPaise > 0 ||
+                  (invoice.totals.serviceChargePaise ?? 0) > 0 ||
+                  (invoice.totals.packagingChargePaise ?? 0) > 0 ||
+                  (invoice.totals.deliveryChargePaise ?? 0) > 0 ||
+                  invoice.totals.otherChargesPaise > 0) ? (
+                  <Summary
+                    label="Net bill (incl. GST)"
+                    value={formatBillMoney(invoice.gst.taxablePaise + invoice.totals.taxPaise)}
+                  />
+                ) : null}
+                <div className="mt-1 border-t border-hair pt-1">
+                  <Summary label="Taxable value (excl. GST)" value={formatBillMoney(invoice.gst.taxablePaise)} />
+                  {invoice.gst.igstPaise > 0 ? (
+                    <Summary label={`IGST @ ${pct(invoice.gst.rateBps)}%`} value={formatBillMoney(invoice.gst.igstPaise)} />
+                  ) : (
+                    <>
+                      <Summary label={`CGST @ ${pct(invoice.gst.cgstBps)}%`} value={formatBillMoney(invoice.gst.cgstPaise)} />
+                      <Summary label={`SGST @ ${pct(invoice.gst.sgstBps)}%`} value={formatBillMoney(invoice.gst.sgstPaise)} />
+                    </>
+                  )}
+                  <Summary label="Total tax" value={formatBillMoney(invoice.totals.taxPaise)} />
+                </div>
+              </>
+            ) : docType === 'bill_of_supply' ? (
+              <>
+                <div className="mt-1 border-t border-hair pt-1">
+                  <Summary label="Taxable value" value={formatBillMoney(invoice.gst?.taxablePaise ?? invoice.totals.subtotalPaise)} />
+                </div>
+                {invoice.gst?.notice ? (
+                  <p className="mt-2 text-[10px] font-semibold leading-[1.5] text-gink-64 uppercase">{invoice.gst.notice}</p>
+                ) : null}
+              </>
+            ) : (
+              <>
+                {invoice.totals.taxPaise > 0 ? (
+                  <Summary label="Tax amount (from ticket records)" value={formatBillMoney(invoice.totals.taxPaise)} />
+                ) : null}
+              </>
+            )}
+            {(invoice.totals.roundOffPaise ?? 0) !== 0 ? (
+              <Summary
+                label="Round-off"
+                value={`${(invoice.totals.roundOffPaise ?? 0) > 0 ? '+' : '−'}${formatBillMoney(Math.abs(invoice.totals.roundOffPaise ?? 0))}`}
+              />
             ) : null}
             <div className="mt-1 flex justify-between gap-3 border-t border-gink py-2 font-semibold">
               <span>Total payable</span>
@@ -286,7 +488,36 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
               <>
                 <p>Place of supply: {invoice.gst.placeOfSupplyStateCode ?? '—'} · {invoice.gst.interState ? 'IGST (inter-State)' : 'CGST + SGST (intra-State)'} · GSTIN {invoice.seller.gstin}</p>
                 {invoice.gst.profileNotification ? <p className="mt-1">{invoice.gst.profileNotification}</p> : null}
-                {invoice.irn ? <p className="mt-1">IRN: <span className="font-mono break-all">{invoice.irn}</span></p> : <p className="mt-1">No IRN on this document (B2C supplies are not e-invoice applicable).</p>}
+                {invoice.irn ? (
+                  <div className="mt-2 rounded border border-hair bg-paper p-2.5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <p className="font-semibold text-gink">e-Invoice Registered</p>
+                        <p>IRN: <span className="font-mono break-all text-gink">{invoice.irn}</span></p>
+                        {invoice.ackNo ? (
+                          <p>
+                            Ack No: <span className="font-mono">{invoice.ackNo}</span>
+                            {invoice.ackDate ? ` · Ack Date: ${invoice.ackDate}` : ''}
+                          </p>
+                        ) : null}
+                      </div>
+                      {invoice.signedQrSvg ? (
+                        <div className="shrink-0 text-center" data-einvoice-qr>
+                          <div className="rounded border border-hair bg-white p-1">
+                            <span
+                              className="block [&>svg]:block [&>svg]:size-full"
+                              style={{ width: 92, height: 92 }}
+                              dangerouslySetInnerHTML={{ __html: invoice.signedQrSvg }}
+                            />
+                          </div>
+                          <p className="mt-1 text-[10px] uppercase tracking-[0.06em] text-gink-64">Signed QR</p>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-1">No IRN on this document (B2C supplies are not e-invoice applicable).</p>
+                )}
               </>
             ) : null}
             {docType === 'bill_of_supply' && invoice.gst ? (
@@ -306,7 +537,7 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
             {invoice.supersedesInvoiceId ? (
               <p className="mt-2">Replacement receipt; previous receipt is voided.</p>
             ) : null}
-            <p className="mt-3 text-center">Thank you.</p>
+            <p className="mt-3 text-center">{invoice.seller.billFooterNote || 'Thank you.'}</p>
           </footer>
         </article>
 
@@ -378,6 +609,104 @@ export function InvoiceScreen({ invoice, shared = false, staffRole }: { invoice:
           </section>
         ) : null}
       </main>
+
+      {shareSheetOpen ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Share receipt options"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3 sm:items-center print:hidden"
+        >
+          <div className="w-full max-w-[420px] rounded-[18px] border border-hair bg-card p-5 shadow-[0_20px_50px_rgba(0,0,0,.22)]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-semibold tracking-[0.12em] text-gink-46 uppercase">
+                  Share {docTitle}
+                </p>
+                <h2 className="mt-0.5 text-[15px] font-semibold text-gink">
+                  {invoice.number} · {formatBillMoney(invoice.totals.totalPaise)}
+                </h2>
+              </div>
+              <button
+                type="button"
+                className={btn('quiet', 'sm')}
+                onClick={() => setShareSheetOpen(false)}
+                aria-label="Close share sheet"
+              >
+                Close
+              </button>
+            </div>
+
+            {activeShareUrl ? (
+              <div className="mt-3 flex items-center gap-2 rounded-[10px] border border-hair bg-paper px-2.5 py-2">
+                <input
+                  readOnly
+                  aria-label="Shareable bill link"
+                  value={activeShareUrl}
+                  className="min-w-0 flex-1 bg-transparent text-[11.5px] text-gink outline-none"
+                />
+                <button type="button" className={btn('ghost', 'sm')} onClick={() => void copyShareUrl()}>
+                  {shareCopied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+            ) : (
+              <p className="mt-3 text-[11.5px] text-gink-64">
+                {shareBusy ? 'Creating 24-hour secure bill link…' : 'Sharing formatted bill summary (link ready when signed in).'}
+              </p>
+            )}
+
+            <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+              <a
+                href={whatsAppLink('', fullShareMessage)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-col items-center justify-center gap-1 rounded-[12px] border border-hair bg-paper px-3 py-3 text-center text-[12.5px] font-medium text-gink transition hover:border-hair-strong hover:bg-paper-deep"
+              >
+                <span className="text-[13.5px] font-semibold text-[#15803d]">WhatsApp</span>
+                <span className="text-[10.5px] text-gink-46">Send bill &amp; link</span>
+              </a>
+              <a
+                href={`mailto:?subject=${encodeURIComponent(`${invoice.seller.name} · ${docTitle} ${invoice.number}`)}&body=${encodeURIComponent(fullShareMessage)}`}
+                className="flex flex-col items-center justify-center gap-1 rounded-[12px] border border-hair bg-paper px-3 py-3 text-center text-[12.5px] font-medium text-gink transition hover:border-hair-strong hover:bg-paper-deep"
+              >
+                <span className="text-[13.5px] font-semibold text-gink">Email</span>
+                <span className="text-[10.5px] text-gink-46">Mail app</span>
+              </a>
+              <a
+                href={`sms:?body=${encodeURIComponent(fullShareMessage)}`}
+                className="flex flex-col items-center justify-center gap-1 rounded-[12px] border border-hair bg-paper px-3 py-3 text-center text-[12.5px] font-medium text-gink transition hover:border-hair-strong hover:bg-paper-deep"
+              >
+                <span className="text-[13.5px] font-semibold text-gink">SMS</span>
+                <span className="text-[10.5px] text-gink-46">Text message</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => void copyShareUrl()}
+                className="flex flex-col items-center justify-center gap-1 rounded-[12px] border border-hair bg-paper px-3 py-3 text-center text-[12.5px] font-medium text-gink transition hover:border-hair-strong hover:bg-paper-deep"
+              >
+                <span className="text-[13.5px] font-semibold text-gink">
+                  {shareCopied ? 'Copied!' : 'Copy link'}
+                </span>
+                <span className="text-[10.5px] text-gink-46">Clipboard</span>
+              </button>
+              <button
+                type="button"
+                onClick={triggerNativeShare}
+                className="flex flex-col items-center justify-center gap-1 rounded-[12px] border border-hair bg-paper px-3 py-3 text-center text-[12.5px] font-medium text-gink transition hover:border-hair-strong hover:bg-paper-deep sm:col-span-2"
+              >
+                <span className="text-[13.5px] font-semibold text-gink">More apps</span>
+                <span className="text-[10.5px] text-gink-46">Instagram, Telegram, AirDrop…</span>
+              </button>
+            </div>
+
+            {shareMessage ? (
+              <p role="status" className="mt-3 text-[11.5px] text-gink-64">
+                {shareMessage}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -19,13 +19,20 @@
  */
 
 import { getStaffContextDetailed } from '@/lib/db/staff';
-import { billLineLabel, billTaxRateBps, type BillData, type BillLine, type BillPayment } from '@/lib/bill';
+import {
+  billLineLabel,
+  billTaxRateBps,
+  type BillData,
+  type BillLine,
+  type BillPayment,
+  type BillStatusEvent,
+} from '@/lib/bill';
 
 // The bill's shape and its wording live in lib/bill.ts, which has no server
 // imports: the bill screen is a client component and must not pull
 // next/headers into the browser bundle. Re-exported here so staff-side code
 // has one place to import from.
-export type { BillData, BillLine, BillPayment } from '@/lib/bill';
+export type { BillData, BillLine, BillPayment, BillStatusEvent } from '@/lib/bill';
 
 export type BillResult =
   | { ok: true; bill: BillData }
@@ -82,7 +89,7 @@ export async function getBillData(orderId: string): Promise<BillResult> {
   if (orderError) throw new Error(`Could not load the order: ${orderError.message}`);
   if (!order) return { ok: false, reason: 'not-found' };
 
-  const [itemsResult, paymentsResult, tableResult] = await Promise.all([
+  const [itemsResult, paymentsResult, tableResult, eventsResult] = await Promise.all([
     supabase
       .from('order_items_finance')
       .select('id, qty, name_snapshot, variant_snapshot, addons_snapshot, unit_price_paise, is_veg, sort_order')
@@ -96,11 +103,29 @@ export async function getBillData(orderId: string): Promise<BillResult> {
     order.table_id
       ? supabase.from('dining_tables').select('label').eq('id', order.table_id).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
+    supabase
+      .from('order_status_events')
+      .select('id, event_type, from_status, to_status, actor_role, detail, created_at')
+      .eq('order_id', order.id)
+      .eq('restaurant_id', restaurantId)
+      .order('created_at', { ascending: true }),
   ]);
 
   if (itemsResult.error) throw new Error(`Could not load the bill lines: ${itemsResult.error.message}`);
   if (paymentsResult.error) throw new Error(`Could not load payments: ${paymentsResult.error.message}`);
   if (tableResult.error) throw new Error(`Could not load the table: ${tableResult.error.message}`);
+
+  const statusEvents: BillStatusEvent[] = eventsResult.error
+    ? []
+    : (eventsResult.data ?? []).map((ev) => ({
+        id: ev.id,
+        eventType: ev.event_type,
+        fromStatus: ev.from_status,
+        toStatus: ev.to_status,
+        actorRole: ev.actor_role,
+        detail: ev.detail,
+        at: formatWhen(ev.created_at, timezone),
+      }));
 
   // Only money that actually moved. A failed or refunded attempt is not part
   // of what the guest has paid, and a pending one has not been collected yet.
@@ -162,6 +187,7 @@ export async function getBillData(orderId: string): Promise<BillResult> {
       lines,
       payments,
       outstandingPaise,
+      statusEvents,
     },
   };
 }

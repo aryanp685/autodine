@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { kitchenOrders, restaurant, type KitchenOrder } from '@/lib/demo-data';
@@ -18,18 +19,25 @@ import {
 } from '@/components/owner/chrome';
 import type { OutletBar } from '@/lib/outlets';
 import type { CancelledTicket, KitchenScreenData, KitchenTicket, KitchenWaiterCall } from '@/lib/db/kitchen-screen';
+import {
+  formatKotHandoffSlip,
+  kotHandoffLabel,
+  normalizeKotHandoffStatus,
+  type KotHandoffStatus,
+} from '@/lib/operating-mode';
 import { claimKitchenSpeaker, type KitchenSpeakerState } from '@/lib/kitchen-speaker-lock';
 import { readMissedOrderIds, writeMissedOrderIds } from '@/lib/kitchen-missed';
 import { clockTimeInZone } from '@/lib/db/time';
-import { printKitchenKot } from '@/lib/kot-print';
 import { confirmedPrepChange, LATE_AFTER_MIN, WARN_AFTER_MIN, nextPrepState, type PrepState } from '@/lib/db/prep';
 import {
   advanceOrderAction,
   claimKitchenOrderAnnouncementAction,
   claimTableWaiterCallAnnouncementAction,
   recordKitchenAnnouncementResultAction,
+  recordOrderKotHandoffAction,
   recordTableWaiterCallAnnouncementAction,
   resolveTableWaiterCallAction,
+  sendKotHandoffWebhookAction,
 } from '@/app/(staff)/kitchen/actions';
 import { HeldTableStrip } from '@/components/owner/HeldTableStrip';
 import { cancelStaffOrderAction } from '@/app/orders/actions';
@@ -153,6 +161,9 @@ type BoardTicket = {
   }[];
   announcementStatus?: 'announced' | 'failed' | null;
   announcementError?: string | null;
+  kotHandoffStatus?: KotHandoffStatus;
+  kotHandoffAt?: string | null;
+  kotHandoffRef?: string | null;
 };
 
 type LogEntry = { key: string; at: string; label: string; text: string; status: 'queued' | 'completed' | 'failed' | 'cancelled' };
@@ -185,6 +196,9 @@ function fromLive(ticket: KitchenTicket): BoardTicket {
     items: ticket.items,
     announcementStatus: ticket.announcementStatus,
     announcementError: ticket.announcementError,
+    kotHandoffStatus: ticket.kotHandoffStatus ?? 'pending',
+    kotHandoffAt: ticket.kotHandoffAt ?? null,
+    kotHandoffRef: ticket.kotHandoffRef ?? null,
   };
 }
 
@@ -376,6 +390,9 @@ export function Kitchen({
   const [cancelBusy, setCancelBusy] = useState<string | null>(null);
   const [waiterCallBusy, setWaiterCallBusy] = useState<string | null>(null);
   const [waiterCallError, setWaiterCallError] = useState('');
+  const [handoffPending, setHandoffPending] = useState<Record<string, KotHandoffStatus>>({});
+  const [handoffBusyId, setHandoffBusyId] = useState<string | null>(null);
+  const [copiedSlipId, setCopiedSlipId] = useState<string | null>(null);
   /**
    * What the queue is doing, not what it was asked to do.
    *
@@ -404,6 +421,10 @@ export function Kitchen({
   const live = Boolean(data);
   const restaurantId = data?.restaurantId ?? null;
   const waiterCalls = data?.waiterCalls ?? EMPTY_WAITER_CALLS;
+  const operatingMode = data?.operatingMode ?? outlet?.operatingMode ?? 'mode_b';
+  const posIntegrationName = data?.posIntegrationName ?? outlet?.posIntegrationName ?? null;
+  const isModeA = operatingMode === 'mode_a';
+  const canManageWebhook = data?.role === 'owner' || data?.role === 'manager';
 
   // The speaker closure is built once, so it reads these through refs rather
   // than capturing the values they had at first render.
@@ -830,13 +851,18 @@ export function Kitchen({
    * (and disappears with the next server payload), a demo ticket's by its
    * sample id (and simply stays until the page is reloaded).
    */
-  const orders = base.map((ticket) =>
-    ticket.orderId && pending[ticket.orderId]
-      ? { ...ticket, state: pending[ticket.orderId]! }
-      : !ticket.orderId && demoState[ticket.key]
-        ? { ...ticket, state: demoState[ticket.key] }
-        : ticket,
-  );
+  const orders = base.map((ticket) => {
+    const withPrep =
+      ticket.orderId && pending[ticket.orderId]
+        ? { ...ticket, state: pending[ticket.orderId]! }
+        : !ticket.orderId && demoState[ticket.key]
+          ? { ...ticket, state: demoState[ticket.key] }
+          : ticket;
+    if (withPrep.orderId && handoffPending[withPrep.orderId]) {
+      return { ...withPrep, kotHandoffStatus: handoffPending[withPrep.orderId] };
+    }
+    return withPrep;
+  });
 
   /* ------------------------------------------------------- arrival highlight */
 
@@ -1434,6 +1460,67 @@ export function Kitchen({
     }
   };
 
+  const copyKotSlip = async (ticket: BoardTicket) => {
+    const slip = formatKotHandoffSlip(ticket, posIntegrationName);
+    try {
+      await navigator.clipboard?.writeText(slip);
+      setCopiedSlipId(ticket.key);
+      setTimeout(() => {
+        setCopiedSlipId((curr) => (curr === ticket.key ? null : curr));
+      }, 2200);
+    } catch {
+      setError('Could not copy the KOT handoff slip to the clipboard.');
+    }
+  };
+
+  const toggleKotHandoff = async (ticket: BoardTicket, next: 'pending' | 'entered_in_pos') => {
+    if (!ticket.orderId || handoffBusyId) return;
+    setHandoffBusyId(ticket.orderId);
+    setError('');
+    setHandoffPending((curr) => ({ ...curr, [ticket.orderId!]: next }));
+    try {
+      const result = await recordOrderKotHandoffAction(ticket.orderId, next);
+      if (!result.ok) {
+        setHandoffPending((curr) => {
+          const copy = { ...curr };
+          delete copy[ticket.orderId!];
+          return copy;
+        });
+        setError(result.error);
+        return;
+      }
+      refresh();
+    } finally {
+      setHandoffBusyId(null);
+    }
+  };
+
+  const sendWebhookHandoff = async (ticket: BoardTicket) => {
+    if (!ticket.orderId || handoffBusyId) return;
+    setHandoffBusyId(ticket.orderId);
+    setError('');
+    try {
+      const result = await sendKotHandoffWebhookAction(ticket.orderId);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setHandoffPending((curr) => ({ ...curr, [ticket.orderId!]: 'webhook_sent' }));
+      refresh();
+    } finally {
+      setHandoffBusyId(null);
+    }
+  };
+
+  const pendingHandoffCount = isModeA
+    ? orders.filter(
+        (o) =>
+          o.state !== 'served' &&
+          normalizeKotHandoffStatus(o.kotHandoffStatus) !== 'entered_in_pos' &&
+          normalizeKotHandoffStatus(o.kotHandoffStatus) !== 'webhook_sent',
+      ).length
+    : 0;
+
   /**
    * Whether prep-advancement controls may write.
    *
@@ -1918,6 +2005,29 @@ export function Kitchen({
 
         {data?.blocked && <SignInPrompt reason={data.blocked} screen="kitchen board" />}
 
+        {isModeA && !data?.blocked && (
+          <Notice
+            role="status"
+            tone="plain"
+            className="mb-0"
+            label={
+              <strong className="text-[12.5px] font-semibold text-gink">
+                Mode A · Alongside {posIntegrationName || 'your existing POS'}
+              </strong>
+            }
+            action={
+              <Link href="/dashboard/orders" className={btn('ghost', 'sm')}>
+                Handoff ledger &amp; CSV
+              </Link>
+            }
+          >
+            AutoDine handles QR ordering and the kitchen pass.{' '}
+            {pendingHandoffCount > 0
+              ? `${pendingHandoffCount} open ticket${pendingHandoffCount === 1 ? ' still needs' : 's still need'} POS billing handoff — copy the KOT slip or mark Entered in POS so nothing is punched twice.`
+              : 'All active tickets have been handed off to your billing POS.'}
+          </Notice>
+        )}
+
         {/* -------------------------------------------------- why nothing moves */}
 
         {/* One banner, naming the actual obstacle. The buttons below are not
@@ -2092,6 +2202,24 @@ export function Kitchen({
                     </p>
                   )}
 
+                  {isModeA && (
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <Tag
+                        tone={
+                          o.kotHandoffStatus === 'entered_in_pos' ||
+                          o.kotHandoffStatus === 'webhook_sent'
+                            ? 'live'
+                            : 'due'
+                        }
+                      >
+                        {kotHandoffLabel(normalizeKotHandoffStatus(o.kotHandoffStatus))}
+                      </Tag>
+                      {o.kotHandoffRef ? (
+                        <span className="tnum text-[11.5px] text-gink-46">Ref {o.kotHandoffRef}</span>
+                      ) : null}
+                    </div>
+                  )}
+
                   <Items order={o} compact={o.state === 'served'} />
 
                   {o.note && (
@@ -2101,38 +2229,6 @@ export function Kitchen({
                   )}
 
                   <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-hair pt-2.5">
-                    {o.orderId ? (
-                      <button
-                        type="button"
-                        className={btn('ghost', 'sm')}
-                        title="Open this kitchen ticket in browser print"
-                        aria-label={`Print KOT for order ${o.code}`}
-                        data-print-kot={o.orderId}
-                        onClick={() => {
-                          setError('');
-                          const opened = printKitchenKot({
-                            restaurantName: data?.restaurantName ?? restaurant.name,
-                            ticketCode: o.code,
-                            table: o.table,
-                            placedAt: o.placedAt,
-                            note: o.note ?? null,
-                            items: o.items.map((item) => {
-                              const detailParts = item.detail?.split(' · ').filter(Boolean) ?? [];
-                              return {
-                                quantity: item.qty,
-                                name: item.name,
-                                portion: item.portion ?? null,
-                                addons: item.addons ?? detailParts.filter((part) => part !== item.portion),
-                              };
-                            }),
-                          });
-                          if (!opened) setError('The print window was blocked. Allow pop-ups for this site, then print the KOT again.');
-                        }}
-                      >
-                        Print KOT
-                      </button>
-                    ) : null}
-
                     {interactive && o.state === 'new' && (
                       <button
                         type="button"
@@ -2243,6 +2339,52 @@ export function Kitchen({
                         </button>
                       )
                     ) : null}
+
+                    {isModeA && (
+                      <div className="mt-1 flex w-full flex-wrap items-center gap-1.5 border-t border-hair pt-2">
+                        <button
+                          type="button"
+                          onClick={() => void copyKotSlip(o)}
+                          className={btn('ghost', 'sm')}
+                        >
+                          {copiedSlipId === o.key ? 'KOT slip copied' : 'Copy KOT slip'}
+                        </button>
+                        {live && o.orderId && (
+                          <button
+                            type="button"
+                            disabled={handoffBusyId === o.orderId}
+                            onClick={() =>
+                              void toggleKotHandoff(
+                                o,
+                                o.kotHandoffStatus === 'entered_in_pos'
+                                  ? 'pending'
+                                  : 'entered_in_pos',
+                              )
+                            }
+                            className={btn(
+                              o.kotHandoffStatus === 'entered_in_pos' ? 'quiet' : 'ghost',
+                              'sm',
+                            )}
+                          >
+                            {handoffBusyId === o.orderId
+                              ? 'Saving…'
+                              : o.kotHandoffStatus === 'entered_in_pos'
+                                ? 'Reset POS handoff'
+                                : 'Entered in POS'}
+                          </button>
+                        )}
+                        {live && o.orderId && canManageWebhook && (
+                          <button
+                            type="button"
+                            disabled={handoffBusyId === o.orderId}
+                            onClick={() => void sendWebhookHandoff(o)}
+                            className={btn('quiet', 'sm')}
+                          >
+                            Sync POS webhook
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </article>
               ))}

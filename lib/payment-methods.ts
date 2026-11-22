@@ -33,3 +33,19 @@ export const COUNTER_METHOD_LABEL: Record<CounterMethod, string> = {
 export function isCounterMethod(value: unknown): value is CounterMethod {
   return COUNTER_METHODS.some((m) => m === value);
 }
+
+/** Accepted by `record_split_counter_payments` (Billing Spec v2.0). */
+export const SPLIT_METHODS = ['cash', 'upi', 'card', 'other'] as const;
+
+export type SplitMethod = (typeof SPLIT_METHODS)[number];
+
+export const SPLIT_METHOD_LABEL: Record<SplitMethod, string> = {
+  cash: 'Cash',
+  upi: 'UPI',
+  card: 'Card',
+  other: 'Other',
+};
+
+export function isSplitMethod(value: unknown): value is SplitMethod {
+  return SPLIT_METHODS.some((m) => m === value);
+}

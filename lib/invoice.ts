@@ -1,7 +1,13 @@
 import { formatBillMoney } from '@/lib/bill';
 
 type ShareReceiptInput = {
-  seller: { name: string; gstin?: string | null; stateCode?: string | null };
+  seller: {
+    name: string;
+    gstin?: string | null;
+    stateCode?: string | null;
+    fssaiNumber?: string | null;
+    billFooterNote?: string | null;
+  };
   number: string;
   issuedAt: string;
   documentType?: 'receipt' | 'gst_tax_invoice' | 'bill_of_supply';
@@ -30,6 +36,10 @@ type ShareReceiptInput = {
     subtotalPaise: number;
     ticketDiscountPaise: number;
     billDiscountPaise: number;
+    serviceChargePaise?: number;
+    packagingChargePaise?: number;
+    deliveryChargePaise?: number;
+    roundOffPaise?: number;
     taxPaise: number;
     otherChargesPaise: number;
     totalPaise: number;
@@ -60,6 +70,9 @@ export function buildReceiptMessage(invoice: ShareReceiptInput): string {
   if (docType !== 'receipt' && invoice.seller.gstin) {
     lines.push(`GSTIN ${invoice.seller.gstin}${invoice.gst?.placeOfSupplyStateCode ? ` · Place of supply ${invoice.gst.placeOfSupplyStateCode}` : ''}`);
   }
+  if (invoice.seller.fssaiNumber) {
+    lines.push(`FSSAI Lic. No. ${invoice.seller.fssaiNumber}`);
+  }
   if (docType === 'bill_of_supply' && invoice.gst?.notice) {
     lines.push(invoice.gst.notice);
   }
@@ -73,29 +86,82 @@ export function buildReceiptMessage(invoice: ShareReceiptInput): string {
   );
   if (docType === 'gst_tax_invoice' && invoice.gst) {
     const pct = (bps: number) => (bps / 100).toFixed(bps % 100 === 0 ? 0 : 2);
+    const hasAdjustments =
+      invoice.totals.ticketDiscountPaise > 0 ||
+      invoice.totals.billDiscountPaise > 0 ||
+      (invoice.totals.serviceChargePaise ?? 0) > 0 ||
+      (invoice.totals.packagingChargePaise ?? 0) > 0 ||
+      (invoice.totals.deliveryChargePaise ?? 0) > 0 ||
+      invoice.totals.otherChargesPaise > 0;
+    lines.push(`Items total (GST-incl.): ${formatBillMoney(invoice.totals.subtotalPaise)}`);
+    if (invoice.totals.ticketDiscountPaise > 0) {
+      lines.push(`Ticket discounts (as recorded): −${formatBillMoney(invoice.totals.ticketDiscountPaise)}`);
+    }
+    if (invoice.totals.billDiscountPaise > 0) {
+      lines.push(`Bill discount: −${formatBillMoney(invoice.totals.billDiscountPaise)}`);
+    }
+    const itemizedCharges =
+      (invoice.totals.serviceChargePaise ?? 0) +
+      (invoice.totals.packagingChargePaise ?? 0) +
+      (invoice.totals.deliveryChargePaise ?? 0);
+    if (itemizedCharges > 0) {
+      if ((invoice.totals.serviceChargePaise ?? 0) > 0) {
+        lines.push(`Service charge: ${formatBillMoney(invoice.totals.serviceChargePaise ?? 0)}`);
+      }
+      if ((invoice.totals.packagingChargePaise ?? 0) > 0) {
+        lines.push(`Packaging charge: ${formatBillMoney(invoice.totals.packagingChargePaise ?? 0)}`);
+      }
+      if ((invoice.totals.deliveryChargePaise ?? 0) > 0) {
+        lines.push(`Delivery charge: ${formatBillMoney(invoice.totals.deliveryChargePaise ?? 0)}`);
+      }
+    } else if (invoice.totals.otherChargesPaise > 0) {
+      lines.push(`Other charges: ${formatBillMoney(invoice.totals.otherChargesPaise)}`);
+    }
+    if (hasAdjustments) {
+      lines.push(`Net bill (incl. GST): ${formatBillMoney(invoice.gst.taxablePaise + invoice.totals.taxPaise)}`);
+    }
     lines.push(
-      `Taxable value: ${formatBillMoney(invoice.gst.taxablePaise)}`,
+      `Taxable value (excl. GST): ${formatBillMoney(invoice.gst.taxablePaise)}`,
       ...(invoice.gst.igstPaise > 0
         ? [`IGST ${pct(invoice.gst.rateBps)}%: ${formatBillMoney(invoice.gst.igstPaise)}`]
         : [
             `CGST ${pct(invoice.gst.cgstBps)}%: ${formatBillMoney(invoice.gst.cgstPaise)}`,
             `SGST ${pct(invoice.gst.sgstBps)}%: ${formatBillMoney(invoice.gst.sgstPaise)}`,
           ]),
+      `Total tax: ${formatBillMoney(invoice.totals.taxPaise)}`,
     );
   } else {
     lines.push(`Subtotal: ${formatBillMoney(invoice.totals.subtotalPaise)}`);
+    if (invoice.totals.ticketDiscountPaise > 0) {
+      lines.push(`Ticket discounts (as recorded): −${formatBillMoney(invoice.totals.ticketDiscountPaise)}`);
+    }
+    if (invoice.totals.billDiscountPaise > 0) {
+      lines.push(`Bill discount: −${formatBillMoney(invoice.totals.billDiscountPaise)}`);
+    }
     if (invoice.totals.taxPaise > 0) {
       lines.push(`Tax amount (from ticket records): ${formatBillMoney(invoice.totals.taxPaise)}`);
     }
+    const itemizedCharges =
+      (invoice.totals.serviceChargePaise ?? 0) +
+      (invoice.totals.packagingChargePaise ?? 0) +
+      (invoice.totals.deliveryChargePaise ?? 0);
+    if (itemizedCharges > 0) {
+      if ((invoice.totals.serviceChargePaise ?? 0) > 0) {
+        lines.push(`Service charge: ${formatBillMoney(invoice.totals.serviceChargePaise ?? 0)}`);
+      }
+      if ((invoice.totals.packagingChargePaise ?? 0) > 0) {
+        lines.push(`Packaging charge: ${formatBillMoney(invoice.totals.packagingChargePaise ?? 0)}`);
+      }
+      if ((invoice.totals.deliveryChargePaise ?? 0) > 0) {
+        lines.push(`Delivery charge: ${formatBillMoney(invoice.totals.deliveryChargePaise ?? 0)}`);
+      }
+    } else if (invoice.totals.otherChargesPaise > 0) {
+      lines.push(`Other charges: ${formatBillMoney(invoice.totals.otherChargesPaise)}`);
+    }
   }
-  if (invoice.totals.ticketDiscountPaise > 0) {
-    lines.push(`Ticket discounts (as recorded): −${formatBillMoney(invoice.totals.ticketDiscountPaise)}`);
-  }
-  if (invoice.totals.billDiscountPaise > 0) {
-    lines.push(`Bill discount: −${formatBillMoney(invoice.totals.billDiscountPaise)}`);
-  }
-  if (invoice.totals.otherChargesPaise > 0) {
-    lines.push(`Other charges: ${formatBillMoney(invoice.totals.otherChargesPaise)}`);
+  if ((invoice.totals.roundOffPaise ?? 0) !== 0) {
+    const ro = invoice.totals.roundOffPaise ?? 0;
+    lines.push(`Round-off: ${ro > 0 ? '+' : '−'}${formatBillMoney(Math.abs(ro))}`);
   }
   lines.push(
     `Total payable: ${formatBillMoney(invoice.totals.totalPaise)}`,
@@ -107,6 +173,7 @@ export function buildReceiptMessage(invoice: ShareReceiptInput): string {
       : docType === 'bill_of_supply'
         ? ['Bill of Supply. Composition taxable person.']
         : ['GST tax invoice. Place of supply as shown above.']),
+    ...(invoice.seller.billFooterNote ? [invoice.seller.billFooterNote] : []),
   );
   return lines.join('\n');
 }

@@ -10,7 +10,7 @@ import { RoleGate } from '@/components/owner/RoleGate';
  */
 export default function Layout({ children }: { children: ReactNode }) {
   return (
-    <RoleGate allow={['owner', 'manager', 'cashier'] as const} area="counter">
+    <RoleGate allow={['owner', 'manager', 'cashier', 'waiter'] as const} area="counter">
       {children}
     </RoleGate>
   );

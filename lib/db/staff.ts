@@ -42,6 +42,7 @@ import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { Database, MemberRole } from './database';
 import type { RestaurantAccess, RestaurantEntitlement } from '@/lib/access';
+import { normalizeOperatingMode, type OperatingMode } from '@/lib/operating-mode';
 
 export type StaffContext = {
   supabase: SupabaseClient<Database>;
@@ -87,10 +88,16 @@ export type StaffContext = {
    * billing fields for Cashier or Kitchen, and this value is null for them.
    */
   access: RestaurantAccess | null;
+  /** Compatible operating path: 'mode_a' (alongside existing POS) or 'mode_b' (primary OS). */
+  operatingMode?: OperatingMode;
+  posIntegrationName?: string | null;
 };
 
 /** Roles allowed to take money at the counter. Mirrors record_cash_payment. */
 export const CASHIER_ROLES: MemberRole[] = ['owner', 'manager', 'cashier'];
+
+/** Roles allowed to take table/counter orders on the floor. */
+export const ORDER_TAKER_ROLES: MemberRole[] = ['owner', 'manager', 'cashier', 'waiter'];
 
 /**
  * Roles allowed to move a ticket along the kitchen board.
@@ -146,14 +153,28 @@ export async function getStaffContextDetailed(): Promise<StaffContextResult> {
     restaurant_id: string;
     role: MemberRole;
     restaurants:
-      | { name: string; slug: string; timezone: string | null; tagline: string | null }
-      | Array<{ name: string; slug: string; timezone: string | null; tagline: string | null }>
+      | {
+          name: string;
+          slug: string;
+          timezone: string | null;
+          tagline: string | null;
+          operating_mode?: string | null;
+          pos_integration_name?: string | null;
+        }
+      | Array<{
+          name: string;
+          slug: string;
+          timezone: string | null;
+          tagline: string | null;
+          operating_mode?: string | null;
+          pos_integration_name?: string | null;
+        }>
       | null;
   };
 
   const { data: membershipRows, error: membershipError } = await supabase
     .from('memberships')
-    .select('restaurant_id, role, restaurants(name, slug, timezone, tagline)')
+    .select('restaurant_id, role, restaurants(name, slug, timezone, tagline, operating_mode, pos_integration_name)')
     .eq('user_id', user.id)
     .order('restaurant_id', { ascending: true });
 
@@ -174,6 +195,8 @@ export async function getStaffContextDetailed(): Promise<StaffContextResult> {
         slug: restaurant.slug,
         timezone: restaurant.timezone,
         tagline: restaurant.tagline,
+        operatingMode: normalizeOperatingMode(restaurant.operating_mode),
+        posIntegrationName: restaurant.pos_integration_name ?? null,
       };
     })
     .filter((row): row is NonNullable<typeof row> => row !== null);
@@ -204,6 +227,8 @@ export async function getStaffContextDetailed(): Promise<StaffContextResult> {
       outlets: rows.map(({ id, name, role }) => ({ id, name, role })),
       entitlement: access?.entitlement ?? null,
       access: access?.billing ?? null,
+      operatingMode: active.operatingMode,
+      posIntegrationName: active.posIntegrationName,
     },
   };
 }

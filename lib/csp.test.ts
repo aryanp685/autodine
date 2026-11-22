@@ -42,6 +42,13 @@ describe('buildCsp', () => {
     expect(buildCsp({ nonce: 'n', supabaseUrl: 'not a url' })).not.toContain('not a url');
   });
 
+  it('allows loopback print bridge connections without opening arbitrary remote HTTP', () => {
+    expect(csp).toContain('http://127.0.0.1:*');
+    expect(csp).toContain('http://localhost:*');
+    expect(csp).not.toMatch(/connect-src[^;]*\bhttp:\/\/\*/);
+    expect(csp).not.toMatch(/connect-src[^;]*\s\*/);
+  });
+
   it('keeps styles practical but scripts strict (style attrs cannot carry a nonce)', () => {
     expect(csp).toContain("style-src 'self' 'unsafe-inline'");
     expect(csp).toContain("font-src 'self'");

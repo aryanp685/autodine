@@ -26,6 +26,11 @@ import { readAllRows, readRowsForIds } from '@/lib/db/paged-read';
  */
 
 import { getStaffContextDetailed, KITCHEN_ROLES } from '@/lib/db/staff';
+import {
+  normalizeKotHandoffStatus,
+  type KotHandoffStatus,
+  type OperatingMode,
+} from '@/lib/operating-mode';
 import { clockTimeInZone } from './time';
 import type { MemberRole } from './database';
 import type { Order } from './types';
@@ -43,6 +48,9 @@ type KitchenOrderRow = Pick<
   kitchen_announcement_status?: Order['kitchen_announcement_status'];
   kitchen_announcement_at?: string | null;
   kitchen_announcement_error?: string | null;
+  kot_handoff_status?: Order['kot_handoff_status'];
+  kot_handoff_at?: string | null;
+  kot_handoff_ref?: string | null;
 };
 
 export type KitchenTicket = {
@@ -94,6 +102,10 @@ export type KitchenTicket = {
   announcementStatus?: 'announced' | 'failed' | null;
   announcementAt?: string | null;
   announcementError?: string | null;
+  /** Migration 20261121000400: Mode A KOT handoff to an existing POS. */
+  kotHandoffStatus?: KotHandoffStatus;
+  kotHandoffAt?: string | null;
+  kotHandoffRef?: string | null;
 };
 
 export type KitchenWaiterCall = {
@@ -187,6 +199,8 @@ export type KitchenScreenData = {
   /** Staff who may clear table-service calls, subject to the write gate. */
   canResolveWaiterCalls?: boolean;
   cannotAdvance?: 'role' | 'plan';
+  operatingMode?: OperatingMode;
+  posIntegrationName?: string | null;
 };
 
 /**
@@ -232,7 +246,8 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
     };
   }
 
-  const { supabase, restaurantId, restaurantName, role, timezone } = staff.context;
+  const { supabase, restaurantId, restaurantName, role, timezone, operatingMode, posIntegrationName } =
+    staff.context;
 
   /**
    * Two independent gates, checked in the order the operator can act on them.
@@ -276,6 +291,8 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
    * absent; only then fall back to the pre-confirmation schema. This avoids
    * making an unconfirmed table look ready just because voice status is new.
    */
+  const orderColumnsWithHandoff =
+    'id, code, table_id, customer_note, prep_status, placed_at, hold_required, confirmed_at, table_session_id, kitchen_announcement_status, kitchen_announcement_at, kitchen_announcement_error, kot_handoff_status, kot_handoff_at, kot_handoff_ref';
   const orderColumnsFull =
     'id, code, table_id, customer_note, prep_status, placed_at, hold_required, confirmed_at, table_session_id, kitchen_announcement_status, kitchen_announcement_at, kitchen_announcement_error';
   const orderColumnsWithHolds =
@@ -290,16 +307,20 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
     .gte('placed_at', cutoff)
     .order('placed_at', { ascending: true }).order('id', { ascending: true }).range(from, to));
 
-  const fullOrdersAttempt = await queryOrders(orderColumnsFull);
-  const ordersWithHolds = fullOrdersAttempt.error?.code === '42703'
+  const handoffAttempt = await queryOrders(orderColumnsWithHandoff);
+  const fullOrdersAttempt = handoffAttempt.error?.code === '42703'
+    ? await queryOrders(orderColumnsFull)
+    : null;
+  const ordersWithHolds = fullOrdersAttempt?.error?.code === '42703'
     ? await queryOrders(orderColumnsWithHolds)
     : null;
   const ordersLegacy = ordersWithHolds?.error?.code === '42703'
     ? await queryOrders(orderColumnsLegacy)
     : null;
-  const selectedOrdersAttempt = ordersLegacy ?? ordersWithHolds ?? fullOrdersAttempt;
+  const selectedOrdersAttempt = ordersLegacy ?? ordersWithHolds ?? fullOrdersAttempt ?? handoffAttempt;
   const noHoldColumns = Boolean(ordersLegacy);
   const noAnnouncementColumns = Boolean(ordersWithHolds || ordersLegacy);
+  const noHandoffColumns = Boolean(fullOrdersAttempt || ordersWithHolds || ordersLegacy);
   const selectedRows = (selectedOrdersAttempt.data ?? []) as unknown as KitchenOrderRow[];
 
   const [ordersResult, cancelledResult] = await Promise.all([
@@ -311,6 +332,11 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
           kitchen_announcement_status: null,
           kitchen_announcement_at: null,
           kitchen_announcement_error: null,
+        } : {}),
+        ...(noHandoffColumns ? {
+          kot_handoff_status: 'pending' as const,
+          kot_handoff_at: null,
+          kot_handoff_ref: null,
         } : {}),
       })),
       error: selectedOrdersAttempt.error,
@@ -492,6 +518,9 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
       announcementStatus: row.kitchen_announcement_status ?? null,
       announcementAt: row.kitchen_announcement_at ?? null,
       announcementError: row.kitchen_announcement_error ?? null,
+      kotHandoffStatus: normalizeKotHandoffStatus(row.kot_handoff_status),
+      kotHandoffAt: row.kot_handoff_at ?? null,
+      kotHandoffRef: row.kot_handoff_ref ?? null,
     };
   });
 
@@ -516,5 +545,7 @@ export async function getKitchenScreenData(): Promise<KitchenScreenData | null> 
     canAdvance,
     canResolveWaiterCalls,
     ...(cannotAdvance ? { cannotAdvance } : {}),
+    operatingMode,
+    posIntegrationName,
   };
 }

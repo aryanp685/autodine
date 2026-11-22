@@ -330,6 +330,44 @@ export function BillScreen({ bill }: { bill: BillData }) {
             </p>
           ) : null}
         </section>
+
+        {bill.statusEvents && bill.statusEvents.length > 0 ? (
+          <section
+            data-order-timeline=""
+            aria-labelledby="bill-timeline-title"
+            className="mt-5 rounded-[var(--p-r-block)] border border-hair bg-card px-5 py-5 print:hidden"
+          >
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 id="bill-timeline-title" className="text-[13px] font-semibold text-gink">
+                Order status trace
+              </h2>
+              <span className="tnum text-[11.5px] text-gink-46">
+                Order ID {order.id}
+              </span>
+            </div>
+            <ol className="mt-3 flex flex-col divide-y divide-hair">
+              {bill.statusEvents.map((ev) => (
+                <li key={ev.id} className="flex flex-wrap items-baseline justify-between gap-2 py-2 text-[12.5px]">
+                  <div className="flex flex-wrap items-center gap-2 text-gink">
+                    <span className="font-medium">
+                      {ev.fromStatus ? `${ev.fromStatus} → ${ev.toStatus}` : ev.toStatus}
+                    </span>
+                    <span className="rounded bg-paper-deep px-1.5 py-0.5 text-[10.5px] text-gink-64">
+                      {ev.eventType.replace('_', ' ')}
+                    </span>
+                    {ev.actorRole ? (
+                      <span className="text-[11.5px] text-gink-46">by {ev.actorRole}</span>
+                    ) : null}
+                    {ev.detail ? (
+                      <span className="text-[11.5px] text-gink-64">· {ev.detail}</span>
+                    ) : null}
+                  </div>
+                  <span className="tnum text-[11.5px] text-gink-46">{ev.at}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ) : null}
       </main>
     </div>
   );

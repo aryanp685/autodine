@@ -30,6 +30,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from './database';
 import { CASHIER_ROLES, getStaffContextDetailed } from './staff';
 import { loadGstMode, type GstMode } from './gst-settings';
+import { loadRestaurantPrinters, type PrinterSummary } from './printers';
+import { summarizeOrderHealth, type OrderHealthSummary } from '@/lib/order-health';
 import { hourInZone, RESTAURANT_TIME_ZONE, startOfDayUtc } from './time';
 
 
@@ -110,6 +112,9 @@ export type DashboardScreenData = {
    * checkout capture optional B2B buyer details on the tax invoice.
    */
   gstMode: GstMode;
+  printers?: PrinterSummary[];
+  /** Order reliability & delay summary for open/active today orders. */
+  orderHealth?: OrderHealthSummary;
   /**
    * Revenue per elapsed hour of the business day. Length is
    * hours elapsed + 1, not 24: a chart that ran to midnight every morning
@@ -179,7 +184,7 @@ async function loadActiveSessions(
   if (orderRows.length === 0) return [];
 
   const orderIds = orderRows.map((order) => order.id);
-  const tableIds = [...new Set(sessions.map((session) => session.table_id))];
+  const tableIds = [...new Set(sessions.map((session) => session.table_id).filter((id): id is string => Boolean(id)))];
   const [paymentsResult, tablesResult, itemsResult] = await Promise.all([
     supabase
       .from('payments')
@@ -269,7 +274,7 @@ async function loadActiveSessions(
 
     return [{
       id: session.id,
-      table: labelByTable.get(session.table_id) ?? 'Table',
+      table: (session.table_id ? labelByTable.get(session.table_id) : null) ?? 'Counter',
       openedAt: session.opened_at,
       orderCount: tickets.length,
       orderCodes: tickets.map((order) => order.code),
@@ -320,7 +325,7 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
   const [ordersResult, paymentsResult, activeSessions] = await Promise.all([
     readAllRows((from, to) => supabase
       .from('orders_finance')
-      .select('id, code, table_id, prep_status, payment_status, total_paise, placed_at')
+      .select('id, code, table_id, prep_status, payment_status, total_paise, placed_at, updated_at, hold_required, confirmed_at, kitchen_announcement_status')
       .eq('restaurant_id', restaurantId)
       .neq('prep_status', 'cancelled')
       .gte('placed_at', dayStartIso)
@@ -395,17 +400,28 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
 
   const orderIds = rows.map((row) => row.id);
   const tableIds = [...new Set(rows.map((row) => row.table_id).filter(Boolean))] as string[];
+  const openOrderIds = rows
+    .filter((row) => OPEN_STATES.includes(row.prep_status))
+    .map((row) => row.id);
 
   // Separate queries rather than embedded selects: lib/db/database.ts is
   // hand-written and does not declare every relationship, so an embed such as
   // dining_tables(label) resolves to a SelectQueryError and will not compile.
-  const [itemsResult, tablesResult] = await Promise.all([
+  const [itemsResult, tablesResult, printers, handoffRowsResult] = await Promise.all([
     readRowsForIds(orderIds, (ids, from, to) => supabase
       .from('order_items_finance')
       .select('order_id, name_snapshot, qty, unit_price_paise')
       .in('order_id', ids).order('id').range(from, to)),
     tableIds.length
       ? supabase.from('dining_tables').select('id, label').in('id', tableIds)
+      : Promise.resolve({ data: [], error: null }),
+    loadRestaurantPrinters(supabase, restaurantId),
+    staff.context.operatingMode === 'mode_a' && openOrderIds.length > 0
+      ? supabase
+          .from('orders')
+          .select('id, kot_handoff_status')
+          .eq('restaurant_id', restaurantId)
+          .in('id', openOrderIds)
       : Promise.resolve({ data: [], error: null }),
   ]);
 
@@ -420,6 +436,26 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
   for (const table of tablesResult.data ?? []) {
     labelById.set(table.id, table.label);
   }
+  const handoffById = new Map<string, string>();
+  for (const h of handoffRowsResult.error ? [] : (handoffRowsResult.data ?? [])) {
+    if (h.kot_handoff_status) handoffById.set(h.id, h.kot_handoff_status);
+  }
+
+  const orderHealth = summarizeOrderHealth(
+    rows.map((row) => ({
+      id: row.id,
+      code: row.code,
+      tableLabel: row.table_id ? (labelById.get(row.table_id) ?? null) : null,
+      placedAt: row.placed_at,
+      updatedAt: row.updated_at,
+      prepStatus: row.prep_status,
+      holdRequired: row.hold_required,
+      confirmedAt: row.confirmed_at,
+      kitchenAnnouncementStatus: row.kitchen_announcement_status,
+      kotHandoffStatus: handoffById.get(row.id) ?? null,
+    })),
+    { now, operatingMode: staff.context.operatingMode },
+  );
 
   const topItems = new Map<string, DashboardTopItem>();
   for (const item of itemsResult.data ?? []) {
@@ -456,6 +492,8 @@ export async function getDashboardScreenData(): Promise<DashboardScreenData | nu
     activeSessions,
     canMarkPaid,
     gstMode,
+    printers,
+    orderHealth,
     hourlyPaise,
     access: staff.context.access,
   };

@@ -196,6 +196,7 @@ describe('where a role works', () => {
     expect(homeForRole('owner')).toBe('/dashboard');
     expect(homeForRole('manager')).toBe('/dashboard');
     expect(homeForRole('cashier')).toBe('/cashier');
+    expect(homeForRole('waiter')).toBe('/dashboard/orders');
     expect(homeForRole('kitchen')).toBe('/kitchen');
   });
 
@@ -203,6 +204,7 @@ describe('where a role works', () => {
     expect(roleLabel('owner')).toBe('Owner');
     expect(roleLabel('manager')).toBe('Manager');
     expect(roleLabel('cashier')).toBe('Cashier');
+    expect(roleLabel('waiter')).toBe('Waiter');
     expect(roleLabel('kitchen')).toBe('Kitchen');
   });
 });
