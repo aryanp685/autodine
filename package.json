@@ -2,7 +2,7 @@
   "name": "autodine",
   "version": "0.1.0",
   "private": true,
-  "description": "AutoDine \u2014 mobile-first QR ordering and restaurant-operations product preview.",
+  "description": "AutoDine — mobile-first QR ordering and restaurant-operations product preview.",
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3000",
     "build": "next build",
@@ -41,7 +41,7 @@
     "test:db:integration": "node scripts/local-pg/run-integration-tests.mjs",
     "backup:verify-file": "node scripts/backup/verify-backup-file.mjs",
     "dr:objectives": "node scripts/backup/check-dr-objectives.mjs",
-    "test:dr": "node --test scripts/backup/verify-backup-file.test.mjs scripts/backup/check-dr-objectives.test.mjs scripts/backup/run-scheduled.test.mjs scripts/backup/b2-upload.test.mjs scripts/backup/prune-b2.test.mjs scripts/backup/verify-restored-db.test.mjs scripts/release/production-apply-plan.test.mjs",
+    "test:dr": "node --test scripts/backup/*.test.mjs scripts/release/*.test.mjs",
     "backup:run": "node scripts/backup/run-scheduled.mjs",
     "d2:verify": "node scripts/d2/verify-acl-posture.mjs",
     "test:d2": "node --test scripts/d2/verify-acl-posture.test.mjs",
@@ -67,13 +67,16 @@
     "@playwright/test": "^1.64.1",
     "@sparticuz/chromium": "^153.0.0",
     "@tailwindcss/postcss": "^4.3.3",
+    "@types/jsdom": "^30.0.0",
     "@types/node": "^22.10.0",
     "@types/pg": "^8.23.1",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "@types/three": "^0.187.0",
     "embedded-postgres": "17.11.0-beta.19",
     "eslint": "^10.13.0",
+    "jsdom": "^31.0.0",
     "pg": "^8.23.1",
     "pgsql-ast-parser": "^12.0.2",
     "tailwindcss": "^4.3.3",
@@ -82,9 +85,7 @@
     "typescript-eslint": "^8.71.2",
     "vitest": "^5.0.5",
     "ws": "^8.22.0",
-    "@types/jsdom": "^30.0.0",
-    "jsdom": "^31.0.0",
-    "@types/three": "^0.187.0"
+    "yaml": "^2.9.1"
   },
   "engines": {
     "node": ">=22"

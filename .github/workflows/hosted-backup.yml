@@ -53,6 +53,16 @@ jobs:
           node-version: 22
           cache: npm
 
+      # The runner image ships an older PostgreSQL client. A custom-format
+      # dump written by a newer pg_dump carries an archive format the older
+      # pg_restore refuses ("unsupported version"), so the backup and the
+      # restore drill must pin the SAME major version. The hosted drill
+      # restores into a postgres:17 container, so 17 is pinned here too.
+      - name: Install the PostgreSQL 17 client tools
+        uses: ./.github/actions/postgres-client
+        with:
+          version: '17'
+
       - name: Install
         run: npm ci
 
@@ -88,5 +98,9 @@ jobs:
             echo;
             echo "- Run: ${{ github.run_id }} (${{ github.event_name }})";
             echo "- Result: ${{ job.status }}";
-            echo "- Remote verification: see the upload-b2 step output — hosted success means it printed uploaded:true, verified:true with the manifest SHA-256.";
+            echo "- Remote verification: see the fixed upload status in the scheduled step; the manifest with its SHA-256 is preserved separately when available.";
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove runner backup material
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/autodine-backups"

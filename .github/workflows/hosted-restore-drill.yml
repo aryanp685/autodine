@@ -61,6 +61,15 @@ jobs:
           node-version: 22
           cache: npm
 
+      # The runner image ships an older PostgreSQL client, and pg_restore
+      # refuses an archive format written by a newer pg_dump. The hosted
+      # backup pins PostgreSQL 17 (see hosted-backup.yml), so the drill
+      # pins 17 as well — and the disposable container is postgres:17.
+      - name: Install the PostgreSQL 17 client tools
+        uses: ./.github/actions/postgres-client
+        with:
+          version: '17'
+
       - name: Install
         run: npm ci
 
@@ -96,6 +105,14 @@ jobs:
           echo "DRILL_MANIFEST=$manifest" >> "$GITHUB_ENV"
           echo "Selected pair: $(basename "$artifact") + $(basename "$manifest")"
 
+      # The public-only archive depends on platform objects (auth.uid and
+      # Supabase roles) absent from a bare postgres image. This local-only
+      # synthetic scaffold is NOT a restore of real Auth or Storage data.
+      - name: Prepare the empty disposable container
+        env:
+          AUTODINE_RESTORE_TARGET_URL: postgresql://postgres:drill-${{ github.run_id }}@127.0.0.1:5432/drill
+        run: node scripts/backup/prepare-disposable-restore.mjs --confirm-disposable
+
       - name: Restore into the disposable container (loopback only, timed)
         env:
           AUTODINE_RESTORE_TARGET_URL: postgresql://postgres:drill-${{ github.run_id }}@127.0.0.1:5432/drill
@@ -120,7 +137,8 @@ jobs:
             echo;
             echo "- Run: ${{ github.run_id }} (manual)";
             echo "- Result: ${{ job.status }}";
-            echo "- Restore duration (rehearsal RTO): ${RESTORE_SECONDS:-not measured} seconds";
+            echo "- Restore command duration (not end-to-end RTO): ${RESTORE_SECONDS:-not measured} seconds";
+            echo "- End-to-end RTO: measure dispatch to green separately, per the owner checklist";
             echo "- RPO: backup manifest createdAt vs run start — see download-report artifact";
             echo "- Target: disposable postgres:17 service container (destroyed with the runner)";
           } >> "$GITHUB_STEP_SUMMARY"

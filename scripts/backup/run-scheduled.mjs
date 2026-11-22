@@ -9,8 +9,8 @@
  *
  * WHAT IT DOES, IN ORDER
  *
- *   1. BACKUP. Runs scripts/backup/backup-logical.mjs (which handles its own
- *      failure alert via BACKUP_ALERT_WEBHOOK when set).
+ *   1. BACKUP. Runs scripts/backup/backup-logical.mjs; this wrapper handles
+ *      failure alerts rather than forwarding child output or alerts.
  *   2. VERIFY (automated recovery check). Runs
  *      scripts/backup/verify-backup-file.mjs on the NEWEST artifact in
  *      --out-dir: magic, manifest sha256, full decrypt, payload sanity. A
@@ -25,8 +25,8 @@
  *
  * Exit 0 only when every step passes. On any failure it POSTs one line to
  * BACKUP_ALERT_WEBHOOK or DR_ALERT_WEBHOOK (if set) and exits 1. It never
- * prints the source URL or the passphrase; the alert text carries the stage
- * and a capped, redacted detail string only.
+ * prints the source URL or the passphrase; logs and alerts carry only fixed
+ * stage-specific diagnostics and an optional numeric child exit code.
  *
  * USE IT FROM
  *
@@ -39,10 +39,10 @@
  * are printed as skipped — they are never a silent pass.
  */
 import { spawnSync } from 'node:child_process';
-import { readdirSync, statSync } from 'node:fs';
+import { readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { selectNewestBackup, formatBackupAlert, BACKUP_NAME_RE } from './lib-schedule.mjs';
+import { selectNewestBackup, formatBackupAlert, scheduledFailure, BACKUP_NAME_RE } from './lib-schedule.mjs';
 
 const args = process.argv.slice(2);
 const opt = {};
@@ -68,34 +68,55 @@ const skipVerify = opt['skip-verify'] === '1';
 const skipObjectives = opt['skip-dr-objectives'] === '1';
 const uploadB2 = opt['b2'] === '1';
 const pruneB2 = opt['prune-b2'] === '1';
+const reportPath = opt.report ?? null;
+const pipelineStarted = Date.now();
+const timings = {};
+const timedChild = (name, childArgs) => {
+  const started = Date.now();
+  const result = runChild(childArgs);
+  timings[`${name}Seconds`] = Math.max(0, (Date.now() - started) / 1000);
+  return result;
+};
 
 const alertHook = process.env.BACKUP_ALERT_WEBHOOK || process.env.DR_ALERT_WEBHOOK || null;
-const alert = async (stage, detail) => {
+const alert = async (stage, reason, exitCode) => {
   if (!alertHook) return;
   try {
-    await fetch(alertHook, {
+    const response = await fetch(alertHook, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ text: formatBackupAlert(stage, detail) }),
+      body: JSON.stringify({ text: formatBackupAlert(stage, reason, exitCode) }),
       signal: AbortSignal.timeout(8000),
     });
-  } catch { /* alerting must never mask the exit code */ }
+    if (!response.ok) throw new Error('alert rejected');
+  } catch {
+    // Do not log the webhook, response, or exception; retain the backup error.
+    process.stderr.write('run-scheduled: alert delivery failed\n');
+  }
 };
-const die = async (stage, detail) => {
-  process.stderr.write(`run-scheduled: FAILED at ${stage}: ${detail}\n`);
-  await alert(stage, detail);
+const die = async (stage, reason, exitCode) => {
+  const safe = scheduledFailure(stage, reason, exitCode);
+  process.stderr.write(`run-scheduled: FAILED at ${safe.stage}: ${safe.detail}\n`);
+  await alert(stage, reason, exitCode);
   process.exit(1);
 };
+// Child output and independent child alerts can contain untrusted paths or
+// provider/database diagnostics. The orchestrator emits its own fixed status.
+const childEnv = { ...process.env, BACKUP_ALERT_WEBHOOK: '', DR_ALERT_WEBHOOK: '' };
+const childOptions = { stdio: 'ignore', env: childEnv };
+const runChild = (args) => {
+  try { return spawnSync(process.execPath, args, childOptions); }
+  catch { return { status: null }; }
+};
 
-// 1. Backup. backup-logical.mjs performs its own alert on failure; we add the
-//    stage name so the operator knows where it broke.
+// 1. Backup. The orchestrator handles failure alerts for all child stages.
 const backupArgs = [path.join(scriptDir, 'backup-logical.mjs'), '--out-dir', outDir];
 for (const key of ['keep-daily', 'keep-weekly', 'keep-monthly']) {
   if (opt[key]) backupArgs.push(`--${key}`, String(opt[key]));
 }
-const backup = spawnSync(process.execPath, backupArgs, { stdio: 'inherit', env: process.env });
+const backup = timedChild('backup', backupArgs);
 if (backup.status !== 0) {
-  await die('backup', `backup-logical.mjs exited ${backup.status ?? 'unknown'} — see its output above`);
+  await die('backup', 'child', backup.status);
 }
 
 // 2. Automated recovery check: the newest artifact must decrypt with the
@@ -112,31 +133,30 @@ if (skipVerify) {
       })
       .filter(Boolean);
   } catch {
-    await die('verify', `cannot read backup directory: ${outDir}`);
+    await die('verify', 'directory');
   }
   const newest = selectNewestBackup(entries);
   if (!newest) {
-    await die('verify', `no autodine-* backup found in ${outDir} after the backup step`);
+    await die('verify', 'missing');
   }
-  const verify = spawnSync(process.execPath, [path.join(scriptDir, 'verify-backup-file.mjs'), path.join(outDir, newest.name)], { stdio: 'inherit', env: process.env });
+  const verify = timedChild('verification', [path.join(scriptDir, 'verify-backup-file.mjs'), path.join(outDir, newest.name)]);
   if (verify.status !== 0) {
-    await die('verify', `verify-backup-file.mjs exited ${verify.status ?? 'unknown'} for ${newest.name}`);
+    await die('verify', 'child', verify.status);
   }
 }
 
 // 3. DR objectives (RPO against the newest artifact; RTO when a restore
-//    report is supplied). check-dr-objectives.mjs alerts on its own misses;
-//    we propagate the stage for the operator's log line.
+//    report is supplied). Child alerts are disabled; the orchestrator
+//    reports the stage using a fixed message.
 if (skipObjectives) {
   process.stderr.write('run-scheduled: DR objective check SKIPPED by flag (--skip-dr-objectives)\n');
 } else {
   const objectiveArgs = [path.join(scriptDir, 'check-dr-objectives.mjs'), '--backup-dir', outDir, '--rpo-minutes', String(rpoMinutes)];
   if (rtoMinutes !== null) objectiveArgs.push('--rto-minutes', String(rtoMinutes));
   if (restoreReport) objectiveArgs.push('--restore-report', restoreReport);
-  const objectives = spawnSync(process.execPath, objectiveArgs, { stdio: 'inherit', env: process.env });
+  const objectives = timedChild('objectives', objectiveArgs);
   if (objectives.status !== 0) {
-    process.stderr.write(`run-scheduled: FAILED at objectives: check-dr-objectives.mjs exited ${objectives.status ?? 'unknown'}\n`);
-    process.exit(1);
+    await die('objectives', 'child', objectives.status);
   }
 }
 
@@ -153,16 +173,18 @@ if (uploadB2) {
       })
       .filter(Boolean);
   } catch {
-    await die('upload', `cannot read backup directory: ${outDir}`);
+    await die('upload', 'directory');
   }
   const newest = selectNewestBackup(entries);
   if (!newest) {
-    await die('upload', `no autodine-* backup found in ${outDir} after the backup step`);
+    await die('upload', 'missing');
   }
-  const upload = spawnSync(process.execPath, [path.join(scriptDir, 'upload-b2.mjs'), '--file', path.join(outDir, newest.name)], { stdio: 'inherit', env: process.env });
+  const upload = timedChild('upload', [path.join(scriptDir, 'upload-b2.mjs'), '--file', path.join(outDir, newest.name)]);
   if (upload.status !== 0) {
-    await die('upload', `upload-b2.mjs exited ${upload.status ?? 'unknown'} for ${newest.name} — hosted backup is NOT verified`);
+    await die('upload', 'child', upload.status);
   }
+  // Fixed evidence: the child exits zero only after PUTs and HEAD verification.
+  process.stdout.write('{"uploaded":true,"verified":true}\n');
 }
 
 // 5. Optional remote retention (only with --b2 --prune-b2, after a verified
@@ -170,14 +192,31 @@ if (uploadB2) {
 //    bucket and fails closed; the newest backup is always protected.
 if (pruneB2) {
   if (!uploadB2) {
-    await die('prune', '--prune-b2 requires --b2 (remote pruning follows a verified upload)');
+    await die('prune', 'requires_b2');
   }
-  const prune = spawnSync(process.execPath, [path.join(scriptDir, 'prune-b2.mjs'), '--confirm'], { stdio: 'inherit', env: process.env });
+  const prune = runChild([path.join(scriptDir, 'prune-b2.mjs'), '--confirm']);
   if (prune.status !== 0) {
-    await die('prune', `prune-b2.mjs exited ${prune.status ?? 'unknown'} — remote retention NOT enforced`);
+    await die('prune', 'child', prune.status);
   }
 }
 
-process.stdout.write(uploadB2
-  ? 'run-scheduled: OK — backup taken, newest artifact verified, DR objectives checked, B2 upload remotely verified.\n'
-  : 'run-scheduled: OK — backup taken, newest artifact verified, DR objectives checked.\n');
+const verifySummary = skipVerify ? 'backup verification skipped' : 'newest artifact verified';
+const objectivesSummary = skipObjectives ? 'DR objectives skipped' : 'DR objectives checked';
+if (reportPath) {
+  const report = {
+    completed: true,
+    uploaded: uploadB2,
+    remotelyVerified: uploadB2,
+    timings: {
+      backupSeconds: timings.backupSeconds,
+      verificationSeconds: timings.verificationSeconds ?? null,
+      objectivesSeconds: timings.objectivesSeconds ?? null,
+      uploadSeconds: timings.uploadSeconds ?? null,
+      totalSeconds: Math.max(0, (Date.now() - pipelineStarted) / 1000),
+    },
+  };
+  const temporary = `${reportPath}.tmp-${process.pid}`;
+  writeFileSync(temporary, JSON.stringify(report, null, 2) + '\n', { mode: 0o600 });
+  renameSync(temporary, reportPath);
+}
+process.stdout.write(`run-scheduled: OK — backup taken, ${verifySummary}, ${objectivesSummary}${uploadB2 ? ', B2 upload remotely verified' : ''}.\n`);

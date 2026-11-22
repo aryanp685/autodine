@@ -45,8 +45,8 @@
  *     exact remote bytes to the manifest the backup pipeline produced.
  *   - A failed DELETE stops the run immediately and exits 1. Pair order is
  *     artifact-then-manifest (documented in executePrune): an artifact
- *     failure leaves the pair intact for a clean re-run; a manifest
- *     failure is retried once before the run aborts naming the orphan.
+ *     failure leaves remote state uncertain; a manifest failure is retried
+ *     once before the run aborts with remote state still uncertain.
  *   - Configuration is environment-only (see lib-b2.mjs); values are never
  *     printed.
  *
@@ -78,13 +78,52 @@ const SHA256_HEX_RE = /^[0-9a-f]{64}$/;
 
 const dayKeyOf = (iso) => iso.slice(0, 10).replaceAll('-', '');
 
+// Only exact, locally defined diagnostics may cross exported helper boundaries.
+// Provider objects (including getters/iterators) can throw arbitrary values.
+const SAFE_HELPER_ERRORS = new Set([
+  'listing page could not be read — aborting',
+  'listing has invalid truncation status — aborting',
+  'listing truncated without a continuation token — aborting',
+  'listing returned a repeated continuation token — aborting',
+  `listing exceeded ${MAX_PAGES} pages — aborting`,
+  ...['is not a JSON object', 'has no well-formed sha256', 'does not name this artifact', 'has no positive integer byte count', 'has no format'].map((why) => `manifest ${why} — aborting, deleting nothing`),
+  'listed key outside the backup prefix — aborting',
+  'manifest missing or unreadable — aborting, deleting nothing',
+  'manifest has no parseable createdAt — aborting, deleting nothing',
+  'manifest is dated implausibly in the future — aborting, deleting nothing',
+  "manifest claims creation after the object's upload time — aborting, deleting nothing",
+  'artifact missing or unreadable — aborting, deleting nothing',
+  'artifact download failed or could not be read — aborting, deleting nothing',
+  'artifact is not a recognisable AutoDine backup (bad magic or truncated) — aborting, deleting nothing',
+  'artifact SHA-256 does not match its manifest — aborting, deleting nothing',
+  'artifact has no trustworthy upload-time SHA-256 metadata — aborting, deleting nothing',
+  'artifact SHA-256 does not match its upload-time metadata — aborting, deleting nothing',
+  'artifact size mismatch against listing reports — aborting, deleting nothing',
+  'artifact size mismatch against Content-Length — aborting, deleting nothing',
+  'no verification evidence — refusing to delete, aborting',
+  'pre-delete recheck could not read artifact — aborting',
+  'pre-delete recheck found no trustworthy upload-time SHA-256 metadata — aborting',
+  'pre-delete recheck: object changed since verification — aborting',
+  'pre-delete recheck: object size changed since verification — aborting',
+]);
+function safeHelperError(error, fallback) {
+  let message;
+  try { message = error?.message; } catch { /* untrusted getter */ }
+  return new Error(typeof message === 'string' && SAFE_HELPER_ERRORS.has(message) ? message : fallback);
+}
+
+
 /**
  * Retention plan with the same day-grouping semantics as the local prune:
  * newest 14 days kept, then the first backup day of each new week bucket
  * (up to 8) and month bucket (up to 6) kept. The single newest backup is
  * always kept. Items: [{ key, manifestKey, createdAt }] (ISO strings).
  */
-export function planRetention(items, { keepDaily = 14, keepWeekly = 8, keepMonthly = 6 } = {}) {
+export function planRetention(...args) {
+  try { return planRetentionInternal(...args); } catch (error) { throw safeHelperError(error, 'retention planning failed — aborting before any deletion'); }
+}
+
+function planRetentionInternal(items, { keepDaily = 14, keepWeekly = 8, keepMonthly = 6 } = {}) {
   const byDay = new Map();
   for (const item of items) {
     const day = dayKeyOf(item.createdAt);
@@ -118,12 +157,19 @@ export function planRetention(items, { keepDaily = 14, keepWeekly = 8, keepMonth
 }
 
 /** Fetch every list page; any irregularity throws (caller deletes nothing). */
-export async function listAllRemoteObjects(fetchPage) {
+export async function listAllRemoteObjects(...args) {
+  try { return await listAllRemoteObjectsInternal(...args); } catch (error) { throw safeHelperError(error, 'listing failed — aborting before any deletion'); }
+}
+
+async function listAllRemoteObjectsInternal(fetchPage) {
   const entries = [];
   const seenTokens = new Set();
   let token = null;
   for (let page = 0; page < MAX_PAGES; page += 1) {
-    const { entries: pageEntries, nextToken, truncated } = await fetchPage(token);
+    let result;
+    try { result = await fetchPage(token); } catch { throw new Error('listing page could not be read — aborting'); }
+    const { entries: pageEntries, nextToken, truncated } = result;
+    if (typeof truncated !== 'boolean') throw new Error('listing has invalid truncation status — aborting');
     entries.push(...pageEntries);
     if (!truncated) return entries;
     if (!nextToken) throw new Error('listing truncated without a continuation token — aborting');
@@ -134,12 +180,29 @@ export async function listAllRemoteObjects(fetchPage) {
   throw new Error(`listing exceeded ${MAX_PAGES} pages — aborting`);
 }
 
+/** A missing, malformed or ambiguous flag must not be treated as a final page. */
+export function parseListingTruncated(...args) {
+  try { return parseListingTruncatedInternal(...args); } catch (error) { throw safeHelperError(error, 'listing parse failed — aborting'); }
+}
+
+function parseListingTruncatedInternal(xml) {
+  const flags = [...String(xml).matchAll(/<IsTruncated>([^<]*)<\/IsTruncated>/g)];
+  if (flags.length !== 1 || !['true', 'false'].includes(flags[0][1])) {
+    throw new Error('listing has invalid truncation status — aborting');
+  }
+  return flags[0][1] === 'true';
+}
+
 /**
  * Extract { key -> size in bytes } from one ListObjectsV2 XML page.
  * Complements parseB2ListXml (lib-b2.mjs), which does not surface sizes;
  * the pruner needs the server-reported size to check downloads against.
  */
-export function parseListSizes(xml) {
+export function parseListSizes(...args) {
+  try { return parseListSizesInternal(...args); } catch (error) { throw safeHelperError(error, 'listing size parse failed — aborting'); }
+}
+
+function parseListSizesInternal(xml) {
   const sizes = new Map();
   const contentsRe = /<Contents>([\s\S]*?)<\/Contents>/g;
   let block;
@@ -161,9 +224,13 @@ export function parseListSizes(xml) {
  * or malformed marks the pair corrupted/tampered and aborts the run.
  * Returns the integrity fields the pruner relies on.
  */
-export function validateManifestStructure(manifest, artifactBase) {
+export function validateManifestStructure(...args) {
+  try { return validateManifestStructureInternal(...args); } catch (error) { throw safeHelperError(error, 'manifest validation failed — aborting, deleting nothing'); }
+}
+
+function validateManifestStructureInternal(manifest, artifactBase) {
   const fail = (why) => {
-    throw new Error(`manifest for ${artifactBase} ${why} — aborting, deleting nothing`);
+    throw new Error(`manifest ${why} — aborting, deleting nothing`);
   };
   if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
     fail('is not a JSON object');
@@ -192,12 +259,16 @@ export function validateManifestStructure(manifest, artifactBase) {
  * the prefix are returned as `ignored` and are never deletion candidates.
  * Items carry the manifest SHA-256 and listed size for the integrity gate.
  */
-export async function buildInventory(entries, loadManifest, { now = new Date() } = {}) {
+export async function buildInventory(...args) {
+  try { return await buildInventoryInternal(...args); } catch (error) { throw safeHelperError(error, 'inventory validation failed — aborting before any deletion'); }
+}
+
+async function buildInventoryInternal(entries, loadManifest, { now = new Date() } = {}) {
   const items = [];
   const ignored = [];
   for (const entry of entries) {
     if (!entry.key.startsWith(BACKUP_PREFIX)) {
-      throw new Error(`listed key outside the backup prefix: ${entry.key} — aborting`);
+      throw new Error('listed key outside the backup prefix — aborting');
     }
     const base = path.basename(entry.key);
     if (!BACKUP_NAME_RE.test(base)) { ignored.push(entry.key); continue; }
@@ -206,21 +277,21 @@ export async function buildInventory(entries, loadManifest, { now = new Date() }
     try {
       manifest = await loadManifest(manifestKey);
     } catch {
-      throw new Error(`manifest missing or unreadable for ${base} — aborting, deleting nothing`);
+      throw new Error('manifest missing or unreadable — aborting, deleting nothing');
     }
     const { sha256 } = validateManifestStructure(manifest, base);
     const createdAt = manifest?.createdAt;
     const when = typeof createdAt === 'string' ? new Date(createdAt) : new Date(NaN);
     if (Number.isNaN(when.getTime())) {
-      throw new Error(`manifest for ${base} has no parseable createdAt — aborting, deleting nothing`);
+      throw new Error('manifest has no parseable createdAt — aborting, deleting nothing');
     }
     if (when.getTime() > now.getTime() + FUTURE_SKEW_MS) {
-      throw new Error(`manifest for ${base} is dated implausibly in the future — aborting, deleting nothing`);
+      throw new Error('manifest is dated implausibly in the future — aborting, deleting nothing');
     }
     const lastModified = entry.lastModified ? new Date(entry.lastModified) : null;
     if (lastModified && !Number.isNaN(lastModified.getTime())
       && when.getTime() > lastModified.getTime() + FUTURE_SKEW_MS) {
-      throw new Error(`manifest for ${base} claims creation after the object's upload time — aborting, deleting nothing`);
+      throw new Error("manifest claims creation after the object's upload time — aborting, deleting nothing");
     }
     const listedSize = Number(entry.size);
     items.push({
@@ -252,13 +323,16 @@ export async function buildInventory(entries, loadManifest, { now = new Date() }
  * fetchArtifact(key) resolves { body, metadataSha256?, contentLength? }
  * where body is a Buffer/Uint8Array or an (async) iterable of chunks.
  */
-export async function verifyArtifactCandidate(item, fetchArtifact) {
-  const base = path.basename(item.key);
+export async function verifyArtifactCandidate(...args) {
+  try { return await verifyArtifactCandidateInternal(...args); } catch (error) { throw safeHelperError(error, 'artifact verification failed — aborting before any deletion'); }
+}
+
+async function verifyArtifactCandidateInternal(item, fetchArtifact) {
   let fetched;
   try {
     fetched = await fetchArtifact(item.key);
-  } catch (error) {
-    throw new Error(`artifact missing or unreadable for ${base} (${error?.message ?? error}) — aborting, deleting nothing`);
+  } catch {
+    throw new Error('artifact missing or unreadable — aborting, deleting nothing');
   }
   const body = fetched?.body;
   const hash = createHash('sha256');
@@ -278,33 +352,32 @@ export async function verifyArtifactCandidate(item, fetchArtifact) {
     } else if (body && (typeof body[Symbol.asyncIterator] === 'function' || typeof body[Symbol.iterator] === 'function')) {
       for await (const chunk of body) consume(chunk);
     } else {
-      throw new Error(`artifact for ${base} could not be read — aborting, deleting nothing`);
+      throw new Error('artifact could not be read — aborting, deleting nothing');
     }
-  } catch (error) {
-    if (String(error?.message ?? '').includes('could not be read')) throw error;
-    throw new Error(`artifact download failed for ${base} (${error?.message ?? error}) — aborting, deleting nothing`);
+  } catch {
+    throw new Error('artifact download failed or could not be read — aborting, deleting nothing');
   }
 
   if (total < MIN_ARTIFACT_BYTES || !head.equals(BACKUP_MAGIC)) {
-    throw new Error(`artifact for ${base} is not a recognisable AutoDine backup (bad magic or truncated) — aborting, deleting nothing`);
+    throw new Error('artifact is not a recognisable AutoDine backup (bad magic or truncated) — aborting, deleting nothing');
   }
   const digest = hash.digest('hex');
   if (digest !== item.sha256) {
-    throw new Error(`artifact SHA-256 does not match its manifest for ${base} — aborting, deleting nothing`);
+    throw new Error('artifact SHA-256 does not match its manifest — aborting, deleting nothing');
   }
-  const metadataSha = typeof fetched.metadataSha256 === 'string' ? fetched.metadataSha256.trim().toLowerCase() : '';
+  const metadataSha = typeof fetched?.metadataSha256 === 'string' ? fetched.metadataSha256.trim().toLowerCase() : '';
   if (!SHA256_HEX_RE.test(metadataSha)) {
-    throw new Error(`artifact for ${base} has no trustworthy upload-time SHA-256 metadata — aborting, deleting nothing`);
+    throw new Error('artifact has no trustworthy upload-time SHA-256 metadata — aborting, deleting nothing');
   }
   if (metadataSha !== digest) {
-    throw new Error(`artifact SHA-256 does not match its upload-time metadata for ${base} — aborting, deleting nothing`);
+    throw new Error('artifact SHA-256 does not match its upload-time metadata — aborting, deleting nothing');
   }
   if (item.size != null && total !== item.size) {
-    throw new Error(`artifact size mismatch for ${base}: downloaded ${total} byte(s), listing reports ${item.size} — aborting, deleting nothing`);
+    throw new Error('artifact size mismatch against listing reports — aborting, deleting nothing');
   }
-  const contentLength = Number(fetched.contentLength);
+  const contentLength = Number(fetched?.contentLength);
   if (Number.isSafeInteger(contentLength) && contentLength >= 0 && total !== contentLength) {
-    throw new Error(`artifact size mismatch for ${base}: downloaded ${total} byte(s), Content-Length ${contentLength} — aborting, deleting nothing`);
+    throw new Error('artifact size mismatch against Content-Length — aborting, deleting nothing');
   }
   return { key: item.key, bytes: total, sha256: digest };
 }
@@ -324,27 +397,30 @@ export async function verifyArtifactCandidate(item, fetchArtifact) {
  * known-limitations section. fetchHead(key) resolves
  * { metadataSha256?, contentLength? }.
  */
-export async function assertArtifactUnchanged(item, evidence, fetchHead) {
-  const base = path.basename(item.key);
+export async function assertArtifactUnchanged(...args) {
+  try { return await assertArtifactUnchangedInternal(...args); } catch (error) { throw safeHelperError(error, 'pre-delete recheck failed — aborting'); }
+}
+
+async function assertArtifactUnchangedInternal(item, evidence, fetchHead) {
   if (!evidence || !SHA256_HEX_RE.test(evidence.sha256 ?? '') || !Number.isSafeInteger(evidence.bytes)) {
-    throw new Error(`no verification evidence for ${base} — refusing to delete, aborting`);
+    throw new Error('no verification evidence — refusing to delete, aborting');
   }
   let head;
   try {
     head = await fetchHead(item.key);
-  } catch (error) {
-    throw new Error(`pre-delete recheck could not read ${base} (${error?.message ?? error}) — aborting`);
+  } catch {
+    throw new Error('pre-delete recheck could not read artifact — aborting');
   }
   const metadataSha = typeof head?.metadataSha256 === 'string' ? head.metadataSha256.trim().toLowerCase() : '';
   if (!SHA256_HEX_RE.test(metadataSha)) {
-    throw new Error(`pre-delete recheck for ${base} found no trustworthy upload-time SHA-256 metadata — aborting`);
+    throw new Error('pre-delete recheck found no trustworthy upload-time SHA-256 metadata — aborting');
   }
   if (metadataSha !== evidence.sha256) {
-    throw new Error(`pre-delete recheck for ${base}: object changed since verification (upload metadata no longer matches the verified bytes) — aborting`);
+    throw new Error('pre-delete recheck: object changed since verification — aborting');
   }
   const contentLength = Number(head?.contentLength);
   if (Number.isSafeInteger(contentLength) && contentLength >= 0 && contentLength !== evidence.bytes) {
-    throw new Error(`pre-delete recheck for ${base}: object size changed since verification (${contentLength} != ${evidence.bytes} byte(s)) — aborting`);
+    throw new Error('pre-delete recheck: object size changed since verification — aborting');
   }
   return true;
 }
@@ -360,14 +436,38 @@ export async function assertArtifactUnchanged(item, evidence, fetchHead) {
  * enforced before verification, so an over-cap plan performs no
  * downloads and no deletions either.
  *
- * Pair deletion is artifact-first on purpose: if the artifact DELETE
- * fails, the pair is left intact and a re-run retries it cleanly. If the
- * manifest DELETE then fails, it is retried once; a persistent failure
- * aborts with the orphaned manifest key named (orphans are inert — later
- * runs report them ignored and never treat them as backups).
+ * Pair deletion is artifact-first. An artifact DELETE failure stops the
+ * run before attempting the manifest, but the artifact's remote state may
+ * be uncertain. A failed manifest DELETE is not retried: its
+ * remote state is uncertain. Inspect object versions before any later action.
  */
-export async function executePrune({ items, deleteObject, verifyCandidate, recheckCandidate, confirm = false, maxDelete = 50, policy } = {}) {
-  const plan = planRetention(items, policy);
+export async function executePrune(options) {
+  try {
+    return await executePruneInternal(options);
+  } catch (error) {
+    let message;
+    try { message = error?.message; } catch { /* untrusted getter */ }
+    const fixed = new Set([
+      'retention planning failed — aborting before any deletion',
+      'invalid deletion limit — aborting before any deletion',
+      'refusing to delete unverified artifacts: no integrity verifier configured — aborting, deleting nothing',
+      'refusing to delete without a pre-delete recheck: no recheck configured — aborting, deleting nothing',
+      'integrity verification failed — aborting before any deletion',
+    ]);
+    const counted = typeof message === 'string' && [
+      /^refusing to delete \d+ artifacts \(limit \d+\) — investigate before raising --max-delete$/,
+      /^pre-delete recheck failed after \d+ artifact\(s\) deleted — aborting$/,
+      /^DELETE failed for artifact after \d+ artifact\(s\) deleted — remote state is uncertain; inspect before retrying$/,
+      /^artifact DELETE succeeded but manifest DELETE failed — remote state is uncertain; inspect before any further action; \d+ artifact\(s\) fully deleted before it$/,
+    ].some((pattern) => pattern.test(message));
+    throw new Error(fixed.has(message) || counted ? message : 'retention failed; remote state may be partial — inspect before retrying');
+  }
+}
+
+async function executePruneInternal({ items, deleteObject, verifyCandidate, recheckCandidate, confirm = false, maxDelete = 50, policy } = {}) {
+  let plan;
+  try { plan = planRetention(items, policy); } catch { throw new Error('retention planning failed — aborting before any deletion'); }
+  if (!Number.isSafeInteger(maxDelete) || maxDelete < 0) throw new Error('invalid deletion limit — aborting before any deletion');
   if (plan.expire.length > maxDelete) {
     throw new Error(`refusing to delete ${plan.expire.length} artifacts (limit ${maxDelete}) — investigate before raising --max-delete`);
   }
@@ -382,31 +482,26 @@ export async function executePrune({ items, deleteObject, verifyCandidate, reche
   for (const item of plan.expire) {
     try {
       evidences.push((await verifyCandidate(item)) ?? null);
-    } catch (error) {
-      throw new Error(`integrity verification failed for ${path.basename(item.key)} — aborting before any deletion: ${error?.message ?? error}`);
+    } catch {
+      throw new Error('integrity verification failed — aborting before any deletion');
     }
   }
   let deleted = 0;
   for (const [index, item] of plan.expire.entries()) {
-    const base = path.basename(item.key);
     try {
       await recheckCandidate(item, evidences[index]);
-    } catch (error) {
-      throw new Error(`pre-delete recheck failed for ${base} after ${deleted} artifact(s) deleted — aborting: ${error?.message ?? error}`);
+    } catch {
+      throw new Error(`pre-delete recheck failed after ${deleted} artifact(s) deleted — aborting`);
     }
     try {
       await deleteObject(item.key);
-    } catch (error) {
-      throw new Error(`DELETE failed for artifact ${base} after ${deleted} artifact(s) deleted — pair left intact, safe to re-run: ${error?.message ?? error}`);
+    } catch {
+      throw new Error(`DELETE failed for artifact after ${deleted} artifact(s) deleted — remote state is uncertain; inspect before retrying`);
     }
     try {
       await deleteObject(item.manifestKey);
     } catch {
-      try {
-        await deleteObject(item.manifestKey);
-      } catch (error) {
-        throw new Error(`artifact ${base} deleted but its manifest could not be deleted after a retry — orphaned manifest ${item.manifestKey} remains (ignored by later runs; safe to delete manually); ${deleted} artifact(s) fully deleted before it: ${error?.message ?? error}`);
-      }
+      throw new Error(`artifact DELETE succeeded but manifest DELETE failed — remote state is uncertain; inspect before any further action; ${deleted} artifact(s) fully deleted before it`);
     }
     deleted += 1;
   }
@@ -438,7 +533,7 @@ if (isMain) {
   async function signedFetch(method, urlString, body, timeoutMs = 120000) {
     const payloadHash = sha256Hex(body ?? Buffer.alloc(0));
     const headers = signB2Request({ method, url: urlString, payloadHash, ...access, region: config.region });
-    return fetch(urlString, { method, headers, body, signal: AbortSignal.timeout(timeoutMs) });
+    return fetch(urlString, { method, headers, body, redirect: 'error', signal: AbortSignal.timeout(timeoutMs) });
   }
   const headObject = async (key) => {
     const res = await signedFetch('HEAD', objectUrl(key));
@@ -462,7 +557,7 @@ if (isMain) {
       return {
         entries: parseB2ListXml(xml).map((e) => ({ ...e, size: sizes.get(e.key) ?? null })),
         nextToken: b2ListContinuationToken(xml),
-        truncated: /<IsTruncated>true<\/IsTruncated>/.test(xml),
+        truncated: parseListingTruncated(xml),
       };
     });
 
@@ -494,8 +589,11 @@ if (isMain) {
     });
     process.stdout.write(JSON.stringify({ ...report, ignoredForeignObjects: ignored.length, bucket: config.bucket, prefix: BACKUP_PREFIX }, null, 2) + '\n');
     if (!confirm) process.stdout.write('prune-b2: dry-run only — re-run with --confirm to verify and delete the expired artifacts listed above (every candidate is integrity-verified before the first deletion).\n');
-  } catch (error) {
-    process.stderr.write(`prune-b2: ABORTED — ${error?.message ?? error}\n`);
+  } catch {
+    // Provider, network and object-derived errors can contain credentials or
+    // untrusted object names. Do not echo them; a failure after DELETE may
+    // have changed only part of a pair, so operators must inspect first.
+    process.stderr.write('prune-b2: ABORTED — remote retention failed; state may be partial, inspect before retrying\n');
     process.exit(1);
   }
 }

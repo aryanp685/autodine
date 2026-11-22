@@ -238,7 +238,7 @@ Full detail and evidence: [`remediation-report-2026-11-21.md`](remediation-repor
 | D2 fixtures | Done |
 | D3 production apply | **Prepared and proven safe, not applied** — 51 files, 0 object/column collisions |
 | D4 recovery evidence | Upgraded to data-level; found and fixed a real microsecond-truncation defect in the dumper |
-| D5 PR #194 port | Assessed; bounded port attempted and **reverted** (15/127 test failures without their docs/CI wiring) |
+| D5 PR #194 port | **Done** on 2026-11-21 (third pass) — 48-file backup subsystem, 230 assertions, the pinned-client composite action, the B2 rehearsal workflow with an exact-code manifest; branch fixes (raw timestamps, relation ACLs) re-applied on top |
 | D6 main red jobs | Diagnosed to root cause (duplicate `record_counter_payment` overload from main's `20261121000200`); guard added here; main repair needs branch permission |
 | D7 deployment visibility | Solved read-only — production health endpoint live and healthy |
 | Lint warnings | 0 problems |
@@ -262,3 +262,27 @@ previous passes could not see because they only compared catalogs.
 | The drill asks the product's questions after a restore | Added: connect to the restored database, insert a profile + membership, then read as member / non-member / `anon` | member 1 row, stranger 0 rows, `anon` refused `42501` |
 | That suite cannot rot | `scripts/release/production-apply-plan.test.mjs` (8 tests: pipe + JSON ledgers, empty ledger refused, pending set, out-of-band reporting, real inventory ordering/uniqueness, CLI exit codes) wired into `test:dr` | `npm run test:dr` → 58 passed / 0 failed |
 | Docs | `docs/backup-restore-runbook.md` (relacl in "what is covered", 123-migration drill numbers, the fifth dumper defect), D3 list regenerated at 51 files, D4 section extended | — |
+
+## 14. D5 closed: the PR #194 backup/DR lineage is in
+
+`scripts/backup/` went from 20 files to 48; `test:dr` from 6 suites to 21 (230
+assertions, all passing). Ported together, because they only work together: the
+client-resolution modules, the composite action that pins PostgreSQL 17 for CI *and*
+both hosted workflows, the two hosted workflow updates, `staging-b2-rehearsal.yml`
+with its byte-exact code gate (manifest regenerated from this tree), and
+`docs/operations/B2_OWNER_CHECKLIST.md`.
+
+Two branch fixes had to be re-applied on their `lib-dump.mjs`, which predates them:
+raw date/time text (microsecond fidelity) and relation ACLs (a restored database the
+app can actually read). Their own `taken_at.toISOString()` call broke the moment the
+raw parser returned — a clean demonstration that the forks had diverged.
+
+Not taken: their `ci.yml` ergonomics additions (demo-seed isolation, hermetic browser
+count, failure annotations). They depend on scripts this branch does not carry and
+add no DR capability.
+
+Evidence: `test:dr` 230/230 · `test:backup` ALL CHECKS PASS (15) · logical restore
+`dataRestoreVerified` + `securityRestoreVerified` at 123 migrations / 64 tables /
+63 policies / 236 functions · cold recovery 123 migrations / 68 tables ·
+`test:db:local` PASS · integration 299/1 · embedded 281/3 · vitest 2,614/309 ·
+lint 0 · tsc clean · `verify:release` 47/47 · `migrations:verify` 123/123.

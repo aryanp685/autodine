@@ -12,6 +12,9 @@
  *   financial spot check sum(amount_paise) for payments / subscription_payments
  *                        vs manifest.financialSpotChecks (measured at backup
  *                        time from the source — never invented here)
+ *   catalog health       no invalid/not-ready indexes or unvalidated check/FK
+ *                        constraints in the restored schema. This is not a
+ *                        source-to-target definition comparison.
  *
  *   AUTODINE_RESTORE_TARGET_URL=... node scripts/backup/verify-restored-db.mjs \
  *     --manifest <manifest.json> --artifact <artifact.enc>
@@ -31,6 +34,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { restoreTargetDecision } from './lib-restore-target.mjs';
 // NOTE: `pg` is imported lazily, AFTER the loopback refusal below — the
 // production-connection guard must fire even in a bare environment where
 // dependencies were never installed.
@@ -58,13 +62,27 @@ if (!targetUrl || !opt.manifest || !opt.artifact) {
   process.stderr.write('verify-restored: set AUTODINE_RESTORE_TARGET_URL and pass --manifest <path> --artifact <path>\n');
   process.exit(2);
 }
-let host;
-try { host = new URL(targetUrl).hostname; } catch {
+try { new URL(targetUrl); } catch {
   process.stderr.write('verify-restored: AUTODINE_RESTORE_TARGET_URL is not a valid URL\n');
   process.exit(2);
 }
-if (!['127.0.0.1', 'localhost', '::1'].includes(host)) {
-  process.stderr.write(`verify-restored: REFUSING non-disposable target host "${host}" — restores are verified only on loopback drill targets\n`);
+// The same guard the restore itself uses (scripts/backup/lib-restore-target.mjs):
+// loopback only by default, a hosted target needs an explicit scratch opt-in
+// and an approved project ref, and a Production project is refused outright.
+// The message keeps the "REFUSING non-disposable target" wording the drill
+// evidence and its tests rely on.
+const targetDecision = restoreTargetDecision({
+  targetUrl,
+  expectedRef: process.env.AUTODINE_RESTORE_EXPECTED_REF,
+  allowScratch: process.env.AUTODINE_RESTORE_ALLOW_SCRATCH === '1',
+  productionRefs: (process.env.AUTODINE_RESTORE_PRODUCTION_REFS ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean),
+});
+if (!targetDecision.allowed) {
+  const reason = targetDecision.reason.startsWith('refusing to restore into the PRODUCTION project ') ? 'PRODUCTION project' : 'target guard did not approve it';
+  process.stderr.write(`verify-restored: REFUSING non-disposable target — ${reason}\n`);
   process.exit(2);
 }
 
@@ -119,7 +137,11 @@ if (artifactSha256 !== manifest.sha256) {
 const { default: pg } = await import('pg');
 
 const client = new pg.Client({ connectionString: targetUrl, application_name: 'autodine-verify-restored' });
-await client.connect();
+try {
+  await client.connect();
+} catch {
+  fail('could not connect to the approved restore target');
+}
 try {
   const one = async (sql, params = []) => (await client.query(sql, params)).rows[0];
   // The same count definitions the backup manifest producers use
@@ -127,6 +149,8 @@ try {
   const tables = await one(`select count(*)::int as n from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = $1 and c.relkind = 'r'`, [schema]);
   const policies = await one(`select count(*)::int as n from pg_policies where schemaname = $1`, [schema]);
   const functions = await one(`select count(*)::int as n from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = $1 and p.prokind in ('f','p')`, [schema]);
+  const invalidIndexes = await one(`select count(*)::int as n from pg_index i join pg_class c on c.oid = i.indexrelid join pg_namespace n on n.oid = c.relnamespace where n.nspname = $1 and (not i.indisvalid or not i.indisready or not i.indislive)`, [schema]);
+  const unvalidatedConstraints = await one(`select count(*)::int as n from pg_constraint c join pg_namespace n on n.oid = c.connamespace where n.nspname = $1 and c.contype in ('f', 'c') and not c.convalidated`, [schema]);
   const tableNames = (await client.query(`select c.relname as tablename from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = $1 and c.relkind = 'r' order by c.relname`, [schema])).rows.map((r) => r.tablename);
   let totalRows = 0;
   for (const t of tableNames) {
@@ -150,6 +174,8 @@ try {
     policies: policies.n === counts.policies,
     functions: functions.n === counts.functions,
     totalRows: totalRows === counts.rows,
+    indexesValid: invalidIndexes.n === 0,
+    constraintsValidated: unvalidatedConstraints.n === 0,
     payments_amount_paise: financialSpotChecks.payments_amount_paise === expectedFinancial.payments_amount_paise,
     subscription_payments_amount_paise: financialSpotChecks.subscription_payments_amount_paise === expectedFinancial.subscription_payments_amount_paise,
   };
@@ -159,6 +185,7 @@ try {
     artifact: path.basename(opt.artifact),
     artifactSha256,
     schemaFingerprint: { tables: tables.n, policies: policies.n, functions: functions.n },
+    catalogHealth: { invalidIndexes: invalidIndexes.n, unvalidatedConstraints: unvalidatedConstraints.n },
     totalRows,
     financialSpotChecks,
     manifestExpectations: { counts, financialSpotChecks: expectedFinancial },
@@ -168,8 +195,11 @@ try {
   process.stdout.write(JSON.stringify(report, null, 2) + '\n');
   if (!report.verified) {
     process.stderr.write('verify-restored: MISMATCH against backup manifest (see report above)\n');
-    process.exit(1);
+    process.exitCode = 1;
   }
+} catch {
+  process.stderr.write('verify-restored: FAILED: database verification could not complete\n');
+  process.exitCode = 1;
 } finally {
-  await client.end();
+  await client.end().catch(() => {});
 }

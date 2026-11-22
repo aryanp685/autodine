@@ -98,6 +98,12 @@ SQL
 # /api/health against the scratch project.
 ```
 
+Never take the backup through the transaction pooler (port **6543**): a consistent
+snapshot is exported on one connection and imported on a second, and the transaction
+pooler may hand those to different backends. Use the **session pooler (port 5432)**
+or a direct connection instead — `scripts/backup/lib-backup-source.mjs` refuses a
+transaction-pooler source before anything is written.
+
 5. Destroy the scratch project when done (or keep it encrypted-in-place until
    sign-off; it contains a copy of production data).
 6. Record: date, operator, backup file sha256, manifest counts vs production

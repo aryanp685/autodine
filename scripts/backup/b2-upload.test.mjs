@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { deriveSigningKey, parseB2ListXml, pickNewestArtifactKey, b2ListContinuationToken, decodeB2XmlEntities, b2ConfigFromEnv, b2ObjectKey, signB2Request, sha256Hex } from './lib-b2.mjs';
+import { B2HttpError, readB2WithRetry } from './lib-b2-read.mjs';
+import { encryptBuffer } from './lib-crypto.mjs';
 
 test('SigV4 signing key matches the published AWS derivation vector', () => {
   // AWS documentation example: secret/date/region/service -> known kSigning.
@@ -120,7 +122,7 @@ test('upload CLI dry-run verifies manifest SHA-256 and refuses mismatches', () =
   const dir = mkdtempSync(path.join(tmpdir(), 'autodine-b2-test-'));
   try {
     const artifact = path.join(dir, 'autodine-test-20260101T000000.sql.gz.enc');
-    const body = Buffer.from('encrypted-fixture-bytes');
+    const body = encryptBuffer(Buffer.from('synthetic fixture bytes'), 'local-fixture-passphrase-012345');
     writeFileSync(artifact, body);
     const manifest = { file: path.basename(artifact), sha256: sha256Hex(body), format: 'autodine-logical-1' };
     writeFileSync(path.join(dir, 'autodine-test-20260101T000000.manifest.json'), JSON.stringify(manifest));
@@ -140,4 +142,147 @@ test('upload CLI dry-run verifies manifest SHA-256 and refuses mismatches', () =
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('B2 endpoints must be official HTTPS and match the signing region', () => {
+  const base = { B2_BUCKET: 'autodine-backups', B2_ACCESS_KEY_ID: 'id', B2_SECRET_ACCESS_KEY: 'secret', B2_REGION: 'us-west-004' };
+  for (const endpoint of ['http://s3.us-west-004.backblazeb2.com', 'https://attacker.example', 'https://s3.us-west-004.backblazeb2.com/path', 'https://s3.eu-central-003.backblazeb2.com']) {
+    assert.equal(b2ConfigFromEnv({ ...base, B2_ENDPOINT: endpoint }).ok, false, endpoint);
+  }
+  assert.equal(b2ConfigFromEnv({ ...base, B2_ENDPOINT: 'https://s3.us-west-004.backblazeb2.com' }).ok, true);
+  assert.equal(b2ConfigFromEnv({ ...base, B2_BUCKET: '../other' }).ok, false);
+});
+
+test('upload refuses a missing or incomplete manifest before any network request', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'autodine-b2-manifest-'));
+  try {
+    const file = path.join(dir, 'autodine-test.sql.gz.enc');
+    writeFileSync(file, encryptBuffer(Buffer.from('synthetic fixture'), 'local-fixture-passphrase-012345'));
+    const script = path.join(import.meta.dirname, 'upload-b2.mjs');
+    const run = () => spawnSync(process.execPath, [script, '--file', file, '--dry-run'], { encoding: 'utf8' });
+    assert.equal(run().status, 1);
+    const manifest = file.replace(/\.sql\.gz\.enc$/, '.manifest.json');
+    for (const value of [{}, { file: path.basename(file) }, { file: path.basename(file), sha256: '' }]) {
+      writeFileSync(manifest, JSON.stringify(value));
+      const result = run();
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /manifest/i);
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('B2 read retries an interrupted body and transient HTTP responses with a strict bound', async () => {
+  let attempts = 0;
+  const delays = [];
+  const result = await readB2WithRetry(async () => {
+    attempts++;
+    if (attempts === 1) return new Response('temporary', { status: 503 });
+    if (attempts === 2) return { ok: true, arrayBuffer: async () => { throw new Error('socket interrupted'); }, headers: new Headers() };
+    return new Response('complete', { status: 200, headers: { 'x-amz-meta-sha256': 'digest' } });
+  }, { delay: async (ms) => { delays.push(ms); } });
+  assert.equal(attempts, 3);
+  assert.equal(result.bytes.toString(), 'complete');
+  assert.equal(result.metadataSha256, 'digest');
+  assert.deepEqual(delays, [1000, 2000]);
+  let rejected = 0;
+  await assert.rejects(readB2WithRetry(async () => { rejected++; return new Response('', { status: 403 }); }, { delay: async () => {} }), B2HttpError);
+  assert.equal(rejected, 1);
+  let interrupted = 0;
+  await assert.rejects(readB2WithRetry(async () => { interrupted++; throw new Error('socket'); }, { delay: async () => {} }));
+  assert.equal(interrupted, 3);
+});
+
+test('download CLI retries an interrupted object read, verifies pairing and leaves no partial file on failure', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'autodine-b2-download-'));
+  try {
+    const file = 'autodine-test-20260101T000000.sql.gz.enc';
+    const payload = Buffer.from('synthetic encrypted backup bytes, no real data');
+    const source = path.join(dir, 'source');
+    writeFileSync(source, payload);
+    const manifest = path.join(dir, 'manifest');
+    writeFileSync(manifest, JSON.stringify({ file, sha256: sha256Hex(payload), format: 'autodine-logical-1' }));
+    const mock = path.join(dir, 'mock.mjs');
+    writeFileSync(mock, `
+      import { readFileSync } from 'node:fs';
+      let artifactAttempts = 0;
+      globalThis.fetch = async (url) => {
+        const u = new URL(url);
+        if (u.search) return new Response('<ListBucketResult><IsTruncated>false</IsTruncated><Contents><Key>autodine-backups/${file}</Key><LastModified>2026-01-01T00:00:00Z</LastModified></Contents></ListBucketResult>');
+        if (u.pathname.endsWith('.manifest.json')) return new Response(readFileSync(process.env.MOCK_MANIFEST));
+        artifactAttempts++;
+        if (artifactAttempts === 1) return { ok: true, arrayBuffer: async () => { throw new Error('interrupted body'); }, headers: new Headers() };
+        return new Response(readFileSync(process.env.MOCK_SOURCE), { headers: { 'x-amz-meta-sha256': process.env.MOCK_META } });
+      };
+    `);
+    const run = (out, metadata) => spawnSync(process.execPath, [path.join(import.meta.dirname, 'download-b2.mjs'), '--out-dir', out], {
+      encoding: 'utf8', timeout: 15_000,
+      env: { ...process.env, NODE_OPTIONS: `--import=${mock}`, B2_ENDPOINT: '', B2_REGION: 'us-west-004', B2_BUCKET: 'test-private', B2_ACCESS_KEY_ID: 'synthetic', B2_SECRET_ACCESS_KEY: 'synthetic', MOCK_SOURCE: source, MOCK_MANIFEST: manifest, MOCK_META: metadata },
+    });
+    const goodDir = path.join(dir, 'good');
+    const good = run(goodDir, sha256Hex(payload));
+    assert.equal(good.status, 0, good.stderr);
+    assert.equal(JSON.parse(good.stdout).verified, true);
+    assert.deepEqual(readFileSync(path.join(goodDir, file)), payload);
+    const repeat = run(goodDir, sha256Hex(payload));
+    assert.equal(repeat.status, 1, 'existing backup must not be overwritten');
+    assert.deepEqual(readFileSync(path.join(goodDir, file)), payload);
+    const badDir = path.join(dir, 'bad');
+    const bad = run(badDir, '0'.repeat(64));
+    assert.equal(bad.status, 1);
+    assert.match(bad.stderr, /INTEGRITY FAILURE/);
+    assert.equal(existsSync(badDir), false);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('upload rejects plaintext even when its manifest hash matches', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'autodine-b2-plaintext-'));
+  try {
+    const file = path.join(dir, 'autodine-fixture.sql.gz.enc');
+    const body = Buffer.from('plaintext '.repeat(20));
+    writeFileSync(file, body);
+    writeFileSync(file.replace(/\.sql\.gz\.enc$/, '.manifest.json'), JSON.stringify({ file: path.basename(file), sha256: sha256Hex(body) }));
+    const result = spawnSync(process.execPath, [path.join(import.meta.dirname, 'upload-b2.mjs'), '--file', file, '--dry-run'], { encoding: 'utf8' });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /encrypted backup framing/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('mocked upload fails closed on interruption, partial publication or metadata mismatch', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'autodine-upload-mock-'));
+  try {
+    const artifact = path.join(dir, 'autodine-test-20260101T000000.sql.gz.enc');
+    const payload = encryptBuffer(Buffer.from('-- synthetic dump'), 'synthetic-test-passphrase');
+    writeFileSync(artifact, payload);
+    writeFileSync(artifact.replace(/\.sql\.gz\.enc$/, '.manifest.json'), JSON.stringify({ file: path.basename(artifact), sha256: sha256Hex(payload) }));
+    const mock = path.join(dir, 'mock.mjs');
+    writeFileSync(mock, `import { appendFileSync } from 'node:fs';
+globalThis.fetch = async (url, options) => {
+  const manifest = String(url).endsWith('.manifest.json');
+  appendFileSync(process.env.MOCK_CALLS, options.method + (manifest ? '-manifest' : '-artifact') + '\\n');
+  if (process.env.MOCK_MODE === 'interrupted' && options.method === 'PUT' && !manifest) throw new Error('simulated interrupted response');
+  if (process.env.MOCK_MODE === 'artifact-error' && options.method === 'PUT' && !manifest) return new Response('', {status: 503});
+  if (process.env.MOCK_MODE === 'manifest-error' && manifest) return new Response('', {status: 503});
+  if (options.method === 'HEAD') return new Response(null, {status: 200, headers: {'x-amz-meta-sha256': process.env.MOCK_MODE === 'bad-head' ? 'bad' : process.env.MOCK_SHA}});
+  return new Response('', {status: 200});
+};`);
+    for (const [mode, expectedCalls, expectedStatus] of [
+      ['success', ['PUT-artifact', 'PUT-manifest', 'HEAD-artifact'], 0],
+      ['interrupted', ['PUT-artifact'], 1],
+      ['artifact-error', ['PUT-artifact'], 1],
+      ['manifest-error', ['PUT-artifact', 'PUT-manifest'], 1],
+      ['bad-head', ['PUT-artifact', 'PUT-manifest', 'HEAD-artifact'], 1],
+    ]) {
+      const calls = path.join(dir, `calls-${mode}`);
+      const result = spawnSync(process.execPath, [path.join(import.meta.dirname, 'upload-b2.mjs'), '--file', artifact], {
+        encoding: 'utf8', env: {
+          ...process.env, NODE_OPTIONS: `--import=${mock}`, B2_ENDPOINT: '', B2_REGION: 'us-west-004', B2_BUCKET: 'test-private',
+          B2_ACCESS_KEY_ID: 'synthetic-id', B2_SECRET_ACCESS_KEY: 'synthetic-secret-do-not-print', MOCK_CALLS: calls, MOCK_MODE: mode, MOCK_SHA: sha256Hex(payload),
+        },
+      });
+      assert.equal(result.status, expectedStatus, `${mode}: ${result.stderr}`);
+      assert.deepEqual(readFileSync(calls, 'utf8').trim().split('\n'), expectedCalls, mode);
+      assert.doesNotMatch(result.stdout + result.stderr, /synthetic-secret-do-not-print/);
+      if (mode === 'artifact-error') assert.match(result.stderr, /remote state is unverified/);
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

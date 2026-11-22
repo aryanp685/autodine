@@ -6,7 +6,8 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { createServer } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -83,4 +84,53 @@ describe('run-scheduled.mjs fail-closed guards', () => {
     assert.equal(result.status, 1);
     assert.match(result.stderr, /FAILED at backup/);
   });
+});
+
+// Loopback-only receiver; no provider credentials or external network involved.
+describe('backup failure alert delivery', () => {
+  const passphrase = 'synthetic-passphrase-private';
+  const source = 'postgresql://postgres:synthetic-password@127.0.0.1:5432/dummy';
+  const invoke = (script, args, hook) => new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [path.join(scriptDir, script), ...args], {
+      env: { ...process.env, AUTODINE_BACKUP_SOURCE_URL: source, AUTODINE_BACKUP_PASSPHRASE: passphrase, BACKUP_ALERT_WEBHOOK: hook, DR_ALERT_WEBHOOK: '' },
+    });
+    let stdout = '', stderr = '';
+    child.stdout.on('data', (data) => { stdout += data; });
+    child.stderr.on('data', (data) => { stderr += data; });
+    child.on('error', reject);
+    child.on('close', (status) => resolve({ status, stdout, stderr }));
+  });
+  for (const script of ['backup-logical.mjs', 'run-scheduled.mjs']) {
+    for (const statusCode of [204, 503]) {
+      it(`${script}: HTTP ${statusCode} is ${statusCode === 204 ? 'accepted' : 'observable without leaking secrets'}`, async () => {
+        const received = [];
+        const server = createServer((req, res) => {
+          let body = '';
+          req.on('data', (chunk) => { body += chunk; });
+          req.on('end', () => { received.push(body); res.writeHead(statusCode); res.end(); });
+        });
+        await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+        const hook = `http://127.0.0.1:${server.address().port}/synthetic-webhook-private`;
+        try {
+          const result = await invoke(script, ['--out-dir', `/dev/null/${passphrase}`], hook);
+          assert.equal(result.status, 1);
+          assert.ok(received.length >= 1);
+          const all = result.stdout + result.stderr + received.join(' ');
+          for (const secret of [source, 'synthetic-password', passphrase, hook, 'synthetic-webhook-private']) assert.ok(!all.includes(secret), 'logs and alerts must not expose credentials');
+          if (statusCode === 503) assert.match(result.stderr, /alert delivery failed/);
+          else assert.doesNotMatch(result.stderr, /alert delivery failed/);
+        } finally {
+          await new Promise((resolve) => server.close(resolve));
+        }
+      });
+    }
+    it(`${script}: network exception is observable and does not mask the original failure`, async () => {
+      const hook = 'http://127.0.0.1:1/synthetic-webhook-private';
+      const result = await invoke(script, ['--out-dir', `/dev/null/${passphrase}`], hook);
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /FAILED/);
+      assert.match(result.stderr, /alert delivery failed/);
+      for (const secret of [source, 'synthetic-password', passphrase, hook, 'synthetic-webhook-private']) assert.ok(!(result.stdout + result.stderr).includes(secret));
+    });
+  }
 });

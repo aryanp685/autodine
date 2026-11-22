@@ -42,6 +42,14 @@ AUTODINE_BACKUP_PASSPHRASE='<same>' \
 node scripts/backup/restore-logical.mjs --file /mnt/backups/autodine/autodine-*.sql.gz.enc --confirm-empty-db
 ```
 
+The source port is a rule, not a preference: the **transaction pooler (port 6543)**
+is refused by the tool itself, because a consistent snapshot is exported on one
+connection and imported on a second, and the transaction pooler may hand those to
+different backends. Use the **session pooler (port 5432)** or a direct connection
+(`db.<ref>.supabase.co:5432`). `scripts/backup/lib-backup-source.mjs` implements
+the refusal and `scripts/backup/backup-source.test.mjs` proves it; this paragraph
+exists so the runbook and the code cannot drift apart.
+
 Never put either URL on a command line (shell history) — always the environment variables, as shown. Neither command prints the URL.
 
 ## Machine-checkable evidence (2026-11-15)
@@ -53,7 +61,7 @@ re-verification of an accessible `p3.backup_file`. It never touches a database o
 
 ## Verified evidence (2026-11-14)
 
-- `selftest.mjs` — 14/14 checks PASS on embedded PostgreSQL 17: dump contains DDL/policies/RLS/functions; destroy-and-restore reproduces the row fingerprint (sha256) exactly; trigger, SECURITY DEFINER, `search_path`, RLS flag and policy all preserved; tampered ciphertext and wrong passphrase both rejected.
+- `selftest.mjs` — 15/15 checks PASS on embedded PostgreSQL 17: dump contains DDL/policies/RLS/functions; destroy-and-restore reproduces the row fingerprint (sha256) exactly; trigger, SECURITY DEFINER, `search_path`, RLS flag and policy all preserved; tampered ciphertext and wrong passphrase both rejected.
 - CLI end-to-end — 400-row fixture: backup → manifest (rows=400, sha256 recorded) → drop → restore → exact row count and `sum(qty)` verified (240600). Restore report prints object counts + exact rows.
 - `test:db:logical-restore` — full 123-migration chain replayed onto embedded PostgreSQL 17, Mode B backup → restore into a shim-only target, then public-schema fingerprint compared: 64 tables / 63 policies / 236 functions identical, and the row counts equal. Since 2026-11-21 the drill also **interrogates the restored database as the application roles** and asserts: a member sees its own card (1 row), a non-member sees nothing (0 rows), and `anon` is refused with `42501`. That probe caught the fifth real dump defect — table and sequence GRANTs were never dumped, so a restore produced a database with the schema, rows and policies but `permission denied for table …` for every application role; the dump now recreates `relacl` explicitly. The earlier four were missing enum/domain types, function dependency order, `name[]` role lists from `pg_policies`, and function EXECUTE ACLs. It does NOT exercise the `pg_dump --format=custom` path — that drill exists only in the CI `native-database` job; see CI notes.
 - NOT YET PERFORMED: a restore rehearsal against a hosted scratch database (acceptance criterion Part 2). Procedure below; needs owner approval to create the scratch project.

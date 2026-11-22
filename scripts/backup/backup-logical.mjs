@@ -29,10 +29,15 @@
  * BACKUP_ALERT_WEBHOOK is set).
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { encryptBuffer, sha256 } from './lib-crypto.mjs';
+import { encryptBuffer, passphraseProblem, sha256 } from './lib-crypto.mjs';
 import { dumpDatabase, openBackupSnapshot } from './lib-dump.mjs';
+import { backupSourceDecision } from './lib-backup-source.mjs';
+import { selectBackupMode } from './lib-backup-mode.mjs';
+import { resolvePgClient } from './lib-pg-client.mjs';
+import { pgServiceFields, withPgService } from './lib-pg-service.mjs';
+import { safeBackupError } from './lib-backup-error.mjs';
 
 const args = process.argv.slice(2);
 const opt = {};
@@ -41,66 +46,119 @@ for (let i = 0; i < args.length; i += 1) {
   if (a.startsWith('--')) opt[a.slice(2)] = args[i + 1] && !args[i + 1].startsWith('--') ? args[++i] : '1';
 }
 const fail = async (msg) => {
-  process.stderr.write(`backup: FAILED: ${msg}\n`);
+  // Client errors can include the connection string or even an argument list.
+  // Redact before writing either logs or alerts; never print webhook details.
+  let clean = String(msg).replace(/postgres(?:ql)?:\/\/\S+/gi, '[redacted database URL]');
+  const source = process.env.AUTODINE_BACKUP_SOURCE_URL || opt['source-url'];
+  const sensitive = [source, process.env.AUTODINE_BACKUP_PASSPHRASE];
+  try {
+    const password = new URL(source).password;
+    if (password) sensitive.push(password, decodeURIComponent(password));
+  } catch { /* malformed or absent source */ }
+  for (const value of sensitive) if (value) clean = clean.replaceAll(value, '[redacted]');
+  clean = clean.replace(/[\x00-\x1f\x7f]+/g, ' ').slice(0, 500);
+  process.stderr.write(`backup: FAILED: ${clean}\n`);
   const hook = process.env.BACKUP_ALERT_WEBHOOK;
   if (hook) {
     try {
-      await fetch(hook, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: `AutoDine backup FAILED (${new Date().toISOString()}): ${msg.slice(0, 300)}` }) });
-    } catch { /* alerting must never mask the original failure */ }
+      const response = await fetch(hook, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: `AutoDine backup FAILED (${new Date().toISOString()}): ${clean.slice(0, 300)}` }), signal: AbortSignal.timeout(8000) });
+      if (!response.ok) throw new Error('alert rejected');
+    } catch { process.stderr.write('backup: alert delivery failed\n'); }
   }
   process.exit(1);
 };
 
 const outDir = opt['out-dir'];
-if (!outDir) fail('missing --out-dir');
-const sourceUrl = process.env.AUTODINE_BACKUP_SOURCE_URL || opt['source-url'];
-if (!sourceUrl) fail('set AUTODINE_BACKUP_SOURCE_URL (never pass the URL on the command line; it leaks into shell history)');
+if (!outDir) await fail('missing --out-dir');
+if (opt['source-url']) await fail('refusing --source-url; set AUTODINE_BACKUP_SOURCE_URL instead');
+const sourceUrl = process.env.AUTODINE_BACKUP_SOURCE_URL;
+if (!sourceUrl) await fail('set AUTODINE_BACKUP_SOURCE_URL (never pass the URL on the command line; it leaks into shell history)');
+// A consistent snapshot cannot be taken through the transaction pooler, so
+// refuse that source BEFORE anything is written or connected to. The rule
+// used to live only in the runbooks; a rule in prose is not a rule.
+const sourceDecision = backupSourceDecision(sourceUrl);
+if (!sourceDecision.allowed) await fail(sourceDecision.reason);
 const passphrase = process.env.AUTODINE_BACKUP_PASSPHRASE;
-if (!passphrase) fail('set AUTODINE_BACKUP_PASSPHRASE (12+ chars; store in a password manager)');
+// Refuse a passphrase that violates the encryption contract before any
+// connection is opened or any byte is written: failing here costs nothing,
+// failing after a long dump costs a whole run and teaches an operator nothing.
+const passphraseProblemText = passphraseProblem(passphrase);
+if (passphraseProblemText) await fail(passphraseProblemText);
 const schema = opt.schema || 'public';
 const keepDaily = Number(opt['keep-daily'] ?? 14);
 const keepWeekly = Number(opt['keep-weekly'] ?? 8);
 const keepMonthly = Number(opt['keep-monthly'] ?? 6);
+if (![keepDaily, keepWeekly, keepMonthly].every((n) => Number.isSafeInteger(n) && n >= 0) || !(keepDaily || keepWeekly || keepMonthly)) {
+  await fail('retention budgets must be non-negative safe integers with at least one positive');
+}
 const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '');
 const host = new URL(sourceUrl).hostname.split('.')[0].replace(/[^a-z0-9-]/gi, '') || 'db';
 const base = `autodine-${host}-${stamp}`;
 
-mkdirSync(outDir, { recursive: true });
-
 try {
+  mkdirSync(outDir, { recursive: true });
   const started = Date.now();
   let outFile, manifest;
   const enc = encryptBuffer;
-  const usePgDump = opt['pg-dump'] === '1' || (opt['pg-dump'] === undefined && (() => { try { execFileSync('pg_dump', ['--version'], { stdio: 'ignore' }); return true; } catch { return false; } })());
+  // Resolve pg_dump to the binary that will actually run.
+  //
+  // The runner image ships an older pg_dump that can shadow the pinned one
+  // on PATH, and the tool that WRITES the archive decides its format: a
+  // dump written by a newer pg_dump is refused outright by an older
+  // pg_restore. When the composite action has pinned a directory, the
+  // absolute path of the VERIFIED binary is used, so PATH cannot change
+  // which client runs, and the version is re-checked at the moment of use.
+  const pgDump = resolvePgClient('pg_dump');
+  const mode = selectBackupMode(opt['pg-dump'], pgDump !== null);
+  if (mode === 'missing_client') {
+    await fail('--pg-dump was requested but no PostgreSQL client is available');
+  }
+  const usePgDump = mode === 'pg_dump';
 
   if (usePgDump) {
+    // Check representability and reject target overrides before the snapshot
+    // connection is opened, not only when the client is later spawned.
+    pgServiceFields(sourceUrl);
     // Mode A: pg_dump custom format. Scoped to the same schema Mode B and the
     // restore target cover — the shim/managed scaffold (auth.*, storage.*,
     // roles) already exists on the restore side and must not be replayed.
-    const sqlPath = path.join(outDir, `${base}.dump`);
-    // The manifest's counts/financial expectations are measured inside the
-    // SAME exported snapshot pg_dump reads, so verification compares the
-    // restored database against exactly what was dumped — concurrent writes
-    // on a live source cannot make a good backup fail its drill (and a bad
-    // one cannot pass: the snapshot is frozen for both readers).
-    const snapshot = await openBackupSnapshot(sourceUrl, { schema });
-    let evidence;
+    // pg_dump must write plaintext briefly. A private directory and file
+    // limit exposure; all ordinary errors remove it, including dump failure.
+    // An uncatchable termination can still leave the directory behind.
+    const tempDir = mkdtempSync(path.join(outDir, '.autodine-plaintext-'));
+    const sqlPath = path.join(tempDir, 'backup.dump');
     try {
-      evidence = await snapshot.collectCounts();
-      execFileSync('pg_dump', ['--format=custom', '--no-owner', `--schema=${schema}`, `--snapshot=${snapshot.snapshotId}`, `--file=${sqlPath}`, sourceUrl], { stdio: ['ignore', 'ignore', 'inherit'] });
+      writeFileSync(sqlPath, '', { mode: 0o600, flag: 'wx' });
+      // Counts and the dump use the same exported repeatable-read snapshot.
+      const snapshot = await openBackupSnapshot(sourceUrl, { schema });
+      let evidence;
+      try {
+        evidence = await snapshot.collectCounts();
+        // Do not inherit client stderr or rethrow Node's command string: both
+        // can contain credentials. Keep an actionable exit code, not raw text.
+        try {
+          withPgService(sourceUrl, ({ env, dbname }) => {
+            execFileSync(pgDump.path, ['--format=custom', '--no-owner', `--schema=${schema}`, `--snapshot=${snapshot.snapshotId}`, `--file=${sqlPath}`, '--dbname', dbname], { stdio: ['ignore', 'ignore', 'pipe'], env });
+          });
+        } catch (error) {
+          const status = Number.isInteger(error?.status) ? ` (exit ${error.status})` : '';
+          throw new Error(`pg_dump failed${status}; inspect client configuration`);
+        }
+      } finally {
+        await snapshot.close();
+      }
+      const plaintext = readFileSync(sqlPath);
+      outFile = `${base}.dump.enc`;
+      writeFileSync(path.join(outDir, outFile), enc(plaintext, passphrase), { flag: 'wx', mode: 0o600 });
+      manifest = { format: 'pg_dump-custom', bytes: plaintext.length, sha256: sha256(readFileSync(path.join(outDir, outFile))), counts: evidence.counts, financialSpotChecks: evidence.financialSpotChecks };
     } finally {
-      await snapshot.close();
+      rmSync(tempDir, { recursive: true, force: true });
     }
-    const plaintext = readFileSync(sqlPath);
-    writeFileSync(sqlPath + '.enc', enc(plaintext, passphrase));
-    unlinkSync(sqlPath);
-    outFile = `${base}.dump.enc`;
-    manifest = { format: 'pg_dump-custom', bytes: plaintext.length, sha256: sha256(readFileSync(path.join(outDir, outFile))), counts: evidence.counts, financialSpotChecks: evidence.financialSpotChecks };
   } else {
     // Mode B: built-in consistent snapshot (REPEATABLE READ READ ONLY).
-    const { sql, counts, financialSpotChecks } = await dumpDatabase(sourceUrl, { schema, log: (m) => process.stderr.write('  ' + m + '\n') });
+    const { sql, counts, financialSpotChecks } = await dumpDatabase(sourceUrl, { schema, log: () => {} });
     const plaintext = Buffer.from(sql, 'utf8');
-    writeFileSync(path.join(outDir, `${base}.sql.gz.enc`), enc(plaintext, passphrase));
+    writeFileSync(path.join(outDir, `${base}.sql.gz.enc`), enc(plaintext, passphrase), { flag: 'wx', mode: 0o600 });
     outFile = `${base}.sql.gz.enc`;
     manifest = { format: 'autodine-logical-1', bytes: plaintext.length, sha256: sha256(readFileSync(path.join(outDir, outFile))), counts, financialSpotChecks };
   }
@@ -112,7 +170,7 @@ try {
   manifest.schema = schema;
   manifest.retention = { keepDaily, keepWeekly, keepMonthly };
   manifest.notes = 'Logical backup. Does NOT cover: Supabase Auth schema (auth.*), Storage buckets, or platform-managed settings — those rely on the managed provider. Restore target must be empty.';
-  writeFileSync(path.join(outDir, `${base}.manifest.json`), JSON.stringify(manifest, null, 2) + '\n');
+  writeFileSync(path.join(outDir, `${base}.manifest.json`), JSON.stringify(manifest, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
 
   // Retention: bucket own files only.
   const files = readdirSync(outDir).filter((f) => /^autodine-.*\.(sql\.gz\.enc|dump\.enc)$/.test(f)).sort();
@@ -135,6 +193,7 @@ try {
     if (isMonthly) monthSeen.add(monthKey);
     if (isDaily || isWeekly || isMonthly) for (const f of byDay.get(day)) keep.add(f);
   });
+  keep.add(outFile); // the artifact just created must survive local retention
   let pruned = 0;
   for (const f of files) {
     if (!keep.has(f)) {
@@ -145,7 +204,8 @@ try {
     }
   }
 
-  process.stdout.write(JSON.stringify({ ok: true, file: full, bytes: statSync(full).size, pruned, ...manifest }, null, 2) + '\n');
+  process.stdout.write(JSON.stringify({ ok: true, bytes: statSync(full).size, pruned, format: manifest.format, sha256: manifest.sha256 }, null, 2) + '\n');
 } catch (err) {
-  await fail(err?.message ?? String(err));
+  // Do not forward arbitrary database/filesystem/client text to logs or alerts.
+  await fail(safeBackupError(err));
 }

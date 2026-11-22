@@ -43,22 +43,25 @@ if (!file || !existsSync(file)) {
 
 const manifestPath = opt.manifest ?? file.replace(/\.(sql\.gz\.enc|dump\.enc)$/, '.manifest.json');
 const bytes = readFileSync(file);
+// Never upload an arbitrary plaintext file under a backup key. The scheduled
+// pipeline separately authenticates and decrypts the artifact before upload.
+if (!/\.(sql\.gz|dump)\.enc$/.test(file) || bytes.length < 52 || !bytes.subarray(0, 7).equals(Buffer.from('ADBK01\n'))) {
+  process.stderr.write('upload-b2: invalid encrypted backup framing or filename; refusing to upload\n');
+  process.exit(1);
+}
 const actualSha = sha256Hex(bytes);
 
-let manifest = null;
-if (existsSync(manifestPath)) {
-  try { manifest = JSON.parse(readFileSync(manifestPath, 'utf8')); } catch {
-    process.stderr.write(`upload-b2: manifest is not valid JSON: ${path.basename(manifestPath)}\n`);
-    process.exit(1);
-  }
-  if (manifest.sha256 && manifest.sha256 !== actualSha) {
-    process.stderr.write('upload-b2: INTEGRITY FAILURE — artifact SHA-256 does not match its backup manifest; refusing to upload\n');
-    process.exit(1);
-  }
-  if (manifest.file && path.basename(manifest.file) !== path.basename(file)) {
-    process.stderr.write('upload-b2: INTEGRITY FAILURE — manifest names a different artifact; refusing to upload\n');
-    process.exit(1);
-  }
+let manifest;
+try { manifest = JSON.parse(readFileSync(manifestPath, 'utf8')); } catch {
+  process.stderr.write('upload-b2: manifest is missing or invalid; refusing to upload\n');
+  process.exit(1);
+}
+if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest) ||
+    typeof manifest.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(manifest.sha256) ||
+    manifest.sha256 !== actualSha || typeof manifest.file !== 'string' ||
+    manifest.file !== path.basename(file)) {
+  process.stderr.write('upload-b2: INTEGRITY FAILURE — manifest must name the artifact and its exact SHA-256; refusing to upload\n');
+  process.exit(1);
 }
 
 const config = b2ConfigFromEnv(process.env);
@@ -93,7 +96,7 @@ async function signedFetch(method, objectKey, body, extraHeaders = {}) {
   const url = `${config.endpoint}/${config.bucket}/${objectKey.split('/').map(encodeURIComponent).join('/')}`;
   const payloadHash = sha256Hex(body ?? Buffer.alloc(0));
   const headers = signB2Request({ method, url, payloadHash, ...access, region: config.region, extraHeaders });
-  return fetch(url, { method, headers, body, signal: AbortSignal.timeout(120000) });
+  return fetch(url, { method, headers, body, redirect: 'error', signal: AbortSignal.timeout(120000) });
 }
 
 try {
@@ -102,14 +105,14 @@ try {
     'x-amz-meta-sha256': actualSha,
   });
   if (!put.ok) {
-    process.stderr.write(`upload-b2: PUT failed with HTTP ${put.status}; artifact NOT uploaded\n`);
+    process.stderr.write(`upload-b2: artifact PUT failed with HTTP ${put.status}; remote state is unverified\n`);
     process.exit(1);
   }
   if (manifest) {
     const manifestBody = Buffer.from(JSON.stringify(manifest, null, 2) + '\n');
     const putManifest = await signedFetch('PUT', manifestKey, manifestBody, { 'content-type': 'application/json' });
     if (!putManifest.ok) {
-      process.stderr.write(`upload-b2: manifest PUT failed with HTTP ${putManifest.status}; artifact uploaded but manifest missing — treat destination as unverified\n`);
+      process.stderr.write(`upload-b2: manifest PUT failed with HTTP ${putManifest.status}; remote pair is unverified and may be partial\n`);
       process.exit(1);
     }
   }
@@ -132,7 +135,7 @@ try {
     bytes: bytes.length,
     sha256: actualSha,
   }, null, 2) + '\n');
-} catch (error) {
-  process.stderr.write(`upload-b2: transfer failed (${error?.name ?? 'Error'}); see network/endpoint configuration — no credentials were printed\n`);
+} catch {
+  process.stderr.write('upload-b2: transfer failed; see network/endpoint configuration — remote state may be unverified\n');
   process.exit(1);
 }

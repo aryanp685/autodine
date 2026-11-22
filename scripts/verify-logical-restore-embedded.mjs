@@ -129,7 +129,10 @@ const before = await fingerprint(urlFor(source), { schemas: ['public'] });
 
 
   const outDir = path.join(scratch, 'backups');
-  execFileSync(process.execPath, ['scripts/backup/backup-logical.mjs', '--out-dir', outDir], {
+  // --pg-dump 0 pins Mode B (the repository's own dump). Without it the drill
+  // would verify whichever path the machine happens to offer — a system pg_dump
+  // on PATH here, nothing there.
+  execFileSync(process.execPath, ['scripts/backup/backup-logical.mjs', '--out-dir', outDir, '--pg-dump', '0'], {
     env: sh({ AUTODINE_BACKUP_SOURCE_URL: urlFor(source), AUTODINE_BACKUP_PASSPHRASE: 'local-drill-passphrase-not-secret-0123456789' }),
     stdio: ['ignore', 'inherit', 'inherit'],
   });

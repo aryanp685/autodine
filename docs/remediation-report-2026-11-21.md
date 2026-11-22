@@ -215,32 +215,51 @@ a **hosted** restore rehearsal against an authorized target (P3–P5 of
 `docs/pitr-verification-procedure-2026-11-14.md`), measured RPO/RTO, and a proven
 alert. Authorization for that has not been given, so it was not attempted.
 
-## D5 — closed PR #194 lineage (assessed; port deliberately not taken)
+## D5 — closed PR #194 lineage (ported; 230 assertions green)
 
-The branch behind closed PR #194 (`arena/88c342c2-autodine`) has moved on: its head
-is now `8e9a701`. Against this branch it holds **33 additive infrastructure files** —
-`scripts/backup/{lib-pg-client,lib-pg-service,lib-b2-read,lib-restore-target,lib-backup-error,lib-backup-mode,lib-backup-source,prepare-disposable-restore,validate-staging-source,verify-b2-staging-scope,compare-rehearsal-manifests}.mjs`,
-`scripts/hosted-verification/preflight.mjs`, `scripts/staging/seed-demo.ts`,
-`.github/actions/postgres-client/*`, `.github/workflows/staging-b2-rehearsal.yml` —
-plus **22 extra `test:dr` files** (28 there vs 6 here) and modified versions of
-`backup-logical.mjs`, `restore-logical.mjs`, `verify-restored-db.mjs`,
-`run-scheduled.mjs`.
+The branch behind closed PR #194 (`arena/88c342c2-autodine`) had moved on: its head
+is now `8e9a701`. Against this branch it held **33 additive infrastructure files**,
+**19 modified backup scripts** and `.github/actions/postgres-client/*`.
 
-Notable: that branch independently found the **same** dump-ordering defect fixed
-here, and solved it with a catalog dependency graph (`lib-dump.mjs`, +182/−129)
-rather than the function-first ordering used here.
+That port is now **done**, as one coherent change rather than a fragment:
 
-A bounded port was attempted and **reverted**: with the modules, the four modified
-scripts and their tests copied in, `node --test scripts/backup/*.test.mjs` ran 127
-tests with **15 failures** (runbook-text assertions, postgres-client CI-action
-wiring, scheduled-alert redaction, mode A/B contract), i.e. the port needs their
-docs, their CI action wiring and their workflow edits together. Shipping a
-half-ported backup library would have replaced a green tree with a red one, so the
-branch was restored (`test:dr`, `test:backup` and the drill are green again) and the
-work is listed as one dedicated pass with an owner-approved scope.
+| Landed | What it buys |
+|---|---|
+| `scripts/backup/*` (48 files) | the whole refactored pipeline: pg client resolution (`lib-pg-client`), service-file URLs (`lib-pg-service`), source guard (`lib-backup-source`), mode selection (`lib-backup-mode`), B2 read (`lib-b2-read`), restore-target guard (`lib-restore-target`), redacted errors (`lib-backup-error`), rehearsal comparison, staging-source validation, disposable-target preparation |
+| 20 test suites, **230 assertions** | `test:dr` is now `node --test scripts/backup/*.test.mjs scripts/release/*.test.mjs` — the wiring tests (docs ↔ code ↔ workflows) are what keep the rest honest |
+| `.github/actions/postgres-client` | one pinned PostgreSQL client (17) installed *and verified* in CI, the hosted backup and the restore drill, so a dump and its restore can never disagree about the archive format |
+| `hosted-backup.yml`, `hosted-restore-drill.yml` | use that action; the drill now prepares the disposable container explicitly and labels the restore duration as "not end-to-end RTO" |
+| `staging-b2-rehearsal.yml` | the gated B2 rehearsal, with an **exact-code gate**: a manifest of the 53 pinned files, byte for byte, before any credential is materialised. The manifest is regenerated from this tree (the test recomputes it and fails on drift) |
+| `docs/operations/B2_OWNER_CHECKLIST.md` | the owner-facing checklist the tests hold against the workflows |
+| `yaml@^2.9.1` (dev) | the wiring tests parse workflows instead of grepping text |
 
-What this branch already has instead: a restorable dumper, data-fidelity restore
-evidence, a fail-closed empty-target guard, and the DR unit suites that exist here.
+Two fixes from this branch were **re-applied on top of their `lib-dump.mjs`**, because
+their fork predates them:
+
+1. **Raw date/time text** (`RAW_TEXT_OIDS` + `types: rawTimeTypes`): their version
+   went back to letting the driver parse `timestamptz`, which truncates
+   microseconds. Their own `taken_at.toISOString()` call broke immediately once the
+   parser was restored — evidence that the two lineages really had diverged.
+2. **Relation ACLs** (`relacl` → `revoke`/`grant`): without it the restored database
+   is unusable, which the drill's security probe reports as
+   `permission denied for table table_qr_codes`.
+
+Evidence at this head:
+
+```
+npm run test:dr           230 passed / 0 failed (was 6 files before the port)
+npm run test:backup       backup selftest: ALL CHECKS PASS (15 checks)
+npm run test:db:logical-restore
+                          LOCAL_LOGICAL_RESTORE_VERIFIED {migrations:123, tables:64,
+                            policies:63, functions:236, dataRestoreVerified:true,
+                            securityRestoreVerified:{memberRows:1,strangerRows:0,anonDenied:true}}
+npm run test:recovery:cold LOCAL_COLD_RECOVERY_VERIFIED {migrations:123, tables:68}
+```
+
+Still not taken from that lineage, deliberately: its `ci.yml` additions that depend
+on files this branch does not carry (demo-seed isolation, hermetic browser count,
+`print-test-failure-annotation`). Those are CI-ergonomics changes, not DR capability,
+and they would have to land with their own scripts and workflow steps.
 
 ## D6 — main's six red jobs (diagnosed; not fixable from this branch)
 
@@ -312,7 +331,7 @@ this branch's migrations are not applied to production (D3).
 | `npm run test:recovery:cold` | `LOCAL_COLD_RECOVERY_VERIFIED` |
 | `npx vitest run` | 2,614 passed / 309 skipped (2,925) |
 | `npm run test:e2e:journey` | 20 passed |
-| `npm run test:dr` · `test:backup` · `test:d2` · `test:staging:guards` | exit 0 (`test:dr` is now 58 assertions, incl. the apply-plan suite) |
+| `npm run test:dr` · `test:backup` · `test:d2` · `test:staging:guards` | exit 0 (`test:dr` is now **230** assertions: 20 backup suites + the apply-plan suite; selftest ALL CHECKS PASS, 15 checks) |
 | `npm run release:apply-plan -- --ledger <prod ledger>` | 123 repo files vs 124 ledger rows → **51 pending**, 72 applied, 52 ledger rows with no repository file |
 | `npm run migrations:verify` | 123 files, 123 unique versions, 4 anchors |
 | `npm run verify:release` | 47 checks OK |
@@ -321,10 +340,9 @@ this branch's migrations are not applied to production (D3).
 
 ## What remains, and it is not code
 
-1. **Owner authorization** to apply the 50-file batch to production (D3).
+1. **Owner authorization** to apply the 51-file batch to production (D3).
 2. **Owner authorization** for the hosted recovery rehearsal (D4) — the only route
    to DR READY.
-3. A dedicated pass for the PR #194 lineage port (D5), with the docs and CI wiring.
-4. Repair of main's six jobs (D6), which needs branch/PR permission.
-5. The B2 staging setup stays exactly as the owner reported it: accepted as done, not
+3. Repair of main's six jobs (D6), which needs branch/PR permission.
+4. The B2 staging setup stays exactly as the owner reported it: accepted as done, not
    verified here (a 403 from this session would mean UNKNOWN, never "missing").
