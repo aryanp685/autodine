@@ -571,6 +571,7 @@ const ADVANCE: Record<string, { table: (t: string) => string; takeaway: string }
  * produces -- a sentence that is not just clumsy but wrong, because a cook
  * listening for a table number hears one that does not exist.
  */
+/** @deprecated — status announcements removed per strict scope (only order + waiter). Kept for backward compat. */
 export function advanceText(table: string, next: string): string {
   const phrase = ADVANCE[next];
   if (phrase) return isTakeaway(table) ? phrase.takeaway : phrase.table(spokenTable(table));
@@ -589,6 +590,7 @@ export function advanceText(table: string, next: string): string {
  * "का ऑर्डर" rather than "ऑर्डर," -- without the possessive the sentence reads
  * as though the whole restaurant's orders were cancelled.
  */
+/** @deprecated — cancellation announcements removed per strict scope. Kept for backward compat. */
 export function cancelText(table: string): string {
   if (isTakeaway(table)) return 'टेकअवे ऑर्डर कैंसल हो गया।';
   return `टेबल ${spokenTable(table)} का ऑर्डर कैंसल हो गया।`;

@@ -123,9 +123,9 @@ test.describe('cancellation', () => {
     // first label: "Cancel" next to the move action is one slip from losing a
     // guest's order.
     await expect(page.getByRole('button', { name: 'Yes, cancel' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'No' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'No', exact: true })).toBeVisible();
 
-    await page.getByRole('button', { name: 'No' }).click();
+    await page.getByRole('button', { name: 'No', exact: true }).click();
     await expect(page.locator('article[data-state="new"]', { hasText: 'T7' })).toHaveCount(1);
   });
 
@@ -141,8 +141,8 @@ test.describe('cancellation', () => {
   });
 });
 
-test.describe('voice announcements are never repeated', () => {
-  test('the board announces each event once — and a refresh re-announces nothing', async ({
+test.describe('voice announcements follow the order-only scope', () => {
+  test('status moves and cancellations stay silent, and a refresh re-announces nothing', async ({
     page,
   }) => {
     await recordAnnouncements(page);
@@ -155,30 +155,22 @@ test.describe('voice announcements are never repeated', () => {
     await page.waitForTimeout(1500);
     expect(await announcementCount(page), 'opening the board announced old tickets').toBe(0);
 
-    // A move announces once.
+    // The approved scope is new orders and waiter calls. A status move is a
+    // screen update, not a voice event.
     await page
       .locator('article[data-state="new"]', { hasText: 'T7' })
       .getByRole('button', { name: 'Start preparing' })
       .click();
-    await expect
-      .poll(() => announcementCount(page), { message: 'the move was never announced' })
-      .toBeGreaterThan(0);
-    const afterMove = await announcementCount(page);
-
-    // …once. Not again a beat later (the queue's duplicate rule), not once per
-    // re-render.
+    await expect(page.locator('article[data-state="preparing"]', { hasText: 'T7' })).toHaveCount(1);
     await page.waitForTimeout(1500);
-    expect(await announcementCount(page), 'the move was announced twice').toBe(afterMove);
+    expect(await announcementCount(page), 'a status move was announced').toBe(0);
 
-    // A cancellation is its own announcement, once.
+    // A cancellation is its own recorded action, not an announcement.
     await page.getByRole('button', { name: 'Cancel order for T3' }).click();
     await page.getByRole('button', { name: 'Yes, cancel' }).click();
-    await expect
-      .poll(() => announcementCount(page), { message: 'the cancel was never announced' })
-      .toBeGreaterThan(afterMove);
-    const afterCancel = await announcementCount(page);
+    await expect(page.locator('article[data-state]', { hasText: 'T3' })).toHaveCount(0);
     await page.waitForTimeout(1500);
-    expect(await announcementCount(page), 'the cancel was announced twice').toBe(afterCancel);
+    expect(await announcementCount(page), 'a cancellation was announced').toBe(0);
 
     // A refresh re-reads the board from scratch — and says nothing. What was
     // seen stays seen (localStorage), so the kitchen is not shouted at twice

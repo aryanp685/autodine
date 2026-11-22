@@ -41,6 +41,17 @@ const NEEDS = 'E2E_BASE_URL + E2E_OWNER_EMAIL + E2E_OWNER_PASSWORD + E2E_SLUG';
 const READY = STAFF_READY && Boolean(SLUG);
 
 test.describe('brand studio flow', () => {
+  // Every page here is opened by hand (`browser.newContext()`), so nothing
+  // closes them. A signed-in owner page keeps the global announcement
+  // provider polling, and a leftover page can claim a later test's
+  // new-order announcement — the kitchen spec then stays silent. Close
+  // whatever this test opened; the built-in `context` fixture is Playwright's.
+  test.afterEach(async ({ browser, context }) => {
+    for (const other of browser.contexts()) {
+      if (other !== context) await other.close();
+    }
+  });
+
   test('the import screen carries the brand section for an owner', async ({ browser }) => {
     test.skip(!READY, skipUnless(READY, NEEDS));
     const page = await signInOwner(await browser.newContext());

@@ -72,6 +72,7 @@ export function DashboardBar({
   active,
   outlet,
   signOut = true,
+  children,
 }: {
   /**
    * Which destination to mark. Optional so a loading skeleton can render this
@@ -84,6 +85,7 @@ export function DashboardBar({
   outlet?: OutletBar | null;
   /** Off on the demo screens, where there is nobody signed in to sign out. */
   signOut?: boolean;
+  children?: ReactNode;
 }) {
   const pathname = usePathname();
 
@@ -407,7 +409,8 @@ export function DashboardBar({
             )}
           </div>
 
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            {children}
             <ShellSearch onLaunch={() => setOpen(false)} />
           </div>
         </div>

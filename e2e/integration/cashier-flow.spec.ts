@@ -165,7 +165,9 @@ test.describe('cashier — real database', () => {
 
     const till = await signInOwner(context);
     await till.goto(`${BASE}/dashboard`);
-    const session = till.locator(`[data-active-session="${first?.order_session_id}"]`);
+    // [data-app] keeps the locator on the revealed page: a suspended server
+    // render can leave a hidden streamed copy outside the live app root.
+    const session = till.locator(`[data-app] [data-active-session="${first?.order_session_id}"]`);
     await expect(session).toBeVisible({ timeout: 45_000 });
     await expect(session).toContainText('2 tickets');
     const dashboardTotal = (await session.locator('[data-session-total]').innerText()).trim();
@@ -230,8 +232,8 @@ test.describe('cashier — real database', () => {
     expect(third?.order_session_id).not.toBe(first?.order_session_id);
     expect(third?.session_status).toBe('open');
     await till.goto(`${BASE}/dashboard`);
-    await expect(till.locator(`[data-active-session="${third?.order_session_id}"]`)).toBeVisible({ timeout: 30_000 });
-    await expect(till.locator(`[data-active-session="${first?.order_session_id}"]`)).toHaveCount(0);
+    await expect(till.locator(`[data-app] [data-active-session="${third?.order_session_id}"]`)).toBeVisible({ timeout: 30_000 });
+    await expect(till.locator(`[data-app] [data-active-session="${first?.order_session_id}"]`)).toHaveCount(0);
   });
 
   test('a cancelled order cannot be settled — money for food that will not come', async ({

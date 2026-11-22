@@ -56,8 +56,10 @@ export default async function StaffLayout({ children }: { children: ReactNode })
    */
   const signOut = isSupabaseConfigured ? outlet !== null : true;
 
+  const restaurantId = outlet?.activeId ?? null;
+
   return (
-    <StaffShell outlet={outlet} signOut={signOut}>
+    <StaffShell outlet={outlet} restaurantId={restaurantId} signOut={signOut}>
       {children}
     </StaffShell>
   );

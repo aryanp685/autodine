@@ -63,7 +63,10 @@ jobs:
         id: supabase-cli
         uses: supabase/setup-cli@v1
         with:
-          version: 2.67.1
+          # 2.99.0 embeds supabase/postgres:17.6.1.106 (plpgsql_check 2.8.11).
+          # 2.67.1 embeds 17.6.1.064, whose preloaded 2.7.11 raises sporadic
+          # "pldbgapi2 call stack" XX000 errors on nested RPCs under load.
+          version: 2.99.0
 
       - name: Start full disposable Supabase stack
         run: supabase start

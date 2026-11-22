@@ -79,7 +79,7 @@ export async function signInOwner(context: BrowserContext): Promise<Page> {
   const page = await context.newPage();
   await page.goto(`${BASE}/login`);
   await page.getByLabel('Work email').fill(OWNER_EMAIL);
-  await page.getByLabel('Password').fill(OWNER_PASSWORD);
+  await page.getByLabel('Password', { exact: true }).fill(OWNER_PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.locator('#app-rail')).toBeVisible({ timeout: 20_000 });
   return page;

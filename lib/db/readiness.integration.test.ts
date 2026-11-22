@@ -24,6 +24,7 @@ async function fixture(): Promise<Fixture> {
   const item = (await db.query(`insert into items(restaurant_id,category_id,name,price_paise,is_available) values($1,$2,'Dish',12500,true) returning id`,[restaurant,category])).rows[0].id;
   const table = (await db.query(`insert into dining_tables(restaurant_id,label) values($1,'T1') returning id`,[restaurant])).rows[0].id;
   const token = randomUUID().replaceAll('-','') + randomUUID().replaceAll('-','');
+  await db.query('delete from table_qr_codes where table_id=$1',[table]);
   await db.query('insert into table_qr_codes(restaurant_id,table_id,public_token) values($1,$2,$3)',[restaurant,table,token]);
   const sessionToken = (await db.query('select * from open_table_session($1,$2)',[token,'a'.repeat(64)])).rows[0].session_token;
   const code = (await db.query('select place_public_order($1,$2::jsonb,null,$3,$4::uuid,null) code',[slug,JSON.stringify([{itemId:item,qty:2}]),sessionToken,randomUUID()])).rows[0].code;
@@ -546,6 +547,7 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
     for(let i=0;i<3;i++) {
       const table=(await db.query('insert into dining_tables(restaurant_id,label) values($1,$2) returning id',[f.restaurant,'WiFi-'+i])).rows[0].id;
       const token=randomUUID().replaceAll('-','')+randomUUID().replaceAll('-','');cards.push(token);
+      await db.query('delete from table_qr_codes where table_id=$1',[table]);
       await db.query('insert into table_qr_codes(restaurant_id,table_id,public_token) values($1,$2,$3)',[f.restaurant,table,token]);
     }
     for(const card of cards) for(let i=0;i<8;i++) {
