@@ -65,9 +65,16 @@ vi.mock('@/lib/supabase/env', () => ({
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: async () => ({
-    rpc: async (name: string, params: Record<string, unknown>) => state.rpc!(name, params),
+    rpc: (name: string, params: Record<string, unknown>) => {
+      const answer = state.rpc!(name, params);
+      return Object.assign(answer, { maybeSingle: () => answer });
+    },
   }),
 }));
+
+/* An async Server Component that renderToStaticMarkup cannot render; it is SEO
+   metadata, not part of the throttle contract under test. */
+vi.mock('@/components/StructuredData', () => ({ default: () => null }));
 
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => {

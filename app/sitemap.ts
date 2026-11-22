@@ -1,29 +1,18 @@
-import { MetadataRoute } from 'next';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import type { MetadataRoute } from 'next';
 
 const STATIC_ROUTES: ReadonlyArray<string> = ['/', '/pricing', '/terms', '/privacy'];
 
-const generateSitemaps = async (): Promise<MetadataRoute.Sitemap[]> => {
-  const entries: MetadataRoute.Sitemap = STATIC_ROUTES.map((url) => ({ url }));
-
-  const client = await createSupabaseServerClient();
-  if (!client) return [entries];
-
-  try {
-    const { data, error } = await client.from('restaurants').select('slug').eq('is_active', true);
-    if (error || !data) return [entries];
-
-    for (const row of data) {
-      const slug = String(row.slug ?? '').trim();
-      if (!slug) continue;
-      entries.push({ url: `/menu?s=${slug}` });
-    }
-  } catch {
-    // The database is unavailable or the read is not permitted: static routes only.
-  }
-
-  return [entries];
+/* Built at build time, where there is no request: no cookies(), no headers()
+   and no database read. Restaurant menus are reached by scanning a table QR,
+   so only the public marketing pages are listed. */
+function configuredOrigin(): string {
+  const configured = process.env.SITE_URL?.trim() || process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (configured) return configured.replace(/\/+$/, '');
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  return vercel ? `https://${vercel.replace(/\/+$/, '')}` : '';
 }
 
-export { generateSitemaps };
-export default generateSitemaps;
+export default function sitemap(): MetadataRoute.Sitemap {
+  const origin = configuredOrigin();
+  return STATIC_ROUTES.map((path) => ({ url: `${origin}${path}` }));
+}
