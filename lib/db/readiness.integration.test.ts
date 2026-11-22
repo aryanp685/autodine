@@ -24,6 +24,7 @@ async function fixture(): Promise<Fixture> {
   const item = (await db.query(`insert into items(restaurant_id,category_id,name,price_paise,is_available) values($1,$2,'Dish',12500,true) returning id`,[restaurant,category])).rows[0].id;
   const table = (await db.query(`insert into dining_tables(restaurant_id,label) values($1,'T1') returning id`,[restaurant])).rows[0].id;
   const token = randomUUID().replaceAll('-','') + randomUUID().replaceAll('-','');
+  await db.query('delete from table_qr_codes where table_id=$1',[table]);
   await db.query('insert into table_qr_codes(restaurant_id,table_id,public_token) values($1,$2,$3)',[restaurant,table,token]);
   const sessionToken = (await db.query('select * from open_table_session($1,$2)',[token,'a'.repeat(64)])).rows[0].session_token;
   const code = (await db.query('select place_public_order($1,$2::jsonb,null,$3,$4::uuid,null) code',[slug,JSON.stringify([{itemId:item,qty:2}]),sessionToken,randomUUID()])).rows[0].code;
@@ -441,6 +442,31 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
     expect((await db.query('select count(*)::int n from payment_audit_events where order_id=$1',[f.order])).rows[0].n).toBe(0);
   });
 
+  it('keeps exactly one record_counter_payment, authenticated-only, with the session lock and pending-online guard', async () => {
+    const fns=(await db.query(`select pg_get_function_identity_arguments(p.oid) args, pg_get_functiondef(p.oid) def,
+        has_function_privilege('anon',p.oid,'EXECUTE') anon_execute,
+        has_function_privilege('authenticated',p.oid,'EXECUTE') authenticated_execute
+      from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+      where n.nspname='public' and p.proname='record_counter_payment'`)).rows;
+    expect(fns).toHaveLength(1);
+    expect(fns[0]).toMatchObject({anon_execute:false,authenticated_execute:true});
+    expect(fns[0].args).toMatch(/p_upi_ref text/);
+    expect(fns[0].def).toMatch(/for update of s/);
+    expect(fns[0].def).toMatch(/An online payment is in progress for this order/);
+    expect(fns[0].def).toMatch(/UPI transaction reference is required/);
+  });
+
+  it('gates safe table delete on write access and waiter-call history, and keeps announcement claims recoverable but final', async () => {
+    const def=async(sig:string)=>(await db.query('select pg_get_functiondef(to_regprocedure($1)) d',[sig])).rows[0].d as string;
+    const del=await def('public.delete_table_safe(uuid)');
+    expect(del).toMatch(/restaurant_can_write\(v_restaurant_id\)/);
+    expect(del).toMatch(/from public\.table_waiter_calls c where c\.table_id = p_table_id/);
+    const kitchen=await def('public.claim_kitchen_order_announcement(uuid)');
+    expect(kitchen).toMatch(/kitchen_announcement_status = 'announced'/);
+    const waiter=await def('public.claim_table_waiter_call_announcement(uuid)');
+    expect(waiter.match(/announcement_claimed_at < statement_timestamp\(\) - interval '2 minutes'/g)).toHaveLength(2);
+  });
+
   it('keeps online intent and settlement executable only by the service role, not guests or staff', async () => {
     for(const signature of [
       'public.begin_online_payment(text,text,text,uuid,uuid,bigint)',
@@ -546,6 +572,7 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
     for(let i=0;i<3;i++) {
       const table=(await db.query('insert into dining_tables(restaurant_id,label) values($1,$2) returning id',[f.restaurant,'WiFi-'+i])).rows[0].id;
       const token=randomUUID().replaceAll('-','')+randomUUID().replaceAll('-','');cards.push(token);
+      await db.query('delete from table_qr_codes where table_id=$1',[table]);
       await db.query('insert into table_qr_codes(restaurant_id,table_id,public_token) values($1,$2,$3)',[f.restaurant,table,token]);
     }
     for(const card of cards) for(let i=0;i<8;i++) {
@@ -1026,7 +1053,7 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
 
     const invoice=await withActor(c.user,async()=>{
       await db.query('select record_counter_payment($1,$2,$3,$4,$5)',[c.slug,c.order,'cash',25000,randomUUID()]);
-      await db.query('select record_counter_payment($1,$2,$3,$4,$5)',[c.slug,secondOrder,'upi',12500,randomUUID()]);
+      await db.query('select record_counter_payment($1,$2,$3,$4,$5,$6)',[c.slug,secondOrder,'upi',12500,randomUUID(),'UPI-TRN-0001']);
       return (await db.query('select close_order_session_and_issue_receipt($1) id',[c.sitting])).rows[0].id as string;
     });
     const snapshot=(await db.query('select totals_snapshot from restaurant_invoices where id=$1',[invoice])).rows[0].totals_snapshot;

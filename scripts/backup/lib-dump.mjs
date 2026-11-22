@@ -113,6 +113,10 @@ export async function dumpDatabase(connectionString, { schema = 'public', log = 
     out.push(`-- server: ${meta.rows[0].version.split(' on ')[0]}`);
     out.push('-- restore into an EMPTY database; never over a live one.');
     out.push('');
+    // Mirrors pg_dump: function bodies are created before the tables they
+    // reference, so PostgreSQL must not validate them at CREATE time.
+    out.push('set check_function_bodies = false;');
+    out.push('');
 
     const exts = await client.query('select extname from pg_extension order by extname');
     out.push('-- required extensions (restore must create these as a superuser or a database owner with the right privileges): ' + exts.rows.map((r) => r.extname).join(', '));
@@ -176,6 +180,60 @@ export async function dumpDatabase(connectionString, { schema = 'public', log = 
     }
     if (counts.types > 0 || composites.rows.length) out.push('');
 
+    // 2) functions — before tables, matching pg_dump. CHECK constraints and
+    //    views in this schema call public.has_restaurant_role(), and a CREATE
+    //    VIEW validates the functions it references, so emitting functions
+    //    last (where this dump used to put them) made every restore fail with
+    //    "function has_restaurant_role(uuid, text[]) does not exist".
+    //    check_function_bodies is off, so bodies may still reference tables
+    //    that this section creates afterwards. Same-schema function references
+    //    stay dependency-ordered so a replay of out-of-order migrations still
+    //    restores.
+    const fns = await client.query(
+      `select p.oid, p.proname, pg_get_functiondef(p.oid) as def,
+              pg_get_function_arguments(p.oid) as args,
+              pg_get_function_result(p.oid) as result
+         from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = $1 and p.prokind in ('f','p')`, [schema]);
+    const bodyOf = (def) => {
+      const m = def.match(/\$[A-Za-z_]*\$[\s\S]*\$[A-Za-z_]*\$/);
+      return m ? m[0] : '';
+    };
+    const names = fns.rows.map((f) => f.proname);
+    const nameSet = new Set(names);
+    const bodyCache = new Map(fns.rows.map((f) => [f.oid, bodyOf(f.def)]));
+    const dependsOn = (f) => {
+      const body = bodyCache.get(f.oid);
+      const deps = new Set();
+      for (const other of fns.rows) {
+        if (other.oid === f.oid) continue;
+        if (nameSet.has(other.proname) && new RegExp(`\\b${other.proname}\\b`).test(body)) deps.add(other.oid);
+      }
+      return deps;
+    };
+    const remaining = new Map(fns.rows.map((f) => [f.oid, f]));
+    const ordered = [];
+    const emitted = new Set();
+    let guard = fns.rows.length + 1;
+    while (remaining.size && guard-- > 0) {
+      const ready = [...remaining.values()].filter((f) => [...dependsOn(f)].every((d) => emitted.has(d) || !remaining.has(d)));
+      const batch = (ready.length ? ready : [...remaining.values()]).sort((a, b) => a.proname.localeCompare(b.proname) || a.oid - b.oid);
+      if (!ready.length) out.push('-- WARNING: dependency cycle among functions; emitting in name order — restore may fail');
+      for (const f of batch) { ordered.push(f); emitted.add(f.oid); remaining.delete(f.oid); }
+    }
+    // A function whose *signature* names a table takes that table's composite
+    // row type, which cannot exist until the table does. Those are emitted
+    // after CREATE TABLE; everything else can go now, which is what lets the
+    // CHECK constraints and views added later resolve the functions they call.
+    const tableNames = new Set(tables.rows.map((r) => r.relname));
+    const needsTableType = (f) => [...tableNames].some((name) => new RegExp(`\\b${name}\\b`).test(`${f.args} ${f.result}`));
+    const lateFns = ordered.filter(needsTableType);
+    for (const f of ordered) {
+      if (needsTableType(f)) continue;
+      out.push(f.def.trim() + ';'); counts.functions += 1;
+    }
+
+
     // 1) CREATE TABLE (PK inline; other constraints deferred)
     const fkDeferred = [], uniqueDeferred = [], checkDeferred = [];
     for (const t of tables.rows) {
@@ -204,6 +262,41 @@ export async function dumpDatabase(connectionString, { schema = 'public', log = 
       }
     }
     out.push('');
+
+
+    // 2b) functions whose signature needs a table's row type, now that the
+    //     tables exist. check_function_bodies is still off, so their bodies may
+    //     reference anything created later in this dump.
+    for (const f of lateFns) { out.push(f.def.trim() + ';'); counts.functions += 1; }
+    if (lateFns.length) out.push('');
+
+    // Function EXECUTE ACLs. CREATE FUNCTION defaults to EXECUTE for PUBLIC,
+    // which would silently undo every `revoke execute` this schema applies
+    // (see 20261114000400_restrict_trigger_functions_execute). Recreate the
+    // exact privilege set for functions whose proacl is not the default.
+    const acls = await client.query(
+      `select p.oid, p.proname, pg_get_function_identity_arguments(p.oid) as identity_args,
+              pg_get_userbyid(p.proowner) as owner, p.proacl::text as acl
+         from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = $1 and p.prokind in ('f','p') and p.proacl is not null
+        order by p.proname, p.oid`, [schema]);
+    const parseAcl = (aclText) => String(aclText).replace(/^\{|\}$/g, '').split(',').map((entry) => {
+      const m = entry.trim().replace(/^"|"$/g, '').match(/^([^=]*)=([^/]*)(?:\/(.*))?$/);
+      return m ? { grantee: m[1], privs: m[2] } : null;
+    }).filter(Boolean);
+    for (const row of acls.rows) {
+      const signature = `${quoteIdent(schema)}.${quoteIdent(row.proname)}(${row.identity_args})`;
+      const entries = parseAcl(row.acl);
+      const publicEntry = entries.find((e) => e.grantee === '');
+      if (!publicEntry || !publicEntry.privs.includes('X')) out.push(`revoke all on function ${signature} from public;`);
+      for (const e of entries) {
+        if (e.grantee === '' || e.grantee === row.owner) continue;
+        if (!e.privs.includes('X')) continue;
+        const withGrant = e.privs.includes('X*');
+        out.push(`grant execute on function ${signature} to ${quoteIdent(e.grantee)}${withGrant ? ' with grant option' : ''};`);
+      }
+    }
+    if (acls.rows.length) out.push('');
 
     // 2) DATA — ::text round-trip, 200 rows per INSERT
     for (const t of tables.rows) {
@@ -265,71 +358,6 @@ export async function dumpDatabase(connectionString, { schema = 'public', log = 
     const views = await client.query('select viewname, definition from pg_views where schemaname = $1 order by viewname', [schema]);
     for (const v of views.rows) { out.push(`create or replace view ${quoteIdent(schema)}.${quoteIdent(v.viewname)} as\n${v.definition};`); counts.views += 1; }
     if (views.rows.length) out.push('');
-
-    // 9) functions (full DDL incl. security definer + search_path), then triggers, then policies, then RLS flags.
-    //    Function bodies may reference other functions regardless of definition
-    //    order only when PostgreSQL validates eagerly — plpgsql/SQL functions
-    //    are parsed at CREATE time, so they must come out dependency-ordered.
-    //    Topologically sort on same-schema function references so a dump of a
-    //    schema whose migrations were replayed out of order still restores.
-    const fns = await client.query(
-      `select p.oid, p.proname, pg_get_functiondef(p.oid) as def
-         from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-        where n.nspname = $1 and p.prokind in ('f','p')`, [schema]);
-    const bodyOf = (def) => {
-      const m = def.match(/\$[A-Za-z_]*\$[\s\S]*\$[A-Za-z_]*\$/);
-      return m ? m[0] : '';
-    };
-    const names = fns.rows.map((f) => f.proname);
-    const nameSet = new Set(names);
-    const bodyCache = new Map(fns.rows.map((f) => [f.oid, bodyOf(f.def)]));
-    const dependsOn = (f) => {
-      const body = bodyCache.get(f.oid);
-      const deps = new Set();
-      for (const other of fns.rows) {
-        if (other.oid === f.oid) continue;
-        if (nameSet.has(other.proname) && new RegExp(`\\b${other.proname}\\b`).test(body)) deps.add(other.oid);
-      }
-      return deps;
-    };
-    const remaining = new Map(fns.rows.map((f) => [f.oid, f]));
-    const ordered = [];
-    const emitted = new Set();
-    let guard = fns.rows.length + 1;
-    while (remaining.size && guard-- > 0) {
-      const ready = [...remaining.values()].filter((f) => [...dependsOn(f)].every((d) => emitted.has(d) || !remaining.has(d)));
-      const batch = (ready.length ? ready : [...remaining.values()]).sort((a, b) => a.proname.localeCompare(b.proname) || a.oid - b.oid);
-      if (!ready.length) out.push('-- WARNING: dependency cycle among functions; emitting in name order — restore may fail');
-      for (const f of batch) { ordered.push(f); emitted.add(f.oid); remaining.delete(f.oid); }
-    }
-    for (const f of ordered) { out.push(f.def.trim() + ';'); counts.functions += 1; }
-    // Function EXECUTE ACLs. CREATE FUNCTION defaults to EXECUTE for PUBLIC,
-    // which would silently undo every `revoke execute` this schema applies
-    // (see 20261114000400_restrict_trigger_functions_execute). Recreate the
-    // exact privilege set for functions whose proacl is not the default.
-    const acls = await client.query(
-      `select p.oid, p.proname, pg_get_function_identity_arguments(p.oid) as identity_args,
-              pg_get_userbyid(p.proowner) as owner, p.proacl::text as acl
-         from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-        where n.nspname = $1 and p.prokind in ('f','p') and p.proacl is not null
-        order by p.proname, p.oid`, [schema]);
-    const parseAcl = (aclText) => String(aclText).replace(/^\{|\}$/g, '').split(',').map((entry) => {
-      const m = entry.trim().replace(/^"|"$/g, '').match(/^([^=]*)=([^/]*)(?:\/(.*))?$/);
-      return m ? { grantee: m[1], privs: m[2] } : null;
-    }).filter(Boolean);
-    for (const row of acls.rows) {
-      const signature = `${quoteIdent(schema)}.${quoteIdent(row.proname)}(${row.identity_args})`;
-      const entries = parseAcl(row.acl);
-      const publicEntry = entries.find((e) => e.grantee === '');
-      if (!publicEntry || !publicEntry.privs.includes('X')) out.push(`revoke all on function ${signature} from public;`);
-      for (const e of entries) {
-        if (e.grantee === '' || e.grantee === row.owner) continue;
-        if (!e.privs.includes('X')) continue;
-        const withGrant = e.privs.includes('X*');
-        out.push(`grant execute on function ${signature} to ${quoteIdent(e.grantee)}${withGrant ? ' with grant option' : ''};`);
-      }
-    }
-    if (acls.rows.length) out.push('');
 
     const triggers = await client.query(
       `select pg_get_triggerdef(t.oid) as def

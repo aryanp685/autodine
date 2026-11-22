@@ -65,9 +65,16 @@ vi.mock('@/lib/supabase/env', () => ({
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: async () => ({
-    rpc: async (name: string, params: Record<string, unknown>) => state.rpc!(name, params),
+    rpc: (name: string, params: Record<string, unknown>) => {
+      const answer = state.rpc!(name, params);
+      return Object.assign(answer, { maybeSingle: () => answer });
+    },
   }),
 }));
+
+/* An async Server Component that renderToStaticMarkup cannot render; it is SEO
+   metadata, not part of the throttle contract under test. */
+vi.mock('@/components/StructuredData', () => ({ default: () => null }));
 
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => {
@@ -244,6 +251,7 @@ describe.skipIf(!DB)('throttling, against a real PostgreSQL', () => {
       `insert into public.dining_tables (restaurant_id, label, is_active) values ($1, 'T1', true) returning id`,
       [restaurantId],
     );
+    await db.query('delete from table_qr_codes where table_id=$1',[table.rows[0].id]);
     await db.query(
       `insert into public.table_qr_codes (restaurant_id, table_id, public_token) values ($1, $2, $3)`,
       [restaurantId, table.rows[0].id, 'throttleit000000000000000000000000000000000000000000000000001'],
@@ -252,6 +260,7 @@ describe.skipIf(!DB)('throttling, against a real PostgreSQL', () => {
       `insert into public.dining_tables (restaurant_id, label, is_active) values ($1, 'T2', true) returning id`,
       [restaurantId],
     );
+    await db.query('delete from table_qr_codes where table_id=$1',[secondTable.rows[0].id]);
     await db.query(
       `insert into public.table_qr_codes (restaurant_id, table_id, public_token) values ($1, $2, $3)`,
       [restaurantId, secondTable.rows[0].id, CARD2],
