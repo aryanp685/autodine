@@ -261,35 +261,32 @@ on files this branch does not carry (demo-seed isolation, hermetic browser count
 `print-test-failure-annotation`). Those are CI-ergonomics changes, not DR capability,
 and they would have to land with their own scripts and workflow steps.
 
-## D6 — main's six red jobs (diagnosed; not fixable from this branch)
+## D6 — main's red jobs (fixed upstream; this branch was never affected)
 
-`main` is `89fa684`. Six checks fail there. Root causes read from the check-run
-annotations:
+`main` is now green: at `3b1ca5b`, `CI`, `E2E (browser)`, `Throttle` and `TTS Smoke`
+all pass. The duplicate `record_counter_payment` overload was removed upstream in
+`20261121000200_upi_ref_at_mark_paid` + `20261122000100_single_counter_payment_function`
+(drop the five-argument function; the six-argument one takes
+`p_upi_ref text default null`, so both shapes resolve). The guard added here
+(`supabase/checks/09_rpc_overloads.sql`) now protects both lineages.
 
-1. `clean migrations · SQL boundaries (PG 15)` — **`error: function
-   record_counter_payment(unknown, unknown, unknown, unknown, unknown) is not
-   unique`** at `lib/db/readiness.integration.test.ts:1028`. Cause: main carries a
-   **second overload**, `record_counter_payment(text, uuid, text, bigint, uuid, text)`,
-   added by `20261121000200_upi_ref_at_mark_paid.sql`, beside the five-argument one.
-   With two candidates, `unknown`-typed literals cannot be resolved. This branch has
-   one signature and passes.
-   *Recommended fix:* rename the six-argument RPC (`record_counter_payment_with_upi_ref`)
-   and update its call sites, or drop the five-argument one and pass the reference
-   explicitly everywhere. A `drop function` alone would break the UPI path.
-2. `typecheck · lint · design · test · build` — the annotation only reports missing
-   diagnostic logs (`restore-drill.log`, `pg-client-install.log`) and exit 1, so the
-   underlying failure is masked by the diagnostics step itself.
-3. `scan throttle · …`, `staff shell · …`, `64 hermetic + 49 Supabase-backed E2E …` —
-   all three fail on missing artifacts (`test-results/supabase-e2e/*.json`,
-   `prepare-local-supabase.log`), i.e. the local-Supabase preparation step dies
-   before Playwright runs.
-4. `encrypted backup → verify → B2 upload (SHA-256 verified)` — fails on main's
-   hosted-backup workflow (the workflow that exists only on main and in the PR #194
-   lineage).
+This branch never carried the defect: its chain defines exactly one signature, and
+the guard fails the build if a second overload ever appears. The UPI-reference
+*requirement* was **not** ported: this branch's cashier UI does not collect a
+reference, so requiring one would turn every UPI settlement into a runtime error.
+The attempt is worth recording because the gate caught it immediately —
+`lib/db/readiness.integration.test.ts` failed with `UPI transaction reference is
+required.` and the migration was withdrawn rather than special-cased.
 
-This branch cannot repair main: it may not switch branches, push to `main`, or open
-a PR. The guard added here (`supabase/checks/09_rpc_overloads.sql`) makes cause 1
-impossible to merge unnoticed in any branch that replays migrations.
+Merge impact (recorded, not acted on — merging is out of scope): `main` has 8
+migrations this branch lacks, this branch has 23 `main` lacks, and the version
+prefix `20261122000100` is used by two different files. That renumbering is a merge
+decision.
+
+`main`'s one remaining red is `Disposable Supabase E2E and load` (run 44987998244):
+the `prepare-local-supabase` step emits no log and the Playwright JSON never appears
+(`ENOENT test-results/supabase-e2e/integration-results.json`) — an infrastructure
+failure before any assertion, in a workflow this branch does not run.
 
 ## D7 — deployment verified live (solved, read-only)
 
@@ -343,6 +340,7 @@ this branch's migrations are not applied to production (D3).
 1. **Owner authorization** to apply the 51-file batch to production (D3).
 2. **Owner authorization** for the hosted recovery rehearsal (D4) — the only route
    to DR READY.
-3. Repair of main's six jobs (D6), which needs branch/PR permission.
+3. A merge decision for `main`: 8 migrations it has, 23 it does not, and one
+   colliding version prefix (`20261122000100`).
 4. The B2 staging setup stays exactly as the owner reported it: accepted as done, not
    verified here (a 403 from this session would mean UNKNOWN, never "missing").

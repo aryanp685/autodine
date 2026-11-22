@@ -286,3 +286,36 @@ Evidence: `test:dr` 230/230 · `test:backup` ALL CHECKS PASS (15) · logical res
 63 policies / 236 functions · cold recovery 123 migrations / 68 tables ·
 `test:db:local` PASS · integration 299/1 · embedded 281/3 · vitest 2,614/309 ·
 lint 0 · tsc clean · `verify:release` 47/47 · `migrations:verify` 123/123.
+
+## 15. D6 is fixed upstream; what is left is a merge, not a bug
+
+Checked on 2026-11-21 at `main` = `3b1ca5b` (read-only):
+
+- **`main`'s CI is green.** Five of its six workflows now pass. The duplicate
+  `record_counter_payment` was fixed in `20261121000200_upi_ref_at_mark_paid` +
+  `20261122000100_single_counter_payment_function`: the five-argument function is
+  dropped and the six-argument one takes `p_upi_ref text default null`, so both
+  call shapes resolve to a single function. The guard added here
+  (`supabase/checks/09_rpc_overloads.sql`) now protects both lineages.
+- **This branch never had the defect.** Its chain defines one signature
+  (`record_counter_payment(text, uuid, text, bigint, uuid)`); `migrations:verify`
+  and the overload check both pass. Deliberately **not** ported: the UPI-reference
+  requirement, because this branch's cashier UI does not collect a reference, so
+  requiring one would turn every UPI settlement into a runtime error. That is a
+  product change that arrives with main's UI at merge. (A same-day attempt to port
+  it was reverted after the readiness suite failed with
+  `UPI transaction reference is required.` — the gate did its job.)
+- **The merge is not free.** Divergence at this head: `main` has 8 migrations this
+  branch does not (`20261118002300`, `20261119000200/00300/00400`,
+  `20261121000100/00200`, `20261122000100/00200`); this branch has 23 `main` does
+  not (the GST/IRP block and the D1 QR fixes). Two of them **collide on the version
+  prefix** `20261122000100` (`announcement_claim_recovery` here,
+  `single_counter_payment_function` there). A merge must renumber one of them and
+  re-run the whole chain; it is a merge decision, not something to guess at.
+- **`main`'s one remaining red** is `Disposable Supabase E2E and load`
+  (run 44987998244), which fails before any test runs: the `prepare-local-supabase`
+  step produced no log and no Playwright JSON
+  (`ENOENT test-results/supabase-e2e/integration-results.json`). It is a runner/Docker
+  infrastructure failure, not a code assertion, and that workflow does not run on
+  this branch.
+
