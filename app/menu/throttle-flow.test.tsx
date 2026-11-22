@@ -70,9 +70,18 @@ vi.mock('@/lib/supabase/env', () => ({
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: async () => ({
-    rpc: async (name: string, params: Record<string, unknown>) => {
+    /* The real rpc() is a synchronous thenable builder, not an async function.
+       readPublicRestaurant chains .maybeSingle() onto it without awaiting. */
+    rpc: (name: string, params: Record<string, unknown>) => {
       mocks.calls.push({ name, params });
-      return mocks.rpc(name, params);
+      const result = Promise.resolve(mocks.rpc(name, params));
+      const builder = {
+        then: (onFulfilled?: ((value: unknown) => unknown) | null, onRejected?: ((reason: unknown) => unknown) | null) =>
+          result.then(onFulfilled, onRejected),
+        maybeSingle: async () => result,
+        single: async () => result,
+      };
+      return builder;
     },
   }),
 }));
@@ -90,6 +99,12 @@ vi.mock('next/navigation', () => ({
 /* The screen under test draws its cart from a provider that needs a browser.
    A passthrough provider plus an empty cart keeps the markup of the page itself
    honest while leaving the guest with nothing in the cart to render. */
+/* The JSON-LD component is async (it awaits siteOrigin()); renderToStaticMarkup
+   cannot host async children and this suite is about the throttle, not ld+json. */
+vi.mock('@/components/StructuredData', () => ({
+  default: () => null,
+}));
+
 vi.mock('@/components/CartProvider', () => ({
   CartProvider: ({ children }: { children: React.ReactNode }) => children,
   useCart: () => ({
@@ -468,10 +483,14 @@ describe('an order the guest already has', () => {
     expect(attempts[0]).toBe('9f4b6c1e-2d3a-4b5c-8d7e-0a1b2c3d4e5f');
     expect(attempts[1]).toBe(attempts[0]);
 
-    // Both presses open the SAME order, with the same private token.
+    // Both presses open the SAME order, with the same private token. The
+    // token no longer rides in the URL: the action sets it as an httpOnly
+    // cookie, and the order screen reads it there (a URL token leaks via
+    // browser history, logs and referrers).
     expect(second).toBe(first);
     expect(first).toContain('code=A-1042');
-    expect(first).toContain('t=9f4b6c1e-2d3a-4b5c-8d7e-0a1b2c3d4e5f');
+    expect(first).not.toContain('t=9f4b6c1e-2d3a-4b5c-8d7e-0a1b2c3d4e5f');
+    expect(mocks.jar.get('autodine_guest_token')).toBe('9f4b6c1e-2d3a-4b5c-8d7e-0a1b2c3d4e5f');
   });
 
   it('is left alone by a throttled scan — nothing is written over it', async () => {

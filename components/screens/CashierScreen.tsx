@@ -598,7 +598,7 @@ export function Cashier({
                             autoComplete="off"
                             spellCheck={false}
                           />
-                          <p className="mt-1 text-[11px] leading-[1.4] text-gink-46">
+                          <p className="mt-1 text-[11.5px] leading-[1.4] text-gink-46">
                             Required when paying by UPI — used to match this settlement to the
                             guest&rsquo;s app transaction.
                           </p>

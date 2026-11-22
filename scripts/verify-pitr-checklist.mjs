@@ -4,7 +4,8 @@
  *
  * Two modes:
  *   --template        print the evidence template the owner/operator fills in
- *                     during the P1–P6 procedure (docs/pitr-verification-procedure-2026-11-14.md)
+ *                     during the P1–P6 procedure (the procedure doc was removed in the
+ *                     2026-11-21 cleanup; see docs/backup-restore-runbook.md)
  *   --check <file>    validate a filled-in evidence file. Exits 1 and names every
  *                     failing field; exits 0 with a PASS summary when every
  *                     checkpoint required for the "backup gate met" claim is present.
@@ -129,7 +130,7 @@ if (isObj(p2)) {
   ok(typeof p2.backup_owner === 'string' && p2.backup_owner.trim().length > 1, 'p2.backup_owner', 'a named human, or the waiver signatory');
   ok(typeof p2.alert_route === 'string' && p2.alert_route.trim().length > 3, 'p2.alert_route', 'record where the alert is routed');
   ok(isIso(p2.written_at), 'p2.written_at', 'must be an ISO-8601 timestamp');
-  if (p2.decision === 'written_waiver') notes.push('p2 is a written waiver — the backup gate is explicitly NOT met by design; see docs/pitr-verification-procedure-2026-11-14.md Part 6.');
+  if (p2.decision === 'written_waiver') notes.push('p2 is a written waiver — the backup gate is explicitly NOT met by design; see docs/backup-restore-runbook.md.');
 }
 
 // ---- P3: restore verified on disposable infrastructure ------------------------

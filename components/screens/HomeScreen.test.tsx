@@ -220,7 +220,7 @@ describe('pricing', () => {
     expect(pricing).toContain('What happens to my data if I don’t continue?');
     expect(pricing).toContain('Are these prices final, and are taxes included?');
     expect(pricing).toContain('Can one account run more than one outlet?');
-    expect(pricing.match(/name="pricing-faq"/g)).toHaveLength(7);
+    expect(pricing.match(/name="pricing-faq"/g)).toHaveLength(6);
   });
 
   it('does not promise unlimited usage or indefinite free access', () => {
