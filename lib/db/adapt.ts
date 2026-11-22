@@ -44,6 +44,8 @@ export type DisplayItem = {
   price: number;
   category: string;
   veg: boolean | null;
+  jain: boolean | null;
+  allergens: string[] | null;
   available: boolean;
   img?: string;
   badge?: string;
@@ -135,6 +137,8 @@ export function toDisplayItem(item: MenuItem): DisplayItem {
     // the screen's own catch-all id, so it lands there instead of vanishing.
     category: item.category_id ?? 'all',
     veg: item.is_veg,
+    jain: item.is_jain,
+    allergens: item.allergens ?? null,
     available: item.is_available,
     ...(item.image_url ? { img: item.image_url } : {}),
     ...(item.translations ? { translations: item.translations } : {}),

@@ -111,6 +111,8 @@ export function demoMenu(slug: string): RestaurantMenu {
     description: it.desc ?? null,
     price_paise: rupeesToPaise(it.price),
     is_veg: it.veg,
+    is_jain: null,
+    allergens: null,
     is_available: it.available,
     image_url: it.img ?? null,
     sort_order: i,

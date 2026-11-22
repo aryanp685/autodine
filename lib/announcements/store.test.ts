@@ -4,6 +4,7 @@ import {
   eventToVoiceText,
   filterUnseenEvents,
   updateSeenWithEvents,
+  releaseSeenEvent,
   addNotifications,
   measureLatencyMs,
   isStaleClaim,
@@ -138,6 +139,15 @@ describe('announcements store — strict scope lock', () => {
       const again = updateSeenWithEvents(seen, [e1, e2]);
       expect(again.orderIds.length).toBe(1);
       expect(again.waiterCallIds.length).toBe(1);
+    });
+  });
+
+  describe('releaseSeenEvent — a failed claim is retried, not lost', () => {
+    it('removes only the released event so the next poll sees it as unseen', () => {
+      const seen = updateSeenWithEvents({ orderIds: [], waiterCallIds: [] }, [orderEvent({ orderId: 'o1' }), orderEvent({ orderId: 'o2' }), waiterEvent({ callId: 'w1' })]);
+      const released = releaseSeenEvent(releaseSeenEvent(seen, orderEvent({ orderId: 'o1' })), waiterEvent({ callId: 'w1' }));
+      expect(released).toEqual({ orderIds: ['o2'], waiterCallIds: [] });
+      expect(filterUnseenEvents([orderEvent({ orderId: 'o1' }), orderEvent({ orderId: 'o2' })], released).map((e) => e.kind === 'order' && e.orderId)).toEqual(['o1']);
     });
   });
 

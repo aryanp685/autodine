@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { headers } from 'next/headers';
+import StructuredData from '@/components/StructuredData';
+import { Analytics } from '@/components/Analytics';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -53,8 +55,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // script still runs, the policy simply is not being enforced on that path.
   const nonce = (await headers()).get('x-nonce') ?? undefined;
   return (
-    <html lang="en">
+    // The inline script above adds .motion before hydration. React must not
+    // treat that intentional pre-hydration class as a mismatch and throw the
+    // server tree away.
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <StructuredData nonce={nonce} />
         {/*
           Marks the document as "animation is safe to prepare for" before the
           first paint.
@@ -93,6 +99,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             so it belongs to the page that knows which restaurant this is --
             see the /menu routes. */}
         <div data-app>{children}</div>
+        {/* Privacy-conscious page-view tracking (path only). No-op unless demo mode. */}
+        <Analytics />
       </body>
     </html>
   );

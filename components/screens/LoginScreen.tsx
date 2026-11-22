@@ -19,12 +19,12 @@ export function LoginScreen({ error, notice, next }: { error?: string; notice?: 
       visual={
         <aside className="hidden pt-2 lg:block" aria-label="Restaurant workspace overview">
           <p className="flex items-center gap-2.5 text-[10.5px] font-semibold uppercase tracking-[0.18em] text-forest">
-            <span aria-hidden="true" className="h-px w-6 bg-[#b98a4b]" />
+            <span aria-hidden="true" className="h-px w-6 bg-brass" />
             Back to your service
           </p>
           <h2 className="mt-6 max-w-[13ch] text-[clamp(2.5rem,4.5vw,3.8rem)] font-medium leading-[1.05] tracking-[-0.05em]">
             The room moves.<br />
-            <span className="text-forest">Stay connected.</span>
+            <span className="text-forest">Stay <em className="font-display font-normal italic">connected.</em></span>
           </h2>
           <p className="mt-6 max-w-[35ch] text-[15px] leading-[1.7] text-gink-64">
             Your menu, kitchen tickets and counter, with a place for every part of service.
@@ -38,7 +38,7 @@ export function LoginScreen({ error, notice, next }: { error?: string; notice?: 
             <div className="relative flex items-center justify-between">
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gink-46">Live service</p>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-forest-soft px-2.5 py-1 text-[10px] font-medium text-forest">
-                <span aria-hidden="true" className="size-1.5 rounded-full bg-forest" />
+                <span aria-hidden="true" className="auth-live-dot size-1.5 rounded-full bg-forest" />
                 One order
               </span>
             </div>
@@ -46,10 +46,10 @@ export function LoginScreen({ error, notice, next }: { error?: string; notice?: 
             <ol className="relative mt-4 space-y-2.5">
               {[
                 { n: '01', place: 'Table 05', state: 'Order sent', detail: '2 dishes · one guest note', accent: 'bg-forest' },
-                { n: '02', place: 'Kitchen', state: 'Preparing', detail: 'Table 05 · no app to install', accent: 'bg-[#b98a4b]' },
+                { n: '02', place: 'Kitchen', state: 'Preparing', detail: 'Table 05 · no app to install', accent: 'bg-brass' },
                 { n: '03', place: 'Counter', state: 'Awaiting payment', detail: 'Check, then record at the counter', accent: 'bg-gink-28' },
               ].map((row) => (
-                <li key={row.place} className="flex items-center gap-3 rounded-2xl border border-hair/80 bg-white/80 px-3.5 py-3">
+                <li key={row.place} className="flex items-center gap-3 rounded-2xl border border-hair/80 bg-white/80 px-3.5 py-3 transition-colors duration-300 hover:border-forest/20 hover:bg-white">
                   <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${row.accent}`} />
                   <span className="min-w-0 flex-1">
                     <span className="block text-[12.5px] font-medium text-gink">{row.place}</span>
@@ -73,7 +73,7 @@ export function LoginScreen({ error, notice, next }: { error?: string; notice?: 
       }
       notesTitle="Before you sign in"
       eyebrow="Welcome back"
-      title="Sign in to your restaurant"
+      title={<>Sign in to your <em className="font-display font-normal italic text-forest">restaurant</em></>}
       lede="Use the email address you signed up with."
       action={{ prompt: 'New to AutoDine?', label: 'Create an account', href: '/signup' }}
       notes={[

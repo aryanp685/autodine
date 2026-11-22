@@ -144,9 +144,6 @@ body {
   font-variant-ligatures: contextual;
 }
 
-h1, h2, h3, h4, h5 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
-p { margin: 0; }
-
 /* ------------------------------------------------------- animation staging
 
    Hidden only while .motion is present, which the inline script in
@@ -177,6 +174,12 @@ p { margin: 0; }
  * assumes happens.
  */
 @layer base {
+  /* Element resets that a utility must be able to override. Kept here for the
+     same reason the comment below records: unlayered beats layered no matter
+     the specificity, so a loose `p { margin: 0 }` silently killed every
+     `mt-*` on a paragraph in the landing page. */
+  h1, h2, h3, h4, h5 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
+  p { margin: 0; }
   a { color: inherit; text-decoration: none; }
   ul, ol { margin: 0; padding: 0; list-style: none; }
   /* THE BUTTON RESET IS FOUR PROPERTIES AND ONE OF THEM WAS MISSING.
@@ -1272,6 +1275,14 @@ p { margin: 0; }
   --font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto,
     'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
 
+  /* The editorial voice of the public pages. No download: the serif is the
+     one the operating system already has, and the stack is ordered so macOS
+     gets Iowan Old Style, Windows gets Palatino/Georgia, everything else
+     falls back to the platform serif. Used in italic for the one accented
+     word in a headline -- never for body text. */
+  --font-display: 'Iowan Old Style', 'Palatino Linotype', Palatino,
+    'Book Antiqua', 'New York', Georgia, ui-serif, serif;
+
   --radius-card: 18px;
   --radius-panel: 24px;
 }
@@ -1312,9 +1323,8 @@ p { margin: 0; }
   --color-rail-ink-40: var(--p-rail-ink-40);
   --color-rail-line: var(--p-rail-line);
 
-  /* Saffron's quieter sibling. One use in the product: the brand mark on the
-     dark rail, where the brand green has no contrast at all. */
-  --color-brass: var(--p-brass);
+  /* The rail's own brand dot reads `var(--p-brass)` directly (DashboardBar),
+     so the public brass token above is left intact. */
   --color-accent-wash: var(--p-accent-wash);
 
   --color-hair: var(--p-line);
@@ -1364,6 +1374,150 @@ p { margin: 0; }
   to { opacity: 1; transform: none; }
 }
 
+/* Staff page arrival (components/owner/PageMotion.tsx adds .pm-enter after
+ * mount, so a page whose JavaScript never ran is simply visible). CSS, not
+ * inline styles, because React streams and hydrates the page in segments: an
+ * effect writing a transform onto a child that had not hydrated yet showed up
+ * as a hydration mismatch on every dashboard route. A child transform is safe
+ * here -- these steps live inside the content column, never a fixed bar. */
+@keyframes pm-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pm-enter > * { animation: pm-rise 320ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards; }
+  .pm-enter > *:nth-child(2) { animation-delay: 38ms; }
+  .pm-enter > *:nth-child(3) { animation-delay: 76ms; }
+  .pm-enter > *:nth-child(4) { animation-delay: 114ms; }
+  .pm-enter > *:nth-child(5) { animation-delay: 152ms; }
+  /* Past six steps everything shares the sixth's delay: a 12-card floor is
+   * not a queue. */
+  .pm-enter > *:nth-child(n + 6) { animation-delay: 190ms; }
+}
+
+/* ---------------------------------------------------------------- public
+   The landing's own polish, kept to four primitives so the page stays
+   Tailwind-first. Colours come from the tokens; nothing here writes a hex. */
+
+/* How much of the page has been read. Decoration only: drawn by SiteMotion
+   and invisible when JavaScript never runs (scaleX(0)). */
+.page-progress {
+  position: fixed;
+  inset-inline: 0;
+  top: 0;
+  z-index: 60;
+  height: 2px;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, var(--color-forest), var(--color-brass));
+  pointer-events: none;
+}
+
+/* The hero composition leans a few degrees towards the pointer. The angle is
+   written to two custom properties by HeroVisualMotion; with reduced motion
+   the transform is dropped entirely and the still is the whole experience. */
+.hero-tilt {
+  transform: perspective(1200px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+  transform-style: preserve-3d;
+  transition: transform 600ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-tilt { transform: none; transition: none; }
+}
+
+/* A hairline that draws itself when its heading enters. */
+.rule-draw {
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, var(--color-forest), var(--color-brass));
+}
+
+/* Anchor navigation glides instead of jumping. Programmatic scrolling and
+   in-page links only; nothing about the layout moves because of this. */
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+
+/* The serif italic accent word in a headline keeps a brass underline that
+   draws itself once the line has landed. Decorative only -- the word is
+   already legible before the underline exists. */
+.hero-accent {
+  background-image: linear-gradient(90deg, var(--color-brass), transparent);
+  background-repeat: no-repeat;
+  /* The serif inline box is taller than the masked headline line, so the rule
+     sits at 78% -- just under the baseline -- rather than at the box bottom,
+     where the line mask would clip it. */
+  background-position: 0 78%;
+  background-size: 100% 2px;
+  padding-bottom: 0.05em;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero-accent {
+    background-size: 0% 2px;
+    animation: hero-accent-in 1.1s cubic-bezier(0.22, 1, 0.36, 1) 1s forwards;
+  }
+  @keyframes hero-accent-in {
+    to { background-size: 100% 2px; }
+  }
+}
+
+/* The quiet "scroll" cue under the hero copy: a hairline that keeps drawing
+   itself downwards. Hidden for reduced motion, where a still line remains. */
+.scroll-cue-line {
+  display: block;
+  width: 1px;
+  height: 38px;
+  transform-origin: 50% 0;
+  background: linear-gradient(to bottom, var(--color-forest), transparent);
+  opacity: 0.55;
+}
+/* The service loop pins at desktop widths and carries one ticket between the
+   three stations. `is-live` is only added by SiteMotion at 1024px and above,
+   so a phone, reduced motion or a missing script keeps the same content in
+   normal flow: the ticket sits above the stations and nothing is hidden. */
+.loop.is-live {
+  height: 240vh;
+}
+.loop.is-live .loop-stage {
+  position: sticky;
+  top: 0;
+  display: flex;
+  min-height: 100dvh;
+  align-items: center;
+  padding-block: 2.5rem;
+}
+.loop.is-live .loop-grid {
+  padding-top: 12.5rem;
+}
+.loop.is-live .loop-ticket {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
+}
+.loop-station {
+  transition: opacity 400ms ease, border-color 400ms ease, background-color 400ms ease;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .loop.is-live .loop-station {
+    opacity: 0.45;
+  }
+  .loop.is-live .loop-station.is-on {
+    opacity: 1;
+    border-color: color-mix(in oklab, white 38%, transparent);
+    background-color: color-mix(in oklab, white 10%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .scroll-cue-line { animation: scroll-cue 2.6s ease-in-out infinite; }
+  @keyframes scroll-cue {
+    0% { transform: scaleY(0.15); opacity: 0; }
+    35% { opacity: 0.7; }
+    100% { transform: scaleY(1); opacity: 0; }
+  }
+}
+
 /* Public landing: tactile controls and a gentle, independent phone drift.
    Content remains visible without JavaScript; motion is opt-in by OS setting. */
 .public-landing section[id] { scroll-margin-top: 5.5rem; }
@@ -1379,11 +1533,6 @@ p { margin: 0; }
   .public-landing a:active, .public-landing button:active { transform: translateY(1px) scale(0.98); }
   .public-landing .public-card { transition: transform 300ms ease, box-shadow 300ms ease; }
   .public-landing .public-card:hover { transform: translateY(-5px); box-shadow: var(--p-shadow-2); }
-  .public-landing [data-phone-float] { animation: public-phone-drift 7s ease-in-out infinite; }
-  @keyframes public-phone-drift {
-    0%, 100% { transform: translateY(0) rotate(-1deg); }
-    50% { transform: translateY(-10px) rotate(1deg); }
-  }
 }
 
 /* Only signed-out account pages inherit the landing palette. Staff screens
@@ -1418,4 +1567,81 @@ p { margin: 0; }
   }
   [data-auth-shell] button[type='submit']:hover { transform: translateY(-1px); }
   [data-auth-shell] button[type='submit']:active { transform: translateY(1px); }
+}
+
+/* The account columns rise into place. Content is visible by default; only
+   visitors who allow motion get the entrance, so a reduced-motion or
+   JS-less visit can never leave the card hidden at opacity 0. */
+@media (prefers-reduced-motion: no-preference) {
+  .auth-rise { animation: auth-rise-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .auth-rise-delay { animation-delay: 70ms; }
+  @keyframes auth-rise-in {
+    from { opacity: 0; transform: translateY(18px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+/* Account pages: a 3px read-only progress hairline while a form is submitting,
+   plus a sheen inside the submit button. Both are decoration -- the button's
+   disabled state and aria-busy carry the actual meaning. */
+.auth-pending-bar {
+  position: fixed;
+  inset-inline: 0;
+  top: 0;
+  z-index: 80;
+  height: 3px;
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, var(--color-forest), var(--color-brass));
+  pointer-events: none;
+}
+.auth-sheen {
+  display: none;
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 38%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, white 22%, transparent),
+    transparent
+  );
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .auth-pending-bar { animation: auth-pending 1.15s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+  @keyframes auth-pending {
+    0% { transform: scaleX(0); opacity: 1; }
+    55% { transform: scaleX(0.82); opacity: 1; }
+    100% { transform: scaleX(1); opacity: 0; }
+  }
+  .auth-sheen {
+    display: block;
+    animation: auth-sheen 1.35s ease-in-out infinite;
+  }
+  @keyframes auth-sheen {
+    from { transform: translateX(-120%); }
+    to { transform: translateX(320%); }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-pending-bar { transform: scaleX(1); opacity: 0.7; }
+}
+
+/* A quiet status pulse for the live-service board on the sign-in visual. */
+.auth-live-dot { position: relative; }
+.auth-live-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: var(--color-forest);
+  opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .auth-live-dot::after { animation: auth-live-pulse 2.6s ease-out infinite; }
+  @keyframes auth-live-pulse {
+    0% { transform: scale(1); opacity: 0.35; }
+    70%, 100% { transform: scale(2.8); opacity: 0; }
+  }
 }

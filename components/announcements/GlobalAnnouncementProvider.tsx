@@ -34,6 +34,7 @@ import {
   eventToVoiceText,
   filterUnseenEvents,
   updateSeenWithEvents,
+  releaseSeenEvent,
   addNotifications,
   measureLatencyMs,
 } from '@/lib/announcements/store';
@@ -524,11 +525,12 @@ export function GlobalAnnouncementProvider({
         if (data.restaurantId !== restaurantId) return;
 
         const events = data.events ?? [];
-        if (events.length === 0) return;
 
-        // Prime on first load: mark all existing as seen, do NOT announce history
+        // Prime on first load: mark all existing as seen, do NOT announce history.
+        // An empty first poll still primes, so the first real arrival is announced.
         if (!primedRef.current) {
           primedRef.current = true;
+          if (events.length === 0) return;
           // All current events are "existing" — mark as seen without announcing
           // But allow very recent orders (last 2 minutes) to be announced if not yet seen
           // Actually: strict prime = mark all as seen silently, to avoid burst on provider mount
@@ -547,6 +549,12 @@ export function GlobalAnnouncementProvider({
         const reservedSeen = updateSeenWithEvents(seenRef.current, unseen);
         seenRef.current = reservedSeen;
         writeSeen(restaurantId, reservedSeen);
+        // A claim that errored (network/auth) is released so the next poll retries it.
+        const releaseReservation = (event: AnnouncementEvent) => {
+          const next = releaseSeenEvent(seenRef.current, event);
+          seenRef.current = next;
+          writeSeen(restaurantId, next);
+        };
 
         const receivedAt = new Date().toISOString();
         const lang = settingsRef.current.lang;
@@ -578,7 +586,8 @@ export function GlobalAnnouncementProvider({
               const result = await claimKitchenOrderAnnouncementAction(event.orderId);
               claimed = result.ok && result.claimed;
               if (!result.ok) {
-                // Claim failed (network/auth) → written notification still exists, voice skipped
+                // Claim failed (network/auth) → written notification still exists; retry next poll
+                releaseReservation(event);
                 continue;
               }
               if (!claimed) {
@@ -589,9 +598,14 @@ export function GlobalAnnouncementProvider({
             } else {
               const result = await claimTableWaiterCallAnnouncementAction(event.callId);
               claimed = result.ok && result.claimed;
-              if (!result.ok || !claimed) continue;
+              if (!result.ok) {
+                releaseReservation(event);
+                continue;
+              }
+              if (!claimed) continue;
             }
           } catch {
+            releaseReservation(event);
             // Network error during claim → written preserved, voice skipped for this poll
             // Will remain as 'pending' and be recovered by another device or next poll after recovery timeout
             continue;

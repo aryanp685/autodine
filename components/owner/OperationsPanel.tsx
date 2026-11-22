@@ -48,7 +48,7 @@ type Telemetry = { email: ChannelCounters; alert: ChannelCounters };
 const SEVERITY_TONE = { info: 'neutral', warning: 'work', critical: 'due' } as const;
 const STATE_TONE = { open: 'due', acknowledged: 'work', resolved: 'neutral' } as const;
 
-async function post(body: Record<string, unknown>): Promise<{ ok: boolean; payload: Record<string, unknown> | null }> {
+async function post(body: Record<string, unknown>): Promise<{ ok: boolean; status: number; payload: Record<string, unknown> | null }> {
   try {
     const response = await fetch('/api/ops/incidents', {
       method: 'POST',
@@ -56,9 +56,9 @@ async function post(body: Record<string, unknown>): Promise<{ ok: boolean; paylo
       body: JSON.stringify(body),
     });
     const payload = (await response.json().catch(() => null)) as Record<string, unknown> | null;
-    return { ok: response.ok, payload };
+    return { ok: response.ok, status: response.status, payload };
   } catch {
-    return { ok: false, payload: null };
+    return { ok: false, status: 0, payload: null };
   }
 }
 
@@ -120,17 +120,27 @@ function TwoStepButton({
   );
 }
 
-export function OperationsPanel() {
-  const [incidents, setIncidents] = useState<Incident[] | null>(null);
+export function OperationsPanel({ disabled = false }: { disabled?: boolean }) {
+  const [incidents, setIncidents] = useState<Incident[] | null>(disabled ? [] : null);
   const [telemetry, setTelemetry] = useState<Telemetry | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [unavailable, setUnavailable] = useState(disabled);
   const [delivery, setDelivery] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
   const load = useCallback(async () => {
-    const { ok, payload } = await post({ action: 'list' });
+    const { ok, status, payload } = await post({ action: 'list' });
     if (!ok) {
+      // 503 is the route saying monitoring is not configured here (demo,
+      // preview or no Supabase) -- a fact, not a failure of this panel.
+      if (status === 503) {
+        setUnavailable(true);
+        setIncidents([]);
+        setError(null);
+        setNow(Date.now());
+        return;
+      }
       setError(
         payload && typeof payload.error === 'string'
           ? payload.error
@@ -145,15 +155,19 @@ export function OperationsPanel() {
     if (rawTelemetry && rawTelemetry.email && rawTelemetry.alert) {
       setTelemetry(rawTelemetry);
     }
+    setUnavailable(false);
     setError(null);
     setNow(Date.now());
   }, []);
 
   useEffect(() => {
+    // Disabled means the page already knows there is no database behind this
+    // instance; a request would only produce a 503 in the console.
+    if (disabled) return;
     void load();
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
     return () => window.clearInterval(timer);
-  }, [load]);
+  }, [load, disabled]);
 
   const act = useCallback(
     async (action: 'acknowledge' | 'resolve' | 'escalate', incidentId: string) => {
@@ -185,7 +199,13 @@ export function OperationsPanel() {
   return (
     <Panel
       title="Operations"
-      meta={incidents === null ? 'Loading…' : `${live.length} open on this instance`}
+      meta={
+        incidents === null
+          ? 'Loading…'
+          : unavailable
+            ? 'Not available here'
+            : `${live.length} open on this instance`
+      }
       bodyClassName="px-5 py-4"
     >
       {error ? <Notice tone="due" label="Something did not work.">{error}</Notice> : null}
@@ -209,7 +229,14 @@ export function OperationsPanel() {
         </div>
       ) : null}
 
-      {incidents !== null && live.length === 0 && !error ? (
+      {unavailable ? (
+        <p className="text-[13px] leading-[1.55] text-gink-64">
+          Live incidents are not available in this environment. The structured log remains the
+          durable record, and this panel makes no claim either way about current health.
+        </p>
+      ) : null}
+
+      {incidents !== null && live.length === 0 && !error && !unavailable ? (
         <p className="text-[13px] leading-[1.55] text-gink-64">
           Nothing is open right now. Failures that the app can see — a degraded kitchen channel, a
           failed health probe — appear here with a button to acknowledge or resolve them, and stay
@@ -273,13 +300,15 @@ export function OperationsPanel() {
           This instance only; other instances report to the same logs. Nothing here is sent anywhere
           unless an alert webhook is configured.
         </p>
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="shrink-0 text-[12.5px] font-medium text-gink-64 underline underline-offset-2 hover:text-gink"
-        >
-          Refresh
-        </button>
+        {disabled ? null : (
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="shrink-0 text-[12.5px] font-medium text-gink-64 underline underline-offset-2 hover:text-gink"
+          >
+            Refresh
+          </button>
+        )}
       </div>
     </Panel>
   );

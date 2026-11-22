@@ -176,12 +176,13 @@ export function AuthField({
 
 /** A short, honest confirmation that the form is working, not stuck. */
 export function AuthSpinner() {
+  const reduce = useReducedMotion();
   return (
     <motion.span
       aria-hidden="true"
       className="inline-block size-3.5 rounded-full border-2 border-white/35 border-t-white"
-      animate={{ rotate: 360 }}
-      transition={{ duration: 0.9, ease: 'linear', repeat: Infinity }}
+      animate={reduce ? undefined : { rotate: 360 }}
+      transition={reduce ? undefined : { duration: 0.9, ease: 'linear', repeat: Infinity }}
     />
   );
 }

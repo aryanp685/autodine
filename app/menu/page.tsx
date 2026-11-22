@@ -9,7 +9,10 @@ import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { getMenuScreenData } from '@/lib/db/menu-screen';
 import { getStorefrontStatusBySlug } from '@/lib/db/storefront-status';
 import { loadTableAccess, verifyAgainHref } from '@/lib/table-access';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { readPublicRestaurant } from '@/lib/db/public-restaurant';
+import StructuredData from '@/components/StructuredData';
 import {
   THROTTLE_COOKIE,
   THROTTLE_PARAM,
@@ -53,6 +56,9 @@ export default async function CustomerMenuPage({
 }) {
   const params = await searchParams;
   const { s, m } = params;
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
+  const client = await createSupabaseServerClient();
+  const profile = client && s ? (await readPublicRestaurant(client, s)).data : null;
   // The parameter name is single-sourced with the handler that writes it.
   const v = params[THROTTLE_PARAM];
 
@@ -123,6 +129,7 @@ export default async function CustomerMenuPage({
   // The cart is keyed by restaurant, so it is mounted where the slug is known.
   return (
     <CartProvider slug={s}>
+      <StructuredData restaurant={profile} nonce={nonce} />
       <CustomerMenu
         data={data ? { ...data, table } : undefined}
         throttleNotice={throttle.throttled ? throttleNotice(throttle.retryAfterSeconds) : null}

@@ -37,6 +37,8 @@ function item(overrides: Partial<MenuItem> = {}): MenuItem {
     description: 'Charred cottage cheese',
     price_paise: 34900,
     is_veg: true,
+    is_jain: null,
+    allergens: null,
     is_available: true,
     image_url: null,
     sort_order: 0,

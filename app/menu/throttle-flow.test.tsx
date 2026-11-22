@@ -70,12 +70,17 @@ vi.mock('@/lib/supabase/env', () => ({
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: async () => ({
-    rpc: async (name: string, params: Record<string, unknown>) => {
+    rpc: (name: string, params: Record<string, unknown>) => {
       mocks.calls.push({ name, params });
-      return mocks.rpc(name, params);
+      const answer = Promise.resolve(mocks.rpc(name, params));
+      return Object.assign(answer, { maybeSingle: () => answer });
     },
   }),
 }));
+
+/* An async Server Component: renderToStaticMarkup cannot render it, and it is
+   SEO metadata, not part of the throttle contract under test. */
+vi.mock('@/components/StructuredData', () => ({ default: () => null }));
 
 vi.mock('next/navigation', () => ({
   // Next unwinds a redirect by throwing; the same shape keeps the flow intact.
@@ -471,7 +476,8 @@ describe('an order the guest already has', () => {
     // Both presses open the SAME order, with the same private token.
     expect(second).toBe(first);
     expect(first).toContain('code=A-1042');
-    expect(first).toContain('t=9f4b6c1e-2d3a-4b5c-8d7e-0a1b2c3d4e5f');
+    expect(first).not.toContain('t=');
+    expect(mocks.jar.get('autodine_guest_token')).toBe('9f4b6c1e-2d3a-4b5c-8d7e-0a1b2c3d4e5f');
   });
 
   it('is left alone by a throttled scan — nothing is written over it', async () => {

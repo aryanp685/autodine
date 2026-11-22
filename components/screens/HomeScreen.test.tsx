@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Home } from './HomeScreen';
 import { PricingScreen } from './PricingScreen';
-import { LIVE, NOT_CONNECTED } from '@/lib/plans';
+import { BILLING, LIVE, NOT_CONNECTED, PLANS } from '@/lib/plans';
 import { TRIAL_DAYS } from '@/lib/trial';
 
 /**
@@ -30,13 +30,13 @@ describe('home', () => {
   it('shows the product instead, as three real screens', () => {
     expect(home).toContain('data-tour-panel');
     expect(home.match(/data-tour-panel/g)?.length).toBe(3);
-    expect(home).toContain('Three screens, in service order.');
+    expect(home).toMatch(/Three screens, in\s*<em[^>]*>service order\.<\/em>/);
   });
 
   it('gives the problem section a named landmark and three readable cards', () => {
     const section = home.match(/<section[^>]*id="why"[\s\S]*?<\/section>/)?.[0] ?? '';
     expect(section).toContain('aria-labelledby="problem-heading"');
-    expect(section).toContain('bg-[#FBFAF7]');
+    expect(section).toContain('bg-ink');
     expect(section.match(/<h3/g)).toHaveLength(3);
     expect(section).toContain('The menu is on paper');
     expect(section).toContain('Orders are carried, not sent');
@@ -65,6 +65,50 @@ describe('home', () => {
     expect(section).toContain('motion-safe:hover:');
     expect(section).not.toContain('instantly');
     expect(section).not.toContain('text-plum');
+  });
+
+  it('tells one illustrative order’s hand-off without depending on the pin', () => {
+    const section =
+      home.match(/<section[^>]*aria-labelledby="loop-heading"[\s\S]*?<\/section>/)?.[0] ?? '';
+    expect(section).toContain('data-loop');
+    expect(section.match(/data-loop-station/g)).toHaveLength(3);
+    expect(section).toContain('data-loop-ticket');
+    expect(section).toContain('Illustrative order');
+    expect(section).toContain('AD-1042');
+    expect(section).toContain('Nothing is charged online.');
+    for (const status of ['Order sent', 'Preparing', 'Awaiting payment']) {
+      expect(section).toContain(status);
+    }
+    expect(section).not.toContain('<button');
+    expect(section).not.toContain('instantly');
+    expect(section).not.toContain('text-plum');
+  });
+
+  it('plays the sample menu in the hero as an honest, tappable preview', () => {
+    const section = home.match(/<section[^>]*data-hero[\s\S]*?<\/section>/)?.[0] ?? '';
+    expect(section).toContain('data-menu-demo');
+    expect(section).toContain('aria-label="Interactive preview of the guest menu"');
+    expect(section.match(/data-menu-dish/g)).toHaveLength(3);
+    expect(section).toContain('aria-pressed="true"');
+    expect(section).toContain('Paneer Tikka');
+    expect(section).toContain('Butter Chicken');
+    expect(section).toContain('Sample order');
+    expect(section).toContain('Interactive preview · sample dishes and prices');
+    expect(section).not.toMatch(/pay now|pay online|checkout/i);
+  });
+
+  it('earns trust with enforced facts instead of badges', () => {
+    const section = home.match(/<section[^>]*id="trust"[\s\S]*?<\/section>/)?.[0] ?? '';
+    expect(section).toContain('aria-labelledby="trust-heading"');
+    expect(section).toContain('Built for the counter');
+    expect(section.match(/data-trust-point/g)).toHaveLength(4);
+    expect(section).toContain('Nothing is charged online.');
+    expect(section).toContain('Row-level security');
+    expect(section).toContain('whole paise');
+    expect(section).toContain('No guest accounts');
+    expect(section).toContain('href="/privacy"');
+    expect(section).toContain('href="/terms"');
+    expect(section).not.toMatch(/certified|bank-grade|PCI|GDPR|DPDP|100%/i);
   });
 
   it('labels product mockups honestly and keeps decorative controls out of the tab order', () => {
@@ -105,11 +149,11 @@ describe('home', () => {
     expect(tail).not.toContain('Recommended');
     expect(tail).toContain('bg-forest text-white');
     expect(tail).toContain('Not connected');
-    expect(tail).toContain('bg-[#8C857A]');
+    expect(tail).toContain('bg-mute-dim');
     expect(tail).toContain('href="/privacy"');
     expect(tail).toContain('href="/terms"');
     expect(tail).not.toContain('ink="#f7f3ea"');
-    expect(home).toContain('data-phone-float');
+    expect(home).toContain('data-menu-demo');
     expect(home).toContain('rgba(251,250,247,0.24)');
   });
 
@@ -130,6 +174,14 @@ describe('home', () => {
     expect(home).toContain('href="/pricing#plan-professional"');
     expect(home).toContain('href="/pricing#plan-business"');
   });
+
+  it('indexes the sections once and marks only the forest bands as dark', () => {
+    expect(home.match(/data-section-rail/g)).toHaveLength(1);
+    for (const id of ['how', 'screens', 'product', 'trust', 'status', 'pricing']) {
+      expect(home).toContain(`href="#${id}"`);
+    }
+    expect(home.match(/data-rail-tone="dark"/g)).toHaveLength(2);
+  });
 });
 
 describe('pricing', () => {
@@ -146,6 +198,29 @@ describe('pricing', () => {
 
   it('marks every plan as not on sale', () => {
     expect(pricing.match(/Planned · not on sale/g)?.length).toBe(3);
+  });
+
+  it('compares the catalog the product enforces, not a second list', () => {
+    const start = pricing.indexOf('id="compare"');
+    const end = pricing.indexOf('aria-labelledby="included-heading"');
+    const section = pricing.slice(start, end);
+    expect(section).toContain('aria-labelledby="compare-heading"');
+    expect(section.match(/data-matrix-row/g)).toHaveLength(10);
+    for (const plan of PLANS) expect(section).toContain(`data-matrix-plan="${plan.id}"`);
+    expect(section).toContain('Outlets on one account');
+    expect(section).toContain('Unlimited');
+    expect(section).toContain('Not included');
+    expect(section).not.toContain('Recommended');
+    expect(section).toContain(`What the ${BILLING.trialDays} days look like`);
+    expect(section).toContain('Read-only, not deleted');
+    expect(section).not.toMatch(/Choose|Buy now/);
+  });
+
+  it('answers the questions a buyer actually asks', () => {
+    expect(pricing).toContain('What happens to my data if I don’t continue?');
+    expect(pricing).toContain('Are these prices final, and are taxes included?');
+    expect(pricing).toContain('Can one account run more than one outlet?');
+    expect(pricing.match(/name="pricing-faq"/g)).toHaveLength(6);
   });
 
   it('does not promise unlimited usage or indefinite free access', () => {

@@ -16,7 +16,7 @@ const { notifyIncident } = vi.hoisted(() => ({
 vi.mock('@/lib/incident-notify', () => ({ notifyIncident }));
 
 import { POST } from './route';
-import { realtimeIncidents } from '@/lib/incident-registry';
+import { operationalIncidents, realtimeIncidents } from '@/lib/incident-registry';
 
 const request = (body: unknown, headers: Record<string, string> = {}) =>
   new Request('http://localhost/api/ops/incidents', {
@@ -112,6 +112,30 @@ describe('POST /api/ops/incidents', () => {
     const found = body.incidents.find((incident: { incidentId: string }) => incident.incidentId === record.incidentId);
     expect(found).toBeDefined();
     expect(JSON.stringify(body)).not.toContain('synthetic-tenant');
+  });
+
+  it('lists operational incidents next to realtime ones, and can acknowledge them', async () => {
+    const { record } = operationalIncidents.report({
+      key: `test-ops-${Date.now()}`,
+      kind: 'staff_invitation_email_failed',
+      severity: 'warning',
+      summary: 'Staff invitation email delivery failed',
+    });
+    try {
+      const listResponse = await POST(request({ action: 'list' }));
+      const listBody = await listResponse.json();
+      const found = listBody.incidents.find(
+        (incident: { incidentId: string }) => incident.incidentId === record.incidentId,
+      );
+      expect(found).toMatchObject({ kind: 'staff_invitation_email_failed', state: 'open' });
+
+      const ackResponse = await POST(request({ action: 'acknowledge', incidentId: record.incidentId }));
+      expect(ackResponse.status).toBe(200);
+      const ackBody = await ackResponse.json();
+      expect(ackBody.incident).toMatchObject({ incidentId: record.incidentId, state: 'acknowledged' });
+    } finally {
+      if (record.state !== 'resolved') operationalIncidents.resolve(record.incidentId, 'test-cleanup');
+    }
   });
 
   it('carries tenant-free delivery telemetry alongside the list', async () => {

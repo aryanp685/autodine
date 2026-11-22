@@ -20,7 +20,7 @@
  */
 
 /** The languages the menu can be translated into. English originals stay as written. */
-export type LanguageCode = 'hi' | 'mr';
+export type LanguageCode = 'hi' | 'mr' | 'gu' | 'ta' | 'te';
 
 /** What the guest picked. 'en' is the menu as the owner wrote it. */
 export type GuestLanguage = 'en' | LanguageCode;
@@ -29,6 +29,9 @@ export const LANGUAGE_LABELS: Record<GuestLanguage, string> = {
   en: 'EN',
   hi: 'हिन्दी',
   mr: 'मराठी',
+  gu: 'ગુજરાતી',
+  ta: 'தமிழ்',
+  te: 'తెలుగు',
 };
 
 /** One saved translation of one row (an item or a category). */

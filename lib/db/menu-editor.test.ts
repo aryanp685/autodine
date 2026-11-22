@@ -72,6 +72,8 @@ const item = (id: string, categoryId: string | null = 'c-1') => ({
   description: null,
   price_paise: 10000,
   is_veg: true,
+  is_jain: null,
+  allergens: null,
   is_available: true,
   sort_order: 0,
 });

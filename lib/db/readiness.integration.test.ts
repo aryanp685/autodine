@@ -442,6 +442,31 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
     expect((await db.query('select count(*)::int n from payment_audit_events where order_id=$1',[f.order])).rows[0].n).toBe(0);
   });
 
+  it('keeps exactly one record_counter_payment, authenticated-only, with the session lock and pending-online guard', async () => {
+    const fns=(await db.query(`select pg_get_function_identity_arguments(p.oid) args, pg_get_functiondef(p.oid) def,
+        has_function_privilege('anon',p.oid,'EXECUTE') anon_execute,
+        has_function_privilege('authenticated',p.oid,'EXECUTE') authenticated_execute
+      from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+      where n.nspname='public' and p.proname='record_counter_payment'`)).rows;
+    expect(fns).toHaveLength(1);
+    expect(fns[0]).toMatchObject({anon_execute:false,authenticated_execute:true});
+    expect(fns[0].args).toMatch(/p_upi_ref text/);
+    expect(fns[0].def).toMatch(/for update of s/);
+    expect(fns[0].def).toMatch(/An online payment is in progress for this order/);
+    expect(fns[0].def).toMatch(/UPI transaction reference is required/);
+  });
+
+  it('gates safe table delete on write access and waiter-call history, and keeps announcement claims recoverable but final', async () => {
+    const def=async(sig:string)=>(await db.query('select pg_get_functiondef(to_regprocedure($1)) d',[sig])).rows[0].d as string;
+    const del=await def('public.delete_table_safe(uuid)');
+    expect(del).toMatch(/restaurant_can_write\(v_restaurant_id\)/);
+    expect(del).toMatch(/from public\.table_waiter_calls c where c\.table_id = p_table_id/);
+    const kitchen=await def('public.claim_kitchen_order_announcement(uuid)');
+    expect(kitchen).toMatch(/kitchen_announcement_status = 'announced'/);
+    const waiter=await def('public.claim_table_waiter_call_announcement(uuid)');
+    expect(waiter.match(/announcement_claimed_at < statement_timestamp\(\) - interval '2 minutes'/g)).toHaveLength(2);
+  });
+
   it('keeps online intent and settlement executable only by the service role, not guests or staff', async () => {
     for(const signature of [
       'public.begin_online_payment(text,text,text,uuid,uuid,bigint)',
@@ -1028,7 +1053,7 @@ describe.skipIf(!URL_VALUE)('native PostgreSQL commercial boundary regression', 
 
     const invoice=await withActor(c.user,async()=>{
       await db.query('select record_counter_payment($1,$2,$3,$4,$5)',[c.slug,c.order,'cash',25000,randomUUID()]);
-      await db.query('select record_counter_payment($1,$2,$3,$4,$5)',[c.slug,secondOrder,'upi',12500,randomUUID()]);
+      await db.query('select record_counter_payment($1,$2,$3,$4,$5,$6)',[c.slug,secondOrder,'upi',12500,randomUUID(),'UPI-TRN-0001']);
       return (await db.query('select close_order_session_and_issue_receipt($1) id',[c.sitting])).rows[0].id as string;
     });
     const snapshot=(await db.query('select totals_snapshot from restaurant_invoices where id=$1',[invoice])).rows[0].totals_snapshot;

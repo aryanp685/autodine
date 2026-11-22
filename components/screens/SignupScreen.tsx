@@ -12,12 +12,12 @@ export function SignupScreen({ error }: { error?: string }) {
       visual={
         <aside className="hidden pt-2 lg:block" aria-label="Restaurant setup overview">
           <p className="flex items-center gap-2.5 text-[10.5px] font-semibold uppercase tracking-[0.18em] text-forest">
-            <span aria-hidden="true" className="h-px w-6 bg-[#b98a4b]" />
+            <span aria-hidden="true" className="h-px w-6 bg-brass" />
             Make room for better service
           </p>
           <h2 className="mt-6 max-w-[13ch] text-[clamp(2.5rem,4.5vw,3.8rem)] font-medium leading-[1.05] tracking-[-0.05em]">
             Your restaurant.<br />
-            <span className="text-forest">A fresh start.</span>
+            <span className="text-forest">A <em className="font-display font-normal italic">fresh</em> start.</span>
           </h2>
           <p className="mt-6 max-w-[35ch] text-[15px] leading-[1.7] text-gink-64">
             Create your workspace, then make it yours. Add dishes and prepare your table cards
@@ -29,7 +29,8 @@ export function SignupScreen({ error }: { error?: string }) {
               aria-hidden="true"
               className="pointer-events-none absolute inset-0 bg-[radial-gradient(75%_55%_at_10%_0%,rgba(185,138,75,0.1),transparent_62%)]"
             />
-            <p className="relative text-[10px] font-semibold uppercase tracking-[0.16em] text-gink-46">
+            <p className="relative flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-gink-46">
+              <span aria-hidden="true" className="size-1 rounded-full bg-brass/70" />
               Your first hour
             </p>
             <ol className="relative mt-3 space-y-2.5" aria-label="Your setup journey">
@@ -38,8 +39,8 @@ export function SignupScreen({ error }: { error?: string }) {
                 { title: 'Build your menu', body: 'Add dishes, prices and the details guests need.', time: '10 min' },
                 { title: 'Prepare your table cards', body: 'Print or share a QR card for each table.', time: '5 min' },
               ].map((step, index) => (
-                <li key={step.title} className="flex items-start gap-3.5 rounded-2xl border border-hair/80 bg-white/80 p-3.5">
-                  <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-forest-soft text-[10.5px] font-medium text-forest">
+                <li key={step.title} className="flex items-start gap-3.5 rounded-2xl border border-hair/80 bg-white/80 p-3.5 transition-colors duration-300 hover:border-forest/20 hover:bg-white">
+                  <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-forest-soft font-display text-[12px] italic text-forest">
                     0{index + 1}
                   </span>
                   <span className="min-w-0 flex-1">
@@ -64,7 +65,7 @@ export function SignupScreen({ error }: { error?: string }) {
       }
       notesTitle="Your workspace, clearly explained"
       eyebrow="Create an account"
-      title="Start with your restaurant"
+      title={<>Start with your <em className="font-display font-normal italic text-forest">restaurant</em></>}
       lede={`Start your ${TRIAL_DAYS}-day trial with one restaurant and one menu. No card required.`}
       action={{ prompt: 'Already have an account?', label: 'Sign in', href: '/login' }}
       notes={[

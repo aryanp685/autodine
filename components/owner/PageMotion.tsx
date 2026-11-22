@@ -13,49 +13,36 @@
  * lesson on the marketing site and documents it at length; this file follows
  * the same rule instead of learning it twice.
  *
- * So the server sends the FINAL state: opacity 1, no transform. On mount, and
- * only then, the element is animated from a keyframe array -- `opacity: [0, 1]`
- * rather than `0 -> 1`. If the animation never runs, nothing was ever hidden;
- * the only loss is the 300ms of polish.
+ * So the server sends the FINAL state: no class, opacity 1, no transform. Only
+ * after mount is the stagger class added, and only the wrapper's class is
+ * written -- never a child's inline style.
  *
- * WHAT MOVES NOW, AND WHY IT CHANGED
+ * WHY CSS AND NOT framer-motion ANY MORE
  *
- * The first version moved the whole content column 6px. On a screen with a
- * hero, a row of figures and four panels that is one object sliding, which
- * reads as a page transition from 2014. What reads as a designed surface is a
- * SHORT STAGGER down the page: the head arrives, then the figures, then the
- * panels, each 12px and 320ms, 38ms apart, on one curve.
+ * React streams the page and hydrates it in segments. A mount effect that
+ * animates each child wrote `transform: translateY(12px)` onto elements that
+ * had not been hydrated yet, and hydration reported a mismatch on every staff
+ * page. A class on the wrapper (hydrated first) plus `@keyframes pm-rise` in
+ * globals.css keeps React's DOM untouched: children are animated by the
+ * stylesheet, not by JavaScript poking at them. It also drops framer-motion
+ * from every dashboard route's payload.
  *
- * It is capped at six steps. Past six the last panel arrives after the person
- * has already read it, and the page feels slow rather than composed -- the
- * same reasoning as Reveal's eight-step cap on a list of cards.
+ * The stagger is capped at six steps, 38ms apart: past six the last panel
+ * arrives after the person has already read it, and the page feels slow rather
+ * than composed -- the same reasoning as Reveal's eight-step cap.
  *
  * WHAT IT MUST NEVER DO
  *
  * Sit between a click and a write. It does not wrap a form's submit path, it
- * does not gate rendering on `onAnimationComplete`, and it cannot delay a
- * server action -- it animates boxes that already contain the result. The
- * children are in the DOM whether or not a single frame runs.
+ * does not gate rendering on an animation, and it cannot delay a server action
+ * -- it animates boxes that already contain the result.
  *
- * Reduced motion is checked at mount, not in CSS, because the decision belongs
- * to the animation engine here: with `prefers-reduced-motion: reduce` the effect
- * returns before any frame is scheduled and the page simply appears.
- *
- * COST
- *
- * `animate` from framer-motion is already in every dashboard route's payload
- * for this component (measured when it was introduced: 20.9 KB gzip, once per
- * session, content-hashed). Nothing here adds a second runtime: GSAP stays on
- * the marketing site, and the drawer, the rail, the scrim and every hover
- * state remain CSS, which costs no JavaScript at all.
+ * Reduced motion is handled in the stylesheet: the animation exists only under
+ * `prefers-reduced-motion: no-preference`, so the page simply appears.
  */
 
-import { animate } from 'framer-motion';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef } from 'react';
-
-/** Children past the sixth arrive with it: a 12-card floor is not a queue. */
-const MAX_STEPS = 6;
 
 export function PageMotion({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -65,31 +52,14 @@ export function PageMotion({ children }: { children: React.ReactNode }) {
     const node = ref.current;
     if (!node) return;
 
-    // Somebody who asked the system for less motion meant it.
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
-    if (reduced.matches) return;
+    // Remove, flush, re-add: the shell survives client navigation, and a class
+    // that is already present would not restart the animation for the new page.
+    node.classList.remove('pm-enter');
+    void node.offsetWidth;
+    node.classList.add('pm-enter');
 
-    const steps = Array.from(node.children) as HTMLElement[];
-    if (steps.length === 0) return;
-
-    const controls = steps.map((step, index) =>
-      animate(
-        step,
-        { opacity: [0, 1], y: [12, 0] },
-        {
-          duration: 0.32,
-          delay: Math.min(index, MAX_STEPS) * 0.038,
-          ease: [0.2, 0.7, 0.2, 1],
-        },
-      ),
-    );
-
-    // A navigation that unmounts mid-fade must not leave a half-faded box, and
-    // must not keep ticking: `stop()` also clears the pending frame.
-    return () => controls.forEach((control) => control.stop());
-    // Re-running on pathname is what makes this a *page* transition: the shell
-    // (and this wrapper) survive client navigation, so without the dependency
-    // the second page would arrive with no movement at all.
+    return () => node.classList.remove('pm-enter');
+    // Re-running on pathname is what makes this a *page* transition.
   }, [pathname]);
 
   return <div ref={ref}>{children}</div>;

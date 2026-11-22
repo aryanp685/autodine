@@ -189,6 +189,8 @@ export async function getRestaurantMenu(
       description: row.description,
       price_paise: row.price_paise,
       is_veg: row.is_veg,
+      is_jain: row.is_jain,
+      allergens: row.allergens,
       is_available: row.is_available,
       image_url: row.image_url,
       sort_order: row.sort_order,

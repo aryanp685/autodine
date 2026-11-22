@@ -90,32 +90,42 @@ export function SiteMotion() {
 
           // The headline, one masked line at a time. yPercent rather than a
           // pixel value so it works whatever the type scale comes out at.
-          gsap.fromTo(
-            '[data-line]',
-            { yPercent: 108 },
-            {
-              yPercent: 0,
-              opacity: 1,
-              duration: 1.15,
-              ease: 'power3.out',
-              stagger: 0.085,
-              delay: 0.12,
-            },
-          );
+          // Guarded: this layer runs on every public route, and pages without
+          // a hero would otherwise make GSAP log "target not found".
+          const lines = gsap.utils.toArray<HTMLElement>('[data-line]');
+          if (lines.length) {
+            gsap.fromTo(
+              lines,
+              { yPercent: 108, filter: 'blur(8px)' },
+              {
+                yPercent: 0,
+                filter: 'blur(0px)',
+                opacity: 1,
+                duration: 1.2,
+                ease: 'power3.out',
+                stagger: 0.09,
+                delay: 0.12,
+                clearProps: 'filter',
+              },
+            );
+          }
 
-          gsap.fromTo(
-            '[data-hero-step]',
-            { opacity: 0, y: 20 },
-            {
-              opacity: 1,
-              y: 0,
-              duration: 0.85,
-              ease: 'power3.out',
-              stagger: 0.09,
-              delay: 0.5,
-              clearProps: 'transform',
-            },
-          );
+          const heroSteps = gsap.utils.toArray<HTMLElement>('[data-hero-step]');
+          if (heroSteps.length) {
+            gsap.fromTo(
+              heroSteps,
+              { opacity: 0, y: 20 },
+              {
+                opacity: 1,
+                y: 0,
+                duration: 0.85,
+                ease: 'power3.out',
+                stagger: 0.09,
+                delay: 0.5,
+                clearProps: 'transform',
+              },
+            );
+          }
 
           const heroImg = document.querySelector<HTMLElement>('[data-hero-image]');
           if (heroImg) {
@@ -152,16 +162,27 @@ export function SiteMotion() {
             });
           }
 
+          // The composition itself drifts up a touch slower than the page, so
+          // the frame reads as a layer behind the copy rather than part of it.
+          const heroVisual = document.querySelector<HTMLElement>('[data-hero-visual]');
+          if (heroVisual && hero) {
+            gsap.to(heroVisual, {
+              yPercent: -7,
+              ease: 'none',
+              scrollTrigger: { trigger: hero, start: 'top top', end: 'bottom top', scrub: 0.6 },
+            });
+          }
+
           /* -------------------------------------------------- the sections */
 
           gsap.utils.toArray<HTMLElement>('[data-reveal]').forEach((el) => {
             gsap.fromTo(
               el,
-              { opacity: 0, y: 30 },
+              { opacity: 0, y: 42 },
               {
                 opacity: 1,
                 y: 0,
-                duration: 0.95,
+                duration: 1.05,
                 ease: 'power3.out',
                 scrollTrigger: { trigger: el, start: 'top 82%', once: true },
               },
@@ -174,13 +195,13 @@ export function SiteMotion() {
 
             gsap.fromTo(
               children,
-              { opacity: 0, y: 26 },
+              { opacity: 0, y: 32 },
               {
                 opacity: 1,
                 y: 0,
-                duration: 0.85,
+                duration: 0.9,
                 ease: 'power3.out',
-                stagger: 0.07,
+                stagger: 0.08,
                 scrollTrigger: { trigger: group, start: 'top 84%', once: true },
               },
             );
@@ -209,6 +230,70 @@ export function SiteMotion() {
               });
             });
           }
+
+          /* The service loop: at desktop widths the stage pins and one
+             ticket travels from the table to the pass to the counter.
+             `is-live` is the switch the stylesheet keys on; the cleanup
+             returns the ticket and the stations to their reading order. */
+          const loopMotion = gsap.matchMedia();
+          loopMotion.add('(min-width: 1024px) and (prefers-reduced-motion: no-preference)', () => {
+            const loop = document.querySelector<HTMLElement>('[data-loop]');
+            const ticket = loop?.querySelector<HTMLElement>('[data-loop-ticket]');
+            const stations = loop
+              ? Array.from(loop.querySelectorAll<HTMLElement>('[data-loop-station]'))
+              : [];
+            if (!loop || !ticket || stations.length !== 3) return;
+
+            loop.classList.add('is-live');
+
+            const centerFor = (index: number) => {
+              const track = ticket.parentElement;
+              if (!track) return 0;
+              const trackBox = track.getBoundingClientRect();
+              const stationBox = stations[index].getBoundingClientRect();
+              return stationBox.left - trackBox.left + stationBox.width / 2 - ticket.offsetWidth / 2;
+            };
+
+            const setActive = (index: number) => {
+              stations.forEach((station, i) => station.classList.toggle('is-on', i === index));
+            };
+
+            gsap.set(ticket, { x: () => centerFor(0), y: 0, rotate: -1.2 });
+            setActive(0);
+
+            gsap
+              .timeline({
+                scrollTrigger: {
+                  trigger: loop,
+                  start: 'top top',
+                  end: 'bottom bottom',
+                  scrub: 0.6,
+                  invalidateOnRefresh: true,
+                  onUpdate: (self) =>
+                    setActive(self.progress < 0.36 ? 0 : self.progress < 0.7 ? 1 : 2),
+                },
+              })
+              .to(ticket, {
+                x: () => centerFor(1),
+                y: -14,
+                rotate: 0.8,
+                duration: 1,
+                ease: 'power1.inOut',
+              })
+              .to(ticket, {
+                x: () => centerFor(2),
+                y: 0,
+                rotate: -0.6,
+                duration: 1,
+                ease: 'power1.inOut',
+              });
+
+            return () => {
+              loop.classList.remove('is-live');
+              stations.forEach((station) => station.classList.remove('is-on'));
+              gsap.set(ticket, { clearProps: 'all' });
+            };
+          });
 
           /* Screen gallery: independent entrance and inner-frame depth so
              the two animations never compete for the same transform. */
@@ -335,11 +420,62 @@ export function SiteMotion() {
             );
           });
 
+          /* The headline's own hairline. Guarded like the hero selectors: the
+             landing is the only page that carries one. */
+          gsap.utils.toArray<HTMLElement>('[data-rule]').forEach((rule) => {
+            gsap.fromTo(
+              rule,
+              { scaleX: 0 },
+              {
+                scaleX: 1,
+                duration: 1.15,
+                ease: 'power3.out',
+                scrollTrigger: { trigger: rule, start: 'top 92%', once: true },
+              },
+            );
+          });
+
+          /* How much of the page has been read -- a 2px hairline, decoration
+             only. ScrollTrigger on the document itself is the cheapest way to
+             ask that question; it is absent on pages shorter than a viewport. */
+          const pageProgress = document.querySelector<HTMLElement>('[data-page-progress]');
+          if (pageProgress) {
+            gsap.to(pageProgress, {
+              scaleX: 1,
+              ease: 'none',
+              scrollTrigger: {
+                trigger: document.documentElement,
+                start: 'top top',
+                end: 'bottom bottom',
+                scrub: 0.3,
+              },
+            });
+          }
+
+          // The closing photograph moves inside its frame. The 8% overscan
+          // means neither edge can ever slide into view.
+          const close = document.querySelector<HTMLElement>('[data-close]');
+          const closeImg = close?.querySelector<HTMLElement>('img');
+          if (close && closeImg) {
+            gsap.fromTo(
+              closeImg,
+              { scale: 1.08, yPercent: -3 },
+              {
+                yPercent: 3,
+                ease: 'none',
+                scrollTrigger: { trigger: close, start: 'top bottom', end: 'bottom top', scrub: 0.7 },
+              },
+            );
+          }
+
           ScrollTrigger.refresh();
 
-          // Runs when the context is reverted (unmount): the tour's media
-          // query group owns the class and the inline styles it added.
-          return () => matchTour.revert();
+          // Runs when the context is reverted (unmount): the media query
+          // groups own the classes and inline styles they added.
+          return () => {
+            loopMotion.revert();
+            matchTour.revert();
+          };
         });
 
         // Belt to the braces: see SAFETY_MS. Only on-screen elements, so the
@@ -384,7 +520,7 @@ export function SiteMotion() {
  */
 function revealAll() {
   document
-    .querySelectorAll<HTMLElement>('[data-reveal], [data-stagger] > *, [data-hero-step], [data-line]')
+    .querySelectorAll<HTMLElement>('[data-reveal], [data-stagger] > *, [data-hero-step], [data-line], [data-rule]')
     .forEach((el) => {
       el.style.opacity = '1';
       el.style.transform = 'none';

@@ -333,6 +333,57 @@ if (forceBaseline || stored.glassSurfaces === undefined) {
   );
 }
 
+/* ---------------------------------------------------------------- rule 4 */
+/* Element resets must live inside @layer base.
+ *
+ * Unlayered rules beat every layered rule regardless of specificity, so a
+ * loose `p { margin: 0 }` silently killed every `mt-*` on a paragraph, and a
+ * loose `h1..h5` block killed `font-medium` and `tracking-*` on every heading.
+ * That exact bug shipped twice. html/body are the only allowed exceptions:
+ * nothing writes utilities onto the root elements. */
+for (const file of cssFiles) {
+  const src = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const stack = [];
+  let buf = '';
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === '{') {
+      const head = buf.trim().replace(/\s+/g, ' ');
+      buf = '';
+      const isAtRule = head.startsWith('@');
+      stack.push({ layer: /^@layer\b/.test(head) });
+      if (!isAtRule) {
+        let body = '';
+        let depth = 1;
+        for (i++; i < src.length; i++) {
+          if (src[i] === '{') depth++;
+          else if (src[i] === '}') {
+            depth--;
+            if (!depth) break;
+          }
+          body += src[i];
+        }
+        const layered = stack.slice(0, -1).some((entry) => entry.layer);
+        const pureElement = head
+          .split(',')
+          .map((selector) => selector.trim().replace(/::?[a-z-]+(\([^)]*\))?$/i, ''))
+          .every((selector) => /^(h[1-6]|p|a|ul|ol|li|button|input|textarea|select|html|body)$/i.test(selector));
+        const resetsPresentation = /\b(margin|padding|color|font|letter-spacing)\s*:/.test(body);
+        const rootOnly = head.split(',').every((selector) => /^(html|body)$/i.test(selector.trim()));
+        if (!layered && pureElement && resetsPresentation && !rootOnly) {
+          problems.push(`${rel(file)}: unlayered element rule "${head}" — move it inside @layer base so utilities can override it.`);
+        }
+        stack.pop();
+      }
+    } else if (ch === '}') {
+      stack.pop();
+      buf = '';
+    } else {
+      buf += ch;
+    }
+  }
+}
+
 if (problems.length) {
   console.error('\nDesign system check FAILED:\n');
   for (const p of problems) console.error(`  ✗ ${p}`);

@@ -24,6 +24,8 @@ const mocks = vi.hoisted(() => ({
   redirect: vi.fn(),
   /** The throttle flag the scan handler left behind, if any. */
   throttle: null as string | null,
+  /** Cookies the action wrote, by name. */
+  written: new Map<string, string>(),
 }));
 
 /* Only one cookie is ever read on this path, and it is a note, not a key. */
@@ -31,6 +33,7 @@ vi.mock('next/headers', () => ({
   cookies: async () => ({
     get: (name: string) =>
       name === 'autodine_throttled' && mocks.throttle ? { name, value: mocks.throttle } : undefined,
+    set: (name: string, value: string) => void mocks.written.set(name, value),
   }),
   // ipHash() reads the forwarded address through headers(); the action now
   // passes a per-restaurant ip hash to place_public_order's rate budget.
@@ -372,8 +375,10 @@ describe('placeOrderAction', () => {
       'place_public_order_attempt',
       expect.objectContaining({ p_guest_token: attempt })
     );
-    // The same key is what the confirmation link carries.
-    expect(url).toContain(`t=${attempt}`);
+    // The same key is the private token the confirmation reads, from an
+    // httpOnly cookie rather than the address bar.
+    expect(mocks.written.get('autodine_guest_token')).toBe(attempt);
+    expect(url).not.toContain('t=');
   });
 
   it('replaces an attempt key that is not a UUID', async () => {
@@ -395,7 +400,7 @@ describe('placeOrderAction', () => {
 
     const url = await run(() => placeOrderAction(form()));
 
-    expect(url).toMatch(/^\/menu\/order\?s=kings-of-kings&code=ORD-123&t=/);
+    expect(url).toBe('/menu/order?s=kings-of-kings&code=ORD-123&placed=1');
     expect(mocks.rpc).toHaveBeenCalledWith(
       'place_public_order_attempt',
       expect.objectContaining({ p_slug: 'kings-of-kings', p_session_token: 'session-token' })

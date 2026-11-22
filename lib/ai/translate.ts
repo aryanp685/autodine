@@ -43,6 +43,9 @@ const CHUNK = 10;
 const LANGUAGE_NAMES: Record<LanguageCode, string> = {
   hi: 'Hindi (Devanagari script)',
   mr: 'Marathi (Devanagari script)',
+  gu: 'Gujarati',
+  ta: 'Tamil',
+  te: 'Telugu',
 };
 
 export function translateConfigured(): boolean {

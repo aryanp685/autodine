@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import type { ReactNode } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { useRef, type ReactNode } from 'react';
+import { AuthHandoffLink } from '@/components/AuthHandoffLink';
+import { useBrandHandoff } from '@/components/useBrandHandoff';
 import { BrandMark } from '@/components/BrandMark';
 
 export const authButtonClass =
@@ -31,7 +32,7 @@ export function AuthShell({
 }: {
   visual?: ReactNode;
   eyebrow: string;
-  title: string;
+  title: ReactNode;
   lede: ReactNode;
   children: ReactNode;
   /** The one link for the other side of this page: sign in <> sign up. */
@@ -40,14 +41,8 @@ export function AuthShell({
   notes?: ReactNode[];
   notesTitle?: string;
 }) {
-  const reduce = useReducedMotion();
-  const rise = reduce
-    ? {}
-    : {
-        initial: { opacity: 0, y: 18 },
-        animate: { opacity: 1, y: 0 },
-        transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const },
-      };
+  const brandRef = useRef<HTMLAnchorElement>(null);
+  useBrandHandoff(brandRef);
 
   return (
     <div
@@ -66,10 +61,10 @@ export function AuthShell({
 
       <header className="relative z-10 border-b border-hair/80 bg-white/70 backdrop-blur-xl">
         <div className="mx-auto flex h-16 w-full max-w-[1120px] items-center justify-between gap-4 px-5 sm:px-8">
-          <Link href="/" className="inline-flex items-center gap-2.5 text-gink transition-opacity hover:opacity-75">
+          <AuthHandoffLink href="/" ref={brandRef} data-brand-handoff className="inline-flex items-center gap-2.5 text-gink transition-opacity hover:opacity-75">
             <BrandMark size={25} className="translate-y-[1px]" tone="auth" />
             <span className="text-[16px] leading-none font-medium tracking-[-0.04em]">autodine</span>
-          </Link>
+          </AuthHandoffLink>
 
           {action ? (
             <div className="flex items-center gap-3 text-[12.5px]">
@@ -92,15 +87,13 @@ export function AuthShell({
         }`}
       >
         {visual ? (
-          <motion.div {...rise} className="hidden min-w-0 lg:block">
+          <div className="auth-rise hidden min-w-0 lg:sticky lg:top-10 lg:block lg:self-start">
             {visual}
-          </motion.div>
+          </div>
         ) : null}
 
-        <motion.div
-          {...rise}
-          transition={reduce ? undefined : { duration: 0.6, delay: 0.07, ease: [0.22, 1, 0.36, 1] }}
-          className={`mx-auto w-full ${visual ? 'max-w-[452px]' : 'max-w-[452px]'}`}
+        <div
+          className="auth-rise auth-rise-delay mx-auto w-full max-w-[452px]"
         >
           <section
             data-auth-card
@@ -108,13 +101,13 @@ export function AuthShell({
           >
             <span
               aria-hidden="true"
-              className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-forest via-forest/70 to-[#b98a4b]/70"
+              className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-forest via-forest/70 to-brass/70"
             />
             <p className="flex items-center gap-2.5 text-[10.5px] font-semibold tracking-[0.14em] text-forest uppercase">
-              <span aria-hidden="true" className="h-px w-5 bg-[#b98a4b]" />
+              <span aria-hidden="true" className="h-px w-5 bg-brass" />
               {eyebrow}
             </p>
-            <h1 className="mt-3 text-[clamp(1.55rem,3.2vw,1.95rem)] leading-[1.12] font-medium tracking-[-0.045em] text-gink">
+            <h1 className="mt-3 text-balance text-[clamp(1.55rem,3.2vw,1.95rem)] leading-[1.12] font-medium tracking-[-0.045em] text-gink">
               {title}
             </h1>
             <p className="mt-2.5 border-b border-hair pb-5 text-[13px] leading-[1.6] text-gink-64">
@@ -159,7 +152,7 @@ export function AuthShell({
               <Link href="/terms" className="transition-colors hover:text-gink">Terms</Link>
             </span>
           </nav>
-        </motion.div>
+        </div>
       </main>
     </div>
   );
