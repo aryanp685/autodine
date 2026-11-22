@@ -51,7 +51,7 @@ export async function GET(_request: NextRequest) {
       .eq('restaurant_id', restaurantId)
       .neq('prep_status', 'cancelled')
       .gte('placed_at', cutoff)
-      .order('placedAt', { ascending: true }); // will fallback to placed_at column name
+      .order('placed_at', { ascending: true });
 
     // Fallback: if above fails due to column ordering issue, retry without order
     let orderRows: unknown[] = [];
