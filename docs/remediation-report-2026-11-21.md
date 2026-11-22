@@ -6,7 +6,7 @@ setting, bucket or secret was written. The only production interaction was
 read-only SQL through the Supabase connector plus one read-only HTTPS GET to the
 public health endpoint.
 
-Head before this batch: `2ecb12e`. Migration inventory: **123 files** (was 120).
+Head before this batch: `2ecb12e`. Migration inventory: **130 files** — 123 at the head of this batch, plus `main`’s 8 ported in and one local duplicate removed (see §D8).
 
 ---
 
@@ -85,8 +85,11 @@ Result: `npm run test:db:embedded` **281 passed / 3 skipped**.
 
 ## D3 — production upgrade package (prepared and proven safe; not applied)
 
-Production's ledger holds **124** rows; the repository holds **123** files; **51**
-repository files are not in production's ledger. That is the real size of the gap —
+Production's ledger held **124** rows when this was first measured on 2026-11-21 and holds
+**160** at the same day's later check — production moved. The repository now holds **130**
+files and **22** are not in production's ledger: the 20-file GST/IRP block
+(`20261118000200`–`20261118002100`) and the two renumbered QR files. The 51-file list this
+section used to carry is obsolete; regenerate rather than trust a number in prose. That is the real size of the gap —
 the earlier "29 missing RPCs" was the symptom, not the cause.
 
 Ordered apply list (**51 files**, chronological — regenerate rather than copy, it is
@@ -162,6 +165,56 @@ Production state today that matters for that list (read-only):
   repository equivalents under different versions — they are idempotent
   (`CREATE OR REPLACE`, `IF NOT EXISTS`, cleanup `DO`).
 
+## D3a — the apply was rehearsed against a production-shaped database (and why it stops there)
+
+A chain that replays from empty proves the chain, not the push. Production is the
+subset its ledger records — 160 rows, 108 of which map to a file here and 52 of which
+were applied out of band — so the rehearsal builds exactly that subset and then
+applies the pending files on top:
+
+```
+node scripts/local-pg/rehearse-prod-apply.mjs --ledger <prod ledger>
+ledger rows:            160
+replayable from ledger: 108
+applied out of band:    52 (no repository file; skipped)
+pending:                22
+production baseline: 108/108 replayed
+pending applied:     22/22
+verification:        {"gst_irp_tables":"9","qr_index":"1","advisory_functions":"2","counter_payment_signatures":"1"}
+REHEARSAL OK: every pending migration applied to a production-shaped database
+```
+
+That is the evidence the 22 fit: every file lands on the schema production actually
+has, in order, and the four invariants the release plan checks come back correct.
+
+**The apply itself is not done, and the reason is a missing credential, not a missing
+plan.** Two independent facts, both produced here:
+
+- Dispatching the repository's own `Hosted backup (B2)` workflow against production
+  fails closed in 40 seconds:
+
+  ```
+  Missing required repository secrets: AUTODINE_BACKUP_SOURCE_URL
+  — configure them under Settings -> Secrets and variables -> Actions. No backup was attempted.
+  ```
+
+  (The step before it, `Install the PostgreSQL 17 client tools`, succeeded on a real
+  runner — the ported composite action works on GitHub, not just locally.)
+
+- The Supabase connector can execute SQL against production but cannot carry this
+  batch: 22 files are ~250 KB of DDL. Re-typing that into a query console is how a
+  controlled rollout becomes an incident, so it was not attempted.
+
+What the owner does, in order, once `AUTODINE_BACKUP_SOURCE_URL` and the four B2
+secrets exist or a `SUPABASE_ACCESS_TOKEN`/`SUPABASE_DB_PASSWORD` pair is configured:
+
+```
+npm run release:apply-plan -- --ledger <ledger dump>     # prints the 22 in order + verification SQL
+supabase link --project-ref bdbaqpevwmgdvghszjno
+supabase db push                                          # applies only those 22, records ledger rows
+# then run the three verification queries the plan prints
+```
+
 ## D4 — recovery evidence is now data-level, not catalog-level (fixed)
 
 `test:db:logical-restore` used to compare schemas only, with **0 rows** in the dump.
@@ -209,6 +262,17 @@ privileges would have made it worse in the other direction, handing `anon` and
 `revoke all … from public, anon, authenticated, service_role` followed by the exact
 `GRANT` list read from `relacl`. The drill asserts member=1 / stranger=0 / anon=42501
 on the restored database, and reports `securityRestoreVerified` in its JSON.
+
+**Hosted side, probed on 2026-11-21:** the restore drill cannot run yet, and not because
+of the drill. `Hosted backup (B2)` has never run — its first dispatch from here (run
+44998836032) failed closed in 40 s naming the one missing secret,
+`AUTODINE_BACKUP_SOURCE_URL`, so there is no artifact in B2 for the drill to download.
+Supabase branching was tried as an alternative hosted copy of production and refused
+with `entitlement_required`: "Branching is supported only on the Pro plan or above".
+So the hosted rehearsal needs one owner action — configure the five backup secrets
+(`AUTODINE_BACKUP_SOURCE_URL`, `AUTODINE_BACKUP_PASSPHRASE`, `B2_REGION`, `B2_BUCKET`,
+`B2_ACCESS_KEY_ID`, `B2_SECRET_ACCESS_KEY`) — after which both buttons exist and the
+pipeline is already proven end to end locally, with data and with policies.
 
 Still missing for DR READY (unchanged, and it is the only thing that can change it):
 a **hosted** restore rehearsal against an authorized target (P3–P5 of
@@ -324,13 +388,13 @@ this branch's migrations are not applied to production (D3).
 | `READINESS_FINANCIAL_UPGRADE=1 node scripts/verify-database.mjs` (on an embedded cluster) | 281 passed / 3 skipped — the closed-loop replay the CI job runs |
 | `npm run test:db:integration` | **299 passed / 1 skipped** (13 files) |
 | `npm run test:db:local` | pass — schema, checks (incl. the new overload check), 5 gated suites, 5,000-guest load |
-| `npm run test:db:logical-restore` | `LOCAL_LOGICAL_RESTORE_VERIFIED` — 123 migrations, 64 tables, 63 policies, 236 functions, data rows identical, `securityRestoreVerified {memberRows:1,strangerRows:0,anonDenied:true}` |
+| `npm run test:db:logical-restore` | `LOCAL_LOGICAL_RESTORE_VERIFIED` — 130 migrations, 64 tables, 63 policies, 241 functions, data rows identical, `securityRestoreVerified {memberRows:1,strangerRows:0,anonDenied:true}` |
 | `npm run test:recovery:cold` | `LOCAL_COLD_RECOVERY_VERIFIED` |
 | `npx vitest run` | 2,614 passed / 309 skipped (2,925) |
 | `npm run test:e2e:journey` | 20 passed |
 | `npm run test:dr` · `test:backup` · `test:d2` · `test:staging:guards` | exit 0 (`test:dr` is now **230** assertions: 20 backup suites + the apply-plan suite; selftest ALL CHECKS PASS, 15 checks) |
-| `npm run release:apply-plan -- --ledger <prod ledger>` | 123 repo files vs 124 ledger rows → **51 pending**, 72 applied, 52 ledger rows with no repository file |
-| `npm run migrations:verify` | 123 files, 123 unique versions, 4 anchors |
+| `npm run release:apply-plan -- --ledger <prod ledger>` | 130 repo files vs **160** ledger rows → **22 pending**, 108 applied, 52 ledger rows with no repository file |
+| `npm run migrations:verify` | 130 files, 130 unique versions, 4 anchors |
 | `npm run verify:release` | 47 checks OK |
 | `npm run lint` | **0 problems** |
 | `npx tsc --noEmit` | clean |

@@ -282,10 +282,10 @@ count, failure annotations). They depend on scripts this branch does not carry a
 add no DR capability.
 
 Evidence: `test:dr` 230/230 · `test:backup` ALL CHECKS PASS (15) · logical restore
-`dataRestoreVerified` + `securityRestoreVerified` at 123 migrations / 64 tables /
-63 policies / 236 functions · cold recovery 123 migrations / 68 tables ·
+`dataRestoreVerified` + `securityRestoreVerified` at 130 migrations / 64 tables /
+63 policies / 241 functions · cold recovery 130 migrations / 68 tables ·
 `test:db:local` PASS · integration 299/1 · embedded 281/3 · vitest 2,614/309 ·
-lint 0 · tsc clean · `verify:release` 47/47 · `migrations:verify` 123/123.
+lint 0 · tsc clean · `verify:release` 47/47 · `migrations:verify` 130/130.
 
 ## 15. D6 is fixed upstream; what is left is a merge, not a bug
 
@@ -318,4 +318,55 @@ Checked on 2026-11-21 at `main` = `3b1ca5b` (read-only):
   (`ENOENT test-results/supabase-e2e/integration-results.json`). It is a runner/Docker
   infrastructure failure, not a code assertion, and that workflow does not run on
   this branch.
+
+## 16. Production status at the end of 2026-11-21 (read-only, plus one rehearsal)
+
+Production moved while this branch was being finished: its ledger is now **160** rows
+ending `20261122000100 single_counter_payment_function` and
+`20261122000200 announcement_claim_and_table_delete_fixes`. That changes the answer
+everywhere:
+
+| Question | Answer, with evidence |
+|---|---|
+| How far behind is production? | **22 migrations**: the 20-file GST/IRP block plus the two renumbered QR files. The 51-file figure in §12 is obsolete. |
+| Do those 22 fit production's schema? | **Yes** — `scripts/local-pg/rehearse-prod-apply.mjs` builds production's ledger subset (108 replayed, 52 out-of-band skipped), applies all 22, and the four verification invariants come back right (`gst_irp_tables 9, qr_index 1, advisory_functions 2, counter_payment_signatures 1`). |
+| Are the two QR files already in production? | Their **effects** are (index `table_qr_codes_one_active_per_table` exists, 0 tables with duplicate live cards, both RPCs carry `pg_advisory_xact_lock`), their **ledger rows** are not. Both files are `if not exists` / `create or replace`, so applying them records the rows without redoing the work. |
+| Why not applied from here? | No credential path. `Hosted backup (B2)` dispatched → `Missing required repository secrets: AUTODINE_BACKUP_SOURCE_URL` (fails closed). The Supabase connector can run SQL but cannot carry ~250 KB of DDL; hand-copying that into a production console was refused on purpose. |
+| Hosted restore rehearsal? | Blocked by the same secret, plus `branching_limit` (`Pro plan or above`) when a schema clone of production was attempted. Both are owner actions, not code. |
+
+One owner action unblocks both: set `AUTODINE_BACKUP_SOURCE_URL` (production read
+connection), `AUTODINE_BACKUP_PASSPHRASE`, `B2_REGION`, `B2_BUCKET`,
+`B2_ACCESS_KEY_ID`, `B2_SECRET_ACCESS_KEY` as repository secrets, then run
+**Hosted backup (B2)** and **Hosted restore rehearsal (disposable)**. For the schema
+push, `supabase link --project-ref bdbaqpevwmgdvghszjno && supabase db push` applies
+exactly those 22 rows.
+
+## 17. The merge divergence is fixed, and provable by set arithmetic
+
+`main` is at `3b1ca5b` with 108 migrations; this branch has 130. Checked mechanically:
+
+```
+$ comm -23 <(main versions) <(our versions)      # versions main has that we lack
+                                                  -> nothing
+$ comm -13 <(main versions) <(our versions) | wc -l
+                                                  -> 22
+$ # same version prefix, different filename
+                                                  -> nothing
+```
+
+How it was fixed, in the order that keeps every ledger honest:
+
+1. **Ported main's 8** so the chain is a superset, not a sibling.
+2. **Deleted our duplicate** `20261122000100_announcement_claim_recovery.sql`: main carries
+   the same correction as `20261119000400`, which production already applied. Two files
+   for one fix is how ledgers start lying.
+3. **Renumbered** the QR pair to `20261122000400`/`20261122000500`. Neither version exists
+   in production's ledger, in main's tree, or in any hosted candidate, so the rename
+   costs nothing anywhere — that is why renumbering was safe here and would not have
+   been for a row production had already recorded.
+4. **Updated** manifest, register and `EXPECTED_MIGRATIONS` to 130, and `verify:release`
+   (47 checks) enforces the tally.
+
+The 22 that remain ours are exactly the work production still needs — the GST/IRP block
+and the two QR files — so the merge and the rollout now point the same way.
 
