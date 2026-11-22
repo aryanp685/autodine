@@ -133,7 +133,7 @@ describe('getTablesScreenData', () => {
 
   it('throws on a real tables read failure instead of rendering an empty room', async () => {
     const supabase = {
-      from: (table: string) => ({
+      from: (_table: string) => ({
         select: () => ({
           eq: () => ({
             order: () => ({ data: [], error: { message: 'connection reset' } }),
