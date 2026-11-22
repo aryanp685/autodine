@@ -90,7 +90,7 @@ export function InvoiceNotesPanel({ notes, sources }: { notes: InvoiceNoteRow[];
   };
 
   return (
-    <section aria-label="Credit and debit notes" className="mb-6 rounded-[14px] border border-hair bg-card p-5">
+    <section id="credit-debit-notes" aria-label="Credit and debit notes" className="mb-6 rounded-[14px] border border-hair bg-card p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-[13px] font-semibold tracking-[0.02em] text-gink">Credit &amp; debit notes</h2>
         <p className="text-[10.5px] text-gink-46">

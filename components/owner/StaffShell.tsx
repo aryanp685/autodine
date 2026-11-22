@@ -6,6 +6,8 @@ import { DashboardBar } from '@/components/DashboardBar';
 import { isWideSection, sectionForPathname } from '@/components/shell-links';
 import type { OutletBar } from '@/lib/outlets';
 import { PageMotion } from '@/components/owner/PageMotion';
+import { GlobalAnnouncementProvider } from '@/components/announcements/GlobalAnnouncementProvider';
+import { AnnouncementInbox, AnnouncementToasts } from '@/components/announcements/AnnouncementInbox';
 
 /**
  * The staff shell, mounted once.
@@ -60,10 +62,12 @@ export function useInStaffShell(): boolean {
 
 export function StaffShell({
   outlet,
+  restaurantId,
   signOut = true,
   children,
 }: {
   outlet?: OutletBar | null;
+  restaurantId?: string | null;
   /** Off where there is nobody signed in to sign out of. */
   signOut?: boolean;
   children: ReactNode;
@@ -71,35 +75,44 @@ export function StaffShell({
   const pathname = usePathname();
   const wide = isWideSection(pathname);
 
+  // Derive restaurantId from outlet when not explicitly passed (backward compat)
+  const activeRestaurantId = restaurantId ?? (outlet as unknown as { id?: string } | null)?.id ?? null;
+
   return (
     <StaffShellContext.Provider value={true}>
-      <div data-surface="owner" className="min-h-dvh bg-paper text-gink antialiased">
-        {/*
-         * `active` is left to the bar, which derives it from this same path.
-         * Passing it here as well would be a second source of truth for the one
-         * thing this refactor exists to make single.
-         */}
-        <DashboardBar outlet={outlet} signOut={signOut} />
-        <div className="lg:pl-[244px]">
-          <main
-            className={[
-              'mx-auto w-full px-5 pt-7 pb-24 sm:px-8 lg:pt-10',
-              wide ? 'max-w-[1380px]' : 'max-w-[1240px]',
-            ].join(' ')}
-            /* The page's own current section, for anything that needs it
-               without a React context (an error boundary, a test). */
-            data-shell-active={sectionForPathname(pathname) ?? ''}
-          >
-            {/*
-             * The arrival, not the layout. PageMotion sends its final state
-             * from the server and animates from keyframes only once the client
-             * is alive, so a blocked bundle leaves a visible page rather than
-             * an invisible one.
-             */}
-            <PageMotion>{children}</PageMotion>
-          </main>
+      <GlobalAnnouncementProvider restaurantId={activeRestaurantId}>
+        <div data-surface="owner" className="min-h-dvh bg-paper text-gink antialiased">
+          {/*
+           * `active` is left to the bar, which derives it from this same path.
+           * Passing it here as well would be a second source of truth for the one
+           * thing this refactor exists to make single.
+           */}
+          <DashboardBar outlet={outlet} signOut={signOut}>
+            <AnnouncementInbox />
+          </DashboardBar>
+          <div className="lg:pl-[244px]">
+            <main
+              className={[
+                'mx-auto w-full px-5 pt-7 pb-24 sm:px-8 lg:pt-10',
+                wide ? 'max-w-[1380px]' : 'max-w-[1240px]',
+              ].join(' ')}
+              /* The page's own current section, for anything that needs it
+                 without a React context (an error boundary, a test). */
+              data-shell-active={sectionForPathname(pathname) ?? ''}
+            >
+              {/*
+               * The arrival, not the layout. PageMotion sends its final state
+               * from the server and animates from keyframes only once the client
+               * is alive, so a blocked bundle leaves a visible page rather than
+               * an invisible one.
+               */}
+              <PageMotion>{children}</PageMotion>
+            </main>
+          </div>
+          {/* Global toasts: visible on every staff page, even when Sound is OFF */}
+          <AnnouncementToasts />
         </div>
-      </div>
+      </GlobalAnnouncementProvider>
     </StaffShellContext.Provider>
   );
 }

@@ -52,7 +52,15 @@ export function buildCsp({ nonce, supabaseUrl }: CspInput): string {
   const supabase = httpsOrigin(supabaseUrl);
 
   const scriptSrc = ["'self'", `'nonce-${nonce}'`];
-  const connectSrc = ["'self'"];
+  // Allow loopback origins for the optional local AutoDine Print Bridge
+  // (127.0.0.1 / localhost only — never arbitrary LAN or remote http://).
+  const connectSrc = [
+    "'self'",
+    'http://127.0.0.1:*',
+    'http://localhost:*',
+    'https://127.0.0.1:*',
+    'https://localhost:*',
+  ];
   const imgSrc = ["'self'", 'data:', 'blob:'];
   // Kitchen TTS fetches an MP3 and plays it through an object URL. Keep blob:
   // scoped to media instead of relying on default-src (which correctly blocks it).

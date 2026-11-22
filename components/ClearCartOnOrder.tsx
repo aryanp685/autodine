@@ -28,6 +28,7 @@
 import { useEffect, useRef } from 'react';
 import { useCart } from '@/components/CartProvider';
 import { browserStorage, rememberLastCart } from '@/lib/guest-orders';
+import { clearPendingOrderAttempt } from '@/lib/order-recovery';
 
 export function ClearCartOnOrder({ clear, slug }: { clear: boolean; slug?: string }) {
   const cart = useCart();
@@ -39,6 +40,8 @@ export function ClearCartOnOrder({ clear, slug }: { clear: boolean; slug?: strin
     // the first render.
     if (!clear || done.current || !cart.ready) return;
     done.current = true;
+    const storage = browserStorage();
+    if (slug) clearPendingOrderAttempt(storage, slug);
     if (cart.count === 0) return;
 
     /*
@@ -54,7 +57,7 @@ export function ClearCartOnOrder({ clear, slug }: { clear: boolean; slug?: strin
      * confirmation page) and before the clear, so a failed or cancelled order
      * leaves the guest's cart exactly as it was.
      */
-    rememberLastCart(browserStorage(), slug ?? '', cart.lines);
+    rememberLastCart(storage, slug ?? '', cart.lines);
     cart.clear();
   }, [clear, cart, slug]);
 

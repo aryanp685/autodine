@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { kitchenOrders, restaurant, type KitchenOrder } from '@/lib/demo-data';
@@ -18,26 +19,36 @@ import {
 } from '@/components/owner/chrome';
 import type { OutletBar } from '@/lib/outlets';
 import type { CancelledTicket, KitchenScreenData, KitchenTicket, KitchenWaiterCall } from '@/lib/db/kitchen-screen';
+import {
+  formatKotHandoffSlip,
+  kotHandoffLabel,
+  normalizeKotHandoffStatus,
+  type KotHandoffStatus,
+} from '@/lib/operating-mode';
 import { claimKitchenSpeaker, type KitchenSpeakerState } from '@/lib/kitchen-speaker-lock';
 import { readMissedOrderIds, writeMissedOrderIds } from '@/lib/kitchen-missed';
 import { clockTimeInZone } from '@/lib/db/time';
-import { printKitchenKot } from '@/lib/kot-print';
 import { confirmedPrepChange, LATE_AFTER_MIN, WARN_AFTER_MIN, nextPrepState, type PrepState } from '@/lib/db/prep';
 import {
   advanceOrderAction,
   claimKitchenOrderAnnouncementAction,
   claimTableWaiterCallAnnouncementAction,
   recordKitchenAnnouncementResultAction,
+  recordOrderKotHandoffAction,
   recordTableWaiterCallAnnouncementAction,
   resolveTableWaiterCallAction,
+  sendKotHandoffWebhookAction,
 } from '@/app/(staff)/kitchen/actions';
 import { HeldTableStrip } from '@/components/owner/HeldTableStrip';
 import { cancelStaffOrderAction } from '@/app/orders/actions';
 import { SignInPrompt } from '@/components/SignInPrompt';
 import {
-  advanceText,
+  // advanceText/cancelText retained for backward compat (deprecated, no longer auto-spoken)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  advanceText as _advanceText,
   announceLogLabel,
-  cancelText,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  cancelText as _cancelText,
   createAnnounceQueue,
   newOrderText,
   newOrderTextEn,
@@ -63,10 +74,13 @@ import { createDualSpeech } from '@/lib/dual-speech';
 import {
   buildKitchenAnnouncement,
   DEFAULT_DIALECT,
-  DIALECT_LABELS,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  DIALECT_LABELS as _DIALECT_LABELS,
   type AnnouncementDialect,
 } from '@/lib/voice-personality';
 import { voiceLabel } from '@/lib/tts-voices';
+import { useInStaffShell } from '@/components/owner/StaffShell';
+import { useAnnouncementsOptional } from '@/components/announcements/GlobalAnnouncementProvider';
 
 /* The thresholds live next to the query that computes the age, so the badge
    and the board cannot disagree about what "late" means. */
@@ -147,6 +161,9 @@ type BoardTicket = {
   }[];
   announcementStatus?: 'announced' | 'failed' | null;
   announcementError?: string | null;
+  kotHandoffStatus?: KotHandoffStatus;
+  kotHandoffAt?: string | null;
+  kotHandoffRef?: string | null;
 };
 
 type LogEntry = { key: string; at: string; label: string; text: string; status: 'queued' | 'completed' | 'failed' | 'cancelled' };
@@ -179,6 +196,9 @@ function fromLive(ticket: KitchenTicket): BoardTicket {
     items: ticket.items,
     announcementStatus: ticket.announcementStatus,
     announcementError: ticket.announcementError,
+    kotHandoffStatus: ticket.kotHandoffStatus ?? 'pending',
+    kotHandoffAt: ticket.kotHandoffAt ?? null,
+    kotHandoffRef: ticket.kotHandoffRef ?? null,
   };
 }
 
@@ -292,8 +312,17 @@ export function Kitchen({
   signOut?: boolean;
 }) {
   const router = useRouter();
+  const inShell = useInStaffShell();
+  // When inside StaffShell, the global announcement provider handles all order+waiter announcements.
+  // Local announcement effects become NO-OP to prevent duplicate listeners/voice.
+  const useGlobalAnnouncements = inShell;
+  // One Sound switch: inside the shell the provider's setting decides whether
+  // anything is spoken, and this board's control edits that same setting.
+  const announcements = useAnnouncementsOptional();
+  const providerSoundOn = useGlobalAnnouncements ? announcements?.settings.soundOn : undefined;
 
   const [audio, setAudio] = useState(true);
+  const audioOn = providerSoundOn ?? audio;
   const [speaksHere, setSpeaksHere] = useState(true);
   const [voiceName, setVoiceName] = useState<string | null>(null);
   /** Every Hindi voice installed here, so a bad default can be swapped. */
@@ -361,6 +390,9 @@ export function Kitchen({
   const [cancelBusy, setCancelBusy] = useState<string | null>(null);
   const [waiterCallBusy, setWaiterCallBusy] = useState<string | null>(null);
   const [waiterCallError, setWaiterCallError] = useState('');
+  const [handoffPending, setHandoffPending] = useState<Record<string, KotHandoffStatus>>({});
+  const [handoffBusyId, setHandoffBusyId] = useState<string | null>(null);
+  const [copiedSlipId, setCopiedSlipId] = useState<string | null>(null);
   /**
    * What the queue is doing, not what it was asked to do.
    *
@@ -389,11 +421,15 @@ export function Kitchen({
   const live = Boolean(data);
   const restaurantId = data?.restaurantId ?? null;
   const waiterCalls = data?.waiterCalls ?? EMPTY_WAITER_CALLS;
+  const operatingMode = data?.operatingMode ?? outlet?.operatingMode ?? 'mode_b';
+  const posIntegrationName = data?.posIntegrationName ?? outlet?.posIntegrationName ?? null;
+  const isModeA = operatingMode === 'mode_a';
+  const canManageWebhook = data?.role === 'owner' || data?.role === 'manager';
 
   // The speaker closure is built once, so it reads these through refs rather
   // than capturing the values they had at first render.
-  const audioRef = useRef(audio);
-  audioRef.current = audio;
+  const audioRef = useRef(audioOn);
+  audioRef.current = audioOn;
   const speaksRef = useRef(speaksHere);
   speaksRef.current = speaksHere;
 
@@ -815,13 +851,18 @@ export function Kitchen({
    * (and disappears with the next server payload), a demo ticket's by its
    * sample id (and simply stays until the page is reloaded).
    */
-  const orders = base.map((ticket) =>
-    ticket.orderId && pending[ticket.orderId]
-      ? { ...ticket, state: pending[ticket.orderId]! }
-      : !ticket.orderId && demoState[ticket.key]
-        ? { ...ticket, state: demoState[ticket.key] }
-        : ticket,
-  );
+  const orders = base.map((ticket) => {
+    const withPrep =
+      ticket.orderId && pending[ticket.orderId]
+        ? { ...ticket, state: pending[ticket.orderId]! }
+        : !ticket.orderId && demoState[ticket.key]
+          ? { ...ticket, state: demoState[ticket.key] }
+          : ticket;
+    if (withPrep.orderId && handoffPending[withPrep.orderId]) {
+      return { ...withPrep, kotHandoffStatus: handoffPending[withPrep.orderId] };
+    }
+    return withPrep;
+  });
 
   /* ------------------------------------------------------- arrival highlight */
 
@@ -879,9 +920,10 @@ export function Kitchen({
   }, [orders]);
 
   /* ------------------------------------------------------------ what to say */
-
+  // Delegated to GlobalAnnouncementProvider when inside StaffShell (prevents duplicate listeners).
+  // Keep priming for standalone/demo/test renders where there is no global provider.
   useEffect(() => {
-    if (!live) return;
+    if (!live || useGlobalAnnouncements) return;
 
     if (!primedRef.current) {
       primedRef.current = true;
@@ -1004,9 +1046,51 @@ export function Kitchen({
 
   }, [orders, live, restaurantId, speak, settled, voiceState, speakerState, changeMissed]);
 
-  /** One elected kitchen device claims and speaks each new table-service call. */
+  /**
+   * Inside StaffShell the provider owns the voice, but the board still keeps
+   * its own "not read out" queue: an order that arrives while Sound is off is
+   * listed here so the pass can replay it from this screen once sound is back.
+   * Nothing is spoken here — the visible order and the replay action are the
+   * whole job (the provider speaks when Sound is on).
+   */
   useEffect(() => {
-    if (!live || !restaurantId || !waiterCalls.length || !settled) return;
+    if (!live || !useGlobalAnnouncements) return;
+
+    if (!primedRef.current) {
+      primedRef.current = true;
+      const persisted = readSeen(restaurantId);
+      const { seen, missed: offered } = primeOnOpen(orders, persisted, Date.now());
+      seenRef.current = new Set(seen);
+      writeSeen(restaurantId, seen);
+      const savedMissedIds = new Set(readMissedOrderIds(kitchenStorage(), restaurantId));
+      const restoredMissed = orders.filter((ticket) => ticket.orderId && savedMissedIds.has(ticket.orderId));
+      const combinedMissed = [...offered, ...restoredMissed.filter((ticket) => !offered.some((row) => row.orderId === ticket.orderId))];
+      missedRef.current = combinedMissed;
+      setMissed(combinedMissed);
+      writeMissedOrderIds(kitchenStorage(), restaurantId, combinedMissed.flatMap((ticket) => ticket.orderId ? [ticket.orderId] : []));
+      return;
+    }
+
+    const fresh = selectNewTickets(orders, seenRef.current);
+    if (fresh.length === 0) return;
+    for (const ticket of fresh) {
+      if (ticket.orderId) seenRef.current.add(ticket.orderId);
+    }
+    writeSeen(restaurantId, [...seenRef.current]);
+
+    // Sound on: the provider's poll read these out (or will on its next pass).
+    if (audioOn) return;
+
+    setMissedReason('muted');
+    changeMissed((current) => [
+      ...fresh.filter((ticket) => ticket.orderId && !current.some((item) => item.orderId === ticket.orderId)),
+      ...current,
+    ].slice(0, MISSED_LIMIT));
+  }, [orders, live, restaurantId, useGlobalAnnouncements, audioOn, changeMissed]);
+
+  /** One elected kitchen device claims and speaks each new table-service call. Delegated to global provider inside StaffShell. */
+  useEffect(() => {
+    if (!live || !restaurantId || !waiterCalls.length || !settled || useGlobalAnnouncements) return;
     if (voiceState === 'starting' || speakerState === 'claiming') return;
     let cancelled = false;
 
@@ -1067,35 +1151,7 @@ export function Kitchen({
     return () => { cancelled = true; };
   }, [waiterCalls, live, restaurantId, speak, settled, voiceState, speakerState, audio, speaksHere]);
 
-  /* ------------------------------------------------------- cancelled tickets */
-
-  useEffect(() => {
-    if (!live || !data) return;
-
-    const list = data.cancelled ?? [];
-
-    // On open, everything already cancelled is history. Reading fifteen
-    // minutes of cancellations out loud the moment the board wakes up would
-    // teach the kitchen to ignore the announcement that matters.
-    if (!cancelPrimedRef.current) {
-      cancelPrimedRef.current = true;
-      for (const row of list) cancelSeenRef.current.add(row.id);
-      return;
-    }
-
-    for (const row of list) {
-      if (cancelSeenRef.current.has(row.id)) continue;
-      cancelSeenRef.current.add(row.id);
-
-      // 'order' priority: this is a stop instruction, not a status note.
-      speak(
-        `cancel:${row.id}`,
-        cancelText(row.table),
-        `${row.table} · cancelled`,
-        'order',
-      );
-    }
-  }, [data, live, speak]);
+  /* Cancelled tickets: display only — cancellation voice removed per strict scope (only order + waiter) */
 
   /* --------------------------------------------------------------- delivery */
 
@@ -1153,12 +1209,18 @@ export function Kitchen({
    * more than a missing tap.
    */
   const status: Status | null = useMemo(() => {
-    if (!audio) {
+    if (!audioOn) {
       return {
         tone: 'alert',
         title: 'Sound is off.',
         body: 'New orders will appear on this board but will not be announced. The kitchen will not hear them.',
-        action: { label: 'Turn sound on', run: () => setAudio(true) },
+        action: {
+          label: 'Turn sound on',
+          run: () => {
+            if (useGlobalAnnouncements && announcements) announcements.setSettings({ soundOn: true });
+            setAudio(true);
+          },
+        },
       };
     }
 
@@ -1236,7 +1298,7 @@ export function Kitchen({
     }
 
     return null;
-  }, [audio, live, speaksHere, stalled, lostCount, voiceState, gestureDone, speakerState]);
+  }, [audioOn, live, speaksHere, stalled, lostCount, voiceState, gestureDone, speakerState]);
 
   /**
    * Move focus to the note, after it exists.
@@ -1290,7 +1352,7 @@ export function Kitchen({
       setError('');
       setDemoState((current) => ({ ...current, [ticket.key]: next }));
       setMoved(movedLine(ticket, next));
-      speak(`demo:${ticket.key}:${next}`, advanceText(ticket.table, next), ticket.table, 'info');
+      // Status voice removed per strict scope
       return;
     }
 
@@ -1328,7 +1390,7 @@ export function Kitchen({
     }
     const announcedState = confirmedPrepChange(ticket.state, result);
     if (announcedState) {
-      speak(`adv:${ticket.orderId}:${announcedState}`, advanceText(ticket.table, announcedState), ticket.table, 'info');
+      // Status voice removed per strict scope
     }
   };
 
@@ -1357,7 +1419,7 @@ export function Kitchen({
     if (!ticket.orderId) {
       setConfirmCancel(null);
       setDemoCancelled((current) => [...current, ticket.key]);
-      speak(`demo-cancel:${ticket.key}`, cancelText(ticket.table), `${ticket.table} · cancelled`, 'order');
+      // Cancel voice removed per strict scope (only order + waiter)
       return;
     }
 
@@ -1375,7 +1437,7 @@ export function Kitchen({
 
     setCancelled((current) => (current.includes(id) ? current : [...current, id]));
     cancelSeenRef.current.add(id);
-    speak(`cancel:${id}`, cancelText(ticket.table), `${ticket.table} · cancelled`, 'order');
+    // Cancel voice removed per strict scope
     // Pick up anything that moved on another screen at the same time.
     refresh();
   };
@@ -1397,6 +1459,67 @@ export function Kitchen({
       setWaiterCallBusy(null);
     }
   };
+
+  const copyKotSlip = async (ticket: BoardTicket) => {
+    const slip = formatKotHandoffSlip(ticket, posIntegrationName);
+    try {
+      await navigator.clipboard?.writeText(slip);
+      setCopiedSlipId(ticket.key);
+      setTimeout(() => {
+        setCopiedSlipId((curr) => (curr === ticket.key ? null : curr));
+      }, 2200);
+    } catch {
+      setError('Could not copy the KOT handoff slip to the clipboard.');
+    }
+  };
+
+  const toggleKotHandoff = async (ticket: BoardTicket, next: 'pending' | 'entered_in_pos') => {
+    if (!ticket.orderId || handoffBusyId) return;
+    setHandoffBusyId(ticket.orderId);
+    setError('');
+    setHandoffPending((curr) => ({ ...curr, [ticket.orderId!]: next }));
+    try {
+      const result = await recordOrderKotHandoffAction(ticket.orderId, next);
+      if (!result.ok) {
+        setHandoffPending((curr) => {
+          const copy = { ...curr };
+          delete copy[ticket.orderId!];
+          return copy;
+        });
+        setError(result.error);
+        return;
+      }
+      refresh();
+    } finally {
+      setHandoffBusyId(null);
+    }
+  };
+
+  const sendWebhookHandoff = async (ticket: BoardTicket) => {
+    if (!ticket.orderId || handoffBusyId) return;
+    setHandoffBusyId(ticket.orderId);
+    setError('');
+    try {
+      const result = await sendKotHandoffWebhookAction(ticket.orderId);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setHandoffPending((curr) => ({ ...curr, [ticket.orderId!]: 'webhook_sent' }));
+      refresh();
+    } finally {
+      setHandoffBusyId(null);
+    }
+  };
+
+  const pendingHandoffCount = isModeA
+    ? orders.filter(
+        (o) =>
+          o.state !== 'served' &&
+          normalizeKotHandoffStatus(o.kotHandoffStatus) !== 'entered_in_pos' &&
+          normalizeKotHandoffStatus(o.kotHandoffStatus) !== 'webhook_sent',
+      ).length
+    : 0;
 
   /**
    * Whether prep-advancement controls may write.
@@ -1422,7 +1545,8 @@ export function Kitchen({
     },
   ];
 
-  const latest = orders.find((order) => order.state !== 'served') ?? orders[0];
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _latest = orders.find((order) => order.state !== 'served') ?? orders[0];
 
   /**
    * Representative sample built with the same formatter as real tickets:
@@ -1564,20 +1688,24 @@ export function Kitchen({
               button: pressing it is the only thing you can do to it. */}
           <button
             type="button"
-            aria-pressed={audio}
-            onClick={() => setAudio((value) => !value)}
-            title={audio ? 'Turn the announcements off on this screen' : 'Turn the announcements on'}
+            aria-pressed={audioOn}
+            onClick={() => {
+              const next = !audioOn;
+              if (useGlobalAnnouncements && announcements) announcements.setSettings({ soundOn: next });
+              setAudio(next);
+            }}
+            title={audioOn ? 'Turn the announcements off on this screen' : 'Turn the announcements on'}
             className={[
               /* A switch with a box drawn around it is two controls stacked: the
                  platform's outline inside a bordered pill. The row is the
                  control; the switch is its state. */
               'inline-flex h-9 items-center gap-2.5 rounded-full px-2 text-[12.5px] font-medium transition-colors',
               'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]',
-              audio ? 'text-gink' : 'text-gink-64 hover:text-gink',
+              audioOn ? 'text-gink' : 'text-gink-64 hover:text-gink',
             ].join(' ')}
           >
-            <SwitchTrack on={audio} />
-            Kitchen audio {audio ? 'on' : 'off'}
+            <SwitchTrack on={audioOn} />
+            Kitchen audio {audioOn ? 'on' : 'off'}
           </button>
 
           {/* Which language the pass speaks. The user's own words: "Hindi me
@@ -1592,64 +1720,14 @@ export function Kitchen({
             options={[
               { value: 'hi', label: 'हिन्दी' },
               { value: 'en', label: 'English' },
-              { value: 'hinglish', label: 'Hinglish' },
             ]}
           />
 
-          {/* Speed. The base pace is already brisk; this is the operator's
-              trim around it, because a hurried Hindi voice is what sounds
-              slurred and every room is different. */}
-          <Segmented
-            label="आवाज़ की रफ़्तार — voice speed"
-            size="sm"
-            value={speed}
-            onChange={(next) => {
-              setSpeed(next);
-              speedRef.current = next;
-              speechRef.current?.setRateScale(SPEEDS[next]);
-            }}
-            options={[
-              { value: 'slow', label: 'धीमा' },
-              { value: 'normal', label: 'सामान्य' },
-              { value: 'fast', label: 'तेज़' },
-            ]}
-          />
+          {/* Speed control removed per strict scope: exactly 4 controls (Sound, Language, Voice, Test) */}
 
-          {/* Which desi dialect the voice speaks. Same facts either way --
-              which table, what arrived -- said the way this room talks.
-              Hindi only: an English announcement has no dialect to choose. */}
-          {announceLang === 'hi' && (
-            <Segmented
-              label="बोली — announcement style"
-              size="sm"
-              value={dialect}
-              onChange={(next) => setDialect(next)}
-              options={[
-                { value: 'nagpuri', label: DIALECT_LABELS.nagpuri },
-                { value: 'mumbai', label: DIALECT_LABELS.mumbai },
-              ]}
-            />
-          )}
+          {/* Dialect removed: only Hindi/English per Language section */}
 
-          {/* Expressive desi personality. When on, the kitchen voice uses
-              rotated announcements in the chosen dialect (Nagpuri or Mumbai)
-              with automatic standard-Hindi fallback for safety-critical
-              notes. When off, the original plain Devanagari sentence is
-              used. Hindi only -- the personality does not translate. */}
-          {announceLang === 'hi' && (
-            <button
-              type="button"
-              aria-pressed={expressive}
-              title={expressive ? 'Turn off the expressive kitchen voice' : 'Turn on the expressive kitchen voice'}
-              onClick={() => setExpressive(!expressive)}
-              className={[
-                expressive ? 'text-gink' : 'text-gink-64 hover:text-gink',
-              ].join(' ')}
-            >
-              <SwitchTrack on={expressive} />
-              Desi voice {expressive ? 'on' : 'off'}
-            </button>
-          )}
+          {/* Desi voice toggle removed per strict scope */}
 
           {/* The exact runtime candidate is shown below, including its
               language tag. Names and language tags identify the browser voice;
@@ -1677,23 +1755,7 @@ export function Kitchen({
 
           <span className="mx-0.5 hidden h-5 w-px bg-hair sm:block" aria-hidden="true" />
 
-          {live && (
-            <button
-              type="button"
-              aria-pressed={speaksHere}
-              onClick={() => setSpeaksHere((value) => !value)}
-              title="Turn this off on a second screen in the same kitchen, so orders are not read out twice"
-              className={[
-                'h-9 rounded-full px-3 text-[12.5px] font-medium transition-colors',
-                'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--p-accent)]',
-                speaksHere
-                  ? 'bg-[color-mix(in_oklab,var(--p-accent)_12%,transparent)] text-gink'
-                  : 'text-gink-64 hover:bg-gink-07 hover:text-gink',
-              ].join(' ')}
-            >
-              {speaksHere ? 'This screen speaks' : 'Screen muted'}
-            </button>
-          )}
+          {/* This screen speaks removed: global provider handles dedup via DB claim */}
 
           <span className="ml-auto flex items-center gap-1.5">
             <button
@@ -1709,21 +1771,7 @@ export function Kitchen({
             >
               Test sample order
             </button>
-            <button
-              type="button"
-              disabled={!latest}
-              onClick={() => {
-                if (!latest) return;
-                replay(
-                  `new:${latest.orderId ?? latest.key}`,
-                  getAnnouncementText(latest),
-                  announceLogLabel(latest.table, latest.items),
-                );
-              }}
-              className={btn('quiet', 'sm')}
-            >
-              Replay latest
-            </button>
+            {/* Replay latest removed per strict scope: no replay controls */}
           </span>
         </div>
 
@@ -1875,7 +1923,7 @@ export function Kitchen({
                   <span className="min-w-0 flex-1 font-medium text-gink">{row.table} · cancelled</span>
                   <button
                     type="button"
-                    onClick={() => replay(`cancel-recovery:${row.id}:${Date.now()}`, cancelText(row.table), `${row.table} · cancelled`)}
+                    onClick={() => {/* Cancellation voice removed per strict scope: only order + waiter */}}
                     className="shrink-0 text-[11.5px] font-medium text-gink-64 underline underline-offset-2 hover:text-gink"
                   >Replay cancellation</button>
                 </li>
@@ -1893,7 +1941,7 @@ export function Kitchen({
                  the kitchen will hear. */
               title="Announcements"
               meta={
-                audio && speaksHere
+                audioOn && speaksHere
                   ? voiceState === 'ready'
                     ? `हिंदी · ${voiceName ?? 'voice'}`
                     : 'हिंदी · no voice on this device'
@@ -1956,6 +2004,29 @@ export function Kitchen({
         )}
 
         {data?.blocked && <SignInPrompt reason={data.blocked} screen="kitchen board" />}
+
+        {isModeA && !data?.blocked && (
+          <Notice
+            role="status"
+            tone="plain"
+            className="mb-0"
+            label={
+              <strong className="text-[12.5px] font-semibold text-gink">
+                Mode A · Alongside {posIntegrationName || 'your existing POS'}
+              </strong>
+            }
+            action={
+              <Link href="/dashboard/orders" className={btn('ghost', 'sm')}>
+                Handoff ledger &amp; CSV
+              </Link>
+            }
+          >
+            AutoDine handles QR ordering and the kitchen pass.{' '}
+            {pendingHandoffCount > 0
+              ? `${pendingHandoffCount} open ticket${pendingHandoffCount === 1 ? ' still needs' : 's still need'} POS billing handoff — copy the KOT slip or mark Entered in POS so nothing is punched twice.`
+              : 'All active tickets have been handed off to your billing POS.'}
+          </Notice>
+        )}
 
         {/* -------------------------------------------------- why nothing moves */}
 
@@ -2131,6 +2202,24 @@ export function Kitchen({
                     </p>
                   )}
 
+                  {isModeA && (
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <Tag
+                        tone={
+                          o.kotHandoffStatus === 'entered_in_pos' ||
+                          o.kotHandoffStatus === 'webhook_sent'
+                            ? 'live'
+                            : 'due'
+                        }
+                      >
+                        {kotHandoffLabel(normalizeKotHandoffStatus(o.kotHandoffStatus))}
+                      </Tag>
+                      {o.kotHandoffRef ? (
+                        <span className="tnum text-[11.5px] text-gink-46">Ref {o.kotHandoffRef}</span>
+                      ) : null}
+                    </div>
+                  )}
+
                   <Items order={o} compact={o.state === 'served'} />
 
                   {o.note && (
@@ -2140,38 +2229,6 @@ export function Kitchen({
                   )}
 
                   <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-hair pt-2.5">
-                    {o.orderId ? (
-                      <button
-                        type="button"
-                        className={btn('ghost', 'sm')}
-                        title="Open this kitchen ticket in browser print"
-                        aria-label={`Print KOT for order ${o.code}`}
-                        data-print-kot={o.orderId}
-                        onClick={() => {
-                          setError('');
-                          const opened = printKitchenKot({
-                            restaurantName: data?.restaurantName ?? restaurant.name,
-                            ticketCode: o.code,
-                            table: o.table,
-                            placedAt: o.placedAt,
-                            note: o.note ?? null,
-                            items: o.items.map((item) => {
-                              const detailParts = item.detail?.split(' · ').filter(Boolean) ?? [];
-                              return {
-                                quantity: item.qty,
-                                name: item.name,
-                                portion: item.portion ?? null,
-                                addons: item.addons ?? detailParts.filter((part) => part !== item.portion),
-                              };
-                            }),
-                          });
-                          if (!opened) setError('The print window was blocked. Allow pop-ups for this site, then print the KOT again.');
-                        }}
-                      >
-                        Print KOT
-                      </button>
-                    ) : null}
-
                     {interactive && o.state === 'new' && (
                       <button
                         type="button"
@@ -2282,6 +2339,52 @@ export function Kitchen({
                         </button>
                       )
                     ) : null}
+
+                    {isModeA && (
+                      <div className="mt-1 flex w-full flex-wrap items-center gap-1.5 border-t border-hair pt-2">
+                        <button
+                          type="button"
+                          onClick={() => void copyKotSlip(o)}
+                          className={btn('ghost', 'sm')}
+                        >
+                          {copiedSlipId === o.key ? 'KOT slip copied' : 'Copy KOT slip'}
+                        </button>
+                        {live && o.orderId && (
+                          <button
+                            type="button"
+                            disabled={handoffBusyId === o.orderId}
+                            onClick={() =>
+                              void toggleKotHandoff(
+                                o,
+                                o.kotHandoffStatus === 'entered_in_pos'
+                                  ? 'pending'
+                                  : 'entered_in_pos',
+                              )
+                            }
+                            className={btn(
+                              o.kotHandoffStatus === 'entered_in_pos' ? 'quiet' : 'ghost',
+                              'sm',
+                            )}
+                          >
+                            {handoffBusyId === o.orderId
+                              ? 'Saving…'
+                              : o.kotHandoffStatus === 'entered_in_pos'
+                                ? 'Reset POS handoff'
+                                : 'Entered in POS'}
+                          </button>
+                        )}
+                        {live && o.orderId && canManageWebhook && (
+                          <button
+                            type="button"
+                            disabled={handoffBusyId === o.orderId}
+                            onClick={() => void sendWebhookHandoff(o)}
+                            className={btn('quiet', 'sm')}
+                          >
+                            Sync POS webhook
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </article>
               ))}

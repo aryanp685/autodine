@@ -50,6 +50,7 @@ async function fixture(): Promise<Fixture> {
   for (const label of ['T1', 'T2']) {
     const table = (await db.query(`insert into dining_tables(restaurant_id,label) values($1,$2) returning id`, [restaurant, label])).rows[0].id;
     const token = randomUUID().replaceAll('-', '') + randomUUID().replaceAll('-', '');
+    await db.query('delete from table_qr_codes where table_id=$1',[table]);
     await db.query('insert into table_qr_codes(restaurant_id,table_id,public_token) values($1,$2,$3)', [restaurant, table, token]);
     tokens.push(token);
   }

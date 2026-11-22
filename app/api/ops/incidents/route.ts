@@ -8,7 +8,16 @@ import {
   IncidentTransitionError,
   type IncidentRecord,
 } from '@/lib/monitoring-incidents';
-import { realtimeIncidents } from '@/lib/incident-registry';
+import { operationalIncidents, realtimeIncidents } from '@/lib/incident-registry';
+
+/** Every tracker this console speaks for: kitchen realtime, plus the
+ *  operational kinds (email delivery, billing webhook) that otherwise exist
+ *  only as log lines an owner could page on but never acknowledge. */
+const TRACKERS = [realtimeIncidents, operationalIncidents] as const;
+
+function trackerOf(incidentId: string) {
+  return TRACKERS.find((tracker) => tracker.list().some((record) => record.incidentId === incidentId)) ?? null;
+}
 import { notifyIncident } from '@/lib/incident-notify';
 import { snapshotDeliveryTelemetry } from '@/lib/delivery-telemetry';
 
@@ -88,7 +97,7 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     if (action === 'list') {
-      const incidents = realtimeIncidents.list().map(present);
+      const incidents = TRACKERS.flatMap((tracker) => tracker.list()).map(present);
       // Per-instance delivery counters (tenant-free fixed vocabulary), so a
       // webhook or provider that started failing is visible without tailing
       // logs. Other instances counters are their own; the log is the record.
@@ -103,8 +112,10 @@ export async function POST(request: Request): Promise<Response> {
 
     const who = staff.context.role; // fixed vocabulary; never a user identifier
     try {
+      const tracker = trackerOf(incidentId);
+      if (!tracker) throw new IncidentTransitionError('unknown incident');
       if (action === 'escalate') {
-        const { record, outcome } = realtimeIncidents.escalate(incidentId, who);
+        const { record, outcome } = tracker.escalate(incidentId, who);
         if (outcome === 'escalated') {
           console.warn(formatIncidentLogLine('escalated', record));
           const delivery = await notifyIncident('incident_escalated', record);
@@ -114,8 +125,8 @@ export async function POST(request: Request): Promise<Response> {
         return NextResponse.json({ incident: present(record), delivery: 'already_escalated' }, { headers: { 'Cache-Control': 'no-store' } });
       }
       const record = action === 'acknowledge'
-        ? realtimeIncidents.acknowledge(incidentId, who)
-        : realtimeIncidents.resolve(incidentId, who);
+        ? tracker.acknowledge(incidentId, who)
+        : tracker.resolve(incidentId, who);
       const event = action === 'acknowledge' ? 'acknowledged' : 'resolved';
       console.info(formatIncidentLogLine(event, record));
       const delivery = await notifyIncident(action === 'acknowledge' ? 'incident_acknowledged' : 'incident_resolved', record);

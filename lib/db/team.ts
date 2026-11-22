@@ -80,6 +80,11 @@ export const INVITABLE_ROLES: Array<{ role: Exclude<MemberRole, 'owner'>; label:
     blurb: 'Takes payment at the counter and sees the day’s bills. No menu or settings changes.',
   },
   {
+    role: 'waiter',
+    label: 'Waiter',
+    blurb: 'Takes table & counter orders, confirms held tables and handles waiter calls. No payment settlement or settings.',
+  },
+  {
     role: 'kitchen',
     label: 'Kitchen',
     blurb: 'Sees the kitchen board and moves tickets along. No bills, no settings.',
@@ -88,12 +93,26 @@ export const INVITABLE_ROLES: Array<{ role: Exclude<MemberRole, 'owner'>; label:
 
 /** What a role may open, in one place. Mirrors the RLS policies. */
 export function roleLabel(role: MemberRole): string {
-  return role === 'owner' ? 'Owner' : role === 'manager' ? 'Manager' : role === 'cashier' ? 'Cashier' : 'Kitchen';
+  return role === 'owner'
+    ? 'Owner'
+    : role === 'manager'
+      ? 'Manager'
+      : role === 'cashier'
+        ? 'Cashier'
+        : role === 'waiter'
+          ? 'Waiter'
+          : 'Kitchen';
 }
 
 /** Where a role lands after signing in. */
 export function homeForRole(role: MemberRole): string {
-  return role === 'kitchen' ? '/kitchen' : role === 'cashier' ? '/cashier' : '/dashboard';
+  return role === 'kitchen'
+    ? '/kitchen'
+    : role === 'cashier'
+      ? '/cashier'
+      : role === 'waiter'
+        ? '/dashboard/orders'
+        : '/dashboard';
 }
 
 export async function getTeamScreenData(): Promise<TeamScreenData | null> {

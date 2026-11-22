@@ -65,9 +65,16 @@ vi.mock('@/lib/supabase/env', () => ({
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: async () => ({
-    rpc: async (name: string, params: Record<string, unknown>) => state.rpc!(name, params),
+    rpc: (name: string, params: Record<string, unknown>) => {
+      const answer = state.rpc!(name, params);
+      return Object.assign(answer, { maybeSingle: () => answer });
+    },
   }),
 }));
+
+/* An async Server Component that renderToStaticMarkup cannot render; it is SEO
+   metadata, not part of the throttle contract under test. */
+vi.mock('@/components/StructuredData', () => ({ default: () => null }));
 
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => {
@@ -173,21 +180,23 @@ async function cleanup(db: Client) {
   // re-enabled in a finally so a failed cleanup cannot leave it off.
   await db.query('alter table public.restaurant_invoice_lines disable trigger restaurant_invoice_lines_immutable');
   await db.query('alter table public.restaurant_invoices disable trigger restaurant_invoices_immutable');
+  await db.query('alter table public.order_status_events disable trigger order_status_events_immutable');
   try {
     await db.query(`delete from public.restaurant_invoice_lines where restaurant_id = ${restaurantId}`, [SLUG]);
     await db.query(`delete from public.restaurant_payment_receipts where restaurant_id = ${restaurantId}`, [SLUG]);
     await db.query(`delete from public.restaurant_invoices where restaurant_id = ${restaurantId}`, [SLUG]);
+    await db.query(`delete from public.restaurant_invoice_series where restaurant_id = ${restaurantId}`, [SLUG]);
+    await db.query(`delete from public.payment_audit_events where restaurant_id = ${restaurantId}`, [SLUG]);
+    await db.query(`delete from public.payments where restaurant_id = ${restaurantId}`, [SLUG]);
+    await db.query(
+      'delete from public.orders where restaurant_id = (select id from public.restaurants where slug = $1)',
+      [SLUG],
+    );
   } finally {
+    await db.query('alter table public.order_status_events enable trigger order_status_events_immutable');
     await db.query('alter table public.restaurant_invoices enable trigger restaurant_invoices_immutable');
     await db.query('alter table public.restaurant_invoice_lines enable trigger restaurant_invoice_lines_immutable');
   }
-  await db.query(`delete from public.restaurant_invoice_series where restaurant_id = ${restaurantId}`, [SLUG]);
-  await db.query(`delete from public.payment_audit_events where restaurant_id = ${restaurantId}`, [SLUG]);
-  await db.query(`delete from public.payments where restaurant_id = ${restaurantId}`, [SLUG]);
-  await db.query(
-    'delete from public.orders where restaurant_id = (select id from public.restaurants where slug = $1)',
-    [SLUG],
-  );
   await db.query('delete from public.restaurants where slug = $1', [SLUG]);
   await db.query('delete from public.profiles where id = any($1::uuid[])', [[KITCHEN_ID, CASHIER_ID]]);
 }
@@ -244,6 +253,7 @@ describe.skipIf(!DB)('throttling, against a real PostgreSQL', () => {
       `insert into public.dining_tables (restaurant_id, label, is_active) values ($1, 'T1', true) returning id`,
       [restaurantId],
     );
+    await db.query('delete from table_qr_codes where table_id=$1',[table.rows[0].id]);
     await db.query(
       `insert into public.table_qr_codes (restaurant_id, table_id, public_token) values ($1, $2, $3)`,
       [restaurantId, table.rows[0].id, 'throttleit000000000000000000000000000000000000000000000000001'],
@@ -252,6 +262,7 @@ describe.skipIf(!DB)('throttling, against a real PostgreSQL', () => {
       `insert into public.dining_tables (restaurant_id, label, is_active) values ($1, 'T2', true) returning id`,
       [restaurantId],
     );
+    await db.query('delete from table_qr_codes where table_id=$1',[secondTable.rows[0].id]);
     await db.query(
       `insert into public.table_qr_codes (restaurant_id, table_id, public_token) values ($1, $2, $3)`,
       [restaurantId, secondTable.rows[0].id, CARD2],

@@ -42,7 +42,8 @@ describe('Kitchen board', () => {
     expect(html).toContain('aria-label="Announcement language"');
     expect(html).toContain('>हिन्दी<');
     expect(html).toContain('>English<');
-    expect(html).toContain('>Hinglish<');
+    // Hinglish removed per strict scope: only Hindi+English (exactly 4 controls), so assert it's gone
+    expect(html).not.toContain('>Hinglish<');
   });
 
   it('names the voice it will use rather than promising Hindi blindly', () => {
@@ -63,12 +64,12 @@ describe('Kitchen board', () => {
     expect(html).toContain('हाफ बटर नान एक्स्ट्रा चीज़ के साथ');
   });
 
-  it('lets the operator slow the voice down from the board itself', () => {
+  it('does not expose speed controls — exactly 4 controls (Sound, Language, Voice, Test)', () => {
     const html = renderToStaticMarkup(<Kitchen />);
-
-    for (const label of ['धीमा', 'सामान्य', 'तेज़']) expect(html).toContain(label);
-    // One of them is the current setting, and the board says which.
-    expect(html).toMatch(/aria-pressed="true"[^<]*>सामान्य</);
+    // Speed controls removed per strict scope; assert they are gone
+    expect(html).not.toContain('धीमा');
+    expect(html).not.toContain('तेज़');
+    expect(html).not.toContain('सामान्य');
   });
 
   it('does not claim to be speaking when it has said nothing', () => {
@@ -134,7 +135,7 @@ describe('Kitchen board', () => {
     expect(html).not.toContain('Demo board · local only');
   });
 
-  it('offers browser KOT printing only for real live tickets', () => {
+  it('keeps kitchen tickets strictly screen-first with no KOT print buttons', () => {
     const html = renderToStaticMarkup(
       <Kitchen
         data={{
@@ -156,8 +157,8 @@ describe('Kitchen board', () => {
         }}
       />,
     );
-    expect(html).toContain('data-print-kot="order-1"');
-    expect(html).toContain('Print KOT');
+    expect(html).not.toContain('data-print-kot');
+    expect(html).not.toContain('Print KOT');
     expect(renderToStaticMarkup(<Kitchen />)).not.toContain('data-print-kot');
   });
 

@@ -85,3 +85,30 @@ describe('the rail for one role', () => {
     expect(groupsForRole(undefined)).toHaveLength(SHELL_GROUPS.length);
   });
 });
+
+describe('shell-links operating mode adaptation', () => {
+  it('keeps Counter, Invoices, and Reports visible in Mode B (default)', () => {
+    const ownerLinks = linksForRole('owner', 'mode_b').map((l) => l.key);
+    expect(ownerLinks).toContain('counter');
+    expect(ownerLinks).toContain('invoices');
+    expect(ownerLinks).toContain('reports');
+    expect(ownerLinks).toContain('kitchen');
+    expect(ownerLinks).toContain('orders');
+  });
+
+  it('hides Counter, Invoices, and Reports in Mode A while keeping QR ordering, Orders, Kitchen, and Settings', () => {
+    const ownerLinks = linksForRole('owner', 'mode_a').map((l) => l.key);
+    expect(ownerLinks).not.toContain('counter');
+    expect(ownerLinks).not.toContain('invoices');
+    expect(ownerLinks).not.toContain('reports');
+    expect(ownerLinks).toContain('overview');
+    expect(ownerLinks).toContain('orders');
+    expect(ownerLinks).toContain('kitchen');
+    expect(ownerLinks).toContain('menus');
+    expect(ownerLinks).toContain('tables');
+    expect(ownerLinks).toContain('settings');
+
+    const cashierGroups = groupsForRole('cashier', 'mode_a');
+    expect(cashierGroups.flatMap((g) => g.links.map((l) => l.key))).toEqual(['orders']);
+  });
+});

@@ -25,23 +25,24 @@ These rules apply to every coding agent, developer task, test, and deployment. R
 - GST calculations must follow a formally approved tax policy; do not infer policy from sample/demo values or existing implementation.
 - Until approval, GST-dependent functionality must remain safely gated and fail closed. Preserve existing safe behavior; do not make a tax calculation appear compliant by guessing.
 
-### GST two-mode billing — owner-approved scope (2026-11-14)
+### GST two-mode billing — owner-approved scope (2026-11-14; extended 2026-11-21 to Billing Spec v2.0)
 
-The owner approved building the two-mode GST system on 2026-11-14 (decisions quoted from the approval):
-- **Normal receipts (GST off)** — unchanged historical behaviour; the default for every restaurant.
+The owner approved building the two-mode GST system on 2026-11-14 and extending it to **Billing Spec v2.0** (`docs/BILLING_SPEC.md`, `docs/GST_COMPLIANCE.md`) on 2026-11-21:
+- **Owner-facing two-mode toggle:** Mode 1 is **Normal Billing (GST Disabled)** (`receipt` / Bill / Cash Memo, unchanged default with explicit self-declaration when saved); Mode 2 is **GST Billing (GST Enabled)** where the owner selects either **Regular GST** or **Composition Scheme**.
 - **Composition Scheme** — issues a Bill of Supply, never a tax invoice; collects no GST; claims no ITC. Activation requires the GSTIN registration type to be `composition` plus the owner's acknowledgment of the ineligibility list (alcoholic liquor, tobacco, inter-State, e-commerce operator). No CMP-02 evidence reference is required. Statutory notice printed on every Bill of Supply.
 - **Regular GST** — exactly two profiles: 5% (other than specified premises, no ITC; Notification No. 11/2017-CT(Rate), Sl. 7(i), as amended) and 18% (specified premises only, w.e.f. 2025-04-01; Notification No. 05/2025-CT(Rate)). The 18% profile requires the specified-premises attestation. Menu prices are **tax-inclusive**; tax is extracted at document level (one rounding), never per line, and never recalculated after issue. Place of supply for restaurant services is always the outlet's state (CGST+SGST).
 - **e-Invoice** — no IRP provider is configured or approved. Applicability is decided at issue time (preceding-FY AATO > ₹5 crore, Notification No. 10/2023-CT as amended; B2C never applicable) and applicable B2B documents are issued `irp_status='pending'` — never presented as final tax invoices until a validated IRN exists; unknown AATO fails closed. B2B recipient capture exists only on Regular GST tax invoices (name/GSTIN/state-code derived/optional address+email); Composition bills and normal receipts refuse buyer details. `lib/gst/irp/` holds the provider-agnostic adapter interface, the deterministic offline sandbox used by tests and rehearsals (not an IRP), structural signed-QR validation and the IRP state machine; the append-only `restaurant_irp_requests` table audits every attempt with hashes only.
-- Restaurant checkout behaviour, IGST for restaurant services, per-item rates, exemptions, discounts (still disabled) and any other rate are all **out of scope** and remain locked. Discounts stay disabled until written financial policy approval exists.
+- **Billing Spec v2.0 extensions (2026-11-21 owner-approved roadmap):** Extend the checked-in billing system via additive migrations with `restaurants.fssai_number`, unified 58mm/80mm/A4/PDF bill branding, role-gated/audited item & bill discounts (applied before GST extraction), configurable charges (packaging/delivery/voluntary service charge), explicit round-off, split & partial counter payments, audited refunds, `DUPLICATE` reprint marking + audit log, Takeaway/Delivery counter billing, optional local ESC/POS Print Bridge for **customer bills/invoices only**, and expanded owner tax/register/Z-report reporting.
+- **Out of scope:** IGST for restaurant services, per-item GST rates, and unregistered GST collection remain prohibited.
 - GST documents are immutable at the database level; only the audited void transition is permitted. `restaurant_invoices` triggers enforce this for every role.
 
 ## Approved product and money decisions
 
 - Money is integer paise (`BIGINT` in SQL); never use floating-point money. The database is the source of truth for order pricing; clients do not submit trusted totals.
 - Preserve immutable order/item/payment snapshots and idempotency guarantees. Do not rewrite historical financial records as part of unrelated work.
-- Customer ordering is **pay at the counter only**. Do not turn on a payment gateway in guest checkout or add a payment-mode selector. Staff settlement remains the simple authorized “mark paid” action; “served” and “paid” are separate states.
+- Customer ordering is **pay at the counter only**. Do not turn on a payment gateway in guest checkout or add a payment-mode selector. Counter staff settlement handles single, split, partial, and refunded payments at the counter; “served” and “paid” are separate states.
 - One table has one open sitting/session; later guest submissions create separate tickets containing only the newly submitted items. Preserve the session link, guest-token idempotency, and payment ledger rather than merging or duplicating tickets.
-- Invoice, checkout, and printing behavior must follow the approved Invoice Spec v1.0 and the already-implemented flows. Browser/OS printing is the supported printing model; do not add printer hardware integrations without approval. Kitchen tickets remain screen-first; do not reintroduce KOT print without approval.
+- Customer bill/invoice printing supports Browser/OS CSS printing (`58mm`, `80mm`, `A4`), downloadable PDF, and the approved optional local **ESC/POS Print Bridge** for customer bills/invoices. **Kitchen KOT paper printing is NOT wanted and must be removed (`lib/kot-print.ts` and Kitchen print buttons); kitchen remains strictly screen-first + voice announcements.**
 - Kitchen announcements must retain the approved content in this order: order number, table, items, quantities, and guest note. Preserve deduplication and persistence. Call Waiter copy is `टेबल X, वेटर ध्यान दीजिए。` unless the user explicitly changes it.
 - For QR/session throttling, follow `docs/scan-limit-l1.md`: throttle verification/session minting only, never order submission; a refused scan does not create a session or order. Keep the race/idempotency guarantees covered by the database tests.
 - **Order submission is never throttled.** Throttle QR verification, session minting and other sensitive endpoints; never count or refuse a legitimate guest order. Migration `20261110000800` removed the per-session, per-restaurant and per-IP attempt budgets from `place_public_order` and `place_public_order_attempt`, keeping the session/tenant check, QR validation, idempotency and replay protection. A guard test in `lib/db/readiness.integration.test.ts` fails if any of those budget keys reappear in a function body.
@@ -62,13 +63,15 @@ The owner approved building the two-mode GST system on 2026-11-14 (decisions quo
 
 - Local migrations and tests may use only disposable, loopback PostgreSQL and synthetic data. Keep migrations additive/forward-only; never apply them to a hosted project without the required explicit approval and recovery gates.
 - Production is read-only unless separately authorized for a specific operation. Staging remains NO-GO: until operator acceptance, recovery evidence, and migration gates are satisfied, limit it to authorized read-only metadata/catalog inspection. No hosted DML, DDL, migrations, orders, side-effecting RPCs, or customer/staff messages as part of ordinary development or this merge task.
-- Online guest payments remain disabled. Do not invoke provider flows/RPCs, make real charges/refunds, or treat credentials/schema functions as an implemented guest payment path. Subscription billing has no approved/configured provider; provider-dependent actions must fail closed.
+- Online guest payments remain permanently disabled (**pay at counter only**). Do not invoke guest online payment RPCs or collect customer food funds through AutoDine.
+- **SaaS Subscription Billing uses Cashfree** (`docs/PAYMENT_ARCHITECTURE.md`): restaurants pay AutoDine for Starter/Professional/Business plans via Cashfree only. Until `BILLING_PROVIDER=cashfree` and Cashfree API/webhook secrets are configured in the environment, provider-dependent checkout/webhook actions must continue to fail closed.
 - Never print, copy, or commit secrets or environment values. Do not contact operators or send external messages; prepare material for the user to share.
 - Do not perform a Production deployment as an incidental side effect of a code task; verify deployment consequences and obtain separate authorization when needed.
 
 ## Source-of-truth map
 
 - This `AGENTS.md` is the cross-cutting source of truth for agents and development tasks.
+- Canonical product, architecture, billing, GST, and Cashfree payment specs: `docs/PRODUCT_REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/BILLING_SPEC.md`, `docs/GST_COMPLIANCE.md`, `docs/PAYMENT_ARCHITECTURE.md`.
 - Exact scan-throttle semantics: `docs/scan-limit-l1.md`; coverage and evidence: `docs/scan-throttle-coverage.md`.
 - Reproducible isolated browser E2E setup: `docs/e2e-local.md`; operator setup checklist: `docs/SETUP.md`.
 - Current readiness evidence and known integration gaps: `docs/website-readiness-audit.md` and `RELEASE-BLOCKER-REPORT.md`.
