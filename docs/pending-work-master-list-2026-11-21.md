@@ -378,3 +378,90 @@ How it was fixed, in the order that keeps every ledger honest:
 The 22 that remain ours are exactly the work production still needs — the GST/IRP block
 and the two QR files — so the merge and the rollout now point the same way.
 
+
+## 18. The `main` ↔ branch divergence: `main` is not a descendant of this branch's root
+
+Discovered while checking whether this branch could be rebased or merged. It cannot be
+merged by the ordinary route, and the reason is worth stating plainly.
+
+```
+git merge-base main HEAD          -> none
+git rev-list --count main         ->  13 commits, one root (bf594a9, 2026-11-21)
+git rev-list --count HEAD         -> 710 commits, one root (eb3da2d, 2026-10-18)
+gh api .../compare/main...<branch> -> 404 "No common ancestor"
+```
+
+`main` was re-created as a single squashed "Initial commit: AutoDine restaurant management
+platform" plus eleven commits and two merge commits (#206, #207). This branch descends from
+the original 710-commit history. So every file the two trees share is an *add/add*
+conflict — 263 of them — and a merge commit would have no parent relationship to fall back on.
+
+**What actually matters, measured, not assumed.** The migration inventories are the part
+that touches production:
+
+| Measure | Result |
+|---|---|
+| `comm -23` (versions in main, not here) | **0** files (the only entry is `.gitkeep`) |
+| `comm -13` (versions here, not in main) | **22** files |
+| same version, different filename | **0** |
+| same filename, different bytes | **1** — `20261118002200_qr_code_staff_boundary.sql` |
+
+So `main`'s migration set is a strict subset of ours, and the single real content
+divergence was that one file — which turned out to be the important one, because production
+applied **main's** body. See §19.
+
+**Recommended route (a history rewrite is not needed and is not proposed):**
+
+1. Land `main`'s content where it is authoritative — the 44 files `main` has that this
+   branch lacks (onboarding wizard, announcements, auth helpers, sitemap/robots, marketing
+   heroes) are a feature-set decision, not a migration one. They were never deleted here;
+   they were never added. That is an owner call about what ships, and it should be made
+   before any merge, not by a merge.
+2. Keep this branch's inventory as the source of truth for `supabase/migrations`, because it
+   is a superset and production's ledger is a subset of it.
+3. When the branch is ready, open it against `main` as a **squash** (one commit, no merge
+   parents), with the 44 `main`-only files re-applied in the same change if they are wanted.
+   A squash is the only GitHub operation that does not need a common ancestor.
+4. In the same change, run `register:migrations` and `verify:release` (130 files) so the
+   manifest and `EXPECTED_MIGRATIONS` match the tree that lands.
+
+## 19. `20261118002200` was not the same migration in both trees, and main's was the stronger one
+
+Production's ledger records `20261118002200_qr_code_staff_boundary` **and** the out-of-band
+`20261120190546_qr_code_staff_boundary`. Applying our weakest version first, then our
+renumbered pair, would have been a no-op on a database that already had the hosted body.
+
+What the two bodies differ in:
+
+| | `main`'s 02200 | this branch's 02200 (before this change) |
+|---|---|---|
+| unique partial index + duplicate heal | yes | **no** — moved to `20261122000500` |
+| `pg_advisory_xact_lock` serialising rotation | yes | **no** — `for update` on `dining_tables` only |
+| `table_verification_sessions` client revoke | yes | no |
+| header | full F-01/F-02/F-03 write-up | a short note |
+
+Because the invariant lived in a *different version*, the version-level set arithmetic in
+§17 said "no drift". It was not drift in the ledger; it was drift in the bytes. `02200` is now
+main's file unchanged, and `20261122000400`/`00500` carry only what their headers claim.
+
+**The measurement that caught it.** `scripts/local-pg/verify-qr-finding.mjs` withholds the
+fix files, reproduces the finding, then applies them. It had been withholding only `02200`,
+so the "pre-fix" database still had the invariant from the pair and the script printed
+`Finding QR-01/QR-02 NOT reproduced`. With all three files withheld, on main's body:
+
+```
+PRE-FIX   outsider rotate         SUCCEEDED (vulnerable) — 64-char token issued to a stranger
+PRE-FIX   outsider retire         SUCCEEDED (vulnerable)
+PRE-FIX   two rotations           issued 2 distinct tokens, 2 live cards   (the race)
+POST-FIX  outsider rotate/retire  refused 42501
+POST-FIX  owner rotates own code  allowed (64 chars)
+POST-FIX  two rotations           issued 2 distinct tokens, 1 live card, second session
+                                  queued 409 ms on the advisory lock
+Result: the isolation defect reproduces and the fix closes it; the invariant holds
+under a held lock.
+```
+
+Order matters and is now encoded: `20261122000400` (heal) → `20261118002200` (gates) →
+`20261122000500` (index + bodies). `02200` collapses duplicates and builds the index in one
+transaction; PostgreSQL refuses `CREATE INDEX` after the collapse leaves pending trigger
+events, which is exactly why the hosted correction split it.

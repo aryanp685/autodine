@@ -8,7 +8,7 @@ applied by generating or reading it, and `NOT AUTHORIZED` means exactly that.
 - Files on disk: **130**
 - Manifest rows: **130**
 - Ordering / uniqueness / coverage problems: **0**
-- Files containing DROP/TRUNCATE/DELETE statements: **63** (inventory below)
+- Files containing DROP/TRUNCATE/DELETE statements: **65** (inventory below)
 
 ## Per-file register
 
@@ -479,6 +479,9 @@ confirm that rather than trust it.
 ### `20261118002100_operational_realtime.sql`
 - `drop policy order_sessions_staff on public.order_sessions`
 
+### `20261118002200_qr_code_staff_boundary.sql`
+- `drop policy if exists table_qr_codes_staff_select on public.table_qr_codes`
+
 ### `20261118002300_qr_owner_management.sql`
 - `delete from public.dining_tables where id = p_table_id`
 
@@ -491,6 +494,9 @@ confirm that rather than trust it.
 ### `20261122000200_announcement_claim_and_table_delete_fixes.sql`
 - `delete from public.dining_tables where id = p_table_id`
 - `delete from public.kitchen_announcement_claims where order_id = p_order_id and claimed_at < statement_timestamp() - interval '2 minutes' and not exists ( select 1 from public.orders o where o.id = p_order_id and o.kitchen_announcement_statu`
+
+### `20261122000500_qr_one_active_per_table.sql`
+- `drop policy if exists table_qr_codes_staff_select on public.table_qr_codes`
 
 ## Authorization rules
 

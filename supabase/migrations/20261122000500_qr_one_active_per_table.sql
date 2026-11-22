@@ -1,11 +1,11 @@
 -- One live table QR at the database level, step 2: the invariant and the bodies.
 --
--- Ported from the hosted applications of the same correction (production ledger
--- 20261120190546_qr_code_staff_boundary, candidate 20261120190508) which had no
--- repository file. 20261118002200 added the membership gates but relied on a
--- `for update` row lock alone; this migration adds the invariant that survives a
--- writer which never takes that lock, and the advisory lock that serialises
--- rotation on the table id.
+-- This is the correction production applied out of band under ledger version
+-- 20261120190546_qr_code_staff_boundary (candidate 20261120190508), which had no
+-- repository file. It is not a restatement of 20261118002200: it carries the
+-- unique partial index, the duplicate-collapsing step before it, the
+-- pg_advisory_xact_lock that serialises rotation, and the RLS/EXECUTE
+-- re-assertions the hosted application was actually running.
 --
 -- Ordering note: this version is newer than every hosted ledger row, so a push of
 -- this directory ends on these bodies. That matters because 20261118002200 is
@@ -14,7 +14,7 @@
 --
 -- Re-running is safe: the index is IF NOT EXISTS and both functions are
 -- CREATE OR REPLACE. Duplicate live cards are collapsed by the previous file
--- (20261122000200), which is a separate transaction so its trigger events have
+-- (20261122000400), which is a separate transaction so its trigger events have
 -- flushed before this CREATE INDEX runs.
 
 create unique index if not exists table_qr_codes_one_active_per_table
@@ -128,3 +128,17 @@ revoke all on function public.rotate_table_qr_code(uuid) from public, anon;
 revoke all on function public.retire_table_qr_code(uuid) from public, anon;
 grant execute on function public.rotate_table_qr_code(uuid) to authenticated;
 grant execute on function public.retire_table_qr_code(uuid) to authenticated;
+
+-- Re-assert table_qr_codes RLS: anon gets nothing, authenticated only its own
+-- restaurant. Without this the pair would rewrite the functions and leave the
+-- table grants exactly as it found them.
+revoke all on public.table_qr_codes from anon;
+grant select on public.table_qr_codes to authenticated;
+
+drop policy if exists table_qr_codes_staff_select on public.table_qr_codes;
+create policy table_qr_codes_staff_select on public.table_qr_codes
+  for select to authenticated using (public.is_member(restaurant_id));
+
+-- Also ensure table_verification_sessions cannot be read directly by clients
+revoke all on public.table_verification_sessions from anon;
+revoke all on public.table_verification_sessions from authenticated;

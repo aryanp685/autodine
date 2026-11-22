@@ -38,7 +38,11 @@ try {
   const files = (await readdir('supabase/migrations')).filter((f) => f.endsWith('.sql')).sort();
   // The fix is three files: the membership gates and the one-live-card invariant
   // with its advisory lock. All three are withheld for the PRE-FIX half.
-  const FIXES = [FIX, ...EXTRA_FIXES];
+  // Healing first, then the gates and the index: 20261118002200 collapses
+  // duplicates and builds the index in ONE transaction, which PostgreSQL refuses
+  // once the collapse has left pending trigger events. The pair splits that, and
+  // 20261122000400 is the healing half, so it is applied before 02200 here.
+  const FIXES = [EXTRA_FIXES[0], FIX, EXTRA_FIXES[1]];
   for (const file of files.filter((f) => !FIXES.includes(f))) await db.query(await readFile(`supabase/migrations/${file}`, 'utf8'));
   step('migrations replayed without the fix', files.length - FIXES.length);
 
@@ -95,14 +99,17 @@ try {
       await c1.query('commit');
       const second = (await pending).rows[0].token;
       await c2.query('commit');
-      const waited = Date.now() - started - firstHold;
+      // Total time the second session spent inside the call. Subtracting the hold
+      // window would measure only what is left after the lock is released, which is
+      // the one number that cannot show serialisation.
+      const waited = Date.now() - started;
       const live = await liveCards();
       step(
         `${label}: two concurrent rotations`,
         `issued 2 distinct token(s), ${live} live card(s)` +
           (holdFirst ? `, second session queued ${Math.max(waited, 0)}ms on the lock` : ''),
       );
-      return { live, secondWaitedForLock: holdFirst && waited > 100, distinct: first !== second };
+      return { live, secondWaitedForLock: holdFirst && waited >= firstHold - 100, distinct: first !== second };
     } finally {
       await c1.end().catch(() => {});
       await c2.end().catch(() => {});
