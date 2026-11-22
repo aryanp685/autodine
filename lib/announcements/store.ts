@@ -123,6 +123,13 @@ export function updateSeenWithEvents(
   };
 }
 
+/** Remove one event from the seen set so a later poll can retry its claim. */
+export function releaseSeenEvent(seen: SeenState, event: AnnouncementEvent): SeenState {
+  return event.kind === 'order'
+    ? { ...seen, orderIds: seen.orderIds.filter((id) => id !== event.orderId) }
+    : { ...seen, waiterCallIds: seen.waiterCallIds.filter((id) => id !== event.callId) };
+}
+
 /** Add notifications, deduplicated by id, capped at MAX_NOTIFICATIONS. */
 export function addNotifications(
   existing: WrittenNotification[],
