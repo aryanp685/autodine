@@ -173,21 +173,23 @@ async function cleanup(db: Client) {
   // re-enabled in a finally so a failed cleanup cannot leave it off.
   await db.query('alter table public.restaurant_invoice_lines disable trigger restaurant_invoice_lines_immutable');
   await db.query('alter table public.restaurant_invoices disable trigger restaurant_invoices_immutable');
+  await db.query('alter table public.order_status_events disable trigger order_status_events_immutable');
   try {
     await db.query(`delete from public.restaurant_invoice_lines where restaurant_id = ${restaurantId}`, [SLUG]);
     await db.query(`delete from public.restaurant_payment_receipts where restaurant_id = ${restaurantId}`, [SLUG]);
     await db.query(`delete from public.restaurant_invoices where restaurant_id = ${restaurantId}`, [SLUG]);
+    await db.query(`delete from public.restaurant_invoice_series where restaurant_id = ${restaurantId}`, [SLUG]);
+    await db.query(`delete from public.payment_audit_events where restaurant_id = ${restaurantId}`, [SLUG]);
+    await db.query(`delete from public.payments where restaurant_id = ${restaurantId}`, [SLUG]);
+    await db.query(
+      'delete from public.orders where restaurant_id = (select id from public.restaurants where slug = $1)',
+      [SLUG],
+    );
   } finally {
+    await db.query('alter table public.order_status_events enable trigger order_status_events_immutable');
     await db.query('alter table public.restaurant_invoices enable trigger restaurant_invoices_immutable');
     await db.query('alter table public.restaurant_invoice_lines enable trigger restaurant_invoice_lines_immutable');
   }
-  await db.query(`delete from public.restaurant_invoice_series where restaurant_id = ${restaurantId}`, [SLUG]);
-  await db.query(`delete from public.payment_audit_events where restaurant_id = ${restaurantId}`, [SLUG]);
-  await db.query(`delete from public.payments where restaurant_id = ${restaurantId}`, [SLUG]);
-  await db.query(
-    'delete from public.orders where restaurant_id = (select id from public.restaurants where slug = $1)',
-    [SLUG],
-  );
   await db.query('delete from public.restaurants where slug = $1', [SLUG]);
   await db.query('delete from public.profiles where id = any($1::uuid[])', [[KITCHEN_ID, CASHIER_ID]]);
 }

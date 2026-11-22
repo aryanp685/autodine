@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { DishPhoto } from '@/components/DishPhoto';
 import { GuestFlow } from '@/components/GuestFlow';
 import { GuestTabs } from '@/components/GuestTabs';
+import { OrderRecoveryBanner } from '@/components/OrderRecoveryBanner';
 import { guestBrandStyle, type GuestBrandState } from '@/lib/branding/guest-theme';
 import { useCart } from '@/components/CartProvider';
 import { inr } from '@/lib/demo-data';
@@ -269,8 +270,24 @@ export function Cart({
         ) : null}
       </header>
 
+      {slug && !placedError ? (
+        <div className="px-4 pb-2">
+          <OrderRecoveryBanner slug={slug} mode="summary" />
+        </div>
+      ) : null}
+
       {placedError ? (
         <div className="px-4 pb-2">
+          {slug ? (
+            <div className="mb-2">
+              <OrderRecoveryBanner
+                slug={slug}
+                placedError={placedError}
+                placedErrorCode={placedErrorCode}
+                mode="summary"
+              />
+            </div>
+          ) : null}
           <div
             role="alert"
             data-place-error=""

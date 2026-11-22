@@ -37,6 +37,16 @@ export type BillPayment = {
   at: string;
 };
 
+export type BillStatusEvent = {
+  id: string;
+  eventType: string;
+  fromStatus: string | null;
+  toStatus: string;
+  actorRole: string | null;
+  detail: string | null;
+  at: string;
+};
+
 export type BillData = {
   restaurant: {
     name: string;
@@ -64,6 +74,7 @@ export type BillData = {
   lines: BillLine[];
   payments: BillPayment[];
   outstandingPaise: number;
+  statusEvents?: BillStatusEvent[];
 };
 
 const METHOD_LABEL: Record<string, string> = {

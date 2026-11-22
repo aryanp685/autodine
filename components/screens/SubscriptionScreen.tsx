@@ -116,7 +116,11 @@ export function SubscriptionScreen({
 
   async function run(action: () => Promise<SubscriptionActionResult>) {
     setFlash(null);
-    setFlash(await action());
+    const result = await action();
+    setFlash(result);
+    if (result.ok && result.checkoutUrl) {
+      window.location.assign(result.checkoutUrl);
+    }
   }
 
   return (

@@ -62,6 +62,7 @@ function run(command, args, env) {
 
 const INTEGRATION_SUITES = [
   'app/menu/throttle-db.integration.test.tsx',
+  'lib/db/billing-v2.integration.test.ts',
   'lib/db/credit-debit-notes.integration.test.ts',
   'lib/db/gst-two-mode.integration.test.ts',
   'lib/db/phase0-security.integration.test.ts',

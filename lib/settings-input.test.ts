@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   canEditSettings,
   formatTaxPercent,
+  parseBillingDefaults,
   parseTaxPercent,
   publicMenuPath,
   taxExamplePaise,
@@ -164,5 +165,75 @@ describe('publicMenuPath', () => {
   it('escapes the slug so the link cannot carry a second query parameter', () => {
     expect(publicMenuPath('maddi')).toBe('/menu?s=maddi');
     expect(publicMenuPath('a&b=c')).toBe('/menu?s=a%26b%3Dc');
+  });
+});
+
+describe('validateDetails FSSAI and bill footer', () => {
+  const base = {
+    name: 'Maddi Kitchen',
+    slug: 'maddi',
+    tagline: '',
+    address: '',
+    phone: '',
+    gstin: '',
+  };
+
+  it('accepts blank or exact 14-digit FSSAI and rejects invalid lengths', () => {
+    expect(validateDetails({ ...base, fssaiNumber: '' }).ok).toBe(true);
+    const valid = validateDetails({ ...base, fssaiNumber: '11524001000123' });
+    expect(valid.ok).toBe(true);
+    if (valid.ok) expect(valid.value.fssaiNumber).toBe('11524001000123');
+
+    const bad = validateDetails({ ...base, fssaiNumber: '12345' });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.field).toBe('fssaiNumber');
+  });
+
+  it('rejects bill footer notes exceeding 240 chars', () => {
+    const ok = validateDetails({ ...base, billFooterNote: 'Thank you for dining!' });
+    expect(ok.ok).toBe(true);
+    const bad = validateDetails({ ...base, billFooterNote: 'x'.repeat(241) });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.field).toBe('billFooterNote');
+  });
+});
+
+describe('parseBillingDefaults', () => {
+  it('parses valid service %, packaging ₹, delivery ₹, and round-off flag', () => {
+    expect(
+      parseBillingDefaults({
+        serviceChargePercent: '5',
+        packagingChargeRupees: '15',
+        deliveryChargeRupees: '40',
+        roundOffEnabled: true,
+      }),
+    ).toEqual({
+      ok: true,
+      value: {
+        serviceChargeBps: 500,
+        packagingChargePaise: 1500,
+        deliveryChargePaise: 4000,
+        roundOffEnabled: true,
+      },
+    });
+  });
+
+  it('rejects service charge above 20% or negative fees', () => {
+    expect(
+      parseBillingDefaults({
+        serviceChargePercent: '25',
+        packagingChargeRupees: '0',
+        deliveryChargeRupees: '0',
+        roundOffEnabled: false,
+      }).ok,
+    ).toBe(false);
+    expect(
+      parseBillingDefaults({
+        serviceChargePercent: '5',
+        packagingChargeRupees: '-10',
+        deliveryChargeRupees: '0',
+        roundOffEnabled: false,
+      }).ok,
+    ).toBe(false);
   });
 });

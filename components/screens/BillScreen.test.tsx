@@ -168,4 +168,37 @@ describe('BillScreen', () => {
     expect(chrome).toHaveLength(2);
     for (const [, classes] of chrome) expect(classes).toContain('print:hidden');
   });
+
+  it('renders an on-screen order status trace that stays hidden when printing', () => {
+    const html = renderToStaticMarkup(
+      <BillScreen
+        bill={bill({
+          statusEvents: [
+            {
+              id: 'ev-1',
+              eventType: 'placed',
+              fromStatus: null,
+              toStatus: 'new',
+              actorRole: 'guest',
+              detail: 'accepted',
+              at: '21 Oct 2026, 8:42 pm',
+            },
+            {
+              id: 'ev-2',
+              eventType: 'prep_changed',
+              fromStatus: 'new',
+              toStatus: 'preparing',
+              actorRole: 'kitchen',
+              detail: null,
+              at: '21 Oct 2026, 8:45 pm',
+            },
+          ],
+        })}
+      />,
+    );
+    expect(html).toContain('Order status trace');
+    expect(html).toContain('new → preparing');
+    expect(html).toContain('by kitchen');
+    expect(html).toContain('data-order-timeline=""');
+  });
 });

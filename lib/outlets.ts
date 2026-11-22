@@ -19,6 +19,8 @@
  * controls by role.
  */
 
+import type { OperatingMode } from '@/lib/operating-mode';
+
 /** Cookie name for the chosen outlet. Read in lib/db/staff.ts. */
 export const OUTLET_COOKIE = 'ad_outlet';
 
@@ -48,6 +50,9 @@ export type OutletOption = {
 export type OutletBar = {
   outlets: OutletOption[];
   activeId: string;
+  /** Compatible operating path for the active outlet ('mode_a' alongside POS, 'mode_b' primary OS). */
+  operatingMode?: OperatingMode;
+  posIntegrationName?: string | null;
 };
 
 /**

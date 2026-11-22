@@ -3,13 +3,10 @@
  *
  * The environment is the ONLY place a provider is selected, and it is
  * fail-closed: without AUTODINE_IRP_PROVIDER explicitly set, no adapter
- * exists and every attempt refuses before touching the database. Today the
- * only implementation is the offline sandbox (provider id 'sandbox',
- * credential-free, no network). Naming any other provider is an explicit
- * error, not a fallback — wiring a live NIC/GSP adapter is an owner decision
- * and must ship as its own reviewed change.
+ * exists and every attempt refuses before touching the database.
  */
 
+import { NIC_GSP_PROVIDER_ID, NicGspIrpAdapter, resolveNicGspConfig } from './irp/nic-gsp';
 import { SandboxIrpAdapter, SANDBOX_PROVIDER_ID } from './irp/sandbox';
 import type { IrpAdapter } from './irp/types';
 
@@ -28,8 +25,13 @@ export function getIrpAdapter(env: NodeJS.ProcessEnv = process.env): IrpAdapterR
   if (provider === SANDBOX_PROVIDER_ID) {
     return { ok: true, adapter: new SandboxIrpAdapter() };
   }
+  if (provider === NIC_GSP_PROVIDER_ID) {
+    const resolved = resolveNicGspConfig(env);
+    if (!resolved.ok) return resolved;
+    return { ok: true, adapter: new NicGspIrpAdapter(resolved.config) };
+  }
   return {
     ok: false,
-    error: `Provider '${provider}' is not wired into this build. Only 'sandbox' (offline, credential-free) exists; a live NIC/GSP adapter needs the owner's explicit approval and reviewed code.`,
+    error: `Provider '${provider}' is not wired into this build. Supported providers: 'sandbox' or 'nic_gsp'.`,
   };
 }

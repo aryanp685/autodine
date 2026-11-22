@@ -94,6 +94,8 @@ function stripUnsupported(sql) {
   // Added with migration 00600, which renames the pricing function so that the
   // wrapper carrying the guest token is the only callable door to it.)
   out = out.replace(/^\s*alter\s+function[\s\S]*?;\s*$/gim, '');
+  // alter type ... add value ...; (no such statement in pgsql-ast-parser)
+  out = out.replace(/^\s*alter\s+type[\s\S]*?;\s*$/gim, '');
   // do $$ ... $$;  (migration 0010 uses a DO block to make an ALTER
   // PUBLICATION idempotent. The parser has no plpgsql, so the whole block
   // goes. It is reported as unverified like the functions above.)

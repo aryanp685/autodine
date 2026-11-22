@@ -261,12 +261,7 @@ export async function dumpDatabase(connectionString, { schema = 'public', log = 
     for (const i of idx.rows) { out.push(i.indexdef + ';'); counts.indexes += 1; }
     if (idx.rows.length) out.push('');
 
-    // 8) views (simple: one replace per view, ordered by dependency via reltuples heuristic — views here are independent)
-    const views = await client.query('select viewname, definition from pg_views where schemaname = $1 order by viewname', [schema]);
-    for (const v of views.rows) { out.push(`create or replace view ${quoteIdent(schema)}.${quoteIdent(v.viewname)} as\n${v.definition};`); counts.views += 1; }
-    if (views.rows.length) out.push('');
-
-    // 9) functions (full DDL incl. security definer + search_path), then triggers, then policies, then RLS flags.
+    // 8) functions (full DDL incl. security definer + search_path), then views (which may call functions like has_restaurant_role), then triggers, then policies, then RLS flags.
     //    Function bodies may reference other functions regardless of definition
     //    order only when PostgreSQL validates eagerly — plpgsql/SQL functions
     //    are parsed at CREATE time, so they must come out dependency-ordered.
@@ -330,6 +325,21 @@ export async function dumpDatabase(connectionString, { schema = 'public', log = 
       }
     }
     if (acls.rows.length) out.push('');
+
+    // 9) views (after functions so security-barrier views calling helper functions like has_restaurant_role restore cleanly)
+    const views = await client.query(
+      `select v.viewname, v.definition, c.reloptions
+         from pg_views v
+         join pg_namespace n on n.nspname = v.schemaname
+         join pg_class c on c.relnamespace = n.oid and c.relname = v.viewname and c.relkind = 'v'
+        where v.schemaname = $1
+        order by v.viewname`, [schema]);
+    for (const v of views.rows) {
+      const opts = Array.isArray(v.reloptions) && v.reloptions.length ? ` with (${v.reloptions.join(', ')})` : '';
+      out.push(`create or replace view ${quoteIdent(schema)}.${quoteIdent(v.viewname)}${opts} as\n${v.definition};`);
+      counts.views += 1;
+    }
+    if (views.rows.length) out.push('');
 
     const triggers = await client.query(
       `select pg_get_triggerdef(t.oid) as def

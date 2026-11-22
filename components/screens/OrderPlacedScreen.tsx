@@ -313,12 +313,24 @@ export function OrderPlacedScreen({
         ) : null}
 
         <FadeUp delay={0.34}>
-          <p aria-label="Order reference" className="mt-3 flex items-center gap-2 text-[11.5px] text-gink-46">
+          <div aria-label="Order reference" className="mt-3 flex flex-wrap items-center gap-2 text-[11.5px] text-gink-46">
             <span className="tracking-[0.08em] uppercase">Reference</span>
             <strong className="tnum rounded-md bg-gink-07 px-2 py-1 text-[13px] tracking-[0.12em] text-gink">
               {data.code}
             </strong>
-          </p>
+            <span
+              data-server-id={data.id}
+              title={`Server Order ID: ${data.id}`}
+              className="tnum rounded-md border border-hair px-2 py-1 text-[11.5px] text-gink-64"
+            >
+              Server ID {data.id.slice(0, 8).toUpperCase()}
+            </span>
+            {data.prepStatus !== 'cancelled' ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-[11.5px] font-medium text-[var(--p-accent)]">
+                Server confirmed
+              </span>
+            ) : null}
+          </div>
         </FadeUp>
 
         {/* What happens next, from the state the kitchen last wrote. A

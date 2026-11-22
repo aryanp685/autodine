@@ -1,30 +1,51 @@
 'use client';
 
+import Link from 'next/link';
 import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { checkoutSessionAction } from '@/app/(staff)/dashboard/actions';
+import { checkoutSessionAction, type CheckoutSessionResult } from '@/app/(staff)/dashboard/actions';
+import { recordInvoiceReprintAction } from '@/app/(staff)/dashboard/invoice-print-actions';
+import { reportPrinterStatusAction } from '@/app/(staff)/dashboard/settings/printer-actions';
 import { btn } from '@/components/owner/chrome';
+import type { PrinterSummary } from '@/lib/db/printers';
+import {
+  DEFAULT_BRIDGE_URL,
+  readLocalBridgeConfig,
+  sendToLocalPrintBridge,
+  type PrintBridgeJob,
+} from '@/lib/print-bridge';
+
+type IssuedSuccess = Extract<CheckoutSessionResult, { ok: true }>;
 
 export function CloseSessionButton({
   sessionId,
   table,
   outstandingPaise,
   gstMode = 'off',
+  printers = [],
 }: {
   sessionId: string;
   table: string;
   outstandingPaise: number;
   /** 'regular' enables the optional B2B buyer block (GST tax invoice). */
   gstMode?: 'off' | 'regular' | 'composition';
+  printers?: PrinterSummary[];
 }) {
   const router = useRouter();
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState('');
   const [buyerOpen, setBuyerOpen] = useState(false);
   const [buyer, setBuyer] = useState({ name: '', gstin: '', address: '', email: '' });
+  const [issued, setIssued] = useState<IssuedSuccess | null>(null);
+  const [printState, setPrintState] = useState<{
+    status: 'printing' | 'printed' | 'failed';
+    message: string;
+  } | null>(null);
   const [pending, startTransition] = useTransition();
   const inFlight = useRef(false);
+
+  const autoPrinter = printers.find((p) => p.autoPrintOnClose) ?? null;
 
   const buyerActive =
     buyer.name.trim() !== '' || buyer.gstin.trim() !== '' || buyer.address.trim() !== '' || buyer.email.trim() !== '';
@@ -35,6 +56,55 @@ export function CloseSessionButton({
         Settle the outstanding balance before closing this table.
       </p>
     );
+  }
+
+  async function dispatchAutoPrint(job: PrintBridgeJob, outcome: IssuedSuccess) {
+    if (!autoPrinter) {
+      router.push(outcome.invoiceUrl);
+      return;
+    }
+    if (autoPrinter.connectionType === 'browser_os') {
+      router.push(outcome.invoiceUrl);
+      return;
+    }
+
+    setPrintState({ status: 'printing', message: `Sending bill to ${autoPrinter.name}…` });
+    const cfg = readLocalBridgeConfig();
+    const res = await sendToLocalPrintBridge(
+      {
+        ...job,
+        printerTarget: cfg.preferredPrinterName
+          ? {
+              ...job.printerTarget,
+              bridgePrinterName: cfg.preferredPrinterName,
+            }
+          : job.printerTarget,
+      },
+      {
+        endpoint: cfg.url || DEFAULT_BRIDGE_URL,
+        token: cfg.token,
+      },
+    );
+
+    void reportPrinterStatusAction({
+      printerId: autoPrinter.id,
+      status: res.ok ? 'connected' : 'offline',
+      error: res.ok ? null : res.error,
+    });
+
+    if (res.ok) {
+      void recordInvoiceReprintAction(outcome.invoiceId, 'escpos');
+      const irpPrefix = outcome.irpStatus === 'generated' ? 'Registered & Printed' : 'Issued & Printed';
+      setPrintState({
+        status: 'printed',
+        message: `${irpPrefix} (${autoPrinter.name}).`,
+      });
+    } else {
+      setPrintState({
+        status: 'failed',
+        message: res.error,
+      });
+    }
   }
 
   function checkout() {
@@ -59,8 +129,50 @@ export function CloseSessionButton({
         setConfirm(false);
         return;
       }
+      if (autoPrinter && result.printJob && autoPrinter.connectionType !== 'browser_os') {
+        setIssued(result);
+        setConfirm(false);
+        await dispatchAutoPrint(result.printJob, result);
+        return;
+      }
       router.push(result.invoiceUrl);
     });
+  }
+
+  if (issued && printState) {
+    const irpWarn =
+      issued.irpStatus === 'failed'
+        ? ` e-Invoice IRP registration failed (${issued.irpMessage ?? 'retry on invoice'}).`
+        : '';
+    return (
+      <div className="flex w-full max-w-[290px] flex-col items-end gap-1.5 text-right">
+        <div
+          role="status"
+          className={`w-full rounded-[var(--p-r-control)] border px-3 py-2 text-[11.5px] leading-[1.45] ${
+            printState.status === 'failed'
+              ? 'border-[var(--p-due)] bg-paper-deep text-[var(--p-due)]'
+              : 'border-[var(--p-accent)] bg-paper-deep text-gink'
+          }`}
+        >
+          <p className="m-0 font-semibold">{printState.message}</p>
+          {irpWarn ? <p className="mt-1 mb-0 text-[10.5px] text-[var(--p-due)]">{irpWarn}</p> : null}
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          {printState.status === 'failed' && issued.printJob ? (
+            <button
+              type="button"
+              className={btn('primary', 'sm')}
+              onClick={() => void dispatchAutoPrint(issued.printJob!, issued)}
+            >
+              Retry print
+            </button>
+          ) : null}
+          <Link href={issued.invoiceUrl} className={btn('ghost', 'sm')}>
+            Open invoice
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   const buyerBlock = gstMode === 'regular' && buyerOpen ? (

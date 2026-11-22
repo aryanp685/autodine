@@ -20,6 +20,13 @@ export type Restaurant = {
   address: string | null;
   phone: string | null;
   gstin: string | null;
+  /** Migration 20261121000100 (Billing Spec v2.0). */
+  fssai_number?: string | null;
+  bill_footer_note?: string | null;
+  default_service_charge_bps?: number;
+  default_packaging_charge_paise?: number;
+  default_delivery_charge_paise?: number;
+  round_off_enabled?: boolean;
   timezone: string;
   tax_rate_bps: number;
   is_active: boolean;
@@ -71,6 +78,17 @@ export type Restaurant = {
    */
   upi_id?: string | null;
   upi_payee_name?: string | null;
+  /** Migration 20261121000400 (Compatible Operating Paths: Mode A vs Mode B). */
+  operating_mode?: 'mode_a' | 'mode_b';
+  pos_integration_name?: string | null;
+};
+
+export type RestaurantPosIntegration = {
+  restaurant_id: string;
+  webhook_url: string | null;
+  webhook_secret: string | null;
+  updated_at: string;
+  updated_by: string | null;
 };
 
 export type Category = {
@@ -171,17 +189,52 @@ export type DiningTable = {
   is_active: boolean;
 };
 
+export type OrderChannel = 'dine_in' | 'takeaway' | 'delivery';
+
 /** One guest sitting; independent of the short-lived QR verification session. */
 export type OrderSession = {
   id: string;
   restaurant_id: string;
-  table_id: string;
+  table_id: string | null;
+  order_channel?: OrderChannel;
+  customer_name?: string | null;
+  customer_phone?: string | null;
   opened_at: string;
   closed_at: string | null;
   closed_by: string | null;
   paid_at?: string | null;
   paid_by?: string | null;
   status: 'open' | 'closed';
+};
+
+export type RestaurantInvoiceReprint = {
+  id: string;
+  restaurant_id: string;
+  invoice_id: string;
+  copy_number: number;
+  format: '58mm' | '80mm' | 'a4' | 'pdf' | 'escpos';
+  reprinted_by: string | null;
+  reprinted_at: string;
+};
+
+export type RestaurantPrinter = {
+  id: string;
+  restaurant_id: string;
+  name: string;
+  role: 'counter' | 'office' | 'bar' | 'other';
+  printer_type: 'thermal' | 'a4';
+  connection_type: 'windows_bridge' | 'network_tcp' | 'browser_os';
+  paper_width: '58mm' | '80mm' | 'a4';
+  bridge_printer_name: string | null;
+  network_host: string | null;
+  network_port: number | null;
+  is_default: boolean;
+  auto_print_on_close: boolean;
+  status: 'connected' | 'offline' | 'untested';
+  last_seen_at: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type RestaurantInvoice = {
@@ -193,10 +246,18 @@ export type RestaurantInvoice = {
   sequence_number: number;
   /** Migration 20261113000100 adds 'bill_of_supply'. */
   document_type: 'receipt' | 'gst_tax_invoice' | 'bill_of_supply';
-  /** e-Invoice state; 'not_required' in this build (no IRP provider). */
+  /** e-Invoice state. */
   irp_status: 'not_required' | 'pending' | 'generated' | 'failed' | 'cancelled';
-  /** IRN assigned only after the IRP validates. NULL in this build. */
+  /** IRN assigned only after the IRP validates. */
   irn: string | null;
+  /** Migration 20261121000300: live IRP acknowledgement and signed QR payload. */
+  ack_no?: string | null;
+  ack_date?: string | null;
+  signed_qr_payload?: string | null;
+  irp_provider?: string | null;
+  irp_generated_at?: string | null;
+  irp_cancelled_at?: string | null;
+  irp_cancel_reason?: string | null;
   /** Immutable GST decomposition; NULL for non-GST receipts. */
   gst_snapshot: unknown | null;
   status: 'issued' | 'voided';
@@ -365,6 +426,37 @@ export type Order = {
   kitchen_announcement_status?: 'announced' | 'failed' | null;
   kitchen_announcement_at?: string | null;
   kitchen_announcement_error?: string | null;
+  /** Migration 20261121000100 (Billing Spec v2.0). */
+  order_channel?: OrderChannel;
+  discount_reason?: string | null;
+  is_complimentary?: boolean;
+  complimentary_reason?: string | null;
+  service_charge_paise?: number;
+  packaging_charge_paise?: number;
+  delivery_charge_paise?: number;
+  round_off_paise?: number;
+  /** Migration 20261121000400 (Mode A defined KOT handoff). */
+  kot_handoff_status?: 'pending' | 'entered_in_pos' | 'webhook_sent' | 'webhook_failed';
+  kot_handoff_at?: string | null;
+  kot_handoff_by?: string | null;
+  kot_handoff_ref?: string | null;
+  /** Migration 20261121000500 (Phase 1 counter idempotency). */
+  counter_idempotency_key?: string | null;
+};
+
+/** Migration 20261121000500: append-only order status audit log row. */
+export type OrderStatusEvent = {
+  id: string;
+  order_id: string;
+  restaurant_id: string;
+  event_type: 'placed' | 'confirmed' | 'prep_changed' | 'cancelled' | 'payment_changed' | 'kot_handoff';
+  from_status: string | null;
+  to_status: string;
+  actor_id: string | null;
+  actor_role: string | null;
+  source: string;
+  detail: string | null;
+  created_at: string;
 };
 
 /** A guest's open request for a staff member to visit their table. */

@@ -18,5 +18,10 @@ export async function getOutletBar(): Promise<OutletBar | null> {
   const staff = await getStaffContextDetailed();
   if (!staff.ok) return null;
 
-  return { outlets: staff.context.outlets, activeId: staff.context.restaurantId };
+  return {
+    outlets: staff.context.outlets,
+    activeId: staff.context.restaurantId,
+    operatingMode: staff.context.operatingMode,
+    posIntegrationName: staff.context.posIntegrationName,
+  };
 }

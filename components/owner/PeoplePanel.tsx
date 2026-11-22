@@ -45,6 +45,7 @@ const ROLE_TONE = {
   owner: 'ink',
   manager: 'work',
   cashier: 'live',
+  waiter: 'work',
   kitchen: 'neutral',
 } as const;
 

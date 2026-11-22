@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: 'Orders · AutoDine', robots: { index
 export const dynamic = 'force-dynamic';
 
 function isOrderFilter(value: string | undefined): value is OrderFilter {
-  return value === 'all' || value === 'open' || value === 'settled' || value === 'cancelled';
+  return value === 'all' || value === 'open' || value === 'delayed' || value === 'settled' || value === 'cancelled';
 }
 
 export default async function OrdersPage({

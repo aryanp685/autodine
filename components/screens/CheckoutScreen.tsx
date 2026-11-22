@@ -1,12 +1,16 @@
 'use client';
 
 import Link from 'next/link';
+import { useRef } from 'react';
 import { DishPhoto } from '@/components/DishPhoto';
 import { GuestFlow } from '@/components/GuestFlow';
 import { guestBrandStyle, type GuestBrandState } from '@/lib/branding/guest-theme';
 import { PlaceOrderButton } from '@/components/PlaceOrderButton';
 import { AttemptToken } from '@/components/AttemptToken';
+import { OrderRecoveryBanner } from '@/components/OrderRecoveryBanner';
 import { useCart } from '@/components/CartProvider';
+import { browserStorage } from '@/lib/guest-orders';
+import { buildCartSignature, markPendingOrderSubmitting } from '@/lib/order-recovery';
 import { inr } from '@/lib/demo-data';
 import { VegMark } from '@/components/ui';
 import { paiseToRupees } from '@/lib/money';
@@ -45,6 +49,9 @@ export function Checkout({
 }) {
   const paint = guestBrandStyle(brandState);
   const cart = useCart();
+  const formRef = useRef<HTMLFormElement>(null);
+  const submitGuardRef = useRef(false);
+  const cartSignature = buildCartSignature(cart.lines);
   const priced = priceCart(
     cart.lines,
     items,
@@ -88,14 +95,52 @@ export function Checkout({
           in the bill and the one pinned at the bottom -- can read the same
           pending state. Two independent submits would have needed the action
           to be called twice, and would have disagreed about being busy. */}
-      <form id="co-place-order" action={placeOrderAction} className="px-4 pb-8">
+      {slug ? (
+        <div className="px-4 pb-3">
+          <OrderRecoveryBanner
+            slug={slug}
+            mode="checkout"
+            onRetryForm={() => formRef.current?.requestSubmit()}
+          />
+        </div>
+      ) : null}
+
+      <form
+        ref={formRef}
+        id="co-place-order"
+        action={placeOrderAction}
+        onSubmit={(event) => {
+          if (submitGuardRef.current) {
+            event.preventDefault();
+            return;
+          }
+          submitGuardRef.current = true;
+          window.setTimeout(() => {
+            submitGuardRef.current = false;
+          }, 8000);
+          if (slug) {
+            const fd = new FormData(event.currentTarget);
+            const attemptToken = String(fd.get('attempt') ?? '').trim();
+            const note = String(fd.get('note') ?? '').trim();
+            if (attemptToken) {
+              markPendingOrderSubmitting(browserStorage(), {
+                attemptToken,
+                slug,
+                lines: cart.lines,
+                note,
+              });
+            }
+          }
+        }}
+        className="px-4 pb-8"
+      >
         <input type="hidden" name="slug" value={slug ?? ''} />
         {/* Only ids and quantities go to the server. The prices are read from
             the database when the order is written. */}
         <input type="hidden" name="lines" value={JSON.stringify(cart.lines)} />
         {/* One key per checkout attempt: a replayed POST lands on the order it
             already wrote instead of writing a second one. */}
-        <AttemptToken />
+        <AttemptToken slug={slug} lines={cart.lines} cartSignature={cartSignature} />
 
         {/* One column at every width. The bill used to sit in a second column
             on a wide screen and inside the form on a phone; the money is the

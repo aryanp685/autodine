@@ -400,4 +400,45 @@ describe('OrdersScreen, the ledger as a page', () => {
     expect(opening).toContain('rounded-[var(--p-r-block)]');
     expect(opening).not.toContain('rounded-full');
   });
+
+  it('shows Mode A KOT handoff status and toggles without disrupting the ledger', () => {
+    const baseData = live({
+      orders: [
+        { ...order({ id: 'o-pending', code: 'MA-201' }), kotHandoffStatus: 'pending' },
+        { ...order({ id: 'o-done', code: 'MA-202' }), kotHandoffStatus: 'entered_in_pos' },
+      ],
+    });
+    const html = renderToStaticMarkup(
+      <OrdersScreen
+        data={{ ...baseData, operatingMode: 'mode_a', posIntegrationName: 'Petpooja' }}
+      />,
+    );
+
+    expect(html).toContain('Mode A · Alongside Petpooja');
+    expect(html).toContain('1 active order is awaiting POS entry');
+    expect(html).toContain('POS handoff');
+    expect(html).toContain('Awaiting POS entry');
+    expect(html).toContain('Entered in POS');
+    expect(html).toContain('Mark entered');
+  });
+
+  it('supports filtering delayed/unacknowledged orders and highlights why they need attention', () => {
+    const oldPlaced = new Date(Date.now() - 25 * 60_000).toISOString();
+    const recentPlaced = new Date(Date.now() - 2 * 60_000).toISOString();
+    const html = renderToStaticMarkup(
+      <OrdersScreen
+        filter="delayed"
+        data={live({
+          orders: [
+            { ...order({ id: 'o-late', code: 'MA-901', prepStatus: 'new', placedAt: oldPlaced }) },
+            { ...order({ id: 'o-ok', code: 'MA-902', prepStatus: 'new', placedAt: recentPlaced }) },
+          ],
+        })}
+      />,
+    );
+    expect(html).toContain('Delayed / alerts');
+    expect(html).toContain('MA-901');
+    expect(html).toContain('Waiting to start');
+    expect(html).not.toContain('MA-902');
+  });
 });

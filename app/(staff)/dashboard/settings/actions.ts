@@ -43,9 +43,11 @@ import { getStaffContextDetailed } from '@/lib/db/staff';
 import {
   canEditSettings,
   formatTaxPercent,
+  parseBillingDefaults,
   parseTaxPercent,
   validateDetails,
 } from '@/lib/settings-input';
+import { validateOperatingModeInput } from '@/lib/operating-mode';
 
 const SETTINGS_PATH = '/dashboard/settings';
 
@@ -142,6 +144,8 @@ export async function saveDetailsAction(formData: FormData): Promise<void> {
     address: formData.get('address'),
     phone: formData.get('phone'),
     gstin: postedGstin ?? current.gstin ?? '',
+    fssaiNumber: formData.get('fssaiNumber'),
+    billFooterNote: formData.get('billFooterNote'),
     slug: formData.get('slug'),
   });
 
@@ -175,14 +179,32 @@ export async function saveDetailsAction(formData: FormData): Promise<void> {
     address: parsed.value.address,
     phone: parsed.value.phone,
     gstin: role === 'owner' ? parsed.value.gstin : current.gstin,
+    fssai_number: parsed.value.fssaiNumber,
+    bill_footer_note: parsed.value.billFooterNote,
     ...(slugChanged ? { slug: parsed.value.slug } : {}),
   };
 
-  const { data: saved, error } = await supabase
+  let { data: saved, error } = await supabase
     .from('restaurants')
     .update(patch)
     .eq('id', restaurantId)
     .select('id');
+
+  if (error?.code === '42703' || error?.code === 'PGRST204') {
+    const legacyPatch = {
+      name: parsed.value.name,
+      tagline: parsed.value.tagline,
+      address: parsed.value.address,
+      phone: parsed.value.phone,
+      gstin: role === 'owner' ? parsed.value.gstin : current.gstin,
+      ...(slugChanged ? { slug: parsed.value.slug } : {}),
+    };
+    ({ data: saved, error } = await supabase
+      .from('restaurants')
+      .update(legacyPatch)
+      .eq('id', restaurantId)
+      .select('id'));
+  }
 
   if (error) writeFailure('saving restaurant details', error);
 
@@ -277,5 +299,181 @@ export async function saveTaxAction(formData: FormData): Promise<void> {
       ? 'Tax set to 0%. Bills will now show no tax at all — set a rate here before you start billing.'
       : `Tax set to ${formatTaxPercent(parsed.bps)}%. New orders are billed at this rate; orders already placed keep the tax they were charged.`
   );
+}
+
+export async function saveBillingDefaultsAction(formData: FormData): Promise<void> {
+  const { supabase, restaurantId, role } = await requireEditor();
+  if (role !== 'owner') fail('Only the owner can change default bill charges or rounding.');
+
+  const parsed = parseBillingDefaults({
+    serviceChargePercent: formData.get('serviceChargePercent'),
+    packagingChargeRupees: formData.get('packagingChargeRupees'),
+    deliveryChargeRupees: formData.get('deliveryChargeRupees'),
+    roundOffEnabled: formData.get('roundOffEnabled'),
+  });
+  if (!parsed.ok) fail(parsed.message);
+
+  const { data: saved, error } = await supabase
+    .from('restaurants')
+    .update({
+      default_service_charge_bps: parsed.value.serviceChargeBps,
+      default_packaging_charge_paise: parsed.value.packagingChargePaise,
+      default_delivery_charge_paise: parsed.value.deliveryChargePaise,
+      round_off_enabled: parsed.value.roundOffEnabled,
+    })
+    .eq('id', restaurantId)
+    .select('id');
+
+  if (error) writeFailure('saving default bill charges', error);
+  if (!saved || saved.length === 0) {
+    fail('Nothing was saved. Your account can see this restaurant but is not allowed to change it.');
+  }
+
+  for (const path of AFFECTED_PATHS) revalidatePath(path);
+  done('Saved default charges and rounding preferences for new counter bills.');
+}
+
+const COUPON_CODE_RE = /^[A-Z0-9_-]{3,24}$/;
+
+export async function saveCouponAction(formData: FormData): Promise<void> {
+  const { supabase, restaurantId } = await requireEditor();
+
+  const code = String(formData.get('code') ?? '').trim().toUpperCase();
+  if (!COUPON_CODE_RE.test(code)) {
+    fail('Promo code must be 3 to 24 characters using letters, numbers, hyphens, or underscores.');
+  }
+
+  const discountType = String(formData.get('discountType') ?? 'percent') === 'flat' ? 'flat' : 'percent';
+  const rawValue = Number(String(formData.get('discountValue') ?? '').trim());
+  if (!Number.isFinite(rawValue) || rawValue <= 0) {
+    fail('Enter a valid discount value greater than zero.');
+  }
+  const discountValue =
+    discountType === 'percent' ? Math.round(rawValue * 100) : Math.round(rawValue * 100);
+  if (discountType === 'percent' && discountValue > 10_000) {
+    fail('Percentage discount cannot exceed 100%.');
+  }
+
+  const rawMin = String(formData.get('minOrderRupees') ?? '').trim();
+  const minOrderRupees = rawMin === '' ? 0 : Number(rawMin);
+  if (!Number.isFinite(minOrderRupees) || minOrderRupees < 0) {
+    fail('Minimum order amount cannot be negative.');
+  }
+
+  const rawMaxDiscount = String(formData.get('maxDiscountRupees') ?? '').trim();
+  let maxDiscountPaise: number | null = null;
+  if (rawMaxDiscount !== '') {
+    const parsedMax = Number(rawMaxDiscount);
+    if (!Number.isFinite(parsedMax) || parsedMax <= 0) {
+      fail('Maximum discount cap must be positive or left blank.');
+    }
+    maxDiscountPaise = Math.round(parsedMax * 100);
+  }
+
+  const rawMaxUses = String(formData.get('maxUses') ?? '').trim();
+  let maxUses: number | null = null;
+  if (rawMaxUses !== '') {
+    const parsedUses = Number(rawMaxUses);
+    if (!Number.isInteger(parsedUses) || parsedUses <= 0) {
+      fail('Usage limit must be a whole number of at least 1, or left blank.');
+    }
+    maxUses = parsedUses;
+  }
+
+  const validUntilRaw = String(formData.get('validUntil') ?? '').trim();
+  const validUntil = validUntilRaw ? new Date(`${validUntilRaw}T23:59:59+05:30`).toISOString() : null;
+  if (validUntilRaw && Number.isNaN(Date.parse(validUntil ?? ''))) {
+    fail('Choose a valid expiry date or leave it blank.');
+  }
+
+  const description = String(formData.get('description') ?? '').trim().slice(0, 120);
+
+  const { error } = await supabase.rpc('upsert_restaurant_coupon', {
+    p_restaurant_id: restaurantId,
+    p_code: code,
+    p_discount_type: discountType,
+    p_discount_value: discountValue,
+    p_min_order_paise: Math.round(minOrderRupees * 100),
+    p_max_discount_paise: maxDiscountPaise,
+    p_max_uses: maxUses,
+    p_valid_until: validUntil,
+    p_description: description,
+    p_is_active: true,
+  });
+
+  if (error) {
+    redirect(`${SETTINGS_PATH}?error=${encodeURIComponent(error.message)}#settings-coupons`);
+  }
+
+  for (const path of AFFECTED_PATHS) revalidatePath(path);
+  revalidatePath('/cashier');
+  redirect(`${SETTINGS_PATH}?notice=${encodeURIComponent(`Promo code ${code} saved.`)}#settings-coupons`);
+}
+
+export async function toggleCouponAction(formData: FormData): Promise<void> {
+  const { supabase } = await requireEditor();
+
+  const couponId = String(formData.get('couponId') ?? '').trim();
+  const nextActive = String(formData.get('isActive') ?? '') === 'true';
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(couponId)) {
+    redirect(`${SETTINGS_PATH}?error=${encodeURIComponent('Promo code reference is invalid.')}#settings-coupons`);
+  }
+
+  const { error } = await supabase.rpc('toggle_restaurant_coupon', {
+    p_coupon_id: couponId,
+    p_is_active: nextActive,
+  });
+
+  if (error) {
+    redirect(`${SETTINGS_PATH}?error=${encodeURIComponent(error.message)}#settings-coupons`);
+  }
+
+  for (const path of AFFECTED_PATHS) revalidatePath(path);
+  revalidatePath('/cashier');
+  redirect(
+    `${SETTINGS_PATH}?notice=${encodeURIComponent(nextActive ? 'Promo code activated.' : 'Promo code paused.')}#settings-coupons`,
+  );
+}
+
+export async function saveOperatingModeAction(formData: FormData): Promise<void> {
+  const { supabase, restaurantId } = await requireEditor();
+
+  const validation = validateOperatingModeInput({
+    operatingMode: formData.get('operatingMode'),
+    posIntegrationName: formData.get('posIntegrationName'),
+    webhookUrl: formData.get('webhookUrl'),
+    webhookSecret: formData.get('webhookSecret'),
+  });
+
+  if (!validation.ok) {
+    redirect(`${SETTINGS_PATH}?error=${encodeURIComponent(validation.message)}#settings-operating-mode`);
+  }
+
+  const { operatingMode, posIntegrationName, webhookUrl, webhookSecret } = validation.value;
+
+  const { error } = await supabase.rpc('save_restaurant_operating_mode', {
+    p_restaurant_id: restaurantId,
+    p_operating_mode: operatingMode,
+    p_pos_integration_name: posIntegrationName,
+    p_webhook_url: webhookUrl,
+    p_webhook_secret: webhookSecret,
+  });
+
+  if (error) {
+    redirect(`${SETTINGS_PATH}?error=${encodeURIComponent(error.message)}#settings-operating-mode`);
+  }
+
+  for (const path of AFFECTED_PATHS) revalidatePath(path);
+  revalidatePath('/kitchen');
+  revalidatePath('/dashboard/orders');
+  revalidatePath('/cashier');
+  revalidatePath('/dashboard/invoices');
+  revalidatePath('/dashboard/reports');
+
+  const label =
+    operatingMode === 'mode_a'
+      ? `Saved Mode A (alongside ${posIntegrationName || 'your existing POS'}).`
+      : 'Saved Mode B (AutoDine as your primary operating system).';
+  redirect(`${SETTINGS_PATH}?notice=${encodeURIComponent(label)}#settings-operating-mode`);
 }
 

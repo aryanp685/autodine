@@ -26,6 +26,8 @@ import { revalidatePath } from 'next/cache';
 import { getStaffContext, KITCHEN_ROLES } from '@/lib/db/staff';
 import { nextPrepState } from '@/lib/db/prep';
 import type { KitchenPrepState } from '@/lib/db/kitchen-screen';
+import { dispatchKotHandoffWebhook } from '@/lib/kot-handoff';
+import { normalizeKotHandoffStatus, type KotHandoffStatus } from '@/lib/operating-mode';
 
 const KITCHEN_PATH = '/kitchen';
 
@@ -104,7 +106,7 @@ export async function claimTableWaiterCallAnnouncementAction(callId: string): Pr
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(callId)) return { ok: false, error: 'That waiter call is no longer active.' };
   const staff = await getStaffContext();
   if (!staff) return { ok: false, error: 'Not signed in, or the database is not connected.' };
-  if (!['owner', 'manager', 'kitchen', 'cashier'].includes(staff.role)) {
+  if (!['owner', 'manager', 'kitchen', 'cashier', 'waiter'].includes(staff.role)) {
     return { ok: false, error: 'You cannot announce waiter calls for this restaurant.' };
   }
   const { data, error } = await staff.supabase.rpc('claim_table_waiter_call_announcement', { p_call_id: callId });
@@ -119,7 +121,7 @@ export async function recordTableWaiterCallAnnouncementAction(input: {
 }): Promise<{ ok: boolean }> {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.callId)) return { ok: false };
   const staff = await getStaffContext();
-  if (!staff || !['owner', 'manager', 'kitchen', 'cashier'].includes(staff.role)) return { ok: false };
+  if (!staff || !['owner', 'manager', 'kitchen', 'cashier', 'waiter'].includes(staff.role)) return { ok: false };
   const { data, error } = await staff.supabase.rpc('record_table_waiter_call_announcement', {
     p_call_id: input.callId,
     p_status: input.status,
@@ -132,7 +134,7 @@ export async function resolveTableWaiterCallAction(callId: string): Promise<{ ok
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(callId)) return { ok: false, error: 'That waiter call is no longer active.' };
   const staff = await getStaffContext();
   if (!staff) return { ok: false, error: 'Not signed in, or the database is not connected.' };
-  if (!['owner', 'manager', 'kitchen', 'cashier'].includes(staff.role)) {
+  if (!['owner', 'manager', 'kitchen', 'cashier', 'waiter'].includes(staff.role)) {
     return { ok: false, error: 'You cannot clear waiter calls for this restaurant.' };
   }
   const { data, error } = await staff.supabase.rpc('resolve_table_waiter_call', { p_call_id: callId });
@@ -281,10 +283,10 @@ export async function confirmTableAction(tableSessionId: string): Promise<Confir
     return { ok: false, error: 'Not signed in, or the database is not connected.' };
   }
 
-  if (!KITCHEN_ROLES.includes(staff.role)) {
+  if (!KITCHEN_ROLES.includes(staff.role) && staff.role !== 'waiter') {
     return {
       ok: false,
-      error: `A ${staff.role} can see the board but cannot confirm a table. Ask an owner, a manager or kitchen staff.`,
+      error: `A ${staff.role} can see the board but cannot confirm a table. Ask an owner, a manager, kitchen, or waiter staff.`,
     };
   }
 
@@ -358,4 +360,141 @@ export async function rejectTableAction(
 
   revalidatePath(KITCHEN_PATH);
   return { ok: true, confirmed: typeof data === 'number' ? data : 0 };
+}
+
+export type KotHandoffResult =
+  | { ok: true; status: KotHandoffStatus; posRef?: string | null }
+  | { ok: false; error: string };
+
+/**
+ * Mark an order as handed off to the restaurant's existing POS (or reset to pending).
+ * Accessible to owner, manager, cashier, waiter, and kitchen staff so the ticket
+ * is never punched twice between AutoDine KDS and the billing terminal.
+ */
+export async function recordOrderKotHandoffAction(
+  orderId: string,
+  status: 'pending' | 'entered_in_pos',
+  posRef?: string | null,
+): Promise<KotHandoffResult> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)) {
+    return { ok: false, error: 'That order is no longer on the board.' };
+  }
+
+  const staff = await getStaffContext();
+  if (!staff) {
+    return { ok: false, error: 'Not signed in, or the database is not connected.' };
+  }
+
+  const normalized = normalizeKotHandoffStatus(status);
+  if (normalized !== 'pending' && normalized !== 'entered_in_pos') {
+    return { ok: false, error: 'Invalid KOT handoff status.' };
+  }
+
+  const { data, error } = await staff.supabase.rpc('record_order_kot_handoff', {
+    p_order_id: orderId,
+    p_status: normalized,
+    p_pos_ref: (posRef ?? '').trim().slice(0, 60) || null,
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      error:
+        error.code === '42501'
+          ? 'You do not have permission to update KOT handoff status.'
+          : error.message,
+    };
+  }
+
+  revalidatePath(KITCHEN_PATH);
+  revalidatePath('/dashboard/orders');
+  const payload = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
+  return {
+    ok: true,
+    status: normalizeKotHandoffStatus(payload.kot_handoff_status),
+    posRef: typeof payload.kot_handoff_ref === 'string' ? payload.kot_handoff_ref : null,
+  };
+}
+
+/**
+ * Dispatch an optional signed HTTPS KOT handoff webhook to the outlet's existing POS.
+ * Only owner or manager can read `restaurant_pos_integrations` (webhook credentials).
+ */
+export async function sendKotHandoffWebhookAction(orderId: string): Promise<KotHandoffResult> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)) {
+    return { ok: false, error: 'That order is no longer on the board.' };
+  }
+
+  const staff = await getStaffContext();
+  if (!staff) {
+    return { ok: false, error: 'Not signed in, or the database is not connected.' };
+  }
+
+  if (staff.role !== 'owner' && staff.role !== 'manager') {
+    return { ok: false, error: 'Only an owner or manager can dispatch a POS webhook.' };
+  }
+
+  const { data: order, error: orderErr } = await staff.supabase
+    .from('orders')
+    .select('id, code, table_id, customer_note, placed_at')
+    .eq('id', orderId)
+    .eq('restaurant_id', staff.restaurantId)
+    .maybeSingle();
+
+  if (orderErr || !order) {
+    return { ok: false, error: 'Order not found for this outlet.' };
+  }
+
+  const [itemsRes, tableRes] = await Promise.all([
+    staff.supabase
+      .from('order_items')
+      .select('name_snapshot, qty, variant_snapshot, addons_snapshot')
+      .eq('order_id', order.id)
+      .order('sort_order', { ascending: true }),
+    order.table_id
+      ? staff.supabase
+          .from('dining_tables')
+          .select('label')
+          .eq('id', order.table_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const dispatch = await dispatchKotHandoffWebhook({
+    supabase: staff.supabase,
+    restaurantId: staff.restaurantId,
+    payload: {
+      event: 'kot.handoff',
+      restaurantId: staff.restaurantId,
+      orderId: order.id,
+      code: order.code,
+      table: tableRes.data?.label ?? 'Takeaway',
+      placedAt: order.placed_at,
+      note: order.customer_note ?? null,
+      items: (itemsRes.data ?? []).map((item) => ({
+        name: item.name_snapshot,
+        qty: item.qty,
+        detail: [item.variant_snapshot, ...(item.addons_snapshot ?? [])].filter(Boolean).join(' · ') || null,
+      })),
+    },
+  });
+
+  if (dispatch.skipped) {
+    return { ok: false, error: dispatch.error ?? 'No POS webhook configured.' };
+  }
+
+  const nextStatus: KotHandoffStatus = dispatch.ok ? 'webhook_sent' : 'webhook_failed';
+  await staff.supabase.rpc('record_order_kot_handoff', {
+    p_order_id: order.id,
+    p_status: nextStatus,
+    p_pos_ref: dispatch.ok ? 'webhook' : null,
+  });
+
+  revalidatePath(KITCHEN_PATH);
+  revalidatePath('/dashboard/orders');
+
+  if (!dispatch.ok) {
+    return { ok: false, error: dispatch.error ?? 'POS webhook failed.' };
+  }
+  return { ok: true, status: 'webhook_sent', posRef: 'webhook' };
 }

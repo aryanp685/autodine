@@ -135,7 +135,7 @@ describe('Kitchen board', () => {
     expect(html).not.toContain('Demo board · local only');
   });
 
-  it('offers browser KOT printing only for real live tickets', () => {
+  it('keeps kitchen tickets strictly screen-first with no KOT print buttons', () => {
     const html = renderToStaticMarkup(
       <Kitchen
         data={{
@@ -157,8 +157,8 @@ describe('Kitchen board', () => {
         }}
       />,
     );
-    expect(html).toContain('data-print-kot="order-1"');
-    expect(html).toContain('Print KOT');
+    expect(html).not.toContain('data-print-kot');
+    expect(html).not.toContain('Print KOT');
     expect(renderToStaticMarkup(<Kitchen />)).not.toContain('data-print-kot');
   });
 

@@ -89,3 +89,22 @@ export async function cancelStaffOrderAction(input: {
 
   return { ok: true, message: 'Order cancelled. The kitchen has been told.' };
 }
+
+export async function toggleOrderKotHandoffAction(formData: FormData): Promise<void> {
+  const orderId = String(formData.get('orderId') ?? '').trim();
+  const next = String(formData.get('nextStatus') ?? '').trim();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)) return;
+  if (next !== 'pending' && next !== 'entered_in_pos') return;
+
+  const staff = await getStaffContext();
+  if (!staff) return;
+
+  await staff.supabase.rpc('record_order_kot_handoff', {
+    p_order_id: orderId,
+    p_status: next,
+    p_pos_ref: null,
+  });
+
+  revalidatePath('/dashboard/orders');
+  revalidatePath('/kitchen');
+}

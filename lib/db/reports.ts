@@ -598,12 +598,75 @@ export function summaryCsv(report: ReportView, range: ReportRange, timeZone: str
 
 /* ====================================================================== loader */
 
+export type BillingSummaryReport = {
+  gstSummary: Array<{
+    mode: string;
+    rateBps: number;
+    bills: number;
+    taxablePaise: number;
+    cgstPaise: number;
+    sgstPaise: number;
+    totalPaise: number;
+  }>;
+  channels: Array<{
+    channel: string;
+    orders: number;
+    billedPaise: number;
+  }>;
+  adjustments: {
+    discountPaise: number;
+    complimentaryCount: number;
+    serviceChargePaise: number;
+    packagingChargePaise: number;
+    deliveryChargePaise: number;
+    roundOffPaise: number;
+    refundedPaise: number;
+    voidedInvoices: number;
+    duplicateReprints: number;
+  };
+  billRegister: Array<{
+    id: string;
+    invoiceNumber: string;
+    documentType: string;
+    status: string;
+    issuedAt: string;
+    tableLabel: string | null;
+    totalPaise: number;
+    taxPaise: number;
+    discountPaise: number;
+    printCount: number;
+  }>;
+};
+
+export type DayEndClosingReport = {
+  businessDate: string;
+  timezone: string;
+  grossSalesPaise: number;
+  discountPaise: number;
+  chargesPaise: number;
+  taxPaise: number;
+  netBilledPaise: number;
+  cashCollectedPaise: number;
+  upiCollectedPaise: number;
+  cardCollectedPaise: number;
+  otherCollectedPaise: number;
+  cashRefundedPaise: number;
+  totalRefundedPaise: number;
+  expectedCashDrawerPaise: number;
+  issuedInvoices: number;
+  voidedInvoices: number;
+  cancelledOrders: number;
+  openUnpaidOrders: number;
+};
+
 export type ReportsScreenData = {
   restaurantName: string;
   tagline: string | null;
   timezone: string;
   range: ReportRange;
   report: ReportView;
+  billingSummary?: BillingSummaryReport | null;
+  dayClosing?: DayEndClosingReport | null;
   /** True when the range holds more bills than the table lists. */
   ordersTruncated: boolean;
   blocked?: 'signed-out' | 'no-membership';
@@ -653,12 +716,107 @@ export async function getReportsScreenDataForStaff(
 
   const report = parseReportPayload(data);
 
+  let billingSummary: BillingSummaryReport | null = null;
+  let dayClosing: DayEndClosingReport | null = null;
+  if (!params.includeLines && params.orderLimit === undefined) {
+    const todayKey = localDateKey(timezone, now);
+    const [sumRes, closeRes] = await Promise.all([
+      supabase.rpc('report_billing_summary', {
+        p_restaurant_id: restaurantId,
+        p_from: range.fromIso,
+        p_to: range.toIso,
+        p_timezone: timezone,
+      }),
+      supabase.rpc('report_day_end_closing', {
+        p_restaurant_id: restaurantId,
+        p_date: todayKey,
+        p_timezone: timezone,
+      }),
+    ]);
+
+    if (!sumRes.error && sumRes.data && typeof sumRes.data === 'object' && !Array.isArray(sumRes.data)) {
+      const raw = sumRes.data as Record<string, unknown>;
+      const adj = (raw.adjustments && typeof raw.adjustments === 'object' ? raw.adjustments : {}) as Record<string, unknown>;
+      billingSummary = {
+        gstSummary: Array.isArray(raw.gst_summary)
+          ? raw.gst_summary.map((g: Record<string, unknown>) => ({
+              mode: String(g.mode ?? 'normal'),
+              rateBps: Number(g.rate_bps ?? 0),
+              bills: Number(g.bills ?? 0),
+              taxablePaise: Number(g.taxable_paise ?? 0),
+              cgstPaise: Number(g.cgst_paise ?? 0),
+              sgstPaise: Number(g.sgst_paise ?? 0),
+              totalPaise: Number(g.total_paise ?? 0),
+            }))
+          : [],
+        channels: Array.isArray(raw.channels)
+          ? raw.channels.map((c: Record<string, unknown>) => ({
+              channel: String(c.channel ?? 'dine_in'),
+              orders: Number(c.orders ?? 0),
+              billedPaise: Number(c.billed_paise ?? 0),
+            }))
+          : [],
+        adjustments: {
+          discountPaise: Number(adj.discount_paise ?? 0),
+          complimentaryCount: Number(adj.complimentary_count ?? 0),
+          serviceChargePaise: Number(adj.service_charge_paise ?? 0),
+          packagingChargePaise: Number(adj.packaging_charge_paise ?? 0),
+          deliveryChargePaise: Number(adj.delivery_charge_paise ?? 0),
+          roundOffPaise: Number(adj.round_off_paise ?? 0),
+          refundedPaise: Number(adj.refunded_paise ?? 0),
+          voidedInvoices: Number(adj.voided_invoices ?? 0),
+          duplicateReprints: Number(adj.duplicate_reprints ?? 0),
+        },
+        billRegister: Array.isArray(raw.bill_register)
+          ? raw.bill_register.map((b: Record<string, unknown>) => ({
+              id: String(b.id ?? ''),
+              invoiceNumber: String(b.invoice_number ?? ''),
+              documentType: String(b.document_type ?? 'receipt'),
+              status: String(b.status ?? 'issued'),
+              issuedAt: String(b.issued_at ?? ''),
+              tableLabel: typeof b.table_label === 'string' ? b.table_label : null,
+              totalPaise: Number(b.total_paise ?? 0),
+              taxPaise: Number(b.tax_paise ?? 0),
+              discountPaise: Number(b.discount_paise ?? 0),
+              printCount: Number(b.print_count ?? 0),
+            }))
+          : [],
+      };
+    }
+
+    if (!closeRes.error && closeRes.data && typeof closeRes.data === 'object' && !Array.isArray(closeRes.data)) {
+      const d = closeRes.data as Record<string, unknown>;
+      dayClosing = {
+        businessDate: String(d.business_date ?? todayKey),
+        timezone: String(d.timezone ?? timezone),
+        grossSalesPaise: Number(d.gross_sales_paise ?? 0),
+        discountPaise: Number(d.discount_paise ?? 0),
+        chargesPaise: Number(d.charges_paise ?? 0),
+        taxPaise: Number(d.tax_paise ?? 0),
+        netBilledPaise: Number(d.net_billed_paise ?? 0),
+        cashCollectedPaise: Number(d.cash_collected_paise ?? 0),
+        upiCollectedPaise: Number(d.upi_collected_paise ?? 0),
+        cardCollectedPaise: Number(d.card_collected_paise ?? 0),
+        otherCollectedPaise: Number(d.other_collected_paise ?? 0),
+        cashRefundedPaise: Number(d.cash_refunded_paise ?? 0),
+        totalRefundedPaise: Number(d.total_refunded_paise ?? 0),
+        expectedCashDrawerPaise: Number(d.expected_cash_drawer_paise ?? 0),
+        issuedInvoices: Number(d.issued_invoices ?? 0),
+        voidedInvoices: Number(d.voided_invoices ?? 0),
+        cancelledOrders: Number(d.cancelled_orders ?? 0),
+        openUnpaidOrders: Number(d.open_unpaid_orders ?? 0),
+      };
+    }
+  }
+
   return {
     restaurantName,
     tagline,
     timezone,
     range,
     report: { ...report, buckets: zeroFillBuckets(range, report.buckets, timezone, now) },
+    billingSummary,
+    dayClosing,
     // `bills` excludes cancelled orders but `orders` includes them, so
     // comparing bills to the array length can miss a truncated list when
     // cancelled orders pad it. Compare the whole order count instead.

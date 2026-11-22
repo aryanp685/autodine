@@ -328,4 +328,85 @@ describe('Reports, the sample window in the past', () => {
     expect(html.match(/rounded-t-\[3px\]/g)?.length).toBe(10);
     expect(html).not.toContain('Nothing billed in this range yet');
   });
+
+  it('renders Billing Spec v2.0 Day-end Z-Report, GST summary, channel mix, and bill register', () => {
+    const html = renderToStaticMarkup(
+      <ReportsScreen
+        data={{
+          ...live(),
+          dayClosing: {
+            businessDate: '2026-10-21',
+            timezone: TZ,
+            grossSalesPaise: 500_000,
+            discountPaise: 25_000,
+            chargesPaise: 15_000,
+            taxPaise: 23_333,
+            netBilledPaise: 490_000,
+            cashCollectedPaise: 120_000,
+            upiCollectedPaise: 250_000,
+            cardCollectedPaise: 100_000,
+            otherCollectedPaise: 0,
+            cashRefundedPaise: 20_000,
+            totalRefundedPaise: 20_000,
+            expectedCashDrawerPaise: 100_000,
+            issuedInvoices: 14,
+            voidedInvoices: 1,
+            cancelledOrders: 2,
+            openUnpaidOrders: 3,
+          },
+          billingSummary: {
+            gstSummary: [
+              {
+                mode: 'regular',
+                rateBps: 500,
+                bills: 14,
+                taxablePaise: 466_667,
+                cgstPaise: 11_667,
+                sgstPaise: 11_666,
+                totalPaise: 490_000,
+              },
+            ],
+            channels: [
+              { channel: 'dine_in', orders: 10, billedPaise: 350_000 },
+              { channel: 'takeaway', orders: 4, billedPaise: 140_000 },
+            ],
+            adjustments: {
+              discountPaise: 25_000,
+              complimentaryCount: 1,
+              serviceChargePaise: 10_000,
+              packagingChargePaise: 5_000,
+              deliveryChargePaise: 0,
+              roundOffPaise: 0,
+              refundedPaise: 20_000,
+              voidedInvoices: 1,
+              duplicateReprints: 2,
+            },
+            billRegister: [
+              {
+                id: 'inv-1',
+                invoiceNumber: 'INV/26-27/000014',
+                documentType: 'gst_tax_invoice',
+                status: 'issued',
+                issuedAt: '2026-10-21T12:00:00Z',
+                tableLabel: 'T4',
+                totalPaise: 42_000,
+                taxPaise: 2_000,
+                discountPaise: 0,
+                printCount: 2,
+              },
+            ],
+          },
+        }}
+      />,
+    );
+
+    expect(html).toContain('Day-end Z-Report closing');
+    expect(html).toContain('Expected cash drawer');
+    expect(html).toContain('GST tax summary');
+    expect(html).toContain('Regular 5%');
+    expect(html).toContain('Channel mix');
+    expect(html).toContain('Duplicate reprints');
+    expect(html).toContain('Bill register');
+    expect(html).toContain('INV/26-27/000014');
+  });
 });
