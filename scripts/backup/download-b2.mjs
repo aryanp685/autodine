@@ -40,8 +40,8 @@ if (!config.ok) {
   process.exit(2);
 }
 const access = {
-  accessKeyId: process.env.B2_ACCESS_KEY_ID,
-  secretAccessKey: process.env.B2_SECRET_ACCESS_KEY,
+  accessKeyId: process.env.B2_ACCESS_KEY_ID?.trim(),
+  secretAccessKey: process.env.B2_SECRET_ACCESS_KEY?.trim(),
 };
 
 async function signedFetch(method, urlString, body) {
