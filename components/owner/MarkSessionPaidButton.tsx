@@ -50,7 +50,7 @@ export function MarkSessionPaidButton({ sessionId, table }: { sessionId: string;
             aria-checked={method === m}
             data-mark-method={m}
             onClick={() => setMethod(method === m ? null : m)}
-            className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
+            className={`rounded-full px-2.5 py-0.5 text-[11.5px] font-medium ${
               method === m ? 'bg-ink text-surface' : 'bg-black/[0.06] text-ink/70'
             }`}
           >
@@ -80,10 +80,10 @@ export function MarkSessionPaidButton({ sessionId, table }: { sessionId: string;
         {pending ? 'Saving…' : '✓ Mark paid'}
       </button>
       {message && (
-        <p role="status" data-mark-paid-status={message} className="text-[11px] text-emerald-700">{message}</p>
+        <p role="status" data-mark-paid-status={message} className="text-[11.5px] text-emerald-700">{message}</p>
       )}
       {error && (
-        <p role="alert" className="text-[11px] text-red-700">{error}</p>
+        <p role="alert" className="text-[11.5px] text-red-700">{error}</p>
       )}
     </div>
   );
