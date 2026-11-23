@@ -13,11 +13,12 @@
 -- never conflicts across different collected methods.
 
 drop function if exists public.mark_order_session_paid(uuid);
+drop function if exists public.mark_order_session_paid(uuid, text, text);
 
 create or replace function public.mark_order_session_paid(
   p_order_session_id uuid,
-  p_method text default 'manual',
-  p_upi_ref text default null
+  p_method text,
+  p_upi_ref text
 ) returns timestamptz
 language plpgsql
 security definer
@@ -195,3 +196,21 @@ revoke all on function public.mark_order_session_paid(uuid, text, text) from pub
 revoke all on function public.mark_order_session_paid(uuid, text, text) from anon;
 revoke all on function public.mark_order_session_paid(uuid, text, text) from authenticated;
 grant execute on function public.mark_order_session_paid(uuid, text, text) to authenticated;
+
+-- Legacy one-argument signature: operational readiness pins it as executable
+-- by authenticated callers, and existing callers (scripts, saved queries) use
+-- it. It delegates to the method-aware function with the 'manual' default.
+create or replace function public.mark_order_session_paid(p_order_session_id uuid)
+returns timestamptz
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  return public.mark_order_session_paid(p_order_session_id, 'manual', null);
+end;
+$$;
+
+revoke all on function public.mark_order_session_paid(uuid) from public;
+revoke all on function public.mark_order_session_paid(uuid) from anon;
+revoke all on function public.mark_order_session_paid(uuid) from authenticated;
+grant execute on function public.mark_order_session_paid(uuid) to authenticated;

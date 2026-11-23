@@ -16,8 +16,8 @@ describe('20261124000100_mark_paid_method.sql', () => {
   it('replaces the one-argument function with the method-aware signature', () => {
     expect(sql).toContain('drop function if exists public.mark_order_session_paid(uuid);');
     expect(sql).toContain('p_order_session_id uuid,');
-    expect(sql).toContain("p_method text default 'manual'");
-    expect(sql).toContain('p_upi_ref text default null');
+    expect(sql).toContain('p_method text,');
+    expect(sql).toContain('p_upi_ref text');
   });
 
   it('validates the method against the ledger-accepted values', () => {
