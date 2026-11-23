@@ -39,7 +39,7 @@ const read = (p) => {
   }
 };
 
-// 1. Migration inventory: exactly 113 files, unique 14-digit versions.
+// 1. Migration inventory: exactly 115 files, unique 14-digit versions.
 // 98 at the 2026-11-14 baseline, plus three 2026-11-19 remediation migrations
 // (receipt-helper ACL restore, new-outlet 0% tax default, guest GST quote
 // projection) plus one announcement claim-recovery (20261119000400) plus two
@@ -47,11 +47,12 @@ const read = (p) => {
 // plus mainline 20261121000100/200 and 20261122000100/200,
 // plus Billing Spec v2.0 foundation (20261123000100), waiter/coupons/split-bill (20261123000200),
 // Printing & Devices + IRP persistence (20261123000300), Mode A/B operating paths (20261123000400),
-// and Phase 1 Order Reliability & Traceability (20261123000500).
+// and Phase 1 Order Reliability & Traceability (20261123000500),
+// plus staff billing settings reads (20261123000600).
 const migDir = join(root, 'supabase/migrations');
 const migFiles = readdirSync(migDir).filter((f) => f.endsWith('.sql')).sort();
 const versions = migFiles.map((f) => f.slice(0, 14));
-check('migration_count_113', migFiles.length === 113, `found ${migFiles.length}`);
+check('migration_count_115', migFiles.length === 115, `found ${migFiles.length}`);
 check('migration_versions_unique', new Set(versions).size === versions.length);
 check('migration_versions_14_digit', versions.every((v) => /^[0-9]{14}$/.test(v)));
 
@@ -65,7 +66,7 @@ for (const f of GST_B) check(`gst_irp_present:${f.slice(0,14)}`, migFiles.includ
 const manifest = existsSync(join(root, 'docs/migration-manifest-2026-11-14.md')) ? read('docs/migration-manifest-2026-11-14.md') : '';
 const manifestVersions = new Set([...manifest.matchAll(/`([0-9]{14})`/g)].map((m) => m[1]));
 const actualVersions = new Set(versions);
-check('manifest_tracks_all_113', actualVersions.size === manifestVersions.size && [...actualVersions].every((v) => manifestVersions.has(v)),
+check('manifest_tracks_all_115', actualVersions.size === manifestVersions.size && [...actualVersions].every((v) => manifestVersions.has(v)),
   `manifest ${manifestVersions.size} versions vs actual ${actualVersions.size}`);
 check('manifest_marks_gst_irp_unauthorized', manifest.includes('NOT AUTHORIZED') && manifest.includes('GST/IRP'));
 check('gst_irp_plan_unauthorized', read('docs/gst-irp-production-readiness-2026-11-14.md').includes('NOT AUTHORIZED'));
