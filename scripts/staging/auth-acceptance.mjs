@@ -223,16 +223,21 @@ async function realtimeAlertStatus(member) {
   }
 }
 
-if (members.kitchen) {
+// Surface WHY a probe threw (masked): a silent catch hides whether the harness
+// or the hosted app failed, which contradicts the fail-honest contract above.
+async function probe(name, member) {
   try {
-    check('realtime-alert-kitchen-204', (await realtimeAlertStatus(members.kitchen)) === 204);
-  } catch { check('realtime-alert-kitchen-204', false); }
-} else skip('realtime-alert-kitchen-204');
-if (members.cashier) {
-  try {
-    check('realtime-alert-cashier-403', (await realtimeAlertStatus(members.cashier)) === 403);
-  } catch { check('realtime-alert-cashier-403', false); }
-} else skip('realtime-alert-cashier-403');
+    check(name, (await realtimeAlertStatus(member)) === member.expectedStatus);
+  } catch (error) {
+    mask(String(error?.message ?? error));
+    console.log(`::error::${name} probe threw: ${String(error?.message ?? error).slice(0, 300)}`);
+    check(name, false);
+  }
+}
+if (members.kitchen) await probe('realtime-alert-kitchen-204', { ...members.kitchen, expectedStatus: 204 });
+else skip('realtime-alert-kitchen-204');
+if (members.cashier) await probe('realtime-alert-cashier-403', { ...members.cashier, expectedStatus: 403 });
+else skip('realtime-alert-cashier-403');
 
 for (const line of results) console.log(line);
 console.log(`auth-acceptance: pass=${tally.pass} fail=${tally.fail} skip=${tally.skip}`);
