@@ -85,7 +85,7 @@ try {
   // Keep this exact count synchronized with the migration chain: a lower
   // bound would allow one or more missing files to be hidden by the current
   // count, and an added migration must deliberately update this assertion.
-  const expectedRepositoryMigrations = 115;
+  const expectedRepositoryMigrations = 116;
   const requiredBoundaryMigrations = [
     '20261112000500_role_scoped_order_reads.sql',
     '20261112000600_cap_subscription_history_ceiling.sql',
