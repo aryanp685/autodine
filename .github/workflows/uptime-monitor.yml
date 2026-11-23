@@ -1,0 +1,65 @@
+name: Uptime monitor (/api/health)
+
+# Ping production /api/health every 5 minutes and post one Discord message
+# per outage to the SAME webhook the backup jobs already use
+# (BACKUP_ALERT_WEBHOOK, with DR_ALERT_WEBHOOK fallback). No new secrets.
+#
+# A single blip does not page: each run retries 3 times over ~45s before
+# declaring the site down. A recovered outage stays silent (down-runs fail,
+# which is visible in the Actions history) to keep the channel signal-only.
+#
+# One-time note: cron runs on GitHub's shared queue can drift a few minutes.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uptime-monitor
+  cancel-in-progress: false
+
+jobs:
+  health:
+    name: GET /api/health (production)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      HEALTH_URL: ${{ secrets.UPTIME_HEALTH_URL || 'https://new-alpha-five-43.vercel.app/api/health' }}
+      DISCORD_WEBHOOK: ${{ secrets.BACKUP_ALERT_WEBHOOK || secrets.DR_ALERT_WEBHOOK }}
+    steps:
+      - name: Check health (3 attempts)
+        id: probe
+        run: |
+          for attempt in 1 2 3; do
+            code=$(curl -sS -o /tmp/health.json -w '%{http_code}' --max-time 20 "$HEALTH_URL" || echo 000)
+            if [ "$code" = "200" ]; then
+              echo "attempt=$attempt status=200" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "attempt $attempt: HTTP $code" >> "$GITHUB_STEP_SUMMARY"
+            [ "$attempt" = "3" ] || sleep 20
+          done
+          echo "last_status=$code" >> "$GITHUB_OUTPUT"
+          echo "::error::Production /api/health failed 3 attempts (last HTTP $code)"
+          exit 1
+
+      - name: Post outage alert to Discord
+        if: failure()
+        run: |
+          if [ -z "$DISCORD_WEBHOOK" ]; then
+            echo "::error::Site is DOWN but BACKUP_ALERT_WEBHOOK/DR_ALERT_WEBHOOK is unset — no Discord alert could be sent. Configure the repository secret."
+            exit 1
+          fi
+          payload=$(jq -n \
+            --arg text "AutoDine DOWN: https://new-alpha-five-43.vercel.app /api/health is failing. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{content: $text}')
+          curl -sS --max-time 15 -H 'content-type: application/json' -d "$payload" "$DISCORD_WEBHOOK" > /dev/null
+
+      - name: Run summary
+        if: always()
+        run: |
+          echo "- Result: ${{ job.status }} at $(date -u '+%Y-%m-%d %H:%M:%SZ')" >> "$GITHUB_STEP_SUMMARY"
