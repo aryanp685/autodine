@@ -503,7 +503,8 @@ export function ReportsScreen({
             <Panel title="How it was paid" meta="Recorded payments">
               {report.methods.length > 0 || totals.unpaidPaise > 0 ? (
                 <>
-                  <table className={tableClass}>
+                  <TableWrap>
+                    <table className={tableClass}>
                     <thead>
                       <tr>
                         <Th>Method</Th>
@@ -536,6 +537,7 @@ export function ReportsScreen({
                       )}
                     </tbody>
                   </table>
+                  </TableWrap>
                   {totals.refundedPaise > 0 && (
                     <p className="mt-2.5 text-[11.5px] text-gink-46">
                       Refunded in this range: <Money value={totals.refundedPaise} />
@@ -709,6 +711,7 @@ export function ReportsScreen({
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
               <Panel title="GST tax summary" meta="By mode & rate">
                 {data.billingSummary.gstSummary.length > 0 ? (
+                  <TableWrap>
                   <table className={tableClass}>
                     <thead>
                       <tr>
@@ -739,6 +742,7 @@ export function ReportsScreen({
                       ))}
                     </tbody>
                   </table>
+                  </TableWrap>
                 ) : (
                   <Empty>No issued invoices in this range.</Empty>
                 )}
@@ -746,6 +750,7 @@ export function ReportsScreen({
 
               <Panel title="Channel mix &amp; audit" meta="Dine-in · Takeaway · Delivery">
                 {data.billingSummary.channels.length > 0 ? (
+                  <TableWrap>
                   <table className={tableClass}>
                     <thead>
                       <tr>
@@ -772,6 +777,7 @@ export function ReportsScreen({
                       ))}
                     </tbody>
                   </table>
+                  </TableWrap>
                 ) : (
                   <Empty>No channel orders in this range.</Empty>
                 )}

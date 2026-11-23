@@ -112,6 +112,9 @@ export default defineConfig({
       // and each of them writes rows.
       workers: 1,
       fullyParallel: false,
+      // Real database flows are slow: some specs hold a 20s expect on top of
+      // owner sign-in and page loads, which does not fit the 30s default.
+      timeout: 60_000,
       use: { ...devices['Desktop Chrome'] },
     },
     {
