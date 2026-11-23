@@ -155,7 +155,7 @@ jobs:
           100644 blob aa0899f196e7278a3be10f6a0bd05e63541e7f23	scripts/backup/lib-backup-mode.mjs
           100644 blob b99e1d42f44d9a872d0d72598ed61a28584d72f7	scripts/backup/lib-backup-source.mjs
           100644 blob 8094474fe5d4323013fa76dd0576e58a82201469	scripts/backup/lib-crypto.mjs
-          100644 blob 135ea4222048f81ff5924208e249125308e8b9ac	scripts/backup/lib-dump.mjs
+          100644 blob 389754287f3a7ddbfd3b5a8379b1d31eca9d0f31	scripts/backup/lib-dump.mjs
           100644 blob c30afd406a996b289bf3bf0511bf3c96ad6355bf	scripts/backup/lib-pg-client.mjs
           100644 blob 5b10a49ae6355b516945e4601215723721f8f82f	scripts/backup/lib-pg-client.test.mjs
           100644 blob 24049caa0cd1e6b8a6a98f3ee61c47f0ae6c0057	scripts/backup/lib-restore-target.mjs
@@ -177,7 +177,7 @@ jobs:
           100644 blob 365a07fcc17afd57b8276d60b8c88e6bc4f9da68	scripts/backup/validate-staging-source.mjs
           100644 blob c6134e56f402d2f9aca0b8dd70de5a8b41a52057	scripts/backup/verify-backup-file.mjs
           100644 blob 305ea6cbc2816c66efa3c786bdb2677cb90c292c	scripts/backup/verify-backup-file.test.mjs
-          100644 blob 5d593f7a77a3b6c1526a72ac0a6dd5d6bfe603dd	scripts/backup/verify-restored-db.mjs
+          100644 blob 0ba1d432f44f8e2aaa1b683c4ba7b7e9ad5ab61a	scripts/backup/verify-restored-db.mjs
           100644 blob d185f27eea8210044229e12652ce2ff8a1149b29	scripts/backup/verify-restored-db.test.mjs
           V3_MANIFEST
           git ls-tree -r FETCH_HEAD -- scripts/backup .github/actions/postgres-client package.json package-lock.json > actual.txt

@@ -72,9 +72,14 @@ async function schemaCountsOn(client, schema) {
     const r = await client.query(`select count(*)::bigint as n from ${quoteIdent(schema)}.${quoteIdent(t)}`);
     rows = manifestInteger(rows + manifestInteger(r.rows[0].n, 'table rows'), 'total rows');
   }
+  // Extension-owned functions (pg_depend.deptype='e') are excluded: Supabase
+  // installs platform extensions into the public schema of a freshly restored
+  // disposable database, so restored-DB counts would otherwise exceed the
+  // dumped source and fail the manifest comparison.
   const functions = await client.query(
     `select count(*)::int as n from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-      where n.nspname = $1 and p.prokind in ('f','p')`, [schema]);
+      where n.nspname = $1 and p.prokind in ('f','p')
+        and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')`, [schema]);
   const policies = await client.query(`select count(*)::int as n from pg_policies where schemaname = $1`, [schema]);
   return {
     counts: { tables: tableNames.length, rows, functions: functions.rows[0].n, policies: policies.rows[0].n },
@@ -300,7 +305,8 @@ export async function dumpDatabase(connectionString, { schema = 'public', log = 
     const fns = await client.query(
       `select p.oid, p.proname, pg_get_functiondef(p.oid) as def
          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-        where n.nspname = $1 and p.prokind in ('f','p')`, [schema]);
+        where n.nspname = $1 and p.prokind in ('f','p')
+          and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')`, [schema]);
     const views = await client.query(
       `select c.oid, v.viewname, v.definition
          from pg_views v
