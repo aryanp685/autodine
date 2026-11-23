@@ -16,22 +16,35 @@ jobs:
           B2_ACCESS_KEY_ID: ${{ secrets.B2_ACCESS_KEY_ID }}
           B2_SECRET_ACCESS_KEY: ${{ secrets.B2_SECRET_ACCESS_KEY }}
         run: |
-          EP="${B2_ENDPOINT:-https://s3.${B2_REGION}.backblazeb2.com}"
-          echo "endpoint host scheme: $(echo "$EP" | sed -E 's#https://s3\.[a-z0-9-]+\.backblazeb2\.com#s3.<region>.backblazeb2.com#')"
+          B2_BUCKET="$(echo -n "$B2_BUCKET" | tr -d '[:space:]')"
+          B2_REGION="$(echo -n "$B2_REGION" | tr -d '[:space:]')"
+          B2_ACCESS_KEY_ID="$(echo -n "$B2_ACCESS_KEY_ID" | tr -d '[:space:]')"
+          B2_SECRET_ACCESS_KEY="$(echo -n "$B2_SECRET_ACCESS_KEY" | tr -d '[:space:]')"
+          EP="https://s3.${B2_REGION}.backblazeb2.com"
+          echo "endpoint host scheme: https://s3.<region>.backblazeb2.com region-len=${#B2_REGION} bucket-len=${#B2_BUCKET} key-len=${#B2_ACCESS_KEY_ID} secret-len=${#B2_SECRET_ACCESS_KEY}"
+          echo "--- node lib tiny PUT (trimmed env)"
+          node --input-type=module - <<'EOF'
+          import { b2ObjectKey, signB2Request, sha256Hex } from './scripts/backup/lib-b2.mjs';
+          const env = process.env;
+          const cfg = { endpoint: `https://s3.${env.B2_REGION}.backblazeb2.com`, bucket: env.B2_BUCKET, region: env.B2_REGION };
+          const access = { accessKeyId: env.B2_ACCESS_KEY_ID, secretAccessKey: env.B2_SECRET_ACCESS_KEY };
+          const body = Buffer.from('hello world\n');
+          const key = b2ObjectKey('smoke/node-tiny.txt');
+          const url = `${cfg.endpoint}/${cfg.bucket}/${key}`;
+          const h = signB2Request({ method: 'PUT', url, payloadHash: sha256Hex(body), ...access, region: cfg.region, extraHeaders: { 'content-type': 'text/plain' } });
+          h['content-length'] = String(body.length);
+          const r = await fetch(url, { method: 'PUT', headers: h, body });
+          console.log('node PUT ->', r.status, (await r.text()).slice(0, 200).replace(/\n/g, ' '));
+          const g = await fetch(url, { method: 'GET', headers: signB2Request({ method: 'GET', url, payloadHash: sha256Hex(Buffer.alloc(0)), ...access, region: cfg.region }) });
+          console.log('node GET ->', g.status, g.ok ? await g.text() : '');
+          EOF
           echo "--- curl sigv4 tiny PUT"
           echo -n "hello world" > /tmp/tiny.txt
-          curl -sS -v -o /tmp/curl_out.xml -w "curl PUT -> HTTP %{http_code}\n" 2>/tmp/curl_verbose.txt \
+          curl -s -o /tmp/curl_out.xml -w "curl PUT -> HTTP %{http_code}\n" \
             --request PUT \
             --aws-sigv4 "aws:amz:${B2_REGION}:s3" \
             --user "${B2_ACCESS_KEY_ID}:${B2_SECRET_ACCESS_KEY}" \
             -H "x-amz-content-sha256: $(sha256sum /tmp/tiny.txt | cut -d' ' -f1)" \
             -T /tmp/tiny.txt \
             "${EP}/${B2_BUCKET}/smoke/curl-tiny.txt" || echo "curl exit code: $?"
-          grep -E '^\*|^< HTTP|^<Code>|Could not|resolve' /tmp/curl_verbose.txt | sed -E 's/(Authorization|amz).*/(redacted)/' | head -12
-          head -c 300 /tmp/curl_out.xml; echo
-          echo "--- curl sigv4 GET"
-          curl -s -o /tmp/curl_get.txt -w "curl GET -> HTTP %{http_code}\n" \
-            --aws-sigv4 "aws:amz:${B2_REGION}:s3" \
-            --user "${B2_ACCESS_KEY_ID}:${B2_SECRET_ACCESS_KEY}" \
-            "${EP}/${B2_BUCKET}/smoke/curl-tiny.txt"
-          head -c 200 /tmp/curl_get.txt; echo
+          head -c 300 /tmp/curl_out.xml 2>/dev/null; echo
