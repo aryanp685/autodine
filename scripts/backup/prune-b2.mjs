@@ -429,7 +429,7 @@ if (isMain) {
     process.stderr.write(`prune-b2: B2 is not configured; missing environment variables: ${config.missing.join(', ')}\n`);
     process.exit(2);
   }
-  const access = { accessKeyId: process.env.B2_ACCESS_KEY_ID, secretAccessKey: process.env.B2_SECRET_ACCESS_KEY };
+  const access = { accessKeyId: process.env.B2_ACCESS_KEY_ID?.trim(), secretAccessKey: process.env.B2_SECRET_ACCESS_KEY?.trim() };
   const objectUrl = (key) => `${config.endpoint}/${config.bucket}/${key.split('/').map(encodeURIComponent).join('/')}`;
   // Verification downloads stream whole artifacts; give them a generous
   // timeout so a large backup on a slow link fails safe (abort) only when
