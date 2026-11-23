@@ -87,13 +87,25 @@ describe('checkoutSessionAction', () => {
 
 describe('markSessionPaidAction', () => {
   it('rejects malformed ids before reaching the database', async () => {
-    const result = await markSessionPaidAction('T6');
+    const result = await markSessionPaidAction('T6', 'cash');
     expect(result).toEqual({ ok: false, error: 'This table session is invalid. Refresh the dashboard.' });
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
+  it('requires the counter method before any auth or database work', async () => {
+    expect(await markSessionPaidAction(SESSION_ID, undefined)).toEqual({
+      ok: false,
+      error: 'Choose how the guest paid: Cash, Card or UPI.',
+    });
+    expect(await markSessionPaidAction(SESSION_ID, 'online')).toEqual({
+      ok: false,
+      error: 'Choose how the guest paid: Cash, Card or UPI.',
+    });
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
   it('requires an authenticated staff session', async () => {
-    expect(await markSessionPaidAction(SESSION_ID)).toEqual({
+    expect(await markSessionPaidAction(SESSION_ID, 'cash')).toEqual({
       ok: false,
       error: 'Sign in to mark this table paid.',
     });
@@ -101,7 +113,7 @@ describe('markSessionPaidAction', () => {
 
   it('rejects roles that cannot collect payment', async () => {
     mocks.staff.result = { supabase: { rpc: mocks.rpc }, role: 'kitchen' };
-    expect(await markSessionPaidAction(SESSION_ID)).toEqual({
+    expect(await markSessionPaidAction(SESSION_ID, 'cash')).toEqual({
       ok: false,
       error: 'Your role (kitchen) cannot mark payments. Ask an owner or manager.',
     });
@@ -113,9 +125,11 @@ describe('markSessionPaidAction', () => {
     mocks.staff.result = { supabase: { rpc: mocks.rpc }, role: 'owner' };
     mocks.rpc.mockResolvedValue({ data: paidAt, error: null });
 
-    expect(await markSessionPaidAction(SESSION_ID)).toEqual({ ok: true, paidAt });
+    expect(await markSessionPaidAction(SESSION_ID, 'cash')).toEqual({ ok: true, paidAt });
     expect(mocks.rpc).toHaveBeenCalledWith('mark_order_session_paid', {
       p_order_session_id: SESSION_ID,
+      p_method: 'cash',
+      p_upi_ref: null,
     });
     expect(mocks.revalidatePath.mock.calls).toEqual([
       ['/dashboard'],
@@ -124,11 +138,23 @@ describe('markSessionPaidAction', () => {
     ]);
   });
 
+  it('forwards the UPI reference when the guest paid by UPI', async () => {
+    mocks.staff.result = { supabase: { rpc: mocks.rpc }, role: 'owner' };
+    mocks.rpc.mockResolvedValue({ data: '2026-11-23T19:20:00.000Z', error: null });
+
+    await markSessionPaidAction(SESSION_ID, 'upi', '  402215883271  ');
+    expect(mocks.rpc).toHaveBeenCalledWith('mark_order_session_paid', {
+      p_order_session_id: SESSION_ID,
+      p_method: 'upi',
+      p_upi_ref: '402215883271',
+    });
+  });
+
   it('returns the database refusal without pretending the table was paid', async () => {
     mocks.staff.result = { supabase: { rpc: mocks.rpc }, role: 'cashier' };
     mocks.rpc.mockResolvedValue({ data: null, error: { message: 'read-only restaurant' } });
 
-    expect(await markSessionPaidAction(SESSION_ID)).toEqual({
+    expect(await markSessionPaidAction(SESSION_ID, 'cash')).toEqual({
       ok: false,
       error: 'read-only restaurant',
     });

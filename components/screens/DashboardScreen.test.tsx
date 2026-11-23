@@ -439,7 +439,11 @@ describe('Dashboard active table sessions', () => {
     expect(html).toContain('Mark T6 paid');
     expect(html).toContain('Settle the outstanding balance before closing this table.');
     expect(html).not.toContain('data-checkout-session="session-1"');
-    expect(html).not.toContain('method');
+    // Since the method-aware settlement, the card asks how the guest actually
+    // paid instead of settling with a generic manual marker.
+    expect(html).toContain('aria-label="How did the T6 guest pay?"');
+    expect(html).toContain('data-mark-method="cash"');
+    expect(html).toContain('data-mark-method="upi"');
   });
 
   it('does not expose a write action when the role or trial gate cannot write', () => {

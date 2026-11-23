@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { getInvoiceData } from '@/lib/db/invoice';
 import { loadRestaurantPrinters } from '@/lib/db/printers';
 import { CASHIER_ROLES, getStaffContext } from '@/lib/db/staff';
+import { isCounterMethod } from '@/lib/payment-methods';
 import { checkGstin } from '@/lib/gst/gstin';
 import { tryAutoRegisterInvoiceIrp } from '@/lib/gst/einvoice-auto';
 import { buildThermalPrintJob, type PrintBridgeJob } from '@/lib/print-bridge';
@@ -27,15 +28,21 @@ export type CheckoutSessionResult =
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Mark one table's open session paid. The browser sends only the session UUID;
- * the SECURITY DEFINER RPC resolves the restaurant, actor, ticket amounts and
+ * Mark one table's open session paid with the method the guest actually paid
+ * by (cash, card or UPI — same contract the cashier screen records). The
+ * SECURITY DEFINER RPC resolves the restaurant, actor, ticket amounts and
  * ledger entries transactionally.
  */
 export async function markSessionPaidAction(
   sessionId: string,
+  method: unknown,
+  upiRef?: unknown,
 ): Promise<MarkSessionPaidResult> {
   const id = String(sessionId ?? '').trim();
   if (!UUID.test(id)) return { ok: false, error: 'This table session is invalid. Refresh the dashboard.' };
+  if (!isCounterMethod(method)) {
+    return { ok: false, error: 'Choose how the guest paid: Cash, Card or UPI.' };
+  }
 
   const staff = await getStaffContext();
   if (!staff) return { ok: false, error: 'Sign in to mark this table paid.' };
@@ -45,6 +52,8 @@ export async function markSessionPaidAction(
 
   const { data, error } = await staff.supabase.rpc('mark_order_session_paid', {
     p_order_session_id: id,
+    p_method: method,
+    p_upi_ref: typeof upiRef === 'string' && upiRef.trim() !== '' ? upiRef.trim() : null,
   });
 
   if (error) return { ok: false, error: error.message };
