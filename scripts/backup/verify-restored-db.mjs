@@ -126,7 +126,7 @@ try {
   // (lib-dump.mjs): tables = pg_class relkind 'r', functions = prokind f/p.
   const tables = await one(`select count(*)::int as n from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = $1 and c.relkind = 'r'`, [schema]);
   const policies = await one(`select count(*)::int as n from pg_policies where schemaname = $1`, [schema]);
-  const functions = await one(`select count(*)::int as n from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = $1 and p.prokind in ('f','p')`, [schema]);
+  const functions = await one(`select count(*)::int as n from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = $1 and p.prokind in ('f','p') and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')`, [schema]);
   const tableNames = (await client.query(`select c.relname as tablename from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = $1 and c.relkind = 'r' order by c.relname`, [schema])).rows.map((r) => r.tablename);
   let totalRows = 0;
   for (const t of tableNames) {

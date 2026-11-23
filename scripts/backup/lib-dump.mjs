@@ -58,9 +58,14 @@ async function schemaCountsOn(client, schema) {
     const r = await client.query(`select count(*)::bigint as n from ${quoteIdent(schema)}.${quoteIdent(t)}`);
     rows += Number(r.rows[0].n);
   }
+  // Extension-owned functions (pg_depend.deptype='e') are excluded: Supabase
+  // installs platform extensions into the public schema, so a disposable
+  // restore carries extra extension functions that never existed in the
+  // dumped source and would otherwise fail the count comparison.
   const functions = await client.query(
     `select count(*)::int as n from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-      where n.nspname = $1 and p.prokind in ('f','p')`, [schema]);
+      where n.nspname = $1 and p.prokind in ('f','p')
+        and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')`, [schema]);
   const policies = await client.query(`select count(*)::int as n from pg_policies where schemaname = $1`, [schema]);
   return {
     counts: { tables: tableNames.length, rows, functions: functions.rows[0].n, policies: policies.rows[0].n },
@@ -194,7 +199,8 @@ export async function dumpDatabase(connectionString, { schema = 'public', log = 
               pg_get_function_arguments(p.oid) as args,
               pg_get_function_result(p.oid) as result
          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-        where n.nspname = $1 and p.prokind in ('f','p')`, [schema]);
+        where n.nspname = $1 and p.prokind in ('f','p')
+          and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')`, [schema]);
     const bodyOf = (def) => {
       const m = def.match(/\$[A-Za-z_]*\$[\s\S]*\$[A-Za-z_]*\$/);
       return m ? m[0] : '';
