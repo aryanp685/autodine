@@ -480,12 +480,14 @@ describe('an order the guest already has', () => {
     expect(attempts[1]).toBe(attempts[0]);
 
     // Both presses open the SAME order, with the same private token. The
-    // token no longer rides in the URL: the action sets it as an httpOnly
-    // cookie, and the order screen reads it there (a URL token leaks via
-    // browser history, logs and referrers).
+    // token is issued once, in the redirect straight after ordering (the
+    // order screen's documented ?s=&code=&t= contract), and is mirrored as
+    // an httpOnly cookie that the order screen also accepts.
     expect(second).toBe(first);
     expect(first).toContain('code=A-1042');
-    expect(first).not.toContain('t=');
+    expect(new URL(first, 'https://example.test').searchParams.get('t')).toBe(
+      '9f4b6c1e-2d3a-4b5c-8d7e-0a1b2c3d4e5f',
+    );
     expect(mocks.jar.get('autodine_guest_token')).toBe('9f4b6c1e-2d3a-4b5c-8d7e-0a1b2c3d4e5f');
   });
 

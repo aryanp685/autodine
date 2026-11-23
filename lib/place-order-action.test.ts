@@ -375,10 +375,11 @@ describe('placeOrderAction', () => {
       'place_public_order_attempt',
       expect.objectContaining({ p_guest_token: attempt })
     );
-    // The same key is the private token the confirmation reads, from an
-    // httpOnly cookie rather than the address bar.
+    // The same key is the private token the confirmation reads. It is issued
+    // once, in the redirect straight after ordering (the order screen's
+    // documented ?s=&code=&t= contract), and rides along as an httpOnly cookie.
     expect(mocks.written.get('autodine_guest_token')).toBe(attempt);
-    expect(url).not.toContain('t=');
+    expect(new URL(url, 'https://example.test').searchParams.get('t')).toBe(attempt);
   });
 
   it('replaces an attempt key that is not a UUID', async () => {
@@ -400,7 +401,11 @@ describe('placeOrderAction', () => {
 
     const url = await run(() => placeOrderAction(form()));
 
-    expect(url).toBe('/menu/order?s=kings-of-kings&code=ORD-123&placed=1');
+    const token = mocks.written.get('autodine_guest_token');
+    expect(token).toBeTruthy();
+    expect(url).toBe(
+      `/menu/order?s=kings-of-kings&code=ORD-123&t=${token}&placed=1`,
+    );
     expect(mocks.rpc).toHaveBeenCalledWith(
       'place_public_order_attempt',
       expect.objectContaining({ p_slug: 'kings-of-kings', p_session_token: 'session-token' })
